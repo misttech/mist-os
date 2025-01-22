@@ -221,8 +221,7 @@ mod test {
         assert_eq!(realm.realm_str, "/test_realm/echo_test_coll");
 
         let offers = realm.offers.into_iter().map(|o| o.fidl_into_native()).collect::<Vec<_>>();
-        // LogSink is offered to all children
-        assert_eq!(offers.len(), 4, "{:?}", offers);
+        assert_eq!(offers.len(), 3, "{:?}", offers);
         offers.iter().for_each(|o| {
             assert_eq!(
                 o.target(),
@@ -244,8 +243,7 @@ mod test {
         assert_eq!(realm.realm_str, "/test_realm/hermetic_test_coll");
 
         let offers = realm.offers.into_iter().map(|o| o.fidl_into_native()).collect::<Vec<_>>();
-        // LogSink is offered to all children.
-        assert_eq!(offers.len(), 3, "{:?}", offers);
+        assert_eq!(offers.len(), 2, "{:?}", offers);
         offers.iter().for_each(|o| {
             assert_eq!(
                 o.target(),

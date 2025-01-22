@@ -28,6 +28,17 @@
             from: "parent",
             to: [ "#realm_builder" ],
         },
+
+        // TODO(b/345827642): Needed for OOT tests
+        // such as bt-host that use RealmBuilder.
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "parent",
+            to: "#realm_builder",
+        },
         {
             event_stream: [
                 "capability_requested",

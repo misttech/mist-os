@@ -26,6 +26,14 @@
             from: "parent",
             to: "#codec-factory",
         },
+
+        // TODO(b/345827642): Remove once dictionaries
+        // are routed through the SDK.
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "parent/diagnostics",
+            to: "#codec-factory",
+        },
         {
             directory: "dev-mediacodec",
             from: "parent",

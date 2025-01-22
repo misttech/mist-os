@@ -25,7 +25,10 @@
         // TODO(b/345827642): Remove once all old prebuilts
         // have been pruned.
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
             from: "parent/diagnostics",
             to: "#test_suite",
         },

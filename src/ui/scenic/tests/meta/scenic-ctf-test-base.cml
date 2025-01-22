@@ -34,6 +34,20 @@
             from: "parent",
             to: [ "#realm-factory" ],
         },
+
+        // TODO(b/345827642): Remove once Chromium is using
+        // the diagnostics dictionary.
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "parent/diagnostics",
+            to: [
+                "#realm-factory",
+                "#validator",
+            ],
+        },
         {
             dictionary: "diagnostics",
             from: "parent",

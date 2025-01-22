@@ -3,12 +3,6 @@
 // found in the LICENSE file.
 {
     offer: [
-        // TODO(b/345827642): Remove this route when the use uses from the dictionary.
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent/diagnostics",
-            to: "all",
-        },
         {
             dictionary: "diagnostics",
             from: "parent",

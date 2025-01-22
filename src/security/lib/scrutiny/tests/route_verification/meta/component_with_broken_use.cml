@@ -16,7 +16,7 @@
         // This is a successful use
         {
             protocol: "fuchsia.logger.LogSink",
-            from: "parent",
+            from: "parent/diagnostics",
         },
     ],
 }

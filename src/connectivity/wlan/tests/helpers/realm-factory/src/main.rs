@@ -260,8 +260,9 @@ async fn create_wlan_components(builder: &RealmBuilder, config: WlanConfig) -> R
         .await?;
 
     // Route capabilities to components.
-    // NOTE: fuchsia.logger.LogSink and fuchsia.inspect.InspectSink are automatically routed
-    // to all components in RealmBuilder, so we don't route them here.
+    // NOTE: fuchsia.logger.LogSink and fuchsia.inspect.InspectSink will be automatically routed
+    // to all components in RealmBuilder, once older CTF tests are removed,
+    // at which point the explicit routes can be removed.
     builder
         .add_route(
             Route::new()
@@ -269,6 +270,16 @@ async fn create_wlan_components(builder: &RealmBuilder, config: WlanConfig) -> R
                 .capability(Capability::protocol_by_name("fuchsia.wlan.policy.AccessPointProvider"))
                 .from(&wlancfg)
                 .to(Ref::parent()),
+        )
+        .await?;
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                .capability(Capability::protocol_by_name("fuchsia.inspect.InspectSink"))
+                .from(Ref::parent())
+                .to(&wlancfg),
         )
         .await?;
 

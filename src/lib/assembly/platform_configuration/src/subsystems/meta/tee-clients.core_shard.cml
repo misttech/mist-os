@@ -64,7 +64,10 @@
         // only "diagnostics" once #tee-clients
         // is migrated to use the dictionary.
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
             from: "parent/diagnostics",
             to: "#tee-clients",
         },

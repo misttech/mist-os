@@ -110,6 +110,17 @@
             from: "parent",
             to: [ "#bt-fastpair-provider" ],
         },
+
+        // TODO(b/345827642): Remove once out-of-tree binaries
+        // use the diagnostics dictionary.
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "parent/diagnostics",
+            to: "#bt-host-collection",
+        },
         {
             protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
             from: "parent",

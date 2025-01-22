@@ -96,6 +96,22 @@
             to: [ "#system-tests" ],
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#system-tests",
+        },
+
+        // TODO(b/345827642): Remove once out-of-tree users
+        // have been migrated to dictionaries.
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "parent/diagnostics",
+            to: "#system-tests",
+        },
+        {
             storage: "fxfs_tests_data",
             from: "self",
             as: "data",
