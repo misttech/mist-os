@@ -238,19 +238,16 @@ async fn serve_wifi_chip<I: IfaceManager>(
     .await;
 }
 
-fn run_callbacks<T: fidl::endpoints::Proxy>(
+fn maybe_run_callback<T: fidl::endpoints::Proxy>(
     event_name: &'static str,
     callback_fn: impl Fn(&T) -> Result<(), fidl::Error>,
-    callbacks: &mut Vec<T>,
+    callback: &mut Option<T>,
 ) {
-    let num_registered = callbacks.len();
-    callbacks.retain(|callback| !callback.is_closed());
-    if callbacks.len() < num_registered {
-        let dropped = num_registered - callbacks.len();
-        warn!("Dropped {} {} proxy because channel is closed", dropped, T::Protocol::DEBUG_NAME);
+    let dropped = callback.take_if(|c| c.is_closed());
+    if dropped.is_some() {
+        warn!("Dropped {} proxy because channel is closed", T::Protocol::DEBUG_NAME);
     }
-
-    for callback in callbacks {
+    if let Some(callback) = callback {
         if let Err(e) = callback_fn(callback) {
             warn!("Failed sending {} event: {}", event_name, e);
         }
@@ -260,7 +257,7 @@ fn run_callbacks<T: fidl::endpoints::Proxy>(
 #[derive(Default)]
 struct WifiState {
     started: bool,
-    callbacks: Vec<fidl_wlanix::WifiEventCallbackProxy>,
+    callback: Option<fidl_wlanix::WifiEventCallbackProxy>,
     scan_multicast_proxy: Option<fidl_wlanix::Nl80211MulticastProxy>,
     mlme_multicast_proxy: Option<fidl_wlanix::Nl80211MulticastProxy>,
 }
@@ -275,7 +272,9 @@ async fn handle_wifi_request<I: IfaceManager>(
         fidl_wlanix::WifiRequest::RegisterEventCallback { payload, .. } => {
             info!("fidl_wlanix::WifiRequest::RegisterEventCallback");
             if let Some(callback) = payload.callback {
-                state.lock().callbacks.push(callback.into_proxy());
+                if state.lock().callback.replace(callback.into_proxy()).is_some() {
+                    warn!("Replaced a WifiEventCallbackProxy when there's one existing");
+                }
             }
         }
         fidl_wlanix::WifiRequest::Start { responder } => {
@@ -283,10 +282,10 @@ async fn handle_wifi_request<I: IfaceManager>(
             let mut state = state.lock();
             state.started = true;
             responder.send(Ok(())).context("send Start response")?;
-            run_callbacks(
+            maybe_run_callback(
                 "WifiEventCallbackProxy::OnStart",
                 fidl_wlanix::WifiEventCallbackProxy::on_start,
-                &mut state.callbacks,
+                &mut state.callback,
             );
 
             let event = wlan_telemetry::ClientConnectionsToggleEvent::Enabled;
@@ -305,10 +304,10 @@ async fn handle_wifi_request<I: IfaceManager>(
             }
             let mut state = state.lock();
             state.started = false;
-            run_callbacks(
+            maybe_run_callback(
                 "WifiEventCallbackProxy::OnStop",
                 fidl_wlanix::WifiEventCallbackProxy::on_stop,
-                &mut state.callbacks,
+                &mut state.callback,
             );
 
             let event = wlan_telemetry::ClientConnectionsToggleEvent::Disabled;
@@ -402,7 +401,7 @@ struct SupplicantStaNetworkState {
 }
 
 struct SupplicantStaIfaceState {
-    callbacks: Vec<fidl_wlanix::SupplicantStaIfaceCallbackProxy>,
+    callback: Option<fidl_wlanix::SupplicantStaIfaceCallbackProxy>,
 }
 
 struct ConnectionContext {
@@ -437,10 +436,10 @@ fn send_disconnect_event<C: ClientIface>(
         reason_code: Some(reason_code),
         ..Default::default()
     };
-    run_callbacks(
+    maybe_run_callback(
         "SupplicantStaIfaceCallbackProxy::onDisconnected",
         |callback_proxy| callback_proxy.on_disconnected(&disconnected_event),
-        &mut sta_iface_state.callbacks,
+        &mut sta_iface_state.callback,
     );
     let state_changed_event = fidl_wlanix::SupplicantStaIfaceCallbackOnStateChangedRequest {
         new_state: Some(fidl_wlanix::StaIfaceCallbackState::Disconnected),
@@ -450,10 +449,10 @@ fn send_disconnect_event<C: ClientIface>(
         ssid: Some(ctx.original_bss_desc.ssid.to_vec()),
         ..Default::default()
     };
-    run_callbacks(
+    maybe_run_callback(
         "SupplicantStaIfaceCallbackProxy::onStateChanged",
         |callback_proxy| callback_proxy.on_state_changed(&state_changed_event),
-        &mut sta_iface_state.callbacks,
+        &mut sta_iface_state.callback,
     );
     // Also communicate the state change via nl80211.
     if let Some(proxy) = &wifi_state.mlme_multicast_proxy {
@@ -657,10 +656,10 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                             ssid: Some(connected.bss.ssid.clone().into()),
                             ..Default::default()
                         };
-                        run_callbacks(
+                        maybe_run_callback(
                             "SupplicantStaIfaceCallbackProxy::onStateChanged",
                             |callback_proxy| callback_proxy.on_state_changed(&event),
-                            &mut sta_iface_state.lock().callbacks,
+                            &mut sta_iface_state.lock().callback,
                         );
                         (
                             Ok(()),
@@ -688,10 +687,10 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                                 timed_out: Some(fail.timed_out),
                                 ..Default::default()
                             };
-                        run_callbacks(
+                        maybe_run_callback(
                             "SupplicantStaIfaceCallbackProxy::onAssociationRejected",
                             |callback_proxy| callback_proxy.on_association_rejected(&event),
-                            &mut sta_iface_state.lock().callbacks,
+                            &mut sta_iface_state.lock().callback,
                         );
                         (Err(zx::sys::ZX_ERR_INTERNAL), None)
                     }
@@ -794,7 +793,9 @@ async fn handle_supplicant_sta_iface_request<C: ClientIface>(
         fidl_wlanix::SupplicantStaIfaceRequest::RegisterCallback { payload, .. } => {
             info!("fidl_wlanix::SupplicantStaIfaceRequest::RegisterCallback");
             if let Some(callback) = payload.callback {
-                sta_iface_state.lock().callbacks.push(callback.into_proxy());
+                if sta_iface_state.lock().callback.replace(callback.into_proxy()).is_some() {
+                    warn!("Replaced a SupplicantStaIfaceCallbackProxy when there's one existing");
+                }
             } else {
                 warn!("Empty callback field in received RegisterCallback request.")
             }
@@ -868,7 +869,7 @@ async fn serve_supplicant_sta_iface<C: ClientIface>(
     iface: Arc<C>,
     iface_id: u16,
 ) {
-    let sta_iface_state = Arc::new(Mutex::new(SupplicantStaIfaceState { callbacks: vec![] }));
+    let sta_iface_state = Arc::new(Mutex::new(SupplicantStaIfaceState { callback: None }));
     reqs.for_each_concurrent(None, |req| async {
         match req {
             Ok(req) => {
@@ -1583,26 +1584,26 @@ mod tests {
     }
 
     #[test]
-    fn test_run_callbacks() {
+    fn test_maybe_run_callback() {
         let _exec = fasync::TestExecutor::new_with_fake_time();
         let (callback_proxy, server_end) = create_proxy::<fidl_wlanix::WifiEventCallbackMarker>();
-        let mut callbacks = vec![callback_proxy];
+        let mut callback = Some(callback_proxy);
         // Simple validation that running callback works fine
-        run_callbacks(
+        maybe_run_callback(
             "WifiEventCallbackProxy::onStart",
             fidl_wlanix::WifiEventCallbackProxy::on_start,
-            &mut callbacks,
+            &mut callback,
         );
-        assert_eq!(callbacks.len(), 1);
+        assert!(callback.is_some());
 
         // Validate that dropping the server end would cause callback proxy to be removed
         std::mem::drop(server_end);
-        run_callbacks(
+        maybe_run_callback(
             "WifiEventCallbackProxy::onStart",
             fidl_wlanix::WifiEventCallbackProxy::on_start,
-            &mut callbacks,
+            &mut callback,
         );
-        assert_eq!(callbacks.len(), 0);
+        assert!(callback.is_none());
     }
 
     #[test]
