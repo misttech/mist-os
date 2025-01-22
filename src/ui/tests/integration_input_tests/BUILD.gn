@@ -8,8 +8,8 @@ group("integration_input_tests") {
   testonly = true
 
   deps = [
-    "activity:tests",
     "factory-reset-handler:tests",
+    "interaction-state:tests",
     "mouse:tests",
     "starnix-touch:tests",
     "text-input:tests",

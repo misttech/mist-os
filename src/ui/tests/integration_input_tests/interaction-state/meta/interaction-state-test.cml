@@ -9,7 +9,7 @@
         "vulkan/client.shard.cml",
     ],
     program: {
-        binary: "bin/activity_manager_test",
+        binary: "bin/interaction_state_test",
     },
     offer: [
         {

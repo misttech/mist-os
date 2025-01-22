@@ -8,10 +8,10 @@ import("//build/rust/rustc_test.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":activity-manager-test" ]
+  deps = [ ":interaction-state-test" ]
 }
 
-rustc_test("activity_manager_test") {
+rustc_test("interaction_state_test") {
   edition = "2021"
   deps = [
     "//sdk/fidl/fuchsia.input:fuchsia.input_rust",
@@ -42,17 +42,17 @@ rustc_test("activity_manager_test") {
   sources = [ "src/lib.rs" ]
 }
 
-fuchsia_test_component("activity-manager-test-component") {
+fuchsia_test_component("interaction-state-test-component") {
   testonly = true
   test_type = "system"
-  manifest = "meta/activity-manager-test.cml"
-  deps = [ ":activity_manager_test" ]
+  manifest = "meta/interaction-state-test.cml"
+  deps = [ ":interaction_state_test" ]
 }
 
-fuchsia_test_package("activity-manager-test") {
-  test_components = [ ":activity-manager-test-component" ]
+fuchsia_test_package("interaction-state-test") {
+  test_components = [ ":interaction-state-test-component" ]
   test_specs = {
-    # Since the activity-manager-test is timer-based, running
+    # Since the interaction-state-test is timer-based, running
     # some in parallel meaningfully reduces the total running
     # time of the test suite. This should be taken in balance,
     # since each simultaneous test runs its own instance of

@@ -23,6 +23,8 @@ pub mod factory_reset_handler;
 pub mod ime_handler;
 pub mod input_handler;
 pub mod inspect_handler;
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+pub mod interaction_state_handler;
 pub mod keymap_handler;
 pub mod light_sensor;
 pub use light_sensor::{light_sensor_binding, light_sensor_handler};
@@ -33,9 +35,6 @@ pub mod pointer_display_scale_handler;
 pub mod pointer_sensor_scale_handler;
 pub mod text_settings_handler;
 pub mod touch_injector_handler;
-
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
-pub mod activity;
 
 // The following imports prevent unused crate errors when building at a stable API level
 // that is not HEAD.

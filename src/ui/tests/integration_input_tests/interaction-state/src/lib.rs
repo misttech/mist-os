@@ -92,7 +92,7 @@ async fn assemble_realm(suspend_enabled: bool) -> RealmInstance {
 async fn enters_idle_state_without_activity(suspend_enabled: bool) {
     let realm = assemble_realm(suspend_enabled).await;
 
-    // Subscribe to activity state, which serves "Active" initially.
+    // Subscribe to interaction state, which serves "active" initially.
     let notifier_proxy = realm
         .root
         .connect_to_protocol_at_exposed_dir::<NotifierMarker>()
@@ -107,7 +107,7 @@ async fn enters_idle_state_without_activity(suspend_enabled: bool) {
         State::Active
     );
 
-    // Do nothing. Activity service transitions to idle state in five seconds.
+    // Do nothing. Interaction state should transition to "idle" in five seconds.
     let activity_timeout_upper_bound = pin!(Timer::new(MonotonicInstant::after(TEST_TIMEOUT)));
     match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
         future::Either::Left((result, _)) => {
@@ -127,7 +127,7 @@ async fn enters_idle_state_without_activity(suspend_enabled: bool) {
 async fn does_not_enter_active_state_with_keyboard(suspend_enabled: bool) {
     let realm = assemble_realm(suspend_enabled).await;
 
-    // Subscribe to activity state, which serves "Active" initially.
+    // Subscribe to interaction state, which serves "active" initially.
     let notifier_proxy = realm
         .root
         .connect_to_protocol_at_exposed_dir::<NotifierMarker>()
@@ -142,7 +142,7 @@ async fn does_not_enter_active_state_with_keyboard(suspend_enabled: bool) {
         State::Active
     );
 
-    // Do nothing. Activity service transitions to idle state in five seconds.
+    // Do nothing. Interaction state should transition to "idle" in five seconds.
     let activity_timeout_upper_bound = pin!(Timer::new(MonotonicInstant::after(TEST_TIMEOUT)));
     match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
         future::Either::Left((result, _)) => {
@@ -175,7 +175,7 @@ async fn does_not_enter_active_state_with_keyboard(suspend_enabled: bool) {
         .await
         .expect("Failed to send key event 'a'.");
 
-    // Activity service does not transition to active state.
+    // Interaction state does not transition to "active".
     let activity_timeout_upper_bound = pin!(Timer::new(MonotonicInstant::after(TEST_TIMEOUT)));
     match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
         future::Either::Left((_, _)) => {
@@ -195,7 +195,7 @@ async fn does_not_enter_active_state_with_keyboard(suspend_enabled: bool) {
 async fn enters_active_state_with_mouse(suspend_enabled: bool) {
     let realm = assemble_realm(suspend_enabled).await;
 
-    // Subscribe to activity state, which serves "Active" initially.
+    // Subscribe to interaction state, which serves "active" initially.
     let notifier_proxy = realm
         .root
         .connect_to_protocol_at_exposed_dir::<NotifierMarker>()
@@ -210,7 +210,7 @@ async fn enters_active_state_with_mouse(suspend_enabled: bool) {
         State::Active
     );
 
-    // Do nothing. Activity service transitions to idle state in five seconds.
+    // Do nothing. Interaction state should transition to "idle" in five seconds.
     let activity_timeout_upper_bound = pin!(Timer::new(MonotonicInstant::after(TEST_TIMEOUT)));
     match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
         future::Either::Left((result, _)) => {
@@ -241,7 +241,7 @@ async fn enters_active_state_with_mouse(suspend_enabled: bool) {
         .await
         .expect("Failed to send mouse movement to location (10, 15).");
 
-    // Activity service transitions to active state.
+    // Interaction state transitions to "active".
     assert_eq!(
         watch_state_stream
             .next()
@@ -262,7 +262,7 @@ async fn enters_active_state_with_mouse(suspend_enabled: bool) {
 async fn enters_active_state_with_touchscreen(suspend_enabled: bool) {
     let realm = assemble_realm(suspend_enabled).await;
 
-    // Subscribe to activity state, which serves "Active" initially.
+    // Subscribe to interaction state, which serves "active" initially.
     let notifier_proxy = realm
         .root
         .connect_to_protocol_at_exposed_dir::<NotifierMarker>()
@@ -277,7 +277,7 @@ async fn enters_active_state_with_touchscreen(suspend_enabled: bool) {
         State::Active
     );
 
-    // Do nothing. Activity service transitions to idle state in five seconds.
+    // Do nothing. Interaction state should transition to "idle" in five seconds.
     let activity_timeout_upper_bound = pin!(Timer::new(MonotonicInstant::after(TEST_TIMEOUT)));
     match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
         future::Either::Left((result, _)) => {
@@ -307,7 +307,7 @@ async fn enters_active_state_with_touchscreen(suspend_enabled: bool) {
         .await
         .expect("Failed to simulate tap at location (0, 0).");
 
-    // Activity service transitions to active state.
+    // Interaction state transitions to "active".
     assert_eq!(
         watch_state_stream
             .next()
@@ -328,7 +328,7 @@ async fn enters_active_state_with_touchscreen(suspend_enabled: bool) {
 async fn enters_active_state_with_media_buttons(suspend_enabled: bool) {
     let realm = assemble_realm(suspend_enabled).await;
 
-    // Subscribe to activity state, which serves "Active" initially.
+    // Subscribe to interaction state, which serves "active" initially.
     let notifier_proxy = realm
         .root
         .connect_to_protocol_at_exposed_dir::<NotifierMarker>()
@@ -343,7 +343,7 @@ async fn enters_active_state_with_media_buttons(suspend_enabled: bool) {
         State::Active
     );
 
-    // Do nothing. Activity service transitions to idle state in five seconds.
+    // Do nothing. Interaction state should transition to "idle" in five seconds.
     let activity_timeout_upper_bound = pin!(Timer::new(MonotonicInstant::after(TEST_TIMEOUT)));
     match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
         future::Either::Left((result, _)) => {
@@ -373,7 +373,7 @@ async fn enters_active_state_with_media_buttons(suspend_enabled: bool) {
         .await
         .expect("Failed to simulate buttons press.");
 
-    // Activity service transitions to active state.
+    // Interaction state transitions to "active".
     assert_eq!(
         watch_state_stream
             .next()

@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use crate::color_transform_manager::ColorTransformManager;
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
-use ::input_pipeline::activity::ActivityManager;
 use ::input_pipeline::input_device::InputDeviceType;
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+use ::input_pipeline::interaction_state_handler::InteractionStateHandler;
 use ::input_pipeline::light_sensor::Configuration as LightSensorConfiguration;
 use anyhow::{Context, Error};
 use fidl_fuchsia_accessibility::{ColorTransformHandlerMarker, ColorTransformMarker};
@@ -246,9 +246,9 @@ async fn inner_main() -> Result<(), Error> {
     // Create a node under root to hang all input pipeline inspect data off of.
     let inspect_node = inspector.root().create_child("input_pipeline");
 
-    // Create Activity Manager.
+    // Create InteractionStateHandler.
     #[cfg(fuchsia_api_level_at_least = "HEAD")]
-    let activity_manager = ActivityManager::new(
+    let interaction_state_handler = InteractionStateHandler::new(
         zx::MonotonicDuration::from_millis(idle_threshold_ms as i64),
         &inspect_node,
         suspend_enabled,
@@ -407,9 +407,9 @@ async fn inner_main() -> Result<(), Error> {
             ExposedServices::UserInteractionObservation(stream) => {
                 #[cfg(fuchsia_api_level_at_least = "HEAD")]
                 {
-                    let activity_manager = activity_manager.clone();
+                    let interaction_state_handler = interaction_state_handler.clone();
                     fasync::Task::local(async move {
-                    match activity_manager
+                    match interaction_state_handler
                         .handle_interaction_aggregator_request_stream(stream)
                         .await
                     {
@@ -425,15 +425,15 @@ async fn inner_main() -> Result<(), Error> {
                 #[cfg(fuchsia_api_level_less_than = "HEAD")]
                 {
                     let _ = stream;
-                    error!("scene_manager built without ActivityMonitor due to stable API level.")
+                    error!("scene_manager built without InteractionStateHandler due to stable API level.")
                 }
             }
             ExposedServices::UserInteraction(stream) => {
                 #[cfg(fuchsia_api_level_at_least = "HEAD")]
                 {
-                    let activity_manager = activity_manager.clone();
+                    let interaction_state_handler = interaction_state_handler.clone();
                     fasync::Task::local(async move {
-                        match activity_manager.handle_interaction_notifier_request_stream(stream).await
+                        match interaction_state_handler.handle_interaction_notifier_request_stream(stream).await
                         {
                             Ok(()) => (),
                             Err(e) => {
@@ -449,7 +449,7 @@ async fn inner_main() -> Result<(), Error> {
                 #[cfg(fuchsia_api_level_less_than = "HEAD")]
                 {
                     let _ = stream;
-                    error!("scene_manager built without ActivityMonitor due to stable API level.")
+                    error!("scene_manager built without InteractionStateHandler due to stable API level.")
                 }
             }
             ExposedServices::GraphicalPresenter(stream) => {
