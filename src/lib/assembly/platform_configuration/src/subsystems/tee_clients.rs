@@ -153,14 +153,6 @@ fn create_tee_clients(
 
     let mut offer = vec![
         cml::Offer {
-            protocol: Some(create_name("fuchsia.inspect.InspectSink")?.into()),
-            ..cml::Offer::empty(cml::OfferFromRef::Parent.into(), cml::OfferToRef::All.into())
-        },
-        cml::Offer {
-            protocol: Some(create_name("fuchsia.logger.LogSink")?.into()),
-            ..cml::Offer::empty(cml::OfferFromRef::Parent.into(), cml::OfferToRef::All.into())
-        },
-        cml::Offer {
             dictionary: Some(create_name("diagnostics")?.into()),
             ..cml::Offer::empty(cml::OfferFromRef::Parent.into(), cml::OfferToRef::All.into())
         },
@@ -404,16 +396,6 @@ mod tests {
           }
         ],
         "offer": [
-          {
-            "protocol": "fuchsia.inspect.InspectSink",
-            "from": "parent",
-            "to": "all"
-          },
-          {
-            "protocol": "fuchsia.logger.LogSink",
-            "from": "parent",
-            "to": "all"
-          },
           {
             "dictionary": "diagnostics",
             "from": "parent",

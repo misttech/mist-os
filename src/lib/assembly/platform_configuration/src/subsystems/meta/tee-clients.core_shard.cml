@@ -59,18 +59,6 @@
             to: "#tee-clients",
             source_availability: "unknown",
         },
-
-        // TODO(b/345827642): Remove this route and instead route
-        // only "diagnostics" once #tee-clients
-        // is migrated to use the dictionary.
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "parent/diagnostics",
-            to: "#tee-clients",
-        },
         {
             storage: "data",
             from: "self",
