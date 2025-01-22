@@ -1267,8 +1267,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 )
 
         with self.subTest(
-            # TODO(https://fxbug.dev/388927685): Invert logic when we make this an error..
-            "it is OK to output to an existing, non-empty directory, for now"
+            "it is an error to output to an existing, non-empty directory"
         ):
             with tempfile.TemporaryDirectory() as td:
                 logpath = os.path.join("log.json.gz")
@@ -1287,30 +1286,25 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                     ]
                 )
                 ret = await main.async_main_wrapper(flags)
-                self.assertEqual(ret, 0)
+                self.assertEqual(ret, 1)
 
                 env = environment.ExecutionEnvironment.initialize_from_args(
                     flags, create_log_file=False
                 )
 
                 artifact_path = None
-                found_warning_log = False
+                found_error = False
                 for log_entry in log.LogSource.from_env(env).read_log():
                     if (event := log_entry.log_event) is not None:
-                        if (
-                            event.payload is not None
-                            and (message := event.payload.user_message)
-                            is not None
-                        ):
+                        if (error_message := event.error) is not None:
                             if (
-                                message.level == WARNING_LEVEL
-                                and "Your output directory already exists"
-                                in message.value
+                                "Your output directory already exists"
+                                in error_message
                             ):
-                                found_warning_log = True
+                                found_error = True
                                 break
 
                 self.assertTrue(
-                    found_warning_log,
-                    "Expected to find a warning log about output directory existing",
+                    found_error,
+                    "Expected to find an error about output directory existing",
                 )
