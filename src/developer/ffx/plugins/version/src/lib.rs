@@ -5,6 +5,7 @@
 use async_trait::async_trait;
 use chrono::Local;
 use ffx_build_version::VersionInfo;
+use ffx_config::EnvironmentContext;
 use ffx_version_args::VersionCommand;
 use ffx_writer::{MachineWriter, ToolIO};
 use fho::{Deferred, FfxContext, FfxMain, FfxTool, Result};
@@ -22,7 +23,7 @@ const DEFAULT_DAEMON_TIMEOUT_MS: u64 = 1500;
 pub struct VersionTool {
     #[command]
     cmd: VersionCommand,
-    build_info: ffx_build_version::VersionInfo,
+    context: EnvironmentContext,
     daemon_proxy: Deferred<ffx::DaemonProxy>,
 }
 
@@ -32,7 +33,7 @@ fho::embedded_plugin!(VersionTool);
 impl FfxMain for VersionTool {
     type Writer = MachineWriter<Versions>;
     async fn main(self, mut writer: Self::Writer) -> Result<()> {
-        let tool_version = self.build_info.into();
+        let tool_version = self.context.build_info().into();
         let daemon_version = if self.cmd.verbose {
             Some(get_daemon_version(self.daemon_proxy.await?).await?.into())
         } else {

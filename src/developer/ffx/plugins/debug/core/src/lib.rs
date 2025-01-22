@@ -25,7 +25,7 @@ const STORAGE_ID: &str = "eb345fb7dcaa4260ee0c65bb73ef0ec5341b15a4f603f358d6631c
 pub struct CoreTool {
     #[command]
     cmd: ffx_debug_core_args::CoreCommand,
-    sdk: ffx_config::Sdk,
+    context: ffx_config::EnvironmentContext,
     rcs: fho::Deferred<RemoteControlProxy>,
 }
 
@@ -35,7 +35,8 @@ fho::embedded_plugin!(CoreTool);
 impl FfxMain for CoreTool {
     type Writer = SimpleWriter;
     async fn main(self, _writer: SimpleWriter) -> fho::Result<()> {
-        if let Err(e) = symbol_index::ensure_symbol_index_registered(&self.sdk) {
+        let sdk = self.context.get_sdk()?;
+        if let Err(e) = symbol_index::ensure_symbol_index_registered(&sdk) {
             eprintln!("ensure_symbol_index_registered failed, error was: {:#?}", e);
         }
 
@@ -49,7 +50,7 @@ impl FfxMain for CoreTool {
             }
         };
 
-        let zxdb_path = ffx_config::get_host_tool(&self.sdk, "zxdb").await?;
+        let zxdb_path = ffx_config::get_host_tool(&sdk, "zxdb").await?;
         let mut args = vec!["--core=".to_owned() + &minidump];
         args.extend(self.cmd.zxdb_args);
 

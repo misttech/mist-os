@@ -253,7 +253,6 @@ impl fho::TryFromEnv for ShowToolWrapper {
 pub struct DoctorTool {
     #[command]
     cmd: DoctorCommand,
-    version_info: VersionInfo,
     show_tool: ShowToolWrapper,
     context: EnvironmentContext,
 }
@@ -270,15 +269,14 @@ impl FfxMain for DoctorTool {
         // this is to refactor `ffx doctor` to make testing things like this less cumbersome.
         // TODO(b/373723080): Add actual tests for the usage of `ffx target show` within `ffx
         // doctor`.
-        doctor_cmd_impl(self.context, self.version_info, self.cmd, Some(self.show_tool), stdout())
-            .await?;
+        doctor_cmd_impl(self.context, self.cmd, Some(self.show_tool), stdout()).await?;
         Ok(())
     }
 }
 
 pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
     context: EnvironmentContext,
-    version_info: VersionInfo,
+
     cmd: DoctorCommand,
     show_tool: Option<ShowToolWrapper>,
     mut writer: W,
@@ -290,7 +288,7 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
     let delay = Duration::from_millis(cmd.retry_delay);
     let target_spec = ffx_target::get_target_specifier(&context).await?;
     let target_str = target_spec.unwrap_or_else(String::default);
-
+    let version_info: VersionInfo = context.build_info();
     let mut log_root = None;
     let mut output_dir = None;
     let mut record = cmd.record;

@@ -4,6 +4,7 @@
 use crate::FhoEnvironment;
 use async_trait::async_trait;
 use ffx_command_error::Result;
+use ffx_config::EnvironmentContext;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
@@ -66,6 +67,23 @@ where
 impl<T> TryFromEnv for PhantomData<T> {
     async fn try_from_env(_env: &FhoEnvironment) -> Result<Self> {
         Ok(PhantomData)
+    }
+}
+
+#[async_trait(?Send)]
+impl<T> TryFromEnv for Result<T>
+where
+    T: TryFromEnv,
+{
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        Ok(T::try_from_env(env).await)
+    }
+}
+
+#[async_trait(?Send)]
+impl TryFromEnv for EnvironmentContext {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        Ok(env.environment_context().clone())
     }
 }
 

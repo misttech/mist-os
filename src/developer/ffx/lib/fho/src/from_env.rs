@@ -11,7 +11,6 @@ use fdomain_client::fidl::{
     DiscoverableProtocolMarker as FDiscoverableProtocolMarker, FDomainResourceDialect,
     Proxy as FProxy,
 };
-use ffx_build_version::VersionInfo;
 use ffx_command_error::{return_user_error, FfxContext, Result};
 use ffx_config::EnvironmentContext;
 use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
@@ -60,23 +59,6 @@ impl DeviceLookup for DeviceLookupDefaultImpl {
                 .await
                 .bug_context("resolving target")
         })
-    }
-}
-
-#[async_trait(?Send)]
-impl<T> TryFromEnv for Result<T>
-where
-    T: TryFromEnv,
-{
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        Ok(T::try_from_env(env).await)
-    }
-}
-
-#[async_trait(?Send)]
-impl TryFromEnv for VersionInfo {
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        Ok(env.environment_context().build_info())
     }
 }
 
@@ -162,22 +144,6 @@ impl TryFromEnv for Vec<ffx_fidl::TargetInfo> {
             }
         }
         Ok(targets)
-    }
-}
-
-/// Gets the actively configured SDK from the environment
-#[async_trait(?Send)]
-impl TryFromEnv for ffx_config::Sdk {
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        env.environment_context().get_sdk().user_message("Could not load currently active SDK")
-    }
-}
-
-/// Gets the actively configured SDK from the environment
-#[async_trait(?Send)]
-impl TryFromEnv for ffx_config::SdkRoot {
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        env.environment_context().get_sdk_root().user_message("Could not load currently active SDK")
     }
 }
 
@@ -439,13 +405,6 @@ impl<T: serde::Serialize + schemars::JsonSchema> TryFromEnv
 {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         Ok(ffx_writer::VerifiedMachineWriter::new(env.ffx_command().global.machine))
-    }
-}
-
-#[async_trait(?Send)]
-impl TryFromEnv for EnvironmentContext {
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        Ok(env.environment_context().clone())
     }
 }
 
