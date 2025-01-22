@@ -34,7 +34,6 @@ if (is_host) {
     sources = [
       "data/app_render_metric.json",
       "data/cpu_metric.json",
-      "data/cpu_metric_system_metrics_logger.json",
       "data/fps_metric.json",
       "data/input_latency_metric.json",
       "data/scenic_metric.json",

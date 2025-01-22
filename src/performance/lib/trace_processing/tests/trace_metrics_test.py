@@ -143,29 +143,15 @@ class MetricProcessorsTest(unittest.TestCase):
                 ],
             ),
             param(
-                "cpu_from_system_metrics_logger",
-                processor=cpu_metrics.CpuMetricsProcessor(
-                    aggregates_only=False
-                ),
-                model_file="cpu_metric_system_metrics_logger.json",
-                expected_results=[
-                    TCR(label="CpuLoad", unit=U.percent, values=[43, 20]),
-                ],
-            ),
-            param(
                 "cpu_aggregates",
                 processor=cpu_metrics.CpuMetricsProcessor(aggregates_only=True),
                 model_file="cpu_metric.json",
                 expected_results=trace_utils.standard_metrics_set(
-                    [43, 20], "Cpu", U.percent
-                ),
-            ),
-            param(
-                "cpu_aggregates_from_system_metrics_logger",
-                processor=cpu_metrics.CpuMetricsProcessor(aggregates_only=True),
-                model_file="cpu_metric_system_metrics_logger.json",
-                expected_results=trace_utils.standard_metrics_set(
-                    [43, 20], "Cpu", U.percent
+                    # ts in the json is in microseconds, durations is in ns.
+                    [43, 20],
+                    "Cpu",
+                    U.percent,
+                    durations=[1000000000, 1100000000],
                 ),
             ),
             param(
