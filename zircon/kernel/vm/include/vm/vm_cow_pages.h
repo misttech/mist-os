@@ -153,14 +153,14 @@ class VmCowPages final : public VmHierarchyBase,
     return page_source_ && page_source_->properties().is_preserving_page_content;
   }
 
-  bool can_root_source_evict_locked() const TA_REQ(lock()) {
+  bool can_root_source_evict() const {
     bool result = is_root_source_preserving_page_content();
     DEBUG_ASSERT(result == is_root_source_user_pager_backed());
     return result;
   }
 
   // Returns whether this cow pages node is dirty tracked.
-  bool is_dirty_tracked_locked() const TA_REQ(lock()) {
+  bool is_dirty_tracked() const {
     canary_.Assert();
     // Pager-backed VMOs require dirty tracking either if they are directly backed by the pager,
     // i.e. the root VMO.
@@ -171,7 +171,7 @@ class VmCowPages final : public VmHierarchyBase,
   // possibly reset) on the next QueryPagerVmoStatsLocked() call. Although the modified state is
   // only tracked for the root VMO.
   void mark_modified_locked() TA_REQ(lock()) {
-    if (!is_dirty_tracked_locked()) {
+    if (!is_dirty_tracked()) {
       return;
     }
     DEBUG_ASSERT(is_source_preserving_page_content());
@@ -784,7 +784,7 @@ class VmCowPages final : public VmHierarchyBase,
   bool is_cow_clonable_locked() const TA_REQ(lock()) {
     // Copy-on-write clones of pager vmos or their descendants aren't supported as we can't
     // efficiently make an immutable snapshot.
-    if (can_root_source_evict_locked()) {
+    if (can_root_source_evict()) {
       return false;
     }
 

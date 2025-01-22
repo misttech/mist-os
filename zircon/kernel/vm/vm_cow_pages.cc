@@ -3809,7 +3809,7 @@ void VmCowPages::PromoteRangeForReclamationLocked(VmCowRange range) {
   canary_.Assert();
 
   // Hints only apply to pager backed VMOs.
-  if (!can_root_source_evict_locked()) {
+  if (!can_root_source_evict()) {
     return;
   }
   // Zero lengths have no work to do.
@@ -3860,7 +3860,7 @@ zx_status_t VmCowPages::ProtectRangeFromReclamationLocked(VmCowRange range, bool
   canary_.Assert();
 
   // Hints only apply to pager backed VMOs.
-  if (!can_root_source_evict_locked()) {
+  if (!can_root_source_evict()) {
     return ZX_OK;
   }
   // Zero lengths have no work to do.
@@ -3892,7 +3892,7 @@ zx_status_t VmCowPages::ProtectRangeFromReclamationLocked(VmCowRange range, bool
 
         // The root might have gone away when the lock was dropped while waiting above. Compute the
         // root again and check if we still have a page source backing it before applying the hint.
-        if (!can_root_source_evict_locked()) {
+        if (!can_root_source_evict()) {
           // Hinting is not applicable anymore. No more pages to hint.
           return ZX_OK;
         }

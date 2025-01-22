@@ -746,7 +746,7 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
   Guard<CriticalMutex> object_guard{object_->lock()};
 
   // Cache whether the object is dirty tracked, we need to know this when computing mmu flags later.
-  const bool dirty_tracked = object_->is_dirty_tracked_locked();
+  const bool dirty_tracked = object_->is_dirty_tracked();
 
   // Trim our range to the current VMO size. Our mapping might exceed the VMO in the case where the
   // VMO is resizable, and this should not be considered an error.

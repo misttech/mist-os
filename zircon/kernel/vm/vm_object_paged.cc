@@ -176,7 +176,7 @@ zx_status_t VmObjectPaged::HintRange(uint64_t offset, uint64_t len, EvictionHint
   // incompatible combinations instead of failing. This is because the kernel does not make any
   // explicit guarantees on hints; since they are just hints, the kernel is always free to ignore
   // them.
-  if (!cow_pages_locked()->can_root_source_evict_locked()) {
+  if (!cow_pages_locked()->can_root_source_evict()) {
     return ZX_OK;
   }
 
@@ -1113,7 +1113,7 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
       // We pin the pages first before marking them dirty in order to guarantee forward progress.
       // Pinning the pages will prevent them from getting decommitted while we are waiting on the
       // dirty page request without the lock held.
-      if (write && pinned_len > 0 && is_dirty_tracked_locked()) {
+      if (write && pinned_len > 0 && is_dirty_tracked()) {
         // Prepare the committed range for writing. We need a page request for this too, so cancel
         // any existing one and reuse it.
         page_request.CancelRequests();

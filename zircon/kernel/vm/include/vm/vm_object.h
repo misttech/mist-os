@@ -311,7 +311,7 @@ class VmObject : public VmHierarchyBase,
   // Returns true if the VMO was created via CreatePagerVmo().
   virtual bool is_user_pager_backed() const { return false; }
   // Returns true if the VMO's pages require dirty bit tracking.
-  virtual bool is_dirty_tracked_locked() const TA_REQ(lock()) { return false; }
+  virtual bool is_dirty_tracked() const { return false; }
   // Marks the VMO as modified if the VMO tracks modified state (only supported for pager-backed
   // VMOs).
   virtual void mark_modified_locked() TA_REQ(lock()) {}

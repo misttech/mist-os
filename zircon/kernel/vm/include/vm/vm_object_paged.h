@@ -90,12 +90,9 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   bool is_resizable() const override { return (options_ & kResizable); }
   bool is_discardable() const override { return (options_ & kDiscardable); }
   bool is_user_pager_backed() const override {
-    Guard<CriticalMutex> guard{lock()};
-    return cow_pages_locked()->is_root_source_user_pager_backed();
+    return cow_pages_->is_root_source_user_pager_backed();
   }
-  bool is_dirty_tracked_locked() const override TA_REQ(lock()) {
-    return cow_pages_locked()->is_dirty_tracked_locked();
-  }
+  bool is_dirty_tracked() const override { return cow_pages_->is_dirty_tracked(); }
   void mark_modified_locked() override TA_REQ(lock()) {
     return cow_pages_locked()->mark_modified_locked();
   }
