@@ -60,7 +60,7 @@ README_SECTIONS = [
     ("Debug Logging", "debug"),
     ("Multi-function", "multi-function"),
     ("System", "system"),
-    ("DDK", "ddk"),
+    ("Driver", "driver"),
     ("Display drivers", "framebuffer"),
     ("Tracing", "tracing"),
     ("Restricted Mode (Work in progress)", "restricted"),
@@ -137,7 +137,7 @@ def get_topic(filename: str) -> str:
         "resource",
         "smc",
     ]:
-        topic = "ddk"
+        topic = "driver"
     elif topic in ["pci", "pc", "ioports"]:
         topic = "others"
     elif topic in ["clock", "deadline", "nanosleep.md", "ticks"]:

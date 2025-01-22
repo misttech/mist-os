@@ -8,7 +8,7 @@
 
 #include <arch/arm64/smccc.h>
 
-#include "ddk_priv.h"
+#include "driver_priv.h"
 
 zx_status_t arch_smc_call(const zx_smc_parameters_t* params, zx_smc_result_t* result) {
   const uint32_t client_and_secure_os_id =
