@@ -219,6 +219,17 @@ pub enum Slot {
     R,
 }
 
+impl std::fmt::Display for Slot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let message = match self {
+            Self::A => "A",
+            Self::B => "B",
+            Self::R => "R",
+        };
+        write!(f, "{}", message)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
