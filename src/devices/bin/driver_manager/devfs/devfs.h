@@ -25,8 +25,6 @@ class Devfs;
 class PseudoDir;
 class DevfsDevice;
 
-std::optional<std::string_view> ProtocolIdToClassName(uint32_t protocol_id);
-
 class Devnode {
  public:
   // This class represents a device in devfs. It is called "passthrough" because it sends
@@ -149,68 +147,6 @@ class PseudoDir : public fs::PseudoDir {
       unpublished;
 };
 
-// Represents an entry in the /dev/class directory. A thin wrapper around
-// `PseudoDir` that can be owned and keeps track of numbered entries
-// contained within it.
-class ProtoNode {
- public:
-  explicit ProtoNode(fbl::String name);
-  virtual ~ProtoNode() = default;
-
-  ProtoNode(const ProtoNode&) = delete;
-  ProtoNode& operator=(const ProtoNode&) = delete;
-
-  ProtoNode(ProtoNode&&) = delete;
-  ProtoNode& operator=(ProtoNode&&) = delete;
-
-  // This is used in tests only.
-  std::string_view name() const { return name_; }
-  PseudoDir& children() const { return *children_; }
-
- private:
-  friend class Devfs;
-  friend class Devnode;
-
-  virtual uint32_t allocate_device_number() = 0;
-  virtual const char* format() = 0;
-
-  zx::result<fbl::String> seq_name();
-
-  const fbl::String name_;
-
-  fbl::RefPtr<PseudoDir> children_ = fbl::MakeRefCounted<PseudoDir>();
-};
-
-// Contains nodes with sequential decimal names.
-class SequentialProtoNode : public ProtoNode {
- public:
-  explicit SequentialProtoNode(fbl::String name);
-
- private:
-  uint32_t allocate_device_number() override;
-  const char* format() override;
-
-  static constexpr uint32_t maximum_device_number_ = 999;
-  static constexpr char format_[] = "%03u";
-
-  uint32_t next_device_number_ = 0;
-};
-
-// Contains nodes with randomized hexadecimal names.
-class RandomizedProtoNode : public ProtoNode {
- public:
-  RandomizedProtoNode(fbl::String name, std::default_random_engine::result_type seed);
-
- private:
-  uint32_t allocate_device_number() override;
-  const char* format() override;
-
-  static constexpr uint32_t maximum_device_number_ = 0xffffffff;
-  static constexpr char format_[] = "%08x";
-
-  std::default_random_engine device_number_generator_;
-};
-
 class DevfsDevice {
  public:
   void advertise_modified();
@@ -234,21 +170,25 @@ class Devfs {
 
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> Connect(fs::FuchsiaVfs& vfs);
 
-  // This method is exposed for testing.
-  std::optional<std::reference_wrapper<ProtoNode>> proto_node(std::string_view protocol_name);
-  std::optional<std::reference_wrapper<ProtoNode>> proto_node(uint32_t protocol_id);
+  zx::result<std::string> MakeInstanceName(std::string_view class_name);
+
+  fbl::RefPtr<PseudoDir> get_class_entry(std::string_view class_name) {
+    EnsureClassExists(class_name);
+    return class_entries_[std::string(class_name)];
+  }
 
  private:
   friend class Devnode;
 
   static std::optional<std::reference_wrapper<fs::Vnode>> Lookup(PseudoDir& parent,
                                                                  std::string_view name);
+  void EnsureClassExists(std::string_view name);
 
   Devnode& root_;
+  std::default_random_engine device_number_generator_;
 
   fbl::RefPtr<PseudoDir> class_ = fbl::MakeRefCounted<PseudoDir>();
-  // TODO(https://fxbug.dev/42064970): Unbox the unique_ptr when ProtoNode is no longer abstract.
-  std::unordered_map<uint32_t, std::unique_ptr<ProtoNode>> proto_info_nodes;
+  std::unordered_map<std::string, fbl::RefPtr<PseudoDir>> class_entries_;
 };
 
 }  // namespace driver_manager
