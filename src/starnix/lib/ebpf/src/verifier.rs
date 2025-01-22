@@ -16,6 +16,8 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 use zerocopy::IntoBytes;
 
+const U32_MAX: u64 = u32::MAX as u64;
+
 /// A trait to receive the log from the verifier.
 pub trait VerifierLogger {
     /// Log a line. The line is always a correct encoded ASCII string.
@@ -196,6 +198,107 @@ impl MemoryParameterSize {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Range<T: Clone + Copy + std::fmt::Debug + PartialOrd + Ord + PartialEq + Eq> {
+    min: T,
+    max: T,
+}
+
+impl<T: Clone + Copy + std::fmt::Debug + PartialOrd + Ord + PartialEq + Eq> Range<T> {
+    const fn new(min: T, max: T) -> Self {
+        Self { min, max }
+    }
+}
+
+impl<T: Clone + Copy + std::fmt::Debug + PartialOrd + Ord + PartialEq + Eq> From<T> for Range<T> {
+    fn from(value: T) -> Self {
+        Self::new(value, value)
+    }
+}
+
+type U64Range = Range<u64>;
+
+impl U64Range {
+    const fn max() -> Self {
+        Self::new(0, u64::MAX)
+    }
+
+    fn extract_slices(value: u64, offset: usize, byte_count: usize) -> (u64, u64, u64) {
+        let v1 = if offset > 0 { NativeEndian::read_uint(&value.as_bytes(), offset) } else { 0 };
+        let v2 = NativeEndian::read_uint(&value.as_bytes()[offset..], byte_count);
+        let v3 = if offset + byte_count < 8 {
+            NativeEndian::read_uint(
+                &value.as_bytes()[(offset + byte_count)..],
+                8 - offset - byte_count,
+            )
+        } else {
+            0
+        };
+        if cfg!(target_endian = "little") {
+            (v1, v2, v3)
+        } else {
+            (v3, v2, v1)
+        }
+    }
+
+    fn assemble_slices(values: (u64, u64, u64), offset: usize, byte_count: usize) -> u64 {
+        let mut result: u64 = 0;
+        let (v1, v2, v3) =
+            if cfg!(target_endian = "little") { values } else { (values.2, values.1, values.0) };
+        if offset > 0 {
+            result.as_mut_bytes()[..offset].copy_from_slice(&v1.as_bytes()[..offset]);
+        }
+        result.as_mut_bytes()[offset..(offset + byte_count)]
+            .copy_from_slice(&v2.as_bytes()[..byte_count]);
+        result.as_mut_bytes()[(offset + byte_count)..]
+            .copy_from_slice(&v3.as_bytes()[..(8 - offset - byte_count)]);
+        result
+    }
+
+    /// Given a target and source values, each in the `target` and `source` ranges. Compute the
+    /// range of the result of the operation where `byte_count` bytes from `source` at offset
+    /// `source_offset` replace `byte_count` bytes from `target` at offset `target_offset`.
+    fn compute_range_for_bytes_swap(
+        target: U64Range,
+        source: U64Range,
+        target_offset: usize,
+        source_offset: usize,
+        byte_count: usize,
+    ) -> U64Range {
+        let (target_umin1, target_umin2, target_umin3) =
+            Self::extract_slices(target.min, target_offset, byte_count);
+        let (target_umax1, target_umax2, target_umax3) =
+            Self::extract_slices(target.max, target_offset, byte_count);
+        let (_, source_umin2, source_umin3) =
+            Self::extract_slices(source.min, source_offset, byte_count);
+        let (_, source_umax2, source_umax3) =
+            Self::extract_slices(source.max, source_offset, byte_count);
+
+        let (final_umin3, final_umax3) = (target_umin3, target_umax3);
+        let (final_umin2, final_umax2) =
+            if source_umax3 > source_umin3 { (0, u64::MAX) } else { (source_umin2, source_umax2) };
+        let (final_umin1, final_umax1) =
+            if target_umax3 > target_umin3 || target_umax2 > target_umin2 {
+                (0, u64::MAX)
+            } else {
+                (target_umin1, target_umax1)
+            };
+
+        let final_min = Self::assemble_slices(
+            (final_umin1, final_umin2, final_umin3),
+            target_offset,
+            byte_count,
+        );
+        let final_max = Self::assemble_slices(
+            (final_umax1, final_umax2, final_umax3),
+            target_offset,
+            byte_count,
+        );
+
+        Range::new(final_min, final_max)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ScalarValueData {
     /// The value. Its interpresentation depends on `unknown_mask` and `unwritten_mask`.
@@ -207,6 +310,8 @@ pub struct ScalarValueData {
     /// userspace) if the equivalent mask in unknown_mask is 0. `unknown_mask` must always be a
     /// subset of `unwritten_mask`.
     unwritten_mask: u64,
+    /// The range of possible unsigned values of this scalar.
+    urange: U64Range,
 }
 
 /// Defines a partial ordering on `ScalarValueData` instances, capturing the notion of how "broad"
@@ -251,13 +356,15 @@ impl PartialOrd for ScalarValueData {
 
 impl From<u64> for ScalarValueData {
     fn from(value: u64) -> Self {
-        Self { value, unknown_mask: 0, unwritten_mask: 0 }
+        Self { value, unknown_mask: 0, unwritten_mask: 0, urange: value.into() }
     }
 }
 
 impl ScalarValueData {
-    const UNINITIALIZED: Self = Self { value: 0, unknown_mask: u64::MAX, unwritten_mask: u64::MAX };
-    const UNKNOWN_WRITTEN: Self = Self { value: 0, unknown_mask: u64::MAX, unwritten_mask: 0 };
+    const UNINITIALIZED: Self =
+        Self { value: 0, unknown_mask: u64::MAX, unwritten_mask: u64::MAX, urange: Range::max() };
+    const UNKNOWN_WRITTEN: Self =
+        Self { value: 0, unknown_mask: u64::MAX, unwritten_mask: 0, urange: Range::max() };
 
     const fn is_known(&self) -> bool {
         self.unknown_mask == 0
@@ -455,27 +562,50 @@ impl Type {
             (JumpWidth::W64, JumpType::Eq, Self::ScalarValue(data1), Self::ScalarValue(data2))
                 if data1.is_fully_initialized() && data2.is_fully_initialized() =>
             {
+                let umin = std::cmp::max(data1.urange.min, data2.urange.min);
+                let umax = std::cmp::min(data1.urange.max, data2.urange.max);
                 let v = Self::ScalarValue(ScalarValueData {
                     value: data1.value | data2.value,
                     unknown_mask: data1.unknown_mask & data2.unknown_mask,
                     unwritten_mask: 0,
+                    urange: Range::new(umin, umax),
                 });
                 (v.clone(), v)
             }
             (JumpWidth::W32, JumpType::Eq, Self::ScalarValue(data1), Self::ScalarValue(data2))
                 if data1.is_fully_initialized() && data2.is_fully_initialized() =>
             {
+                let maybe_umin = if data1.urange.min <= U32_MAX && data2.urange.min <= U32_MAX {
+                    Some(std::cmp::max(data1.urange.min, data2.urange.min))
+                } else {
+                    None
+                };
+                let maybe_umax = if data1.urange.max <= U32_MAX && data2.urange.max <= U32_MAX {
+                    Some(std::cmp::min(data1.urange.max, data2.urange.max))
+                } else {
+                    None
+                };
+
+                let urange1 = Range::new(
+                    maybe_umin.unwrap_or(data1.urange.min),
+                    maybe_umax.unwrap_or(data1.urange.max),
+                );
                 let v1 = Self::ScalarValue(ScalarValueData {
-                    value: data1.value | (data2.value & (u32::MAX as u64)),
-                    unknown_mask: data1.unknown_mask
-                        & (data2.unknown_mask | ((u32::MAX as u64) << 32)),
+                    value: data1.value | (data2.value & U32_MAX),
+                    unknown_mask: data1.unknown_mask & (data2.unknown_mask | (U32_MAX << 32)),
                     unwritten_mask: 0,
+                    urange: urange1,
                 });
+
+                let urange2 = Range::new(
+                    maybe_umin.unwrap_or(data2.urange.min),
+                    maybe_umax.unwrap_or(data2.urange.max),
+                );
                 let v2 = Self::ScalarValue(ScalarValueData {
-                    value: data2.value | (data1.value & (u32::MAX as u64)),
-                    unknown_mask: data2.unknown_mask
-                        & (data1.unknown_mask | ((u32::MAX as u64) << 32)),
+                    value: data2.value | (data1.value & U32_MAX),
+                    unknown_mask: data2.unknown_mask & (data1.unknown_mask | (U32_MAX << 32)),
                     unwritten_mask: 0,
+                    urange: urange2,
                 });
                 (v1, v2)
             }
@@ -1083,9 +1213,21 @@ impl Stack {
                         width,
                         sub_index,
                     );
+                    let urange = U64Range::compute_range_for_bytes_swap(
+                        old_data.urange,
+                        data.urange,
+                        sub_index,
+                        0,
+                        width.bytes(),
+                    );
                     self.set(
                         index,
-                        Type::ScalarValue(ScalarValueData { value, unknown_mask, unwritten_mask }),
+                        Type::ScalarValue(ScalarValueData {
+                            value,
+                            unknown_mask,
+                            unwritten_mask,
+                            urange,
+                        }),
                     );
                 }
                 _ => {
@@ -1125,7 +1267,19 @@ impl Stack {
                         Self::extract_sub_value(data.unknown_mask, sub_index, width.bytes());
                     let unwritten_mask =
                         Self::extract_sub_value(data.unwritten_mask, sub_index, width.bytes());
-                    Ok(Type::ScalarValue(ScalarValueData { value, unknown_mask, unwritten_mask }))
+                    let urange = U64Range::compute_range_for_bytes_swap(
+                        0.into(),
+                        data.urange,
+                        0,
+                        sub_index,
+                        width.bytes(),
+                    );
+                    Ok(Type::ScalarValue(ScalarValueData {
+                        value,
+                        unknown_mask,
+                        unwritten_mask,
+                        urange,
+                    }))
                 }
                 _ => Err(format!("incorrect load of {} bytes at pc {}", width.bytes(), pc)),
             }
@@ -1508,7 +1662,12 @@ impl ComputationContext {
                 let unknown_mask = data1.unknown_mask | data2.unknown_mask;
                 let unwritten_mask = data1.unwritten_mask | data2.unwritten_mask;
                 let value = op(data1.value, data2.value) & !unknown_mask;
-                Type::ScalarValue(ScalarValueData { value, unknown_mask, unwritten_mask })
+                Type::ScalarValue(ScalarValueData {
+                    value,
+                    unknown_mask,
+                    unwritten_mask,
+                    urange: Range::max(),
+                })
             }
             (AluType::Shift, Type::ScalarValue(data1), Type::ScalarValue(data2))
                 if data2.is_known() =>
@@ -1516,13 +1675,23 @@ impl ComputationContext {
                 let value = op(data1.value, data2.value);
                 let unknown_mask = op(data1.unknown_mask, data2.value);
                 let unwritten_mask = op(data1.unwritten_mask, data2.value);
-                Type::ScalarValue(ScalarValueData { value, unknown_mask, unwritten_mask })
+                Type::ScalarValue(ScalarValueData {
+                    value,
+                    unknown_mask,
+                    unwritten_mask,
+                    urange: Range::max(),
+                })
             }
             (AluType::Arsh, Type::ScalarValue(data1), Type::ScalarValue(data2)) => {
                 let unknown_mask = data1.unknown_mask.overflowing_shr(data2.value as u32).0;
                 let unwritten_mask = data1.unwritten_mask.overflowing_shr(data2.value as u32).0;
                 let value = op(data1.value, data2.value) & !unknown_mask;
-                Type::ScalarValue(ScalarValueData { value, unknown_mask, unwritten_mask })
+                Type::ScalarValue(ScalarValueData {
+                    value,
+                    unknown_mask,
+                    unwritten_mask,
+                    urange: Range::max(),
+                })
             }
             (alu_type, Type::PtrToStack { offset: x }, Type::ScalarValue(data))
                 if alu_type.is_ptr_compatible() && data.is_known() =>
@@ -1760,6 +1929,7 @@ impl ComputationContext {
                 value: bit_op(data.value),
                 unknown_mask: bit_op(data.unknown_mask),
                 unwritten_mask: bit_op(data.unwritten_mask),
+                urange: Range::max(),
             }),
             _ => Type::default(),
         };
@@ -3016,7 +3186,8 @@ impl BpfVisitor for ComputationContext {
                 let value = (data.value as u32) as u64;
                 let unknown_mask = (data.unknown_mask as u32) as u64;
                 let unwritten_mask = (data.unwritten_mask as u32) as u64;
-                Type::ScalarValue(ScalarValueData { value, unknown_mask, unwritten_mask })
+                let urange = U64Range::compute_range_for_bytes_swap(0.into(), data.urange, 0, 0, 4);
+                Type::ScalarValue(ScalarValueData { value, unknown_mask, unwritten_mask, urange })
             }
             _ => Type::default(),
         };
@@ -4064,6 +4235,8 @@ fn associate_orderings(o1: Ordering, o2: Ordering) -> Option<Ordering> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeSet;
+    use test_util::{assert_geq, assert_leq};
 
     #[test]
     fn test_type_ordering() {
@@ -4171,5 +4344,44 @@ mod tests {
 
         // Verify that overflows are handled properly.
         assert!(s.read_data_ptr(2, StackOffset(12), u64::MAX - 2).is_err());
+    }
+
+    #[test]
+    fn test_compute_range_for_bytes_swap() {
+        // Build a list of interesting values. Interesting values are all possible combination of
+        // bytes being either 0, max value, or an intermediary value.
+        let mut values = BTreeSet::<u64>::default();
+        for v1 in &[0x00, 0x1, u64::MAX] {
+            for v2 in &[0x00, 0x1, u64::MAX] {
+                for v3 in &[0x00, 0x1, u64::MAX] {
+                    values.insert(U64Range::assemble_slices((*v1, *v2, *v3), 1, 1));
+                }
+            }
+        }
+        // Replace the second byte of old by the first byte of new and return the result.
+        let store = |old: u64, new: u64| (old & !0xff00) | ((new & 0xff) << 8);
+
+        for old in &values {
+            for new in &values {
+                let s = store(*old, *new);
+                for min_old in values.iter().filter(|v| *v <= old) {
+                    for min_new in values.iter().filter(|v| *v <= new) {
+                        for max_old in values.iter().filter(|v| *v >= old) {
+                            for max_new in values.iter().filter(|v| *v >= new) {
+                                let range = U64Range::compute_range_for_bytes_swap(
+                                    Range::new(*min_old, *max_old),
+                                    Range::new(*min_new, *max_new),
+                                    1,
+                                    0,
+                                    1,
+                                );
+                                assert_leq!(range.min, s);
+                                assert_geq!(range.max, s);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
