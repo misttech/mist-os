@@ -643,6 +643,8 @@ class VmMappingCoalescer {
   // the pages are contiguous.
   paddr_t* GetNextPageSlot() { return &phys_[count_]; }
 
+  uint GetMmuFlags() { return mmu_flags_; }
+
   void IncrementCount(size_t i) { count_ += i; }
 
   // Submit any outstanding mappings to the MMU.
@@ -948,10 +950,21 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
       ("va", ktrace::Pointer{va}));
   canary_.Assert();
 
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(va));
-  DEBUG_ASSERT(is_in_range_locked(va, 1));
+  // Currently, PageFaultLocked only supports faulting a single page.
+  // TODO(https://fxbug.dev/380938506) expose num_pages argument to VmMapping::PageFaultLocked for
+  // use in VmAspace page fault functions. It will be the responsibility of the Aspace layer to
+  // calculate the fault range.
+  constexpr size_t num_pages = 1;
 
-  uint64_t vmo_offset = va - base_ + object_offset_locked();
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(va));
+
+  // Maximum number of pages the optimisation can extend the function to fault.
+  static constexpr uint64_t kMaxOptPages = 16;
+
+  // Fault batch size when num_pages > 1.
+  static constexpr uint64_t kBatchPages = 16;
+
+  const uint64_t vmo_offset = va - base_ + object_offset_locked();
 
   [[maybe_unused]] char pf_string[5];
   LTRACEF("%p va %#" PRIxPTR " vmo_offset %#" PRIx64 ", pf_flags %#x (%s)\n", this, va, vmo_offset,
@@ -1001,34 +1014,54 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
   // grab the lock for the vmo
   Guard<CriticalMutex> guard{object_->lock()};
 
-  // Determine how far to the end of the page table so we do not cause extra allocations.
-  const uint64_t next_pt_base = ArchVmAspace::NextUserPageTableOffset(va);
-  // Find the minimum between the size of this protection range and the end of the page table.
-  const uint64_t max_map = ktl::min(next_pt_base, range.region_top);
-  // Convert this into a number of pages, limited by the max lookup window.
-  static constexpr uint64_t kMaxPages = 16;
-  uint64_t max_out_pages = ktl::min((max_map - va) / PAGE_SIZE, kMaxPages);
-  DEBUG_ASSERT(max_out_pages > 0);
-
   const uint64_t vmo_size = object_->size_locked();
   if (vmo_offset >= vmo_size) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  // Trim out pages to the limit of the VMO.
-  max_out_pages = ktl::min(max_out_pages, (vmo_size - vmo_offset) / PAGE_SIZE);
+  // Calculate the number of pages from va until the end of the VMO and protection range, so we
+  // don't try to fault pages outside of the current VMO and protection range.
+  const size_t num_protection_range_pages = (range.region_top - va) / PAGE_SIZE;
+  const size_t num_vmo_pages = (vmo_size - vmo_offset) / PAGE_SIZE;
 
-  CurrentlyFaulting currently_faulting(this, vmo_offset, PAGE_SIZE);
+  // Calculate the number of pages from va until the end of the page table, so we don't make extra
+  // page table allocations for opportunistic pages.
+  vaddr_t last_va = va + ((num_pages - 1) * PAGE_SIZE);
+  const uint64_t next_pt_base = ArchVmAspace::NextUserPageTableOffset(last_va);
+  const size_t num_pt_pages = (next_pt_base - va) / PAGE_SIZE;
 
-  __UNINITIALIZED VmMappingCoalescer<kMaxPages> coalescer(
+  // Number of requested pages, trimmed to protection range & VMO.
+  const size_t num_requested_pages =
+      ktl::min({num_pages, num_protection_range_pages, num_vmo_pages});
+  DEBUG_ASSERT(is_in_range_locked(va, num_requested_pages * PAGE_SIZE));
+
+  // Number of opporturtunistic pages we can fault after the requested range. Currently, this is
+  // only applied if faulting 1 page.
+  const size_t ceil_pages_with_opt =
+      ktl::min({kMaxOptPages, num_pt_pages, num_protection_range_pages, num_vmo_pages});
+  const size_t num_opt_pages =
+      (num_requested_pages < ceil_pages_with_opt) ? ceil_pages_with_opt - num_requested_pages : 0;
+
+  // Number of pages we're aiming to fault. If a range > 1 page is supplied, it is assumed the user
+  // knows the appropriate range, so opportunistic pages will not be added.
+  const size_t num_fault_pages =
+      (num_pages == 1) ? num_requested_pages + num_opt_pages : num_requested_pages;
+
+  // Oppertunistic pages are not considered in currently_faulting optimisation, as it is not
+  // guaranteed the mappings will be updated.
+  CurrentlyFaulting currently_faulting(this, vmo_offset, num_requested_pages * PAGE_SIZE);
+
+  static constexpr uint64_t coalescer_size = ktl::max(kMaxOptPages, kBatchPages);
+
+  __UNINITIALIZED VmMappingCoalescer<coalescer_size> coalescer(
       this, va, range.mmu_flags, ArchVmAspace::ExistingEntryAction::Upgrade);
 
   if (VmObjectPaged* paged = DownCastVmObject<VmObjectPaged>(object_.get()); likely(paged)) {
     AssertHeld(paged->lock_ref());
 
     // fault in or grab existing pages.
-    __UNINITIALIZED auto cursor =
-        paged->GetLookupCursorLocked(vmo_offset, max_out_pages * PAGE_SIZE);
+    const size_t cursor_size = num_fault_pages * PAGE_SIZE;
+    __UNINITIALIZED auto cursor = paged->GetLookupCursorLocked(vmo_offset, cursor_size);
     if (cursor.is_error()) {
       return cursor.error_value();
     }
@@ -1036,54 +1069,69 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
     // get an accessed bit set in the hardware.
     cursor->DisableMarkAccessed();
     AssertHeld(cursor->lock_ref());
-    __UNINITIALIZED
-    zx::result<VmCowPages::LookupCursor::RequireResult> result =
-        cursor->RequirePage(write, 1, page_request);
-    if (result.is_error()) {
-      return result.error_value();
+
+    // Fault requested pages.
+    uint64_t offset = 0;
+    for (; offset < (num_requested_pages * PAGE_SIZE); offset += PAGE_SIZE) {
+      uint curr_mmu_flags = range.mmu_flags;
+
+      uint num_curr_pages = static_cast<uint>(num_requested_pages - (offset / PAGE_SIZE));
+      __UNINITIALIZED zx::result<VmCowPages::LookupCursor::RequireResult> result =
+          cursor->RequirePage(write, num_curr_pages, page_request);
+      if (result.is_error()) {
+        coalescer.Flush();
+        return result.error_value();
+      }
+
+      DEBUG_ASSERT(!write || result->writable);
+
+      // If we read faulted, and lookup didn't say that this is always writable, then we map or
+      // modify the page without any write permissions. This ensures we will fault again if a write
+      // is attempted so we can potentially replace this page with a copy or a new one, or update
+      // the page's dirty state.
+      if (!write && !result->writable) {
+        // we read faulted, so only map with read permissions
+        curr_mmu_flags &= ~ARCH_MMU_FLAG_PERM_WRITE;
+      }
+
+      zx_status_t status =
+          coalescer.AppendOrAdjustMapping(va + offset, result->page->paddr(), curr_mmu_flags);
+      if (status != ZX_OK) {
+        // Flush any existing pages in the coalescer.
+        coalescer.Flush();
+        return status;
+      }
     }
 
     // We looked up in order to write. Mark as modified.
     if (write) {
-      DEBUG_ASSERT(result->writable);
-      paged->mark_modified_locked();
+      object_->mark_modified_locked();
     }
 
-    // if we read faulted, and lookup didn't say that this is always writable, then we map or modify
-    // the page without any write permissions. This ensures we will fault again if a write is
-    // attempted so we can potentially replace this page with a copy or a new one, or update the
-    // page's dirty state.
-    if (!write && !result->writable) {
-      // we read faulted, so only map with read permissions
-      range.mmu_flags &= ~ARCH_MMU_FLAG_PERM_WRITE;
+    // Fault opportunistic pages. If a range is supplied, it is assumed the user knows the
+    // appropriate range, so opportunistic pages will not be fault.
+    if (num_fault_pages > num_requested_pages) {
+      // Check how much space the coalescer has for faulting additional pages.
+      size_t extra_pages = coalescer.ExtraPageCapacityFrom(last_va + PAGE_SIZE);
+      extra_pages = ktl::min(extra_pages, num_opt_pages);
+
+      // Acquire any additional pages, but only if they already exist as the user has not attempted
+      // to use these pages yet.
+      if (extra_pages > 0) {
+        bool writeable = (coalescer.GetMmuFlags() & ARCH_MMU_FLAG_PERM_WRITE);
+        size_t num_extra_pages = cursor->IfExistPages(writeable, static_cast<uint>(extra_pages),
+                                                      coalescer.GetNextPageSlot());
+        coalescer.IncrementCount(num_extra_pages);
+      }
     }
-
-    zx_status_t status =
-        coalescer.AppendOrAdjustMapping(va, result->page->paddr(), range.mmu_flags);
-    if (status != ZX_OK) {
-      return status;
-    }
-
-    // Check how much space the coalescer has for faulting additional pages.
-    size_t extra_pages = coalescer.ExtraPageCapacityFrom(va + PAGE_SIZE);
-    extra_pages = ktl::min(extra_pages, max_out_pages - 1);
-
-    // Acquire any additional pages, but only if they already exist as the user has not actually
-    // attempted to use these pages yet.
-    if (extra_pages > 0) {
-      size_t num_pages = cursor->IfExistPages(result->writable, static_cast<uint>(extra_pages),
-                                              coalescer.GetNextPageSlot());
-      coalescer.IncrementCount(num_pages);
-    }
-
   } else if (VmObjectPhysical* phys = DownCastVmObject<VmObjectPhysical>(object_.get()); phys) {
     AssertHeld(phys->lock_ref());
 
-    // Already validated the size, and since physical VMOs are always allocated, and not resizable,
-    // we know we can always retrieve the maximum number of pages without failure.
-    uint64_t len = max_out_pages * PAGE_SIZE;
+    // Already validated the size, and since physical VMOs are always allocated, and not
+    // resizable, we know we can always retrieve the maximum number of pages without failure.
+    uint64_t phys_len = num_fault_pages * PAGE_SIZE;
     paddr_t phys_base = 0;
-    zx_status_t status = phys->LookupContiguousLocked(vmo_offset, len, &phys_base);
+    zx_status_t status = phys->LookupContiguousLocked(vmo_offset, phys_len, &phys_base);
 
     ASSERT(status == ZX_OK);
 
@@ -1093,7 +1141,7 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
     }
 
     // Extrapolate the pages from the base address.
-    for (size_t offset = PAGE_SIZE; offset < len; offset += PAGE_SIZE) {
+    for (size_t offset = PAGE_SIZE; offset < phys_len; offset += PAGE_SIZE) {
       status = coalescer.Append(va + offset, phys_base + offset);
       if (status != ZX_OK) {
         return status;
