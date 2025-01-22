@@ -66,6 +66,3 @@ pub struct FileObjectState {
 pub struct FileSystemState {
     state: selinux_hooks::FileSystemState,
 }
-
-/// Default access-check exceptions configuration for SELinux-enabled Starnix containers.
-pub const DEFAULT_EXCEPTIONS_CONFIG: &str = include_str!("selinux_hooks/default_exceptions_config");

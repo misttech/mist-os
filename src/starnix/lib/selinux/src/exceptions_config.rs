@@ -58,8 +58,9 @@ impl ExceptionsConfig {
 
                     // Parse the bug Id, which must be present, prefixed by "b/"
                     let bug = parts.next().ok_or_else(|| anyhow!("Expected bug identifier"))?;
-                    let bug_id_part = bug.strip_prefix("b/").or_else(|| bug.strip_prefix("https://fxbug.dev/"))
-                        .ok_or_else(|| anyhow!("Expected bug Identifier of the form b/<id> or https://fxbug.dev/<id>"))?;
+                    let bug_id_part = bug
+                        .strip_prefix("b/")
+                        .ok_or_else(|| anyhow!("Expected bug identifier of the form b/<id>"))?;
                     let bug_id = bug_id_part
                         .parse::<NonZeroU64>()
                         .map_err(|_| anyhow!("Malformed bug Id: {}", bug_id_part))?;

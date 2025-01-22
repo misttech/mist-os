@@ -12,10 +12,15 @@
         {
             type: "expect_failure",
             matchers: [
+                // TODO(http://b/330904217): update `entrypoint` expectation to pass once filesystems are labeled correctly.
+                "*entrypoint*",
+                "*execshare*",
+
                 // TODO(http://b/385121365): `inherit` tests will pass once the `file_permission`
                 // hook correctly enforces the `write` permission.
                 "*inherit*",
 
+                // TODO(http://b/330904217): update `execute_no_trans` expectation to pass once filesystems are labeled correctly.
                 // keep-sorted start
                 "*atsecure*",
                 "*bounds*",
@@ -26,7 +31,7 @@
                 "*cgroupfs_label*",
                 "*checkreqprot*",
                 "*dyntrace*",
-                "*execshare*",
+                "*execute_no_trans*",
                 "*fdreceive*",
                 "*inet_socket*",
                 "*ioctl*",
@@ -51,7 +56,6 @@
                 "*tun_tap*",
 
                 // keep-sorted end
-
                 // The tests below are all explicitly expected to fail. The ones
                 // containing "*" above sometimes cover more than one test.
                 // keep-sorted start

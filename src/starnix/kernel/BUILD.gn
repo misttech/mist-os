@@ -446,7 +446,6 @@ rustc_library("starnix_core") {
     features += [ "alternate_anon_allocs" ]
   }
   inputs = [
-    "//src/starnix/kernel/security/selinux_hooks/default_exceptions_config",
     "//src/starnix/lib/selinux/testdata/micro_policies/hooks_tests_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/bounded_transition_policy.pp",
   ]
