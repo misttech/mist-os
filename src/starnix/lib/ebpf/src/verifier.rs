@@ -1020,25 +1020,25 @@ const STACK_MAX_INDEX: usize = BPF_STACK_SIZE / STACK_ELEMENT_SIZE;
 /// An offset inside the stack. The offset is from the end of the stack.
 /// downward.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct StackOffset(i64);
+pub struct StackOffset(u64);
 
 impl Default for StackOffset {
     fn default() -> Self {
-        Self(BPF_STACK_SIZE as i64)
+        Self(BPF_STACK_SIZE as u64)
     }
 }
 
 impl StackOffset {
-    const INVALID: Self = Self(i64::MIN);
+    const INVALID: Self = Self(u64::MAX >> 1);
 
     /// Whether the current offset is valid.
     fn is_valid(&self) -> bool {
-        self.0 >= 0 && self.0 <= (BPF_STACK_SIZE as i64)
+        self.0 <= (BPF_STACK_SIZE as u64)
     }
 
     /// The value of the register.
     fn reg(&self) -> u64 {
-        self.0 as u64
+        self.0
     }
 
     /// The index into the stack array this offset points to. Can be called only if `is_valid()`
@@ -1053,7 +1053,7 @@ impl StackOffset {
     }
 
     fn checked_add<T: TryInto<i64>>(self, rhs: T) -> Option<Self> {
-        self.0.checked_add(rhs.try_into().ok()?).map(Self)
+        Some(Self(self.0.overflowing_add_signed(rhs.try_into().ok()?).0))
     }
 }
 
@@ -4212,7 +4212,7 @@ fn run_on_stack_offset<F>(v: StackOffset, f: F) -> StackOffset
 where
     F: FnOnce(u64) -> u64,
 {
-    StackOffset(f(v.reg()) as i64)
+    StackOffset(f(v.reg()))
 }
 
 fn error_and_log<T>(
