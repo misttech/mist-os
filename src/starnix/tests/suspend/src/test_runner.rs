@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_component_test::{RealmBuilder, RealmBuilderParams, RealmInstance};
+use futures::task::Poll;
 use zx::{HandleBased, Peered};
 use {fidl_fuchsia_starnix_runner as fstarnix, fuchsia_async as fasync};
 
@@ -17,7 +18,7 @@ async fn build_realm() -> RealmInstance {
     builder.build().await.unwrap()
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn test_register_wake_watcher() {
     let realm_instance = build_realm().await;
     let manager = realm_instance
@@ -29,6 +30,7 @@ async fn test_register_wake_watcher() {
     let child_job = job.create_child_job().unwrap();
 
     let (wake_watcher, wake_watcher_remote) = zx::EventPair::create();
+
     manager
         .register_wake_watcher(fstarnix::ManagerRegisterWakeWatcherRequest {
             watcher: Some(wake_watcher_remote),
@@ -36,16 +38,23 @@ async fn test_register_wake_watcher() {
         })
         .await
         .unwrap();
+
     // Get initial AWAKE SIGNAL.
-    fasync::OnSignals::new(&wake_watcher, AWAKE_SIGNAL).await.expect("awake signal");
-    let _fut = manager.suspend_container(fstarnix::ManagerSuspendContainerRequest {
+    fasync::OnSignals::new(&wake_watcher, AWAKE_SIGNAL).await.expect("awake");
+
+    let mut signal_fut = fasync::OnSignals::new(&wake_watcher, ASLEEP_SIGNAL);
+    assert_eq!(Poll::Pending, futures::poll!(&mut signal_fut));
+
+    let suspend_fut = manager.suspend_container(fstarnix::ManagerSuspendContainerRequest {
         container_job: Some(child_job.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap()),
         wake_locks: None,
         ..Default::default()
     });
 
-    fasync::OnSignals::new(&wake_watcher, ASLEEP_SIGNAL).await.expect("asleep signal");
-    fasync::OnSignals::new(&wake_watcher, AWAKE_SIGNAL).await.expect("awake signal");
+    signal_fut.await.expect("asleep future");
+
+    fasync::OnSignals::new(&wake_watcher, AWAKE_SIGNAL).await.expect("final awake signal");
+    let _ = suspend_fut.await;
 }
 
 #[fasync::run_singlethreaded(test)]
