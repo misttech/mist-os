@@ -19,7 +19,6 @@ fuchsia_component("root") {
 fuchsia_test_package("pkg") {
   package_name = "detect_integration_test"
   test_components = [ ":root" ]
-  deps = [ "//src/lib/fuchsia-component-test" ]
   subpackages = [
     "realm_factory:pkg",
     "test_cases:pkg",
