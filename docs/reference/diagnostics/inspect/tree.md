@@ -75,7 +75,7 @@ The protocol supports this behavior in the following ways:
 
   This method accepts a request for `fuchsia.inspect.Tree` that will
   be bound to the tree specified by a given name. Using this method a
-  client may iterate through all trees exposed over the root iterface.
+  client may iterate through all trees exposed over the root interface.
 
 ### `fuchsia.inspect.deprecated.Inspect` {#deprecated}
 
@@ -177,14 +177,15 @@ following:
   protocols.
 
 A component that wishes to expose Inspect needs to use the `fuchsia.inspect.InspectSink`
-protocol. This typically looks as follows:
+protocol. Components typically have the `diagnostics` dictionary routed to them,
+so this typically looks as follows:
 
 ```json5
 {
     use: [
         {
             protocol: "fuchsia.inspect.InspectSink",
-            from: "parent",
+            from: "parent/diagnostics",
         },
     ],
 }
@@ -197,6 +198,21 @@ There's a useful manifest include that simplifies this and is required by Inspec
     include: [
         "inspect/client.shard.cml",
     ]
+}
+```
+
+If a component doesn't have the `diagnostics` dictionary routed to it and the
+component only has the protocol routed to it then using it typically looks as
+follows:
+
+```json5
+{
+    use: [
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+        },
+    ],
 }
 ```
 
