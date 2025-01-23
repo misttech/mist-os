@@ -233,7 +233,10 @@ impl ObjectManager {
             self.open_store(&root_store, store_id).await?;
         }
 
-        self.init_metadata_reservation()?;
+        // This can fail if a filesystem is created and truncated to a size
+        // that doesn't leave enough free space for metadata reservations.
+        self.init_metadata_reservation()
+            .context("Insufficient free space for metadata reservation.")?;
 
         Ok(())
     }

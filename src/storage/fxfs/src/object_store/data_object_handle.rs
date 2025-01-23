@@ -1519,6 +1519,47 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         self.read(0u64, buf.as_mut()).await?;
         Ok(buf.as_slice().into())
     }
+
+    /// Returns the set of file_offset->extent mappings for this file.
+    /// This operation is potentially expensive and should generally be avoided.
+    pub async fn device_extents(&self) -> Result<Vec<(u64, Range<u64>)>, Error> {
+        let mut extents = Vec::new();
+        let tree = &self.store().tree;
+        let layer_set = tree.layer_set();
+        let mut merger = layer_set.merger();
+        let mut iter = merger
+            .query(Query::FullRange(&ObjectKey::attribute(
+                self.object_id(),
+                self.attribute_id(),
+                AttributeKey::Extent(ExtentKey::search_key_from_offset(0)),
+            )))
+            .await?;
+        loop {
+            match iter.get() {
+                Some(ItemRef {
+                    key:
+                        ObjectKey {
+                            object_id,
+                            data:
+                                ObjectKeyData::Attribute(
+                                    attribute_id,
+                                    AttributeKey::Extent(ExtentKey { range }),
+                                ),
+                        },
+                    value: ObjectValue::Extent(ExtentValue::Some { device_offset, .. }),
+                    ..
+                }) if *object_id == self.object_id() && *attribute_id == self.attribute_id() => {
+                    extents.push((
+                        range.start,
+                        *device_offset..*device_offset + range.length().unwrap(),
+                    ))
+                }
+                _ => break,
+            }
+            iter.advance().await?;
+        }
+        Ok(extents)
+    }
 }
 
 impl<S: HandleOwner> AssociatedObject for DataObjectHandle<S> {
@@ -1529,9 +1570,12 @@ impl<S: HandleOwner> AssociatedObject for DataObjectHandle<S> {
                 ..
             }) => self.content_size.store(*size, atomic::Ordering::Relaxed),
             Mutation::ObjectStore(ObjectStoreMutation {
-                item: ObjectItem { value: ObjectValue::VerifiedAttribute { .. }, .. },
+                item: ObjectItem { value: ObjectValue::VerifiedAttribute { size, .. }, .. },
                 ..
-            }) => self.finalize_fsverity_state(),
+            }) => {
+                debug_assert_eq!(self.get_size(), *size, "VerifiedAttribute size should be set when verity is enabled and should not change");
+                self.finalize_fsverity_state()
+            }
             Mutation::ObjectStore(ObjectStoreMutation {
                 item:
                     ObjectItem {

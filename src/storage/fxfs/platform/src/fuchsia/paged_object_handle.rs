@@ -2610,18 +2610,14 @@ mod tests {
             file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
         }
 
-        // Writing outside the allocated range fails.
+        // Writing outside the allocated range fails (because not overwrite mode.)
         assert_eq!(
             file.write_at(&write_data, page_size).await.unwrap().map_err(zx::Status::from_raw),
             Err(zx::Status::NO_SPACE)
         );
 
         for _ in 0..100 {
-            // Writing inside the allocated range succeeds indefinitely.
-            assert_eq!(
-                file.write_at(&write_data, 0).await.unwrap().map_err(zx::Status::from_raw).unwrap(),
-                page_size
-            );
+            // Writing inside the allocated range succeeds indefinitely (because overwrite mode).
             assert_eq!(
                 file.write_at(&write_data, 0).await.unwrap().map_err(zx::Status::from_raw).unwrap(),
                 page_size
@@ -2629,11 +2625,10 @@ mod tests {
             file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
         }
 
-        // Writing outside the allocated range still fails.
-        assert_eq!(
-            file.write_at(&write_data, page_size).await.unwrap().map_err(zx::Status::from_raw),
-            Err(zx::Status::NO_SPACE)
-        );
+        // Note that it is possible now that writing outside the range may work again because
+        // the overwrite transactions committed above as part of the fallocate range above will
+        // consume journal space and this space may lead to a compaction that frees the prefix of
+        // the journal, creating up to around 128kb of available space.
 
         fixture.close().await;
     }

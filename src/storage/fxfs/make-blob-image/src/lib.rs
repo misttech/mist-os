@@ -11,6 +11,7 @@ use fxfs::errors::FxfsError;
 use fxfs::filesystem::{FxFilesystem, FxFilesystemBuilder, SyncOptions};
 use fxfs::object_handle::WriteBytes;
 use fxfs::object_store::directory::Directory;
+use fxfs::object_store::journal::RESERVED_SPACE;
 use fxfs::object_store::transaction::{lock_keys, LockKey};
 use fxfs::object_store::volume::root_volume;
 use fxfs::object_store::{DirectWriter, HandleOptions, ObjectStore, BLOB_MERKLE_ATTRIBUTE_ID};
@@ -117,7 +118,7 @@ pub async fn make_blob_image(
     if target_size == 0 {
         // Apply a default heuristic of 2x the actual image size.  This is necessary to use the
         // Fxfs image, since if it's completely full it can't be modified.
-        target_size = actual_size * 2;
+        target_size = actual_size * 2 + RESERVED_SPACE;
     }
 
     if let Some(sparse_path) = sparse_output_image_path {
@@ -453,7 +454,7 @@ mod tests {
             BlobsJsonOutputEntry {
                 merkle,
                 bytes: 65537,
-                // XXX: This is technically sensitive to compression, but a string of 'a' should
+                // This is technically sensitive to compression, but a string of 'a' should
                 // always compress down to a single block.
                 size: 8192,
                 file_size: 65537,

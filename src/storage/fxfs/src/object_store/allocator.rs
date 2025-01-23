@@ -2352,20 +2352,30 @@ mod tests {
         let mut transaction =
             fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         let mut device_ranges = collect_allocations(&allocator).await;
+
+        // Expected extents:
+        let expected = vec![
+            0..4096,        // Superblock A
+            4096..139264,   // Superblock A extension
+            139264..204800, // Superblock B extension
+            204800..335872, // Initial Journal
+            524288..528384, // Superblock B extension
+        ];
+        assert_eq!(device_ranges, expected);
         device_ranges.push(
             allocator
                 .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
                 .await
                 .expect("allocate failed"),
         );
-        assert_eq!(device_ranges.last().unwrap().length().expect("Invalid range"), fs.block_size(),);
+        assert_eq!(device_ranges.last().unwrap().length().expect("Invalid range"), fs.block_size());
         device_ranges.push(
             allocator
                 .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
                 .await
                 .expect("allocate failed"),
         );
-        assert_eq!(device_ranges.last().unwrap().length().expect("Invalid range"), fs.block_size(),);
+        assert_eq!(device_ranges.last().unwrap().length().expect("Invalid range"), fs.block_size());
         assert_eq!(overlap(&device_ranges[0], &device_ranges[1]), 0);
         transaction.commit().await.expect("commit failed");
         let mut transaction =
@@ -2376,9 +2386,9 @@ mod tests {
                 .await
                 .expect("allocate failed"),
         );
-        assert_eq!(device_ranges[2].length().unwrap(), fs.block_size());
-        assert_eq!(overlap(&device_ranges[0], &device_ranges[2]), 0);
-        assert_eq!(overlap(&device_ranges[1], &device_ranges[2]), 0);
+        assert_eq!(device_ranges[7].length().expect("Invalid range"), fs.block_size());
+        assert_eq!(overlap(&device_ranges[5], &device_ranges[7]), 0);
+        assert_eq!(overlap(&device_ranges[6], &device_ranges[7]), 0);
         transaction.commit().await.expect("commit failed");
 
         check_allocations(&allocator, &device_ranges).await;
