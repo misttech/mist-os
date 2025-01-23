@@ -175,22 +175,30 @@ async fn list_impl(
             entries: None,
         };
 
-        package.entries = repo.show_package(&package.name, true).await?.map(|entries| {
-            // Compute the total size of the unique blobs.
-            let mut blob_sizes = HashMap::new();
-            for entry in &entries {
-                if let (Some(hash), Some(size)) = (entry.hash, entry.size) {
-                    blob_sizes.insert(hash, size);
+        if cmd.include_size || cmd.include_components {
+            if let Some(entries) = repo.show_package(&package.name, cmd.include_size).await? {
+                if cmd.include_size {
+                    // Compute the total size of the unique blobs.
+                    let mut blob_sizes = HashMap::new();
+                    for entry in &entries {
+                        if let (Some(hash), Some(size)) = (entry.hash, entry.size) {
+                            blob_sizes.insert(hash, size);
+                        }
+                    }
+                    package.size = Some(blob_sizes.values().sum());
+                }
+
+                if cmd.include_components {
+                    package.entries = Some(
+                        entries
+                            .into_iter()
+                            .filter(|entry| entry.subpackage.is_none())
+                            .filter(|entry| entry.path.ends_with(".cm"))
+                            .collect(),
+                    );
                 }
             }
-            package.size = Some(blob_sizes.values().sum());
-
-            entries
-                .into_iter()
-                .filter(|entry| entry.subpackage.is_none())
-                .filter(|entry| entry.path.ends_with(".cm"))
-                .collect()
-        });
+        }
 
         packages.push(package);
     }
@@ -213,7 +221,10 @@ fn print_package_table(
     writer: &mut PackagesWriter,
 ) -> Result<()> {
     let mut table = Table::new();
-    let mut header = row!("NAME", "SIZE", "HASH", "MODIFIED");
+    let mut header = row!("NAME", "HASH", "MODIFIED");
+    if cmd.include_size {
+        header.add_cell(cell!("SIZE"));
+    }
     if cmd.include_components {
         header.add_cell(cell!("COMPONENTS"));
     }
@@ -225,17 +236,20 @@ fn print_package_table(
     for pkg in packages {
         let mut row = row!(
             pkg.name,
-            pkg.size
-                .map(|s| s
-                    .file_size(file_size_opts::CONVENTIONAL)
-                    .unwrap_or_else(|_| format!("{}b", s)))
-                .unwrap_or_else(|| "<unknown>".to_string()),
             format_hash(&Some(pkg.hash), cmd.full_hash),
             pkg.modified
                 .and_then(|m| SystemTime::UNIX_EPOCH.checked_add(Duration::from_secs(m)))
                 .map(to_rfc2822)
                 .unwrap_or_else(String::new)
         );
+        if cmd.include_size {
+            row.add_cell(cell!(pkg
+                .size
+                .map(|s| s
+                    .file_size(file_size_opts::CONVENTIONAL)
+                    .unwrap_or_else(|_| format!("{}b", s)))
+                .unwrap_or_else(|| "<unknown>".to_string())));
+        }
         if cmd.include_components {
             if let Some(entries) = pkg.entries {
                 row.add_cell(cell!(entries
@@ -430,26 +444,35 @@ mod test {
         env
     }
 
-    async fn run_impl(
-        cmd: ListSubCommand,
-        context: EnvironmentContext,
-        writer: &mut PackagesWriter,
-    ) {
-        timeout::timeout(std::time::Duration::from_millis(1000), list_impl(cmd, context, writer))
-            .await
-            .unwrap()
-            .unwrap();
+    async fn run_impl(cmd: ListSubCommand, context: EnvironmentContext) -> TestBuffers {
+        let test_buffers = TestBuffers::default();
+        let mut writer = PackagesWriter::new_test(None, &test_buffers);
+        timeout::timeout(
+            std::time::Duration::from_millis(1000),
+            list_impl(cmd, context, &mut writer),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+        test_buffers
     }
 
     async fn run_impl_for_show_command(
         cmd: ShowSubCommand,
         context: EnvironmentContext,
-        writer: &mut PackagesWriter,
-    ) {
-        timeout::timeout(std::time::Duration::from_millis(1000), show_impl(cmd, context, writer))
-            .await
-            .unwrap()
-            .unwrap();
+    ) -> TestBuffers {
+        let test_buffers = TestBuffers::default();
+        let mut writer = PackagesWriter::new_test(None, &test_buffers);
+        timeout::timeout(
+            std::time::Duration::from_millis(1000),
+            show_impl(cmd, context, &mut writer),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+        test_buffers
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -465,18 +488,15 @@ mod test {
             .await
             .unwrap();
 
-        let test_buffers = TestBuffers::default();
-        let mut writer = PackagesWriter::new_test(None, &test_buffers);
-
-        run_impl(
+        let test_buffers = run_impl(
             ListSubCommand {
                 repository: Some("devhost".to_string()),
                 port: None,
                 full_hash: false,
                 include_components: false,
+                include_size: false,
             },
             env.context.clone(),
-            &mut writer,
         )
         .await;
 
@@ -495,9 +515,9 @@ mod test {
             stdout,
             format!(
                 "\
-NAME       SIZE     HASH        MODIFIED \n\
-package1/0 24.03 KB {pkg1_hash} {pkg1_modified} \n\
-package2/0 24.03 KB {pkg2_hash} {pkg2_modified} \n",
+NAME       HASH        MODIFIED \n\
+package1/0 {pkg1_hash} {pkg1_modified} \n\
+package2/0 {pkg2_hash} {pkg2_modified} \n",
             ),
         );
 
@@ -517,18 +537,15 @@ package2/0 24.03 KB {pkg2_hash} {pkg2_modified} \n",
             .await
             .unwrap();
 
-        let test_buffers = TestBuffers::default();
-        let mut writer = PackagesWriter::new_test(None, &test_buffers);
-
-        run_impl(
+        let test_buffers = run_impl(
             ListSubCommand {
                 repository: Some("devhost".to_string()),
                 port: None,
                 full_hash: true,
                 include_components: false,
+                include_size: false,
             },
             env.context.clone(),
-            &mut writer,
         )
         .await;
 
@@ -547,9 +564,9 @@ package2/0 24.03 KB {pkg2_hash} {pkg2_modified} \n",
             stdout,
             format!(
                 "\
-NAME       SIZE     HASH                                                             MODIFIED \n\
-package1/0 24.03 KB {pkg1_hash} {pkg1_modified} \n\
-package2/0 24.03 KB {pkg2_hash} {pkg2_modified} \n",
+NAME       HASH                                                             MODIFIED \n\
+package1/0 {pkg1_hash} {pkg1_modified} \n\
+package2/0 {pkg2_hash} {pkg2_modified} \n",
             ),
         );
 
@@ -569,18 +586,15 @@ package2/0 24.03 KB {pkg2_hash} {pkg2_modified} \n",
             .await
             .unwrap();
 
-        let test_buffers = TestBuffers::default();
-        let mut writer = PackagesWriter::new_test(None, &test_buffers);
-
-        run_impl(
+        let test_buffers = run_impl(
             ListSubCommand {
                 repository: Some("devhost".to_string()),
                 port: None,
                 full_hash: false,
                 include_components: true,
+                include_size: false,
             },
             env.context.clone(),
-            &mut writer,
         )
         .await;
 
@@ -599,9 +613,60 @@ package2/0 24.03 KB {pkg2_hash} {pkg2_modified} \n",
             stdout,
             format!(
                 "\
-NAME       SIZE     HASH        {:1$} COMPONENTS \n\
-package1/0 24.03 KB {pkg1_hash} {pkg1_modified} meta/package1.cm \n\
-package2/0 24.03 KB {pkg2_hash} {pkg2_modified} meta/package2.cm \n",
+NAME       HASH        {:1$} COMPONENTS \n\
+package1/0 {pkg1_hash} {pkg1_modified} meta/package1.cm \n\
+package2/0 {pkg2_hash} {pkg2_modified} meta/package2.cm \n",
+                "MODIFIED",
+                pkg1_modified.len().max(pkg2_modified.len())
+            ),
+        );
+
+        assert_eq!(stderr, "");
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_package_list_including_size() {
+        let tmp = tempfile::tempdir().unwrap();
+        let env = setup_repo(tmp.path()).await;
+
+        // This test is only testing with daemon based repo.
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_data").to_string_lossy().into())
+            .await
+            .unwrap();
+
+        let test_buffers = run_impl(
+            ListSubCommand {
+                repository: Some("devhost".to_string()),
+                port: None,
+                full_hash: false,
+                include_components: false,
+                include_size: true,
+            },
+            env.context.clone(),
+        )
+        .await;
+
+        let blobs_path = tmp.path().join("repository/blobs/1");
+
+        let pkg1_hash = &PKG1_HASH[..MAX_HASH];
+        let pkg1_path = blobs_path.join(PKG1_HASH);
+        let pkg1_modified = to_rfc2822(std::fs::metadata(pkg1_path).unwrap().modified().unwrap());
+
+        let pkg2_hash = &PKG2_HASH[..MAX_HASH];
+        let pkg2_path = blobs_path.join(PKG2_HASH);
+        let pkg2_modified = to_rfc2822(std::fs::metadata(pkg2_path).unwrap().modified().unwrap());
+
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert_eq!(
+            stdout,
+            format!(
+                "\
+NAME       HASH        {:1$} SIZE \n\
+package1/0 {pkg1_hash} {pkg1_modified} 24.03 KB \n\
+package2/0 {pkg2_hash} {pkg2_modified} 24.03 KB \n",
                 "MODIFIED",
                 pkg1_modified.len().max(pkg2_modified.len())
             ),
@@ -623,10 +688,7 @@ package2/0 24.03 KB {pkg2_hash} {pkg2_modified} meta/package2.cm \n",
             .await
             .unwrap();
 
-        let test_buffers = TestBuffers::default();
-        let mut writer = PackagesWriter::new_test(None, &test_buffers);
-
-        run_impl_for_show_command(
+        let test_buffers = run_impl_for_show_command(
             ShowSubCommand {
                 repository: Some("devhost".to_string()),
                 port: None,
@@ -635,7 +697,6 @@ package2/0 24.03 KB {pkg2_hash} {pkg2_modified} meta/package2.cm \n",
                 package: "package1/0".to_string(),
             },
             env.context.clone(),
-            &mut writer,
         )
         .await;
 
@@ -688,10 +749,7 @@ meta/package1.cmx             12 B  <unknown>   {pkg1_modified} \n"
             .await
             .unwrap();
 
-        let test_buffers = TestBuffers::default();
-        let mut writer = PackagesWriter::new_test(None, &test_buffers);
-
-        run_impl_for_show_command(
+        let test_buffers = run_impl_for_show_command(
             ShowSubCommand {
                 repository: Some("devhost".to_string()),
                 port: None,
@@ -700,7 +758,6 @@ meta/package1.cmx             12 B  <unknown>   {pkg1_modified} \n"
                 package: "package1/0".to_string(),
             },
             env.context.clone(),
-            &mut writer,
         )
         .await;
 
@@ -751,10 +808,7 @@ meta/package1.cmx             12 B  <unknown>                                   
             .await
             .unwrap();
 
-        let test_buffers = TestBuffers::default();
-        let mut writer = PackagesWriter::new_test(None, &test_buffers);
-
-        run_impl_for_show_command(
+        let test_buffers = run_impl_for_show_command(
             ShowSubCommand {
                 repository: Some("devhost".to_string()),
                 port: None,
@@ -763,7 +817,6 @@ meta/package1.cmx             12 B  <unknown>                                   
                 package: "package1/0".to_string(),
             },
             env.context.clone(),
-            &mut writer,
         )
         .await;
 
