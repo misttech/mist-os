@@ -20,8 +20,13 @@ _host_linux_toolchain = "//build/toolchain:linux_$host_cpu"
 syscall_tests = [
   # go/keep-sorted start
 
+  "abort_test",
+  "custom_artifact_test",
+  "input_test",
   "loop_test",
+  "prctl_test",
   "restart_read_test",
+  "sysfs_kernel_test",
   "syslog_test",
   "test_helper_test",
   "time_test",
@@ -36,14 +41,12 @@ syscall_tests = [
 arch64_syscall_tests = [
   # go/keep-sorted start
 
-  "abort_test",
   "ashmem_test",
   "aspace_test",
   "bpf_test",
   "capabilities_test",
   "cgroup_freezer_test",
   "cgroup_test",
-  "custom_artifact_test",
   "epoll_test",
   "extended_pstate_test",
   "fcntl_test",
@@ -52,7 +55,6 @@ arch64_syscall_tests = [
   "fuse_test",
   "futex_test",
   "getrandom_test",
-  "input_test",
   "ioctl_test",
   "memfd_test",
   "mmap_test",
@@ -62,7 +64,6 @@ arch64_syscall_tests = [
   "pidfd_test",
   "pipe_test",
   "poll_test",
-  "prctl_test",
   "procfs_mem_test",
   "procfs_test",
   "ptrace_test",
@@ -76,7 +77,6 @@ arch64_syscall_tests = [
   "suid_test",
   "sw_breakpoint_test",
   "symlink_test",
-  "sysfs_kernel_test",
   "sysfs_power_test",
   "task_test",
   "terminal_test",
