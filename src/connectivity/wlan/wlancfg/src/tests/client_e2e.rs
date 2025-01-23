@@ -2116,3 +2116,91 @@ fn test_connect_failure_recovery() {
         TEST_CLIENT_IFACE_ID,
     );
 }
+
+#[fuchsia::test]
+fn listnr_updates_connecting_networks_correctly_on_removal() {
+    let mut exec = fasync::TestExecutor::new();
+    let mut test_values = test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false);
+
+    // No request has been sent yet. Future should be idle.
+    assert_variant!(
+        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+        Poll::Pending
+    );
+
+    // Initial update should reflect client connections are disabled
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsDisabled);
+    assert_eq!(networks.unwrap().len(), 0);
+
+    // Get ready for client connections
+    let _iface_sme_stream = prepare_client_interface(&mut exec, &mut test_values);
+
+    // Check for a listener update saying client connections are enabled
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
+    assert_eq!(networks.unwrap().len(), 0);
+
+    // Generate network ID
+    let network_id =
+        fidl_policy::NetworkIdentifier { ssid: TEST_SSID.clone().to_vec(), type_: Saved::Wpa2 };
+    let network_config = fidl_policy::NetworkConfig {
+        id: Some(network_id.clone()),
+        credential: Some(TEST_CREDS.wpa_pass_min.policy.clone()),
+        ..Default::default()
+    };
+
+    // Save the network
+    let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
+    let save_fut = pin!(save_fut);
+
+    // Continue processing the save request. Connect process starts, and save request returns once the scan has been queued.
+    let save_resp =
+        run_while(&mut exec, &mut test_values.internal_objects.internal_futures, save_fut);
+    assert_variant!(save_resp, Ok(Ok(())));
+
+    // Check for a listener update saying we're connecting
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
+    let mut networks = networks.unwrap();
+    assert_eq!(networks.len(), 1);
+    let network = networks.pop().unwrap();
+    assert_eq!(network.id.unwrap(), network_id.clone());
+    assert_eq!(network.state.unwrap(), types::ConnectionState::Connecting);
+
+    // Remove network before connection has completed.
+    let remove_fut =
+        test_values.external_interfaces.client_controller.remove_network(&network_config);
+    let remove_fut = pin!(remove_fut);
+
+    // Continue processing the remove request.
+    let remove_resp =
+        run_while(&mut exec, &mut test_values.internal_objects.internal_futures, remove_fut);
+    assert_variant!(remove_resp, Ok(Ok(())));
+
+    // Check for a listener update saying the connecting network has disconnected.
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
+    let mut networks = networks.unwrap();
+    assert_eq!(networks.len(), 1);
+    let network = networks.pop().unwrap();
+    assert_eq!(network.id.unwrap(), network_id.clone());
+    assert_eq!(network.state.unwrap(), types::ConnectionState::Disconnected);
+    assert_eq!(network.status, Some(types::DisconnectStatus::ConnectionStopped));
+}

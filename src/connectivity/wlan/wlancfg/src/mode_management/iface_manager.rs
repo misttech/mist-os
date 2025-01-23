@@ -48,15 +48,22 @@ enum ConnectionSelectionResponse {
     Autoconnect(Option<client_types::ScannedCandidate>),
 }
 
+#[derive(Clone, PartialEq)]
+#[cfg_attr(test, derive(Debug))]
+enum ClientIfaceContainerConfig {
+    Unconfigured,
+    Configured(ap_types::NetworkIdentifier),
+}
+
 /// Wraps around vital information associated with a WLAN client interface.  In all cases, a client
 /// interface will have an ID and a ClientSmeProxy to make requests of the interface.  If a client
 /// is configured to connect to a WLAN network, it will store the network configuration information
-/// associated with that network as well as a communcation channel to make requests of the state
+/// associated with that network as well as a communication channel to make requests of the state
 /// machine that maintains client connectivity.
 struct ClientIfaceContainer {
     iface_id: u16,
     sme_proxy: SmeForClientStateMachine,
-    config: Option<ap_types::NetworkIdentifier>,
+    config: ClientIfaceContainerConfig,
     client_state_machine: Option<Box<dyn client_fsm::ClientApi>>,
     /// The time of the last scan for roaming or new connection on this iface.
     last_roam_time: fasync::MonotonicInstant,
@@ -207,11 +214,9 @@ impl IfaceManagerService {
             None => {
                 // If no iface_id is specified and if there there are any unconfigured client
                 // ifaces, use the first available unconfigured iface.
-                if let Some(removal_index) = self
-                    .clients
-                    .iter()
-                    .position(|client_container| client_container.config.is_none())
-                {
+                if let Some(removal_index) = self.clients.iter().position(|client_container| {
+                    client_container.config == ClientIfaceContainerConfig::Unconfigured
+                }) {
                     return Ok(self.clients.remove(removal_index));
                 }
 
@@ -224,6 +229,20 @@ impl IfaceManagerService {
             }
         };
         self.setup_client_container(iface_id).await
+    }
+
+    // Retrieves a client iface container where the config has been set to Configured for a given
+    // network id.
+    fn get_configured_client(
+        &mut self,
+        network_id: client_types::NetworkIdentifier,
+    ) -> Result<ClientIfaceContainer, Error> {
+        if let Some(removal_index) = self.clients.iter().position(|client_container| {
+            client_container.config == ClientIfaceContainerConfig::Configured(network_id.clone())
+        }) {
+            return Ok(self.clients.remove(removal_index));
+        }
+        Err(format_err!("No configured client iface container found for network id"))
     }
 
     /// Remove the client iface from the list of configured ifaces if it is there, and create a
@@ -256,7 +275,7 @@ impl IfaceManagerService {
         Ok(ClientIfaceContainer {
             iface_id,
             sme_proxy,
-            config: None,
+            config: ClientIfaceContainerConfig::Unconfigured,
             client_state_machine: None,
             last_roam_time: fasync::MonotonicInstant::now(),
             status,
@@ -366,34 +385,60 @@ impl IfaceManagerService {
         let mut fsm_ack_receiver = None;
         let mut iface_id = None;
 
-        // If a client is configured for the specified network, tell the state machine to
-        // disconnect.  This will cause the state machine's future to exit so that the monitoring
-        // loop discovers the completed future and attempts to reconnect the interface.
+        // Check if the disconnect affects any clients.
         for client in self.clients.iter_mut() {
-            if client.config.as_ref() == Some(&network_id) {
-                client.config = None;
-
-                let (responder, receiver) = oneshot::channel();
-                match client.client_state_machine.as_mut() {
-                    Some(state_machine) => match state_machine.disconnect(reason, responder) {
-                        Ok(()) => {}
-                        Err(e) => {
-                            client.client_state_machine = None;
-
-                            return ready(Err(format_err!("failed to send disconnect: {:?}", e)))
+            match &client.config {
+                // If a client is configured for the specified network, tell the state machine to
+                // disconnect.  This will cause the state machine's future to exit so that the monitoring
+                // loop discovers the completed future and attempts to reconnect the interface.
+                ClientIfaceContainerConfig::Configured(id) if id == &network_id => {
+                    client.config = ClientIfaceContainerConfig::Unconfigured;
+                    let (responder, receiver) = oneshot::channel();
+                    match client.client_state_machine.as_mut() {
+                        Some(state_machine) => match state_machine.disconnect(reason, responder) {
+                            Ok(()) => {}
+                            Err(e) => {
+                                client.client_state_machine = None;
+                                return ready(Err(format_err!(
+                                    "failed to send disconnect: {:?}",
+                                    e
+                                )))
                                 .boxed();
+                            }
+                        },
+                        None => {
+                            // If there is a Configured client for this network with no client state
+                            // machine, it means this disconnect came before a state machine could
+                            // be set up fully (e.g. if connection selection was still
+                            // ongoing). In this case, there will be a lingering `connecting` client
+                            // state update for the given network that we must handle here, rather
+                            // than in a client state machine.
+                            let networks = vec![listener::ClientNetworkState {
+                                id: network_id,
+                                state: client_types::ConnectionState::Disconnected,
+                                status: Some(client_types::DisconnectStatus::ConnectionStopped),
+                            }];
+                            let update = listener::ClientStateUpdate {
+                                state: client_types::ClientState::ConnectionsEnabled,
+                                networks,
+                            };
+                            match self
+                                .client_update_sender
+                                .clone()
+                                .unbounded_send(listener::Message::NotifyListeners(update))
+                            {
+                                Ok(_) => (),
+                                Err(e) => error!("failed to send state update: {:?}", e),
+                            };
+                            return ready(Ok(())).boxed();
                         }
-                    },
-                    None => {
-                        return ready(Ok(())).boxed();
                     }
+                    client.client_state_machine = None;
+                    fsm_ack_receiver = Some(receiver);
+                    iface_id = Some(client.iface_id);
+                    break;
                 }
-
-                client.config = None;
-                client.client_state_machine = None;
-                fsm_ack_receiver = Some(receiver);
-                iface_id = Some(client.iface_id);
-                break;
+                _ => {}
             }
         }
 
@@ -429,14 +474,24 @@ impl IfaceManagerService {
             }
         }
 
-        // Check if already connected to requested network
-        if self.clients.iter().any(|client| match &client.config {
-            Some(config) => config == &connect_request.network,
-            None => false,
-        }) {
-            info!("Received connect request to already connected network.");
-            return Ok(());
-        };
+        for client in self.clients.iter() {
+            match &client.config {
+                ClientIfaceContainerConfig::Configured(config)
+                    if config == &connect_request.network =>
+                {
+                    info!("Received connect request to already connected network");
+                    return Ok(());
+                }
+                _ => {}
+            }
+        }
+
+        // Get a client, and mark its config as Configured, reserving it for this connect
+        // attempt
+        let mut client_iface = self.get_client(None).await?;
+        client_iface.config =
+            ClientIfaceContainerConfig::Configured(connect_request.network.clone());
+        self.clients.push(client_iface);
 
         self.telemetry_sender
             .send(TelemetryEvent::StartEstablishConnection { reset_start_time: true });
@@ -465,11 +520,17 @@ impl IfaceManagerService {
     }
 
     async fn connect(&mut self, selection: client_types::ConnectSelection) -> Result<(), Error> {
-        // Get a ClientIfaceContainer.
-        let mut client_iface = self.get_client(None).await?;
-
-        // Set the new config on this client
-        client_iface.config = Some(selection.target.network.clone());
+        // Get a client iface, preferring one that was reserved for this connect attempt, if
+        // applicable.
+        let mut client_iface = match self.get_configured_client(selection.target.network.clone()) {
+            Ok(container) => container,
+            Err(_) => {
+                let mut client = self.get_client(None).await?;
+                client.config =
+                    ClientIfaceContainerConfig::Configured(selection.target.network.clone());
+                client
+            }
+        };
 
         // Check if there's an existing state machine we can use
         match client_iface.client_state_machine.as_mut() {
@@ -513,7 +574,7 @@ impl IfaceManagerService {
                         return;
                     }
                 }
-                client.config = None;
+                client.config = ClientIfaceContainerConfig::Unconfigured;
                 client.client_state_machine = None;
                 return;
             }
@@ -524,7 +585,7 @@ impl IfaceManagerService {
         let mut idle_clients = Vec::new();
 
         for client in self.clients.iter() {
-            if client.config.is_none() {
+            if client.config == ClientIfaceContainerConfig::Unconfigured {
                 idle_clients.push(client.iface_id);
                 continue;
             }
@@ -576,7 +637,8 @@ impl IfaceManagerService {
                 .await?;
 
                 self.fsm_futures.push(fut);
-                client.config = Some(connect_selection.target.network);
+                client.config =
+                    ClientIfaceContainerConfig::Configured(connect_selection.target.network);
                 client.status = status;
                 client.client_state_machine = Some(new_client);
                 client.last_roam_time = fasync::MonotonicInstant::now();
@@ -1810,7 +1872,7 @@ mod tests {
         let mut client_container = ClientIfaceContainer {
             iface_id: TEST_CLIENT_IFACE_ID,
             sme_proxy,
-            config: None,
+            config: ClientIfaceContainerConfig::Unconfigured,
             client_state_machine: None,
             last_roam_time: fasync::MonotonicInstant::now(),
             status,
@@ -1839,10 +1901,11 @@ mod tests {
         );
 
         if configured {
-            client_container.config = Some(ap_types::NetworkIdentifier {
-                ssid: TEST_SSID.clone(),
-                security_type: ap_types::SecurityType::Wpa,
-            });
+            client_container.config =
+                ClientIfaceContainerConfig::Configured(ap_types::NetworkIdentifier {
+                    ssid: TEST_SSID.clone(),
+                    security_type: ap_types::SecurityType::Wpa,
+                });
             client_container.client_state_machine = Some(Box::new(FakeClient::new()));
         }
         iface_manager.clients.push(client_container);
@@ -1950,7 +2013,10 @@ mod tests {
 
         // Verify that the ClientIfaceContainer has the correct config.
         assert_eq!(iface_manager.clients.len(), 1);
-        assert_eq!(iface_manager.clients[0].config, Some(connect_selection.target.network.clone()));
+        assert_eq!(
+            iface_manager.clients[0].config,
+            ClientIfaceContainerConfig::Configured(connect_selection.target.network.clone())
+        );
     }
 
     /// Tests the case where connect is called while the only available interface is currently
@@ -2033,7 +2099,10 @@ mod tests {
 
         // Verify that the ClientIfaceContainer has been moved from unconfigured to configured.
         assert_eq!(iface_manager.clients.len(), 1);
-        assert_eq!(iface_manager.clients[0].config, Some(connect_selection.target.network.clone()));
+        assert_eq!(
+            iface_manager.clients[0].config,
+            ClientIfaceContainerConfig::Configured(connect_selection.target.network.clone())
+        );
     }
 
     #[fuchsia::test]
@@ -2303,7 +2372,7 @@ mod tests {
 
         // Verify that the ClientIfaceContainer has been moved from configured to unconfigured.
         assert_eq!(iface_manager.clients.len(), 1);
-        assert!(iface_manager.clients[0].config.is_none());
+        assert_eq!(iface_manager.clients[0].config, ClientIfaceContainerConfig::Unconfigured);
     }
 
     /// Tests the case where disconnect is called for a network for which the IfaceManager is not
@@ -2340,7 +2409,10 @@ mod tests {
 
         // Verify that the configured client has not been affected.
         assert_eq!(iface_manager.clients.len(), 1);
-        assert!(iface_manager.clients[0].config.is_some());
+        assert_variant!(
+            &iface_manager.clients[0].config,
+            ClientIfaceContainerConfig::Configured(..)
+        );
     }
 
     /// Tests the case where disconnect is called and no client ifaces are present.
@@ -2658,9 +2730,12 @@ mod tests {
             expected_connect_selection: None,
         }));
 
-        assert!(iface_manager.clients[0].config.is_some());
+        assert_variant!(
+            &iface_manager.clients[0].config,
+            ClientIfaceContainerConfig::Configured(..)
+        );
         iface_manager.record_idle_client(TEST_CLIENT_IFACE_ID);
-        assert!(iface_manager.clients[0].config.is_none());
+        assert_variant!(&iface_manager.clients[0].config, ClientIfaceContainerConfig::Unconfigured);
     }
 
     /// Tests the case where a running and configured iface is marked as idle.
@@ -2670,12 +2745,18 @@ mod tests {
         let test_values = test_setup(&mut exec);
         let (mut iface_manager, _) = create_iface_manager_with_client(&test_values, true);
 
-        assert!(iface_manager.clients[0].config.is_some());
+        assert_variant!(
+            &iface_manager.clients[0].config,
+            ClientIfaceContainerConfig::Configured(..)
+        );
 
         // The request to mark the interface as idle should be ignored since the interface's state
         // machine is still running.
         iface_manager.record_idle_client(TEST_CLIENT_IFACE_ID);
-        assert!(iface_manager.clients[0].config.is_some());
+        assert_variant!(
+            &iface_manager.clients[0].config,
+            ClientIfaceContainerConfig::Configured(..)
+        );
     }
 
     /// Tests the case where a non-existent iface is marked as idle.
@@ -2685,9 +2766,15 @@ mod tests {
         let test_values = test_setup(&mut exec);
         let (mut iface_manager, _) = create_iface_manager_with_client(&test_values, true);
 
-        assert!(iface_manager.clients[0].config.is_some());
+        assert_variant!(
+            &iface_manager.clients[0].config,
+            ClientIfaceContainerConfig::Configured(..)
+        );
         iface_manager.record_idle_client(123);
-        assert!(iface_manager.clients[0].config.is_some());
+        assert_variant!(
+            &iface_manager.clients[0].config,
+            ClientIfaceContainerConfig::Configured(..)
+        );
     }
 
     /// Tests the case where an iface is not configured and has_idle_client is called.
@@ -5096,7 +5183,10 @@ mod tests {
 
         // There should not be any idle clients.
         assert!(iface_manager.idle_clients().is_empty());
-        assert_eq!(iface_manager.clients[0].config, Some(connect_selection.target.network.clone()));
+        assert_eq!(
+            iface_manager.clients[0].config,
+            ClientIfaceContainerConfig::Configured(connect_selection.target.network.clone())
+        );
     }
 
     #[fuchsia::test]
@@ -5629,7 +5719,7 @@ mod tests {
     fn test_attempt_atomic_operation() {
         let mut exec = fuchsia_async::TestExecutor::new();
 
-        // The mpsc channel pair represents a requestor/worker pair to be managed by an
+        // The mpsc channel pair represents a requester/worker pair to be managed by an
         // AtomicOneshotReceiver.
         let (mpsc_sender, mpsc_receiver) = mpsc::unbounded();
         let mut mpsc_receiver = atomic_oneshot_stream::AtomicOneshotStream::new(mpsc_receiver);
@@ -5857,7 +5947,7 @@ mod tests {
         let client_container = ClientIfaceContainer {
             iface_id: TEST_CLIENT_IFACE_ID,
             sme_proxy,
-            config: None,
+            config: ClientIfaceContainerConfig::Unconfigured,
             client_state_machine: None,
             last_roam_time: fasync::MonotonicInstant::now(),
             status,
@@ -5935,6 +6025,68 @@ mod tests {
                     }
                 }
             });
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_disconnect_update_on_stopped_connection() {
+        let mut exec = fuchsia_async::TestExecutor::new();
+        let mut test_values = test_setup(&mut exec);
+
+        // Set up iface manager with an unconfigured client.
+        let (mut iface_manager, _stream) = create_iface_manager_with_client(&test_values, false);
+
+        // Send connect request to iface manager.
+        let connect_selection = generate_connect_selection();
+        let connect_req = ConnectAttemptRequest::new(
+            connect_selection.target.network.clone(),
+            connect_selection.target.credential,
+            client_types::ConnectReason::FidlConnectRequest,
+        );
+        {
+            let connect_fut = iface_manager.handle_connect_request(connect_req);
+            let mut connect_fut = pin!(connect_fut);
+            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(())));
+        }
+
+        // Expect a "Connecting" update to be sent.
+        let connecting_state_update = listener::ClientStateUpdate {
+            state: fidl_fuchsia_wlan_policy::WlanClientState::ConnectionsEnabled,
+            networks: vec![listener::ClientNetworkState {
+                id: connect_selection.target.network.clone(),
+                state: client_types::ConnectionState::Connecting,
+                status: None,
+            }],
+        };
+        assert_variant!(
+            test_values.client_update_receiver.try_next(),
+            Ok(Some(listener::Message::NotifyListeners(updates))) => {
+            assert_eq!(updates, connecting_state_update);
+        });
+
+        // Send a disconnect request to iface manager.
+        {
+            let disconnect_fut = iface_manager.disconnect(
+                connect_selection.target.network.clone(),
+                client_types::DisconnectReason::NetworkUnsaved,
+            );
+            let mut disconnect_fut = pin!(disconnect_fut);
+            assert_variant!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
+        }
+
+        // Expect a "Disconnected" update to be sent, with status "ConnectionStopped".
+        let disconnected_state_update = listener::ClientStateUpdate {
+            state: fidl_fuchsia_wlan_policy::WlanClientState::ConnectionsEnabled,
+            networks: vec![listener::ClientNetworkState {
+                id: connect_selection.target.network.clone(),
+                state: client_types::ConnectionState::Disconnected,
+                status: Some(client_types::DisconnectStatus::ConnectionStopped),
+            }],
+        };
+        assert_variant!(
+            test_values.client_update_receiver.try_next(),
+            Ok(Some(listener::Message::NotifyListeners(updates))) => {
+            assert_eq!(updates, disconnected_state_update);
         });
     }
 }
