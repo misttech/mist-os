@@ -15,8 +15,12 @@
     use: [
         {
             protocol: [
-                "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.net.routes.State",
+
+                // TODO(https://fxbug.dev/389134835): Remove the initiator
+                // capability.
+                "fuchsia.power.CollaborativeRebootInitiator",
+                "fuchsia.power.internal.CollaborativeRebootScheduler",
                 "fuchsia.process.Launcher",
                 "fuchsia.stash.Store2",
                 "fuchsia.update.channelcontrol.ChannelControl",

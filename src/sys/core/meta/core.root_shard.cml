@@ -175,6 +175,11 @@
                 "fuchsia.pkg.RetainedPackages",
                 "fuchsia.power.button.Monitor",
                 "fuchsia.power.clientlevel.Connector",
+
+                // TODO(https://fxbug.dev/389134835): Remove the initiator
+                // capability.
+                "fuchsia.power.CollaborativeRebootInitiator",
+                "fuchsia.power.internal.CollaborativeRebootScheduler",
                 "fuchsia.power.profile.Watcher",
                 "fuchsia.power.systemmode.ClientConfigurator",
                 "fuchsia.power.systemmode.Requester",

@@ -139,6 +139,16 @@
             protocol: "fuchsia.hardware.power.statecontrol.Admin",
             from: "#shutdown_shim",
         },
+
+        // TODO(https://fxbug.dev/389134835): Remove the initiator capability.
+        {
+            protocol: "fuchsia.power.CollaborativeRebootInitiator",
+            from: "#shutdown_shim",
+        },
+        {
+            protocol: "fuchsia.power.internal.CollaborativeRebootScheduler",
+            from: "#shutdown_shim",
+        },
         {
             service: "fuchsia.power.broker.ElementInfoProviderService",
             from: "#system-activity-governor",

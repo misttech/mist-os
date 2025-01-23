@@ -9,7 +9,11 @@ use anyhow::{anyhow, Context as _, Error};
 use channel_config::ChannelConfigs;
 use event_queue::{ClosedClient, ControlHandle, Event, EventQueue, Notify};
 use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_hardware_power_statecontrol::RebootReason;
+use fidl_fuchsia_power::{CollaborativeRebootInitiatorMarker, CollaborativeRebootInitiatorProxy};
+use fidl_fuchsia_power_internal::{
+    CollaborativeRebootReason, CollaborativeRebootSchedulerMarker,
+    CollaborativeRebootSchedulerProxy,
+};
 use fidl_fuchsia_update::{
     self as update, AttemptsMonitorMarker, CheckNotStartedReason, CheckingForUpdatesData,
     ErrorCheckingForUpdateData, Initiator, InstallationDeferralReason, InstallationDeferredData,
@@ -278,16 +282,19 @@ where
             .add_fidl_service(IncomingServices::Listener);
         const MAX_CONCURRENT: usize = 1000;
         // Handle each client connection concurrently.
-        fs.for_each_concurrent(MAX_CONCURRENT, |stream| {
-            Self::handle_client(Rc::clone(&server), stream).unwrap_or_else(|e| error!("{:?}", e))
+        fs.for_each_concurrent(MAX_CONCURRENT, |stream| async {
+            Self::handle_client(Rc::clone(&server), stream, &mut CollaborativeRebootFromSvcDir {})
+                .await
+                .unwrap_or_else(|e| error!("{:?}", e))
         })
         .await
     }
 
     /// Handle an incoming FIDL connection from a client.
-    async fn handle_client(
+    async fn handle_client<P: CollaborativeRebootProvider>(
         server: Rc<RefCell<Self>>,
         stream: IncomingServices,
+        cr_provider: &mut P,
     ) -> Result<(), Error> {
         match stream {
             IncomingServices::Manager(mut stream) => {
@@ -296,7 +303,7 @@ where
                 while let Some(request) =
                     stream.try_next().await.context("error receiving Manager request")?
                 {
-                    Self::handle_manager_request(Rc::clone(&server), request).await?;
+                    Self::handle_manager_request(Rc::clone(&server), request, cr_provider).await?;
                 }
             }
             IncomingServices::ChannelControl(mut stream) => {
@@ -326,9 +333,10 @@ where
     }
 
     /// Handle fuchsia.update.Manager requests.
-    async fn handle_manager_request(
+    async fn handle_manager_request<P: CollaborativeRebootProvider>(
         server: Rc<RefCell<Self>>,
         request: ManagerRequest,
+        cr_provider: &mut P,
     ) -> Result<(), Error> {
         match request {
             ManagerRequest::CheckNow { options, monitor, responder } => {
@@ -343,19 +351,14 @@ where
             }
 
             ManagerRequest::PerformPendingReboot { responder } => {
-                if server.borrow().state.manager_state == state_machine::State::WaitingForReboot {
-                    info!("Received PerformPendingRebootRequest. Rebooting.");
-                    connect_to_protocol::<fidl_fuchsia_hardware_power_statecontrol::AdminMarker>()?
-                        .reboot(RebootReason::SystemUpdate)
-                        .await?
-                        .map_err(zx::Status::from_raw)
-                        .context("reboot error")?;
-
-                    responder.send(true)?;
-                } else {
-                    info!("Received PerformPendingRebootRequest. Not waiting for one so ignoring");
-                    responder.send(false)?;
-                }
+                // TODO(https://fxbug.dev/389134835): Delete this method once
+                // it's removed from the FIDL. For now, proxy the request to
+                // the new API.
+                info!("Received PerformPendingReboot. Proxying it for Collaborative Reboot.");
+                let response = cr_provider.new_initiator_proxy()?.perform_pending_reboot().await?;
+                let rebooting = response.rebooting;
+                info!("Received PerformPendingReboot response: rebooting={rebooting:?}");
+                responder.send(rebooting.unwrap_or(false))?
             }
 
             ManagerRequest::MonitorAllUpdateChecks { attempts_monitor, control_handle: _ } => {
@@ -583,7 +586,11 @@ where
     }
 
     /// The state change callback from StateMachine.
-    pub async fn on_state_change(server: Rc<RefCell<Self>>, state: state_machine::State) {
+    pub async fn on_state_change<P: CollaborativeRebootProvider>(
+        server: Rc<RefCell<Self>>,
+        state: state_machine::State,
+        cr_provider: &mut P,
+    ) {
         server.borrow_mut().state.manager_state = state;
 
         match state {
@@ -653,6 +660,20 @@ where
                 let s = server.borrow();
                 s.state_node.set(&s.state);
             }
+        }
+
+        if state == state_machine::State::WaitingForReboot {
+            info!("Observed State::WaitingForReboot; scheduling collaborative reboot");
+            match cr_provider.new_scheduler_proxy() {
+                Err(e) => error!("Failed to connect to 'CollaborativeRebootScheduler': {e:?}"),
+                Ok(proxy) => {
+                    match proxy.schedule_reboot(CollaborativeRebootReason::SystemUpdate, None).await
+                    {
+                        Ok(()) => {}
+                        Err(e) => error!("Failed to schedule collaborative reboot: {e:?}"),
+                    }
+                }
+            };
         }
     }
 
@@ -727,9 +748,31 @@ impl CompletionResponder {
     }
 }
 
+/// A provider of Collaborative Reboot protocol connections
+pub trait CollaborativeRebootProvider {
+    fn new_scheduler_proxy(&mut self) -> Result<CollaborativeRebootSchedulerProxy, Error>;
+    fn new_initiator_proxy(&mut self) -> Result<CollaborativeRebootInitiatorProxy, Error>;
+}
+
+/// An implementation of [`CollaborativeRebootProvider`] that connects to the
+/// FIDL protocols from the svc directory.
+pub struct CollaborativeRebootFromSvcDir {}
+
+impl CollaborativeRebootProvider for CollaborativeRebootFromSvcDir {
+    fn new_scheduler_proxy(&mut self) -> Result<CollaborativeRebootSchedulerProxy, Error> {
+        connect_to_protocol::<CollaborativeRebootSchedulerMarker>()
+    }
+    fn new_initiator_proxy(&mut self) -> Result<CollaborativeRebootInitiatorProxy, Error> {
+        connect_to_protocol::<CollaborativeRebootInitiatorMarker>()
+    }
+}
+
 #[cfg(test)]
 pub use stub::{
-    FidlServerBuilder, MockOrRealStateMachineController, MockStateMachineController, StubFidlServer,
+    expect_perform_pending_reboot_once, expect_system_update_scheduled_once,
+    FakeCollaborativeRebootInitiator, FakeCollaborativeRebootScheduler, FidlServerBuilder,
+    MockOrRealStateMachineController, MockStateMachineController, NoCollaborativeReboot,
+    StubFidlServer,
 };
 
 #[cfg(test)]
@@ -740,6 +783,13 @@ mod stub {
     use crate::configuration;
     use crate::inspect::{LastResultsNode, ProtocolStateNode, ScheduleNode};
     use crate::observer::FuchsiaObserver;
+    use fidl_fuchsia_power::{
+        CollaborativeRebootInitiatorPerformPendingRebootResponse as PerformPendingRebootResponse,
+        CollaborativeRebootInitiatorRequest, CollaborativeRebootInitiatorRequestStream,
+    };
+    use fidl_fuchsia_power_internal::{
+        CollaborativeRebootSchedulerRequest, CollaborativeRebootSchedulerRequestStream,
+    };
     use fuchsia_inspect::Inspector;
     use omaha_client::common::{App, CheckTiming, ProtocolState, UpdateCheckSchedule};
     use omaha_client::cup_ecdsa::StandardCupv2Handler;
@@ -991,6 +1041,131 @@ mod stub {
             future::ready(true).boxed()
         }
     }
+
+    /// A fake that panics if Collaborative Reboot connections are attempted.
+    pub struct NoCollaborativeReboot {}
+
+    impl CollaborativeRebootProvider for NoCollaborativeReboot {
+        fn new_scheduler_proxy(&mut self) -> Result<CollaborativeRebootSchedulerProxy, Error> {
+            panic!("CollaborativeRebootScheduler connection was unexpectedly created")
+        }
+        fn new_initiator_proxy(&mut self) -> Result<CollaborativeRebootInitiatorProxy, Error> {
+            panic!("CollaborativeRebootInitiator connection was unexpectedly created")
+        }
+    }
+
+    /// A fake provider of a CollaborativeRebootScheduler connection.
+    pub struct FakeCollaborativeRebootScheduler {
+        sender:
+            Option<futures::channel::oneshot::Sender<CollaborativeRebootSchedulerRequestStream>>,
+    }
+
+    impl FakeCollaborativeRebootScheduler {
+        pub fn new(
+        ) -> (futures::channel::oneshot::Receiver<CollaborativeRebootSchedulerRequestStream>, Self)
+        {
+            let (sender, receiver) = futures::channel::oneshot::channel();
+            (receiver, Self { sender: Some(sender) })
+        }
+    }
+
+    impl CollaborativeRebootProvider for FakeCollaborativeRebootScheduler {
+        fn new_scheduler_proxy(&mut self) -> Result<CollaborativeRebootSchedulerProxy, Error> {
+            let (client, rs) =
+                fidl::endpoints::create_request_stream::<CollaborativeRebootSchedulerMarker>();
+            if let Some(sender) = self.sender.take() {
+                sender.send(rs).map_err(|_rs| ()).expect("send request stream should succeed");
+                Ok(client.into_proxy())
+            } else {
+                panic!("new_scheduler_proxy called multiple times");
+            }
+        }
+        fn new_initiator_proxy(&mut self) -> Result<CollaborativeRebootInitiatorProxy, Error> {
+            panic!("CollaborativeRebootInitiator connection was unexpectedly created")
+        }
+    }
+
+    // A helper function to drive a Fake Collaborative Reboot server expecting
+    // exactly once scheduled request.
+    pub async fn expect_system_update_scheduled_once(
+        receiver: futures::channel::oneshot::Receiver<CollaborativeRebootSchedulerRequestStream>,
+    ) {
+        let num_calls = receiver
+            .await
+            .expect("receive request stream should succeed.")
+            .fold(0, |num_calls, request| {
+                match request.expect("receive scheduler request should succeed") {
+                    CollaborativeRebootSchedulerRequest::ScheduleReboot {
+                        reason,
+                        cancel,
+                        responder,
+                    } => {
+                        assert_eq!(reason, CollaborativeRebootReason::SystemUpdate);
+                        assert_eq!(cancel, None);
+                        responder.send().expect("responding to schedule should succeed");
+                        futures::future::ready(num_calls + 1)
+                    }
+                }
+            })
+            .await;
+        assert_eq!(num_calls, 1);
+    }
+
+    /// A fake provider of a CollaborativeRebootInitiator connection.
+    pub struct FakeCollaborativeRebootInitiator {
+        sender:
+            Option<futures::channel::oneshot::Sender<CollaborativeRebootInitiatorRequestStream>>,
+    }
+
+    impl FakeCollaborativeRebootInitiator {
+        pub fn new(
+        ) -> (futures::channel::oneshot::Receiver<CollaborativeRebootInitiatorRequestStream>, Self)
+        {
+            let (sender, receiver) = futures::channel::oneshot::channel();
+            (receiver, Self { sender: Some(sender) })
+        }
+    }
+
+    impl CollaborativeRebootProvider for FakeCollaborativeRebootInitiator {
+        fn new_initiator_proxy(&mut self) -> Result<CollaborativeRebootInitiatorProxy, Error> {
+            let (client, rs) =
+                fidl::endpoints::create_request_stream::<CollaborativeRebootInitiatorMarker>();
+            if let Some(sender) = self.sender.take() {
+                sender.send(rs).map_err(|_rs| ()).expect("send request stream should succeed");
+                Ok(client.into_proxy())
+            } else {
+                panic!("new_initiator_proxy called multiple times");
+            }
+        }
+        fn new_scheduler_proxy(&mut self) -> Result<CollaborativeRebootSchedulerProxy, Error> {
+            panic!("CollaborativeRebootScheduler connection was unexpectedly created")
+        }
+    }
+
+    // A helper function to drive a Fake Collaborative Reboot server expecting
+    // exactly once PerformPendingReboot request.
+    pub async fn expect_perform_pending_reboot_once(
+        receiver: futures::channel::oneshot::Receiver<CollaborativeRebootInitiatorRequestStream>,
+    ) {
+        let num_calls = receiver
+            .await
+            .expect("receive request stream should succeed.")
+            .fold(0, |num_calls, request| {
+                match request.expect("receive initiator request should succeed") {
+                    CollaborativeRebootInitiatorRequest::PerformPendingReboot { responder } => {
+                        responder
+                            .send(&PerformPendingRebootResponse {
+                                rebooting: Some(true),
+                                ..Default::default()
+                            })
+                            .expect("responding to request should succeed.");
+                        futures::future::ready(num_calls + 1)
+                    }
+                }
+            })
+            .await;
+        assert_eq!(num_calls, 1);
+    }
 }
 
 #[cfg(test)]
@@ -1019,9 +1194,11 @@ mod tests {
         service: fn(M::RequestStream) -> IncomingServices,
     ) -> M::Proxy {
         let (proxy, stream) = create_proxy_and_stream::<M>();
-        fasync::Task::local(
-            FidlServer::handle_client(fidl, service(stream)).unwrap_or_else(|e| panic!("{}", e)),
-        )
+        fasync::Task::local(async move {
+            FidlServer::handle_client(fidl, service(stream), &mut NoCollaborativeReboot {})
+                .await
+                .unwrap_or_else(|e| panic!("{}", e))
+        })
         .detach();
         proxy
     }
@@ -1046,6 +1223,7 @@ mod tests {
         FidlServer::on_state_change(
             Rc::clone(&fidl),
             state_machine::State::CheckingForUpdates(InstallSource::OnDemand),
+            &mut NoCollaborativeReboot {},
         )
         .await;
         assert_eq!(
@@ -1261,7 +1439,12 @@ mod tests {
         };
         let result = proxy.check_now(&options, Some(client_end)).await.unwrap();
         assert_matches!(result, Ok(()));
-        FidlServer::on_state_change(Rc::clone(&fidl), state_machine::State::InstallingUpdate).await;
+        FidlServer::on_state_change(
+            Rc::clone(&fidl),
+            state_machine::State::InstallingUpdate,
+            &mut NoCollaborativeReboot {},
+        )
+        .await;
         // Ignore the first InstallingUpdate state with no progress.
         let MonitorRequest::OnState { state: _, responder } =
             stream.try_next().await.unwrap().unwrap();
@@ -1534,7 +1717,17 @@ mod tests {
             let apps_node = AppsNode::new(inspector.root().create_child("apps"));
             let fidl = FidlServerBuilder::new().with_apps_node(apps_node).build().await;
 
-            StubFidlServer::on_state_change(Rc::clone(&fidl), state).await;
+            if state == state_machine::State::WaitingForReboot {
+                let (request_stream_receiver, mut cr_provider) =
+                    FakeCollaborativeRebootScheduler::new();
+                let ((), ()) = futures::join!(
+                    FidlServer::on_state_change(Rc::clone(&fidl), state, &mut cr_provider),
+                    expect_system_update_scheduled_once(request_stream_receiver),
+                );
+            } else {
+                FidlServer::on_state_change(Rc::clone(&fidl), state, &mut NoCollaborativeReboot {})
+                    .await;
+            }
 
             let app_set = Rc::clone(&fidl.borrow().app_set);
             assert_data_tree!(
@@ -1595,8 +1788,12 @@ mod tests {
             }
         );
 
-        StubFidlServer::on_state_change(Rc::clone(&fidl), state_machine::State::InstallingUpdate)
-            .await;
+        StubFidlServer::on_state_change(
+            Rc::clone(&fidl),
+            state_machine::State::InstallingUpdate,
+            &mut NoCollaborativeReboot {},
+        )
+        .await;
 
         assert_data_tree!(
             inspector,
@@ -1608,65 +1805,28 @@ mod tests {
         );
     }
 
+    // Test that calls to PerformPendingReboot are proxied to
+    // collaborative reboots.
     #[fasync::run_singlethreaded(test)]
-    async fn test_perform_pending_reboot_returns_false() {
+    async fn test_perform_pending_reboot() {
         let fidl = FidlServerBuilder::new().build().await;
-        let proxy = spawn_fidl_server::<ManagerMarker>(fidl, IncomingServices::Manager);
-        let result = proxy.perform_pending_reboot().await.unwrap();
-        assert!(!result);
-    }
 
-    async fn assert_fidl_server_calls_reboot(
-        fidl: Rc<
-            RefCell<
-                FidlServer<omaha_client::storage::MemStorage, MockOrRealStateMachineController>,
-            >,
-        >,
-    ) {
         let (proxy, stream) = create_proxy_and_stream::<ManagerMarker>();
-        // Handling this request should fail because unit test can't access the Admin FIDL.
-        // Don't use spawn_fidl_server to run this task, since that will panic on any errors.
 
-        // Also, be very careful to assign the result of Task::local to a named variable
-        // (i.e. not `_`). Results assigned to `_` are immediately dropped. In the case of a task,
-        // that means the task might never run or might be canceled.
-        let _task = fasync::Task::local(async move {
-            let error = FidlServer::handle_client(fidl, IncomingServices::Manager(stream))
-                .await
-                .unwrap_err();
-
-            // The only reason OMCL should have attempted to talk to this FIDL service was for a
-            // reboot call, so this shows we actually attempted to call reboot.
-            assert_matches!(
-                error.downcast::<fidl::Error>().unwrap(),
-                fidl::Error::ClientChannelClosed {
-                    status: _,
-                    protocol_name: "fuchsia.hardware.power.statecontrol.Admin"
-                }
-            );
-        });
-        assert_matches!(
-            proxy.perform_pending_reboot().await,
-            Err(fidl::Error::ClientChannelClosed {
-                status: zx::Status::PEER_CLOSED,
-                protocol_name: "fuchsia.update.Manager"
-            })
-        );
-    }
-
-    // When the state machine is in WaitingForReboot, a call to PerformPendingReboot should call
-    // reboot
-    #[fasync::run_singlethreaded(test)]
-    async fn test_perform_pending_reboot_waiting_for_reboot() {
-        let fidl = FidlServerBuilder::new().build().await;
-        fidl.borrow_mut().state = State {
-            manager_state: state_machine::State::WaitingForReboot,
-            version_available: None,
-            install_progress: None,
-            urgent: None,
+        let (request_stream_receiver, mut cr_provider) = FakeCollaborativeRebootInitiator::new();
+        let pending_reboot_fut = futures::future::join(
+            proxy.perform_pending_reboot(),
+            expect_perform_pending_reboot_once(request_stream_receiver),
+        )
+        .fuse();
+        futures::pin_mut!(pending_reboot_fut);
+        futures::select! {
+            (result, ()) = pending_reboot_fut => assert_matches!(result, Ok(true)),
+            _result = FidlServer::handle_client(
+                fidl, IncomingServices::Manager(stream), &mut cr_provider).fuse() => unreachable!(
+                    "handle_client never exits"
+                ),
         };
-
-        assert_fidl_server_calls_reboot(fidl).await;
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -1682,7 +1842,12 @@ mod tests {
         FidlServer::set_urgent_update(Rc::clone(&fidl), true);
         assert_eq!(fidl.borrow().state.urgent, Some(true));
 
-        FidlServer::on_state_change(Rc::clone(&fidl), state_machine::State::Idle).await;
+        FidlServer::on_state_change(
+            Rc::clone(&fidl),
+            state_machine::State::Idle,
+            &mut NoCollaborativeReboot {},
+        )
+        .await;
         assert_eq!(fidl.borrow().state.urgent, None);
     }
 
@@ -1699,7 +1864,17 @@ mod tests {
             state_machine::State::InstallationError,
         ] {
             let fidl = FidlServerBuilder::new().build().await;
-            FidlServer::on_state_change(Rc::clone(&fidl), state).await;
+            if state == state_machine::State::WaitingForReboot {
+                let (request_stream_receiver, mut cr_provider) =
+                    FakeCollaborativeRebootScheduler::new();
+                let ((), ()) = futures::join!(
+                    FidlServer::on_state_change(Rc::clone(&fidl), state, &mut cr_provider),
+                    expect_system_update_scheduled_once(request_stream_receiver),
+                );
+            } else {
+                FidlServer::on_state_change(Rc::clone(&fidl), state, &mut NoCollaborativeReboot {})
+                    .await;
+            }
             let proxy = spawn_fidl_server::<ListenerMarker>(fidl, IncomingServices::Listener);
             let fut = proxy.wait_for_first_update_check_to_complete();
             pin_mut!(fut);
@@ -1733,12 +1908,21 @@ mod tests {
         pin_mut!(waiter1);
         pin_mut!(waiter2);
 
-        FidlServer::on_state_change(Rc::clone(&fidl), state_machine::State::Idle).await;
+        FidlServer::on_state_change(
+            Rc::clone(&fidl),
+            state_machine::State::Idle,
+            &mut NoCollaborativeReboot {},
+        )
+        .await;
         assert_matches!(TestExecutor::poll_until_stalled(&mut waiter1).await, Poll::Pending);
         assert_matches!(TestExecutor::poll_until_stalled(&mut waiter2).await, Poll::Pending);
 
-        FidlServer::on_state_change(Rc::clone(&fidl), state_machine::State::NoUpdateAvailable)
-            .await;
+        FidlServer::on_state_change(
+            Rc::clone(&fidl),
+            state_machine::State::NoUpdateAvailable,
+            &mut NoCollaborativeReboot {},
+        )
+        .await;
         let _ = waiter1.await;
         let _ = waiter2.await;
         // Clients that start to wait after the happy state is received should return immediately.

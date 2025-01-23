@@ -278,8 +278,12 @@
         },
         {
             protocol: [
-                "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.paver.Paver",
+
+                // TODO(https://fxbug.dev/389134835): Remove the initiator
+                // capability.
+                "fuchsia.power.CollaborativeRebootInitiator",
+                "fuchsia.power.internal.CollaborativeRebootScheduler",
                 "fuchsia.update.verify.BlobfsVerifier",
             ],
             from: "parent",

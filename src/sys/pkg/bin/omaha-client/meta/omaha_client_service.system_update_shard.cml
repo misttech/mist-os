@@ -36,8 +36,15 @@
             from: "parent",
             to: "#omaha-client-service",
         },
+
+        // TODO(https://fxbug.dev/389134835): Remove the initiator capability.
         {
-            protocol: "fuchsia.hardware.power.statecontrol.Admin",
+            protocol: "fuchsia.power.CollaborativeRebootInitiator",
+            from: "parent",
+            to: "#omaha-client-service",
+        },
+        {
+            protocol: "fuchsia.power.internal.CollaborativeRebootScheduler",
             from: "parent",
             to: "#omaha-client-service",
         },
