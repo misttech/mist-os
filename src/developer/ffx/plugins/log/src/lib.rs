@@ -308,7 +308,8 @@ mod tests {
     use futures::StreamExt;
     use log_command::log_formatter::{LogData, TIMESTAMP_FORMAT};
     use log_command::{
-        parse_seconds_string_as_duration, parse_time, DumpCommand, SymbolizeMode, TimeFormat,
+        parse_seconds_string_as_duration, parse_time, DumpCommand, OneOrMany, SymbolizeMode,
+        TimeFormat,
     };
     use moniker::Moniker;
     use selectors::parse_log_interest_selector;
@@ -380,7 +381,9 @@ mod tests {
         let rcs_connector = environment.rcs_connector().await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            set_severity: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
+            set_severity: vec![OneOrMany::One(
+                parse_log_interest_selector("ambiguous_selector#INFO").unwrap(),
+            )],
             symbolize: SymbolizeMode::Off,
             ..LogCommand::default()
         };
@@ -440,7 +443,7 @@ ffx log --force-set-severity.
 
     #[fuchsia::test]
     async fn logger_sets_interest_if_one_match() {
-        let selectors = vec![parse_log_interest_selector("core/foo#INFO").unwrap()];
+        let selectors = vec![OneOrMany::One(parse_log_interest_selector("core/foo#INFO").unwrap())];
         let mut environment = TestEnvironment::new(TestEnvironmentConfig {
             instances: vec![Moniker::try_from("core/foo").unwrap()],
             ..Default::default()
@@ -458,7 +461,10 @@ ffx log --force-set-severity.
         let mut event_stream = environment.take_event_stream().unwrap();
 
         assert_matches!(tool.main_no_timestamp(writer).await, Ok(()));
-        assert_eq!(event_stream.next().await, Some(TestEvent::SetInterest(selectors)));
+        assert_eq!(
+            event_stream.next().await,
+            Some(TestEvent::SetInterest(selectors.into_iter().flatten().collect()))
+        );
     }
 
     #[fuchsia::test]
@@ -592,7 +598,7 @@ ffx log --force-set-severity.
 
     #[fuchsia::test]
     async fn logger_shows_logs_since_specific_timestamp_across_reboots() {
-        let selectors = vec![parse_log_interest_selector("core/foo#INFO").unwrap()];
+        let selectors = vec![OneOrMany::One(parse_log_interest_selector("core/foo#INFO").unwrap())];
         let mut environment = TestEnvironment::new(TestEnvironmentConfig {
             messages: vec![testing_utils::test_log(testing_utils::naive_utc_nanos(
                 "1980-01-01T00:00:03",
@@ -632,7 +638,10 @@ ffx log --force-set-severity.
         );
 
         // Interest should be set
-        assert_eq!(event_stream.next().await, Some(TestEvent::SetInterest(selectors.clone())));
+        assert_eq!(
+            event_stream.next().await,
+            Some(TestEvent::SetInterest(selectors.clone().into_iter().flatten().collect()))
+        );
 
         environment.reboot_target(Some(42));
 
@@ -652,7 +661,10 @@ ffx log --force-set-severity.
         environment.disconnect_target();
 
         // Interest should be set again
-        assert_eq!(event_stream.next().await, Some(TestEvent::SetInterest(selectors)));
+        assert_eq!(
+            event_stream.next().await,
+            Some(TestEvent::SetInterest(selectors.clone().into_iter().flatten().collect()))
+        );
 
         assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
     }
@@ -885,7 +897,8 @@ ffx log --force-set-severity.
             messages: vec![testing_utils::test_log(0)],
             ..Default::default()
         });
-        let selector = vec![parse_log_interest_selector("archivist.cm#TRACE").unwrap()];
+        let selector =
+            vec![OneOrMany::One(parse_log_interest_selector("archivist.cm#TRACE").unwrap())];
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             symbolize: SymbolizeMode::Off,
@@ -898,7 +911,7 @@ ffx log --force-set-severity.
         let tool = LogTool { cmd, rcs_connector };
         let buffers = TestBuffers::default();
         let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
-
+        let selector = selector.into_iter().flatten().collect::<Vec<_>>();
         assert_matches!(tool.main_no_timestamp(writer).await, Ok(()));
         assert_eq!(buffers.into_stdout_str(), "[00000.000000][ffx] INFO: Hello world!\u{1b}[m\n");
         assert_matches!(

@@ -107,7 +107,7 @@ impl From<LogCommand> for LogFilterCriteria {
             exclude_tags: cmd.exclude_tags,
             pid: cmd.pid,
             tid: cmd.tid,
-            interest_selectors: cmd.set_severity,
+            interest_selectors: cmd.set_severity.into_iter().flatten().collect(),
         }
     }
 }
@@ -284,6 +284,7 @@ mod test {
     use selectors::parse_log_interest_selector;
     use std::time::Duration;
 
+    use crate::log_socket_stream::OneOrMany;
     use crate::{DumpCommand, LogSubCommand};
 
     use super::*;
@@ -402,7 +403,9 @@ mod test {
     async fn test_per_component_severity() {
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            set_severity: vec![parse_log_interest_selector("test_selector#DEBUG").unwrap()],
+            set_severity: vec![OneOrMany::One(
+                parse_log_interest_selector("test_selector#DEBUG").unwrap(),
+            )],
             ..LogCommand::default()
         };
         let expectations = [
@@ -441,9 +444,9 @@ mod test {
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             set_severity: vec![
-                parse_log_interest_selector("test_selector#INFO").unwrap(),
-                parse_log_interest_selector("test_selector#TRACE").unwrap(),
-                parse_log_interest_selector("test_selector#DEBUG").unwrap(),
+                OneOrMany::One(parse_log_interest_selector("test_selector#INFO").unwrap()),
+                OneOrMany::One(parse_log_interest_selector("test_selector#TRACE").unwrap()),
+                OneOrMany::One(parse_log_interest_selector("test_selector#DEBUG").unwrap()),
             ],
             ..LogCommand::default()
         };

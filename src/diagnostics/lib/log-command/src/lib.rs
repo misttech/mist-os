@@ -12,6 +12,7 @@ use errors::{ffx_bail, FfxError};
 use fidl_fuchsia_diagnostics::{LogInterestSelector, LogSettingsProxy};
 use fidl_fuchsia_sys2::RealmQueryProxy;
 use log_formatter::FormatterError;
+pub use log_socket_stream::OneOrMany;
 use moniker::Moniker;
 use selectors::{sanitize_moniker_for_selectors, SelectorExt};
 use std::borrow::Cow;
@@ -274,7 +275,7 @@ pub struct LogCommand {
     /// as one of FATAL|ERROR|WARN|INFO|DEBUG|TRACE.
     /// May be repeated.
     #[argh(option, from_str_fn(log_interest_selector))]
-    pub set_severity: Vec<LogInterestSelector>,
+    pub set_severity: Vec<OneOrMany<LogInterestSelector>>,
 
     /// filters by pid
     #[argh(option)]
@@ -495,17 +496,17 @@ impl LogCommand {
     ) -> Result<(), LogError> {
         if !self.set_severity.is_empty() {
             let selectors = if self.force_set_severity {
-                Cow::Borrowed(&self.set_severity)
+                self.set_severity.clone().into_iter().flatten().collect::<Vec<_>>()
             } else {
                 let new_selectors =
-                    Self::map_interest_selectors(realm_query, self.set_severity.iter())
+                    Self::map_interest_selectors(realm_query, self.set_severity.iter().flatten())
                         .await?
                         .map(|s| s.into_owned())
                         .collect::<Vec<_>>();
                 if new_selectors.is_empty() {
-                    Cow::Borrowed(&self.set_severity)
+                    self.set_severity.clone().into_iter().flatten().collect::<Vec<_>>()
                 } else {
-                    Cow::Owned(new_selectors)
+                    new_selectors
                 }
             };
 
@@ -547,8 +548,16 @@ impl LogCommand {
 
 impl TopLevelCommand for LogCommand {}
 
-fn log_interest_selector(s: &str) -> Result<LogInterestSelector, String> {
-    selectors::parse_log_interest_selector(s).map_err(|s| s.to_string())
+fn log_interest_selector(s: &str) -> Result<OneOrMany<LogInterestSelector>, String> {
+    if s.contains(",") {
+        let many: Result<Vec<LogInterestSelector>, String> = s
+            .split(",")
+            .map(|value| selectors::parse_log_interest_selector(value).map_err(|e| e.to_string()))
+            .collect();
+        Ok(OneOrMany::Many(many?))
+    } else {
+        Ok(OneOrMany::One(selectors::parse_log_interest_selector(s).map_err(|s| s.to_string())?))
+    }
 }
 
 #[cfg(test)]
@@ -606,7 +615,9 @@ mod test {
 
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            set_severity: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
+            set_severity: vec![OneOrMany::One(
+                parse_log_interest_selector("ambiguous_selector#INFO").unwrap(),
+            )],
             ..LogCommand::default()
         };
         let mut set_interest_result = None;
@@ -646,7 +657,9 @@ ffx log --force-set-severity.
     async fn logger_translates_selector_if_one_match() {
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            set_severity: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
+            set_severity: vec![OneOrMany::One(
+                parse_log_interest_selector("ambiguous_selector#INFO").unwrap(),
+            )],
             ..LogCommand::default()
         };
         let mut set_interest_result = None;
@@ -682,10 +695,10 @@ ffx log --force-set-severity.
     async fn logger_uses_specified_selectors_if_no_results_returned() {
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            set_severity: vec![parse_log_interest_selector(
-                "core/something/a:b/elements:main/otherstuff:*#DEBUG",
-            )
-            .unwrap()],
+            set_severity: vec![OneOrMany::One(
+                parse_log_interest_selector("core/something/a:b/elements:main/otherstuff:*#DEBUG")
+                    .unwrap(),
+            )],
             ..LogCommand::default()
         };
         let mut set_interest_result = None;
@@ -723,7 +736,9 @@ ffx log --force-set-severity.
     async fn logger_prints_ignores_ambiguity_if_force_set_severity_is_used() {
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            set_severity: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
+            set_severity: vec![OneOrMany::One(
+                parse_log_interest_selector("ambiguous_selector#INFO").unwrap(),
+            )],
             force_set_severity: true,
             ..LogCommand::default()
         };
@@ -763,7 +778,9 @@ ffx log --force-set-severity.
     async fn logger_prints_ignores_ambiguity_if_machine_output_is_used() {
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            set_severity: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
+            set_severity: vec![OneOrMany::One(
+                parse_log_interest_selector("ambiguous_selector#INFO").unwrap(),
+            )],
             force_set_severity: true,
             ..LogCommand::default()
         };
@@ -802,7 +819,18 @@ ffx log --force-set-severity.
     fn test_parse_selector() {
         assert_eq!(
             log_interest_selector("core/audio#DEBUG").unwrap(),
-            parse_log_interest_selector("core/audio#DEBUG").unwrap()
+            OneOrMany::One(parse_log_interest_selector("core/audio#DEBUG").unwrap())
+        );
+    }
+
+    #[test]
+    fn test_parse_selector_with_commas() {
+        assert_eq!(
+            log_interest_selector("core/audio#DEBUG,bootstrap/archivist#TRACE").unwrap(),
+            OneOrMany::Many(vec![
+                parse_log_interest_selector("core/audio#DEBUG").unwrap(),
+                parse_log_interest_selector("bootstrap/archivist#TRACE").unwrap()
+            ])
         );
     }
 

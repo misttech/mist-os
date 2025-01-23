@@ -102,14 +102,14 @@ impl Stream for LogsDataStream {
 }
 
 /// Something that can contain either a single value or a Vec of values
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(untagged)]
-enum OneOrMany<T> {
+pub enum OneOrMany<T> {
     One(T),
     Many(Vec<T>),
 }
 
-enum OneOrManyIterator<T> {
+pub enum OneOrManyIterator<T> {
     One(Option<T>),
     Many(std::vec::IntoIter<T>),
 }
@@ -133,6 +133,18 @@ impl<T> IntoIterator for OneOrMany<T> {
         match self {
             OneOrMany::One(v) => OneOrManyIterator::One(Some(v)),
             OneOrMany::Many(v) => OneOrManyIterator::Many(v.into_iter()),
+        }
+    }
+}
+
+impl<'a, T> IntoIterator for &'a OneOrMany<T> {
+    type Item = &'a T;
+    type IntoIter = std::slice::Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            OneOrMany::One(v) => std::slice::from_ref(v).iter(),
+            OneOrMany::Many(v) => v.iter(),
         }
     }
 }
