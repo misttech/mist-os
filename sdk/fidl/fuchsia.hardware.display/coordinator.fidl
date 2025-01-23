@@ -118,12 +118,20 @@ closed protocol Coordinator {
     /// `image_config`.
     /// Returns `ZX_ERR_ALREADY_EXISTS` if `image_id` was used in a successful
     /// `ImportImage()` without a corresponding `ReleaseImage()`.
+    /// Returns `ZX_ERR_INVALID_ARGS` for a variety of reasons, such as:
+    ///   - `image_id` is invalid
+    ///   - `buffer_id` does not refer to an already-imported buffer collection
+    ///   - `image_metadata.dimensions` have negative width/height, or exceed maximums
+    /// Returns `ZX_ERR_NO_MEMORY` if memory cannot be allocated for managing the image
+    /// Additionally, this method delegates internally to `fuchsia.hardware.display.engine/Engine`,
+    /// and will forward errors received from `ImportImage()` and `ImportImageForCapture()`.
+    // TODO(https://fxbug.dev/391698891): it's undesirable to expose the implementation dependency
+    //                                    on `fuchsia.hardware.display.engine/Engine`.
     strict ImportImage(struct {
         image_metadata fuchsia.hardware.display.types.ImageMetadata;
         buffer_id BufferId;
         image_id ImageId;
     }) -> () error zx.Status;
-
 
     /// Releases an imported image.
     ///

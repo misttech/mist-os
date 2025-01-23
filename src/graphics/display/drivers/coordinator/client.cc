@@ -343,7 +343,8 @@ void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
 
   fbl::AllocChecker alloc_checker;
   display::DriverLayerId driver_layer_id = next_driver_layer_id++;
-  auto new_layer = fbl::make_unique_checked<Layer>(&alloc_checker, driver_layer_id);
+  auto new_layer = fbl::make_unique_checked<Layer>(&alloc_checker, &controller_, driver_layer_id,
+                                                   &layer_waiting_image_allocator_);
   if (!alloc_checker.check()) {
     --driver_layer_id;
     completer.ReplyError(ZX_ERR_NO_MEMORY);
@@ -761,7 +762,7 @@ void Client::ApplyConfigFromFidl(display::ConfigStamp new_config_stamp) {
         // Don't migrate images between displays if there are pending images. See
         // `Controller::ApplyConfig` for more details.
         if (layer->current_display_id_ != display_config.id && layer->displayed_image_ &&
-            !layer->waiting_images_.is_empty()) {
+            layer->HasWaitingImages()) {
           {
             fbl::AutoLock lock(controller_.mtx());
             controller_.AssertMtxAliasHeld(*layer->displayed_image_->mtx());
@@ -1410,9 +1411,7 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
 void Client::OnFenceFired(FenceReference* fence) {
   bool new_image_ready = false;
   for (auto& layer : layers_) {
-    for (Image& waiting_image : layer.waiting_images_) {
-      new_image_ready |= waiting_image.OnFenceReady(fence);
-    }
+    new_image_ready |= layer.OnFenceReady(fence);
   }
   if (new_image_ready) {
     ApplyConfig();
@@ -1499,35 +1498,29 @@ void Client::TearDown(zx_status_t epitaph) {
 void Client::TearDownForTesting() { valid_ = false; }
 
 bool Client::CleanUpAllImages() {
-  // Clean up all image fences.
-  {
-    fbl::AutoLock lock(controller_.mtx());
-    for (auto& image : images_) {
-      controller_.AssertMtxAliasHeld(*image.mtx());
-      image.ResetFences();
-    }
-  }
-
   // Clean up any layer state associated with the images.
-  bool current_config_changed = std::any_of(layers_.begin(), layers_.end(),
-                                            [](Layer& layer) { return layer.CleanUpAllImages(); });
+  fbl::AutoLock lock(controller_.mtx());
+  bool current_config_changed = std::any_of(layers_.begin(), layers_.end(), [this](Layer& layer) {
+    controller_.AssertMtxAliasHeld(*layer.mtx());
+    return layer.CleanUpAllImages();
+  });
 
   images_.clear();
   return current_config_changed;
 }
 
 bool Client::CleanUpImage(Image& image) {
-  // Clean up any fences associated with the image.
+  // Clean up any layer state associated with the images.
+  bool current_config_changed = false;
+
   {
     fbl::AutoLock lock(controller_.mtx());
-    controller_.AssertMtxAliasHeld(*image.mtx());
-    image.ResetFences();
+    current_config_changed = std::any_of(layers_.begin(), layers_.end(),
+                                         [this, &image = std::as_const(image)](Layer& layer) {
+                                           controller_.AssertMtxAliasHeld(*layer.mtx());
+                                           return layer.CleanUpImage(image);
+                                         });
   }
-
-  // Clean up any layer state associated with the images.
-  bool current_config_changed = std::any_of(
-      layers_.begin(), layers_.end(),
-      [&image = std::as_const(image)](Layer& layer) { return layer.CleanUpImage(image); });
 
   images_.erase(image);
   return current_config_changed;
@@ -1626,13 +1619,26 @@ Client::Client(Controller* controller, ClientProxy* proxy, ClientPriority priori
       priority_(priority),
       id_(client_id),
       fences_(controller->client_dispatcher()->async_dispatcher(),
-              fit::bind_member<&Client::OnFenceFired>(this)) {
+              fit::bind_member<&Client::OnFenceFired>(this)),
+      // TODO(https://fxbug.dev/370839049): this assumes that clients won't exhaust a single slab's
+      // worth of allocations. Scenic's usage patterns shouldn't trigger this. Anyway, a CL is
+      // already in progress to replace this slab allocation approach, so this is a short-term
+      // concern.
+      layer_waiting_image_allocator_(/*max_slabs=*/1) {
   ZX_DEBUG_ASSERT(controller);
   ZX_DEBUG_ASSERT(proxy);
   ZX_DEBUG_ASSERT(client_id != kInvalidClientId);
 }
 
-Client::~Client() { ZX_DEBUG_ASSERT(!valid_); }
+Client::~Client() {
+  ZX_DEBUG_ASSERT(!valid_);
+
+  ZX_DEBUG_ASSERT(layers_.size() == 0);
+#ifndef NDEBUG
+  // obj_count() is only available in debug builds.
+  ZX_ASSERT(layer_waiting_image_allocator_.obj_count() == 0);
+#endif
+}
 
 void ClientProxy::SetOwnership(bool is_owner) {
   fbl::AllocChecker ac;
@@ -1884,7 +1890,7 @@ zx_status_t ClientProxy::Init(
         // Make sure we `TearDown()` so that no further tasks are scheduled on the controller loop.
         client->TearDown(ZX_OK);
 
-        // The client has died.  Notify the proxy, which will free the classes.
+        // The client has died. Notify the proxy, which will free the classes.
         OnClientDead();
       };
 

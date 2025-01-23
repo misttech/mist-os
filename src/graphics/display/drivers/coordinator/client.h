@@ -284,6 +284,9 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   FenceCollection fences_;
 
+  // Used by layers to track which images are waiting on fences. Must outlive `layers_`.
+  LayerWaitingImageAllocator layer_waiting_image_allocator_;
+
   Layer::Map layers_;
 
   // TODO(fxbug.com/129082): Move to Controller, so values issued using this

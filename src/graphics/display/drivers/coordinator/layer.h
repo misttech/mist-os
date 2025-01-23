@@ -14,6 +14,7 @@
 
 #include <fbl/intrusive_double_list.h>
 #include <fbl/ref_ptr.h>
+#include <fbl/slab_allocator.h>
 
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
@@ -33,10 +34,67 @@ struct LayerNode : public fbl::DoublyLinkedListable<LayerNode*> {
   Layer* layer;
 };
 
+class LayerWaitingImage;
+
+using LayerWaitingImagePointer = std::unique_ptr<LayerWaitingImage>;
+
+// Define a slab allocator for instances of `LayerWaitingImage`. Maintaining the object count is
+// only done in debug builds, to ensure that there are no outstanding allocations when the allocator
+// is destroyed.
+constexpr fbl::SlabAllocatorOptions kLayerWaitingImageAllocatorOptions =
+    fbl::SlabAllocatorOptions::None
+#if !defined(NDEBUG)
+    | fbl::SlabAllocatorOptions::EnableObjectCount
+#endif  // !defined(NDEBUG)
+    ;
+using LayerWaitingImageAllocatorTraits =
+    fbl::InstancedSlabAllocatorTraits<LayerWaitingImagePointer,
+                                      /*SLAB_SIZE=*/fbl::DEFAULT_SLAB_ALLOCATOR_SLAB_SIZE,
+                                      /*LockType=*/fbl::Mutex,
+                                      /*Options=*/kLayerWaitingImageAllocatorOptions>;
+using LayerWaitingImageAllocator = fbl::SlabAllocator<LayerWaitingImageAllocatorTraits>;
+
+using LayerWaitingImageDoublyLinkedList =
+    fbl::DoublyLinkedList<LayerWaitingImagePointer, fbl::DefaultObjectTag, fbl::SizeOrder::N>;
+
+// Maps an image to a wait fence that will be signaled when its contents are ready. We want to be
+// able to maintain per-Layer lists of them without heap allocations, as would be required if we
+// stored them in C++ stdlib containers.
+//
+// This class is thread-unsafe and must be externally synchronized to guarantee access from only
+// one thread at a time.
+class LayerWaitingImage : public fbl::SlabAllocated<LayerWaitingImageAllocatorTraits>,
+                          public fbl::DoublyLinkedListable<LayerWaitingImagePointer> {
+ public:
+  // `image` must be non-null. `wait_fence` is nullable; if null it means that the image may be
+  // presented immediately.
+  LayerWaitingImage(fbl::RefPtr<Image> image, fbl::RefPtr<FenceReference> wait_fence)
+      : image_(std::move(image)), wait_fence_(std::move(wait_fence)) {
+    ZX_DEBUG_ASSERT(image_);
+  }
+
+  const fbl::RefPtr<Image>& image() const { return image_; }
+
+  // Indicates whether the image contents are ready for display.
+  bool IsReady() const { return wait_fence_ == nullptr; }
+
+  // Mark the image as presentable if fence matches the wait_fence in the constructor.
+  void OnFenceReady(FenceReference* fence);
+
+  // If there is a wait fence, reset it, then clear it.
+  void ResetWaitFence();
+
+ private:
+  fbl::RefPtr<Image> image_;
+  fbl::RefPtr<FenceReference> wait_fence_;
+};
+
 // Almost-POD used by Client to manage layer state. Public state is used by Controller.
 class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> {
  public:
-  explicit Layer(display::DriverLayerId id);
+  // `controller` and `layer_waiting_image_allocator` must be non-null.
+  explicit Layer(Controller* controller, display::DriverLayerId id,
+                 LayerWaitingImageAllocator* layer_waiting_image_allocator);
   ~Layer();
 
   fbl::RefPtr<Image> current_image() const { return displayed_image_; }
@@ -78,11 +136,11 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
 
   // Removes references to all Images associated with this Layer.
   // Returns true if the current config has been affected.
-  bool CleanUpAllImages();
+  bool CleanUpAllImages() __TA_REQUIRES(mtx());
 
   // Removes references to the provided Image. `image` must be valid.
   // Returns true if the current config has been affected.
-  bool CleanUpImage(const Image& image);
+  bool CleanUpImage(const Image& image) __TA_REQUIRES(mtx());
 
   // If a new image is available, retire current_image() and other pending images. Returns false if
   // no images were ready.
@@ -106,6 +164,17 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
   void SetColorConfig(fuchsia_hardware_display_types::wire::Color color);
   void SetImage(fbl::RefPtr<Image> image_id, display::EventId wait_event_id);
 
+  // Called on all waiting images when any fence fires. Returns true if an image is ready to
+  // present.
+  bool OnFenceReady(FenceReference* fence);
+
+  // Returns true if the layer has any waiting images. An image transitions from "pending" to
+  // "waiting" (in the context of a specific layer) when that layer appears in an applied config.
+  bool HasWaitingImages() const;
+
+  // Aliases controller_.mtx() for the purpose of thread-safety analysis.
+  fbl::Mutex* mtx() const;
+
  private:
   // Retires the `pending_image_`.
   void RetirePendingImage();
@@ -116,7 +185,11 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
 
   // Retires the image that is being displayed.
   // Returns true if this affects the current display config.
-  bool RetireDisplayedImage();
+  bool RetireDisplayedImage() __TA_REQUIRES(mtx());
+
+  Controller& controller_;
+
+  LayerWaitingImageAllocator& layer_waiting_image_allocator_;
 
   layer_t pending_layer_;
   layer_t current_layer_;
@@ -130,8 +203,12 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
   // The image given to SetLayerImage which hasn't been applied yet.
   fbl::RefPtr<Image> pending_image_;
 
-  // Image which are waiting to be displayed
-  Image::DoublyLinkedList waiting_images_;
+  // Image which are waiting to be displayed. Each one has an optional wait fence which may not
+  // have been signaled.
+  //
+  // Must be accessed on `controller_`'s client dispatcher loop. Call-sites must guarantee this via
+  // `ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher())`.
+  LayerWaitingImageDoublyLinkedList waiting_images_;
 
   // The image which has most recently been sent to the display controller impl
   fbl::RefPtr<Image> displayed_image_;

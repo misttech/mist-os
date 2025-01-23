@@ -58,28 +58,7 @@ fbl::RefPtr<Image> Image::RemoveFromDoublyLinkedList() {
   return doubly_linked_list_node_state_.RemoveFromContainer<DefaultDoublyLinkedListTraits>();
 }
 
-void Image::PrepareFences(fbl::RefPtr<FenceReference>&& wait) {
-  wait_fence_ = std::move(wait);
-
-  if (wait_fence_) {
-    zx_status_t status = wait_fence_->StartReadyWait();
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to start waiting %d", status);
-      // Mark the image as ready. Displaying garbage is better than hanging or crashing.
-      wait_fence_ = nullptr;
-    }
-  }
-}
-
-bool Image::OnFenceReady(FenceReference* fence) {
-  if (wait_fence_.get() == fence) {
-    wait_fence_ = nullptr;
-  }
-  return wait_fence_ == nullptr;
-}
-
 void Image::StartPresent() {
-  ZX_DEBUG_ASSERT(wait_fence_ == nullptr);
   TRACE_DURATION("gfx", "Image::StartPresent", "id", id.value());
   TRACE_FLOW_BEGIN("gfx", "present_image", id.value());
 
@@ -90,14 +69,9 @@ void Image::StartPresent() {
 void Image::EarlyRetire() {
   // A client may reuse an image as soon as retire_fence_ fires. Set in_use_ first.
   std::atomic_store(&in_use_, false);
-  if (wait_fence_) {
-    wait_fence_ = nullptr;
-  }
 }
 
 void Image::StartRetire() {
-  ZX_DEBUG_ASSERT(wait_fence_ == nullptr);
-
   if (!presenting_) {
     std::atomic_store(&in_use_, false);
   } else {
@@ -117,19 +91,8 @@ void Image::OnRetire() {
   }
 }
 
-void Image::DiscardAcquire() {
-  ZX_DEBUG_ASSERT(wait_fence_ == nullptr);
-
-  std::atomic_store(&in_use_, false);
-}
+void Image::DiscardAcquire() { std::atomic_store(&in_use_, false); }
 
 bool Image::Acquire() { return !std::atomic_exchange(&in_use_, true); }
-
-void Image::ResetFences() {
-  if (wait_fence_) {
-    wait_fence_->ResetReadyWait();
-    wait_fence_ = nullptr;
-  }
-}
 
 }  // namespace display_coordinator

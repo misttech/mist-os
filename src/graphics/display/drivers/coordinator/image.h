@@ -82,8 +82,6 @@ class Image : public fbl::RefCounted<Image>,
   bool Acquire();
   // Marks the image as not in use. Should only be called before PrepareFences.
   void DiscardAcquire();
-  // Prepare the image for display. It will not be READY until `wait` is signaled.
-  void PrepareFences(fbl::RefPtr<FenceReference>&& wait);
   // Called to immediately retire the image if StartPresent hasn't been called yet.
   void EarlyRetire();
   // Called when the image is passed to the display hardware.
@@ -92,16 +90,6 @@ class Image : public fbl::RefCounted<Image>,
   void StartRetire() __TA_REQUIRES(mtx());
   // Called on vsync after StartRetire has been called.
   void OnRetire() __TA_REQUIRES(mtx());
-
-  // Called on all waiting images when any fence fires. Returns true if the image is ready to
-  // present.
-  bool OnFenceReady(FenceReference* fence);
-
-  // Called to reset fences when client releases the image. Releasing fences
-  // is independent of the rest of the image lifecycle.
-  void ResetFences() __TA_REQUIRES(mtx());
-
-  bool IsReady() const { return wait_fence_ == nullptr; }
 
   void set_latest_controller_config_stamp(display::ConfigStamp stamp) {
     latest_controller_config_stamp_ = stamp;
@@ -167,10 +155,6 @@ class Image : public fbl::RefCounted<Image>,
   // a client configuration sets a new layer image but the new image is not
   // ready yet, so the controller has to keep using the old image.
   display::ConfigStamp latest_client_config_stamp_ = display::kInvalidConfigStamp;
-
-  // Indicates that the image contents are ready for display.
-  // Only ever accessed on loop thread, so no synchronization
-  fbl::RefPtr<FenceReference> wait_fence_ = nullptr;
 
   // Flag which indicates that the image is currently in some display configuration.
   std::atomic_bool in_use_ = {};
