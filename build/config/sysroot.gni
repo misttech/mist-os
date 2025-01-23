@@ -10,7 +10,11 @@ declare_args() {
 if (current_os == target_os && target_sysroot != "") {
   sysroot = target_sysroot
 } else if (is_fuchsia) {
-  sysroot = get_label_info("//zircon/public/sysroot", "target_gen_dir")
+  # The sysroot generation does not differ between $shlib_toolchain and its
+  # base toolchain, so always redirect to the base toolchain for this variant
+  # rather than generating both identical copies for each variant.
+  sysroot = get_label_info("//zircon/public/sysroot($variant_base_toolchain)",
+                           "target_gen_dir")
 } else if (is_linux) {
   if (is_host) {
     # Use an older Linux sysroot to compile host tools.

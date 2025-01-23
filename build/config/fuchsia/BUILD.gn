@@ -317,7 +317,7 @@ group("terminal_link_deps") {
   # responsible for making sure there are data_deps for any shared_library()
   # targets that may be runtime file dependencies.  This gets those files into
   # the Fuchsia package via their distribution_entries metadata.
-  data_deps = [ "//zircon/public/sysroot:data" ]
+  data_deps = [ "//zircon/public/sysroot:data($variant_base_toolchain)" ]
 }
 
 group("executable_deps") {
@@ -335,7 +335,7 @@ group("link_deps") {
   # is linked.  But it doesn't contribute any link inputs as a GN target, so it
   # does no harm to have it in deps even when the link uses -nostartfiles or
   # equivalent.
-  data_deps = [ "//zircon/public/sysroot:startfiles" ]
+  data_deps = [ "//zircon/public/sysroot:startfiles($variant_base_toolchain)" ]
 }
 
 group("source_deps") {
@@ -355,7 +355,7 @@ group("source_deps") {
   # But the link steps have direct order-only Ninja deps on their data_deps, so
   # action re-runs for those alone won't always cause relinks.
   deps = [
-    "//zircon/public/sysroot:include",
-    "//zircon/public/sysroot:lib",
+    "//zircon/public/sysroot:include($variant_base_toolchain)",
+    "//zircon/public/sysroot:lib($variant_base_toolchain)",
   ]
 }

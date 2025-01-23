@@ -109,10 +109,13 @@ sysroot_uninstrumented_libc_entries = [
 
       # The build-internal sysroot is the most convenient known path and direct
       # deps label to use it as an input.
-      deps = [ "//zircon/system/ulib/c/startup:startfiles" ]
-      source = rebase_path(get_label_info("//zircon/public/sysroot",
-                                          "target_gen_dir") + "/$link",
-                           root_build_dir)
+      deps = [
+        "//zircon/system/ulib/c/startup:startfiles($variant_base_toolchain)",
+      ]
+      source = rebase_path(
+              get_label_info("//zircon/public/sysroot($variant_base_toolchain)",
+                             "target_gen_dir") + "/$link",
+              root_build_dir)
     }
   },
 ]

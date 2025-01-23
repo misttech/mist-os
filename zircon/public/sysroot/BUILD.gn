@@ -6,6 +6,9 @@ import("//src/zircon/lib/zircon/sysroot_entries.gni")
 import("//zircon/system/ulib/c/libc_toolchain.gni")
 import("//zircon/system/ulib/c/sysroot_entries.gni")
 
+assert(current_toolchain != shlib_toolchain,
+       "deps in //zircon/public/sysroot should use \$variant_base_toolchain")
+
 # This file is used to build the sysroot directories used to build C++,
 # Rust and Go binaries with the Fuchsia build system.
 #
