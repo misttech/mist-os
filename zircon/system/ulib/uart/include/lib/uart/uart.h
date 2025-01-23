@@ -77,6 +77,9 @@ inline void UnparseConfig(const Config& config, FILE* out) {
 }
 
 enum class IoRegisterType {
+  // Null/Stub drivers.
+  kNone,
+
   // MMIO is performed without any scaling what so ever, this means that
   // registers offsets are treated as byte offsets from the base address.
   kMmio8,
@@ -92,9 +95,22 @@ enum class IoRegisterType {
 template <IoRegisterType IoRegType>
 using IoSlotType = std::conditional_t<IoRegType == IoRegisterType::kPio, uint16_t, size_t>;
 
+template <typename UartDriver>
+concept MmioDriver =
+    UartDriver::kIoType == IoRegisterType::kMmio32 || UartDriver::kIoType == IoRegisterType::kMmio8;
+
 // Constant indicating that the number of `io_slots()` is to be determined at
 // runtime.
 constexpr size_t kDynamicIoSlot = std::numeric_limits<size_t>::max();
+
+// Communicates the range where the configuration dictates the registers are located.
+//
+// It may need to be translated if the addressing used for the configuration is different from
+// the one used for execution (e.g. physical and virtual addressing).
+struct MmioRange {
+  uint64_t address;
+  uint64_t size;
+};
 
 // Specific hardware support is implemented in a class uart::xyz::Driver,
 // referred to here as UartDriver.  The uart::DriverBase template class
@@ -246,6 +262,17 @@ class DriverBase {
     return IoSlots;
   }
 
+  template <MmioDriver UartDriver = Driver>
+  constexpr MmioRange mmio_range() const {
+    if constexpr (Driver::kIoType == IoRegisterType::kMmio32) {
+      // Each IoSlot represent 4 bytes.
+      return {.address = config().mmio_phys, .size = io_slots() * sizeof(uint32_t)};
+    } else if constexpr (Driver::kIoType == IoRegisterType::kMmio8) {
+      return {.address = config().mmio_phys, .size = io_slots()};
+    }
+    __UNREACHABLE;
+  }
+
  protected:
   config_type cfg_;
 
@@ -345,6 +372,16 @@ class BasicIoProvider;
 inline auto DirectMapMmio(uint64_t phys, size_t size) {
   return reinterpret_cast<volatile void*>(phys);
 }
+
+// Specialization for Stub drivers, such as `null::Driver`.
+template <typename ConfigType>
+class BasicIoProvider<ConfigType, IoRegisterType::kNone> {
+ public:
+  constexpr BasicIoProvider(const ConfigType& cfg, size_t io_slots) {}
+  constexpr BasicIoProvider& operator=(BasicIoProvider&& other) {}
+
+  auto io() { return nullptr; }
+};
 
 // The specialization used most commonly handles simple MMIO devices.
 template <IoRegisterType IoType>
@@ -447,6 +484,12 @@ class KernelDriver {
   // Access underlying hardware driver object.
   const auto& uart() const { return uart_; }
   auto& uart() { return uart_; }
+
+  template <typename LockPolicy = DefaultLockPolicy, MmioDriver = UartDriver>
+  constexpr MmioRange mmio_range() const {
+    Guard<LockPolicy> lock(&lock_, SOURCE_TAG);
+    return uart_.mmio_range();
+  }
 
   // Returns a copy of the underlying uart config.
   template <typename LockPolicy = DefaultLockPolicy>

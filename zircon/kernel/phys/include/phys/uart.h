@@ -24,30 +24,15 @@ template <typename AllDrivers>
 std::optional<memalloc::Range> GetUartMmioRange(const AllDrivers& driver, size_t page_size) {
   std::optional<memalloc::Range> mmio_range;
   uart::internal::Visit(
-      [&mmio_range, page_size](const auto& driver) {
-        using driver_type = std::decay_t<decltype(driver)>;
-        using config_type = std::decay_t<decltype(driver.config())>;
-        if constexpr (std::is_same_v<config_type, zbi_dcfg_simple_t>) {
-          const zbi_dcfg_simple_t& uart_mmio_config = driver.config();
+      [&mmio_range, page_size]<typename UartDriver>(const UartDriver& driver) {
+        if constexpr (uart::MmioDriver<UartDriver>) {
+          uart::MmioRange uart_mmio = driver.mmio_range();
 
           mmio_range = {
-              .addr = uart_mmio_config.mmio_phys,
+              .addr = uart_mmio.address,
+              .size = uart_mmio.size,
               .type = memalloc::Type::kPeripheral,
           };
-
-          switch (driver_type::kIoType) {
-            case uart::IoRegisterType::kMmio32:
-              mmio_range->size = driver.io_slots();
-              break;
-            case uart::IoRegisterType::kMmio8:
-              mmio_range->size = driver.io_slots() * 4;
-              break;
-
-            default:
-              ZX_PANIC("Unknown uart::IoRegisterType for %.*s/n",
-                       static_cast<int>(driver_type::kConfigName.length()),
-                       driver_type::kConfigName.data());
-          }
 
           // Adjust range to page boundaries.
           ZX_ASSERT(mmio_range);
