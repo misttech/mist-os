@@ -294,9 +294,14 @@ if (!is_host) {
         # :fuchsia_idk_atoms_independent_of_api_level_for_one_cpu_arch,
         # which verifies there are no API level dependencies.
 
-        # There are very limited exceptions that do depend on API level but are
-        # only built at "PLATFORM".
-        ":fuchsia_idk_atoms_built_only_at_platform_for_each_cpu_arch",
+        # While the Vulkan layers support being built at individual API levels,
+        # the SDK atom is not aware of API levels so each subbuilds would be
+        # written to the same path in the IDK, clobbering all but one for each
+        # CPU architecture.
+        # TODO(https://fxbug.dev/327223536): Make an SDK atom for loadable
+        # modules that supports is API level-aware and move this to
+        # :fuchsia_idk_atoms_for_each_api_level.
+        "//src/lib/vulkan:vulkan_layers",
 
         # Atoms in :fuchsia_idk_atoms_for_each_api_level that currently must
         # also be built at "PLATFORM" for backwards compatibility with IDK users
@@ -328,36 +333,14 @@ if (!is_host) {
       }
     }
 
-    # Do not add dependencies to this target without a really good reason.
-    # Most dependencies should be built at every API level (add to
-    # :fuchsia_idk_atoms_for_each_api_level) or be verifiably independent of the
-    # API level and target CPU architecture (add to
-    # :fuchsia_idk_atoms_independent_of_api_level_for_one_cpu_arch).
-    #
-    # IDK atoms that must be built at "PLATFORM" for each CPU architecture.
-    sdk_molecule("fuchsia_idk_atoms_built_only_at_platform_for_each_cpu_arch") {
-      category = "partner"
-
-      deps = [
-        # TODO(https://fxbug.dev/327223536): `loadable_modules` (a.k.a., the
-        # "Vulkan layers") support being built at individual API levels, but
-        # each of the subbuilds currently puts the build files at the same path,
-        # so all but one of them gets clobbered. Give `loadable_modules` the
-        # proper per-API-level treatment and move this to
-        # :fuchsia_idk_atoms_for_each_api_level.
-        ":core_loadable_modules",
-      ]
-    }
-
     # The rules below only need to be processed once when building the final
     # IDK. Since sub-builds change the `target_cpu`, this cannot be used as
     # a condition. While, `host_cpu` does not change in sub-builds, using that
     # would require extra processing and building when it does not match the
     # primary target CPU. Therefore, use `sdk_inside_sub_build`.
-    # TODO(https://fxbug.dev/310006516): Once this and the issues in
-    # `fuchsia_idk_atoms_built_only_at_platform_for_each_cpu_arch` are addressed
-    # sub-builds will never target "PLATFORM" and this logic and GN variable
-    # can be removed.
+    # TODO(https://fxbug.dev/310006516): Once this and
+    # https://fxbug.dev/327223536 are addressed sub-builds will never target
+    # "PLATFORM" and this logic and GN variable can be removed.
     if (!sdk_inside_sub_build) {
       # Do not add dependencies to this target without a really good reason.
       # Most such dependencies should be verifiably independent of the API level
@@ -717,11 +700,6 @@ sdk_molecule("core_data") {
     "//sdk/lib/vulkan",
     "//src/developer/ffx/lib/symbol-index:symbol-index-sdk",
   ]
-}
-
-sdk_molecule("core_loadable_modules") {
-  category = "partner"
-  deps = [ "//src/lib/vulkan:vulkan_layers" ]
 }
 
 sdk_molecule("core_dart_library") {
