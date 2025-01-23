@@ -4,6 +4,7 @@
 
 pub mod binding_stubs;
 pub mod context;
+pub mod crypto;
 pub mod mem;
 pub mod props;
 pub mod storage;

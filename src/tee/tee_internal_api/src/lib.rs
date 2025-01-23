@@ -608,7 +608,7 @@ pub struct OperationInfoMultiple {
 output_parameter!(OperationInfoMultiple, binding::TEE_OperationInfoMultiple);
 
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, FromPrimitive, PartialEq)]
 pub enum Algorithm {
     AesEcbNopad = binding::TEE_ALG_AES_ECB_NOPAD,
     AesCbcNopad = binding::TEE_ALG_AES_CBC_NOPAD,

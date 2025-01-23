@@ -4,6 +4,7 @@
 
 use std::cell::RefCell;
 
+use crate::crypto::Operations;
 use crate::props::Properties;
 use crate::storage::Storage;
 
@@ -13,6 +14,7 @@ use crate::storage::Storage;
 pub struct Context {
     pub properties: Properties,
     pub storage: Storage,
+    pub operations: Operations,
 }
 
 // The TA entry points are FFI calls that are expected to call back into the
@@ -42,7 +44,11 @@ where
 
 impl Context {
     pub fn new() -> Self {
-        Self { properties: Properties::new(), storage: Storage::new() }
+        Self {
+            properties: Properties::new(),
+            storage: Storage::new(),
+            operations: Operations::new(),
+        }
     }
 
     pub fn cleanup_after_call(&mut self) {

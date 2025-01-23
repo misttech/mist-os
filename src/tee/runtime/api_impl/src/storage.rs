@@ -47,7 +47,7 @@ fn is_transient_handle(object: ObjectHandle) -> bool {
 // implementations to generate "unimplemented" stubs for the various key types
 // we don't yet support with minimal boilerplate. When more is
 // supported/implemented, we can remove these defaults.
-trait KeyType {
+pub trait KeyType {
     fn new(_max_size: u32) -> TeeResult<Self>
     where
         Self: Sized,
@@ -85,7 +85,7 @@ trait KeyType {
 }
 
 #[derive(Clone)]
-struct SimpleSymmetricKey<const SIZE_MIN: u32, const SIZE_MAX: u32, const SIZE_MULTIPLE: u32> {
+pub struct SimpleSymmetricKey<const SIZE_MIN: u32, const SIZE_MAX: u32, const SIZE_MULTIPLE: u32> {
     secret: Vec<u8>, // TEE_ATTR_SECRET_VALUE
 }
 
@@ -166,27 +166,27 @@ impl<const SIZE_MIN: u32, const SIZE_MAX: u32, const SIZE_MULTIPLE: u32> KeyType
     // TODO(https://fxbug.dev/371213067): generate() too.
 }
 
-type AesKey = SimpleSymmetricKey<128, 256, 64>; // 128, 192, or 256
-type DesKey = SimpleSymmetricKey<64, 64, 64>; // 64
-type Des3Key = SimpleSymmetricKey<128, 192, 64>; // 128 or 192
-type Sm4Key = SimpleSymmetricKey<128, 128, 128>; // 128
-type HmacMd5Key = SimpleSymmetricKey<64, 512, 8>;
-type HmacSha1Key = SimpleSymmetricKey<80, 512, 8>;
-type HmacSha224Key = SimpleSymmetricKey<112, 512, 8>;
-type HmacSha256Key = SimpleSymmetricKey<192, 1024, 8>;
-type HmacSha384Key = SimpleSymmetricKey<256, 512, 8>;
-type HmacSha512Key = SimpleSymmetricKey<256, 512, 8>;
-type HmacSha3_224Key = SimpleSymmetricKey<192, 1024, 8>;
-type HmacSha3_256Key = SimpleSymmetricKey<256, 1024, 8>;
-type HmacSha3_384Key = SimpleSymmetricKey<256, 512, 8>;
-type HmacSha3_512Key = SimpleSymmetricKey<256, 512, 8>;
-type HmacSm3Key = SimpleSymmetricKey<80, 1024, 8>;
-type GenericSecretKey = SimpleSymmetricKey<8, 4096, 8>;
+pub type AesKey = SimpleSymmetricKey<128, 256, 64>; // 128, 192, or 256
+pub type DesKey = SimpleSymmetricKey<64, 64, 64>; // 64
+pub type Des3Key = SimpleSymmetricKey<128, 192, 64>; // 128 or 192
+pub type Sm4Key = SimpleSymmetricKey<128, 128, 128>; // 128
+pub type HmacMd5Key = SimpleSymmetricKey<64, 512, 8>;
+pub type HmacSha1Key = SimpleSymmetricKey<80, 512, 8>;
+pub type HmacSha224Key = SimpleSymmetricKey<112, 512, 8>;
+pub type HmacSha256Key = SimpleSymmetricKey<192, 1024, 8>;
+pub type HmacSha384Key = SimpleSymmetricKey<256, 512, 8>;
+pub type HmacSha512Key = SimpleSymmetricKey<256, 512, 8>;
+pub type HmacSha3_224Key = SimpleSymmetricKey<192, 1024, 8>;
+pub type HmacSha3_256Key = SimpleSymmetricKey<256, 1024, 8>;
+pub type HmacSha3_384Key = SimpleSymmetricKey<256, 512, 8>;
+pub type HmacSha3_512Key = SimpleSymmetricKey<256, 512, 8>;
+pub type HmacSm3Key = SimpleSymmetricKey<80, 1024, 8>;
+pub type GenericSecretKey = SimpleSymmetricKey<8, 4096, 8>;
 
 // TODO(https://fxbug.dev/371213067): Properly implement KeyType.
 #[allow(dead_code)]
 #[derive(Clone)]
-struct RsaPublicKey {
+pub struct RsaPublicKey {
     modulus: Vec<u8>,  // TEE_ATTR_RSA_MODULUS
     exponent: Vec<u8>, // TEE_ATTR_RSA_PUBLIC_EXPONENT
 }
@@ -196,7 +196,7 @@ impl KeyType for RsaPublicKey {}
 // TODO(https://fxbug.dev/371213067): Properly implement KeyType.
 #[allow(dead_code)]
 #[derive(Clone)]
-struct RsaKeypair {
+pub struct RsaKeypair {
     modulus: Vec<u8>,          // TEE_ATTR_RSA_MODULUS
     public_exponent: Vec<u8>,  // TEE_ATTR_RSA_PUBLIC_EXPONENT
     private_exponent: Vec<u8>, // TEE_ATTR_RSA_PRIVATE_EXPONENT
@@ -213,7 +213,7 @@ impl KeyType for RsaKeypair {}
 // TODO(https://fxbug.dev/371213067): Properly implement KeyType.
 #[allow(dead_code)]
 #[derive(Clone)]
-struct DsaPublicKey {
+pub struct DsaPublicKey {
     prime: Vec<u8>,    // TEE_ATTR_DSA_PRIME
     subprime: Vec<u8>, // TEE_ATTR_DSA_SUBPRIME
     base: Vec<u8>,     // TEE_ATTR_DSA_BASE
@@ -225,7 +225,7 @@ impl KeyType for DsaPublicKey {}
 // TODO(https://fxbug.dev/371213067): Properly implement KeyType.
 #[allow(dead_code)]
 #[derive(Clone)]
-struct DsaKeypair {
+pub struct DsaKeypair {
     prime: Vec<u8>,    // TEE_ATTR_DSA_PRIME
     subprime: Vec<u8>, // TEE_ATTR_DSA_SUBPRIME
     base: Vec<u8>,     // TEE_ATTR_DSA_BASE
@@ -238,7 +238,7 @@ impl KeyType for DsaKeypair {}
 // TODO(https://fxbug.dev/371213067): Properly implement KeyType.
 #[allow(dead_code)]
 #[derive(Clone)]
-struct DhKeypair {
+pub struct DhKeypair {
     prime: Vec<u8>,   // TEE_ATTR_DH_PRIME
     base: Vec<u8>,    // TEE_ATTR_DH_BASE
     public: Vec<u8>,  // TEE_ATTR_DH_PUBLIC_VALUE
@@ -253,7 +253,7 @@ impl KeyType for DhKeypair {}
 // TODO(https://fxbug.dev/371213067): Properly implement KeyType.
 #[allow(dead_code)]
 #[derive(Clone)]
-struct EccPublicKey {
+pub struct EccPublicKey {
     x: Vec<u8>,         // TEE_ATTR_ECC_PUBLIC_VALUE_X
     y: Vec<u8>,         // TEE_ATTR_ECC_PUBLIC_VALUE_Y
     curve: ValueFields, // TEE_ATTR_ECC_CURVE
@@ -264,7 +264,7 @@ impl KeyType for EccPublicKey {}
 // TODO(https://fxbug.dev/371213067): Properly implement KeyType.
 #[allow(dead_code)]
 #[derive(Clone)]
-struct EccKeypair {
+pub struct EccKeypair {
     x: Vec<u8>,         // TEE_ATTR_ECC_PUBLIC_VALUE_X
     y: Vec<u8>,         // TEE_ATTR_ECC_PUBLIC_VALUE_Y
     private: Vec<u8>,   // TEE_ATTR_ECC_PRIVATE_VALUE
@@ -274,7 +274,7 @@ struct EccKeypair {
 impl KeyType for EccKeypair {}
 
 #[derive(Clone)]
-struct NoKey {}
+pub struct NoKey {}
 
 impl KeyType for NoKey {
     fn new(max_size: u32) -> TeeResult<Self> {
@@ -301,7 +301,7 @@ impl KeyType for NoKey {
 
 /// A cryptographic key (or key pair).
 #[derive(Clone)]
-enum Key {
+pub enum Key {
     Aes(AesKey),
     Des(DesKey),
     Des3(Des3Key),
@@ -489,7 +489,7 @@ impl DerefMut for Key {
 
 // The common object abstraction implemented by transient and persistent
 // storage objects.
-trait Object {
+pub trait Object {
     fn key(&self) -> &Key;
 
     fn usage(&self) -> &Usage;
@@ -556,7 +556,7 @@ impl Object for TransientObject {
 
 // A class abstraction implementing the transient storage interface.
 struct TransientObjects {
-    by_handle: HashMap<ObjectHandle, RefCell<TransientObject>>,
+    by_handle: HashMap<ObjectHandle, Rc<RefCell<TransientObject>>>,
     next_handle_value: u64,
 }
 
@@ -572,7 +572,8 @@ impl TransientObjects {
     fn allocate(&mut self, type_: Type, max_size: u32) -> TeeResult<ObjectHandle> {
         let key = Key::new(type_, max_size)?;
         let handle = self.mint_handle();
-        let prev = self.by_handle.insert(handle.clone(), RefCell::new(TransientObject::new(key)));
+        let prev =
+            self.by_handle.insert(handle.clone(), Rc::new(RefCell::new(TransientObject::new(key))));
         debug_assert!(prev.is_none());
         Ok(handle)
     }
@@ -1106,6 +1107,14 @@ impl Storage {
         Self {
             persistent_objects: PersistentObjects::new(),
             transient_objects: TransientObjects::new(),
+        }
+    }
+
+    pub fn get(&self, object: ObjectHandle) -> Rc<RefCell<dyn Object>> {
+        if is_transient_handle(object) {
+            self.transient_objects.by_handle.get(&object).unwrap().clone()
+        } else {
+            self.persistent_objects.by_handle.get(&object).unwrap().borrow().object.clone()
         }
     }
 

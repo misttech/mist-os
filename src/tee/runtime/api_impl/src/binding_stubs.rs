@@ -20,9 +20,9 @@ use tee_internal::binding::{
     TEE_Time, TEE_Whence, TEE_SUCCESS, TEE_UUID,
 };
 use tee_internal::{
-    to_tee_result, Attribute, AttributeId, Error, HandleFlags, ObjectEnumHandle, ObjectHandle,
-    PropSetHandle, Result as TeeResult, Storage as TeeStorage, Type, Usage, ValueFields, Whence,
-    OBJECT_ID_MAX_LEN,
+    to_tee_result, Algorithm, Attribute, AttributeId, Error, HandleFlags, Mode, ObjectEnumHandle,
+    ObjectHandle, OperationHandle, PropSetHandle, Result as TeeResult, Storage as TeeStorage, Type,
+    Usage, ValueFields, Whence, OBJECT_ID_MAX_LEN,
 };
 
 // This function returns a list of the C entry point that we want to expose from
@@ -1205,12 +1205,24 @@ extern "C" fn TEE_AllocateOperation(
     mode: u32,
     maxKeySize: u32,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!operation.is_null());
+    to_tee_result(|| -> TeeResult {
+        let algorithm = Algorithm::from_u32(algorithm).ok_or(Error::NotSupported)?;
+        let mode = Mode::from_u32(mode).ok_or(Error::NotSupported)?;
+        context::with_current_mut(|context| {
+            let operation_handle = context.operations.allocate(algorithm, mode, maxKeySize)?;
+            // Safety: |operation| is checked as non-null above.
+            unsafe { *operation = *operation_handle.to_binding() };
+            Ok(())
+        })
+    }())
 }
 
 #[no_mangle]
 extern "C" fn TEE_FreeOperation(operation: TEE_OperationHandle) {
-    unimplemented!()
+    context::with_current_mut(|context| {
+        context.operations.free(*OperationHandle::from_binding(&operation))
+    });
 }
 
 #[no_mangle]
@@ -1240,7 +1252,18 @@ extern "C" fn TEE_SetOperationKey(
     operation: TEE_OperationHandle,
     key: TEE_ObjectHandle,
 ) -> TEE_Result {
-    unimplemented!()
+    to_tee_result(|| -> TeeResult {
+        context::with_current_mut(|context| {
+            let operation = *OperationHandle::from_binding(&operation);
+            let key = *ObjectHandle::from_binding(&key);
+            if key.is_null() {
+                context.operations.clear_key(operation)
+            } else {
+                let key_object = context.storage.get(key);
+                context.operations.set_key(operation, key_object)
+            }
+        })
+    }())
 }
 
 #[no_mangle]
