@@ -410,7 +410,6 @@ if (!is_host) {
           ":core_bindlib",
           ":core_dart_library",
           ":core_data",
-          ":core_documentation",
           ":core_licenses",
           ":version_history_sdk($default_toolchain)",
           "//sdk/devices",
@@ -720,11 +719,6 @@ sdk_molecule("core_data") {
   ]
 }
 
-sdk_molecule("core_documentation") {
-  category = "partner"
-  deps = [ "//third_party/Vulkan-Loader:vulkan_license" ]
-}
-
 sdk_molecule("core_loadable_modules") {
   category = "partner"
   deps = [ "//src/lib/vulkan:vulkan_layers" ]
@@ -839,6 +833,7 @@ sdk_molecule("core_licenses") {
     ":musl_license",
     ":open_source",
     ":sdk_notice",
+    "//third_party/Vulkan-Loader:vulkan_license",
   ]
 }
 
