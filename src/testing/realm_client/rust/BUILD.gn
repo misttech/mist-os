@@ -35,5 +35,14 @@ group("tests") {
   testonly = true
 
   # Ensure this library builds only.
-  deps = [ ":rust" ]
+  #
+  # NOTE: This library is only included when variants (e.g. asan) are not
+  # enabled to avoid mixing variant and non-variant libraries in the same build.
+  # This check (and likely this group) can be removed when the library is
+  # actually used by a binary in the build graph.
+  #
+  # See details in https://fxbug.dev/391294693.
+  if (select_variant == []) {
+    deps = [ ":rust" ]
+  }
 }
