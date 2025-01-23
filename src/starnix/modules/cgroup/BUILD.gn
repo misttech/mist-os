@@ -19,9 +19,12 @@ rustc_library("cgroup") {
 
   sources = [
     "cgroup.rs",
-    "freezer.rs",
+    "directory.rs",
+    "events.rs",
+    "freeze.rs",
     "fs.rs",
     "lib.rs",
+    "procs.rs",
   ]
 
   # TODO(https://fxbug.dev/42059075): Re-enable starnix in these environments.

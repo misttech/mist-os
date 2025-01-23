@@ -8,34 +8,37 @@
 //! to a control group (for the duration of their lifetime).
 
 use starnix_core::signals::send_freeze_signal;
-use starnix_core::task::{CurrentTask, Kernel, ProcessEntryRef, ThreadGroup, WaitQueue, Waiter};
-use starnix_core::vfs::buffers::InputBuffer;
+use starnix_core::task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter};
 use starnix_core::vfs::{
-    fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, fs_node_impl_not_dir,
-    AppendLockGuard, BytesFile, BytesFileOps, DirectoryEntryType, DynamicFile, DynamicFileBuf,
-    DynamicFileSource, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo,
-    FsNodeOps, FsStr, FsString, PathBuilder, VecDirectory, VecDirectoryEntry,
+    BytesFile, DirectoryEntryType, FileSystemHandle, FsNodeHandle, FsNodeInfo, FsStr, FsString,
+    PathBuilder, VecDirectoryEntry,
 };
 use starnix_logging::{log_warn, track_stub};
-use starnix_sync::{FileOpsCore, Locked, Mutex};
+use starnix_sync::Mutex;
 use starnix_types::ownership::{TempRef, WeakRef};
 use starnix_uapi::auth::FsCred;
-use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::file_mode::{mode, FileMode};
-use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::file_mode::mode;
 use starnix_uapi::{errno, error, pid_t};
-use std::borrow::Cow;
 use std::collections::{btree_map, hash_map, BTreeMap, HashMap};
 use std::ops::Deref;
 use std::sync::{Arc, OnceLock, Weak};
 
-use crate::freezer::{FreezerFile, FreezerState};
+use crate::directory::CgroupDirectory;
+use crate::events::EventsFile;
+use crate::freeze::FreezeFile;
+use crate::procs::ControlGroupNode;
 
 const CONTROLLERS_FILE: &str = "cgroup.controllers";
 const PROCS_FILE: &str = "cgroup.procs";
 const FREEZE_FILE: &str = "cgroup.freeze";
 const EVENTS_FILE: &str = "cgroup.events";
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum FreezerState {
+    Thawed,
+    Frozen,
+}
 
 /// Common operations of all cgroups.
 pub trait CgroupOps: Send + Sync + 'static {
@@ -425,7 +428,7 @@ pub struct Cgroup {
     state: Mutex<CgroupState>,
 
     /// The directory node associated with this control group.
-    directory_node: FsNodeHandle,
+    pub directory_node: FsNodeHandle,
 
     /// The interface nodes associated with this control group.
     interface_nodes: BTreeMap<FsString, FsNodeHandle>,
@@ -487,7 +490,7 @@ impl Cgroup {
                         FREEZE_FILE.into(),
                         fs.create_node(
                             current_task,
-                            FreezerFile::new_node(weak.clone() as Weak<Self>),
+                            FreezeFile::new_node(weak.clone() as Weak<Self>),
                             FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
                         ),
                     ),
@@ -644,262 +647,6 @@ impl CgroupOps for Cgroup {
         state.self_freezer_state = FreezerState::Thawed;
         let inherited_freezer_state = state.inherited_freezer_state;
         state.propagate_thaw(inherited_freezer_state);
-    }
-}
-
-/// A `CgroupDirectoryNode` represents the node associated with a particular control group.
-#[derive(Debug)]
-pub struct CgroupDirectory {
-    /// The associated cgroup.
-    cgroup: Weak<dyn CgroupOps>,
-}
-
-impl CgroupDirectory {
-    pub fn new(cgroup: Weak<dyn CgroupOps>) -> CgroupDirectoryHandle {
-        CgroupDirectoryHandle(Arc::new(Self { cgroup }))
-    }
-}
-
-/// `CgroupDirectoryHandle` is needed to implement a trait for an Arc.
-#[derive(Debug, Clone)]
-pub struct CgroupDirectoryHandle(Arc<CgroupDirectory>);
-impl CgroupDirectoryHandle {
-    fn cgroup(&self) -> Result<Arc<dyn CgroupOps>, Errno> {
-        self.cgroup.upgrade().ok_or_else(|| errno!(ENODEV))
-    }
-}
-
-impl Deref for CgroupDirectoryHandle {
-    type Target = CgroupDirectory;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0.deref()
-    }
-}
-
-impl FsNodeOps for CgroupDirectoryHandle {
-    fn create_file_ops(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _flags: OpenFlags,
-    ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(VecDirectory::new_file(self.cgroup()?.get_entries()))
-    }
-
-    fn mkdir(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        node: &FsNode,
-        current_task: &CurrentTask,
-        name: &FsStr,
-        _mode: FileMode,
-        _owner: FsCred,
-    ) -> Result<FsNodeHandle, Errno> {
-        let child = self.cgroup()?.new_child(current_task, &node.fs(), name)?;
-        node.update_info(|info| {
-            info.link_count += 1;
-        });
-        Ok(child.directory_node.clone())
-    }
-
-    fn mknod(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _name: &FsStr,
-        _mode: FileMode,
-        _dev: DeviceType,
-        _owner: FsCred,
-    ) -> Result<FsNodeHandle, Errno> {
-        error!(EACCES)
-    }
-
-    fn unlink(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        node: &FsNode,
-        _current_task: &CurrentTask,
-        name: &FsStr,
-        child: &FsNodeHandle,
-    ) -> Result<(), Errno> {
-        let cgroup = self.cgroup()?;
-
-        // Only cgroup directories can be removed. Cgroup interface files cannot be removed.
-        let Some(child_dir) = child.downcast_ops::<CgroupDirectoryHandle>() else {
-            return error!(EPERM);
-        };
-        let child_cgroup = child_dir.cgroup()?;
-
-        let removed = cgroup.remove_child(name)?;
-        assert!(Arc::ptr_eq(&(removed as Arc<dyn CgroupOps>), &child_cgroup));
-
-        node.update_info(|info| {
-            info.link_count -= 1;
-        });
-
-        Ok(())
-    }
-
-    fn create_symlink(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _name: &FsStr,
-        _target: &FsStr,
-        _owner: FsCred,
-    ) -> Result<FsNodeHandle, Errno> {
-        error!(EPERM)
-    }
-
-    fn lookup(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        name: &FsStr,
-    ) -> Result<FsNodeHandle, Errno> {
-        self.cgroup()?.get_node(name)
-    }
-}
-
-/// A `ControlGroupNode` backs the `cgroup.procs` file.
-///
-/// Opening and writing to this node will add tasks to the control group.
-struct ControlGroupNode {
-    cgroup: Weak<dyn CgroupOps>,
-}
-
-impl ControlGroupNode {
-    fn new(cgroup: Weak<dyn CgroupOps>) -> Self {
-        ControlGroupNode { cgroup }
-    }
-}
-
-impl FsNodeOps for ControlGroupNode {
-    fs_node_impl_not_dir!();
-
-    fn create_file_ops(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _flags: OpenFlags,
-    ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(Box::new(ControlGroupFile::new(self.cgroup.clone())))
-    }
-
-    fn truncate(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _guard: &AppendLockGuard<'_>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _length: u64,
-    ) -> Result<(), Errno> {
-        Ok(())
-    }
-}
-
-struct ControlGroupFileSource {
-    cgroup: Weak<dyn CgroupOps>,
-}
-
-impl ControlGroupFileSource {
-    fn cgroup(&self) -> Result<Arc<dyn CgroupOps>, Errno> {
-        self.cgroup.upgrade().ok_or_else(|| errno!(ENODEV))
-    }
-}
-
-impl DynamicFileSource for ControlGroupFileSource {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let cgroup = self.cgroup()?;
-        for pid in cgroup.get_pids() {
-            write!(sink, "{pid}\n")?;
-        }
-        Ok(())
-    }
-}
-
-/// A `ControlGroupFile` currently represents the `cgroup.procs` file for the control group. Writing
-/// to this file will add tasks to the control group.
-pub struct ControlGroupFile {
-    cgroup: Weak<dyn CgroupOps>,
-    dynamic_file: DynamicFile<ControlGroupFileSource>,
-}
-
-impl ControlGroupFile {
-    fn new(cgroup: Weak<dyn CgroupOps>) -> Self {
-        Self {
-            cgroup: cgroup.clone(),
-            dynamic_file: DynamicFile::new(ControlGroupFileSource { cgroup: cgroup.clone() }),
-        }
-    }
-
-    fn cgroup(&self) -> Result<Arc<dyn CgroupOps>, Errno> {
-        self.cgroup.upgrade().ok_or_else(|| errno!(ENODEV))
-    }
-}
-
-impl FileOps for ControlGroupFile {
-    fileops_impl_delegate_read_and_seek!(self, self.dynamic_file);
-    fileops_impl_noop_sync!();
-
-    fn write(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        _offset: usize,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        let bytes = data.read_all()?;
-        let pid_string = std::str::from_utf8(&bytes).map_err(|_| errno!(EINVAL))?;
-        let pid = pid_string.trim().parse::<pid_t>().map_err(|_| errno!(ENOENT))?;
-
-        // Check if the pid is a valid task.
-        let thread_group = if let Some(ProcessEntryRef::Process(thread_group)) =
-            current_task.kernel().pids.read().get_process(pid)
-        {
-            TempRef::into_static(thread_group)
-        } else {
-            return error!(EINVAL);
-        };
-
-        self.cgroup()?.add_process(pid, &thread_group)?;
-
-        Ok(bytes.len())
-    }
-}
-
-pub struct EventsFile {
-    cgroup: Weak<Cgroup>,
-}
-impl EventsFile {
-    fn new_node(cgroup: Weak<Cgroup>) -> impl FsNodeOps {
-        BytesFile::new_node(Self { cgroup })
-    }
-
-    fn cgroup(&self) -> Result<Arc<Cgroup>, Errno> {
-        self.cgroup.upgrade().ok_or_else(|| errno!(ENODEV))
-    }
-}
-
-impl BytesFileOps for EventsFile {
-    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        track_stub!(
-            TODO("https://fxbug.dev/377755814"),
-            "cgroup.events does not check state of parent and children cgroup"
-        );
-        let status = self.cgroup()?.get_status();
-        let events_str = format!(
-            "populated {}\nfrozen {}\n",
-            status.populated as u8, status.effective_freezer_state
-        );
-        Ok(events_str.as_bytes().to_owned().into())
     }
 }
 
