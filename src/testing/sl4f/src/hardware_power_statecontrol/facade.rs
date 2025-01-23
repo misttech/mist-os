@@ -4,7 +4,9 @@
 
 use crate::common_utils::common::macros::{fx_err_and_bail, with_line};
 use anyhow::Error;
-use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminProxy, RebootReason};
+use fidl_fuchsia_hardware_power_statecontrol::{
+    AdminMarker, AdminProxy, RebootOptions, RebootReason2,
+};
 use fuchsia_component as app;
 use log::info;
 
@@ -35,7 +37,14 @@ impl HardwarePowerStatecontrolFacade {
     pub async fn suspend_reboot(&self) -> Result<(), Error> {
         let tag = "HardwarePowerStatecontrolFacade::suspend_reboot";
         info!("Executing Suspend: REBOOT");
-        if let Err(err) = self.get_admin_proxy()?.reboot(RebootReason::UserRequest).await? {
+        if let Err(err) = self
+            .get_admin_proxy()?
+            .perform_reboot(&RebootOptions {
+                reasons: Some(vec![RebootReason2::UserRequest]),
+                ..Default::default()
+            })
+            .await?
+        {
             fx_err_and_bail!(
                 &with_line!(tag),
                 format_err!("Failed to change power control state: {:?}", err)
