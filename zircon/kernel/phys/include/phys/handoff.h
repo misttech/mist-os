@@ -185,6 +185,9 @@ struct PhysHandoff {
   // ZBI_TYPE_EFI_SYSTEM_TABLE payload.
   // Physical address of the EFI system table.
   std::optional<uint64_t> efi_system_table;
+
+  // Initialized UART to be used by the kernel, if any.
+  uart::all::Driver uart;
 };
 
 static_assert(std::is_default_constructible_v<PhysHandoff>);

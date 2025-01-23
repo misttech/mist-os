@@ -372,7 +372,7 @@ void HandoffPrep::SetVersionString(ktl::string_view version) {
   SetMemory();
 
   // Hand-off the serial driver. There may be no more logging beyond this point.
-  handoff_options.serial = ktl::move(uart).TakeUart();
+  handoff()->uart = ktl::move(uart).TakeUart();
 
   boot(handoff());
   ZX_PANIC("HandoffPrep::DoHandoff boot function returned!");
