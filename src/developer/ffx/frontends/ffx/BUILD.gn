@@ -91,10 +91,6 @@ host_test("ffx-e2e-without-target") {
     "//src/developer/ffx:suite_test_data",
     "//src/developer/ffx/plugins/self-test:ffx_selftest_tool_test_data",
   ]
-
-  # TODO(https://fxbug.dev/42077085) ffx self-test seems to be buggy, so let's at least
-  # prevent it from affecting other tests by isolating it to its own shard.
-  isolated = true
 }
 
 host_test("ffx-e2e-with-target") {
@@ -123,10 +119,6 @@ host_test("ffx-e2e-with-target") {
     nuc7_env,
     nuc11_env,
   ]
-
-  # TODO(https://fxbug.dev/42077085) ffx self-test seems to be buggy, so let's at least
-  # prevent it from affecting other tests by isolating it to its own shard.
-  isolated = true
 }
 
 host_test_data("ffx-e2e-test-data") {
