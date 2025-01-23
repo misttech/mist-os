@@ -35,6 +35,27 @@ struct AcpiDebugPortDescriptor;
 
 namespace uart {
 
+// Tagged configuration type, used to represent the configuration of `Driver` even if multiple types
+// of driver have the same `config_type`.
+template <typename Driver>
+class Config {
+ public:
+  using uart_type = Driver;
+  using config_type = typename Driver::config_type;
+
+  constexpr Config() = default;
+  explicit constexpr Config(const config_type& cfg) : config_(cfg) {}
+
+  constexpr config_type* operator->() { return &config_; }
+  constexpr const config_type* operator->() const { return &config_; }
+
+  constexpr config_type& operator*() { return config_; }
+  constexpr const config_type& operator*() const { return config_; }
+
+ private:
+  config_type config_;
+};
+
 //
 // These types are used in configuring the line control settings (i.e., in the
 // `SetLineControl()` method).

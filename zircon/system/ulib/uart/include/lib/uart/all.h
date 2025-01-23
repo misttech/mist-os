@@ -87,6 +87,80 @@ using WithAllDrivers = Template<
 // to another, e.g. to hand off from physboot to the kernel.
 using Driver = WithAllDrivers<std::variant>;
 
+// This represents the a configuration tagged with a driver from the set of available drivers.
+// Helper methods allows us to generate a `uart::all::Driver`.
+//
+// The provided configuration object has the following properties:
+//    * `uart_type` alias for the uart driver type.
+//    * `config_type` alias for `uart_type::config_type`.
+//    * `operator()*` and `operator()->` return reference and pointer to the underlying
+//    `config_type` object.
+//
+// Note: There is no driver `state` being held in this object, just the configuration.
+template <typename UartDriver = Driver>
+class Config {
+ public:
+  Config() = default;
+  Config(const Config&) = default;
+  Config(Config&&) = default;
+
+  // Constructor to obtain configurations from a Uart.
+  template <typename Uart>
+  explicit Config(const uart::Config<Uart>& config) : configs_(config) {}
+  template <typename Uart>
+  explicit Config(const Uart& uart) : configs_(uart::Config<Uart>(uart.config())) {}
+  template <typename Uart, template <typename, IoRegisterType> class IoProvider, typename Sync>
+  explicit Config(const uart::KernelDriver<Uart, IoProvider, Sync>& uart)
+      : configs_(uart::Config<Uart>(uart.config())) {}
+
+  Config& operator=(const Config&) = default;
+  Config& operator=(Config&&) = default;
+
+  template <typename Uart, template <typename, IoRegisterType> class IoProvider, typename Sync>
+  Config& operator=(const uart::KernelDriver<Uart, IoProvider, Sync>& driver) {
+    configs_ = uart::Config<Uart>(driver.config());
+    return *this;
+  }
+
+  template <typename T>
+  Config& operator=(const T& uart) {
+    configs_ = uart::Config<T>(uart.config());
+    return *this;
+  }
+
+  // Visitor to access the active configuration object.
+  template <typename T>
+  void Visit(T&& visitor) {
+    internal::Visit(std::forward<T>(visitor), configs_);
+  }
+
+  template <typename T>
+  void Visit(T&& visitor) const {
+    internal::Visit(std::forward<T>(visitor), configs_);
+  }
+
+ private:
+  template <typename T>
+  struct Variant;
+
+  template <typename... Args>
+  struct Variant<std::variant<Args...>> {
+    using type = std::variant<uart::Config<Args>...>;
+  };
+
+  typename Variant<UartDriver>::type configs_;
+};
+
+// Instantiates `uart::all::Driver` with `config`.
+template <typename UartDriver>
+UartDriver MakeDriver(const Config<UartDriver>& config) {
+  UartDriver driver;
+  config.Visit([&driver]<typename T>(const T& uart_config) {
+    driver.template emplace<typename T::uart_type>(*uart_config);
+  });
+  return driver;
+}
+
 // uart::all::KernelDriver is a variant across all the KernelDriver types.
 template <template <typename, IoRegisterType> class IoProvider, typename Sync,
           typename UartDriver = Driver>
@@ -105,6 +179,12 @@ class KernelDriver {
   // ...or from another all::KernelDriver::uart() result.
   explicit KernelDriver(const uart_type& uart) { *this = uart; }
 
+  explicit KernelDriver(const Config<UartDriver>& config) {
+    config.Visit([this]<typename ConfigType>(const ConfigType& driver_config) {
+      variant_.template emplace<OneDriver<typename ConfigType::uart_type>>(*driver_config);
+    });
+  }
+
   // Assignment is another way to reinitialize the configuration.
   KernelDriver& operator=(const uart_type& uart) {
     internal::Visit(
@@ -114,6 +194,12 @@ class KernelDriver {
         },
         uart);
     return *this;
+  }
+
+  Config<UartDriver> config() const {
+    Config<UartDriver> conf;
+    Visit([&conf](const auto& driver) { conf = driver; });
+    return conf;
   }
 
   // If this ZBI item matches a supported driver, instantiate that driver and

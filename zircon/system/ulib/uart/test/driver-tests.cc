@@ -109,6 +109,135 @@ TEST(UartTests, Blocking) {
   EXPECT_EQ(driver.Write<uart::mock::Locking>("hello world\n"), 12);
 }
 
+TEST(UartTests, Config) {
+  uart::all::Config all_configs;
+
+  zbi_dcfg_simple_t dcfg = {
+      .mmio_phys = 1,
+      .irq = 2,
+      .flags = 3,
+  };
+
+  // uart::foo::Driver
+  uart::ns8250::Mmio32Driver uart(dcfg);
+
+  // From uart driver.
+  all_configs = uart;
+  all_configs.Visit([&dcfg](auto& config) {
+    if constexpr (std::is_same_v<std::decay_t<decltype(*config)>, zbi_dcfg_simple_t>) {
+      using uart_type = typename std::decay_t<decltype(config)>::uart_type;
+      ASSERT_TRUE((std::is_same_v<uart_type, uart::ns8250::Mmio32Driver>));
+      EXPECT_EQ(config->mmio_phys, dcfg.mmio_phys);
+      EXPECT_EQ(config->irq, dcfg.irq);
+      EXPECT_EQ(config->flags, dcfg.flags);
+    } else {
+      FAIL("Unexpected configuration");
+    }
+  });
+
+  // From kernel driver
+  zbi_dcfg_simple_pio_t pio_cfg{
+      .base = 0x3f8,
+      .irq = 3,
+  };
+  uart::KernelDriver<uart::ns8250::PioDriver, uart::mock::IoProvider, uart::UnsynchronizedPolicy>
+      driver(pio_cfg);
+  all_configs = driver;
+  all_configs.Visit([&pio_cfg](auto& config) {
+    if constexpr (std::is_same_v<std::decay_t<decltype(*config)>, zbi_dcfg_simple_pio_t>) {
+      using uart_type = typename std::decay_t<decltype(config)>::uart_type;
+      ASSERT_TRUE((std::is_same_v<uart_type, uart::ns8250::PioDriver>));
+      EXPECT_EQ(config->base, pio_cfg.base);
+      EXPECT_EQ(config->irq, pio_cfg.irq);
+    } else {
+      FAIL("Unexpected configuration");
+    }
+  });
+
+  // Construct from uart.
+  {
+    zbi_dcfg_simple_t dcfg = {
+        .mmio_phys = 1,
+        .irq = 2,
+        .flags = 3,
+    };
+
+    // uart::foo::Driver
+    uart::ns8250::Mmio32Driver uart(dcfg);
+    uart::all::Config all_configs(uart);
+
+    all_configs.Visit([&dcfg](auto& config) {
+      if constexpr (std::is_same_v<std::decay_t<decltype(*config)>, zbi_dcfg_simple_t>) {
+        using uart_type = typename std::decay_t<decltype(config)>::uart_type;
+        ASSERT_TRUE((std::is_same_v<uart_type, uart::ns8250::Mmio32Driver>));
+        EXPECT_EQ(config->mmio_phys, dcfg.mmio_phys);
+        EXPECT_EQ(config->irq, dcfg.irq);
+        EXPECT_EQ(config->flags, dcfg.flags);
+      } else {
+        FAIL("Unexpected configuration");
+      }
+    });
+  }
+
+  // Construct from kernel driver.
+  {
+    // From kernel driver
+    zbi_dcfg_simple_pio_t pio_cfg{
+        .base = 0x3f8,
+        .irq = 3,
+    };
+    uart::KernelDriver<uart::ns8250::PioDriver, uart::mock::IoProvider, uart::UnsynchronizedPolicy>
+        driver(pio_cfg);
+    uart::all::Config all_configs(driver);
+    all_configs.Visit([&pio_cfg](auto& config) {
+      if constexpr (std::is_same_v<std::decay_t<decltype(*config)>, zbi_dcfg_simple_pio_t>) {
+        using uart_type = typename std::decay_t<decltype(config)>::uart_type;
+        ASSERT_TRUE((std::is_same_v<uart_type, uart::ns8250::PioDriver>));
+        EXPECT_EQ(config->base, pio_cfg.base);
+        EXPECT_EQ(config->irq, pio_cfg.irq);
+      } else {
+        FAIL("Unexpected configuration");
+      }
+    });
+  }
+}
+
+TEST(UartTests, AllConfig) {
+  // Assignment
+  uart::all::KernelDriver<uart::mock::IoProvider, uart::UnsynchronizedPolicy> all_driver;
+  zbi_dcfg_simple_pio_t pio_cfg{
+      .base = 0x3f8,
+      .irq = 3,
+  };
+  uart::KernelDriver<uart::ns8250::PioDriver, uart::mock::IoProvider, uart::UnsynchronizedPolicy>
+      driver(pio_cfg);
+  all_driver = std::move(driver).TakeUart();
+  uart::all::Config all_config = all_driver.config();
+  all_config.Visit([&pio_cfg](auto& config) {
+    if constexpr (std::is_same_v<std::decay_t<decltype(*config)>, zbi_dcfg_simple_pio_t>) {
+      using uart_type = typename std::decay_t<decltype(config)>::uart_type;
+      ASSERT_TRUE((std::is_same_v<uart_type, uart::ns8250::PioDriver>));
+      EXPECT_EQ(config->base, pio_cfg.base);
+      EXPECT_EQ(config->irq, pio_cfg.irq);
+    } else {
+      FAIL("Unexpected configuration");
+    }
+  });
+
+  // Constctor
+  uart::all::KernelDriver<uart::mock::IoProvider, uart::UnsynchronizedPolicy> all_driver2(
+      all_config);
+  all_driver2.Visit([&](const auto& driver) {
+    using uart_type = typename std::decay_t<decltype(driver)>::uart_type;
+    if constexpr (std::is_same_v<uart_type, uart::ns8250::PioDriver>) {
+      EXPECT_EQ(driver.config().base, pio_cfg.base);
+      EXPECT_EQ(driver.config().irq, pio_cfg.irq);
+    } else {
+      FAIL("Unexpected configuration");
+    }
+  });
+}
+
 TEST(UartTests, Null) {
   uart::KernelDriver<uart::null::Driver, uart::mock::IoProvider, uart::UnsynchronizedPolicy> driver;
   // Unsynchronized LockPolicy is dropped.
