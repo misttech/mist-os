@@ -29,6 +29,8 @@ struct Driver {
   static constexpr std::array<std::string_view, 0> kDevicetreeBindings = {};
   static constexpr std::string_view config_name() { return "none"; }
   static constexpr IoRegisterType kIoType = IoRegisterType::kMmio8;
+  static constexpr uint32_t kType = 0;
+  static constexpr uint32_t kExtra = 0;
 
   Driver() = default;
 
@@ -37,10 +39,6 @@ struct Driver {
   constexpr bool operator==(const Driver& other) const { return true; }
   constexpr bool operator!=(const Driver& other) const { return false; }
 
-  // API to (not) fill a ZBI item describing this UART.
-  constexpr uint32_t type() const { return 0; }
-  constexpr uint32_t extra() const { return 0; }
-  constexpr size_t size() const { return 0; }
   void FillItem(void*) const { ZX_PANIC("should never be called"); }
 
   // API to (not) match a ZBI item describing this UART.

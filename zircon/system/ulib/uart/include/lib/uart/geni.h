@@ -320,7 +320,7 @@ class Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_s
   static constexpr auto kDevicetreeBindings =
       cpp20::to_array<std::string_view>({"qcom,geni-debug-uart"});
 
-  static constexpr std::string_view config_name() { return "geni"; }
+  static constexpr std::string_view kConfigName = "geni";
 
   template <typename... Args>
   explicit Driver(Args&&... args)

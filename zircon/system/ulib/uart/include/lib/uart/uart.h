@@ -151,6 +151,9 @@ class DriverBase {
   // Register Io Type.
   static constexpr IoRegisterType kIoType = IoRegType;
 
+  static constexpr uint32_t kType = ZBI_TYPE_KERNEL_DRIVER;
+  static constexpr uint32_t kExtra = KdrvExtra;
+
   explicit DriverBase(const config_type& cfg) : cfg_(cfg) {}
 
   constexpr bool operator==(const Driver& other) const {
@@ -159,10 +162,7 @@ class DriverBase {
   constexpr bool operator!=(const Driver& other) const { return !(*this == other); }
 
   // API to fill a ZBI item describing this UART.
-  constexpr uint32_t type() const { return ZBI_TYPE_KERNEL_DRIVER; }
-  constexpr uint32_t extra() const { return KdrvExtra; }
-  constexpr size_t size() const { return sizeof(cfg_); }
-  void FillItem(void* payload) const { memcpy(payload, &cfg_, sizeof(cfg_)); }
+  void FillItem(void* payload) const { memcpy(payload, &cfg_, sizeof(config_type)); }
 
   // API to match a ZBI item describing this UART.
   static std::optional<Driver> MaybeCreate(const zbi_header_t& header, const void* payload) {
@@ -176,7 +176,7 @@ class DriverBase {
 
   // API to match a configuration string.
   static std::optional<Driver> MaybeCreate(std::string_view string) {
-    const auto config_name = Driver::config_name();
+    const auto config_name = Driver::kConfigName;
     if (string.substr(0, config_name.size()) == config_name) {
       string.remove_prefix(config_name.size());
       auto config = ParseConfig<KdrvConfig>(string);
@@ -215,8 +215,7 @@ class DriverBase {
 
   // API to reproduce a configuration string.
   void Unparse(FILE* out) const {
-    fprintf(out, "%.*s", static_cast<int>(Driver::config_name().size()),
-            Driver::config_name().data());
+    fprintf(out, "%.*s", static_cast<int>(Driver::kConfigName.size()), Driver::kConfigName.data());
     UnparseConfig<KdrvConfig>(cfg_, out);
   }
 

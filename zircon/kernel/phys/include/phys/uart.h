@@ -45,8 +45,8 @@ std::optional<memalloc::Range> GetUartMmioRange(const AllDrivers& driver, size_t
 
             default:
               ZX_PANIC("Unknown uart::IoRegisterType for %.*s/n",
-                       static_cast<int>(driver.config_name().length()),
-                       driver.config_name().data());
+                       static_cast<int>(driver_type::kConfigName.length()),
+                       driver_type::kConfigName.data());
           }
 
           // Adjust range to page boundaries.

@@ -331,8 +331,6 @@ void platform_early_init(void) {
   // is the cmdline option to bypass dlog set ?
   dlog_bypass_init();
 
-  // Serial port should be active now
-
   // Initialize the PmmChecker now that the cmdline has been parsed.
   pmm_checker_init_from_cmdline();
 

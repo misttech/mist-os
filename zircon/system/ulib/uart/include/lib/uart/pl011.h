@@ -152,7 +152,7 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_PL011_UART, zbi_dcfg
 
   static constexpr auto kDevicetreeBindings =
       cpp20::to_array<std::string_view>({"arm,primecell", "arm,pl011"});
-  static constexpr std::string_view config_name() { return "pl011"; }
+  static constexpr std::string_view kConfigName = "pl011";
 
   template <typename... Args>
   explicit Driver(Args&&... args) : Base(std::forward<Args>(args)...) {}

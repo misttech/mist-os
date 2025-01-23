@@ -256,7 +256,7 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig, IoRegType
     }
   }();
 
-  static constexpr std::string_view config_name() {
+  static constexpr std::string_view kConfigName = []() {
     switch (KdrvExtra) {
       case ZBI_KERNEL_DRIVER_I8250_PIO_UART:
         return "ioport";
@@ -273,7 +273,7 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig, IoRegType
       default:
         return "ns8250";
     }
-  }
+  }();
 
   template <typename... Args>
   explicit DriverImpl(Args&&... args) : Base(std::forward<Args>(args)...) {}

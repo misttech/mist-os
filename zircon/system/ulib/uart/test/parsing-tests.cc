@@ -9,6 +9,7 @@
 #include <lib/zbi-format/driver-config.h>
 
 #include <string>
+#include <type_traits>
 #include <utility>
 
 #include <zxtest/zxtest.h>
@@ -289,8 +290,9 @@ void CheckMaybeCreateFromAcpi(const U& debug_port) {
 TEST(ParsingTests, Ns8250MmioDriver) {
   {
     auto driver = uart::ns8250::Mmio32Driver::MaybeCreate(kX86 ? "mmio,0xa,0xb" : "ns8250,0xa,0xb");
+    using uart_t = std::decay_t<decltype(*driver)>;
     ASSERT_TRUE(driver.has_value());
-    EXPECT_STREQ(kX86 ? "mmio" : "ns8250", driver->config_name());
+    EXPECT_STREQ(kX86 ? "mmio" : "ns8250", uart_t::kConfigName);
     const zbi_dcfg_simple_t& config = driver->config();
     EXPECT_EQ(0xa, config.mmio_phys);
     EXPECT_EQ(0xb, config.irq);
@@ -299,8 +301,9 @@ TEST(ParsingTests, Ns8250MmioDriver) {
   {
     auto driver =
         uart::ns8250::Mmio32Driver::MaybeCreate(kX86 ? "mmio,0xa,0xb,0xc" : "ns8250,0xa,0xb,0xc");
+    using uart_t = std::decay_t<decltype(*driver)>;
     ASSERT_TRUE(driver.has_value());
-    EXPECT_STREQ(kX86 ? "mmio" : "ns8250", driver->config_name());
+    EXPECT_STREQ(kX86 ? "mmio" : "ns8250", uart_t::kConfigName);
     const zbi_dcfg_simple_t& config = driver->config();
     EXPECT_EQ(0xa, config.mmio_phys);
     EXPECT_EQ(0xb, config.irq);
@@ -313,8 +316,9 @@ TEST(ParsingTests, Ns8250MmioDriver) {
 TEST(ParsingTests, Ns82508BMmioDriver) {
   {
     auto driver = uart::ns8250::Mmio8Driver::MaybeCreate("ns8250-8bit,0xa,0xb");
+    using uart_t = std::decay_t<decltype(*driver)>;
     ASSERT_TRUE(driver.has_value());
-    EXPECT_STREQ("ns8250-8bit", driver->config_name());
+    EXPECT_STREQ("ns8250-8bit", uart_t::kConfigName);
     const zbi_dcfg_simple_t& config = driver->config();
     EXPECT_EQ(0xa, config.mmio_phys);
     EXPECT_EQ(0xb, config.irq);
@@ -323,8 +327,9 @@ TEST(ParsingTests, Ns82508BMmioDriver) {
 
   {
     auto driver = uart::ns8250::Mmio8Driver::MaybeCreate("ns8250-8bit,0xa,0xb,0xc");
+    using uart_t = std::decay_t<decltype(*driver)>;
     ASSERT_TRUE(driver.has_value());
-    EXPECT_STREQ("ns8250-8bit", driver->config_name());
+    EXPECT_STREQ("ns8250-8bit", uart_t::kConfigName);
     const zbi_dcfg_simple_t& config = driver->config();
     EXPECT_EQ(0xa, config.mmio_phys);
     EXPECT_EQ(0xb, config.irq);
@@ -334,8 +339,9 @@ TEST(ParsingTests, Ns82508BMmioDriver) {
 
 TEST(ParsingTests, Ns8250PioDriver) {
   auto driver = uart::ns8250::PioDriver::MaybeCreate("ioport,0xa,0xb");
+  using uart_t = std::decay_t<decltype(*driver)>;
   ASSERT_TRUE(driver.has_value());
-  EXPECT_STREQ("ioport", driver->config_name());
+  EXPECT_STREQ("ioport", uart_t::kConfigName);
   const zbi_dcfg_simple_pio_t& config = driver->config();
   EXPECT_EQ(0xa, config.base);
   EXPECT_EQ(0xb, config.irq);
@@ -346,8 +352,9 @@ TEST(ParsingTests, Ns8250PioDriver) {
 
 TEST(ParsingTests, Ns8250LegacyDriver) {
   auto driver = uart::ns8250::PioDriver::MaybeCreate("legacy");
+  using uart_t = std::decay_t<decltype(*driver)>;
   ASSERT_TRUE(driver.has_value());
-  EXPECT_STREQ("ioport", driver->config_name());
+  EXPECT_STREQ("ioport", uart_t::kConfigName);
   const zbi_dcfg_simple_pio_t& config = driver->config();
   EXPECT_EQ(0x3f8, config.base);
   EXPECT_EQ(4, config.irq);
@@ -356,8 +363,9 @@ TEST(ParsingTests, Ns8250LegacyDriver) {
 TEST(ParsingTests, Pl011Driver) {
   {
     auto driver = uart::pl011::Driver::MaybeCreate("pl011,0xa,0xb");
+    using uart_t = std::decay_t<decltype(*driver)>;
     ASSERT_TRUE(driver.has_value());
-    EXPECT_STREQ("pl011", driver->config_name());
+    EXPECT_STREQ("pl011", uart_t::kConfigName);
     const zbi_dcfg_simple_t& config = driver->config();
     EXPECT_EQ(0xa, config.mmio_phys);
     EXPECT_EQ(0xb, config.irq);
@@ -365,8 +373,9 @@ TEST(ParsingTests, Pl011Driver) {
   }
   {
     auto driver = uart::pl011::Driver::MaybeCreate("pl011,0xa,0xb,0xc");
+    using uart_t = std::decay_t<decltype(*driver)>;
     ASSERT_TRUE(driver.has_value());
-    EXPECT_STREQ("pl011", driver->config_name());
+    EXPECT_STREQ("pl011", uart_t::kConfigName);
     const zbi_dcfg_simple_t& config = driver->config();
     EXPECT_EQ(0xa, config.mmio_phys);
     EXPECT_EQ(0xb, config.irq);
@@ -379,8 +388,9 @@ TEST(ParsingTests, Pl011Driver) {
 
 TEST(ParsingTests, Pl011QemuDriver) {
   auto driver = uart::pl011::Driver::MaybeCreate("qemu");
+  using uart_t = std::decay_t<decltype(*driver)>;
   ASSERT_TRUE(driver.has_value());
-  EXPECT_STREQ("pl011", driver->config_name());
+  EXPECT_STREQ("pl011", uart_t::kConfigName);
   const zbi_dcfg_simple_t& config = driver->config();
   EXPECT_EQ(0x09000000, config.mmio_phys);
   EXPECT_EQ(33, config.irq);
@@ -391,8 +401,9 @@ TEST(ParsingTests, Pl011QemuDriver) {
 TEST(ParsingTests, AmlogicDriver) {
   {
     auto driver = uart::amlogic::Driver::MaybeCreate("amlogic,0xa,0xb");
+    using uart_t = std::decay_t<decltype(*driver)>;
     ASSERT_TRUE(driver.has_value());
-    EXPECT_STREQ("amlogic", driver->config_name());
+    EXPECT_STREQ("amlogic", uart_t::kConfigName);
     const zbi_dcfg_simple_t& config = driver->config();
     EXPECT_EQ(0xa, config.mmio_phys);
     EXPECT_EQ(0xb, config.irq);
@@ -401,8 +412,9 @@ TEST(ParsingTests, AmlogicDriver) {
 
   {
     auto driver = uart::amlogic::Driver::MaybeCreate("amlogic,0xa,0xb,0xc");
+    using uart_t = std::decay_t<decltype(*driver)>;
     ASSERT_TRUE(driver.has_value());
-    EXPECT_STREQ("amlogic", driver->config_name());
+    EXPECT_STREQ("amlogic", uart_t::kConfigName);
     const zbi_dcfg_simple_t& config = driver->config();
     EXPECT_EQ(0xa, config.mmio_phys);
     EXPECT_EQ(0xb, config.irq);

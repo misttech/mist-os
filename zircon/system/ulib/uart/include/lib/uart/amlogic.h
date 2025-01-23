@@ -106,14 +106,13 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dc
   static constexpr auto kDevicetreeBindings =
       cpp20::to_array<std::string_view>({"amlogic,meson-gx-uart", "amlogic,meson-ao-uart"});
 
+  static constexpr std::string_view kConfigName = "amlogic";
+  static constexpr uint32_t kFifoDepth = 64;
+
   template <typename... Args>
   explicit Driver(Args&&... args)
       : DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dcfg_simple_t,
                    IoRegisterType::kMmio8, kIoSlots>(std::forward<Args>(args)...) {}
-
-  static constexpr std::string_view config_name() { return "amlogic"; }
-
-  static constexpr uint32_t kFifoDepth = 64;
 
   template <class IoProvider>
   void Init(IoProvider& io) {

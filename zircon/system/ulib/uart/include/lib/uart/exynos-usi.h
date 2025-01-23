@@ -220,7 +220,7 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_EXYNOS_USI_UART, zbi
                           IoRegisterType::kMmio8, kIoSlots>;
 
  public:
-  static constexpr std::string_view config_name() { return "exynos_usi"; }
+  static constexpr std::string_view kConfigName = "exynos_usi";
 
   template <typename... Args>
   explicit Driver(Args&&... args) : Base(std::forward<Args>(args)...) {}
