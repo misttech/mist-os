@@ -155,9 +155,19 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
                 }
             }
         }
-        fidl_wlanix::WifiChipRequest::SetCountryCode { payload: _, responder } => {
+        fidl_wlanix::WifiChipRequest::SetCountryCode { payload, responder } => {
             info!("fidl_wlanix::WifiChipRequest::SetCountryCode");
-            responder.send(Ok(())).context("send SetCountryCode response")?;
+            let result = match payload.code {
+                Some(code) => iface_manager.set_country(chip_id, code).await.map_err(|e| {
+                    error!("Failed to set country code {:?} in phy: {}", code, e);
+                    zx::sys::ZX_ERR_INTERNAL
+                }),
+                None => {
+                    error!("SetCountryCode missing country code");
+                    Err(zx::sys::ZX_ERR_INVALID_ARGS)
+                }
+            };
+            responder.send(result).context("send SetCountryCode response")?;
         }
         // TODO(https://fxbug.dev/366027488): GetAvailableModes is hardcoded.
         fidl_wlanix::WifiChipRequest::GetAvailableModes { responder } => {
@@ -851,9 +861,19 @@ async fn handle_supplicant_sta_iface_request<C: ClientIface>(
                 warn!("Failed to send disconnect response: {}", e);
             }
         }
-        fidl_wlanix::SupplicantStaIfaceRequest::SetStaCountryCode { payload: _, responder } => {
+        fidl_wlanix::SupplicantStaIfaceRequest::SetStaCountryCode { payload, responder } => {
             info!("fidl_wlanix::SupplicantStaIfaceRequest::SetStaCountryCode");
-            responder.send(Ok(())).context("send SetStaCountryCode response")?;
+            let result = match payload.code {
+                Some(code) => iface.set_country(code).await.map_err(|e| {
+                    error!("Failed to set country code {:?} for iface: {}", code, e);
+                    zx::sys::ZX_ERR_INTERNAL
+                }),
+                None => {
+                    error!("SetStaCountryCode missing country code");
+                    Err(zx::sys::ZX_ERR_INVALID_ARGS)
+                }
+            };
+            responder.send(result).context("send SetStaCountryCode response")?;
         }
         fidl_wlanix::SupplicantStaIfaceRequest::_UnknownMethod { ordinal, .. } => {
             warn!("Unknown SupplicantStaIfaceRequest ordinal: {}", ordinal);
@@ -1709,6 +1729,30 @@ mod tests {
     }
 
     #[test]
+    fn test_wifi_set_country_code() {
+        let (mut test_helper, mut test_fut) = setup_wifi_test();
+        const COUNTRY_CODE: [u8; 2] = *b"WW";
+
+        let set_country_fut = test_helper.wifi_chip_proxy.set_country_code(
+            fidl_wlanix::WifiChipSetCountryCodeRequest {
+                code: Some(COUNTRY_CODE),
+                ..Default::default()
+            },
+        );
+        let mut set_country_fut = pin!(set_country_fut);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut set_country_fut), Poll::Pending);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let calls = test_helper.iface_manager.calls.lock();
+        assert_eq!(calls.len(), 2);
+        // CreateClientIface is called in setup_wifi_test.
+        assert_variant!(&calls[0], ifaces::test_utils::IfaceManagerCall::CreateClientIface(_));
+        assert_variant!(
+            &calls[1],
+            ifaces::test_utils::IfaceManagerCall::SetCountry { country, .. } => { assert_eq!(*country, COUNTRY_CODE) }
+        );
+    }
+
+    #[test]
     fn test_wifi_chip_get_available_modes() {
         let (mut test_helper, mut test_fut) = setup_wifi_test();
 
@@ -1991,6 +2035,26 @@ mod tests {
             test_helper.exec.run_until_stalled(&mut disconnect_fut),
             Poll::Ready(Ok(()))
         );
+    }
+
+    #[test]
+    fn test_supplicant_sta_iface_set_sta_country_code() {
+        let (mut test_helper, mut test_fut) = setup_supplicant_test();
+        const COUNTRY_CODE: [u8; 2] = *b"WW";
+
+        let mut set_sta_country_fut = test_helper.supplicant_sta_iface_proxy.set_sta_country_code(
+            fidl_wlanix::SupplicantStaIfaceSetStaCountryCodeRequest {
+                code: Some(COUNTRY_CODE),
+                ..Default::default()
+            },
+        );
+        assert_variant!(
+            test_helper.exec.run_until_stalled(&mut set_sta_country_fut),
+            Poll::Pending
+        );
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let iface_calls = test_helper.iface_manager.get_iface_call_history();
+        assert_variant!(&iface_calls.lock()[0], ClientIfaceCall::SetCountry(country) => assert_eq!(*country, COUNTRY_CODE));
     }
 
     #[test]
