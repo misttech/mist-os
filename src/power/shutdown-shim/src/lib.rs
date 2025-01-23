@@ -21,11 +21,12 @@ use fidl_fuchsia_system_state::{
 use fuchsia_component::client;
 use fuchsia_component::directory::{AsRefDirectory, Directory};
 use fuchsia_component::server::ServiceFs;
+use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
 use futures::prelude::*;
 use futures::select;
 use std::pin::pin;
-use std::sync::{LazyLock, Mutex};
+use std::sync::LazyLock;
 use std::time::Duration;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_power_system as fsystem, fuchsia_async as fasync};
 
@@ -191,11 +192,11 @@ impl<D: Directory + AsRefDirectory + Send + Sync> ProgramContext<D> {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
                 SystemStateTransitionRequest::GetTerminationSystemState { responder } => {
-                    let state = (*SYSTEM_STATE).lock().unwrap();
+                    let state = (*SYSTEM_STATE).lock();
                     let _ = responder.send(state.power_state);
                 }
                 SystemStateTransitionRequest::GetMexecZbis { responder } => {
-                    let mut state = (*SYSTEM_STATE).lock().unwrap();
+                    let mut state = (*SYSTEM_STATE).lock();
                     if state.power_state != SystemPowerState::Mexec {
                         let _ = responder.send(Err(zx::Status::BAD_STATE.into_raw()));
                         continue;
@@ -497,16 +498,16 @@ static SYSTEM_STATE: LazyLock<Mutex<SystemState>> =
     LazyLock::new(|| Mutex::new(SystemState::new()));
 
 fn set_system_power_state(new: SystemPowerState) {
-    let mut s = (*SYSTEM_STATE).lock().unwrap();
+    let mut s = (*SYSTEM_STATE).lock();
     s.power_state = new;
 }
 
 fn set_mexec_kernel_zbi(new: zx::Vmo) {
-    let mut s = (*SYSTEM_STATE).lock().unwrap();
+    let mut s = (*SYSTEM_STATE).lock();
     s.mexec_kernel_zbi = new;
 }
 
 fn set_mexec_data_zbi(new: zx::Vmo) {
-    let mut s = (*SYSTEM_STATE).lock().unwrap();
+    let mut s = (*SYSTEM_STATE).lock();
     s.mexec_data_zbi = new;
 }
