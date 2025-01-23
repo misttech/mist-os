@@ -80,7 +80,7 @@ using AllUartDrivers =
                  uart::ns8250::PxaDriver>;
 
 template <typename ChosenItemType>
-void CheckChosenMatcher(const ChosenItemType& matcher, const ExpectedChosen& expected) {
+void CheckChosenMatcher(ChosenItemType& matcher, const ExpectedChosen& expected) {
   std::vector<std::unique_ptr<devicetree::Node>> nodes_in_path;
   size_t current = 0;
   while (current < expected.uart_absolute_path.length()) {
@@ -117,7 +117,8 @@ void CheckChosenMatcher(const ChosenItemType& matcher, const ExpectedChosen& exp
   EXPECT_EQ(*matcher.stdout_path(), expected_uart_path);
 
   // Uart.
-  ASSERT_TRUE(matcher.uart());
+  auto uart = std::move(matcher).TakeUart();
+  ASSERT_TRUE(uart);
   uart::internal::Visit(
       [expected]<typename UartType>(const UartType& uart) {
         using config_t = typename UartType::config_type;
@@ -133,7 +134,7 @@ void CheckChosenMatcher(const ChosenItemType& matcher, const ExpectedChosen& exp
           FAIL("Unexpected driver: %s", fbl::TypeInfo<decltype(uart)>::Name());
         }
       },
-      *matcher.uart());
+      *uart);
 }
 
 TEST_F(ChosenNodeMatcherTest, Chosen) {

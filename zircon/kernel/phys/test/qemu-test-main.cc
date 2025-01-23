@@ -9,11 +9,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <ktl/move.h>
 #include <phys/main.h>
 #include <phys/stdio.h>
 #include <phys/uart.h>
 
 #include "test-main.h"
+
+#include <ktl/enforce.h>
 
 void PhysMain(void* bootloader_data, arch::EarlyTicks ticks) {
   // Apply any relocations required to ourself.
@@ -21,11 +24,10 @@ void PhysMain(void* bootloader_data, arch::EarlyTicks ticks) {
 
   InitStdout();
 
-  static uart::qemu::KernelDriver<> uart;
-  SetUartConsole(uart.uart());
+  SetUartConsole(uart::qemu::Driver());
 
   static BootOptions boot_opts;
-  boot_opts.serial = uart.uart();
+  boot_opts.serial = uart::qemu::Driver{};
   gBootOptions = &boot_opts;
 
   ArchSetUp(nullptr);

@@ -14,7 +14,11 @@
 #include <lib/zbitl/view.h>
 
 #include <explicit-memory/bytes.h>
+#include <ktl/algorithm.h>
+#include <ktl/move.h>
 #include <ktl/string_view.h>
+
+#include <ktl/enforce.h>
 
 void SetBootOptions(BootOptions& boot_opts, zbitl::ByteView zbi, ktl::string_view legacy_cmdline) {
   {
@@ -25,7 +29,7 @@ void SetBootOptions(BootOptions& boot_opts, zbitl::ByteView zbi, ktl::string_vie
     uart::all::KernelDriver<uart::BasicIoProvider, uart::UnsynchronizedPolicy> driver;
     for (auto [header, payload] : view) {
       if (driver.Match(*header, payload.data())) {
-        boot_opts.serial = driver.uart();
+        boot_opts.serial = ktl::move(driver).TakeUart();
       }
     }
     view.ignore_error();
@@ -56,7 +60,7 @@ void SetBootOptionsWithoutEntropy(BootOptions& boot_opts, zbitl::ByteView zbi,
       if (ktl::starts_with(word, kPrefix)) {
         word.remove_prefix(kPrefix.length());
         memcpy(const_cast<char*>(word.data()), boot_opts.entropy_mixin.hex.data(),
-               std::min(boot_opts.entropy_mixin.len, word.size()));
+               ktl::min(boot_opts.entropy_mixin.len, word.size()));
         mandatory_memset(boot_opts.entropy_mixin.hex.data(), 0, boot_opts.entropy_mixin.len);
         break;
       }

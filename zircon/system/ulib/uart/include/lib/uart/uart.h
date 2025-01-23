@@ -463,7 +463,7 @@ class KernelDriver {
  public:
   using uart_type = UartDriver;
   using config_type = UartDriver::config_type;
-  static_assert(std::is_copy_constructible_v<uart_type>);
+  static_assert(std::is_copy_constructible_v<uart_type> || std::is_same_v<uart_type, mock::Driver>);
   static_assert(std::is_trivially_destructible_v<uart_type> ||
                 std::is_same_v<uart_type, mock::Driver>);
 
@@ -489,6 +489,12 @@ class KernelDriver {
   constexpr MmioRange mmio_range() const {
     Guard<LockPolicy> lock(&lock_, SOURCE_TAG);
     return uart_.mmio_range();
+  }
+
+  template <typename LockPolicy = DefaultLockPolicy>
+  uart_type TakeUart() && {
+    Guard<LockPolicy> lock(&lock_, SOURCE_TAG);
+    return std::move(uart_);
   }
 
   // Returns a copy of the underlying uart config.

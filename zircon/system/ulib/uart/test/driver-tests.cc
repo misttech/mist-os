@@ -25,10 +25,9 @@ using namespace std::literals;
 namespace {
 
 TEST(UartTests, Nonblocking) {
-  uart::KernelDriver<uart::mock::Driver, uart::mock::IoProvider, uart::mock::SyncPolicy> driver;
+  uart::mock::Driver uart;
 
-  driver.uart()
-      .ExpectLock()
+  uart.ExpectLock()
       .ExpectInit()
       .ExpectUnlock()
       // First Write call -> sends all chars, no waiting.
@@ -46,16 +45,17 @@ TEST(UartTests, Nonblocking) {
       .ExpectWrite("world\r\n"sv)
       .ExpectUnlock();
 
+  uart::KernelDriver<uart::mock::Driver, uart::mock::IoProvider, uart::mock::SyncPolicy> driver(
+      std::move(uart));
+
   driver.Init<uart::mock::Locking>();
   EXPECT_EQ(driver.Write<uart::mock::Locking>("hi!"), 3);
   EXPECT_EQ(driver.Write<uart::mock::Locking>("hello world\n"), 12);
 }
 
 TEST(UartTests, LockPolicy) {
-  uart::KernelDriver<uart::mock::Driver, uart::mock::IoProvider, uart::mock::SyncPolicy> driver;
-
-  driver.uart()
-      .ExpectLock()
+  uart::mock::Driver uart;
+  uart.ExpectLock()
       .ExpectInit()
       .ExpectUnlock()
       // First Write call -> sends all chars, no waiting.
@@ -69,6 +69,9 @@ TEST(UartTests, LockPolicy) {
       .ExpectTxReady(true)
       .ExpectWrite("world\r\n"sv);
 
+  uart::KernelDriver<uart::mock::Driver, uart::mock::IoProvider, uart::mock::SyncPolicy> driver(
+      std::move(uart));
+
   driver.Init<uart::mock::Locking>();
   // Just check that lock args are forwarded correctly.
   EXPECT_EQ(driver.Write<uart::mock::NoopLocking>("hi!"), 3);
@@ -76,10 +79,9 @@ TEST(UartTests, LockPolicy) {
 }
 
 TEST(UartTests, Blocking) {
-  uart::KernelDriver<uart::mock::Driver, uart::mock::IoProvider, uart::mock::SyncPolicy> driver;
+  uart::mock::Driver uart;
 
-  driver.uart()
-      .ExpectLock()
+  uart.ExpectLock()
       .ExpectInit()
       .ExpectUnlock()
       // First Write call -> sends all chars, no waiting.
@@ -98,6 +100,9 @@ TEST(UartTests, Blocking) {
       .ExpectTxReady(true)
       .ExpectWrite("world\r\n"sv)
       .ExpectUnlock();
+
+  uart::KernelDriver<uart::mock::Driver, uart::mock::IoProvider, uart::mock::SyncPolicy> driver(
+      std::move(uart));
 
   driver.Init<uart::mock::Locking>();
   EXPECT_EQ(driver.Write<uart::mock::Locking>("hi!"), 3);
@@ -131,7 +136,7 @@ TEST(UartTests, All) {
   });
 
   // Transfer state to a new instantiation and pick up using it.
-  AllDriver newdriver{driver.uart()};
+  AllDriver newdriver{std::move(driver).TakeUart()};
   newdriver.Visit([](auto&& driver) {
     EXPECT_EQ(driver.template Write("hello world\n"), 12);
     EXPECT_FALSE(driver.template Read());
@@ -238,7 +243,7 @@ TEST(UartTests, MatchCompatible) {
 
   auto visit = [](auto&& visitor) {
     auto actual_visitor = [visitor = std::move(visitor)](auto&& driver) {
-      using DriverType = std::decay_t<decltype(driver.uart())>;
+      using DriverType = std::decay_t<decltype(driver)>::uart_type;
       if constexpr (!std::is_same_v<uart::null::Driver, DriverType> &&
                     !std::is_same_v<uart::internal::DummyDriver, DriverType>) {
         if constexpr (std::is_same_v<zbi_dcfg_simple_t, std::decay_t<decltype(driver.config())>>) {

@@ -38,6 +38,8 @@ struct DummyDriver : public null::Driver {
     return {};
   }
 
+  using null::Driver::Driver;
+
   void Unparse(FILE*) const { ZX_PANIC("DummyDriver should never be called!"); }
 };
 
@@ -145,13 +147,13 @@ class KernelDriver {
   // Apply f to selected driver.
   template <typename T, typename... Args>
   void Visit(T&& f, Args... args) {
-    internal::Visit(std::forward<T>(f), variant_, std::forward<Args>(args)...);
+    internal::Visit(VariantVisitor<T>{std::forward<T>(f)}, variant_, std::forward<Args>(args)...);
   }
 
   // Apply f to selected driver.
   template <typename T, typename... Args>
   void Visit(T&& f, Args... args) const {
-    internal::Visit(std::forward<T>(f), variant_, std::forward<Args>(args)...);
+    internal::Visit(VariantVisitor<T>{std::forward<T>(f)}, variant_, std::forward<Args>(args)...);
   }
 
   // Extract the hardware configuration and state.  The return type is const
@@ -166,11 +168,27 @@ class KernelDriver {
     return driver;
   }
 
+  // Takes ownership of the underlying hardware management and state. This object will be left
+  // in an invalid state, and should be reinitialized before interacting with it.
+  uart_type TakeUart() && {
+    uart_type driver;
+    Visit([&driver](auto&& active) { driver = std::move(active).TakeUart(); });
+    // moved-from state.
+    variant_.template emplace<std::monostate>();
+    return driver;
+  }
+
+  // Returns true if the active `uart::KernelDriver<...>` is backed by `TargetUartDriver`.
+  template <typename TargetUartDriver>
+  bool holds_alternative() const {
+    return std::holds_alternative<OneDriver<TargetUartDriver>>(variant_);
+  }
+
  private:
   template <class Uart>
   using OneDriver = uart::KernelDriver<Uart, IoProvider, Sync>;
   template <class... Uart>
-  using Variant = std::variant<OneDriver<Uart>...>;
+  using Variant = std::variant<OneDriver<Uart>..., std::monostate>;
 
   template <typename T>
   struct OneDriverVariant;
@@ -183,9 +201,11 @@ class KernelDriver {
   template <size_t I, typename... Args>
   bool TryOneMatch(Args&&... args) {
     using Try = std::variant_alternative_t<I, decltype(variant_)>;
-    if (auto driver = Try::uart_type::MaybeCreate(std::forward<Args>(args)...)) {
-      variant_.template emplace<I>(*driver);
-      return true;
+    if constexpr (!std::is_same_v<Try, std::monostate>) {
+      if (auto driver = Try::uart_type::MaybeCreate(std::forward<Args>(args)...)) {
+        variant_.template emplace<I>(*driver);
+        return true;
+      }
     }
     return false;
   }
@@ -194,11 +214,13 @@ class KernelDriver {
   fit::inline_function<void(const zbi_dcfg_simple_t&)> TryOneMatch(
       const devicetree::PropertyDecoder& decoder) {
     using Try = std::variant_alternative_t<I, decltype(variant_)>;
-    using ConfigType = typename Try::uart_type::config_type;
 
-    if constexpr (std::is_same_v<ConfigType, zbi_dcfg_simple_t>) {
-      if (Try::uart_type::MatchDevicetree(decoder)) {
-        return [this](const zbi_dcfg_simple_t& config) { variant_.template emplace<I>(config); };
+    if constexpr (!std::is_same_v<Try, std::monostate>) {
+      using ConfigType = typename Try::uart_type::config_type;
+      if constexpr (std::is_same_v<ConfigType, zbi_dcfg_simple_t>) {
+        if (Try::uart_type::MatchDevicetree(decoder)) {
+          return [this](const zbi_dcfg_simple_t& config) { variant_.template emplace<I>(config); };
+        }
       }
     }
     return nullptr;
@@ -216,6 +238,24 @@ class KernelDriver {
     constexpr auto n = std::variant_size_v<decltype(variant_)>;
     return DoMatchHelper(std::make_index_sequence<n>(), std::forward<Args>(args)...);
   }
+
+  template <typename Delegate>
+  struct VariantVisitor {
+    template <typename T, typename... Args>
+    void operator()(T&& alternative, Args&&... args) const {
+      delegate(std::forward<T>(alternative), std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    void operator()(std::monostate, Args&&... args) const {
+      // We cannot use panic macros in this spot, since it will end up calling printf, which
+      // may end up visiting the same uart, whose invalid state(monostate) triggered this. Even
+      // this will cause a chain of exceptions.
+      __builtin_abort();
+    }
+
+    Delegate delegate;
+  };
 
   typename OneDriverVariant<UartDriver>::type variant_;
 };

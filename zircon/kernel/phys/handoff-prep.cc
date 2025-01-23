@@ -160,9 +160,13 @@ void HandoffPrep::SetMemory() {
   // providing a PERIPHERAL range that already covers UART MMIO, but there is
   // currently a gap in that coverage.
   if constexpr (kArchHandoffGenerateUartPeripheralRanges) {
-    if (auto uart_mmio = GetUartMmioRange(gBootOptions->serial, ZX_PAGE_SIZE)) {
-      ZX_ASSERT(Allocation::GetPool().MarkAsPeripheral(*uart_mmio).is_ok());
-    }
+    uart::internal::Visit(
+        [&](auto& driver) {
+          if (auto uart_mmio = GetUartMmioRange(driver, ZX_PAGE_SIZE)) {
+            ZX_ASSERT(Allocation::GetPool().MarkAsPeripheral(*uart_mmio).is_ok());
+          }
+        },
+        gBootOptions->serial);
   }
 
   // Normalizes types so that only those that are of interest to the kernel
@@ -363,15 +367,12 @@ void HandoffPrep::SetVersionString(ktl::string_view version) {
   // hand-off.
   handoff()->times = gBootTimes;
 
-  // Copy any post-Init() serial state from the live driver here in physboot
-  // into the handoff BootOptions.  There should be no more printing from here
-  // on.  TODO(https://fxbug.dev/42164859): Actually there is some printing in BootZbi,
-  // but no current drivers carry post-Init() state so it's harmless for now.
-  uart.Visit([&handoff_options](const auto& driver) { handoff_options.serial = driver.uart(); });
-
-  // This must be called last, as this finalizes the state of memory to hand off
-  // to the kernel, which is affected by other set-up routines.
+  // This finalizes the state of memory to hand off to the kernel, which is affected by other set-up
+  // routines.
   SetMemory();
+
+  // Hand-off the serial driver. There may be no more logging beyond this point.
+  handoff_options.serial = ktl::move(uart).TakeUart();
 
   boot(handoff());
   ZX_PANIC("HandoffPrep::DoHandoff boot function returned!");

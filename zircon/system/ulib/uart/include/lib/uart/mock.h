@@ -58,6 +58,11 @@ class IoProvider {
 class Driver {
  public:
   struct config_type {};
+
+  Driver() = default;
+  Driver(const Driver&) = delete;
+  Driver(Driver&&) = default;
+
   static constexpr IoRegisterType kIoType = IoRegisterType::kMmio8;
   constexpr config_type config() const { return {}; }
   constexpr size_t io_slots() const { return 0; }

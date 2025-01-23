@@ -8,6 +8,7 @@
 #include <lib/uart/all.h>
 #include <lib/zbitl/view.h>
 
+#include <ktl/move.h>
 #include <phys/boot-options.h>
 #include <phys/main.h>
 #include <phys/stdio.h>
@@ -27,7 +28,13 @@ void PhysMain(void* zbi, arch::EarlyTicks ticks) {
   // in the kernel proper.
   gBootOptions = &boot_options;
 
-  boot_options.serial = GetUartDriver().uart();
+  // Move default uart into the boot options, so its properly overriden (if any) by the different
+  // boot options below.
+  //
+  // TODO(fxb/42084617): To be removed when driver state handed over switches do `uart::all::Config`
+  // as we work to remove `uart()` accessor.
+  boot_options.serial = ktl::move(GetUartDriver()).TakeUart();
+
   // Obtain proper UART configuration from ZBI, both cmdline items and uart driver items.
   SetBootOptions(boot_options, zbitl::StorageFromRawHeader(static_cast<const zbi_header_t*>(zbi)));
 

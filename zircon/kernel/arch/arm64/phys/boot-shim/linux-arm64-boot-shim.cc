@@ -85,7 +85,6 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
     return new (ktl::align_val_t{align}, gPhysNew<memalloc::Type::kPhysScratch>, ac) uint8_t[size];
   });
   shim.set_cmdline(gDevicetreeBoot.cmdline);
-  shim.Get<boot_shim::UartItem<>>().Init(GetUartDriver().uart());
   shim.Get<boot_shim::DevicetreeDtbItem>().set_payload(
       {reinterpret_cast<const ktl::byte*>(gDevicetreeBoot.fdt.fdt().data()),
        gDevicetreeBoot.fdt.size_bytes()});
@@ -93,14 +92,18 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   if (gDevicetreeBoot.nvram) {
     shim.Get<boot_shim::NvramItem>().set_payload(*gDevicetreeBoot.nvram);
   }
-
-  // Mark the UART MMIO range as peripheral range.
-  if (auto uart_mmio = GetUartMmioRange(GetUartDriver().uart(), ZX_PAGE_SIZE)) {
-    if (Allocation::GetPool().MarkAsPeripheral(*uart_mmio).is_error()) {
-      printf("%s: Failed to mark [%#" PRIx64 ", %#" PRIx64 "] as peripheral.\n", shim.shim_name(),
-             uart_mmio->addr, uart_mmio->end());
+  GetUartDriver().Visit([&shim]<typename KernelDriver>(const KernelDriver& driver) {
+    // Mark the UART MMIO range as peripheral range.
+    if (auto uart_mmio = GetUartMmioRange(driver, ZX_PAGE_SIZE)) {
+      if (Allocation::GetPool().MarkAsPeripheral(*uart_mmio).is_error()) {
+        printf("%s: Failed to mark [%#" PRIx64 ", %#" PRIx64 "] as peripheral.\n", shim.shim_name(),
+               uart_mmio->addr, uart_mmio->end());
+      }
     }
-  }
+    // TODO(fxb/42084617): To be removed when driver state handed over switches do
+    // `uart::all::Config` as we work to remove `uart()` accessor.
+    shim.Get<boot_shim::UartItem<>>().Init(typename KernelDriver::uart_type(driver.config()));
+  });
 
   // Fill DevicetreeItems.
   ZX_ASSERT(shim.Init());

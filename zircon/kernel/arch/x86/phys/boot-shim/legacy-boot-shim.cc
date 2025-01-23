@@ -46,7 +46,14 @@ void PhysMain(void* ptr, arch::EarlyTicks boot_ticks) {
 
   LegacyBootShim shim(symbolize.name(), gLegacyBoot);
   shim.set_build_id(symbolize.build_id());
-  shim.Get<boot_shim::UartItem<>>().Init(GetUartDriver().uart());
+
+  // We will be handing off the configuration only, so the uart is not moved into the uart item
+  // but the configuration is copied over.
+  GetUartDriver().Visit([&shim]<typename KernelDriver>(const KernelDriver& driver) {
+    // TODO(fxb/42084617): To be removed when driver state handed over switches do
+    // `uart::all::Config` as we work to remove `uart()` accessor.
+    shim.Get<boot_shim::UartItem<>>().Init(typename KernelDriver::uart_type(driver.config()));
+  });
 
   // The pool knows all the memory details, so populate the ZBI item that way.
   memalloc::Pool& memory = Allocation::GetPool();
@@ -103,7 +110,7 @@ ktl::optional<uart::all::Driver> GetUartFromRange(  //
     auto& [header, payload] = *start;
     if (header->type == ZBI_TYPE_KERNEL_DRIVER) {
       if (driver.Match(*header, payload.data())) {
-        uart = driver.uart();
+        uart = ktl::move(driver).TakeUart();
       }
     }
     start++;

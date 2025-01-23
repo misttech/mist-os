@@ -340,10 +340,11 @@ class DevicetreeChosenNodeMatcher : public DevicetreeChosenNodeMatcherBase {
 
   // We use std::nullopt over the null driver as a clearer indication that no
   // UART was matched.
-  constexpr std::optional<AllUartDrivers> uart() const {
-    return std::holds_alternative<uart::null::Driver>(uart_.uart())
-               ? std::nullopt
-               : std::make_optional(uart_.uart());
+  constexpr std::optional<AllUartDrivers> TakeUart() {
+    if (uart_.template holds_alternative<uart::null::Driver>()) {
+      return std::nullopt;
+    }
+    return std::move(uart_).TakeUart();
   }
 
  private:
