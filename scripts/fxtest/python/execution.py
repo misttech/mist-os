@@ -110,7 +110,7 @@ class TestExecution:
         if self._use_test_interface():
             # assert for mypy
             assert self._test.build.test.new_path is not None
-            return [os.path.join(self._test.build.test.new_path)]
+            return [os.path.join(".", self._test.build.test.new_path)]
         elif self._test.info.execution is not None:
             exec_env = self._exec_env
             execution = self._test.info.execution
@@ -240,7 +240,7 @@ class TestExecution:
             # parameters like test filter, etc.
             env.update(
                 {
-                    # TODO(https://fxbug.dev/327640651): For now add ask path as
+                    # TODO(https://fxbug.dev/327640651): For now add SDK path as
                     # host-tools till we figure out a better way.
                     "FUCHSIA_SDK_TOOL_PATH": os.path.join(
                         self._exec_env.out_dir, "host-tools"
@@ -250,7 +250,7 @@ class TestExecution:
             if self._device_env is not None:
                 env.update(
                     {
-                        "FUCHSIA_TARGETS": self._device_env.address,
+                        "FUCHSIA_TARGETS": f"{self._device_env.address}:{self._device_env.port}",
                     }
                 )
             if self._flags.extra_args:
@@ -260,7 +260,7 @@ class TestExecution:
                         "FUCHSIA_CUSTOM_TEST_ARGS": custom_args,
                     }
                 )
-        if self._test.is_e2e_test() and self._device_env is not None:
+        elif self._test.is_e2e_test() and self._device_env is not None:
             env.update(
                 {
                     "FUCHSIA_DEVICE_ADDR": self._device_env.address,
@@ -325,6 +325,8 @@ class TestExecution:
         if not outdir:
             maybe_temp_dir = tempfile.TemporaryDirectory()
             outdir = maybe_temp_dir.name
+        if not os.path.exists(outdir):
+            os.makedirs(outdir)
 
         env.update(
             {
