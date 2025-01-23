@@ -52,7 +52,7 @@ for all supported CPUs, not just $target_cpu.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/BUILD.gn:21
+From //zircon/kernel/BUILD.gn:22
 
 ### all_cpu_phys_boot_tests
 
@@ -79,7 +79,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2097
+From //build/config/BUILDCONFIG.gn:2105
 
 ### allowed_test_device_types
 
@@ -731,7 +731,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8725042623884369025"`
+**Current value for `target_cpu = "arm64"`:** `"8724952012895749809"`
 
 From //out/not-default/args.gn:10
 
@@ -739,7 +739,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8725042623884369025"`
+**Current value for `target_cpu = "riscv64"`:** `"8724952012895749809"`
 
 From //out/not-default/args.gn:10
 
@@ -747,7 +747,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8725042623884369025"`
+**Current value for `target_cpu = "x64"`:** `"8724952012895749809"`
 
 From //out/not-default/args.gn:10
 
@@ -831,7 +831,7 @@ max(platform_version.frozen_api_levels).
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:31
+From //build/config/fuchsia/versioning.gni:11
 
 ### cache_package_labels
 
@@ -1989,7 +1989,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1877
+From //build/config/BUILDCONFIG.gn:1885
 
 ### fastboot_product
 
@@ -2211,7 +2211,7 @@ From //build/sdk/plasa/config.gni:8
 
 **Current value (from the default):** `false`
 
-From //build/go/go_build.gni:23
+From //build/go/go_build.gni:22
 
 ### gocache_dir
 
@@ -2222,7 +2222,7 @@ From //build/go/go_build.gni:23
 
 **Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
 
-From //build/go/go_build.gni:19
+From //build/go/go_build.gni:18
 
 ### gpt_image
 
@@ -2731,7 +2731,7 @@ injecting new instances of subsystems that the kernel has defined modularly
 
 **Current value (from the default):** `[]`
 
-From //zircon/kernel/BUILD.gn:37
+From //zircon/kernel/BUILD.gn:38
 
 ### kernel_no_userabi
 
@@ -2764,7 +2764,7 @@ the like can be listed here to be used as a ZBI-to-ZBI boot shim
 
 **Current value (from the default):** `[]`
 
-From //zircon/kernel/BUILD.gn:31
+From //zircon/kernel/BUILD.gn:32
 
 ### known_variants
 
@@ -2795,7 +2795,7 @@ Each element of the list is one variant, which is a scope defining:
       added.
 
   `deps` (optional)
-      [list of labels] Added to the deps of every target linked in
+      [list of labels] Added to the deps of every terminal target linked in
       this variant (as well as the automatic `${label}_deps` for
       each label in configs).
 
@@ -2803,6 +2803,12 @@ Each element of the list is one variant, which is a scope defining:
       [list of labels] Added to the deps of every executable() target
       linked in this variant (as well as `deps`, above, and the automatic
       `${label}_deps` for each label in configs).
+
+  `link_deps`
+      [list of labels] Added to the deps of every linking target
+      (i.e. terminal targets, plus shared_library() targets) linked in this
+      variant (as well as `deps`, above, and the automatic `${label}_deps`
+      for each label in configs).
 
   `source_deps`
       [list of labels] Added to the deps of every target that compiles
@@ -2952,7 +2958,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1673
+From //build/config/BUILDCONFIG.gn:1681
 
 ### legacy_base_package_labels
 
@@ -3829,7 +3835,7 @@ To override the set of target CPUs, see `override_idk_target_cpus`.
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:50
+From //build/config/fuchsia/platform_version.gni:44
 
 ### override_idk_target_cpus
 
@@ -4057,7 +4063,7 @@ From //build/images/tools/fastboot.gni:6
 
 **Current value (from the default):** `"//prebuilt/third_party/go/linux-x64"`
 
-From //build/go/go_build.gni:28
+From //build/go/go_build.gni:27
 
 ### product_assembly_overrides
 
@@ -4783,7 +4789,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2087
+From //build/config/BUILDCONFIG.gn:2095
 
 ### select_variant_canonical
 
@@ -4793,7 +4799,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2092
+From //build/config/BUILDCONFIG.gn:2100
 
 ### select_variant_shortcuts
 
@@ -4858,7 +4864,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1884
+From //build/config/BUILDCONFIG.gn:1892
 
 ### size_checker_input
 
@@ -5401,7 +5407,7 @@ instead of failing the action or test.
 
 **Current value (from the default):** `false`
 
-From //build/testing/config.gni:8
+From //build/testing/config.gni:10
 
 ### update_package_size_creep_limit
 
@@ -5823,7 +5829,7 @@ From //build/images/args.gni:98
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/BUILD.gn:180
+From //build/config/fuchsia/BUILD.gn:179
 
 ### zircon_b_partition
 
