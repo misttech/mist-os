@@ -470,7 +470,7 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
   constraints.usage(fuchsia_sysmem2::wire::BufferUsage::Builder(arena)
                         .none(fuchsia_sysmem2::wire::kNoneUsage)
                         .Build());
-  // We specify min_size_bytes 1 so that something is specifying a minimum size.  More typically the
+  // We specify min_size_bytes 1 so that something is specifying a minimum size. More typically the
   // display client would specify ImageFormatConstraints that implies a non-zero min_size_bytes.
   constraints.buffer_memory_constraints(
       fuchsia_sysmem2::wire::BufferMemoryConstraints::Builder(arena)

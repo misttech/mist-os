@@ -161,7 +161,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   size_t ImportedImagesCountForTesting() const;
   display::ConfigStamp TEST_controller_stamp() const;
 
-  // Typically called by OpenController/OpenVirtconController.  However, this is made public
+  // Typically called by OpenController/OpenVirtconController. However, this is made public
   // for use by testing services which provide a fake display controller.
   zx_status_t CreateClient(
       ClientPriority client_priority,

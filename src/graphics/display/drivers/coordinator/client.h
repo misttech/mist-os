@@ -102,7 +102,7 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, display:
 // executed on the same thread.
 class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
  public:
-  // |controller| must outlive this and |proxy|.
+  // `controller` must outlive both this client and `proxy`.
   Client(Controller* controller, ClientProxy* proxy, ClientPriority priority, ClientId client_id);
 
   Client(const Client&) = delete;
@@ -211,7 +211,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
                        SetDisplayPowerCompleter::Sync& _completer) override;
 
  private:
-  // Called by FIDL entrypoints such as `ApplyConfig()` and `ApplyConfig3()`;
+  // Called by FIDL entrypoints such as `ApplyConfig()` and `ApplyConfig3()`.
   void ApplyConfigFromFidl(display::ConfigStamp new_config_stamp);
 
   // Cleans up states of all current Images.
@@ -299,7 +299,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator>> binding_;
   fidl::WireSharedClient<fuchsia_hardware_display::CoordinatorListener> coordinator_listener_;
 
-  // Capture related book keeping
+  // Capture related bookkeeping.
   display::EventId capture_fence_id_ = display::kInvalidEventId;
 
   // Points to the image whose contents is modified by the current capture.
@@ -342,7 +342,7 @@ class ClientProxy {
   // have it be freed.
   void CloseOnControllerLoop();
 
-  // Requires holding controller_.mtx() lock
+  // Requires holding `controller_.mtx()` lock.
   zx_status_t OnDisplayVsync(display::DisplayId display_id, zx_time_t timestamp,
                              display::ConfigStamp controller_stamp);
   void OnDisplaysChanged(std::span<const display::DisplayId> added_display_ids,
@@ -364,7 +364,7 @@ class ClientProxy {
 
   // This function restores client configurations that are not part of
   // the standard configuration. These configurations are typically one-time
-  // settings that need to get restored once client takes control again.
+  // settings that need to get restored once the client takes control again.
   void ReapplySpecialConfigs();
 
   ClientId client_id() const { return handler_.id(); }
@@ -379,8 +379,8 @@ class ClientProxy {
     return pending_applied_config_stamps_;
   }
 
-  // Add a new mapping entry from |stamps.controller_stamp| to |stamp.config_stamp|.
-  // Controller should guarantee that |stamps.controller_stamp| is strictly
+  // Add a new mapping entry from `stamps.controller_stamp` to `stamp.config_stamp`.
+  // Controller should guarantee that `stamps.controller_stamp` is strictly
   // greater than existing pending controller stamps.
   void UpdateConfigStampMapping(ConfigStampPair stamps);
 
@@ -388,7 +388,7 @@ class ClientProxy {
 
   size_t ImportedImagesCountForTesting() const { return handler_.ImportedImagesCountForTesting(); }
 
-  // Define these constants here so we can access it for test
+  // Define these constants here so we can access them in tests.
 
   static constexpr uint32_t kVsyncBufferSize = 10;
 
@@ -417,7 +417,7 @@ class ClientProxy {
   fbl::Mutex task_mtx_;
   std::vector<std::unique_ptr<async::Task>> client_scheduled_tasks_ __TA_GUARDED(task_mtx_);
 
-  // This variable is used to limit the number of errors logged in case of channel oom error
+  // This variable is used to limit the number of errors logged in case of channel OOM error.
   static constexpr uint32_t kChannelOomPrintFreq = 600;  // 1 per 10 seconds (assuming 60fps)
   uint32_t chn_oom_print_freq_ = 0;
   uint64_t total_oom_errors_ = 0;
@@ -440,7 +440,7 @@ class ClientProxy {
 
   // Mapping from controller_stamp to client_stamp for all configurations that
   // are already applied and pending to be presented on the display.
-  // Ordered by |controller_stamp_| in increasing order.
+  // Ordered by `controller_stamp_` in increasing order.
   std::list<ConfigStampPair> pending_applied_config_stamps_;
 
   inspect::Node node_;
