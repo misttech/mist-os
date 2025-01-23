@@ -30,7 +30,7 @@ _categories_partner_prebuilts_may_depend_on =
 # All marker targets representing IDK categories
 all_idk_category_markers_targets = []
 foreach(category, _all_idk_categories) {
-  all_idk_category_markers_targets += [ "//sdk:marker-${category}" ]
+  all_idk_category_markers_targets += [ "//sdk/categories:marker-${category}" ]
 }
 
 # Incompatible marker lists.
@@ -61,12 +61,12 @@ markers_partner_idk_sources_must_not_depend_on =
     all_idk_category_markers_targets
 foreach(compatible_category, _categories_partner_sources_may_depend_on) {
   markers_partner_idk_sources_must_not_depend_on -=
-      [ "//sdk:marker-${compatible_category}" ]
+      [ "//sdk/categories:marker-${compatible_category}" ]
 }
 
 markers_partner_idk_prebuilts_must_not_depend_on =
     all_idk_category_markers_targets
 foreach(compatible_category, _categories_partner_prebuilts_may_depend_on) {
   markers_partner_idk_prebuilts_must_not_depend_on -=
-      [ "//sdk:marker-${compatible_category}" ]
+      [ "//sdk/categories:marker-${compatible_category}" ]
 }

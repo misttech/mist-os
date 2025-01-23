@@ -174,7 +174,7 @@ template("ffx_plugin") {
                                      "with_unit_tests",
                                      "original_target_name",
                                    ])
-        deps += [ "//sdk:marker-$sdk_category" ]
+        deps += [ "//sdk/categories:marker-${sdk_category}" ]
       }
 
       args_deps += [ ":" + sub_cmd ]
@@ -253,7 +253,7 @@ template("ffx_plugin") {
                                    "original_target_name",
                                    "test_deps",
                                  ])
-      deps += [ "//sdk:marker-$sdk_category" ]
+      deps += [ "//sdk/categories:marker-${sdk_category}" ]
     }
     if (defined(invoker.args_with_unit_tests) && invoker.args_with_unit_tests) {
       tests_deps += [ ":" + args_target_name + "_test" ]
@@ -322,7 +322,7 @@ template("ffx_plugin") {
         if (!defined(deps)) {
           deps = []
         }
-        deps += lib_deps + [ "//sdk:marker-$sdk_category" ]
+        deps += lib_deps + [ "//sdk/categories:marker-${sdk_category}" ]
       }
       suite_deps += [ ":" + crate_name ]
 
@@ -340,7 +340,7 @@ template("ffx_plugin") {
       with_unit_tests = false
       disable_rustdoc = true
       sources = [ "$target_gen_dir/plugins.rs" ]
-      deps = suite_deps + [ "//sdk:marker-$sdk_category" ]
+      deps = suite_deps + [ "//sdk/categories:marker-${sdk_category}" ]
 
       forward_variables_from(invoker,
                              "*",

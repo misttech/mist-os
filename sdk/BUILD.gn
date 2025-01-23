@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# Definitions to build each of the Fuchsia SDKs.
+# Definitions to build each of the Fuchsia IDKs.
 
 import("//build/bazel/bazel_fuchsia_sdk.gni")
 import("//build/config/build_api_module.gni")
@@ -28,9 +28,11 @@ visibility = [ ":*" ]
 # `default_toolchain`. The following assert prevents accidentally adding
 # dependencies that cause this file and the many SDK-specific rules to be
 # processed in other toolchains.
-# None of the Fuchsia targets are binaries that would have variants applied.
-# The host tools may be built with toolchain variants.
-assert(current_toolchain == default_toolchain || is_host,
+# None of the targets are binaries that would have variants applied.
+# Additional host toolchains will process this file when cross-compiling tools.
+assert(current_toolchain == default_toolchain ||
+           current_toolchain == host_toolchain ||
+           (sdk_cross_compile_host_tools && is_host),
        "Unexpected target toolchain")
 
 # Log a message if a non-default set of API levels or CPU architecture will be
@@ -1109,42 +1111,4 @@ copy("idk_build_tools") {
 # Controls the maximum number of simultaneous subbuilds.
 pool("subbuild_pool") {
   depth = sdk_max_simultaneous_sub_builds
-}
-
-# These markers are used to define dependencies on FIDL bindings
-# so host tools can assert_no_deps to make sure all host tools
-# in the SDK are only using FIDL libraries included in the SDK.
-group("marker-cts") {
-  visibility += [ "*" ]
-}
-group("marker-excluded") {
-  visibility += [ "*" ]
-}
-group("marker-experimental") {
-  visibility += [ "*" ]
-}
-group("marker-internal") {
-  visibility += [ "*" ]
-}
-group("marker-unknown") {
-  visibility += [ "*" ]
-}
-group("marker-partner") {
-  visibility += [ "*" ]
-}
-group("marker-partner_internal") {
-  visibility += [ "*" ]
-}
-group("marker-public") {
-  visibility += [ "*" ]
-}
-
-# Marker for the allow list for use in a subtool.
-group("marker-allowed-for-ffx-subtool") {
-  visibility += [ "*" ]
-}
-
-# Marker for the allow list for use in Lacewing.
-group("marker-allowed-for-host-test") {
-  visibility += [ "*" ]
 }

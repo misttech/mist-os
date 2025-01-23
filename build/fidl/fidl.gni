@@ -352,7 +352,7 @@ template("fidl") {
                "Update //src/developer/ffx/build/ffx_subtool_allowlist.gni.")
         marker_category = "allowed-for-host-test"
       }
-      deps += [ "//sdk:marker-${marker_category}" ]
+      deps += [ "//sdk/categories:marker-${marker_category}" ]
     }
 
     group("${target_name}_host_test_data") {
@@ -481,7 +481,7 @@ template("fidl") {
           if (is_allowed_for_ffx) {
             marker_category = "allowed-for-ffx-subtool"
           }
-          deps += [ "//sdk:marker-${marker_category}" ]
+          deps += [ "//sdk/categories:marker-${marker_category}" ]
         }
         fidl_gen_dir += "/rust"
       }
@@ -521,7 +521,9 @@ template("fidl") {
           if (is_allowed_for_ffx) {
             marker_category = "allowed-for-ffx-subtool"
           }
-          deps += [ "//sdk:marker-${marker_category}(${default_toolchain})" ]
+          deps += [
+            "//sdk/categories:marker-${marker_category}(${default_toolchain})",
+          ]
           fidl_gen_dir += "/rust"
         }
       }
