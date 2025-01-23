@@ -25,6 +25,20 @@
             protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
         },
         {
+            config: "fuchsia.fshost.FxfsBlob",
+            key: "fxfs_blob",
+            type: "bool",
+            default: false,
+            availability: "optional",
+        },
+        {
+            config: "fuchsia.fshost.StorageHost",
+            key: "storage_host",
+            type: "bool",
+            default: false,
+            availability: "optional",
+        },
+        {
             service: [ "fuchsia.storage.partitions.PartitionService" ],
             availability: "optional",
         },

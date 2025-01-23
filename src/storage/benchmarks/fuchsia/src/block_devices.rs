@@ -3,13 +3,15 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use fidl::endpoints::{create_proxy, create_request_stream, Proxy};
+use fidl::endpoints::{
+    create_proxy, create_request_stream, DiscoverableProtocolMarker as _, Proxy,
+};
 use fidl::HandleBased as _;
 use fidl_fuchsia_device::ControllerMarker;
 use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
 use fidl_fuchsia_hardware_block::BlockMarker;
 use fidl_fuchsia_hardware_block_volume::{
-    VolumeManagerMarker, VolumeManagerProxy, VolumeSynchronousProxy,
+    VolumeManagerMarker, VolumeManagerProxy, VolumeMarker, VolumeSynchronousProxy,
     ALLOCATE_PARTITION_FLAG_INACTIVE,
 };
 use fidl_fuchsia_io as fio;
@@ -19,7 +21,7 @@ use fs_management::filesystem::{
 use fs_management::format::DiskFormat;
 use fs_management::{Fvm, BLOBFS_TYPE_GUID};
 use fuchsia_component::client::{
-    connect_to_named_protocol_at_dir_root, connect_to_protocol_at_dir_root,
+    connect_to_named_protocol_at_dir_root, connect_to_protocol, connect_to_protocol_at_dir_root,
     connect_to_protocol_at_path, Service,
 };
 
@@ -144,6 +146,46 @@ impl BlockDeviceFactory for FvmInstance {
 }
 
 impl FvmInstance {
+    /// Connects to the FVM instance the benchmarks should run in based on the provided
+    /// configuration.  Uses various capabilities in the incoming namespace of the process.
+    pub async fn from_config(storage_host: bool, fxfs_blob: bool) -> FvmInstance {
+        if storage_host {
+            let partitions = Service::open(fpartitions::PartitionServiceMarker).unwrap();
+            let manager = connect_to_protocol::<fpartitions::PartitionsManagerMarker>().unwrap();
+            if fxfs_blob {
+                let instance = FvmInstance::connect_to_test_fvm(partitions, manager).await;
+                assert!(
+                    instance.is_some(),
+                    "Failed to open or create testing FVM in GPT.  \
+                    Perhaps the system doesn't have a GPT-formatted block device?"
+                );
+                instance.unwrap()
+            } else {
+                // TODO(https://fxbug.dev/372555079): Support this by routing the FVM protocols from
+                // fshost.
+                unimplemented!("Running benchmarks on FVM + storage-host is not supported yet!");
+            }
+        } else {
+            if fxfs_blob {
+                let instance = FvmInstance::connect_to_test_fvm_devfs().await;
+                assert!(
+                    instance.is_some(),
+                    "Failed to open or create testing FVM in GPT.  \
+                    Perhaps the system doesn't have a GPT-formatted block device?"
+                );
+                instance.unwrap()
+            } else {
+                let instance = FvmInstance::connect_to_system_fvm_devfs().await;
+                assert!(
+                    instance.is_some(),
+                    "Failed to open or create volume in FVM.  \
+                    Perhaps the system doesn't have an FVM-formatted block device?"
+                );
+                instance.unwrap()
+            }
+        }
+    }
+
     /// Connects to the system FVM component.
     pub fn connect_to_system_fvm(
         volumes_connector: Box<dyn Send + Sync + Fn() -> fidl_fuchsia_fs_startup::VolumesProxy>,
@@ -467,7 +509,7 @@ impl FvmInstance {
                     .map_err(zx::Status::from_raw)
             })),
             volume_dir: Some(volume_dir),
-            block_path: "volume".to_string(),
+            block_path: format!("svc/{}", VolumeMarker::PROTOCOL_NAME),
             crypt_task,
         }
     }

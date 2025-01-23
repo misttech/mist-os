@@ -28,6 +28,8 @@
                 "fuchsia.bluetooth.LegacyPairing",
                 "fuchsia.fonts.FontManifest",
                 "fuchsia.fonts.VerboseLogging",
+                "fuchsia.fshost.FxfsBlob",
+                "fuchsia.fshost.StorageHost",
                 "fuchsia.http-client.StopOnIdleTimeoutMillis",
                 "fuchsia.memory.CaptureOnPressureChange",
                 "fuchsia.memory.CriticalCaptureDelay",

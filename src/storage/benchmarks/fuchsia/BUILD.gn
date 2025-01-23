@@ -82,6 +82,7 @@ rustc_binary("fuchsia-storage-benchmarks") {
   ]
   deps = [
     ":framework",
+    ":fuchsia-storage-benchmarks-config",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/rust/zx",
     "//src/lib/fuchsia",
@@ -95,7 +96,6 @@ rustc_binary("fuchsia-storage-benchmarks") {
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:log",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:rand_xorshift",
     "//third_party/rust_crates:regex",
@@ -105,9 +105,19 @@ rustc_binary("fuchsia-storage-benchmarks") {
   exclude_toolchain_tags = [ "profile" ]
 }
 
-fuchsia_test_component("fuchsia-storage-benchmarks-component") {
+fuchsia_component_manifest("fuchsia-storage-benchmarks-component-manifest") {
   component_name = "storage-benchmarks"
   manifest = "meta/storage-benchmarks.cml"
+}
+
+fuchsia_structured_config_rust_lib("fuchsia-storage-benchmarks-config") {
+  name = "fuchsia_storage_benchmarks_config"
+  cm_label = ":fuchsia-storage-benchmarks-component-manifest"
+}
+
+fuchsia_test_component("fuchsia-storage-benchmarks-component") {
+  component_name = "storage-benchmarks"
+  cm_label = ":fuchsia-storage-benchmarks-component-manifest"
   deps = [ ":fuchsia-storage-benchmarks" ]
   test_type = "storage"
 }
@@ -125,6 +135,7 @@ fuchsia_test_package("storage-benchmarks") {
     "//src/storage/blobfs/bin:blobfs-component",
     "//src/storage/crypt/fxfs",
     "//src/storage/f2fs/bin:f2fs-component",
+    "//src/storage/fvm:fvm-component",
     "//src/storage/fxfs:fxfs_component",
     "//src/storage/memfs:memfs_component",
     "//src/storage/minfs/bin:minfs-component",

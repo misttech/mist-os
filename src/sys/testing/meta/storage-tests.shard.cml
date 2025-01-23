@@ -64,6 +64,14 @@
             availability: "optional",
         },
         {
+            config: [
+                "fuchsia.fshost.FxfsBlob",
+                "fuchsia.fshost.StorageHost",
+            ],
+            from: "parent",
+            to: "#storage-tests",
+        },
+        {
             storage: "fxfs_tests_data",
             from: "self",
             as: "data",

@@ -516,5 +516,29 @@
             to: "#testing",
             source_availability: "unknown",
         },
+
+        // Needed for storage-tests
+        {
+            config: [
+                "fuchsia.fshost.FxfsBlob",
+                "fuchsia.fshost.StorageHost",
+            ],
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            service: [ "fuchsia.storage.partitions.PartitionService" ],
+            from: "parent",
+            to: "#testing",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.storage.partitions.PartitionsManager" ],
+            from: "parent",
+            to: "#testing",
+            availability: "optional",
+            source_availability: "unknown",
+        },
     ],
 }

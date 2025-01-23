@@ -2673,6 +2673,16 @@ assembly_input_bundle("testing_support") {
   ]
   compiled_packages = [
     {
+      bootfs_package = true
+      name = "root"
+      components = [
+        {
+          component_name = "root"
+          shards = [ "//src/sys/testing/meta/test_realm.root_shard.cml" ]
+        },
+      ]
+    },
+    {
       name = "core"
       components = [
         {

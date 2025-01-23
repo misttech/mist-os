@@ -1,0 +1,24 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// Exposes capabilities from bootstrap to core so that test realms can use them.
+{
+    offer: [
+        // Needed for storage-tests
+        {
+            protocol: [ "fuchsia.storage.partitions.PartitionsManager" ],
+            from: "#bootstrap",
+            to: "#core",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+        {
+            service: [ "fuchsia.storage.partitions.PartitionService" ],
+            from: "#bootstrap",
+            to: "#core",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+    ],
+}

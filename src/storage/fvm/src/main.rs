@@ -417,7 +417,8 @@ impl Fvm {
         }
 
         info!(
-            "Mounted fvm, partitions: {:?}",
+            "Mounted fvm, slice size {} partitions: {:?}",
+            metadata.header.slice_size,
             metadata.partitions.iter().map(|(_, e)| e.name()).collect::<Vec<_>>()
         );
 
@@ -957,6 +958,7 @@ impl Component {
                     create_options,
                     mount_options,
                 } => {
+                    log::info!(name:?; "Create volume");
                     responder.send(
                         self.handle_create_volume(
                             &name,
@@ -972,6 +974,7 @@ impl Component {
                     )?;
                 }
                 VolumesRequest::Remove { responder, name } => {
+                    log::info!(name:?; "Remove volume");
                     responder.send(self.handle_remove_volume(&name).await.map_err(|error| {
                         log::warn!(error:?; "Remove volume failed");
                         map_to_raw_status(error)
@@ -1177,16 +1180,17 @@ impl Component {
         let fvm = self.fvm.lock().unwrap().as_ref().unwrap().clone();
         let inner = fvm.inner.upgradable_read().await;
         let Some(type_guid) = create_options.type_guid else {
-            warn!("Unable to create volume; missing type GUID");
-            bail!(zx::Status::INVALID_ARGS);
+            return Err(anyhow!(zx::Status::INVALID_ARGS).context("Missing type GUID"));
         };
         let guid = create_options.guid.unwrap_or_else(|| Uuid::new_v4().to_bytes_le());
         let slices = match create_options.initial_size {
             Some(x) => {
-                ensure!(x % inner.metadata.header.slice_size == 0, zx::Status::INVALID_ARGS);
+                if x % inner.metadata.header.slice_size > 0 {
+                    return Err(anyhow!(zx::Status::INVALID_ARGS).context("Invalid volume size"));
+                }
                 (x / inner.metadata.header.slice_size)
                     .try_into()
-                    .map_err(|_| zx::Status::INVALID_ARGS)?
+                    .map_err(|_| anyhow!(zx::Status::INVALID_ARGS).context("Invalid volume size"))?
             }
             None => 1,
         };

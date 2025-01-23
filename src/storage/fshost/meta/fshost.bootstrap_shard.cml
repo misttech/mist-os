@@ -127,6 +127,16 @@
             from: "#fshost",
             availability: "optional",
         },
+        {
+            protocol: "fuchsia.storage.partitions.PartitionsManager",
+            from: "#fshost",
+            availability: "optional",
+        },
+        {
+            service: "fuchsia.storage.partitions.PartitionService",
+            from: "#fshost",
+            availability: "optional",
+        },
     ],
     environments: [
         {
