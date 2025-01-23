@@ -53,11 +53,17 @@ WakeLease::WakeLease(async_dispatcher_t* dispatcher, std::string_view lease_name
 
 bool WakeLease::HandleInterrupt(zx::duration timeout) {
   // Only acquire a wake lease if the system state is appropriate.
-  // TODO(https://fxbug.dev/389163722) Restore this optimization once we can
-  // acquire a wake lease in a suspend handler.
-  // if (!system_suspended_) {
-  //   return false;
-  // }
+  if (!system_suspended_) {
+    // If we don't acquire a wake lease, store the time we would have held it
+    // until. If we start suspension before this time, we'll acquire a wake
+    // lease then and hold it until the timeout.
+    prevent_sleep_before_ = zx::clock::get_monotonic().get() + timeout.to_nsecs();
+    return false;
+  }
+
+  // Since we're acquiring a wake lease, reset our sleep prevention time since
+  // we don't need to check upon suspension starting.
+  prevent_sleep_before_ = 0;
   return AcquireWakeLease(timeout);
 }
 
@@ -104,7 +110,7 @@ bool WakeLease::AcquireWakeLease(zx::duration timeout) {
 void WakeLease::DepositWakeLease(zx::eventpair wake_lease, zx::time timeout_deadline) {
   if (lease_) {
     if (timeout_deadline < lease_task_.last_deadline()) {
-      // If the current least out lives the new one, don't need to do anything.
+      // If the current lease out lives the new one, don't need to do anything.
       return;
     }
     // If already holding a lease, cancel the current timeout.
@@ -141,6 +147,16 @@ void WakeLease::OnResume(OnResumeCompleter::Sync& completer) {
 }
 
 void WakeLease::OnSuspendStarted(OnSuspendStartedCompleter::Sync& completer) {
+  // Check if we've moved past any previously set timeout for which we did
+  // NOT acquire a lease because the system wasn't suspended.
+  zx_time_t current_time = zx::clock::get_monotonic().get();
+  if (current_time < prevent_sleep_before_) {
+    if (log_) {
+      fdf::warn("Acquiring lease to honor previously set timeout.");
+    }
+    AcquireWakeLease(zx::nsec(prevent_sleep_before_ - current_time));
+  }
+
   system_suspended_ = true;
   completer.Reply();
 }
