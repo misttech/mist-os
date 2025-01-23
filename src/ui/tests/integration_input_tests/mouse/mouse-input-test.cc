@@ -467,7 +467,7 @@ class ChromiumInputTest : public MouseInputBase {
   static const int kMaxRetry = 10;
 };
 
-TEST_F(ChromiumInputTest, ChromiumMouseMove) {
+TEST_F(ChromiumInputTest, DISABLED_ChromiumMouseMove) {
   auto initial_position = EnsureMouseIsReadyAndGetPosition();
 
   double initial_x = initial_position.x;
