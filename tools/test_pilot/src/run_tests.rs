@@ -15,6 +15,7 @@ use tokio::process::{self, Command};
 
 const ENV_TAGS: &str = "FUCHSIA_TAGS";
 const ENV_EXECUTION_JSON: &str = "FUCHSIA_EXECUTION_JSON";
+const ENV_DEBUG: &str = "DEBUG";
 const BUFFER_SIZE: usize = 2048;
 
 fn create_test_launch_command_v1(args: &TestPilotArgs, config: &TestConfigV1) -> Command {
@@ -45,6 +46,9 @@ fn create_test_launch_command_v1(args: &TestPilotArgs, config: &TestConfigV1) ->
     }
     if let Some(out_dir) = &args.out_dir {
         cmd.env(ENV_OUT_DIR, out_dir);
+    }
+    if args.debug {
+        cmd.env(ENV_DEBUG, "1");
     }
 
     if config.tags.len() > 0 {
@@ -182,6 +186,7 @@ mod tests {
             timeout_seconds: None,
             strict_mode: true,
             extra_env_vars: vec![],
+            debug: false,
         }
     }
 
