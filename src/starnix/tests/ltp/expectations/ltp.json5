@@ -154,9 +154,13 @@
                 "request_key01",
                 "request_key02",
                 "request_key03",
+                "request_key04",
+                "request_key05",
+                "request_key06",
                 "runpwtests03",
                 "runpwtests04",
                 "runpwtests06",
+                "sched_football",
                 "sched_getattr01",
                 "sched_getattr02",
                 "sched_rr_get_interval02",
@@ -164,6 +168,7 @@
                 "sched_setattr01",
                 "sched_setparam05",
                 "sched_setscheduler02",
+                "seccomp01",
                 "send02",
                 "setitimer01",
                 "setitimer02",
@@ -211,7 +216,6 @@
                 // TODO(https://fxbug.dev/377877724)
                 "getsockopt01",
                 "mlock05",
-                "mmap09",
                 "swapon03",
                 "unlink09",
             ],
@@ -279,6 +283,11 @@
 
                 // TODO(http://fxbuf.dev/390870202): Re-enable once flake is resolved.
                 "clock_nanosleep02",
+
+                // TODO(https://fxbug.dev/391669044): Enable or move to the failure list after
+                // LTP tests roll.
+                "getdents02",
+                "mmap09",
             ],
         },
     ],
