@@ -81,6 +81,7 @@ template("bazel_test_package_group") {
 
     foreach(test_component_name, test.test_component_names) {
       test_spec_target = "${package_name}.${test_component_name}"
+      _extract_target_name = "${package_name}.extract"
 
       # Test metadata for `fx test` / test infra integration
       test_spec(test_spec_target) {
@@ -89,9 +90,9 @@ template("bazel_test_package_group") {
         }
         package_url = "fuchsia-pkg://fuchsia.com/${package_name}#meta/${test_component_name}.cm"
         target =
-            get_label_info(":${_build_action_target}", "label_with_toolchain")
+            get_label_info(":${_extract_target_name}", "label_with_toolchain")
         package_label =
-            get_label_info(":${_build_action_target}", "label_with_toolchain")
+            get_label_info(":${_extract_target_name}", "label_with_toolchain")
         package_manifests =
             rebase_path([ "${_package_output_dir}/package_manifest.json" ],
                         root_build_dir)
@@ -118,8 +119,6 @@ template("bazel_test_package_group") {
         _deps += [ dep ]
       }
     }
-
-    _extract_target_name = "${package_name}.extract"
 
     package_tool_package_archive_extract(_extract_target_name) {
       forward_variables_from(invoker, [ "visibility" ])
