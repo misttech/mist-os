@@ -197,6 +197,7 @@ pub enum ManagerConfig {
     DuplicateNames,
     PacketFilterEthernet,
     PacketFilterWlan,
+    WithBlackhole,
 }
 
 impl ManagerConfig {
@@ -210,6 +211,7 @@ impl ManagerConfig {
             ManagerConfig::DuplicateNames => "/pkg/netcfg/duplicate_names.json",
             ManagerConfig::PacketFilterEthernet => "/pkg/netcfg/packet_filter_ethernet.json",
             ManagerConfig::PacketFilterWlan => "/pkg/netcfg/packet_filter_wlan.json",
+            ManagerConfig::WithBlackhole => "/pkg/netcfg/with_blackhole.json",
         }
     }
 }
@@ -367,7 +369,8 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                     | ManagerConfig::IfacePrefix
                     | ManagerConfig::DuplicateNames
                     | ManagerConfig::PacketFilterEthernet
-                    | ManagerConfig::PacketFilterWlan => false,
+                    | ManagerConfig::PacketFilterWlan
+                    | ManagerConfig::WithBlackhole => false,
                 };
 
                 fnetemul::ChildDef {

@@ -625,7 +625,7 @@ impl FilterEnabledState {
         interface_type
             .as_ref()
             .map(|ty| match ty {
-                InterfaceType::WlanClient | InterfaceType::Ethernet => {
+                InterfaceType::WlanClient | InterfaceType::Ethernet | InterfaceType::Blackhole => {
                     self.interface_types.contains(ty)
                 }
                 // An AP device can be filtered by specifying AP or WLAN.

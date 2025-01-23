@@ -42,6 +42,7 @@ use {
 };
 
 use anyhow::{anyhow, Context as _};
+use assert_matches::assert_matches;
 use async_trait::async_trait;
 use async_utils::stream::WithTag as _;
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource, DEFAULT_DNS_PORT};
@@ -57,7 +58,7 @@ use thiserror::Error;
 use self::devices::DeviceInfo;
 use self::errors::{accept_error, ContextExt as _};
 use self::filter::{FilterControl, FilterEnabledState};
-use self::interface::DeviceInfoRef;
+use self::interface::{DeviceInfoRef, InterfaceNamingIdentifier};
 use self::masquerade::MasqueradeHandler;
 
 /// Interface Identifier
@@ -234,6 +235,7 @@ pub enum InterfaceType {
     // NB: Serde alias provides backwards compatibility.
     #[serde(alias = "ap")]
     WlanAp,
+    Blackhole,
 }
 
 impl TryFrom<fidl_fuchsia_hardware_network::PortClass> for InterfaceType {
@@ -248,6 +250,7 @@ impl From<DeviceClass> for InterfaceType {
     fn from(device_class: DeviceClass) -> Self {
         match device_class {
             DeviceClass::WlanClient => InterfaceType::WlanClient,
+            DeviceClass::Blackhole => InterfaceType::Blackhole,
             DeviceClass::WlanAp => InterfaceType::WlanAp,
             DeviceClass::Ethernet
             | DeviceClass::Virtual
@@ -267,6 +270,8 @@ pub struct InterfaceMetrics {
     pub wlan_metric: Metric,
     #[serde(default)]
     pub eth_metric: Metric,
+    #[serde(default)]
+    pub blackhole_metric: Metric,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Deserialize)]
@@ -281,6 +286,7 @@ pub enum DeviceClass {
     Bridge,
     WlanAp,
     Lowpan,
+    Blackhole,
 }
 
 #[derive(Debug, Error)]
@@ -322,7 +328,8 @@ impl Default for AllowedDeviceClasses {
             | DeviceClass::Ppp
             | DeviceClass::Bridge
             | DeviceClass::WlanAp
-            | DeviceClass::Lowpan => {}
+            | DeviceClass::Lowpan
+            | DeviceClass::Blackhole => {}
         }
         Self(HashSet::from([
             DeviceClass::Virtual,
@@ -332,6 +339,7 @@ impl Default for AllowedDeviceClasses {
             DeviceClass::Bridge,
             DeviceClass::WlanAp,
             DeviceClass::Lowpan,
+            DeviceClass::Blackhole,
         ]))
     }
 }
@@ -372,6 +380,12 @@ struct Config {
     pub interface_naming_policy: Vec<interface::NamingRule>,
     #[serde(default)]
     pub interface_provisioning_policy: Vec<interface::ProvisioningRule>,
+    /// The names of blackhole interfaces to install.
+    ///
+    /// The interfaces are named exactly as specified in the configuration, and are not under
+    /// the influence of `interface_naming_policy`.
+    #[serde(default)]
+    pub blackhole_interfaces: Vec<String>,
 }
 
 impl Config {
@@ -393,7 +407,6 @@ struct InterfaceConfig {
 
 #[derive(Debug)]
 struct InterfaceState {
-    interface_naming_id: interface::InterfaceNamingIdentifier,
     // Hold on to control to enforce interface ownership, even if unused.
     control: fidl_fuchsia_net_interfaces_ext::admin::Control,
     device_class: DeviceClass,
@@ -406,6 +419,7 @@ struct InterfaceState {
 enum InterfaceConfigState {
     Host(HostInterfaceState),
     WlanAp(WlanApInterfaceState),
+    Blackhole(BlackholeInterfaceState),
 }
 
 #[derive(Debug)]
@@ -422,10 +436,16 @@ struct HostInterfaceState {
     // The PD configuration to use for the DHCPv6 client on this interface.
     dhcpv6_pd_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
     interface_admin_auth: fnet_interfaces_admin::GrantForInterfaceAuthorization,
+    interface_naming_id: interface::InterfaceNamingIdentifier,
 }
 
 #[derive(Debug)]
-struct WlanApInterfaceState {}
+struct WlanApInterfaceState {
+    interface_naming_id: interface::InterfaceNamingIdentifier,
+}
+
+#[derive(Debug)]
+struct BlackholeInterfaceState;
 
 impl InterfaceState {
     async fn new_host(
@@ -443,13 +463,13 @@ impl InterfaceState {
                 ))
             })?;
         Ok(Self {
-            interface_naming_id,
             control,
             config: InterfaceConfigState::Host(HostInterfaceState {
                 dhcpv4_client: Dhcpv4ClientState::NotRunning,
                 dhcpv6_client_state: None,
                 dhcpv6_pd_config,
                 interface_admin_auth,
+                interface_naming_id,
             }),
             device_class,
             provisioning,
@@ -463,10 +483,21 @@ impl InterfaceState {
         provisioning: interface::ProvisioningAction,
     ) -> Self {
         Self {
-            interface_naming_id,
             control,
             device_class,
-            config: InterfaceConfigState::WlanAp(WlanApInterfaceState {}),
+            config: InterfaceConfigState::WlanAp(WlanApInterfaceState { interface_naming_id }),
+            provisioning,
+        }
+    }
+
+    fn new_blackhole(
+        control: fidl_fuchsia_net_interfaces_ext::admin::Control,
+        provisioning: interface::ProvisioningAction,
+    ) -> Self {
+        Self {
+            control,
+            device_class: DeviceClass::Blackhole,
+            config: InterfaceConfigState::Blackhole(BlackholeInterfaceState),
             provisioning,
         }
     }
@@ -474,8 +505,18 @@ impl InterfaceState {
     fn is_wlan_ap(&self) -> bool {
         let Self { config, .. } = self;
         match config {
-            InterfaceConfigState::Host(_) => false,
+            InterfaceConfigState::Host(_) | InterfaceConfigState::Blackhole(_) => false,
             InterfaceConfigState::WlanAp(_) => true,
+        }
+    }
+
+    fn interface_naming_id(&self) -> Option<&InterfaceNamingIdentifier> {
+        match &self.config {
+            InterfaceConfigState::Host(HostInterfaceState { interface_naming_id, .. })
+            | InterfaceConfigState::WlanAp(WlanApInterfaceState { interface_naming_id, .. }) => {
+                Some(interface_naming_id)
+            }
+            InterfaceConfigState::Blackhole(_) => None,
         }
     }
 
@@ -491,7 +532,7 @@ impl InterfaceState {
         dhcpv4_configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
         dhcpv6_prefixes_streams: &mut dhcpv6::PrefixesStreamMap,
     ) -> Result<(), errors::Error> {
-        let Self { config, provisioning, interface_naming_id, .. } = self;
+        let Self { config, provisioning, .. } = self;
         let fnet_interfaces_ext::Properties { online, .. } = properties;
 
         // Netcfg won't handle interface update results for a delegated
@@ -509,6 +550,7 @@ impl InterfaceState {
                 dhcpv6_client_state,
                 dhcpv6_pd_config,
                 interface_admin_auth,
+                interface_naming_id,
             }) => {
                 NetCfg::handle_dhcpv4_client_start(
                     properties.id.into(),
@@ -533,13 +575,14 @@ impl InterfaceState {
                     *dhcpv6_client_state = sockaddr.map(dhcpv6::ClientState::new);
                 }
             }
-            InterfaceConfigState::WlanAp(WlanApInterfaceState {}) => {
+            InterfaceConfigState::WlanAp(WlanApInterfaceState { interface_naming_id: _ }) => {
                 if let Some(dhcpv4_server) = dhcpv4_server {
                     dhcpv4::start_server(dhcpv4_server)
                         .await
                         .context("error starting DHCP server")?
                 }
             }
+            InterfaceConfigState::Blackhole(BlackholeInterfaceState) => {}
         }
 
         Ok(())
@@ -943,6 +986,7 @@ impl<'a> NetCfg<'a> {
                         dhcpv6_client_state,
                         dhcpv6_pd_config: _,
                         interface_admin_auth: _,
+                        interface_naming_id: _,
                     }) => {
                         let _: dhcpv6::ClientState =
                             dhcpv6_client_state.take().unwrap_or_else(|| {
@@ -973,9 +1017,17 @@ impl<'a> NetCfg<'a> {
                             self.dhcpv6_prefix_provider_handler.as_mut(),
                         )
                     }
-                    InterfaceConfigState::WlanAp(WlanApInterfaceState {}) => {
+                    InterfaceConfigState::WlanAp(WlanApInterfaceState {
+                        interface_naming_id: _,
+                    }) => {
                         panic!(
                             "should not have a DNS watcher for a WLAN AP interface with id={}",
+                            interface_id
+                        );
+                    }
+                    InterfaceConfigState::Blackhole(BlackholeInterfaceState) => {
+                        panic!(
+                            "should not have a DNS watcher for a blackhole interface with id={}",
                             interface_id
                         );
                     }
@@ -1095,12 +1147,13 @@ impl<'a> NetCfg<'a> {
                         dhcpv6_client_state: _,
                         dhcpv6_pd_config: _,
                         interface_admin_auth: _,
+                        interface_naming_id: _,
                     }) => match dhcpv4_client {
                         Dhcpv4ClientState::NotRunning => None,
                         Dhcpv4ClientState::Running(_) => None,
                         Dhcpv4ClientState::ScheduledRestart(timer) => Some(timer.map(|()| *id)),
                     },
-                    InterfaceConfigState::WlanAp(_) => None,
+                    InterfaceConfigState::WlanAp(_) | InterfaceConfigState::Blackhole(_) => None,
                 })
                 .collect::<futures::stream::FuturesUnordered<_>>();
             let event = futures::select! {
@@ -1333,7 +1386,6 @@ impl<'a> NetCfg<'a> {
                             .get_mut(&interface_id)
                             .map(
                                 |InterfaceState {
-                                     interface_naming_id: _,
                                      control,
                                      device_class: _,
                                      config,
@@ -1345,8 +1397,10 @@ impl<'a> NetCfg<'a> {
                                             dhcpv6_client_state: _,
                                             dhcpv6_pd_config: _,
                                             interface_admin_auth: _,
+                                            interface_naming_id: _,
                                         }) => Some((dhcpv4_client, control)),
-                                        InterfaceConfigState::WlanAp(_) => None,
+                                        InterfaceConfigState::WlanAp(_)
+                                        | InterfaceConfigState::Blackhole(_) => None,
                                     }
                                 },
                             )
@@ -1584,8 +1638,9 @@ impl<'a> NetCfg<'a> {
                     dhcpv6_client_state: _,
                     dhcpv6_pd_config: _,
                     interface_admin_auth,
+                    interface_naming_id: _,
                 }) => Some((dhcpv4_client, interface_admin_auth)),
-                InterfaceConfigState::WlanAp(_) => None,
+                InterfaceConfigState::WlanAp(_) | InterfaceConfigState::Blackhole(_) => None,
             }) {
             Some(state) => state,
             None => {
@@ -1794,9 +1849,9 @@ impl<'a> NetCfg<'a> {
                                 dhcpv6_client_state,
                                 dhcpv6_pd_config,
                                 interface_admin_auth,
+                                interface_naming_id,
                             }),
                         control,
-                        interface_naming_id,
                         ..
                     }) => {
                         if previous_online.is_some() {
@@ -1910,7 +1965,10 @@ impl<'a> NetCfg<'a> {
                         Ok(())
                     }
                     Some(InterfaceState {
-                        config: InterfaceConfigState::WlanAp(WlanApInterfaceState {}),
+                        config:
+                            InterfaceConfigState::WlanAp(WlanApInterfaceState {
+                                interface_naming_id: _,
+                            }),
                         ..
                     }) => {
                         // TODO(https://fxbug.dev/42133555): Stop the DHCP server when the address it is
@@ -1945,6 +2003,10 @@ impl<'a> NetCfg<'a> {
                                 .context("error stopping DHCP server")
                         }
                     }
+                    Some(InterfaceState {
+                        config: InterfaceConfigState::Blackhole(BlackholeInterfaceState),
+                        ..
+                    }) => return Ok(()),
                 }
             }
             fnet_interfaces_ext::UpdateResult::Removed(
@@ -1964,6 +2026,7 @@ impl<'a> NetCfg<'a> {
                                 mut dhcpv6_client_state,
                                 dhcpv6_pd_config: _,
                                 interface_admin_auth: _,
+                                interface_naming_id: _,
                             }) => {
                                 Self::handle_dhcpv4_client_stop(
                                     (*id).into(),
@@ -2005,7 +2068,9 @@ impl<'a> NetCfg<'a> {
                                 )
                                 .await)
                             }
-                            InterfaceConfigState::WlanAp(WlanApInterfaceState {}) => {
+                            InterfaceConfigState::WlanAp(WlanApInterfaceState {
+                                interface_naming_id: _,
+                            }) => {
                                 if let Some(dhcp_server) = dhcp_server {
                                     // The DHCP server should only run on the WLAN AP interface, so stop it
                                     // since the AP interface is removed.
@@ -2019,6 +2084,9 @@ impl<'a> NetCfg<'a> {
                                 } else {
                                     Ok(())
                                 }
+                            }
+                            InterfaceConfigState::Blackhole(BlackholeInterfaceState) => {
+                                Ok(())
                             }
                         }
                         .context("failed to handle interface removed event")
@@ -2145,7 +2213,7 @@ impl<'a> NetCfg<'a> {
         match self.interface_states.iter().find_map(|(_id, state)| {
             // A device with the same PersistentId is considered to be
             // the same logical interface.
-            if state.interface_naming_id == interface_naming_id {
+            if state.interface_naming_id() == Some(&interface_naming_id) {
                 Some(state)
             } else {
                 None
@@ -2154,7 +2222,8 @@ impl<'a> NetCfg<'a> {
             // If Netcfg knows about the device already, then it's likely
             // flapped and we should uninstall the existing interface prior
             // to adding the new one.
-            Some(InterfaceState { control, interface_naming_id, .. }) => {
+            Some(interface_state @ InterfaceState { control, .. }) => {
+                let interface_naming_id = interface_state.interface_naming_id();
                 warn!(
                     "interface likely flapped. attempting to remove interface with \
                     interface naming id ({interface_naming_id:?}) prior to adding \
@@ -2214,6 +2283,67 @@ impl<'a> NetCfg<'a> {
         }
     }
 
+    /// Add a blackhole interface to the netstack.
+    async fn add_blackhole_interface(&mut self, name: &str) -> Result<(), devices::AddDeviceError> {
+        let (control, control_server_end) =
+            fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
+                .context("create Control proxy")
+                .map_err(errors::Error::NonFatal)?;
+        let Metric(metric) = self.interface_metrics.blackhole_metric;
+        self.installer
+            .install_blackhole_interface(
+                control_server_end,
+                &fnet_interfaces_admin::Options {
+                    name: Some(name.to_owned()),
+                    metric: Some(metric),
+                    __source_breaking: fidl::marker::SourceBreaking,
+                },
+            )
+            .context("error installing blackhole interface")
+            .map_err(errors::Error::NonFatal)?;
+        let interface_id = control.get_id().await.map_err(|err| {
+            let other = match err {
+                fidl_fuchsia_net_interfaces_ext::admin::TerminalError::Fidl(err) => err.into(),
+                fidl_fuchsia_net_interfaces_ext::admin::TerminalError::Terminal(terminal_error) => {
+                    match terminal_error {
+                        fidl_fuchsia_net_interfaces_admin::InterfaceRemovedReason::DuplicateName => {
+                            return devices::AddDeviceError::AlreadyExists(name.to_owned());
+                        }
+                        reason => {
+                            anyhow::anyhow!("received terminal event {:?}", reason)
+                        }
+                    }
+                }
+            };
+            devices::AddDeviceError::Other(
+                errors::Error::NonFatal(other).context("calling Control get_id"),
+            )
+        })?;
+        let _did_enable: bool = control
+            .enable()
+            .await
+            .map_err(map_control_error("error sending enable request"))
+            .and_then(|res| {
+                // ControlEnableError is an empty *flexible* enum, so we can't match on it, but
+                // the operation is infallible at the time of writing.
+                res.map_err(|e: fidl_fuchsia_net_interfaces_admin::ControlEnableError| {
+                    errors::Error::Fatal(anyhow::anyhow!("enable interface: {:?}", e))
+                })
+            })?;
+        let interface_state =
+            InterfaceState::new_blackhole(control, interface::ProvisioningAction::Local);
+
+        assert_matches!(
+            self.interface_states
+                .insert(InterfaceId::new(interface_id).expect("must be nonzero"), interface_state),
+            None
+        );
+
+        info!("installed blackhole interface (id={} name={})", interface_id, name);
+
+        Ok(())
+    }
+
     /// Add a device at `filepath` to the netstack.
     async fn add_new_device(
         &mut self,
@@ -2242,6 +2372,7 @@ impl<'a> NetCfg<'a> {
         let metric = match interface_type {
             InterfaceType::WlanClient | InterfaceType::WlanAp => self.interface_metrics.wlan_metric,
             InterfaceType::Ethernet => self.interface_metrics.eth_metric,
+            InterfaceType::Blackhole => self.interface_metrics.blackhole_metric,
         }
         .into();
         let (interface_name, interface_naming_id) = match self
@@ -2707,6 +2838,17 @@ impl<'a> NetCfg<'a> {
                         .context("failed to send InvalidInterface terminal event")
                         .map_err(errors::Error::NonFatal);
                 }
+                Some(InterfaceState { config: InterfaceConfigState::Blackhole(_), .. }) => {
+                    warn!(
+                        "Attempted to acquire a prefix on blackhole interface; \
+                        id={:?}, preferred_prefix_len={:?}",
+                        interface_id, preferred_prefix_len,
+                    );
+                    return control_handle
+                        .send_on_exit(fnet_dhcpv6::PrefixControlExitReason::InvalidInterface)
+                        .context("failed to send InvalidInterface terminal event")
+                        .map_err(errors::Error::NonFatal);
+                }
                 Some(InterfaceState {
                     config:
                         InterfaceConfigState::Host(HostInterfaceState {
@@ -2714,6 +2856,7 @@ impl<'a> NetCfg<'a> {
                             dhcpv6_client_state: _,
                             dhcpv6_pd_config: _,
                             interface_admin_auth: _,
+                            interface_naming_id: _,
                         }),
                     ..
                 }) => dhcpv6::AcquirePrefixInterfaceConfig::Id(interface_id),
@@ -2771,15 +2914,17 @@ impl<'a> NetCfg<'a> {
             ),
         };
         // Look for all eligible interfaces and start/restart DHCPv6 client as needed.
-        for (id, InterfaceState { config, interface_naming_id, .. }) in interface_state_iter {
+        for (id, InterfaceState { config, .. }) in interface_state_iter {
             let HostInterfaceState {
                 dhcpv4_client: _,
                 dhcpv6_client_state,
                 dhcpv6_pd_config,
                 interface_admin_auth: _,
+                interface_naming_id,
             } = match config {
                 InterfaceConfigState::Host(state) => state,
-                InterfaceConfigState::WlanAp(WlanApInterfaceState {}) => {
+                InterfaceConfigState::WlanAp(WlanApInterfaceState { interface_naming_id: _ })
+                | InterfaceConfigState::Blackhole(_) => {
                     continue;
                 }
             };
@@ -2895,11 +3040,10 @@ impl<'a> NetCfg<'a> {
             .expect("DHCPv6 prefix provider handler must be present");
         let dhcpv6_client_provider =
             self.dhcpv6_client_provider.as_ref().expect("DHCPv6 client provider must be present");
-        for (id, InterfaceState { config, interface_naming_id, .. }) in
-            self.interface_states.iter_mut()
-        {
-            let dhcpv6_client_state = match config {
-                InterfaceConfigState::WlanAp(WlanApInterfaceState {}) => {
+        for (id, InterfaceState { config, .. }) in self.interface_states.iter_mut() {
+            let (dhcpv6_client_state, interface_naming_id) = match config {
+                InterfaceConfigState::WlanAp(WlanApInterfaceState { interface_naming_id: _ })
+                | InterfaceConfigState::Blackhole(_) => {
                     continue;
                 }
                 InterfaceConfigState::Host(HostInterfaceState {
@@ -2907,12 +3051,13 @@ impl<'a> NetCfg<'a> {
                     dhcpv6_client_state,
                     dhcpv6_pd_config,
                     interface_admin_auth: _,
+                    interface_naming_id,
                 }) => {
                     if dhcpv6_pd_config.take().is_none() {
                         continue;
                     }
                     match dhcpv6_client_state.take() {
-                        Some(_) => dhcpv6_client_state,
+                        Some(_) => (dhcpv6_client_state, interface_naming_id),
                         None => continue,
                     }
                 }
@@ -3030,6 +3175,7 @@ impl<'a> NetCfg<'a> {
                     dhcpv6_client_state: _,
                     dhcpv6_pd_config: _,
                     interface_admin_auth: _,
+                    interface_naming_id: _,
                 }) => (
                     match dhcpv4_client {
                         Dhcpv4ClientState::Running(client) => client,
@@ -3046,6 +3192,12 @@ impl<'a> NetCfg<'a> {
                     panic!(
                         "interface {} expected to be host but is WLAN AP with state {:?}",
                         interface_id, wlan_ap_state
+                    );
+                }
+                InterfaceConfigState::Blackhole(state) => {
+                    panic!(
+                        "interface {} expected to be host but is blackhole with state {:?}",
+                        interface_id, state
                     );
                 }
             }
@@ -3103,6 +3255,7 @@ impl<'a> NetCfg<'a> {
                 dhcpv6_client_state,
                 dhcpv6_pd_config: _,
                 interface_admin_auth: _,
+                interface_naming_id: _,
             }) => dhcpv6_client_state.as_mut().unwrap_or_else(|| {
                 panic!("interface {} does not have a running DHCPv6 client", interface_id)
             }),
@@ -3110,6 +3263,12 @@ impl<'a> NetCfg<'a> {
                 panic!(
                     "interface {} expected to be host but is WLAN AP with state {:?}",
                     interface_id, wlan_ap_state
+                );
+            }
+            InterfaceConfigState::Blackhole(state) => {
+                panic!(
+                    "interface {} expected to be host but is blackhole with state {:?}",
+                    interface_id, state
                 );
             }
         };
@@ -3167,6 +3326,7 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
         forwarded_device_classes,
         interface_naming_policy,
         interface_provisioning_policy,
+        blackhole_interfaces,
     } = Config::load(config_data)?;
 
     let mut netcfg = NetCfg::new(
@@ -3180,6 +3340,30 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
     )
     .await
     .context("error creating new netcfg instance")?;
+
+    for name in &blackhole_interfaces {
+        let result = netcfg.add_blackhole_interface(name).await;
+
+        match result {
+            Ok(()) => {}
+            Err(devices::AddDeviceError::AlreadyExists(name)) => {
+                // Either the interface with this name was not installed
+                // by Netcfg or another device installed by Netcfg used
+                // the same name already. We will reject interface
+                // installation.
+                error!(
+                    "interface with name ({name}) is already present in the Netstack, \
+                    so we're rejecting installation of a blackhole interface with that name."
+                );
+            }
+            Err(devices::AddDeviceError::Other(errors::Error::NonFatal(e))) => {
+                error!("non-fatal error adding blackhole interface {:?}: {:?}", name, e);
+            }
+            Err(devices::AddDeviceError::Other(errors::Error::Fatal(e))) => {
+                return Err(e.context(format!("error adding new blackhole interface {:?}", name)));
+            }
+        }
+    }
 
     // TODO(https://fxbug.dev/42080661): Once non-Fuchsia components can control filtering rules, disable
     // setting filters when interfaces are in Delegated provisioning mode.
@@ -3383,6 +3567,7 @@ mod tests {
                 Self::Bridge => fidl_fuchsia_hardware_network::PortClass::Bridge,
                 Self::WlanAp => fidl_fuchsia_hardware_network::PortClass::WlanAp,
                 Self::Lowpan => fidl_fuchsia_hardware_network::PortClass::Lowpan,
+                Self::Blackhole => fidl_fuchsia_hardware_network::PortClass::Virtual,
             }
         }
     }
@@ -5274,7 +5459,8 @@ mod tests {
   "filter_enabled_interface_types": ["wlanclient", "wlanap"],
   "interface_metrics": {
     "wlan_metric": 100,
-    "eth_metric": 10
+    "eth_metric": 10,
+    "blackhole_metric": 123
   },
   "allowed_upstream_device_classes": ["ethernet", "wlanclient"],
   "allowed_bridge_upstream_device_classes": ["ethernet"],
@@ -5299,7 +5485,8 @@ mod tests {
     }, {
         "matchers": [ {"interface_name": "xyz" } ],
         "provisioning": "local"
-    } ]
+    } ],
+   "blackhole_interfaces": [ "ifb0" ]
 }
 "#;
 
@@ -5314,6 +5501,7 @@ mod tests {
             forwarded_device_classes,
             interface_naming_policy,
             interface_provisioning_policy,
+            blackhole_interfaces,
         } = Config::load_str(config_str).unwrap();
 
         assert_eq!(vec!["8.8.8.8".parse::<std::net::IpAddr>().unwrap()], servers);
@@ -5327,8 +5515,11 @@ mod tests {
             filter_enabled_interface_types
         );
 
-        let expected_metrics =
-            InterfaceMetrics { wlan_metric: Metric(100), eth_metric: Metric(10) };
+        let expected_metrics = InterfaceMetrics {
+            wlan_metric: Metric(100),
+            eth_metric: Metric(10),
+            blackhole_metric: Metric(123),
+        };
         assert_eq!(interface_metrics, expected_metrics);
 
         assert_eq!(
@@ -5397,6 +5588,8 @@ mod tests {
             },
         ]);
         assert_eq!(interface_provisioning_policy, expected_provisioning_policy);
+
+        assert_eq!(blackhole_interfaces, vec!["ifb0".to_string()])
     }
 
     #[test]
@@ -5424,6 +5617,7 @@ mod tests {
             forwarded_device_classes: _,
             interface_naming_policy,
             interface_provisioning_policy,
+            blackhole_interfaces,
         } = Config::load_str(config_str).unwrap();
 
         assert_eq!(allowed_upstream_device_classes, Default::default());
@@ -5432,6 +5626,7 @@ mod tests {
         assert_eq!(enable_dhcpv6, true);
         assert_eq!(interface_naming_policy.len(), 0);
         assert_eq!(interface_provisioning_policy.len(), 0);
+        assert_eq!(blackhole_interfaces, Vec::<String>::new());
     }
 
     #[test_case(
@@ -5472,9 +5667,11 @@ mod tests {
             forwarded_device_classes: _,
             interface_naming_policy: _,
             interface_provisioning_policy: _,
+            blackhole_interfaces: _,
         } = Config::load_str(&config_str).unwrap();
 
-        let expected_metrics = InterfaceMetrics { wlan_metric, eth_metric };
+        let expected_metrics =
+            InterfaceMetrics { wlan_metric, eth_metric, blackhole_metric: Default::default() };
         assert_eq!(interface_metrics, expected_metrics);
     }
 

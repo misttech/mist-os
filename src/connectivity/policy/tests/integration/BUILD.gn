@@ -131,6 +131,7 @@ resource("netcfg-netemul-configs") {
     "management/config/iface_prefix.json",
     "management/config/packet_filter_ethernet.json",
     "management/config/packet_filter_wlan.json",
+    "management/config/with_blackhole.json",
   ]
 
   outputs = [ "netcfg/{{source_file_part}}" ]
