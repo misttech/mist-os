@@ -192,6 +192,10 @@ declare_args() {
   # Extra GN targets to include when Bazel assembly is enabled. This list is
   # useful for including verification and other Bazel assembly specific targets.
   extra_bazel_assembly_targets = []
+
+  # Label pointing to the main product bundle to work with if the default product in a multi-product
+  # build is not desired.
+  main_pb_label = ""
 }
 
 recovery_is_zedboot =

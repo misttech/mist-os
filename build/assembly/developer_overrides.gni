@@ -443,7 +443,10 @@ if (product_assembly_overrides_label != false) {
 
   # extract 'labels' from the temp scope.
   _temp_labels = _temp_scope.labels
-  if (_temp_scope.use_bazel_images_only) {
+  if (_temp_labels.main_pb != "") {
+    # main_pb works only with bazel targets. See below.
+    _assembly_pattern = get_label_info(_temp_labels.main_pb, "dir") + "/*"
+  } else if (_temp_scope.use_bazel_images_only) {
     # For Bazel-assembled products we directly set the assembly target that's matched against
     # as a wildcard in the directory of the product bundle.  This imposes restrictions on the
     # product to define the product assembly in the same dir, or a subdir, of the one that the

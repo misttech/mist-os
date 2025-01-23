@@ -11,12 +11,6 @@ import("//build/tools/json_merge/json_merge.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
 import("config.gni")
 
-declare_args() {
-  # Label pointing to the main product bundle to work with if the default product in a multi-product
-  # build is not desired.
-  main_pb_label = ""
-}
-
 group("ffx") {
   testonly = true
 
