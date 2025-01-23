@@ -430,16 +430,19 @@ impl IpTables {
     }
 
     fn get_controller(&mut self) -> Result<&mut Controller, GetControllerError> {
-        Ok(self.controller.get_or_insert({
+        if self.controller.is_none() {
             let control_proxy = connect_to_protocol_sync::<fnet_filter::ControlMarker>()
                 .map_err(GetControllerError::ConnectToProtocol)?;
-            Controller::new(
-                &control_proxy,
-                &ControllerId(NAMESPACE_ID_PREFIX.to_string()),
-                zx::MonotonicInstant::INFINITE,
-            )
-            .map_err(GetControllerError::ControllerCreation)?
-        }))
+            self.controller = Some(
+                Controller::new(
+                    &control_proxy,
+                    &ControllerId(NAMESPACE_ID_PREFIX.to_string()),
+                    zx::MonotonicInstant::INFINITE,
+                )
+                .map_err(GetControllerError::ControllerCreation)?,
+            );
+        }
+        Ok(self.controller.as_mut().expect("just ensured this is Some"))
     }
 
     /// Returns `true` if the sockopt can be handled by [`IpTables`].
