@@ -11,6 +11,7 @@ rustc_test("driver") {
   edition = "2021"
 
   deps = [
+    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.paver:fuchsia.paver_rust",
     "//sdk/fidl/fuchsia.update:fuchsia.update_rust",

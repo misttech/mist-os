@@ -9,7 +9,7 @@ use crate::vfs::{
     fileops_impl_noop_sync, AppendLockGuard, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeOps,
     FsStr, InputBuffer, OutputBuffer, SeekTarget,
 };
-use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootReason};
+use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootOptions, RebootReason2};
 use fuchsia_component::client::connect_to_protocol_sync;
 
 use starnix_logging::{log_warn, track_stub};
@@ -140,10 +140,14 @@ impl FileOps for SysRqFile {
                     // When this call succeeds with a production implementation it should never
                     // return. If it returns at all it is a sign the kernel either doesn't have the
                     // capability or there was a problem with the shutdown request.
-                    let reboot_res = connect_to_protocol_sync::<AdminMarker>().unwrap().reboot(
-                        RebootReason::CriticalComponentFailure,
-                        zx::MonotonicInstant::INFINITE,
-                    );
+                    let reboot_res =
+                        connect_to_protocol_sync::<AdminMarker>().unwrap().perform_reboot(
+                            &RebootOptions {
+                                reasons: Some(vec![RebootReason2::CriticalComponentFailure]),
+                                ..Default::default()
+                            },
+                            zx::MonotonicInstant::INFINITE,
+                        );
 
                     // LINT.IfChange
                     panic!(

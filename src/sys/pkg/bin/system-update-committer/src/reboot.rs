@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Context};
 use fidl_fuchsia_hardware_power_statecontrol::{
-    AdminProxy as PowerStateControlProxy, RebootReason,
+    AdminProxy as PowerStateControlProxy, RebootOptions, RebootReason2,
 };
 use fuchsia_async as fasync;
 use log::error;
@@ -15,7 +15,10 @@ pub(super) async fn wait_and_reboot(timer: fasync::Timer, proxy: &PowerStateCont
     let () = timer.await;
     if let Err(e) = async move {
         proxy
-            .reboot(RebootReason::RetrySystemUpdate)
+            .perform_reboot(&RebootOptions {
+                reasons: Some(vec![RebootReason2::RetrySystemUpdate]),
+                ..Default::default()
+            })
             .await
             .context("while performing reboot call")?
             .map_err(Status::from_raw)
@@ -45,8 +48,8 @@ mod tests {
         // Create a mock reboot service.
         let (sender, recv) = oneshot::channel();
         let sender = Arc::new(Mutex::new(Some(sender)));
-        let mock = Arc::new(MockRebootService::new(Box::new(move |reason: RebootReason| {
-            sender.lock().take().unwrap().send(reason).unwrap();
+        let mock = Arc::new(MockRebootService::new(Box::new(move |options: RebootOptions| {
+            sender.lock().take().unwrap().send(options).unwrap();
             Ok(())
         })));
         let proxy = mock.spawn_reboot_service();
@@ -86,7 +89,13 @@ mod tests {
             Poll::Pending => panic!("future unexpectedly pending"),
         };
         match executor.run_until_stalled(&mut recv) {
-            Poll::Ready(res) => assert_eq!(res, Ok(RebootReason::RetrySystemUpdate)),
+            Poll::Ready(res) => assert_eq!(
+                res,
+                Ok(RebootOptions {
+                    reasons: Some(vec![RebootReason2::RetrySystemUpdate]),
+                    ..Default::default()
+                })
+            ),
             Poll::Pending => panic!("future unexpectedly pending"),
         };
     }

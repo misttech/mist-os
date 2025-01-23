@@ -58,9 +58,12 @@ impl RebootController {
 /// Reboots the system, logging errors instead of failing.
 pub(super) async fn reboot(proxy: &PowerStateControlProxy) {
     if let Err(e) = async move {
-        use fidl_fuchsia_hardware_power_statecontrol::RebootReason;
+        use fidl_fuchsia_hardware_power_statecontrol::{RebootOptions, RebootReason2};
         proxy
-            .reboot(RebootReason::SystemUpdate)
+            .perform_reboot(&RebootOptions {
+                reasons: Some(vec![RebootReason2::SystemUpdate]),
+                ..Default::default()
+            })
             .await
             .context("while performing reboot call")?
             .map_err(zx::Status::from_raw)

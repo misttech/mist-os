@@ -315,10 +315,12 @@ pub fn sys_reboot(
                 }
             }
 
+            // TODO(https://391585107): Loop through all the arguments and
+            // generate a list of reboot reasons.
             let reboot_reason = if reboot_args.contains(&&b"ota_update"[..])
                 || reboot_args.contains(&&b"System update during setup"[..])
             {
-                fpower::RebootReason::SystemUpdate
+                fpower::RebootReason2::SystemUpdate
             } else if reboot_args.contains(&&b"recovery"[..]) {
                 // Read the bootloader message from the misc partition to determine whether the
                 // device is rebooting to perform an FDR.
@@ -354,23 +356,26 @@ pub fn sys_reboot(
                     }
                 }
                 log_warn!("Recovery mode isn't supported yet, rebooting as normal...");
-                fpower::RebootReason::UserRequest
+                fpower::RebootReason2::UserRequest
             } else if reboot_args == [b""] // args empty? splitting "" returns [""], not []
                 || reboot_args.contains(&&b"shell"[..])
                 || reboot_args.contains(&&b"userrequested"[..])
             {
-                fpower::RebootReason::UserRequest
+                fpower::RebootReason2::UserRequest
             } else {
                 log_warn!("Unknown reboot args: {arg_bytes:?}");
                 track_stub!(
                     TODO("https://fxbug.dev/322874610"),
                     "unknown reboot args, see logs for strings"
                 );
-                fpower::RebootReason::UserRequest
+                fpower::RebootReason2::UserRequest
             };
 
             log_info!("Rebooting... reason: {:?}", reboot_reason);
-            match proxy.reboot(reboot_reason, zx::MonotonicInstant::INFINITE) {
+            match proxy.perform_reboot(
+                &fpower::RebootOptions { reasons: Some(vec![reboot_reason]), ..Default::default() },
+                zx::MonotonicInstant::INFINITE,
+            ) {
                 Ok(_) => {
                     // System is rebooting... wait until runtime ends.
                     zx::MonotonicInstant::INFINITE.sleep();

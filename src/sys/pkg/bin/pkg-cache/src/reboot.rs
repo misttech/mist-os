@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context};
-use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootReason};
+use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootOptions, RebootReason2};
 use fuchsia_component::client::connect_to_protocol;
 use log::error;
 
@@ -15,7 +15,10 @@ pub(super) async fn reboot() {
 
         proxy
             // FIXME(b/298716497): Replace with a unique reboot reason
-            .reboot(RebootReason::CriticalComponentFailure)
+            .perform_reboot(&RebootOptions {
+                reasons: Some(vec![RebootReason2::CriticalComponentFailure]),
+                ..Default::default()
+            })
             .await
             .context("while performing reboot call")?
             .map_err(zx::Status::from_raw)

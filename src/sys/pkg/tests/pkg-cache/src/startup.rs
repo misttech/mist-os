@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::TestEnv;
-use mock_reboot::RebootReason;
+use fidl_fuchsia_hardware_power_statecontrol::{RebootOptions, RebootReason2};
 
 #[fuchsia::test]
 async fn reboots_on_startup_failure() {
@@ -17,7 +17,13 @@ async fn reboots_on_startup_failure() {
 
     let _ = env.proxies.package_cache.sync().await;
 
-    assert_eq!(env.take_reboot_reasons(), vec![RebootReason::CriticalComponentFailure]);
+    assert_eq!(
+        env.take_reboot_options(),
+        vec![RebootOptions {
+            reasons: Some(vec![RebootReason2::CriticalComponentFailure]),
+            ..Default::default()
+        }]
+    );
 }
 
 #[fuchsia::test]
@@ -26,5 +32,5 @@ async fn does_not_reboot_on_startup_success() {
 
     let _ = env.proxies.package_cache.sync().await;
 
-    assert_eq!(env.take_reboot_reasons(), vec![]);
+    assert_eq!(env.take_reboot_options(), vec![]);
 }

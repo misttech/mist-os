@@ -9,6 +9,7 @@ use assert_matches::assert_matches;
 use diagnostics_assertions::{assert_data_tree, AnyProperty};
 use diagnostics_hierarchy::DiagnosticsHierarchy;
 use diagnostics_reader::{ArchiveReader, Inspect};
+use fidl_fuchsia_hardware_power_statecontrol::{RebootOptions, RebootReason2};
 use fidl_fuchsia_paver::{self as fpaver, Configuration, ConfigurationStatus};
 use fidl_fuchsia_update::{CommitStatusProviderMarker, CommitStatusProviderProxy};
 use fuchsia_async::{self as fasync, OnSignals, TimeoutExt};
@@ -18,7 +19,7 @@ use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
 use futures::prelude::*;
 use mock_paver::{hooks as mphooks, MockPaverService, MockPaverServiceBuilder, PaverEvent};
-use mock_reboot::{MockRebootService, RebootReason};
+use mock_reboot::MockRebootService;
 use mock_verifier::MockVerifierService;
 use serde_json::json;
 use std::path::PathBuf;
@@ -529,14 +530,20 @@ async fn paver_failure_causes_reboot() {
         // effect on whether the paver failures cause a reboot.
         .config_data("config.json", json!({"blobfs": "ignore"}).to_string())
         // Handle the reboot requests.
-        .reboot_service(MockRebootService::new(Box::new(move |reason: RebootReason| {
-            reboot_sender.lock().take().unwrap().send(reason).unwrap();
+        .reboot_service(MockRebootService::new(Box::new(move |options: RebootOptions| {
+            reboot_sender.lock().take().unwrap().send(options).unwrap();
             Ok(())
         })))
         .build()
         .await;
 
-    assert_eq!(reboot_recv.await, Ok(RebootReason::RetrySystemUpdate));
+    assert_eq!(
+        reboot_recv.await,
+        Ok(RebootOptions {
+            reasons: Some(vec![RebootReason2::RetrySystemUpdate]),
+            ..Default::default()
+        })
+    );
 
     let hierarchy = env.system_update_committer_inspect_hierarchy().await;
     assert_data_tree!(
@@ -572,15 +579,21 @@ async fn blobfs_verification_failure_causes_reboot() {
         // Make us reboot on failure.
         .config_data("config.json", json!({"blobfs": "reboot_on_failure"}).to_string())
         // Handle the reboot requests.
-        .reboot_service(MockRebootService::new(Box::new(move |reason: RebootReason| {
-            reboot_sender.lock().take().unwrap().send(reason).unwrap();
+        .reboot_service(MockRebootService::new(Box::new(move |options: RebootOptions| {
+            reboot_sender.lock().take().unwrap().send(options).unwrap();
             Ok(())
         })))
         .build()
         .await;
 
     // We should observe a reboot.
-    assert_eq!(reboot_recv.await, Ok(RebootReason::RetrySystemUpdate));
+    assert_eq!(
+        reboot_recv.await,
+        Ok(RebootOptions {
+            reasons: Some(vec![RebootReason2::RetrySystemUpdate]),
+            ..Default::default()
+        })
+    );
 
     // Observe failed verification shows up in inspect.
     let hierarchy = env.system_update_committer_inspect_hierarchy().await;
@@ -624,15 +637,21 @@ async fn netstack_verification_failure_causes_reboot() {
         // Make us reboot on failure.
         .config_data("config.json", json!({"netstack": "reboot_on_failure"}).to_string())
         // Handle the reboot requests.
-        .reboot_service(MockRebootService::new(Box::new(move |reason: RebootReason| {
-            reboot_sender.lock().take().unwrap().send(reason).unwrap();
+        .reboot_service(MockRebootService::new(Box::new(move |options: RebootOptions| {
+            reboot_sender.lock().take().unwrap().send(options).unwrap();
             Ok(())
         })))
         .build()
         .await;
 
     // We should observe a reboot.
-    assert_eq!(reboot_recv.await, Ok(RebootReason::RetrySystemUpdate));
+    assert_eq!(
+        reboot_recv.await,
+        Ok(RebootOptions {
+            reasons: Some(vec![RebootReason2::RetrySystemUpdate]),
+            ..Default::default()
+        })
+    );
 
     // Observe failed verification shows up in inspect.
     let hierarchy = env.system_update_committer_inspect_hierarchy().await;
@@ -676,8 +695,8 @@ async fn verification_failure_does_not_cause_reboot() {
         // Make us IGNORE the verification failure.
         .config_data("config.json", json!({"blobfs": "ignore"}).to_string())
         // Handle the reboot requests.
-        .reboot_service(MockRebootService::new(Box::new(move |reason: RebootReason| {
-            reboot_sender.lock().take().unwrap().send(reason).unwrap();
+        .reboot_service(MockRebootService::new(Box::new(move |options: RebootOptions| {
+            reboot_sender.lock().take().unwrap().send(options).unwrap();
             Ok(())
         })))
         .build()

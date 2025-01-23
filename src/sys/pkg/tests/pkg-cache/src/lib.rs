@@ -11,6 +11,7 @@ use assert_matches::assert_matches;
 use blobfs_ramdisk::BlobfsRamdisk;
 use diagnostics_assertions::TreeAssertion;
 use fidl::endpoints::DiscoverableProtocolMarker as _;
+use fidl_fuchsia_hardware_power_statecontrol::RebootOptions;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use fuchsia_inspect::reader::DiagnosticsHierarchy;
 use fuchsia_merkle::Hash;
@@ -21,7 +22,7 @@ use futures::prelude::*;
 use mock_boot_arguments::MockBootArgumentsService;
 use mock_metrics::MockMetricEventLoggerFactory;
 use mock_paver::{MockPaverService, MockPaverServiceBuilder};
-use mock_reboot::{MockRebootService, RebootReason};
+use mock_reboot::MockRebootService;
 use mock_verifier::MockVerifierService;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -515,11 +516,11 @@ where
                 .unwrap();
         }
 
-        let reboot_reasons = Arc::new(Mutex::new(vec![]));
+        let reboot_options = Arc::new(Mutex::new(vec![]));
         let reboot_service = Arc::new(MockRebootService::new(Box::new({
-            let reboot_reasons = Arc::clone(&reboot_reasons);
-            move |reason| {
-                reboot_reasons.lock().push(reason);
+            let reboot_options = Arc::clone(&reboot_options);
+            move |options| {
+                reboot_options.lock().push(options);
                 Ok(())
             }
         })));
@@ -880,7 +881,7 @@ where
             apps: Apps { realm_instance },
             blobfs,
             system_image,
-            reboot_reasons,
+            reboot_options,
             proxies,
             mocks: Mocks {
                 logger_factory,
@@ -915,7 +916,7 @@ struct TestEnv<B = BlobfsRamdisk> {
     apps: Apps,
     blobfs: B,
     system_image: Option<Hash>,
-    reboot_reasons: Arc<Mutex<Vec<RebootReason>>>,
+    reboot_options: Arc<Mutex<Vec<RebootOptions>>>,
     proxies: Proxies,
     pub mocks: Mocks,
 }
@@ -1037,7 +1038,7 @@ impl<B: Blobfs> TestEnv<B> {
             .unwrap();
     }
 
-    fn take_reboot_reasons(&self) -> Vec<RebootReason> {
-        std::mem::take(&mut *self.reboot_reasons.lock())
+    fn take_reboot_options(&self) -> Vec<RebootOptions> {
+        std::mem::take(&mut *self.reboot_options.lock())
     }
 }

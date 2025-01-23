@@ -8,6 +8,7 @@
 use self::SystemUpdaterInteraction::*;
 use anyhow::{anyhow, Context as _, Error};
 use assert_matches::assert_matches;
+use fidl_fuchsia_hardware_power_statecontrol::{RebootOptions, RebootReason2};
 use fidl_fuchsia_update_installer_ext::{
     start_update, Initiator, Options, UpdateAttempt, UpdateAttemptError,
 };
@@ -22,7 +23,7 @@ use fuchsia_url::AbsoluteComponentUrl;
 use futures::prelude::*;
 use mock_metrics::MockMetricEventLoggerFactory;
 use mock_paver::{hooks as mphooks, MockPaverService, MockPaverServiceBuilder, PaverEvent};
-use mock_reboot::{MockRebootService, RebootReason};
+use mock_reboot::MockRebootService;
 use mock_resolver::MockResolverService;
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -241,8 +242,14 @@ impl TestEnvBuilder {
 
         let reboot_service = {
             let interactions = Arc::clone(&interactions);
-            Arc::new(MockRebootService::new(Box::new(move |reason| {
-                assert_eq!(reason, RebootReason::SystemUpdate);
+            Arc::new(MockRebootService::new(Box::new(move |options| {
+                assert_eq!(
+                    options,
+                    RebootOptions {
+                        reasons: Some(vec![RebootReason2::SystemUpdate]),
+                        ..Default::default()
+                    }
+                );
                 interactions.lock().push(Reboot);
                 Ok(())
             })))

@@ -7,7 +7,7 @@ use component_events::events::{Event, EventStream, ExitStatus, Stopped};
 use component_events::matcher::EventMatcher;
 use diagnostics_reader::{ArchiveReader, Logs, Severity};
 use fidl_fuchsia_hardware_power_statecontrol::{
-    AdminMarker, AdminRequest, AdminRequestStream, RebootReason,
+    AdminMarker, AdminRequest, AdminRequestStream, RebootOptions, RebootReason2,
 };
 use fidl_fuchsia_io::FileProxy;
 use fuchsia_async::Task;
@@ -140,10 +140,13 @@ async fn c_reboot() {
 
     info!("waiting for power admin request");
     let mut admin_client = admin_requests.next().await.unwrap();
-    assert_matches!(
+    let reasons = assert_matches!(
         admin_client.next().await.unwrap().unwrap(),
-        AdminRequest::Reboot { reason: RebootReason::CriticalComponentFailure, .. }
+        AdminRequest::PerformReboot { options: RebootOptions {
+            reasons: Some(reasons), ..
+        }, .. } => reasons
     );
+    assert_eq!(&reasons[..], [RebootReason2::CriticalComponentFailure]);
 }
 
 async fn open_sysrq_trigger(realm: &RealmInstance) -> FileProxy {
