@@ -4,41 +4,7 @@
 
 import("//build/components.gni")
 import("//build/config.gni")
-import("//build/json/validate_json.gni")
 import("//build/rust/rustc_binary.gni")
-
-# TODO(https://fxbug.dev/330204282): Migrate metrics-logger away from config-data.
-template("metrics_logger_config") {
-  config_data("${target_name}_config_data") {
-    for_pkg = "metrics-logger"
-    sources = [ "${invoker.source}" ]
-    outputs = [ "config.json" ]
-  }
-
-  validate_json("${target_name}_validate_json") {
-    data = "${invoker.source}"
-    schema = "config/config.schema.json"
-  }
-
-  group(target_name) {
-    deps = [
-      ":${target_name}_config_data",
-      ":${target_name}_validate_json",
-    ]
-  }
-}
-
-metrics_logger_config("astro_config") {
-  source = "config/astro_config.json"
-}
-
-metrics_logger_config("sherlock_config") {
-  source = "config/sherlock_config.json"
-}
-
-metrics_logger_config("nelson_config") {
-  source = "config/nelson_config.json"
-}
 
 rustc_binary("bin") {
   name = "metrics_logger"
