@@ -19,14 +19,10 @@ enum IncomingRequest {
 
 #[fuchsia::main]
 async fn main() {
-    // TODO(https://fxbug.dev/372555079): Detect storage-host configuration.  While we're at it,
-    // we can also detect Fxblob v.s. FVM and use that instead of trying to connect to the system
-    // FVM first.
-    let mut fvm_instance = FvmInstance::connect_to_system_fvm_devfs().await;
-    if fvm_instance.is_none() {
-        fvm_instance = FvmInstance::connect_to_test_fvm_devfs().await;
-    }
-    let mut fs = Fxfs::new(20 * 1024 * 1024).start_filesystem(fvm_instance.as_ref().unwrap()).await;
+    let config = verity_benchmarks_test_fxfs_config::Config::take_from_startup_handle();
+    let fvm_instance = FvmInstance::from_config(config.storage_host, config.fxfs_blob).await;
+
+    let mut fs = Fxfs::new(24 * 1024 * 1024).start_filesystem(&fvm_instance).await;
     let mut svc = ServiceFs::new();
     let root_dir = open_in_namespace(
         &fs.benchmark_dir().to_string_lossy(),

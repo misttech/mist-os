@@ -21,16 +21,30 @@
         },
         {
             directory: [
+                "boot",
                 "dev-class",
                 "dev-topological",
+                "sys",
             ],
             from: "parent",
             to: [ "#storage-tests" ],
         },
+
+        // Storage verity benchmarks need access to /dev/class/block
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-class-block",
+            to: [ "#storage-tests" ],
+            subdir: "block",
+        },
         {
             protocol: [
-                // Tests can write to debug logs
+                // Tests can write to debug logs.
                 "fuchsia.boot.WriteOnlyLog",
+
+                // Needed for the storage verity benchmarks.
+                "fuchsia.kernel.VmexResource",
                 "fuchsia.process.Launcher",
 
                 // Tests can produce trace.
