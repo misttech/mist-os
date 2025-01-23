@@ -22,6 +22,7 @@ use fidl_fuchsia_power_internal::{
     CollaborativeRebootSchedulerRequestStream as SchedulerRequestStream,
 };
 use fuchsia_async::OnSignals;
+use fuchsia_inspect::NumericProperty;
 use fuchsia_sync::Mutex;
 use futures::{StreamExt, TryStreamExt};
 use log::{error, info};
@@ -32,11 +33,19 @@ const CANCELLATION_SIGNALS: zx::Signals =
     zx::Signals::USER_ALL.union(zx::Signals::OBJECT_PEER_CLOSED);
 
 /// Construct a new [`State`] and it's paired [`Cancellations`].
-pub(super) fn new() -> (State, Cancellations) {
+pub(super) fn new(inspector: &fuchsia_inspect::Inspector) -> (State, Cancellations) {
     let (cancellation_sender, cancellation_receiver) = futures::channel::mpsc::unbounded();
-    let scheduled_requests: Arc<Mutex<ScheduledRequests>> = Default::default();
+    let cr_node = inspector.root().create_child("CollaborativeReboot");
+    let scheduled_requests_node = cr_node.create_child("ScheduledRequests");
+
+    let scheduled_requests: Arc<Mutex<ScheduledRequests>> =
+        Arc::new(Mutex::new(ScheduledRequests::new(&scheduled_requests_node)));
     (
-        State { scheduled_requests: scheduled_requests.clone(), cancellation_sender },
+        State {
+            scheduled_requests: scheduled_requests.clone(),
+            cancellation_sender,
+            _inspect_nodes: [cr_node, scheduled_requests_node],
+        },
         Cancellations { scheduled_requests, cancellation_receiver },
     )
 }
@@ -53,6 +62,12 @@ pub(super) struct State {
     ///
     /// The receiver half is held by [`Cancellations`].
     cancellation_sender: futures::channel::mpsc::UnboundedSender<Cancel>,
+
+    /// A container to hold the Inspect nodes for collaborative reboot.
+    ///
+    /// These nodes need to retained, as dropping them would delete the
+    /// underlying Inspect data.
+    _inspect_nodes: [fuchsia_inspect::types::Node; 2],
 }
 
 impl State {
@@ -190,31 +205,54 @@ struct Cancel {
 }
 
 /// A reference count of the scheduled requests, broken down by reason.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct ScheduledRequests {
     system_update: usize,
     netstack_migration: usize,
+    // Inspect properties to report the counters from above.
+    system_update_inspect_prop: fuchsia_inspect::types::UintProperty,
+    netstack_migration_inspect_prop: fuchsia_inspect::types::UintProperty,
 }
 
 impl ScheduledRequests {
+    fn new(inspect_node: &fuchsia_inspect::types::Node) -> Self {
+        Self {
+            system_update: 0,
+            netstack_migration: 0,
+            system_update_inspect_prop: inspect_node.create_uint("SystemUpdate", 0),
+            netstack_migration_inspect_prop: inspect_node.create_uint("NetstackMigration", 0),
+        }
+    }
+
     fn schedule(&mut self, reason: Reason) {
-        let rc = match reason {
-            Reason::SystemUpdate => &mut self.system_update,
-            Reason::NetstackMigration => &mut self.netstack_migration,
+        let (rc, inspect_prop) = match reason {
+            Reason::SystemUpdate => (&mut self.system_update, &self.system_update_inspect_prop),
+            Reason::NetstackMigration => {
+                (&mut self.netstack_migration, &self.netstack_migration_inspect_prop)
+            }
         };
         *rc = rc.saturating_add(1);
+        inspect_prop.add(1);
     }
 
     fn cancel(&mut self, reason: Reason) {
-        let rc = match reason {
-            Reason::SystemUpdate => &mut self.system_update,
-            Reason::NetstackMigration => &mut self.netstack_migration,
+        let (rc, inspect_prop) = match reason {
+            Reason::SystemUpdate => (&mut self.system_update, &self.system_update_inspect_prop),
+            Reason::NetstackMigration => {
+                (&mut self.netstack_migration, &self.netstack_migration_inspect_prop)
+            }
         };
         *rc = rc.saturating_sub(1);
+        inspect_prop.subtract(1);
     }
 
     fn list_reasons(&self) -> Vec<Reason> {
-        let Self { system_update, netstack_migration } = self;
+        let Self {
+            system_update,
+            netstack_migration,
+            system_update_inspect_prop: _,
+            netstack_migration_inspect_prop: _,
+        } = self;
         let mut reasons = Vec::new();
         if *system_update != 0 {
             reasons.push(Reason::SystemUpdate);
@@ -228,7 +266,12 @@ impl ScheduledRequests {
 
 impl std::fmt::Display for ScheduledRequests {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Self { system_update, netstack_migration } = self;
+        let Self {
+            system_update,
+            netstack_migration,
+            system_update_inspect_prop: _,
+            netstack_migration_inspect_prop: _,
+        } = self;
         write!(f, "SystemUpdate:{system_update}, NetstackMigration:{netstack_migration}")
     }
 }
@@ -245,6 +288,7 @@ mod tests {
 
     use std::cell::RefCell;
 
+    use diagnostics_assertions::assert_data_tree;
     use fidl::Peered;
     use fidl_fuchsia_power::CollaborativeRebootInitiatorMarker;
     use fidl_fuchsia_power_internal::CollaborativeRebootSchedulerMarker;
@@ -279,7 +323,9 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn collaborative_reboot(mut reasons: Vec<Reason>) -> bool {
         // Note: this test doesn't exercise cancellations.
-        let (state, _cancellations) = new();
+        let inspector =
+            fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default());
+        let (state, _cancellations) = new(&inspector);
 
         let (scheduler_client, scheduler_request_stream) =
             fidl::endpoints::create_request_stream::<CollaborativeRebootSchedulerMarker>();
@@ -357,7 +403,9 @@ mod tests {
         // so we need direct access to the executor.
         let mut exec = fuchsia_async::TestExecutor::new();
 
-        let (state, cancellations_worker) = new();
+        let inspector =
+            fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default());
+        let (state, cancellations_worker) = new(&inspector);
 
         let (scheduler_client, scheduler_request_stream) =
             fidl::endpoints::create_request_stream::<CollaborativeRebootSchedulerMarker>();
@@ -449,5 +497,83 @@ mod tests {
         assert_eq!(*mock.reasons.borrow(), expected_reasons);
 
         rebooting.expect("rebooting should be present")
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn inspect() {
+        let inspector =
+            fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default());
+        let (state, cancellations_worker) = new(&inspector);
+
+        let mut cancellation_signals = vec![];
+        let (scheduler_client, scheduler_request_stream) =
+            fidl::endpoints::create_request_stream::<CollaborativeRebootSchedulerMarker>();
+        let scheduler = scheduler_client.into_proxy();
+        let schedule_server_fut = state.handle_scheduler_requests(scheduler_request_stream).fuse();
+        futures::pin_mut!(schedule_server_fut);
+
+        // At the start, expect the tree to be initialized with 0 values.
+        assert_data_tree!(inspector, root: {
+            "CollaborativeReboot": {
+                "ScheduledRequests": {
+                    "SystemUpdate": 0u64,
+                    "NetstackMigration": 0u64,
+                }
+            }
+        });
+
+        // Schedule a `SystemUpdate` reboot, twice, and verify the inspect data.
+        for count in [1u64, 2u64] {
+            let (ep1, ep2) = zx::EventPair::create();
+            cancellation_signals.push(ep1);
+            futures::select!(
+                result = scheduler.schedule_reboot(
+                    Reason::SystemUpdate, Some(ep2)).fuse() => {
+                        result.expect("failed to schedule reboot");
+                    },
+                () = schedule_server_fut => {
+                    unreachable!("The `Scheduler` protocol worker shouldn't exit");
+                }
+            );
+            assert_data_tree!(inspector, root: {
+                "CollaborativeReboot": {
+                    "ScheduledRequests": {
+                        "SystemUpdate": count,
+                        "NetstackMigration": 0u64,
+                    }
+                }
+            });
+        }
+
+        // Schedule a `NetstackMigration` reboot, and verify the inspect data.
+        futures::select!(
+            result = scheduler.schedule_reboot(Reason::NetstackMigration, None).fuse() => {
+                    result.expect("failed to schedule reboot");
+                },
+            () = schedule_server_fut => {
+                unreachable!("The `Scheduler` protocol worker shouldn't exit");
+            }
+        );
+        assert_data_tree!(inspector, root: {
+            "CollaborativeReboot": {
+                "ScheduledRequests": {
+                    "SystemUpdate": 2u64,
+                    "NetstackMigration": 1u64,
+                }
+            }
+        });
+
+        // Cancel the `SystemUpdate` requests, and verify the inspect data.
+        std::mem::drop(cancellation_signals);
+        state.cancellation_sender.close_channel();
+        cancellations_worker.run().await;
+        assert_data_tree!(inspector, root: {
+            "CollaborativeReboot": {
+                "ScheduledRequests": {
+                    "SystemUpdate": 0u64,
+                    "NetstackMigration": 1u64,
+                }
+            }
+        });
     }
 }

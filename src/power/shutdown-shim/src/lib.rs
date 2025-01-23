@@ -54,6 +54,32 @@ pub async fn main(
 ) -> Result<(), anyhow::Error> {
     println!("[shutdown-shim]: started");
 
+    // Initialize the inspect framework.
+    //
+    // Note that shutdown-shim is a builtin component of ComponentManager, which
+    // means we must setup the inspector in a non-conventional way:
+    // * We must initialize the connection to the inspect sink relative to the
+    // `svc` directory.
+    // * We must not use the global `fuchsia_inspect::component::inspector()`;
+    //   this instance instance is a singleton and would be shared with
+    //   ComponentManager. Instead we declare our own local inspector.
+    let inspector = fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default());
+    let (client, server) =
+        fidl::endpoints::create_endpoints::<fidl_fuchsia_inspect::InspectSinkMarker>();
+    // Note: The inspect server is detached, so we need not poll it.
+    let _inspect_server_task = inspect_runtime::publish(
+        &inspector,
+        inspect_runtime::PublishOptions::default().on_inspect_sink_client(client),
+    )
+    .ok_or_else(|| format_err!("failed to initialize inspect framework"))?;
+    svc.as_ref_directory()
+        .open(
+            fidl_fuchsia_inspect::InspectSinkMarker::PROTOCOL_NAME,
+            fio::Flags::PROTOCOL_SERVICE,
+            server.into_channel().into(),
+        )
+        .context("failed to connect to InspectSink")?;
+
     let mut service_fs = ServiceFs::new();
     service_fs.dir("svc").add_fidl_service(IncomingRequest::Admin);
     service_fs.dir("svc").add_fidl_service(IncomingRequest::SystemStateTransition);
@@ -62,7 +88,7 @@ pub async fn main(
     service_fs.serve_connection(directory_request).context("failed to serve outgoing namespace")?;
 
     let (abort_tx, mut abort_rx) = mpsc::unbounded::<()>();
-    let (cr_state, cr_cancellations) = collaborative_reboot::new();
+    let (cr_state, cr_cancellations) = collaborative_reboot::new(&inspector);
     let ctx = ProgramContext { svc, abort_tx, collaborative_reboot: cr_state };
     let mut service_fut = service_fs
         .for_each_concurrent(None, |request: IncomingRequest| async {
@@ -89,6 +115,7 @@ pub async fn main(
     let collaborative_reboot_cancellation_fut = pin!(cr_cancellations.run());
     let mut collaborative_reboot_cancellation_fut = collaborative_reboot_cancellation_fut.fuse();
     let mut abort_fut = abort_rx.next().fuse();
+
     select! {
         () = service_fut => {},
         () = reboot_watcher_fut => unreachable!(),
