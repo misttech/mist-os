@@ -58,20 +58,33 @@ pub trait SuspendResumeListener {
 /// not suspend in the gap between when a wake lease is acquired and when the lease becomes
 /// satisfied.
 pub struct SuspendBlockManager {
-    marker: Rc<()>,
+    marker: Mutex<Rc<()>>,
 }
 
 impl SuspendBlockManager {
     pub fn new() -> Self {
-        SuspendBlockManager { marker: Rc::new(()) }
+        SuspendBlockManager { marker: Mutex::new(Rc::new(())) }
     }
 
-    pub fn get_suspend_blocker(&self) -> std::rc::Weak<()> {
-        Rc::downgrade(&self.marker)
+    /// Returns a reference that, as long as it is held, causes suspend_allowed() to return None.
+    pub async fn get_suspend_blocker(&self) -> std::rc::Weak<()> {
+        let marker = self.marker.lock().await;
+        Rc::downgrade(&marker)
     }
 
-    pub fn suspend_blocked(&self) -> bool {
-        Rc::weak_count(&self.marker) > 0
+    /// If suspend is allowed, returns a guard that blocks further get_suspend_blocker() calls
+    /// as long as it is held. Otherwise, returns None.
+    pub(crate) fn suspend_allowed(&self) -> Option<futures::lock::MutexGuard<'_, Rc<()>>> {
+        match self.marker.try_lock() {
+            None => None,
+            Some(marker) => {
+                if Rc::weak_count(&marker) > 0 {
+                    None
+                } else {
+                    Some(marker)
+                }
+            }
+        }
     }
 }
 
@@ -190,10 +203,15 @@ impl CpuManager {
             if !inner.cpu_element_is_inactive {
                 log::info!("Suspend not allowed because CPU element is not inactive");
                 return SuspendResult::NotAllowed;
-            } else if inner.suspend_block_manager.suspend_blocked() {
-                log::info!("Suspend not allowed due to outstanding wake leases");
-                return SuspendResult::NotAllowed;
             }
+
+            let _lock = match inner.suspend_block_manager.suspend_allowed() {
+                Some(lock) => lock,
+                None => {
+                    log::info!("Suspend not allowed due to outstanding wake leases");
+                    return SuspendResult::NotAllowed;
+                }
+            };
 
             self._inspect_node.borrow_mut().add_entry(|node| {
                 node.record_int(

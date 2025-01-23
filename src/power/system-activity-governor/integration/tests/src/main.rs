@@ -2309,3 +2309,38 @@ async fn test_activity_governor_cpu_element_allows_leases_during_boot() -> Resul
     assert_eq!(1u8, cpu_driver_power_level.get());
     Ok(())
 }
+
+#[fuchsia::test]
+async fn test_acquire_wake_lease_blocks_during_suspend() -> Result<()> {
+    let (realm, _) = create_realm().await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+
+    // Call SetBootComplete to allow SAG to start suspending.
+    {
+        let boot_control = realm.connect_to_protocol::<fsystem::BootControlMarker>().await?;
+        let () =
+            boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
+    }
+
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
+
+    // Spawn an AcquireWakeLease request, and ensure that it's still blocked after a brief wait.
+    let mut task = fasync::Task::local(async move {
+        activity_governor.acquire_wake_lease("some_wake_lease").await
+    });
+    fasync::Timer::new(fasync::MonotonicDuration::from_seconds(1)).await;
+    assert!(futures::poll!(&mut task).is_pending());
+
+    // Allow the system to resume and confirm that AcquireWakeLease returns.
+    suspend_device
+        .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult::default()))
+        .await
+        .unwrap()
+        .unwrap();
+    let _ = task.await;
+
+    Ok(())
+}

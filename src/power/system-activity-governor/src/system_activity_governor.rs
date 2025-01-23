@@ -231,7 +231,7 @@ impl LeaseManager {
 
     async fn create_wake_lease(&self, name: String) -> Result<fsystem::LeaseToken> {
         let (server_token, client_token) = fsystem::LeaseToken::create();
-        let suspend_blocker = self.suspend_block_manager.get_suspend_blocker();
+        let suspend_blocker = self.suspend_block_manager.get_suspend_blocker().await;
 
         let lease_helper =
             LeaseHelper::new(
