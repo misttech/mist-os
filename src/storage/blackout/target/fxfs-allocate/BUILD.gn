@@ -1,4 +1,4 @@
-# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -7,17 +7,14 @@ import("//build/rust/rustc_binary.gni")
 
 group("tests") {
   testonly = true
-
-  # There aren't any tests but this makes sure it's in the build graph so the build doesn't break.
-  deps = [ ":blackout-fxfs-tree" ]
+  deps = [ ":blackout-fxfs-allocate" ]
 }
 
-rustc_binary("blackout-fxfs-tree-bin") {
-  output_name = "blackout_fxfs_tree_bin"
+rustc_binary("blackout-fxfs-allocate-bin") {
+  output_name = "blackout_fxfs_allocate_bin"
   testonly = true
   edition = "2021"
   deps = [
-    "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
@@ -34,25 +31,24 @@ rustc_binary("blackout-fxfs-tree-bin") {
     "//third_party/rust_crates:rand",
   ]
   data_deps = [
-    "//src/storage/crypt/fxfs",
+    "//src/storage/crypt/fxfs:fxfs-crypt",
     "//src/storage/fxfs",
   ]
   sources = [ "src/main.rs" ]
-  rustenv = [ "DATA_FILESYSTEM_FORMAT=fxfs" ]
 }
 
-fuchsia_component("blackout-fxfs-tree-component") {
+fuchsia_component("blackout-fxfs-allocate-component") {
   testonly = true
   deps = [
-    ":blackout-fxfs-tree-bin",
+    ":blackout-fxfs-allocate-bin",
     "//src/storage/fs_test:test_crypt_service",
     "//src/storage/fxfs:fxfs_component",
     "//src/storage/fxfs:test_fxfs_component_manifest_shard",
   ]
-  manifest = "meta/blackout_fxfs_tree.cml"
+  manifest = "meta/blackout_fxfs_allocate.cml"
 }
 
-fuchsia_package("blackout-fxfs-tree") {
+fuchsia_package("blackout-fxfs-allocate") {
   testonly = true
-  deps = [ ":blackout-fxfs-tree-component" ]
+  deps = [ ":blackout-fxfs-allocate-component" ]
 }

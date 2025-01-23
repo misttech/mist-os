@@ -6,15 +6,14 @@
 
 #![deny(missing_docs)]
 
-use anyhow::{anyhow, Context as _, Result};
+use anyhow::{Context as _, Result};
 use async_trait::async_trait;
-use device_watcher::recursive_wait_and_open;
+use fidl::endpoints::create_proxy;
 use fidl_fuchsia_blackout_test::{ControllerRequest, ControllerRequestStream};
 use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
-use fidl_fuchsia_hardware_block::BlockMarker;
-use fuchsia_component::client::{
-    connect_to_named_protocol_at_dir_root, connect_to_protocol_at_path,
-};
+use fidl_fuchsia_hardware_block_volume::VolumeManagerMarker;
+use fs_management::format::DiskFormat;
+use fuchsia_component::client::connect_to_protocol_at_path;
 use fuchsia_component::server::{ServiceFs, ServiceObj};
 use fuchsia_fs::directory::readdir;
 use futures::{future, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
@@ -22,8 +21,10 @@ use rand::rngs::StdRng;
 use rand::{distributions, Rng, SeedableRng};
 use std::pin::pin;
 use std::sync::Arc;
-use storage_isolated_driver_manager::fvm;
-use uuid::Uuid;
+use storage_isolated_driver_manager::{
+    create_random_guid, find_block_device_devfs, into_guid, wait_for_block_device_devfs,
+    BlockDeviceMatcher, Guid,
+};
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 pub mod static_tree;
@@ -178,165 +179,105 @@ pub fn dev() -> fio::DirectoryProxy {
         .expect("failed to open /dev")
 }
 
-fn dev_class_block() -> fio::DirectoryProxy {
-    fuchsia_fs::directory::open_in_namespace("/dev/class/block", fio::PERM_READABLE)
-        .expect("failed to open /dev/class/block")
-}
+/// This type guid is only used if the test has to create the gpt partition itself. Otherwise, only
+/// the label is used to find the partition.
+const BLACKOUT_TYPE_GUID: &Guid = &[
+    0x68, 0x45, 0x23, 0x01, 0xab, 0x89, 0xef, 0xcd, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+];
 
-const RAMDISK_PREFIX: &'static str = "/dev/sys/platform/ram-disk/ramctl";
+const GPT_PARTITION_SIZE: u64 = 60 * 1024 * 1024;
 
-/// During the setup step, formats a device with fvm, creating a single partition named
-/// [`partition_label`]. If [`device_path`] is `None`, finds a device which already had fvm, erase
-/// it, and then set it up in this way. Returns the path to the device with the created partition,
-/// only once the device is enumerated, so it can be used immediately.
+/// Set up a partition for testing using the device label and optional device path, returning the
+/// device controller for it. If the path is provided, it's directly connected to. If a label is
+/// provided, it searches for that label, using it if found. If it's not found, the logic attempts
+/// to create a new gpt partition to use.
 pub async fn set_up_partition(
-    partition_label: &str,
-    device_dir: Option<&fio::DirectoryProxy>,
-    skip_ramdisk: bool,
+    device_label: String,
+    device_path: Option<String>,
 ) -> Result<ControllerProxy> {
-    let mut device_controller = None;
-    let mut owned_device_dir = None;
-    let device_dir = match device_dir {
-        Some(device_dir) => {
-            device_controller = Some(
-                connect_to_named_protocol_at_dir_root::<ControllerMarker>(
-                    device_dir,
-                    "device_controller",
-                )
-                .context("new class path connect failed")?,
-            );
-            device_dir
-        }
-        None => {
-            let dev_class_block_dir = dev_class_block();
-            for entry in readdir(&dev_class_block_dir).await.context("readdir failed")? {
-                let entry_controller = connect_to_named_protocol_at_dir_root::<ControllerMarker>(
-                    &dev_class_block_dir,
-                    &format!("{}/device_controller", entry.name),
-                )
-                .context("get_topo controller connect failed")?;
-                let topo_path = entry_controller
-                    .get_topological_path()
-                    .await
-                    .context("transport error on get_topological_path")?
-                    .map_err(zx::Status::from_raw)
-                    .context("get_topo failed")?;
-                if skip_ramdisk && topo_path.starts_with(RAMDISK_PREFIX) {
-                    continue;
-                }
-                if let Some(fvm_index) = topo_path.find("/block/fvm") {
-                    let fvm_path = format!("{}/block", &topo_path[..fvm_index]);
-                    let controller_path = format!("{fvm_path}/device_controller");
-                    let fvm_controller =
-                        connect_to_protocol_at_path::<ControllerMarker>(&controller_path)
-                            .context("new class path connect failed")?;
-                    fvm_controller
-                        .unbind_children()
-                        .await
-                        .context("unbind children call failed")?
-                        .map_err(zx::Status::from_raw)
-                        .context("unbind children returned error")?;
-                    device_controller = Some(fvm_controller);
-                    owned_device_dir = Some(fuchsia_fs::directory::open_in_namespace(
-                        &fvm_path,
-                        fio::Flags::empty(),
-                    )?);
-                    break;
-                }
-            }
-            owned_device_dir
-                .as_ref()
-                .ok_or_else(|| anyhow!("failed to find a device with fvm on it"))?
-        }
-    };
-
-    let fvm_slice_size = 8192_usize * 4;
-
-    // Get the size of the underlying device so we can use a bunch of it for our fancy new fvm
-    // partition without dealing with expansion. We do this because some tests use the size of the
-    // device to figure out what they can do, but getting the total used bytes from a filesystem
-    // doesn't take into account possible expansion.
-    let device_size_bytes = {
-        let fvm_block = connect_to_named_protocol_at_dir_root::<BlockMarker>(device_dir, ".")?;
-        let info = fvm_block
-            .get_info()
+    let mut partition_path = if let Some(path) = device_path {
+        log::info!("using provided path");
+        path.into()
+    } else if let Ok(path) =
+        find_block_device_devfs(&[BlockDeviceMatcher::Name(&device_label)]).await
+    {
+        log::info!("found existing partition");
+        path
+    } else {
+        log::info!("finding existing gpt and adding a new partition to it");
+        let mut gpt_block_path =
+            find_block_device_devfs(&[BlockDeviceMatcher::ContentsMatch(DiskFormat::Gpt)])
+                .await
+                .context("finding gpt device failed")?;
+        gpt_block_path.push("device_controller");
+        let gpt_block_controller =
+            connect_to_protocol_at_path::<ControllerMarker>(gpt_block_path.to_str().unwrap())
+                .context("connecting to block controller")?;
+        let gpt_path = gpt_block_controller
+            .get_topological_path()
             .await
-            .context("fvm path get info call failed")?
+            .context("get_topo fidl error")?
             .map_err(zx::Status::from_raw)
-            .context("fvm path get info returned error")?;
-        u64::from(info.block_size) * info.block_count
-    };
+            .context("get_topo failed")?;
+        let gpt_controller = connect_to_protocol_at_path::<ControllerMarker>(&format!(
+            "{}/gpt/device_controller",
+            gpt_path
+        ))
+        .context("connecting to gpt controller")?;
 
-    // It's tricky to really allocate the maximum number of slices, so we use a whole lot less than
-    // that. It should still be enough to count.
-    let num_slices = device_size_bytes / fvm_slice_size as u64 / 2;
-    let fvm_volume_size = num_slices * fvm_slice_size as u64;
+        let (volume_manager, server) = create_proxy::<VolumeManagerMarker>();
+        gpt_controller
+            .connect_to_device_fidl(server.into_channel())
+            .context("connecting to gpt fidl")?;
+        let slice_size = {
+            let (status, info) = volume_manager.get_info().await.context("get_info fidl error")?;
+            zx::ok(status).context("get_info returned error")?;
+            info.unwrap().slice_size
+        };
+        let slice_count = GPT_PARTITION_SIZE / slice_size;
+        let instance_guid = into_guid(create_random_guid());
+        let status = volume_manager
+            .allocate_partition(
+                slice_count,
+                &into_guid(BLACKOUT_TYPE_GUID.clone()),
+                &instance_guid,
+                &device_label,
+                0,
+            )
+            .await
+            .context("allocating test partition fidl error")?;
+        zx::ok(status).context("allocating test partition returned error")?;
 
-    let device_controller =
-        device_controller.ok_or_else(|| anyhow!("invalid device controller"))?;
-    let volume_manager = fvm::set_up_fvm(&device_controller, device_dir, fvm_slice_size)
+        wait_for_block_device_devfs(&[
+            BlockDeviceMatcher::Name(&device_label),
+            BlockDeviceMatcher::TypeGuid(&BLACKOUT_TYPE_GUID),
+        ])
         .await
-        .context("set_up_fvm failed")?;
-    fvm::create_fvm_volume(
-        &volume_manager,
-        partition_label,
-        Uuid::new_v4().as_bytes(),
-        Uuid::new_v4().as_bytes(),
-        Some(fvm_volume_size),
-        0,
-    )
-    .await
-    .context("create_fvm_volume failed")?;
-    recursive_wait_and_open::<ControllerMarker>(
-        device_dir,
-        &format!("/fvm/{}-p-1/block/device_controller", partition_label),
-    )
-    .await
-    .context("recursive_wait for new fvm path failed")
+        .context("waiting for new gpt partition")?
+    };
+    partition_path.push("device_controller");
+    log::info!(partition_path:?; "found partition to use");
+    connect_to_protocol_at_path::<ControllerMarker>(partition_path.to_str().unwrap())
+        .context("connecting to provided path")
 }
 
-/// During the test or verify steps, finds a block device which represents an fvm partition named
-/// [`partition_label`]. If [`device_path`] is provided, this assumes the partition is on that
-/// device. Returns the topological path to the device, only returning once the device is
-/// enumerated, so it can be used immediately.
+/// Find an existing test partition using the device label and optional path, and connect to the
+/// controller proxy for it.
 pub async fn find_partition(
-    partition_label: &str,
-    device_dir: Option<&fio::DirectoryProxy>,
+    device_label: String,
+    device_path: Option<String>,
 ) -> Result<ControllerProxy> {
-    if let Some(device_dir) = device_dir {
-        match connect_to_named_protocol_at_dir_root::<ControllerMarker>(
-            device_dir,
-            &format!("/fvm/{}-p-1/block/device_controller", partition_label),
-        ) {
-            Ok(partition_controller) => {
-                return Ok(partition_controller);
-            }
-            Err(err) => return Err(err).context("failed to open fvm path"),
-        }
-    }
-
-    let dev_class_block_dir = dev_class_block();
-    for entry in readdir(&dev_class_block_dir).await? {
-        let class_path = format!("/dev/class/block/{}", entry.name);
-        let partition = connect_to_protocol_at_path::<
-            fidl_fuchsia_hardware_block_partition::PartitionMarker,
-        >(&class_path)
-        .context("class path partition connect failed")?;
-        // The device might not support the partition protocol, in which case we skip it. Also skip
-        // it if an error is returned, or if no name is returned.
-        let entry_name = if let Ok((0, Some(entry_name))) = partition.get_name().await {
-            entry_name
-        } else {
-            continue;
-        };
-        if &entry_name == partition_label {
-            let controller_proxy = connect_to_named_protocol_at_dir_root::<ControllerMarker>(
-                &dev_class_block_dir,
-                &format!("{}/device_controller", &entry.name),
-            )?;
-            return Ok(controller_proxy);
-        }
-    }
-
-    return Err(anyhow::anyhow!("couldn't find device with name \"{}\"", partition_label));
+    let mut partition_path = if let Some(path) = device_path {
+        log::info!("using provided path");
+        path.into()
+    } else {
+        log::info!("finding gpt");
+        find_block_device_devfs(&[BlockDeviceMatcher::Name(&device_label)])
+            .await
+            .context("finding block device")?
+    };
+    partition_path.push("device_controller");
+    log::info!(partition_path:?; "found partition to use");
+    connect_to_protocol_at_path::<ControllerMarker>(partition_path.to_str().unwrap())
+        .context("connecting to provided path")
 }

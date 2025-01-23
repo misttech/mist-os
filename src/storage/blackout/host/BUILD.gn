@@ -50,7 +50,11 @@ group("blackout_workbench_vim3_stable") {
 
 group("blackout_workbench_vim3_unstable") {
   testonly = true
-  deps = []
+  deps = [
+    ":blackout_fxfs_allocate_hard_reboot($host_toolchain)",
+    ":blackout_fxfs_allocate_soft_reboot($host_toolchain)",
+    "//src/storage/blackout/target/fxfs-allocate:blackout-fxfs-allocate",
+  ]
 }
 
 # This is a special integration test which is supposed to fail, to test that verification failures
@@ -169,6 +173,62 @@ if (is_host) {
       # Blackout args
       component_name = "/core/ffx-laboratory:blackout-target"
       component_url = "fuchsia-pkg://fuchsia.com/blackout-fxfs-tree#meta/blackout-fxfs-tree-component.cm"
+      load_generation_duration = 30
+
+      # TODO(https://fxbug.dev/338452001): the vim3 bootloader currently resets the gpt partition
+      # table if it isn't the exact hard-coded partition table it expects, so we use the label of a
+      # 32MiB partition that isn't used so it doesn't get blown away on reboot. Once the bootloader
+      # doesn't do that, we can use our own partition (in other words, delete the following line
+      # once the bug is resolved).
+      device_label = "factory"
+
+      # test case revive args
+      test_case_revive = true
+      fuchsia_device_operation = "Hard-Reboot"
+    }
+    environments = [ vim3_env ]
+    timeout_secs = 360
+  }
+
+  python_mobly_test("blackout_fxfs_allocate_soft_reboot") {
+    main_source = "blackout.py"
+    libraries = [
+      "//src/storage/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data(${toolchain_variant.base})",
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
+    ]
+    params = {
+      # Blackout args
+      component_name = "/core/ffx-laboratory:blackout-target"
+      component_url = "fuchsia-pkg://fuchsia.com/blackout-fxfs-allocate#meta/blackout-fxfs-allocate-component.cm"
+      load_generation_duration = 30
+
+      # TODO(https://fxbug.dev/338452001): the vim3 bootloader currently resets the gpt partition
+      # table if it isn't the exact hard-coded partition table it expects, so we use the label of a
+      # 32MiB partition that isn't used so it doesn't get blown away on reboot. Once the bootloader
+      # doesn't do that, we can use our own partition (in other words, delete the following line
+      # once the bug is resolved).
+      device_label = "factory"
+
+      # test case revive args
+      test_case_revive = true
+      fuchsia_device_operation = "Soft-Reboot"
+    }
+    environments = [ vim3_env ]
+    timeout_secs = 360
+  }
+
+  python_mobly_test("blackout_fxfs_allocate_hard_reboot") {
+    main_source = "blackout.py"
+    libraries = [
+      "//src/storage/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data(${toolchain_variant.base})",
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
+    ]
+    params = {
+      # Blackout args
+      component_name = "/core/ffx-laboratory:blackout-target"
+      component_url = "fuchsia-pkg://fuchsia.com/blackout-fxfs-allocate#meta/blackout-fxfs-allocate-component.cm"
       load_generation_duration = 30
 
       # TODO(https://fxbug.dev/338452001): the vim3 bootloader currently resets the gpt partition
