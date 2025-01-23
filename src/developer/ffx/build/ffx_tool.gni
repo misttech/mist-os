@@ -6,6 +6,7 @@ import("//build/host.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/sdk/sdk_atom.gni")
 import("//build/testing/host_test_data.gni")
+import("//sdk/categories/compatibility.gni")
 import("//src/developer/ffx/build/ffx_action.gni")
 import("//src/developer/ffx/config.gni")
 import("//src/developer/ffx/lib/version/build/ffx_apply_version.gni")
@@ -283,13 +284,7 @@ template("ffx_tool") {
         if (!defined(assert_no_deps)) {
           assert_no_deps = []
         }
-        assert_no_deps += [
-          "//sdk:marker-cts",
-          "//sdk:marker-excluded",
-          "//sdk:marker-experimental",
-          "//sdk:marker-internal",
-          "//sdk:marker-unknown",
-        ]
+        assert_no_deps += markers_partner_idk_prebuilts_must_not_depend_on
       }
     }
   }

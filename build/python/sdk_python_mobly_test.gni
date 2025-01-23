@@ -4,6 +4,7 @@
 
 import("//build/python/python_action.gni")
 import("//build/sdk/sdk_atom.gni")
+import("//sdk/categories/compatibility.gni")
 
 # Declares an in-tree Python E2E Mobly test for distribution in the SDK.
 #
@@ -137,14 +138,6 @@ template("sdk_python_mobly_test") {
     # However, note that not everything in those categories is stable.
     # TODO(https://fxbug.dev/314822328): Reframe the markers in terms of stability.
     # Also, there are exceptions for host tests - see https://fxbug.dev/326090508.
-    #
-    # TODO(b/330629017): Centralize this group in //sdk somewhere.
-    assert_no_deps = [
-      "//sdk:marker-cts",
-      "//sdk:marker-excluded",
-      "//sdk:marker-experimental",
-      "//sdk:marker-internal",
-      "//sdk:marker-unknown",
-    ]
+    assert_no_deps = markers_partner_idk_prebuilts_must_not_depend_on
   }
 }

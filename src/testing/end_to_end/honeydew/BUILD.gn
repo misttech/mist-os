@@ -6,6 +6,7 @@ import("//build/fidl/toolchain.gni")
 import("//build/images/tools/fastboot.gni")
 import("//build/python/python_library.gni")
 import("//build/testing/host_test_data.gni")
+import("//sdk/categories/compatibility.gni")
 
 group("honeydew") {
   testonly = true
@@ -139,13 +140,7 @@ python_library("honeydew_no_testonly") {
   # However, note that not everything in those categories is stable.
   # TODO(https://fxbug.dev/314822328): Reframe the markers in terms of stability.
   # Also, there are exceptions for host tests - see https://fxbug.dev/326090508.
-  assert_no_deps = [
-    "//sdk:marker-cts",
-    "//sdk:marker-excluded",
-    "//sdk:marker-experimental",
-    "//sdk:marker-internal",
-    "//sdk:marker-unknown",
-  ]
+  assert_no_deps = markers_partner_idk_prebuilts_must_not_depend_on
 }
 
 # FIDL dependencies that will be used in Honeydew using Fuchsia-Controller.

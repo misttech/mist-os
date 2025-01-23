@@ -4,6 +4,7 @@
 
 import("//build/rust/rustc_library.gni")
 import("//build/tools/json_merge/json_merge.gni")
+import("//sdk/categories/compatibility.gni")
 import("command.gni")
 import("plugins.gni")
 
@@ -371,13 +372,7 @@ template("ffx_plugin") {
         if (!defined(assert_no_deps)) {
           assert_no_deps = []
         }
-        assert_no_deps += [
-          "//sdk:marker-cts",
-          "//sdk:marker-excluded",
-          "//sdk:marker-experimental",
-          "//sdk:marker-internal",
-          "//sdk:marker-unknown",
-        ]
+        assert_no_deps += markers_partner_idk_prebuilts_must_not_depend_on
       }
     }
   } else {

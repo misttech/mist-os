@@ -1,0 +1,50 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//sdk/categories/compatibility.gni")
+
+visibility = []
+
+# Ensure that a marker exists for each of `_all_idk_categories` and that the
+# marker targets lists only use valid marker targets.
+group("test_all_markers") {
+  testonly = true
+  visibility = [ ":tests" ]
+  deps = all_idk_category_markers_targets
+}
+
+# Do the same for each list of incompatible marker targets.
+group("test_all_marker_lists") {
+  testonly = true
+  visibility = [ ":tests" ]
+  deps = markers_partner_idk_sources_must_not_depend_on +
+         markers_partner_idk_prebuilts_must_not_depend_on
+
+  assert(markers_partner_idk_sources_must_not_depend_on -
+         [ "//sdk:marker-partner_internal" ] ==
+         markers_partner_idk_prebuilts_must_not_depend_on)
+
+  # Temporarily verify the list matches the lists it replaced.
+  # TODO(https://fxbug.dev/314822328): Remove when updating categories.
+  assert(markers_partner_idk_prebuilts_must_not_depend_on == [
+               "//sdk:marker-unknown",
+               "//sdk:marker-excluded",
+               "//sdk:marker-experimental",
+               "//sdk:marker-internal",
+               "//sdk:marker-cts",
+             ],
+         "${markers_partner_idk_prebuilts_must_not_depend_on}")
+}
+
+group("tests") {
+  testonly = true
+  visibility = [ "//sdk:tests_no_e2e" ]
+  deps = [
+    # Force the category and markers GN checks to be processed.
+    # This adds the markers as a dependency of all test targets that depend on
+    # this one, but that is okay because tests do not check the markers.
+    ":test_all_marker_lists",
+    ":test_all_markers",
+  ]
+}

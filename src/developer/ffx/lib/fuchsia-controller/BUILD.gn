@@ -6,6 +6,7 @@ import("//build/python/python_binary.gni")
 import("//build/python/python_host_test.gni")
 import("//build/python/python_library.gni")
 import("//build/rust/rustc_staticlib.gni")
+import("//sdk/categories/compatibility.gni")
 import("//src/tests/fidl/conformance_suite/gidl-conformance-suite.gni")
 import("//tools/fidl/gidl/gidl.gni")
 
@@ -96,13 +97,7 @@ python_library("fuchsia_controller_py") {
   # "partner_internal" SDK category and greater as an approximation of this.
   # However, note that not everything in those categories is stable.
   # TODO(https://fxbug.dev/314822328): Reframe the markers in terms of stability.
-  assert_no_deps = [
-    "//sdk:marker-cts",
-    "//sdk:marker-excluded",
-    "//sdk:marker-experimental",
-    "//sdk:marker-internal",
-    "//sdk:marker-unknown",
-  ]
+  assert_no_deps = markers_partner_idk_prebuilts_must_not_depend_on
 }
 
 python_library("fidl_bindings") {
