@@ -5,7 +5,7 @@
 #include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller-impl.h"
 
 #include <lib/driver/logging/cpp/logger.h>
-#include <unistd.h>
+#include <lib/zx/time.h>
 #include <zircon/assert.h>
 
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
@@ -43,7 +43,7 @@ void HdmiTransmitterControllerImpl::ScdcWrite(uint8_t addr, uint8_t val) {
       &controller_mmio_);
   registers::DdcControllerWriteByte::Get().FromValue(0).set_byte(val).WriteTo(&controller_mmio_);
   registers::DdcControllerCommand::Get().FromValue(0).set_write(true).WriteTo(&controller_mmio_);
-  usleep(2000);
+  zx::nanosleep(zx::deadline_after(zx::usec(2000)));
 }
 
 uint8_t HdmiTransmitterControllerImpl::ScdcRead(uint8_t addr) {
@@ -55,7 +55,7 @@ uint8_t HdmiTransmitterControllerImpl::ScdcRead(uint8_t addr) {
       &controller_mmio_);
   registers::DdcControllerCommand::Get().FromValue(0).set_ddc_read_byte(true).WriteTo(
       &controller_mmio_);
-  usleep(2000);
+  zx::nanosleep(zx::deadline_after(zx::usec(2000)));
 
   return registers::DdcControllerReadByte::Get().ReadFrom(&controller_mmio_).byte();
 }
@@ -367,7 +367,7 @@ void HdmiTransmitterControllerImpl::SetupInterrupts() {
 void HdmiTransmitterControllerImpl::Reset() {
   // reset
   WriteReg(HDMITX_DWC_MC_SWRSTZREQ, 0x00);
-  usleep(10);
+  zx::nanosleep(zx::deadline_after(zx::usec(10)));
   WriteReg(HDMITX_DWC_MC_SWRSTZREQ, 0x7d);
   // why???
   WriteReg(HDMITX_DWC_FC_VSYNCINWIDTH, ReadReg(HDMITX_DWC_FC_VSYNCINWIDTH));
@@ -396,11 +396,11 @@ void HdmiTransmitterControllerImpl::ResetFc() {
   auto regval = ReadReg(HDMITX_DWC_FC_INVIDCONF);
   regval &= ~(1 << 3);  // clear hdmi mode select
   WriteReg(HDMITX_DWC_FC_INVIDCONF, regval);
-  usleep(1);
+  zx::nanosleep(zx::deadline_after(zx::usec(1)));
   regval = ReadReg(HDMITX_DWC_FC_INVIDCONF);
   regval |= (1 << 3);  // clear hdmi mode select
   WriteReg(HDMITX_DWC_FC_INVIDCONF, regval);
-  usleep(1);
+  zx::nanosleep(zx::deadline_after(zx::usec(1)));
 }
 
 void HdmiTransmitterControllerImpl::SetFcScramblerCtrl(bool is4k) {
@@ -678,14 +678,14 @@ zx_status_t HdmiTransmitterControllerImpl::EdidTransfer(const i2c_impl_op_t* op_
           interrupt_status.ReadFrom(&controller_mmio_);
           if (interrupt_status.command_done_pending())
             break;
-          usleep(1000);
+          zx::nanosleep(zx::deadline_after(zx::usec(1000)));
           timeout++;
         }
         if (timeout == 5) {
           FDF_LOG(ERROR, "HDMI DDC TimeOut\n");
           return ZX_ERR_TIMED_OUT;
         }
-        usleep(1000);
+        zx::nanosleep(zx::deadline_after(zx::usec(1000)));
         interrupt_status.set_command_done_pending(true).WriteTo(&controller_mmio_);
 
         for (int j = 0; j < 8; j++) {
