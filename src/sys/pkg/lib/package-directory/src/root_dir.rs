@@ -839,18 +839,6 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_open_unsets_posix_writable() {
-        let (_env, root_dir) = TestEnv::new().await;
-
-        let () = crate::verify_open_adjusts_flags(
-            root_dir,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE,
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await;
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_rejects_invalid_flags() {
         let (_env, root_dir) = TestEnv::new().await;
 

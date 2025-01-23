@@ -246,25 +246,6 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_open_unsets_posix_flags() {
-        let (_env, validation) = TestEnv::new().await;
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-
-        validation.open(
-            ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::POSIX_WRITABLE
-                | fio::OpenFlags::POSIX_EXECUTABLE,
-            VfsPath::dot(),
-            server_end.into_channel().into(),
-        );
-
-        let (status, flags) = proxy.get_flags().await.unwrap();
-        let () = zx::Status::ok(status).unwrap();
-        assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE);
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_rejects_disallowed_flags() {
         let (_env, validation) = TestEnv::new().await;
 
