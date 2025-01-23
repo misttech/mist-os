@@ -28,6 +28,16 @@ impl IidSecret {
         rng.fill(&mut bytes[..]);
         Self(bytes)
     }
+
+    /// Creates a new secret from the provided bytes.
+    pub fn new(bytes: [u8; IID_SECRET_KEY_BYTES]) -> Self {
+        Self(bytes)
+    }
+
+    /// Returns the inner bytes of the secret.
+    pub fn into_inner(self) -> [u8; IID_SECRET_KEY_BYTES] {
+        self.0
+    }
 }
 
 impl Debug for IidSecret {

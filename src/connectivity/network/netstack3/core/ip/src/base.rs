@@ -1642,12 +1642,24 @@ impl Ipv4StateBuilder {
 }
 
 /// A builder for IPv6 state.
+///
+/// By default, opaque IIDs will not be used to generate stable SLAAC addresses.
 #[derive(Copy, Clone, Default)]
 pub struct Ipv6StateBuilder {
     icmp: Icmpv6StateBuilder,
+    slaac_stable_secret_key: Option<IidSecret>,
 }
 
 impl Ipv6StateBuilder {
+    /// Sets the secret key used to generate stable SLAAC addresses.
+    ///
+    /// If `slaac_stable_secret_key` is left unset, opaque IIDs will not be used to
+    /// generate stable SLAAC addresses.
+    pub fn slaac_stable_secret_key(&mut self, secret_key: IidSecret) -> &mut Self {
+        self.slaac_stable_secret_key = Some(secret_key);
+        self
+    }
+
     /// Builds the [`Ipv6State`].
     pub fn build<
         CC: CoreTimerContext<IpLayerTimerId, BC>,
@@ -1657,13 +1669,13 @@ impl Ipv6StateBuilder {
         self,
         bindings_ctx: &mut BC,
     ) -> Ipv6State<StrongDeviceId, BC> {
-        let Ipv6StateBuilder { icmp } = self;
-
+        let Ipv6StateBuilder { icmp, slaac_stable_secret_key } = self;
         Ipv6State {
             inner: IpStateInner::new::<CC>(bindings_ctx),
             icmp: icmp.build(),
             slaac_counters: Default::default(),
             slaac_temp_secret_key: IidSecret::new_random(&mut bindings_ctx.rng()),
+            slaac_stable_secret_key,
         }
     }
 }
@@ -1705,6 +1717,11 @@ pub struct Ipv6State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindings
     pub slaac_counters: SlaacCounters,
     /// Secret key used for generating SLAAC temporary addresses.
     pub slaac_temp_secret_key: IidSecret,
+    /// Secret key used for generating SLAAC stable addresses.
+    ///
+    /// If `None`, opaque IIDs will not be used to generate stable SLAAC
+    /// addresses.
+    pub slaac_stable_secret_key: Option<IidSecret>,
 }
 
 impl<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>

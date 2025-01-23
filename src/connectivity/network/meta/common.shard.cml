@@ -202,7 +202,10 @@
         {
             storage: "data",
             from: "parent",
-            to: [ "#netcfg" ],
+            to: [
+                "#netcfg",
+                "#netstack",
+            ],
         },
     ],
     expose: [

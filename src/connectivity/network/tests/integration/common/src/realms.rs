@@ -324,35 +324,37 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                 exposes: Some(
                     version.get_services().iter().map(|service| service.to_string()).collect(),
                 ),
-                uses: Some(fnetemul::ChildUses::Capabilities(
-                    std::iter::once(fnetemul::Capability::LogSink(fnetemul::Empty {}))
-                        .chain(match version {
-                            // NB: intentionally do not route SecureStore; it is
-                            // intentionally not available in all tests to
-                            // ensure that its absence is handled gracefully.
-                            // Note also that netstack-debug does not have a use
-                            // declaration for this protocol for the same
-                            // reason.
-                            NetstackVersion::Netstack2 { tracing: false, fast_udp: _ } => {
-                                itertools::Either::Left(std::iter::empty())
-                            }
-                            NetstackVersion::Netstack2 { tracing: true, fast_udp: _ }
-                            | NetstackVersion::Netstack3
-                            | NetstackVersion::ProdNetstack3 => {
-                                itertools::Either::Right(std::iter::once(
-                                    fnetemul::Capability::TracingProvider(fnetemul::Empty),
-                                ))
-                            }
-                            NetstackVersion::ProdNetstack2 => itertools::Either::Right(
-                                std::iter::once(fnetemul::Capability::ChildDep(protocol_dep::<
-                                    fstash::SecureStoreMarker,
-                                >(
-                                    constants::secure_stash::COMPONENT_NAME,
-                                ))),
-                            ),
-                        })
-                        .collect(),
-                )),
+                uses: {
+                    let mut uses = vec![fnetemul::Capability::LogSink(fnetemul::Empty {})];
+                    match version {
+                        // NB: intentionally do not route SecureStore; it is
+                        // intentionally not available in all tests to
+                        // ensure that its absence is handled gracefully.
+                        // Note also that netstack-debug does not have a use
+                        // declaration for this protocol for the same
+                        // reason.
+                        NetstackVersion::Netstack2 { tracing: false, fast_udp: _ } => {}
+                        NetstackVersion::Netstack2 { tracing: true, fast_udp: _ } => {
+                            uses.push(fnetemul::Capability::TracingProvider(fnetemul::Empty));
+                        }
+                        NetstackVersion::ProdNetstack2 => {
+                            uses.push(fnetemul::Capability::ChildDep(protocol_dep::<
+                                fstash::SecureStoreMarker,
+                            >(
+                                constants::secure_stash::COMPONENT_NAME,
+                            )));
+                        }
+                        NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => {
+                            uses.push(fnetemul::Capability::TracingProvider(fnetemul::Empty));
+                            uses.push(fnetemul::Capability::StorageDep(fnetemul::StorageDep {
+                                variant: Some(fnetemul::StorageVariant::Data),
+                                path: Some("/data".to_string()),
+                                ..Default::default()
+                            }));
+                        }
+                    }
+                    Some(fnetemul::ChildUses::Capabilities(uses))
+                },
                 ..Default::default()
             },
             KnownServiceProvider::Manager {

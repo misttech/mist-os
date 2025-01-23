@@ -23,6 +23,7 @@ mod multicast_admin;
 mod name_worker;
 mod neighbor_worker;
 mod netdevice_worker;
+mod persistence;
 mod power;
 mod resource_removal;
 mod root_fidl_worker;
@@ -102,8 +103,8 @@ use netstack3_core::udp::{
 };
 use netstack3_core::{
     neighbor, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
-    IpExt, ReferenceNotifiers, RngContext, StackState, TimerBindingsTypes, TimerContext, TimerId,
-    TracingContext,
+    IpExt, ReferenceNotifiers, RngContext, StackState, StackStateBuilder, TimerBindingsTypes,
+    TimerContext, TimerId, TracingContext,
 };
 
 pub(crate) use inspect::InspectPublisher;
@@ -158,7 +159,12 @@ mod ctx {
                 resource_removal,
                 multicast_admin,
             )));
-            let core_ctx = Arc::new(StackState::new(&mut bindings_ctx));
+            let persistence::State { opaque_iid_secret_key } =
+                persistence::State::load_or_create(&mut bindings_ctx.rng());
+            let mut state = StackStateBuilder::default();
+            let _: &mut _ = state.ipv6_builder().slaac_stable_secret_key(opaque_iid_secret_key);
+            let core_ctx = Arc::new(state.build_with_ctx(&mut bindings_ctx));
+
             Self { bindings_ctx, core_ctx }
         }
 

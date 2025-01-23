@@ -16,6 +16,7 @@ import("//src/connectivity/network/unified_binary/network_unified_binary.gni")
 
 common_deps = [
   ":config_lib",
+  "fidl:fuchsia.netstack.persistence_rust",
   "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
   "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
   "//sdk/fidl/fuchsia.net.debug:fuchsia.net.debug_rust",
@@ -119,6 +120,7 @@ common_sources = [
   "src/bindings/name_worker.rs",
   "src/bindings/neighbor_worker.rs",
   "src/bindings/netdevice_worker.rs",
+  "src/bindings/persistence.rs",
   "src/bindings/power.rs",
   "src/bindings/resource_removal.rs",
   "src/bindings/root_fidl_worker.rs",
