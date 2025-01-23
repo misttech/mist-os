@@ -106,18 +106,6 @@ assert(current_toolchain != shlib_toolchain,
 sysroot_entries = sysroot_uninstrumented_libc_entries +
                   sysroot_instrumented_libc_entries + sysroot_vdso_entries
 
-# Write sysroot_entries to a JSON file that will get parsed
-# by our populate_sysroot_headers.py script below, since using it
-# is faster than creating hundred of copy() targets in each toolchain,
-# and ensures the destination directory is cleaned up from stale header
-# files from a previous build.
-generated_file("sysroot-entries.json") {
-  visibility = [ ":*" ]
-  contents = sysroot_entries
-  outputs = [ "$target_gen_dir/$target_name" ]
-  output_conversion = "json"
-}
-
 # Generate the "$target_gen_dir/include" directory by parsing the
 # sysroot_entries list of scopes.
 #
@@ -164,43 +152,77 @@ generated_file("sysroot-entries.json") {
 #     this should correspond to the GN target that built the `source`
 #     file, once the sysroot generation is moved to the Fuchsia build.
 #
-# IMPORTANT: The populate_sysroot_headers.py script in this directory relies
-# on this exact schema definition. Keep it in sync if the schema changes!
-#
-action("include") {
-  visibility = [ "//build/config/fuchsia:source_deps" ]
 
-  deps = [ ":sysroot-entries.json" ]
-  sources = get_target_outputs(deps[0])
-
-  outputs = []
-  foreach(entry, sysroot_entries) {
-    if (defined(entry.sdk)) {
-      foreach(sdk, [ entry.sdk ]) {
-        if (defined(sdk.headers)) {
+# The flat list of files relative to include/ is collected here.  For each
+# file, a generated_file() target generates an `#include "../..."` header that
+# acts as a "redirector".  The labels of all these targets are collected too,
+# along with any labels from `sdk.deps`.
+sysroot_include_files = []
+sysroot_include_deps = []
+foreach(entry, sysroot_entries) {
+  if (defined(entry.sdk)) {
+    foreach(sdk, [ entry.sdk ]) {  # Singleton loop to get a temporary scope.
+      if (defined(sdk.headers)) {
+        if (defined(sdk.deps)) {
+          # Add the deps of any sdk scope that adds headers to get generation
+          # steps--but not others, which will reach binaries and influence the
+          # link.  This loses the association of which headers had which deps
+          # when looking at the deps graph with `gn desc` or `gn path` and so
+          # on.  However, it avoids a bunch of duplicated lists and many more
+          # multiple paths to reach the same deps from :include.
+          sysroot_include_deps += sdk.deps
+        }
+        foreach(dir, [ sdk.include_dir ]) {  # Singleton for scope.
+          # The sdk.include_dir item is a strange beast: it's either a // path
+          # or it's a path relative to $root_build_dir.  The rebase_path()
+          # operation treats the input path as relative to the last argument
+          # if it's relative, so rebasing it to the same directory is a no-op;
+          # but it relativizes an absolute (//) path.
+          dir = rebase_path(dir, root_build_dir, root_build_dir)
           foreach(file, sdk.headers) {
-            outputs += [ "$target_gen_dir/include/$file" ]
-            if (defined(sdk.deps)) {
-              deps += sdk.deps
+            file_target = "include." + string_replace(file, "/", "-")
+            sysroot_include_files += [ file ]
+            sysroot_include_deps += [ ":$file_target" ]
+            generated_file(file_target) {
+              visibility = [ ":*" ]
+              output_conversion = "list lines"
+              outputs = [ "$target_gen_dir/include/$file" ]
+
+              # The `#include "..."` path is always tried first relative to
+              # the containing file itself.  So compute the precise path
+              # relative from this proxy header to the real file in the source
+              # (which $dir represents relative to $root_build_dir).
+              # This is not only smaller and more rare to change than a copy,
+              # but the compiler's error messages will report the real source
+              # location in the original file that can be edited.
+              _relative_path = rebase_path("$dir/$file",
+                                           get_path_info(outputs[0], "dir"),
+                                           root_build_dir)
+              contents = [ "#include \"${_relative_path}\"" ]
             }
           }
         }
       }
     }
   }
+}
 
-  script = "populate_sysroot_headers.py"
-  depfile = "$target_gen_dir/$target_name.d"
-  args = [
-    "--src-dir=" + rebase_path("//", root_build_dir),
-    "--sysroot-json=" + rebase_path(sources[0], root_build_dir),
-    "--sysroot-dir=" + rebase_path(target_gen_dir, root_build_dir),
-    "--dep-file=" + rebase_path(depfile, root_build_dir),
+# This doesn't have anything to do at runtime except whatever
+# header-generation steps are reached by some sdk.deps lists.  Its deps must
+# also reach all the generated_file() targets just to keep them alive so the
+# files are actually generated by `gn gen`.
+group("include") {
+  visibility = [ "//build/config/fuchsia:source_deps" ]
 
-    # The --debug flag can be used to print the script's operations for
-    # debugging.
-    #"--debug",
-  ]
+  deps = sysroot_include_deps
+
+  metadata = {
+    # Populate build_api("generated_sources") to ensure all the headers are
+    # present for analysis.
+    generated_sources = rebase_path(sysroot_include_files,
+                                    root_build_dir,
+                                    "$target_gen_dir/include")
+  }
 }
 
 # Generate the shared library linking stubs in "$target_gen_dir/lib".  This
@@ -243,30 +265,37 @@ foreach(stub, sysroot_stub_libs) {
   }
 }
 
-# Generate a JSON list of file names relative to $target_gen_dir/lib.
+# Generate a JSON list of file names relative to target_gen_dir.
 # No others should exist.
-lib_files = [ "Scrt1.o" ] + sysroot_stub_libs
+sysroot_files = rebase_path(sysroot_include_files,
+                            target_gen_dir,
+                            "$target_gen_dir/include") +
+                rebase_path([ "Scrt1.o" ] + sysroot_stub_libs,
+                            target_gen_dir,
+                            "$target_gen_dir/lib")
 foreach(name, get_path_info(link_stub_dirs, "name")) {
-  lib_files += [ "lib$name.so" ]
+  sysroot_files += [ "lib/lib$name.so" ]
 }
 
-generated_file("lib-files.json") {
+# The JSON file itself is the only file in target_gen_dir not in sysroot_files.
+# It's listed as well so it doesn't get removed by the cleanup script.
+generated_file("sysroot-files.json") {
   visibility = [ ":*" ]
   outputs = [ "$target_gen_dir/$target_name" ]
   output_conversion = "json"
-  contents = lib_files
+  contents = sysroot_files + rebase_path(outputs, target_gen_dir)
 }
 
 # The libc/startup target writes into our $target_gen_dir/lib directly.  This
-# does the cleanup checking for all of $target_gen_dir/lib, meaning its deps
-# must reach :lib too.  This target reached only via link_deps and :lib will
-# also be reached by source_deps in the same target anyway, it doesn't cause
-# and more serialization.
+# does the cleanup checking for all of $target_gen_dir, meaning its deps must
+# reach :include and :lib too.  This target is reached only via link_deps and
+# those will also be reached by source_deps in the same target anyway, it
+# doesn't cause any more serialization.
 action("startfiles") {
   script = "cleanup.py"
 
   # The script reads the JSON file and runs again when it changes.
-  deps = [ ":lib-files.json" ]
+  deps = [ ":sysroot-files.json" ]
   sources = get_target_outputs(deps[0])
 
   # The script also runs again when any of the files has changed as a secondary
@@ -277,7 +306,12 @@ action("startfiles") {
   # the script won't be run when it does have files to clean up.  But that
   # can't really be avoided without using directory timestamps, which tend to
   # be problematic.
-  inputs = rebase_path(lib_files, ".", "$target_gen_dir/lib")
+  inputs = rebase_path(sysroot_files, ".", target_gen_dir)
+
+  # This gets all the header files up to date before checking for stale files.
+  # This is just the deps list of :include, but the generated_file() targets
+  # must be direct deps to use their outputs as inputs.
+  deps += sysroot_include_deps
 
   # This gets all the linking stubs (and indirectly, the stub linker scripts)
   # that are in inputs.
@@ -293,9 +327,8 @@ action("startfiles") {
 
   # The script takes the directory, the JSON file, and the stamp file.  All the
   # other inputs are just to get it to check for stray files more often.
-  dir = "$target_gen_dir/lib"
-  outputs = [ "$dir.stamp" ]
-  args = rebase_path([ dir ] + sources + outputs, root_build_dir)
+  outputs = [ "$target_gen_dir/cleanup.stamp" ]
+  args = rebase_path([ target_gen_dir ] + sources + outputs, root_build_dir)
 }
 
 # //build/config:terminal_link_deps is in deps of every executable() and
