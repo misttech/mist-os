@@ -284,7 +284,7 @@ Build Info:
   Base packages: [//other:tests] (--with-base argument of `fx set`)
   Cache packages: [//src/other:tests] (--with-cache argument of `fx set`)
   Universe packages: [//scripts:tests, //tools/devshell/python:tests] (--with argument of `fx set`)
-  Is release?: false (--release argument of `fx set`)
+  Compilation mode: debug
 """
 
 
@@ -350,10 +350,10 @@ EXPECTED_JSON_OUTPUT = """
         ],
         "notes": "--with argument of `fx set`"
       },
-      "release": {
-        "title": "Is release?",
-        "value": false,
-        "notes": "--release argument of `fx set`"
+      "compilation_mode": {
+        "title": "Compilation mode",
+        "value": "debug",
+        "notes": null
       }
     }
   }

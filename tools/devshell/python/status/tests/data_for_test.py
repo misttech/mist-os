@@ -8,7 +8,7 @@ import("//boards/x64.gni")
 import("//products/core.gni")
 
 # Basic args:
-is_debug = true
+compilation_mode = "debug"
 
 # Target lists:
 base_package_labels = []
@@ -112,25 +112,25 @@ ARGS_GN_JSON = r"""
          "location": {
             "begin_column": 1,
             "begin_line": 5,
-            "end_column": 9,
+            "end_column": 17,
             "end_line": 5
          },
          "type": "IDENTIFIER",
-         "value": "is_debug"
+         "value": "compilation_mode"
       }, {
          "location": {
-            "begin_column": 12,
+            "begin_column": 20,
             "begin_line": 5,
-            "end_column": 16,
+            "end_column": 27,
             "end_line": 5
          },
          "type": "LITERAL",
-         "value": "true"
+         "value": "\"debug\""
       } ],
       "location": {
          "begin_column": 1,
          "begin_line": 5,
-         "end_column": 16,
+         "end_column": 27,
          "end_line": 5
       },
       "type": "BINARY",
@@ -285,29 +285,29 @@ ARGS_GN_JSON = r"""
          "begin_token": "[",
          "child": [ {
             "location": {
-               "begin_column": 3,
-               "begin_line": 15,
-               "end_column": 16,
-               "end_line": 15
+               "begin_column": 25,
+               "begin_line": 14,
+               "end_column": 38,
+               "end_line": 14
             },
             "type": "LITERAL",
             "value": "\"//src:tests\""
          }, {
             "location": {
-               "begin_column": 3,
-               "begin_line": 16,
-               "end_column": 18,
-               "end_line": 16
+               "begin_column": 40,
+               "begin_line": 14,
+               "end_column": 55,
+               "end_line": 14
             },
             "type": "LITERAL",
             "value": "\"//other:tests\""
          } ],
          "end": {
             "location": {
-               "begin_column": 1,
-               "begin_line": 17,
-               "end_column": 2,
-               "end_line": 17
+               "begin_column": 55,
+               "begin_line": 14,
+               "end_column": 56,
+               "end_line": 14
             },
             "type": "END",
             "value": "]"
@@ -315,16 +315,16 @@ ARGS_GN_JSON = r"""
          "location": {
             "begin_column": 24,
             "begin_line": 14,
-            "end_column": 1,
-            "end_line": 17
+            "end_column": 55,
+            "end_line": 14
          },
          "type": "LIST"
       } ],
       "location": {
          "begin_column": 1,
          "begin_line": 14,
-         "end_column": 1,
-         "end_line": 17
+         "end_column": 55,
+         "end_line": 14
       },
       "type": "BINARY",
       "value": "+="
@@ -332,9 +332,9 @@ ARGS_GN_JSON = r"""
       "child": [ {
          "location": {
             "begin_column": 1,
-            "begin_line": 18,
+            "begin_line": 15,
             "end_column": 20,
-            "end_line": 18
+            "end_line": 15
          },
          "type": "IDENTIFIER",
          "value": "base_package_labels"
@@ -342,37 +342,37 @@ ARGS_GN_JSON = r"""
          "begin_token": "[",
          "child": [ {
             "location": {
-               "begin_column": 26,
-               "begin_line": 18,
-               "end_column": 39,
-               "end_line": 18
+               "begin_column": 25,
+               "begin_line": 15,
+               "end_column": 38,
+               "end_line": 15
             },
             "type": "LITERAL",
             "value": "\"//src:tests\""
          } ],
          "end": {
             "location": {
-               "begin_column": 40,
-               "begin_line": 18,
-               "end_column": 41,
-               "end_line": 18
+               "begin_column": 38,
+               "begin_line": 15,
+               "end_column": 39,
+               "end_line": 15
             },
             "type": "END",
             "value": "]"
          },
          "location": {
             "begin_column": 24,
-            "begin_line": 18,
-            "end_column": 40,
-            "end_line": 18
+            "begin_line": 15,
+            "end_column": 38,
+            "end_line": 15
          },
          "type": "LIST"
       } ],
       "location": {
          "begin_column": 1,
-         "begin_line": 18,
-         "end_column": 40,
-         "end_line": 18
+         "begin_line": 15,
+         "end_column": 38,
+         "end_line": 15
       },
       "type": "BINARY",
       "value": "-="
@@ -380,9 +380,9 @@ ARGS_GN_JSON = r"""
       "child": [ {
          "location": {
             "begin_column": 1,
-            "begin_line": 19,
+            "begin_line": 16,
             "end_column": 21,
-            "end_line": 19
+            "end_line": 16
          },
          "type": "IDENTIFIER",
          "value": "cache_package_labels"
@@ -390,37 +390,37 @@ ARGS_GN_JSON = r"""
          "begin_token": "[",
          "child": [ {
             "location": {
-               "begin_column": 26,
-               "begin_line": 19,
-               "end_column": 45,
-               "end_line": 19
+               "begin_column": 25,
+               "begin_line": 16,
+               "end_column": 44,
+               "end_line": 16
             },
             "type": "LITERAL",
             "value": "\"//src/other:tests\""
          } ],
          "end": {
             "location": {
-               "begin_column": 46,
-               "begin_line": 19,
-               "end_column": 47,
-               "end_line": 19
+               "begin_column": 44,
+               "begin_line": 16,
+               "end_column": 45,
+               "end_line": 16
             },
             "type": "END",
             "value": "]"
          },
          "location": {
             "begin_column": 24,
-            "begin_line": 19,
-            "end_column": 46,
-            "end_line": 19
+            "begin_line": 16,
+            "end_column": 44,
+            "end_line": 16
          },
          "type": "LIST"
       } ],
       "location": {
          "begin_column": 1,
-         "begin_line": 19,
-         "end_column": 46,
-         "end_line": 19
+         "begin_line": 16,
+         "end_column": 44,
+         "end_line": 16
       },
       "type": "BINARY",
       "value": "="
@@ -428,8 +428,8 @@ ARGS_GN_JSON = r"""
    "location": {
       "begin_column": 1,
       "begin_line": 1,
-      "end_column": 46,
-      "end_line": 19
+      "end_column": 44,
+      "end_line": 16
    },
    "result_mode": "discards_result",
    "type": "BLOCK"

@@ -335,15 +335,14 @@ async def args_gn_collector() -> list[data.Result]:
             )
 
     # Compute some extra values that are a function of some assigned variables.
-    is_release = assigned_variables.get("is_debug") == "false"
+    compilation_mode = assigned_variables.get("compilation_mode")
     results.append(
         data.Result(
             item=data.Item(
                 category=data.Category.BUILD,
-                key="release",
-                title="Is release?",
-                value=is_release,
-                notes="--release argument of `fx set`",
+                key="compilation_mode",
+                title="Compilation mode",
+                value=compilation_mode,
             )
         )
     )
