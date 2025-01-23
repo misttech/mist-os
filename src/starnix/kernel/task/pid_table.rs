@@ -133,6 +133,13 @@ impl PidTable {
         }
     }
 
+    pub fn get_thread_group(&self, pid: pid_t) -> Option<TempRef<'_, ThreadGroup>> {
+        match self.get_process(pid) {
+            Some(ProcessEntryRef::Process(tg)) => Some(tg),
+            _ => None,
+        }
+    }
+
     pub fn get_thread_groups(&self) -> impl Iterator<Item = TempRef<'_, ThreadGroup>> + '_ {
         self.table
             .iter()

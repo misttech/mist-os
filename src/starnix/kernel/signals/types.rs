@@ -218,7 +218,7 @@ impl QueuedSignals {
 
     /// Returns an iterator over all the pending signals.
     fn iter(&self) -> impl Iterator<Item = &SignalInfo> {
-        [&self.queue, &self.rt_queue].into_iter().flatten()
+        self.queue.iter().chain(self.rt_queue.iter())
     }
 
     /// Iterates over queued signals with the given number.

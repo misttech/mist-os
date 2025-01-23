@@ -18,7 +18,7 @@ use crate::security;
 use crate::task::{
     AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, HrTimerManager,
     HrTimerManagerHandle, IpTables, KernelStats, KernelThreads, NetstackDevices, PidTable,
-    StopState, Syslog, UtsNamespace, UtsNamespaceHandle,
+    StopState, Syslog, ThreadGroup, UtsNamespace, UtsNamespaceHandle,
 };
 use crate::vdso::vdso_loader::Vdso;
 use crate::vfs::socket::{
@@ -31,7 +31,10 @@ use crate::vfs::{
 };
 use bstr::BString;
 use expando::Expando;
-use fidl::endpoints::{create_endpoints, ClientEnd, DiscoverableProtocolMarker, ProtocolMarker};
+use fidl::endpoints::{
+    create_endpoints, ClientEnd, ControlHandle, DiscoverableProtocolMarker, ProtocolMarker,
+};
+use fidl_fuchsia_component_runner::{ComponentControllerControlHandle, ComponentStopInfo};
 use fidl_fuchsia_feedback::CrashReporterProxy;
 use fidl_fuchsia_scheduler::RoleManagerSynchronousProxy;
 use futures::FutureExt;
@@ -40,18 +43,19 @@ use netlink::interfaces::InterfacesHandler;
 use netlink::{Netlink, NETLINK_LOG_TAG};
 use once_cell::sync::OnceCell;
 use starnix_lifecycle::{AtomicU32Counter, AtomicU64Counter};
-use starnix_logging::log_error;
+use starnix_logging::{log_debug, log_error, log_info, log_warn};
 use starnix_sync::{
-    DeviceOpen, KernelIpTables, KernelSwapFiles, LockBefore, Locked, OrderedMutex, OrderedRwLock,
-    RwLock,
+    DeviceOpen, KernelIpTables, KernelSwapFiles, LockBefore, Locked, Mutex, OrderedMutex,
+    OrderedRwLock, RwLock,
 };
+use starnix_types::ownership::{TempRef, WeakRef};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::from_status_like_fdio;
 use starnix_uapi::open_flags::OpenFlags;
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU16, AtomicU8};
+use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU8, Ordering};
 use std::sync::{Arc, OnceLock, Weak};
 use zx::AsHandleRef;
 use {
@@ -305,6 +309,12 @@ pub struct Kernel {
     /// Vector of functions to be run when procfs is constructed. This is to allow
     /// modules to expose directories into /proc/device-tree.
     pub procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>, &CurrentTask)>,
+
+    /// Whether this kernel is shutting down. When shutting down, new processes may not be spawned.
+    shutting_down: AtomicBool,
+
+    /// Control handle to the running container's ComponentController.
+    pub container_control_handle: Mutex<Option<ComponentControllerControlHandle>>,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -435,6 +445,8 @@ impl Kernel {
             crash_reporter,
             encryption_keys: RwLock::new(HashMap::new()),
             procfs_device_tree_setup,
+            shutting_down: AtomicBool::new(false),
+            container_control_handle: Mutex::new(None),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle
@@ -450,6 +462,157 @@ impl Kernel {
         });
 
         Ok(this)
+    }
+
+    /// Shuts down userspace and the kernel in an orderly fashion, eventually terminating the root
+    /// kernel process.
+    pub fn shut_down(self: &Arc<Self>) {
+        // Run shutdown code on a kthread in the main process so that it can be the last process
+        // alive.
+        let kernel = self.clone();
+        self.kthreads.spawn_future(async move {
+            kernel.run_shutdown().await;
+        });
+    }
+
+    /// Starts shutting down the Starnix kernel and any running container. Only one thread can drive
+    /// shutdown at a time. This function will return immediately if shut down is already under way.
+    ///
+    /// Shutdown happens in several phases:
+    ///
+    /// 1. Disable launching new processes
+    /// 2. Shut down individual ThreadGroups until only the init and system tasks remain
+    /// 3. Repeat the above for the init task
+    /// 4. Ensure this process is the only one running in the kernel job.
+    /// 5. Tell CF the container component has stopped
+    /// 6. Exit this process
+    ///
+    /// If a ThreadGroup does not shut down on its own (including after SIGKILL), that phase of
+    /// shutdown will hang. To gracefully shut down any further we need the other kernel processes
+    /// to do controlled exits that properly release access to shared state. If our orderly shutdown
+    /// does hang, eventually CF will kill the container component which will lead to the job of
+    /// this process being killed and shutdown will still complete.
+    async fn run_shutdown(&self) {
+        const INIT_PID: i32 = 1;
+        const SYSTEM_TASK_PID: i32 = 2;
+
+        // Step 1: Prevent new processes from being created once they observe this update. We don't
+        // want the thread driving shutdown to be racing with other threads creating new processes.
+        if self
+            .shutting_down
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
+            log_debug!("Additional thread tried to initiate shutdown while already in-progress.");
+            return;
+        }
+
+        log_info!("Shutting down Starnix kernel.");
+
+        // Step 2: Shut down thread groups in a loop until init and the system task are all that
+        // remain.
+        loop {
+            let tgs = {
+                // Exiting thread groups need to acquire a write lock for the pid table to
+                // successfully exit so we need to acquire that lock in a reduced scope.
+                self.pids
+                    .read()
+                    .get_thread_groups()
+                    .filter(|tg| tg.leader != SYSTEM_TASK_PID && tg.leader != INIT_PID)
+                    .map(TempRef::into_static)
+                    .collect::<Vec<_>>()
+            };
+            if tgs.is_empty() {
+                log_debug!("pid table is empty except init and system task");
+                break;
+            }
+
+            log_debug!(tgs:?; "shutting down thread groups");
+            let mut tasks = vec![];
+            for tg in tgs {
+                let task = fasync::Task::local(ThreadGroup::shut_down(WeakRef::from(tg)));
+                tasks.push(task);
+            }
+            futures::future::join_all(tasks).await;
+        }
+
+        // Step 3: Terminate the init process.
+        let maybe_init = {
+            // Exiting thread groups need to acquire a write lock for the pid table to successfully
+            // exit so we need to acquire that lock in a reduced scope.
+            self.pids.read().get_thread_group(1).map(|tg| WeakRef::from(tg))
+        };
+        if let Some(init) = maybe_init {
+            log_debug!("shutting down init");
+            ThreadGroup::shut_down(init).await;
+        } else {
+            log_debug!("init already terminated");
+        }
+
+        // Step 4: Make sure this is the only process running in the job. We already should have
+        // cleared up all processes other than the system task at this point, but wait on any that
+        // might be around for good measure.
+        //
+        // Use unwrap liberally since we're shutting down anyway and errors will still tear down the
+        // kernel.
+        let kernel_job = fuchsia_runtime::job_default();
+        assert_eq!(kernel_job.children().unwrap(), &[], "starnix does not create any child jobs");
+        let own_koid = fuchsia_runtime::process_self().get_koid().unwrap();
+
+        log_debug!("waiting for this to be the only process in the job");
+        loop {
+            let remaining_processes = kernel_job.processes().unwrap();
+            if remaining_processes.len() == 1 && remaining_processes[0] == own_koid {
+                log_debug!("No stray Zircon processes.");
+                break;
+            }
+
+            let mut terminated_signals = vec![];
+            for koid in remaining_processes {
+                // Don't wait for ourselves to exit.
+                if koid == own_koid {
+                    continue;
+                }
+                let handle = match kernel_job.get_child(
+                    &koid,
+                    zx::Rights::BASIC | zx::Rights::PROPERTY | zx::Rights::DESTROY,
+                ) {
+                    Ok(h) => h,
+                    Err(e) => {
+                        log_debug!(koid:?, e:?; "failed to get child process from job");
+                        continue;
+                    }
+                };
+                terminated_signals
+                    .push(fuchsia_async::OnSignals::new(handle, zx::Signals::PROCESS_TERMINATED));
+            }
+            log_debug!("waiting on process terminated signals");
+            futures::future::join_all(terminated_signals).await;
+        }
+
+        // Step 5: Tell CF the container stopped.
+        log_debug!("all non-root processes killed, notifying CF container is stopped");
+        if let Some(control_handle) = self.container_control_handle.lock().take() {
+            log_debug!("Notifying CF that the container has stopped.");
+            control_handle
+                .send_on_stop(ComponentStopInfo {
+                    termination_status: Some(zx::Status::OK.into_raw()),
+                    exit_code: Some(0),
+                    ..ComponentStopInfo::default()
+                })
+                .unwrap();
+            control_handle.shutdown_with_epitaph(zx::Status::OK);
+        } else {
+            log_warn!("Shutdown invoked without a container controller control handle.");
+        }
+
+        // Step 6: exiting this process.
+        log_info!("All tasks killed, exiting Starnix kernel root process.");
+        std::process::exit(0);
+    }
+
+    pub fn is_shutting_down(&self) -> bool {
+        self.shutting_down.load(Ordering::Acquire)
     }
 
     /// Opens a device file (driver) identified by `dev`.

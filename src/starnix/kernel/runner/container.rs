@@ -31,7 +31,8 @@ use starnix_core::vfs::{
     FileSystemOptions, FsContext, LookupContext, Namespace, StaticDirectoryBuilder, WhatToMount,
 };
 use starnix_logging::{
-    log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
+    log_debug, log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX,
+    NAME_CREATE_CONTAINER,
 };
 use starnix_modules::{init_common_devices, register_common_file_systems};
 use starnix_modules_layeredfs::LayeredFs;
@@ -323,7 +324,11 @@ impl Container {
     pub async fn serve(&self, service_config: ContainerServiceConfig) -> Result<(), Error> {
         let (r, _) = futures::join!(
             self.serve_outgoing_directory(service_config.config.outgoing_dir),
-            server_component_controller(service_config.request_stream, service_config.receiver)
+            server_component_controller(
+                self.kernel.clone(),
+                service_config.request_stream,
+                service_config.receiver
+            )
         );
         r
     }
@@ -346,10 +351,11 @@ enum ExposedServices {
 type TaskResult = Result<ExitStatus, Error>;
 
 async fn server_component_controller(
+    kernel: Arc<Kernel>,
     request_stream: frunner::ComponentControllerRequestStream,
     task_complete: oneshot::Receiver<TaskResult>,
 ) {
-    let request_stream_control = request_stream.control_handle();
+    *kernel.container_control_handle.lock() = Some(request_stream.control_handle());
 
     enum Event<T, U> {
         Controller(T),
@@ -363,24 +369,36 @@ async fn server_component_controller(
 
     if let Some(event) = stream.next().await {
         match event {
-            Event::Controller(_) => {
-                // If we get a `Stop` request, we would ideally like to ask userspace to shut
-                // down gracefully.
+            Event::Controller(Ok(frunner::ComponentControllerRequest::Stop { .. })) => {
+                log_info!("Stopping the container.");
+            }
+            Event::Controller(Ok(frunner::ComponentControllerRequest::Kill { control_handle })) => {
+                log_info!("Killing the container's job.");
+                control_handle.shutdown_with_epitaph(zx::Status::from_raw(
+                    fcomponent::Error::InstanceDied.into_primitive() as i32,
+                ));
+                fruntime::job_default().kill().expect("Failed to kill job");
+            }
+            Event::Controller(Ok(frunner::ComponentControllerRequest::_UnknownMethod {
+                ordinal,
+                method_type,
+                ..
+            })) => {
+                log_error!(ordinal, method_type:?; "Unknown component controller request received.");
+            }
+            Event::Controller(Err(e)) => {
+                log_warn!(e:?; "Container component controller channel encountered an error.");
             }
             Event::Completion(result) => {
-                match result {
-                    Ok(Ok(ExitStatus::Exit(0))) => {
-                        request_stream_control.shutdown_with_epitaph(zx::Status::OK)
-                    }
-                    _ => request_stream_control.shutdown_with_epitaph(zx::Status::from_raw(
-                        fcomponent::Error::InstanceDied.into_primitive() as i32,
-                    )),
-                };
+                log_info!(result:?; "init process exited.");
             }
         }
     }
-    // Kill the starnix_kernel job, as the kernel is expected to reboot when init exits.
-    fruntime::job_default().kill().expect("Failed to kill job");
+
+    log_debug!("done listening for container-terminating events");
+    if !kernel.is_shutting_down() {
+        kernel.shut_down();
+    }
 }
 
 pub async fn create_component_from_stream(

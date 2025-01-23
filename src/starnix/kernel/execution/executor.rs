@@ -32,7 +32,7 @@ use starnix_syscalls::SyscallResult;
 use starnix_types::ownership::{OwnedRef, Releasable, ReleaseGuard, WeakRef};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::SIGKILL;
-use starnix_uapi::{errno, from_status_like_fdio, pid_t};
+use starnix_uapi::{errno, error, from_status_like_fdio, pid_t};
 use std::os::unix::thread::JoinHandleExt;
 use std::sync::mpsc::sync_channel;
 use std::sync::Arc;
@@ -409,6 +409,10 @@ pub fn create_zircon_process<L>(
 where
     L: LockBefore<ProcessGroupState>,
 {
+    // Don't allow new processes to be created once the kernel has started shutting down.
+    if kernel.is_shutting_down() {
+        return error!(EBUSY);
+    }
     let (process, root_vmar) =
         create_shared(&kernel.kthreads.starnix_process, zx::ProcessOptions::empty(), name)
             .map_err(|status| from_status_like_fdio!(status))?;

@@ -20,7 +20,7 @@ use crate::task::{
 use itertools::Itertools;
 use macro_rules_attribute::apply;
 use starnix_lifecycle::{AtomicU64Counter, DropNotifier};
-use starnix_logging::{log_error, track_stub};
+use starnix_logging::{log_debug, log_error, track_stub};
 use starnix_sync::{LockBefore, Locked, Mutex, MutexGuard, ProcessGroupState, RwLock, Unlocked};
 use starnix_types::ownership::{OwnedRef, Releasable, TempRef, WeakRef};
 use starnix_types::stats::TaskTimeStats;
@@ -29,7 +29,9 @@ use starnix_uapi::auth::{Credentials, CAP_SYS_ADMIN, CAP_SYS_RESOURCE};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::personality::PersonalityFlags;
 use starnix_uapi::resource_limits::{Resource, ResourceLimits};
-use starnix_uapi::signals::{Signal, UncheckedSignal, SIGCHLD, SIGCONT, SIGHUP, SIGKILL, SIGTTOU};
+use starnix_uapi::signals::{
+    Signal, UncheckedSignal, SIGCHLD, SIGCONT, SIGHUP, SIGKILL, SIGTERM, SIGTTOU,
+};
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
     errno, error, itimerval, pid_t, rlimit, uid_t, ITIMER_PROF, ITIMER_REAL, ITIMER_VIRTUAL,
@@ -112,6 +114,9 @@ pub struct ThreadGroupMutableState {
 
     /// Thread groups allowed to trace tasks in this this thread group.
     pub allowed_ptracers: PtraceAllowedPtracers,
+
+    /// Channel to message when this thread group exits.
+    exit_notifier: Option<futures::channel::oneshot::Sender<()>>,
 }
 
 /// A collection of `Task` objects that roughly correspond to a "process".
@@ -471,6 +476,7 @@ impl ThreadGroup {
                         .map(|p| p.personality)
                         .unwrap_or(Default::default()),
                     allowed_ptracers: PtraceAllowedPtracers::None,
+                    exit_notifier: None,
                 }),
             };
 
@@ -1455,6 +1461,55 @@ impl ThreadGroup {
 
         Ok(Some(signal))
     }
+
+    /// Drive this `ThreadGroup` to exit, allowing it time to handle SIGTERM before sending SIGKILL.
+    ///
+    /// Returns once `ThreadGroup::exit()` has completed.
+    ///
+    /// Must be called from the system task.
+    pub async fn shut_down(this: WeakRef<Self>) {
+        const SHUTDOWN_SIGNAL_HANDLING_TIMEOUT: zx::MonotonicDuration =
+            zx::MonotonicDuration::from_seconds(1);
+
+        // Prepare for shutting down the thread group.
+        let (tg_name, mut on_exited) = {
+            // Nest this upgraded access so TempRefs aren't held across await-points.
+            let Some(this) = this.upgrade() else {
+                return;
+            };
+
+            // Register a channel to be notified when exit() is complete.
+            let (on_exited_send, on_exited) = futures::channel::oneshot::channel();
+            this.write().exit_notifier = Some(on_exited_send);
+
+            // We want to be able to log about this thread group without upgrading the WeakRef.
+            let tg_name = format!("{this:?}");
+
+            (tg_name, on_exited)
+        };
+
+        log_debug!(tg:% = tg_name; "shutting down thread group, sending SIGTERM");
+        this.upgrade().map(|tg| tg.write().send_signal(SignalInfo::default(SIGTERM)));
+
+        // Give thread groups some time to handle SIGTERM, proceeding early if they exit
+        let timeout = fuchsia_async::Timer::new(SHUTDOWN_SIGNAL_HANDLING_TIMEOUT);
+        futures::pin_mut!(timeout);
+
+        // Use select_biased instead of on_timeout() so that we can await on on_exited later
+        futures::select_biased! {
+            _ = &mut on_exited => (),
+            _ = timeout => {
+                log_debug!(tg:% = tg_name; "sending SIGKILL");
+                this.upgrade().map(|tg| tg.write().send_signal(SignalInfo::default(SIGKILL)));
+            },
+        };
+
+        log_debug!(tg:% = tg_name; "waiting for exit");
+        // It doesn't matter whether ThreadGroup::exit() was called or the process exited with
+        // a return code and dropped the sender end of the channel.
+        on_exited.await.ok();
+        log_debug!(tg:% = tg_name; "thread group shutdown complete");
+    }
 }
 
 pub enum WaitableChildResult {
@@ -1792,7 +1847,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
     }
 
     /// Sends the signal `signal_info` to this thread group.
-    #[allow(unused_mut)]
+    #[allow(unused_mut, reason = "needed for some but not all macro outputs")]
     pub fn send_signal(mut self, signal_info: SignalInfo) {
         let sigaction = self.base.signal_actions.get(signal_info.signal);
         let action = action_for_signal(&signal_info, sigaction);

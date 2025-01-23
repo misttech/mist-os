@@ -149,6 +149,44 @@ async fn c_reboot() {
     assert_eq!(&reasons[..], [RebootReason2::CriticalComponentFailure]);
 }
 
+#[fuchsia::test]
+async fn o_shutdown() {
+    let mut events = EventStream::open().await.unwrap();
+    let builder = RealmBuilder::with_params(
+        RealmBuilderParams::new()
+            .realm_name("o_shutdown")
+            .from_relative_url("#meta/kernel_with_container.cm"),
+    )
+    .await
+    .unwrap();
+
+    info!("starting realm");
+    let kernel_with_container = builder.build().await.unwrap();
+    let realm_moniker = format!("realm_builder:{}", kernel_with_container.root.child_name());
+    info!(realm_moniker:%; "started");
+    let container_moniker = format!("{realm_moniker}/debian_container");
+    let kernel_moniker = format!("{realm_moniker}/kernel");
+
+    let mut kernel_logs = ArchiveReader::new()
+        .select_all_for_moniker(&kernel_moniker)
+        .snapshot_then_subscribe::<Logs>()
+        .unwrap();
+
+    // Open sysrq-trigger to start the kernel, then make sure we see its logs.
+    let sysrq = open_sysrq_trigger(&kernel_with_container).await;
+    let first_kernel_log = kernel_logs.next().await.unwrap().unwrap();
+    info!(first_kernel_log:?; "receiving logs from starnix kernel now that it's started");
+
+    info!("writing o to sysrq, ignoring result");
+    let _ = fuchsia_fs::file::write(&sysrq, "o").await;
+
+    info!("waiting for exit");
+    assert_matches!(
+        wait_for_exit_status(&mut events, [&container_moniker, &kernel_moniker]).await,
+        [ExitStatus::Clean, ExitStatus::Clean]
+    );
+}
+
 async fn open_sysrq_trigger(realm: &RealmInstance) -> FileProxy {
     info!("opening sysrq trigger");
     // Some clients of the file[0] truncate it on open[1] despite not having contents.

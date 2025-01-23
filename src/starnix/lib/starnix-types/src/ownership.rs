@@ -425,6 +425,12 @@ impl<'a, T> From<&TempRef<'a, T>> for WeakRef<T> {
     }
 }
 
+impl<'a, T> From<TempRef<'a, T>> for WeakRef<T> {
+    fn from(temp_ref: TempRef<'a, T>) -> Self {
+        Self(Arc::downgrade(&temp_ref.0))
+    }
+}
+
 impl<'a, T> std::ops::Deref for TempRef<'a, T> {
     type Target = T;
 

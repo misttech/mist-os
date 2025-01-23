@@ -16,7 +16,8 @@ use crate::device::android::bootloader_message_store::BootloaderMessage;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::{FdNumber, FsString};
-use starnix_logging::{log_error, log_info, log_warn, track_stub};
+use starnix_logging::{log_debug, log_error, log_info, log_warn, track_stub};
+use starnix_sync::InterruptibleEvent;
 #[cfg(feature = "arch32")]
 use starnix_syscalls::{for_each_arch32_syscall, syscall_arch32_number_to_name_literal_callback};
 use starnix_syscalls::{
@@ -266,6 +267,12 @@ pub fn sys_reboot(
     } else {
         FsString::default()
     };
+
+    if current_task.kernel().is_shutting_down() {
+        log_debug!("Ignoring reboot() and parking caller, already shutting down.");
+        let event = InterruptibleEvent::new();
+        return current_task.block_until(event.begin_wait(), zx::MonotonicInstant::INFINITE);
+    }
 
     let proxy = connect_to_protocol_sync::<fpower::AdminMarker>().or_else(|_| error!(EINVAL))?;
 
