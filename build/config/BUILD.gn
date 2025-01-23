@@ -667,7 +667,7 @@ config("default_frame_pointers") {
   }
 }
 
-config("frame_pointers") {
+variant("frame_pointers") {
   cflags = [
     "-fno-omit-frame-pointer",
     "-momit-leaf-frame-pointer",
@@ -679,13 +679,7 @@ config("frame_pointers") {
   }
 }
 
-# Implicit dependencies for frame_pointers config
-group("frame_pointers_deps") {
-}
-group("frame_pointers_executable_deps") {
-}
-
-config("no_frame_pointers") {
+variant("no_frame_pointers") {
   cflags = [ "-fomit-frame-pointer" ]
   ldflags = cflags
 
@@ -694,10 +688,6 @@ config("no_frame_pointers") {
   if (zircon_toolchain != false) {
     defines = [ "WITH_FRAME_POINTERS=0" ]
   }
-}
-
-group("no_frame_pointers_deps") {
-  # Implicit dependencies for no_frame_pointers config
 }
 
 config("suppress_iterator_warnings") {

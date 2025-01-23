@@ -16,11 +16,15 @@ clang_toolchain_suite(target_cpu) {
   strip_cxx_bin_args = "--strip-sections"
 
   # LINT.IfChange
-
-  # When generating Fuchsia user binaries, ensure the right sysroot-related
-  # dependencies are added to source_set() and static_library() instances
-  # automatically.
-  source_deps = [ "//zircon/public/sysroot:headers" ]
+  #
+  # These must match their toolchain_variant.*deps counterparts as set in
+  # BUILDCONFIG.gn for $default_toolchain, as GN ignores all the toolchain_args
+  # passed here.  These should very rarely need to change since they just defer
+  # the settings to the //build/config/fuchsia:*_deps group() targets.
+  deps = [ "//build/config/fuchsia:terminal_link_deps" ]
+  executable_deps = [ "//build/config/fuchsia:executable_deps" ]
+  link_deps = [ "//build/config/fuchsia:link_deps" ]
+  source_deps = [ "//build/config/fuchsia:source_deps" ]
 
   # LINT.ThenChange(//build/config/BUILDCONFIG.gn)
 }

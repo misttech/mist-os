@@ -7,6 +7,7 @@
 import("//build/config/zircon/standard.gni")
 import("//build/testing/boot_tests/boot_test.gni")
 import("//build/toolchain/toolchain_environment.gni")
+import("//build/toolchain/variant.gni")
 import("//build/toolchain/zircon/zircon_toolchain_suite.gni")
 
 import("//build/zircon/c_utils.gni")
@@ -72,13 +73,14 @@ if (current_toolchain == default_toolchain) {
 
 if (toolchain_environment == "userboot") {
   # Everything in userboot gets compiled this way.
-  config("userboot_config") {
+  variant("userboot_config") {
     configs = [
       "//build/config/zircon:user",
       "//build/config/zircon:static-libc++",
       "//build/config/sanitizers:no_sanitizers",
       "//build/config:symbol_no_undefined",
     ]
+    deps = [ "//build/config/zircon:user_deps" ]
 
     cflags = [
       # -fPIE is the default in Clang, but not in GCC.
@@ -90,12 +92,6 @@ if (toolchain_environment == "userboot") {
       rebase_path("//zircon/kernel/include/hidden.h", root_build_dir),
     ]
     defines = [ "HIDDEN" ]
-  }
-
-  group("userboot_config_deps") {
-    public_deps = [ "//build/config/zircon:user_deps" ]
-  }
-  group("userboot_config_executable_deps") {
   }
 
   # This is the output of target ":gen-vdso-syms-ld", below.

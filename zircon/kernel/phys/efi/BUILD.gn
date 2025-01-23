@@ -7,6 +7,7 @@
 import("//build/config/zircon/standard.gni")
 import("//build/test.gni")
 import("//build/toolchain/toolchain_environment.gni")
+import("//build/toolchain/variant.gni")
 import("//build/toolchain/zircon/zircon_toolchain_suite.gni")
 import("//build/zircon/zircon_cpu.gni")
 import("efi_executable.gni")
@@ -43,7 +44,7 @@ if (current_toolchain == default_toolchain) {
     }
   }
 } else if (toolchain_environment == "kernel.efi") {
-  config("efi_config") {
+  variant("efi_config") {
     configs = [
       "//zircon/kernel:standalone",
       "//zircon/kernel:warnings",
@@ -78,13 +79,7 @@ if (current_toolchain == default_toolchain) {
       "-noprofilelib",
       "-Wl,/nodefaultlib",
     ]
-  }
 
-  group("efi_config_executable_deps") {
-    deps = [ ":main" ]
-  }
-
-  group("efi_config_deps") {
     deps = [
       "//zircon/kernel/phys:ubsan-runtime",
 
@@ -94,6 +89,7 @@ if (current_toolchain == default_toolchain) {
       # uninstrumented builds.  It's simplest to just always include it.
       "//src/lib/llvm-profdata",
     ]
+    executable_deps = [ ":main" ]
   }
 }
 

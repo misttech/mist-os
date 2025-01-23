@@ -131,8 +131,6 @@ if (!defined(toolchain_variant.name)) {
   toolchain_variant.prefix_configs = []
   toolchain_variant.remove_common_configs = []
   toolchain_variant.remove_shared_configs = []
-  toolchain_variant.deps = []
-  toolchain_variant.executable_deps = []
   toolchain_variant.is_pic_default = false
   toolchain_variant.with_shared = true
   toolchain_variant.instrumented = false
@@ -143,7 +141,11 @@ if (!defined(toolchain_variant.name)) {
   ]
 
   # LINT.IfChange
-  toolchain_variant.source_deps = [ "//zircon/public/sysroot:headers" ]
+  toolchain_variant.deps = [ "//build/config/fuchsia:terminal_link_deps" ]
+  toolchain_variant.executable_deps =
+      [ "//build/config/fuchsia:executable_deps" ]
+  toolchain_variant.link_deps = [ "//build/config/fuchsia:link_deps" ]
+  toolchain_variant.source_deps = [ "//build/config/fuchsia:source_deps" ]
 
   # LINT.ThenChange(//build/toolchain/fuchsia/BUILD.gn)
 }
@@ -1629,7 +1631,7 @@ declare_args() {
   #       added.
   #
   #   `deps` (optional)
-  #       [list of labels] Added to the deps of every target linked in
+  #       [list of labels] Added to the deps of every terminal target linked in
   #       this variant (as well as the automatic `${label}_deps` for
   #       each label in configs).
   #
@@ -1637,6 +1639,12 @@ declare_args() {
   #       [list of labels] Added to the deps of every executable() target
   #       linked in this variant (as well as `deps`, above, and the automatic
   #       `${label}_deps` for each label in configs).
+  #
+  #   `link_deps`
+  #       [list of labels] Added to the deps of every linking target
+  #       (i.e. terminal targets, plus shared_library() targets) linked in this
+  #       variant (as well as `deps`, above, and the automatic `${label}_deps`
+  #       for each label in configs).
   #
   #   `source_deps`
   #       [list of labels] Added to the deps of every target that compiles
@@ -2246,6 +2254,8 @@ if (in_default_toolchain) {
         remove_shared_configs = []
         deps = []
         executable_deps = []
+        link_deps = []
+        source_deps = []
         tags = []
         if (variant == false) {
           name = ""
@@ -2373,30 +2383,22 @@ template("_fuchsia_binary") {
     # This is implicitly added to every kind of target that can have `sources`.
     deps += toolchain_variant.source_deps
 
+    # This is implicitly added to every kind of linking target.
+    deps += toolchain_variant.link_deps
+
+    foreach(
+        config,
+        toolchain_variant.configs + toolchain_variant.remove_common_configs -
+            toolchain_variant.remove_common_configs) {
+      # Expand the label so it always has a `:name` part.
+      config = get_label_info(config, "label_no_toolchain")
+      deps += [
+        "${config}_link_deps",
+        "${config}_source_deps",
+      ]
+    }
+
     if (is_fuchsia && zircon_toolchain == false) {
-      # Depend on runtime libraries provided by the sysroot and the toolchain.
-      # This ensures the libraries are packaged up with the output of this
-      # target.
-      # These dependencies need to be attached here rather than higher up in the
-      # dependency tree in order to correctly capture the active toolchain
-      # variant.
-
-      # NOTE: invoker.crate_root will be defined when building a Rust crate
-      # instead of a C++ binary.
-      if (defined(crate_root)) {
-        deps += [ "//zircon/public/sysroot:rust_binary_deps" ]
-      } else {
-        deps += [ "//zircon/public/sysroot:cpp_binary_deps" ]
-      }
-
-      # Add dependency to the C runtime startup object file for executables,
-      # except if the static-pie-config is used.
-      if ((target_type == "executable" || target_type == "test") &&
-          configs + [ "//build/config/fuchsia:static-pie-config" ] -
-          [ "//build/config/fuchsia:static-pie-config" ] == configs) {
-        deps += [ "//zircon/public/sysroot:crt1_deps" ]
-      }
-
       if (target_type == "shared_library") {
         # Add zircon dependency for the profile variant. TODO(https://fxbug.dev/42139818): Remove this.
         if (toolchain_variant.tags + [
@@ -3807,6 +3809,14 @@ template("source_set") {
 
     # This is implicitly added to every kind of target that can have `sources`.
     deps += toolchain_variant.source_deps
+    foreach(
+        config,
+        toolchain_variant.configs + toolchain_variant.remove_common_configs -
+            toolchain_variant.remove_common_configs) {
+      # Expand the label so it always has a `:name` part.
+      config = get_label_info(config, "label_no_toolchain")
+      deps += [ "${config}_source_deps" ]
+    }
   }
 }
 _built_in_target_types_without_public_wrapper -= [ "source_set" ]
@@ -3852,6 +3862,14 @@ template("static_library") {
 
     # This is implicitly added to every kind of target that can have `sources`.
     deps += toolchain_variant.source_deps
+    foreach(
+        config,
+        toolchain_variant.configs + toolchain_variant.remove_common_configs -
+            toolchain_variant.remove_common_configs) {
+      # Expand the label so it always has a `:name` part.
+      config = get_label_info(config, "label_no_toolchain")
+      deps += [ "${config}_source_deps" ]
+    }
 
     if (defined(invoker.no_rust_aux_build_config_dep)) {
       _no_rust_aux_build_config_dep = invoker.no_rust_aux_build_config_dep

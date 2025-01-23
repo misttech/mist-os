@@ -37,9 +37,8 @@ import("//zircon/system/ulib/c/sysroot_entries.gni")
 # sysroot_entries will be a list of GN scopes, whose schema is documented
 # in //zircon/public/sysroot/BUILD.gn.
 #
-sysroot_entries =
-    sysroot_uninstrumented_libc_entries + sysroot_instrumented_libc_entries +
-    sysroot_crt1_entries + sysroot_vdso_entries
+sysroot_entries = sysroot_uninstrumented_libc_entries +
+                  sysroot_instrumented_libc_entries + sysroot_vdso_entries
 
 sysroot_sdk_deps = []
 foreach(entry, sysroot_entries) {

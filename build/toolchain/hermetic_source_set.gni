@@ -17,6 +17,15 @@ import("ifs_shared_library.gni")
 # contract that says which global symbols are defined and which undefined
 # symbols may be referenced.
 #
+# This actually defines two targets:
+#  * The main "$target_name" target is a source_set() for linking the hermetic
+#    hermetic object file into another target.
+#  * The "$target_name.objfile" subtarget is an action() target with the
+#    hermetic object file "$target_out_dir/$target_name.o" as a direct output.
+#    So this must be in deps to use that file as a an input file to some other
+#    target such as copy() or action(), but depending on it does not contribute
+#    any link inputs like a source_set() would.
+#
 # Parameters
 #
 #   * allow_init, allow_fini
@@ -38,6 +47,18 @@ import("ifs_shared_library.gni")
 #     - Type: list(string) or true
 #     - Default: []
 #
+#   * metadata
+#     - Optional: See source_set().  This sets metadata on "$target_name".
+#     Note interactions with $objfile_metadata, below.
+#     - Type: scope
+#
+#   * objfile_metadata
+#     - Optional: See action().  This sets metadata on "$target_name.objfile".
+#     Note that "$target_name" will have a deps path to "$target_name.objfile",
+#     so there may be a need to set barrier keys in $metadata to prevent data
+#     keys in $objfile_metadata from being picked up via "$target_name" deps.
+#     - Type: scope
+#
 # See source_set() for other parameters.
 template("hermetic_source_set") {
   assert(defined(invoker.global_symbols),
@@ -47,7 +68,7 @@ template("hermetic_source_set") {
   link_target = "_hermetic_source_set.$target_name.link"
   link_rspfile_target = "$link_target.rsp"
   libs_target = "_hermetic_source_set.$target_name.libs"
-  hermetic_target = "_hermetic_source_set.$target_name.hermetic"
+  hermetic_target = "$target_name.objfile"
   link_output_name = "$target_name.link"
   link_rspfile = "$target_gen_dir/$link_output_name.rsp"
   hermetic_output_file = "$target_out_dir/$target_name.o"
@@ -102,6 +123,7 @@ template("hermetic_source_set") {
   # relocatable (-r) link.
   basic_executable(link_target) {
     visibility = [ ":$link_rspfile_target" ]
+    forward_variables_from(invoker, [ "testonly" ])
 
     ldflags = []
     forward_variables_from(invoker,
@@ -109,6 +131,7 @@ template("hermetic_source_set") {
                            [
                              "global_symbols",
                              "metadata",
+                             "objfile_metadata",
                              "ouput_dir",
                              "output_extension",
                              "output_name",
@@ -118,15 +141,6 @@ template("hermetic_source_set") {
     output_dir = target_out_dir
     output_name = link_output_name
     output_extension = "o"
-
-    ldflags += [
-      "-r",
-      "-static",
-
-      # This might be implied by -r in the compiler driver, but not always.
-      "-Wl,--build-id=none",
-      "-Wl,--no-eh-frame-hdr",
-    ]
 
     # Force the exported symbols to be treated as GC roots.
     foreach(symbol, invoker.global_symbols) {
@@ -179,6 +193,9 @@ template("hermetic_source_set") {
     # Don't link in any ET_DYN files, which aren't allowed with ld -r.
     # This will be handled via libs_target instead.
     configs += [ "//build/config:ifs-as-needed" ]
+
+    # Let this override everything earlier, including this target's ldflags.
+    configs += [ "//build/config/zircon:hermetic_source_set.config" ]
 
     # Set the metadata for link_output_rspfile() to collect.
     output_file = "$output_name.$output_extension"
@@ -250,6 +267,15 @@ template("hermetic_source_set") {
   }
 
   toolchain_utils_action(hermetic_target) {
+    forward_variables_from(invoker,
+                           [
+                             "visibility",
+                             "testonly",
+                           ])
+    if (defined(visibility)) {
+      visibility += [ ":$export_target" ]
+    }
+
     utils = [ "objcopy" ]
     script = true
 
@@ -264,6 +290,10 @@ template("hermetic_source_set") {
 
     outputs = [ hermetic_output_file ]
     args += rebase_path(outputs, root_build_dir)
+
+    if (defined(invoker.objfile_metadata)) {
+      metadata = invoker.objfile_metadata
+    }
   }
 }
 

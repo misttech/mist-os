@@ -29,7 +29,7 @@ shift 3
 
 trap 'rm -f "$OUTPUT" "$DEPFILE"' ERR HUP INT TERM
 
-if [ "${PROGRAM##*/}" = llvm-objcopy ]; then
+if [ "${PROGRAM##*/}" == ln ]; then
   expand_rspfile=true
 else
   expand_rspfile=false

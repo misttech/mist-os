@@ -109,6 +109,10 @@ if (toolchain_environment == "kernel.phys" ||
   }
   group("phys_config_executable_deps") {
   }
+  group("phys_config_link_deps") {
+  }
+  group("phys_config_source_deps") {
+  }
 
   source_set("trampoline-boot") {
     visibility = [

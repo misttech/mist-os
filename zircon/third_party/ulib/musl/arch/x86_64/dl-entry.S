@@ -22,7 +22,10 @@ ENTRY(_start)
     xor %rbp,%rbp
 
     call _dl_start
-    mov %rax,%rdi
-    push %rbp                   // Zero in the return address slot.
-    jmp *%rdx
+    mov %rax,%rdi               // 1st return value -> 1st user arg register.
+    mov %rdx,%rax               // 2st return value -> user entry PC.
+    xor %esi,%esi               // Zero -> 2nd user arg register.
+    xor %edx,%edx               // Zero -> 3rd user arg register.
+    push %rbp                   // Zero -> return address slot.
+    jmp *%rax
 END(_start)

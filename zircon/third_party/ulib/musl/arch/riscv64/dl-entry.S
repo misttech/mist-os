@@ -13,7 +13,14 @@
 .hidden _start
 ENTRY(_start)
   call _dl_start
+  // That returned the argument value for the user in a0, where it stays; and
+  // the user entry PC in a1, which we move to t1.  Then zero any interesting
+  // state: fp & ra to show base frame; 2nd and 3rd user argument registers for
+  // unused __libc_start_main arguments _start will leave in place.
+  mv t1, a1                     // 2nd return value -> user PC (t1)
   mv fp, zero
   mv ra, zero
-  jr a1
+  mv a1, zero
+  mv a2, zero
+  jr t1                         // Avoid `jr t0`, which is hinted as return.
 END(_start)

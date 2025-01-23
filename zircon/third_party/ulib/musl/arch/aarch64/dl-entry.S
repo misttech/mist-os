@@ -13,7 +13,11 @@
 .hidden _start
 ENTRY(_start)
     bl _dl_start
-    mov x29, #0 // frame pointer (FP)
-    mov x30, #0 // return address (LR)
-    br x1
+    // 1st return value (x0) -> 1st user argument register (x0).
+    mov x16, x1                 // 2nd return value -> user PC, use x16 temp.
+    mov x29, xzr                // Clear frame pointer.
+    mov x30, xzr                // Clear return address register.
+    mov x1, xzr                 // Zero -> 2nd user argument register.
+    mov x2, xzr                 // Zero -> 3nd user argument register.
+    br x16
 END(_start)

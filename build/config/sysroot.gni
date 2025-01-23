@@ -10,8 +10,7 @@ declare_args() {
 if (current_os == target_os && target_sysroot != "") {
   sysroot = target_sysroot
 } else if (is_fuchsia) {
-  import("//zircon/public/sysroot/cpp.gni")
-  sysroot = cpp_sysroot_dir
+  sysroot = get_label_info("//zircon/public/sysroot", "target_gen_dir")
 } else if (is_linux) {
   if (is_host) {
     # Use an older Linux sysroot to compile host tools.

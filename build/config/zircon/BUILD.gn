@@ -464,3 +464,16 @@ config("no-synthetic-sections") {
     ]
   }
 }
+
+# This is used by the basic_executable() for an hermetic partial link step.
+config("hermetic_source_set.config") {
+  # The partial link with --gc-sections will drop some sections that should
+  # survive (while not directly referenced) into the outer link to be
+  # implicitly referenced later, e.g. via a generated .eh_frame_hdr.
+  inputs = [ "//build/toolchain/hermetic_source_set.ld" ]
+  ldflags = [
+    "-r",
+    "-static",
+    "-Wl,-T," + rebase_path(inputs[0], root_build_dir),
+  ]
+}

@@ -13,7 +13,10 @@ import("//build/toolchain/zircon/zircon_toolchain.gni")
 # List of keys in toolchain_variant scope related to configs.
 _config_keys = [
   "configs",
+  "deps",
   "executable_configs",
+  "executable_deps",
+  "link_deps",
   "prefix_configs",
   "remove_common_configs",
   "remove_executable_configs",
@@ -64,7 +67,10 @@ template("_variant_toolchain") {
   _toolchain_variant = {
     # First forward variables from the variant.
     configs = []
+    deps = []
     executable_configs = []
+    executable_deps = []
+    link_deps = []
     prefix_configs = []
     remove_common_configs = []
     remove_executable_configs = []
@@ -76,8 +82,17 @@ template("_variant_toolchain") {
     if (defined(this_invoker.configs)) {
       configs += this_invoker.configs
     }
+    if (defined(this_invoker.deps)) {
+      deps += this_invoker.deps
+    }
     if (defined(this_invoker.executable_configs)) {
       executable_configs += this_invoker.executable_configs
+    }
+    if (defined(this_invoker.executable_deps)) {
+      executable_deps += this_invoker.executable_deps
+    }
+    if (defined(this_invoker.link_deps)) {
+      link_deps += this_invoker.link_deps
     }
     if (defined(this_invoker.prefix_configs)) {
       prefix_configs += this_invoker.prefix_configs
