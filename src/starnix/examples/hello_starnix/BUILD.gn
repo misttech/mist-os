@@ -6,7 +6,8 @@ import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//src/starnix/build/starnix_linux_executable.gni")
 
-starnix_linux_executable("hello_starnix") {
+starnix_linux_executable("hello_starnix_bin") {
+  output_name = "hello_starnix"
   if (current_cpu == "x64") {
     sources = [ "hello_x64.S" ]
   } else if (current_cpu == "arm64") {
@@ -31,11 +32,9 @@ starnix_linux_executable("hello_starnix") {
   exclude_toolchain_tags = [ "instrumented" ]
 }
 
-fuchsia_package_with_single_component("hello_starnix_pkg") {
-  package_name = "hello_starnix"
-  component_name = "hello_starnix"
+fuchsia_package_with_single_component("hello_starnix") {
   manifest = "meta/hello_starnix.cml"
-  deps = [ ":hello_starnix" ]
+  deps = [ ":hello_starnix_bin" ]
 }
 
 rustc_binary("hello_starnix_integration_test_bin") {
@@ -67,7 +66,7 @@ fuchsia_test_component("hello_starnix_integration") {
 fuchsia_test_package("hello_starnix_integration_test") {
   test_components = [ ":hello_starnix_integration" ]
   subpackages = [
-    ":hello_starnix_pkg",
+    ":hello_starnix",
     "//src/starnix/kernel:starnix_kernel_package",
     "//src/starnix/containers/empty_container",
   ]
