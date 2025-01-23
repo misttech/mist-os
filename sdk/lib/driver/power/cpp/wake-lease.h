@@ -17,6 +17,9 @@
 
 namespace fdf_power {
 
+// Wrapper around usage of fuchsia.power.system/ActivityGovernor.AcquireWakeLease. The wrapper
+// reduces wake lease creation by allow callers to set timeout after which to drop the lease and
+// provides mechanisms to extend that timeout.
 class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernorListener> {
  public:
   // If |log| is set to true, logs will be emitted when acquiring leases and when lease times out.
@@ -25,12 +28,12 @@ class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernor
             fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag_client,
             inspect::Node* parent_node = nullptr, bool log = false);
 
-  // Acquire a wake lease if the system is suspend state. Ideally this is only called after
-  // we wake up due to an interrupt, however it may be called due to an interrupt firing after the
-  // suspension process begins. If acquired, the wake lease will be dropped after the specified
-  // timeout. If a lease was still held from an earlier invocation, it will be extended until the
-  // new timeout. Note that a duration is taken because the deadline is computed once the lease is
-  // acquired, rather than at the point this method is called.
+  // Acquire a wake lease **only** if the system is in a suspended state. Ideally this is only
+  // called after we wake up due to an interrupt, however it may be called due to an interrupt
+  // firing after the suspension process begins. If acquired, the wake lease will be dropped after
+  // the specified timeout. If a lease was still held from an earlier invocation, it will be
+  // extended until the new timeout. Note that a duration is taken because the deadline is
+  // computed once the lease is acquired, rather than at the point this method is called.
   bool HandleInterrupt(zx::duration timeout);
 
   // Acquire a wake lease and automatically drop it after the specified timeout. If a lease was
@@ -39,10 +42,10 @@ class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernor
   // rather than at the point this method is called.
   bool AcquireWakeLease(zx::duration timeout);
 
-  // Deposit a wake lease which will automatically be dropped after the specified timeout deadline.
-  // If a lease was already held from an earlier invocation, it will be dropped in favor of the new
-  // lease if the new lease has a later deadline. If the old lease has a later deadline, then the
-  // new lease will be dropped instead.
+  // Provide a wake lease which will be dropped either:
+  //   * immediately if there is already a wake lease with a later deadline
+  //   * at the specified deadline
+  // In the latter case any previous lease held by this object is dropped immediately.
   void DepositWakeLease(zx::eventpair wake_lease, zx::time timeout_deadline);
 
   // Cancel timeout and take the wake lease. Returns ZX_ERR_BAD_HANDLE if we don't currently have a
@@ -53,7 +56,8 @@ class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernor
   // a wake lease.
   zx::result<zx::eventpair> GetWakeLeaseCopy();
 
-  // fuchsia.power.system/ActivityGovernorListener implementation.
+  // fuchsia.power.system/ActivityGovernorListener implementation. This is used to avoid creating
+  // wake leases in cases where the system is resumed and `HandleInterrupt` is called.
   void OnResume(OnResumeCompleter::Sync& completer) override;
   void OnSuspendStarted(OnSuspendStartedCompleter::Sync& completer) override;
   void OnSuspendFail(OnSuspendFailCompleter::Sync& completer) override;
