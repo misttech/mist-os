@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/storage/lib/paver/x64.h"
+#include "src/storage/lib/paver/uefi.h"
 
 #include <lib/fidl/cpp/channel.h>
 #include <zircon/process.h>
@@ -34,7 +34,7 @@ constexpr size_t kKibibyte = 1024;
 constexpr size_t kMebibyte = kKibibyte * 1024;
 constexpr size_t kGibibyte = kMebibyte * 1024;
 
-// All X64 boards currently use the legacy partition scheme.
+// All UEFI boards currently use the legacy partition scheme.
 constexpr PartitionScheme kPartitionScheme = PartitionScheme::kLegacy;
 
 // TODO: Remove support after July 9th 2021.
@@ -294,7 +294,7 @@ zx::result<> EfiDevicePartitioner::OnStop() const {
   return zx::ok();
 }
 
-zx::result<std::unique_ptr<DevicePartitioner>> X64PartitionerFactory::New(
+zx::result<std::unique_ptr<DevicePartitioner>> UefiPartitionerFactory::New(
     const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     Arch arch, std::shared_ptr<Context> context,
     fidl::ClientEnd<fuchsia_device::Controller> block_device) {

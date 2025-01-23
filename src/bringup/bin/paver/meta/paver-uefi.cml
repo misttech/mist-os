@@ -4,6 +4,6 @@
 {
     include: [ "//src/bringup/bin/paver/meta/paver.cml" ],
     program: {
-        binary: "bin/paver-x64",
+        binary: "bin/paver-uefi",
     },
 }

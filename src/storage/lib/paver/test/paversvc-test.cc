@@ -56,8 +56,8 @@
 #include "src/storage/lib/paver/paver.h"
 #include "src/storage/lib/paver/sherlock.h"
 #include "src/storage/lib/paver/test/test-utils.h"
+#include "src/storage/lib/paver/uefi.h"
 #include "src/storage/lib/paver/vim3.h"
-#include "src/storage/lib/paver/x64.h"
 
 namespace {
 

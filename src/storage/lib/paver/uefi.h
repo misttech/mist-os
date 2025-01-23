@@ -1,8 +1,8 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#ifndef SRC_STORAGE_LIB_PAVER_X64_H_
-#define SRC_STORAGE_LIB_PAVER_X64_H_
+#ifndef SRC_STORAGE_LIB_PAVER_UEFI_H_
+#define SRC_STORAGE_LIB_PAVER_UEFI_H_
 
 #include <utility>
 
@@ -56,7 +56,7 @@ class EfiDevicePartitioner : public DevicePartitioner {
   std::shared_ptr<Context> context_;
 };
 
-class X64PartitionerFactory : public DevicePartitionerFactory {
+class UefiPartitionerFactory : public DevicePartitionerFactory {
  public:
   zx::result<std::unique_ptr<DevicePartitioner>> New(
       const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
@@ -66,4 +66,4 @@ class X64PartitionerFactory : public DevicePartitionerFactory {
 
 }  // namespace paver
 
-#endif  // SRC_STORAGE_LIB_PAVER_X64_H_
+#endif  // SRC_STORAGE_LIB_PAVER_UEFI_H_

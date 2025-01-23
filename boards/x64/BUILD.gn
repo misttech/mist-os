@@ -302,5 +302,5 @@ board_input_bundle("x64_common") {
 }
 
 board_input_bundle("paver") {
-  bootfs_packages = [ "//src/bringup/bin/paver:package-x64" ]
+  bootfs_packages = [ "//src/bringup/bin/paver:package-uefi" ]
 }

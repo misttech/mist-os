@@ -65,8 +65,8 @@
 #include "src/storage/lib/paver/sherlock.h"
 #include "src/storage/lib/paver/system_shutdown_state.h"
 #include "src/storage/lib/paver/test/test-utils.h"
+#include "src/storage/lib/paver/uefi.h"
 #include "src/storage/lib/paver/utils.h"
-#include "src/storage/lib/paver/x64.h"
 
 namespace paver {
 extern zx_duration_t g_wipe_timeout;
