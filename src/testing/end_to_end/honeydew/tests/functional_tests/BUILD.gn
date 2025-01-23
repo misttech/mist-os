@@ -189,10 +189,6 @@ group_with_no_dir_target_deps("starnix_arm64_unstable_tests") {
   public_deps = [
     "affordance_tests/test_rtc:rtc_test_fc($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:vim3_test($host_toolchain)",
-
-    # These tests fail so we explicitly comment them out here for posterity.
-    # TODO(https://fxbug.dev/364744544): Fix/remove once consensus is reached.
-    # "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
   ]
 }
 

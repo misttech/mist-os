@@ -238,7 +238,6 @@ group_with_no_dir_target_deps("starnix_arm64_unstable_tests") {
     # TODO(https://fxbug.dev/390219788): Moved from stable because it closed the tree.
     "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "honeydew/tests/functional_tests:starnix_arm64_unstable_tests",
-    "//src/performance/memory/attribution/monitor/tests/e2e:tests",
   ]
 }
 
