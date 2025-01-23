@@ -231,6 +231,9 @@ rm -rf \"$2\" && cp -fR \"$1/\" \"$2\";
 """
     if subdirectories_to_overwrite:
         for src_subdir, dest_subdir in subdirectories_to_overwrite.items():
+            # Check that all subdirectories which are being overwritten exist
+            dest_dir = dst + "/" + dest_subdir
+            cmd += 'if [ ! -d "' + dest_dir + '" ]; then echo "ERROR: ' + dest_dir + ' does not exist." 1>&2; exit 1; fi;\n'
             cmd += 'rm -rf \"' + dst + "/" + dest_subdir + '\";\n'
             cmd += 'cp -fR \"' + src_subdir + "\" \"" + dst + "/" + dest_subdir + '\";\n'
     mnemonic = "CopyDirectory"
