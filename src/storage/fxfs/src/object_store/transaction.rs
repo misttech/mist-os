@@ -825,6 +825,10 @@ impl<'a> Transaction<'a> {
         self.checksums.push((range, checksums, first_write));
     }
 
+    pub fn checksums(&self) -> &[(Range<u64>, Vec<Checksum>, bool)] {
+        &self.checksums
+    }
+
     pub fn take_checksums(&mut self) -> Vec<(Range<u64>, Vec<Checksum>, bool)> {
         std::mem::replace(&mut self.checksums, Vec::new())
     }

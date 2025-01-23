@@ -4026,6 +4026,19 @@ mod tests {
                     .multi_overwrite(&mut transaction, 0, &overwrite, write_buf.as_mut())
                     .await
                     .unwrap_or_else(|_| panic!("multi_overwrite error on case {}", i));
+                // Double check the emitted checksums. We should have one u64 checksum for every
+                // block we wrote to disk.
+                let mut checksummed_range_length = 0;
+                let mut num_checksums = 0;
+                for (device_range, checksums, _) in transaction.checksums() {
+                    let range_len = device_range.end - device_range.start;
+                    let checksums_len = checksums.len() as u64;
+                    assert_eq!(range_len / checksums_len, block_size);
+                    checksummed_range_length += range_len;
+                    num_checksums += checksums_len;
+                }
+                assert_eq!(checksummed_range_length, write_len);
+                assert_eq!(num_checksums, write_len / block_size);
                 transaction.commit().await.unwrap();
 
                 let mut buf = object.allocate_buffer(file_size as usize).await;

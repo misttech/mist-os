@@ -131,6 +131,130 @@ enum Encryption {
     PermanentKeys,
 }
 
+#[derive(PartialEq, Debug)]
+enum OverwriteBitmaps {
+    None,
+    Some {
+        /// The block bitmap of a partial overwrite extent in the tree.
+        extent_bitmap: BitVec,
+        /// A bitmap of the blocks written to by the current overwrite.
+        write_bitmap: BitVec,
+        /// BitVec doesn't have a slice equivalent, so for a particular section of the write we
+        /// keep track of an offset in the bitmaps to operate on.
+        bitmap_offset: usize,
+    },
+}
+
+impl OverwriteBitmaps {
+    fn new(extent_bitmap: BitVec) -> Self {
+        OverwriteBitmaps::Some {
+            write_bitmap: BitVec::from_elem(extent_bitmap.len(), false),
+            extent_bitmap,
+            bitmap_offset: 0,
+        }
+    }
+
+    fn is_none(&self) -> bool {
+        *self == OverwriteBitmaps::None
+    }
+
+    fn set_offset(&mut self, new_offset: usize) {
+        match self {
+            OverwriteBitmaps::None => (),
+            OverwriteBitmaps::Some { bitmap_offset, .. } => *bitmap_offset = new_offset,
+        }
+    }
+
+    fn get_from_extent_bitmap(&self, i: usize) -> Option<bool> {
+        match self {
+            OverwriteBitmaps::None => None,
+            OverwriteBitmaps::Some { extent_bitmap, bitmap_offset, .. } => {
+                extent_bitmap.get(*bitmap_offset + i)
+            }
+        }
+    }
+
+    fn set_in_write_bitmap(&mut self, i: usize, x: bool) {
+        match self {
+            OverwriteBitmaps::None => (),
+            OverwriteBitmaps::Some { write_bitmap, bitmap_offset, .. } => {
+                write_bitmap.set(*bitmap_offset + i, x)
+            }
+        }
+    }
+
+    fn take_bitmaps(self) -> Option<(BitVec, BitVec)> {
+        match self {
+            OverwriteBitmaps::None => None,
+            OverwriteBitmaps::Some { extent_bitmap, write_bitmap, .. } => {
+                Some((extent_bitmap, write_bitmap))
+            }
+        }
+    }
+}
+
+/// When writing to Overwrite ranges, we need to emit whether a set of checksums for a device range
+/// is the first write to that region or not. This tracks one such range so we can use it after the
+/// write to break up the returned checksum list.
+#[derive(PartialEq, Debug)]
+struct ChecksumRangeChunk {
+    checksum_range: Range<usize>,
+    device_range: Range<u64>,
+    is_first_write: bool,
+}
+
+impl ChecksumRangeChunk {
+    fn group_first_write_ranges(
+        bitmaps: &mut OverwriteBitmaps,
+        block_size: u64,
+        write_device_range: Range<u64>,
+    ) -> Vec<ChecksumRangeChunk> {
+        let write_block_len = (write_device_range.length().unwrap() / block_size) as usize;
+        if bitmaps.is_none() {
+            // If there is no bitmap, then the overwrite range is fully written to. However, we
+            // could still be within the journal flush window where one of the blocks was written
+            // to for the first time to put it in this state, so we still need to emit the
+            // checksums in case replay needs them.
+            vec![ChecksumRangeChunk {
+                checksum_range: 0..write_block_len,
+                device_range: write_device_range,
+                is_first_write: false,
+            }]
+        } else {
+            let mut checksum_ranges = vec![ChecksumRangeChunk {
+                checksum_range: 0..0,
+                device_range: write_device_range.start..write_device_range.start,
+                is_first_write: !bitmaps.get_from_extent_bitmap(0).unwrap(),
+            }];
+            let mut working_range = checksum_ranges.last_mut().unwrap();
+            for i in 0..write_block_len {
+                bitmaps.set_in_write_bitmap(i, true);
+
+                // bitmap.get returning true means the block is initialized and therefore has been
+                // written to before.
+                if working_range.is_first_write != bitmaps.get_from_extent_bitmap(i).unwrap() {
+                    // is_first_write is tracking opposite of what comes back from the bitmap, so
+                    // if the are still opposites we continue our current range.
+                    working_range.checksum_range.end += 1;
+                    working_range.device_range.end += block_size;
+                } else {
+                    // If they are the same, then we need to make a new chunk.
+                    let new_chunk = ChecksumRangeChunk {
+                        checksum_range: working_range.checksum_range.end
+                            ..working_range.checksum_range.end + 1,
+                        device_range: working_range.device_range.end
+                            ..working_range.device_range.end + block_size,
+                        is_first_write: !working_range.is_first_write,
+                    };
+                    checksum_ranges.push(new_chunk);
+                    working_range = checksum_ranges.last_mut().unwrap();
+                }
+            }
+            checksum_ranges
+        }
+    }
+}
+
 /// StoreObjectHandle is the lowest-level, untyped handle to an object with the id [`object_id`] in
 /// a particular store, [`owner`]. It provides functionality shared across all objects, such as
 /// reading and writing attributes and managing encryption keys.
@@ -1282,80 +1406,52 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                             })
                         }
                         ExtentMode::OverwritePartial(bitmap) => {
-                            Some((bitmap.clone(), BitVec::from_elem(bitmap.len(), false)))
+                            OverwriteBitmaps::new(bitmap.clone())
                         }
-                        ExtentMode::Overwrite => None,
+                        ExtentMode::Overwrite => OverwriteBitmaps::None,
                     };
                     loop {
                         let offset_within_extent = target_range.start - range.start;
+                        let bitmap_offset = offset_within_extent / block_size;
                         let write_device_offset = *device_offset + offset_within_extent;
-                        let block_offset_within_extent = offset_within_extent / block_size;
                         let write_end = min(range.end, target_range.end);
-                        let write_length = write_end - target_range.start;
-                        let (current_buf, remaining_buf) = buf.split_at_mut(write_length as usize);
-                        let checksum_ranges = if let Some((bitmap, write_bitmap)) = &mut bitmap {
-                            let mut checksum_range_start = 0;
-                            let mut checksum_range_type =
-                                !bitmap.get(block_offset_within_extent as usize).unwrap();
-                            let mut checksum_ranges = Vec::new();
-                            let mut write_device_offset_start = write_device_offset;
-                            for i in block_offset_within_extent
-                                ..block_offset_within_extent + write_length / block_size
-                            {
-                                write_bitmap.set(i as usize, true);
-                                if checksum_range_type == bitmap.get(i as usize).unwrap() {
-                                    checksum_ranges.push((
-                                        checksum_range_start as usize
-                                            ..(i - block_offset_within_extent) as usize,
-                                        write_device_offset_start
-                                            ..write_device_offset + i * block_size,
-                                        checksum_range_type,
-                                    ));
-                                    checksum_range_start = i - block_offset_within_extent;
-                                    checksum_range_type = !checksum_range_type;
-                                    write_device_offset_start =
-                                        write_device_offset + i * block_size;
-                                }
-                            }
-                            checksum_ranges
-                        } else {
-                            // If there is no bitmap, then the overwrite range is fully written to.
-                            // However, we could still be within the journal flush window where one
-                            // of the blocks was written to for the first time to put it in this
-                            // state, so we still need to emit the checksums in case replay needs
-                            // them.
-                            vec![(
-                                0..(write_length / block_size) as usize,
-                                write_device_offset..(write_device_offset + write_length),
-                                false,
-                            )]
-                        };
+                        let write_len = write_end - target_range.start;
+                        let write_device_range =
+                            write_device_offset..write_device_offset + write_len;
+                        let (current_buf, remaining_buf) = buf.split_at_mut(write_len as usize);
+
+                        bitmap.set_offset(bitmap_offset as usize);
+                        let checksum_ranges = ChecksumRangeChunk::group_first_write_ranges(
+                            &mut bitmap,
+                            block_size,
+                            write_device_range,
+                        );
                         writes.push(async move {
                             let maybe_checksums = self
                                 .write_aligned(current_buf.as_ref(), write_device_offset)
                                 .await?;
-                            Ok::<Vec<_>, Error>(
-                                maybe_checksums
-                                    .into_option()
+                            Ok::<_, Error>(match maybe_checksums {
+                                MaybeChecksums::None => Vec::new(),
+                                MaybeChecksums::Fletcher(checksums) => checksum_ranges
                                     .into_iter()
-                                    .flat_map(|checksums| {
-                                        let mut out_checksums = Vec::new();
-                                        for (checksum_range, write_range, first_write) in
-                                            &checksum_ranges
-                                        {
-                                            out_checksums.push((
-                                                write_range.clone(),
-                                                checksums[checksum_range.clone()].to_vec(),
-                                                *first_write,
-                                            ))
-                                        }
-                                        out_checksums
-                                    })
+                                    .map(
+                                        |ChecksumRangeChunk {
+                                             checksum_range,
+                                             device_range,
+                                             is_first_write,
+                                         }| {
+                                            (
+                                                device_range,
+                                                checksums[checksum_range].to_vec(),
+                                                is_first_write,
+                                            )
+                                        },
+                                    )
                                     .collect(),
-                            )
+                            })
                         });
                         buf = remaining_buf;
-                        target_range.start += write_length;
+                        target_range.start += write_len;
                         if target_range.start == target_range.end {
                             match range_iter.next() {
                                 None => break,
@@ -1366,7 +1462,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                             break;
                         }
                     }
-                    if let Some((mut bitmap, write_bitmap)) = bitmap {
+                    if let Some((mut bitmap, write_bitmap)) = bitmap.take_bitmaps() {
                         if bitmap.or(&write_bitmap) {
                             let mode = if bitmap.all() {
                                 ExtentMode::Overwrite
@@ -1836,6 +1932,7 @@ pub struct NeedsTrim(pub bool);
 
 #[cfg(test)]
 mod tests {
+    use super::{ChecksumRangeChunk, OverwriteBitmaps};
     use crate::errors::FxfsError;
     use crate::filesystem::{FxFilesystem, OpenFxFilesystem};
     use crate::object_handle::ObjectHandle;
@@ -1845,6 +1942,7 @@ mod tests {
         AttributeKey, DataObjectHandle, Directory, HandleOptions, LockKey, ObjectKey, ObjectStore,
         ObjectValue, SetExtendedAttributeMode, StoreObjectHandle, FSVERITY_MERKLE_ATTRIBUTE_ID,
     };
+    use bit_vec::BitVec;
     use fuchsia_async as fasync;
     use futures::join;
     use fxfs_insecure_crypto::InsecureCrypt;
@@ -2611,5 +2709,142 @@ mod tests {
         // Watchdog is dropped, nothing should trigger.
         TestExecutor::advance_to(make_time(100)).await;
         receiver.recv().expect_err("Watchdog should be gone");
+    }
+
+    #[fuchsia::test]
+    fn test_checksum_range_chunk() {
+        let block_size = 4096;
+
+        // No bitmap means one chunk that covers the whole range
+        assert_eq!(
+            ChecksumRangeChunk::group_first_write_ranges(
+                &mut OverwriteBitmaps::None,
+                block_size,
+                block_size * 2..block_size * 5,
+            ),
+            vec![ChecksumRangeChunk {
+                checksum_range: 0..3,
+                device_range: block_size * 2..block_size * 5,
+                is_first_write: false,
+            }],
+        );
+
+        let mut bitmaps = OverwriteBitmaps::new(BitVec::from_bytes(&[0b11110000]));
+        assert_eq!(
+            ChecksumRangeChunk::group_first_write_ranges(
+                &mut bitmaps,
+                block_size,
+                block_size * 2..block_size * 5,
+            ),
+            vec![ChecksumRangeChunk {
+                checksum_range: 0..3,
+                device_range: block_size * 2..block_size * 5,
+                is_first_write: false,
+            }],
+        );
+        assert_eq!(
+            bitmaps.take_bitmaps(),
+            Some((BitVec::from_bytes(&[0b11110000]), BitVec::from_bytes(&[0b11100000])))
+        );
+
+        let mut bitmaps = OverwriteBitmaps::new(BitVec::from_bytes(&[0b11110000]));
+        bitmaps.set_offset(2);
+        assert_eq!(
+            ChecksumRangeChunk::group_first_write_ranges(
+                &mut bitmaps,
+                block_size,
+                block_size * 2..block_size * 5,
+            ),
+            vec![
+                ChecksumRangeChunk {
+                    checksum_range: 0..2,
+                    device_range: block_size * 2..block_size * 4,
+                    is_first_write: false,
+                },
+                ChecksumRangeChunk {
+                    checksum_range: 2..3,
+                    device_range: block_size * 4..block_size * 5,
+                    is_first_write: true,
+                },
+            ],
+        );
+        assert_eq!(
+            bitmaps.take_bitmaps(),
+            Some((BitVec::from_bytes(&[0b11110000]), BitVec::from_bytes(&[0b00111000])))
+        );
+
+        let mut bitmaps = OverwriteBitmaps::new(BitVec::from_bytes(&[0b11110000]));
+        bitmaps.set_offset(4);
+        assert_eq!(
+            ChecksumRangeChunk::group_first_write_ranges(
+                &mut bitmaps,
+                block_size,
+                block_size * 2..block_size * 5,
+            ),
+            vec![ChecksumRangeChunk {
+                checksum_range: 0..3,
+                device_range: block_size * 2..block_size * 5,
+                is_first_write: true,
+            }],
+        );
+        assert_eq!(
+            bitmaps.take_bitmaps(),
+            Some((BitVec::from_bytes(&[0b11110000]), BitVec::from_bytes(&[0b00001110])))
+        );
+
+        let mut bitmaps = OverwriteBitmaps::new(BitVec::from_bytes(&[0b01010101]));
+        assert_eq!(
+            ChecksumRangeChunk::group_first_write_ranges(
+                &mut bitmaps,
+                block_size,
+                block_size * 2..block_size * 10,
+            ),
+            vec![
+                ChecksumRangeChunk {
+                    checksum_range: 0..1,
+                    device_range: block_size * 2..block_size * 3,
+                    is_first_write: true,
+                },
+                ChecksumRangeChunk {
+                    checksum_range: 1..2,
+                    device_range: block_size * 3..block_size * 4,
+                    is_first_write: false,
+                },
+                ChecksumRangeChunk {
+                    checksum_range: 2..3,
+                    device_range: block_size * 4..block_size * 5,
+                    is_first_write: true,
+                },
+                ChecksumRangeChunk {
+                    checksum_range: 3..4,
+                    device_range: block_size * 5..block_size * 6,
+                    is_first_write: false,
+                },
+                ChecksumRangeChunk {
+                    checksum_range: 4..5,
+                    device_range: block_size * 6..block_size * 7,
+                    is_first_write: true,
+                },
+                ChecksumRangeChunk {
+                    checksum_range: 5..6,
+                    device_range: block_size * 7..block_size * 8,
+                    is_first_write: false,
+                },
+                ChecksumRangeChunk {
+                    checksum_range: 6..7,
+                    device_range: block_size * 8..block_size * 9,
+                    is_first_write: true,
+                },
+                ChecksumRangeChunk {
+                    checksum_range: 7..8,
+                    device_range: block_size * 9..block_size * 10,
+                    is_first_write: false,
+                },
+            ],
+        );
+        assert_eq!(
+            bitmaps.take_bitmaps(),
+            Some((BitVec::from_bytes(&[0b01010101]), BitVec::from_bytes(&[0b11111111])))
+        );
     }
 }
