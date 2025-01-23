@@ -114,9 +114,7 @@ type Flags = flexible bits : uint64 {
     ///  * A `PROTOCOL_*` flag is set to indicate the type of object to be created. Currently, this
     ///    is only supported when specified with `PROTOCOL_FILE`, in which case, it is equivalent
     ///    to Linux `O_TMPFILE`.
-    ///  * Must be opened with either Write-only permissions or ReadWrite permissions, otherwise,
-    ///    it will fail with `ZX_ERR_INVALID_ARGS`.
-    ///  * Will fail with `ZX_ERR_INVALID_ARGS` when request to open with `FLAG_MAYBE_CREATE`.
+    ///  * `FLAG_MAYBE_CREATE` will be ignored.
     @available(added=HEAD)
     FLAG_CREATE_AS_UNNAMED_TEMPORARY = 0x800000000;
 
