@@ -700,7 +700,12 @@ closed protocol Linkable {
     /// support the [`Rights.EXECUTE`] right. Insufficient rights will result in
     /// `ZX_ERR_ACCESS_DENIED`.
     ///
-    /// If this object has no links, it will fail with `ZX_ERR_NOT_FOUND`.
+    /// If this object has no links and is *NOT* an unnamed temporary object (objects opened with
+    /// `Flags.FLAG_CREATE_AS_UNNAMED_TEMPORARY`), it will fail with `ZX_ERR_NOT_FOUND`.
+    ///
+    /// For unnamed temporary objects, use LinkInto to give it a name. Upon successful completion,
+    /// the object will be permanently linked to the filesystem. Requires that the unnamed temporary
+    /// object is linkable, if not, it will fail with `ZX_ERR_NOT_FOUND`.
     ///
     /// This method does not have the same atomicity properties has the `Directory::Link` method,
     /// which means that calling `Open` then `LinkInto` is not equivalent to `Directory::Link`
