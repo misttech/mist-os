@@ -241,8 +241,7 @@ TEST(UartTests, MatchCompatible) {
       using DriverType = std::decay_t<decltype(driver.uart())>;
       if constexpr (!std::is_same_v<uart::null::Driver, DriverType> &&
                     !std::is_same_v<uart::internal::DummyDriver, DriverType>) {
-        if constexpr (std::is_same_v<zbi_dcfg_simple_t,
-                                     std::decay_t<decltype(driver.uart().config())>>) {
+        if constexpr (std::is_same_v<zbi_dcfg_simple_t, std::decay_t<decltype(driver.config())>>) {
           visitor(driver);
         } else {
           FAIL("Unexpected dcfg_simple_pio_t.");
@@ -271,8 +270,8 @@ TEST(UartTests, MatchCompatible) {
       using uart_t = typename std::decay_t<decltype(driver)>::uart_type;
       EXPECT_EQ(uart_t::kExtra, ZBI_KERNEL_DRIVER_I8250_MMIO8_UART);
       EXPECT_EQ(uart_t::kConfigName, uart::ns8250::Mmio8Driver::kConfigName);
-      EXPECT_EQ(driver.uart().config().mmio_phys, 1);
-      EXPECT_EQ(driver.uart().config().irq, 2);
+      EXPECT_EQ(driver.config().mmio_phys, 1);
+      EXPECT_EQ(driver.config().irq, 2);
     }));
   }
 
@@ -295,8 +294,8 @@ TEST(UartTests, MatchCompatible) {
       using uart_t = typename std::decay_t<decltype(driver)>::uart_type;
       EXPECT_EQ(uart_t::kExtra, ZBI_KERNEL_DRIVER_I8250_MMIO32_UART);
       EXPECT_EQ(uart_t::kConfigName, uart::ns8250::Mmio32Driver::kConfigName);
-      EXPECT_EQ(driver.uart().config().mmio_phys, 1);
-      EXPECT_EQ(driver.uart().config().irq, 2);
+      EXPECT_EQ(driver.config().mmio_phys, 1);
+      EXPECT_EQ(driver.config().irq, 2);
     }));
   }
 
@@ -330,8 +329,8 @@ TEST(UartTests, MatchCompatible) {
       using uart_t = typename std::decay_t<decltype(driver)>::uart_type;
       EXPECT_EQ(uart_t::kExtra, ZBI_KERNEL_DRIVER_DW8250_UART);
       EXPECT_EQ(uart_t::kConfigName, uart::ns8250::Dw8250Driver::kConfigName);
-      EXPECT_EQ(driver.uart().config().mmio_phys, 1);
-      EXPECT_EQ(driver.uart().config().irq, 2);
+      EXPECT_EQ(driver.config().mmio_phys, 1);
+      EXPECT_EQ(driver.config().irq, 2);
     }));
   }
 
@@ -351,8 +350,8 @@ TEST(UartTests, MatchCompatible) {
       using uart_t = typename std::decay_t<decltype(driver)>::uart_type;
       EXPECT_EQ(uart_t::kExtra, ZBI_KERNEL_DRIVER_PL011_UART);
       EXPECT_EQ(uart_t::kConfigName, uart::pl011::Driver::kConfigName);
-      EXPECT_EQ(driver.uart().config().mmio_phys, 1);
-      EXPECT_EQ(driver.uart().config().irq, 2);
+      EXPECT_EQ(driver.config().mmio_phys, 1);
+      EXPECT_EQ(driver.config().irq, 2);
     }));
   }
 
@@ -373,8 +372,8 @@ TEST(UartTests, MatchCompatible) {
       using uart_t = typename std::decay_t<decltype(driver)>::uart_type;
       EXPECT_EQ(uart_t::kExtra, ZBI_KERNEL_DRIVER_AMLOGIC_UART);
       EXPECT_EQ(uart_t::kConfigName, uart::amlogic::Driver::kConfigName);
-      EXPECT_EQ(driver.uart().config().mmio_phys, 1);
-      EXPECT_EQ(driver.uart().config().irq, 2);
+      EXPECT_EQ(driver.config().mmio_phys, 1);
+      EXPECT_EQ(driver.config().irq, 2);
     }));
   }
 }

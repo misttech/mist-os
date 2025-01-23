@@ -201,14 +201,14 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
   // Check for interrupt support or explicitly polling uart.
   ktl::optional<uint32_t> uart_irq;
   bool polling_mode = false;
-  gUart.Visit([&](auto& driver) {
-    using cfg_type = ktl::decay_t<decltype(driver.uart().config())>;
+  gUart.Visit([&]<typename DriverType>(DriverType& driver) {
+    using uart_type = typename DriverType::uart_type;
+    using cfg_type = typename uart_type::config_type;
     if constexpr (ktl::is_same_v<cfg_type, zbi_dcfg_simple_pio_t> ||
                   ktl::is_same_v<cfg_type, zbi_dcfg_simple_t>) {
-      uart_irq = PlatformUartGetIrqNumber(driver.uart().config().irq);
+      uart_irq = PlatformUartGetIrqNumber(driver.config().irq);
     } else {  // Only |uart::null::Driver| is expected to have a different configuration type.
-      using driver_type = ktl::decay_t<decltype(driver.uart())>;
-      constexpr auto kIsNullDriver = ktl::is_same_v<driver_type, uart::null::Driver>;
+      constexpr auto kIsNullDriver = ktl::is_same_v<uart_type, uart::null::Driver>;
       ZX_ASSERT_MSG(kIsNullDriver, "Unexpected UART Configuration.");
       // No IRQ Handler for null driver.
       return;
@@ -275,7 +275,7 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
 
     if constexpr (ktl::is_same_v<cfg_type, zbi_dcfg_simple_t>) {
       // Configure the interrupt if available.
-      auto irq_config = GetIrqConfigFromFlags(driver.uart().config().flags);
+      auto irq_config = GetIrqConfigFromFlags(driver.config().flags);
       if (irq_config) {
         zx_status_t irq_config_result =
             configure_interrupt(*uart_irq, irq_config->trigger, irq_config->polarity);

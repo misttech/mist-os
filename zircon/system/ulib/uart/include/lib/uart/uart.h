@@ -425,6 +425,7 @@ class KernelDriver {
 
  public:
   using uart_type = UartDriver;
+  using config_type = UartDriver::config_type;
   static_assert(std::is_copy_constructible_v<uart_type>);
   static_assert(std::is_trivially_destructible_v<uart_type> ||
                 std::is_same_v<uart_type, mock::Driver>);
@@ -446,6 +447,13 @@ class KernelDriver {
   // Access underlying hardware driver object.
   const auto& uart() const { return uart_; }
   auto& uart() { return uart_; }
+
+  // Returns a copy of the underlying uart config.
+  template <typename LockPolicy = DefaultLockPolicy>
+  config_type config() const {
+    Guard<LockPolicy> lock(&lock_, SOURCE_TAG);
+    return uart_.config();
+  }
 
   // Access IoProvider object.
   auto& io() { return io_; }
