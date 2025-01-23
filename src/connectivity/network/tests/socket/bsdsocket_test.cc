@@ -639,6 +639,54 @@ INSTANTIATE_TEST_SUITE_P(
                                      STRINGIFIED_SOCKOPT(IPPROTO_IPV6, IPV6_UNICAST_HOPS))),
     SocketKindAndOptionToString);
 
+class NullSocketOptionTest : public SocketOptionTestBase,
+                             public testing::WithParamInterface<
+                                 std::tuple<SocketDomain, SocketType, SocketOption, int, int>> {
+ protected:
+  NullSocketOptionTest()
+      : SocketOptionTestBase(std::get<0>(GetParam()), std::get<1>(GetParam())),
+        opt_(std::get<2>(GetParam())) {}
+
+  void SetUp() override { SocketOptionTestBase::SetUp(); }
+
+  void TearDown() override { SocketOptionTestBase::TearDown(); }
+
+  const SocketOption& opt() { return opt_; }
+
+  static int getsockopt_errno() { return std::get<3>(GetParam()); }
+  static int setsockopt_errno() { return std::get<4>(GetParam()); }
+
+ private:
+  SocketOption opt_;
+};
+
+TEST_P(NullSocketOptionTest, Set) {
+  ASSERT_EQ(setsockopt(sock().get(), opt().level, opt().name, nullptr, sizeof(int)), -1);
+  ASSERT_EQ(errno, setsockopt_errno());
+}
+
+TEST_P(NullSocketOptionTest, Get) {
+  ASSERT_EQ(getsockopt(sock().get(), opt().level, opt().name, nullptr, nullptr), -1);
+  ASSERT_EQ(errno, getsockopt_errno());
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    NullSocketOptionValidLevelsAndNames, NullSocketOptionTest,
+    testing::Combine(testing::Values(SocketDomain::IPv4(), SocketDomain::IPv6()),
+                     testing::Values(SocketType::Dgram(), SocketType::Stream()),
+                     testing::Values(STRINGIFIED_SOCKOPT(SOL_SOCKET, SO_REUSEADDR),
+                                     STRINGIFIED_SOCKOPT(SOL_SOCKET, SO_RCVBUF),
+                                     STRINGIFIED_SOCKOPT(SOL_SOCKET, SO_SNDBUF)),
+                     testing::Values(EFAULT), testing::Values(EFAULT)));
+
+INSTANTIATE_TEST_SUITE_P(
+    NullSocketOptionInvalidLevels, NullSocketOptionTest,
+    testing::Combine(testing::Values(SocketDomain::IPv4()),
+                     testing::Values(SocketType::Dgram(), SocketType::Stream()),
+                     testing::Values(SocketOption(1000, "invalid level", SO_SNDBUF, "SO_SNDBUF"),
+                                     SocketOption(1000, "invalid level", 1000, "invalid name")),
+                     testing::Values(EOPNOTSUPP), testing::Values(ENOPROTOOPT)));
+
 // TODO(https://fxbug.dev/42171446): Use SocketOptionTestBase for these tests.
 class SocketOptsTest : public SocketKindTest {
  protected:

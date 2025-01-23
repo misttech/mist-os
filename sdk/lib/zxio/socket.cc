@@ -162,6 +162,12 @@ struct SockOptResult {
   const zx_status_t status;
   const int16_t err;
 
+  // An implicit constructor to simplify error handling. This should represent an errno.
+  SockOptResult(fit::error<int16_t> error)
+      : SockOptResult(ZX_OK, fit::result<int16_t>(error).error_value()) {}
+
+  SockOptResult(zx_status_t status, int16_t err) : status(status), err(err) {}
+
   bool ok() const { return status == ZX_OK && err == 0; }
 
   static inline SockOptResult Ok() { return SockOptResult{ZX_OK, 0}; }
@@ -183,9 +189,52 @@ struct SockOptResult {
   }
 };
 
-class GetSockOptProcessor {
+// A helper class that forbids direct access to `optval` and `optlen`.
+template <typename OptVal, typename OptLen>
+class OptValAndLen {
+  static_assert(std::is_pointer_v<OptVal>);
+  static_assert(std::is_same_v<std::remove_pointer_t<OptLen>, socklen_t>);
+  static_assert(std::is_same_v<std::remove_const_t<std::remove_pointer_t<OptVal>>, void>);
+
+ protected:
+  OptValAndLen(OptVal optval, OptLen optlen) : optval_(optval), optlen_(optlen) {}
+  fit::result<int16_t, const OptVal> checked_optval() const {
+    if (!optval_) {
+      return fit::as_error<int16_t>(EFAULT);
+    }
+    return fit::success(optval_);
+  }
+
+  // The only exception that allows direct access is when `optlen_` is not a pointer.
+  template <typename T = OptLen, typename = std::enable_if_t<!std::is_pointer_v<T>>>
+  OptLen optlen() const {
+    return optlen_;
+  }
+
+  template <typename T = OptLen, typename = std::enable_if_t<std::is_pointer_v<T>>>
+  fit::result<int16_t, const OptLen> checked_optlen() const {
+    if (!optlen_) {
+      return fit::as_error<int16_t>(EFAULT);
+    }
+    return fit::success(optlen_);
+  }
+
+  template <typename T = OptLen, typename = std::enable_if_t<std::is_pointer_v<T>>>
+  fit::result<int16_t, std::pair<const OptVal, const OptLen>> checked_optval_and_optlen() const {
+    if (!optlen_ || !optval_) {
+      return fit::as_error<int16_t>(EFAULT);
+    }
+    return fit::success(std::pair(optval_, optlen_));
+  }
+
+ private:
+  const OptVal optval_;
+  const OptLen optlen_;
+};
+
+class GetSockOptProcessor : OptValAndLen<void*, socklen_t*> {
  public:
-  GetSockOptProcessor(void* optval, socklen_t* optlen) : optval_(optval), optlen_(optlen) {}
+  GetSockOptProcessor(void* optval, socklen_t* optlen) : OptValAndLen(optval, optlen) {}
 
   template <typename T, typename F>
   SockOptResult Process(T&& response, F getter) {
@@ -206,16 +255,18 @@ class GetSockOptProcessor {
 
  private:
   SockOptResult StoreRaw(const void* data, socklen_t data_len) {
-    if (data_len > *optlen_) {
+    auto optval_len = checked_optval_and_optlen();
+    if (optval_len.is_error()) {
+      return optval_len.take_error();
+    }
+    auto [optval, optlen] = *optval_len;
+    if (data_len > *optlen) {
       return SockOptResult::Errno(EINVAL);
     }
-    memcpy(optval_, data, data_len);
-    *optlen_ = data_len;
+    memcpy(optval, data, data_len);
+    *optlen = data_len;
     return SockOptResult::Ok();
   }
-
-  void* const optval_;
-  socklen_t* const optlen_;
 };
 
 template <>
@@ -259,12 +310,17 @@ SockOptResult GetSockOptProcessor::StoreOption(const struct linger& value) {
 
 template <>
 SockOptResult GetSockOptProcessor::StoreOption(const fidl::StringView& value) {
+  auto optval_len = checked_optval_and_optlen();
+  if (optval_len.is_error()) {
+    return optval_len.take_error();
+  }
+  auto [optval, optlen] = *optval_len;
   if (value.empty()) {
-    *optlen_ = 0;
-  } else if (*optlen_ > value.size()) {
-    char* p = std::copy(value.begin(), value.end(), static_cast<char*>(optval_));
+    *optlen = 0;
+  } else if (*optlen > value.size()) {
+    char* p = std::copy(value.begin(), value.end(), static_cast<char*>(optval));
     *p = 0;
-    *optlen_ = static_cast<socklen_t>(value.size()) + 1;
+    *optlen = static_cast<socklen_t>(value.size()) + 1;
   } else {
     return SockOptResult::Errno(EINVAL);
   }
@@ -280,9 +336,14 @@ struct TruncatingStringView {
 
 template <>
 SockOptResult GetSockOptProcessor::StoreOption(const TruncatingStringView& value) {
-  *optlen_ = std::min(*optlen_, static_cast<socklen_t>(value.string.size()));
-  if (*optlen_ > 0) {
-    char* p = std::copy_n(value.string.begin(), *optlen_ - 1, static_cast<char*>(optval_));
+  auto optval_len = checked_optval_and_optlen();
+  if (optval_len.is_error()) {
+    return optval_len.take_error();
+  }
+  auto [optval, optlen] = *optval_len;
+  *optlen = std::min(*optlen, static_cast<socklen_t>(value.string.size()));
+  if (*optlen > 0) {
+    char* p = std::copy_n(value.string.begin(), *optlen - 1, static_cast<char*>(optval));
     *p = 0;
   }
   return SockOptResult::Ok();
@@ -317,9 +378,14 @@ SockOptResult GetSockOptProcessor::StoreOption(const fnet::wire::Ipv4Address& va
 
 template <>
 SockOptResult GetSockOptProcessor::StoreOption(const frawsocket::wire::Icmpv6Filter& value) {
+  auto optval_len = checked_optval_and_optlen();
+  if (optval_len.is_error()) {
+    return optval_len.take_error();
+  }
+  auto [optval, optlen] = *optval_len;
   static_assert(sizeof(icmp6_filter) == sizeof(value.blocked_types));
-  *optlen_ = std::min(static_cast<socklen_t>(sizeof(icmp6_filter)), *optlen_);
-  memcpy(optval_, value.blocked_types.data(), *optlen_);
+  *optlen = std::min(static_cast<socklen_t>(sizeof(icmp6_filter)), *optlen);
+  memcpy(optval, value.blocked_types.data(), *optlen);
   return SockOptResult::Ok();
 }
 
@@ -333,6 +399,11 @@ SockOptResult GetSockOptProcessor::StoreOption(const fsocket::wire::TcpInfo& val
   // Note that "unsupported" includes fields not defined in FIDL *and* fields not populated by
   // the server.
   memset(&info, 0xff, sizeof(info));
+
+  auto optlen = checked_optlen();
+  if (optlen.is_error()) {
+    return optlen.take_error();
+  }
 
   if (value.has_state()) {
     info.tcpi_state = [](fsocket::wire::TcpState state) -> uint8_t {
@@ -398,12 +469,17 @@ SockOptResult GetSockOptProcessor::StoreOption(const fsocket::wire::TcpInfo& val
   }
 
   static_assert(sizeof(info) <= std::numeric_limits<socklen_t>::max());
-  return StoreRaw(&info, std::min(*optlen_, static_cast<socklen_t>(sizeof(info))));
+  return StoreRaw(&info, std::min(**optlen, static_cast<socklen_t>(sizeof(info))));
 }
 
 template <>
 SockOptResult GetSockOptProcessor::StoreOption(const fuchsia_net::wire::SocketAddress& value) {
-  *optlen_ = fidl_to_sockaddr(value, optval_, *optlen_);
+  auto optval_len = checked_optval_and_optlen();
+  if (optval_len.is_error()) {
+    return optval_len.take_error();
+  }
+  auto [optval, optlen] = *optval_len;
+  *optlen = fidl_to_sockaddr(value, optval, *optlen);
   return SockOptResult::Ok();
 }
 
@@ -464,26 +540,35 @@ struct PartialCopy {
 
 template <>
 SockOptResult GetSockOptProcessor::StoreOption(const PartialCopy& value) {
+  auto optval_len = checked_optval_and_optlen();
+  if (optval_len.is_error()) {
+    return optval_len.take_error();
+  }
+  auto [optval, optlen] = *optval_len;
   socklen_t want_size =
-      *optlen_ < sizeof(int32_t) && value.allow_char ? sizeof(uint8_t) : sizeof(value.value);
-  *optlen_ = std::min(want_size, *optlen_);
-  memcpy(optval_, &value.value, *optlen_);
+      *optlen < sizeof(int32_t) && value.allow_char ? sizeof(uint8_t) : sizeof(value.value);
+  *optlen = std::min(want_size, *optlen);
+  memcpy(optval, &value.value, *optlen);
   return SockOptResult::Ok();
 }
 
-class SetSockOptProcessor {
+class SetSockOptProcessor : OptValAndLen<const void*, socklen_t> {
  public:
-  SetSockOptProcessor(const void* optval, socklen_t optlen) : optval_(optval), optlen_(optlen) {}
+  SetSockOptProcessor(const void* optval, socklen_t optlen) : OptValAndLen(optval, optlen) {}
 
   template <typename T>
   using GetResult = fit::result<int16_t, T>;
 
   template <typename T>
   GetResult<T> Get() {
-    if (optlen_ < sizeof(T)) {
+    if (optlen() < sizeof(T)) {
       return fit::as_error<int16_t>(EINVAL);
     }
-    return fit::success(fbl::UnalignedLoad<T>(optval_));
+    auto optval = checked_optval();
+    if (optval.is_error()) {
+      return optval.take_error();
+    }
+    return fit::success(fbl::UnalignedLoad<T>(*optval));
   }
 
   template <typename T, typename F>
@@ -494,16 +579,16 @@ class SetSockOptProcessor {
     }
     return SockOptResult::FromFidlResponse(f(result.value()));
   }
-
- private:
-  const void* const optval_;
-  socklen_t const optlen_;
 };
 
 template <>
 SetSockOptProcessor::GetResult<fidl::StringView> SetSockOptProcessor::Get() {
-  const char* optval = static_cast<const char*>(optval_);
-  return fit::success(fidl::StringView::FromExternal(optval, strnlen(optval, optlen_)));
+  auto optval = checked_optval();
+  if (optval.is_error()) {
+    return optval.take_error();
+  }
+  const char* str = static_cast<const char*>(*optval);
+  return fit::success(fidl::StringView::FromExternal(str, strnlen(str, optlen())));
 }
 
 template <>
@@ -550,9 +635,13 @@ struct OptionalUint8CharAllowed {
 
 template <>
 SetSockOptProcessor::GetResult<OptionalUint8CharAllowed> SetSockOptProcessor::Get() {
-  if (optlen_ == sizeof(uint8_t)) {
+  if (optlen() == sizeof(uint8_t)) {
+    auto optval = checked_optval();
+    if (optval.is_error()) {
+      return optval.take_error();
+    }
     return fit::success(
-        fsocket::wire::OptionalUint8::WithValue(*static_cast<const uint8_t*>(optval_)));
+        fsocket::wire::OptionalUint8::WithValue(*static_cast<const uint8_t*>(*optval)));
   }
   return Get<fsocket::wire::OptionalUint8>();
 }
@@ -562,7 +651,7 @@ SetSockOptProcessor::GetResult<fsocket::wire::IpMulticastMembership> SetSockOptP
   struct in_addr local;
   struct in_addr mcast;
   fsocket::wire::IpMulticastMembership out;
-  if (optlen_ < sizeof(struct ip_mreqn)) {
+  if (optlen() < sizeof(struct ip_mreqn)) {
     auto req = Get<struct ip_mreq>();
     if (req.is_error()) {
       return fit::as_error<int16_t>(EINVAL);
@@ -613,10 +702,14 @@ SetSockOptProcessor::GetResult<frawsocket::wire::Icmpv6Filter> SetSockOptProcess
 
 template <>
 SetSockOptProcessor::GetResult<fsocket::wire::TcpCongestionControl> SetSockOptProcessor::Get() {
-  if (strncmp(static_cast<const char*>(optval_), kCcCubic, optlen_) == 0) {
+  auto optval = checked_optval();
+  if (optval.is_error()) {
+    return optval.take_error();
+  }
+  if (strncmp(static_cast<const char*>(*optval), kCcCubic, optlen()) == 0) {
     return fit::success(fsocket::wire::TcpCongestionControl::kCubic);
   }
-  if (strncmp(static_cast<const char*>(optval_), kCcReno, optlen_) == 0) {
+  if (strncmp(static_cast<const char*>(*optval), kCcReno, optlen()) == 0) {
     return fit::success(fsocket::wire::TcpCongestionControl::kReno);
   }
   return fit::as_error<int16_t>(ENOENT);
@@ -632,10 +725,14 @@ SetSockOptProcessor::GetResult<IntOrChar> SetSockOptProcessor::Get() {
   if (value.is_ok()) {
     return value.take_value();
   }
-  if (optlen_ == 0) {
+  if (optlen() == 0) {
     return fit::as_error<int16_t>(EINVAL);
   }
-  return fit::success(*static_cast<const uint8_t*>(optval_));
+  auto optval = checked_optval();
+  if (optval.is_error()) {
+    return optval.take_error();
+  }
+  return fit::success(*static_cast<const uint8_t*>(*optval));
 }
 
 // TODO(https://fxbug.dev/384115233): Update after the API is stabilized.
@@ -1063,10 +1160,6 @@ struct network_socket : public base_socket<T> {
   }
 
   SockOptResult getsockopt_fidl(int level, int optname, void* optval, socklen_t* optlen) {
-    if (optval == nullptr || optlen == nullptr) {
-      return SockOptResult::Errno(EFAULT);
-    }
-
     GetSockOptProcessor proc(optval, optlen);
     switch (level) {
       case SOL_SOCKET:
