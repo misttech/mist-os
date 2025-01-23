@@ -106,7 +106,7 @@ class Config {
 
   // Constructor to obtain configurations from a Uart.
   template <typename Uart>
-  explicit Config(const uart::Config<Uart>& config) : configs_(config) {}
+  explicit(false) Config(const uart::Config<Uart>& config) : configs_(config) {}
   template <typename Uart>
   explicit Config(const Uart& uart) : configs_(uart::Config<Uart>(uart.config())) {}
   template <typename Uart, template <typename, IoRegisterType> class IoProvider, typename Sync>
@@ -152,8 +152,8 @@ class Config {
 };
 
 // Instantiates `uart::all::Driver` with `config`.
-template <typename UartDriver>
-UartDriver MakeDriver(const Config<UartDriver>& config) {
+template <typename UartDriver = uart::all::Driver>
+UartDriver MakeDriver(const uart::all::Config<UartDriver>& config) {
   UartDriver driver;
   config.Visit([&driver]<typename T>(const T& uart_config) {
     driver.template emplace<typename T::uart_type>(*uart_config);
