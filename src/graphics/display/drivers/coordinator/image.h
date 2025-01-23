@@ -28,7 +28,7 @@ namespace display_coordinator {
 
 class Controller;
 
-// An Image is both a reference to an imported pixel buffer (hereafter ImageRef)
+// An Image is a reference to an imported sysmem pixel buffer.
 // and the state machine (hereafter ImageUse) for tracking its use as part of a config.
 //
 // ImageUse can be NOT_READY, READY, ACQUIRED, or PRESENTED.
@@ -78,19 +78,6 @@ class Image : public fbl::RefCounted<Image>,
   // The client that owns the image.
   ClientId client_id() const { return client_id_; }
 
-  // Marks the image as in use.
-  bool Acquire();
-  // Marks the image as not in use. Should only be called before PrepareFences.
-  void DiscardAcquire();
-  // Called to immediately retire the image if StartPresent hasn't been called yet.
-  void EarlyRetire();
-  // Called when the image is passed to the display hardware.
-  void StartPresent() __TA_REQUIRES(mtx());
-  // Called when another image is presented after this one.
-  void StartRetire() __TA_REQUIRES(mtx());
-  // Called on vsync after StartRetire has been called.
-  void OnRetire() __TA_REQUIRES(mtx());
-
   void set_latest_controller_config_stamp(display::ConfigStamp stamp) {
     latest_controller_config_stamp_ = stamp;
   }
@@ -107,6 +94,8 @@ class Image : public fbl::RefCounted<Image>,
   fbl::Mutex* mtx() const;
 
   // Checks if the Image is in a DoublyLinkedList container.
+  // TODO(https://fxbug.dev/317914671): investigate whether storing Images in doubly-linked lists
+  //                                    continues to be desirable.
   bool InDoublyLinkedList() const __TA_REQUIRES(mtx());
 
   // Removes the Image from the DoublyLinkedList. The Image must be in a
@@ -155,15 +144,6 @@ class Image : public fbl::RefCounted<Image>,
   // a client configuration sets a new layer image but the new image is not
   // ready yet, so the controller has to keep using the old image.
   display::ConfigStamp latest_client_config_stamp_ = display::kInvalidConfigStamp;
-
-  // Flag which indicates that the image is currently in some display configuration.
-  std::atomic_bool in_use_ = {};
-  // Flag indicating that the image is being managed by the display hardware.
-  bool presenting_ __TA_GUARDED(mtx()) = false;
-  // Flag indicating that the image has started the process of retiring and will be free after
-  // the next vsync. This is distinct from presenting_ due to multiplexing the display between
-  // multiple clients.
-  bool retiring_ __TA_GUARDED(mtx()) = false;
 
   inspect::Node node_;
   inspect::ValueList properties_;

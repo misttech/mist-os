@@ -635,11 +635,6 @@ void Client::SetLayerImageImpl(display::LayerId layer_id, display::ImageId image
   }
 
   Image& image = *image_it;
-  if (!image.Acquire()) {
-    FDF_LOG(ERROR, "SetLayerImage with image that is already in use");
-    TearDown(ZX_ERR_BAD_STATE);
-    return;
-  }
 
   // TODO(https://fxbug.dev/42076907): Currently this logic only compares size
   // and usage type between the current `Image` and a given `Layer`'s accepted
@@ -659,7 +654,6 @@ void Client::SetLayerImageImpl(display::LayerId layer_id, display::ImageId image
   // `Layer`'s format support.
   if (image.metadata() != display::ImageMetadata(layer->pending_image_metadata())) {
     FDF_LOG(ERROR, "SetLayerImage with mismatching layer and image metadata");
-    image.DiscardAcquire();
     TearDown(ZX_ERR_BAD_STATE);
     return;
   }
@@ -763,11 +757,6 @@ void Client::ApplyConfigFromFidl(display::ConfigStamp new_config_stamp) {
         // `Controller::ApplyConfig` for more details.
         if (layer->current_display_id_ != display_config.id && layer->displayed_image_ &&
             layer->HasWaitingImages()) {
-          {
-            fbl::AutoLock lock(controller_.mtx());
-            controller_.AssertMtxAliasHeld(*layer->displayed_image_->mtx());
-            layer->displayed_image_->StartRetire();
-          }
           layer->displayed_image_ = nullptr;
 
           // This doesn't need to be reset anywhere, since we really care about the last

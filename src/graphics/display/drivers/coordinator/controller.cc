@@ -180,7 +180,7 @@ zx::result<> Controller::AddDisplay(const raw_display_info_t& banjo_display_info
           PopulateDisplayTimings(display_info);
         }
 
-        // TODO(b/317914671): Pass parsed display metadata to driver.
+        // TODO(https://fxbug.dev/317914671): Pass parsed display metadata to driver.
 
         fbl::AutoLock lock(mtx());
 
@@ -224,10 +224,8 @@ zx::result<> Controller::RemoveDisplay(display::DisplayId display_id) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
-  while (fbl::RefPtr<Image> image = removed_display->images.pop_front()) {
-    AssertMtxAliasHeld(*image->mtx());
-    image->StartRetire();
-    image->OnRetire();
+  // Release references to all images on the display.
+  while (removed_display->images.pop_front()) {
   }
 
   fbl::AllocChecker alloc_checker;
@@ -406,14 +404,11 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
       // layer.
       if (should_retire) {
         fbl::RefPtr<Image> image_to_retire = info->images.erase(it++);
-
-        AssertMtxAliasHeld(*image_to_retire->mtx());
-        image_to_retire->OnRetire();
         // Older images may not be presented. Ending their flows here
         // ensures the correctness of traces.
         //
         // NOTE: If changing this flow name or ID, please also do so in the
-        // corresponding FLOW_BEGIN in display_swapchain.cc.
+        // corresponding FLOW_BEGIN.
         TRACE_FLOW_END("gfx", "present_image", image_to_retire->id.value());
       } else {
         it++;
@@ -447,7 +442,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
         // End of the flow for the image going to be presented.
         //
         // NOTE: If changing this flow name or ID, please also do so in the
-        // corresponding FLOW_BEGIN in display_swapchain.cc.
+        // corresponding FLOW_BEGIN.
         TRACE_FLOW_END("gfx", "present_image", image.image_id.value());
       }
     }
@@ -572,7 +567,10 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
         // image was used at.
         AssertMtxAliasHeld(*image->mtx());
         image->set_latest_controller_config_stamp(applied_config_stamp);
-        image->StartPresent();
+
+        // NOTE: If changing this flow name or ID, please also do so in the
+        // corresponding FLOW_END.
+        TRACE_FLOW_BEGIN("gfx", "present_image", image->id.value());
 
         // It's possible that the image's layer was moved between displays. The logic around
         // pending_layer_change guarantees that the old display will be done with the image
@@ -581,6 +579,9 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
         // Even if we're on the same display, the entry needs to be moved to the end of the
         // list to ensure that the last config->current.layer_count elements in the queue
         // are the current images.
+        //
+        // TODO(https://fxbug.dev/317914671): investigate whether storing Images in doubly-linked
+        //                                    lists continues to be desirable.
         if (image->InDoublyLinkedList()) {
           image->RemoveFromDoublyLinkedList();
         }
@@ -942,10 +943,8 @@ void Controller::PrepareStop() {
     // triggered when drivers are shut down. We should proactively retire
     // all images on all displays.
     for (DisplayInfo& display : displays_) {
-      while (fbl::RefPtr<Image> image = display.images.pop_front()) {
-        AssertMtxAliasHeld(*image->mtx());
-        image->StartRetire();
-        image->OnRetire();
+      // Release all reffed images.
+      while (display.images.pop_front()) {
       }
     }
   }

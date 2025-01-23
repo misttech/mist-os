@@ -48,20 +48,4 @@ class ImageTest : public TestBase, public FenceCallback {
   display::ImageId next_image_id_ = display::ImageId(1);
 };
 
-TEST_F(ImageTest, MultipleAcquiresAllowed) {
-  zx::vmo vmo;
-  ASSERT_OK(zx::vmo::create(1024 * 600 * 4, 0u, &vmo));
-  static constexpr display::ImageMetadata image_metadata({
-      .width = 1024,
-      .height = 600,
-      .tiling_type = display::ImageTilingType::kLinear,
-  });
-  fbl::RefPtr<Image> image = ImportImage(std::move(vmo), image_metadata);
-
-  EXPECT_TRUE(image->Acquire());
-  image->DiscardAcquire();
-  EXPECT_TRUE(image->Acquire());
-  image->EarlyRetire();
-}
-
 }  // namespace display_coordinator

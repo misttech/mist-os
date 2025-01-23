@@ -34,7 +34,6 @@ Image::Image(Controller* controller, const display::ImageMetadata& metadata,
   InitializeInspect(parent_node);
 }
 Image::~Image() {
-  ZX_ASSERT(!std::atomic_load(&in_use_));
   ZX_ASSERT(!InDoublyLinkedList());
   controller_.ReleaseImage(driver_id_);
 }
@@ -57,42 +56,5 @@ bool Image::InDoublyLinkedList() const { return doubly_linked_list_node_state_.I
 fbl::RefPtr<Image> Image::RemoveFromDoublyLinkedList() {
   return doubly_linked_list_node_state_.RemoveFromContainer<DefaultDoublyLinkedListTraits>();
 }
-
-void Image::StartPresent() {
-  TRACE_DURATION("gfx", "Image::StartPresent", "id", id.value());
-  TRACE_FLOW_BEGIN("gfx", "present_image", id.value());
-
-  presenting_ = true;
-  presenting_property_.Set(true);
-}
-
-void Image::EarlyRetire() {
-  // A client may reuse an image as soon as retire_fence_ fires. Set in_use_ first.
-  std::atomic_store(&in_use_, false);
-}
-
-void Image::StartRetire() {
-  if (!presenting_) {
-    std::atomic_store(&in_use_, false);
-  } else {
-    retiring_ = true;
-    retiring_property_.Set(true);
-  }
-}
-
-void Image::OnRetire() {
-  presenting_ = false;
-  presenting_property_.Set(false);
-
-  if (retiring_) {
-    std::atomic_store(&in_use_, false);
-    retiring_ = false;
-    retiring_property_.Set(false);
-  }
-}
-
-void Image::DiscardAcquire() { std::atomic_store(&in_use_, false); }
-
-bool Image::Acquire() { return !std::atomic_exchange(&in_use_, true); }
 
 }  // namespace display_coordinator

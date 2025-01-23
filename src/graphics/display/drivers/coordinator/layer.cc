@@ -43,7 +43,6 @@ static void EarlyRetireUpTo(LayerWaitingImageDoublyLinkedList& list,
                             LayerWaitingImageDoublyLinkedList::iterator end) {
   while (list.begin() != end) {
     auto waiting_image = list.pop_front();
-    waiting_image->image()->EarlyRetire();
     waiting_image->ResetWaitFence();
   }
 }
@@ -83,14 +82,7 @@ Layer::~Layer() {
   ZX_DEBUG_ASSERT(!in_use());
   ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
 
-  if (pending_image_) {
-    pending_image_->DiscardAcquire();
-  }
   EarlyRetireUpTo(waiting_images_, waiting_images_.end());
-  if (displayed_image_) {
-    fbl::AutoLock lock(displayed_image_->mtx());
-    displayed_image_->StartRetire();
-  }
 }
 
 fbl::Mutex* Layer::mtx() const { return controller_.mtx(); }
@@ -108,13 +100,7 @@ bool Layer::ResolvePendingLayerProperties() {
     }
 
     EarlyRetireUpTo(waiting_images_, waiting_images_.end());
-    if (displayed_image_ != nullptr) {
-      {
-        fbl::AutoLock lock(displayed_image_->mtx());
-        displayed_image_->StartRetire();
-      }
-      displayed_image_ = nullptr;
-    }
+    displayed_image_ = nullptr;
   }
   return true;
 }
@@ -170,10 +156,7 @@ void Layer::ApplyChanges(const display_mode_t& mode) {
 
 void Layer::DiscardChanges() {
   pending_image_config_gen_ = current_image_config_gen_;
-  if (pending_image_) {
-    pending_image_->DiscardAcquire();
-    pending_image_ = nullptr;
-  }
+  pending_image_ = nullptr;
   if (config_change_) {
     pending_layer_ = current_layer_;
     config_change_ = false;
@@ -231,12 +214,6 @@ bool Layer::ActivateLatestReadyImage() {
 
   if (!found_ready_image) {
     return false;
-  }
-
-  // Retire the last active image
-  if (displayed_image_ != nullptr) {
-    fbl::AutoLock lock(displayed_image_->mtx());
-    displayed_image_->StartRetire();
   }
 
   // Retire the waiting images that were never presented.
@@ -316,10 +293,6 @@ void Layer::SetColorConfig(fuchsia_hardware_display_types::wire::Color color) {
 }
 
 void Layer::SetImage(fbl::RefPtr<Image> image, display::EventId wait_event_id) {
-  if (pending_image_) {
-    pending_image_->DiscardAcquire();
-  }
-
   pending_image_ = std::move(image);
   pending_wait_event_id_ = wait_event_id;
 }
@@ -340,12 +313,7 @@ bool Layer::HasWaitingImages() const {
   return !waiting_images_.is_empty();
 }
 
-void Layer::RetirePendingImage() {
-  if (pending_image_) {
-    pending_image_->DiscardAcquire();
-    pending_image_ = nullptr;
-  }
-}
+void Layer::RetirePendingImage() { pending_image_ = nullptr; }
 
 void Layer::RetireWaitingImage(const Image& image) {
   ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
@@ -359,7 +327,6 @@ void Layer::RetireWaitingImage(const Image& image) {
       LayerWaitingImagePointer to_retire = waiting_images_.erase(it);
       ZX_DEBUG_ASSERT(to_retire);
       to_retire->ResetWaitFence();
-      to_retire->image()->EarlyRetire();
 
       it = next_it;
     } else {
@@ -372,10 +339,6 @@ bool Layer::RetireDisplayedImage() {
   if (!displayed_image_) {
     return false;
   }
-
-  controller_.AssertMtxAliasHeld(*displayed_image_->mtx());
-  displayed_image_->StartRetire();
-
   displayed_image_ = nullptr;
 
   return current_node_.InContainer();

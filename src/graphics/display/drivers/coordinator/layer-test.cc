@@ -56,7 +56,6 @@ class LayerTest : public TestBase {
     fbl::RefPtr<Image> image = fbl::AdoptRef(new Image(
         CoordinatorController(), image_metadata, import_result.value(), nullptr, ClientId(1)));
     image->id = next_image_id_++;
-    image->Acquire();
     return image;
   }
 
@@ -248,40 +247,24 @@ TEST_F(LayerTest, CleanUpImage) {
   ASSERT_TRUE(ActivateLatestReadyImageOnControllerLoop(*layer));
 
   EXPECT_TRUE(layer->current_image());
-  // pending / waiting images are still busy.
-  EXPECT_FALSE(pending_image->Acquire());
-  EXPECT_FALSE(waiting_image->Acquire());
 
   // Nothing should happen if image doesn't match.
   auto not_matching_image = CreateReadyImage();
   EXPECT_FALSE(CleanUpImageOnControllerLoop(*layer, *not_matching_image));
   EXPECT_TRUE(layer->current_image());
-  EXPECT_FALSE(pending_image->Acquire());
-  EXPECT_FALSE(waiting_image->Acquire());
 
   // Test cleaning up a waiting image.
   EXPECT_FALSE(CleanUpImageOnControllerLoop(*layer, *waiting_image));
   EXPECT_TRUE(layer->current_image());
-  EXPECT_FALSE(pending_image->Acquire());
-  // waiting_image should be released.
-  EXPECT_TRUE(waiting_image->Acquire());
 
   // Test cleaning up a pending image.
   EXPECT_FALSE(CleanUpImageOnControllerLoop(*layer, *pending_image));
   EXPECT_TRUE(layer->current_image());
-  // pending_image should be released.
-  EXPECT_TRUE(pending_image->Acquire());
 
   // Test cleaning up the displayed image.
   // layer is not labeled current, so it doesn't change the current config.
   EXPECT_FALSE(CleanUpImageOnControllerLoop(*layer, *displayed_image));
   EXPECT_FALSE(layer->current_image());
-
-  // Teardown. Images must be unused (retired) when destroyed.
-  displayed_image->EarlyRetire();
-  not_matching_image->EarlyRetire();
-  waiting_image->EarlyRetire();
-  pending_image->EarlyRetire();
 }
 
 TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
@@ -312,8 +295,6 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
     // config.
     EXPECT_FALSE(CleanUpImageOnControllerLoop(*layer, *image));
     EXPECT_FALSE(layer->current_image());
-
-    image->EarlyRetire();
   }
 
   // Clean up images, which changes the current config.
@@ -331,8 +312,6 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
     // layer is labeled current, so image cleanup will change the current config.
     EXPECT_TRUE(CleanUpImageOnControllerLoop(*layer, *image));
     EXPECT_FALSE(layer->current_image());
-
-    image->EarlyRetire();
 
     current_layers.clear();
   }
@@ -374,15 +353,6 @@ TEST_F(LayerTest, CleanUpAllImages) {
   // layer is not labeled current, so it doesn't change the current config.
   EXPECT_FALSE(CleanUpAllImagesOnControllerLoop(*layer));
   EXPECT_FALSE(layer->current_image());
-  // pending_image should be released.
-  EXPECT_TRUE(pending_image->Acquire());
-  // waiting_image should be released.
-  EXPECT_TRUE(waiting_image->Acquire());
-
-  // Teardown. Images must be unused (retired) when destroyed.
-  displayed_image->EarlyRetire();
-  waiting_image->EarlyRetire();
-  pending_image->EarlyRetire();
 }
 
 TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
@@ -413,8 +383,6 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
     // config.
     EXPECT_FALSE(CleanUpAllImagesOnControllerLoop(*layer));
     EXPECT_FALSE(layer->current_image());
-
-    image->EarlyRetire();
   }
 
   // Clean up all images, which changes the current config.
@@ -432,8 +400,6 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
     // layer is labeled current, so image cleanup will change the current config.
     EXPECT_TRUE(CleanUpAllImagesOnControllerLoop(*layer));
     EXPECT_FALSE(layer->current_image());
-
-    image->EarlyRetire();
 
     current_layers.clear();
   }
