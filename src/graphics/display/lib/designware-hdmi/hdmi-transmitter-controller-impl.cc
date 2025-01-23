@@ -667,12 +667,7 @@ zx_status_t HdmiTransmitterControllerImpl::EdidTransfer(const i2c_impl_op_t* op_
         registers::DdcControllerWordOffset::Get().FromValue(0).set_word_offset(offset).WriteTo(
             &controller_mmio_);
 
-        // TODO(https://fxbug.dev/390552175): The code below uses DDC instead of
-        // E-DDC to read the EDID bytes. The segment pointer is not sent to the
-        // display device, so the actual bytes read by the DDC controller are
-        // dependent by the display device implementation. We should use E-DDC
-        // instead.
-        registers::DdcControllerCommand::Get().FromValue(0).set_ddc_read_8bytes(true).WriteTo(
+        registers::DdcControllerCommand::Get().FromValue(0).set_eddc_read_8bytes(true).WriteTo(
             &controller_mmio_);
         offset = static_cast<uint8_t>(offset + 8);
 
