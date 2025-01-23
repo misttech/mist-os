@@ -24,6 +24,7 @@ use pkg::repo::repo_spec_to_backend;
 use pkg::{PkgServerInstanceInfo as _, PkgServerInstances};
 use prettytable::format::{FormatBuilder, TableFormat};
 use prettytable::{cell, row, Row, Table};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufWriter, Cursor, Read};
 use std::time::{Duration, SystemTime};
@@ -169,20 +170,27 @@ async fn list_impl(
         let mut package = RepositoryPackage {
             name: package.name,
             hash: package.hash.to_string(),
-            size: package.size,
+            size: None,
             modified: package.modified,
             entries: None,
         };
 
-        if cmd.include_components {
-            package.entries = repo.show_package(&package.name, false).await?.map(|entries| {
-                entries
-                    .into_iter()
-                    .filter(|entry| entry.subpackage.is_none())
-                    .filter(|entry| entry.path.ends_with(".cm"))
-                    .collect()
-            });
-        };
+        package.entries = repo.show_package(&package.name, true).await?.map(|entries| {
+            // Compute the total size of the unique blobs.
+            let mut blob_sizes = HashMap::new();
+            for entry in &entries {
+                if let (Some(hash), Some(size)) = (entry.hash, entry.size) {
+                    blob_sizes.insert(hash, size);
+                }
+            }
+            package.size = Some(blob_sizes.values().sum());
+
+            entries
+                .into_iter()
+                .filter(|entry| entry.subpackage.is_none())
+                .filter(|entry| entry.path.ends_with(".cm"))
+                .collect()
+        });
 
         packages.push(package);
     }

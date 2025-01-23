@@ -1501,7 +1501,6 @@ mod tests {
 
         for (repo_pkg, pb_pkg) in std::iter::zip(repo_pkgs, pb_pkgs) {
             assert_eq!(repo_pkg.name, pb_pkg.name);
-            assert_eq!(repo_pkg.size, pb_pkg.size);
             assert_eq!(repo_pkg.hash, pb_pkg.hash);
             // Although the test is fairly quick, it does happen that the modified stamps differ by
             // a short timespan (1-2 seconds), hence we allow a grace period of 5 seconds to pass.

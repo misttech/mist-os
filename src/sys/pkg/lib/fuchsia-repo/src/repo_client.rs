@@ -19,7 +19,7 @@ use futures::future::{BoxFuture, Shared};
 use futures::io::Cursor;
 use futures::stream::{self, BoxStream};
 use futures::{AsyncRead, AsyncReadExt as _, FutureExt as _, StreamExt as _, TryStreamExt as _};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 use std::fmt::{self, Debug};
 use std::time::SystemTime;
 use tuf::client::{Client as TufClient, Config};
@@ -194,6 +194,18 @@ where
         Err(anyhow!("blob {path} too small"))
     }
 
+    async fn blob_modification_time_secs(&self, hash: &Hash) -> Result<Option<u64>> {
+        let path = self.delivery_blob_path(hash);
+        self.tuf_client
+            .remote_repo()
+            .blob_modification_time(&path)
+            .await?
+            .map(|x| -> anyhow::Result<u64> {
+                Ok(x.duration_since(SystemTime::UNIX_EPOCH)?.as_secs())
+            })
+            .transpose()
+    }
+
     /// Return the target description for a TUF target path.
     pub async fn get_target_description(
         &self,
@@ -259,32 +271,10 @@ where
 
             let meta_far_hash = Hash::try_from(meta_far_hash_str)?;
 
-            // Parse the meta.far file.
-            let entries =
-                self.walk_meta_package(&meta_far_hash, package_name.as_str(), &None, true).await?;
-
-            // First entry contains the meta.far entry.
-            let meta_far_modified = match entries.first() {
-                Some(entry) => entry.modified,
-                None => None,
-            };
-
-            // Compute the total size of the unique blobs.
-            let mut blob_sizes = HashMap::new();
-            for entry in entries {
-                if let (Some(hash), Some(size)) = (entry.hash, entry.size) {
-                    blob_sizes.insert(hash, size);
-                }
-            }
-            let mut size = 0;
-            for blob_size in blob_sizes.values() {
-                size += blob_size;
-            }
             packages.push(RepositoryPackage {
                 name: package_name.to_string(),
                 hash: meta_far_hash,
-                size: Some(size),
-                modified: meta_far_modified,
+                modified: self.blob_modification_time_secs(&meta_far_hash).await?,
             });
         }
 
@@ -337,15 +327,7 @@ where
                 fuchsia_archive::AsyncUtf8Reader::new(Adapter::new(Cursor::new(meta_far_bytes)))
                     .await?;
 
-            let modified = self
-                .tuf_client
-                .remote_repo()
-                .blob_modification_time(&self.delivery_blob_path(hash))
-                .await?
-                .map(|x| -> anyhow::Result<u64> {
-                    Ok(x.duration_since(SystemTime::UNIX_EPOCH)?.as_secs())
-                })
-                .transpose()?;
+            let modified = self.blob_modification_time_secs(hash).await?;
 
             // Add entry for meta.far
             let mut entries = vec![PackageEntry {
@@ -378,13 +360,7 @@ where
                                 self.blob_decompressed_size(hash).await.with_context(|| {
                                     format!("getting decompressed size of blob {hash}")
                                 })?;
-                            let modified = self
-                                .blob_modification_time(&self.delivery_blob_path(hash))
-                                .await?
-                                .map(|x| -> anyhow::Result<u64> {
-                                    Ok(x.duration_since(SystemTime::UNIX_EPOCH)?.as_secs())
-                                })
-                                .transpose()?;
+                            let modified = self.blob_modification_time_secs(hash).await?;
                             Ok::<_, anyhow::Error>(PackageEntry {
                                 subpackage: subpackage.clone(),
                                 path: name.to_owned(),
@@ -576,9 +552,6 @@ pub struct RepositoryPackage {
     /// The package merkle hash (the hash of the `meta.far`).
     pub hash: Hash,
 
-    /// The total size in bytes of all the blobs in this package if known.
-    pub size: Option<u64>,
-
     /// The last modification timestamp (seconds since UNIX epoch) if known.
     pub modified: Option<u64>,
 }
@@ -711,13 +684,11 @@ mod tests {
                 RepositoryPackage {
                     name: "package1/0".into(),
                     hash: PKG1_HASH.try_into().unwrap(),
-                    size: Some(24603),
                     modified: Some(pkg1_modified),
                 },
                 RepositoryPackage {
                     name: "package2/0".into(),
                     hash: PKG2_HASH.try_into().unwrap(),
-                    size: Some(24603),
                     modified: Some(pkg2_modified),
                 },
             ],
