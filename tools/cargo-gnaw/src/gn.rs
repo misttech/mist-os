@@ -13,7 +13,7 @@ use cargo_metadata::Package;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt::Display;
-use std::io::{self, Write};
+use std::io;
 use std::path::Path;
 use walkdir::WalkDir;
 
@@ -112,30 +112,8 @@ pub fn write_fuchsia_sdk_metadata<W: io::Write>(
     output: &mut W,
     platform: Option<&str>,
     pkg: &Package,
-    abs_dir: &Path,
-    rel_dir: &Path,
 ) -> Result<()> {
-    // TODO: add features, and registry
-    std::fs::create_dir_all(abs_dir)
-        .with_context(|| format!("while making directories for {}", abs_dir.display()))?;
-
-    let file_name = format!("{}.sdk.meta.json", pkg.name);
-    let abs_path = abs_dir.join(&file_name);
-    let rel_path = rel_dir.join(&file_name);
-    let mut metadata_output = std::fs::File::create(&abs_path)
-        .with_context(|| format!("while writing {}", abs_path.display()))?;
-    writeln!(
-        metadata_output,
-        r#"{{
-    "type": "{sdk_atom_type}",
-    "name": "{group_name}",
-    "version": "{version}"
-}}"#,
-        sdk_atom_type = if pkg.is_proc_macro() { "rust_3p_proc_macro" } else { "rust_3p_library" },
-        group_name = pkg.name,
-        version = pkg.version,
-    )?;
-
+    // TODO: add features and registry to metadata
     let platform_constraint = if let Some(p) = platform {
         format!(" && {}", target_to_gn_conditional(p)?)
     } else {
@@ -147,18 +125,23 @@ pub fn write_fuchsia_sdk_metadata<W: io::Write>(
         r#" if (_generating_sdk{constraint}) {{
             sdk_atom("{group_name}_sdk") {{
                 id = "sdk://${{_sdk_prefix}}third_party/rust_crates/{group_name}"
-                category = "internal"
+                category = "partner_internal"
                 meta = {{
-                    source = "{source}"
+                    value = {{
+                        type = "{sdk_atom_type}"
+                        name = "{group_name}"
+                        version = "{version}"
+                    }}
                     dest = "${{_sdk_prefix}}third_party/rust_crates/{group_name}/meta.json"
-                    schema = "3p_rust_library"
+                    schema = "rust_3p_library"
                 }}
             }}
         }}
         "#,
         constraint = platform_constraint,
-        source = rel_path.display(),
         group_name = pkg.name,
+        sdk_atom_type = "rust_3p_library",
+        version = pkg.version,
     )?;
 
     Ok(())

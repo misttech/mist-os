@@ -165,7 +165,6 @@ if (is_host) {
       "sdk_metadata/BUILD.gn",
       "sdk_metadata/Cargo.lock",
       "sdk_metadata/Cargo.toml",
-      "sdk_metadata/sdk_metas/sdk_metadata.sdk.meta.json",
       "sdk_metadata/src/lib.rs",
       "sdk_metadata/sub-crate-proc-macro/Cargo.toml",
       "sdk_metadata/sub-crate-proc-macro/src/lib.rs",

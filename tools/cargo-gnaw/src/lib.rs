@@ -74,9 +74,9 @@ pub struct Opt {
     #[argh(option)]
     features: Vec<String>,
 
-    /// directory to emit Fuchsia SDK metadata atoms into
-    #[argh(option)]
-    output_fuchsia_sdk_metadata: Option<PathBuf>,
+    /// whether to emit Fuchsia SDK metadata atoms
+    #[argh(switch)]
+    output_fuchsia_sdk_metadata: bool,
 }
 
 type PackageName = String;
@@ -304,13 +304,6 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
         .unwrap()
         .strip_prefix(&opt.project_root)
         .expect("--project-root must be a parent of --output");
-    let fuchsia_sdk_metadata_paths =
-        opt.output_fuchsia_sdk_metadata.as_ref().map(|output_fuchsia_sdk_metadata| {
-            let path_from_root_to_generated = output_fuchsia_sdk_metadata
-                .strip_prefix(opt.output.parent().unwrap())
-                .expect("--output_fuchsia_sdk_metadata must be in the same directory as --output");
-            (output_fuchsia_sdk_metadata, path_from_root_to_generated)
-        });
     let mut emitted_metadata: Vec<CrateOutputMetadata> = Vec::new();
     let mut top_level_metadata: HashSet<String> = HashSet::new();
     let mut imported_files: HashSet<String> = HashSet::new();
@@ -350,7 +343,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
 
     gn::write_header(&mut output, manifest_path).context("writing header")?;
 
-    if opt.output_fuchsia_sdk_metadata.is_some() {
+    if opt.output_fuchsia_sdk_metadata {
         gn::write_fuchsia_sdk_metadata_header(&mut output)
             .context("writing Fuchsia SDK metadata header")?;
     }
@@ -413,13 +406,11 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                             })
                             .context("writing top level rule")?;
 
-                            if let Some((abs_path, rel_path)) = &fuchsia_sdk_metadata_paths {
+                            if opt.output_fuchsia_sdk_metadata {
                                 gn::write_fuchsia_sdk_metadata(
                                     &mut output,
                                     platform.as_deref(),
                                     package,
-                                    abs_path,
-                                    rel_path,
                                 )
                                 .with_context(|| {
                                     format!(
@@ -461,8 +452,8 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                 )
                 .with_context(|| "writing top level rule")?;
 
-                if let Some((abs_path, rel_path)) = &fuchsia_sdk_metadata_paths {
-                    gn::write_fuchsia_sdk_metadata(&mut output, None, package, abs_path, rel_path)
+                if opt.output_fuchsia_sdk_metadata {
+                    gn::write_fuchsia_sdk_metadata(&mut output, None, package)
                         .with_context(|| "writing Fuchsia SDK metadata for top level rule")?;
                 }
             }

@@ -29,6 +29,7 @@ _types_not_requiring_compatibility = [
   "ffx_tool",
   "host_tool",
   "package",
+  "rust_3p_library",
   "version_history",
 ]
 

@@ -17,6 +17,6 @@
         }
     ],
     "description": "A third party Rust library",
-    "id": "https://fuchsia.com/schemas/sdk/3p_rust_library.json",
+    "id": "https://fuchsia.com/schemas/sdk/rust_3p_library.json",
     "type": "object"
 }

@@ -150,6 +150,7 @@ _AREA_OPTIONAL_TYPES = [
     "host_tool",
     "loadable_module",
     "package",
+    "rust_3p_library",
     "sysroot",
     "version_history",
 ]
