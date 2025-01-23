@@ -192,7 +192,7 @@ TEST(Devfs, PassthroughTarget) {
       });
 
   DevfsDevice device;
-  ASSERT_OK(root_slot.value().add_child("test", std::nullopt, passthrough.Clone(), device));
+  ASSERT_OK(root_slot.value().add_child("test", std::nullopt, passthrough, device));
   device.publish();
 
   zx::result devfs_client = devfs.Connect(vfs);

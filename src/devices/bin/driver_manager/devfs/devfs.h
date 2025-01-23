@@ -45,8 +45,6 @@ class Devnode {
           controller_connect(
               std::make_shared<ControllerConnectCallback>(std::move(controller_callback))) {}
 
-    PassThrough Clone() { return *this; }
-
     std::shared_ptr<DeviceConnectCallback> device_connect;
     std::shared_ptr<ControllerConnectCallback> controller_connect;
   };

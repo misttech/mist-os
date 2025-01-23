@@ -34,11 +34,6 @@
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 namespace driver_manager {
-namespace {
-
-Devnode::Target clone_target(Devnode::Target& target) { return target; }
-
-}  // namespace
 
 namespace fio = fuchsia_io;
 
@@ -111,7 +106,7 @@ Devnode::Devnode(Devfs& devfs)
 Devnode::Devnode(Devfs& devfs, PseudoDir& parent, Target target, fbl::String name)
     : devfs_(devfs),
       parent_(&parent),
-      node_(fbl::MakeRefCounted<VnodeImpl>(*this, clone_target(target))),
+      node_(fbl::MakeRefCounted<VnodeImpl>(*this, target)),
       name_([this, &parent, name = std::move(name)]() {
         auto [it, inserted] = parent.unpublished.emplace(name, *this);
         ZX_ASSERT(inserted);
@@ -120,14 +115,14 @@ Devnode::Devnode(Devfs& devfs, PseudoDir& parent, Target target, fbl::String nam
   if (target.has_value()) {
     children().AddEntry(
         fuchsia_device_fs::wire::kDeviceControllerName,
-        fbl::MakeRefCounted<fs::Service>([passthrough = target->Clone()](zx::channel channel) {
-          return (*passthrough.controller_connect.get())(
+        fbl::MakeRefCounted<fs::Service>([passthrough = target](zx::channel channel) {
+          return (*passthrough->controller_connect.get())(
               fidl::ServerEnd<fuchsia_device::Controller>(std::move(channel)));
         }));
     children().AddEntry(
         fuchsia_device_fs::wire::kDeviceProtocolName,
-        fbl::MakeRefCounted<fs::Service>([passthrough = target->Clone()](zx::channel channel) {
-          return (*passthrough.device_connect.get())(std::move(channel));
+        fbl::MakeRefCounted<fs::Service>([passthrough = target](zx::channel channel) {
+          return (*passthrough->device_connect.get())(std::move(channel));
         }));
   }
 }
@@ -246,9 +241,8 @@ zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_
   if (class_name.has_value()) {
     zx::result<std::string> instance_name = devfs_.MakeInstanceName(class_name.value());
     if (instance_name.is_ok()) {
-      Devnode::Target target_clone = clone_target(target);
-      out_child.protocol_node().emplace(devfs_, *devfs_.get_class_entry(class_name.value()),
-                                        std::move(target_clone), instance_name.value());
+      out_child.protocol_node().emplace(devfs_, *devfs_.get_class_entry(class_name.value()), target,
+                                        instance_name.value());
     }
   }
 
@@ -372,16 +366,14 @@ zx_status_t Devnode::export_dir(Devnode::Target target,
                                 std::optional<std::string_view> class_path,
                                 std::vector<std::unique_ptr<Devnode>>& out) {
   if (topological_path.has_value()) {
-    Devnode::Target target_clone = clone_target(target);
-    zx_status_t status =
-        export_topological_path(std::move(target_clone), topological_path.value(), out);
+    zx_status_t status = export_topological_path(target, topological_path.value(), out);
     if (status != ZX_OK) {
       return status;
     }
   }
 
   if (class_path.has_value()) {
-    zx_status_t status = export_class(std::move(target), class_path.value(), out);
+    zx_status_t status = export_class(target, class_path.value(), out);
     if (status != ZX_OK) {
       return status;
     }
