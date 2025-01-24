@@ -26,6 +26,21 @@ source_set("platform_device_helper_dfv2") {
   sources = [ "platform_device_helper.h" ]
 }
 
+source_set("gtest_printer") {
+  testonly = true
+  public_configs = [ "../../..:src_config" ]
+
+  public_deps = [
+    "//src/graphics/magma/lib/magma/platform:logger_header",
+    "//third_party/googletest:gtest",
+  ]
+
+  sources = [
+    "gtest_printer.cc",
+    "gtest_printer.h",
+  ]
+}
+
 source_set("platform_pci_device_helper") {
   public_configs = [ "../../..:src_config" ]
 
