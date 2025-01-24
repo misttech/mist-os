@@ -69,6 +69,10 @@ fuchsia_package_with_single_component("config-use-suspender") {
   manifest = "meta/config-use-suspender.cml"
 }
 
+fuchsia_package_with_single_component("config-wait-for-token") {
+  manifest = "meta/config-wait-for-token.cml"
+}
+
 fuchsia_component("component") {
   cm_label = ":manifest"
   deps = [ ":bin" ]

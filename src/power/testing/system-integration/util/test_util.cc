@@ -254,6 +254,72 @@ zx::result<std::string> TestLoopBase::GetPowerElementId(diagnostics::reader::Arc
   }
 }
 
+zx::eventpair TestLoopBase::PrepareDriver(std::string_view node_filter, std::string_view driver_url,
+                                          bool expect_new_koid) {
+  // Find the node running our target driver.
+  std::cout << "Preparing driver '" << driver_url << "' for test..." << std::endl;
+  std::optional<std::string> found = std::nullopt;
+  uint64_t old_koid;
+  while (!found) {
+    auto node_vec = GetNodeInfo(node_filter);
+    for (auto& node : node_vec) {
+      if (node.bound_driver_url().has_value() && node.bound_driver_url().value() == driver_url) {
+        std::cout << "driver found with moniker '" << node.moniker().value() << "'" << std::endl;
+        found.emplace(node.moniker().value());
+        old_koid = node.driver_host_koid().value();
+        break;
+      }
+    }
+
+    if (!found) {
+      std::cout << "driver not found, retrying... " << std::endl;
+      // Small loop delay.
+      RunLoopWithTimeout(zx::msec(10));
+    }
+  }
+
+  std::cout << "restarting driver with test dictionary..." << std::endl;
+  // Setup the power dictionary and restart the node with this dictionary.
+  auto dict_ref = CreateDictionaryForTest();
+  auto result =
+      fidl::Call(driver_manager_client_end_)->RestartWithDictionary({*found, std::move(dict_ref)});
+  EXPECT_EQ(true, result.is_ok());
+
+  if (!expect_new_koid) {
+    // Let the restart make progress, otherwise our next loop could run early enough to see the old
+    // instance of the target node since its not doing the koid comparison.
+    RunLoopWithTimeout(zx::sec(1));
+  }
+
+  std::cout << "checking for the driver to be up again..." << std::endl;
+  found = std::nullopt;
+
+  // Wait until the node is available again, possibly under a new driver host.
+  while (!found) {
+    auto node_vec = GetNodeInfo(node_filter);
+    for (auto& node : node_vec) {
+      if (node.bound_driver_url().has_value() && node.bound_driver_url().value() == driver_url) {
+        if (node.driver_host_koid().has_value()) {
+          if (!expect_new_koid || old_koid != node.driver_host_koid().value()) {
+            found.emplace(node.moniker().value());
+            break;
+          }
+        }
+      }
+    }
+
+    if (!found) {
+      std::cout << "driver not found, retrying... " << std::endl;
+      // Small loop delay.
+      RunLoopWithTimeout(zx::msec(10));
+    }
+  }
+
+  std::cout << "proceeding with test! " << std::endl;
+  // Return the release_fence for the caller to hold on to.
+  return std::move(result.value().release_fence());
+}
+
 fuchsia_component_sandbox::DictionaryRef TestLoopBase::CreateDictionaryForTest() {
   // Start a background loop to run the sandbox connectors.
   sandbox_connector_loop_.StartThread("sandbox-loop");

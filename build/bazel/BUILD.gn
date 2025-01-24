@@ -215,7 +215,6 @@ group("bazel_action_allowlist") {
   visibility += [
     "//build/images/updates/tests:bazel_pb_bazel_build_group",
     "//src/power/testing/system-integration/msd-arm-mali/custom-product:product_bundle_bazel_build_group",
-    "//src/power/testing/system-integration/storage/custom-product:product_bundle_bazel_build_group",
   ]
 
   # Bazel build related targets

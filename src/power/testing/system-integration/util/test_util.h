@@ -59,8 +59,26 @@ class TestLoopBase : public loop_fixture::RealLoop {
                                             const std::string& pb_moniker,
                                             const std::string& power_element_name);
 
+  // Prepare the target driver for power system testing. This is done by creating a dictionary
+  // with the power protocols from the test-specific instances of the SAG and power broker,
+  // and restarting the target driver and its children with access to this dictionary.
+  //
+  // |expect_new_koid| whether to expect the restarted node to have a new driver host koid, this
+  // should be true if the target driver is not colocated with its parent driver, otherwise it
+  // should be false.
+  //
+  // Returns a zx::eventpair that should be held onto for the duration of the test. When released
+  // the target driver and children are restarted again and lose access to the test-specific
+  // power protocols.
+  zx::eventpair PrepareDriver(std::string_view node_filter, std::string_view driver_url,
+                              bool expect_new_koid);
+
+  // Create and export a component framework dictionary that contains connectors for the various
+  // power framework protocols, that are connected to the test-specific SAG and power broker that
+  // is accessible in the incoming namespace of the test component. See 'meta/client.shard.cml'.
   fuchsia_component_sandbox::DictionaryRef CreateDictionaryForTest();
 
+  // Query the driver framework for nodes that have a moniker matching the |node_filter|.
   std::vector<fuchsia_driver_development::NodeInfo> GetNodeInfo(std::string_view node_filter);
 
  private:

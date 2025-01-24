@@ -532,7 +532,6 @@ group("legacy_bundle_allowlist") {
   visibility += [
     "//build/testing/boot_tests:*",
     "//src/power/testing/system-integration/msd-arm-mali/custom-product:*",
-    "//src/power/testing/system-integration/storage/custom-product:*",
     "//src/security/lib/scrutiny/collector:*",
     "//src/security/lib/scrutiny/tests/structured_config:*",
     "//src/security/tests/pkg_test/tests:*",

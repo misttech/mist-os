@@ -45,5 +45,9 @@ product_assembly_configuration("bringup_with_tests") {
       package_target =
           "//src/power/testing/system-integration/example:bootstrap_pkg"
     },
+    {
+      package_target =
+          "//src/power/testing/system-integration/storage:bootstrap_pkg"
+    },
   ]
 }

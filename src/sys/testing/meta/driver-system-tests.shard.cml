@@ -22,6 +22,12 @@
             to: "#driver-system-tests",
         },
         {
+            protocol: "fuchsia.diagnostics.ArchiveAccessor",
+            from: "parent",
+            as: "fuchsia.diagnostics.RealArchiveAccessor",
+            to: "#driver-system-tests",
+        },
+        {
             event_stream: [
                 "capability_requested",
                 "destroyed",
