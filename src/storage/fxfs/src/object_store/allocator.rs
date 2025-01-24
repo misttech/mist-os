@@ -109,7 +109,7 @@ use crate::object_store::{tree, DataObjectHandle, DirectWriter, HandleOptions, O
 use crate::range::RangeExt;
 use crate::round::{round_div, round_down, round_up};
 use crate::serialized_types::{
-    Version, Versioned, VersionedLatest, DEFAULT_MAX_SERIALIZED_RECORD_SIZE,
+    Version, Versioned, VersionedLatest, DEFAULT_MAX_SERIALIZED_RECORD_SIZE, LATEST_VERSION,
 };
 use anyhow::{anyhow, bail, ensure, Context, Error};
 use async_trait::async_trait;
@@ -1899,9 +1899,10 @@ impl JournalingObject for Allocator {
     async fn flush(&self) -> Result<Version, Error> {
         let filesystem = self.filesystem.upgrade().unwrap();
         let object_manager = filesystem.object_manager();
-        if !object_manager.needs_flush(self.object_id()) {
+        let earliest_version = self.tree.get_earliest_version();
+        if !object_manager.needs_flush(self.object_id()) && earliest_version == LATEST_VERSION {
             // Early exit, but still return the earliest version used by a struct in the tree
-            return Ok(self.tree.get_earliest_version());
+            return Ok(earliest_version);
         }
 
         let fs = self.filesystem.upgrade().unwrap();

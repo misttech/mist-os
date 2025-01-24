@@ -6,6 +6,7 @@ use crate::lsm_tree::types::{LayerIterator, MergeableKey, Value};
 use crate::lsm_tree::{LSMTree, LockedLayer, Query};
 use crate::object_handle::WriteBytes;
 use crate::object_store::journal;
+use crate::serialized_types::LATEST_VERSION;
 use anyhow::{Context, Error};
 use std::future::{ready, Future};
 
@@ -32,29 +33,36 @@ pub async fn flush<'a, K: MergeableKey, V: Value>(
 where
     LSMTree<K, V>: MajorCompactable<K, V>,
 {
+    let earliest_version = tree.get_earliest_version();
     let mut layer_set = tree.immutable_layer_set();
     let mut total_size = 0;
     let mut layer_count = 0;
-    let mut split_index = layer_set
-        .layers
-        .iter()
-        .position(|layer| {
-            match layer.handle() {
-                None => {}
-                Some(handle) => {
-                    let size = handle.get_size();
-                    // Stop adding more layers when the total size of all the immutable layers
-                    // so far is less than 3/4 of the layer we are looking at.
-                    if total_size > 0 && total_size * 4 < size * 3 {
-                        return true;
+    let mut split_index = if earliest_version == LATEST_VERSION {
+        layer_set
+            .layers
+            .iter()
+            .position(|layer| {
+                match layer.handle() {
+                    None => {}
+                    Some(handle) => {
+                        let size = handle.get_size();
+                        // Stop adding more layers when the total size of all the immutable layers
+                        // so far is less than 3/4 of the layer we are looking at.
+                        if total_size > 0 && total_size * 4 < size * 3 {
+                            return true;
+                        }
+                        total_size += size;
+                        layer_count += 1;
                     }
-                    total_size += size;
-                    layer_count += 1;
                 }
-            }
-            false
-        })
-        .unwrap_or(layer_set.layers.len());
+                false
+            })
+            .unwrap_or(layer_set.layers.len())
+    } else {
+        // We force a full compaction if there is an older version data structure
+        // in the layer set to upgrade it to the latest.
+        layer_set.layers.len()
+    };
 
     // If there's only one immutable layer to merge with and it's big, don't merge with it.
     // Instead, we'll create a new layer and eventually that will grow to be big enough to merge

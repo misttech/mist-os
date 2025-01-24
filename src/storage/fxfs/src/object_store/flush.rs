@@ -18,7 +18,7 @@ use crate::object_store::{
     HandleOptions, LockState, ObjectStore, Options, StoreInfo, Transaction,
     MAX_ENCRYPTED_MUTATIONS_SIZE,
 };
-use crate::serialized_types::{Version, VersionedLatest};
+use crate::serialized_types::{Version, VersionedLatest, LATEST_VERSION};
 use anyhow::{Context, Error};
 use once_cell::sync::OnceCell;
 use std::sync::atomic::Ordering;
@@ -63,10 +63,15 @@ impl ObjectStore {
                 }
             }
             Reason::Journal => {
-                if !object_manager.needs_flush(self.store_object_id) {
+                // We flush if we have something to flush *or* the on-disk version of data is not
+                // the latest.
+                let earliest_version = self.tree.get_earliest_version();
+                if !object_manager.needs_flush(self.store_object_id)
+                    && earliest_version == LATEST_VERSION
+                {
                     // Early exit, but still return the earliest version used by a struct in the
                     // tree.
-                    return Ok(self.tree.get_earliest_version());
+                    return Ok(earliest_version);
                 }
             }
         }
