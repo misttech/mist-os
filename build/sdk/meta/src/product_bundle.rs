@@ -6,7 +6,7 @@
 
 mod v2;
 
-use crate::VirtualDeviceManifest;
+use crate::{VirtualDevice, VirtualDeviceManifest, VirtualDeviceV1};
 use anyhow::{anyhow, bail, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_repo::repository::FileSystemRepository;
@@ -252,6 +252,47 @@ impl ProductBundle {
             Self::V2(pb) => pb.product_name.clone(),
         }
     }
+
+    /// Attempts to load a `VirtualDeviceV1` from the product bundle with the
+    /// given `device` name.
+    /// If `device` is empty, loads the default recommended device instead.
+    /// If `device` does not exist within the product bundle, `device` is
+    /// instead interpreted as a virtual device file path.
+    pub fn get_device(&self, device: &Option<String>) -> Result<VirtualDeviceV1> {
+        let Self::V2(pb) = self;
+
+        // Determine the correct device name from the user, or default to the "recommended"
+        // device, if one is provided in the product bundle.
+        let path = pb.get_virtual_devices_path();
+        let manifest = VirtualDeviceManifest::from_path(&path).context("manifest from_path")?;
+        let result = match device.as_deref() {
+            // If no device is given, return the default specified in the manifest.
+            None | Some("") => manifest.default_device(),
+
+            // Otherwise, find the virtual device by name in the product bundle.
+            Some(device) => manifest
+                .device(device)
+                .or_else(|name_err| {
+                    // If we cannot find it in the product bundle, attempt to parse
+                    // `device` as a virtual device file path.
+                    VirtualDevice::try_load_from(Utf8Path::new(device)).map_err(|file_err| {
+                        anyhow!(
+                            "No virtual device matches '{}': {}\n\
+                            We were also not able to parse '{}' as a virtual device file: {}",
+                            device,
+                            name_err,
+                            device,
+                            file_err
+                        )
+                    })
+                })
+                .map(|d| Some(d)),
+        }?;
+        match result {
+            Some(VirtualDevice::V1(virtual_device)) => Ok(virtual_device),
+            None => bail!("No default virtual device is available, please specify one by name."),
+        }
+    }
 }
 
 /// Construct a Vec<FileSystemRepository> from product bundle.
@@ -285,10 +326,14 @@ pub fn get_repositories(product_bundle_dir: Utf8PathBuf) -> Result<Vec<FileSyste
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::fs;
     use std::io::Write;
     use tempfile::TempDir;
     use zip::write::FileOptions;
     use zip::{CompressionMethod, ZipWriter};
+
+    const VIRTUAL_DEVICE_VALID: &str =
+        include_str!("../../../../build/sdk/meta/test_data/virtual_device.json");
 
     fn make_sample_pbv1(name: &str) -> serde_json::Value {
         json!({
@@ -323,7 +368,7 @@ mod tests {
         }};
     }
 
-    fn make_sample_pbv2(name: &str) -> serde_json::Value {
+    fn make_sample_pbv2(name: &str, virtual_devices_path: Option<String>) -> serde_json::Value {
         json!({
             "version": "2",
             "product_name": name,
@@ -336,6 +381,7 @@ mod tests {
                 "partitions": [],
                 "unlock_credentials": [],
             },
+            "virtual_devices_path": virtual_devices_path,
         })
     }
     /// Macro to create a v1 product bundle in the tmp directory
@@ -344,7 +390,15 @@ mod tests {
             let pb_dir = Utf8Path::from_path($dir.path()).unwrap();
 
             let pb_file = File::create(pb_dir.join("product_bundle.json")).unwrap();
-            serde_json::to_writer(&pb_file, &make_sample_pbv2($name)).unwrap();
+            serde_json::to_writer(&pb_file, &make_sample_pbv2($name, Some("virtual_device_manifest.json".into()))).unwrap();
+
+            let dev_manifest = pb_dir.join("virtual_device_manifest.json");
+            fs::write(&dev_manifest,r#"
+            {"recommended":"virtual_device_1","device_paths":{"virtual_device_1":"virtual_device_1.json","virtual_device_2":"virtual_device_2.json"}}
+            "#).unwrap();
+
+            fs::write(pb_dir.join("virtual_device_1.json"), VIRTUAL_DEVICE_VALID)
+                .expect("writing device json");
 
             pb_dir
         }};
@@ -363,7 +417,7 @@ mod tests {
         let pb_dir = Utf8Path::from_path(tmp.path()).unwrap();
 
         let pb_file = File::create(pb_dir.join("product_bundle.json")).unwrap();
-        serde_json::to_writer(&pb_file, &make_sample_pbv2(&"fake.pb-name")).unwrap();
+        serde_json::to_writer(&pb_file, &make_sample_pbv2(&"fake.pb-name", None)).unwrap();
         let pb = LoadedProductBundle::try_load_from(pb_dir).unwrap();
         assert!(matches!(pb.deref(), &ProductBundle::V2 { .. }));
     }
@@ -403,7 +457,7 @@ mod tests {
     fn test_zip_loaded() -> anyhow::Result<()> {
         let tmp = TempDir::new().unwrap();
 
-        let pb = make_sample_pbv2("generic-x64");
+        let pb = make_sample_pbv2("generic-x64", None);
         let pb_filename = tmp.into_path().join("pb.zip");
         let pb_file = File::create(pb_filename.clone())?;
 
@@ -423,7 +477,7 @@ mod tests {
     #[test]
     fn test_zip_product_bundle_into() -> anyhow::Result<()> {
         let tmp = TempDir::new().unwrap();
-        let pb = make_sample_pbv2("generic-x64");
+        let pb = make_sample_pbv2("generic-x64", None);
         let pb_filename = tmp.into_path().join("pb.zip");
         let pb_file = File::create(pb_filename.clone())?;
 
@@ -444,7 +498,7 @@ mod tests {
     #[test]
     fn test_zip_from_product_bundle_deref() -> anyhow::Result<()> {
         let tmp = TempDir::new().unwrap();
-        let pb = make_sample_pbv2("generic-x64");
+        let pb = make_sample_pbv2("generic-x64", None);
         let pb_filename = tmp.into_path().join("pb.zip");
         let pb_file = File::create(pb_filename.clone())?;
 
@@ -472,7 +526,7 @@ mod tests {
     fn test_product_bundle_try_load_from_for_zip() -> anyhow::Result<()> {
         let tmp = TempDir::new().unwrap();
 
-        let pb = make_sample_pbv2("generic-x64");
+        let pb = make_sample_pbv2("generic-x64", None);
         let pb_filename = tmp.into_path().join("pb.zip");
         let pb_file = File::create(pb_filename.clone())?;
 
@@ -494,7 +548,7 @@ mod tests {
     fn test_no_file_fail_zip() -> anyhow::Result<()> {
         let tmp = TempDir::new().unwrap();
 
-        let pb = make_sample_pbv2("generic-x64");
+        let pb = make_sample_pbv2("generic-x64", None);
         let pb_filename = tmp.into_path().join("pb.zip");
         let pb_file = File::create(pb_filename.clone())?;
 
@@ -516,7 +570,7 @@ mod tests {
     fn test_product_bundle_try_load_from_for_zip_deep_path() -> anyhow::Result<()> {
         let tmp = TempDir::new().unwrap();
 
-        let pb = make_sample_pbv2("generic-x64");
+        let pb = make_sample_pbv2("generic-x64", None);
         let pb_filename = tmp.into_path().join("pb.zip");
         let pb_file = File::create(pb_filename.clone())?;
 
@@ -560,6 +614,104 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let pb_dir = make_pb_v2_in!(tmp, "generic-x64");
         let _ = ProductBundle::try_load_from(pb_dir).unwrap();
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_from_path_absolute() -> Result<()> {
+        let temp_dir = tempfile::TempDir::new().expect("creating temp dir");
+        let pb_dir = make_pb_v2_in!(temp_dir, "generic-x64");
+
+        let VirtualDevice::V1(expected) =
+            VirtualDevice::try_load_from(pb_dir.join("virtual_device_1.json")).unwrap();
+
+        let absolute_path = pb_dir.join("virtual_device_1.json");
+        let pb = LoadedProductBundle::try_load_from(pb_dir).unwrap();
+        let actual = pb.get_device(&Some(absolute_path.into_string()));
+
+        assert!(actual.is_ok());
+        assert_eq!(expected, actual?);
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_from_path_relative() -> Result<()> {
+        let temp_dir = tempfile::TempDir::new().expect("creating temp dir");
+        let pb_dir = make_pb_v2_in!(temp_dir, "generic-x64");
+
+        let VirtualDevice::V1(expected) =
+            VirtualDevice::try_load_from(pb_dir.join("virtual_device_1.json")).unwrap();
+
+        let absolute_path = pb_dir.join("virtual_device_1.json");
+        let relative_path =
+            pathdiff::diff_paths(absolute_path, std::env::current_dir().unwrap()).unwrap();
+        let pb = LoadedProductBundle::try_load_from(pb_dir).unwrap();
+        let actual = pb.get_device(&Some(relative_path.to_str().unwrap().to_string()));
+
+        assert!(actual.is_ok());
+        assert_eq!(expected, actual?);
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_from_name() -> Result<()> {
+        let temp_dir = tempfile::TempDir::new().expect("creating temp dir");
+        let pb_dir = make_pb_v2_in!(temp_dir, "generic-x64");
+
+        let VirtualDevice::V1(expected) =
+            VirtualDevice::try_load_from(pb_dir.join("virtual_device_1.json")).unwrap();
+
+        let pb = LoadedProductBundle::try_load_from(pb_dir).unwrap();
+        let actual = pb.get_device(&Some("virtual_device_1".into()));
+
+        assert!(actual.is_ok());
+        assert_eq!(expected, actual?);
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_from_name_nondefault_device() -> Result<()> {
+        let temp_dir = tempfile::TempDir::new().expect("creating temp dir");
+        let pb_dir = make_pb_v2_in!(temp_dir, "generic-x64");
+        fs::rename(pb_dir.join("virtual_device_1.json"), pb_dir.join("virtual_device_2.json"))
+            .expect("remove default virtual device, create non-default virtual device");
+
+        let VirtualDevice::V1(expected) =
+            VirtualDevice::try_load_from(pb_dir.join("virtual_device_2.json")).unwrap();
+
+        let pb = LoadedProductBundle::try_load_from(pb_dir).unwrap();
+        let actual = pb.get_device(&Some("virtual_device_2".into()));
+
+        assert!(actual.is_ok());
+        assert_eq!(expected, actual?);
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_default_device() -> Result<()> {
+        let temp_dir = tempfile::TempDir::new().expect("creating temp dir");
+        let pb_dir = make_pb_v2_in!(temp_dir, "generic-x64");
+
+        let VirtualDevice::V1(expected) =
+            VirtualDevice::try_load_from(pb_dir.join("virtual_device_1.json")).unwrap();
+
+        let pb = LoadedProductBundle::try_load_from(pb_dir).unwrap();
+        let actual = pb.get_device(&None);
+
+        assert!(actual.is_ok());
+        assert_eq!(expected, actual?);
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_from_invalid_name() -> Result<()> {
+        let temp_dir = tempfile::TempDir::new().expect("creating temp dir");
+        let pb_dir = make_pb_v2_in!(temp_dir, "generic-x64");
+
+        let pb = LoadedProductBundle::try_load_from(pb_dir).unwrap();
+        let actual = pb.get_device(&Some("invalid_device".into()));
+
+        assert!(actual.is_err());
         Ok(())
     }
 }

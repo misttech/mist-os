@@ -10,7 +10,7 @@ mod v1;
 pub use manifest::*;
 pub use v1::*;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use camino::Utf8Path;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
@@ -37,6 +37,9 @@ impl VirtualDevice {
         let name = path.as_ref().file_stem().with_context(|| {
             format!("Can't determine device name based on provided path: '{}'", path.as_ref())
         })?;
+        if !path.as_ref().is_file() {
+            bail!("Value '{}' doesn't appear to be a valid file.", path.as_ref());
+        }
         let file = File::open(path.as_ref())
             .with_context(|| format!("opening virtual device: {:?}", path.as_ref()))?;
         let file = std::io::BufReader::new(file);
@@ -79,7 +82,39 @@ impl VirtualDevice {
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::io::Write;
     use tempfile::TempDir;
+
+    #[test]
+    fn test_parse_nonexistent_file() {
+        assert!(VirtualDevice::try_load_from(Utf8Path::new("SomeNameThatsNotAFile")).is_err());
+    }
+
+    #[test]
+    fn test_parse_empty_file() {
+        let temp_dir = tempfile::TempDir::new().expect("creating temp dir");
+        let path = temp_dir.path().join("other_file.json");
+        File::create(&path).unwrap();
+        assert!(VirtualDevice::try_load_from(Utf8Path::from_path(&path).unwrap()).is_err());
+    }
+
+    #[test]
+    fn test_parse_non_json() {
+        let temp_dir = tempfile::TempDir::new().expect("creating temp dir");
+        let path = temp_dir.path().join("device.json");
+        let mut file = File::create(&path).unwrap();
+        file.write_all("this is not json".as_bytes()).unwrap();
+        assert!(VirtualDevice::try_load_from(Utf8Path::from_path(&path).unwrap()).is_err());
+    }
+
+    #[test]
+    fn test_parse_random_json() {
+        let temp_dir = tempfile::TempDir::new().expect("creating temp dir");
+        let path = temp_dir.path().join("device.json");
+        let mut file = File::create(&path).unwrap();
+        file.write_all("{\"foo\": 123}".as_bytes()).unwrap();
+        assert!(VirtualDevice::try_load_from(Utf8Path::from_path(&path).unwrap()).is_err());
+    }
 
     #[test]
     fn test_parse_v1() {

@@ -17,6 +17,7 @@ use fho::{
 use pbm::generate_mac_address;
 use pbms::LoadedProductBundle;
 use schemars::JsonSchema;
+use sdk_metadata::CpuArchitecture;
 use serde::Serialize;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -440,47 +441,61 @@ impl<T: EngineOperations> EmuStartTool<T> {
                 }
             }
 
-            // At this moment, the android emulator does not support risc-v, so
-            // force using the qemu engine.
-            if (*loaded_product_bundle).get_product_bundle_name().ends_with("riscv64") {
-                self.cmd.engine = match &self.cmd.engine {
-                    Some(engine_name) => {
-                        if engine_name != "qemu" {
-                            return_user_error!("Engine {engine_name} does not support risc-v images. Please use `qemu`.")
-                        } else {
-                            Some(engine_name.into())
-                        }
-                    }
-                    None => Some("qemu".into()),
-                };
-            } else {
-                let engine = self.cmd.engine()?;
-                if self.cmd.engine.is_none() {
-                    if engine != "" {
-                        self.cmd.engine = Some(engine);
-                    }
-                }
+            let target_arch = loaded_product_bundle.get_device(&self.cmd.device)?.hardware.cpu.arch;
+
+            match target_arch {
+                CpuArchitecture::X64 | CpuArchitecture::Arm64 => (),
+                _ if self.cmd.uefi => return_user_error!(
+                    "The --uefi flag is currently only supported for x64 and arm64 target cpus."
+                ),
+                _ => (),
             }
-            if self.cmd.uefi {
-                if (*loaded_product_bundle).get_product_bundle_name().ends_with("x64")
-                    || (*loaded_product_bundle).get_product_bundle_name().ends_with("arm64")
-                {
-                    let name = self.cmd.engine.clone().unwrap_or_else(|| "qemu".into());
-                    if name != "qemu" {
-                        let msg = format!("[emulator] engine '{name}' is not supported with the --uefi flag. Using `qemu`.");
-                        tracing::info!(msg);
-                        writer.line(msg)?;
-                        self.cmd.engine = Some("qemu".into());
-                    }
-                } else {
-                    return_user_error!(
-                        "The --uefi flag is currently only supported for x64 and arm64."
-                    )
-                }
+
+            if self.cmd.engine.is_none() {
+                self.cmd.engine =
+                    Some(self.pick_compatible_default_engine_type(writer, target_arch)?);
             }
+
             return Ok(Some(loaded_product_bundle));
         }
         Ok(None)
+    }
+
+    /// Checks whether the default engine type is compatible with possible uefi
+    /// and cross-cpu virtualization use-cases.
+    ///
+    /// Attempts to fix cross-cpu and uefi engine incompatibility by overriding
+    /// to the "qemu" engine type for those cases.
+    fn pick_compatible_default_engine_type(
+        &mut self,
+        writer: &mut <EmuStartTool<T> as fho::FfxMain>::Writer,
+        target_arch: CpuArchitecture,
+    ) -> Result<String> {
+        let config_default_engine = self.cmd.engine()?;
+        let is_uefi = self.cmd.uefi;
+
+        // The android emulator (femu) doesn't support cross-cpu virtualization,
+        // so check for cases where the host and target cpus don't match.
+        let is_cross_cpu = CpuArchitecture::current() != target_arch;
+
+        if let Some(unsupported_feature) =
+            match (config_default_engine == "qemu", is_cross_cpu, is_uefi) {
+                (false, false, true) => Some("uefi"),
+                (false, true, false) => Some("cross-cpu virtualization"),
+                (false, true, true) => Some("uefi and cross-cpu virtualization"),
+                _ => None,
+            }
+        {
+            let msg = format!(
+                "[emulator] defaulting to qemu engine to support {unsupported_feature}.\n\
+                Use `--engine` to explicitly set the engine type if needed."
+            );
+            tracing::warn!(msg);
+            writer.line(msg)?;
+            return Ok("qemu".into());
+        }
+
+        Ok(config_default_engine)
     }
 
     /// Checks the configuration of the given engine against the
@@ -551,12 +566,12 @@ mod tests {
     use super::*;
     use assembly_manifest::Image;
     use assembly_partitions_config::PartitionsConfig;
-    use camino::Utf8PathBuf;
+    use camino::{Utf8Path, Utf8PathBuf};
     use emulator_instance::{LogLevel, RuntimeConfig};
     use ffx_config::{ConfigLevel, ConfigQuery, TestEnv};
     use ffx_writer::TestBuffers;
     use pbms::ProductBundle;
-    use sdk_metadata::ProductBundleV2;
+    use sdk_metadata::{ProductBundleV2, VirtualDevice};
     use std::fs;
     use std::path::Path;
     use std::process::Command;
@@ -657,6 +672,20 @@ mod tests {
         async fn try_from_env(_env: &fho::FhoEnvironment) -> fho::Result<Self> {
             Ok(Self::default())
         }
+    }
+
+    fn set_virtual_device_arch(dir: &Path, target_arch: CpuArchitecture) {
+        let manifest_path_binding = dir.join("virtual_device_1.json");
+        let manifest_path = Utf8Path::from_path(manifest_path_binding.as_path())
+            .expect("construct virtual device manifest path");
+        let mut manifest =
+            VirtualDevice::try_load_from(manifest_path).expect("parse virtual device");
+        match manifest {
+            VirtualDevice::V1(ref mut device) => {
+                device.hardware.cpu.arch = target_arch;
+            }
+        }
+        manifest.write(manifest_path).expect("write virtual device manifest");
     }
 
     fn make_test_product_bundle(dir: &Path) -> Result<ProductBundleV2> {
@@ -1628,6 +1657,7 @@ mod tests {
         let pb = ProductBundle::V2(
             make_test_product_bundle(env.isolate_root.path()).expect("test product bundle"),
         );
+        set_virtual_device_arch(env.isolate_root.path(), CpuArchitecture::Riscv64);
         let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
 
         let cmd = StartCommand { uefi: true, ..Default::default() };
@@ -1646,7 +1676,7 @@ mod tests {
                 .err()
                 .expect("non-x64/arm64 product bundle is expected to fail")
                 .to_string(),
-            "The --uefi flag is currently only supported for x64 and arm64."
+            "The --uefi flag is currently only supported for x64 and arm64 target cpus."
         );
     }
 
@@ -1659,7 +1689,7 @@ mod tests {
 
         let mut pb =
             make_test_product_bundle(env.isolate_root.path()).expect("test product bundle");
-        pb.product_name = "pb.x64".into();
+        pb.product_name = "product.arch".into();
         let pb = ProductBundle::V2(pb);
         let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
 
@@ -1694,7 +1724,7 @@ mod tests {
 
         let mut pb =
             make_test_product_bundle(env.isolate_root.path()).expect("test product bundle");
-        pb.product_name = "pb.x64".into();
+        pb.product_name = "product.arch".into();
         let pb = ProductBundle::V2(pb);
         let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
 
@@ -1718,7 +1748,7 @@ mod tests {
         // TODO(https://fxbug.dev/382694675): When zircon.nodename can be persisted across reboots
         // from a running instance, rewriting the name won't be necessary anymore.
         assert_eq!(tool.cmd.name, Some("fuchsia-5254-ea06-13fe".into()));
-        assert_eq!(tool.cmd.engine, Some("qemu".into()));
+        assert_eq!(tool.cmd.engine, Some("femu".into()));
     }
 
     #[fuchsia::test]
@@ -1730,7 +1760,8 @@ mod tests {
 
         let mut pb =
             make_test_product_bundle(env.isolate_root.path()).expect("test product bundle");
-        pb.product_name = "pb.arm64".into();
+        pb.product_name = "product.arch".into();
+        set_virtual_device_arch(env.isolate_root.path(), CpuArchitecture::Arm64);
         let pb = ProductBundle::V2(pb);
         let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
 
@@ -1754,6 +1785,111 @@ mod tests {
         // from a running instance, rewriting the name won't be necessary anymore.
         assert_eq!(tool.cmd.name, Some("fuchsia-5254-ea06-13fe".into()));
         assert_eq!(tool.cmd.engine, Some("qemu".into()));
+    }
+
+    #[fuchsia::test]
+    async fn test_finalize_start_command_same_arch_pb_default_femu() {
+        let env = ffx_config::test_init().await.unwrap();
+
+        let test_buffers = TestBuffers::default();
+        let mut writer = VerifiedMachineWriter::new_test(None, &test_buffers);
+
+        let mut pb =
+            make_test_product_bundle(env.isolate_root.path()).expect("test product bundle");
+        pb.product_name = "product.arch".into();
+        set_virtual_device_arch(env.isolate_root.path(), CpuArchitecture::current());
+        let pb = ProductBundle::V2(pb);
+        let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
+
+        let cmd = StartCommand::default();
+
+        let mut tool = make_test_emu_start_tool(cmd).await;
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_| Ok(loaded_pb.clone()))
+            .times(1);
+        tool.engine_operations.expect_context().times(0);
+
+        tool.finalize_start_command(&mut writer).await.unwrap();
+
+        // If `--engine` is not specified, the default value should be "femu".
+        assert_eq!(tool.cmd.engine, Some("femu".into()));
+    }
+
+    #[fuchsia::test]
+    async fn test_finalize_start_command_cross_arch_pb_default_femu() {
+        let env = ffx_config::test_init().await.unwrap();
+
+        let test_buffers = TestBuffers::default();
+        let mut writer = VerifiedMachineWriter::new_test(None, &test_buffers);
+
+        let mut pb =
+            make_test_product_bundle(env.isolate_root.path()).expect("test product bundle");
+        pb.product_name = "product.arch".into();
+        set_virtual_device_arch(
+            env.isolate_root.path(),
+            match CpuArchitecture::current() {
+                CpuArchitecture::X64 => CpuArchitecture::Arm64,
+                _ => CpuArchitecture::X64,
+            },
+        );
+        let pb = ProductBundle::V2(pb);
+        let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
+
+        let cmd = StartCommand::default();
+
+        let mut tool = make_test_emu_start_tool(cmd).await;
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_| Ok(loaded_pb.clone()))
+            .times(1);
+        tool.engine_operations.expect_context().times(0);
+
+        tool.finalize_start_command(&mut writer).await.unwrap();
+
+        // If `--engine` is not specified and we're running cross-arch, the
+        // default value should be overridden to "qemu".
+        assert_eq!(tool.cmd.engine, Some("qemu".into()));
+    }
+
+    #[fuchsia::test]
+    async fn test_finalize_start_command_cross_arch_pb_explicit_femu() {
+        let env = ffx_config::test_init().await.unwrap();
+
+        let test_buffers = TestBuffers::default();
+        let mut writer = VerifiedMachineWriter::new_test(None, &test_buffers);
+
+        let mut pb =
+            make_test_product_bundle(env.isolate_root.path()).expect("test product bundle");
+        pb.product_name = "product.arch".into();
+        set_virtual_device_arch(
+            env.isolate_root.path(),
+            match CpuArchitecture::current() {
+                CpuArchitecture::X64 => CpuArchitecture::Arm64,
+                _ => CpuArchitecture::X64,
+            },
+        );
+        let pb = ProductBundle::V2(pb);
+        let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
+
+        let cmd = StartCommand { engine: Some("femu".into()), ..Default::default() };
+
+        let mut tool = make_test_emu_start_tool(cmd).await;
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_| Ok(loaded_pb.clone()))
+            .times(1);
+        tool.engine_operations.expect_context().times(0);
+
+        tool.finalize_start_command(&mut writer).await.unwrap();
+
+        // If `--engine` is explicitly specified try using that engine
+        // unconditionally, even when we're running cross-arch and "femu" is
+        // presumed incompatible.
+        assert_eq!(tool.cmd.engine, Some("femu".into()));
     }
 
     #[fuchsia::test]
