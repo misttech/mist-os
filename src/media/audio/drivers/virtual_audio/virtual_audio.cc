@@ -6,7 +6,6 @@
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
-#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
 
@@ -94,9 +93,8 @@ void VirtualAudio::AddDevice(AddDeviceRequestView request, AddDeviceCompleter::S
   auto config = fidl::ToNatural(request->config);
   ZX_ASSERT(config.device_specific().has_value());
   auto device_id = next_device_id_++;
-  auto result =
-      VirtualAudioDevice::Create(std::move(config), std::move(request->server), parent_,
-                                 dispatcher_, [this, device_id]() { OnDeviceShutdown(device_id); });
+  auto result = VirtualAudioDevice::Create(std::move(config), std::move(request->server), parent_,
+                                           [this, device_id]() { OnDeviceShutdown(device_id); });
   if (!result.is_ok()) {
     zxlogf(ERROR, "Device creation failed with status %d",
            fidl::ToUnderlying(result.error_value()));

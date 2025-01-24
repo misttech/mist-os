@@ -33,67 +33,44 @@ class VirtualAudioDriver {
  public:
   using ErrorT = fuchsia_virtualaudio::Error;
 
-  // Thread safety token.
-  //
-  // This token acts like a "no-op mutex", allowing compiler thread safety annotations
-  // to be placed on code or data that should only be accessed by a particular thread.
-  // Any code that acquires the token makes the claim that it is running on the (single)
-  // correct thread, and hence it is safe to access the annotated data and execute the annotated
-  // code.
-  struct __TA_CAPABILITY("role") Token {};
-  class __TA_SCOPED_CAPABILITY ScopedToken{
-    public : explicit ScopedToken(const Token& token) __TA_ACQUIRE(token){} ~ScopedToken()
-        __TA_RELEASE(){}
-  };
-
   explicit VirtualAudioDriver(fit::closure on_shutdown) : on_shutdown_(std::move(on_shutdown)) {
     ZX_ASSERT(on_shutdown_ != nullptr);
   }
 
   virtual ~VirtualAudioDriver() = default;
 
-  // Execute the given task on a dispatcher.
-  // Typically callbacks should acquire domain_token() before calling any methods.
-  virtual void PostToDispatcher(fit::closure task_to_post) {
-    async::PostTask(dispatcher(), std::move(task_to_post));
-  }
-
-  // Dispatcher used by PostToDispatcher().
-  virtual async_dispatcher_t* dispatcher() = 0;
-
-  // Used to mark that the task is executed in a given dispatcher context.
-  const Token& domain_token() const __TA_RETURN_CAPABILITY(domain_token_) { return domain_token_; }
-
   // Shutdown the stream and request that it be unbound from the device tree.
   virtual void ShutdownAsync() = 0;
 
   //
   // The following methods implement getters and setters for fuchsia.virtualaudio.Device.
-  // Default to not supported.
+  // Default to not supported. Callback may be invoked on any dispatcher.
   // TODO(https://fxbug.dev/42077474): Add the ability to trigger dynamic delay changes.
   //
-  virtual fit::result<ErrorT, CurrentFormat> GetFormatForVA() __TA_REQUIRES(domain_token()) {
-    return fit::error(ErrorT::kNotSupported);
+  virtual void GetFormatForVA(fit::callback<void(fit::result<ErrorT, CurrentFormat>)> callback) {
+    callback(fit::error(ErrorT::kNotSupported));
   }
-  virtual fit::result<ErrorT, CurrentGain> GetGainForVA() __TA_REQUIRES(domain_token()) {
-    return fit::error(ErrorT::kNotSupported);
+  virtual void GetGainForVA(fit::callback<void(fit::result<ErrorT, CurrentGain>)> callback) {
+    callback(fit::error(ErrorT::kNotSupported));
   }
-  virtual fit::result<ErrorT, CurrentBuffer> GetBufferForVA() __TA_REQUIRES(domain_token()) {
-    return fit::error(ErrorT::kNotSupported);
+  virtual void GetBufferForVA(fit::callback<void(fit::result<ErrorT, CurrentBuffer>)> callback) {
+    callback(fit::error(ErrorT::kNotSupported));
   }
-  virtual fit::result<ErrorT, CurrentPosition> GetPositionForVA() __TA_REQUIRES(domain_token()) {
-    return fit::error(ErrorT::kNotSupported);
+  virtual void GetPositionForVA(
+      fit::callback<void(fit::result<ErrorT, CurrentPosition>)> callback) {
+    callback(fit::error(ErrorT::kNotSupported));
   }
-  virtual fit::result<ErrorT> SetNotificationFrequencyFromVA(uint32_t notifications_per_ring)
-      __TA_REQUIRES(domain_token()) {
-    return fit::error(ErrorT::kNotSupported);
+  virtual void SetNotificationFrequencyFromVA(uint32_t notifications_per_ring,
+                                              fit::callback<void(fit::result<ErrorT>)> callback) {
+    callback(fit::error(ErrorT::kNotSupported));
   }
-  virtual fit::result<ErrorT> ChangePlugStateFromVA(bool plugged) __TA_REQUIRES(domain_token()) {
-    return fit::error(ErrorT::kNotSupported);
+  virtual void ChangePlugStateFromVA(bool plugged,
+                                     fit::callback<void(fit::result<ErrorT>)> callback) {
+    callback(fit::error(ErrorT::kNotSupported));
   }
-  virtual fit::result<ErrorT> AdjustClockRateFromVA(int32_t ppm_from_monotonic)
-      __TA_REQUIRES(domain_token()) {
-    return fit::error(ErrorT::kNotSupported);
+  virtual void AdjustClockRateFromVA(int32_t ppm_from_monotonic,
+                                     fit::callback<void(fit::result<ErrorT>)> callback) {
+    callback(fit::error(ErrorT::kNotSupported));
   }
 
  protected:
@@ -101,7 +78,6 @@ class VirtualAudioDriver {
   void OnShutdown() { on_shutdown_(); }
 
  private:
-  Token domain_token_;
   fit::closure on_shutdown_;
 };
 

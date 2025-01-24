@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.virtualaudio/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/device.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/result.h>
 #include <lib/zx/clock.h>
 
@@ -40,7 +41,7 @@ class VirtualAudioDevice : public fidl::WireServer<fuchsia_virtualaudio::Device>
   static fit::result<fuchsia_virtualaudio::Error, std::shared_ptr<VirtualAudioDevice>> Create(
       const fuchsia_virtualaudio::Configuration& cfg,
       fidl::ServerEnd<fuchsia_virtualaudio::Device> server, zx_device_t* dev_node,
-      async_dispatcher_t* fidl_dispatcher, fit::closure on_shutdown);
+      fit::closure on_shutdown);
 
   std::optional<bool> is_input() const { return is_input_; }
 
@@ -83,12 +84,11 @@ class VirtualAudioDevice : public fidl::WireServer<fuchsia_virtualaudio::Device>
                        AdjustClockRateCompleter::Sync& completer) override;
 
   // Public for std::make_shared. Use Create, not this ctor.
-  VirtualAudioDevice(std::optional<bool> is_input, async_dispatcher_t* fidl_dispatcher,
-                     fit::closure on_shutdown);
+  VirtualAudioDevice(std::optional<bool> is_input, fit::closure on_shutdown);
   ~VirtualAudioDevice() override;
 
  private:
-  // Called when `binding_` is unbound. Called on `fidl_dispatcher_`.
+  // Called when `binding_` is unbound.
   static void OnFidlServerUnbound(VirtualAudioDevice* device, fidl::UnbindInfo unbind_info,
                                   fidl::ServerEnd<fuchsia_virtualaudio::Device> server_end);
 
@@ -96,7 +96,7 @@ class VirtualAudioDevice : public fidl::WireServer<fuchsia_virtualaudio::Device>
   void OnDriverShutdown();
 
   const std::optional<bool> is_input_;
-  async_dispatcher_t* const fidl_dispatcher_;
+  async_dispatcher_t* const dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
 
   // Will be set to `std::nullopt` when the FIDL server is unbound.
   std::optional<fidl::ServerBindingRef<fuchsia_virtualaudio::Device>> binding_;

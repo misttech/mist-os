@@ -20,8 +20,7 @@ namespace virtual_audio {
 fit::result<fuchsia_virtualaudio::Error, std::shared_ptr<VirtualAudioDevice>>
 VirtualAudioDevice::Create(const fuchsia_virtualaudio::Configuration& cfg,
                            fidl::ServerEnd<fuchsia_virtualaudio::Device> server,
-                           zx_device_t* dev_node, async_dispatcher_t* fidl_dispatcher,
-                           fit::closure on_shutdown) {
+                           zx_device_t* dev_node, fit::closure on_shutdown) {
   std::optional<bool> is_input;
   switch (cfg.device_specific()->Which()) {
     case fuchsia_virtualaudio::DeviceSpecific::Tag::kCodec:
@@ -40,11 +39,10 @@ VirtualAudioDevice::Create(const fuchsia_virtualaudio::Configuration& cfg,
       zxlogf(ERROR, "Device type creation not supported");
       return fit::error(fuchsia_virtualaudio::Error::kInternal);
   }
-  auto device = std::make_shared<VirtualAudioDevice>(std::move(is_input), fidl_dispatcher,
-                                                     std::move(on_shutdown));
+  auto device = std::make_shared<VirtualAudioDevice>(std::move(is_input), std::move(on_shutdown));
 
   // The `device` shared_ptr is held until the server is unbound (i.e. until the channel is closed).
-  device->binding_ = fidl::BindServer(fidl_dispatcher, std::move(server), device,
+  device->binding_ = fidl::BindServer(device->dispatcher_, std::move(server), device,
                                       &VirtualAudioDevice::OnFidlServerUnbound);
 
   switch (cfg.device_specific()->Which()) {
@@ -94,12 +92,8 @@ void VirtualAudioDevice::OnFidlServerUnbound(
   }
 }
 
-VirtualAudioDevice::VirtualAudioDevice(std::optional<bool> is_input,
-                                       async_dispatcher_t* fidl_dispatcher,
-                                       fit::closure on_shutdown)
-    : is_input_(std::move(is_input)),
-      fidl_dispatcher_(fidl_dispatcher),
-      on_shutdown_(std::move(on_shutdown)) {}
+VirtualAudioDevice::VirtualAudioDevice(std::optional<bool> is_input, fit::closure on_shutdown)
+    : is_input_(std::move(is_input)), on_shutdown_(std::move(on_shutdown)) {}
 
 VirtualAudioDevice::~VirtualAudioDevice() {
   // The driver should have been shutdown.
@@ -111,12 +105,11 @@ VirtualAudioDevice::~VirtualAudioDevice() {
 
 // Post the given task with automatic cancellation if the device is cancelled before the task fires.
 void VirtualAudioDevice::PostToDispatcher(fit::closure task_to_post) {
-  async::PostTask(fidl_dispatcher_,
-                  [weak = weak_from_this(), task_to_post = std::move(task_to_post)]() {
-                    if (weak.lock()) {
-                      task_to_post();
-                    }
-                  });
+  async::PostTask(dispatcher_, [weak = weak_from_this(), task_to_post = std::move(task_to_post)]() {
+    if (weak.lock()) {
+      task_to_post();
+    }
+  });
 }
 
 void VirtualAudioDevice::ShutdownAsync() {
@@ -154,9 +147,7 @@ void VirtualAudioDevice::GetFormat(GetFormatCompleter::Sync& completer) {
     return;
   }
 
-  driver_->PostToDispatcher([driver = driver_.get(), completer = completer.ToAsync()]() mutable {
-    VirtualAudioDriver::ScopedToken t(driver->domain_token());
-    auto result = driver->GetFormatForVA();
+  driver_->GetFormatForVA([completer = completer.ToAsync()](auto result) mutable {
     if (!result.is_ok()) {
       completer.ReplyError(result.error_value());
       return;
@@ -191,9 +182,7 @@ void VirtualAudioDevice::GetGain(GetGainCompleter::Sync& completer) {
     return;
   }
 
-  driver_->PostToDispatcher([driver = driver_.get(), completer = completer.ToAsync()]() mutable {
-    VirtualAudioDriver::ScopedToken t(driver->domain_token());
-    auto result = driver->GetGainForVA();
+  driver_->GetGainForVA([completer = completer.ToAsync()](auto result) mutable {
     if (!result.is_ok()) {
       completer.ReplyError(result.error_value());
       return;
@@ -223,9 +212,7 @@ void VirtualAudioDevice::GetBuffer(GetBufferCompleter::Sync& completer) {
     return;
   }
 
-  driver_->PostToDispatcher([driver = driver_.get(), completer = completer.ToAsync()]() mutable {
-    VirtualAudioDriver::ScopedToken t(driver->domain_token());
-    auto result = driver->GetBufferForVA();
+  driver_->GetBufferForVA([completer = completer.ToAsync()](auto result) mutable {
     if (!result.is_ok()) {
       completer.ReplyError(result.error_value());
       return;
@@ -261,17 +248,14 @@ void VirtualAudioDevice::SetNotificationFrequency(
     return;
   }
 
-  driver_->PostToDispatcher([driver = driver_.get(),
-                             notifications_per_ring = request->notifications_per_ring,
-                             completer = completer.ToAsync()]() mutable {
-    VirtualAudioDriver::ScopedToken t(driver->domain_token());
-    auto result = driver->SetNotificationFrequencyFromVA(notifications_per_ring);
-    if (!result.is_ok()) {
-      completer.ReplyError(result.error_value());
-      return;
-    }
-    completer.ReplySuccess();
-  });
+  driver_->SetNotificationFrequencyFromVA(request->notifications_per_ring,
+                                          [completer = completer.ToAsync()](auto result) mutable {
+                                            if (!result.is_ok()) {
+                                              completer.ReplyError(result.error_value());
+                                              return;
+                                            }
+                                            completer.ReplySuccess();
+                                          });
 }
 
 void VirtualAudioDevice::NotifyStart(zx_time_t start_time) {
@@ -307,9 +291,7 @@ void VirtualAudioDevice::GetPosition(GetPositionCompleter::Sync& completer) {
     return;
   }
 
-  driver_->PostToDispatcher([driver = driver_.get(), completer = completer.ToAsync()]() mutable {
-    VirtualAudioDriver::ScopedToken t(driver->domain_token());
-    auto result = driver->GetPositionForVA();
+  driver_->GetPositionForVA([completer = completer.ToAsync()](auto result) mutable {
     if (!result.is_ok()) {
       completer.ReplyError(result.error_value());
       return;
@@ -340,16 +322,14 @@ void VirtualAudioDevice::ChangePlugState(ChangePlugStateRequestView request,
     return;
   }
 
-  driver_->PostToDispatcher([driver = driver_.get(), plugged = request->plugged,
-                             completer = completer.ToAsync()]() mutable {
-    VirtualAudioDriver::ScopedToken t(driver->domain_token());
-    auto result = driver->ChangePlugStateFromVA(plugged);
-    if (!result.is_ok()) {
-      completer.ReplyError(result.error_value());
-      return;
-    }
-    completer.ReplySuccess();
-  });
+  driver_->ChangePlugStateFromVA(request->plugged,
+                                 [completer = completer.ToAsync()](auto result) mutable {
+                                   if (!result.is_ok()) {
+                                     completer.ReplyError(result.error_value());
+                                     return;
+                                   }
+                                   completer.ReplySuccess();
+                                 });
 }
 
 void VirtualAudioDevice::AdjustClockRate(AdjustClockRateRequestView request,
@@ -359,17 +339,14 @@ void VirtualAudioDevice::AdjustClockRate(AdjustClockRateRequestView request,
     return;
   }
 
-  driver_->PostToDispatcher([driver = driver_.get(),
-                             ppm_from_monotonic = request->ppm_from_monotonic,
-                             completer = completer.ToAsync()]() mutable {
-    VirtualAudioDriver::ScopedToken t(driver->domain_token());
-    auto result = driver->AdjustClockRateFromVA(ppm_from_monotonic);
-    if (!result.is_ok()) {
-      completer.ReplyError(result.error_value());
-      return;
-    }
-    completer.ReplySuccess();
-  });
+  driver_->AdjustClockRateFromVA(request->ppm_from_monotonic,
+                                 [completer = completer.ToAsync()](auto result) mutable {
+                                   if (!result.is_ok()) {
+                                     completer.ReplyError(result.error_value());
+                                     return;
+                                   }
+                                   completer.ReplySuccess();
+                                 });
 }
 
 }  // namespace virtual_audio

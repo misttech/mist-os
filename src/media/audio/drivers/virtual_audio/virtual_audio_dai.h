@@ -34,10 +34,6 @@ class VirtualAudioDai final : public VirtualAudioDaiDeviceType,
                   std::weak_ptr<VirtualAudioDevice> owner, zx_device_t* parent,
                   fit::closure on_shutdown);
   void ResetDaiState() { connected_ = false; }
-
-  async_dispatcher_t* dispatcher() override {
-    return fdf::Dispatcher::GetCurrent()->async_dispatcher();
-  }
   void ShutdownAsync() override;
   void DdkRelease();
 
@@ -45,8 +41,8 @@ class VirtualAudioDai final : public VirtualAudioDaiDeviceType,
   // TODO(https://fxbug.dev/42075676): Add support for GetPositionForVA,
   // SetNotificationFrequencyFromVA and AdjustClockRateFromVA.
   using ErrorT = fuchsia_virtualaudio::Error;
-  fit::result<ErrorT, CurrentFormat> GetFormatForVA() override;
-  fit::result<ErrorT, CurrentBuffer> GetBufferForVA() override;
+  void GetFormatForVA(fit::callback<void(fit::result<ErrorT, CurrentFormat>)> callback) override;
+  void GetBufferForVA(fit::callback<void(fit::result<ErrorT, CurrentBuffer>)> callback) override;
 
  protected:
   // FIDL LLCPP method for fuchsia.hardware.audio.DaiConnector.
@@ -57,7 +53,7 @@ class VirtualAudioDai final : public VirtualAudioDaiDeviceType,
     }
     connected_ = true;
     fidl::BindServer(
-        dispatcher(), std::move(request->dai_protocol), this,
+        dispatcher_, std::move(request->dai_protocol), this,
         [](VirtualAudioDai* dai_instance, fidl::UnbindInfo,
            fidl::ServerEnd<fuchsia_hardware_audio::Dai>) { dai_instance->ResetDaiState(); });
   }
@@ -124,6 +120,7 @@ class VirtualAudioDai final : public VirtualAudioDaiDeviceType,
 
   std::optional<fuchsia_hardware_audio::DaiFormat> dai_format_;
   fuchsia_virtualaudio::Configuration config_;
+  async_dispatcher_t* dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
 };
 
 }  // namespace virtual_audio

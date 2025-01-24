@@ -45,8 +45,6 @@ class VirtualAudio : public VirtualAudioDeviceType {
 
   void ShutdownAllDevices();
 
-  async_dispatcher_t* dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
-
   // `DeviceId` is needed in order to locate a device when the device has shutdown and is to be
   // removed.
   std::unordered_map<DeviceId, std::shared_ptr<VirtualAudioDevice>> devices_;

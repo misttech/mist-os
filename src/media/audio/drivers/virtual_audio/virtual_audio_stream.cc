@@ -108,6 +108,10 @@ fuchsia_virtualaudio::Configuration VirtualAudioStream::GetDefaultConfig(bool is
   return config;
 }
 
+void VirtualAudioStream::PostToDispatcher(fit::closure task_to_post) {
+  async::PostTask(dispatcher(), [task_to_post = std::move(task_to_post)]() { task_to_post(); });
+}
+
 zx_status_t VirtualAudioStream::Init() {
   if (config_.device_name().has_value()) {
     strncpy(device_name_, config_.device_name()->c_str(), sizeof(device_name_));

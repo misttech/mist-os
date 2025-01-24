@@ -34,6 +34,7 @@ class VirtualAudioStream : public audio::SimpleAudioStream {
   using audio::SimpleAudioStream::domain_token;
 
   async_dispatcher_t* dispatcher() { return audio::SimpleAudioStream::dispatcher(); }
+  void PostToDispatcher(fit::closure task_to_post);
 
   //
   // The following methods implement getters and setters for fuchsia.virtualaudio.Device.
@@ -175,35 +176,58 @@ class VirtualAudioStreamWrapper : public VirtualAudioDriver {
         cfg, std::move(owner), dev_node,
         fit::bind_member<&VirtualAudioStreamWrapper::OnStreamShutdown>(this));
   }
-  async_dispatcher_t* dispatcher() override { return stream_->dispatcher(); }
-  fit::result<ErrorT, CurrentFormat> GetFormatForVA() override {
+  void GetFormatForVA(fit::callback<void(fit::result<ErrorT, CurrentFormat>)> callback) override {
     audio::ScopedToken t(stream_->domain_token());
-    return stream_->GetFormatForVA();
+    stream_->PostToDispatcher([stream = stream_, callback = std::move(callback)]() mutable {
+      audio::ScopedToken t(stream->domain_token());
+      callback(stream->GetFormatForVA());
+    });
   }
-  fit::result<ErrorT, CurrentGain> GetGainForVA() override {
+  void GetGainForVA(fit::callback<void(fit::result<ErrorT, CurrentGain>)> callback) override {
     audio::ScopedToken t(stream_->domain_token());
-    return stream_->GetGainForVA();
+    stream_->PostToDispatcher([stream = stream_, callback = std::move(callback)]() mutable {
+      audio::ScopedToken t(stream->domain_token());
+      callback(stream->GetGainForVA());
+    });
   }
-  fit::result<ErrorT, CurrentBuffer> GetBufferForVA() override {
+  void GetBufferForVA(fit::callback<void(fit::result<ErrorT, CurrentBuffer>)> callback) override {
     audio::ScopedToken t(stream_->domain_token());
-    return stream_->GetBufferForVA();
+    stream_->PostToDispatcher([stream = stream_, callback = std::move(callback)]() mutable {
+      audio::ScopedToken t(stream->domain_token());
+      callback(stream->GetBufferForVA());
+    });
   }
-  fit::result<ErrorT, CurrentPosition> GetPositionForVA() override {
-    audio::ScopedToken t(stream_->domain_token());
-    return stream_->GetPositionForVA();
+  void GetPositionForVA(
+      fit::callback<void(fit::result<ErrorT, CurrentPosition>)> callback) override {
+    stream_->PostToDispatcher([stream = stream_, callback = std::move(callback)]() mutable {
+      audio::ScopedToken t(stream->domain_token());
+      callback(stream->GetPositionForVA());
+    });
   }
-
-  fit::result<ErrorT> SetNotificationFrequencyFromVA(uint32_t notifications_per_ring) override {
+  void SetNotificationFrequencyFromVA(uint32_t notifications_per_ring,
+                                      fit::callback<void(fit::result<ErrorT>)> callback) override {
     audio::ScopedToken t(stream_->domain_token());
-    return stream_->SetNotificationFrequencyFromVA(notifications_per_ring);
+    stream_->PostToDispatcher(
+        [stream = stream_, notifications_per_ring, callback = std::move(callback)]() mutable {
+          audio::ScopedToken t(stream->domain_token());
+          callback(stream->SetNotificationFrequencyFromVA(notifications_per_ring));
+        });
   }
-  fit::result<ErrorT> ChangePlugStateFromVA(bool plugged) override {
-    audio::ScopedToken t(stream_->domain_token());
-    return stream_->ChangePlugStateFromVA(plugged);
+  void ChangePlugStateFromVA(bool plugged,
+                             fit::callback<void(fit::result<ErrorT>)> callback) override {
+    stream_->PostToDispatcher(
+        [stream = stream_, plugged, callback = std::move(callback)]() mutable {
+          audio::ScopedToken t(stream->domain_token());
+          callback(stream->ChangePlugStateFromVA(plugged));
+        });
   }
-  fit::result<ErrorT> AdjustClockRateFromVA(int32_t ppm_from_monotonic) override {
-    audio::ScopedToken t(stream_->domain_token());
-    return stream_->AdjustClockRateFromVA(ppm_from_monotonic);
+  void AdjustClockRateFromVA(int32_t ppm_from_monotonic,
+                             fit::callback<void(fit::result<ErrorT>)> callback) override {
+    stream_->PostToDispatcher(
+        [stream = stream_, ppm_from_monotonic, callback = std::move(callback)]() mutable {
+          audio::ScopedToken t(stream->domain_token());
+          callback(stream->AdjustClockRateFromVA(ppm_from_monotonic));
+        });
   }
 
   void ShutdownAsync() override {

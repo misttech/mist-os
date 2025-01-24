@@ -32,9 +32,6 @@ class VirtualAudioCodec : public VirtualAudioCodecDeviceType,
                     fit::closure on_shutdown);
   void ResetCodecState();
 
-  async_dispatcher_t* dispatcher() override {
-    return fdf::Dispatcher::GetCurrent()->async_dispatcher();
-  }
   void DdkRelease();
   void ShutdownAsync() override;
 

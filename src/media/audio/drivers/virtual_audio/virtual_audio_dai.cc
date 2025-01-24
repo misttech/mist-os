@@ -91,27 +91,31 @@ VirtualAudioDai::VirtualAudioDai(fuchsia_virtualaudio::Configuration config,
   ZX_ASSERT_MSG(status == ZX_OK, "DdkAdd failed");
 }
 
-fit::result<VirtualAudioDai::ErrorT, CurrentFormat> VirtualAudioDai::GetFormatForVA() {
+void VirtualAudioDai::GetFormatForVA(
+    fit::callback<void(fit::result<ErrorT, CurrentFormat>)> callback) {
   if (!ring_buffer_format_.has_value() || !ring_buffer_format_->pcm_format().has_value()) {
     zxlogf(WARNING, "%p ring buffer not initialized yet", this);
-    return fit::error(ErrorT::kNoRingBuffer);
+    callback(fit::error(ErrorT::kNoRingBuffer));
+    return;
   }
   auto& pcm_format = ring_buffer_format_->pcm_format();
   auto& ring_buffer = dai_config().ring_buffer().value();
   int64_t external_delay = ring_buffer.external_delay().value_or(0);
-  return fit::ok(CurrentFormat{
+  callback(fit::ok(CurrentFormat{
       .frames_per_second = pcm_format->frame_rate(),
       .sample_format = audio::utils::GetSampleFormat(pcm_format->valid_bits_per_sample(),
                                                      pcm_format->bytes_per_sample() * 8),
       .num_channels = pcm_format->number_of_channels(),
       .external_delay = zx::nsec(external_delay),
-  });
+  }));
 }
 
-fit::result<VirtualAudioDai::ErrorT, CurrentBuffer> VirtualAudioDai::GetBufferForVA() {
+void VirtualAudioDai::GetBufferForVA(
+    fit::callback<void(fit::result<ErrorT, CurrentBuffer>)> callback) {
   if (!ring_buffer_vmo_.is_valid()) {
     zxlogf(WARNING, "%p ring buffer not initialized yet", this);
-    return fit::error(ErrorT::kNoRingBuffer);
+    callback(fit::error(ErrorT::kNoRingBuffer));
+    return;
   }
 
   zx::vmo dup_vmo;
@@ -119,14 +123,15 @@ fit::result<VirtualAudioDai::ErrorT, CurrentBuffer> VirtualAudioDai::GetBufferFo
       ZX_RIGHT_TRANSFER | ZX_RIGHT_READ | ZX_RIGHT_WRITE | ZX_RIGHT_MAP, &dup_vmo);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%p ring buffer creation failed: %s", this, zx_status_get_string(status));
-    return fit::error(ErrorT::kInternal);
+    callback(fit::error(ErrorT::kInternal));
+    return;
   }
 
-  return fit::ok(CurrentBuffer{
+  callback(fit::ok(CurrentBuffer{
       .vmo = std::move(dup_vmo),
       .num_frames = num_ring_buffer_frames_,
       .notifications_per_ring = notifications_per_ring_,
-  });
+  }));
 }
 
 void VirtualAudioDai::GetProperties(
@@ -210,7 +215,7 @@ void VirtualAudioDai::CreateRingBuffer(CreateRingBufferRequest& request,
         }
         ResetRingBuffer();
       };
-  fidl::BindServer(dispatcher(), std::move(request.ring_buffer()), this, std::move(on_unbound));
+  fidl::BindServer(dispatcher_, std::move(request.ring_buffer()), this, std::move(on_unbound));
 }
 
 void VirtualAudioDai::ResetRingBuffer() {

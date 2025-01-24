@@ -89,7 +89,7 @@ void VirtualAudioCodec::Connect(ConnectRequestView request, ConnectCompleter::Sy
   }
   connected_ = true;
   fidl::BindServer(
-      dispatcher(), std::move(request->codec_protocol), this,
+      fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(request->codec_protocol), this,
       [](VirtualAudioCodec* codec_instance, fidl::UnbindInfo,
          fidl::ServerEnd<fuchsia_hardware_audio::Codec>) { codec_instance->ResetCodecState(); });
 }

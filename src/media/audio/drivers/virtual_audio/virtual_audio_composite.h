@@ -39,9 +39,6 @@ class VirtualAudioComposite final
                         std::weak_ptr<VirtualAudioDevice> owner, zx_device_t* parent,
                         fit::closure on_shutdown);
   void ResetCompositeState();
-  async_dispatcher_t* dispatcher() override {
-    return fdf::Dispatcher::GetCurrent()->async_dispatcher();
-  }
   void ShutdownAsync() override;
   void DdkRelease();
 
@@ -49,8 +46,8 @@ class VirtualAudioComposite final
   // TODO(https://fxbug.dev/42075676): Add support for GetPositionForVA,
   // SetNotificationFrequencyFromVA and AdjustClockRateFromVA.
   using ErrorT = fuchsia_virtualaudio::Error;
-  fit::result<ErrorT, CurrentFormat> GetFormatForVA() override;
-  fit::result<ErrorT, CurrentBuffer> GetBufferForVA() override;
+  void GetFormatForVA(fit::callback<void(fit::result<ErrorT, CurrentFormat>)> callback) override;
+  void GetBufferForVA(fit::callback<void(fit::result<ErrorT, CurrentBuffer>)> callback) override;
 
  protected:
   // FIDL LLCPP method for fuchsia.hardware.audio.CompositeConnector.
@@ -153,6 +150,7 @@ class VirtualAudioComposite final
   std::optional<fidl::ServerBinding<fuchsia_hardware_audio::RingBuffer>> ring_buffer_;
   std::optional<fidl::ServerBinding<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>
       signal_;
+  async_dispatcher_t* dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
 };
 
 }  // namespace virtual_audio
