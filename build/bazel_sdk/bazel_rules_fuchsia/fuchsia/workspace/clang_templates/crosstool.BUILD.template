@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
-load("@fuchsia_sdk//:generated_constants.bzl", sdk_constants = "constants")
 load(
     "@fuchsia_sdk//fuchsia:defs.bzl",
     "COMPATIBILITY",
@@ -31,6 +30,15 @@ licenses(["notice"])
 package(default_visibility = ["//visibility:public"])
 
 setup_clang_repository(clang_constants)
+
+# This is the set of CPUs that the Fuchsia SDK provides sysroots for. These
+# sysroots are guaranteed to exist in an official release of the SDK but they
+# may not be present in custom builds of the SDK. It is up to the user to ensure
+# that they are not building against a CPU that is not present in the SDK if they
+# are doing a custom build.
+# It is safe to register these toolchains if they are not used even if the paths
+# don't exist because the paths and targets are only resolved if they are used.
+_SDK_SUPPORTED_TARGET_CPUS = ["x64", "arm64", "riscv64"]
 
 _FUCHSIA_SYSROOT_HEADERS_FILEGROUPS = {
     "aarch64": "%{SYSROOT_HEADERS_AARCH64}",
@@ -61,7 +69,7 @@ cc_toolchain_suite(
                 "riscv64": ":cc-compiler-riscv64",
             },
         },
-        sdk_constants.target_cpus,
+        _SDK_SUPPORTED_TARGET_CPUS,
     ),
 )
 
@@ -70,7 +78,7 @@ _TO_BAZEL_CPU_MAP = {
     "arm64": "aarch64",
 }
 
-TARGET_CPUS = [_TO_BAZEL_CPU_MAP.get(cpu, cpu) for cpu in sdk_constants.target_cpus]
+TARGET_CPUS = [_TO_BAZEL_CPU_MAP.get(cpu, cpu) for cpu in _SDK_SUPPORTED_TARGET_CPUS]
 
 exports_files([
     "bin/clang-format",
@@ -326,7 +334,7 @@ fuchsia_package_resource_group(
                 ],
             },
         },
-        sdk_constants.target_cpus,
+        _SDK_SUPPORTED_TARGET_CPUS,
     ),
     dest = "lib" + select({
         ":asan_variant": "/asan",
@@ -350,7 +358,7 @@ fuchsia_package_resource_group(
                 ":riscv64_hwasan_variant": "lib/riscv64-unknown-fuchsia/hwasan",
             },
         },
-        sdk_constants.target_cpus,
+        _SDK_SUPPORTED_TARGET_CPUS,
     ),
     target_compatible_with = COMPATIBILITY.FUCHSIA_CONDITION,
     visibility = ["//visibility:public"],
@@ -385,7 +393,7 @@ fuchsia_package_resource_group(
                 ],
             },
         },
-        sdk_constants.target_cpus,
+        _SDK_SUPPORTED_TARGET_CPUS,
         default = [],
     ),
     dest = "lib" + select({
@@ -405,7 +413,7 @@ fuchsia_package_resource_group(
                 ":riscv64_build": "lib/clang/%{CLANG_VERSION}/lib/riscv64-unknown-fuchsia",
             },
         },
-        sdk_constants.target_cpus,
+        _SDK_SUPPORTED_TARGET_CPUS,
     ),
     target_compatible_with = COMPATIBILITY.FUCHSIA_CONDITION,
     visibility = ["//visibility:public"],
