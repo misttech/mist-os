@@ -86,7 +86,9 @@ async fn show_impl(
     context: EnvironmentContext,
     writer: &mut PackagesWriter,
 ) -> Result<()> {
-    let repo = connect_to_repo(cmd.repository.clone(), cmd.port, context).await?;
+    let repo = connect_to_repo(cmd.repository.clone(), cmd.port, context)
+        .await
+        .context("connect to repo")?;
 
     let Some(mut blobs) = repo
         .show_package(&cmd.package, cmd.include_subpackages)
@@ -163,7 +165,9 @@ async fn list_impl(
     context: EnvironmentContext,
     writer: &mut PackagesWriter,
 ) -> Result<()> {
-    let repo = connect_to_repo(cmd.repository.clone(), cmd.port, context).await?;
+    let repo = connect_to_repo(cmd.repository.clone(), cmd.port, context)
+        .await
+        .context("connect to repo")?;
 
     let mut packages = vec![];
     for package in repo.list_packages().await? {
@@ -299,7 +303,10 @@ async fn connect_to_repo(
             .get("repository.process_dir")
             .map_err(|e: ffx_config::api::ConfigError| bug!(e))?;
         let mgr = PkgServerInstances::new(instance_root);
-        if let Some(info) = mgr.get_instance(repo_name.clone(), repo_port)? {
+        if let Some(info) = mgr
+            .get_instance(repo_name.clone(), repo_port)
+            .with_context(|| format!("Getting server instance for {repo_name}"))?
+        {
             Some(info.repo_spec())
         } else if let Some(repo_spec) = pkg::config::get_repository(&repo_name)
             .await
@@ -350,7 +357,9 @@ async fn extract_archive_impl(
     cmd: ExtractArchiveSubCommand,
     context: EnvironmentContext,
 ) -> Result<()> {
-    let repo = connect_to_repo(cmd.repository.clone(), cmd.port, context).await?;
+    let repo = connect_to_repo(cmd.repository.clone(), cmd.port, context)
+        .await
+        .context("connect to repo")?;
 
     let Some(entries) = repo
         .show_package(&cmd.package, true)

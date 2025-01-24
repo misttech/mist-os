@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context as _, Result};
 use camino::Utf8PathBuf;
 use ffx_config::EnvironmentContext;
 use fidl_fuchsia_pkg_ext::{
@@ -214,21 +214,23 @@ impl PkgServerInstanceInfo for PkgServerInstances {
         let mut instances = Vec::<PkgServerInfo>::new();
         let root = self.instance_root.as_path();
         if root.is_dir() {
-            for entry in root.read_dir()? {
+            for entry in root.read_dir().with_context(|| format!("read dir {root:?}"))? {
                 if let Ok(entry) = entry {
                     if entry.path().is_dir() {
                         continue;
                     }
                     if entry.path().extension().unwrap_or_default() == "json" {
                         // If there is a problem reading the file, return the error.
-                        let data = fs::read(entry.path())?;
+                        let data = fs::read(entry.path())
+                            .with_context(|| format!("read {:?}", entry.path()))?;
 
                         match serde_json::from_slice::<PkgServerInfo>(&data) {
                             Ok(info) => {
                                 if info.is_running() {
                                     instances.push(info);
                                 } else {
-                                    fs::remove_file(entry.path())?;
+                                    fs::remove_file(entry.path())
+                                        .with_context(|| format!("remove {:?}", entry.path()))?;
                                 }
                             }
                             Err(e) => {
@@ -238,7 +240,9 @@ impl PkgServerInstanceInfo for PkgServerInstances {
                                 );
                                 let mut bad_name = entry.path().clone();
                                 bad_name.set_extension("json.bad");
-                                fs::rename(entry.path(), &bad_name)?;
+                                fs::rename(entry.path(), &bad_name).with_context(|| {
+                                    format!("rename {:?} to {:?}", entry.path(), bad_name)
+                                })?;
                                 tracing::warn!(
                                     "Renamed instance file {old} to {new}",
                                     old = entry.path().display(),
@@ -255,7 +259,8 @@ impl PkgServerInstanceInfo for PkgServerInstances {
 
     fn get_instance(&self, name: String, port: Option<u16>) -> Result<Option<PkgServerInfo>> {
         let instances: Vec<PkgServerInfo> = self
-            .list_instances()?
+            .list_instances()
+            .context("list instances")?
             .iter()
             .filter(|r| r.name == name)
             .filter(|r| r.is_running())
@@ -284,7 +289,7 @@ impl PkgServerInstanceInfo for PkgServerInstances {
             let fullpath = self.instance_root.join(instance_file);
 
             if fullpath.exists() {
-                fs::remove_file(fullpath).map_err(Into::into)
+                fs::remove_file(&fullpath).with_context(|| format!("removing {fullpath:?}"))
             } else {
                 Ok(())
             }
@@ -295,7 +300,8 @@ impl PkgServerInstanceInfo for PkgServerInstances {
 
     fn write_instance(&self, instance: &PkgServerInfo) -> Result<()> {
         if !self.instance_root.exists() {
-            fs::create_dir_all(&self.instance_root)?;
+            fs::create_dir_all(&self.instance_root)
+                .with_context(|| format!("create root {:?}", self.instance_root))?;
         }
         // There can be multiple repository servers that are serving the same instance name
         // This is common where the repository name is constrained, such as preconfigured on the
@@ -304,7 +310,8 @@ impl PkgServerInstanceInfo for PkgServerInstances {
         let filename = instance.filename();
         let instance_file = self.instance_root.join(filename);
         let contents = serde_json::to_string_pretty(&instance)?;
-        fs::write(instance_file, &contents).map_err(Into::into)
+        fs::write(&instance_file, &contents)
+            .with_context(|| format!("writing file {instance_file:?}"))
     }
 }
 
