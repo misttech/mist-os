@@ -1087,7 +1087,7 @@ if (current_os == "fuchsia") {
 }
 
 group("tuf") {
-  public_deps = [ ":tuf-v0_3_0-beta12" ]
+  public_deps = [ ":tuf-v0_3_0-beta13" ]
 }
 
 group("typed-builder") {
@@ -12787,66 +12787,13 @@ rust_library("ring-v0_17_8") {
   visibility += [ ":rustls-v0_21_12" ]
   visibility += [ ":rustls-webpki-v0_101_7" ]
   visibility += [ ":sct-v0_7_1" ]
+  visibility += [ ":tuf-v0_3_0-beta13" ]
+  visibility += [ ":tuf-v0_3_0-beta13.aux.deps" ]
+  visibility += [ ":tuf-v0_3_0-beta13.aux.transdeps" ]
+  visibility += [ ":tuf-v0_3_0-beta13.clippy" ]
+  visibility += [ ":tuf-v0_3_0-beta13.rustdoc" ]
 
   applicable_licenses = [ ":ring-v0_17_8.license" ]
-}
-
-license("ring-v0_16_20.license") {
-  public_package_name = "ring"
-  license_files = [
-    "//third_party/rust_crates/vendor/ring-0.16.20/LICENSE",
-    "//third_party/rust_crates/vendor/ring-0.16.20/third_party/fiat/LICENSE",
-  ]
-}
-
-rust_library("ring-v0_16_20") {
-  crate_name = "ring"
-  crate_root = "//third_party/rust_crates/vendor/ring-0.16.20/src/lib.rs"
-  output_name = "ring-924aac29f221fe6c"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":untrusted-v0_7_1" ]
-  if (current_cpu == "wasm32" && false && current_os == "unknown" && false) {
-    deps += [ ":web-sys-v0_3_40" ]
-  }
-  if (false || current_cpu == "x64" ||
-      ((current_cpu == "arm64" || false) &&
-       (false || current_os == "fuchsia" || current_os == "linux"))) {
-    deps += [ ":spin-v0_5_2" ]
-  }
-  if (false || current_os == "linux") {
-    deps += [ ":libc-v0_2_169" ]
-    deps += [ ":once_cell-v1_20_2" ]
-  }
-  if (false || false || false || false || false || false) {
-    deps += [ ":once_cell-v1_20_2" ]
-  }
-  if (false) {
-    deps += [ ":winapi-v0_3_9" ]
-  }
-  deps += [ "//third_party/rust_crates/compat/ring-0.16.20:ring-core" ]
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=924aac29f221fe6c",
-    "-Cextra-filename=-924aac29f221fe6c",
-    "--cfg=feature=\"alloc\"",
-    "--cfg=feature=\"default\"",
-    "--cfg=feature=\"dev_urandom_fallback\"",
-    "--cfg=feature=\"once_cell\"",
-  ]
-
-  visibility = []
-  visibility += [ ":tuf-v0_3_0-beta12" ]
-  visibility += [ ":tuf-v0_3_0-beta12.clippy" ]
-  visibility += [ ":tuf-v0_3_0-beta12.rustdoc" ]
-  visibility += [ ":tuf-v0_3_0-beta12.aux.deps" ]
-  visibility += [ ":tuf-v0_3_0-beta12.aux.transdeps" ]
-
-  applicable_licenses = [ ":ring-v0_16_20.license" ]
 }
 
 license("ringbuf-v0_4_4.license") {
@@ -14948,33 +14895,6 @@ rust_library("socket2-v0_5_5") {
   applicable_licenses = [ ":socket2-v0_5_5.license" ]
 }
 
-license("spin-v0_5_2.license") {
-  public_package_name = "spin"
-  license_files = [ "//third_party/rust_crates/vendor/spin-0.5.2/LICENSE" ]
-}
-
-rust_library("spin-v0_5_2") {
-  crate_name = "spin"
-  crate_root = "//third_party/rust_crates/vendor/spin-0.5.2/src/lib.rs"
-  output_name = "spin-50733eeb0bba4c8d"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=50733eeb0bba4c8d",
-    "-Cextra-filename=-50733eeb0bba4c8d",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":spin-v0_5_2.license" ]
-}
-
 license("spin-v0_9_8.license") {
   public_package_name = "spin"
   license_files = [ "//third_party/rust_crates/vendor/spin-0.9.8/LICENSE" ]
@@ -16884,21 +16804,22 @@ rust_library("ttf-parser-v0_10_1") {
   applicable_licenses = [ ":ttf-parser-v0_10_1.license" ]
 }
 
-license("tuf-v0_3_0-beta12.license") {
+license("tuf-v0_3_0-beta13.license") {
   public_package_name = "tuf"
   license_files = [
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/tuf-0.3.0-beta13/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/tuf-0.3.0-beta13/LICENSE-MIT",
   ]
 }
 
-rust_library("tuf-v0_3_0-beta12") {
+rust_library("tuf-v0_3_0-beta13") {
   crate_name = "tuf"
-  crate_root = "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/lib.rs"
-  output_name = "tuf-90ecc9b52560181b"
+  crate_root = "//third_party/rust_crates/vendor/tuf-0.3.0-beta13/src/lib.rs"
+  output_name = "tuf-d81b942ee08d5c9e"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
+  deps += [ ":ring-v0_17_8" ]
   deps += [ ":chrono-v0_4_34" ]
   deps += [ ":data-encoding-v2_3_2" ]
   deps += [ ":futures-io-v0_3_30" ]
@@ -16908,13 +16829,12 @@ rust_library("tuf-v0_3_0-beta12") {
   deps += [ ":itoa-v1_0_5" ]
   deps += [ ":log-v0_4_22" ]
   deps += [ ":percent-encoding-v2_2_0" ]
-  deps += [ ":ring-v0_16_20" ]
   deps += [ ":serde-v1_0_204" ]
   deps += [ ":serde_derive-v1_0_204($host_toolchain)" ]
   deps += [ ":serde_json-v1_0_128" ]
   deps += [ ":tempfile-v3_2_0" ]
   deps += [ ":thiserror-v1_0_57" ]
-  deps += [ ":untrusted-v0_7_1" ]
+  deps += [ ":untrusted-v0_9_0" ]
   deps += [ ":url-v2_3_1" ]
 
   rustenv = []
@@ -16922,14 +16842,14 @@ rust_library("tuf-v0_3_0-beta12") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=90ecc9b52560181b",
-    "-Cextra-filename=-90ecc9b52560181b",
+    "-Cmetadata=d81b942ee08d5c9e",
+    "-Cextra-filename=-d81b942ee08d5c9e",
     "--cfg=feature=\"hyper\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":tuf-v0_3_0-beta12.license" ]
+  applicable_licenses = [ ":tuf-v0_3_0-beta13.license" ]
 }
 
 license("typed-arena-v1_4_1.license") {
@@ -18272,30 +18192,6 @@ rust_library("wasm-bindgen-v0_2_91") {
   applicable_licenses = [ "//build/licenses:fuchsia_license" ]
 }
 
-rust_library("web-sys-v0_3_40") {
-  crate_name = "web_sys"
-  crate_root = "//third_party/rust_crates/empty/web-sys/src/lib.rs"
-  output_name = "web_sys-587629034c2c5b90"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=587629034c2c5b90",
-    "-Cextra-filename=-587629034c2c5b90",
-    "--cfg=feature=\"Crypto\"",
-    "--cfg=feature=\"Window\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
-}
-
 license("rustls-webpki-v0_101_7.license") {
   public_package_name = "webpki"
   license_files =
@@ -18409,7 +18305,6 @@ rust_library("winapi-v0_3_9") {
     "--cfg=feature=\"winnt\"",
     "--cfg=feature=\"winsock2\"",
     "--cfg=feature=\"winuser\"",
-    "--cfg=feature=\"wtypesbase\"",
   ]
 
   visibility = [ ":*" ]

@@ -1471,7 +1471,7 @@ dependencies = [
  "regex",
  "regex-syntax 0.8.3",
  "rend",
- "ring 0.17.8",
+ "ring",
  "rust_icu_common",
  "rust_icu_sys",
  "rust_icu_ucal",
@@ -3581,28 +3581,13 @@ dependencies = [
 
 [[package]]
 name = "ring"
-version = "0.16.20"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3053cf52e236a3ed746dfc745aa9cacf1b791d846bdaf412f60a8d7d6e17c8fc"
-dependencies = [
- "cc",
- "libc",
- "once_cell",
- "spin 0.5.2",
- "untrusted 0.7.1",
- "web-sys",
- "winapi",
-]
-
-[[package]]
-name = "ring"
 version = "0.17.8"
 dependencies = [
  "cc",
  "cfg-if 1.0.0",
  "getrandom",
  "libc",
- "spin 0.9.8",
+ "spin",
  "untrusted 0.9.0",
  "windows-sys 0.52.0",
 ]
@@ -3786,7 +3771,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f56a14d1f48b391359b22f731fd4bd7e43c97f3c50eee276f3aa09c94784d3e"
 dependencies = [
  "log",
- "ring 0.17.8",
+ "ring",
  "rustls-webpki",
  "sct",
 ]
@@ -3818,7 +3803,7 @@ version = "0.101.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b6275d1ee7a1cd780b64aca7726599a1dbc893b1e64144529e55c3c2f745765"
 dependencies = [
- "ring 0.17.8",
+ "ring",
  "untrusted 0.9.0",
 ]
 
@@ -3964,7 +3949,7 @@ version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da046153aa2352493d6cb7da4b6e5c0c057d8a1d0a9aa8560baffdd945acd414"
 dependencies = [
- "ring 0.17.8",
+ "ring",
  "untrusted 0.9.0",
 ]
 
@@ -4274,12 +4259,6 @@ dependencies = [
  "libc",
  "windows-sys 0.48.0",
 ]
-
-[[package]]
-name = "spin"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 
 [[package]]
 name = "spin"
@@ -4801,9 +4780,9 @@ checksum = "bbf752f9ee0c3d93a52ae37a2af72e98bb9230b4164737623b0bfc1d84db1eda"
 
 [[package]]
 name = "tuf"
-version = "0.3.0-beta12"
+version = "0.3.0-beta13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bd403d0dc8bf17442863b8b7d8e691fe975f26208df082af3516d238903798e"
+checksum = "45e58f3cf666ddf531699a34907cbc1086cd1f3bc3a6a1e6bf3caa9fdfd70f17"
 dependencies = [
  "chrono",
  "data-encoding",
@@ -4814,13 +4793,13 @@ dependencies = [
  "itoa 1.0.5",
  "log",
  "percent-encoding 2.2.0",
- "ring 0.16.20",
+ "ring",
  "serde",
  "serde_derive",
  "serde_json",
  "tempfile",
  "thiserror 1.0.57",
- "untrusted 0.7.1",
+ "untrusted 0.9.0",
  "url 2.3.1",
 ]
 
@@ -5159,10 +5138,6 @@ name = "wasm-bindgen"
 version = "0.2.91"
 
 [[package]]
-name = "web-sys"
-version = "0.3.40"
-
-[[package]]
 name = "which"
 version = "4.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5304,11 +5279,3 @@ version = "2.0.1+zstd.1.5.6"
 dependencies = [
  "libc",
 ]
-
-[[patch.unused]]
-name = "wepoll-ffi"
-version = "0.1.2"
-
-[[patch.unused]]
-name = "windows-sys"
-version = "0.42.0"

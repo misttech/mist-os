@@ -6,10 +6,12 @@ import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 
+tuf_root = "//third_party/rust_crates/vendor/tuf-0.3.0-beta13"
+
 rustc_test("tuf_lib_test") {
   edition = "2021"
 
-  source_root = "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/lib.rs"
+  source_root = "$tuf_root/src/lib.rs"
 
   configs -= [ "//build/config/rust:2018_idioms" ]
 
@@ -36,37 +38,37 @@ rustc_test("tuf_lib_test") {
   ]
 
   sources = [
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/client.rs",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/crypto.rs",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/database.rs",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/error.rs",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/format_hex.rs",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/lib.rs",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/metadata.rs",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/pouf/mod.rs",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/pouf/pouf1/mod.rs",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/pouf/pouf1/shims.rs",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/repo_builder.rs",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/repository.rs",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/repository/ephemeral.rs",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/repository/error_repo.rs",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/repository/file_system.rs",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/repository/http.rs",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/repository/track_repo.rs",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/util.rs",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/verify.rs",
+    "$tuf_root/src/client.rs",
+    "$tuf_root/src/crypto.rs",
+    "$tuf_root/src/database.rs",
+    "$tuf_root/src/error.rs",
+    "$tuf_root/src/format_hex.rs",
+    "$tuf_root/src/lib.rs",
+    "$tuf_root/src/metadata.rs",
+    "$tuf_root/src/pouf/mod.rs",
+    "$tuf_root/src/pouf/pouf1/mod.rs",
+    "$tuf_root/src/pouf/pouf1/shims.rs",
+    "$tuf_root/src/repo_builder.rs",
+    "$tuf_root/src/repository.rs",
+    "$tuf_root/src/repository/ephemeral.rs",
+    "$tuf_root/src/repository/error_repo.rs",
+    "$tuf_root/src/repository/file_system.rs",
+    "$tuf_root/src/repository/http.rs",
+    "$tuf_root/src/repository/track_repo.rs",
+    "$tuf_root/src/util.rs",
+    "$tuf_root/src/verify.rs",
   ]
 
   inputs = [
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/tests/ed25519/ed25519-1",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/tests/ed25519/ed25519-1.spki.der",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/tests/ed25519/ed25519-5.pk8.der",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/tests/ed25519/ed25519-3.pk8.der",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/tests/ed25519/ed25519-1.pub",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/tests/ed25519/ed25519-4.pk8.der",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/tests/ed25519/ed25519-1.pk8.der",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/tests/ed25519/ed25519-2.pk8.der",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/tests/ed25519/ed25519-6.pk8.der",
+    "$tuf_root/tests/ed25519/ed25519-1",
+    "$tuf_root/tests/ed25519/ed25519-1.spki.der",
+    "$tuf_root/tests/ed25519/ed25519-5.pk8.der",
+    "$tuf_root/tests/ed25519/ed25519-3.pk8.der",
+    "$tuf_root/tests/ed25519/ed25519-1.pub",
+    "$tuf_root/tests/ed25519/ed25519-4.pk8.der",
+    "$tuf_root/tests/ed25519/ed25519-1.pk8.der",
+    "$tuf_root/tests/ed25519/ed25519-2.pk8.der",
+    "$tuf_root/tests/ed25519/ed25519-6.pk8.der",
   ]
 
   rustflags = [

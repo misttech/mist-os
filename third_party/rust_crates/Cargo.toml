@@ -229,7 +229,7 @@ tracing = { version = "0.1.40", default-features = false, features = ["std", "at
 tracing-core = "0.1.32"
 tracing-log = "0.2.0"
 tracing-mutex = { version = "0.3.0", features = ["lockapi", "parkinglot"] }
-tuf = { version = "=0.3.0-beta12", default-features = false, features = ["hyper"] }
+tuf = { version = "=0.3.0-beta13", default-features = false, features = ["hyper"] }
 typed-builder = "0.10.0"
 unic-char-range = "0.9"
 unic-ucd-block = "0.9"
@@ -375,13 +375,10 @@ redox_syscall = { path = "empty/redox_syscall" }
 rustversion = { path = "empty/rustversion" }
 wasi-0_11_0_preview1 = { path = "empty/wasi-0.11.0-wasi-snapshot-preview1", package = "wasi" }
 wasm-bindgen = { path = "empty/wasm-bindgen" }
-web-sys = { path = "empty/web-sys" }
-wepoll-ffi = { path = "empty/wepoll-ffi" }
 winapi = { path = "empty/winapi" }
 winapi-util = { path = "empty/winapi-util" }
 windows = { path = "empty/windows" }
 windows-core = { path = "empty/windows-core" }
-windows-sys-0_42_0 = { package = "windows-sys", path = "empty/windows-sys-0.42.0" }
 windows-sys-0_45_0 = { package = "windows-sys", path = "empty/windows-sys-0.45.0" }
 windows-sys-0_48_0 = { package = "windows-sys", path = "empty/windows-sys-0.48.0" }
 windows-sys-0_52_0 = { package = "windows-sys", path = "empty/windows-sys-0.52.0" }
@@ -831,18 +828,6 @@ license_files = ["LICENSE-APACHE"]
 [gn.package.ref-cast."1.0.23"]
 rustflags = []
 
-[gn.package.ring."0.16.20"]
-# See https://fxbug.dev/104855 if you want to change this: Please talk to Security team.
-# Thank you!
-visibility = [
-  ":tuf-v0_3_0-beta12",
-  ":tuf-v0_3_0-beta12.clippy",
-  ":tuf-v0_3_0-beta12.rustdoc",
-  ":tuf-v0_3_0-beta12.aux.deps",
-  ":tuf-v0_3_0-beta12.aux.transdeps",
-]
-deps = [ "//third_party/rust_crates/compat/ring-0.16.20:ring-core" ]
-
 [gn.package.ring."0.17.8"]
 # See https://fxbug.dev/104855 if you want to change this: Please talk to Security team.
 # Thank you!
@@ -851,6 +836,11 @@ visibility = [
   ":rustls-v0_21_12",
   ":rustls-webpki-v0_101_7",
   ":sct-v0_7_1",
+  ":tuf-v0_3_0-beta13",
+  ":tuf-v0_3_0-beta13.aux.deps",
+  ":tuf-v0_3_0-beta13.aux.transdeps",
+  ":tuf-v0_3_0-beta13.clippy",
+  ":tuf-v0_3_0-beta13.rustdoc",
 ]
 deps = [ "//third_party/rust_crates/compat/ring-0.17.8:ring-core" ]
 env_vars = [ "RING_CORE_PREFIX=ring_core_0_17_8_" ]
