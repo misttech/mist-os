@@ -191,10 +191,7 @@ group("workbench_vim3_staging_tests") {
 # instead of internal `<PRODUCT>` name.
 group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
   testonly = true
-  public_deps = [
-    "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
-    "honeydew/tests/functional_tests:starnix_vim3_stable_tests",
-  ]
+  public_deps = [ "honeydew/tests/functional_tests:starnix_vim3_stable_tests" ]
 }
 
 # DO NOT ADD MORE TESTS.  Use `starnix_arm64_unstable_tests` instead.

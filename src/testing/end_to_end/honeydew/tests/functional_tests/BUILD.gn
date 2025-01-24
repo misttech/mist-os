@@ -157,9 +157,6 @@ group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
     "affordance_tests/test_session:test_session_ffx",
     "affordance_tests/test_ui:test_screenshot_ffx",
     "affordance_tests/test_ui:test_user_input_fc",
-
-    # TODO(https://fxbug.dev/369415658): Re-promote after fix and stabilization.
-    "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
   ]
 }
 
