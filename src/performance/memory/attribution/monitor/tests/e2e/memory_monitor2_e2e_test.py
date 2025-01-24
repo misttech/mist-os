@@ -47,7 +47,7 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
         assertContainsRegex(r"(?m)^Total memory: \d+\.\d+ MiB$", profile)
         assertContainsRegex(r"(?m)^Kernel: +\d+\.\d+ MiB$", profile)
         assertContainsRegex(
-            r"(?m)^Processes: memory_monitor2\.cm \(\d+\)$", profile
+            r"(?m)^\s*Processes:\s*memory_monitor2\.cm \(\d+\)\s*$", profile
         )
 
     def test_memory_monitor2_inspect(self) -> None:
