@@ -63,6 +63,17 @@ function fixup_absolute_paths() {
   fi
 }
 
+# Touches args.gn in the given checkout
+function touch_args_gn() {
+  local -r checkoutdir="$1"
+  (
+    cd $checkoutdir
+    local fuchsia_build_dir
+    fuchsia_build_dir="$(./scripts/fx get-build-dir)"
+    touch $fuchsia_build_dir/args.gn
+  )
+}
+
 function cmd_sync_and_build() {
   local -r multifuchsia_workdir="$(realpath $(dirname "${BASH_SOURCE[0]}"))"
   local -r multifuchsia_srcdir="$(dirname $(realpath "${BASH_SOURCE[0]}"))"
@@ -162,6 +173,7 @@ function cmd_checkout() {
         ;;
     esac
     fixup_absolute_paths "$destdir" "$destdir"
+    touch_args_gn "$destdir"
   fi
 }
 
@@ -304,6 +316,8 @@ function cmd_rebase() {
     git -C "$checkout" submodule foreach --recursive --quiet 'sed -i "/^\tworktree/d" "$(cat .git|sed "s/^gitdir: //")"/config'
     git -C "$checkout" submodule foreach --recursive --quiet 'git config core.worktree "$(pwd)"'
   fi
+
+  touch_args_gn "$checkout"
 }
 
 function detect_non_fuchsia_git_changes() {
