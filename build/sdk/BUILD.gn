@@ -48,6 +48,7 @@ _partner_idk_source_sets_list = [
   "//sdk/lib/driver/node/cpp",
   "//sdk/lib/driver/devfs/cpp",
   "//sdk/lib/driver/fake-object/cpp",
+  "//sdk/lib/driver/fake-mmio-reg/cpp:cpp",
   "//sdk/lib/driver/incoming/cpp",
   "//sdk/lib/driver/logging/cpp",
   "//sdk/lib/driver/outgoing/cpp",
@@ -161,9 +162,6 @@ _internal_source_sets_list = [
   "//sdk/lib/driver/devicetree/visitors:registration",
   "//sdk/lib/driver/devicetree/visitors:registry",
   "//sdk/lib/driver_test_realm/realm_builder/cpp:cpp",
-
-  # TODO(https://fxbug.dev/349834645): Promote fake-mmio-reg to "partner".
-  "//sdk/lib/driver/fake-mmio-reg/cpp:cpp",
 
   # TODO(https://fxbug.dev/373899421): Promote mock-mmio-range to "partner".
   "//sdk/lib/driver/mock-mmio-range/cpp:cpp",

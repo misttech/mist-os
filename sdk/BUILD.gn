@@ -759,6 +759,7 @@ sdk_molecule("core_cc_source_libraries") {
     "//sdk/lib/driver/component/cpp:cpp_sdk",
     "//sdk/lib/driver/devfs/cpp:cpp_sdk",
     "//sdk/lib/driver/fake-bti/cpp:cpp_sdk",
+    "//sdk/lib/driver/fake-mmio-reg/cpp:cpp_sdk",
     "//sdk/lib/driver/fake-object/cpp:cpp_sdk",
     "//sdk/lib/driver/fake-platform-device/cpp:cpp_sdk",
     "//sdk/lib/driver/metadata/cpp:cpp_sdk",
