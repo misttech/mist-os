@@ -14,7 +14,6 @@ const CONFIG_KEY_REPOSITORIES: &str = "repository.repositories";
 const CONFIG_KEY_REGISTRATIONS: &str = "repository.registrations";
 const CONFIG_KEY_REGISTRATION_MODE: &str = "repository.registration-mode";
 const CONFIG_KEY_DEFAULT_REPOSITORY: &str = "repository.default";
-const CONFIG_KEY_SERVER_MODE: &str = "repository.server.mode";
 const CONFIG_KEY_SERVER_ENABLED: &str = "repository.server.enabled";
 const CONFIG_KEY_SERVER_LISTEN: &str = "repository.server.listen";
 const CONFIG_KEY_LAST_USED_ADDRESS: &str = "repository.server.last_used_address";
@@ -62,15 +61,6 @@ pub async fn determine_why_repository_server_is_not_running() -> anyhow::Error {
                 $ ffx repository server start --address <port_number>",
             );
         }
-    }
-}
-
-/// Return the repository server mode.
-pub async fn repository_server_mode() -> Result<String> {
-    if let Some(mode) = ffx_config::get(CONFIG_KEY_SERVER_MODE)? {
-        Ok(mode)
-    } else {
-        Ok(String::new())
     }
 }
 

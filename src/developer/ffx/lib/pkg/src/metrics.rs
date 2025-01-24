@@ -30,11 +30,6 @@ async fn add_event(action: &'static str, label: Option<String>) {
 }
 
 // TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
-pub async fn server_mode_event(mode: &str) {
-    add_event("server.mode", Some(mode.into())).await
-}
-
-// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
 pub async fn server_started_event() {
     add_event("server.state", Some("started".into())).await
 }

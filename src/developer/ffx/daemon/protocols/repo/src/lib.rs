@@ -839,17 +839,6 @@ impl<
     async fn start(&mut self, cx: &Context) -> Result<(), anyhow::Error> {
         tracing::debug!("Starting repository protocol");
 
-        // Log the server mode to get an understanding of the distribution of users between pm and
-        // the ffx repository server.
-        match pkg_config::repository_server_mode().await {
-            Ok(mode) => {
-                metrics::server_mode_event(&mode).await;
-            }
-            Err(err) => {
-                tracing::warn!("Failed to determine if server is enabled from config: {:#}", err);
-            }
-        }
-
         // Make sure the server is initially off.
         {
             let mut inner = self.inner.write().await;
