@@ -27,21 +27,6 @@
 
 namespace intel_display {
 
-namespace {
-
-// Must match `kPixelFormatTypes` defined in intel-display.cc.
-constexpr fuchsia_images2_pixel_format_enum_value_t kBanjoSupportedPixelFormatsArray[] = {
-    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-        fuchsia_images2::wire::PixelFormat::kB8G8R8A8),
-    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-        fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
-};
-
-constexpr cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> kBanjoSupportedPixelFormats(
-    kBanjoSupportedPixelFormatsArray);
-
-}  // namespace
-
 DisplayDevice::DisplayDevice(Controller* controller, display::DisplayId id, DdiId ddi_id,
                              DdiReference ddi_reference, Type type)
     : controller_(controller),
@@ -210,26 +195,6 @@ void DisplayDevice::ApplyConfiguration(const display_config_t* banjo_display_con
           return controller->GetImportedImagePixelFormat(image_id);
         });
   }
-}
-
-raw_display_info_t DisplayDevice::CreateRawDisplayInfo() {
-  i2c_impl_protocol_t i2c_protocol;
-  i2c().GetProto(&i2c_protocol);
-
-  return raw_display_info_t{
-      .display_id = display::ToBanjoDisplayId(id()),
-      .preferred_modes_list = nullptr,
-      .preferred_modes_count = 0,
-      .edid_bytes_list = nullptr,
-      .edid_bytes_count = 0,
-      .eddc_client = i2c_protocol,
-      .pixel_formats_list = kBanjoSupportedPixelFormats.data(),
-      .pixel_formats_count = kBanjoSupportedPixelFormats.size(),
-  };
-
-  // TODO(b/317914671): After the display coordinator provides display metadata
-  // to the drivers, each display's type should potentially be adjusted from
-  // HDMI to DVI, based on EDID information.
 }
 
 }  // namespace intel_display

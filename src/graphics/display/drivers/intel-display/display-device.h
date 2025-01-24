@@ -85,8 +85,6 @@ class DisplayDevice {
   Controller* controller() { return controller_; }
   const std::optional<DdiReference>& ddi_reference() const { return ddi_reference_; }
 
-  virtual ddk::I2cImplProtocolClient i2c() = 0;
-
   void set_pipe(Pipe* pipe) { pipe_ = pipe; }
   Pipe* pipe() const { return pipe_; }
 
@@ -103,7 +101,7 @@ class DisplayDevice {
 
   virtual bool CheckPixelRate(int64_t pixel_rate_hz) = 0;
 
-  raw_display_info_t CreateRawDisplayInfo();
+  virtual raw_display_info_t CreateRawDisplayInfo() = 0;
 
  protected:
   // Attempts to initialize the ddi.

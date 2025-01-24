@@ -17,15 +17,18 @@
 #include "src/graphics/display/drivers/intel-display/display-device.h"
 #include "src/graphics/display/drivers/intel-display/dpll.h"
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
+#include "src/graphics/display/drivers/intel-display/i2c/gmbus-i2c.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 
 namespace intel_display {
 
-class HdmiDisplay : public DisplayDevice {
+class HdmiDisplay final : public DisplayDevice {
  public:
+  // `controller` and `gmbus_i2c` must be non-null and must outlive
+  // `HdmiDisplay`.
   HdmiDisplay(Controller* controller, display::DisplayId id, DdiId ddi_id,
-              DdiReference ddi_reference, const ddk::I2cImplProtocolClient& i2c);
+              DdiReference ddi_reference, GMBusI2c* gmbus_i2c);
 
   HdmiDisplay(const HdmiDisplay&) = delete;
   HdmiDisplay(HdmiDisplay&&) = delete;
@@ -34,7 +37,6 @@ class HdmiDisplay : public DisplayDevice {
 
   ~HdmiDisplay() override;
 
- private:
   bool InitDdi() final;
   bool Query() final;
   bool DdiModeset(const display::DisplayTiming& mode) final;
@@ -48,9 +50,10 @@ class HdmiDisplay : public DisplayDevice {
 
   bool CheckPixelRate(int64_t pixel_rate_hz) final;
 
-  ddk::I2cImplProtocolClient i2c() final { return i2c_; }
+  raw_display_info_t CreateRawDisplayInfo() override;
 
-  const ddk::I2cImplProtocolClient i2c_;
+ private:
+  GMBusI2c& gmbus_i2c_;
 };
 
 }  // namespace intel_display

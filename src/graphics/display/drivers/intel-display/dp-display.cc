@@ -221,6 +221,17 @@ std::string EdpDpcdRevisionToString(dpcd::EdpRevision rev) {
 // Section 2.1.1 "Number of Lanes and Per-lane Data Rate in SST and MST Modes".
 constexpr int kMaxDisplayPortLaneCount = 4;
 
+// Must match `kPixelFormatTypes` defined in intel-display.cc.
+constexpr fuchsia_images2_pixel_format_enum_value_t kBanjoSupportedPixelFormatsArray[] = {
+    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
+        fuchsia_images2::wire::PixelFormat::kB8G8R8A8),
+    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
+        fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
+};
+
+constexpr cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> kBanjoSupportedPixelFormats(
+    kBanjoSupportedPixelFormatsArray);
+
 }  // namespace
 
 zx::result<DdiAuxChannel::ReplyInfo> DpAux::DoTransaction(const DdiAuxChannel::Request& request,
@@ -2296,6 +2307,22 @@ int32_t DpDisplay::LoadPixelRateForTranscoderKhz(TranscoderId transcoder_id) {
   double total_link_bit_rate_khz = dp_link_rate_khz * (8.0 / 10.0) * dp_lane_count_;
   double pixel_clock_rate_khz = (data_m * total_link_bit_rate_khz) / (data_n * kBitsPerPixel);
   return static_cast<int32_t>(round(pixel_clock_rate_khz));
+}
+
+raw_display_info_t DpDisplay::CreateRawDisplayInfo() {
+  i2c_impl_protocol_t i2c_protocol;
+  i2c_.GetProto(&i2c_protocol);
+
+  return raw_display_info_t{
+      .display_id = display::ToBanjoDisplayId(id()),
+      .preferred_modes_list = nullptr,
+      .preferred_modes_count = 0,
+      .edid_bytes_list = nullptr,
+      .edid_bytes_count = 0,
+      .eddc_client = i2c_protocol,
+      .pixel_formats_list = kBanjoSupportedPixelFormats.data(),
+      .pixel_formats_count = kBanjoSupportedPixelFormats.size(),
+  };
 }
 
 }  // namespace intel_display

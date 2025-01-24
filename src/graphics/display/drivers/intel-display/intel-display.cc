@@ -543,7 +543,7 @@ std::unique_ptr<DisplayDevice> Controller::QueryDisplay(DdiId ddi_id,
       FDF_LOG(DEBUG, "DDI %d PHY not available. Skip querying.", ddi_id);
     } else {
       auto hdmi_disp = fbl::make_unique_checked<HdmiDisplay>(
-          &ac, this, display_id, ddi_id, std::move(ddi_reference_maybe), gmbus_i2cs_[ddi_id].i2c());
+          &ac, this, display_id, ddi_id, std::move(ddi_reference_maybe), &gmbus_i2cs_[ddi_id]);
       if (ac.check() && reinterpret_cast<DisplayDevice*>(hdmi_disp.get())->Query()) {
         return hdmi_disp;
       }

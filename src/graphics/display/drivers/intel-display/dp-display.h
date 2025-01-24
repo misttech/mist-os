@@ -184,7 +184,7 @@ class DpCapabilities final {
   std::optional<Edp> edp_dpcd_;
 };
 
-class DpDisplay : public DisplayDevice {
+class DpDisplay final : public DisplayDevice {
  public:
   DpDisplay(Controller* controller, display::DisplayId id, DdiId ddi_id, DpcdChannel* dp_aux,
             PchEngine* pch_engine, DdiReference ddi_reference, inspect::Node* parent_node);
@@ -204,6 +204,8 @@ class DpDisplay : public DisplayDevice {
   bool Query() final;
   bool InitWithDdiPllConfig(const DdiPllConfig& pll_config) final;
 
+  raw_display_info_t CreateRawDisplayInfo() override;
+
   uint8_t lane_count() const { return dp_lane_count_; }
   uint32_t link_rate_mhz() const { return dp_link_rate_mhz_; }
 
@@ -219,8 +221,6 @@ class DpDisplay : public DisplayDevice {
   int32_t LoadPixelRateForTranscoderKhz(TranscoderId transcoder_id) final;
 
   bool CheckPixelRate(int64_t pixel_rate_hz) final;
-
-  ddk::I2cImplProtocolClient i2c() final { return i2c_; }
 
   // Returns true if the eDP panel is powered on.
   //

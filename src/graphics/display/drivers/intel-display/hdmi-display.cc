@@ -80,6 +80,17 @@ cpp20::span<const DdiPhyConfigEntry> GetHdmiPhyConfigEntries(uint16_t device_id,
   return kPhyConfigHdmiSkylakeUhs;
 }
 
+// Must match `kPixelFormatTypes` defined in intel-display.cc.
+constexpr fuchsia_images2_pixel_format_enum_value_t kBanjoSupportedPixelFormatsArray[] = {
+    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
+        fuchsia_images2::wire::PixelFormat::kB8G8R8A8),
+    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
+        fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
+};
+
+constexpr cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> kBanjoSupportedPixelFormats(
+    kBanjoSupportedPixelFormatsArray);
+
 }  // namespace
 
 // Modesetting functions
@@ -88,8 +99,12 @@ cpp20::span<const DdiPhyConfigEntry> GetHdmiPhyConfigEntries(uint16_t device_id,
 // display; this will be updated when intel-display Controller gets EDID
 // information for this device (before Init()).
 HdmiDisplay::HdmiDisplay(Controller* controller, display::DisplayId id, DdiId ddi_id,
-                         DdiReference ddi_reference, const ddk::I2cImplProtocolClient& i2c)
-    : DisplayDevice(controller, id, ddi_id, std::move(ddi_reference), Type::kHdmi), i2c_(i2c) {}
+                         DdiReference ddi_reference, GMBusI2c* gmbus_i2c)
+    : DisplayDevice(controller, id, ddi_id, std::move(ddi_reference), Type::kHdmi),
+      gmbus_i2c_(*gmbus_i2c) {
+  ZX_DEBUG_ASSERT(controller != nullptr);
+  ZX_DEBUG_ASSERT(gmbus_i2c != nullptr);
+}
 
 HdmiDisplay::~HdmiDisplay() = default;
 
@@ -125,7 +140,7 @@ bool HdmiDisplay::Query() {
         .stop = 1,
     };
     registers::GMBusClockPortSelect::Get().FromValue(0).WriteTo(mmio_space());
-    if (i2c().Transact(&op, 1) == ZX_OK) {
+    if (gmbus_i2c_.i2c().Transact(&op, 1) == ZX_OK) {
       FDF_LOG(TRACE, "Found a hdmi/dvi monitor");
       return true;
     }
@@ -291,6 +306,26 @@ bool HdmiDisplay::CheckPixelRate(int64_t pixel_rate_hz) {
 
   DpllOscillatorConfig dco_config = CreateDpllOscillatorConfigKabyLake(pll_config.ddi_clock_khz);
   return dco_config.frequency_khz != 0;
+}
+
+raw_display_info_t HdmiDisplay::CreateRawDisplayInfo() {
+  i2c_impl_protocol_t i2c_protocol;
+  gmbus_i2c_.i2c().GetProto(&i2c_protocol);
+
+  return raw_display_info_t{
+      .display_id = display::ToBanjoDisplayId(id()),
+      .preferred_modes_list = nullptr,
+      .preferred_modes_count = 0,
+      .edid_bytes_list = nullptr,
+      .edid_bytes_count = 0,
+      .eddc_client = i2c_protocol,
+      .pixel_formats_list = kBanjoSupportedPixelFormats.data(),
+      .pixel_formats_count = kBanjoSupportedPixelFormats.size(),
+  };
+
+  // TODO(b/317914671): After the display coordinator provides display metadata
+  // to the drivers, each display's type should potentially be adjusted from
+  // HDMI to DVI, based on EDID information.
 }
 
 }  // namespace intel_display
