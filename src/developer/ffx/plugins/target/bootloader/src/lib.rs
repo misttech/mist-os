@@ -9,6 +9,7 @@ use chrono::{DateTime, Duration, Utc};
 use errors::ffx_bail;
 use ffx_bootloader_args::SubCommand::{Boot, Info, Lock, Unlock};
 use ffx_bootloader_args::{BootCommand, BootloaderCommand, UnlockCommand};
+use ffx_fastboot::boot::boot;
 use ffx_fastboot::common::fastboot::{
     tcp_proxy, udp_proxy, usb_proxy, FastbootNetworkConnectionConfig,
 };
@@ -17,13 +18,11 @@ use ffx_fastboot::file_resolver::resolvers::EmptyResolver;
 use ffx_fastboot::info::info;
 use ffx_fastboot::lock::lock;
 use ffx_fastboot::unlock::unlock;
-use ffx_fastboot::util::Event;
-use ffx_fastboot::{boot::boot, util::UnlockEvent};
+use ffx_fastboot::util::{Event, UnlockEvent};
 use ffx_fastboot_interface::fastboot_interface::{FastbootInterface, UploadProgress, Variable};
 use fho::{FfxContext, FfxMain, FfxTool, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx::{
-    FastbootInterface as FidlFastbootInterface, TargetInfo, TargetProxy, TargetRebootState,
-    TargetState,
+    FastbootInterface as FidlFastbootInterface, TargetInfo, TargetRebootState, TargetState,
 };
 use fuchsia_async::{MonotonicInstant, Timer};
 use futures::try_join;
@@ -33,6 +32,7 @@ use std::io::{stdin, Write};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Once;
+use target_holders::TargetProxyHolder;
 use termion::{color, style};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
@@ -48,7 +48,7 @@ const WAIT_WARN_SECS: u64 = 20;
 pub struct BootloaderTool {
     #[command]
     cmd: BootloaderCommand,
-    target_proxy: TargetProxy,
+    target_proxy: TargetProxyHolder,
 }
 
 fho::embedded_plugin!(BootloaderTool);

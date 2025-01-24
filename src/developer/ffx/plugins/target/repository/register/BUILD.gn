@@ -17,6 +17,7 @@ ffx_plugin("ffx_target_repository_register") {
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/developer/ffx/lib/pkg",
     "//src/developer/ffx/lib/target:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/timeout:lib",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:schemars",

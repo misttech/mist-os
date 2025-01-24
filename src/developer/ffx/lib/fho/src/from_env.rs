@@ -304,30 +304,6 @@ impl TryFromEnv for Option<ffx_fidl::DaemonProxy> {
 }
 
 #[async_trait(?Send)]
-impl TryFromEnv for ffx_fidl::TargetProxy {
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        if env.behavior().await.is_none() {
-            let b = init_daemon_behavior(env.environment_context()).await?;
-            env.set_behavior(b.clone()).await;
-        }
-        match env.injector::<Self>().await?.target_factory().await.map_err(|e| {
-            // This error case happens when there are multiple targets in target list.
-            // So let's print out the ffx error message directly (which comes from OpenTargetError::QueryAmbiguous)
-            // rather than just returning "Failed to create target proxy" which is not helpful.
-            if let Some(ffx_e) = &e.downcast_ref::<FfxError>() {
-                let message = format!("{ffx_e}");
-                Err(e).user_message(message)
-            } else {
-                Err(e).user_message("Failed to create target proxy")
-            }
-        }) {
-            Ok(p) => Ok(p),
-            Err(e) => e,
-        }
-    }
-}
-
-#[async_trait(?Send)]
 impl TryFromEnv for fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         let behavior = if let Some(behavior) = env.behavior().await {

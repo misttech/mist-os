@@ -8,7 +8,6 @@ use camino::{Utf8Path, Utf8PathBuf};
 use ffx_config::environment::EnvironmentKind;
 use ffx_config::EnvironmentContext;
 use ffx_repository_serve_args::ServeCommand;
-use ffx_target::TargetProxy;
 use fho::{
     bug, daemon_protocol, deferred, return_bug, return_user_error, Deferred, FfxMain, FfxTool,
     Result, SimpleWriter,
@@ -33,6 +32,7 @@ use std::io::Write;
 use std::sync::Arc;
 use target_connector::Connector;
 use target_errors::FfxTargetError;
+use target_holders::TargetProxyHolder;
 use tuf::metadata::RawSignedMetadata;
 
 // LINT.IfChange
@@ -56,7 +56,7 @@ pub struct ServeTool {
     #[command]
     pub cmd: ServeCommand,
     pub context: EnvironmentContext,
-    pub target_proxy_connector: Connector<TargetProxy>,
+    pub target_proxy_connector: Connector<TargetProxyHolder>,
     pub rcs_proxy_connector: Connector<RemoteControlProxy>,
     #[with(deferred(daemon_protocol()))]
     pub repos: Deferred<ffx::RepositoryRegistryProxy>,
@@ -401,7 +401,7 @@ async fn daemon_repo_is_running(repos: ffx::RepositoryRegistryProxy) -> Result<b
 }
 
 pub async fn serve_impl<W: Write + 'static>(
-    target_proxy: Connector<TargetProxy>,
+    target_proxy: Connector<TargetProxyHolder>,
     rcs_proxy: Connector<RemoteControlProxy>,
     repos: Deferred<RepositoryRegistryProxy>,
     cmd: ServeCommand,
@@ -647,6 +647,7 @@ mod test {
     use assert_matches::assert_matches;
     use ffx_config::keys::TARGET_DEFAULT_KEY;
     use ffx_config::{ConfigLevel, TestEnv};
+    use ffx_target::TargetProxy;
     use fho::macro_deps::ffx_writer::TestBuffer;
     use fho::testing::ToolEnv;
     use fho::{user_error, TryFromEnv};

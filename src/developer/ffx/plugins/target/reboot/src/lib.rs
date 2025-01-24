@@ -7,6 +7,7 @@ use errors::ffx_bail;
 use ffx_reboot_args::RebootCommand;
 use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{TargetProxy, TargetRebootError, TargetRebootState};
+use target_holders::TargetProxyHolder;
 
 const NETSVC_NOT_FOUND: &str = "The Fuchsia target's netsvc address could not be determined.\n\
                                 If this problem persists, try running `ffx doctor` for diagnostics";
@@ -21,7 +22,7 @@ const COMM_ERR: &str = "There was a communication error with the device. Please 
 pub struct RebootTool {
     #[command]
     cmd: RebootCommand,
-    target_proxy: TargetProxy,
+    target_proxy: TargetProxyHolder,
 }
 
 fho::embedded_plugin!(RebootTool);
@@ -30,11 +31,11 @@ fho::embedded_plugin!(RebootTool);
 impl FfxMain for RebootTool {
     type Writer = SimpleWriter;
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        reboot(self.target_proxy, self.cmd).await
+        reboot(&self.target_proxy, self.cmd).await
     }
 }
 
-async fn reboot(target_proxy: TargetProxy, cmd: RebootCommand) -> fho::Result<()> {
+async fn reboot(target_proxy: &TargetProxy, cmd: RebootCommand) -> fho::Result<()> {
     let state = reboot_state(&cmd)?;
     match target_proxy.reboot(state).await.bug()? {
         Ok(_) => Ok(()),
@@ -82,7 +83,7 @@ mod test {
 
     async fn run_reboot_test(cmd: RebootCommand) -> fho::Result<()> {
         let target_proxy = setup_fake_target_server(cmd);
-        reboot(target_proxy, cmd).await
+        reboot(&target_proxy, cmd).await
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

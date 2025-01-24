@@ -22,6 +22,7 @@ ffx_plugin("ffx_target_set_preferred_ssh_address") {
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/netext:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
   ]

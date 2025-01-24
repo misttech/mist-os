@@ -13,6 +13,7 @@ use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use pkg::{PkgServerInstanceInfo, PkgServerInstances, ServerMode};
 use std::time::Duration;
 use target_connector::Connector;
+use target_holders::TargetProxyHolder;
 
 // map from the start command to the serve command.
 pub(crate) fn to_serve_command(cmd: &StartCommand) -> ServeCommand {
@@ -83,7 +84,7 @@ pub(crate) fn to_argv(cmd: &StartCommand) -> Vec<String> {
 pub async fn run_foreground_server(
     start_cmd: StartCommand,
     context: EnvironmentContext,
-    target_proxy_connector: Connector<ffx::TargetProxy>,
+    target_proxy_connector: Connector<TargetProxyHolder>,
     rcs_proxy_connector: Connector<RemoteControlProxy>,
     repos: Deferred<ffx::RepositoryRegistryProxy>,
     w: <ServerStartTool as FfxMain>::Writer,

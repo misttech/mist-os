@@ -30,8 +30,8 @@ ffx_plugin("ffx_repository_server_start") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/developer/ffx/lib/pkg",
-    "//src/developer/ffx/lib/target:lib",
     "//src/developer/ffx/lib/target/connector:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/timeout:lib",
     "//src/developer/ffx/plugins/repository/serve:ffx_repository_serve",
     "//src/developer/ffx/plugins/repository/serve:ffx_repository_serve_args",
@@ -44,6 +44,7 @@ ffx_plugin("ffx_repository_server_start") {
   ]
   test_deps = [
     "//src/developer/ffx/config:lib",
+    "//src/developer/ffx/lib/target:lib",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:futures",

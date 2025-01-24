@@ -7,7 +7,6 @@ use daemonize::daemonize;
 use ffx_config::EnvironmentContext;
 use ffx_repository_serve::{serve_impl_validate_args, DEFAULT_REPO_NAME};
 use ffx_repository_server_start_args::StartCommand;
-use ffx_target::TargetProxy;
 use fho::{
     bug, daemon_protocol, deferred, return_bug, return_user_error, Deferred, Error, FfxContext,
     FfxMain, FfxTool, Result, VerifiedMachineWriter,
@@ -22,6 +21,7 @@ use serde::{Deserialize, Serialize};
 use std::io::Write as _;
 use std::time::Duration;
 use target_connector::Connector;
+use target_holders::TargetProxyHolder;
 
 mod server;
 
@@ -50,7 +50,7 @@ pub struct ServerStartTool {
     #[with(deferred(daemon_protocol()))]
     pub repos: Deferred<ffx::RepositoryRegistryProxy>,
     pub context: EnvironmentContext,
-    pub target_proxy_connector: Connector<TargetProxy>,
+    pub target_proxy_connector: Connector<TargetProxyHolder>,
     pub rcs_proxy_connector: Connector<RemoteControlProxy>,
 }
 
@@ -301,6 +301,7 @@ async fn start_daemon_server(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ffx_target::TargetProxy;
     use fho::testing::ToolEnv;
     use fho::{Format, TestBuffers, TryFromEnv as _};
     use fidl_fuchsia_developer_ffx::{RepositoryError, RepositoryRegistryRequest};

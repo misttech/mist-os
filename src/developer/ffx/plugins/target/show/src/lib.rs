@@ -11,7 +11,7 @@ use fho::{
     deferred, moniker, Deferred, DirectConnector, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter,
 };
 use fidl_fuchsia_buildinfo::ProviderProxy;
-use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetProxy};
+use fidl_fuchsia_developer_ffx::TargetAddrInfo;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_feedback::{DeviceIdProviderProxy, LastRebootInfoProviderProxy};
 use fidl_fuchsia_hwinfo::{Architecture, BoardProxy, DeviceProxy, ProductProxy};
@@ -22,6 +22,7 @@ use show::{
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
+use target_holders::TargetProxyHolder;
 use timeout::timeout;
 use {ffx_target, ffx_target_show_args as args};
 
@@ -33,7 +34,7 @@ pub struct ShowTool {
     cmd: args::TargetShow,
     rcs_proxy: RemoteControlProxy,
     connector: Option<Arc<dyn DirectConnector>>, // Returns Some(dc) only if we have a direct connection
-    target_proxy: Deferred<TargetProxy>,
+    target_proxy: Deferred<TargetProxyHolder>,
     #[with(moniker("/core/system-update"))]
     channel_control_proxy: ChannelControlProxy,
     #[with(moniker("/core/hwinfo"))]
@@ -104,7 +105,7 @@ async fn gather_target_info_direct(
 }
 
 async fn gather_target_info_from_daemon(
-    target_proxy: TargetProxy,
+    target_proxy: TargetProxyHolder,
 ) -> Result<(AddressData, Option<fidl_fuchsia_developer_ffx::CompatibilityInfo>)> {
     let addr_info = timeout(Duration::from_secs(1), target_proxy.get_ssh_address())
         .await?
@@ -132,7 +133,7 @@ async fn gather_target_info_from_daemon(
 async fn gather_target_show(
     rcs_proxy: RemoteControlProxy,
     connector: Option<Arc<dyn DirectConnector>>,
-    target_proxy: Deferred<TargetProxy>,
+    target_proxy: Deferred<TargetProxyHolder>,
     last_reboot_info_proxy: LastRebootInfoProviderProxy,
 ) -> Result<TargetData> {
     let host = rcs_proxy
@@ -261,7 +262,7 @@ async fn gather_update_show(channel_control: ChannelControlProxy) -> Result<Upda
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffx_target::FidlPipe;
+    use ffx_target::{FidlPipe, TargetProxy};
     use fho::{Format, TestBuffers};
     use fidl_fuchsia_buildinfo::{BuildInfo, ProviderRequest};
     use fidl_fuchsia_developer_ffx::{TargetInfo, TargetIp, TargetRequest};
@@ -324,9 +325,9 @@ mod tests {
         \n    Commit: \"fake_commit\"\
         \n";
 
-    fn setup_fake_target_server() -> Deferred<TargetProxy> {
+    fn setup_fake_target_server() -> Deferred<TargetProxyHolder> {
         Deferred::from_output(Ok({
-            fho::testing::fake_proxy(move |req| match req {
+            fho::testing::fake_proxy::<TargetProxy>(move |req| match req {
                 TargetRequest::GetSshAddress { responder, .. } => {
                     responder
                         .send(&TargetAddrInfo::Ip(TargetIp {
@@ -351,6 +352,7 @@ mod tests {
                 }
                 _ => assert!(false),
             })
+            .into()
         }))
     }
 

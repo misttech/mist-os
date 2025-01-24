@@ -4,7 +4,6 @@
 
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
-use ffx_target::TargetProxy;
 use ffx_target_repository_register_args::RegisterCommand;
 use fho::{
     bug, daemon_protocol, moniker, return_bug, return_user_error, user_error, Error, FfxContext,
@@ -20,6 +19,7 @@ use pkg::{PkgServerInfo, PkgServerInstanceInfo as _, PkgServerInstances, ServerM
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use target_holders::TargetProxyHolder;
 use timeout::timeout;
 
 const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";
@@ -42,7 +42,7 @@ pub struct RegisterTool {
     #[with(daemon_protocol())]
     repos: RepositoryRegistryProxy,
     context: EnvironmentContext,
-    target_proxy: TargetProxy,
+    target_proxy: TargetProxyHolder,
     #[with(moniker(REPOSITORY_MANAGER_MONIKER))]
     repo_proxy: RepositoryManagerProxy,
     #[with(moniker(REPOSITORY_MANAGER_MONIKER))]
@@ -237,6 +237,7 @@ mod test {
     use camino::Utf8PathBuf;
     use ffx_config::keys::TARGET_DEFAULT_KEY;
     use ffx_config::ConfigLevel;
+    use ffx_target::TargetProxy;
     use fho::{Format, TestBuffers};
     use fidl_fuchsia_developer_ffx::{
         RepositoryError, RepositoryRegistryRequest, RepositoryStorageType, SshHostAddrInfo,
@@ -523,7 +524,7 @@ mod test {
             context: env.context.clone(),
             repo_proxy,
             engine_proxy,
-            target_proxy,
+            target_proxy: target_proxy.into(),
         };
         let buffers = TestBuffers::default();
         let writer = <RegisterTool as FfxMain>::Writer::new_test(None, &buffers);
@@ -584,7 +585,7 @@ mod test {
             context: env.context.clone(),
             repo_proxy,
             engine_proxy,
-            target_proxy,
+            target_proxy: target_proxy.into(),
         };
         let buffers = TestBuffers::default();
         let writer = <RegisterTool as FfxMain>::Writer::new_test(None, &buffers);
@@ -663,7 +664,7 @@ mod test {
             context: env.context.clone(),
             repo_proxy,
             engine_proxy,
-            target_proxy,
+            target_proxy: target_proxy.into(),
         };
         let buffers = TestBuffers::default();
         let writer = <RegisterTool as FfxMain>::Writer::new_test(None, &buffers);
@@ -715,7 +716,7 @@ mod test {
             context: env.context.clone(),
             repo_proxy,
             engine_proxy,
-            target_proxy,
+            target_proxy: target_proxy.into(),
         };
         let buffers = TestBuffers::default();
         let writer = <RegisterTool as FfxMain>::Writer::new_test(None, &buffers);
@@ -776,7 +777,7 @@ mod test {
             context: env.context.clone(),
             repo_proxy,
             engine_proxy,
-            target_proxy,
+            target_proxy: target_proxy.into(),
         };
         let buffers = TestBuffers::default();
         let writer = <RegisterTool as FfxMain>::Writer::new_test(None, &buffers);
@@ -835,7 +836,7 @@ mod test {
             context: env.context.clone(),
             repo_proxy,
             engine_proxy,
-            target_proxy,
+            target_proxy: target_proxy.into(),
         };
         let buffers = TestBuffers::default();
         let writer = <RegisterTool as FfxMain>::Writer::new_test(None, &buffers);
@@ -901,7 +902,7 @@ mod test {
             context: env.context.clone(),
             repo_proxy,
             engine_proxy,
-            target_proxy,
+            target_proxy: target_proxy.into(),
         };
         let buffers = TestBuffers::default();
         let writer = <RegisterTool as FfxMain>::Writer::new_test(None, &buffers);
@@ -960,7 +961,7 @@ mod test {
             context: env.context.clone(),
             repo_proxy,
             engine_proxy,
-            target_proxy,
+            target_proxy: target_proxy.into(),
         };
         let buffers = TestBuffers::default();
         let writer = <RegisterTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
@@ -1021,7 +1022,7 @@ mod test {
             context: env.context.clone(),
             repo_proxy,
             engine_proxy,
-            target_proxy,
+            target_proxy: target_proxy.into(),
         };
         let buffers = TestBuffers::default();
         let writer = <RegisterTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);

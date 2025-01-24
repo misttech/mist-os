@@ -6,13 +6,14 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use ffx_target_set_preferred_ssh_address_args::SetPreferredSshAddressCommand;
 use fho::{FfxMain, FfxTool, SimpleWriter};
+use target_holders::TargetProxyHolder;
 use {fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_net as fnet};
 
 #[derive(FfxTool)]
 pub struct SetPreferredSshAddressTool {
     #[command]
     cmd: SetPreferredSshAddressCommand,
-    target_proxy: ffx::TargetProxy,
+    target_proxy: TargetProxyHolder,
 }
 
 fho::embedded_plugin!(SetPreferredSshAddressTool);
@@ -21,13 +22,13 @@ fho::embedded_plugin!(SetPreferredSshAddressTool);
 impl FfxMain for SetPreferredSshAddressTool {
     type Writer = SimpleWriter;
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        set_preferred_ssh_address(self.target_proxy, self.cmd).await?;
+        set_preferred_ssh_address(&self.target_proxy, self.cmd).await?;
         Ok(())
     }
 }
 
 async fn set_preferred_ssh_address(
-    target_proxy: ffx::TargetProxy,
+    target_proxy: &ffx::TargetProxy,
     cmd: SetPreferredSshAddressCommand,
 ) -> Result<()> {
     let (addr, scope, _port) = netext::parse_address_parts(cmd.addr.as_str())
@@ -76,7 +77,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn ipv4() {
         set_preferred_ssh_address(
-            setup_fake_target_server(ffx::TargetIp { ip: IPV4_ADDRESS, scope_id: 0 }),
+            &setup_fake_target_server(ffx::TargetIp { ip: IPV4_ADDRESS, scope_id: 0 }),
             SetPreferredSshAddressCommand { addr: "192.168.0.1".to_string() },
         )
         .await
@@ -86,7 +87,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn ipv6_with_no_scope() {
         set_preferred_ssh_address(
-            setup_fake_target_server(ffx::TargetIp { ip: IPV6_ADDRESS, scope_id: 0 }),
+            &setup_fake_target_server(ffx::TargetIp { ip: IPV6_ADDRESS, scope_id: 0 }),
             SetPreferredSshAddressCommand { addr: "fe80::1".to_string() },
         )
         .await
@@ -96,7 +97,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn ipv6_with_numeric_scope() {
         set_preferred_ssh_address(
-            setup_fake_target_server(ffx::TargetIp { ip: IPV6_ADDRESS, scope_id: 1 }),
+            &setup_fake_target_server(ffx::TargetIp { ip: IPV6_ADDRESS, scope_id: 1 }),
             SetPreferredSshAddressCommand { addr: "fe80::1%1".to_string() },
         )
         .await

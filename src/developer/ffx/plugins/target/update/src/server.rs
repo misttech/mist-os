@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use ffx_config::EnvironmentContext;
-use ffx_target::TargetProxy;
 use fho::{
     bug, return_bug, return_user_error, user_error, Deferred, FfxMain, Result,
     VerifiedMachineWriter,
@@ -25,6 +24,7 @@ use std::path::PathBuf;
 use std::process;
 use std::time::Duration;
 use target_connector::Connector;
+use target_holders::TargetProxyHolder;
 use timeout::timeout;
 use zx_status::Status;
 
@@ -62,7 +62,7 @@ pub(crate) struct PackageServerTask {
 }
 
 pub(crate) async fn package_server_task(
-    target_proxy_connector: Connector<TargetProxy>,
+    target_proxy_connector: Connector<TargetProxyHolder>,
     rcs_proxy_connector: Connector<RemoteControlProxy>,
     repos: Deferred<RepositoryRegistryProxy>,
     context: EnvironmentContext,
@@ -445,6 +445,7 @@ async fn try_rcs_proxy_connection(
 mod tests {
     use super::*;
     use ffx_config::TestEnv;
+    use ffx_target::TargetProxy;
     use fho::testing::ToolEnv;
     use fho::TryFromEnv as _;
     use fidl_fuchsia_developer_remotecontrol::{ConnectCapabilityError, RemoteControlRequest};
@@ -463,7 +464,7 @@ mod tests {
     struct FakeTestEnv {
         pub context: EnvironmentContext,
         pub rcs_proxy_connector: Connector<RemoteControlProxy>,
-        pub target_proxy_connector: Connector<TargetProxy>,
+        pub target_proxy_connector: Connector<TargetProxyHolder>,
         pub repo_proxy: Deferred<RepositoryRegistryProxy>,
     }
 

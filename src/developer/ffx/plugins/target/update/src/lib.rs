@@ -4,7 +4,6 @@
 
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
-use ffx_target::TargetProxy;
 use ffx_update_args::ForceInstall;
 use fho::{
     bug, daemon_protocol, deferred, moniker, return_user_error, Deferred, FfxContext, FfxMain,
@@ -24,6 +23,7 @@ use futures::{pin_mut, select, TryStreamExt};
 use std::path::PathBuf;
 use std::time::Duration;
 use target_connector::Connector;
+use target_holders::TargetProxyHolder;
 use {
     ffx_update_args as args, fidl_fuchsia_developer_ffx as ffx,
     fidl_fuchsia_update_installer_ext as installer,
@@ -42,7 +42,7 @@ pub struct UpdateTool {
     channel_control_proxy: ChannelControlProxy,
     #[with(deferred(moniker("/core/system-update/system-updater")))]
     installer_proxy: Deferred<InstallerProxy>,
-    target_proxy_connector: Connector<TargetProxy>,
+    target_proxy_connector: Connector<TargetProxyHolder>,
     rcs_proxy_connector: Connector<RemoteControlProxy>,
     #[with(deferred(daemon_protocol()))]
     repos: Deferred<ffx::RepositoryRegistryProxy>,
@@ -524,6 +524,7 @@ async fn monitor_state<W: std::io::Write>(
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use ffx_target::TargetProxy;
     use ffx_update_args::Update;
     use fho::testing::ToolEnv;
     use fho::{TestBuffers, TryFromEnv};
