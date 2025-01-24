@@ -8,6 +8,10 @@
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <zircon/status.h>
 
+#include "fidl/fuchsia.hardware.power.statecontrol/cpp/common_types.h"
+#include "fidl/fuchsia.hardware.power.statecontrol/cpp/wire_types.h"
+#include "lib/fidl/cpp/wire/vector_view.h"
+
 namespace pwrbtn {
 namespace statecontrol_fidl = fuchsia_hardware_power_statecontrol;
 
@@ -24,7 +28,13 @@ void OomWatcher::OnOOM(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx
                        const zx_packet_signal_t* signal) {
   printf("critical-services: received kernel OOM signal\n");
   fidl::WireSyncClient sync_client{std::move(pwr_ctl_)};
-  fidl::WireResult r_status = sync_client->Reboot(statecontrol_fidl::RebootReason::kOutOfMemory);
+  fidl::Arena arena;
+  auto builder = statecontrol_fidl::wire::RebootOptions::Builder(arena);
+  std::vector<statecontrol_fidl::RebootReason2> reasons = {
+      statecontrol_fidl::RebootReason2::kOutOfMemory};
+  auto vector_view = fidl::VectorView<statecontrol_fidl::RebootReason2>::FromExternal(reasons);
+  builder.reasons(vector_view);
+  fidl::WireResult r_status = sync_client->PerformReboot(builder.Build());
   if (r_status.status() || r_status->is_error()) {
     printf("critical-services: got error trying reboot: %s\n",
            r_status.FormatDescription().c_str());
