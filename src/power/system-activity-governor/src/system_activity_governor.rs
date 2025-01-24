@@ -329,8 +329,6 @@ pub struct SystemActivityGovernor {
     /// asynchronously. This signal prevents exposing uninitialized power
     /// element state to external clients.
     is_running_signal: async_lock::OnceCell<()>,
-    /// The flag which indicates a successful suspension.
-    suspend_succeeded: Cell<bool>,
     /// The flag used to synchronize the resume_control_lease.
     /// It's set to true when a resume_control_lease is created and to false
     /// when it needs to be dropped.
@@ -470,7 +468,6 @@ impl SystemActivityGovernor {
             cpu_manager,
             boot_control,
             element_power_level_names,
-            suspend_succeeded: Cell::new(false),
             waiting_for_es_activation_after_resume: Cell::new(false),
             resume_control_lease: RefCell::new(None),
             is_running_signal: async_lock::OnceCell::new(),
@@ -572,7 +569,7 @@ impl SystemActivityGovernor {
                             // State.
                             let this2 = this.clone();
                             fasync::Task::local(async move {
-                                this2.notify_suspend_ended().await;
+                                this2.notify_on_resume().await;
                             })
                             .detach();
                         }
@@ -840,9 +837,8 @@ impl SuspendResumeListener for SystemActivityGovernor {
         &self.suspend_stats
     }
 
-    async fn on_suspend_ended(&self, suspend_succeeded: bool) {
-        log::debug!(suspend_succeeded:?; "on_suspend_ended");
-        self.suspend_succeeded.set(suspend_succeeded);
+    async fn on_suspend_ended(&self) {
+        log::debug!("on_suspend_ended");
         self.waiting_for_es_activation_after_resume.set(true);
 
         let lease = self
@@ -882,32 +878,12 @@ impl SuspendResumeListener for SystemActivityGovernor {
         }
     }
 
-    async fn notify_suspend_ended(&self) {
-        let suspend_succeeded = self.suspend_succeeded.get();
-        log::debug!(suspend_succeeded:?; "notify_suspend_ended");
-        if suspend_succeeded {
-            self.notify_on_resume().await;
-            self.suspend_succeeded.set(false);
-        } else {
-            self.notify_on_suspend_fail().await;
-        }
-    }
-
     async fn notify_on_resume(&self) {
         // A client may call RegisterListener while handling on_resume which may cause another
         // mutable borrow of listeners. Clone the listeners to prevent this.
         let listeners: Vec<_> = self.listeners.borrow_mut().clone();
         for l in listeners {
             let _ = l.on_resume().await;
-        }
-    }
-
-    async fn notify_on_suspend_fail(&self) {
-        // A client may call RegisterListener while handling on_suspend_fail which may cause another
-        // mutable borrow of listeners. Clone the listeners to prevent this.
-        let listeners: Vec<_> = self.listeners.borrow_mut().clone();
-        for l in listeners {
-            let _ = l.on_suspend_fail().await;
         }
     }
 }

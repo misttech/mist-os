@@ -85,7 +85,7 @@ where
             inspect_root.create_child("suspend_events"),
         ));
 
-        cpu_manager.run(&inspect_root, &power_elements_node2);
+        cpu_manager.run(&power_elements_node2);
 
         log::info!("Leasing CPU power element");
         let cpu_lease = LeaseHelper::new(

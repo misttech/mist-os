@@ -42,13 +42,9 @@ pub trait SuspendResumeListener {
     /// Gets the manager of suspend stats.
     fn suspend_stats(&self) -> &dyn SuspendStatsUpdater;
     /// Leases (Execution State, Suspending). Called after system suspension ends.
-    async fn on_suspend_ended(&self, suspend_suceeded: bool);
+    async fn on_suspend_ended(&self);
     /// Notify the listeners that system suspension is about to begin
     async fn notify_on_suspend(&self);
-    /// Notify the listeners of suspend results.
-    async fn notify_suspend_ended(&self);
-    /// Notify the listeners of a suspend failure.
-    async fn notify_on_suspend_fail(&self);
     /// Notify the listeners of a suspend success.
     async fn notify_on_resume(&self);
 }
@@ -294,7 +290,7 @@ impl CpuManager {
         // At this point, the suspend request is no longer in flight and has been handled. With
         // `inner` going out of scope, other tasks can modify flags and update the power level of
         // CPU power element.
-        listener.on_suspend_ended(!suspend_failed).await;
+        listener.on_suspend_ended().await;
         if suspend_failed {
             SuspendResult::Fail
         } else {
@@ -302,23 +298,16 @@ impl CpuManager {
         }
     }
 
-    pub fn run(self: &Rc<Self>, inspect_root: &INode, power_elements_node: &INode) {
+    pub fn run(self: &Rc<Self>, power_elements_node: &INode) {
         let (suspend_tx, suspend_rx) = mpsc::channel(1);
-        self.run_suspend_task(inspect_root, suspend_rx);
+        self.run_suspend_task(suspend_rx);
         self.run_power_element(power_elements_node, suspend_tx);
     }
 
-    pub fn run_suspend_task(
-        self: &Rc<Self>,
-        inspect_node: &INode,
-        mut suspend_signal: Receiver<()>,
-    ) {
+    fn run_suspend_task(self: &Rc<Self>, mut suspend_signal: Receiver<()>) {
         let cpu_manager = self.clone();
-        let inspect_node = inspect_node.clone_weak();
 
         fasync::Task::local(async move {
-            let _unhandled_suspend_failures_node =
-                inspect_node.create_uint(fobs::UNHANDLED_SUSPEND_FAILURES_COUNT, 0);
             loop {
                 log::debug!("awaiting suspend signals");
                 suspend_signal.next().await;

@@ -59,6 +59,3 @@ const SUSPEND_SUCCESS_COUNT string = "success_count";
 
 /// The number of failed suspends.
 const SUSPEND_FAIL_COUNT string = "fail_count";
-
-/// The number of suspend failures observed.
-const UNHANDLED_SUSPEND_FAILURES_COUNT string = "unhandled_suspend_failures_count";

@@ -188,17 +188,6 @@ open protocol ActivityGovernorListener {
     /// safe to call.) Doing so will currently result in a deadlock. This
     /// constraint will eventually be removed; see https://fxbug.dev/391429689.
     flexible OnSuspendStarted() -> ();
-
-    /// Called when the activity governor detects a suspend failure.
-    ///
-    /// The server is expected to respond to this notification. The activity
-    /// governor will not attempt to suspend again until it receives the
-    /// respond.
-    ///
-    /// SAG does not block on the response to this method, so the listener may
-    /// safely take actions that block on raising Execution State's power level.
-    /// In particular, it is not affected by https://fxbug.dev/391429689.
-    flexible OnSuspendFail() -> ();
 };
 
 /// A service for exposing events and power elements managed by the system

@@ -32,9 +32,6 @@ impl ActivityGovernorListener {
                         assert!(on_suspend_sender.unbounded_send(()).is_ok());
                         responder.send().context("send failed")
                     }
-                    fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
-                        responder.send().context("send failed")
-                    }
                     _ => unreachable!(),
                 }
             })

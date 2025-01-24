@@ -161,11 +161,6 @@ void WakeLease::OnSuspendStarted(OnSuspendStartedCompleter::Sync& completer) {
   completer.Reply();
 }
 
-void WakeLease::OnSuspendFail(OnSuspendFailCompleter::Sync& completer) {
-  system_suspended_ = false;
-  completer.Reply();
-}
-
 void WakeLease::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernorListener> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {

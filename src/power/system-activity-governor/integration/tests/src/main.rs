@@ -261,7 +261,6 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
             suspend_events: {
             },
             wake_leases: {},
-            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -322,7 +321,6 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 },
             },
             wake_leases: {},
-            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -368,7 +366,6 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 },
             },
             wake_leases: {},
-            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -436,7 +433,6 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 },
             },
             wake_leases: {},
-            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -498,7 +494,6 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
             suspend_events: {
             },
             wake_leases: {},
-            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -544,7 +539,6 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                 },
             },
             wake_leases: {},
-            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -606,7 +600,6 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
             suspend_events: {
             },
             wake_leases: {},
-            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -652,7 +645,6 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                 },
             },
             wake_leases: {},
-            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -763,9 +755,6 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                     responder.send().unwrap();
                     on_suspend_started_tx.try_send(()).unwrap();
                 }
-                fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
-                    responder.send().unwrap();
-                }
                 fsystem::ActivityGovernorListenerRequest::_UnknownMethod { ordinal, .. } => {
                     panic!("Unexpected method: {}", ordinal);
                 }
@@ -809,7 +798,6 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                 },
             },
             wake_leases: {},
-            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -877,7 +865,6 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                 },
             },
             wake_leases: {},
-            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -930,9 +917,6 @@ async fn test_activity_governor_blocks_for_on_suspend_started() -> Result<()> {
                     _on_suspend_started_responder = responder;
                     on_suspend_started_tx.try_send(()).unwrap();
                 }
-                fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
-                    responder.send().unwrap();
-                }
                 fsystem::ActivityGovernorListenerRequest::_UnknownMethod { ordinal, .. } => {
                     panic!("Unexpected method: {}", ordinal);
                 }
@@ -983,17 +967,12 @@ async fn test_acquire_wake_lease_doesnt_deadlock_in_on_suspend_started() -> Resu
         .unwrap();
 
     // Define the listener such that:
-    //  - OnResume and OnSuspendFail both notify on_resume_tx. (At time of writing, the
-    //    OnSuspendFail path is exercised, but we plan to remove that method soon.)
+    //  - OnResume notifies on_resume_tx.
     //  - OnSuspendStarted calls AcquireWakeLease and passes the lease to on_suspend_started_rx.
     let (on_resume_tx, mut on_resume_rx) = mpsc::channel(1);
     let (on_suspend_started_tx, mut on_suspend_started_rx) = mpsc::channel(1);
     fasync::Task::local(async move {
-        // At time of writing, OnSuspendFail is executed rather than OnResume, but this is written
-        // in preparation for removal of OnSuspendFail.
         let mut on_resume_tx = on_resume_tx;
-        let mut on_suspend_fail_tx = on_resume_tx.clone();
-
         let mut on_suspend_started_tx = on_suspend_started_tx;
 
         while let Some(Ok(req)) = listener_stream.next().await {
@@ -1012,11 +991,6 @@ async fn test_acquire_wake_lease_doesnt_deadlock_in_on_suspend_started() -> Resu
                         .unwrap();
                     on_suspend_started_tx.try_send(lease).unwrap();
                     responder.send().unwrap()
-                }
-                fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
-                    log::info!("Running OnSuspendFail");
-                    on_suspend_fail_tx.try_send(()).unwrap();
-                    responder.send().unwrap();
                 }
                 fsystem::ActivityGovernorListenerRequest::_UnknownMethod { ordinal, .. } => {
                     panic!("Unexpected method: {}", ordinal);
@@ -1081,9 +1055,6 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                     responder.send().unwrap();
                     on_suspend_started_tx.try_send(()).unwrap();
                 }
-                fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
-                    responder.send().unwrap();
-                }
                 fsystem::ActivityGovernorListenerRequest::_UnknownMethod { ordinal, .. } => {
                     panic!("Unexpected method: {}", ordinal);
                 }
@@ -1143,7 +1114,6 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 },
             },
             wake_leases: {},
-            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -1211,7 +1181,6 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 },
             },
             wake_leases: {},
-            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -1221,125 +1190,6 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
             },
         }
     );
-
-    Ok(())
-}
-
-#[fuchsia::test]
-async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
-    let (realm, activity_governor_moniker) = create_realm().await?;
-    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
-    set_up_default_suspender(&suspend_device).await;
-    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
-
-    let suspend_controller = create_suspend_topology(&realm).await?;
-
-    let (listener_client_end, mut listener_stream) = fidl::endpoints::create_request_stream();
-    activity_governor
-        .register_listener(fsystem::ActivityGovernorRegisterListenerRequest {
-            listener: Some(listener_client_end),
-            ..Default::default()
-        })
-        .await
-        .unwrap();
-
-    let (on_suspend_started_tx, mut on_suspend_started_rx) = mpsc::channel(1);
-    let (on_suspend_fail_tx, mut on_suspend_fail_rx) = mpsc::channel(1);
-
-    fasync::Task::local(async move {
-        let mut on_suspend_started_tx = on_suspend_started_tx;
-        let mut on_suspend_fail_tx = on_suspend_fail_tx;
-
-        while let Some(Ok(req)) = listener_stream.next().await {
-            match req {
-                fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
-                    responder.send().unwrap();
-                }
-                fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
-                    responder.send().unwrap();
-                    on_suspend_started_tx.try_send(()).unwrap();
-                }
-                fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
-                    let suspend_lease = lease(&suspend_controller, 1).await.unwrap();
-                    on_suspend_fail_tx.try_send(suspend_lease).unwrap();
-                    responder.send().unwrap();
-                }
-                fsystem::ActivityGovernorListenerRequest::_UnknownMethod { ordinal, .. } => {
-                    panic!("Unexpected method: {}", ordinal);
-                }
-            }
-        }
-    })
-    .detach();
-
-    // Trigger "boot complete" logic.
-    let boot_control = realm.connect_to_protocol::<fsystem::BootControlMarker>().await?;
-    let () = boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
-
-    // OnSuspendStarted should have been called.
-    on_suspend_started_rx.next().await.unwrap();
-
-    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
-    suspend_device
-        .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
-            suspend_duration: None,
-            suspend_overhead: None,
-            ..Default::default()
-        }))
-        .await
-        .unwrap()
-        .unwrap();
-
-    // At this point, the listener should have raised the execution_state power level to 2.
-    block_until_inspect_matches!(
-        activity_governor_moniker,
-        root: {
-            booting: false,
-            power_elements: {
-                execution_state: {
-                    power_level: 2u64,
-                },
-                application_activity: {
-                    power_level: 1u64,
-                },
-                cpu: {
-                    power_level: 1u64,
-                },
-            },
-            suspend_stats: {
-                ref fobs::SUSPEND_SUCCESS_COUNT: 0u64,
-                ref fobs::SUSPEND_FAIL_COUNT: 1u64,
-                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
-                ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
-                ref fobs::SUSPEND_LAST_DURATION: -1i64,
-            },
-            suspend_events: {
-                "0": {
-                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
-                },
-                "1": {
-                    ref fobs::SUSPEND_FAILED_AT: AnyProperty,
-                },
-            },
-            wake_leases: {},
-            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
-            config: {
-                use_suspender: true,
-                wait_for_suspending_token: false,
-            },
-            "fuchsia.inspect.Health": contains {
-                status: "OK",
-            },
-        }
-    );
-
-    // Drop the lease and wait for suspend,
-    on_suspend_fail_rx.next().await.unwrap();
-
-    // OnSuspendStarted should be called again.
-    on_suspend_started_rx.next().await.unwrap();
-
-    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
 
     Ok(())
 }
@@ -1384,7 +1234,6 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
             suspend_events: {
             },
             wake_leases: {},
-            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -1428,7 +1277,6 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
                 }
             },
             wake_leases: {},
-            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,

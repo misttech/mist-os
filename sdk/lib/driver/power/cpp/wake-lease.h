@@ -65,7 +65,6 @@ class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernor
   // wake leases in cases where the system is resumed and `HandleInterrupt` is called.
   void OnResume(OnResumeCompleter::Sync& completer) override;
   void OnSuspendStarted(OnSuspendStartedCompleter::Sync& completer) override;
-  void OnSuspendFail(OnSuspendFailCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernorListener> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
