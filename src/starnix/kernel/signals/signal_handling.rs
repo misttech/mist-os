@@ -147,7 +147,7 @@ fn send_signal_prio(
     // Unstop the process for SIGCONT. Also unstop for SIGKILL, the only signal that can interrupt
     // a stopped process.
     if signal == Some(SIGKILL) {
-        task.write().freeze_canceler.take().map(|canceler| canceler.cancel());
+        task.write().thaw();
         task.thread_group.set_stopped(StopState::ForceWaking, siginfo, false);
         task.write().set_stopped(StopState::ForceWaking, None, None, None);
     } else if signal == Some(SIGCONT) || force_wake {

@@ -158,14 +158,14 @@ impl CgroupOps for CgroupRoot {
     fn add_process(
         &self,
         pid: pid_t,
-        _thread_group: &TempRef<'_, ThreadGroup>,
+        thread_group: &TempRef<'_, ThreadGroup>,
     ) -> Result<(), Errno> {
         let mut pid_table = self.pid_table.lock();
         match pid_table.entry(pid) {
             hash_map::Entry::Occupied(entry) => {
                 // If pid is in a child cgroup, remove it.
                 if let Some(cgroup) = entry.get().upgrade() {
-                    cgroup.remove_process_internal(pid);
+                    cgroup.state.lock().remove_process(pid, thread_group)?;
                 }
                 entry.remove();
             }
@@ -366,6 +366,17 @@ impl CgroupState {
         }
     }
 
+    fn thaw_thread_group(&self, thread_group: &ThreadGroup) {
+        // Create static-lifetime TempRefs of Tasks so that we avoid don't hold the ThreadGroup
+        // lock while iterating and sending the signal.
+        // SAFETY: static TempRefs are released after all signals are queued.
+        let tasks = thread_group.read().tasks().map(TempRef::into_static).collect::<Vec<_>>();
+        for task in tasks {
+            task.write().thaw();
+            task.interrupt();
+        }
+    }
+
     fn get_status(&mut self) -> CgroupStatus {
         if self.deleted {
             return CgroupStatus::default();
@@ -380,6 +391,38 @@ impl CgroupState {
 
     fn get_effective_freezer_state(&self) -> FreezerState {
         std::cmp::max(self.self_freezer_state, self.inherited_freezer_state)
+    }
+
+    fn add_process(
+        &mut self,
+        pid: pid_t,
+        thread_group: &TempRef<'_, ThreadGroup>,
+    ) -> Result<(), Errno> {
+        if self.deleted {
+            return error!(ENOENT);
+        }
+        self.processes.insert(pid, WeakRef::from(thread_group));
+
+        if self.get_effective_freezer_state() == FreezerState::Frozen {
+            self.freeze_thread_group(&thread_group);
+        }
+        Ok(())
+    }
+
+    fn remove_process(
+        &mut self,
+        pid: pid_t,
+        thread_group: &TempRef<'_, ThreadGroup>,
+    ) -> Result<(), Errno> {
+        if self.deleted {
+            return error!(ENOENT);
+        }
+        self.processes.remove(&pid);
+
+        if self.get_effective_freezer_state() == FreezerState::Frozen {
+            self.thaw_thread_group(thread_group);
+        }
+        Ok(())
     }
 
     fn propagate_freeze(&mut self, inherited_freezer_state: FreezerState) {
@@ -521,30 +564,6 @@ impl Cgroup {
     fn parent(&self) -> Result<Option<CgroupHandle>, Errno> {
         self.parent.as_ref().map(|weak| weak.upgrade().ok_or_else(|| errno!(ENODEV))).transpose()
     }
-
-    fn add_process_internal(
-        &self,
-        pid: pid_t,
-        thread_group: &TempRef<'_, ThreadGroup>,
-    ) -> Result<(), Errno> {
-        let mut state = self.state.lock();
-        if state.deleted {
-            return error!(ENOENT);
-        }
-        state.processes.insert(pid, WeakRef::from(thread_group));
-
-        if state.get_effective_freezer_state() == FreezerState::Frozen {
-            state.freeze_thread_group(&thread_group);
-        }
-        Ok(())
-    }
-
-    fn remove_process_internal(&self, pid: pid_t) {
-        let mut state = self.state.lock();
-        if !state.deleted {
-            state.processes.remove(&pid);
-        }
-    }
 }
 
 impl CgroupOps for Cgroup {
@@ -566,14 +585,14 @@ impl CgroupOps for Cgroup {
                 // If pid is in another cgroup, we need to remove it first.
                 track_stub!(TODO("https://fxbug.dev/383374687"), "check permissions");
                 if let Some(other_cgroup) = entry.get().upgrade() {
-                    other_cgroup.remove_process_internal(pid);
+                    other_cgroup.state.lock().remove_process(pid, thread_group)?;
                 }
 
-                self.add_process_internal(pid, thread_group)?;
+                self.state.lock().add_process(pid, thread_group)?;
                 entry.insert(self.weak_self.clone());
             }
             hash_map::Entry::Vacant(entry) => {
-                self.add_process_internal(pid, thread_group)?;
+                self.state.lock().add_process(pid, thread_group)?;
                 entry.insert(self.weak_self.clone());
             }
         }

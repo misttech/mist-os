@@ -421,3 +421,53 @@ TEST_F(CgroupFreezerTest, FreezerState) {
   files::ReadFileToString(freeze_path(grand_child_cgroup), &grand_child_freezer_state);
   EXPECT_EQ(grand_child_freezer_state, "0\n");
 }
+
+TEST_F(CgroupFreezerTest, MoveProcess) {
+  // This test verifies that moving a process between frozen and thawed cgroups correctly affects
+  // signal delivery.  It creates two frozen child cgroups and starts a child process in one of
+  // them.  Signals sent to the child process should be blocked while it's in a frozen cgroup and
+  // delivered once it's moved to a thawed cgroup.
+
+  pid_t parent_pid = getpid();
+  test_helper::ForkHelper fork_helper;
+  test_helper::SignalMaskHelper mask_helper;
+  mask_helper.blockSignal(SIGUSR1);
+
+  std::string frozen_child1_cgroup = test_cgroup_path() + "/frozen_child_1";
+  create_child_cgroup(frozen_child1_cgroup);
+  files::WriteFile(freeze_path(frozen_child1_cgroup), "1");
+  std::string frozen_child2_cgroup = test_cgroup_path() + "/frozen_child_2";
+  create_child_cgroup(frozen_child2_cgroup);
+  files::WriteFile(freeze_path(frozen_child2_cgroup), "1");
+
+  pid_t child_pid = fork_helper.RunInForkedProcess([parent_pid] {
+    // Set up a signal set to wait for SIGUSR1 which will be sent by the test(parent) process
+    test_helper::SignalMaskHelper mask_helper;
+    mask_helper.blockSignal(SIGUSR1);
+
+    mask_helper.waitForSignal(SIGUSR1);
+    kill(parent_pid, SIGUSR1);
+
+    mask_helper.waitForSignal(SIGUSR1);
+    kill(parent_pid, SIGUSR1);
+  });
+  test_pids_.push_back(child_pid);
+
+  ASSERT_TRUE(files::WriteFile(procs_path(frozen_child1_cgroup), std::to_string(child_pid)));
+
+  kill(child_pid, SIGUSR1);
+  EXPECT_THAT(mask_helper.timedWaitForSignal(SIGUSR1, 1), SyscallFailsWithErrno(EAGAIN));
+
+  // Put the child proc into the root cgroup
+  ASSERT_TRUE(files::WriteFile(procs_path(cgroup_path()), std::to_string(child_pid)));
+  mask_helper.waitForSignal(SIGUSR1);
+
+  ASSERT_TRUE(files::WriteFile(procs_path(frozen_child2_cgroup), std::to_string(child_pid)));
+  kill(child_pid, SIGUSR1);
+  EXPECT_THAT(mask_helper.timedWaitForSignal(SIGUSR1, 1), SyscallFailsWithErrno(EAGAIN));
+
+  ASSERT_TRUE(files::WriteFile(procs_path(test_cgroup_path()), std::to_string(child_pid)));
+  mask_helper.waitForSignal(SIGUSR1);
+
+  EXPECT_TRUE(fork_helper.WaitForChildren());
+}

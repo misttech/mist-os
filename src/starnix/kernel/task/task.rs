@@ -633,6 +633,11 @@ impl TaskMutableState {
     pub fn notify_signal_waiters(&self) {
         self.signals.signal_wait.notify_all();
     }
+
+    /// Thaw the task if has been frozen
+    pub fn thaw(&mut self) {
+        self.freeze_canceler.take().map(|canceler| canceler.cancel());
+    }
 }
 
 #[apply(state_implementation!)]
