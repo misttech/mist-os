@@ -125,31 +125,6 @@ group("minimal_vim3_staging_tests") {
   ]
 }
 
-# DO NOT ADD MORE TESTS.  Use `starnix_arm64_stable_tests` instead.
-# TODO(https://fxbug.dev/388073420): Remove in favor of `starnix_arm64_stable_tests`.
-# starnix.vim3
-# Note: This will be run on *.vim3 internal builder, hence using `starnix` here
-# instead of internal `<PRODUCT>` name.
-group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
-  testonly = true
-  public_deps = []
-}
-
-# DO NOT ADD MORE TESTS.  Use `starnix_arm64_unstable_tests` instead.
-# TODO(https://fxbug.dev/388073420): Remove in favor of `starnix_arm64_unstable_tests`.
-group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
-  testonly = true
-  public_deps = []
-}
-
-group("starnix_vim3_staging_tests") {
-  testonly = true
-  public_deps = [
-    ":starnix_vim3_stable_tests",
-    ":starnix_vim3_unstable_tests",
-  ]
-}
-
 # starnix.arm64
 # Note: This will be run on internal *.arm64 builder, hence using `starnix` here
 # instead of internal `<PRODUCT>` name.
