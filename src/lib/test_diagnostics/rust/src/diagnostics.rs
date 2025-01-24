@@ -7,7 +7,7 @@ use diagnostics_data::LogsData;
 use fidl_fuchsia_test_manager as ftest_manager;
 use futures::stream::BoxStream;
 use futures::{Stream, StreamExt};
-use log_command::log_socket_stream::LogsDataStream;
+use log_command::LogsDataStream;
 use pin_project::pin_project;
 use std::pin::Pin;
 use std::task::{Context, Poll};

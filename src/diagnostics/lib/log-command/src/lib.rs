@@ -11,7 +11,6 @@ use diagnostics_data::Severity;
 use errors::{ffx_bail, FfxError};
 use fidl_fuchsia_diagnostics::{LogInterestSelector, LogSettingsProxy};
 use fidl_fuchsia_sys2::RealmQueryProxy;
-use log_formatter::FormatterError;
 pub use log_socket_stream::OneOrMany;
 use moniker::Moniker;
 use selectors::{sanitize_moniker_for_selectors, SelectorExt};
@@ -22,9 +21,14 @@ use std::str::FromStr;
 use std::string::FromUtf8Error;
 use std::time::Duration;
 use thiserror::Error;
-pub mod filter;
+mod filter;
 pub mod log_formatter;
-pub mod log_socket_stream;
+mod log_socket_stream;
+pub use log_formatter::{
+    dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, FormatterError, LogData,
+    LogEntry, Symbolize, Timestamp, WriterContainer, TIMESTAMP_FORMAT,
+};
+pub use log_socket_stream::{JsonDeserializeError, LogsDataStream};
 
 // Subcommand for ffx log (either watch or dump).
 #[derive(ArgsInfo, FromArgs, Clone, PartialEq, Debug)]

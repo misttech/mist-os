@@ -5,7 +5,7 @@
 use crate::transactional_symbolizer::ReadError;
 use ffx_config::api::ConfigError;
 use fidl_fuchsia_developer_remotecontrol::{ConnectCapabilityError, IdentifyHostError};
-use log_command::log_formatter::FormatterError;
+use log_command::FormatterError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

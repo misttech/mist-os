@@ -18,7 +18,7 @@ use ffx_log_args::LogCommand;
 use fho::{FfxMain, FfxTool, MachineWriter};
 use fidl_fuchsia_developer_remotecontrol as rc;
 use futures::FutureExt;
-use log_command::log_formatter::LogEntry;
+use log_command::LogEntry;
 use std::io::Write;
 
 async fn cmd_impl(

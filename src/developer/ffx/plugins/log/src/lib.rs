@@ -10,11 +10,10 @@ use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, LogSettingsProxy, StreamParameters};
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
 use fidl_fuchsia_sys2::RealmQueryProxy;
-use log_command::log_formatter::{
-    dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, Symbolize, Timestamp,
-    WriterContainer,
+use log_command::{
+    dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, LogProcessingResult,
+    LogSubCommand, Symbolize, Timestamp, WatchCommand, WriterContainer,
 };
-use log_command::{LogProcessingResult, LogSubCommand, WatchCommand};
 use std::io::Write;
 use target_connector::Connector;
 use transactional_symbolizer::{RealSymbolizerProcess, TransactionalSymbolizer};
@@ -306,10 +305,9 @@ mod tests {
     use fidl_fuchsia_diagnostics::StreamMode;
     use fuchsia_async as fasync;
     use futures::StreamExt;
-    use log_command::log_formatter::{LogData, TIMESTAMP_FORMAT};
     use log_command::{
-        parse_seconds_string_as_duration, parse_time, DumpCommand, OneOrMany, SymbolizeMode,
-        TimeFormat,
+        parse_seconds_string_as_duration, parse_time, DumpCommand, LogData, OneOrMany,
+        SymbolizeMode, TimeFormat, TIMESTAMP_FORMAT,
     };
     use moniker::Moniker;
     use selectors::parse_log_interest_selector;
