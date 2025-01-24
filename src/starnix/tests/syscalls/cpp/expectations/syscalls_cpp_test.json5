@@ -90,9 +90,6 @@
 
                 // TODO(https://fxbug.dev/379958264)
                 "CgroupTest.WriteToInterfaceFileAfterCgroupIsDeleted",
-
-                // TODO(https://fxbug.dev/377755814)
-                "CgroupTest.EventsWithPopulatedChild",
             ],
         },
     ],

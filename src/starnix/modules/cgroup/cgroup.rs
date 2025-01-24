@@ -301,8 +301,8 @@ impl CgroupChildren {
         })
     }
 
-    fn get_children(&self) -> impl IntoIterator<Item = &CgroupHandle> + '_ {
-        self.0.values()
+    fn get_children(&self) -> Vec<CgroupHandle> {
+        self.0.values().cloned().collect()
     }
 
     fn get_node(&self, name: &FsStr) -> Result<FsNodeHandle, Errno> {
@@ -642,7 +642,11 @@ impl CgroupOps for Cgroup {
             return false;
         }
         state.update_processes();
-        !state.processes.is_empty()
+        if !state.processes.is_empty() {
+            return true;
+        }
+
+        state.children.get_children().into_iter().any(|child| child.is_populated())
     }
 
     fn get_freezer_state(&self) -> CgroupFreezerState {
