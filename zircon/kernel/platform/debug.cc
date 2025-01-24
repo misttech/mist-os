@@ -223,8 +223,7 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
       return;
     }
 
-    static constexpr auto rx_irq_handler = [](auto& spinlock, auto&& read_char,
-                                              auto&& mask_rx_interrupt) {
+    static constexpr auto rx_irq_handler = [](auto& rx_interrupt) {
       // This check needs to be performed under a lock, such that we prevent operation
       // interleaving that would leave us in a blocked state.
       //
@@ -242,30 +241,31 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
       //  masking RX interrupts. By pairing this with the acquisition of the
       //  same lock around unmasking RX interrupts, we prevent the writer above
       //  from being interrupted by a read-and-unmask.
+      char c;
       {
-        Guard<MonitoredSpinLock, NoIrqSave> lock(&spinlock, SOURCE_TAG);
+        Guard<MonitoredSpinLock, NoIrqSave> lock(&rx_interrupt.lock(), SOURCE_TAG);
         if (rx_queue.Full()) {
           // disables RX interrupts.
-          mask_rx_interrupt();
+          rx_interrupt.DisableInterrupt();
           return;
         }
+        c = static_cast<char>(rx_interrupt.ReadChar());
       }
-      rx_queue.WriteChar(static_cast<char>(read_char()));
+      rx_queue.WriteChar(c);
     };
 
-    static constexpr auto tx_irq_handler = [](auto& spinlock, auto& waiter,
-                                              auto&& mask_tx_interrupts) {
+    static constexpr auto tx_irq_handler = [](auto& tx_interrupt) {
       // Mask the TX interrupt before signalling any blocked thread as there may
       // be a race between masking TX here below and unmasking by the blocked
       // thread.
       {
-        Guard<MonitoredSpinLock, NoIrqSave> lock(&spinlock, SOURCE_TAG);
-        mask_tx_interrupts();
+        Guard<MonitoredSpinLock, NoIrqSave> lock(&tx_interrupt.lock(), SOURCE_TAG);
+        tx_interrupt.DisableInterrupt();
       }
 
       // Do not signal the event while holding the sync capability, this could lead
       // to invalid lock dependencies.
-      waiter.Wake();
+      tx_interrupt.Notify();
     };
 
     constexpr auto irq_handler = [](void* driver_ptr) {

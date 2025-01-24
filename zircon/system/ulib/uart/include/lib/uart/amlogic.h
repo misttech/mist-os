@@ -13,6 +13,7 @@
 
 #include <hwreg/bitfields.h>
 
+#include "interrupt.h"
 #include "uart.h"
 
 namespace uart::amlogic {
@@ -200,16 +201,17 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dc
       // If there were no characters in the fifo, then it was either an error
       // or TX IRQ, will be handled in this pass.
       drained_rx += sr.rx_fifo_count() == 0 ? kFifoDepth : sr.rx_fifo_count();
+      auto rx_irq = RxInterrupt(
+          lock,  //
+          [&]() { return ReadFifoRegister::Get().ReadFrom(io.io()).data(); },
+          [&]() {
+            // If the buffer is full, disable the receive interrupt instead
+            // and stop checking.
+            EnableRxInterrupt(io, false);
+            rx_disabled = true;
+          });
       for (size_t i = 0; i < sr.rx_fifo_count() && !rx_disabled; ++i) {
-        rx(
-            lock,  //
-            [&]() { return ReadFifoRegister::Get().ReadFrom(io.io()).data(); },
-            [&]() {
-              // If the buffer is full, disable the receive interrupt instead
-              // and stop checking.
-              EnableRxInterrupt(io, false);
-              rx_disabled = true;
-            });
+        rx(rx_irq);
       }
 
       // Clear any interrupt due to errors.
@@ -218,7 +220,8 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dc
       }
 
       if (cr.tx_interrupt() && !sr.tx_fifo_full()) {
-        tx(lock, waiter, [&]() { EnableTxInterrupt(io, false); });
+        auto tx_irq = TxInterrupt(lock, waiter, [&]() { EnableTxInterrupt(io, false); });
+        tx(tx_irq);
       }
     }
   }

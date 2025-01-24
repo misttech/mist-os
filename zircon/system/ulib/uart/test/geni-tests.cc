@@ -11,6 +11,8 @@
 
 #include <zxtest/zxtest.h>
 
+#include "lib/uart/sync.h"
+
 namespace {
 
 using SimpleTestDriver =
@@ -123,6 +125,9 @@ void InitWithInterrupt(SimpleTestDriver& driver) {
   driver.io().mock().VerifyAndClear();
 }
 
+using UnsyncronizedGuard =
+    uart::UnsynchronizedPolicy::Guard<uart::UnsynchronizedPolicy::DefaultLockPolicy>;
+
 TEST(GeniTests, TxIrqOnly) {
   SimpleTestDriver driver(kTestConfig);
 
@@ -141,13 +146,12 @@ TEST(GeniTests, TxIrqOnly) {
 
   int call_count = 0;
   driver.Interrupt(
-      [&](auto& sync, auto& waiter, auto&& disable_tx_irq) {
+      [&](auto& tx_irq) {
         call_count++;
-        disable_tx_irq();
+        UnsyncronizedGuard g(&tx_irq.lock(), SOURCE_TAG);
+        tx_irq.DisableInterrupt();
       },
-      [](auto& sync, auto&& reader, auto&& full) {
-        FAIL("Unexpected call on |rx| irq callback.");
-      });
+      [](auto& rx_irq) { FAIL("Unexpected call on |rx| irq callback."); });
 
   EXPECT_EQ(call_count, 1);
 }
@@ -171,9 +175,8 @@ TEST(GeniTests, RxIrqEmptyFifo) {
   // Empty Fifo bit is set, so it should just return.
 
   int call_count = 0;
-  driver.Interrupt([](auto& sync, auto& waiter,
-                      auto&& disable_tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
-                   [&](auto& sync, auto&& reader, auto&& full) { call_count++; });
+  driver.Interrupt([](auto& tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
+                   [&](auto& rx_irq) { call_count++; });
 
   driver.io().mock().VerifyAndClear();
   EXPECT_EQ(call_count, 0);
@@ -199,11 +202,11 @@ TEST(GeniTests, RxTimeoutIrqWithNonEmptyFifoAndNonFullQueue) {
       .ExpectWrite(uint32_t{0b0000'0100'0000'0000'0000'0000'0000'0000}, 0x648);
 
   int call_count = 0;
-  driver.Interrupt([](auto& sync, auto& waiter,
-                      auto&& disable_tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
-                   [&](auto& sync, auto&& reader, auto&& full) {
+  driver.Interrupt([](auto& tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
+                   [&](auto& rx_irq) {
                      call_count++;
-                     auto c = reader();
+                     UnsyncronizedGuard g(&rx_irq.lock(), SOURCE_TAG);
+                     char c = static_cast<char>(rx_irq.ReadChar());
                      EXPECT_EQ('A', c);
                    });
 
@@ -237,10 +240,10 @@ TEST(GeniTests, RxIrqWithNonEmptyFifoAndFullQueue) {
       .ExpectWrite(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x648);
 
   int call_count = 0;
-  driver.Interrupt([](auto& sync, auto& waiter,
-                      auto&& disable_tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
-                   [&](auto& sync, auto&& reader, auto&& full) {
-                     full();
+  driver.Interrupt([](auto& tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
+                   [&](auto& rx_irq) {
+                     UnsyncronizedGuard g(&rx_irq.lock(), SOURCE_TAG);
+                     rx_irq.DisableInterrupt();
                      call_count++;
                    });
 
@@ -269,11 +272,11 @@ TEST(GeniTests, RxLastByteInterruptWithAllBytesValidInTheLastWord) {
 
   int call_count = 0;
   std::string read_chars;
-  driver.Interrupt([](auto& sync, auto& waiter,
-                      auto&& disable_tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
-                   [&](auto& sync, auto&& reader, auto&& full) {
+  driver.Interrupt([](auto& tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
+                   [&](auto& rx_irq) {
                      call_count++;
-                     char c = static_cast<char>(reader());
+                     UnsyncronizedGuard g(&rx_irq.lock(), SOURCE_TAG);
+                     char c = static_cast<char>(rx_irq.ReadChar());
                      read_chars.push_back(c);
                    });
 
@@ -304,11 +307,11 @@ TEST(GeniTests, RxLastByteInterruptWithPartialBytesValidInTheLastWord) {
 
   int call_count = 0;
   std::string read_chars;
-  driver.Interrupt([](auto& sync, auto& waiter,
-                      auto&& disable_tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
-                   [&](auto& sync, auto&& reader, auto&& full) {
+  driver.Interrupt([](auto& tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
+                   [&](auto& rx_irq) {
                      call_count++;
-                     char c = static_cast<char>(reader());
+                     UnsyncronizedGuard g(&rx_irq.lock(), SOURCE_TAG);
+                     char c = static_cast<char>(rx_irq.ReadChar());
                      read_chars.push_back(c);
                    });
 

@@ -12,6 +12,7 @@
 
 #include <hwreg/bitfields.h>
 
+#include "interrupt.h"
 #include "uart.h"
 
 namespace uart::exynos_usi {
@@ -365,20 +366,21 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_EXYNOS_USI_UART, zbi
         // appropriate action accordingly.
         ack.set_rx(true);
         auto rxdhr = RxBufferRegister::Get().ReadFrom(io.io());
+        auto rx_irq = RxInterrupt(
+            lock,  //
+            [&]() { return rxdhr.data(); },
+            [&]() {
+              // If the buffer is full, disable the receive interrupt instead
+              // and stop checking.
+              EnableRxInterrupt(io, false);
+              rx_disabled = true;
+            });
         switch (RxErrorAction(io)) {
           case ErrorAction::kPreserveData:
             ack.set_error(true);
             __FALLTHROUGH;
           case ErrorAction::kNoAction:
-            rx(
-                lock,  //
-                [&]() { return rxdhr.data(); },
-                [&]() {
-                  // If the buffer is full, disable the receive interrupt instead
-                  // and stop checking.
-                  EnableRxInterrupt(io, false);
-                  rx_disabled = true;
-                });
+            rx(rx_irq);
             break;
           case ErrorAction::kDiscardData:
             ack.set_error(true);
@@ -389,7 +391,8 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_EXYNOS_USI_UART, zbi
       // Check Tx.
       if (ipr.tx() && !fsr.tx_fifo_full()) {
         ack.set_tx(true);
-        tx(lock, waiter, [&]() { EnableTxInterrupt(io, false); });
+        auto tx_irq = TxInterrupt(lock, waiter, [&]() { EnableTxInterrupt(io, false); });
+        tx(tx_irq);
       }
 
       // Commit handled IRQ signals to Interrupt Pending Register. By writing

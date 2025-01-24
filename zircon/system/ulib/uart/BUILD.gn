@@ -8,6 +8,7 @@ zx_library("uart") {
   sdk = "source"
   sdk_headers = [
     "lib/uart/all.h",
+    "lib/uart/interrupt.h",
     "lib/uart/chars-from.h",
     "lib/uart/ns8250.h",
     "lib/uart/null.h",
