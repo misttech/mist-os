@@ -22,18 +22,22 @@
 #include "parent_device_dfv2.h"
 
 #if MAGMA_TEST_DRIVER
+constexpr char kDriverName[] = "vsi-vip-test";
 using MagmaDriverBaseType = msd::MagmaTestDriverBase;
 
 zx_status_t magma_indriver_test(ParentDeviceDfv2* device);
 
 #else
+
+constexpr char kDriverName[] = "vsi-vip";
 using MagmaDriverBaseType = msd::MagmaProductionDriverBase;
+
 #endif
 
 class NpuDevice : public MagmaDriverBaseType {
  public:
   NpuDevice(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : MagmaDriverBaseType("vsi-vip", std::move(start_args), std::move(driver_dispatcher)),
+      : MagmaDriverBaseType(kDriverName, std::move(start_args), std::move(driver_dispatcher)),
         parent_{.incoming_ = incoming()} {}
 
   zx::result<> MagmaStart() override;
