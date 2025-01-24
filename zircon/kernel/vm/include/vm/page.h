@@ -276,11 +276,9 @@ struct vm_page {
 
       // offset 0x28
 
-      // Identifies how many objects can access this page besides the owner.
-      //
-      // This may encode either an actual shared reference count, or split status+direction if split
-      // bits are in use. See |IsSplit|, |SetSplit|, |ClearSplits| in the VmCowPages implementation
-      // for details on the encoding for split status+direction.
+      // Identifies how many objects can access this page when it doesn't have a unique owner. A
+      // page with a unique owner may still have multiple objects able to access it, just the count
+      // is not tracked.
       uint32_t share_count;
 
       // offset 0x2c
