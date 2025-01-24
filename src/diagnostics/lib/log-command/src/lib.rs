@@ -22,7 +22,7 @@ use std::string::FromUtf8Error;
 use std::time::Duration;
 use thiserror::Error;
 mod filter;
-pub mod log_formatter;
+mod log_formatter;
 mod log_socket_stream;
 pub use log_formatter::{
     dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, FormatterError, LogData,
