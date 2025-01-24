@@ -62,7 +62,7 @@ impl BytesFileOps for FreezeFile {
     }
 
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        let state_str = format!("{}\n", self.cgroup()?.get_status().self_freezer_state);
+        let state_str = format!("{}\n", self.cgroup()?.get_freezer_state().self_freezer_state);
         Ok(state_str.as_bytes().to_owned().into())
     }
 }

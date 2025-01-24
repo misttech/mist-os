@@ -40,6 +40,16 @@ pub enum FreezerState {
     Frozen,
 }
 
+#[derive(Default)]
+pub struct CgroupFreezerState {
+    /// Cgroups's own freezer state as set by the `cgroup.freeze` file.
+    pub self_freezer_state: FreezerState,
+    /// Considers both the cgroup's self freezer state as set by the `cgroup.freeze` file and
+    /// the freezer state of its ancestors. A cgroup is considered frozen if either itself or any
+    /// of its ancestors is frozen.
+    pub effective_freezer_state: FreezerState,
+}
+
 /// Common operations of all cgroups.
 pub trait CgroupOps: Send + Sync + 'static {
     /// Add a process to a cgroup. Errors if the cgroup has been deleted.
@@ -69,8 +79,11 @@ pub trait CgroupOps: Send + Sync + 'static {
     /// Return all pids that belong to this cgroup.
     fn get_pids(&self) -> Vec<pid_t>;
 
-    /// Gets the current status of the cgroup.
-    fn get_status(&self) -> CgroupStatus;
+    /// Whether the cgroup or any of its descendants have any processes.
+    fn is_populated(&self) -> bool;
+
+    /// Get the freezer `self state` and `effective state`.
+    fn get_freezer_state(&self) -> CgroupFreezerState;
 
     /// Freeze all tasks in the cgroup.
     fn freeze(&self);
@@ -220,7 +233,11 @@ impl CgroupOps for CgroupRoot {
         kernel_pids.into_iter().filter(|pid| !controlled_pids.contains_key(pid)).collect()
     }
 
-    fn get_status(&self) -> CgroupStatus {
+    fn is_populated(&self) -> bool {
+        false
+    }
+
+    fn get_freezer_state(&self) -> CgroupFreezerState {
         Default::default()
     }
 
@@ -301,25 +318,6 @@ impl Deref for CgroupChildren {
     }
 }
 
-/// Status of the cgroup, used for populating `cgroup.events` and `cgroup.freeze` file.
-#[derive(Debug, Default, Clone)]
-pub struct CgroupStatus {
-    /// Whether the cgroup or any of its descendants have any processes.
-    pub populated: bool,
-
-    /// Effective freezer state of this cgroup.
-    ///
-    /// This considers both the cgroup's own freezer state as set by the `cgroup.freeze` file and
-    /// the freezer state of its ancestors. A cgroup is considered frozen if either itself
-    /// or any of its ancestors is frozen.
-    pub effective_freezer_state: FreezerState,
-
-    /// The cgroup's own freezer state as set by the `cgroup.freeze` file.
-    ///
-    /// This does not reflect the state of its ancestors.
-    pub self_freezer_state: FreezerState,
-}
-
 #[derive(Default)]
 struct CgroupState {
     /// Subgroups of this control group.
@@ -374,18 +372,6 @@ impl CgroupState {
         for task in tasks {
             task.write().thaw();
             task.interrupt();
-        }
-    }
-
-    fn get_status(&mut self) -> CgroupStatus {
-        if self.deleted {
-            return CgroupStatus::default();
-        }
-        self.update_processes();
-        CgroupStatus {
-            populated: !self.processes.is_empty(),
-            effective_freezer_state: self.get_effective_freezer_state(),
-            self_freezer_state: self.self_freezer_state,
         }
     }
 
@@ -650,8 +636,21 @@ impl CgroupOps for Cgroup {
         state.processes.keys().copied().collect()
     }
 
-    fn get_status(&self) -> CgroupStatus {
-        self.state.lock().get_status()
+    fn is_populated(&self) -> bool {
+        let mut state = self.state.lock();
+        if state.deleted {
+            return false;
+        }
+        state.update_processes();
+        !state.processes.is_empty()
+    }
+
+    fn get_freezer_state(&self) -> CgroupFreezerState {
+        let state = self.state.lock();
+        CgroupFreezerState {
+            self_freezer_state: state.self_freezer_state,
+            effective_freezer_state: state.get_effective_freezer_state(),
+        }
     }
 
     fn freeze(&self) {

@@ -41,10 +41,11 @@ impl BytesFileOps for EventsFile {
             TODO("https://fxbug.dev/377755814"),
             "cgroup.events does not check state of parent and children cgroup"
         );
-        let status = self.cgroup()?.get_status();
+        let cgroup = self.cgroup()?;
         let events_str = format!(
             "populated {}\nfrozen {}\n",
-            status.populated as u8, status.effective_freezer_state
+            cgroup.is_populated() as u8,
+            cgroup.get_freezer_state().effective_freezer_state
         );
         Ok(events_str.as_bytes().to_owned().into())
     }
