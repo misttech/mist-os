@@ -71,6 +71,7 @@ pkg-resolver
 ?scenic
 ?sensor-config
 ?sensors
+serial
 ?session_manager
 ?setui_service
 ?soundplayer

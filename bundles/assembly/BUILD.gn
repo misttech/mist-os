@@ -306,10 +306,6 @@ assembly_input_bundle("bootstrap") {
       driver_components = [ "meta/ftdi.cm" ]
     },
     {
-      package_target = "//src/devices/serial/drivers/serial:package"
-      driver_components = [ "meta/serial.cm" ]
-    },
-    {
       package_target = "//src/devices/serial/drivers/usb-cdc-acm:package"
       driver_components = [ "meta/usb-cdc-acm.cm" ]
     },
@@ -921,6 +917,14 @@ assembly_input_bundle("core_realm") {
 
     # Developer.
     "//src/developer/forensics:pkg",
+  ]
+
+  base_driver_packages = [
+    {
+      # Fallback driver for uart nodes.
+      package_target = "//src/devices/serial/drivers/serial:package"
+      driver_components = [ "meta/serial.cm" ]
+    },
   ]
 
   compiled_packages = [
