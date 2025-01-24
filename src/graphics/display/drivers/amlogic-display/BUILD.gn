@@ -204,7 +204,7 @@ test("amlogic-display-test") {
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/incoming/cpp",
     "//sdk/lib/driver/logging/cpp",
-    "//sdk/lib/driver/mock-mmio-range/cpp",
+    "//sdk/lib/driver/mock-mmio/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/driver/testing/cpp:scoped_global_logger",

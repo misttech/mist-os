@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/driver/mock-mmio-reg/cpp/mock-mmio-reg.h>
+#include <lib/driver/mock-mmio/cpp/mock-mmio-reg.h>
 #include <lib/mmio/mmio.h>
 #include <zircon/syscalls.h>
 

@@ -5,7 +5,7 @@
 #include "src/graphics/display/drivers/intel-display/ddi-physical-layer.h"
 
 #include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
-#include <lib/driver/mock-mmio-range/cpp/mock-mmio-range.h>
+#include <lib/driver/mock-mmio/cpp/mock-mmio-range.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio/mmio-buffer.h>
 

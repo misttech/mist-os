@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_MOCK_MMIO_REG_CPP_MOCK_MMIO_REG_H_
-#define LIB_DRIVER_MOCK_MMIO_REG_CPP_MOCK_MMIO_REG_H_
+#ifndef LIB_DRIVER_MOCK_MMIO_CPP_MOCK_MMIO_REG_H_
+#define LIB_DRIVER_MOCK_MMIO_CPP_MOCK_MMIO_REG_H_
 
 #include <lib/mmio-ptr/fake.h>
 #include <lib/mmio/mmio.h>
@@ -173,4 +173,4 @@ class MockMmioRegRegion {
 
 }  // namespace mock_mmio
 
-#endif  // LIB_DRIVER_MOCK_MMIO_REG_CPP_MOCK_MMIO_REG_H_
+#endif  // LIB_DRIVER_MOCK_MMIO_CPP_MOCK_MMIO_REG_H_

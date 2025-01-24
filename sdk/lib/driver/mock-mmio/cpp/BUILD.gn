@@ -10,10 +10,12 @@ sdk_source_set("cpp") {
   # TODO(https://fxbug.dev/382792202): Promote category to "partner".
   category = "internal"
   stable = false
-  sdk_name = "mock_mmio_reg_cpp"
+  sdk_name = "mock_mmio_cpp"
   include_base = "//sdk"
 
   sources = [
+    "mock-mmio-range.cc",
+    "mock-mmio-range.h",
     "mock-mmio-reg.cc",
     "mock-mmio-reg.h",
   ]
@@ -28,7 +30,10 @@ sdk_source_set("cpp") {
 
 group("tests") {
   testonly = true
-  deps = [ ":mock-mmio-reg-test-bin" ]
+  deps = [
+    ":mock-mmio-range-test-bin",
+    ":mock-mmio-reg-test-bin",
+  ]
 }
 
 test("mock-mmio-reg-test-bin") {
@@ -39,7 +44,7 @@ test("mock-mmio-reg-test-bin") {
     }
   }
   output_name = "mock-mmio-reg-sdk-test"
-  sources = [ "mock-mmio-reg-test.cc" ]
+  sources = [ "tests/mock-mmio-reg-test.cc" ]
   deps = [
     ":cpp",
     "//src/devices/lib/mmio",
@@ -48,6 +53,19 @@ test("mock-mmio-reg-test-bin") {
   ]
 }
 
-fuchsia_unittest_package("mock-mmio-reg-test") {
-  deps = [ ":mock-mmio-reg-test-bin" ]
+test("mock-mmio-range-test-bin") {
+  output_name = "mock_mmio_range_cpp_test"
+  sources = [ "tests/mock-mmio-range-test.cc" ]
+  deps = [
+    ":cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gtest",
+  ]
+}
+
+fuchsia_unittest_package("mock-mmio-cpp-test") {
+  deps = [
+    ":mock-mmio-range-test-bin",
+    ":mock-mmio-reg-test-bin",
+  ]
 }

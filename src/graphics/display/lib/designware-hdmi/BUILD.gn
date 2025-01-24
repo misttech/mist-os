@@ -40,7 +40,7 @@ test("designware-hdmi-tests-bin") {
   deps = [
     ":hdmi-transmitter-controller-impl",
     "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
-    "//sdk/lib/driver/mock-mmio-range/cpp",
+    "//sdk/lib/driver/mock-mmio/cpp",
     "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//src/devices/lib/mmio",
     "//src/lib/fxl/test:gtest_main",

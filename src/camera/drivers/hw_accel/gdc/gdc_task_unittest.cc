@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/ddk/debug.h>
-#include <lib/driver/mock-mmio-reg/cpp/mock-mmio-reg.h>
+#include <lib/driver/mock-mmio/cpp/mock-mmio-reg.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zbi-format/graphics.h>

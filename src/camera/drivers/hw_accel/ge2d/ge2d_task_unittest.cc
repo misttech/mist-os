@@ -6,7 +6,7 @@
 #include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/debug.h>
-#include <lib/driver/mock-mmio-reg/cpp/mock-mmio-reg.h>
+#include <lib/driver/mock-mmio/cpp/mock-mmio-reg.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/image-format/image_format.h>
 #include <lib/mmio/mmio.h>

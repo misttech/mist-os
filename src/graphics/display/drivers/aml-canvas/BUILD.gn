@@ -75,7 +75,7 @@ test("aml-canvas-tests") {
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/driver/mock-mmio-range/cpp",
+    "//sdk/lib/driver/mock-mmio/cpp",
     "//sdk/lib/driver/runtime/testing/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/driver/testing/cpp:scoped_global_logger",

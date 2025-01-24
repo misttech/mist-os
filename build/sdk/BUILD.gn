@@ -145,7 +145,7 @@ _internal_source_sets_list = [
   # TODO(https://fxbug.dev/343059325): Promote devicetree to "partner".
   "//sdk/lib/device-watcher/cpp:cpp",
   "//sdk/lib/driver/devicetree/manager:headers",
-  "//sdk/lib/driver/mock-mmio-reg/cpp",
+  "//sdk/lib/driver/mock-mmio/cpp",
   "//sdk/lib/driver/devicetree/manager:manager",
   "//sdk/lib/driver/devicetree/testing:board-test-helper",
   "//sdk/lib/driver/devicetree/visitors:common-types",
@@ -173,6 +173,7 @@ _internal_source_sets_list = [
   "//src/devices/lib/mmio:test_helper",
   "//src/devices/testing/fake-mmio-reg:fake-mmio-reg",
   "//src/devices/testing/mock-mmio-reg:mock-mmio-reg",
+  "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
 
   # TODO(https://fxbug.dev/331991540): Remove once the Firmware SDK no longer
   # uses `sdk_source_set()`.
