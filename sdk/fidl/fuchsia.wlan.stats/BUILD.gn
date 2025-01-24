@@ -5,6 +5,9 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.wlan.stats") {
+  sdk_category = "partner"
+  stable = false
+  sdk_area = "WLAN"
   sources = [ "wlan_stats.fidl" ]
   enable_banjo = true
 

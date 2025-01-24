@@ -14,7 +14,6 @@ wlan_fidls_allowlist = [
   "//sdk/fidl/fuchsia.wlan.minstrel:fuchsia.wlan.minstrel",
   "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme",
   "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme",
-  "//sdk/fidl/fuchsia.wlan.stats:fuchsia.wlan.stats",
 ]
 
 # These are FIDL libraries that are temporarily allowed to be depended on by the
