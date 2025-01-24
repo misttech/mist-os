@@ -21,7 +21,7 @@ source_set("mock-mmio-reg-zxtest") {
   public = [ "include/mock-mmio-reg/mock-mmio-reg.h" ]
   deps = [
     "//src/devices/lib/mmio:test_helper",
-    "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
+    "//zircon/system/ulib/mmio-ptr",
   ]
   public_configs = [
     ":headers.config",
@@ -55,7 +55,7 @@ sdk_source_set("mock-mmio-reg") {
   public_deps = [
     "//src/devices/lib/mmio:test_helper",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
+    "//zircon/system/ulib/mmio-ptr",
   ]
   non_sdk_public_deps = [ "//third_party/googletest:gtest_no_testonly" ]
   public_configs = [ ":headers.config" ]

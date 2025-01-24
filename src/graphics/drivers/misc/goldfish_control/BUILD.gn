@@ -103,7 +103,7 @@ test("goldfish-control-device-test") {
            "//src/lib/fxl/test:gtest_main",
            "//third_party/googletest:gtest",
            "//zircon/system/ulib/fzl",
-           "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
+           "//zircon/system/ulib/mmio-ptr",
            "//zircon/system/ulib/sync",
            "//zircon/system/ulib/sync:sync-cpp",
            "//zircon/system/ulib/zircon-internal",

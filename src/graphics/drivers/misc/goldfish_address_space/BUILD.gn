@@ -76,7 +76,7 @@ test("goldfish-address-space-test") {
            "//sdk/lib/component/outgoing/cpp",
            "//src/devices/testing/fake-bti",
            "//src/devices/testing/mock-ddk",
-           "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
+           "//zircon/system/ulib/mmio-ptr",
            "//zircon/system/ulib/mock-function",
            "//zircon/system/ulib/sync",
            "//zircon/system/ulib/zircon-internal",

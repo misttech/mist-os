@@ -107,7 +107,7 @@ test("amlogic-clk-test-bin") {
     "//src/devices/lib/mmio:test_helper",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
-    "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
+    "//zircon/system/ulib/mmio-ptr",
   ]
 }
 

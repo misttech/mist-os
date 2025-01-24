@@ -175,7 +175,6 @@ _internal_source_sets_list = [
   "//src/devices/lib/mmio:test_helper",
   "//src/devices/testing/fake-mmio-reg:fake-mmio-reg",
   "//src/devices/testing/mock-mmio-reg:mock-mmio-reg",
-  "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
 
   # TODO(https://fxbug.dev/331991540): Remove once the Firmware SDK no longer
   # uses `sdk_source_set()`.

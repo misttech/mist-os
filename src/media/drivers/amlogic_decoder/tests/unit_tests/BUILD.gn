@@ -20,7 +20,7 @@ cc_test_executable("amlogic-decoder-unittest-bin") {
     "//src/devices/testing/mock-ddk",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
+    "//zircon/system/ulib/mmio-ptr",
   ]
   sources = [
     "test_binding.cc",

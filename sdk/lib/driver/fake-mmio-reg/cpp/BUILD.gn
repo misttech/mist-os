@@ -18,7 +18,7 @@ sdk_source_set("cpp") {
     "fake-mmio-reg.h",
   ]
 
-  deps = [ "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake" ]
+  deps = [ "//zircon/system/ulib/mmio-ptr" ]
 
   public_deps = [
     "//sdk/lib/fit",

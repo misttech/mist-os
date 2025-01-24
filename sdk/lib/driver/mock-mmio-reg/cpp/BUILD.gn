@@ -20,7 +20,7 @@ sdk_source_set("cpp") {
 
   public_deps = [
     "//src/devices/lib/mmio",
-    "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
+    "//zircon/system/ulib/mmio-ptr",
   ]
 
   public_configs = [ "//sdk/config" ]
