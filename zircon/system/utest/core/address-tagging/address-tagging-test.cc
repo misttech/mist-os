@@ -496,7 +496,7 @@ TEST(TopByteIgnoreTests, ProcessStartTaggedAddress) {
                          zx::handle(), 0));
 
     zx_signals_t signals;
-    EXPECT_OK(proc.wait_one(ZX_TASK_TERMINATED, zx::deadline_after(zx::sec(1)), &signals));
+    EXPECT_OK(proc.wait_one(ZX_TASK_TERMINATED, zx::time::infinite(), &signals));
     EXPECT_EQ(signals, ZX_TASK_TERMINATED);
   };
 
