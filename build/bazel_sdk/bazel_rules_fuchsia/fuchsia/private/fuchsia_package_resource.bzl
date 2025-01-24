@@ -80,7 +80,14 @@ def _fuchsia_package_resource_group_impl(ctx):
         if ctx.attr.basename_only:
             name = src.basename
         else:
-            name = src.short_path.removeprefix(ctx.label.package + "/").removeprefix(ctx.attr.strip_prefix).removeprefix("/")
+            name = src.path
+            if src.root:
+                # Remove gen directories, e.g. bazel-bin
+                name = name.removeprefix(src.root.path + "/")
+            if src.owner.workspace_root:
+                # Remove workspace name, e.g. external/fuchsia_sdk
+                name = name.removeprefix(src.owner.workspace_root + "/")
+            name = name.removeprefix(ctx.label.package + "/").removeprefix(ctx.attr.strip_prefix).removeprefix("/")
 
         resources.append(
             make_resource_struct(src = src, dest = dest + "/" + name),

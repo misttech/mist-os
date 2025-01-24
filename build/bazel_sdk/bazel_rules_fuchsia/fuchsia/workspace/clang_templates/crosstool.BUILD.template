@@ -335,19 +335,19 @@ fuchsia_package_resource_group(
     strip_prefix = fuchsia_cpu_select(
         {
             "arm64": {
-                ":arm64_novariant": "../fuchsia_clang/lib/aarch64-unknown-fuchsia",
-                ":arm64_asan_variant": "../fuchsia_clang/lib/aarch64-unknown-fuchsia/asan",
-                ":arm64_hwasan_variant": "../fuchsia_clang/lib/aarch64-unknown-fuchsia/hwasan",
+                ":arm64_novariant": "lib/aarch64-unknown-fuchsia",
+                ":arm64_asan_variant": "lib/aarch64-unknown-fuchsia/asan",
+                ":arm64_hwasan_variant": "lib/aarch64-unknown-fuchsia/hwasan",
             },
             "x64": {
-                ":x64_novariant": "../fuchsia_clang/lib/x86_64-unknown-fuchsia",
-                ":x64_asan_variant": "../fuchsia_clang/lib/x86_64-unknown-fuchsia/asan",
-                ":x64_hwasan_variant": "../fuchsia_clang/lib/x86_64-unknown-fuchsia/hwasan",
+                ":x64_novariant": "lib/x86_64-unknown-fuchsia",
+                ":x64_asan_variant": "lib/x86_64-unknown-fuchsia/asan",
+                ":x64_hwasan_variant": "lib/x86_64-unknown-fuchsia/hwasan",
             },
             "riscv64": {
-                ":riscv64_novariant": "../fuchsia_clang/lib/riscv64-unknown-fuchsia",
-                ":riscv64_asan_variant": "../fuchsia_clang/lib/riscv64-unknown-fuchsia/asan",
-                ":riscv64_hwasan_variant": "../fuchsia_clang/lib/riscv64-unknown-fuchsia/hwasan",
+                ":riscv64_novariant": "lib/riscv64-unknown-fuchsia",
+                ":riscv64_asan_variant": "lib/riscv64-unknown-fuchsia/asan",
+                ":riscv64_hwasan_variant": "lib/riscv64-unknown-fuchsia/hwasan",
             },
         },
         sdk_constants.target_cpus,
@@ -396,13 +396,13 @@ fuchsia_package_resource_group(
     strip_prefix = fuchsia_cpu_select(
         {
             "arm64": {
-                ":arm64_build": "../fuchsia_clang/lib/clang/%{CLANG_VERSION}/lib/aarch64-unknown-fuchsia",
+                ":arm64_build": "lib/clang/%{CLANG_VERSION}/lib/aarch64-unknown-fuchsia",
             },
             "x64": {
-                ":x64_build": "../fuchsia_clang/lib/clang/%{CLANG_VERSION}/lib/x86_64-unknown-fuchsia",
+                ":x64_build": "lib/clang/%{CLANG_VERSION}/lib/x86_64-unknown-fuchsia",
             },
             "riscv64": {
-                ":riscv64_build": "../fuchsia_clang/lib/clang/%{CLANG_VERSION}/lib/riscv64-unknown-fuchsia",
+                ":riscv64_build": "lib/clang/%{CLANG_VERSION}/lib/riscv64-unknown-fuchsia",
             },
         },
         sdk_constants.target_cpus,
