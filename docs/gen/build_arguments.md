@@ -731,7 +731,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8724952012895749809"`
+**Current value for `target_cpu = "arm64"`:** `"8724906702464993329"`
 
 From //out/not-default/args.gn:10
 
@@ -739,7 +739,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8724952012895749809"`
+**Current value for `target_cpu = "riscv64"`:** `"8724906702464993329"`
 
 From //out/not-default/args.gn:10
 
@@ -747,7 +747,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8724952012895749809"`
+**Current value for `target_cpu = "x64"`:** `"8724906702464993329"`
 
 From //out/not-default/args.gn:10
 
@@ -3140,7 +3140,7 @@ build is not desired.
 
 **Current value (from the default):** `""`
 
-From //src/developer/ffx/BUILD.gn:17
+From //build/images/args.gni:198
 
 ### max_blob_contents_size
 
