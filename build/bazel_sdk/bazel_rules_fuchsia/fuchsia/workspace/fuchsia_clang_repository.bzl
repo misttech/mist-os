@@ -243,9 +243,9 @@ archive file.
         "sysroot_paths": attr.string_dict(
             doc = "sysroot paths by Bazel arch, relative to execroot",
             default = {
-                "aarch64": "external/fuchsia_sdk/arch/arm64/sysroot",
-                "x86_64": "external/fuchsia_sdk/arch/x64/sysroot",
-                "riscv64": "external/fuchsia_sdk/arch/riscv64/sysroot",
+                "aarch64": "external/" + Label("@fuchsia_sdk").repo_name + "/arch/arm64/sysroot",
+                "x86_64": "external/" + Label("@fuchsia_sdk").repo_name + "/arch/x64/sysroot",
+                "riscv64": "external/" + Label("@fuchsia_sdk").repo_name + "/arch/riscv64/sysroot",
             },
         ),
         "sysroot_headers": attr.string_dict(
