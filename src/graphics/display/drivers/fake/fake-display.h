@@ -19,10 +19,8 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <mutex>
 #include <unordered_map>
-
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
 
 #include "src/graphics/display/drivers/fake/image-info.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
@@ -119,7 +117,7 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   zx::result<display::DriverImageId> ImportVmoImageForTesting(zx::vmo vmo, size_t offset);
 
   uint8_t GetClampRgbValue() const {
-    fbl::AutoLock lock(&capture_mutex_);
+    std::lock_guard capture_lock(capture_mutex_);
     return clamp_rgb_value_;
   }
 
@@ -174,15 +172,15 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   thrd_t capture_thread_;
 
   // Guards display coordinator interface.
-  mutable fbl::Mutex engine_listener_mutex_;
+  mutable std::mutex engine_listener_mutex_;
 
   // Guards imported images and references to imported images.
-  mutable fbl::Mutex image_mutex_;
+  mutable std::mutex image_mutex_;
 
   // Guards imported capture buffers, capture interface and state.
   // `capture_mutex_` must never be acquired when `image_mutex_` is already
   // held.
-  mutable fbl::Mutex capture_mutex_;
+  mutable std::mutex capture_mutex_;
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
   fidl::SyncClient<fuchsia_sysmem2::Allocator> sysmem_;
