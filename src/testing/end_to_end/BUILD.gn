@@ -201,10 +201,8 @@ group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
 # TODO(https://fxbug.dev/388073420): Remove in favor of `starnix_arm64_unstable_tests`.
 group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
   testonly = true
-  public_deps = [
-    "honeydew/tests/functional_tests:starnix_vim3_unstable_tests",
-    "//src/performance/memory/attribution/monitor/tests/e2e:tests",
-  ]
+  public_deps =
+      [ "honeydew/tests/functional_tests:starnix_vim3_unstable_tests" ]
 }
 
 group("starnix_vim3_staging_tests") {
