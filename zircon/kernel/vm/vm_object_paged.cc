@@ -1240,12 +1240,12 @@ zx_status_t VmObjectPaged::ZeroPartialPageLocked(uint64_t page_base_offset,
   return ReadWriteInternalLocked(
       page_base_offset + zero_start_offset, zero_end_offset - zero_start_offset, true,
       VmObjectReadWriteOptions::None,
-      [](void* dst, size_t offset, size_t len, Guard<CriticalMutex>* guard) -> zx_status_t {
+      [](void* dst, size_t offset, size_t len) -> UserCopyCaptureFaultsResult {
         // We're memsetting the *kernel* address of an allocated page, so we know that this
         // cannot fault. memset may not be the most efficient, but we don't expect to be doing
         // this very often.
         memset(dst, 0, len);
-        return ZX_OK;
+        return UserCopyCaptureFaultsResult{ZX_OK};
       },
       guard);
 }
@@ -1514,9 +1514,26 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
 
         // Call the copy routine. If the copy was successful then ZX_OK is returned, otherwise
         // ZX_ERR_SHOULD_WAIT may be returned to indicate the copy failed but we can retry it.
-        status = copyfunc(page_ptr + page_offset, dest_offset, tocopy, guard);
-        if (status == StatusType(ZX_ERR_SHOULD_WAIT)) {
-          status = LockDroppedTag{};
+        UserCopyCaptureFaultsResult copy_result =
+            copyfunc(page_ptr + page_offset, dest_offset, tocopy);
+
+        // If a fault has actually occurred, then we will have captured fault info that we can use
+        // to handle the fault.
+        if (copy_result.fault_info.has_value()) {
+          guard->CallUnlocked([&info = *copy_result.fault_info, &status] {
+            status = Thread::Current::SoftFault(info.pf_va, info.pf_flags);
+          });
+          if (status == StatusType(ZX_OK)) {
+            status = LockDroppedTag{};
+          }
+        } else {
+          // If we encounter _any_ unrecoverable error from the copy operation which
+          // produced no fault address, squash the error down to just "NOT_FOUND".
+          // This is what the SoftFault error would have told us if we did try to
+          // handle the fault and could not.
+          if (copy_result.status != ZX_OK) {
+            status = ZX_ERR_NOT_FOUND;
+          }
         }
       } else if (status == StatusType(ZX_ERR_SHOULD_WAIT)) {
         // RequirePage 'failed', but told us that it had filled out the page request, so we should
@@ -1593,10 +1610,10 @@ zx_status_t VmObjectPaged::Read(void* _ptr, uint64_t offset, size_t len) {
 
   // read routine that just uses a memcpy
   char* ptr = reinterpret_cast<char*>(_ptr);
-  auto read_routine = [ptr](const void* src, size_t offset, size_t len,
-                            Guard<CriticalMutex>* guard) -> zx_status_t {
+  auto read_routine = [ptr](const void* src, size_t offset,
+                            size_t len) -> UserCopyCaptureFaultsResult {
     memcpy(ptr + offset, src, len);
-    return ZX_OK;
+    return UserCopyCaptureFaultsResult{ZX_OK};
   };
 
   if (can_block_on_page_requests()) {
@@ -1619,10 +1636,9 @@ zx_status_t VmObjectPaged::Write(const void* _ptr, uint64_t offset, size_t len) 
 
   // write routine that just uses a memcpy
   const char* ptr = reinterpret_cast<const char*>(_ptr);
-  auto write_routine = [ptr](void* dst, size_t offset, size_t len,
-                             Guard<CriticalMutex>* guard) -> zx_status_t {
+  auto write_routine = [ptr](void* dst, size_t offset, size_t len) -> UserCopyCaptureFaultsResult {
     memcpy(dst, ptr + offset, len);
-    return ZX_OK;
+    return UserCopyCaptureFaultsResult{ZX_OK};
   };
 
   if (can_block_on_page_requests()) {
@@ -1758,34 +1774,15 @@ zx_status_t VmObjectPaged::ReadUser(user_out_ptr<char> ptr, uint64_t offset, siz
   }
 
   // read routine that uses copy_to_user
-  auto read_routine = [ptr, out_actual](const char* src, size_t offset, size_t len,
-                                        Guard<CriticalMutex>* guard) -> zx_status_t {
+  auto read_routine = [ptr, out_actual](const char* src, size_t offset,
+                                        size_t len) -> UserCopyCaptureFaultsResult {
     __UNINITIALIZED auto copy_result =
         ptr.byte_offset(offset).copy_array_to_user_capture_faults(src, len);
 
-    // If a fault has actually occurred, then we will have captured fault info that we can use to
-    // handle the fault.
-    if (copy_result.fault_info.has_value()) {
-      zx_status_t result;
-      guard->CallUnlocked([&info = *copy_result.fault_info, &result] {
-        result = Thread::Current::SoftFault(info.pf_va, info.pf_flags);
-      });
-      // If we handled the fault, tell the upper level to try again.
-      return result == ZX_OK ? ZX_ERR_SHOULD_WAIT : result;
-    }
-
-    // If we encounter _any_ unrecoverable error from the copy operation which
-    // produced no fault address, squash the error down to just "NOT_FOUND".
-    // This is what the SoftFault error would have told us if we did try to
-    // handle the fault and could not.
-    if (copy_result.status != ZX_OK) {
-      return ZX_ERR_NOT_FOUND;
-    }
-
-    if (out_actual != nullptr) {
+    if (copy_result.status == ZX_OK && out_actual) {
       *out_actual += len;
     }
-    return ZX_OK;
+    return copy_result;
   };
 
   if (can_block_on_page_requests()) {
@@ -1808,39 +1805,20 @@ zx_status_t VmObjectPaged::WriteUser(user_in_ptr<const char> ptr, uint64_t offse
 
   // write routine that uses copy_from_user
   auto write_routine = [ptr, base_vmo_offset = offset, out_actual, &on_bytes_transferred](
-                           char* dst, size_t offset, size_t len,
-                           Guard<CriticalMutex>* guard) -> zx_status_t {
+                           char* dst, size_t offset, size_t len) -> UserCopyCaptureFaultsResult {
     __UNINITIALIZED auto copy_result =
         ptr.byte_offset(offset).copy_array_from_user_capture_faults(dst, len);
 
-    // If a fault has actually occurred, then we will have captured fault info that we can use to
-    // handle the fault.
-    if (copy_result.fault_info.has_value()) {
-      zx_status_t result;
-      guard->CallUnlocked([&info = *copy_result.fault_info, &result] {
-        result = Thread::Current::SoftFault(info.pf_va, info.pf_flags);
-      });
-      // If we handled the fault, tell the upper level to try again.
-      return result == ZX_OK ? ZX_ERR_SHOULD_WAIT : result;
-    }
+    if (copy_result.status == ZX_OK) {
+      if (out_actual != nullptr) {
+        *out_actual += len;
+      }
 
-    // If we encounter _any_ unrecoverable error from the copy operation which
-    // produced no fault address, squash the error down to just "NOT_FOUND".
-    // This is what the SoftFault error would have told us if we did try to
-    // handle the fault and could not.
-    if (copy_result.status != ZX_OK) {
-      return ZX_ERR_NOT_FOUND;
+      if (on_bytes_transferred) {
+        on_bytes_transferred(base_vmo_offset + offset, len);
+      }
     }
-
-    if (out_actual != nullptr) {
-      *out_actual += len;
-    }
-
-    if (on_bytes_transferred) {
-      on_bytes_transferred(base_vmo_offset + offset, len);
-    }
-
-    return ZX_OK;
+    return copy_result;
   };
 
   if (can_block_on_page_requests()) {
