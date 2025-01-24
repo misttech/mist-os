@@ -55,11 +55,13 @@ group("e2e_tests") {
   testonly = true
   deps = [
     "developer:e2e_tests",
+    "devices:e2e_tests",
     "recovery:e2e_tests",
     "testing:e2e_tests",
     "tests",
     "//src/connectivity/network:e2e_tests",
     "//src/storage/lib/paver/e2e_tests",
     "//src/sys/pkg:e2e_tests",
+    "//src/zircon:e2e_tests",
   ]
 }

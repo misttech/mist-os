@@ -14,3 +14,8 @@ group("tests") {
     "//zircon/tools:tests",
   ]
 }
+
+group("e2e_tests") {
+  testonly = true
+  deps = [ "//zircon/system/ulib:e2e_tests" ]
+}

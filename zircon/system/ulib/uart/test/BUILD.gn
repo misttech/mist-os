@@ -52,6 +52,13 @@ group("tests") {
   deps = [
     ":uart-unittests($host_toolchain)",
     ":uart-unittests-test-pkg",
+  ]
+}
+
+group("e2e_tests") {
+  testonly = true
+
+  deps = [
     "interrupt-test",
     "polling-input-test",
   ]

@@ -69,3 +69,8 @@ group("tests") {
     "//zircon/third_party/ulib/lz4:tests",
   ]
 }
+
+group("e2e_tests") {
+  testonly = true
+  deps = [ "uart:e2e_tests" ]
+}

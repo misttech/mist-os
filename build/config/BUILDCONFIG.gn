@@ -572,7 +572,12 @@ e2e_test_libs = [
   "//third_party/mobly($host_toolchain)",
   "//src/testing/end_to_end/honeydew($host_toolchain)",
 ]
-if (is_linux) {
+
+# For libraries only supported on Linux hosts, we must use host_os to determine
+# whether to include them. The is_linux condition will not function as naively expected
+# because it applies to the current toolchain which may not be a host toolchain
+# when this file is loaded.
+if (host_os == "linux") {
   e2e_test_libs += [ "//tools/emulator($host_toolchain)" ]
 }
 

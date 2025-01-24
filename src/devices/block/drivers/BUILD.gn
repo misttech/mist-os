@@ -25,3 +25,9 @@ group("tests") {
     "zxcrypt:tests",
   ]
 }
+
+group("e2e_tests") {
+  testonly = true
+
+  deps = [ "ufs:e2e_tests" ]
+}

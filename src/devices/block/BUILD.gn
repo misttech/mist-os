@@ -36,3 +36,9 @@ group("tests") {
     "lib:tests",
   ]
 }
+
+group("e2e_tests") {
+  testonly = true
+
+  deps = [ "drivers:e2e_tests" ]
+}

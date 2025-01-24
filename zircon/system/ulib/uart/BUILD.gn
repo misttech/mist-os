@@ -68,3 +68,8 @@ group("tests") {
   testonly = true
   deps = [ "test:tests" ]
 }
+
+group("e2e_tests") {
+  testonly = true
+  deps = [ "test:e2e_tests" ]
+}

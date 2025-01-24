@@ -23,8 +23,12 @@ group("tests") {
   deps = [
     ":ufs-bind_test",
     ":ufs-tests",
-    "test/e2e:tests",
   ]
+}
+
+group("e2e_tests") {
+  testonly = true
+  deps = [ "test/e2e:tests" ]
 }
 
 _common_deps = [
