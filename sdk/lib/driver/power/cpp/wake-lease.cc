@@ -90,6 +90,13 @@ bool WakeLease::AcquireWakeLease(zx::duration timeout) {
       return false;
     }
 
+    // If we acquired a wake lease, the system is not suspended. This bit is
+    // useful to flip because when this WakeLease instance was created the
+    // system might have been resumed and it hasn't gotten any callbacks to let
+    // it know the system state. By flipping the flag here after lease
+    // acquisition the object might avoid future, unnecessary acquisitions.
+    system_suspended_ = false;
+
     lease_ = std::move(result_lease->token);
     if (log_) {
       fdf::info("Created a wake lease due to recent wake event.");
