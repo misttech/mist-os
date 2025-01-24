@@ -368,6 +368,9 @@ impl FatDirectory {
         flags: fio::Flags,
         closer: &mut Closer<'_>,
     ) -> Result<FatNode, Status> {
+        if flags.create_unnamed_temporary_in_directory_path() {
+            return Err(Status::NOT_SUPPORTED);
+        }
         let fs_lock = self.filesystem.lock().unwrap();
 
         // Check if the entry already exists in the cache.

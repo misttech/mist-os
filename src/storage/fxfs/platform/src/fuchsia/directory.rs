@@ -99,6 +99,9 @@ impl FxDirectory {
         request: &ObjectRequest,
     ) -> Result<OpenedNode<dyn FxNode>, Error> {
         if path.is_empty() {
+            if protocols.create_unnamed_temporary_in_directory_path() {
+                bail!(FxfsError::NotSupported)
+            }
             return Ok(OpenedNode::new(self.clone()));
         }
         let store = self.store();
@@ -118,6 +121,9 @@ impl FxDirectory {
             )];
             let transaction_or_guard =
                 if last_segment && protocols.creation_mode() != vfs::CreationMode::Never {
+                    if protocols.create_unnamed_temporary_in_directory_path() {
+                        bail!(FxfsError::NotSupported)
+                    }
                     Left(fs.clone().new_transaction(keys, Options::default()).await?)
                 } else {
                     // When child objects are created, the object is created along with the

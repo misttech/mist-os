@@ -89,6 +89,7 @@ async fn run(mut stream: TestHarnessRequestStream) -> Result<(), Error> {
                     supports_truncate: false,
                     supports_modify_directory: false,
                     supports_mutable_file: false,
+                    supports_unnamed_temporary_file: false,
                 };
                 responder.send(&config)?;
             }

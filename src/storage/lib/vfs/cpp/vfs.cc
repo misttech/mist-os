@@ -264,6 +264,12 @@ zx::result<Vfs::Open2Result> Vfs::Open3(fbl::RefPtr<Vnode> vndir, std::string_vi
     return Open2Result::Remote(std::move(vn), ".");
   }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  if (flags & fio::Flags::kFlagCreateAsUnnamedTemporary) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+#endif
+
   // Determine if the protocols and rights specified in |flags| are compatible with |vn|.
   zx::result protocol = internal::NegotiateProtocol(flags, vn->GetProtocols());
   if (protocol.is_error()) {

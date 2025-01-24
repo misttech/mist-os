@@ -98,6 +98,10 @@ fn to_open_flags(flags: &impl ProtocolsExt) -> OpenFlags {
     match flags.creation_mode() {
         vfs::CreationMode::Always => open_flags |= OpenFlags::CREAT | OpenFlags::EXCL,
         vfs::CreationMode::AllowExisting => open_flags |= OpenFlags::CREAT,
+        vfs::CreationMode::UnnamedTemporary => open_flags |= OpenFlags::TMPFILE,
+        vfs::CreationMode::UnlinkableUnnamedTemporary => {
+            open_flags |= OpenFlags::TMPFILE | OpenFlags::EXCL
+        }
         vfs::CreationMode::Never => {}
     };
 

@@ -252,6 +252,8 @@ pub enum CreationMode {
     Never,
     AllowExisting,
     Always,
+    UnnamedTemporary,
+    UnlinkableUnnamedTemporary,
 }
 
 /// Used to translate fuchsia.io/Node.SetAttr calls (io1) to fuchsia.io/Node.UpdateAttributes (io2).

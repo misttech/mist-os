@@ -91,5 +91,6 @@ rustc_test("conformance_test") {
     "tests/remote.rs",
     "tests/service.rs",
     "tests/tests.rs",
+    "tests/unnamed_temporary_file.rs",
   ]
 }

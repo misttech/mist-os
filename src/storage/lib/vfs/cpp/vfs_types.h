@@ -335,6 +335,16 @@ constexpr CreationMode CreationModeFromFidl(fuchsia_io::OpenFlags flags) {
 }
 
 constexpr CreationMode CreationModeFromFidl(fuchsia_io::Flags flags) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  // We traverse the path, then lookup and create the last segment. This is used to determine if the
+  // last segment is to be created. When creating an unnamed temporary file, it is created in the
+  // last segment. And so it must already exist, we pretend that the creation mode for the last
+  // segment is '"never".
+  if ((flags & fuchsia_io::Flags::kFlagCreateAsUnnamedTemporary) ||
+      (flags & fuchsia_io::Flags::kFlagCreateAsUnnamedTemporary)) {
+    return CreationMode::kNever;
+  }
+#endif
   if (flags & fuchsia_io::Flags::kFlagMustCreate) {
     return CreationMode::kAlways;
   }

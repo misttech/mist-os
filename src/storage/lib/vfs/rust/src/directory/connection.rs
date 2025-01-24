@@ -372,6 +372,22 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                     return Err(Status::INVALID_ARGS);
                 }
             }
+            CreationMode::UnnamedTemporary | CreationMode::UnlinkableUnnamedTemporary => {
+                // We only support creating unnamed temporary files.
+                if !flags.intersects(fio::Flags::PROTOCOL_FILE) {
+                    return Err(Status::NOT_SUPPORTED);
+                }
+                // The parent connection must be able to modify directories if creating an object.
+                if !self.options.rights.contains(fio::Rights::MODIFY_DIRECTORY) {
+                    return Err(Status::ACCESS_DENIED);
+                }
+                // The ability to create an unnamed temporary file is dependent on the filesystem.
+                // We won't know if the directory the path eventually leads to supports the creation
+                // of unnamed temporary files until we have fully traversed the path. The way that
+                // Rust VFS is set up is such that the filesystem is responsible for traversing the
+                // path, so it is the filesystem's responsibility to report if it does not support
+                // this feature.
+            }
             CreationMode::AllowExisting | CreationMode::Always => {
                 // The parent connection must be able to modify directories if creating an object.
                 if !self.options.rights.contains(fio::Rights::MODIFY_DIRECTORY) {
@@ -395,7 +411,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             }
         }
 
-        if path.is_dot() {
+        if path.is_dot() && !flags.create_unnamed_temporary_in_directory_path() {
             if !flags.is_dir_allowed() {
                 return Err(Status::INVALID_ARGS);
             }

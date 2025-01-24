@@ -63,6 +63,9 @@ type HarnessConfig = struct {
 
     /// Supports services.
     supports_services bool;
+
+    /// Supports unnamed temporary files.
+    supports_unnamed_temporary_file bool;
 };
 
 /// Directory entries should support opening with any combination of read/write/execute rights.
