@@ -10,6 +10,7 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_profile_memory") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
 

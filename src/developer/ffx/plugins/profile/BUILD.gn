@@ -7,6 +7,7 @@ import("//src/developer/ffx/build/ffx_tool.gni")
 
 if (is_host) {
   ffx_plugin("ffx_profile") {
+    sdk_category = "not-yet-specified"
     version = "0.1.0"
     edition = "2021"
     plugin_deps = [

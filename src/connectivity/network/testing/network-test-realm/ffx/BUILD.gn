@@ -8,6 +8,7 @@ import("//src/developer/ffx/build/ffx_tool.gni")
 assert(is_host)
 
 ffx_plugin("ffx_net_test_realm") {
+  sdk_category = "not-yet-specified"
   edition = "2021"
   with_unit_tests = true
   args_deps = [

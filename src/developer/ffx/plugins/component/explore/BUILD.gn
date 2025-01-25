@@ -5,6 +5,7 @@
 import("../../../build/ffx_plugin.gni")
 
 ffx_plugin("ffx_component_explore") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   deps = [

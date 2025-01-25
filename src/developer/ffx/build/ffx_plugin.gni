@@ -91,8 +91,7 @@ import("plugins.gni")
 #     '--cfg feature=XXX'
 #
 #   sdk_category (optional)
-#     Publication level of the plugin in SDKs. Defaults to "partner" if not
-#     specified.
+#     Publication level of the plugin in SDKs. Defaults to not published.
 #     See //build/sdk/sdk_atom.gni.
 template("ffx_plugin") {
   if (defined(invoker.name)) {
@@ -118,18 +117,6 @@ template("ffx_plugin") {
       "args_with_unit_tests",
     ]
 
-    # Default to partner.
-    # TODO(https://fxbug.dev/330629017): Remove the default and use
-    # `invoker.sdk_category` directly in the individual targets to avoid
-    # this reference counting as a use for all of them.
-    if (defined(invoker.sdk_category)) {
-      sdk_category = invoker.sdk_category
-    } else {
-      sdk_category = "partner"
-    }
-
-    args_deps = []
-
     # Ensure FIDL libraries with more restrictive visibility are not used.
     # Each target below must use these two variables for this to work.
     # Note that not everything in categories with greater visibility is stable.
@@ -137,22 +124,43 @@ template("ffx_plugin") {
     # Also, there are exceptions - see https://fxbug.dev/42081073 and
     # https://fxbug.dev/326090508.
     # TODO(https://fxbug.dev/314822328): Improve this logic to cascade properly.
-    category_marker = "//sdk/categories:marker-${sdk_category}"
-    if (sdk_category == "partner") {
-      disallowed_category_markers =
-          markers_partner_idk_prebuilts_must_not_depend_on
-    } else if (sdk_category == "internal") {
+    #
+    # Plugins may specify an IDK category in which to be included. Otherwise,
+    # they are only used within the platform environment.
+    if (defined(invoker.sdk_category)) {
+      # Historically, plugins rarely specified a category and defaulted to
+      # "partner". The category for those plugins was set to "not-yet-specified"
+      # and the default was changed to not in an IDK. Continue to treat those
+      # as "partner", and use the "internal" marker for plugins not specifying
+      # a category.
+      # TODO(https://fxbug.dev/330629017): For all uses of "not-yet-specified",
+      # either replace them with "partner" or remove them as appropriate. Then use
+      # invoker.sdk_category` directly in the individual targets to avoid
+      # this refereence counting as a use for all of them.
+      sdk_category = invoker.sdk_category
+      if (sdk_category == "not-yet-specified") {
+        sdk_category = "partner"
+      }
+
+      category_marker = "//sdk/categories:marker-${sdk_category}"
+      if (sdk_category == "partner") {
+        disallowed_category_markers =
+            markers_partner_idk_prebuilts_must_not_depend_on
+      } else {
+        assert(false, "Unexpected SDK category '${sdk_category}'.")
+      }
+    } else {
       # The plugin is not in an IDK, so there are no restrictions.
       disallowed_category_markers = []
       category_marker = "//sdk/categories:marker-not-in-idk"
-    } else {
-      assert(false, "Unexpected SDK category '${sdk_category}'.")
     }
 
+    args_deps = []
     cmd_deps = []
     p_deps = []
     json_deps = []
     json_merge_deps = []
+
     if (defined(invoker.plugin_deps)) {
       foreach(d, invoker.plugin_deps) {
         p_deps += [ d + "_suite" ]

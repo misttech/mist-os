@@ -8,6 +8,7 @@ import("//src/developer/ffx/build/ffx_tool.gni")
 assert(is_host, "FFX tools can only be compiled in the host toolchain")
 
 ffx_plugin("ffx_bluetooth") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
 

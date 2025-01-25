@@ -5,6 +5,7 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_profile_temperature") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   plugin_deps = [ "logger:ffx_temperature_logger" ]

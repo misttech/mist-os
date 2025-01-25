@@ -5,6 +5,7 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_net") {
+  sdk_category = "not-yet-specified"
   edition = "2021"
   args_deps = [
     "//src/connectivity/network/net-cli:lib",

@@ -17,6 +17,7 @@ visibility = [ "//src/developer/ffx/*" ]
 # `fx gen-cargo '//src/developer/ffx/frontends/ffx:ffx_bin_unversioned(//build/toolchain:host_x64)'`
 
 ffx("ffx") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true

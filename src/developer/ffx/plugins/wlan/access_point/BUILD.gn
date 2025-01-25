@@ -5,6 +5,7 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_wlan_ap") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   args_sources = [ "src/args.rs" ]

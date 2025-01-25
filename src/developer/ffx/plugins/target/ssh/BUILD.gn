@@ -7,6 +7,7 @@ import("//src/developer/ffx/build/ffx_tool.gni")
 import("//src/developer/ffx/lib/e2e_emu/ffx_e2e_test.gni")
 
 ffx_plugin("ffx_target_ssh") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true

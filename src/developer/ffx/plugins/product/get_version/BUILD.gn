@@ -5,6 +5,7 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_product_get_version") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true

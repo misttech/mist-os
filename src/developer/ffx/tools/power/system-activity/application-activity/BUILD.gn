@@ -12,6 +12,7 @@ import("//build/assembly/product_assembly_configuration.gni")
 import("//build/sdk/product_bundle.gni")
 
 ffx_plugin("ffx_power_system_activity_application_activity") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
 
