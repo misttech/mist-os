@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fidl/cpp/wire/server.h>
@@ -147,15 +147,18 @@ class TestServerEvent final : public CloseCountingFileServer {
   zx::event event_;
 };
 
-class GetAttrTestServer final : public CloseCountingFileServer {
+class GetAttributesTestServer final : public CloseCountingFileServer {
  public:
-  void GetAttr(GetAttrCompleter::Sync& completer) final {
-    completer.Reply(0, fuchsia_io::wire::NodeAttributes{});
+  void GetAttributes(GetAttributesRequestView, GetAttributesCompleter::Sync& completer) final {
+    fuchsia_io::ImmutableNodeAttributes immutable_attrs;
+    immutable_attrs.protocols() = fuchsia_io::NodeProtocolKinds::kFile;
+    fidl::Arena arena;
+    completer.ReplySuccess(/*mutable_attrs*/ {}, fidl::ToWire(arena, immutable_attrs));
   }
 };
 
 TEST_F(File, Open) {
-  ASSERT_NO_FAILURES(StartServer<GetAttrTestServer>());
+  ASSERT_NO_FAILURES(StartServer<GetAttributesTestServer>());
   ASSERT_NO_FAILURES(OpenFile());
 
   zxio_node_attributes_t attr = {.has = {.object_type = true}};
@@ -205,11 +208,12 @@ TEST_F(File, GetVmoPropagatesError) {
 
   class TestServer : public CloseCountingFileServer {
    public:
-    void GetAttr(GetAttrCompleter::Sync& completer) override {
-      completer.Reply(kGetAttrError, fuchsia_io::wire::NodeAttributes{});
+    void GetAttributes(GetAttributesRequestView, GetAttributesCompleter::Sync& completer) final {
+      completer.ReplyError(kGetAttrError);
     }
+
     void GetBackingMemory(GetBackingMemoryRequestView request,
-                          GetBackingMemoryCompleter::Sync& completer) override {
+                          GetBackingMemoryCompleter::Sync& completer) final {
       completer.ReplyError(kGetBufferError);
     }
   };

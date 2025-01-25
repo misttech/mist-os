@@ -18,6 +18,7 @@ __BEGIN_CDECLS
 // of `protocols` and `abilities` is used to derive the owner permission bits (`S_I*USR`).
 //
 // **NOTE**: Only owner bits (`S_IRUSR` / `S_IWUSR` / `S_IXUSR`) are set on the resulting mode.
+// TODO(https://fxbug.dev/324111518): Remove this when it is no longer required by fdio.
 uint32_t zxio_get_posix_mode(zxio_node_protocols_t protocols, zxio_abilities_t abilities);
 
 __END_CDECLS

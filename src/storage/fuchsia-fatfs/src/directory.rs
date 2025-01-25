@@ -860,6 +860,7 @@ impl vfs::node::Node for FatDirectory {
                     | fio::Operations::ENUMERATE
                     | fio::Operations::TRAVERSE
                     | fio::Operations::MODIFY_DIRECTORY,
+                link_count: 1, // FAT does not support hard links, so there is always 1 "link".
             }
         ))
     }

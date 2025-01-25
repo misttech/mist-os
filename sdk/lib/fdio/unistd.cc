@@ -489,6 +489,7 @@ zx_status_t stat_impl(const fdio_ptr& io, struct stat* s) {
                                      .creation_time = true,
                                      .modification_time = true,
                                  }};
+  // TODO(https://fxbug.dev/324111518): Migrate to GetAttributes and remove `zxio_get_posix_mode`.
   const zx_status_t status = io->get_attr(&attr);
   if (status != ZX_OK) {
     return status;

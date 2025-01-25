@@ -99,8 +99,11 @@ class TestDirectoryServer : public zxio_tests::TestDirectoryServerBase {
     completer.Reply(ZX_OK, std::move(dup));
   }
 
-  void GetAttr(GetAttrCompleter::Sync& completer) final {
-    completer.Reply(0, fio::wire::NodeAttributes{});
+  void GetAttributes(GetAttributesRequestView, GetAttributesCompleter::Sync& completer) override {
+    fuchsia_io::ImmutableNodeAttributes immutable_attrs;
+    immutable_attrs.protocols() = fuchsia_io::NodeProtocolKinds::kDirectory;
+    fidl::Arena arena;
+    completer.ReplySuccess(/*mutable_attrs*/ {}, fidl::ToWire(arena, immutable_attrs));
   }
 
   void Unlink(UnlinkRequestView request, UnlinkCompleter::Sync& completer) final {

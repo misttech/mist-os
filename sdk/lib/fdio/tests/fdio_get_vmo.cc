@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -36,7 +37,7 @@ class TestServer final : public fidl::testing::WireTestBase<fuchsia_io::File> {
  public:
   explicit TestServer(Context* context) : context(context) {}
 
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) final {
     ADD_FAILURE("%s should not be called", name.c_str());
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
@@ -48,23 +49,24 @@ class TestServer final : public fidl::testing::WireTestBase<fuchsia_io::File> {
     completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
   }
 
-  void Close(CloseCompleter::Sync& completer) override {
+  void Close(CloseCompleter::Sync& completer) final {
     completer.ReplySuccess();
     completer.Close(ZX_OK);
   }
 
-  void Describe(DescribeCompleter::Sync& completer) override { completer.Reply({}); }
+  void Describe(DescribeCompleter::Sync& completer) final { completer.Reply({}); }
 
-  void GetAttr(GetAttrCompleter::Sync& completer) override {
-    completer.Reply(ZX_OK, {
-                               .id = 5,
-                               .content_size = context->content_size,
-                               .storage_size = zx_system_get_page_size(),
-                               .link_count = 1,
-                           });
+  void GetAttributes(GetAttributesRequestView, GetAttributesCompleter::Sync& completer) final {
+    fuchsia_io::ImmutableNodeAttributes immutable_attrs;
+    immutable_attrs.link_count() = 1;
+    immutable_attrs.id() = 5;
+    immutable_attrs.content_size() = context->content_size;
+    immutable_attrs.storage_size() = zx_system_get_page_size();
+    fidl::Arena arena;
+    completer.ReplySuccess(/*mutable_attrs*/ {}, fidl::ToWire(arena, immutable_attrs));
   }
 
-  void ReadAt(ReadAtRequestView request, ReadAtCompleter::Sync& completer) override {
+  void ReadAt(ReadAtRequestView request, ReadAtCompleter::Sync& completer) final {
     if (!context->supports_read_at) {
       completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
       return;
@@ -83,7 +85,7 @@ class TestServer final : public fidl::testing::WireTestBase<fuchsia_io::File> {
     completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(buffer.data(), actual));
   }
 
-  void Seek(SeekRequestView request, SeekCompleter::Sync& completer) override {
+  void Seek(SeekRequestView request, SeekCompleter::Sync& completer) final {
     if (!context->supports_seek) {
       completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
     }
@@ -91,7 +93,7 @@ class TestServer final : public fidl::testing::WireTestBase<fuchsia_io::File> {
   }
 
   void GetBackingMemory(GetBackingMemoryRequestView request,
-                        GetBackingMemoryCompleter::Sync& completer) override {
+                        GetBackingMemoryCompleter::Sync& completer) final {
     context->last_flags = request->flags;
 
     if (!context->supports_get_backing_memory) {
