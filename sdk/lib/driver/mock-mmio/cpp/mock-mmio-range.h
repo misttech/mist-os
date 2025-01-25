@@ -52,6 +52,9 @@ namespace mock_mmio {
 // * A test's expectations should be grouped in a single Expect() call. In rare
 //   cases, multiple cases and conditional logic may improve readability.
 // * Expect() should not be called concurrently from multiple threads.
+//
+// MockMmioRange instances are 100% thread-safe because all MMIO accesses to the range are
+// serialized using a mutex.
 
 class MockMmioRange {
  public:
@@ -96,6 +99,7 @@ class MockMmioRange {
   // Asserts that the entire memory access list has been replayed.
   void CheckAllAccessesReplayed();
 
+  // Constructs and returns a MmioBuffer object with a size that matches MockMmioRange.
   fdf::MmioBuffer GetMmioBuffer();
 
  private:
