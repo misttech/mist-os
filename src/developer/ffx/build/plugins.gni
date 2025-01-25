@@ -75,5 +75,10 @@ template("plugins") {
     inputs = [ template ]
     outputs = [ generated_file ]
     deps = [ "//src/developer/ffx/build:gn_generate_plugins" ]
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
   }
 }
