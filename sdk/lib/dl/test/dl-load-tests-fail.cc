@@ -18,7 +18,7 @@ using dl::testing::TestSym;
 using ::testing::MatchesRegex;
 
 TYPED_TEST(DlTests, InvalidMode) {
-  const std::string kFile = TestModule("ret17");
+  const std::string kRet17File = TestModule("ret17");
 
   if constexpr (!TestFixture::kCanValidateMode) {
     GTEST_SKIP() << "test requires dlopen to validate mode argment";
@@ -36,24 +36,24 @@ TYPED_TEST(DlTests, InvalidMode) {
   // checks by the test fixture.
   bad_mode &= ~RTLD_NOLOAD;
 
-  auto result = this->DlOpen(kFile.c_str(), bad_mode);
-  ASSERT_TRUE(result.is_error());
-  EXPECT_EQ(result.error_value().take_str(), "invalid mode parameter")
+  auto open = this->DlOpen(kRet17File.c_str(), bad_mode);
+  ASSERT_TRUE(open.is_error());
+  EXPECT_EQ(open.error_value().take_str(), "invalid mode parameter")
       << "for mode argument " << bad_mode;
 }
 
 TYPED_TEST(DlTests, NotFound) {
-  const std::string kFile = TestModule("does-not-exist");
+  const std::string kDoesNotExistFile = TestModule("does-not-exist");
 
-  this->ExpectMissing(kFile);
+  this->ExpectMissing(kDoesNotExistFile);
 
-  auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(result.is_error());
+  auto open = this->DlOpen(kDoesNotExistFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open.is_error());
   if constexpr (TestFixture::kCanMatchExactError) {
-    EXPECT_EQ(result.error_value().take_str(), "does-not-exist.NotFound.module.so not found");
+    EXPECT_EQ(open.error_value().take_str(), "does-not-exist.NotFound.module.so not found");
   } else {
     EXPECT_THAT(
-        result.error_value().take_str(),
+        open.error_value().take_str(),
         MatchesRegex(
             // emitted by Fuchsia-musl
             "Error loading shared library .*does-not-exist.NotFound.module.so: ZX_ERR_NOT_FOUND"
@@ -66,16 +66,16 @@ TYPED_TEST(DlTests, NotFound) {
 // Load a module that depends on libld-dep-a.so, but this dependency does not
 // provide the c symbol referenced by the root module, so relocation fails.
 TYPED_TEST(DlTests, MissingSymbol) {
-  const std::string kFile = TestModule("missing-sym");
-  const std::string kDepFile = TestShlib("libld-dep-missing-sym-dep");
+  const std::string kMissingSymFile = TestModule("missing-sym");
+  const std::string kMissingSymDepFile = TestShlib("libld-dep-missing-sym-dep");
 
-  this->ExpectRootModule(kFile);
-  this->Needed({kDepFile});
+  this->ExpectRootModule(kMissingSymFile);
+  this->Needed({kMissingSymDepFile});
 
-  auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(result.is_error());
-  EXPECT_THAT(result.error_value().take_str(),
-              IsUndefinedSymbolErrMsg(TestSym("missing_sym"), kFile));
+  auto open = this->DlOpen(kMissingSymFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open.is_error());
+  EXPECT_THAT(open.error_value().take_str(),
+              IsUndefinedSymbolErrMsg(TestSym("missing_sym"), kMissingSymFile));
 }
 
 // TODO(https://fxbug.dev/3313662773): Test simple case of transitive missing
@@ -87,24 +87,24 @@ TYPED_TEST(DlTests, MissingSymbol) {
 
 // Try to load a module that has a (direct) dependency that cannot be found.
 TYPED_TEST(DlTests, MissingDependency) {
-  const std::string kFile = TestModule("missing-dep");
-  const std::string kDepFile = TestShlib("libmissing-dep-dep");
+  const std::string kMissingDepFile = TestModule("missing-dep");
+  const std::string kMissingDepDepFile = TestShlib("libmissing-dep-dep");
 
-  this->ExpectRootModule(kFile);
-  this->Needed({NotFound(kDepFile)});
+  this->ExpectRootModule(kMissingDepFile);
+  this->Needed({NotFound(kMissingDepDepFile)});
 
-  auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(result.is_error());
+  auto open = this->DlOpen(kMissingDepFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open.is_error());
 
   // TODO(https://fxbug.dev/336633049): Harmonize "not found" error messages
   // between implementations.
   // Expect that the dependency lib to missing-dep.module.so cannot be found.
   if constexpr (TestFixture::kCanMatchExactError) {
-    EXPECT_EQ(result.error_value().take_str(),
+    EXPECT_EQ(open.error_value().take_str(),
               "cannot open dependency: libmissing-dep-dep.MissingDependency.so");
   } else {
     EXPECT_THAT(
-        result.error_value().take_str(),
+        open.error_value().take_str(),
         MatchesRegex(
             // emitted by Fuchsia-musl
             "Error loading shared library .*libmissing-dep-dep.MissingDependency.so: ZX_ERR_NOT_FOUND \\(needed by missing-dep.MissingDependency.module.so\\)"
@@ -116,23 +116,23 @@ TYPED_TEST(DlTests, MissingDependency) {
 // Try to load a module where the dependency of its direct dependency (i.e. a
 // transitive dependency of the root module) cannot be found.
 TYPED_TEST(DlTests, MissingTransitiveDependency) {
-  const std::string kFile = TestModule("missing-transitive-dep");
-  const std::string kDepFile1 = TestShlib("libhas-missing-dep");
-  const std::string kDepFile2 = TestShlib("libmissing-dep-dep");
+  const std::string kMissingTransitiveDepFile = TestModule("missing-transitive-dep");
+  const std::string kHasMissingDepFile = TestShlib("libhas-missing-dep");
+  const std::string kMissingDepDepFile = TestShlib("libmissing-dep-dep");
 
-  this->ExpectRootModule(kFile);
-  this->Needed({Found(kDepFile1), NotFound(kDepFile2)});
+  this->ExpectRootModule(kMissingTransitiveDepFile);
+  this->Needed({Found(kHasMissingDepFile), NotFound(kMissingDepDepFile)});
 
-  auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  auto open = this->DlOpen(kMissingTransitiveDepFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   // TODO(https://fxbug.dev/336633049): Harmonize "not found" error messages
   // between implementations.
   // Expect that the dependency lib to libhas-missing-dep.so cannot be found.
   if constexpr (TestFixture::kCanMatchExactError) {
-    EXPECT_EQ(result.error_value().take_str(),
+    EXPECT_EQ(open.error_value().take_str(),
               "cannot open dependency: libmissing-dep-dep.MissingTransitiveDependency.so");
   } else {
     EXPECT_THAT(
-        result.error_value().take_str(),
+        open.error_value().take_str(),
         MatchesRegex(
             // emitted by Fuchsia-musl
             "Error loading shared library .*libmissing-dep-dep.MissingTransitiveDependency.so: ZX_ERR_NOT_FOUND \\(needed by libhas-missing-dep.MissingTransitiveDependency.so\\)"

@@ -18,13 +18,13 @@ using dl::testing::IsUndefinedSymbolErrMsg;
 using dl::testing::RunFunction;
 
 TYPED_TEST(DlTests, TlsDescStaticStartupModules) {
-  const std::string kGetTlsVarFile = "static-tls-desc-module.so";
+  const std::string kStaticTlsDescModuleFile = "static-tls-desc-module.so";
 
   EXPECT_EQ(gStaticTlsVar, kStaticTlsDataValue);
 
-  this->ExpectRootModule(kGetTlsVarFile);
+  this->ExpectRootModule(kStaticTlsDescModuleFile);
 
-  auto open = this->DlOpen(kGetTlsVarFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  auto open = this->DlOpen(kStaticTlsDescModuleFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(open.is_ok()) << open.error_value();
   EXPECT_TRUE(open.value()) << open.error_value();
 
@@ -32,20 +32,19 @@ TYPED_TEST(DlTests, TlsDescStaticStartupModules) {
   ASSERT_TRUE(sym.is_ok()) << sym.error_value();
   ASSERT_TRUE(sym.value());
 
-  int* ptr = RunFunction<int*>(sym.value());
-  EXPECT_EQ(*ptr, kStaticTlsDataValue);
+  EXPECT_EQ(*RunFunction<int*>(sym.value()), kStaticTlsDataValue);
 
   ASSERT_TRUE(this->DlClose(open.value()).is_ok());
 }
 
 TYPED_TEST(DlTests, TlsGetAddrStaticStartupModules) {
-  const std::string kGetTlsVarFile = "static-tls-module.so";
+  const std::string kStaticTlsModuleFile = "static-tls-module.so";
 
-  this->ExpectRootModule(kGetTlsVarFile);
+  this->ExpectRootModule(kStaticTlsModuleFile);
 
   // Don't expect tls_get_addr() to return any useful value for relocations, but
   // expect that dlopen() will at least succeed when calling it.
-  auto open = this->DlOpen(kGetTlsVarFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  auto open = this->DlOpen(kStaticTlsModuleFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(open.is_ok()) << open.error_value();
   EXPECT_TRUE(open.value()) << open.error_value();
 
@@ -188,9 +187,9 @@ class OpenModule {
                   const char* canary_symbol = nullptr) {
     fixture_.ExpectRootModule(file);
     file_ = file;
-    auto open_result = fixture_.DlOpen(file_, mode);
-    ASSERT_TRUE(open_result.is_ok()) << file_ << ": " << open_result.error_value();
-    handle_ = open_result.value();
+    auto open = fixture_.DlOpen(file_, mode);
+    ASSERT_TRUE(open.is_ok()) << file_ << ": " << open.error_value();
+    handle_ = open.value();
 
     if (canary_symbol && !IsSymbolEnabledAtCompileTime(canary_symbol)) {
       return;
@@ -200,16 +199,16 @@ class OpenModule {
 
   void InitSymbols(std::initializer_list<const char*> symbol_list) {
     for (const char* symbol : symbol_list) {
-      auto result = fixture_.DlSym(handle_, symbol);
-      ASSERT_TRUE(result.is_ok()) << file_ << ": " << symbol << ": " << result.error_value();
-      symbols_[symbol] = result.value();
+      auto sym = fixture_.DlSym(handle_, symbol);
+      ASSERT_TRUE(sym.is_ok()) << file_ << ": " << symbol << ": " << sym.error_value();
+      symbols_[symbol] = sym.value();
     }
   }
 
   bool IsSymbolEnabledAtCompileTime(const char* symbol) {
-    auto result = fixture_.DlSym(handle_, symbol);
-    if (result.is_error()) {
-      EXPECT_THAT(result.error_value().take_str(), IsUndefinedSymbolErrMsg(symbol, file_));
+    auto sym = fixture_.DlSym(handle_, symbol);
+    if (sym.is_error()) {
+      EXPECT_THAT(sym.error_value().take_str(), IsUndefinedSymbolErrMsg(symbol, file_));
       skip_ = true;
     }
     return !skip_;
@@ -217,8 +216,8 @@ class OpenModule {
 
   void CloseHandle() {
     if (handle_) {
-      auto result = fixture_.DlClose(std::exchange(handle_, nullptr));
-      EXPECT_TRUE(result.is_ok()) << result.error_value();
+      auto close = fixture_.DlClose(std::exchange(handle_, nullptr));
+      EXPECT_TRUE(close.is_ok()) << close.error_value();
     }
   }
 

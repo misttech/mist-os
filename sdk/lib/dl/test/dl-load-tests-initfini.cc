@@ -32,7 +32,7 @@ class MockTestCallback : public TestCallback {
 
 // Sets the test module's gTestCallback to the given mock and runs the provided
 // function under the context of the mock instance.
-void RunWithMock(::testing::StrictMock<MockTestCallback> &mock, fit::function<void()> &run) {
+void RunWithMock(::testing::StrictMock<MockTestCallback>& mock, fit::function<void()>& run) {
   gTestCallback = &mock;
   run();
   gTestCallback = nullptr;
@@ -55,12 +55,12 @@ void RunWithExpectedTestCallbacks(fit::function<void()> run,
 // DT_INIT and DT_FINI sections. These functions will call a callback with a
 // value that is checked by the test to ensure those functions were run in order.
 TYPED_TEST(DlTests, InitFiniLegacy) {
-  const std::string kFile = "init-fini-legacy.so";
+  const std::string kInitFiniLegacyFile = "init-fini-legacy.so";
 
   auto test = [&] {
-    this->ExpectRootModule(kFile);
+    this->ExpectRootModule(kInitFiniLegacyFile);
 
-    auto open = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+    auto open = this->DlOpen(kInitFiniLegacyFile.c_str(), RTLD_NOW | RTLD_LOCAL);
     ASSERT_TRUE(open.is_ok()) << open.error_value();
     EXPECT_TRUE(open.value()) << open.error_value();
 
@@ -79,12 +79,12 @@ TYPED_TEST(DlTests, InitFiniLegacy) {
 // tests that multiple initializers/finalizers in the dlopen-ed module are run in
 // correct order.
 TYPED_TEST(DlTests, InitFiniArray) {
-  const std::string kFile = "init-fini-array.so";
+  const std::string kInitFiniArrayFile = "init-fini-array.so";
 
   auto test = [&] {
-    this->ExpectRootModule(kFile);
+    this->ExpectRootModule(kInitFiniArrayFile);
 
-    auto open = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+    auto open = this->DlOpen(kInitFiniArrayFile.c_str(), RTLD_NOW | RTLD_LOCAL);
     ASSERT_TRUE(open.is_ok()) << open.error_value();
     EXPECT_TRUE(open.value()) << open.error_value();
 
@@ -127,7 +127,7 @@ TYPED_TEST(DlTests, InitFiniArray) {
 //   init-fini-array-a-dep
 //   init-fini-array-b-dep
 TYPED_TEST(DlTests, InitFiniArrayWithDeps) {
-  const std::string kFile = "init-fini-array-with-deps.so";
+  const std::string kRootFile = "init-fini-array-with-deps.so";
   const std::string kAFile = "libinit-fini-array-a.so";
   const std::string kADepFile = "libinit-fini-array-a-dep.so";
   const std::string kBFile = "libinit-fini-array-b.so";
@@ -135,10 +135,10 @@ TYPED_TEST(DlTests, InitFiniArrayWithDeps) {
   const std::string kCFile = "libinit-fini-array-c.so";
 
   auto test = [&] {
-    this->ExpectRootModule(kFile);
+    this->ExpectRootModule(kRootFile);
     this->Needed({kAFile, kBFile, kCFile, kADepFile, kBDepFile});
 
-    auto open = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+    auto open = this->DlOpen(kRootFile.c_str(), RTLD_NOW | RTLD_LOCAL);
     ASSERT_TRUE(open.is_ok()) << open.error_value();
     EXPECT_TRUE(open.value()) << open.error_value();
 
@@ -155,12 +155,12 @@ TYPED_TEST(DlTests, InitFiniArrayWithDeps) {
 // dlopen a module with a mix of DT_INIT/DT_FINI and DT_INIT_ARRAY and
 // DT_FINI_ARRAY entries.
 TYPED_TEST(DlTests, InitFiniArrayWithLegacy) {
-  const std::string kFile = "init-fini-array-with-legacy.so";
+  const std::string kInitFiniArrayWithLegacyFile = "init-fini-array-with-legacy.so";
 
   auto test = [&] {
-    this->ExpectRootModule(kFile);
+    this->ExpectRootModule(kInitFiniArrayWithLegacyFile);
 
-    auto open = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+    auto open = this->DlOpen(kInitFiniArrayWithLegacyFile.c_str(), RTLD_NOW | RTLD_LOCAL);
     ASSERT_TRUE(open.is_ok()) << open.error_value();
     EXPECT_TRUE(open.value()) << open.error_value();
 
@@ -208,69 +208,68 @@ TYPED_TEST(DlTests, InitFiniArrayWithLegacy) {
 //   init-fini-array-with-loaded-deps-b
 //   init-fini-array-with-loaded-deps-b-dep
 TYPED_TEST(DlTests, InitFiniArrayWithLoadedDeps) {
-  const std::string kFile = "init-fini-array-with-loaded-deps.so";
+  const std::string kRootFile = "init-fini-array-with-loaded-deps.so";
   const std::string kAFile = "libinit-fini-array-with-loaded-deps-a.so";
   const std::string kADepFile = "libinit-fini-array-with-loaded-deps-a-dep.so";
   const std::string kBFile = "libinit-fini-array-with-loaded-deps-b.so";
   const std::string kBDepFile = "libinit-fini-array-with-loaded-deps-b-dep.so";
   const std::string kCDepFile = "libinit-fini-array-with-loaded-deps-c.so";
 
-  void *dep_a_handle = nullptr;
-  auto dep_a_open_test = [&] {
+  void* first_open_a;
+  auto first_open_a_test = [&] {
     this->Needed({kAFile, kADepFile});
-    auto dep_a_open = this->DlOpen(kAFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-    ASSERT_TRUE(dep_a_open.is_ok()) << dep_a_open.error_value();
-    EXPECT_TRUE(dep_a_open.value()) << dep_a_open.error_value();
-    dep_a_handle = dep_a_open.value();
+    auto open_a = this->DlOpen(kAFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+    ASSERT_TRUE(open_a.is_ok()) << open_a.error_value();
+    EXPECT_TRUE(open_a.value()) << open_a.error_value();
+    first_open_a = open_a.value();
   };
 
-  RunWithExpectedTestCallbacks(dep_a_open_test, {0, 1});
+  RunWithExpectedTestCallbacks(first_open_a_test, {0, 1});
 
   // Don't expect another dlopen on dep-a will run initializers.
-  void *second_dep_a_handle = nullptr;
-  auto second_dep_a_open_test = [&] {
-    auto second_dep_a_open = this->DlOpen(kAFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-    ASSERT_TRUE(second_dep_a_open.is_ok()) << second_dep_a_open.error_value();
-    EXPECT_TRUE(second_dep_a_open.value()) << second_dep_a_open.error_value();
-    second_dep_a_handle = second_dep_a_open.value();
+  void* second_open_a;
+  auto second_open_a_test = [&] {
+    auto open_a = this->DlOpen(kAFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+    ASSERT_TRUE(open_a.is_ok()) << open_a.error_value();
+    EXPECT_TRUE(open_a.value()) << open_a.error_value();
+    second_open_a = open_a.value();
   };
 
-  RunWithExpectedTestCallbacks(second_dep_a_open_test, {});
+  RunWithExpectedTestCallbacks(second_open_a_test, {});
 
-  void *c_handle = nullptr;
-  auto c_open_test = [&] {
+  void* open_c;
+  auto open_c_test = [&] {
     this->Needed({kCDepFile});
-    auto c_open = this->DlOpen(kCDepFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-    ASSERT_TRUE(c_open.is_ok()) << c_open.error_value();
-    EXPECT_TRUE(c_open.value()) << c_open.error_value();
-    c_handle = c_open.value();
+    auto open = this->DlOpen(kCDepFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+    ASSERT_TRUE(open.is_ok()) << open.error_value();
+    EXPECT_TRUE(open.value()) << open.error_value();
+    open_c = open.value();
   };
 
-  RunWithExpectedTestCallbacks(c_open_test, {2});
+  RunWithExpectedTestCallbacks(open_c_test, {2});
 
-  void *root_handle = nullptr;
-  auto root_open_test = [&] {
-    this->ExpectRootModule(kFile);
+  void* open_root;
+  auto open_root_test = [&] {
+    this->ExpectRootModule(kRootFile);
     this->Needed({kBFile, kBDepFile});
 
     // This will only run initializers on the modules that are loaded by this call.
-    auto root_open = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-    ASSERT_TRUE(root_open.is_ok()) << root_open.error_value();
-    EXPECT_TRUE(root_open.value()) << root_open.error_value();
-    root_handle = root_open.value();
+    auto open = this->DlOpen(kRootFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+    ASSERT_TRUE(open.is_ok()) << open.error_value();
+    EXPECT_TRUE(open.value()) << open.error_value();
+    open_root = open.value();
   };
 
-  RunWithExpectedTestCallbacks(root_open_test, {3, 4, 5});
+  RunWithExpectedTestCallbacks(open_root_test, {3, 4, 5});
 
   // Don't expect these dlclose calls on dep-a will run any finalizers.
-  RunWithExpectedTestCallbacks([&] { ASSERT_TRUE(this->DlClose(dep_a_handle).is_ok()); }, {});
+  RunWithExpectedTestCallbacks([&] { ASSERT_TRUE(this->DlClose(first_open_a).is_ok()); }, {});
 
-  RunWithExpectedTestCallbacks([&] { ASSERT_TRUE(this->DlClose(second_dep_a_handle).is_ok()); },
-                               {});
+  RunWithExpectedTestCallbacks([&] { ASSERT_TRUE(this->DlClose(second_open_a).is_ok()); }, {});
 
-  RunWithExpectedTestCallbacks([&] { ASSERT_TRUE(this->DlClose(c_handle).is_ok()); }, {});
+  RunWithExpectedTestCallbacks([&] { ASSERT_TRUE(this->DlClose(open_c).is_ok()); }, {});
 
-  auto close_root_test = [&] { ASSERT_TRUE(this->DlClose(root_handle).is_ok()); };
+  auto close_root_test = [&] { ASSERT_TRUE(this->DlClose(open_root).is_ok()); };
   if (TestFixture::kDlCloseCanRunFinalizers) {
     // TODO(https://fxbug.dev/385377689): In older versions of glibc, destructor
     // order can be re-sorted in dlclose. Remove this detection when our x86-64

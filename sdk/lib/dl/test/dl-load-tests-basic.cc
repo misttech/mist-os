@@ -16,83 +16,83 @@ using dl::testing::TestSym;
 // Load a basic file with no dependencies.
 TYPED_TEST(DlTests, Basic) {
   constexpr int64_t kReturnValue = 17;
-  const std::string kFile = TestModule("ret17");
+  const std::string kRet17File = TestModule("ret17");
 
-  this->ExpectRootModule(kFile);
+  this->ExpectRootModule(kRet17File);
 
-  auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(result.is_ok()) << result.error_value();
-  EXPECT_TRUE(result.value());
+  auto open = this->DlOpen(kRet17File.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open.is_ok()) << open.error_value();
+  EXPECT_TRUE(open.value());
 
   // Look up the TestSym("TestStart").c_str() function and call it, expecting it to return 17.
-  auto sym_result = this->DlSym(result.value(), TestSym("TestStart").c_str());
-  ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
-  ASSERT_TRUE(sym_result.value());
+  auto sym = this->DlSym(open.value(), TestSym("TestStart").c_str());
+  ASSERT_TRUE(sym.is_ok()) << sym.error_value();
+  ASSERT_TRUE(sym.value());
 
-  EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
+  EXPECT_EQ(RunFunction<int64_t>(sym.value()), kReturnValue);
 
-  ASSERT_TRUE(this->DlClose(result.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open.value()).is_ok());
 }
 
 // Load a file that performs relative relocations against itself. The TestStart
 // function's return value is derived from the resolved symbols.
 TYPED_TEST(DlTests, Relative) {
   constexpr int64_t kReturnValue = 17;
-  const std::string kFile = TestModule("relative-reloc");
+  const std::string kRelativeRelocFile = TestModule("relative-reloc");
 
-  this->ExpectRootModule(kFile);
+  this->ExpectRootModule(kRelativeRelocFile);
 
-  auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(result.is_ok()) << result.error_value();
-  EXPECT_TRUE(result.value());
+  auto open = this->DlOpen(kRelativeRelocFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open.is_ok()) << open.error_value();
+  EXPECT_TRUE(open.value());
 
-  auto sym_result = this->DlSym(result.value(), TestSym("TestStart").c_str());
-  ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
-  ASSERT_TRUE(sym_result.value());
+  auto sym = this->DlSym(open.value(), TestSym("TestStart").c_str());
+  ASSERT_TRUE(sym.is_ok()) << sym.error_value();
+  ASSERT_TRUE(sym.value());
 
-  EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
+  EXPECT_EQ(RunFunction<int64_t>(sym.value()), kReturnValue);
 
-  ASSERT_TRUE(this->DlClose(result.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open.value()).is_ok());
 }
 
 // Load a file that performs symbolic relocations against itself. The TestStart
 // functions' return value is derived from the resolved symbols.
 TYPED_TEST(DlTests, Symbolic) {
   constexpr int64_t kReturnValue = 17;
-  const std::string kFile = TestModule("symbolic-reloc");
+  const std::string kSymbolicFile = TestModule("symbolic-reloc");
 
-  this->ExpectRootModule(kFile);
+  this->ExpectRootModule(kSymbolicFile);
 
-  auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(result.is_ok()) << result.error_value();
-  EXPECT_TRUE(result.value());
+  auto open = this->DlOpen(kSymbolicFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open.is_ok()) << open.error_value();
+  EXPECT_TRUE(open.value());
 
-  auto sym_result = this->DlSym(result.value(), TestSym("TestStart").c_str());
-  ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
-  ASSERT_TRUE(sym_result.value());
+  auto sym = this->DlSym(open.value(), TestSym("TestStart").c_str());
+  ASSERT_TRUE(sym.is_ok()) << sym.error_value();
+  ASSERT_TRUE(sym.value());
 
-  EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
+  EXPECT_EQ(RunFunction<int64_t>(sym.value()), kReturnValue);
 
-  ASSERT_TRUE(this->DlClose(result.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open.value()).is_ok());
 }
 
 // Test loading a module with relro protections.
 TYPED_TEST(DlTests, Relro) {
-  const std::string kFile = TestModule("relro");
+  const std::string kRelroFile = TestModule("relro");
 
-  this->ExpectRootModule(kFile);
+  this->ExpectRootModule(kRelroFile);
 
-  auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(result.is_ok()) << result.error_value();
-  ASSERT_TRUE(result.value());
+  auto open = this->DlOpen(kRelroFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open.is_ok()) << open.error_value();
+  ASSERT_TRUE(open.value());
 
-  auto sym = this->DlSym(result.value(), TestSym("TestStart").c_str());
+  auto sym = this->DlSym(open.value(), TestSym("TestStart").c_str());
   ASSERT_TRUE(sym.is_ok()) << sym.error_value();
   ASSERT_TRUE(sym.value());
 
   EXPECT_DEATH(RunFunction<int64_t>(sym.value()), "");
 
-  ASSERT_TRUE(this->DlClose(result.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open.value()).is_ok());
 }
 
 // Test that calling dlopen twice on a file will return the same pointer,
@@ -100,77 +100,70 @@ TYPED_TEST(DlTests, Relro) {
 // dlsym() should return a pointer to the same symbol from the same module as
 // well.
 TYPED_TEST(DlTests, BasicModuleReuse) {
-  const std::string kFile = TestModule("ret17");
+  const std::string kRet17File = TestModule("ret17");
 
-  this->ExpectRootModule(kFile);
+  this->ExpectRootModule(kRet17File);
 
-  auto res1 = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(res1.is_ok()) << res1.error_value();
-  auto ptr1 = res1.value();
-  EXPECT_TRUE(ptr1);
+  auto first_open_ret17 = this->DlOpen(kRet17File.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(first_open_ret17.is_ok()) << first_open_ret17.error_value();
+  EXPECT_TRUE(first_open_ret17.value());
 
-  auto res2 = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(res2.is_ok()) << res2.error_value();
-  auto ptr2 = res2.value();
-  EXPECT_TRUE(ptr2);
+  auto second_open_ret17 = this->DlOpen(kRet17File.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(second_open_ret17.is_ok()) << second_open_ret17.error_value();
+  EXPECT_TRUE(second_open_ret17.value());
 
-  EXPECT_EQ(ptr1, ptr2);
+  EXPECT_EQ(first_open_ret17.value(), second_open_ret17.value());
 
-  auto sym1 = this->DlSym(ptr1, TestSym("TestStart").c_str());
-  ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
-  auto sym1_ptr = sym1.value();
-  EXPECT_TRUE(sym1_ptr);
+  auto first_ret17_test_start = this->DlSym(first_open_ret17.value(), TestSym("TestStart").c_str());
+  ASSERT_TRUE(first_ret17_test_start.is_ok()) << first_ret17_test_start.error_value();
+  EXPECT_TRUE(first_ret17_test_start.value());
 
-  auto sym2 = this->DlSym(ptr2, TestSym("TestStart").c_str());
-  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
-  auto sym2_ptr = sym2.value();
-  EXPECT_TRUE(sym2_ptr);
+  auto second_ret17_test_start =
+      this->DlSym(second_open_ret17.value(), TestSym("TestStart").c_str());
+  ASSERT_TRUE(second_ret17_test_start.is_ok()) << second_ret17_test_start.error_value();
+  EXPECT_TRUE(second_ret17_test_start.value());
 
-  EXPECT_EQ(sym1_ptr, sym2_ptr);
+  EXPECT_EQ(first_ret17_test_start.value(), second_ret17_test_start.value());
 
-  ASSERT_TRUE(this->DlClose(ptr1).is_ok());
-  ASSERT_TRUE(this->DlClose(ptr2).is_ok());
+  ASSERT_TRUE(this->DlClose(first_open_ret17.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(second_open_ret17.value()).is_ok());
 }
 
 // Test that different mutually-exclusive kFiles that were dlopen-ed do not share
 // pointers or resolved symbols.
 TYPED_TEST(DlTests, UniqueModules) {
-  const std::string kFile1 = TestModule("ret17");
-  const std::string kFile2 = TestModule("ret23");
+  const std::string kRet17File = TestModule("ret17");
+  const std::string kRet23File = TestModule("ret23");
 
-  this->ExpectRootModule(kFile1);
+  this->ExpectRootModule(kRet17File);
 
-  auto ret17 = this->DlOpen(kFile1.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(ret17.is_ok()) << ret17.error_value();
-  auto ret17_ptr = ret17.value();
-  EXPECT_TRUE(ret17_ptr);
+  auto open_ret17 = this->DlOpen(kRet17File.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_ret17.is_ok()) << open_ret17.error_value();
+  EXPECT_TRUE(open_ret17.value());
 
-  this->ExpectRootModule(kFile2);
+  this->ExpectRootModule(kRet23File);
 
-  auto ret23 = this->DlOpen(kFile2.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(ret23.is_ok()) << ret23.error_value();
-  auto ret23_ptr = ret23.value();
-  EXPECT_TRUE(ret23_ptr);
+  auto open_ret23 = this->DlOpen(kRet23File.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_ret23.is_ok()) << open_ret23.error_value();
+  EXPECT_TRUE(open_ret23.value());
 
-  EXPECT_NE(ret17_ptr, ret23_ptr);
+  EXPECT_NE(open_ret17.value(), open_ret23.value());
 
-  auto sym17 = this->DlSym(ret17_ptr, TestSym("TestStart").c_str());
-  ASSERT_TRUE(sym17.is_ok()) << sym17.error_value();
-  auto sym17_ptr = sym17.value();
-  EXPECT_TRUE(sym17_ptr);
+  auto ret17_test_start = this->DlSym(open_ret17.value(), TestSym("TestStart").c_str());
+  ASSERT_TRUE(ret17_test_start.is_ok()) << ret17_test_start.error_value();
+  EXPECT_TRUE(ret17_test_start.value());
 
-  auto sym23 = this->DlSym(ret23_ptr, TestSym("TestStart").c_str());
-  ASSERT_TRUE(sym23.is_ok()) << sym23.error_value();
-  auto sym23_ptr = sym23.value();
-  EXPECT_TRUE(sym23_ptr);
+  auto sym23_test_start = this->DlSym(open_ret23.value(), TestSym("TestStart").c_str());
+  ASSERT_TRUE(sym23_test_start.is_ok()) << sym23_test_start.error_value();
+  EXPECT_TRUE(sym23_test_start.value());
 
-  EXPECT_NE(sym17_ptr, sym23_ptr);
+  EXPECT_NE(ret17_test_start.value(), sym23_test_start.value());
 
-  EXPECT_EQ(RunFunction<int64_t>(sym17_ptr), 17);
-  EXPECT_EQ(RunFunction<int64_t>(sym23_ptr), 23);
+  EXPECT_EQ(RunFunction<int64_t>(ret17_test_start.value()), 17);
+  EXPECT_EQ(RunFunction<int64_t>(sym23_test_start.value()), 23);
 
-  ASSERT_TRUE(this->DlClose(ret17_ptr).is_ok());
-  ASSERT_TRUE(this->DlClose(ret23_ptr).is_ok());
+  ASSERT_TRUE(this->DlClose(open_ret17.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_ret23.value()).is_ok());
 }
 
 }  // namespace
