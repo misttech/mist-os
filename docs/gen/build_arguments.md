@@ -731,7 +731,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8724816091759153825"`
+**Current value for `target_cpu = "arm64"`:** `"8724770787495295953"`
 
 From //out/not-default/args.gn:10
 
@@ -739,7 +739,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8724816091759153825"`
+**Current value for `target_cpu = "riscv64"`:** `"8724770787495295953"`
 
 From //out/not-default/args.gn:10
 
@@ -747,7 +747,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8724816091759153825"`
+**Current value for `target_cpu = "x64"`:** `"8724770787495295953"`
 
 From //out/not-default/args.gn:10
 
