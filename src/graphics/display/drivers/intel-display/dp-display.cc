@@ -234,8 +234,8 @@ constexpr cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> kBanjoSup
 
 }  // namespace
 
-zx::result<DdiAuxChannel::ReplyInfo> DpAux::DoTransaction(const DdiAuxChannel::Request& request,
-                                                          cpp20::span<uint8_t> reply_data_buffer) {
+zx::result<DdiAuxChannel::ReplyInfo> DpAuxChannelImpl::DoTransaction(
+    const DdiAuxChannel::Request& request, cpp20::span<uint8_t> reply_data_buffer) {
   // If the DisplayPort sink device isn't ready to handle an Aux message,
   // it can return an AUX_DEFER reply, which means we should retry the
   // request. The spec added a requirement for >=7 defer retries in v1.3,
@@ -309,7 +309,7 @@ zx::result<DdiAuxChannel::ReplyInfo> DpAux::DoTransaction(const DdiAuxChannel::R
   }
 }
 
-zx_status_t DpAux::DpAuxRead(uint32_t dp_cmd, uint32_t addr, uint8_t* buf, size_t size) {
+zx_status_t DpAuxChannelImpl::DpAuxRead(uint32_t dp_cmd, uint32_t addr, uint8_t* buf, size_t size) {
   while (size > 0) {
     uint32_t chunk_size = static_cast<uint32_t>(std::min<size_t>(size, DdiAuxChannel::kMaxOpSize));
     size_t bytes_read = 0;
@@ -329,8 +329,8 @@ zx_status_t DpAux::DpAuxRead(uint32_t dp_cmd, uint32_t addr, uint8_t* buf, size_
   return ZX_OK;
 }
 
-zx_status_t DpAux::DpAuxReadChunk(uint32_t dp_cmd, uint32_t addr, uint8_t* buf, uint32_t size_in,
-                                  size_t* size_out) {
+zx_status_t DpAuxChannelImpl::DpAuxReadChunk(uint32_t dp_cmd, uint32_t addr, uint8_t* buf,
+                                             uint32_t size_in, size_t* size_out) {
   const DdiAuxChannel::Request request = {
       .address = static_cast<int32_t>(addr),
       .command = static_cast<int8_t>(dp_cmd),
@@ -355,7 +355,8 @@ zx_status_t DpAux::DpAuxReadChunk(uint32_t dp_cmd, uint32_t addr, uint8_t* buf, 
   return ZX_OK;
 }
 
-zx_status_t DpAux::DpAuxWrite(uint32_t dp_cmd, uint32_t addr, const uint8_t* buf, size_t size) {
+zx_status_t DpAuxChannelImpl::DpAuxWrite(uint32_t dp_cmd, uint32_t addr, const uint8_t* buf,
+                                         size_t size) {
   // Implement this if it's ever needed
   ZX_ASSERT_MSG(size <= 16, "message too large");
 
@@ -383,17 +384,17 @@ zx_status_t DpAux::DpAuxWrite(uint32_t dp_cmd, uint32_t addr, const uint8_t* buf
 }
 
 static constexpr size_t kMaxTransferSize = 255;
-zx_status_t DpAux::I2cImplGetMaxTransferSize(uint64_t* out_size) {
+zx_status_t DpAuxChannelImpl::I2cImplGetMaxTransferSize(uint64_t* out_size) {
   *out_size = kMaxTransferSize;
   return ZX_OK;
 }
 
-zx_status_t DpAux::I2cImplSetBitrate(uint32_t bitrate) {
+zx_status_t DpAuxChannelImpl::I2cImplSetBitrate(uint32_t bitrate) {
   // no-op for now
   return ZX_OK;
 }
 
-zx_status_t DpAux::I2cImplTransact(const i2c_impl_op_t* ops, size_t count) {
+zx_status_t DpAuxChannelImpl::I2cImplTransact(const i2c_impl_op_t* ops, size_t count) {
   for (unsigned i = 0; i < count; i++) {
     if (ops[i].data_size > kMaxTransferSize) {
       return ZX_ERR_INVALID_ARGS;
@@ -417,12 +418,12 @@ zx_status_t DpAux::I2cImplTransact(const i2c_impl_op_t* ops, size_t count) {
   return ZX_OK;
 }
 
-ddk::I2cImplProtocolClient DpAux::i2c() {
+ddk::I2cImplProtocolClient DpAuxChannelImpl::i2c() {
   const i2c_impl_protocol_t i2c{.ops = &i2c_impl_protocol_ops_, .ctx = this};
   return ddk::I2cImplProtocolClient(&i2c);
 }
 
-bool DpAux::DpcdRead(uint32_t addr, uint8_t* buf, size_t size) {
+bool DpAuxChannelImpl::DpcdRead(uint32_t addr, uint8_t* buf, size_t size) {
   fbl::AutoLock lock(&lock_);
   constexpr uint32_t kReadAttempts = 3;
   for (unsigned i = 0; i < kReadAttempts; i++) {
@@ -434,12 +435,12 @@ bool DpAux::DpcdRead(uint32_t addr, uint8_t* buf, size_t size) {
   return false;
 }
 
-bool DpAux::DpcdWrite(uint32_t addr, const uint8_t* buf, size_t size) {
+bool DpAuxChannelImpl::DpcdWrite(uint32_t addr, const uint8_t* buf, size_t size) {
   fbl::AutoLock lock(&lock_);
   return DpAuxWrite(DP_REQUEST_NATIVE_WRITE, addr, buf, size) == ZX_OK;
 }
 
-DpAux::DpAux(fdf::MmioBuffer* mmio_buffer, DdiId ddi_id, uint16_t device_id)
+DpAuxChannelImpl::DpAuxChannelImpl(fdf::MmioBuffer* mmio_buffer, DdiId ddi_id, uint16_t device_id)
     : aux_channel_(mmio_buffer, ddi_id, device_id) {
   ZX_ASSERT(mtx_init(&lock_, mtx_plain) == thrd_success);
 }
@@ -449,10 +450,10 @@ DpCapabilities::DpCapabilities() { dpcd_.fill(0); }
 DpCapabilities::Edp::Edp() { bytes.fill(0); }
 
 // static
-fpromise::result<DpCapabilities> DpCapabilities::Read(DpcdChannel* dp_aux) {
+fpromise::result<DpCapabilities> DpCapabilities::Read(DpAuxChannel* dp_aux_channel) {
   DpCapabilities caps;
 
-  if (!dp_aux->DpcdRead(dpcd::DPCD_CAP_START, caps.dpcd_.data(), caps.dpcd_.size())) {
+  if (!dp_aux_channel->DpcdRead(dpcd::DPCD_CAP_START, caps.dpcd_.data(), caps.dpcd_.size())) {
     FDF_LOG(TRACE, "Failed to read dpcd capabilities");
     return fpromise::error();
   }
@@ -464,7 +465,7 @@ fpromise::result<DpCapabilities> DpCapabilities::Read(DpcdChannel* dp_aux) {
     FDF_LOG(DEBUG, "Found branch with %d ports", dsp_count.count());
   }
 
-  if (!dp_aux->DpcdRead(dpcd::DPCD_SINK_COUNT, caps.sink_count_.reg_value_ptr(), 1)) {
+  if (!dp_aux_channel->DpcdRead(dpcd::DPCD_SINK_COUNT, caps.sink_count_.reg_value_ptr(), 1)) {
     FDF_LOG(ERROR, "Failed to read DisplayPort sink count");
     return fpromise::error();
   }
@@ -475,11 +476,11 @@ fpromise::result<DpCapabilities> DpCapabilities::Read(DpcdChannel* dp_aux) {
     return fpromise::error();
   }
 
-  if (!caps.ProcessEdp(dp_aux)) {
+  if (!caps.ProcessEdp(dp_aux_channel)) {
     return fpromise::error();
   }
 
-  if (!caps.ProcessSupportedLinkRates(dp_aux)) {
+  if (!caps.ProcessSupportedLinkRates(dp_aux_channel)) {
     return fpromise::error();
   }
 
@@ -487,7 +488,7 @@ fpromise::result<DpCapabilities> DpCapabilities::Read(DpcdChannel* dp_aux) {
   return fpromise::ok(std::move(caps));
 }
 
-bool DpCapabilities::ProcessEdp(DpcdChannel* dp_aux) {
+bool DpCapabilities::ProcessEdp(DpAuxChannel* dp_aux_channel) {
   // Check if the Display Control registers reserved for eDP are available.
   auto edp_config = dpcd_reg<dpcd::EdpConfigCap, dpcd::DPCD_EDP_CONFIG>();
   if (!edp_config.dpcd_display_ctrl_capable()) {
@@ -497,8 +498,8 @@ bool DpCapabilities::ProcessEdp(DpcdChannel* dp_aux) {
   FDF_LOG(TRACE, "eDP registers are available");
 
   edp_dpcd_.emplace();
-  if (!dp_aux->DpcdRead(dpcd::DPCD_EDP_CAP_START, edp_dpcd_->bytes.data(),
-                        edp_dpcd_->bytes.size())) {
+  if (!dp_aux_channel->DpcdRead(dpcd::DPCD_EDP_CAP_START, edp_dpcd_->bytes.data(),
+                                edp_dpcd_->bytes.size())) {
     FDF_LOG(ERROR, "Failed to read eDP capabilities");
     return false;
   }
@@ -516,7 +517,7 @@ bool DpCapabilities::ProcessEdp(DpcdChannel* dp_aux) {
   return true;
 }
 
-bool DpCapabilities::ProcessSupportedLinkRates(DpcdChannel* dp_aux) {
+bool DpCapabilities::ProcessSupportedLinkRates(DpAuxChannel* dp_aux_channel) {
   ZX_ASSERT(supported_link_rates_mbps_.empty());
 
   // According to eDP v1.4b, Table 4-24, a device supporting eDP version v1.4 and higher can support
@@ -530,7 +531,8 @@ bool DpCapabilities::ProcessSupportedLinkRates(DpcdChannel* dp_aux) {
     constexpr size_t kBufferSize =
         dpcd::DPCD_SUPPORTED_LINK_RATE_END - dpcd::DPCD_SUPPORTED_LINK_RATE_START + 1;
     std::array<uint8_t, kBufferSize> link_rates;
-    if (dp_aux->DpcdRead(dpcd::DPCD_SUPPORTED_LINK_RATE_START, link_rates.data(), kBufferSize)) {
+    if (dp_aux_channel->DpcdRead(dpcd::DPCD_SUPPORTED_LINK_RATE_START, link_rates.data(),
+                                 kBufferSize)) {
       for (size_t i = 0; i < link_rates.size(); i += 2) {
         uint16_t value = link_rates[i] | (static_cast<uint16_t>(link_rates[i + 1] << 8));
 
@@ -659,11 +661,11 @@ bool DpDisplay::EnsureEdpPanelIsPoweredOn() {
 }
 
 bool DpDisplay::DpcdWrite(uint32_t addr, const uint8_t* buf, size_t size) {
-  return dp_aux_->DpcdWrite(addr, buf, size);
+  return dp_aux_channel_->DpcdWrite(addr, buf, size);
 }
 
 bool DpDisplay::DpcdRead(uint32_t addr, uint8_t* buf, size_t size) {
-  return dp_aux_->DpcdRead(addr, buf, size);
+  return dp_aux_channel_->DpcdRead(addr, buf, size);
 }
 
 // Link training functions
@@ -1681,14 +1683,14 @@ bool IsEdp(Controller* controller, DdiId ddi_id) {
 }  // namespace
 
 DpDisplay::DpDisplay(Controller* controller, display::DisplayId id, DdiId ddi_id,
-                     DpcdChannel* dp_aux, PchEngine* pch_engine, DdiReference ddi_reference,
-                     inspect::Node* parent_node)
+                     DpAuxChannel* dp_aux_channel, PchEngine* pch_engine,
+                     DdiReference ddi_reference, inspect::Node* parent_node)
     : DisplayDevice(controller, id, ddi_id, std::move(ddi_reference),
                     IsEdp(controller, ddi_id) ? Type::kEdp : Type::kDp),
-      dp_aux_(dp_aux),
+      dp_aux_channel_(dp_aux_channel),
       pch_engine_(type() == Type::kEdp ? pch_engine : nullptr),
-      i2c_(dp_aux->i2c()) {
-  ZX_ASSERT(dp_aux);
+      i2c_(dp_aux_channel->i2c()) {
+  ZX_ASSERT(dp_aux_channel);
   if (type() == Type::kEdp) {
     ZX_ASSERT(pch_engine_ != nullptr);
   } else {
@@ -1709,7 +1711,7 @@ bool DpDisplay::Query() {
   // general DP displays, the default power state is D0, so we don't have to
   // worry about AUX failures because of power saving mode.
   {
-    fpromise::result<DpCapabilities> capabilities = DpCapabilities::Read(dp_aux_);
+    fpromise::result<DpCapabilities> capabilities = DpCapabilities::Read(dp_aux_channel_);
     if (capabilities.is_error()) {
       return false;
     }

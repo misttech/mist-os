@@ -341,7 +341,7 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
 
   cpp20::span<const DdiId> ddis_;
   fbl::Vector<GMBusI2c> gmbus_i2cs_;
-  fbl::Vector<DpAux> dp_auxs_;
+  fbl::Vector<DpAuxChannelImpl> dp_aux_channels_;
 
   // References to displays. References are owned by devmgr, but will always
   // be valid while they are in this vector.

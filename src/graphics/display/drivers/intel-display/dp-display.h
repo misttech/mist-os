@@ -23,27 +23,34 @@
 
 namespace intel_display {
 
-// Abstraction over the DPCD register transactions that are performed over the DisplayPort Auxiliary
+// Represents transactions performed over the DisplayPort Auxiliary (DP AUX)
 // channel.
-class DpcdChannel {
+class DpAuxChannel {
  public:
-  virtual ~DpcdChannel() = default;
+  virtual ~DpAuxChannel() = default;
 
+  // Interface for DDC I2C transactions performed over the DP AUX channel.
   virtual ddk::I2cImplProtocolClient i2c() = 0;
+
+  // Reads from DisplayPort Configuration Data (DPCD) registers over the DP AUX
+  // channel.
   virtual bool DpcdRead(uint32_t addr, uint8_t* buf, size_t size) = 0;
+
+  // Writes to DisplayPort Configuration Data (DPCD) registers over the DP AUX
+  // channel.
   virtual bool DpcdWrite(uint32_t addr, const uint8_t* buf, size_t size) = 0;
 };
 
-class DpAux : public DpcdChannel, public ddk::I2cImplProtocol<DpAux> {
+class DpAuxChannelImpl : public DpAuxChannel, public ddk::I2cImplProtocol<DpAuxChannelImpl> {
  public:
   // `mmio_buffer` must outlive this instance.
-  DpAux(fdf::MmioBuffer* mmio_buffer, DdiId ddi_id, uint16_t device_id);
+  DpAuxChannelImpl(fdf::MmioBuffer* mmio_buffer, DdiId ddi_id, uint16_t device_id);
 
   zx_status_t I2cImplGetMaxTransferSize(uint64_t* out_size);
   zx_status_t I2cImplSetBitrate(uint32_t bitrate);
   zx_status_t I2cImplTransact(const i2c_impl_op_t* ops, size_t count);
 
-  // DpcdChannel overrides:
+  // `DpAuxChannel`:
   ddk::I2cImplProtocolClient i2c() final;
   bool DpcdRead(uint32_t addr, uint8_t* buf, size_t size) final;
   bool DpcdWrite(uint32_t addr, const uint8_t* buf, size_t size) final;
@@ -86,7 +93,7 @@ class DpCapabilities final {
   DpCapabilities& operator=(DpCapabilities&&) = default;
 
   // Read and parse DPCD capabilities. Clears any previously initialized content
-  static fpromise::result<DpCapabilities> Read(DpcdChannel* dp_aux);
+  static fpromise::result<DpCapabilities> Read(DpAuxChannel* dp_aux_channel);
 
   // Publish the capabilities fields to inspect node `caps_node`.
   void PublishToInspect(inspect::Node* caps_node) const;
@@ -172,8 +179,8 @@ class DpCapabilities final {
     bool backlight_aux_brightness = false;
   };
 
-  bool ProcessEdp(DpcdChannel* dp_aux);
-  bool ProcessSupportedLinkRates(DpcdChannel* dp_aux);
+  bool ProcessEdp(DpAuxChannel* dp_aux_channel);
+  bool ProcessSupportedLinkRates(DpAuxChannel* dp_aux_channel);
 
   std::array<uint8_t, dpcd::DPCD_SUPPORTED_LINK_RATE_START - dpcd::DPCD_CAP_START> dpcd_;
   dpcd::SinkCount sink_count_;
@@ -186,8 +193,9 @@ class DpCapabilities final {
 
 class DpDisplay final : public DisplayDevice {
  public:
-  DpDisplay(Controller* controller, display::DisplayId id, DdiId ddi_id, DpcdChannel* dp_aux,
-            PchEngine* pch_engine, DdiReference ddi_reference, inspect::Node* parent_node);
+  DpDisplay(Controller* controller, display::DisplayId id, DdiId ddi_id,
+            DpAuxChannel* dp_aux_channel, PchEngine* pch_engine, DdiReference ddi_reference,
+            inspect::Node* parent_node);
 
   DpDisplay(const DpDisplay&) = delete;
   DpDisplay(DpDisplay&&) = delete;
@@ -278,7 +286,7 @@ class DpDisplay final : public DisplayDevice {
   void SetLinkRate(uint32_t value);
 
   // The object referenced by this pointer must outlive the DpDisplay.
-  DpcdChannel* dp_aux_;  // weak
+  DpAuxChannel* dp_aux_channel_;  // weak
 
   // Used by eDP displays.
   PchEngine* pch_engine_;

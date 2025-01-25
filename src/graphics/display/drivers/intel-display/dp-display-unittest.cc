@@ -151,7 +151,7 @@ class DpDisplayTest : public ::testing::Test {
     controller_.SetDpllManagerForTesting(std::make_unique<TestDpllManager>());
     controller_.SetPipeManagerForTesting(std::make_unique<TestPipeManager>(controller()));
     controller_.SetPowerWellForTesting(Power::New(controller_.mmio_space(), kTestDeviceDid));
-    fake_dpcd_.SetDefaults();
+    fake_dp_aux_channel_.SetDefaults();
 
     static constexpr int kAtlasGpuDeviceId = 0x591c;
 
@@ -181,9 +181,9 @@ class DpDisplayTest : public ::testing::Test {
       ddi_phys_[ddi_id] = std::make_unique<TestDdiPhysicalLayer>(ddi_id);
       ddi_phys_[ddi_id]->Enable();
     }
-    auto display =
-        std::make_unique<DpDisplay>(&controller_, id, ddi_id, &fake_dpcd_, &pch_engine_.value(),
-                                    DdiReference(ddi_phys_[ddi_id].get()), &node_);
+    auto display = std::make_unique<DpDisplay>(&controller_, id, ddi_id, &fake_dp_aux_channel_,
+                                               &pch_engine_.value(),
+                                               DdiReference(ddi_phys_[ddi_id].get()), &node_);
     if (!display->Query()) {
       return nullptr;
     }
@@ -191,7 +191,7 @@ class DpDisplayTest : public ::testing::Test {
   }
 
   Controller* controller() { return &controller_; }
-  testing::FakeDpcdChannel* fake_dpcd() { return &fake_dpcd_; }
+  testing::FakeDpAuxChannel* fake_dp_aux_channel() { return &fake_dp_aux_channel_; }
   PchEngine* pch_engine() { return &pch_engine_.value(); }
   fdf::MmioBuffer* mmio_buffer() { return &mmio_buffer_; }
 
@@ -205,7 +205,7 @@ class DpDisplayTest : public ::testing::Test {
   fdf::MmioBuffer mmio_buffer_;
 
   inspect::Node node_;
-  testing::FakeDpcdChannel fake_dpcd_;
+  testing::FakeDpAuxChannel fake_dp_aux_channel_;
 
   std::unordered_map<DdiId, std::unique_ptr<DdiPhysicalLayer>> ddi_phys_;
 
@@ -214,14 +214,14 @@ class DpDisplayTest : public ::testing::Test {
 
 // Tests that display creation fails if the there is no DisplayPort sink.
 TEST_F(DpDisplayTest, NoSinkNotSupported) {
-  fake_dpcd()->SetSinkCount(0);
+  fake_dp_aux_channel()->SetSinkCount(0);
   ASSERT_EQ(nullptr, MakeDisplay(DdiId::DDI_A));
 }
 
 // Tests that display creation fails if the DP sink count is greater than 1, as
 // MST is not supported.
 TEST_F(DpDisplayTest, MultipleSinksNotSupported) {
-  fake_dpcd()->SetSinkCount(2);
+  fake_dp_aux_channel()->SetSinkCount(2);
   ASSERT_EQ(nullptr, MakeDisplay(DdiId::DDI_A));
 }
 
@@ -230,7 +230,7 @@ TEST_F(DpDisplayTest, ReducedMaxLaneCountWhenDdiEIsEnabled) {
   auto buffer_control = registers::DdiRegs(DdiId::DDI_A).BufferControl().ReadFrom(mmio_buffer());
   buffer_control.set_ddi_e_disabled_kaby_lake(false).WriteTo(mmio_buffer());
 
-  fake_dpcd()->SetMaxLaneCount(4);
+  fake_dp_aux_channel()->SetMaxLaneCount(4);
 
   auto display = MakeDisplay(DdiId::DDI_A);
   ASSERT_NE(nullptr, display);
@@ -241,7 +241,7 @@ TEST_F(DpDisplayTest, ReducedMaxLaneCountWhenDdiEIsEnabled) {
 TEST_F(DpDisplayTest, MaxLaneCount) {
   auto buffer_control = registers::DdiRegs(DdiId::DDI_A).BufferControl().ReadFrom(mmio_buffer());
   buffer_control.set_ddi_e_disabled_kaby_lake(true).WriteTo(mmio_buffer());
-  fake_dpcd()->SetMaxLaneCount(4);
+  fake_dp_aux_channel()->SetMaxLaneCount(4);
 
   auto display = MakeDisplay(DdiId::DDI_A);
   ASSERT_NE(nullptr, display);
@@ -270,8 +270,8 @@ TEST_F(DpDisplayTest, LinkRateSelectionViaInit) {
   controller()->power()->SetDdiIoPowerState(DdiId::DDI_A, /* enable */ true);
   controller()->power()->SetAuxIoPowerState(DdiId::DDI_A, /* enable */ true);
 
-  fake_dpcd()->registers[dpcd::DPCD_LANE0_1_STATUS] = 0xFF;
-  fake_dpcd()->SetMaxLinkRate(dpcd::LinkBw::k5400Mbps);
+  fake_dp_aux_channel()->registers[dpcd::DPCD_LANE0_1_STATUS] = 0xFF;
+  fake_dp_aux_channel()->SetMaxLinkRate(dpcd::LinkBw::k5400Mbps);
 
   auto display = MakeDisplay(DdiId::DDI_A);
   ASSERT_NE(nullptr, display);
@@ -284,7 +284,7 @@ TEST_F(DpDisplayTest, LinkRateSelectionViaInit) {
 // InitWithDdiPllConfig.
 TEST_F(DpDisplayTest, LinkRateSelectionViaInitWithDdiPllConfig) {
   // The max link rate should be disregarded by InitWithDdiPllConfig.
-  fake_dpcd()->SetMaxLinkRate(dpcd::LinkBw::k5400Mbps);
+  fake_dp_aux_channel()->SetMaxLinkRate(dpcd::LinkBw::k5400Mbps);
 
   auto display = MakeDisplay(DdiId::DDI_A);
   ASSERT_NE(nullptr, display);
@@ -318,20 +318,24 @@ TEST_F(DpDisplayTest, GetBacklightBrightnessUsesDpcd) {
   pch_engine()->SetPanelBrightness(0.5);
   controller()->igd_opregion_for_testing()->SetIsEdpForTesting(DdiId::DDI_A, true);
 
-  fake_dpcd()->SetEdpCapable(dpcd::EdpRevision::k1_4);
-  fake_dpcd()->SetEdpBacklightBrightnessCapable();
+  fake_dp_aux_channel()->SetEdpCapable(dpcd::EdpRevision::k1_4);
+  fake_dp_aux_channel()->SetEdpBacklightBrightnessCapable();
 
   // Set the brightness to 100%.
-  fake_dpcd()->registers[dpcd::DPCD_EDP_BACKLIGHT_BRIGHTNESS_LSB] = kDpcdBrightness100 & 0xFF;
-  fake_dpcd()->registers[dpcd::DPCD_EDP_BACKLIGHT_BRIGHTNESS_MSB] = kDpcdBrightness100 >> 8;
+  fake_dp_aux_channel()->registers[dpcd::DPCD_EDP_BACKLIGHT_BRIGHTNESS_LSB] =
+      kDpcdBrightness100 & 0xFF;
+  fake_dp_aux_channel()->registers[dpcd::DPCD_EDP_BACKLIGHT_BRIGHTNESS_MSB] =
+      kDpcdBrightness100 >> 8;
 
   auto display = MakeDisplay(DdiId::DDI_A);
   ASSERT_NE(nullptr, display);
   EXPECT_DOUBLE_EQ(1.0, display->GetBacklightBrightness());
 
   // Set the brightness to 20%.
-  fake_dpcd()->registers[dpcd::DPCD_EDP_BACKLIGHT_BRIGHTNESS_LSB] = kDpcdBrightness20 & 0xFF;
-  fake_dpcd()->registers[dpcd::DPCD_EDP_BACKLIGHT_BRIGHTNESS_MSB] = kDpcdBrightness20 >> 8;
+  fake_dp_aux_channel()->registers[dpcd::DPCD_EDP_BACKLIGHT_BRIGHTNESS_LSB] =
+      kDpcdBrightness20 & 0xFF;
+  fake_dp_aux_channel()->registers[dpcd::DPCD_EDP_BACKLIGHT_BRIGHTNESS_MSB] =
+      kDpcdBrightness20 >> 8;
 
   display = MakeDisplay(DdiId::DDI_A);
   ASSERT_NE(nullptr, display);

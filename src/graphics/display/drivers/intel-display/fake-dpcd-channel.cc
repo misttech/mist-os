@@ -7,14 +7,14 @@
 namespace intel_display {
 namespace testing {
 
-void FakeDpcdChannel::SetDefaults() {
+void FakeDpAuxChannel::SetDefaults() {
   SetDpcdRevision(dpcd::Revision::k1_4);
   SetSinkCount(kDefaultSinkCount);
   SetMaxLaneCount(kDefaultLaneCount);
   SetMaxLinkRate(dpcd::LinkBw::k1620Mbps);
 }
 
-void FakeDpcdChannel::PopulateLinkRateTable(std::vector<uint16_t> values) {
+void FakeDpAuxChannel::PopulateLinkRateTable(std::vector<uint16_t> values) {
   std::memset(registers.data() + dpcd::DPCD_SUPPORTED_LINK_RATE_START, 0,
               kMaxLinkRateTableEntries * 2);
   for (unsigned i = 0; i < values.size() && i < kMaxLinkRateTableEntries; i++) {
@@ -24,7 +24,7 @@ void FakeDpcdChannel::PopulateLinkRateTable(std::vector<uint16_t> values) {
   }
 }
 
-bool FakeDpcdChannel::DpcdRead(uint32_t addr, uint8_t* buf, size_t size) {
+bool FakeDpAuxChannel::DpcdRead(uint32_t addr, uint8_t* buf, size_t size) {
   if (addr + size > registers.size()) {
     return false;
   }
@@ -33,7 +33,7 @@ bool FakeDpcdChannel::DpcdRead(uint32_t addr, uint8_t* buf, size_t size) {
   return true;
 }
 
-bool FakeDpcdChannel::DpcdWrite(uint32_t addr, const uint8_t* buf, size_t size) {
+bool FakeDpAuxChannel::DpcdWrite(uint32_t addr, const uint8_t* buf, size_t size) {
   if (addr + size > registers.size()) {
     return false;
   }

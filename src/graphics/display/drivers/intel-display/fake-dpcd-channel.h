@@ -17,11 +17,11 @@ constexpr uint8_t kDefaultSinkCount = 1;
 constexpr size_t kMaxLinkRateTableEntries =
     (dpcd::DPCD_SUPPORTED_LINK_RATE_END + 1 - dpcd::DPCD_SUPPORTED_LINK_RATE_START) / 2;
 
-// FakeDpcdChannel is a utility that allows the DPCD register space to be mocked for test that need
+// FakeDpAuxChannel is a utility that allows the DPCD register space to be mocked for test that need
 // to exercise DisplayPort functionality.
-class FakeDpcdChannel : public DpcdChannel {
+class FakeDpAuxChannel : public DpAuxChannel {
  public:
-  FakeDpcdChannel() { registers.fill(0); }
+  FakeDpAuxChannel() { registers.fill(0); }
 
   // Populates the bare minimum of required fields to form a valid set of capabilities.
   void SetDefaults();

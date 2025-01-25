@@ -529,7 +529,7 @@ std::unique_ptr<DisplayDevice> Controller::QueryDisplay(DdiId ddi_id,
       FDF_LOG(DEBUG, "DDI %d PHY not available. Skip querying.", ddi_id);
     } else {
       auto dp_disp = fbl::make_unique_checked<DpDisplay>(
-          &ac, this, display_id, ddi_id, &dp_auxs_[ddi_id], &pch_engine_.value(),
+          &ac, this, display_id, ddi_id, &dp_aux_channels_[ddi_id], &pch_engine_.value(),
           std::move(ddi_reference_maybe), &root_node_);
       if (ac.check() && reinterpret_cast<DisplayDevice*>(dp_disp.get())->Query()) {
         return dp_disp;
@@ -2277,9 +2277,9 @@ zx_status_t Controller::Init() {
   for (unsigned i = 0; i < ddis_.size(); i++) {
     gmbus_i2cs_.push_back(GMBusI2c(ddis_[i], GetPlatform(device_id_), mmio_space()));
 
-    dp_auxs_.push_back(DpAux(mmio_space(), ddis_[i], device_id_));
+    dp_aux_channels_.push_back(DpAuxChannelImpl(mmio_space(), ddis_[i], device_id_));
     FDF_LOG(TRACE, "DDI %d AUX channel initial configuration:", ddis_[i]);
-    dp_auxs_[dp_auxs_.size() - 1].aux_channel().Log();
+    dp_aux_channels_[dp_aux_channels_.size() - 1].aux_channel().Log();
   }
 
   if (!is_tgl(device_id_)) {

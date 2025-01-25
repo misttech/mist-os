@@ -17,7 +17,7 @@ namespace intel_display {
 
 namespace {
 
-using testing::FakeDpcdChannel;
+using testing::FakeDpAuxChannel;
 using testing::kDefaultLaneCount;
 using testing::kMaxLinkRateTableEntries;
 
@@ -27,37 +27,37 @@ class DpCapabilitiesTest : public ::testing::Test {
 };
 
 TEST_F(DpCapabilitiesTest, NoSupportedLinkRates) {
-  FakeDpcdChannel fake_dpcd;
+  FakeDpAuxChannel fake_dp_aux_channel;
 
-  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dpcd);
+  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dp_aux_channel);
   EXPECT_TRUE(cap.is_error());
 }
 
 // Tests that invalid lane counts are rejected.
 TEST_F(DpCapabilitiesTest, InvalidMaxLaneCount) {
-  FakeDpcdChannel fake_dpcd;
-  fake_dpcd.SetMaxLinkRate(dpcd::LinkBw::k1620Mbps);
+  FakeDpAuxChannel fake_dp_aux_channel;
+  fake_dp_aux_channel.SetMaxLinkRate(dpcd::LinkBw::k1620Mbps);
 
-  fake_dpcd.SetMaxLaneCount(0);
-  EXPECT_TRUE(DpCapabilities::Read(&fake_dpcd).is_error());
+  fake_dp_aux_channel.SetMaxLaneCount(0);
+  EXPECT_TRUE(DpCapabilities::Read(&fake_dp_aux_channel).is_error());
 
-  fake_dpcd.SetMaxLaneCount(3);
-  EXPECT_TRUE(DpCapabilities::Read(&fake_dpcd).is_error());
+  fake_dp_aux_channel.SetMaxLaneCount(3);
+  EXPECT_TRUE(DpCapabilities::Read(&fake_dp_aux_channel).is_error());
 
-  fake_dpcd.SetMaxLaneCount(5);
-  EXPECT_TRUE(DpCapabilities::Read(&fake_dpcd).is_error());
+  fake_dp_aux_channel.SetMaxLaneCount(5);
+  EXPECT_TRUE(DpCapabilities::Read(&fake_dp_aux_channel).is_error());
 }
 
 // Tests that the basic set of getters work for non-EDP.
 TEST_F(DpCapabilitiesTest, BasicFields) {
-  FakeDpcdChannel fake_dpcd;
+  FakeDpAuxChannel fake_dp_aux_channel;
 
-  fake_dpcd.SetDpcdRevision(dpcd::Revision::k1_4);
-  fake_dpcd.SetMaxLaneCount(kDefaultLaneCount);
-  fake_dpcd.SetMaxLinkRate(dpcd::LinkBw::k1620Mbps);
-  fake_dpcd.SetSinkCount(1);
+  fake_dp_aux_channel.SetDpcdRevision(dpcd::Revision::k1_4);
+  fake_dp_aux_channel.SetMaxLaneCount(kDefaultLaneCount);
+  fake_dp_aux_channel.SetMaxLinkRate(dpcd::LinkBw::k1620Mbps);
+  fake_dp_aux_channel.SetSinkCount(1);
 
-  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dpcd);
+  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dp_aux_channel);
   ASSERT_TRUE(cap.is_ok());
   EXPECT_EQ(dpcd::Revision::k1_4, cap.value().dpcd_revision());
   EXPECT_EQ(kDefaultLaneCount, cap.value().max_lane_count());
@@ -72,11 +72,11 @@ TEST_F(DpCapabilitiesTest, BasicFields) {
 
 // Tests that eDP registers are processed when supported.
 TEST_F(DpCapabilitiesTest, EdpRegisters) {
-  FakeDpcdChannel fake_dpcd;
-  fake_dpcd.SetDefaults();
-  fake_dpcd.SetEdpCapable(dpcd::EdpRevision::k1_2);
+  FakeDpAuxChannel fake_dp_aux_channel;
+  fake_dp_aux_channel.SetDefaults();
+  fake_dp_aux_channel.SetEdpCapable(dpcd::EdpRevision::k1_2);
 
-  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dpcd);
+  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dp_aux_channel);
   ASSERT_TRUE(cap.is_ok());
   EXPECT_EQ(std::optional{dpcd::EdpRevision::k1_2}, cap.value().edp_revision());
   EXPECT_FALSE(cap.value().backlight_aux_power());
@@ -84,20 +84,20 @@ TEST_F(DpCapabilitiesTest, EdpRegisters) {
 }
 
 TEST_F(DpCapabilitiesTest, EdpBacklight) {
-  FakeDpcdChannel fake_dpcd;
-  fake_dpcd.SetDefaults();
-  fake_dpcd.SetEdpCapable(dpcd::EdpRevision::k1_2);
+  FakeDpAuxChannel fake_dp_aux_channel;
+  fake_dp_aux_channel.SetDefaults();
+  fake_dp_aux_channel.SetEdpCapable(dpcd::EdpRevision::k1_2);
 
   dpcd::EdpGeneralCap1 gc;
   gc.set_tcon_backlight_adjustment_cap(1);
   gc.set_backlight_aux_enable_cap(1);
-  fake_dpcd.registers[dpcd::DPCD_EDP_GENERAL_CAP1] = gc.reg_value();
+  fake_dp_aux_channel.registers[dpcd::DPCD_EDP_GENERAL_CAP1] = gc.reg_value();
 
   dpcd::EdpBacklightCap bc;
   bc.set_brightness_aux_set_cap(1);
-  fake_dpcd.registers[dpcd::DPCD_EDP_BACKLIGHT_CAP] = bc.reg_value();
+  fake_dp_aux_channel.registers[dpcd::DPCD_EDP_BACKLIGHT_CAP] = bc.reg_value();
 
-  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dpcd);
+  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dp_aux_channel);
   ASSERT_TRUE(cap.is_ok());
   EXPECT_TRUE(cap.value().backlight_aux_power());
   EXPECT_TRUE(cap.value().backlight_aux_brightness());
@@ -106,11 +106,11 @@ TEST_F(DpCapabilitiesTest, EdpBacklight) {
 // Tests that the list of supported link rates is populated correctly using the "Max Link Rate"
 // method.
 TEST_F(DpCapabilitiesTest, MaxLinkRate1620NoEdp) {
-  FakeDpcdChannel fake_dpcd;
-  fake_dpcd.SetDefaults();
-  fake_dpcd.SetMaxLinkRate(dpcd::LinkBw::k1620Mbps);
+  FakeDpAuxChannel fake_dp_aux_channel;
+  fake_dp_aux_channel.SetDefaults();
+  fake_dp_aux_channel.SetMaxLinkRate(dpcd::LinkBw::k1620Mbps);
 
-  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dpcd);
+  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dp_aux_channel);
   ASSERT_TRUE(cap.is_ok());
   EXPECT_FALSE(cap.value().use_link_rate_table());
   ASSERT_EQ(1u, cap.value().supported_link_rates_mbps().size());
@@ -120,11 +120,11 @@ TEST_F(DpCapabilitiesTest, MaxLinkRate1620NoEdp) {
 // Tests that the list of supported link rates is populated correctly using the "Max Link Rate"
 // method.
 TEST_F(DpCapabilitiesTest, MaxLinkRate2700NoEdp) {
-  FakeDpcdChannel fake_dpcd;
-  fake_dpcd.SetDefaults();
-  fake_dpcd.SetMaxLinkRate(dpcd::LinkBw::k2700Mbps);
+  FakeDpAuxChannel fake_dp_aux_channel;
+  fake_dp_aux_channel.SetDefaults();
+  fake_dp_aux_channel.SetMaxLinkRate(dpcd::LinkBw::k2700Mbps);
 
-  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dpcd);
+  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dp_aux_channel);
   ASSERT_TRUE(cap.is_ok());
   EXPECT_FALSE(cap.value().use_link_rate_table());
   ASSERT_EQ(2u, cap.value().supported_link_rates_mbps().size());
@@ -135,11 +135,11 @@ TEST_F(DpCapabilitiesTest, MaxLinkRate2700NoEdp) {
 // Tests that the list of supported link rates is populated correctly using the "Max Link Rate"
 // method.
 TEST_F(DpCapabilitiesTest, MaxLinkRate5400NoEdp) {
-  FakeDpcdChannel fake_dpcd;
-  fake_dpcd.SetDefaults();
-  fake_dpcd.SetMaxLinkRate(dpcd::LinkBw::k5400Mbps);
+  FakeDpAuxChannel fake_dp_aux_channel;
+  fake_dp_aux_channel.SetDefaults();
+  fake_dp_aux_channel.SetMaxLinkRate(dpcd::LinkBw::k5400Mbps);
 
-  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dpcd);
+  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dp_aux_channel);
   ASSERT_TRUE(cap.is_ok());
   EXPECT_FALSE(cap.value().use_link_rate_table());
   ASSERT_EQ(3u, cap.value().supported_link_rates_mbps().size());
@@ -151,11 +151,11 @@ TEST_F(DpCapabilitiesTest, MaxLinkRate5400NoEdp) {
 // Tests that the list of supported link rates is populated correctly using the "Max Link Rate"
 // method.
 TEST_F(DpCapabilitiesTest, MaxLinkRate8100NoEdp) {
-  FakeDpcdChannel fake_dpcd;
-  fake_dpcd.SetDefaults();
-  fake_dpcd.SetMaxLinkRate(dpcd::LinkBw::k8100Mbps);
+  FakeDpAuxChannel fake_dp_aux_channel;
+  fake_dp_aux_channel.SetDefaults();
+  fake_dp_aux_channel.SetMaxLinkRate(dpcd::LinkBw::k8100Mbps);
 
-  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dpcd);
+  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dp_aux_channel);
   ASSERT_TRUE(cap.is_ok());
   EXPECT_FALSE(cap.value().use_link_rate_table());
   ASSERT_EQ(4u, cap.value().supported_link_rates_mbps().size());
@@ -168,12 +168,12 @@ TEST_F(DpCapabilitiesTest, MaxLinkRate8100NoEdp) {
 // Tests that link rate discovery falls back to MAX_LINK_RATE if eDP v1.4 is supported but the
 // link rate table is empty.
 TEST_F(DpCapabilitiesTest, FallbackToMaxLinkRateWhenLinkRateTableIsEmpty) {
-  FakeDpcdChannel fake_dpcd;
-  fake_dpcd.SetDefaults();
-  fake_dpcd.SetEdpCapable(dpcd::EdpRevision::k1_4);
-  fake_dpcd.SetMaxLinkRate(dpcd::LinkBw::k1620Mbps);
+  FakeDpAuxChannel fake_dp_aux_channel;
+  fake_dp_aux_channel.SetDefaults();
+  fake_dp_aux_channel.SetEdpCapable(dpcd::EdpRevision::k1_4);
+  fake_dp_aux_channel.SetMaxLinkRate(dpcd::LinkBw::k1620Mbps);
 
-  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dpcd);
+  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dp_aux_channel);
   ASSERT_TRUE(cap.is_ok());
   EXPECT_FALSE(cap.value().use_link_rate_table());
   EXPECT_FALSE(cap.value().supported_link_rates_mbps().empty());
@@ -182,14 +182,14 @@ TEST_F(DpCapabilitiesTest, FallbackToMaxLinkRateWhenLinkRateTableIsEmpty) {
 // Tests that the list of supported link rates is populated correctly when using the "Link Rate
 // Table" method.
 TEST_F(DpCapabilitiesTest, LinkRateTableOneEntry) {
-  FakeDpcdChannel fake_dpcd;
-  fake_dpcd.SetDefaults();
-  fake_dpcd.SetEdpCapable(dpcd::EdpRevision::k1_4);
-  fake_dpcd.SetMaxLinkRate(0);  // Not supported
+  FakeDpAuxChannel fake_dp_aux_channel;
+  fake_dp_aux_channel.SetDefaults();
+  fake_dp_aux_channel.SetEdpCapable(dpcd::EdpRevision::k1_4);
+  fake_dp_aux_channel.SetMaxLinkRate(0);  // Not supported
 
-  fake_dpcd.PopulateLinkRateTable({100});  // 100 * 200kHz ==> 20MHz
+  fake_dp_aux_channel.PopulateLinkRateTable({100});  // 100 * 200kHz ==> 20MHz
 
-  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dpcd);
+  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dp_aux_channel);
   ASSERT_TRUE(cap.is_ok());
   EXPECT_TRUE(cap.value().use_link_rate_table());
   EXPECT_EQ(1u, cap.value().supported_link_rates_mbps().size());
@@ -199,17 +199,17 @@ TEST_F(DpCapabilitiesTest, LinkRateTableOneEntry) {
 // Tests that the list of supported link rates is populated correctly when using the "Link Rate
 // Table" method.
 TEST_F(DpCapabilitiesTest, LinkRateTableSomeEntries) {
-  FakeDpcdChannel fake_dpcd;
-  fake_dpcd.SetDefaults();
-  fake_dpcd.SetEdpCapable(dpcd::EdpRevision::k1_4);
-  fake_dpcd.SetMaxLinkRate(0);  // Not supported
+  FakeDpAuxChannel fake_dp_aux_channel;
+  fake_dp_aux_channel.SetDefaults();
+  fake_dp_aux_channel.SetEdpCapable(dpcd::EdpRevision::k1_4);
+  fake_dp_aux_channel.SetMaxLinkRate(0);  // Not supported
 
   // 100 * 200kHz ==> 20MHz
   // 200 * 200kHz ==> 40MHz
   // 300 * 200kHz ==> 60MHz
-  fake_dpcd.PopulateLinkRateTable({100, 200, 300});
+  fake_dp_aux_channel.PopulateLinkRateTable({100, 200, 300});
 
-  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dpcd);
+  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dp_aux_channel);
   ASSERT_TRUE(cap.is_ok());
   EXPECT_TRUE(cap.value().use_link_rate_table());
   EXPECT_EQ(3u, cap.value().supported_link_rates_mbps().size());
@@ -219,10 +219,10 @@ TEST_F(DpCapabilitiesTest, LinkRateTableSomeEntries) {
 // Tests that the list of supported link rates is populated correctly when using the "Link Rate
 // Table" method.
 TEST_F(DpCapabilitiesTest, LinkRateTableMaxEntries) {
-  FakeDpcdChannel fake_dpcd;
-  fake_dpcd.SetDefaults();
-  fake_dpcd.SetEdpCapable(dpcd::EdpRevision::k1_4);
-  fake_dpcd.SetMaxLinkRate(0);  // Not supported
+  FakeDpAuxChannel fake_dp_aux_channel;
+  fake_dp_aux_channel.SetDefaults();
+  fake_dp_aux_channel.SetEdpCapable(dpcd::EdpRevision::k1_4);
+  fake_dp_aux_channel.SetMaxLinkRate(0);  // Not supported
 
   // Link rate table entries are stored in units of 200kHz (or kbps). The DpCapabilities data
   // structure stores them in units of Mbps. 1 Mbps = 5 * 200kbps.
@@ -233,9 +233,9 @@ TEST_F(DpCapabilitiesTest, LinkRateTableMaxEntries) {
     input.push_back(static_cast<uint16_t>(kConversionFactor * i));
     output.push_back(i);
   }
-  fake_dpcd.PopulateLinkRateTable(std::move(input));
+  fake_dp_aux_channel.PopulateLinkRateTable(std::move(input));
 
-  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dpcd);
+  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dp_aux_channel);
   ASSERT_TRUE(cap.is_ok());
   EXPECT_TRUE(cap.value().use_link_rate_table());
   EXPECT_EQ(kMaxLinkRateTableEntries, cap.value().supported_link_rates_mbps().size());
@@ -246,18 +246,18 @@ TEST_F(DpCapabilitiesTest, LinkRateTableMaxEntries) {
 // when both the table and the MAX_LINK_RATE register hold valid values (which is optional but
 // allowed by the eDP specification).
 TEST_F(DpCapabilitiesTest, LinkRateTableUsedWhenMaxLinkRateIsAlsoPresent) {
-  FakeDpcdChannel fake_dpcd;
-  fake_dpcd.SetDefaults();
-  fake_dpcd.SetEdpCapable(dpcd::EdpRevision::k1_4);
-  fake_dpcd.SetMaxLinkRate(dpcd::LinkBw::k2700Mbps);
+  FakeDpAuxChannel fake_dp_aux_channel;
+  fake_dp_aux_channel.SetDefaults();
+  fake_dp_aux_channel.SetEdpCapable(dpcd::EdpRevision::k1_4);
+  fake_dp_aux_channel.SetMaxLinkRate(dpcd::LinkBw::k2700Mbps);
 
   // Link rate table entries are stored in units of 200kHz (or kbps). The DpCapabilities data
   // structure stores them in units of Mbps. 1 Mbps = 5 * 200kbps.
   constexpr uint16_t kConversionFactor = 5;
   constexpr uint32_t kExpectedLinkRate = 5400;
-  fake_dpcd.PopulateLinkRateTable({kExpectedLinkRate * kConversionFactor});
+  fake_dp_aux_channel.PopulateLinkRateTable({kExpectedLinkRate * kConversionFactor});
 
-  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dpcd);
+  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dp_aux_channel);
   ASSERT_TRUE(cap.is_ok());
   EXPECT_TRUE(cap.value().use_link_rate_table());
   EXPECT_EQ(1u, cap.value().supported_link_rates_mbps().size());
@@ -267,11 +267,11 @@ TEST_F(DpCapabilitiesTest, LinkRateTableUsedWhenMaxLinkRateIsAlsoPresent) {
 // Tests that the DP capabilities can be inspected and the DP capability values
 // are correctly propagated to the inspect node.
 TEST_F(DpCapabilitiesTest, Inspect) {
-  FakeDpcdChannel fake_dpcd;
-  fake_dpcd.SetDefaults();
-  fake_dpcd.SetMaxLinkRate(dpcd::LinkBw::k2700Mbps);
+  FakeDpAuxChannel fake_dp_aux_channel;
+  fake_dp_aux_channel.SetDefaults();
+  fake_dp_aux_channel.SetMaxLinkRate(dpcd::LinkBw::k2700Mbps);
 
-  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dpcd);
+  const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dp_aux_channel);
   ASSERT_TRUE(cap.is_ok());
 
   inspect::Inspector inspector;
