@@ -14,9 +14,11 @@
 #include <zircon/syscalls/smc.h>
 #include <zircon/types.h>
 
+#include <cstdint>
 #include <memory>
 
 #include <fbl/auto_lock.h>
+#include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/amlogic-display/hdmi-transmitter-top-regs.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
@@ -193,6 +195,13 @@ zx::result<> HdmiTransmitter::I2cTransact(const i2c_impl_op_t* i2c_ops, size_t i
     return zx::error(status);
   }
   return zx::ok();
+}
+
+zx::result<fbl::Vector<uint8_t>> HdmiTransmitter::ReadExtendedEdid() {
+  fbl::AutoLock lock(&dw_lock_);
+  // HdmiTransmitterController already logs its errors, so we don't need to
+  // print additional error logs.
+  return designware_controller_->ReadExtendedEdid();
 }
 
 void HdmiTransmitter::WriteTopLevelReg(uint32_t addr, uint32_t val) {

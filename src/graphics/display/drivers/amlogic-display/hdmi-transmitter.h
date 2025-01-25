@@ -15,6 +15,7 @@
 #include <memory>
 
 #include <fbl/mutex.h>
+#include <fbl/vector.h>
 
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/designware-hdmi/color-param.h"
@@ -60,6 +61,8 @@ class HdmiTransmitter {
   zx::result<> ModeSet(const display::DisplayTiming& timing,
                        const designware_hdmi::ColorParam& color);
   zx::result<> I2cTransact(const i2c_impl_op_t* i2c_ops, size_t i2c_op_count);
+
+  zx::result<fbl::Vector<uint8_t>> ReadExtendedEdid();
 
   void PrintRegisters();
 

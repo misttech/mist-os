@@ -40,6 +40,10 @@ class MockHdmiTransmitterController : public designware_hdmi::HdmiTransmitterCon
   zx_status_t InitHw() override { return ZX_OK; }
   zx_status_t EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count) override { return ZX_OK; }
 
+  zx::result<fbl::Vector<uint8_t>> ReadExtendedEdid() override {
+    return zx::ok(fbl::Vector<uint8_t>{});
+  }
+
   void ConfigHdmitx(const designware_hdmi::ColorParam& color_param,
                     const display::DisplayTiming& mode,
                     const designware_hdmi::hdmi_param_tx& p) override {

@@ -8,9 +8,12 @@
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 
 #include <fbl/array.h>
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
+#include "src/graphics/display/lib/edid-values/edid-values.h"
+#include "src/lib/testing/predicates/status.h"
 
 // The MMIO register addresses here are from the Synopsis DesignWare Cores HDMI
 // Transmitter Controller Databook, which is distributed by Synopsis.
@@ -509,6 +512,230 @@ TEST_F(HdmiTransmitterControllerImplTest, SetFcScramblerCtrlTest) {
   }));
 
   hdmitx_controller_->SetFcScramblerCtrl(false);
+}
+
+TEST_F(HdmiTransmitterControllerImplTest, ReadExtendedEdidForOneBlockEdid) {
+  // The EDID of HP ZR30W has one block.
+  static_assert(edid::kHpZr30wEdid.size() == 128);
+
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+      {.address = kI2cmTargetOffset, .value = 0x50, .write = true},
+      {.address = kI2cmSegAddrOffset, .value = 0x30, .write = true},
+      {.address = kI2cmSegPtrOffset, .value = 0x00, .write = true},
+  }));
+
+  for (size_t i = 0; i < 128; i += 8) {
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+        {.address = kI2cmAddressOffset, .value = i, .write = true},
+        {.address = kI2cmOperationOffset, .value = 0b00'1000, .write = true},
+
+        {.address = kIhI2cmStat0Offset, .value = 0b0000'0000},
+        {.address = kIhI2cmStat0Offset, .value = 0b1111'1111},
+        {.address = kIhI2cmStat0Offset, .value = 0b1111'1111, .write = true},
+
+        {.address = kI2cmReadBuff0Offset + 0, .value = edid::kHpZr30wEdid[i + 0]},
+        {.address = kI2cmReadBuff0Offset + 1, .value = edid::kHpZr30wEdid[i + 1]},
+        {.address = kI2cmReadBuff0Offset + 2, .value = edid::kHpZr30wEdid[i + 2]},
+        {.address = kI2cmReadBuff0Offset + 3, .value = edid::kHpZr30wEdid[i + 3]},
+        {.address = kI2cmReadBuff0Offset + 4, .value = edid::kHpZr30wEdid[i + 4]},
+        {.address = kI2cmReadBuff0Offset + 5, .value = edid::kHpZr30wEdid[i + 5]},
+        {.address = kI2cmReadBuff0Offset + 6, .value = edid::kHpZr30wEdid[i + 6]},
+        {.address = kI2cmReadBuff0Offset + 7, .value = edid::kHpZr30wEdid[i + 7]},
+    }));
+  };
+
+  zx::result<fbl::Vector<uint8_t>> read_extended_edid_result =
+      hdmitx_controller_->ReadExtendedEdid();
+  ASSERT_OK(read_extended_edid_result);
+
+  fbl::Vector<uint8_t> extended_edid = std::move(read_extended_edid_result).value();
+  EXPECT_THAT(std::span(extended_edid), ::testing::ElementsAreArray(edid::kHpZr30wEdid));
+}
+
+TEST_F(HdmiTransmitterControllerImplTest, ReadExtendedEdidForTwoBlockEdid) {
+  // The EDID of Dell P2719H has two blocks.
+  static_assert(edid::kDellP2719hEdid.size() == 256);
+
+  // Read the first EDID block.
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+      {.address = kI2cmTargetOffset, .value = 0x50, .write = true},
+      {.address = kI2cmSegAddrOffset, .value = 0x30, .write = true},
+      {.address = kI2cmSegPtrOffset, .value = 0x00, .write = true},
+  }));
+
+  for (size_t i = 0; i < 128; i += 8) {
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+        {.address = kI2cmAddressOffset, .value = i, .write = true},
+        {.address = kI2cmOperationOffset, .value = 0b00'1000, .write = true},
+
+        {.address = kIhI2cmStat0Offset, .value = 0b0000'0000},
+        {.address = kIhI2cmStat0Offset, .value = 0b1111'1111},
+        {.address = kIhI2cmStat0Offset, .value = 0b1111'1111, .write = true},
+
+        {.address = kI2cmReadBuff0Offset + 0, .value = edid::kDellP2719hEdid[i + 0]},
+        {.address = kI2cmReadBuff0Offset + 1, .value = edid::kDellP2719hEdid[i + 1]},
+        {.address = kI2cmReadBuff0Offset + 2, .value = edid::kDellP2719hEdid[i + 2]},
+        {.address = kI2cmReadBuff0Offset + 3, .value = edid::kDellP2719hEdid[i + 3]},
+        {.address = kI2cmReadBuff0Offset + 4, .value = edid::kDellP2719hEdid[i + 4]},
+        {.address = kI2cmReadBuff0Offset + 5, .value = edid::kDellP2719hEdid[i + 5]},
+        {.address = kI2cmReadBuff0Offset + 6, .value = edid::kDellP2719hEdid[i + 6]},
+        {.address = kI2cmReadBuff0Offset + 7, .value = edid::kDellP2719hEdid[i + 7]},
+    }));
+  };
+
+  // Read the second EDID block.
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+      {.address = kI2cmTargetOffset, .value = 0x50, .write = true},
+      {.address = kI2cmSegAddrOffset, .value = 0x30, .write = true},
+      {.address = kI2cmSegPtrOffset, .value = 0x00, .write = true},
+  }));
+
+  for (size_t i = 128; i < 256; i += 8) {
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+        {.address = kI2cmAddressOffset, .value = i, .write = true},
+        {.address = kI2cmOperationOffset, .value = 0b00'1000, .write = true},
+
+        {.address = kIhI2cmStat0Offset, .value = 0b0000'0000},
+        {.address = kIhI2cmStat0Offset, .value = 0b1111'1111},
+        {.address = kIhI2cmStat0Offset, .value = 0b1111'1111, .write = true},
+
+        {.address = kI2cmReadBuff0Offset + 0, .value = edid::kDellP2719hEdid[i + 0]},
+        {.address = kI2cmReadBuff0Offset + 1, .value = edid::kDellP2719hEdid[i + 1]},
+        {.address = kI2cmReadBuff0Offset + 2, .value = edid::kDellP2719hEdid[i + 2]},
+        {.address = kI2cmReadBuff0Offset + 3, .value = edid::kDellP2719hEdid[i + 3]},
+        {.address = kI2cmReadBuff0Offset + 4, .value = edid::kDellP2719hEdid[i + 4]},
+        {.address = kI2cmReadBuff0Offset + 5, .value = edid::kDellP2719hEdid[i + 5]},
+        {.address = kI2cmReadBuff0Offset + 6, .value = edid::kDellP2719hEdid[i + 6]},
+        {.address = kI2cmReadBuff0Offset + 7, .value = edid::kDellP2719hEdid[i + 7]},
+    }));
+  };
+
+  zx::result<fbl::Vector<uint8_t>> read_extended_edid_result =
+      hdmitx_controller_->ReadExtendedEdid();
+  ASSERT_OK(read_extended_edid_result);
+
+  fbl::Vector<uint8_t> extended_edid = std::move(read_extended_edid_result).value();
+  EXPECT_THAT(std::span(extended_edid), ::testing::ElementsAreArray(edid::kDellP2719hEdid));
+}
+
+TEST_F(HdmiTransmitterControllerImplTest, ReadExtendedEdidForMultiSegmentExtendedEdid) {
+  // The E-EDID of Samsung CRG9 has four blocks.
+  static_assert(edid::kSamsungCrg9Edid.size() == 512);
+
+  // Read the first EDID block.
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+      {.address = kI2cmTargetOffset, .value = 0x50, .write = true},
+      {.address = kI2cmSegAddrOffset, .value = 0x30, .write = true},
+      {.address = kI2cmSegPtrOffset, .value = 0x00, .write = true},
+  }));
+
+  for (size_t i = 0; i < 128; i += 8) {
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+        {.address = kI2cmAddressOffset, .value = i, .write = true},
+        {.address = kI2cmOperationOffset, .value = 0b00'1000, .write = true},
+
+        {.address = kIhI2cmStat0Offset, .value = 0b0000'0000},
+        {.address = kIhI2cmStat0Offset, .value = 0b1111'1111},
+        {.address = kIhI2cmStat0Offset, .value = 0b1111'1111, .write = true},
+
+        {.address = kI2cmReadBuff0Offset + 0, .value = edid::kSamsungCrg9Edid[i + 0]},
+        {.address = kI2cmReadBuff0Offset + 1, .value = edid::kSamsungCrg9Edid[i + 1]},
+        {.address = kI2cmReadBuff0Offset + 2, .value = edid::kSamsungCrg9Edid[i + 2]},
+        {.address = kI2cmReadBuff0Offset + 3, .value = edid::kSamsungCrg9Edid[i + 3]},
+        {.address = kI2cmReadBuff0Offset + 4, .value = edid::kSamsungCrg9Edid[i + 4]},
+        {.address = kI2cmReadBuff0Offset + 5, .value = edid::kSamsungCrg9Edid[i + 5]},
+        {.address = kI2cmReadBuff0Offset + 6, .value = edid::kSamsungCrg9Edid[i + 6]},
+        {.address = kI2cmReadBuff0Offset + 7, .value = edid::kSamsungCrg9Edid[i + 7]},
+    }));
+  }
+
+  // Read the second EDID block.
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+      {.address = kI2cmTargetOffset, .value = 0x50, .write = true},
+      {.address = kI2cmSegAddrOffset, .value = 0x30, .write = true},
+      {.address = kI2cmSegPtrOffset, .value = 0x00, .write = true},
+  }));
+
+  for (size_t i = 128; i < 256; i += 8) {
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+        {.address = kI2cmAddressOffset, .value = i, .write = true},
+        {.address = kI2cmOperationOffset, .value = 0b00'1000, .write = true},
+
+        {.address = kIhI2cmStat0Offset, .value = 0b0000'0000},
+        {.address = kIhI2cmStat0Offset, .value = 0b1111'1111},
+        {.address = kIhI2cmStat0Offset, .value = 0b1111'1111, .write = true},
+
+        {.address = kI2cmReadBuff0Offset + 0, .value = edid::kSamsungCrg9Edid[i + 0]},
+        {.address = kI2cmReadBuff0Offset + 1, .value = edid::kSamsungCrg9Edid[i + 1]},
+        {.address = kI2cmReadBuff0Offset + 2, .value = edid::kSamsungCrg9Edid[i + 2]},
+        {.address = kI2cmReadBuff0Offset + 3, .value = edid::kSamsungCrg9Edid[i + 3]},
+        {.address = kI2cmReadBuff0Offset + 4, .value = edid::kSamsungCrg9Edid[i + 4]},
+        {.address = kI2cmReadBuff0Offset + 5, .value = edid::kSamsungCrg9Edid[i + 5]},
+        {.address = kI2cmReadBuff0Offset + 6, .value = edid::kSamsungCrg9Edid[i + 6]},
+        {.address = kI2cmReadBuff0Offset + 7, .value = edid::kSamsungCrg9Edid[i + 7]},
+    }));
+  }
+
+  // Read the third EDID block.
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+      {.address = kI2cmTargetOffset, .value = 0x50, .write = true},
+      {.address = kI2cmSegAddrOffset, .value = 0x30, .write = true},
+      {.address = kI2cmSegPtrOffset, .value = 0x01, .write = true},
+  }));
+
+  for (size_t i = 256; i < 384; i += 8) {
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+        {.address = kI2cmAddressOffset, .value = i - 256, .write = true},
+        {.address = kI2cmOperationOffset, .value = 0b00'1000, .write = true},
+
+        {.address = kIhI2cmStat0Offset, .value = 0b0000'0000},
+        {.address = kIhI2cmStat0Offset, .value = 0b1111'1111},
+        {.address = kIhI2cmStat0Offset, .value = 0b1111'1111, .write = true},
+
+        {.address = kI2cmReadBuff0Offset + 0, .value = edid::kSamsungCrg9Edid[i + 0]},
+        {.address = kI2cmReadBuff0Offset + 1, .value = edid::kSamsungCrg9Edid[i + 1]},
+        {.address = kI2cmReadBuff0Offset + 2, .value = edid::kSamsungCrg9Edid[i + 2]},
+        {.address = kI2cmReadBuff0Offset + 3, .value = edid::kSamsungCrg9Edid[i + 3]},
+        {.address = kI2cmReadBuff0Offset + 4, .value = edid::kSamsungCrg9Edid[i + 4]},
+        {.address = kI2cmReadBuff0Offset + 5, .value = edid::kSamsungCrg9Edid[i + 5]},
+        {.address = kI2cmReadBuff0Offset + 6, .value = edid::kSamsungCrg9Edid[i + 6]},
+        {.address = kI2cmReadBuff0Offset + 7, .value = edid::kSamsungCrg9Edid[i + 7]},
+    }));
+  }
+
+  // Read the fourth EDID block.
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+      {.address = kI2cmTargetOffset, .value = 0x50, .write = true},
+      {.address = kI2cmSegAddrOffset, .value = 0x30, .write = true},
+      {.address = kI2cmSegPtrOffset, .value = 0x01, .write = true},
+  }));
+
+  for (size_t i = 384; i < 512; i += 8) {
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+        {.address = kI2cmAddressOffset, .value = i - 256, .write = true},
+        {.address = kI2cmOperationOffset, .value = 0b00'1000, .write = true},
+
+        {.address = kIhI2cmStat0Offset, .value = 0b0000'0000},
+        {.address = kIhI2cmStat0Offset, .value = 0b1111'1111},
+        {.address = kIhI2cmStat0Offset, .value = 0b1111'1111, .write = true},
+
+        {.address = kI2cmReadBuff0Offset + 0, .value = edid::kSamsungCrg9Edid[i + 0]},
+        {.address = kI2cmReadBuff0Offset + 1, .value = edid::kSamsungCrg9Edid[i + 1]},
+        {.address = kI2cmReadBuff0Offset + 2, .value = edid::kSamsungCrg9Edid[i + 2]},
+        {.address = kI2cmReadBuff0Offset + 3, .value = edid::kSamsungCrg9Edid[i + 3]},
+        {.address = kI2cmReadBuff0Offset + 4, .value = edid::kSamsungCrg9Edid[i + 4]},
+        {.address = kI2cmReadBuff0Offset + 5, .value = edid::kSamsungCrg9Edid[i + 5]},
+        {.address = kI2cmReadBuff0Offset + 6, .value = edid::kSamsungCrg9Edid[i + 6]},
+        {.address = kI2cmReadBuff0Offset + 7, .value = edid::kSamsungCrg9Edid[i + 7]},
+    }));
+  }
+
+  zx::result<fbl::Vector<uint8_t>> read_extended_edid_result =
+      hdmitx_controller_->ReadExtendedEdid();
+  ASSERT_OK(read_extended_edid_result);
+
+  fbl::Vector<uint8_t> extended_edid = std::move(read_extended_edid_result).value();
+  EXPECT_THAT(std::span(extended_edid), ::testing::ElementsAreArray(edid::kSamsungCrg9Edid));
 }
 
 }  // namespace

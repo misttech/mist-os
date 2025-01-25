@@ -5,8 +5,16 @@
 #include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller-impl.h"
 
 #include <lib/driver/logging/cpp/logger.h>
+#include <lib/zx/result.h>
 #include <lib/zx/time.h>
 #include <zircon/assert.h>
+
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+
+#include <fbl/vector.h>
 
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/designware-hdmi/color-param.h"
@@ -704,6 +712,145 @@ zx_status_t HdmiTransmitterControllerImpl::EdidTransfer(const i2c_impl_op_t* op_
   }
 
   return ZX_OK;
+}
+
+bool HdmiTransmitterControllerImpl::PollForDdcCommandDone() {
+  auto interrupt_status = registers::DdcControllerInterruptStatus::Get().FromValue(0);
+  bool interrupt_triggered = false;
+  for (int attempt = 0; attempt < kMaxAttemptCountForPollForDdcCommandDone; ++attempt) {
+    interrupt_status.ReadFrom(&controller_mmio_);
+    if (interrupt_status.command_done_pending()) {
+      interrupt_triggered = true;
+      break;
+    }
+
+    // The duration between polls is from the U-boot reference code provided by
+    // Amlogic.
+    constexpr zx::duration kPollDuration = zx::usec(1000);
+    zx::nanosleep(zx::deadline_after(kPollDuration));
+  }
+
+  if (!interrupt_triggered) {
+    return false;
+  }
+
+  // The sleep duration is from the U-boot reference code provided by Amlogic.
+  constexpr zx::duration kWaitDurationBeforeAckInterrupt = zx::usec(1000);
+  zx::nanosleep(zx::deadline_after(kWaitDurationBeforeAckInterrupt));
+  interrupt_status.set_command_done_pending(true).WriteTo(&controller_mmio_);
+  return true;
+}
+
+zx::result<> HdmiTransmitterControllerImpl::ReadEdidBlock(
+    int index, std::span<uint8_t, edid::kBlockSize> edid_block) {
+  ZX_DEBUG_ASSERT(index >= 0);
+  ZX_DEBUG_ASSERT(index < edid::kMaxEdidBlockCount);
+
+  registers::DdcControllerDataTargetAddress::Get()
+      .FromValue(0)
+      .set_data_target_address(kDdcDataI2cTargetAddress)
+      .WriteTo(&controller_mmio_);
+  registers::DdcControllerSegmentTargetAddress::Get()
+      .FromValue(0)
+      .set_segment_target_address(kDdcSegmentI2cTargetAddress)
+      .WriteTo(&controller_mmio_);
+
+  // Size of an E-DDC segment.
+  //
+  // VESA Enhanced Display Data Channel (E-DDC) Standard version 1.3 revised
+  // Dec 31 2020, Section 2.2.5 "Segment Pointer", page 18.
+  static constexpr int kEddcSegmentSize = 256;
+  static_assert(kEddcSegmentSize == edid::kBlockSize * 2);
+
+  const int segment_pointer = index / 2;
+
+  // `segment_pointer` is in [0, 127], so casting `segment_pointer` to uint8_t
+  // doesn't overflow.
+  registers::DdcControllerSegmentPointer::Get()
+      .FromValue(0)
+      .set_segment_pointer(static_cast<uint8_t>(segment_pointer))
+      .WriteTo(&controller_mmio_);
+
+  // Segment offset of the first byte in the current block.
+  const int initial_segment_offset = (index % 2) * static_cast<int>(edid::kBlockSize);
+
+  for (uint8_t bytes_read = 0; bytes_read < edid::kBlockSize; bytes_read += 8) {
+    const int segment_offset = initial_segment_offset + bytes_read;
+
+    // `segment_offset` is in [0, 255], so casting `segment_offset` to uint8_t
+    // doesn't overflow.
+    registers::DdcControllerWordOffset::Get()
+        .FromValue(0)
+        .set_word_offset(static_cast<uint8_t>(segment_offset))
+        .WriteTo(&controller_mmio_);
+
+    registers::DdcControllerCommand::Get().FromValue(0).set_eddc_read_8bytes(true).WriteTo(
+        &controller_mmio_);
+
+    bool success = PollForDdcCommandDone();
+    if (!success) {
+      FDF_LOG(ERROR, "DDC controller did not finish reading after %d attempts",
+              kMaxAttemptCountForPollForDdcCommandDone);
+      return zx::error(ZX_ERR_TIMED_OUT);
+    }
+
+    for (int i = 0; i < 8; i++) {
+      edid_block[bytes_read + i] =
+          registers::DdcControllerReadBuffer::Get(i).ReadFrom(&controller_mmio_).byte();
+    }
+  }
+
+  return zx::ok();
+}
+
+zx::result<fbl::Vector<uint8_t>> HdmiTransmitterControllerImpl::ReadExtendedEdid() {
+  fbl::Vector<uint8_t> base_edid;
+  fbl::AllocChecker alloc_checker;
+  base_edid.resize(edid::kBlockSize, &alloc_checker);
+  if (!alloc_checker.check()) {
+    FDF_LOG(ERROR, "Failed to allocate memory for base EDID");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  zx::result<> base_edid_result =
+      ReadEdidBlock(0, std::span<uint8_t, edid::kBlockSize>(base_edid.data(), edid::kBlockSize));
+  if (base_edid_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to read EDID base block: %s", base_edid_result.status_string());
+    return base_edid_result.take_error();
+  }
+
+  // VESA Enhanced Extended Display Identification Data (E-EDID) Standard,
+  // Release A, Revision 2, dated September 25, 2006, revised December 31, 2020.
+  // Section 3.1 "EDID Format Overview", page 19.
+  static constexpr int kBaseEdidExtensionBlockCountOffset = 126;
+  const int extension_block_count = base_edid[kBaseEdidExtensionBlockCountOffset];
+
+  fbl::Vector<uint8_t> extended_edid = std::move(base_edid);
+  const size_t extended_edid_size =
+      static_cast<size_t>(extension_block_count + 1) * edid::kBlockSize;
+  extended_edid.resize(extended_edid_size, 0, &alloc_checker);
+
+  if (!alloc_checker.check()) {
+    FDF_LOG(ERROR, "Failed to allocate %zu bytes for E-EDID", extended_edid_size);
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  std::ranges::copy(base_edid, extended_edid.begin());
+
+  for (int extension_block_index = 1; extension_block_index <= extension_block_count;
+       ++extension_block_index) {
+    int extended_block_offset = extension_block_index * static_cast<int>(edid::kBlockSize);
+    std::span<uint8_t, edid::kBlockSize> extended_block(
+        extended_edid.begin() + extended_block_offset, edid::kBlockSize);
+    zx::result<> extension_block_result = ReadEdidBlock(extension_block_index, extended_block);
+    if (extension_block_result.is_error()) {
+      FDF_LOG(ERROR, "Failed to read EDID extension block #%d: %s", extension_block_index,
+              extension_block_result.status_string());
+      return extension_block_result.take_error();
+    }
+  }
+
+  return zx::ok(std::move(extended_edid));
 }
 
 #define PRINT_REG(name) PrintReg(#name, (name))

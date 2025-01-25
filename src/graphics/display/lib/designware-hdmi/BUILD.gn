@@ -27,6 +27,7 @@ source_set("hdmi-transmitter-controller-impl") {
   public_deps = [
     ":hdmi-transmitter-controller",
     "//sdk/lib/driver/logging/cpp",
+    "//src/graphics/display/lib/edid",
     "//zircon/system/ulib/hwreg",
   ]
 }
@@ -43,8 +44,10 @@ test("designware-hdmi-tests-bin") {
     "//sdk/lib/driver/mock-mmio/cpp",
     "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//src/devices/lib/mmio",
+    "//src/graphics/display/lib/edid-values",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
+    "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/zx",
   ]

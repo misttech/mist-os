@@ -7,6 +7,11 @@
 
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <lib/zx/result.h>
+
+#include <cstdint>
+
+#include <fbl/vector.h>
 
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/designware-hdmi/color-param.h"
@@ -33,6 +38,8 @@ class HdmiTransmitterController {
 
   virtual zx_status_t InitHw() = 0;
   virtual zx_status_t EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count) = 0;
+
+  virtual zx::result<fbl::Vector<uint8_t>> ReadExtendedEdid() = 0;
 
   virtual void ConfigHdmitx(const ColorParam& color_param, const display::DisplayTiming& mode,
                             const hdmi_param_tx& p) = 0;
