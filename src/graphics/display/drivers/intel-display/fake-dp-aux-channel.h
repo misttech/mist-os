@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_FAKE_DPCD_CHANNEL_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_FAKE_DPCD_CHANNEL_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_FAKE_DP_AUX_CHANNEL_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_FAKE_DP_AUX_CHANNEL_H_
 
 #include <cstdint>
 
@@ -71,4 +71,4 @@ class FakeDpAuxChannel : public DpAuxChannel {
 }  // namespace testing
 }  // namespace intel_display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_FAKE_DPCD_CHANNEL_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_FAKE_DP_AUX_CHANNEL_H_

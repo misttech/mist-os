@@ -11,7 +11,7 @@
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/drivers/intel-display/dp-display.h"
-#include "src/graphics/display/drivers/intel-display/fake-dpcd-channel.h"
+#include "src/graphics/display/drivers/intel-display/fake-dp-aux-channel.h"
 
 namespace intel_display {
 

@@ -16,7 +16,7 @@
 
 #include "src/graphics/display/drivers/intel-display/ddi-physical-layer-manager.h"
 #include "src/graphics/display/drivers/intel-display/dpll.h"
-#include "src/graphics/display/drivers/intel-display/fake-dpcd-channel.h"
+#include "src/graphics/display/drivers/intel-display/fake-dp-aux-channel.h"
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 #include "src/graphics/display/drivers/intel-display/intel-display.h"
 #include "src/graphics/display/drivers/intel-display/pch-engine.h"
