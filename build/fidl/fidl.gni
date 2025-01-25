@@ -443,6 +443,27 @@ template("fidl") {
     }
 
     if (enable_rust && (is_fidl_toolchain || toolchain_variant.supports_rust)) {
+      if (is_host || enable_fdomain) {
+        # Add SDK category markers as Rust is used for ffx host tools.
+        # Check for allowed marker before adding category.
+        import("//src/developer/ffx/build/ffx_subtool_allowlist.gni")
+        label_name = get_label_info(_fidl_target, "label_no_toolchain")
+        is_allowed_for_ffx = ffx_subtool_fidl_allowlist + [ label_name ] -
+                             [ label_name ] != ffx_subtool_fidl_allowlist
+        marker_category = "unknown"
+        if (defined(invoker.sdk_category)) {
+          marker_category = invoker.sdk_category
+
+          # TODO(https://fxbug.dev/333907192): Remove when fuchsia.boot is promoted.
+          if (marker_category == "internal_only_idk") {
+            marker_category = "internal"
+          }
+        }
+        if (is_allowed_for_ffx) {
+          marker_category = "allowed-for-ffx-subtool"
+        }
+      }
+
       # Only import the fidl_rust() template if in a rust-capable toolchain and
       # rust bindings are to be defined.
       import("//build/rust/fidl_rust.gni")
@@ -461,27 +482,8 @@ template("fidl") {
         if (!is_host && enable_rust_drivers) {
           forward_variables_from(invoker, [ "contains_drivers" ])
         }
-        deps = []
         if (is_host) {
-          # Add SDK category markers as Rust is used for ffx host tools.
-          # Check for allowed marker before adding category.
-          import("//src/developer/ffx/build/ffx_subtool_allowlist.gni")
-          label_name = get_label_info(_fidl_target, "label_no_toolchain")
-          is_allowed_for_ffx = ffx_subtool_fidl_allowlist + [ label_name ] -
-                               [ label_name ] != ffx_subtool_fidl_allowlist
-          marker_category = "unknown"
-          if (defined(invoker.sdk_category)) {
-            marker_category = invoker.sdk_category
-
-            # TODO(https://fxbug.dev/333907192): Remove when fuchsia.boot is promoted.
-            if (marker_category == "internal_only_idk") {
-              marker_category = "internal"
-            }
-          }
-          if (is_allowed_for_ffx) {
-            marker_category = "allowed-for-ffx-subtool"
-          }
-          deps += [ "//sdk/categories:marker-${marker_category}" ]
+          deps = [ "//sdk/categories:marker-${marker_category}" ]
         }
         fidl_gen_dir += "/rust"
       }
@@ -501,27 +503,7 @@ template("fidl") {
           fdomain = true
 
           forward_variables_from(common_parameters, "*")
-          deps = []
-
-          # Add SDK category markers as Rust is used for ffx host tools.
-          # Check for allowed marker before adding category.
-          import("//src/developer/ffx/build/ffx_subtool_allowlist.gni")
-          label_name = get_label_info(_fidl_target, "label_no_toolchain")
-          is_allowed_for_ffx = ffx_subtool_fidl_allowlist + [ label_name ] -
-                               [ label_name ] != ffx_subtool_fidl_allowlist
-          marker_category = "unknown"
-          if (defined(invoker.sdk_category)) {
-            marker_category = invoker.sdk_category
-
-            # TODO(https://fxbug.dev/333907192): Remove when fuchsia.boot is promoted.
-            if (marker_category == "internal_only_idk") {
-              marker_category = "internal"
-            }
-          }
-          if (is_allowed_for_ffx) {
-            marker_category = "allowed-for-ffx-subtool"
-          }
-          deps += [ "//sdk/categories:marker-${marker_category}" ]
+          deps = [ "//sdk/categories:marker-${marker_category}" ]
           fidl_gen_dir += "/rust"
         }
       }
