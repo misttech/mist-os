@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-display/i2c/gmbus-i2c.h"
 
+#include <lib/fit/defer.h>
 #include <threads.h>
 
 #include <fbl/auto_lock.h>
@@ -147,92 +148,212 @@ bool GMBusI2c::SetDdcSegment(uint8_t segment_num) {
   return i2c_scl(mmio_space_, *gpio_port_, 1);
 }
 
-static constexpr size_t kMaxTransferSize = 255;
-zx_status_t GMBusI2c::I2cImplGetMaxTransferSize(uint64_t* out_size) {
-  *out_size = kMaxTransferSize;
-  return ZX_OK;
-}
-
-zx_status_t GMBusI2c::I2cImplSetBitrate(uint32_t bitrate) {
-  // no-op for now
-  return ZX_OK;
-}
-
-zx_status_t GMBusI2c::I2cImplTransact(const i2c_impl_op_t* ops, size_t size) {
+bool GMBusI2c::ProbeDisplay() {
   ZX_ASSERT(gmbus_pin_pair_.has_value());
   ZX_ASSERT(gpio_port_.has_value());
 
-  for (unsigned i = 0; i < size; i++) {
-    if (ops[i].data_size > kMaxTransferSize) {
-      return ZX_ERR_INVALID_ARGS;
-    }
-  }
-  if (!ops[size - 1].stop) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  // The GMBus register is a limited interface to the i2c bus - it doesn't support complex
-  // transactions like setting the E-DDC segment. For now, providing a special-case interface
-  // for reading the E-DDC is good enough.
   fbl::AutoLock lock(&lock_);
-  zx_status_t fail_res = ZX_ERR_IO;
-  bool gmbus_set = false;
-  for (unsigned i = 0; i < size; i++) {
-    const i2c_impl_op_t* op = ops + i;
-    if (op->address == kDdcSegmentAddress && !op->is_read && op->data_size == 1) {
-      registers::GMBusClockPortSelect::Get().FromValue(0).WriteTo(mmio_space_);
-      gmbus_set = false;
-      if (!SetDdcSegment(*static_cast<uint8_t*>(op->data_buffer))) {
-        goto fail;
-      }
-    } else if (op->address == kDdcDataAddress) {
-      if (!gmbus_set) {
-        auto gmbus_clock_port_select = registers::GMBusClockPortSelect::Get().FromValue(0);
-        gmbus_clock_port_select.SetPinPair(*gmbus_pin_pair_).WriteTo(mmio_space_);
 
-        gmbus_set = true;
-      }
+  // Clears the GMBus clock configuration before starting a DDC transaction.
+  auto gmbus_clock_port_select = registers::GMBusClockPortSelect::Get().FromValue(0);
+  gmbus_clock_port_select.WriteTo(mmio_space_);
 
-      uint8_t* buf = static_cast<uint8_t*>(op->data_buffer);
-      uint8_t len = static_cast<uint8_t>(op->data_size);
-      if (op->is_read ? GMBusRead(kDdcDataAddress, buf, len)
-                      : GMBusWrite(kDdcDataAddress, buf, len)) {
-        // Alias `mmio_space_` to aid Clang's thread safety analyzer, which
-        // can't reason about closure scopes. The type system helps ensure
-        // thread-safety, because the scope of the alias is included in the
-        // scope of the AutoLock.
-        fdf::MmioBuffer& mmio_space = *mmio_space_;
+  gmbus_clock_port_select.SetPinPair(*gmbus_pin_pair_).WriteTo(mmio_space_);
 
-        if (!display::PollUntil(
-                [&]() {
-                  return registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_waiting();
-                },
-                zx::msec(1), 10)) {
-          FDF_LOG(TRACE, "Transition to wait phase timed out");
-          goto fail;
-        }
-      } else {
-        goto fail;
-      }
-    } else {
-      fail_res = ZX_ERR_NOT_SUPPORTED;
-      goto fail;
+  // We disable Clang thread safety analyzer as it cannot reason about mutex
+  // usage in closures. The closure is called while `lock_` is held, so it's
+  // safe to call `I2cClearNack()`.
+  auto clear_nack_on_failure = fit::defer([this]() __TA_NO_THREAD_SAFETY_ANALYSIS {
+    if (!I2cClearNack()) {
+      FDF_LOG(TRACE, "Failed to clear nack");
     }
+  });
 
-    if (op->stop) {
-      if (!I2cFinish()) {
-        goto fail;
-      }
-      gmbus_set = false;
+  uint8_t byte_read;
+  bool read_result = GMBusRead(kDdcDataAddress, &byte_read, 1);
+  if (!read_result) {
+    FDF_LOG(ERROR, "Failed to read a EDID byte from the E-DDC channel");
+    return false;
+  }
+
+  // Alias `mmio_space_` to aid Clang's thread safety analyzer, which
+  // can't reason about closure scopes. The type system helps ensure
+  // thread-safety, because the scope of the alias is included in the
+  // scope of the AutoLock.
+  fdf::MmioBuffer& mmio_space = *mmio_space_;
+
+  if (!display::PollUntil(
+          [&]() {
+            return registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_waiting();
+          },
+          zx::msec(1), 10)) {
+    FDF_LOG(ERROR, "Failed to transition GMBus Controller to wait state");
+    return false;
+  }
+
+  if (!I2cFinish()) {
+    FDF_LOG(ERROR, "Failed to finish DDC transactions");
+    return false;
+  }
+
+  clear_nack_on_failure.cancel();
+  return true;
+}
+
+zx::result<> GMBusI2c::ReadEdidBlock(int index, std::span<uint8_t, edid::kBlockSize> edid_block) {
+  ZX_DEBUG_ASSERT(index >= 0);
+  ZX_DEBUG_ASSERT(index < edid::kMaxEdidBlockCount);
+
+  ZX_ASSERT(gmbus_pin_pair_.has_value());
+  ZX_ASSERT(gpio_port_.has_value());
+
+  fbl::AutoLock lock(&lock_);
+
+  // Clears the GMBus clock configuration before starting a DDC transaction.
+  auto gmbus_clock_port_select = registers::GMBusClockPortSelect::Get().FromValue(0);
+  gmbus_clock_port_select.WriteTo(mmio_space_);
+
+  // Size of an E-DDC segment.
+  //
+  // VESA Enhanced Display Data Channel (E-DDC) Standard version 1.3 revised
+  // Dec 31 2020, Section 2.2.5 "Segment Pointer", page 18.
+  static constexpr int kEddcSegmentSize = 256;
+  static_assert(kEddcSegmentSize == edid::kBlockSize * 2);
+
+  const int segment_pointer = index / 2;
+
+  // The VESA E-DDC standard claims that the segment pointer is reset to its
+  // default value (00h) at the completion of each command sequence.
+  // (Section 2.2.5 "Segment Pointer", Page 18, VESA E-DDC Standard,
+  //  Version 1.3)
+  //
+  // The recommended reading patterns in the E-DDC standard require drivers
+  // to always issue a segment write before each read operation and ignore any
+  // NACKs (Section 5.1.1 "Basic Operation for E-DDC Access of EDID", Section
+  // 6.5 "E-DDC Sequential Read", VESA E-DDC Standard, Version 1.3).
+  //
+  // However, The Intel GMBus I2C controller does not handle NACKs correctly,
+  // which makes it impossible to follow the procedure recommended by the E-DDC
+  // standard. Our workaround is to skip the segment write for segment 0, and
+  // rely on the segment reset logic mandated by the E-DDC standard. This
+  // workaround guarantees we only send segment write command to devices that
+  // support the E-DDC standard.
+  //
+  // It is possible that the driver may fail connecting to monitors that only
+  // recognize some fixed DDC command patterns (for example, segment write
+  // must always precede data read), though we have never encountered such
+  // display in our testing.
+  if (segment_pointer != 0) {
+    // `segment_pointer` is in [0, 127], so casting `segment_pointer` to uint8_t
+    // doesn't change its value.
+    const bool set_ddc_segment_success = SetDdcSegment(static_cast<uint8_t>(segment_pointer));
+    if (!set_ddc_segment_success) {
+      FDF_LOG(ERROR, "Failed to set DDC segment %d for block %d", segment_pointer, index);
+      return zx::error(ZX_ERR_IO);
     }
   }
 
-  return ZX_OK;
-fail:
-  if (!I2cClearNack()) {
-    FDF_LOG(TRACE, "Failed to clear nack");
+  gmbus_clock_port_select.SetPinPair(*gmbus_pin_pair_).WriteTo(mmio_space_);
+
+  // We disable the Clang thread safety analyzer as it cannot reason about mutex
+  // usage in closures. The closure is called while `lock_` is held, so it's
+  // safe to call `I2cClearNack()`.
+  auto clear_nack_on_failure = fit::defer([this]() __TA_NO_THREAD_SAFETY_ANALYSIS {
+    if (!I2cClearNack()) {
+      FDF_LOG(TRACE, "Failed to clear nack");
+    }
+  });
+
+  // Segment offset of the first byte in the current block.
+  // Its value must be 0 or 128, so it fits in a uint8_t variable.
+  const uint8_t initial_segment_offset =
+      static_cast<uint8_t>(index % 2 * static_cast<int>(edid::kBlockSize));
+  bool write_offset_result = GMBusWrite(kDdcDataAddress, &initial_segment_offset, 1);
+  if (!write_offset_result) {
+    FDF_LOG(ERROR, "Failed to write offset %d for block %d", initial_segment_offset, index);
+    return zx::error(ZX_ERR_IO);
   }
-  return fail_res;
+
+  // Alias `mmio_space_` to aid Clang's thread safety analyzer, which
+  // can't reason about closure scopes. The type system helps ensure
+  // thread-safety, because the scope of the alias is included in the
+  // scope of the AutoLock.
+  fdf::MmioBuffer& mmio_space = *mmio_space_;
+
+  if (!display::PollUntil(
+          [&]() {
+            return registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_waiting();
+          },
+          zx::msec(1), 10)) {
+    FDF_LOG(ERROR, "Failed to transition GMBus Controller to wait state");
+    return zx::error(ZX_ERR_IO);
+  }
+
+  bool read_result = GMBusRead(kDdcDataAddress, edid_block.data(), edid_block.size());
+  if (!read_result) {
+    FDF_LOG(ERROR, "Failed to read EDID block %d", index);
+    return zx::error(ZX_ERR_IO);
+  }
+
+  if (!display::PollUntil(
+          [&]() {
+            return registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_waiting();
+          },
+          zx::msec(1), 10)) {
+    FDF_LOG(ERROR, "Failed to transition GMBus Controller to wait state");
+    return zx::error(ZX_ERR_IO);
+  }
+
+  if (!I2cFinish()) {
+    FDF_LOG(ERROR, "Failed to finish DDC transactions");
+    return zx::error(ZX_ERR_IO);
+  }
+
+  clear_nack_on_failure.cancel();
+  return zx::ok();
+}
+
+zx::result<fbl::Vector<uint8_t>> GMBusI2c::ReadExtendedEdid() {
+  std::array<uint8_t, edid::kBlockSize> base_edid;
+  zx::result<> base_edid_result = ReadEdidBlock(0, base_edid);
+  if (base_edid_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to read EDID base block: %s", base_edid_result.status_string());
+    return base_edid_result.take_error();
+  }
+
+  // VESA Enhanced Extended Display Identification Data (E-EDID) Standard,
+  // Release A, Revision 2, dated September 25, 2006, revised December 31, 2020.
+  // Section 3.1 "EDID Format Overview", page 19.
+  static constexpr int kBaseEdidExtensionBlockCountOffset = 126;
+  const int extension_block_count = base_edid[kBaseEdidExtensionBlockCountOffset];
+
+  fbl::Vector<uint8_t> extended_edid;
+  fbl::AllocChecker alloc_checker;
+  const size_t extended_edid_size =
+      static_cast<size_t>(extension_block_count + 1) * edid::kBlockSize;
+  extended_edid.resize(extended_edid_size, 0, &alloc_checker);
+
+  if (!alloc_checker.check()) {
+    FDF_LOG(ERROR, "Failed to allocate %zu bytes for E-EDID", extended_edid_size);
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  std::ranges::copy(base_edid, extended_edid.begin());
+
+  for (int extension_block_index = 1; extension_block_index <= extension_block_count;
+       ++extension_block_index) {
+    int extension_block_offset = extension_block_index * static_cast<int>(edid::kBlockSize);
+    std::span<uint8_t, edid::kBlockSize> extension_block(
+        extended_edid.begin() + extension_block_offset, edid::kBlockSize);
+    zx::result<> extension_block_result = ReadEdidBlock(extension_block_index, extension_block);
+    if (extension_block_result.is_error()) {
+      FDF_LOG(ERROR, "Failed to read EDID extension block #%d: %s", extension_block_index,
+              extension_block_result.status_string());
+      return extension_block_result.take_error();
+    }
+  }
+
+  return zx::ok(std::move(extended_edid));
 }
 
 bool GMBusI2c::GMBusWrite(uint8_t addr, const uint8_t* buf, uint8_t size) {

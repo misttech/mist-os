@@ -54,6 +54,8 @@ class HdmiDisplay final : public DisplayDevice {
 
  private:
   GMBusI2c& gmbus_i2c_;
+
+  fbl::Vector<uint8_t> edid_bytes_;
 };
 
 }  // namespace intel_display

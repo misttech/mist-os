@@ -10,25 +10,30 @@
 #include <threads.h>
 #include <zircon/assert.h>
 
+#include <array>
+
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 #include "src/graphics/display/drivers/intel-display/i2c/gmbus-gpio.h"
+#include "src/graphics/display/lib/edid/edid.h"
 
 namespace intel_display {
 
-class GMBusI2c : public ddk::I2cImplProtocol<GMBusI2c> {
+class GMBusI2c {
  public:
   GMBusI2c(DdiId ddi_id, registers::Platform platform, fdf::MmioBuffer* mmio_space);
 
-  zx_status_t I2cImplGetMaxTransferSize(uint64_t* out_size);
-  zx_status_t I2cImplSetBitrate(uint32_t bitrate);
-  zx_status_t I2cImplTransact(const i2c_impl_op_t* ops, size_t count);
+  // Checks for the presence of a display device by reading a byte of EDID data.
+  //
+  // Returns true iff a display is available on the pins connected by the
+  // GMBus controller.
+  bool ProbeDisplay();
 
-  ddk::I2cImplProtocolClient i2c() {
-    const i2c_impl_protocol_t i2c{.ops = &i2c_impl_protocol_ops_, .ctx = this};
-    return ddk::I2cImplProtocolClient(&i2c);
-  }
+  zx::result<fbl::Vector<uint8_t>> ReadExtendedEdid();
 
  private:
+  // `index` must be non-negative and less than `edid::kMaxEdidBlockCount`.
+  zx::result<> ReadEdidBlock(int index, std::span<uint8_t, edid::kBlockSize> edid_block);
+
   const std::optional<GMBusPinPair> gmbus_pin_pair_;
   const std::optional<GpioPort> gpio_port_;
 

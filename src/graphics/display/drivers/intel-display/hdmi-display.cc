@@ -119,35 +119,33 @@ bool HdmiDisplay::Query() {
   registers::GMBusClockPortSelect::Get().FromValue(0).WriteTo(mmio_space());
   registers::GMBusControllerInterruptMask::Get().FromValue(0).WriteTo(mmio_space());
 
-  // The I2C address for writing the DDC data offset/reading DDC data.
-  //
-  // VESA Enhanced Display Data Channel (E-DDC) Standard version 1.3 revised
-  // Dec 31 2020, Section 2.2.3 "DDC Addresses", page 17.
-  //
-  // TODO(https://fxbug.dev/42068376): De-duplicate DDC address definitions from
-  // HdmiDisplay and GMBusI2c implementations.
-  constexpr static uint8_t kDdcDataAddress = 0x50;
-
   // The only way to tell if an HDMI monitor is actually connected is
-  // to try to read a byte over I2C data address.
-  for (unsigned i = 0; i < 3; i++) {
-    uint8_t test_data = 0;
-    i2c_impl_op_t op = {
-        .address = kDdcDataAddress,
-        .data_buffer = &test_data,
-        .data_size = 1,
-        .is_read = true,
-        .stop = 1,
-    };
-    registers::GMBusClockPortSelect::Get().FromValue(0).WriteTo(mmio_space());
-    if (gmbus_i2c_.i2c().Transact(&op, 1) == ZX_OK) {
+  // to try to read an E-EDID byte.
+  bool has_display = false;
+  static constexpr int kMaxProbeDisplayAttemptCount = 3;
+  for (int i = 0; i < kMaxProbeDisplayAttemptCount; ++i) {
+    has_display = gmbus_i2c_.ProbeDisplay();
+    if (has_display) {
       FDF_LOG(TRACE, "Found a hdmi/dvi monitor");
-      return true;
+      break;
     }
     zx_nanosleep(zx_deadline_after(ZX_MSEC(5)));
   }
-  FDF_LOG(TRACE, "Failed to query hdmi i2c bus");
-  return false;
+
+  if (!has_display) {
+    FDF_LOG(TRACE, "Failed to find a display after %d attempts", kMaxProbeDisplayAttemptCount);
+    return false;
+  }
+
+  zx::result<fbl::Vector<uint8_t>> read_extended_edid_result = gmbus_i2c_.ReadExtendedEdid();
+  if (read_extended_edid_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to read E-EDID of the display: %s",
+            read_extended_edid_result.status_string());
+    return false;
+  }
+
+  edid_bytes_ = std::move(read_extended_edid_result).value();
+  return true;
 }
 
 bool HdmiDisplay::InitDdi() {
@@ -309,23 +307,16 @@ bool HdmiDisplay::CheckPixelRate(int64_t pixel_rate_hz) {
 }
 
 raw_display_info_t HdmiDisplay::CreateRawDisplayInfo() {
-  i2c_impl_protocol_t i2c_protocol;
-  gmbus_i2c_.i2c().GetProto(&i2c_protocol);
-
   return raw_display_info_t{
       .display_id = display::ToBanjoDisplayId(id()),
       .preferred_modes_list = nullptr,
       .preferred_modes_count = 0,
-      .edid_bytes_list = nullptr,
-      .edid_bytes_count = 0,
-      .eddc_client = i2c_protocol,
+      .edid_bytes_list = edid_bytes_.data(),
+      .edid_bytes_count = edid_bytes_.size(),
+      .eddc_client = {.ops = nullptr, .ctx = nullptr},
       .pixel_formats_list = kBanjoSupportedPixelFormats.data(),
       .pixel_formats_count = kBanjoSupportedPixelFormats.size(),
   };
-
-  // TODO(b/317914671): After the display coordinator provides display metadata
-  // to the drivers, each display's type should potentially be adjusted from
-  // HDMI to DVI, based on EDID information.
 }
 
 }  // namespace intel_display
