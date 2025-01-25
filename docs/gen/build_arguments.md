@@ -731,7 +731,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8724861396695692849"`
+**Current value for `target_cpu = "arm64"`:** `"8724816091759153825"`
 
 From //out/not-default/args.gn:10
 
@@ -739,7 +739,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8724861396695692849"`
+**Current value for `target_cpu = "riscv64"`:** `"8724816091759153825"`
 
 From //out/not-default/args.gn:10
 
@@ -747,7 +747,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8724861396695692849"`
+**Current value for `target_cpu = "x64"`:** `"8724816091759153825"`
 
 From //out/not-default/args.gn:10
 
@@ -4653,7 +4653,7 @@ From //sdk/config.gni:13
 
 Identifier for the Core SDK.
 
-**Current value (from the default):** `"26.99991231.0.1"`
+**Current value (from the default):** `"27.99991231.0.1"`
 
 From //sdk/config.gni:7
 
