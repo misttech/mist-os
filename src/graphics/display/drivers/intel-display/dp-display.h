@@ -8,188 +8,20 @@
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/result.h>
-#include <threads.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
 #include <cstdint>
 
-#include "src/graphics/display/drivers/intel-display/ddi-aux-channel.h"
 #include "src/graphics/display/drivers/intel-display/ddi-physical-layer.h"
 #include "src/graphics/display/drivers/intel-display/display-device.h"
+#include "src/graphics/display/drivers/intel-display/dp-aux-channel.h"
+#include "src/graphics/display/drivers/intel-display/dp-capabilities.h"
 #include "src/graphics/display/drivers/intel-display/dpcd.h"
 #include "src/graphics/display/drivers/intel-display/pch-engine.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 
 namespace intel_display {
-
-// Represents transactions performed over the DisplayPort Auxiliary (DP AUX)
-// channel.
-class DpAuxChannel {
- public:
-  virtual ~DpAuxChannel() = default;
-
-  // Interface for DDC I2C transactions performed over the DP AUX channel.
-  virtual ddk::I2cImplProtocolClient i2c() = 0;
-
-  // Reads from DisplayPort Configuration Data (DPCD) registers over the DP AUX
-  // channel.
-  virtual bool DpcdRead(uint32_t addr, uint8_t* buf, size_t size) = 0;
-
-  // Writes to DisplayPort Configuration Data (DPCD) registers over the DP AUX
-  // channel.
-  virtual bool DpcdWrite(uint32_t addr, const uint8_t* buf, size_t size) = 0;
-};
-
-class DpAuxChannelImpl : public DpAuxChannel, public ddk::I2cImplProtocol<DpAuxChannelImpl> {
- public:
-  // `mmio_buffer` must outlive this instance.
-  DpAuxChannelImpl(fdf::MmioBuffer* mmio_buffer, DdiId ddi_id, uint16_t device_id);
-
-  zx_status_t I2cImplGetMaxTransferSize(uint64_t* out_size);
-  zx_status_t I2cImplSetBitrate(uint32_t bitrate);
-  zx_status_t I2cImplTransact(const i2c_impl_op_t* ops, size_t count);
-
-  // `DpAuxChannel`:
-  ddk::I2cImplProtocolClient i2c() final;
-  bool DpcdRead(uint32_t addr, uint8_t* buf, size_t size) final;
-  bool DpcdWrite(uint32_t addr, const uint8_t* buf, size_t size) final;
-
-  // Exposed for configuration logging.
-  DdiAuxChannel& aux_channel() { return aux_channel_; }
-
- private:
-  DdiAuxChannel aux_channel_ __TA_GUARDED(lock_);
-  mtx_t lock_;
-
-  zx_status_t DpAuxRead(uint32_t dp_cmd, uint32_t addr, uint8_t* buf, size_t size)
-      __TA_REQUIRES(lock_);
-  zx_status_t DpAuxReadChunk(uint32_t dp_cmd, uint32_t addr, uint8_t* buf, uint32_t size_in,
-                             size_t* size_out) __TA_REQUIRES(lock_);
-  zx_status_t DpAuxWrite(uint32_t dp_cmd, uint32_t addr, const uint8_t* buf, size_t size)
-      __TA_REQUIRES(lock_);
-
-  zx::result<DdiAuxChannel::ReplyInfo> DoTransaction(const DdiAuxChannel::Request& request,
-                                                     cpp20::span<uint8_t> reply_data_buffer)
-      __TA_REQUIRES(lock_);
-};
-
-// DpCapabilities is a utility for reading and storing DisplayPort capabilities
-// supported by the display based on a copy of read-only DPCD capability
-// registers. Drivers can also use PublishToInspect() to publish the data to
-// inspect.
-class DpCapabilities final {
- public:
-  // Initializes the DPCD capability array with all zeros and the EDP DPCD capabilities as
-  // non-present.
-  DpCapabilities();
-
-  // Allow copy.
-  DpCapabilities(const DpCapabilities&) = default;
-  DpCapabilities& operator=(const DpCapabilities&) = default;
-
-  // Allow move.
-  DpCapabilities(DpCapabilities&&) = default;
-  DpCapabilities& operator=(DpCapabilities&&) = default;
-
-  // Read and parse DPCD capabilities. Clears any previously initialized content
-  static fpromise::result<DpCapabilities> Read(DpAuxChannel* dp_aux_channel);
-
-  // Publish the capabilities fields to inspect node `caps_node`.
-  void PublishToInspect(inspect::Node* caps_node) const;
-
-  // Get the cached value of a DPCD register using its DPCD address.
-  uint8_t dpcd_at(dpcd::Register address) const {
-    ZX_ASSERT(address < dpcd::DPCD_SUPPORTED_LINK_RATE_START);
-    return dpcd_[address - dpcd::DPCD_CAP_START];
-  }
-
-  // Get the cached value of a EDP DPCD register using its address. Asserts if the eDP capabilities
-  // are not available.
-  uint8_t edp_dpcd_at(dpcd::EdpRegister address) const {
-    ZX_ASSERT(edp_dpcd_.has_value());
-    ZX_ASSERT(address < dpcd::DPCD_EDP_RESERVED);
-    ZX_ASSERT(address >= dpcd::DPCD_EDP_CAP_START);
-    return edp_dpcd_->bytes[address - dpcd::DPCD_EDP_CAP_START];
-  }
-
-  template <typename T, dpcd::Register A>
-  T dpcd_reg() const {
-    T reg;
-    reg.set_reg_value(dpcd_at(A));
-    return reg;
-  }
-
-  // Asserts if eDP capabilities are not available.
-  template <typename T, dpcd::EdpRegister A>
-  T edp_dpcd_reg() const {
-    T reg;
-    reg.set_reg_value(edp_dpcd_at(A));
-    return reg;
-  }
-
-  dpcd::Revision dpcd_revision() const {
-    return static_cast<dpcd::Revision>(dpcd_[dpcd::DPCD_REV]);
-  }
-
-  std::optional<dpcd::EdpRevision> edp_revision() const {
-    if (edp_dpcd_) {
-      return edp_dpcd_->revision;
-    }
-    return std::nullopt;
-  }
-
-  // Total number of stream sinks within this Sink device.
-  size_t sink_count() const { return sink_count_.count(); }
-
-  // Maximum number of DisplayPort lanes.
-  uint8_t max_lane_count() const { return max_lane_count_.lane_count_set(); }
-
-  // True for SST mode displays that support the Enhanced Framing symbol sequence (see DP v1.4a
-  // Section 2.2.1.2).
-  bool enhanced_frame_capability() const { return max_lane_count_.enhanced_frame_enabled(); }
-
-  // True for eDP displays that support the `backlight_enable` bit in the
-  // dpcd::DPCD_EDP_DISPLAY_CTRL register (see dpcd.h).
-  bool backlight_aux_power() const { return edp_dpcd_ && edp_dpcd_->backlight_aux_power; }
-
-  // True for eDP displays that support backlight adjustment through the
-  // dpcd::DPCD_EDP_BACKLIGHT_BRIGHTNESS_[MSB|LSB] registers.
-  bool backlight_aux_brightness() const { return edp_dpcd_ && edp_dpcd_->backlight_aux_brightness; }
-
-  // The list of supported link rates in ascending order, measured in units of Mbps/lane.
-  const std::vector<uint32_t>& supported_link_rates_mbps() const {
-    return supported_link_rates_mbps_;
-  }
-
-  // True if the contents of vector returned by `supported_link_rates_mbps()` was populated using
-  // the  "Link Rate Table" method. If true, the link rate must be selected by writing the vector
-  // index to the DPCD LINK_RATE_SET register. Otherwise, the selected link rate must be programmed
-  // using the DPCD LINK_BW_SET register.
-  bool use_link_rate_table() const { return use_link_rate_table_; }
-
- private:
-  // DpCapabilities that are only present in eDP displays.
-  struct Edp {
-    Edp();
-
-    std::array<uint8_t, dpcd::DPCD_EDP_RESERVED - dpcd::DPCD_EDP_CAP_START> bytes;
-    dpcd::EdpRevision revision;
-    bool backlight_aux_power = false;
-    bool backlight_aux_brightness = false;
-  };
-
-  bool ProcessEdp(DpAuxChannel* dp_aux_channel);
-  bool ProcessSupportedLinkRates(DpAuxChannel* dp_aux_channel);
-
-  std::array<uint8_t, dpcd::DPCD_SUPPORTED_LINK_RATE_START - dpcd::DPCD_CAP_START> dpcd_;
-  dpcd::SinkCount sink_count_;
-  dpcd::LaneCount max_lane_count_;
-  std::vector<uint32_t> supported_link_rates_mbps_;
-  bool use_link_rate_table_ = false;
-
-  std::optional<Edp> edp_dpcd_;
-};
 
 class DpDisplay final : public DisplayDevice {
  public:

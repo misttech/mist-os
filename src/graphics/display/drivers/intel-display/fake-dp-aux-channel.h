@@ -5,9 +5,11 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_FAKE_DP_AUX_CHANNEL_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_FAKE_DP_AUX_CHANNEL_H_
 
+#include <array>
 #include <cstdint>
 
-#include "src/graphics/display/drivers/intel-display/dp-display.h"
+#include "src/graphics/display/drivers/intel-display/dp-aux-channel.h"
+#include "src/graphics/display/drivers/intel-display/dpcd.h"
 
 namespace intel_display {
 namespace testing {

@@ -31,6 +31,7 @@
 #include "src/devices/pci/testing/pci_protocol_fake.h"
 #include "src/graphics/display/drivers/intel-display/intel-display.h"
 #include "src/graphics/display/drivers/intel-display/pci-ids.h"
+#include "src/graphics/display/drivers/intel-display/registers.h"
 #include "src/graphics/display/drivers/intel-display/testing/fake-buffer-collection.h"
 #include "src/graphics/display/drivers/intel-display/testing/fake-framebuffer.h"
 #include "src/graphics/display/drivers/intel-display/testing/mock-allocator.h"
