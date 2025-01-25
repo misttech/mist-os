@@ -307,13 +307,13 @@ template("fidl") {
 
     # Use SDK category markers to enable detection of host targets that use FIDL
     # libraries in nonpermissible categories.
-    marker_category = "unknown"
+    marker_category = "not-in-idk"
     if (defined(invoker.sdk_category)) {
       marker_category = invoker.sdk_category
 
       # TODO(https://fxbug.dev/333907192): Remove when fuchsia.boot is promoted.
       if (marker_category == "internal_only_idk") {
-        marker_category = "internal"
+        marker_category = "not-in-idk"
       }
     }
 
@@ -450,13 +450,13 @@ template("fidl") {
         label_name = get_label_info(_fidl_target, "label_no_toolchain")
         is_allowed_for_ffx = ffx_subtool_fidl_allowlist + [ label_name ] -
                              [ label_name ] != ffx_subtool_fidl_allowlist
-        marker_category = "unknown"
+        marker_category = "not-in-idk"
         if (defined(invoker.sdk_category)) {
           marker_category = invoker.sdk_category
 
           # TODO(https://fxbug.dev/333907192): Remove when fuchsia.boot is promoted.
           if (marker_category == "internal_only_idk") {
-            marker_category = "internal"
+            marker_category = "not-in-idk"
           }
         }
         if (is_allowed_for_ffx) {

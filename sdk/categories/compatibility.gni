@@ -2,13 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# TODO(https://fxbug.dev/314822328): Update categories. These match the existing
-# implementation of SDK markers for host tools and tests.
 _all_idk_categories = [
-  "unknown",
-  "excluded",
-  "experimental",
-  "internal",
+  # A fake category used only for markers to represent targets that do not have
+  # a category and thus are not included in the IDK.
+  "not-in-idk",
+
+  # The categories supported by `sdk_atom()`.
   "cts",
   "partner_internal",
   "partner",

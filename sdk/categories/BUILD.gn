@@ -28,39 +28,25 @@ template("idk_category_marker_template") {
   }
 }
 
+idk_category_marker_template("not-in-idk") {
+  visibility += [ "*" ]
+}
+
 idk_category_marker_template("cts") {
   # "cts" should not be used until implemented. See https://fxbug.dev/367760026.
+  # TODO(https://fxbug.dev/367760026): Add an appropriate pattern when the
+  # category is implemented.
   visibility = []
 }
-idk_category_marker_template("excluded") {
-  # TODO(https://fxbug.dev/314822328): Removed obsolete category.
-  visibility = []
-}
-idk_category_marker_template("experimental") {
-  # TODO(https://fxbug.dev/314822328): Removed obsolete category.
-  visibility = []
-}
-idk_category_marker_template("internal") {
-  # "internal" is deprecated and has very limited uses. Prevent new uses.
-  visibility = [
-    "//sdk/fidl/fuchsia.boot:*",
 
-    # FFX plugins use the internal marker, though they are not IDK atoms.
-    # TODO(https://fxbug.dev/314822328): Reconcile this.
-    "//src/developer/ffx/tools/power:*",
-    "//src/developer/ffx/tools/power/debugcmd:*",
-    "//src/virtualization/ffx/*",
-  ]
+idk_category_marker_template("partner_internal") {
+  visibility = [ "//sdk/fidl/*" ]
 }
-idk_category_marker_template("unknown") {
-  visibility = [ "*" ]
-}
+
 idk_category_marker_template("partner") {
   visibility = [ "*" ]
 }
-idk_category_marker_template("partner_internal") {
-  visibility = [ "*" ]
-}
+
 idk_category_marker_template("public") {
   # The public IDK does not yet exist, so "public" should not be used.
   visibility = []
@@ -72,6 +58,7 @@ if (is_host) {
   # TODO(https://fxbug.dev/314822328): Only exclude checks when appropriate.
 
   # Marker for the allow list for use in a subtool.
+  # Using this marker avoids depending on a disallowed marker above.
   idk_category_marker_template("allowed-for-ffx-subtool") {
     import("//src/developer/ffx/build/ffx_subtool_allowlist.gni")
     visibility =
@@ -88,6 +75,7 @@ if (is_host) {
   }
 
   # Marker for the allow list for use in Lacewing.
+  # Using this marker avoids depending on a disallowed marker above.
   idk_category_marker_template("allowed-for-host-test") {
     import("//src/testing/end_to_end/host_test_allowlist.gni")
     visibility = host_test_fidl_allowlist + [
@@ -130,13 +118,8 @@ group("test_all_marker_lists") {
          [ "//sdk/categories:marker-partner_internal" ] ==
          markers_partner_idk_prebuilts_must_not_depend_on)
 
-  # Temporarily verify the list matches the lists it replaced.
-  # TODO(https://fxbug.dev/314822328): Remove when updating categories.
   assert(markers_partner_idk_prebuilts_must_not_depend_on == [
-               "//sdk/categories:marker-unknown",
-               "//sdk/categories:marker-excluded",
-               "//sdk/categories:marker-experimental",
-               "//sdk/categories:marker-internal",
+               "//sdk/categories:marker-not-in-idk",
                "//sdk/categories:marker-cts",
              ],
          "${markers_partner_idk_prebuilts_must_not_depend_on}")

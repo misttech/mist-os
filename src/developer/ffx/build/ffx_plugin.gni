@@ -141,10 +141,12 @@ template("ffx_plugin") {
     if (sdk_category == "partner") {
       disallowed_category_markers =
           markers_partner_idk_prebuilts_must_not_depend_on
-    } else {
-      assert(sdk_category == "internal",
-             "Unexpected SDK category '${sdk_category}'.")
+    } else if (sdk_category == "internal") {
+      # The plugin is not in an IDK, so there are no restrictions.
       disallowed_category_markers = []
+      category_marker = "//sdk/categories:marker-not-in-idk"
+    } else {
+      assert(false, "Unexpected SDK category '${sdk_category}'.")
     }
 
     cmd_deps = []

@@ -280,12 +280,14 @@ template("ffx_tool") {
       # Also, there are exceptions - see https://fxbug.dev/42081073 and
       # https://fxbug.dev/326090508.
       # TODO(b/314822328): improve this logic to cascade properly
-      if (invoker.sdk_category != "internal") {
-        if (!defined(assert_no_deps)) {
-          assert_no_deps = []
-        }
-        assert_no_deps += markers_partner_idk_prebuilts_must_not_depend_on
+      if (!defined(assert_no_deps)) {
+        assert_no_deps = []
       }
+
+      assert(invoker.sdk_category == "partner",
+             "Unexpected SDK category '${invoker.sdk_category}'.")
+
+      assert_no_deps += markers_partner_idk_prebuilts_must_not_depend_on
     }
   }
 }
