@@ -758,7 +758,7 @@ mod tests {
             "id": "9999",
             "parts": [
                 {
-      "meta": "qemu_uefi_internal-meta.json",
+      "meta": "qemu_uefi_internal_x64-meta.json",
       "type": "companion_host_tool"
     }],  "root": "..",
   "schema_version": "1"}"#,
@@ -769,7 +769,7 @@ mod tests {
         fs::write(&ovmf_code, "ovmf").expect("fake ovmf");
 
         env.context
-            .query("sdk.overrides.uefi_internal")
+            .query("sdk.overrides.uefi_internal_x64")
             .level(Some(ConfigLevel::User))
             .set(ovmf_code.to_string_lossy().into())
             .await

@@ -238,18 +238,12 @@ func (t *Emulator) Start(ctx context.Context, images []bootserver.Image, args []
 		return err
 	}
 	edk2Dir := filepath.Join(t.config.EDK2Dir, "qemu-"+string(t.config.Target))
-	var code string
-	switch t.config.Target {
-	case "x64":
-		code = filepath.Join(edk2Dir, "OVMF_CODE.fd")
-	case "arm64":
-		code = filepath.Join(edk2Dir, "QEMU_EFI.fd")
-	}
 	tools := ffxutil.EmuTools{
-		Emulator: absBin,
-		FVM:      t.config.FVMTool,
-		ZBI:      t.config.ZBITool,
-		UEFI:     code,
+		Emulator:   absBin,
+		FVM:        t.config.FVMTool,
+		ZBI:        t.config.ZBITool,
+		UEFI_arm64: filepath.Join(edk2Dir, "QEMU_EFI.fd"),
+		UEFI_x64:   filepath.Join(edk2Dir, "OVMF_CODE.fd"),
 	}
 	startArgs := ffxutil.EmuStartArgs{
 		Engine:        strings.ToLower(os.Getenv("FUCHSIA_DEVICE_TYPE")),

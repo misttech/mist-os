@@ -129,10 +129,11 @@ cc_source_library://pkg/vfs_cpp
 cc_source_library://pkg/virtgralloc_headers
 cc_source_library://pkg/zbi-format
 cc_source_library://pkg/zx
+companion_host_tool://tools/qemu_uefi_internal/arm64
+companion_host_tool://tools/qemu_uefi_internal/x64
 companion_host_tool://tools/x64/aemu_internal
 companion_host_tool://tools/x64/crosvm_internal
 companion_host_tool://tools/x64/qemu_internal
-companion_host_tool://tools/x64/qemu_uefi_internal
 dart_library://dart/sl4f
 data://data/config/symbol_index
 data://pkg/driver_component/driver_component.json

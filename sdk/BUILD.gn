@@ -590,7 +590,8 @@ if (is_host) {
       "//src/developer/ffx/plugins/emulator:aemu_internal",
       "//src/developer/ffx/plugins/emulator:crosvm_internal",
       "//src/developer/ffx/plugins/emulator:qemu_internal",
-      "//src/developer/ffx/plugins/emulator:uefi_internal",
+      "//src/developer/ffx/plugins/emulator:uefi_internal_arm64",
+      "//src/developer/ffx/plugins/emulator:uefi_internal_x64",
     ]
   }
 } else {

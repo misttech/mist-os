@@ -10,7 +10,7 @@ use emulator_instance::{
     NetworkingMode, OperatingSystem,
 };
 use ffx_config::EnvironmentContext;
-use ffx_emulator_common::config::{EMU_UPSCRIPT_FILE, KVM_PATH, OVMF_CODE};
+use ffx_emulator_common::config::{EMU_UPSCRIPT_FILE, KVM_PATH, OVMF_CODE_ARM64, OVMF_CODE_X64};
 use ffx_emulator_common::split_once;
 use ffx_emulator_common::tuntap::tap_available;
 use ffx_emulator_config::convert_bundle_to_configs;
@@ -54,8 +54,12 @@ pub(crate) async fn make_configs(
         // Set OVMF references for non riscv guests (at this time we have no efi support for riscv).
         if emu_config.device.cpu.architecture != CpuArchitecture::Riscv64 {
             let sdk = ctx.get_sdk()?;
-            emu_config.guest.ovmf_code = ffx_config::get_host_tool(&sdk, OVMF_CODE).await
-                .map_err(|e| bug!("cannot locate ovmf code in SDK: {e}"))?;
+            emu_config.guest.ovmf_code = ffx_config::get_host_tool(&sdk,
+                match emu_config.device.cpu.architecture {
+                    CpuArchitecture::X64 => OVMF_CODE_X64,
+                    CpuArchitecture::Arm64 => OVMF_CODE_ARM64,
+                    arch @ _ => bail!("CPU architecture {} is currently unsupported with (U)EFI", arch),
+                }).await.map_err(|e| bug!("cannot locate ovmf code in SDK: {e}"))?;
 
             tracing::info!("Found ovmf code at {:?}", &emu_config.guest.ovmf_code);
 
@@ -66,9 +70,15 @@ pub(crate) async fn make_configs(
             }
 
             // vars is in the same directory with the same basename prefix. ARM64 and x64 have different
-            // filenames.
+            // filenames:
+            // x64: OVMF_CODE.fd, OVMF_VARS.fd
+            // arm64: QEMU_EFI.fd, QEMU_VARS.fd
             let vars_filename = if let Some(code_name) = emu_config.guest.ovmf_code.file_name() {
-                code_name.to_string_lossy().replace("_CODE.fd", "_VARS.fd")
+                match emu_config.device.cpu.architecture {
+                    CpuArchitecture::X64 => code_name.to_string_lossy().replace("_CODE.fd", "_VARS.fd"),
+                    CpuArchitecture::Arm64 => code_name.to_string_lossy().replace("_EFI.fd", "_VARS.fd"),
+                    arch @ _ => bail!("CPU architecture {} is currently unsupported with (U)EFI", arch),
+                }
             } else {
                 tracing::warn!("unrecognized OVMF code file name {:?}", emu_config.guest.ovmf_code);
                 "OVMF_VARS.fd".to_string()
