@@ -12,7 +12,6 @@ load(
     "fuchsia_product",
     "fuchsia_product_bundle",
     "fuchsia_product_configuration",
-    "fuchsia_virtual_device",
 )
 load("//build/info:info.bzl", "DEFAULT_PRODUCT_BUILD_INFO")
 
@@ -55,16 +54,6 @@ fuchsia_product(
     product_config = ":product_config",
 )
 
-fuchsia_virtual_device(
-    name = "minimal_emu_x64",
-    arch = ARCH.X64,
-    audio_model = "hda",
-    device_name = "minimal_emu",
-    input_device = "touch",
-    window_height_px = 1200,
-    window_width_px = 720,
-)
-
 fuchsia_elf_sizes(
     name = "elf_sizes.x64",
     product = ":image.x64",
@@ -73,6 +62,7 @@ fuchsia_elf_sizes(
 fuchsia_product_bundle(
     name = "product_bundle.x64",
     board_name = "x64",
+    default_virtual_device = "//build/bazel/assembly/virtual_devices:x64-emu-recommended",
     main = ":image.x64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:x64",
     product_bundle_name = "fuchsia",
@@ -81,7 +71,9 @@ fuchsia_product_bundle(
     update_epoch = "1",
     update_version_file = "//build/info:version",
     virtual_devices = [
-        ":minimal_emu_x64",
+        "//build/bazel/assembly/virtual_devices:x64-emu-recommended",
+        "//build/bazel/assembly/virtual_devices:x64-emu-min",
+        "//build/bazel/assembly/virtual_devices:x64-emu-large",
     ],
 )
 
@@ -101,6 +93,7 @@ fuchsia_elf_sizes(
 fuchsia_product_bundle(
     name = "product_bundle.arm64",
     board_name = "arm64",
+    default_virtual_device = "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
     main = ":image.arm64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:arm64",
     product_bundle_name = "fuchsia",
@@ -108,6 +101,11 @@ fuchsia_product_bundle(
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
     update_version_file = "//build/info:version",
+    virtual_devices = [
+        "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
+        "//build/bazel/assembly/virtual_devices:arm64-emu-min",
+        "//build/bazel/assembly/virtual_devices:arm64-emu-large",
+    ],
 )
 
 fuchsia_product(
@@ -159,16 +157,6 @@ fuchsia_product_bundle(
     update_version_file = "//build/info:version",
 )
 
-fuchsia_virtual_device(
-    name = "minimal_emu_riscv64",
-    arch = ARCH.RISCV64,
-    audio_model = "hda",
-    device_name = "minimal_emu",
-    input_device = "touch",
-    window_height_px = 1200,
-    window_width_px = 720,
-)
-
 fuchsia_product(
     name = "image.riscv64",
     board_config = "//boards:riscv64",
@@ -185,6 +173,7 @@ fuchsia_elf_sizes(
 fuchsia_product_bundle(
     name = "product_bundle.riscv64",
     board_name = "riscv64",
+    default_virtual_device = "//build/bazel/assembly/virtual_devices:riscv64-emu-recommended",
     main = ":image.riscv64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:riscv64",
     product_bundle_name = "fuchsia",
@@ -193,6 +182,8 @@ fuchsia_product_bundle(
     update_epoch = "1",
     update_version_file = "//build/info:version",
     virtual_devices = [
-        ":minimal_emu_riscv64",
+        "//build/bazel/assembly/virtual_devices:riscv64-emu-recommended",
+        "//build/bazel/assembly/virtual_devices:riscv64-emu-min",
+        "//build/bazel/assembly/virtual_devices:riscv64-emu-large",
     ],
 )
