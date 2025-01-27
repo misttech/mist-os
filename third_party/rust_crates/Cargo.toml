@@ -79,6 +79,7 @@ clap = "2.34"
 crc = "1.8.1"
 criterion = { version = "0.2", default-features = false }
 crossbeam = "0.8.0"
+crossbeam-channel = "0.5.1"
 crossbeam-utils = "0.8.14"
 csv = "1.2.1"
 darling = "0.20.10"

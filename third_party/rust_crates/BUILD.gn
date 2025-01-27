@@ -189,6 +189,10 @@ group("crossbeam") {
   public_deps = [ ":crossbeam-v0_8_0" ]
 }
 
+group("crossbeam-channel") {
+  public_deps = [ ":crossbeam-channel-v0_5_1" ]
+}
+
 group("crossbeam-utils") {
   public_deps = [ ":crossbeam-utils-v0_8_14" ]
 }
@@ -3776,6 +3780,7 @@ rust_library("crossbeam-channel-v0_5_1") {
     "-Cmetadata=4f2cca7fb0f4b481",
     "-Cextra-filename=-4f2cca7fb0f4b481",
     "--cfg=feature=\"crossbeam-utils\"",
+    "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
