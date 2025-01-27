@@ -40,17 +40,16 @@ bazel_fuchsia_test_package("adc-buttons-test-package") {
     "adc-buttons-test.cc",
   ]
   test_specs = {
-    environments = basic_envs
     log_settings = {
       max_severity = "ERROR"
     }
   }
 }
 
+# Note: Don't add additional bazel tests into this group as it will introduce
+# more bazel actions into build graph. Instead, add them into
+# //src:bazel_tests
 group("tests") {
   testonly = true
-  deps = [
-    ":adc-buttons-bind_test",
-    ":adc-buttons-test-package",
-  ]
+  deps = [ ":adc-buttons-bind_test" ]
 }

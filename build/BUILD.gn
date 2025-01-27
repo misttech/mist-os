@@ -170,6 +170,7 @@ group("non_hermetic_deps") {
     "//build/bazel/examples/*",
     "//build/bazel/tests/*",
     "//sdk/lib/driver/devicetree/*",
+    "//src:*",
     "//src/devices/block/drivers/aml-sdmmc:*",
     "//src/devices/board/drivers/vim3-devicetree:*",
     "//src/devices/clock/drivers/vim3-clk:*",

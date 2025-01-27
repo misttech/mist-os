@@ -188,7 +188,6 @@ bazel_fuchsia_test_package("aml-g12-composite-test-package") {
   ]
   test_component_names = [ "aml-g12-composite-test-bin" ]
   test_specs = {
-    environments = basic_envs
     log_settings = {
       max_severity = "ERROR"
     }
@@ -196,12 +195,13 @@ bazel_fuchsia_test_package("aml-g12-composite-test-package") {
 }
 
 # Tests.
-
+# Note: Don't add additional bazel tests into this group as it will introduce
+# more bazel actions into build graph. Instead, add them into
+# //src:bazel_tests
 group("tests") {
   testonly = true
   deps = [
     ":aml-g12-composite-bind_test",
-    ":aml-g12-composite-test-package",
     ":aml-g12-tdm-bind_test",
     ":aml-g12-tdm-dai-bind_test",
     "test:dai-test-package",

@@ -241,6 +241,7 @@ group("bazel_action_allowlist") {
     "//examples/drivers/transport/driver/v2:parent_bazel_package.bazel_build",
     "//sdk/lib/driver/devicetree/examples/example-board:bazel_package.bazel_build",
     "//sdk/lib/driver/devicetree/examples/example-board:example-board-test-package.bazel_build",
+    "//src:bazel_tests.bazel_build",
     "//src/connectivity/bluetooth/core/bt-host:bazel_test_pkg.bazel_build",
     "//src/connectivity/bluetooth/core/bt-host:bt-host.bazel_build",
     "//src/connectivity/bluetooth/core/bt-host/att:test_pkg.bazel_build",

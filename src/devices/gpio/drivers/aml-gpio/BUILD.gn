@@ -50,10 +50,10 @@ driver_bind_rules("aml-gpio-bind") {
   ]
 }
 
+# Note: Don't add additional bazel tests into this group as it will introduce
+# more bazel actions into build graph. Instead, add them into
+# //src:bazel_tests
 group("tests") {
   testonly = true
-  deps = [
-    ":aml-gpio-bind_test",
-    ":aml-gpio-test-package",
-  ]
+  deps = [ ":aml-gpio-bind_test" ]
 }
