@@ -801,7 +801,13 @@ impl Environment for FshostEnvironment {
             expected_format = "fxfs";
             "Mounting fxblob"
         );
-        let serving_fs = self.launcher.serve_fxblob(device.block_connector()?).await?;
+        let config = Fxfs {
+            component_type: ComponentType::StaticChild,
+            startup_profiling_seconds: Some(60),
+            ..Default::default()
+        };
+        let serving_fs =
+            self.launcher.serve_fxblob(device.block_connector()?, Box::new(config)).await?;
         self.container = Some(Box::new(FxfsContainer::new(serving_fs)));
         Ok(())
     }
@@ -1320,15 +1326,10 @@ impl FilesystemLauncher {
     pub async fn serve_fxblob(
         &self,
         block_connector: Box<dyn BlockConnector>,
+        config: Box<dyn FSConfig>,
     ) -> Result<ServingMultiVolumeFilesystem, Error> {
-        let mut fs = fs_management::filesystem::Filesystem::from_boxed_config(
-            block_connector,
-            Box::new(Fxfs {
-                component_type: ComponentType::StaticChild,
-                startup_profiling_seconds: Some(60),
-                ..Default::default()
-            }),
-        );
+        let mut fs =
+            fs_management::filesystem::Filesystem::from_boxed_config(block_connector, config);
         if self.config.check_filesystems {
             log::info!("fsck started for fxblob");
             if let Err(error) = fs.fsck().await {

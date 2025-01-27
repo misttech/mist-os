@@ -3,13 +3,15 @@
 // found in the LICENSE file.
 
 use crate::crypt::zxcrypt::{UnsealOutcome, ZxcryptDevice};
+use crate::debug_log;
 use crate::device::constants::{
     self, BLOB_VOLUME_LABEL, DATA_PARTITION_LABEL, LEGACY_DATA_PARTITION_LABEL,
     UNENCRYPTED_VOLUME_LABEL, ZXCRYPT_DRIVER_PATH,
 };
 use crate::device::{BlockDevice, Device, DeviceTag};
-use crate::environment::{Environment, FilesystemLauncher, ServeFilesystemStatus};
-use crate::{debug_log, fxblob};
+use crate::environment::{
+    Container, Environment, FilesystemLauncher, FxfsContainer, ServeFilesystemStatus,
+};
 use anyhow::{anyhow, ensure, Context, Error};
 use device_watcher::recursive_wait_and_open;
 use fidl::endpoints::{Proxy, RequestStream, ServerEnd};
@@ -360,9 +362,24 @@ async fn write_data_file(
         usize::try_from(content_size).context("Failed to convert u64 content_size to usize")?;
 
     let (mut filesystem, mut data) = if config.fxfs_blob {
-        fxblob::mount_or_format_data(environment, launcher)
+        // Find the device via our own matcher.
+        let registered_devices = environment.lock().await.registered_devices().clone();
+        let block_connector = registered_devices
+            .get_block_connector(DeviceTag::SystemContainerOnRecovery)
+            .on_timeout(FIND_PARTITION_DURATION, || {
+                Err(anyhow!("timed out waiting for fxfs partition"))
+            })
             .await
-            .map(|(fs, data)| ((Some(fs), data)))?
+            .context("failed to get block connector for fxfs partition")?;
+        let mut container = Box::new(FxfsContainer::new(
+            launcher
+                .serve_fxblob(block_connector, Box::new(Fxfs::dynamic_child()))
+                .await
+                .context("serving Fxblob")?,
+        ));
+        let data = container.serve_data(&launcher).await.context("serving data from Fxblob")?;
+
+        (Some(container.into_fs()), data)
     } else {
         let partition_controller = find_data_partition(ramdisk_prefix).await?;
 
