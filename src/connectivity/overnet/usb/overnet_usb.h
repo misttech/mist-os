@@ -51,8 +51,7 @@ class OvernetUsb : public fdf::DriverBase,
   explicit OvernetUsb(fdf::DriverStartArgs start_args,
                       fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : DriverBase("overnet-usb", std::move(start_args), std::move(driver_dispatcher)),
-        devfs_connector_(fit::bind_member<&OvernetUsb::FidlConnect>(this)),
-        endpoint_dispatcher_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
+        devfs_connector_(fit::bind_member<&OvernetUsb::FidlConnect>(this)) {}
 
   zx::result<> Start() override;
   void PrepareStop(fdf::PrepareStopCompleter Completer) override;
@@ -254,7 +253,7 @@ class OvernetUsb : public fdf::DriverBase,
   }
 
   // Whether there are any pending requests.
-  bool HasPendingRequests() { return bulk_in_ep_.RequestsEmpty() || bulk_out_ep_.RequestsEmpty(); }
+  bool HasPendingRequests() { return !bulk_in_ep_.RequestsFull() || !bulk_out_ep_.RequestsFull(); }
 
   // Get an IN request ready for use.
   std::optional<usb::FidlRequest> PrepareTx() __TA_REQUIRES(lock_);
@@ -269,10 +268,8 @@ class OvernetUsb : public fdf::DriverBase,
   // for all pending transactions).
   void Shutdown(fit::function<void()> callback);
 
-  // The driver framework may call DdkRelease at any point after we trigger the shutdown callback,
-  // so we should not hold the lock when executing the callback or we might get a use-after-free
-  // when the lock is released.
-  void ShutdownComplete() __TA_EXCLUDES(lock_);
+  // Finishes shutting down by calling the shutdown callback.
+  void ShutdownComplete() __TA_REQUIRES(lock_);
 
   // Handle the completion of an outstanding USB read request.
   void ReadComplete(fuchsia_hardware_usb_endpoint::Completion completion);
@@ -377,7 +374,6 @@ class OvernetUsb : public fdf::DriverBase,
       }};
 
   async_dispatcher_t* dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
-  async::Loop endpoint_dispatcher_;
 };
 
 #endif  // SRC_CONNECTIVITY_OVERNET_USB_OVERNET_USB_H_
