@@ -21,6 +21,7 @@
 use core::borrow::Borrow;
 use core::convert::Infallible as Never;
 use core::marker::PhantomData;
+use core::num::NonZeroUsize;
 use core::ops::Deref;
 
 use zerocopy::{ByteSlice, IntoByteSlice, SplitByteSlice};
@@ -62,6 +63,15 @@ impl<T> ParsedRecord<T> {
             ParsedRecord::Done => false,
         }
     }
+}
+
+/// A type that encapsulates the result of measuring the next record.
+pub enum MeasuredRecord {
+    /// A record was measured. This record may be skipped once it is actually parsed.
+    Measured(NonZeroUsize),
+    /// All possible records have been already been consumed; there is nothing
+    /// left to parse.
+    Done,
 }
 
 /// A parsed sequence of records.
@@ -199,6 +209,14 @@ impl<B: Deref<Target = [u8]>, R: RecordsImplLayout> RecordsRaw<B, R> {
 pub struct RecordsIter<'a, B, R: RecordsImpl> {
     bytes: B,
     records_left: usize,
+    context: R::Context,
+    _marker: PhantomData<&'a ()>,
+}
+
+/// An iterator over the records bytes contained inside a [`Records`] instance.
+#[derive(Copy, Clone, Debug)]
+pub struct RecordsBytesIter<'a, B, R: RecordsImpl> {
+    bytes: B,
     context: R::Context,
     _marker: PhantomData<&'a ()>,
 }
@@ -412,6 +430,16 @@ pub trait RecordsImpl: RecordsImplLayout {
         data: &mut BV,
         context: &mut Self::Context,
     ) -> RecordParseResult<Self::Record<'a>, Self::Error>;
+}
+
+/// Implemented for [`RecordsImpl`] instances that allow peeking at the length
+/// of the first record in the buffer.
+pub trait MeasureRecordsImpl: RecordsImpl {
+    /// Returns the length in bytes of the next record.
+    fn measure_next_record<'a, BV: BufferView<&'a [u8]>>(
+        data: &BV,
+        context: &mut Self::Context,
+    ) -> core::result::Result<MeasuredRecord, Self::Error>;
 }
 
 /// An implementation of a raw records parser.
@@ -785,6 +813,24 @@ where
             _marker: PhantomData,
         }
     }
+
+    /// Iterates over byte slices corresponding to options.
+    ///
+    /// Since the records were validated in [`parse`], then so long as
+    /// [`R::parse_with_context`] is deterministic, the iterator is infallible.
+    /// Unrecognized record types will still be included as long as they don't
+    /// fail length validation, even if they would be skipped by the
+    /// [`RecordsIter`] returned by [`Records::iter`].
+    ///
+    /// [`parse`]: Records::parse
+    /// [`R::parse_with_context`]: RecordsImpl::parse_with_context
+    pub fn iter_bytes(&'a self) -> RecordsBytesIter<'a, &'a [u8], R> {
+        RecordsBytesIter {
+            bytes: &self.bytes,
+            context: self.context.clone_for_iter(),
+            _marker: PhantomData,
+        }
+    }
 }
 
 impl<'a, B, R> Records<B, R>
@@ -855,6 +901,55 @@ where
 {
     fn len(&self) -> usize {
         self.records_left
+    }
+}
+
+impl<'a, B, R> RecordsBytesIter<'a, B, R>
+where
+    R: RecordsImpl,
+{
+    /// Gets a reference to the context.
+    pub fn context(&self) -> &R::Context {
+        &self.context
+    }
+}
+
+impl<'a, B, R> Iterator for RecordsBytesIter<'a, B, R>
+where
+    R: MeasureRecordsImpl,
+    B: SplitByteSlice + IntoByteSlice<'a>,
+{
+    type Item = &'a [u8];
+
+    fn next(&mut self) -> Option<&'a [u8]> {
+        replace_with::replace_with_and(&mut self.bytes, |bytes| {
+            let mut bytes = SplitSliceBufferView(bytes);
+            // use match rather than expect because expect requires that Err: Debug
+            #[allow(clippy::match_wild_err_arm)]
+            let result = match next_bytes::<_, R>(&mut bytes, &mut self.context) {
+                Ok(o) => o,
+                Err(_) => panic!("already-validated options should not fail to parse"),
+            };
+            let SplitSliceBufferView(bytes) = bytes;
+            (bytes, result)
+        })
+    }
+}
+
+fn next_bytes<'a, BV, R>(
+    bytes: &mut BV,
+    context: &mut R::Context,
+) -> Result<Option<&'a [u8]>, R::Error>
+where
+    R: MeasureRecordsImpl,
+    BV: BufferView<&'a [u8]>,
+{
+    match R::measure_next_record(bytes, context)? {
+        MeasuredRecord::Measured(len) => {
+            let buf = bytes.take_front(len.get()).expect("should have already measured");
+            Ok(Some(buf))
+        }
+        MeasuredRecord::Done => Ok(None),
     }
 }
 
@@ -1416,6 +1511,56 @@ pub mod options {
         }
     }
 
+    impl<O: OptionsImpl> MeasureRecordsImpl for O {
+        fn measure_next_record<'a, BV: BufferView<&'a [u8]>>(
+            data: &BV,
+            _context: &mut Self::Context,
+        ) -> core::result::Result<MeasuredRecord, Self::Error> {
+            if data.len() == 0 {
+                return Ok(MeasuredRecord::Done);
+            }
+
+            // First peek at the kind field.
+            match data.peek_obj_front::<O::KindLenField>() {
+                // Thanks to the preceding `if`, we know at this point that
+                // `data.len() > 0`. If `peek_obj_front` returns `None`, that
+                // means that `data.len()` is shorter than `O::KindLenField`.
+                None => return Err(O::Error::SEQUENCE_FORMAT_ERROR),
+                Some(k) => {
+                    // Can't do pattern matching with associated constants, so
+                    // do it the good-ol' way:
+                    if Some(*k) == O::NOP {
+                        // The next record is a NOP record which is always just
+                        // the kind field itself.
+                        return Ok(MeasuredRecord::Measured(
+                            NonZeroUsize::new(size_of::<O::KindLenField>())
+                                .expect("KindLenField must not be 0-sized"),
+                        ));
+                    } else if Some(*k) == O::END_OF_OPTIONS {
+                        return Ok(MeasuredRecord::Done);
+                    }
+                }
+            };
+
+            // Then, since we only _peeked_ before, we have to peek again to get
+            // both the kind field (again) and the length field.
+            let body_len = match data.peek_obj_front::<[O::KindLenField; 2]>() {
+                None => return Err(O::Error::SEQUENCE_FORMAT_ERROR),
+                Some([_kind, len]) => O::LENGTH_ENCODING
+                    .decode_length::<O::KindLenField>(*len)
+                    .ok_or(O::Error::SEQUENCE_FORMAT_ERROR)?,
+            };
+            Ok(MeasuredRecord::Measured(
+                NonZeroUsize::new(
+                    O::LENGTH_ENCODING
+                        .record_length::<O::KindLenField>(body_len)
+                        .expect("record_length(decode_length(..)) should succeed"),
+                )
+                .expect("should never get 0-length record"),
+            ))
+        }
+    }
+
     impl<O: OptionBuilder> RecordBuilder for O {
         fn serialized_len(&self) -> usize {
             // TODO(https://fxbug.dev/42158056): Remove this `.expect`
@@ -1942,7 +2087,7 @@ pub mod options {
         #[derive(Debug)]
         struct DummyNdpOptionsImpl;
 
-        #[derive(Debug)]
+        #[derive(Debug, PartialEq, Eq)]
         struct NdpOption {
             kind: u8,
             data: Vec<u8>,
@@ -2558,8 +2703,7 @@ pub mod options {
             assert_eq!(serialized, bytes);
         }
 
-        #[test]
-        fn test_parse_and_serialize_ndp() {
+        fn test_ndp_bytes() -> Vec<u8> {
             let mut bytes = Vec::new();
             for i in 0..16 {
                 bytes.push(i);
@@ -2570,6 +2714,12 @@ pub mod options {
                     bytes.push(j)
                 }
             }
+            bytes
+        }
+
+        #[test]
+        fn test_parse_and_serialize_ndp() {
+            let bytes = test_ndp_bytes();
             let options = Options::<_, DummyNdpOptionsImpl>::parse(bytes.as_slice()).unwrap();
             let collected = options.iter().collect::<Vec<_>>();
             // Pass `collected.iter()` instead of `options.iter()` since we need
@@ -2580,6 +2730,31 @@ pub mod options {
             let serialized = ser.into_serializer().serialize_vec_outer().unwrap().as_ref().to_vec();
 
             assert_eq!(serialized, bytes);
+        }
+
+        #[test]
+        fn measure_ndp_records() {
+            let bytes = test_ndp_bytes();
+            let options = Options::<_, DummyNdpOptionsImpl>::parse(bytes.as_slice()).unwrap();
+            let collected = options.iter().collect::<Vec<_>>();
+
+            for (i, mut bytes) in options.iter_bytes().enumerate() {
+                // Each byte slice we iterate over should parse as the equivalent NDP option.
+                let parsed = <DummyNdpOptionsImpl as RecordsImpl>::parse_with_context(
+                    &mut &mut bytes,
+                    &mut (),
+                )
+                .expect("should parse successfully");
+                let option = match parsed {
+                    ParsedRecord::Parsed(option) => option,
+                    ParsedRecord::Skipped => panic!("no options should be skipped"),
+                    ParsedRecord::Done => panic!("should not be done"),
+                };
+                assert_eq!(option, collected[i]);
+
+                // The byte slice should be exhausted after re-parsing the record.
+                assert_eq!(bytes, &[]);
+            }
         }
 
         #[test]

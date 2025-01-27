@@ -1255,11 +1255,11 @@ pub trait BufferView<B: SplitByteSlice>: Sized + AsRef<[u8]> {
     /// buffer's body, and interprets them as a `T`. Unlike `take_obj_front`,
     /// `peek_obj_front` does not modify the body. If the body is not at least
     /// `size_of::<T>()` bytes in length, `peek_obj_front` returns `None`.
-    fn peek_obj_front<T>(&mut self) -> Option<&T>
+    fn peek_obj_front<T>(&self) -> Option<&T>
     where
         T: FromBytes + KnownLayout + Immutable + Unaligned,
     {
-        Some(Ref::into_ref(Ref::<_, T>::from_prefix((&*self).as_ref()).ok()?.0))
+        Some(Ref::into_ref(Ref::<_, T>::from_prefix(self.as_ref()).ok()?.0))
     }
 
     /// Takes an object from the front of the buffer's body.
