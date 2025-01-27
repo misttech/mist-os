@@ -40,6 +40,7 @@ test("dl-unittests") {
       "dl-load-tests-fail.cc",
       "dl-load-tests-global.cc",
       "dl-load-tests-initfini.cc",
+      "dl-load-tests-open-flags.cc",
       "dl-load-tests-tls.cc",
       "dl-load-tests.h",
       "dl-system-tests.cc",

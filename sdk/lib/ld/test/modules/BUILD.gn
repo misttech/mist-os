@@ -75,6 +75,7 @@ per_test_suffices = [
   "PrecedenceInDepResolution",
   "StartupModulesBasic",
   "StartupModulesPriorityOverGlobal",
+  "RtldNoLoadBasic",
 ]
 
 # This reaches all the runtime deps of //sdk/lib/dl/test:dl-unittests.
