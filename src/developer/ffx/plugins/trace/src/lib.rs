@@ -580,14 +580,32 @@ pub async fn trace(
                 waiter.wait().await;
             }
             writer.line(format!("Shutting down recording and writing to file."))?;
-            stop_tracing(&context, &proxy, output, writer, opts.verbose, opts.no_symbolize).await?;
+            stop_tracing(
+                &context,
+                &proxy,
+                output,
+                writer,
+                opts.verbose,
+                opts.no_symbolize,
+                opts.no_verify_trace,
+            )
+            .await?;
         }
         TraceSubCommand::Stop(opts) => {
             let output = match opts.output {
                 Some(o) => canonical_path(o)?,
                 None => target_spec.unwrap_or_else(|| "".to_owned()),
             };
-            stop_tracing(&context, &proxy, output, writer, opts.verbose, opts.no_symbolize).await?;
+            stop_tracing(
+                &context,
+                &proxy,
+                output,
+                writer,
+                opts.verbose,
+                opts.no_symbolize,
+                opts.no_verify_trace,
+            )
+            .await?;
         }
         TraceSubCommand::Status(_opts) => status(&proxy, writer).await?,
         TraceSubCommand::Symbolize(opts) => {
@@ -689,6 +707,7 @@ async fn stop_tracing(
     mut writer: Writer,
     verbose: bool,
     skip_symbolization: bool,
+    no_verify_trace: bool,
 ) -> Result<()> {
     let res = proxy.stop_recording(&output).await?;
     let (target, output_file) = match res {
@@ -698,7 +717,18 @@ async fn stop_tracing(
                     writer.line(stat_output)?;
                 }
             }
-
+            if !no_verify_trace {
+                match std::fs::read(output_file.clone()) {
+                    Ok(content) => {
+                        let mut parser = SessionParser::new(std::io::Cursor::new(content));
+                        let mut parser_iter = parser.by_ref().peekable();
+                        if parser_iter.peek().is_none() {
+                            writer.line(format!("The trace file is empty. Please verify that the input categories are valid. Input categories are: {:?}", categories))?;
+                        }
+                    }
+                    Err(e) => ffx_bail!("Failed to read the trace file: {}", e),
+                };
+            }
             if !skip_symbolization && categories.contains(&"kernel:ipc".to_string()) {
                 symbolize_trace_file(output_file.clone(), output_file.clone(), &context)?;
             }
@@ -832,7 +862,7 @@ mod tests {
     use pretty_assertions::assert_eq;
     use serde_json::json;
     use std::matches;
-    use tempfile::NamedTempFile;
+    use tempfile::{Builder, NamedTempFile};
     use {
         fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_tracing as tracing,
         fidl_fuchsia_tracing_controller as tracing_controller,
@@ -1103,6 +1133,38 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn test_empty_trace_data() {
+        let fake_temp_file =
+            Builder::new().suffix("foo.fxt").tempfile().expect("Failed to create a temp file");
+        let fake_trace_file_name = fake_temp_file.path().to_str().unwrap().to_string();
+        let env = ffx_config::test_init().await.unwrap();
+        let test_buffers = TestBuffers::default();
+        let writer = Writer::new_test(None, &test_buffers);
+        run_trace_test(
+            env.context.clone(),
+            TraceCommand {
+                sub_cmd: TraceSubCommand::Start(Start {
+                    buffer_size: 2,
+                    categories: vec!["invalid_categories".to_string()],
+                    duration: Some(1_f64),
+                    buffering_mode: tracing::BufferingMode::Oneshot,
+                    output: fake_trace_file_name,
+                    background: false,
+                    verbose: false,
+                    trigger: vec![],
+                    no_symbolize: false,
+                    no_verify_trace: false,
+                }),
+            },
+            writer,
+        )
+        .await;
+        let output = test_buffers.into_stdout_str();
+        let want = "The trace file is empty. Please verify that the input categories are valid. Input categories are: ";
+        assert!(output.contains(want), "\"{}\" didn't contain  /{}/", output, want);
+    }
+
+    #[fuchsia::test]
     async fn test_symbolize_fail() {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
@@ -1229,6 +1291,7 @@ mod tests {
                     verbose: false,
                     trigger: vec![],
                     no_symbolize: false,
+                    no_verify_trace: true,
                 }),
             },
             writer,
@@ -1274,6 +1337,7 @@ Current tracing status:
                     verbose: false,
                     trigger: vec![],
                     no_symbolize: false,
+                    no_verify_trace: true,
                 }),
             },
             writer,
@@ -1340,6 +1404,7 @@ Current tracing status:
                     output: Some("foo.txt".to_string()),
                     verbose: false,
                     no_symbolize: false,
+                    no_verify_trace: true,
                 }),
             },
             writer,
@@ -1363,6 +1428,7 @@ Current tracing status:
                     output: Some("long_directory_name_0123456789abcdef_1123456789abcdef_2123456789abcdef_3123456789abcdef_4123456789abcdef_5123456789abcdef_6123456789abcdef_7123456789abcdef_8123456789abcdef_9123456789abcdef_a123456789abcdef_b123456789abcdef_c123456789abcdef_d123456789abcdef_e123456789abcdef_f123456789abcdef/trace.fxt".to_string()),
                     verbose: false,
                     no_symbolize: false,
+                    no_verify_trace: true,
                 }),
             },
             writer,
@@ -1392,6 +1458,7 @@ Current tracing status:
                     verbose: true,
                     trigger: vec![],
                     no_symbolize: false,
+                    no_verify_trace: true,
                 }),
             },
             writer,
@@ -1431,6 +1498,7 @@ Current tracing status:
                     output: Some("foo.txt".to_string()),
                     verbose: true,
                     no_symbolize: false,
+                    no_verify_trace: true,
                 }),
             },
             writer,
@@ -1467,6 +1535,7 @@ Current tracing status:
                     verbose: false,
                     trigger: vec![],
                     no_symbolize: false,
+                    no_verify_trace: true,
                 }),
             },
             writer,
@@ -1497,6 +1566,7 @@ Current tracing status:
                     verbose: false,
                     trigger: vec![],
                     no_symbolize: false,
+                    no_verify_trace: true,
                 }),
             },
             writer,
@@ -1531,6 +1601,7 @@ Current tracing status:
                     verbose: false,
                     trigger: vec![],
                     no_symbolize: false,
+                    no_verify_trace: true,
                 }),
             },
             writer,
@@ -1565,6 +1636,7 @@ Current tracing status:
                     verbose: false,
                     trigger: vec![],
                     no_symbolize: false,
+                    no_verify_trace: true,
                 }),
             },
             writer,

@@ -114,6 +114,11 @@ pub struct Stop {
     /// kernel IPC traces, leaving only the ordinals in the trace.
     #[argh(switch)]
     pub no_symbolize: bool,
+
+    /// prevent checking the trace data when stopping tracing. Defaults to false.
+    /// If this flag is enabled, trace result analysis will not be triggered.
+    #[argh(switch)]
+    pub no_verify_trace: bool,
 }
 
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
@@ -248,6 +253,11 @@ pub struct Start {
     /// This flag is only used if tracing is manually stopped.
     #[argh(switch)]
     pub no_symbolize: bool,
+
+    /// prevent checking the trace data when stopping tracing. Defaults to false.
+    /// If this flag is enabled, trace result analysis will not be triggered.
+    #[argh(switch)]
+    pub no_verify_trace: bool,
 }
 
 fn try_string_to_action(s: &str) -> Result<Action, String> {
