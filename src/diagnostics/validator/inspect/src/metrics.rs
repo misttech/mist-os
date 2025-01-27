@@ -102,6 +102,7 @@ impl Description for ScannedBlock<'_> {
             BlockType::BufferValue => match self.property_format()? {
                 PropertyFormat::String => Ok("STRING".to_owned()),
                 PropertyFormat::Bytes => Ok("BYTES".to_owned()),
+                PropertyFormat::StringReference => Ok("STRING_REFERENCE".to_owned()),
             },
             _ => Ok(format!("{}", self.block_type_or()?)),
         }

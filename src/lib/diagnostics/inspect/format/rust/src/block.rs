@@ -33,6 +33,7 @@ pub enum LinkNodeDisposition {
 pub enum PropertyFormat {
     String = 0,
     Bytes = 1,
+    StringReference = 2,
 }
 
 /// Points to an index in the VMO and reads it according to the bytes in it.

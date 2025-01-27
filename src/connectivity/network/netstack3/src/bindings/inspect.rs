@@ -120,7 +120,7 @@ pub(crate) fn devices(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
         let external_state = device_id.external_state();
         let DeviceIdAndName { id: binding_id, name } = device_id.bindings_id();
         node.record_child(format!("{binding_id}"), |node| {
-            node.record_string("Name", &name);
+            node.record_string("Name", name);
             node.record_uint("InterfaceId", (*binding_id).into());
             node.record_child("IPv4", |node| {
                 ctx.api()

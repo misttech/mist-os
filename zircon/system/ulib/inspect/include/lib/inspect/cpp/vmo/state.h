@@ -313,7 +313,11 @@ class State final {
                                   size_t length, PropertyBlockFormat format);
 
   template <typename WrapperType>
-  void InnerSetProperty(WrapperType* property, const char* value, size_t length);
+  void InnerSetBytesProperty(WrapperType* property, const char* value, size_t length)
+      __TA_REQUIRES(mutex_);
+
+  void InnerSetStringProperty(StringProperty* property, const std::string& value)
+      __TA_REQUIRES(mutex_);
 
   // Helper function to delete String or ByteVector properties.
   template <typename WrapperType>

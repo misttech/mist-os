@@ -14,6 +14,7 @@ use inspect_format::{
     constants, utils, Block, BlockAccessorExt, BlockContainer, BlockIndex, BlockType, Container,
     CopyBytes, Error as FormatError, PropertyFormat, ReadBytes,
 };
+use itertools::Itertools;
 use std::cmp;
 
 pub use crate::reader::tree_reader::SnapshotTree;
@@ -37,11 +38,11 @@ impl Snapshot {
     }
 
     /// Gets the block at the given |index|.
-    pub fn get_block(&self, index: BlockIndex) -> Option<ScannedBlock<'_>> {
+    pub fn get_block(&self, index: BlockIndex) -> Result<ScannedBlock<'_>, ReaderError> {
         if index.offset() < self.buffer.len() {
-            Some(self.buffer.block_at(index))
+            Ok(self.buffer.block_at(index))
         } else {
-            None
+            Err(ReaderError::GetBlock(index))
         }
     }
 
@@ -119,11 +120,11 @@ impl Snapshot {
     }
 
     pub(crate) fn get_name(&self, index: BlockIndex) -> Option<String> {
-        let block = self.get_block(index)?;
+        let block = self.get_block(index).ok()?;
 
         match block.block_type() {
             BlockType::Name => self.load_name(block),
-            BlockType::StringReference => self.load_string_reference(block),
+            BlockType::StringReference => self.load_string_reference(block).ok(),
             _ => None,
         }
     }
@@ -132,18 +133,21 @@ impl Snapshot {
         block.name_contents().ok().map(|s| s.to_string())
     }
 
-    pub(crate) fn load_string_reference(&self, block: ScannedBlock<'_>) -> Option<String> {
-        let mut data = block.inline_string_reference().ok()?.to_vec();
-        let total_length = block.total_length().ok()?;
+    pub(crate) fn load_string_reference(
+        &self,
+        block: ScannedBlock<'_>,
+    ) -> Result<String, ReaderError> {
+        let mut data = block.inline_string_reference()?.to_vec();
+        let total_length = block.total_length()?;
         if data.len() == total_length {
-            return String::from_utf8(data).ok();
+            return Ok(String::from_utf8_lossy(&data).to_string());
         }
 
-        let extent_index = block.next_extent().ok()?;
+        let extent_index = block.next_extent()?;
         let still_to_read_length = total_length - data.len();
-        data.append(&mut self.read_extents(still_to_read_length, extent_index).ok()?);
+        data.append(&mut self.read_extents(still_to_read_length, extent_index)?);
 
-        String::from_utf8(data).ok()
+        Ok(String::from_utf8_lossy(&data).to_string())
     }
 
     pub(crate) fn parse_numeric_property(
@@ -201,7 +205,7 @@ impl Snapshot {
             return Err(ReaderError::AttemptedToReadTooManyArraySlots(block.index()));
         }
         let value_indexes = 0..array_slots;
-        let parsed_property = match block.array_entry_type().map_err(ReaderError::VmoFormat)? {
+        let parsed_property = match block.array_entry_type()? {
             BlockType::IntValue => {
                 let values = value_indexes
                     // Safety: in release mode, this can only error for index-out-of-bounds.
@@ -212,8 +216,7 @@ impl Snapshot {
                     name,
                     // Safety: if the block is an array, it must have an array format.
                     // We have already verified it is an array.
-                    ArrayContent::new(values, block.array_format().unwrap())
-                        .map_err(ReaderError::Hierarchy)?,
+                    ArrayContent::new(values, block.array_format().unwrap())?,
                 )
             }
             BlockType::UintValue => {
@@ -226,8 +229,7 @@ impl Snapshot {
                     name,
                     // Safety: if the block is an array, it must have an array format.
                     // We have already verified it is an array.
-                    ArrayContent::new(values, block.array_format().unwrap())
-                        .map_err(ReaderError::Hierarchy)?,
+                    ArrayContent::new(values, block.array_format().unwrap())?,
                 )
             }
             BlockType::DoubleValue => {
@@ -240,27 +242,23 @@ impl Snapshot {
                     name,
                     // Safety: if the block is an array, it must have an array format.
                     // We have already verified it is an array.
-                    ArrayContent::new(values, block.array_format().unwrap())
-                        .map_err(ReaderError::Hierarchy)?,
+                    ArrayContent::new(values, block.array_format().unwrap())?,
                 )
             }
             BlockType::StringReference => {
                 let values = value_indexes
-                    .map(|i| {
-                        // Safety: in release mode, this can only error for index-out-of-bounds.
-                        // We check above that indexes are in-bounds.
-                        let string_idx = block.array_get_string_index_slot(i).unwrap();
+                    .map(|i| block.array_get_string_index_slot(i))
+                    .map_ok(|string_idx| {
                         // default initialize unset values -- 0 index is never a string, it is always
                         // the header block
                         if string_idx == BlockIndex::EMPTY {
-                            return String::new();
+                            return Ok(String::new());
                         }
 
-                        self.get_block(string_idx)
-                            .and_then(|b| self.load_string_reference(b))
-                            .unwrap_or_default()
+                        let ref_block = self.get_block(string_idx)?;
+                        self.load_string_reference(ref_block)
                     })
-                    .collect::<Vec<String>>();
+                    .collect::<Result<Result<Vec<String>, _>, _>>()??;
                 Property::StringList(name, values)
             }
             t => return Err(ReaderError::UnexpectedArrayEntryFormat(t)),
@@ -271,14 +269,22 @@ impl Snapshot {
     pub(crate) fn parse_property(&self, block: &ScannedBlock<'_>) -> Result<Property, ReaderError> {
         let name_index = block.name_index()?;
         let name = self.get_name(name_index).ok_or(ReaderError::ParseName(name_index))?;
-        let total_length = block.total_length().map_err(ReaderError::VmoFormat)?;
-        let extent_index = block.property_extent_index()?;
-        let buffer = self.read_extents(total_length, extent_index)?;
-        match block.property_format().map_err(ReaderError::VmoFormat)? {
+        let data_index = block.property_extent_index()?;
+        match block.property_format()? {
             PropertyFormat::String => {
+                let total_length = block.total_length()?;
+                let buffer = self.read_extents(total_length, data_index)?;
                 Ok(Property::String(name, String::from_utf8_lossy(&buffer).to_string()))
             }
-            PropertyFormat::Bytes => Ok(Property::Bytes(name, buffer)),
+            PropertyFormat::Bytes => {
+                let total_length = block.total_length()?;
+                let buffer = self.read_extents(total_length, data_index)?;
+                Ok(Property::Bytes(name, buffer))
+            }
+            PropertyFormat::StringReference => {
+                let data_head = self.get_block(data_index)?;
+                Ok(Property::String(name, self.load_string_reference(data_head)?))
+            }
         }
     }
 
@@ -303,8 +309,7 @@ impl Snapshot {
         let mut offset = 0;
         let mut extent_index = first_extent;
         while extent_index != BlockIndex::EMPTY && offset < total_length {
-            let extent =
-                self.get_block(extent_index).ok_or(ReaderError::GetExtent(extent_index))?;
+            let extent = self.get_block(extent_index)?;
             let content = extent.extent_contents()?;
             let extent_length = cmp::min(total_length - offset, content.len());
             buffer[offset..offset + extent_length].copy_from_slice(&content[..extent_length]);
@@ -424,7 +429,7 @@ pub enum BackingBuffer {
 impl TryFrom<&zx::Vmo> for BackingBuffer {
     type Error = ReaderError;
     fn try_from(source: &zx::Vmo) -> Result<Self, Self::Error> {
-        let container = Container::read_only(source).map_err(ReaderError::Vmo)?;
+        let container = Container::read_only(source)?;
         Ok(BackingBuffer::Container(container))
     }
 }
@@ -469,6 +474,7 @@ impl BlockContainer for BackingBuffer {
 mod tests {
     use super::*;
     use anyhow::Error;
+    use assert_matches::assert_matches;
     use inspect_format::{BlockAccessorMutExt, WriteBytes};
 
     #[cfg(target_os = "fuchsia")]
@@ -542,7 +548,11 @@ mod tests {
         assert_eq!(snapshot.get_block(2.into()).unwrap().block_type(), BlockType::Extent);
         assert_eq!(snapshot.get_block(6.into()).unwrap().block_type(), BlockType::IntValue);
         assert_eq!(snapshot.get_block(7.into()).unwrap().block_type(), BlockType::Free);
-        assert!(snapshot.get_block(4096.into()).is_none());
+        let bad_index = BlockIndex::from(4096);
+        assert_matches!(
+            snapshot.get_block(bad_index),
+            Err(ReaderError::GetBlock(index)) if index == bad_index
+        );
 
         Ok(())
     }

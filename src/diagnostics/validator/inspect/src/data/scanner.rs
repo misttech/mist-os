@@ -228,7 +228,8 @@ impl Scanner {
             self.final_dereferenced_strings.insert(index, dereferenced);
         }
 
-        // We defer processing LINK blocks after because the population of the ScannedPayload::Link depends on all NAME blocks having been read.
+        // We defer processing LINK blocks after because the population of the
+        // ScannedPayload::Link depends on all NAME blocks having been read.
         for block in link_blocks.into_iter() {
             self.process_property(block, buffer)?
         }
@@ -452,11 +453,19 @@ impl Scanner {
             BlockType::BoolValue => ScannedPayload::Bool(block.bool_value()?),
             BlockType::BufferValue => {
                 let format = block.property_format()?;
-                let length = block.total_length()?;
                 let link = block.property_extent_index()?;
                 match format {
-                    PropertyFormat::String => ScannedPayload::String { length, link },
-                    PropertyFormat::Bytes => ScannedPayload::Bytes { length, link },
+                    PropertyFormat::String => {
+                        let length = Some(block.total_length()?);
+                        ScannedPayload::String { length, link }
+                    }
+                    PropertyFormat::Bytes => {
+                        let length = block.total_length()?;
+                        ScannedPayload::Bytes { length, link }
+                    }
+                    PropertyFormat::StringReference => {
+                        ScannedPayload::String { link, length: None }
+                    }
                 }
             }
             BlockType::ArrayValue => {
@@ -619,9 +628,13 @@ impl Scanner {
             ScannedPayload::Bytes { length, link } => {
                 Payload::Bytes(self.make_valid_vector(length, link)?)
             }
-            ScannedPayload::String { length, link } => Payload::String(
-                std::str::from_utf8(&self.make_valid_vector(length, link)?)?.to_owned(),
-            ),
+            ScannedPayload::String { length, link } => {
+                Payload::String(if let Some(length) = length {
+                    std::str::from_utf8(&self.make_valid_vector(length, link)?)?.to_owned()
+                } else {
+                    self.final_dereferenced_strings.get(&link).unwrap().clone()
+                })
+            }
             ScannedPayload::Link { disposition, scanned_tree } => {
                 Payload::Link { disposition, parsed_data: scanned_tree.data() }
             }
@@ -708,8 +721,16 @@ struct ScannedExtent {
 
 #[derive(Debug)]
 enum ScannedPayload {
-    String { length: usize, link: BlockIndex },
-    Bytes { length: usize, link: BlockIndex },
+    String {
+        // length might be `None` if `link` points to a `StringReference`, because the
+        // `StringReference` encodes its own length parameter
+        length: Option<usize>,
+        link: BlockIndex,
+    },
+    Bytes {
+        length: usize,
+        link: BlockIndex,
+    },
     Int(i64),
     Uint(u64),
     Double(f64),
@@ -718,7 +739,10 @@ enum ScannedPayload {
     UintArray(Vec<u64>, ArrayFormat),
     DoubleArray(Vec<f64>, ArrayFormat),
     StringArray(Vec<BlockIndex>),
-    Link { disposition: LinkNodeDisposition, scanned_tree: Box<Scanner> },
+    Link {
+        disposition: LinkNodeDisposition,
+        scanned_tree: Box<Scanner>,
+    },
 }
 
 #[cfg(test)]

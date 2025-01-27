@@ -13,7 +13,7 @@ use crate::writer::{
 };
 use diagnostics_hierarchy::{ArrayFormat, ExponentialHistogramParams, LinearHistogramParams};
 use futures::future::BoxFuture;
-use inspect_format::{BlockIndex, LinkNodeDisposition, PropertyFormat};
+use inspect_format::{BlockIndex, LinkNodeDisposition};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Inspect Node data type.
@@ -431,7 +431,7 @@ impl Node {
     pub fn create_string(
         &self,
         name: impl Into<StringReference>,
-        value: impl AsRef<str>,
+        value: impl Into<StringReference>,
     ) -> StringProperty {
         self.inner
             .inner_ref()
@@ -440,12 +440,7 @@ impl Node {
                     .state
                     .try_lock()
                     .and_then(|mut state| {
-                        state.create_property(
-                            name.into(),
-                            value.as_ref().as_bytes(),
-                            PropertyFormat::String,
-                            inner_ref.block_index,
-                        )
+                        state.create_string(name.into(), value.into(), inner_ref.block_index)
                     })
                     .map(|block_index| StringProperty::new(inner_ref.state.clone(), block_index))
                     .ok()
@@ -454,8 +449,12 @@ impl Node {
     }
 
     /// Creates and saves a string property for the lifetime of the node.
-    pub fn record_string(&self, name: impl Into<StringReference>, value: impl AsRef<str>) {
-        let property = self.create_string(name.into(), value);
+    pub fn record_string(
+        &self,
+        name: impl Into<StringReference>,
+        value: impl Into<StringReference>,
+    ) {
+        let property = self.create_string(name, value);
         self.record(property);
     }
 
@@ -473,10 +472,9 @@ impl Node {
                     .state
                     .try_lock()
                     .and_then(|mut state| {
-                        state.create_property(
+                        state.create_buffer_property(
                             name.into(),
                             value.as_ref(),
-                            PropertyFormat::Bytes,
                             inner_ref.block_index,
                         )
                     })

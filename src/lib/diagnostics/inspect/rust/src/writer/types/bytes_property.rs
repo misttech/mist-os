@@ -24,7 +24,7 @@ impl<'t> Property<'t> for BytesProperty {
             inner_ref
                 .state
                 .try_lock()
-                .and_then(|mut state| state.set_property(inner_ref.block_index, value))
+                .and_then(|mut state| state.set_buffer_property(inner_ref.block_index, value))
                 .unwrap_or_else(|e| error!("Failed to set property. Error: {:?}", e));
         }
     }

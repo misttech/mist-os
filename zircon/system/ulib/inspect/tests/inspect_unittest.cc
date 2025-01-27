@@ -438,7 +438,8 @@ TEST(Inspect, CreateStatsNode) {
   CheckStats(&hierarchy, &expected);
 
   for (int i = 0; i < 100; i++) {
-    inspector.GetRoot().CreateString(std::to_string(i), "This is a test", &inspector);
+    inspector.GetRoot().CreateString(std::to_string(i), "This is a test" + std::to_string(i),
+                                     &inspector);
   }
 
   ReadChildHierarchy(&inspector, &hierarchy, FUCHSIA_INSPECT_STATS);
@@ -452,7 +453,8 @@ TEST(Inspect, CreateStatsNode) {
   CheckStats(&hierarchy, &expected);
 
   for (int i = 101; i < 128; i++) {
-    inspector.GetRoot().CreateString(std::to_string(i), "This is a test", &inspector);
+    inspector.GetRoot().CreateString(std::to_string(i), "This is a test" + std::to_string(i),
+                                     &inspector);
   }
 
   ReadChildHierarchy(&inspector, &hierarchy, FUCHSIA_INSPECT_STATS);

@@ -402,15 +402,25 @@ impl<'a> LockedStateGuard<'a> {
         self.inner_lock.free_value(index)
     }
 
-    /// Allocate a PROPERTY block with the given |name|, |value| and |parent_index|.
-    pub fn create_property(
+    /// Allocate a BUFFER_VALUE block with the given |name|, |value| and |parent_index|.
+    pub fn create_buffer_property(
         &mut self,
         name: StringReference,
         value: &[u8],
-        format: PropertyFormat,
         parent_index: BlockIndex,
     ) -> Result<BlockIndex, Error> {
-        self.inner_lock.create_property(name, value, format, parent_index)
+        self.inner_lock.create_buffer_property(name, value, parent_index)
+    }
+
+    /// Allocate a BUFFER_VALUE block with the given |name|, |value| and |parent_index|, where
+    /// |value| is stored as a |STRING_REFERENCE|.
+    pub fn create_string(
+        &mut self,
+        name: StringReference,
+        value: StringReference,
+        parent_index: BlockIndex,
+    ) -> Result<BlockIndex, Error> {
+        self.inner_lock.create_string(name, value, parent_index)
     }
 
     pub fn reparent(
@@ -421,14 +431,27 @@ impl<'a> LockedStateGuard<'a> {
         self.inner_lock.reparent(being_reparented, new_parent)
     }
 
-    /// Free a PROPERTY block.
-    pub fn free_property(&mut self, index: BlockIndex) -> Result<(), Error> {
-        self.inner_lock.free_property(index)
+    /// Free a BUFFER_VALUE block.
+    pub fn free_string_or_bytes_buffer_property(&mut self, index: BlockIndex) -> Result<(), Error> {
+        self.inner_lock.free_string_or_bytes_buffer_property(index)
     }
 
-    /// Set the |value| of a String PROPERTY block.
-    pub fn set_property(&mut self, block_index: BlockIndex, value: &[u8]) -> Result<(), Error> {
-        self.inner_lock.set_property(block_index, value)
+    /// Set the |value| of a StringReference BUFFER_VALUE block.
+    pub fn set_string_property(
+        &mut self,
+        block_index: BlockIndex,
+        value: impl Into<StringReference>,
+    ) -> Result<(), Error> {
+        self.inner_lock.set_string_property(block_index, value)
+    }
+
+    /// Set the |value| of a non-StringReference BUFFER_VALUE block.
+    pub fn set_buffer_property(
+        &mut self,
+        block_index: BlockIndex,
+        value: &[u8],
+    ) -> Result<(), Error> {
+        self.inner_lock.set_buffer_property(block_index, value)
     }
 
     pub fn create_bool(
@@ -707,12 +730,11 @@ impl InnerState {
         Ok(())
     }
 
-    /// Allocate a PROPERTY block with the given |name|, |value| and |parent_index|.
-    fn create_property(
+    /// Allocate a BUFFER_VALUE block with the given |name|, |value| and |parent_index|.
+    fn create_buffer_property(
         &mut self,
         name: StringReference,
         value: &[u8],
-        format: PropertyFormat,
         parent_index: BlockIndex,
     ) -> Result<BlockIndex, Error> {
         let (block_index, name_block_index) =
@@ -720,13 +742,47 @@ impl InnerState {
         self.heap.container.block_at_mut(block_index).become_property(
             name_block_index,
             parent_index,
-            format,
+            PropertyFormat::Bytes,
         )?;
-        if let Err(err) = self.inner_set_property_value(block_index, value) {
+        if let Err(err) = self.inner_set_buffer_property_value(block_index, value) {
             self.heap.free_block(block_index)?;
             self.release_string_reference(name_block_index)?;
             return Err(err);
         }
+        Ok(block_index)
+    }
+
+    /// Allocate a BUFFER_VALUE block with the given |name|, |value| and |parent_index|, where
+    /// |value| is stored as a STRING_REFERENCE.
+    fn create_string(
+        &mut self,
+        name: StringReference,
+        value: StringReference,
+        parent_index: BlockIndex,
+    ) -> Result<BlockIndex, Error> {
+        let (block_index, name_block_index) =
+            self.allocate_reserved_value(name, parent_index, constants::MIN_ORDER_SIZE)?;
+        self.heap.container.block_at_mut(block_index).become_property(
+            name_block_index,
+            parent_index,
+            PropertyFormat::StringReference,
+        )?;
+
+        let value_block_index = match self.get_or_create_string_reference(value) {
+            Ok(b_index) => {
+                self.heap.container.block_at_mut(b_index).increment_string_reference_count()?;
+                b_index
+            }
+            Err(err) => {
+                self.heap.free_block(block_index)?;
+                return Err(err);
+            }
+        };
+
+        let mut block = self.heap.container.block_at_mut(block_index);
+        block.set_property_extent_index(value_block_index)?;
+        block.set_total_length(0)?;
+
         Ok(block_index)
     }
 
@@ -838,17 +894,35 @@ impl InnerState {
         String::from_utf8(content).ok().ok_or(Error::NameNotUtf8)
     }
 
-    /// Free a PROPERTY block.
-    fn free_property(&mut self, index: BlockIndex) -> Result<(), Error> {
-        let property_extent_index = self.heap.container.block_at(index).property_extent_index()?;
-        self.free_extents(property_extent_index)?;
+    /// Free a BUFFER_VALUE block.
+    fn free_string_or_bytes_buffer_property(&mut self, index: BlockIndex) -> Result<(), Error> {
+        let data_index = self.heap.container.block_at(index).property_extent_index()?;
+        match self.heap.container.block_at(index).property_format()? {
+            PropertyFormat::String | PropertyFormat::Bytes => {
+                self.free_extents(data_index)?;
+            }
+            PropertyFormat::StringReference => {
+                self.release_string_reference(data_index)?;
+            }
+        }
+
         self.delete_value(index)?;
         Ok(())
     }
 
-    /// Set the |value| of a String PROPERTY block.
-    fn set_property(&mut self, block_index: BlockIndex, value: &[u8]) -> Result<(), Error> {
-        self.inner_set_property_value(block_index, value)?;
+    /// Set the |value| of a String BUFFER_VALUE block.
+    fn set_string_property(
+        &mut self,
+        block_index: BlockIndex,
+        value: impl Into<StringReference>,
+    ) -> Result<(), Error> {
+        self.inner_set_string_property_value(block_index, value)?;
+        Ok(())
+    }
+
+    /// Set the |value| of a String BUFFER_VALUE block.
+    fn set_buffer_property(&mut self, block_index: BlockIndex, value: &[u8]) -> Result<(), Error> {
+        self.inner_set_buffer_property_value(block_index, value)?;
         Ok(())
     }
 
@@ -1097,7 +1171,33 @@ impl InnerState {
         Ok(())
     }
 
-    fn inner_set_property_value(
+    fn inner_set_string_property_value(
+        &mut self,
+        block_index: BlockIndex,
+        value: impl Into<StringReference>,
+    ) -> Result<(), Error> {
+        let old_string_ref_idx =
+            self.heap.container.block_at(block_index).property_extent_index()?;
+        let new_string_ref_idx = match self.get_or_create_string_reference(value.into()) {
+            Ok(b_index) => {
+                self.heap.container.block_at_mut(b_index).increment_string_reference_count()?;
+                b_index
+            }
+            Err(err) => {
+                self.heap.free_block(block_index)?;
+                return Err(err);
+            }
+        };
+
+        self.heap
+            .container
+            .block_at_mut(block_index)
+            .set_property_extent_index(new_string_ref_idx)?;
+        self.release_string_reference(old_string_ref_idx)?;
+        Ok(())
+    }
+
+    fn inner_set_buffer_property_value(
         &mut self,
         block_index: BlockIndex,
         value: &[u8],
@@ -1502,7 +1602,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_create_property_cleanup_on_failure() {
+    fn test_create_buffer_property_cleanup_on_failure() {
         // this implementation detail is important for the test below to be valid
         assert_eq!(constants::MAX_ORDER_SIZE, 2048);
 
@@ -1516,7 +1616,7 @@ mod tests {
         let payload = [0u8; 4096]; // won't fit into vmo
 
         // fails because the property is too big, but, allocates the name and should clean it up
-        assert!(state.create_property(name, &payload, PropertyFormat::Bytes, 0.into()).is_err());
+        assert!(state.create_buffer_property(name, &payload, 0.into()).is_err());
 
         drop(state);
 
@@ -1617,35 +1717,30 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_string_property() {
+    fn test_string_reference_format_property() {
         let core_state = get_state(4096);
         let block_index = {
             let mut state = core_state.try_lock().expect("lock state");
 
             // Creates with value
             let block_index = state
-                .create_property("test".into(), b"test-property", PropertyFormat::String, 0.into())
+                .create_string("test".into(), "test-property".into(), BlockIndex::from(0))
                 .unwrap();
             let block = state.get_block(block_index);
             assert_eq!(block.block_type(), BlockType::BufferValue);
             assert_eq!(*block.index(), 2);
             assert_eq!(*block.parent_index().unwrap(), 0);
             assert_eq!(*block.name_index().unwrap(), 3);
-            assert_eq!(block.total_length().unwrap(), 13);
-            assert_eq!(block.property_format().unwrap(), PropertyFormat::String);
+            assert_eq!(block.property_format().unwrap(), PropertyFormat::StringReference);
 
             let name_block = state.get_block(block.name_index().unwrap());
             assert_eq!(name_block.block_type(), BlockType::StringReference);
             assert_eq!(name_block.total_length().unwrap(), 4);
             assert_eq!(state.load_string(name_block.index()).unwrap(), "test");
 
-            let extent_block = state.get_block(4.into());
-            assert_eq!(extent_block.block_type(), BlockType::Extent);
-            assert_eq!(*extent_block.next_extent().unwrap(), 0);
-            assert_eq!(
-                std::str::from_utf8(extent_block.extent_contents().unwrap()).unwrap(),
-                "test-property\0\0\0\0\0\0\0\0\0\0\0"
-            );
+            let data_block = state.get_block(block.property_extent_index().unwrap());
+            assert_eq!(data_block.block_type(), BlockType::StringReference);
+            assert_eq!(state.load_string(data_block.index()).unwrap(), "test-property");
             block_index
         };
 
@@ -1655,17 +1750,19 @@ mod tests {
         assert_eq!(blocks[0].block_type(), BlockType::Header);
         assert_eq!(blocks[1].block_type(), BlockType::BufferValue);
         assert_eq!(blocks[2].block_type(), BlockType::StringReference);
-        assert_eq!(blocks[3].block_type(), BlockType::Extent);
+        assert_eq!(blocks[3].block_type(), BlockType::StringReference);
         assert!(blocks[4..].iter().all(|b| b.block_type() == BlockType::Free));
 
         {
             let mut state = core_state.try_lock().expect("lock state");
             // Free property.
-            assert!(state.free_property(block_index).is_ok());
+            assert!(state.free_string_or_bytes_buffer_property(block_index).is_ok());
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert!(blocks[1..].iter().all(|b| b.block_type() == BlockType::Free));
+        for b in blocks[1..].iter() {
+            assert_eq!(b.block_type(), BlockType::Free);
+        }
     }
 
     #[fuchsia::test]
@@ -1836,9 +1933,8 @@ mod tests {
         // Creates with value
         let block_index = {
             let mut state = core_state.try_lock().expect("lock state");
-            let block_index = state
-                .create_property("test".into(), b"test-property", PropertyFormat::Bytes, 0.into())
-                .unwrap();
+            let block_index =
+                state.create_buffer_property("test".into(), b"test-property", 0.into()).unwrap();
             let block = state.get_block(block_index);
             assert_eq!(block.block_type(), BlockType::BufferValue);
             assert_eq!(*block.index(), 2);
@@ -1875,7 +1971,7 @@ mod tests {
         // Free property.
         {
             let mut state = core_state.try_lock().expect("lock state");
-            assert!(state.free_property(block_index).is_ok());
+            assert!(state.free_string_or_bytes_buffer_property(block_index).is_ok());
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
@@ -1997,9 +2093,8 @@ mod tests {
         let mut state = core_state.try_lock().expect("lock state");
 
         let data = "X".repeat(SIZE * 2);
-        let block_index = state
-            .create_property("test".into(), data.as_bytes(), PropertyFormat::String, 0.into())
-            .unwrap();
+        let block_index =
+            state.create_buffer_property("test".into(), data.as_bytes(), 0.into()).unwrap();
         let block = state.get_block(block_index);
         assert_eq!(block.block_type(), BlockType::BufferValue);
         assert_eq!(*block.index(), 2);
@@ -2007,7 +2102,7 @@ mod tests {
         assert_eq!(*block.name_index().unwrap(), 3);
         assert_eq!(block.total_length().unwrap(), EXPECTED_WRITTEN);
         assert_eq!(*block.property_extent_index().unwrap(), 128);
-        assert_eq!(block.property_format().unwrap(), PropertyFormat::String);
+        assert_eq!(block.property_format().unwrap(), PropertyFormat::Bytes);
 
         let name_block = state.get_block(block.name_index().unwrap());
         assert_eq!(name_block.block_type(), BlockType::StringReference);
@@ -2032,9 +2127,8 @@ mod tests {
 
             let chars = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
             let data = chars.iter().cycle().take(6000).collect::<String>();
-            let block_index = state
-                .create_property("test".into(), data.as_bytes(), PropertyFormat::String, 0.into())
-                .unwrap();
+            let block_index =
+                state.create_buffer_property("test".into(), data.as_bytes(), 0.into()).unwrap();
             let block = state.get_block(block_index);
             assert_eq!(block.block_type(), BlockType::BufferValue);
             assert_eq!(*block.index(), 2);
@@ -2042,7 +2136,7 @@ mod tests {
             assert_eq!(*block.name_index().unwrap(), 3);
             assert_eq!(block.total_length().unwrap(), 6000);
             assert_eq!(*block.property_extent_index().unwrap(), 128);
-            assert_eq!(block.property_format().unwrap(), PropertyFormat::String);
+            assert_eq!(block.property_format().unwrap(), PropertyFormat::Bytes);
 
             let name_block = state.get_block(block.name_index().unwrap());
             assert_eq!(name_block.block_type(), BlockType::StringReference);
@@ -2092,7 +2186,7 @@ mod tests {
         // Free property.
         {
             let mut state = core_state.try_lock().expect("lock state");
-            assert!(state.free_property(block_index).is_ok());
+            assert!(state.free_string_or_bytes_buffer_property(block_index).is_ok());
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
@@ -2416,9 +2510,8 @@ mod tests {
 
             let chars = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
             let data = chars.iter().cycle().take(6000).collect::<String>();
-            let block_index = state
-                .create_property("test".into(), data.as_bytes(), PropertyFormat::String, 0.into())
-                .unwrap();
+            let block_index =
+                state.create_buffer_property("test".into(), data.as_bytes(), 0.into()).unwrap();
             assert_eq!(state.header().header_vmo_size().unwrap().unwrap(), 2 * 4096);
 
             block_index
@@ -2429,9 +2522,8 @@ mod tests {
 
             let chars = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
             let data = chars.iter().cycle().take(3000).collect::<String>();
-            let block_index = state
-                .create_property("test".into(), data.as_bytes(), PropertyFormat::String, 0.into())
-                .unwrap();
+            let block_index =
+                state.create_buffer_property("test".into(), data.as_bytes(), 0.into()).unwrap();
             assert_eq!(state.header().header_vmo_size().unwrap().unwrap(), 3 * 4096);
 
             block_index
@@ -2439,8 +2531,8 @@ mod tests {
         // Free properties.
         {
             let mut state = core_state.try_lock().expect("lock state");
-            assert!(state.free_property(block1_index).is_ok());
-            assert!(state.free_property(block2_index).is_ok());
+            assert!(state.free_string_or_bytes_buffer_property(block1_index).is_ok());
+            assert!(state.free_string_or_bytes_buffer_property(block2_index).is_ok());
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
@@ -2448,15 +2540,14 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_string_property_on_overflow_set() {
+    fn test_buffer_property_on_overflow_set() {
         let core_state = get_state(4096);
         let block_index = {
             let mut state = core_state.try_lock().expect("lock state");
 
             // Create string property with value.
-            let block_index = state
-                .create_property("test".into(), b"test-property", PropertyFormat::String, 0.into())
-                .unwrap();
+            let block_index =
+                state.create_buffer_property("test".into(), b"test-property", 0.into()).unwrap();
 
             // Fill the vmo.
             for _ in 10..(4096 / constants::MIN_ORDER_SIZE).try_into().unwrap() {
@@ -2465,7 +2556,7 @@ mod tests {
 
             // Set the value of the string to something very large that causes an overflow.
             let values = [b'a'; 8096];
-            assert!(state.set_property(block_index, &values).is_err());
+            assert!(state.set_buffer_property(block_index, &values).is_err());
 
             // We now expect the length of the payload, as well as the property extent index to be
             // reset.
@@ -2476,7 +2567,7 @@ mod tests {
             assert_eq!(*block.name_index().unwrap(), 3);
             assert_eq!(block.total_length().unwrap(), 0);
             assert_eq!(*block.property_extent_index().unwrap(), 0);
-            assert_eq!(block.property_format().unwrap(), PropertyFormat::String);
+            assert_eq!(block.property_format().unwrap(), PropertyFormat::Bytes);
 
             block_index
         };
@@ -2495,7 +2586,7 @@ mod tests {
         {
             let mut state = core_state.try_lock().expect("lock state");
             // Free property.
-            assert_matches!(state.free_property(block_index), Ok(()));
+            assert_matches!(state.free_string_or_bytes_buffer_property(block_index), Ok(()));
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();

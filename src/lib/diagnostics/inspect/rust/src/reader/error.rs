@@ -25,7 +25,7 @@ pub enum ReaderError {
     MalformedTree,
 
     #[error("VMO format error")]
-    VmoFormat(#[source] FormatError),
+    VmoFormat(#[from] FormatError),
 
     #[error("Tried to read more slots than available at block index {0}")]
     AttemptedToReadTooManyArraySlots(BlockIndex),
@@ -36,11 +36,8 @@ pub enum ReaderError {
     #[error("Failed to parse name at index {0}")]
     ParseName(BlockIndex),
 
-    #[error("Failed to get link content at index {0}")]
-    GetLinkContent(BlockIndex),
-
-    #[error("Failed to get extent at index {0}")]
-    GetExtent(BlockIndex),
+    #[error("No blocks at BlockIndex {0}")]
+    GetBlock(BlockIndex),
 
     #[error("Failed to get consistent snapshot")]
     InconsistentSnapshot,
@@ -53,10 +50,10 @@ pub enum ReaderError {
 
     #[cfg(target_os = "fuchsia")]
     #[error("Failed to call vmo")]
-    Vmo(zx::Status),
+    Vmo(#[from] zx::Status),
 
     #[error("Error creating node hierarchy")]
-    Hierarchy(#[source] HierarchyError),
+    Hierarchy(#[from] HierarchyError),
 
     #[error("Failed to duplicate vmo handle")]
     DuplicateVmo,
@@ -75,10 +72,4 @@ pub enum ReaderError {
 
     #[error("Offset out of bounds while reading")]
     OffsetOutOfBounds,
-}
-
-impl From<FormatError> for ReaderError {
-    fn from(error: FormatError) -> Self {
-        Self::VmoFormat(error)
-    }
 }

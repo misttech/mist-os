@@ -100,7 +100,7 @@ impl InnerType for InnerPropertyType {
     fn free(state: &State, _: &Self::Data, block_index: BlockIndex) -> Result<(), Error> {
         let mut state_lock = state.try_lock()?;
         state_lock
-            .free_property(block_index)
+            .free_string_or_bytes_buffer_property(block_index)
             .map_err(|err| Error::free("property", block_index, err))
     }
 }

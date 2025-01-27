@@ -450,8 +450,24 @@ WrapperType State::InnerCreateProperty(std::string_view name, BlockIndex parent,
 
 StringProperty State::CreateStringProperty(std::string_view name, BlockIndex parent,
                                            const std::string& value) {
-  return InnerCreateProperty<StringProperty, std::string>(
-      name, parent, value.data(), value.length(), PropertyBlockFormat::kUtf8);
+  std::lock_guard<std::mutex> lock(mutex_);
+  std::unique_ptr<AutoGenerationIncrement> gen = MaybeIncrementGeneration();
+
+  BlockIndex name_index, value_index;
+  const zx_status_t creation_status =
+      InnerCreateValue(name, BlockType::kBufferValue, parent, &name_index, &value_index);
+  if (creation_status != ZX_OK) {
+    return StringProperty();
+  }
+
+  BlockIndex data_index;
+  InnerCreateAndIncrementStringReference(value, &data_index, true);
+  heap_->GetBlock(value_index)->payload.u64 =
+      PropertyBlockPayload::ExtentIndex::Make(data_index) |
+      PropertyBlockPayload::TotalLength::Make(0) |
+      PropertyBlockPayload::Flags::Make(PropertyBlockFormat::kStringReference);
+
+  return StringProperty(weak_self_ptr_.lock(), name_index, value_index);
 }
 
 ByteVectorProperty State::CreateByteVectorProperty(std::string_view name, BlockIndex parent,
@@ -700,12 +716,7 @@ void State::SubtractDoubleArray(DoubleArray* array, size_t index, double value) 
 }
 
 template <typename WrapperType>
-void State::InnerSetProperty(WrapperType* property, const char* value, size_t length) {
-  ZX_ASSERT(property->state_.get() == this);
-
-  std::lock_guard<std::mutex> lock(mutex_);
-  std::unique_ptr<AutoGenerationIncrement> gen = MaybeIncrementGeneration();
-
+void State::InnerSetBytesProperty(WrapperType* property, const char* value, size_t length) {
   auto* block = heap_->GetBlock(property->value_index_);
   InnerFreeExtentChain(PropertyBlockPayload::ExtentIndex::Get<BlockIndex>(block->payload.u64));
 
@@ -721,12 +732,38 @@ void State::InnerSetProperty(WrapperType* property, const char* value, size_t le
                            PropertyBlockPayload::Flags::Get<uint8_t>(block->payload.u64));
 }
 
+void State::InnerSetStringProperty(StringProperty* property, const std::string& value) {
+  auto* property_block = heap_->GetBlock(property->value_index_);
+  const auto old_string_ref_idx =
+      PropertyBlockPayload::ExtentIndex::Get<BlockIndex>(property_block->payload.u64);
+
+  BlockIndex new_string_ref_idx;
+  InnerCreateAndIncrementStringReference(value, &new_string_ref_idx, true);
+
+  InnerReleaseStringReference(old_string_ref_idx);
+
+  property_block->payload.u64 =
+      PropertyBlockPayload::ExtentIndex::Make(new_string_ref_idx) |
+      PropertyBlockPayload::Flags::Make(
+          PropertyBlockPayload::Flags::Get<uint8_t>(property_block->payload.u64));
+}
+
 void State::SetStringProperty(StringProperty* property, const std::string& value) {
-  InnerSetProperty(property, value.data(), value.size());
+  ZX_ASSERT(property->state_.get() == this);
+
+  std::lock_guard<std::mutex> lock(mutex_);
+  std::unique_ptr<AutoGenerationIncrement> gen = MaybeIncrementGeneration();
+
+  InnerSetStringProperty(property, value);
 }
 
 void State::SetByteVectorProperty(ByteVectorProperty* property, cpp20::span<const uint8_t> value) {
-  InnerSetProperty(property, reinterpret_cast<const char*>(value.data()), value.size());
+  ZX_ASSERT(property->state_.get() == this);
+
+  std::lock_guard<std::mutex> lock(mutex_);
+  std::unique_ptr<AutoGenerationIncrement> gen = MaybeIncrementGeneration();
+
+  InnerSetBytesProperty(property, reinterpret_cast<const char*>(value.data()), value.size());
 }
 
 void State::DecrementParentRefcount(BlockIndex value_index) {
@@ -866,7 +903,17 @@ void State::InnerFreePropertyWithExtents(WrapperType* property) {
   DecrementParentRefcount(property->value_index_);
 
   const auto* block = heap_->GetBlock(property->value_index_);
-  InnerFreeExtentChain(PropertyBlockPayload::ExtentIndex::Get<BlockIndex>(block->payload.u64));
+
+  switch (PropertyBlockPayload::Flags::Get<PropertyBlockFormat>(block->payload.u64)) {
+    case PropertyBlockFormat::kBinary:
+    case PropertyBlockFormat::kUtf8:
+      InnerFreeExtentChain(PropertyBlockPayload::ExtentIndex::Get<BlockIndex>(block->payload.u64));
+      break;
+    case PropertyBlockFormat::kStringReference:
+      InnerReleaseStringReference(
+          PropertyBlockPayload::ExtentIndex::Get<BlockIndex>(block->payload.u64));
+      break;
+  }
 
   InnerReleaseStringReference(property->name_index_);
   heap_->Free(property->value_index_);
@@ -1194,11 +1241,13 @@ zx_status_t State::InnerCreateStringReference(std::string_view value, BlockIndex
 }
 
 namespace {
+
 constexpr size_t GetOrderForSizeOfStringReference(const size_t data_size) {
   return std::min(
       BlockSizeForPayload(data_size + StringReferenceBlockPayload::TotalLength::SizeInBytes()),
       BlockSizeForPayload(kMaxPayloadSize));
 }
+
 }  // namespace
 
 zx_status_t State::InnerDoStringReferenceAllocations(std::string_view data, BlockIndex* const out,

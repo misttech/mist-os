@@ -695,7 +695,8 @@ mod tests {
         // The first byte of the actual property string is at this byte offset in the VMO.
         let byte_offset = constants::MIN_ORDER_SIZE
             * (*block.property_extent_index().unwrap() as usize)
-            + constants::HEADER_SIZE_BYTES;
+            + constants::HEADER_SIZE_BYTES
+            + constants::STRING_REFERENCE_TOTAL_LENGTH_BYTES;
 
         // Get the raw VMO bytes to mess with.
         let vmo_size = BlockContainer::len(&vmo);

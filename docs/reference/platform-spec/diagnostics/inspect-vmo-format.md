@@ -347,16 +347,17 @@ packet-beta
 16-39: "parent index"
 40-63: "name index"
 64-95: "total length"
-96-123: "extent index"
-124-127: "format (0|1)"
+96-123: "extent OR string reference index"
+124-127: "format (0|1|2)"
 ```
 
-General `BUFFER_VALUE` blocks reference arbitrary byte data across
-one or more linked `EXTENT` blocks.
+`BUFFER_VALUE` blocks may point to either the first `EXTENT` block in a chain, or to a
+`STRING_REFERENCE`.
 
-`BUFFER_VALUE` blocks contain the index of the first `EXTENT` block holding
-the binary data, and they contain the total length of the data in bytes
-across all extents.
+For `format` values of `kUtf8` or `kBinary`, the referee is an `EXTENT` chain. For `format` values
+of `kStringReference`, the referee is a `STRING_REFERENCE`.
+
+If the `format` is `kStringReference`, then the `total length` field is zeroed.
 
 The format flags specify how the byte data should be interpreted,
 as follows:
@@ -365,6 +366,7 @@ Enum    | Value | Meaning
 ----    | ----  | ----
 kUtf8   | 0     | The byte data may be interpreted as a UTF-8 string.
 kBinary | 1     | The byte data is arbitrary binary data and may not be printable.
+kStringReference | 2     | The data is a `STRING_REFERENCE` block.
 
 ## EXTENT {#extent}
 
