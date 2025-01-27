@@ -161,10 +161,15 @@ template("fshost_integration_test_component") {
 # Generates an fshost integration test package. Includes the fshost component on which the test is
 # executed.
 #
-#   extra_deps (optional)
-#     [array] A list of extra deps for the general integration test component. These deps are not
-#             added to any of the other components right now. NB: if other test components need
-#             extra deps then come up with a different solution here.
+#   enable_migration_tests (default: true)
+#   enable_write_data_file_tests (default: true)
+#   enable_wipe_storage_tests (default: true)
+#     [bool] Enable additional fshost integration tests for more specific things. Default to
+#            enabled, but some configurations don't support them.
+#
+#   data_filesystem_variant (optional)
+#     [string] A variant string passed to the integration test harness. Defaults to the
+#              data_filesystem_format.
 #
 #   options.data_filesystem_format (required)
 #     [string] The format of the data partition fshost exports. One of "fxfs", "minfs", or "f2fs".
@@ -173,15 +178,25 @@ template("fshost_integration_test_component") {
 #   options.storage_host (optional)
 #     [bool] Whether storage-host should be used.
 #
-#   data_filesystem_variant (optional)
-#     [string] A variant string passed to the integration test harness. Defaults to the
-#              data_filesystem_format.
+#   extra_deps (optional)
+#     [array] A list of extra deps for the general integration test component. These deps are not
+#             added to any of the other components right now. NB: if other test components need
+#             extra deps then come up with a different solution here.
 #
 template("fshost_integration_test_package") {
   assert(defined(invoker.options), "fshost options not specified")
   fshost_options = invoker.options
   if (!defined(invoker.data_filesystem_variant)) {
     invoker.data_filesystem_variant = fshost_options.data_filesystem_format
+  }
+  if (!defined(invoker.enable_migration_tests)) {
+    invoker.enable_migration_tests = true
+  }
+  if (!defined(invoker.enable_write_data_file_tests)) {
+    invoker.enable_write_data_file_tests = true
+  }
+  if (!defined(invoker.enable_wipe_storage_tests)) {
+    invoker.enable_wipe_storage_tests = true
   }
 
   _fshost_target = "test-fshost-${target_name}"
@@ -199,6 +214,7 @@ template("fshost_integration_test_package") {
   }
 
   _integration_component_target = "${target_name}_general"
+  _test_components = [ ":$_integration_component_target" ]
   fshost_integration_test_component(_integration_component_target) {
     fshost_target = _fshost_target
     data_filesystem_format = fshost_options.data_filesystem_format
@@ -239,50 +255,59 @@ template("fshost_integration_test_package") {
     }
   }
 
-  _migration_component_target = "${target_name}_migration"
-  fshost_integration_test_component(_migration_component_target) {
-    fshost_target = _fshost_target
-    data_filesystem_format = fshost_options.data_filesystem_format
-    data_filesystem_variant = invoker.data_filesystem_variant
-    extra_features = _extra_features
-    source_root = "tests/migration.rs"
+  if (invoker.enable_migration_tests) {
+    _migration_component_target = "${target_name}_migration"
+    _test_components += [ ":$_migration_component_target" ]
+    fshost_integration_test_component(_migration_component_target) {
+      fshost_target = _fshost_target
+      data_filesystem_format = fshost_options.data_filesystem_format
+      data_filesystem_variant = invoker.data_filesystem_variant
+      extra_features = _extra_features
+      source_root = "tests/migration.rs"
+    }
   }
 
-  _wipe_storage_component_target = "${target_name}_wipe_storage"
-  fshost_integration_test_component(_wipe_storage_component_target) {
-    fshost_target = _fshost_target
-    data_filesystem_format = fshost_options.data_filesystem_format
-    data_filesystem_variant = invoker.data_filesystem_variant
-    extra_features = _extra_features
-    source_root = "tests/wipe_storage.rs"
-    deps = [
-      "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_rust",
-      "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
-      "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_rust",
-      "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-      "//sdk/fidl/fuchsia.storage.partitions:fuchsia.storage.partitions_rust",
-      "//sdk/lib/device-watcher/rust",
-      "//sdk/rust/zx",
-      "//src/lib/fidl/rust/fidl",
-      "//src/lib/fuchsia-fs",
-      "//src/storage/lib/block_client/rust",
-      "//src/storage/lib/fs_management/rust:fs_management",
-    ]
+  if (invoker.enable_wipe_storage_tests) {
+    _wipe_storage_component_target = "${target_name}_wipe_storage"
+    _test_components += [ ":$_wipe_storage_component_target" ]
+    fshost_integration_test_component(_wipe_storage_component_target) {
+      fshost_target = _fshost_target
+      data_filesystem_format = fshost_options.data_filesystem_format
+      data_filesystem_variant = invoker.data_filesystem_variant
+      extra_features = _extra_features
+      source_root = "tests/wipe_storage.rs"
+      deps = [
+        "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_rust",
+        "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
+        "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_rust",
+        "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+        "//sdk/fidl/fuchsia.storage.partitions:fuchsia.storage.partitions_rust",
+        "//sdk/lib/device-watcher/rust",
+        "//sdk/rust/zx",
+        "//src/lib/fidl/rust/fidl",
+        "//src/lib/fuchsia-fs",
+        "//src/storage/lib/block_client/rust",
+        "//src/storage/lib/fs_management/rust:fs_management",
+      ]
+    }
   }
 
-  _write_data_file_component_target = "${target_name}_write_data_file"
-  fshost_integration_test_component(_write_data_file_component_target) {
-    fshost_target = _fshost_target
-    data_filesystem_format = fshost_options.data_filesystem_format
-    data_filesystem_variant = invoker.data_filesystem_variant
-    extra_features = _extra_features
-    source_root = "tests/write_data_file.rs"
-    deps = [
-      "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_rust",
-      "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-      "//sdk/rust/zx",
-      "//src/lib/fuchsia-fs",
-    ]
+  if (invoker.enable_write_data_file_tests) {
+    _write_data_file_component_target = "${target_name}_write_data_file"
+    _test_components += [ ":$_write_data_file_component_target" ]
+    fshost_integration_test_component(_write_data_file_component_target) {
+      fshost_target = _fshost_target
+      data_filesystem_format = fshost_options.data_filesystem_format
+      data_filesystem_variant = invoker.data_filesystem_variant
+      extra_features = _extra_features
+      source_root = "tests/write_data_file.rs"
+      deps = [
+        "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_rust",
+        "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+        "//sdk/rust/zx",
+        "//src/lib/fuchsia-fs",
+      ]
+    }
   }
 
   fuchsia_test_package(target_name) {
@@ -292,23 +317,8 @@ template("fshost_integration_test_package") {
       }
       parallel = 1
     }
-    test_components = [
-      ":$_integration_component_target",
-      ":$_migration_component_target",
-      ":$_wipe_storage_component_target",
-      ":$_write_data_file_component_target",
-    ]
+    test_components = _test_components
 
-    # TODO(https://fxbug.dev/339491886): Support these components in storage-host
-    if (defined(fshost_options.storage_host) && fshost_options.storage_host) {
-      if (defined(fshost_options.fxfs_blob) && !fshost_options.fxfs_blob) {
-        test_components -= [
-          ":$_migration_component_target",
-          ":$_wipe_storage_component_target",
-          ":$_write_data_file_component_target",
-        ]
-      }
-    }
     deps = [
       ":$_fshost_target",
       "//src/storage/testing:storage_driver_test_realm",
@@ -325,6 +335,7 @@ template("fshost_integration_test_package") {
 }
 
 fshost_integration_test_package("fshost_integration_tests_fxfs") {
+  enable_migration_tests = false
   data_filesystem_variant = "fxblob"
   options = {
     data_filesystem_format = "fxfs"
@@ -337,6 +348,7 @@ fshost_integration_test_package("fshost_integration_tests_fxfs") {
 }
 
 fshost_integration_test_package("fshost_integration_tests_storage_host_fxfs") {
+  enable_migration_tests = false
   data_filesystem_variant = "fxblob"
   options = {
     data_filesystem_format = "fxfs"
@@ -352,6 +364,10 @@ fshost_integration_test_package("fshost_integration_tests_storage_host_fxfs") {
 
 fshost_integration_test_package(
     "fshost_integration_tests_storage_host_fvm_minfs") {
+  # TODO(https://fxbug.dev/339491886): Support these components in storage-host
+  enable_migration_tests = false
+  enable_wipe_storage_tests = false
+  enable_write_data_file_tests = false
   options = {
     data_filesystem_format = "minfs"
     use_disk_migration = false
@@ -366,6 +382,10 @@ fshost_integration_test_package(
 
 fshost_integration_test_package(
     "fshost_integration_tests_storage_host_fvm_minfs_no_zxcrypt") {
+  # TODO(https://fxbug.dev/339491886): Support these components in storage-host
+  enable_migration_tests = false
+  enable_wipe_storage_tests = false
+  enable_write_data_file_tests = false
   data_filesystem_variant = "minfs-no-zxcrypt"
   options = {
     data_filesystem_format = "minfs"
@@ -388,6 +408,7 @@ fshost_integration_test_package("fshost_integration_tests_fxfs_no_fxblob") {
 }
 
 fshost_integration_test_package("fshost_integration_tests_f2fs") {
+  enable_wipe_storage_tests = false
   options = {
     data_filesystem_format = "f2fs"
     fxfs_blob = false
@@ -402,6 +423,7 @@ fshost_integration_test_package("fshost_integration_tests_minfs") {
 }
 
 fshost_integration_test_package("fshost_integration_tests_f2fs_no_zxcrypt") {
+  enable_wipe_storage_tests = false
   data_filesystem_variant = "f2fs-no-zxcrypt"
   options = {
     no_zxcrypt = true
