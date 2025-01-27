@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::convert::fullmac_to_mlme;
 use anyhow::{format_err, Context};
 use fidl::endpoints::ClientEnd;
 use {
@@ -195,9 +194,7 @@ impl DeviceOps for FullmacDevice {
             .get_iface_counter_stats(zx::MonotonicInstant::INFINITE)
             .context("FIDL error on GetIfaceCounterStats")?
         {
-            Ok(stats) => Ok(fidl_mlme::GetIfaceCounterStatsResponse::Stats(
-                fullmac_to_mlme::convert_iface_counter_stats(stats),
-            )),
+            Ok(stats) => Ok(fidl_mlme::GetIfaceCounterStatsResponse::Stats(stats)),
             Err(e) => Ok(fidl_mlme::GetIfaceCounterStatsResponse::ErrorStatus(e)),
         }
     }
@@ -209,9 +206,7 @@ impl DeviceOps for FullmacDevice {
             .get_iface_histogram_stats(zx::MonotonicInstant::INFINITE)
             .context("FIDL error on GetIfaceHistogramStats")?
         {
-            Ok(stats) => Ok(fidl_mlme::GetIfaceHistogramStatsResponse::Stats(
-                fullmac_to_mlme::convert_iface_histogram_stats(stats),
-            )),
+            Ok(stats) => Ok(fidl_mlme::GetIfaceHistogramStatsResponse::Stats(stats)),
             Err(e) => Ok(fidl_mlme::GetIfaceHistogramStatsResponse::ErrorStatus(e)),
         }
     }

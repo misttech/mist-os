@@ -756,17 +756,24 @@ fn inspect_record_external_data(
                                 let mut histograms = HistogramsNode::new(
                                     inspector.root().create_child("histograms"),
                                 );
-                                histograms
-                                    .log_per_antenna_snr_histograms(&stats.snr_histograms[..]);
-                                histograms.log_per_antenna_rx_rate_histograms(
-                                    &stats.rx_rate_index_histograms[..],
-                                );
-                                histograms.log_per_antenna_noise_floor_histograms(
-                                    &stats.noise_floor_histograms[..],
-                                );
-                                histograms.log_per_antenna_rssi_histograms(
-                                    &stats.rssi_histograms[..],
-                                );
+                                if let Some(snr_histograms) = &stats.snr_histograms {
+                                    histograms.log_per_antenna_snr_histograms(&snr_histograms[..]);
+                                }
+                                if let Some(rx_rate_histograms) = &stats.rx_rate_index_histograms {
+                                    histograms.log_per_antenna_rx_rate_histograms(
+                                        &rx_rate_histograms[..],
+                                    );
+                                }
+                                if let Some(noise_floor_histograms) = &stats.noise_floor_histograms {
+                                    histograms.log_per_antenna_noise_floor_histograms(
+                                        &noise_floor_histograms[..],
+                                    );
+                                }
+                                if let Some(rssi_histograms) = &stats.rssi_histograms {
+                                    histograms.log_per_antenna_rssi_histograms(
+                                        &rssi_histograms[..],
+                                    );
+                                }
 
                                 inspector.root().record(histograms);
                             }
@@ -10181,10 +10188,11 @@ mod tests {
 
     fn fake_iface_histogram_stats() -> fidl_fuchsia_wlan_stats::IfaceHistogramStats {
         fidl_fuchsia_wlan_stats::IfaceHistogramStats {
-            noise_floor_histograms: fake_noise_floor_histograms(),
-            rssi_histograms: fake_rssi_histograms(),
-            rx_rate_index_histograms: fake_rx_rate_index_histograms(),
-            snr_histograms: fake_snr_histograms(),
+            noise_floor_histograms: Some(fake_noise_floor_histograms()),
+            rssi_histograms: Some(fake_rssi_histograms()),
+            rx_rate_index_histograms: Some(fake_rx_rate_index_histograms()),
+            snr_histograms: Some(fake_snr_histograms()),
+            ..Default::default()
         }
     }
 

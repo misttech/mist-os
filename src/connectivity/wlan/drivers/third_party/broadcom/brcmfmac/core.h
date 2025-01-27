@@ -322,11 +322,10 @@ struct net_device {
 
     // rssi histogram, index = -(rssi), For ex, -128 => 128....-1 => 1
     std::array<uint64_t, RSSI_HISTOGRAM_LEN> rssi_buckets;
-    std::vector<fuchsia_wlan_fullmac::wire::WlanFullmacNoiseFloorHistogram> noise_floor_histograms;
-    std::vector<fuchsia_wlan_fullmac::wire::WlanFullmacRssiHistogram> rssi_histograms;
-    std::vector<fuchsia_wlan_fullmac::wire::WlanFullmacRxRateIndexHistogram>
-        rx_rate_index_histograms;
-    std::vector<fuchsia_wlan_fullmac::wire::WlanFullmacSnrHistogram> snr_histograms;
+    std::vector<fuchsia_wlan_stats::wire::NoiseFloorHistogram> noise_floor_histograms;
+    std::vector<fuchsia_wlan_stats::wire::RssiHistogram> rssi_histograms;
+    std::vector<fuchsia_wlan_stats::wire::RxRateIndexHistogram> rx_rate_index_histograms;
+    std::vector<fuchsia_wlan_stats::wire::SnrHistogram> snr_histograms;
     brcmf_pktcnt_le fw_pktcnt;
   } stats;
   zx::channel sme_channel;

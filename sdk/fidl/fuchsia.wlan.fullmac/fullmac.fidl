@@ -6,6 +6,7 @@ library fuchsia.wlan.fullmac;
 
 using fuchsia.wlan.common;
 using fuchsia.wlan.ieee80211 as ieee80211;
+using fuchsia.wlan.stats;
 using zx;
 
 type WlanScanType = flexible enum : uint8 {
@@ -144,165 +145,6 @@ type BandCapability = table {
 
 type WlanFullmacRssiStats = struct {
     hist vector<uint64>:MAX;
-};
-
-// LINT.IfChange
-/// Histogram bucket.
-type WlanFullmacHistBucket = struct {
-    /// Index into a lookup table for each histogram type. The lookup table for each type is
-    /// described below in the comments for each type.
-    bucket_index uint16;
-    /// The count of samples in the bucket.
-    num_samples uint64;
-};
-
-/// All histograms have a fixed number of buckets. To save space, each histogram type
-/// uses a vector to hold only non-empty buckets (a sparse histogram), with these constants as the
-/// max size of each vector.
-/// Noise floor values range from -255 to -1 dBm.
-const WLAN_FULLMAC_MAX_NOISE_FLOOR_SAMPLES uint8 = 255;
-/// Size of RX_RATE_INDEX lookup table (see comments in RxRateIndexHistogram).
-const WLAN_FULLMAC_MAX_RX_RATE_INDEX_SAMPLES uint8 = 196;
-/// RSSI values range from -255 to -1 dBm.
-const WLAN_FULLMAC_MAX_RSSI_SAMPLES uint8 = 255;
-/// SNR values range from 0 to 255 dB.
-const WLAN_FULLMAC_MAX_SNR_SAMPLES uint16 = 256;
-
-/// Antenna frequency.
-type WlanFullmacAntennaFreq = strict enum : uint8 {
-    /// 2.4 GHz.
-    ANTENNA_2_G = 1;
-    /// 5 GHz.
-    ANTENNA_5_G = 2;
-};
-
-/// Identifier for antenna.
-type WlanFullmacAntennaId = struct {
-    freq WlanFullmacAntennaFreq;
-    /// 0 indexed antenna number of freq.
-    index uint8;
-};
-
-/// The scope of the histogram, e.g. if the histogram contains data for the entire station, or has
-/// data for just a single antenna.
-type WlanFullmacHistScope = strict enum : uint8 {
-    STATION = 1;
-    PER_ANTENNA = 2;
-};
-
-/// Histogram for noise floor samples.
-type WlanFullmacNoiseFloorHistogram = struct {
-    hist_scope WlanFullmacHistScope;
-    /// If hist_scope is PER_ANTENNA, antenna_id must be provided.
-    antenna_id WlanFullmacAntennaId;
-    /// Sparse histogram of noise floor of current channel in dBm. Each sample's bucket_index is an
-    /// index into this list of dBm values: [-255, -254, ... -1]. For example, if
-    /// noise_floor_samples contains a WlanFullmacHistBucket with bucket_index = 165 and num_samples =
-    /// 50, that means there were 50 frames counted that had a noise floor of -90 dBm.
-    noise_floor_samples vector<WlanFullmacHistBucket>:WLAN_FULLMAC_MAX_NOISE_FLOOR_SAMPLES;
-    /// Count of invalid samples encountered, if any.
-    invalid_samples uint64;
-};
-
-/// Histogram for received data rate.
-type WlanFullmacRxRateIndexHistogram = struct {
-    hist_scope WlanFullmacHistScope;
-    /// If hist_scope is PER_ANTENNA, antenna_id must be provided.
-    antenna_id WlanFullmacAntennaId;
-    /// Sparse histogram of count of received frames for each rate. Each sample's bucket_index is an
-    /// index into this lookup table:
-    /// 0-3: B-MCS 0-3
-    /// 4-11: G-MCS 0-7
-    /// 12-27: N-MCS 0-15 (BW20)
-    /// 28-43: N-MCS 0-15 (BW40)
-    /// 44-59: N-MCS 0-15 (BW20:SGI)
-    /// 60-75: N-MCS 0-15 (BW40:SGI)
-    /// 76-85: AC-MCS 0-9 (VHT:BW20:NSS1)
-    /// 86-95: AC-MCS 0-9 (VHT:BW20:NSS2)
-    /// 96-105: AC-MCS 0-9 (VHT:BW40:NSS1)
-    /// 106-115: AC-MCS 0-9 (VHT:BW40:NSS2)
-    /// 116-125: AC-MCS 0-9 (VHT:BW80:NSS1)
-    /// 126-135: AC-MCS 0-9 (VHT:BW80:NSS2)
-    /// 136-145: AC-MCS 0-9 (VHT:BW20:NSS1:SGI)
-    /// 146-155: AC-MCS 0-9 (VHT:BW20:NSS2:SGI)
-    /// 156-165: AC-MCS 0-9 (VHT:BW40:NSS1:SGI)
-    /// 166-175: AC-MCS 0-9 (VHT:BW40:NSS2:SGI)
-    /// 176-185: AC-MCS 0-9 (VHT:BW80:NSS1:SGI)
-    /// 186-195: AC-MCS 0-9 (VHT:BW80:NSS2:SGI)
-    ///
-    /// For example, if rx_rate_index_samples contains a WlanFullmacHistBucket with bucket_index = 75
-    /// and num_samples = 50, that means there were 50 frames counted that had a rate corresponding
-    /// to N-MCS 15 (BW40:SGI).
-    rx_rate_index_samples vector<WlanFullmacHistBucket>:WLAN_FULLMAC_MAX_RX_RATE_INDEX_SAMPLES;
-    /// Count of invalid samples encountered, if any.
-    invalid_samples uint64;
-};
-
-/// Histogram for received signal strength indicator (RSSI).
-type WlanFullmacRssiHistogram = struct {
-    hist_scope WlanFullmacHistScope;
-    /// If hist_scope is PER_ANTENNA, antenna_id must be provided.
-    antenna_id WlanFullmacAntennaId;
-    /// Sparse histogram of RSSI of AP in dBm. Each sample's bucket_index is an index
-    /// into this list of dBm values: [-255, -254, ... -1]. For example, if rssi_samples
-    /// contains a WlanFullmacHistBucket with bucket_index = 225 and num_samples = 50, that means
-    /// there were 50 frames counted that had a signal level of -30 dBm.
-    rssi_samples vector<WlanFullmacHistBucket>:WLAN_FULLMAC_MAX_RSSI_SAMPLES;
-    /// Count of invalid samples encountered, if any.
-    invalid_samples uint64;
-};
-
-/// Histogram for signal to noise ratio (SNR).
-type WlanFullmacSnrHistogram = struct {
-    hist_scope WlanFullmacHistScope;
-    /// If hist_scope is PER_ANTENNA, antenna_id must be provided.
-    antenna_id WlanFullmacAntennaId;
-    /// Sparse histogram of signal to noise ratio in dB. Each sample's bucket_index is an index
-    /// into this list of dB values: [0, 1, ... 255]. For example, if snr_samples contains a
-    /// WlanFullmacHistBucket with value = 60 and num_samples = 50, that means there were 50 frames
-    /// counted that had a SNR of 60 dB.
-    snr_samples vector<WlanFullmacHistBucket>:WLAN_FULLMAC_MAX_SNR_SAMPLES;
-    /// Count of invalid samples encountered, if any.
-    @allow_deprecated_struct_defaults
-    invalid_samples uint64 = 0;
-};
-
-/// For each histogram type (e.g. RSSI), there can be multiple histograms up to this limit. For
-/// example, an interface might have 1 histogram for station-wide RSSI, but also 1 for each of the
-/// antennas used by the interface.
-const WLAN_FULLMAC_MAX_HISTOGRAMS_PER_TYPE uint8 = 8;
-// LINT.ThenChange(//sdk/fidl/fuchsia.wlan.stats/wlan_stats.fidl)
-
-/// The number of 802.11B rates in the WlanFullmacRxRateIndexHistogram lookup table.
-const WLAN_FULLMAC_NUM_RATES_B uint8 = 4;
-/// The number of 802.11G rates in the WlanFullmacRxRateIndexHistogram lookup table.
-const WLAN_FULLMAC_NUM_RATES_G uint8 = 8;
-/// The number of 802.11N rates in the WlanFullmacRxRateIndexHistogram lookup table.
-const WLAN_FULLMAC_NUM_RATES_N uint8 = 64;
-/// The number of 802.11AC rates in the WlanFullmacRxRateIndexHistogram lookup table.
-const WLAN_FULLMAC_NUM_RATES_AC uint8 = 120;
-
-// TODO(https://fxbug.dev/42164319): Use wlan_stats.fidl structure after https://fxbug.dev/42166364 is fixed
-type WlanFullmacIfaceCounterStats = struct {
-    rx_unicast_total uint64;
-    rx_unicast_drop uint64;
-    rx_multicast uint64;
-    tx_total uint64;
-    tx_drop uint64;
-};
-
-// TODO(https://fxbug.dev/42164319): Use wlan_stats.fidl structure after https://fxbug.dev/42166364 is fixed
-type WlanFullmacIfaceHistogramStats = table {
-    /// Noise floor histogram(s).
-    1: noise_floor_histograms
-            vector<WlanFullmacNoiseFloorHistogram>:WLAN_FULLMAC_MAX_HISTOGRAMS_PER_TYPE;
-    /// Received signal strength indicator (RSSI) histogram(s).
-    2: rssi_histograms vector<WlanFullmacRssiHistogram>:WLAN_FULLMAC_MAX_HISTOGRAMS_PER_TYPE;
-    /// Received rate index histogram(s).
-    3: rx_rate_index_histograms
-            vector<WlanFullmacRxRateIndexHistogram>:WLAN_FULLMAC_MAX_HISTOGRAMS_PER_TYPE;
-    /// Signal to noise ratio (SNR) histogram(s).
-    4: snr_histograms vector<WlanFullmacSnrHistogram>:WLAN_FULLMAC_MAX_HISTOGRAMS_PER_TYPE;
 };
 
 type WlanFullmacChannelSwitchInfo = struct {
@@ -654,10 +496,10 @@ closed protocol WlanFullmacImpl {
 
     // MLME extensions
     strict GetIfaceCounterStats() -> (struct {
-        stats WlanFullmacIfaceCounterStats;
+        stats fuchsia.wlan.stats.IfaceCounterStats;
     }) error zx.Status;
     strict GetIfaceHistogramStats() -> (struct {
-        stats WlanFullmacIfaceHistogramStats;
+        stats fuchsia.wlan.stats.IfaceHistogramStats;
     }) error zx.Status;
     /// Informs the driver of the result of an SAE handshake.
     strict SaeHandshakeResp(table {

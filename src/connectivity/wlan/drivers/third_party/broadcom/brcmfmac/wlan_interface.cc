@@ -468,7 +468,7 @@ void WlanInterface::EapolTx(EapolTxRequestView request, EapolTxCompleter::Sync& 
 
 void WlanInterface::GetIfaceCounterStats(GetIfaceCounterStatsCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
-  fuchsia_wlan_fullmac::wire::WlanFullmacIfaceCounterStats out_stats;
+  fuchsia_wlan_stats::wire::IfaceCounterStats out_stats;
   if (wdev_ == nullptr) {
     completer.ReplyError(ZX_ERR_BAD_STATE);
     return;
@@ -481,15 +481,15 @@ void WlanInterface::GetIfaceCounterStats(GetIfaceCounterStatsCompleter::Sync& co
   }
 }
 
-// Max size of WlanFullmacIfaceHistogramStats.
-constexpr size_t kWlanFullmacIfaceHistogramStatsBufferSize =
-    fidl::MaxSizeInChannel<fuchsia_wlan_fullmac::wire::WlanFullmacIfaceHistogramStats,
+// Max size of IfaceHistogramStats.
+constexpr size_t kIfaceHistogramStatsBufferSize =
+    fidl::MaxSizeInChannel<fuchsia_wlan_stats::wire::IfaceHistogramStats,
                            fidl::MessageDirection::kSending>();
 
 void WlanInterface::GetIfaceHistogramStats(GetIfaceHistogramStatsCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
-  fidl::Arena<kWlanFullmacIfaceHistogramStatsBufferSize> table_arena;
-  fuchsia_wlan_fullmac::wire::WlanFullmacIfaceHistogramStats out_stats;
+  fidl::Arena<kIfaceHistogramStatsBufferSize> table_arena;
+  fuchsia_wlan_stats::wire::IfaceHistogramStats out_stats;
   if (wdev_ == nullptr) {
     completer.ReplyError(ZX_ERR_BAD_STATE);
     return;
