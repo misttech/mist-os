@@ -130,9 +130,11 @@ void Console::DebugReaderThread() {
     if (status != ZX_OK) {
       return;
     }
-    if (ch == 3) {
-      SetEvent(true, fuchsia_hardware_pty::wire::kEventInterrupt);
-      continue;
+    if (!(features_ & fuchsia_hardware_pty::wire::kFeatureRaw)) {
+      if (ch == 3) {
+        SetEvent(true, fuchsia_hardware_pty::wire::kEventInterrupt);
+        continue;
+      }
     }
     size_t actual;
     rx_fifo_.Write(&ch, 1, &actual);

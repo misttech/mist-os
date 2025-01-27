@@ -57,6 +57,62 @@ TEST(ConsoleTestCase, Read) {
   ASSERT_OK(loop.RunUntilIdle());
 }
 
+// Verify that calling Read() returns data from the RxSource
+// and passes through control characters like CTRL+C
+// when in RAW mode
+TEST(ConsoleTestCase, ReadRaw) {
+  constexpr size_t kReadSize = 10;
+  constexpr size_t kWriteCount = kReadSize - 1;
+  constexpr uint8_t kWrittenByte = 3;
+
+  sync_completion_t rx_source_done;
+  sync_completion_t console_setup_done;
+  Console::RxSource rx_source = [write_count = kWriteCount, &rx_source_done,
+                                 &console_setup_done](uint8_t* byte) mutable {
+    sync_completion_wait_deadline(&console_setup_done, ZX_TIME_INFINITE);
+    if (write_count == 0) {
+      sync_completion_signal(&rx_source_done);
+      return ZX_ERR_SHOULD_WAIT;
+    }
+
+    *byte = kWrittenByte;
+    write_count--;
+    return ZX_OK;
+  };
+  Console::TxSink tx_sink = [](const uint8_t* buffer, size_t length) { return ZX_OK; };
+
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_pty::Device>::Create();
+
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  zx::eventpair event1, event2;
+  ASSERT_OK(zx::eventpair::create(0, &event1, &event2));
+  Console console(loop.dispatcher(), std::move(event1), std::move(event2), std::move(rx_source),
+                  std::move(tx_sink));
+  fidl::BindServer(loop.dispatcher(), std::move(server_end),
+                   static_cast<fidl::WireServer<fuchsia_hardware_pty::Device>*>(&console));
+  fidl::WireClient client(std::move(client_end), loop.dispatcher());
+  client->ClrSetFeature(0, fuchsia_hardware_pty::wire::kFeatureRaw)
+      .ThenExactlyOnce(
+          [](fidl::WireUnownedResult<fuchsia_hardware_pty::Device::ClrSetFeature>& result) {
+            ASSERT_EQ(result->features, fuchsia_hardware_pty::wire::kFeatureRaw);
+          });
+  ASSERT_OK(loop.RunUntilIdle());
+  sync_completion_signal(&console_setup_done);
+  ASSERT_OK(sync_completion_wait_deadline(&rx_source_done, ZX_TIME_INFINITE));
+  client->Read(kReadSize).ThenExactlyOnce(
+      [kWriteCount,
+       kWrittenByte](fidl::WireUnownedResult<fuchsia_hardware_pty::Device::Read>& result) {
+        ASSERT_OK(result.status());
+        fit::result response = result.value();
+        ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
+        ASSERT_EQ(response.value()->data.count(), kWriteCount);
+        for (uint8_t byte : response.value()->data) {
+          ASSERT_EQ(byte, kWrittenByte);
+        }
+      });
+  ASSERT_OK(loop.RunUntilIdle());
+}
+
 // Verify that CTRL+C does the following:
 // * Does not write the byte (3) to the RX source
 // * Asserts ZX_USER_SIGNAL_1
