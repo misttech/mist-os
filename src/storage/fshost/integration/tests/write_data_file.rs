@@ -137,9 +137,6 @@ async fn unformatted_netboot() {
 }
 
 #[fuchsia::test]
-// TODO(https://fxbug.dev/42182707): this test is flaking, disabling it temporarily to help with
-// tree health.
-#[cfg_attr(feature = "minfs", ignore)]
 async fn unformatted_small_disk() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("ramdisk_image", true);
