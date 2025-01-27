@@ -207,7 +207,7 @@ signature =  "1.4.0"
 # targetting fuchsia.
 simplelog = "0.10.2"
 siphasher = "0.3.10"
-slab = "0.4.7"
+slab = "0.4.9"
 smallvec = {version= "1.13.1", features = ["const_generics", "const_new", "union"]}
 socket2 = { version = "0.5.5", features = ["all"] }
 splines = "2.2.0"
@@ -928,7 +928,7 @@ group_visibility = { import = "//third_party/rust_crates/visibility.gni", variab
 [gn.package.signal-hook."0.3.17"]
 rustflags = []
 
-[gn.package.slab."0.4.7"]
+[gn.package.slab."0.4.9"]
 rustflags = []
 
 [gn.package.syn."1.0.98"]

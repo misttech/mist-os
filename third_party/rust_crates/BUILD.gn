@@ -915,7 +915,7 @@ group("siphasher") {
 }
 
 group("slab") {
-  public_deps = [ ":slab-v0_4_7" ]
+  public_deps = [ ":slab-v0_4_9" ]
 }
 
 group("smallvec") {
@@ -2019,7 +2019,7 @@ rust_library("async-executor-v1_5_0") {
   deps += [ ":concurrent-queue-v2_5_0" ]
   deps += [ ":fastrand-v1_4_0" ]
   deps += [ ":futures-lite-v1_11_3" ]
-  deps += [ ":slab-v0_4_7" ]
+  deps += [ ":slab-v0_4_9" ]
 
   rustenv = []
 
@@ -5838,7 +5838,7 @@ rust_library("fuse3-v0_6_1") {
   deps += [ ":libc-v0_2_169" ]
   deps += [ ":nix-v0_26_2" ]
   deps += [ ":serde-v1_0_204" ]
-  deps += [ ":slab-v0_4_7" ]
+  deps += [ ":slab-v0_4_9" ]
   deps += [ ":tokio-v1_38_1" ]
   deps += [ ":tracing-v0_1_40" ]
   deps += [ ":which-v4_0_2" ]
@@ -6252,7 +6252,7 @@ rust_library("futures-util-v0_3_30") {
   deps += [ ":futures-task-v0_3_30" ]
   deps += [ ":pin-project-lite-v0_2_13" ]
   deps += [ ":pin-utils-v0_1_0" ]
-  deps += [ ":slab-v0_4_7" ]
+  deps += [ ":slab-v0_4_9" ]
 
   rustenv = [ "CARGO_PKG_NAME=futures-util" ]
 
@@ -14796,15 +14796,15 @@ rust_library("siphasher-v0_3_10") {
   applicable_licenses = [ ":siphasher-v0_3_10.license" ]
 }
 
-license("slab-v0_4_7.license") {
+license("slab-v0_4_9.license") {
   public_package_name = "slab"
-  license_files = [ "//third_party/rust_crates/vendor/slab-0.4.7/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/slab-0.4.9/LICENSE" ]
 }
 
-rust_library("slab-v0_4_7") {
+rust_library("slab-v0_4_9") {
   crate_name = "slab"
-  crate_root = "//third_party/rust_crates/vendor/slab-0.4.7/src/lib.rs"
-  output_name = "slab-bf82e5c05d7edc0d"
+  crate_root = "//third_party/rust_crates/vendor/slab-0.4.9/src/lib.rs"
+  output_name = "slab-4972c41855e4b08c"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -14814,15 +14814,15 @@ rust_library("slab-v0_4_7") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=bf82e5c05d7edc0d",
-    "-Cextra-filename=-bf82e5c05d7edc0d",
+    "-Cmetadata=4972c41855e4b08c",
+    "-Cextra-filename=-4972c41855e4b08c",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":slab-v0_4_7.license" ]
+  applicable_licenses = [ ":slab-v0_4_9.license" ]
 }
 
 license("smallvec-v1_13_1.license") {

@@ -5,10 +5,9 @@
 include /src/connectivity/bluetooth/OWNERS
 include /src/connectivity/lowpan/OWNERS
 include /src/lib/async-utils/OWNERS
-include /src/lib/fidl/rust/OWNERS
+include /src/fidl/OWNERS
 include /src/starnix/OWNERS
 include /src/storage/OWNERS
-include /third_party/rust_crates/forks/async-io/OWNERS
 include /third_party/rust_crates/forks/fuse3/OWNERS
 include /third_party/rust_crates/vendor/async-executor-1.5.0/OWNERS
 include /third_party/rust_crates/vendor/futures-util-0.3.30/OWNERS

@@ -196,7 +196,15 @@ fn reserve_exact_does_not_allocate_if_available() {
 fn reserve_does_panic_with_capacity_overflow() {
     let mut slab = Slab::with_capacity(10);
     slab.insert(true);
-    slab.reserve(std::usize::MAX);
+    slab.reserve(std::isize::MAX as usize);
+}
+
+#[test]
+#[should_panic(expected = "capacity overflow")]
+fn reserve_does_panic_with_capacity_overflow_bytes() {
+    let mut slab = Slab::with_capacity(10);
+    slab.insert(1u16);
+    slab.reserve((std::isize::MAX as usize) / 2);
 }
 
 #[test]
@@ -204,7 +212,7 @@ fn reserve_does_panic_with_capacity_overflow() {
 fn reserve_exact_does_panic_with_capacity_overflow() {
     let mut slab = Slab::with_capacity(10);
     slab.insert(true);
-    slab.reserve_exact(std::usize::MAX);
+    slab.reserve_exact(std::isize::MAX as usize);
 }
 
 #[test]
@@ -701,4 +709,25 @@ fn try_remove() {
 #[test]
 fn const_new() {
     static _SLAB: Slab<()> = Slab::new();
+}
+
+#[test]
+fn clone_from() {
+    let mut slab1 = Slab::new();
+    let mut slab2 = Slab::new();
+    for i in 0..5 {
+        slab1.insert(i);
+        slab2.insert(2 * i);
+        slab2.insert(2 * i + 1);
+    }
+    slab1.remove(1);
+    slab1.remove(3);
+    slab2.clone_from(&slab1);
+
+    let mut iter2 = slab2.iter();
+    assert_eq!(iter2.next(), Some((0, &0)));
+    assert_eq!(iter2.next(), Some((2, &2)));
+    assert_eq!(iter2.next(), Some((4, &4)));
+    assert_eq!(iter2.next(), None);
+    assert!(slab2.capacity() >= 10);
 }
