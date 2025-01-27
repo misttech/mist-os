@@ -7,7 +7,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
 use ffx_get_ssh_address_args::GetSshAddressCommand;
-use fho::{daemon_protocol, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{
     DaemonError, TargetAddrInfo, TargetCollectionProxy, TargetMarker, TargetQuery,
 };
@@ -15,6 +15,7 @@ use std::io::Write;
 use std::net::IpAddr;
 use std::time::Duration;
 use target_errors::FfxTargetError;
+use target_holders::daemon_protocol;
 use timeout::timeout;
 
 #[derive(FfxTool)]

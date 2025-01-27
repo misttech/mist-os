@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use ffx_repository_add_args::AddCommand;
-use fho::{
-    bug, daemon_protocol, return_user_error, user_error, FfxMain, FfxTool, Result, SimpleWriter,
-};
+use fho::{bug, return_user_error, user_error, FfxMain, FfxTool, Result, SimpleWriter};
 use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
 use fidl_fuchsia_developer_ffx_ext::{RepositoryError, RepositorySpec};
 use fuchsia_repo::repository::RepoProvider;
@@ -13,6 +11,8 @@ use fuchsia_url::RepositoryUrl;
 use pkg::config as pkg_config;
 use sdk_metadata::get_repositories;
 use std::io::Write as _;
+use target_holders::daemon_protocol;
+
 #[derive(FfxTool)]
 pub struct RepoAddTool {
     #[command]

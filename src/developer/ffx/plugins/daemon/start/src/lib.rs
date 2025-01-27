@@ -7,16 +7,16 @@ use ffx_config::EnvironmentContext;
 use ffx_daemon::DaemonConfig;
 use ffx_daemon_start_args::StartCommand;
 use fho::{user_error, FfxContext, FfxMain, FfxTool, FhoEnvironment, TryFromEnv};
-use fidl_fuchsia_developer_ffx::DaemonProxy;
+use target_holders::DaemonProxyHolder;
 
 // The field in this tuple is never read because getting a daemon proxy is sufficient enough to
 // determine that a connection is valid (this requires a version negotiation handshake).
-pub struct DefaultDaemonProvider(#[allow(dead_code)] DaemonProxy);
+pub struct DefaultDaemonProvider(#[allow(dead_code)] DaemonProxyHolder);
 
 #[async_trait(?Send)]
 impl TryFromEnv for DefaultDaemonProvider {
     async fn try_from_env(env: &FhoEnvironment) -> fho::Result<Self> {
-        Ok(Self(DaemonProxy::try_from_env(env).await?))
+        Ok(Self(DaemonProxyHolder::try_from_env(env).await?))
     }
 }
 

@@ -3,12 +3,11 @@
 // found in the LICENSE file.
 
 use ffx_repository_remove_args::RemoveCommand;
-use fho::{
-    bug, daemon_protocol, return_user_error, user_error, FfxMain, FfxTool, Result, SimpleWriter,
-};
+use fho::{bug, return_user_error, user_error, FfxMain, FfxTool, Result, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{
     RepositoryConfig, RepositoryIteratorMarker, RepositoryRegistryProxy,
 };
+use target_holders::daemon_protocol;
 
 #[derive(FfxTool)]
 pub struct RepoRemoveTool {

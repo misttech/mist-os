@@ -14,6 +14,7 @@ ffx_plugin("ffx_repository_list") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/developer/ffx/lib/pkg",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:prettytable-rs",

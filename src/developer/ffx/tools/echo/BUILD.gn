@@ -16,6 +16,7 @@ rustc_library("lib") {
   deps = [
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:async-trait",
   ]

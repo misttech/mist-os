@@ -3,12 +3,13 @@
 // found in the LICENSE file.
 
 use ffx_repository_list_args::ListCommand;
-use fho::{bug, daemon_protocol, FfxMain, FfxTool, MachineWriter, Result, ToolIO as _};
+use fho::{bug, FfxMain, FfxTool, MachineWriter, Result, ToolIO as _};
 use fidl_fuchsia_developer_ffx::{RepositoryIteratorMarker, RepositoryRegistryProxy};
 use fidl_fuchsia_developer_ffx_ext::{RepositoryConfig, RepositorySpec};
 use prettytable::format::FormatBuilder;
 use prettytable::{cell, row, Cell, Table};
 use std::collections::BTreeSet;
+use target_holders::daemon_protocol;
 
 #[derive(FfxTool)]
 pub struct RepoListTool {

@@ -9,8 +9,8 @@ use ffx_config::api::ConfigError;
 use ffx_config::EnvironmentContext;
 use ffx_repository_server_stop_args::StopCommand;
 use fho::{
-    bug, daemon_protocol, deferred, return_bug, return_user_error, Deferred, Error, FfxMain,
-    FfxTool, Result, VerifiedMachineWriter,
+    bug, deferred, return_bug, return_user_error, Deferred, Error, FfxMain, FfxTool, Result,
+    VerifiedMachineWriter,
 };
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx_ext::RepositoryError;
@@ -19,6 +19,7 @@ use pkg::{
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use target_holders::daemon_protocol;
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]

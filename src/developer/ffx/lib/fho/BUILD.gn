@@ -25,7 +25,6 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/lib/rcs:lib_fdomain",
     "//src/developer/ffx/lib/target:lib",
-    "//src/developer/ffx/lib/target_errors:lib",
     "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fdomain/client",
     "//src/lib/fidl/rust/fidl",

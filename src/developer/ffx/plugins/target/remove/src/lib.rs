@@ -5,13 +5,13 @@
 use async_trait::async_trait;
 use ffx_target_remove_args::RemoveCommand;
 use fho::{
-    bug, daemon_protocol, return_bug, return_user_error, FfxMain, FfxTool, Result, ToolIO,
-    VerifiedMachineWriter,
+    bug, return_bug, return_user_error, FfxMain, FfxTool, Result, ToolIO, VerifiedMachineWriter,
 };
 use fidl_fuchsia_developer_ffx as ffx;
 use manual_targets::{Config, ManualTargets};
 use schemars::JsonSchema;
 use serde::Serialize;
+use target_holders::daemon_protocol;
 
 #[derive(Debug, Serialize, JsonSchema)]
 pub enum CommandStatus {

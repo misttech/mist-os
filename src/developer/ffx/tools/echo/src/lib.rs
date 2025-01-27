@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 use argh::{ArgsInfo, FromArgs};
 use async_trait::async_trait;
-use fho::{daemon_protocol, FfxContext, FfxMain, FfxTool, MachineWriter, Result, ToolIO};
+use fho::{FfxContext, FfxMain, FfxTool, MachineWriter, Result, ToolIO};
 use fidl_fuchsia_developer_ffx as ffx;
+use target_holders::daemon_protocol;
 
 // [START command_struct]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]

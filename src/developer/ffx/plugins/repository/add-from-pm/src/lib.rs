@@ -7,8 +7,8 @@ use errors::ffx_error;
 use ffx::RepositoryIteratorMarker;
 use ffx_repository_add_from_pm_args::AddFromPmCommand;
 use fho::{
-    bug, daemon_protocol, return_user_error, user_error, Error, FfxContext, FfxMain, FfxTool,
-    Result, VerifiedMachineWriter,
+    bug, return_user_error, user_error, Error, FfxContext, FfxMain, FfxTool, Result,
+    VerifiedMachineWriter,
 };
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx_ext::{RepositoryError, RepositorySpec};
@@ -17,6 +17,7 @@ use pkg::config as pkg_config;
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::collections::BTreeSet;
+use target_holders::daemon_protocol;
 
 enum RepoRegState {
     New,

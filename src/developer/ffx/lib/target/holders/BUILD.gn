@@ -20,6 +20,8 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/target:lib",
+    "//src/developer/ffx/lib/target_errors:lib",
+    "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
   ]
@@ -30,6 +32,7 @@ rustc_library("lib") {
   ]
 
   sources = [
+    "src/daemon_proxy.rs",
     "src/device_lookup.rs",
     "src/lib.rs",
     "src/target_info.rs",

@@ -7,19 +7,10 @@ use fdomain_client::fidl::{
     DiscoverableProtocolMarker as FDiscoverableProtocolMarker, Proxy as FProxy,
 };
 use fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy as FRemoteControlProxy;
-use ffx_command::{Error, FfxContext, Result};
-use fidl::endpoints::{DiscoverableProtocolMarker, Proxy, ServerEnd};
-use fidl_fuchsia_developer_ffx::DaemonProxy;
+use ffx_command::{FfxContext, Result};
+use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use std::time::Duration;
-
-pub fn create_proxy<P>() -> Result<(P, ServerEnd<P::Protocol>)>
-where
-    P: Proxy + 'static,
-    P::Protocol: DiscoverableProtocolMarker,
-{
-    Ok(fidl::endpoints::create_proxy::<P::Protocol>())
-}
 
 pub async fn connect_to_rcs(env: &FhoEnvironment) -> Result<RemoteControlProxy> {
     let retry_count = 1;
@@ -103,23 +94,5 @@ where
         let protocol_name = P::Protocol::PROTOCOL_NAME;
         format!("Failed to connect to protocol '{protocol_name}' at moniker '{moniker}' within {} seconds", timeout.as_secs_f64())
     })?;
-    Ok(proxy)
-}
-
-pub async fn load_daemon_protocol<P>(env: &FhoEnvironment) -> Result<P>
-where
-    P: Proxy + Clone + 'static,
-    P::Protocol: DiscoverableProtocolMarker,
-{
-    let svc_name = <P::Protocol as DiscoverableProtocolMarker>::PROTOCOL_NAME;
-    let daemon = DaemonProxy::try_from_env(env).await.map_err(|err| anyhow::Error::from(err))?;
-    let (proxy, server_end) = create_proxy().bug_context("creating proxy")?;
-
-    daemon
-        .connect_to_protocol(svc_name, server_end.into_channel())
-        .await
-        .bug_context("Connecting to protocol")?
-        .map_err(|err| Error::User(target_errors::map_daemon_error(svc_name, err)))?;
-
     Ok(proxy)
 }

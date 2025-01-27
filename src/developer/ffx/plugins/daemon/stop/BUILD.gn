@@ -21,14 +21,15 @@ ffx_plugin("ffx_daemon_stop") {
   deps = [
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/daemon:lib",
-    "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
   ]
   test_deps = [
+    "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:futures-lite",

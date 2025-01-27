@@ -21,6 +21,7 @@ ffx_plugin("ffx_target_remove") {
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/manual_targets:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",

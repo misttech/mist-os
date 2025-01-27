@@ -6,10 +6,11 @@ use crate::args::{AgisCommand, ListenOp, Operation, RegisterOp};
 use anyhow::{anyhow, Result};
 use errors::ffx_error;
 use ffx_config::EnvironmentContext;
-use fho::{daemon_protocol, moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{ListenerProxy, TargetQuery};
 use fidl_fuchsia_gpu_agis::{ComponentRegistryProxy, ObserverProxy};
 use serde::Serialize;
+use target_holders::daemon_protocol;
 
 const GLOBAL_ID: u32 = 1;
 

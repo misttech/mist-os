@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use ffx_crash_args::CrashCommand;
-use fho::{daemon_protocol, FfxMain, FfxTool, Result, SimpleWriter};
+use fho::{FfxMain, FfxTool, Result, SimpleWriter};
 use fidl_fuchsia_developer_ffx::TestingProxy;
-
+use target_holders::daemon_protocol;
 #[derive(FfxTool)]
 pub struct DaemonCrashTool {
     #[command]

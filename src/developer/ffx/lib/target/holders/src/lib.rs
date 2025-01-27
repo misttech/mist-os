@@ -9,10 +9,12 @@ use ffx_config::EnvironmentContext;
 use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
 use fho::FhoConnectionBehavior;
 
+mod daemon_proxy;
 mod device_lookup;
 mod target_info;
 mod target_proxy;
 
+pub use daemon_proxy::{daemon_protocol, DaemonProxyHolder};
 pub use device_lookup::DeviceLookupDefaultImpl;
 pub use target_info::TargetInfoHolder;
 pub use target_proxy::TargetProxyHolder;

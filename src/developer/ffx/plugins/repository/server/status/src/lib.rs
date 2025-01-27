@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use ffx_repository_server_status_args::StatusCommand;
-use fho::{bug, daemon_protocol, FfxMain, FfxTool, MachineWriter, Result, ToolIO as _};
+use fho::{bug, FfxMain, FfxTool, MachineWriter, Result, ToolIO as _};
 use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
 use fidl_fuchsia_developer_ffx_ext::ServerStatus;
 use std::io::Write as _;
+use target_holders::daemon_protocol;
 
 #[derive(FfxTool)]
 pub struct RepoStatusTool {

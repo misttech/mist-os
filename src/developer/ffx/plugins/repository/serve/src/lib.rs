@@ -9,8 +9,7 @@ use ffx_config::environment::EnvironmentKind;
 use ffx_config::EnvironmentContext;
 use ffx_repository_serve_args::ServeCommand;
 use fho::{
-    bug, daemon_protocol, deferred, return_bug, return_user_error, Deferred, FfxMain, FfxTool,
-    Result, SimpleWriter,
+    bug, deferred, return_bug, return_user_error, Deferred, FfxMain, FfxTool, Result, SimpleWriter,
 };
 use fidl_fuchsia_developer_ffx::{self as ffx, RepositoryRegistryProxy, ServerStatus};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
@@ -32,7 +31,7 @@ use std::io::Write;
 use std::sync::Arc;
 use target_connector::Connector;
 use target_errors::FfxTargetError;
-use target_holders::TargetProxyHolder;
+use target_holders::{daemon_protocol, TargetProxyHolder};
 use tuf::metadata::RawSignedMetadata;
 
 // LINT.IfChange

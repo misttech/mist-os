@@ -10,11 +10,11 @@ use fho::{
     bug, return_bug, return_user_error, Error, FfxContext, FfxMain, FfxTool, Result, ToolIO,
     VerifiedMachineWriter,
 };
-use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::{MonotonicInstant, Timer};
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::time::Duration;
+use target_holders::DaemonProxyHolder;
 
 const STOP_WAIT_POLL_TIME: Duration = Duration::from_millis(100);
 
@@ -32,7 +32,7 @@ pub enum CommandStatus {
 pub struct StopTool {
     #[command]
     cmd: StopCommand,
-    daemon_proxy: Option<ffx::DaemonProxy>,
+    daemon_proxy: Result<DaemonProxyHolder>,
     context: EnvironmentContext,
 }
 
@@ -123,7 +123,7 @@ impl FfxMain for StopTool {
             }
         };
 
-        if let Some(d) = self.daemon_proxy {
+        if let Ok(d) = self.daemon_proxy {
             let timeout = match wb {
                 WaitBehavior::Timeout(t) => Some(t),
                 _ => None,
@@ -186,6 +186,7 @@ mod test {
     use super::*;
     use fho::macro_deps::ffx_writer::TestBuffer;
     use fho::{Format, TestBuffers};
+    use fidl_fuchsia_developer_ffx::{self as ffx};
     use futures_lite::StreamExt;
     use serde_json::json;
 
@@ -214,7 +215,7 @@ mod test {
         let writer = <StopTool as FfxMain>::Writer::new_test(None, &buffers);
         let tool = StopTool {
             cmd: StopCommand { wait: false, no_wait: true, timeout_ms: None },
-            daemon_proxy: Some(setup_fake_daemon_server()),
+            daemon_proxy: Ok(setup_fake_daemon_server().into()),
             context: config_env.context.clone(),
         };
         let result = tool.main(writer).await;
@@ -234,7 +235,7 @@ mod test {
         );
         let tool = StopTool {
             cmd: StopCommand { wait: false, no_wait: true, timeout_ms: None },
-            daemon_proxy: Some(setup_fake_daemon_server()),
+            daemon_proxy: Ok(setup_fake_daemon_server().into()),
             context: config_env.context.clone(),
         };
         let result = tool.main(writer).await;

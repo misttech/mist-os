@@ -6,13 +6,14 @@ use async_trait::async_trait;
 use errors::ffx_error;
 use ffx_target::add_manual_target;
 use ffx_target_add_args::AddCommand;
-use fho::{daemon_protocol, FfxContext, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
+use fho::{FfxContext, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx::{TargetCollectionProxy, TargetConnectionError};
 use netext::parse_address_parts;
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::io::Write;
 use target_errors::FfxTargetError;
+use target_holders::daemon_protocol;
 
 #[derive(Debug, Serialize, JsonSchema)]
 pub enum CommandStatus {

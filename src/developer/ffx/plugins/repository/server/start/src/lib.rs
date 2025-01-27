@@ -8,8 +8,8 @@ use ffx_config::EnvironmentContext;
 use ffx_repository_serve::{serve_impl_validate_args, DEFAULT_REPO_NAME};
 use ffx_repository_server_start_args::StartCommand;
 use fho::{
-    bug, daemon_protocol, deferred, return_bug, return_user_error, Deferred, Error, FfxContext,
-    FfxMain, FfxTool, Result, VerifiedMachineWriter,
+    bug, deferred, return_bug, return_user_error, Deferred, Error, FfxContext, FfxMain, FfxTool,
+    Result, VerifiedMachineWriter,
 };
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx_ext::RepositoryError;
@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use std::io::Write as _;
 use std::time::Duration;
 use target_connector::Connector;
-use target_holders::TargetProxyHolder;
+use target_holders::{daemon_protocol, TargetProxyHolder};
 
 mod server;
 

@@ -16,7 +16,6 @@ use ffx_config::EnvironmentContext;
 use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
 use fidl::encoding::DefaultFuchsiaResourceDialect;
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
-use fidl_fuchsia_developer_ffx as ffx_fidl;
 use rcs::OpenDirType;
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -129,97 +128,6 @@ pub fn moniker<P: Proxy>(
 /// Same as [`moniker`] but for FDomain
 pub fn moniker_f<P: FProxy>(moniker: impl AsRef<str>) -> WithToolbox<P, FDomainResourceDialect> {
     toolbox_or_f(moniker)
-}
-
-#[derive(Debug, Clone)]
-pub struct DaemonProtocol<P: Clone>(P);
-
-#[derive(Debug, Clone, Default)]
-pub struct WithDaemonProtocol<P>(PhantomData<fn() -> P>);
-
-impl<P: Clone> std::ops::Deref for DaemonProtocol<P> {
-    type Target = P;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[async_trait(?Send)]
-impl<P> TryFromEnv for DaemonProtocol<P>
-where
-    P: Proxy + Clone + 'static,
-    P::Protocol: DiscoverableProtocolMarker,
-{
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        load_daemon_protocol(env).await.map(DaemonProtocol)
-    }
-}
-
-#[async_trait(?Send)]
-impl<P> TryFromEnvWith for WithDaemonProtocol<P>
-where
-    P: Proxy + Clone + 'static,
-    P::Protocol: DiscoverableProtocolMarker,
-{
-    type Output = P;
-    async fn try_from_env_with(self, env: &FhoEnvironment) -> Result<P> {
-        load_daemon_protocol(env).await
-    }
-}
-
-/// A decorator for daemon proxies.
-///
-/// Example:
-///
-/// ```rust
-/// #[derive(FfxTool)]
-/// struct Tool {
-///     #[with(fho::daemon_protocol())]
-///     foo_proxy: FooProxy,
-/// }
-/// ```
-pub fn daemon_protocol<P>() -> WithDaemonProtocol<P> {
-    WithDaemonProtocol(Default::default())
-}
-
-#[async_trait(?Send)]
-impl TryFromEnv for ffx_fidl::DaemonProxy {
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        if env.behavior().await.is_none() {
-            let b = init_daemon_behavior(env.environment_context()).await?;
-            env.set_behavior(b.clone()).await;
-        }
-        // Might need to revisit whether it's necessary to cast every daemon_factory() invocation
-        // into a user error. This line originally casted every error into "Failed to create daemon
-        // proxy", which obfuscates the original error.
-        env.injector::<Self>()
-            .await?
-            .daemon_factory()
-            .await
-            .map_err(|e| crate::user_error!("{}", e))
-    }
-}
-
-#[async_trait(?Send)]
-impl TryFromEnv for Option<ffx_fidl::DaemonProxy> {
-    /// Attempts to connect to the ffx daemon, returning Ok(None) if no instance of the daemon is
-    /// started. If you would like to use the normal flow of attempting to connect to the daemon,
-    /// and starting a new instance of the daemon if none is currently present, you should use the
-    /// impl for `ffx_fidl::DaemonProxy`, which returns a `Result<ffx_fidl::DaemonProxy>`.
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        if env.behavior().await.is_none() {
-            let b = init_daemon_behavior(env.environment_context()).await?;
-            env.set_behavior(b.clone()).await;
-        }
-        let res = env
-            .injector::<Self>()
-            .await?
-            .try_daemon()
-            .await
-            .user_message("Failed internally while checking for daemon.")?;
-        Ok(res)
-    }
 }
 
 #[async_trait(?Send)]

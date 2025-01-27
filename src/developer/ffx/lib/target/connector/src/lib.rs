@@ -14,7 +14,7 @@ use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 use std::sync::Arc;
 use std::time::Duration;
-use target_holders::{init_daemon_behavior, DeviceLookupDefaultImpl};
+use target_holders::{init_daemon_behavior, DaemonProxyHolder, DeviceLookupDefaultImpl};
 
 mod network_connector;
 
@@ -165,8 +165,7 @@ async fn daemon_try_connect<T: TryFromEnv>(
                         target,
                         ..
                     }) => {
-                        let Ok(daemon_proxy) = ffx_fidl::DaemonProxy::try_from_env(env).await
-                        else {
+                        let Ok(daemon_proxy) = DaemonProxyHolder::try_from_env(env).await else {
                             // Let the initial try_from_env detect this error.
                             continue;
                         };

@@ -14,7 +14,7 @@ pub mod testing;
 pub use subtool::{FfxMain, FfxTool};
 
 // Re-export TryFromEnv related symbols
-pub use from_env::{daemon_protocol, moniker, moniker_f, AvailabilityFlag, CheckEnv};
+pub use from_env::{moniker, moniker_f, AvailabilityFlag, CheckEnv};
 
 pub use fho_env::{DeviceLookup, FhoConnectionBehavior, FhoEnvironment};
 pub use try_from_env::{deferred, Deferred, TryFromEnv, TryFromEnvWith};
