@@ -218,6 +218,9 @@
                 "mlock05",
                 "swapon03",
                 "unlink09",
+
+                // TODO(https://fxbug.dev/287114514)
+                "userfaultfd01",
             ],
         },
         {

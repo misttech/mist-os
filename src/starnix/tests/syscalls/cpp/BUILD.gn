@@ -86,6 +86,7 @@ arch64_syscall_tests = [
   "trivial_test",
   "tun_test",
   "uio_test",
+  "userfaultfd_test",
   "vdso_test",
   "vmsplice_test",
   "waitpid_exit_signal_test",

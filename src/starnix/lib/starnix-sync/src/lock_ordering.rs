@@ -44,4 +44,7 @@ lock_ordering! {
     FileOpsCore => BpfHelperOps,
     BpfHelperOps => BpfMapEntries,
     UninterruptibleLock => BpfMapEntries,
+    // Userfaultfd
+    FileOpsCore => UserFaultInner,
+    UninterruptibleLock => UserFaultInner,
 }

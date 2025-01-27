@@ -4,8 +4,8 @@
 
 use crate::mm::memory::MemoryObject;
 use crate::mm::{
-    FutexTable, InflightVmsplicedPayloads, PrivateFutexKey, VmsplicePayload,
-    VmsplicePayloadSegment, VMEX_RESOURCE,
+    FaultRegisterMode, FutexTable, InflightVmsplicedPayloads, PrivateFutexKey, UserFault,
+    VmsplicePayload, VmsplicePayloadSegment, VMEX_RESOURCE,
 };
 use crate::signals::{SignalDetail, SignalInfo};
 use crate::task::{CurrentTask, ExceptionResult, PageFaultExceptionReport, Task};
@@ -52,7 +52,7 @@ use std::collections::HashMap;
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut, Range};
-use std::sync::{Arc, LazyLock};
+use std::sync::{Arc, LazyLock, Weak};
 use syncio::zxio::zxio_default_maybe_faultable_copy;
 use usercopy::slice_to_maybe_uninit_mut;
 use zerocopy::{FromBytes, Immutable, IntoBytes};
@@ -387,6 +387,20 @@ enum MappingBacking {
     PrivateAnonymous,
 }
 
+#[derive(Debug, Clone)]
+struct UserFaultRegistration {
+    userfault: Weak<UserFault>,
+    mode: FaultRegisterMode,
+}
+
+impl PartialEq for UserFaultRegistration {
+    fn eq(&self, other: &Self) -> bool {
+        (self.mode == other.mode) && self.userfault.ptr_eq(&other.userfault)
+    }
+}
+
+impl Eq for UserFaultRegistration {}
+
 #[derive(Debug, Eq, PartialEq, Clone)]
 struct Mapping {
     /// Object backing this mapping.
@@ -407,6 +421,10 @@ struct Mapping {
     /// Because of this exception, avoid using this field to check if a mapping is anonymous.
     /// Instead, check if `options` bitfield contains `MappingOptions::ANONYMOUS`.
     name: MappingName,
+
+    /// If the mapping is registered with a userfaultfd, this field contains information about
+    /// the userfault object associated with it and the fault handling mode.
+    userfault: Option<Box<UserFaultRegistration>>,
 
     /// Lock guard held to prevent this file from being written while it's being executed.
     file_write_guard: FileWriteGuardRef,
@@ -446,6 +464,7 @@ impl Mapping {
             flags,
             max_access,
             name,
+            userfault: None,
             file_write_guard,
         }
     }
@@ -457,6 +476,7 @@ impl Mapping {
             flags,
             max_access: Access::rwx(),
             name,
+            userfault: None,
             file_write_guard: FileWriteGuardRef(None),
         }
     }
@@ -576,7 +596,13 @@ impl Mapping {
         // nh   -   no-huge page advise flag
         // mg   -   mergeable advise flag
         // um   -   userfaultfd missing pages tracking (since Linux 4.3)
+        if let Some(userfault) = &self.userfault {
+            if userfault.mode == FaultRegisterMode::MISSING {
+                string.push_str("um");
+            }
+        }
         // uw   -   userfaultfd wprotect pages tracking (since Linux 4.3)
+        // ui   -   userfaultfd minor fault pages tracking (since Linux 5.13)
         string
     }
 }
@@ -3342,6 +3368,95 @@ impl MemoryManager {
                 released_mappings,
             )
             .is_ok()
+    }
+
+    // Register a given memory range with a userfault object.
+    pub fn register_with_uffd(
+        self: Arc<Self>,
+        addr: UserAddress,
+        length: usize,
+        userfault: Weak<UserFault>,
+        mode: FaultRegisterMode,
+    ) -> Result<(), Errno> {
+        let end_addr = addr.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
+        let range_for_op = addr..end_addr;
+        let mut updates = vec![];
+
+        let mut state = self.state.write();
+        for (range, mapping) in state.mappings.intersection(range_for_op.clone()) {
+            if !mapping.private_anonymous() {
+                track_stub!(TODO("https://fxbug.dev/391599171"), "uffd for shmem and hugetlbfs");
+                return error!(EINVAL);
+            }
+            if mapping.userfault.is_some() {
+                return error!(EBUSY);
+            }
+            let range = range.intersect(&range_for_op);
+            let mut mapping = mapping.clone();
+            let registration = UserFaultRegistration { userfault: userfault.clone(), mode };
+            mapping.userfault = Some(Box::new(registration));
+            updates.push((range, mapping));
+        }
+        if updates.is_empty() {
+            return error!(EINVAL);
+        }
+        // Use a separate loop to avoid mutating the mappings structure while iterating over it.
+        for (range, mapping) in updates {
+            state.mappings.insert(range, mapping);
+        }
+        Ok(())
+    }
+
+    // Unregister a given range from any userfault objects associated with it.
+    pub fn unregister_range_from_uffd(
+        self: Arc<Self>,
+        addr: UserAddress,
+        length: usize,
+    ) -> Result<(), Errno> {
+        let end_addr = addr.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
+        let range_for_op = addr..end_addr;
+        let mut updates = vec![];
+
+        let mut state = self.state.write();
+        for (range, mapping) in state.mappings.intersection(range_for_op.clone()) {
+            if !mapping.private_anonymous() {
+                track_stub!(TODO("https://fxbug.dev/391599171"), "uffd for shmem and hugetlbfs");
+                return error!(EINVAL);
+            }
+            let range = range.intersect(&range_for_op);
+            let mut mapping = mapping.clone();
+            mapping.userfault = None;
+            updates.push((range, mapping));
+        }
+        if updates.is_empty() {
+            return error!(EINVAL);
+        }
+        // Use a separate loop to avoid mutating the mappings structure while iterating over it.
+        for (range, mapping) in updates {
+            state.mappings.insert(range, mapping);
+        }
+        Ok(())
+    }
+
+    // Unregister any mappings registered with a given userfault object. Used when closing the last
+    // file descriptor associated to it.
+    pub fn unregister_all_from_uffd(self: Arc<Self>, userfault: Weak<UserFault>) {
+        let mut updates = vec![];
+
+        let mut state = self.state.write();
+        for (range, mapping) in state.mappings.iter() {
+            if let Some(uf) = &mapping.userfault {
+                if uf.userfault.ptr_eq(&userfault) {
+                    let mut mapping = mapping.clone();
+                    mapping.userfault = None;
+                    updates.push((range.clone(), mapping));
+                }
+            }
+        }
+        // Use a separate loop to avoid mutating the mappings structure while iterating over it.
+        for (range, mapping) in updates {
+            state.mappings.insert(range, mapping);
+        }
     }
 
     pub fn snapshot_to<L>(

@@ -75,7 +75,7 @@ pub fn dispatch_syscall(
         sys_brk, sys_futex, sys_get_robust_list, sys_madvise, sys_membarrier, sys_mincore,
         sys_mlock, sys_mlockall, sys_mmap, sys_mprotect, sys_mremap, sys_msync, sys_munlock,
         sys_munmap, sys_process_mrelease, sys_process_vm_readv, sys_process_vm_writev,
-        sys_set_robust_list,
+        sys_set_robust_list, sys_userfaultfd,
     };
     use crate::signals::syscalls::{
         sys_kill, sys_pidfd_send_signal, sys_restart_syscall, sys_rt_sigaction, sys_rt_sigpending,
@@ -515,6 +515,7 @@ pub fn dispatch_syscall(
         #[cfg(target_arch = "x86_64")] unlink[1],
         unlinkat[3],
         unshare[1],
+        userfaultfd[1],
         utimensat[4],
         vhangup[0],
         #[cfg(target_arch = "x86_64")] vfork[0],

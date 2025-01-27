@@ -5799,6 +5799,44 @@ pub const USB3_LPM_MAX_U1_SEL_PEL: u32 = 255;
 pub const USB3_LPM_MAX_U2_SEL_PEL: u32 = 65535;
 pub const USB_SELF_POWER_VBUS_MAX_DRAW: u32 = 100;
 pub const USB_FFS_DMABUF_TRANSFER_MASK: u32 = 0;
+pub const USERFAULTFD_IOC: u32 = 170;
+pub const _UFFDIO_REGISTER: u32 = 0;
+pub const _UFFDIO_UNREGISTER: u32 = 1;
+pub const _UFFDIO_WAKE: u32 = 2;
+pub const _UFFDIO_COPY: u32 = 3;
+pub const _UFFDIO_ZEROPAGE: u32 = 4;
+pub const _UFFDIO_MOVE: u32 = 5;
+pub const _UFFDIO_WRITEPROTECT: u32 = 6;
+pub const _UFFDIO_CONTINUE: u32 = 7;
+pub const _UFFDIO_POISON: u32 = 8;
+pub const _UFFDIO_API: u32 = 63;
+pub const UFFDIO: u32 = 170;
+pub const UFFD_EVENT_PAGEFAULT: u32 = 18;
+pub const UFFD_EVENT_FORK: u32 = 19;
+pub const UFFD_EVENT_REMAP: u32 = 20;
+pub const UFFD_EVENT_REMOVE: u32 = 21;
+pub const UFFD_EVENT_UNMAP: u32 = 22;
+pub const UFFD_PAGEFAULT_FLAG_WRITE: u32 = 1;
+pub const UFFD_PAGEFAULT_FLAG_WP: u32 = 2;
+pub const UFFD_PAGEFAULT_FLAG_MINOR: u32 = 4;
+pub const UFFD_FEATURE_PAGEFAULT_FLAG_WP: u32 = 1;
+pub const UFFD_FEATURE_EVENT_FORK: u32 = 2;
+pub const UFFD_FEATURE_EVENT_REMAP: u32 = 4;
+pub const UFFD_FEATURE_EVENT_REMOVE: u32 = 8;
+pub const UFFD_FEATURE_MISSING_HUGETLBFS: u32 = 16;
+pub const UFFD_FEATURE_MISSING_SHMEM: u32 = 32;
+pub const UFFD_FEATURE_EVENT_UNMAP: u32 = 64;
+pub const UFFD_FEATURE_SIGBUS: u32 = 128;
+pub const UFFD_FEATURE_THREAD_ID: u32 = 256;
+pub const UFFD_FEATURE_MINOR_HUGETLBFS: u32 = 512;
+pub const UFFD_FEATURE_MINOR_SHMEM: u32 = 1024;
+pub const UFFD_FEATURE_EXACT_ADDRESS: u32 = 2048;
+pub const UFFD_FEATURE_WP_HUGETLBFS_SHMEM: u32 = 4096;
+pub const UFFD_FEATURE_WP_UNPOPULATED: u32 = 8192;
+pub const UFFD_FEATURE_POISON: u32 = 16384;
+pub const UFFD_FEATURE_WP_ASYNC: u32 = 32768;
+pub const UFFD_FEATURE_MOVE: u32 = 65536;
+pub const UFFD_USER_MODE_ONLY: u32 = 1;
 pub const __OLD_UTS_LEN: u32 = 8;
 pub const __NEW_UTS_LEN: u32 = 64;
 pub const SO_VM_SOCKETS_BUFFER_SIZE: u32 = 0;
@@ -16775,6 +16813,163 @@ impl Default for usb_functionfs_event {
         }
     }
 }
+#[repr(C, packed)]
+#[derive(Copy, Clone)]
+pub struct uffd_msg {
+    pub event: __u8,
+    pub reserved1: __u8,
+    pub reserved2: __u16,
+    pub reserved3: __u32,
+    pub arg: uffd_msg__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union uffd_msg__bindgen_ty_1 {
+    pub pagefault: uffd_msg__bindgen_ty_1__bindgen_ty_1,
+    pub fork: uffd_msg__bindgen_ty_1__bindgen_ty_2,
+    pub remap: uffd_msg__bindgen_ty_1__bindgen_ty_3,
+    pub remove: uffd_msg__bindgen_ty_1__bindgen_ty_4,
+    pub reserved: uffd_msg__bindgen_ty_1__bindgen_ty_5,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct uffd_msg__bindgen_ty_1__bindgen_ty_1 {
+    pub flags: __u64,
+    pub address: __u64,
+    pub feat: uffd_msg__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1,
+    pub __bindgen_padding_0: [u8; 4usize],
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union uffd_msg__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
+    pub ptid: __u32,
+}
+impl Default for uffd_msg__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl Default for uffd_msg__bindgen_ty_1__bindgen_ty_1 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct uffd_msg__bindgen_ty_1__bindgen_ty_2 {
+    pub ufd: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct uffd_msg__bindgen_ty_1__bindgen_ty_3 {
+    pub from: __u64,
+    pub to: __u64,
+    pub len: __u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct uffd_msg__bindgen_ty_1__bindgen_ty_4 {
+    pub start: __u64,
+    pub end: __u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct uffd_msg__bindgen_ty_1__bindgen_ty_5 {
+    pub reserved1: __u64,
+    pub reserved2: __u64,
+    pub reserved3: __u64,
+}
+impl Default for uffd_msg__bindgen_ty_1 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl Default for uffd_msg {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct uffdio_api {
+    pub api: __u64,
+    pub features: __u64,
+    pub ioctls: __u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct uffdio_range {
+    pub start: __u64,
+    pub len: __u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct uffdio_register {
+    pub range: uffdio_range,
+    pub mode: __u64,
+    pub ioctls: __u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct uffdio_copy {
+    pub dst: __u64,
+    pub src: __u64,
+    pub len: __u64,
+    pub mode: __u64,
+    pub copy: __s64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct uffdio_zeropage {
+    pub range: uffdio_range,
+    pub mode: __u64,
+    pub zeropage: __s64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct uffdio_writeprotect {
+    pub range: uffdio_range,
+    pub mode: __u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct uffdio_continue {
+    pub range: uffdio_range,
+    pub mode: __u64,
+    pub mapped: __s64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct uffdio_poison {
+    pub range: uffdio_range,
+    pub mode: __u64,
+    pub updated: __s64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct uffdio_move {
+    pub dst: __u64,
+    pub src: __u64,
+    pub len: __u64,
+    pub mode: __u64,
+    pub move_: __s64,
+}
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct oldold_utsname {
@@ -16984,6 +17179,23 @@ pub const RNDADDENTROPY: __u32 = 1074287107;
 pub const RNDZAPENTCNT: __u32 = 20996;
 pub const RNDCLEARPOOL: __u32 = 20998;
 pub const RNDRESEEDCRNG: __u32 = 20999;
+pub const UFFDIO_REGISTER: __u32 = 3223366144;
+pub const UFFDIO_UNREGISTER: __u32 = 2148575745;
+pub const UFFDIO_WAKE: __u32 = 2148575746;
+pub const UFFDIO_COPY: __u32 = 3223890435;
+pub const UFFDIO_ZEROPAGE: __u32 = 3223366148;
+pub const UFFDIO_WRITEPROTECT: __u32 = 3222841862;
+pub const UFFDIO_CONTINUE: __u32 = 3223366151;
+pub const UFFDIO_POISON: __u32 = 3223366152;
+pub const UFFDIO_MOVE: __u32 = 3223890437;
+pub const UFFDIO_API: __u32 = 3222841919;
+pub const UFFDIO_REGISTER_MODE_MISSING: __u32 = 1;
+pub const UFFDIO_REGISTER_MODE_WP: __u32 = 2;
+pub const UFFDIO_REGISTER_MODE_MINOR: __u32 = 4;
+pub const UFFDIO_COPY_MODE_DONTWAKE: __u32 = 1;
+pub const UFFDIO_COPY_MODE_WP: __u32 = 2;
+pub const UFFDIO_ZEROPAGE_MODE_DONTWAKE: __u32 = 1;
+pub const UFFDIO_CONTINUE_MODE_DONTWAKE: __u32 = 1;
 pub type utsname = new_utsname;
 pub type gid_t = __kernel_gid_t;
 pub type ino_t = __kernel_ino_t;
