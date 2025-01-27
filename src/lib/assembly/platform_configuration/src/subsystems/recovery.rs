@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::fs::File;
+
 use crate::subsystems::prelude::*;
 use anyhow::Context;
 use assembly_config_capabilities::{Config, ConfigValueType};
@@ -18,8 +20,43 @@ impl DefineSubsystemConfiguration<(&RecoveryConfig, &VolumeConfig)> for Recovery
     ) -> anyhow::Result<()> {
         let (config, volume_config) = *configs;
 
-        if config.factory_reset_trigger {
+        if let Some(mapping) = &config.factory_reset_trigger_config {
+            // If configuration is provided for the factory-reset-trigger component, include it
+            // and the configuration in the build.
+
             builder.platform_bundle("factory_reset_trigger");
+
+            let config = serde_json::json!({
+                "version": "1",
+                "content": {
+                    "channel_indices": mapping
+                }
+            });
+
+            let config_file_path = context
+                .get_gendir()
+                .context("getting gen dir for factory-reset-trigger config file")?
+                .join("forced-fdr-channel-indices.config");
+            let config_file = File::create(&config_file_path).with_context(|| {
+                format!("Creating factory-reset-trigger config file: {}", config_file_path)
+            })?;
+            serde_json::to_writer_pretty(config_file, &config).with_context(|| {
+                format!("Writing factory-reset-trigger config file: {}", config_file_path)
+            })?;
+
+            builder
+                .package("factory-reset-trigger")
+                .config_data(FileEntry {
+                    source: config_file_path,
+                    destination: "forced-fdr-channel-indices.config".into(),
+                })
+                .context("Adding factory-reset-trigger config data entry")?;
+        } else {
+            // Otherwise, only include the factory-reset-trigger (without configuration, assuming
+            // it will be provided via the legacy bundle) if explicitly requested.
+            if config.factory_reset_trigger {
+                builder.platform_bundle("factory_reset_trigger");
+            }
         }
 
         if *context.feature_set_level == FeatureSupportLevel::Standard

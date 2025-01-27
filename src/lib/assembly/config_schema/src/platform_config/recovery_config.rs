@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::collections::BTreeMap;
+
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -13,7 +15,17 @@ use serde::{Deserialize, Serialize};
 #[serde(default, deny_unknown_fields)]
 pub struct RecoveryConfig {
     /// Whether to include the factory-reset-trigger package.
+    ///
+    /// This field is deprecated, and ignored if the 'factory_reset_trigger_config'
+    /// field is provided.
     pub factory_reset_trigger: bool,
+
+    /// Include the factory-reset-trigger package, and configure it using the given file.
+    ///
+    /// This is a a map of channel names to indices, when the current OTA
+    /// channel matches one of the names in the file, if a stored index is less
+    /// than the index value in the file, a factory reset is triggered.
+    pub factory_reset_trigger_config: Option<BTreeMap<String, i32>>,
 
     /// Which system_recovery implementation to include
     pub system_recovery: Option<SystemRecovery>,
