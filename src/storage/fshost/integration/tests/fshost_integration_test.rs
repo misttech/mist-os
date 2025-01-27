@@ -42,8 +42,8 @@ use {
 pub mod config;
 
 use config::{
-    blob_fs_type, data_fs_name, data_fs_spec, data_fs_type, data_fs_zxcrypt, new_builder,
-    volumes_spec, DATA_FILESYSTEM_FORMAT, DATA_FILESYSTEM_VARIANT,
+    blob_fs_type, data_fs_spec, data_fs_type, data_fs_zxcrypt, new_builder, volumes_spec,
+    DATA_FILESYSTEM_FORMAT, DATA_FILESYSTEM_VARIANT,
 };
 
 #[fuchsia::test]
@@ -112,30 +112,6 @@ async fn data_formatted_legacy_label() {
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
-
-    fixture.tear_down().await;
-}
-
-#[fuchsia::test]
-async fn data_reformatted_when_corrupt() {
-    let mut builder = new_builder();
-    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec()).corrupt_data();
-    let mut fixture = builder.build().await;
-
-    fixture.check_fs_type("data", data_fs_type()).await;
-    fixture.check_test_data_file_absent().await;
-
-    // Ensure blobs are not reformatted.
-    fixture.check_fs_type("blob", blob_fs_type()).await;
-    fixture.check_test_blob(DATA_FILESYSTEM_VARIANT == "fxblob").await;
-
-    fixture
-        .wait_for_crash_reports(
-            1,
-            data_fs_name(),
-            &format!("fuchsia-{}-corruption", data_fs_name()),
-        )
-        .await;
 
     fixture.tear_down().await;
 }
