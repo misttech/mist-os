@@ -42,11 +42,10 @@ pub enum SaveConfig {
 #[derive(Debug)]
 pub struct ServerInfo {
     // TODO(fxbug/127781) Remove `pub` once library centralized here.
+    // Used by //src/developer/ffx/daemon/protocols/repo/src/lib.rs
     pub server: RepositoryServer,
-    // TODO(fxbug/127781) Remove `pub` once library centralized here.
-    pub task: fasync::Task<()>,
-    // TODO(fxbug/127781) Remove `pub` once library centralized here.
-    pub tunnel_manager: TunnelManager,
+    task: fasync::Task<()>,
+    tunnel_manager: TunnelManager,
 }
 
 impl ServerInfo {
@@ -128,10 +127,13 @@ impl ServerState {
 
 pub struct RepoInner {
     // TODO(fxbug/127781) Remove `pub` once library centralized here.
+    // Used by //src/developer/ffx/daemon/protocols/repo/src/lib.rs
     pub manager: Arc<RepositoryManager>,
     // TODO(fxbug/127781) Remove `pub` once library centralized here.
+    // Used by //src/developer/ffx/daemon/protocols/repo/src/lib.rs
     pub server: ServerState,
     // TODO(fxbug/127781) Remove `pub` once library centralized here.
+    // Used by //src/developer/ffx/daemon/protocols/repo/src/lib.rs
     pub https_client: HttpsClient,
 }
 

@@ -19,29 +19,26 @@ const TUNNEL_CONNECT_RETRY_TIMEOUT: Duration = Duration::from_secs(5);
 const TUNNEL_LISTEN_BACKLOG: u16 = 5;
 const RCS_SOCKET_PROVIDER_TIMEOUT: Duration = Duration::from_secs(5);
 
-// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
 /// Manage all the repository tunnels.
 #[derive(Debug)]
-pub struct TunnelManager {
+pub(crate) struct TunnelManager {
     tunnel_addr: SocketAddr,
     server_sink: UnboundedSender<Result<ConnectionStream>>,
     tunnels: Arc<RwLock<HashMap<String, fasync::Task<()>>>>,
 }
 
 impl TunnelManager {
-    // TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
     /// Create a new [TunnelManager].
-    pub fn new(
+    pub(crate) fn new(
         tunnel_addr: SocketAddr,
         server_sink: UnboundedSender<Result<ConnectionStream>>,
     ) -> Self {
         Self { tunnel_addr, server_sink, tunnels: Arc::new(RwLock::new(HashMap::new())) }
     }
 
-    // TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
     /// Spawn a repository tunnel to `target_nodename`.
     #[tracing::instrument(skip(self, cx))]
-    pub async fn start_tunnel(&self, cx: &Context, target_nodename: String) -> Result<()> {
+    pub(crate) async fn start_tunnel(&self, cx: &Context, target_nodename: String) -> Result<()> {
         // Exit early if we already have a tunnel set up for this source.
         {
             let tunnels = self.tunnels.read().await;
