@@ -35,7 +35,16 @@ namespace lockup_internal {
 zx_status_t GetBacktraceFromDapState(const arm64_dap_processor_state& state, Backtrace& out_bt);
 #endif  // __aarch64__
 
-void DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target);
+// Errors:
+//
+//   ZX_ERR_NOT_SUPPORTED - there is no debug facility present to support this.
+//
+//   arm64-specific:
+//     See documented errors of GetBacktraceFromDapState().
+//
+//   x86-specific:
+//     ZX_ERR_TIMED_OUT - timed out trying to get CPU context.
+zx_status_t DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target);
 
 enum class FailureSeverity { Oops, Fatal };
 void DumpCommonDiagnostics(cpu_num_t cpu, FILE* output_target, FailureSeverity severity);

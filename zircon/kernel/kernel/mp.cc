@@ -9,12 +9,12 @@
 
 #include <assert.h>
 #include <debug.h>
-#include <inttypes.h>
 #include <lib/arch/intrin.h>
 #include <lib/console.h>
 #include <lib/fit/defer.h>
 #include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/lockup_detector.h>
+#include <lib/lockup_detector/diagnostics.h>
 #include <lib/system-topology.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
@@ -432,19 +432,38 @@ static void mp_all_cpu_startup_sync_hook(unsigned int rl) {
         "At least one CPU has not declared itself to be started after %ld ms.  "
         "(online mask = %08x)\n",
         kCpuStartupTimeout / ZX_MSEC(1), online_mask);
-
     // Also report a separate OOPS for any processor which is not yet in the
-    // online mask.  Depending on where the core got wedged, it may be "online"
-    // but has not managed to declare itself as started, or it might not have
-    // even made it to the point where it declared itself to be online.
+    // online mask and try to dump its state, if such a debug facility exists.
+    // If we did successfully dump the secondary state, we panic, assuming that
+    // enough helpful debugging information was logged in the dump.
+    //
+    // Depending on where the core got wedged, it may be "online" but has not
+    // managed to declare itself as started, or it might not have even made it
+    // to the point where it declared itself to be online.
+    bool panic_after_dumps = false;
     for (auto* node : system_topology::GetSystemTopology().processors()) {
       const auto& processor = node->entity.processor;
       for (int i = 0; i < processor.logical_id_count; i++) {
         const cpu_num_t logical_id = node->entity.processor.logical_ids[i];
         if ((cpu_num_to_mask(logical_id) & online_mask) == 0) {
-          KERNEL_OOPS("CPU %u is not online\n", logical_id);
+          zx_status_t dump_status = lockup_internal::DumpRegistersAndBacktrace(logical_id, stdout);
+          switch (dump_status) {
+            case ZX_OK:                  // Successfully dumped the secondary's state...
+              panic_after_dumps = true;  // ...so we can now panic with that debug feedback
+              [[fallthrough]];
+            case ZX_ERR_NOT_SUPPORTED:  // No state dumping facility present.
+              KERNEL_OOPS("CPU %u is not online\n", logical_id);
+              break;
+            default:
+              KERNEL_OOPS("CPU %u is not online; error (%d) trying to dump its state\n", logical_id,
+                          dump_status);
+              break;
+          }
         }
       }
+    }
+    if (panic_after_dumps) {
+      ZX_PANIC("Secondary CPU(s) not online; see logging for dumped state");
     }
   }
 }

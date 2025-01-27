@@ -87,14 +87,18 @@ zx_status_t GetBacktraceFromDapState(const arm64_dap_processor_state& state, Bac
   return ZX_OK;
 }
 
-void DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
+zx_status_t DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
+  if (!arm64_dap_is_enabled()) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
   arm64_dap_processor_state state;
   // TODO(maniscalco): Update the DAP to make use of lockup_detector_diagnostic_query_timeout_ms.
   zx_status_t result = arm64_dap_read_processor_state(cpu, &state);
 
   if (result != ZX_OK) {
     fprintf(output_target, "Failed to read DAP state (res %d)\n", result);
-    return;
+    return result;
   }
 
   fprintf(output_target, "DAP state:\n");
@@ -123,28 +127,35 @@ void DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
     if (bt.size() > 0) {
       bt.PrintWithoutVersion(output_target);
     }
+    return status;
+  } else {
+    return ZX_OK;
   }
 }
 
 #elif defined(__x86_64__)
 
-void DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
+zx_status_t DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
   DEBUG_ASSERT(arch_ints_disabled());
 
   zx_duration_t timeout = ZX_MSEC(gBootOptions->lockup_detector_diagnostic_query_timeout_ms);
   if (timeout == 0) {
     fprintf(output_target, "diagnostic query disabled (timeout is 0)\n");
-    return;
+    return ZX_OK;
   }
 
   // First, dump the context for the unresponsive CPU.  Then, dump the contexts of the other CPUs.
   cpu_num_t target_cpu = cpu;
   cpu_mask_t remaining_cpus = Scheduler::PeekActiveMask() & ~cpu_num_to_mask(target_cpu);
+  zx_status_t result = ZX_OK;
   do {
     CpuContext context;
     zx_status_t status = g_cpu_context_exchange.RequestContext(target_cpu, timeout, context);
     if (status != ZX_OK) {
       fprintf(output_target, "failed to get context of CPU-%u: %d\n", target_cpu, status);
+      if (result == ZX_OK) {
+        result = status;
+      }
     } else {
       fprintf(output_target, "CPU-%u context follows\n", target_cpu);
       context.backtrace.PrintWithoutVersion(output_target);
@@ -152,12 +163,16 @@ void DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
       fprintf(output_target, "end of CPU-%u context\n", target_cpu);
     }
   } while ((target_cpu = remove_cpu_from_mask(remaining_cpus)) != INVALID_CPU);
+
+  return result;
 }
 
 #elif defined(__riscv)
 
 // TODO(eieio): implement me
-void DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) { PANIC_UNIMPLEMENTED; }
+zx_status_t DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
 
 #else
 #error "Unknown architecture! Neither __aarch64__ nor __x86_64__ are defined"
@@ -175,7 +190,10 @@ void DumpCommonDiagnostics(cpu_num_t cpu, FILE* output_target, FailureSeverity s
 
   if (severity == FailureSeverity::Fatal) {
     fprintf(output_target, "\n");
-    DumpRegistersAndBacktrace(cpu, output_target);
+    zx_status_t status = DumpRegistersAndBacktrace(cpu, output_target);
+    if (status != ZX_OK) {
+      fprintf(output_target, "failed to dump registers and backtrace: %d", status);
+    }
   }
 }
 
