@@ -1012,6 +1012,9 @@ impl ClientState {
             Self::Associated(state) => match state.link_state {
                 LinkState::EstablishingRsna(_) => RSNA_STATE,
                 LinkState::LinkUp(_) => LINK_UP_STATE,
+                // LinkState always transition to EstablishingRsna or LinkUp on initialization
+                // and never transition back
+                #[expect(clippy::unreachable)]
                 _ => unreachable!(),
             },
             Self::Roaming(_) => ROAMING_STATE,
@@ -1484,6 +1487,9 @@ impl ClientState {
                         wmm_param: associated.wmm_param,
                     })
                 }
+                // LinkState always transition to EstablishingRsna or LinkUp on initialization
+                // and never transition back
+                #[expect(clippy::unreachable)]
                 _ => unreachable!(),
             },
             Self::Roaming(roaming) => ClientSmeStatus::Roaming(roaming.cmd.bss.bssid),

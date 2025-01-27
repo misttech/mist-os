@@ -10,13 +10,14 @@ use crate::{MlmeEventStream, MlmeSink, MlmeStream};
 use fidl::endpoints::{RequestStream, ServerEnd};
 use fidl_fuchsia_wlan_common::BssDescription as BssDescriptionFidl;
 use fidl_fuchsia_wlan_sme::{self as fidl_sme, ClientSmeRequest, TelemetryRequest};
+use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
 use futures::prelude::*;
 use futures::select;
 use ieee80211::MacAddrBytes;
 use log::error;
 use std::pin::pin;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use wlan_common::scan::write_vmo;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
@@ -113,7 +114,7 @@ async fn handle_telemetry_fidl_request(
 ) -> Result<(), fidl::Error> {
     match request {
         TelemetryRequest::GetCounterStats { responder, .. } => {
-            let counter_stats_fut = sme.lock().unwrap().counter_stats();
+            let counter_stats_fut = sme.lock().counter_stats();
             let counter_stats = counter_stats_fut
                 .await
                 .map_err(|_| zx::Status::CONNECTION_ABORTED.into_raw())
@@ -124,7 +125,7 @@ async fn handle_telemetry_fidl_request(
             responder.send(counter_stats.as_ref().map_err(|e| *e))
         }
         TelemetryRequest::GetHistogramStats { responder, .. } => {
-            let histogram_stats_fut = sme.lock().unwrap().histogram_stats();
+            let histogram_stats_fut = sme.lock().histogram_stats();
             let histogram_stats = histogram_stats_fut
                 .await
                 .map_err(|_| zx::Status::CONNECTION_ABORTED.into_raw())
@@ -135,11 +136,8 @@ async fn handle_telemetry_fidl_request(
             responder.send(histogram_stats.as_ref().map_err(|e| *e))
         }
         TelemetryRequest::CloneInspectVmo { responder } => {
-            let inspect_vmo = sme
-                .lock()
-                .unwrap()
-                .on_clone_inspect_vmo()
-                .ok_or_else(|| zx::Status::INTERNAL.into_raw());
+            let inspect_vmo =
+                sme.lock().on_clone_inspect_vmo().ok_or_else(|| zx::Status::INTERNAL.into_raw());
             responder.send(inspect_vmo)
         }
     }
@@ -152,7 +150,7 @@ async fn scan(
         Result<Vec<fidl_sme::ScanResult>, fidl_sme::ScanErrorCode>,
     ) -> Result<(), anyhow::Error>,
 ) -> Result<(), anyhow::Error> {
-    let receiver = sme.lock().unwrap().on_scan_command(request);
+    let receiver = sme.lock().on_scan_command(request);
     let receive_result = match receiver.await {
         Ok(receive_result) => receive_result,
         Err(e) => {
@@ -198,7 +196,7 @@ async fn connect(
         None => None,
         Some(txn) => Some(txn.into_stream().control_handle()),
     };
-    let connect_txn_stream = sme.lock().unwrap().on_connect_command(req);
+    let connect_txn_stream = sme.lock().on_connect_command(req);
     serve_connect_txn_stream(handle, connect_txn_stream).await?;
     Ok(())
 }
@@ -238,7 +236,7 @@ async fn serve_connect_txn_stream(
 }
 
 fn roam(sme: &Mutex<Sme>, req: fidl_sme::RoamRequest) {
-    sme.lock().unwrap().on_roam_command(req);
+    sme.lock().on_roam_command(req);
 }
 
 fn disconnect(
@@ -246,18 +244,18 @@ fn disconnect(
     policy_disconnect_reason: fidl_sme::UserDisconnectReason,
     responder: fidl_sme::ClientSmeDisconnectResponder,
 ) {
-    sme.lock().unwrap().on_disconnect_command(policy_disconnect_reason, responder);
+    sme.lock().on_disconnect_command(policy_disconnect_reason, responder);
 }
 
 fn status(sme: &Mutex<Sme>) -> fidl_sme::ClientStatusResponse {
-    sme.lock().unwrap().status().into()
+    sme.lock().status().into()
 }
 
 async fn wmm_status(
     sme: &Mutex<Sme>,
     responder: fidl_sme::ClientSmeWmmStatusResponder,
 ) -> Result<(), fidl::Error> {
-    let receiver = sme.lock().unwrap().wmm_status();
+    let receiver = sme.lock().wmm_status();
     let wmm_status = match receiver.await {
         Ok(result) => result,
         Err(_) => Err(zx::sys::ZX_ERR_CANCELED),

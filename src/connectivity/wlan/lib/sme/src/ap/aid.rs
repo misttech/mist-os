@@ -42,7 +42,13 @@ impl Map {
 
     pub fn release_aid(&mut self, aid: Aid) {
         let index = (aid / Map::ELEM_BITS) as usize;
-        self.aids[index] &= !(1 << (aid % Map::ELEM_BITS));
+        if index < self.aids.len() {
+            // Safe to index because we checked that index is less than length of array
+            #[expect(clippy::indexing_slicing)]
+            let () = self.aids[index] &= !(1 << (aid % Map::ELEM_BITS));
+        } else {
+            log::warn!("Received unexpectedly large association ID {}, max ID {}", aid, MAX_AID);
+        }
     }
 }
 

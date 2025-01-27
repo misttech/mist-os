@@ -45,6 +45,9 @@ pub fn convert_set_keys_resp(
     }
     let mut results = vec![];
     for i in 0..resp.statuslist.len() {
+        // Okay to index because `i` is less than the length of `resp.statuslist`, and we
+        // already checked that `keylist` is the same length as `resp.statuslist`
+        #[expect(clippy::indexing_slicing)]
         results.push(fidl_mlme::SetKeyResult {
             key_id: original_set_keys_req.keylist[i].key_id,
             status: resp.statuslist[i],
@@ -67,9 +70,10 @@ pub fn convert_scan_end(
     end: fidl_fullmac::WlanFullmacImplIfcOnScanEndRequest,
 ) -> Result<fidl_mlme::ScanEnd> {
     use fidl_fullmac::WlanScanResult;
+    let scan_result_code = end.code.context("missing code")?;
     Ok(fidl_mlme::ScanEnd {
         txn_id: end.txn_id.context("missing txn_id")?,
-        code: match end.code.context("missing code")? {
+        code: match scan_result_code {
             WlanScanResult::Success => fidl_mlme::ScanResultCode::Success,
             WlanScanResult::NotSupported => fidl_mlme::ScanResultCode::NotSupported,
             WlanScanResult::InvalidArgs => fidl_mlme::ScanResultCode::InvalidArgs,
@@ -81,7 +85,7 @@ pub fn convert_scan_end(
             _ => {
                 warn!(
                     "Invalid scan result code {}, defaulting to ScanResultCode::NotSupported",
-                    end.code.unwrap().into_primitive()
+                    scan_result_code.into_primitive()
                 );
                 fidl_mlme::ScanResultCode::NotSupported
             }
@@ -175,19 +179,18 @@ pub fn convert_authenticate_indication(
     ind: fidl_fullmac::WlanFullmacImplIfcAuthIndRequest,
 ) -> Result<fidl_mlme::AuthenticateIndication> {
     use fidl_fullmac::WlanAuthType;
+    let auth_type = ind.auth_type.context("missing auth type")?;
     Ok(fidl_mlme::AuthenticateIndication {
         peer_sta_address: ind.peer_sta_address.context("missing peer_sta_address")?,
-        auth_type: match ind.auth_type {
-            Some(WlanAuthType::OpenSystem) => fidl_mlme::AuthenticationTypes::OpenSystem,
-            Some(WlanAuthType::SharedKey) => fidl_mlme::AuthenticationTypes::SharedKey,
-            Some(WlanAuthType::FastBssTransition) => {
-                fidl_mlme::AuthenticationTypes::FastBssTransition
-            }
-            Some(WlanAuthType::Sae) => fidl_mlme::AuthenticationTypes::Sae,
+        auth_type: match auth_type {
+            WlanAuthType::OpenSystem => fidl_mlme::AuthenticationTypes::OpenSystem,
+            WlanAuthType::SharedKey => fidl_mlme::AuthenticationTypes::SharedKey,
+            WlanAuthType::FastBssTransition => fidl_mlme::AuthenticationTypes::FastBssTransition,
+            WlanAuthType::Sae => fidl_mlme::AuthenticationTypes::Sae,
             _ => {
                 warn!(
                     "Invalid auth type {}, defaulting to AuthenticationTypes::OpenSystem",
-                    ind.auth_type.expect("missing auth type").into_primitive()
+                    auth_type.into_primitive()
                 );
                 fidl_mlme::AuthenticationTypes::OpenSystem
             }
@@ -198,15 +201,10 @@ pub fn convert_authenticate_indication(
 pub fn convert_deauthenticate_confirm(
     conf: fidl_fullmac::WlanFullmacImplIfcDeauthConfRequest,
 ) -> fidl_mlme::DeauthenticateConfirm {
-    let peer_sta_address = conf
-        .peer_sta_address
-        .or_else(|| {
-            warn!(
-                "Got None for peer_sta_address when converting DeauthConf. Substituting all zeros."
-            );
-            Some([0 as u8; fidl_ieee80211::MAC_ADDR_LEN as usize])
-        })
-        .unwrap();
+    let peer_sta_address = conf.peer_sta_address.unwrap_or_else(|| {
+        warn!("Got None for peer_sta_address when converting DeauthConf. Substituting all zeros.");
+        [0 as u8; fidl_ieee80211::MAC_ADDR_LEN as usize]
+    });
     fidl_mlme::DeauthenticateConfirm { peer_sta_address }
 }
 
@@ -222,36 +220,27 @@ pub fn convert_deauthenticate_indication(
 pub fn convert_associate_indication(
     ind: fidl_fullmac::WlanFullmacImplIfcAssocIndRequest,
 ) -> Result<fidl_mlme::AssociateIndication> {
+    let ssid = ind.ssid.context("missing ssid")?;
+    let rsne = ind.rsne.context("missing rsne")?;
     Ok(fidl_mlme::AssociateIndication {
         peer_sta_address: ind.peer_sta_address.context("missing peer sta address")?,
         // TODO(https://fxbug.dev/42068281): Fix the discrepancy between WlanFullmacAssocInd and
         // fidl_mlme::AssociateIndication
         capability_info: 0,
         listen_interval: ind.listen_interval.context("missing listen interval")?,
-        ssid: if ind.ssid.clone().expect("missing ssid").len() > 0 {
-            Some(ind.ssid.expect("missing ssid"))
-        } else {
-            None
-        },
+        ssid: if ssid.len() > 0 { Some(ssid) } else { None },
         rates: vec![],
-        rsne: if ind.rsne.clone().expect("missing rsne").len() > 0 {
-            Some(ind.rsne.expect("missing rsne"))
-        } else {
-            None
-        },
+        rsne: if rsne.len() > 0 { Some(rsne) } else { None },
     })
 }
 
 pub fn convert_disassociate_confirm(
     conf: fidl_fullmac::WlanFullmacImplIfcDisassocConfRequest,
 ) -> fidl_mlme::DisassociateConfirm {
-    let status = conf
-        .status
-        .or_else(|| {
-            warn!("Got None for status when converting DisassocConf. Using error INTERNAL.");
-            Some(zx::Status::INTERNAL.into_raw())
-        })
-        .unwrap();
+    let status = conf.status.unwrap_or_else(|| {
+        warn!("Got None for status when converting DisassocConf. Using error INTERNAL.");
+        zx::Status::INTERNAL.into_raw()
+    });
     fidl_mlme::DisassociateConfirm { status }
 }
 

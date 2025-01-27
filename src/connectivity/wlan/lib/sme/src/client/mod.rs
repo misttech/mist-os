@@ -830,6 +830,8 @@ impl ClientSme {
     }
 
     pub fn status(&self) -> ClientSmeStatus {
+        // `self.state` is always set to another state on transition and thus always present
+        #[expect(clippy::expect_used)]
         self.state.as_ref().expect("expected state to be always present").status()
     }
 

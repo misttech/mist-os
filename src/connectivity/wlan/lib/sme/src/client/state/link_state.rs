@@ -214,6 +214,9 @@ impl LinkState {
                 let connected_duration = now() - state.since;
                 (state.protection, Some(connected_duration))
             }
+            // We always transition to EstablishingRsna or LinkUp on initialization
+            // and never transition back
+            #[expect(clippy::unreachable)]
             _ => unreachable!(),
         }
     }
@@ -289,6 +292,9 @@ impl LinkState {
                 }
                 Ok(transition.to(state).into())
             }
+            // We always transition to EstablishingRsna or LinkUp on initialization
+            // and never transition back
+            #[expect(clippy::unreachable)]
             _ => unreachable!(),
         }
     }
@@ -404,6 +410,9 @@ impl LinkState {
                 _ => Ok(state.into()),
             },
             Self::LinkUp(state) => Ok(state.into()),
+            // We always transition to EstablishingRsna or LinkUp on initialization
+            // and never transition back
+            #[expect(clippy::unreachable)]
             _ => unreachable!(),
         }
     }
