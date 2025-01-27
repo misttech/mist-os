@@ -846,11 +846,12 @@ mod handle_mlme_request_tests {
     fn test_get_iface_counter_stats() {
         let mut h = TestHelper::set_up();
         let mocked_stats = fidl_stats::IfaceCounterStats {
-            rx_unicast_drop: 11,
-            rx_unicast_total: 22,
-            rx_multicast: 33,
-            tx_total: 44,
-            tx_drop: 55,
+            rx_unicast_drop: Some(11),
+            rx_unicast_total: Some(22),
+            rx_multicast: Some(33),
+            tx_total: Some(44),
+            tx_drop: Some(55),
+            ..Default::default()
         };
         h.fake_device
             .lock()
@@ -869,11 +870,12 @@ mod handle_mlme_request_tests {
         assert_eq!(
             stats,
             fidl_stats::IfaceCounterStats {
-                rx_unicast_drop: 11,
-                rx_unicast_total: 22,
-                rx_multicast: 33,
-                tx_total: 44,
-                tx_drop: 55,
+                rx_unicast_drop: Some(11),
+                rx_unicast_total: Some(22),
+                rx_multicast: Some(33),
+                tx_total: Some(44),
+                tx_drop: Some(55),
+                ..Default::default()
             }
         );
     }

@@ -654,8 +654,9 @@ std::vector<zx_status_t> brcmf_if_set_keys_req(
 void brcmf_if_eapol_req(net_device* ndev,
                         const fuchsia_wlan_fullmac_wire::WlanFullmacImplEapolTxRequest* req);
 void brcmf_if_stats_query_req(net_device* ndev);
-zx_status_t brcmf_if_get_iface_counter_stats(
-    net_device* ndev, fuchsia_wlan_stats::wire::IfaceCounterStats* out_stats);
+zx_status_t brcmf_if_get_iface_counter_stats(net_device* ndev,
+                                             fuchsia_wlan_stats::wire::IfaceCounterStats* out_stats,
+                                             fidl::AnyArena& arena);
 zx_status_t brcmf_if_get_iface_histogram_stats(
     net_device* ndev, fuchsia_wlan_stats::wire::IfaceHistogramStats* out_stats,
     fidl::AnyArena& arena);

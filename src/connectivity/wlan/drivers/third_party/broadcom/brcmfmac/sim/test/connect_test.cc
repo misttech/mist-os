@@ -516,11 +516,16 @@ TEST_F(ConnectTest, GetIfaceCounterStatsTest) {
   const uint64_t fw_rx_multicast = 1;
   const uint64_t fw_tx_good = 3;
   const uint64_t fw_tx_bad = 2;
-  EXPECT_EQ(stats.rx_unicast_total, fw_rx_good + fw_rx_bad);
-  EXPECT_EQ(stats.rx_unicast_drop, fw_rx_bad);
-  EXPECT_EQ(stats.rx_multicast, fw_rx_multicast);
-  EXPECT_EQ(stats.tx_total, fw_tx_good + fw_tx_bad);
-  EXPECT_EQ(stats.tx_drop, fw_tx_bad);
+  ASSERT_TRUE(stats.has_rx_unicast_total());
+  EXPECT_EQ(stats.rx_unicast_total(), fw_rx_good + fw_rx_bad);
+  ASSERT_TRUE(stats.has_rx_unicast_drop());
+  EXPECT_EQ(stats.rx_unicast_drop(), fw_rx_bad);
+  ASSERT_TRUE(stats.has_rx_multicast());
+  EXPECT_EQ(stats.rx_multicast(), fw_rx_multicast);
+  ASSERT_TRUE(stats.has_tx_total());
+  EXPECT_EQ(stats.tx_total(), fw_tx_good + fw_tx_bad);
+  ASSERT_TRUE(stats.has_tx_drop());
+  EXPECT_EQ(stats.tx_drop(), fw_tx_bad);
 }
 
 TEST_F(ConnectTest, GetIfaceHistogramStatsTest) {

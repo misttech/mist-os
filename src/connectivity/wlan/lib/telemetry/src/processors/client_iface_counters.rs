@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_wlan_stats as fidl_stats;
 use fuchsia_async::TimeoutExt;
 use fuchsia_sync::Mutex;
 
@@ -85,10 +86,19 @@ impl ClientIfaceCountersLogger {
                         .await
                     {
                         Ok(Ok(stats)) => {
-                            self.time_series_stats.log_rx_unicast_total(stats.rx_unicast_total);
-                            self.time_series_stats.log_rx_unicast_drop(stats.rx_unicast_drop);
-                            self.time_series_stats.log_tx_total(stats.tx_total);
-                            self.time_series_stats.log_tx_drop(stats.tx_drop);
+                            if let fidl_stats::IfaceCounterStats {
+                                rx_unicast_total: Some(rx_unicast_total),
+                                rx_unicast_drop: Some(rx_unicast_drop),
+                                tx_total: Some(tx_total),
+                                tx_drop: Some(tx_drop),
+                                ..
+                            } = stats
+                            {
+                                self.time_series_stats.log_rx_unicast_total(rx_unicast_total);
+                                self.time_series_stats.log_rx_unicast_drop(rx_unicast_drop);
+                                self.time_series_stats.log_tx_total(tx_total);
+                                self.time_series_stats.log_tx_drop(tx_drop);
+                            }
                         }
                         error => {
                             // It's normal for this call to fail while the device is not connected,
@@ -191,12 +201,13 @@ mod tests {
 
         let is_connected = true;
         let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
-        let counter_stats = fidl_fuchsia_wlan_stats::IfaceCounterStats {
-            rx_unicast_total: 100,
-            rx_unicast_drop: 5,
-            rx_multicast: 30,
-            tx_total: 50,
-            tx_drop: 2,
+        let counter_stats = fidl_stats::IfaceCounterStats {
+            rx_unicast_total: Some(100),
+            rx_unicast_drop: Some(5),
+            rx_multicast: Some(30),
+            tx_total: Some(50),
+            tx_drop: Some(2),
+            ..Default::default()
         };
         assert_eq!(
             test_helper.run_and_respond_iface_counter_stats_req(&mut test_fut, Ok(&counter_stats)),

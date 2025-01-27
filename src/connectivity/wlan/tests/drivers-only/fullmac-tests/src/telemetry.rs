@@ -16,11 +16,12 @@ async fn test_get_iface_counter_stats() {
     let telemetry_fut = telemetry_proxy.get_counter_stats();
 
     let driver_counter_stats = fidl_stats::IfaceCounterStats {
-        rx_unicast_total: rand::thread_rng().gen(),
-        rx_unicast_drop: rand::thread_rng().gen(),
-        rx_multicast: rand::thread_rng().gen(),
-        tx_total: rand::thread_rng().gen(),
-        tx_drop: rand::thread_rng().gen(),
+        rx_unicast_total: Some(rand::thread_rng().gen()),
+        rx_unicast_drop: Some(rand::thread_rng().gen()),
+        rx_multicast: Some(rand::thread_rng().gen()),
+        tx_total: Some(rand::thread_rng().gen()),
+        tx_drop: Some(rand::thread_rng().gen()),
+        ..Default::default()
     };
 
     let driver_fut = async {
@@ -43,6 +44,7 @@ async fn test_get_iface_counter_stats() {
             rx_multicast: driver_counter_stats.rx_multicast,
             tx_total: driver_counter_stats.tx_total,
             tx_drop: driver_counter_stats.tx_drop,
+            ..Default::default()
         }
     );
 }

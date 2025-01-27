@@ -5234,8 +5234,9 @@ zx_status_t brcmf_get_histograms_report(brcmf_if* ifp, histograms_report_t* out_
 
 }  // namespace
 
-zx_status_t brcmf_if_get_iface_counter_stats(
-    net_device* ndev, fuchsia_wlan_stats::wire::IfaceCounterStats* out_stats) {
+zx_status_t brcmf_if_get_iface_counter_stats(net_device* ndev,
+                                             fuchsia_wlan_stats::wire::IfaceCounterStats* out_stats,
+                                             fidl::AnyArena& arena) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   if (!ndev->if_proto.is_valid()) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping get iface counter stats");
@@ -5266,12 +5267,13 @@ zx_status_t brcmf_if_get_iface_counter_stats(
   BRCMF_DBG(DATA, "Cntrs: rxgood:%d rxbad:%d txgood:%d txbad:%d rxocast:%d", pktcnt.rx_good_pkt,
             pktcnt.rx_bad_pkt, pktcnt.tx_good_pkt, pktcnt.tx_bad_pkt, pktcnt.rx_ocast_good_pkt);
 
-  out_stats->rx_unicast_total = pktcnt.rx_good_pkt + pktcnt.rx_bad_pkt + ndev->stats.rx_errors;
-  out_stats->rx_unicast_drop = pktcnt.rx_bad_pkt + ndev->stats.rx_errors;
-  out_stats->rx_multicast = pktcnt.rx_ocast_good_pkt;
-  out_stats->tx_total = pktcnt.tx_good_pkt + pktcnt.tx_bad_pkt + ndev->stats.tx_dropped;
-  out_stats->tx_drop = pktcnt.tx_bad_pkt + ndev->stats.tx_dropped;
-
+  *out_stats = fuchsia_wlan_stats::wire::IfaceCounterStats::Builder(arena)
+                   .rx_unicast_total(pktcnt.rx_good_pkt + pktcnt.rx_bad_pkt + ndev->stats.rx_errors)
+                   .rx_unicast_drop(pktcnt.rx_bad_pkt + ndev->stats.rx_errors)
+                   .rx_multicast(pktcnt.rx_ocast_good_pkt)
+                   .tx_total(pktcnt.tx_good_pkt + pktcnt.tx_bad_pkt + ndev->stats.tx_dropped)
+                   .tx_drop(pktcnt.tx_bad_pkt + ndev->stats.tx_dropped)
+                   .Build();
   return ZX_OK;
 }
 
