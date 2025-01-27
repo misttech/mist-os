@@ -7,13 +7,11 @@ use crate::log_if_err;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::platform_metrics::PlatformMetric;
-use crate::shutdown_request::{RebootReasons, ShutdownRequest};
 use crate::temperature_handler::TemperatureFilter;
 use crate::timer::get_periodic_timer_stream;
 use crate::types::{Celsius, Nanoseconds, Seconds, ThermalLoad};
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
-use fidl_fuchsia_hardware_power_statecontrol::RebootReason2;
 use fuchsia_inspect::{self as inspect, Property};
 use futures::future::{FutureExt, LocalBoxFuture};
 use futures::stream::FuturesUnordered;
@@ -417,14 +415,9 @@ impl ThermalPolicy {
 
             self.log_platform_metric(PlatformMetric::ThrottlingResultShutdown).await;
 
-            self.send_message(
-                &self.config.sys_pwr_handler,
-                &Message::SystemShutdown(ShutdownRequest::Reboot(RebootReasons::new(
-                    RebootReason2::HighTemperature,
-                ))),
-            )
-            .await
-            .map_err(|e| format_err!("Failed to shut down the system: {}", e))?;
+            self.send_message(&self.config.sys_pwr_handler, &Message::HighTemperatureReboot)
+                .await
+                .map_err(|e| format_err!("Failed to shut down the system: {}", e))?;
         }
 
         Ok(())

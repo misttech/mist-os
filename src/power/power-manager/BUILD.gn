@@ -34,8 +34,6 @@ power_manager_deps = [
   "//sdk/fidl/fuchsia.power.profile:fuchsia.power.profile_rust",
   "//sdk/fidl/fuchsia.power.systemmode:fuchsia.power.systemmode_rust",
   "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust",
-  "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
-  "//sdk/fidl/fuchsia.system.state:fuchsia.system.state_rust",
   "//sdk/fidl/fuchsia.thermal:fuchsia.thermal_rust",
   "//sdk/fidl/fuchsia.ui.activity:fuchsia.ui.activity_rust",
   "//sdk/rust/zx",
@@ -55,7 +53,6 @@ power_manager_deps = [
   "//src/lib/trace/rust:trace-provider",
   "//third_party/rust_crates:anyhow",
   "//third_party/rust_crates:async-trait",
-  "//third_party/rust_crates:either",
   "//third_party/rust_crates:futures",
   "//third_party/rust_crates:libm",
   "//third_party/rust_crates:log",
@@ -80,8 +77,6 @@ power_manager_sources = [
   "src/node.rs",
   "src/platform_metrics.rs",
   "src/power_manager.rs",
-  "src/shutdown_request.rs",
-  "src/shutdown_watcher.rs",
   "src/system_power_mode_handler.rs",
   "src/system_profile_handler.rs",
   "src/system_shutdown_handler.rs",
@@ -106,7 +101,6 @@ rustc_binary("bin") {
   test_deps = [
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:test-case",
   ]
 }
 

@@ -2,13 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use assert_matches::assert_matches;
-use fidl::marker::SourceBreaking;
-use power_manager_integration_test_lib::client_connectors::{
-    DeprecatedRebootWatcherClient, RebootWatcherClient, ThermalClient,
-};
+use power_manager_integration_test_lib::client_connectors::ThermalClient;
 use power_manager_integration_test_lib::TestEnvBuilder;
-use {fidl_fuchsia_hardware_power_statecontrol as fpower, fuchsia_async as fasync};
 
 /// Integration test for Power Manager to verify correct behavior of the thermal client service.
 #[fuchsia::test]
@@ -43,108 +38,6 @@ async fn thermal_client_service_test() {
 
     // Verify client0 thermal state goes back to 0
     assert_eq!(client0.get_thermal_state().await.unwrap(), 0);
-
-    env.destroy().await;
-}
-
-/// Verifies that `fuchsia.hardware.power.statecontrol/Admin.Reboot` requests
-/// sent to Power Manager are handled as expected:
-///     1) forward the reboot reason to connected RebootWatcher clients
-///     2) update Driver Manager with the appropriate termination SystemPowerState
-///     3) send a shutdown request to the system controller
-// TODO(https://fxbug.dev/385742868): Delete this test once the API is removed.
-#[fuchsia::test]
-async fn deprecated_shutdown_test() {
-    let mut env = TestEnvBuilder::new()
-        .power_manager_node_config_path(&"/pkg/shutdown_test/power_manager_node_config.json5")
-        .build()
-        .await;
-
-    // Check the device has finished enumerating before proceeding with the test
-    env.wait_for_device("/dev/sys/platform/soc_thermal").await;
-
-    // Verify both the "current" and "deprecated" watcher APIs.
-    let mut reboot_watcher = RebootWatcherClient::new(&env).await;
-    let mut deprecated_reboot_watcher = DeprecatedRebootWatcherClient::new(&env).await;
-
-    // Send a reboot request to the Power Manager (in a separate Task because it never returns)
-    let shutdown_client = env.connect_to_protocol::<fpower::AdminMarker>();
-    let _shutdown_task =
-        fasync::Task::local(shutdown_client.reboot(fpower::RebootReason::SystemUpdate));
-
-    // Verify Power Manager forwards the reboot reason to the watcher client
-    let reasons = assert_matches!(
-        reboot_watcher.get_reboot_options().await,
-        fpower::RebootOptions{ reasons: Some(reasons), ..} => reasons
-    );
-    assert_eq!(&reasons[..], [fpower::RebootReason2::SystemUpdate]);
-    assert_eq!(
-        deprecated_reboot_watcher.get_reboot_reason().await,
-        fpower::RebootReason::SystemUpdate
-    );
-
-    // Verify the system controller service gets the shutdown request from Power Manager
-    env.mocks.system_controller_service.wait_for_shutdown_request().await;
-
-    // TODO(https://fxbug.dev/42071033): Update integration tests to ensure interaction between driver
-    // manager and shutdown shim works as intended. This likely requires using shutdown shim in
-    // this integration test.
-
-    env.destroy().await;
-}
-
-/// Verifies that `fuchsia.hardware.power.statecontrol/Admin.PerformReboot`
-/// requests sent to Power Manager are handled as expected:
-///     1) forward the reboot reason to connected RebootWatcher clients
-///     2) update Driver Manager with the appropriate termination SystemPowerState
-///     3) send a shutdown request to the system controller
-#[fuchsia::test]
-async fn shutdown_test() {
-    let mut env = TestEnvBuilder::new()
-        .power_manager_node_config_path(&"/pkg/shutdown_test/power_manager_node_config.json5")
-        .build()
-        .await;
-
-    // Check the device has finished enumerating before proceeding with the test
-    env.wait_for_device("/dev/sys/platform/soc_thermal").await;
-
-    // Verify both the "current" and "deprecated" watcher APIs.
-    let mut reboot_watcher = RebootWatcherClient::new(&env).await;
-    let mut deprecated_reboot_watcher = DeprecatedRebootWatcherClient::new(&env).await;
-
-    // Send a reboot request to the Power Manager (in a separate Task because it never returns)
-    let shutdown_client = env.connect_to_protocol::<fpower::AdminMarker>();
-    let options = fpower::RebootOptions {
-        reasons: Some(vec![
-            fpower::RebootReason2::SystemUpdate,
-            fpower::RebootReason2::NetstackMigration,
-        ]),
-        __source_breaking: SourceBreaking,
-    };
-    let _shutdown_task = fasync::Task::local(shutdown_client.perform_reboot(&options));
-
-    // Verify Power Manager forwards the reboot reason to the watcher client
-    let reasons = assert_matches!(
-        reboot_watcher.get_reboot_options().await,
-        fpower::RebootOptions{ reasons: Some(reasons), ..} => reasons
-    );
-    assert_eq!(
-        &reasons[..],
-        [fpower::RebootReason2::SystemUpdate, fpower::RebootReason2::NetstackMigration]
-    );
-    // TODO(https://fxbug.dev/385742868): Delete the deprecated watcher assertions once the API
-    // is removed. For now, verify that a backwards-compatible reason is provided.
-    assert_eq!(
-        deprecated_reboot_watcher.get_reboot_reason().await,
-        fpower::RebootReason::SystemUpdate
-    );
-
-    // Verify the system controller service gets the shutdown request from Power Manager
-    env.mocks.system_controller_service.wait_for_shutdown_request().await;
-
-    // TODO(https://fxbug.dev/42071033): Update integration tests to ensure interaction between
-    // driver manager and shutdown shim works as intended. This likely requires using shutdown shim
-    // in this integration test.
 
     env.destroy().await;
 }

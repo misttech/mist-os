@@ -9,8 +9,6 @@
     capabilities: [
         {
             protocol: [
-                "fuchsia.hardware.power.statecontrol.Admin",
-                "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
                 "fuchsia.power.clientlevel.Connector",
                 "fuchsia.power.manager.debug.Debug",
                 "fuchsia.power.profile.Watcher",
@@ -46,10 +44,10 @@
         {
             protocol: [
                 "fuchsia.feedback.CrashReporter",
+                "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.kernel.CpuResource",
                 "fuchsia.kernel.Stats",
                 "fuchsia.metrics.MetricEventLoggerFactory",
-                "fuchsia.sys2.SystemController",
                 "fuchsia.ui.activity.Provider",
             ],
         },
@@ -71,8 +69,6 @@
     expose: [
         {
             protocol: [
-                "fuchsia.hardware.power.statecontrol.Admin",
-                "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
                 "fuchsia.power.clientlevel.Connector",
                 "fuchsia.power.manager.debug.Debug",
                 "fuchsia.power.profile.Watcher",

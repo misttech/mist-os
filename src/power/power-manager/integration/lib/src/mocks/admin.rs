@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_hardware_power_statecontrol::{self as fpower, RebootReason};
 use fidl_fuchsia_io::DirectoryMarker;
+use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::LocalComponentHandles;
 use futures::channel::mpsc;
@@ -11,16 +13,15 @@ use futures::lock::Mutex;
 use futures::{StreamExt, TryStreamExt};
 use log::*;
 use std::sync::Arc;
-use {fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync};
 
-/// Mocks the fuchsia.sys2.SystemController service to be used in integration tests.
-pub struct MockSystemControllerService {
-    shutdown_received_sender: Mutex<mpsc::Sender<()>>,
-    shutdown_received_receiver: Mutex<mpsc::Receiver<()>>,
+/// Mocks the fuchsia.hardware.power.statecontrol.Admin service to be used in integration tests.
+pub struct MockStateControlAdminService {
+    shutdown_received_sender: Mutex<mpsc::Sender<RebootReason>>,
+    shutdown_received_receiver: Mutex<mpsc::Receiver<RebootReason>>,
 }
 
-impl MockSystemControllerService {
-    pub fn new() -> Arc<MockSystemControllerService> {
+impl MockStateControlAdminService {
+    pub fn new() -> Arc<MockStateControlAdminService> {
         let (sender, receiver) = mpsc::channel(1);
         Arc::new(Self {
             shutdown_received_sender: Mutex::new(sender),
@@ -30,19 +31,19 @@ impl MockSystemControllerService {
 
     /// Runs the mock using the provided `LocalComponentHandles`.
     ///
-    /// The mock intentionally does not complete shutdown requests in order to more closely mimic
-    /// the behavior that Power Manager would normally see.
+    /// The mock intentionally does not complete reboot requests in order to prevent further calls
+    /// that may cause extra send.
     ///
     /// Expected usage is to call this function from a closure for the
     /// `local_component_implementation` parameter to `RealmBuilder.add_local_child`.
     ///
     /// For example:
-    ///     let mock_system_controller_service = MockInputSettingsService::new();
-    ///     let system_controller_service_child = realm_builder
+    ///     let mock_admin_service = MockStateControlAdminService::new();
+    ///     let admin_service_child = realm_builder
     ///         .add_local_child(
-    ///             "system_controller_service",
+    ///             "admin_service",
     ///             move |handles| {
-    ///                 Box::pin(system_controller_service.clone().run(handles))
+    ///                 Box::pin(mock_admin_service.clone().run(handles))
     ///             },
     ///             ChildOptions::new(),
     ///         )
@@ -58,18 +59,18 @@ impl MockSystemControllerService {
         outgoing_dir: ServerEnd<DirectoryMarker>,
     ) -> Result<(), anyhow::Error> {
         let mut fs = ServiceFs::new();
-        fs.dir("svc").add_fidl_service(move |mut stream: fsys::SystemControllerRequestStream| {
+        fs.dir("svc").add_fidl_service(move |mut stream: fpower::AdminRequestStream| {
             let this = self.clone();
             fasync::Task::local(async move {
-                info!("MockSystemControllerService: new connection");
-                while let Some(fsys::SystemControllerRequest::Shutdown { .. }) =
+                info!("MockStateControlAdminService: new connection Admin");
+                while let Some(fpower::AdminRequest::Reboot { responder: _, reason }) =
                     stream.try_next().await.unwrap()
                 {
-                    info!("MockSystemControllerService: received shutdown request");
+                    info!("MockStateControlAdminService: received Reboot request");
                     this.shutdown_received_sender
                         .lock()
                         .await
-                        .try_send(())
+                        .try_send(reason)
                         .expect("Failed to notify shutdown");
                 }
             })
@@ -83,7 +84,7 @@ impl MockSystemControllerService {
     }
 
     /// Waits for the mock to receive a fidl.fuchsia.SystemController/Shutdown request.
-    pub async fn wait_for_shutdown_request(&self) {
+    pub async fn wait_for_shutdown_request(&self) -> RebootReason {
         self.shutdown_received_receiver
             .lock()
             .await
@@ -102,15 +103,17 @@ mod tests {
     async fn test_shutdown() {
         // Create and serve the mock service
         let (dir, outgoing_dir) = fidl::endpoints::create_proxy::<DirectoryMarker>();
-        let mock = MockSystemControllerService::new();
+        let mock = MockStateControlAdminService::new();
         let _task = fasync::Task::local(mock.clone().run_inner(outgoing_dir));
 
         // Connect to the mock server
         let controller_client =
-            connect_to_protocol_at_dir_svc::<fsys::SystemControllerMarker>(&dir).unwrap();
+            connect_to_protocol_at_dir_svc::<fpower::AdminMarker>(&dir).unwrap();
 
         // Call the server's `shutdown` method and verify the mock sees the request
-        let _task = fuchsia_async::Task::local(controller_client.shutdown());
+        let _task = fuchsia_async::Task::local(
+            controller_client.reboot(fpower::RebootReason::HighTemperature),
+        );
         mock.wait_for_shutdown_request().await;
     }
 }

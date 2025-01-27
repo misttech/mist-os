@@ -63,6 +63,11 @@
             to: "#power_manager",
         },
         {
+            protocol: [ "fuchsia.hardware.power.statecontrol.Admin" ],
+            from: "#shutdown_shim",
+            to: "#power_manager",
+        },
+        {
             protocol: [
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.kernel.Stats",
@@ -81,7 +86,6 @@
     expose: [
         {
             protocol: [
-                "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
                 "fuchsia.power.clientlevel.Connector",
                 "fuchsia.power.profile.Watcher",
                 "fuchsia.power.systemmode.ClientConfigurator",

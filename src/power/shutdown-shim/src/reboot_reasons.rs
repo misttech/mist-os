@@ -3,28 +3,14 @@
 // found in the LICENSE file.
 
 use fidl::marker::SourceBreaking;
-use {
-    fidl_fuchsia_hardware_power_statecontrol as fpower,
-    fidl_fuchsia_system_state as fdevice_manager,
-};
-
-/// Represents the available shutdown types of the system. These are intended to mirror the
-/// supported shutdown APIs of fuchsia.hardware.power.statecontrol.Admin.
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
-pub enum ShutdownRequest {
-    PowerOff,
-    Reboot(RebootReasons),
-    RebootBootloader,
-    RebootRecovery,
-    SuspendToRam,
-}
+use fidl_fuchsia_hardware_power_statecontrol as fpower;
 
 /// The reasons of a reboot.
 ///
 /// This type acts as a witness that the provided reasons are valid (i.e. at
 /// least one reason was provided).
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
-pub struct RebootReasons(Vec<fpower::RebootReason2>);
+pub struct RebootReasons(pub Vec<fpower::RebootReason2>);
 
 impl RebootReasons {
     /// Construct a new `RebootReasons` with the given reason.
@@ -155,27 +141,6 @@ impl TryFrom<fpower::RebootOptions> for RebootReasons {
         }
 
         Err(InvalidRebootOptions::NoReasons)
-    }
-}
-
-/// Converts a ShutdownRequest into a fuchsia.hardware.power.statecontrol.SystemPowerState value.
-impl Into<fdevice_manager::SystemPowerState> for ShutdownRequest {
-    fn into(self) -> fdevice_manager::SystemPowerState {
-        match self {
-            ShutdownRequest::PowerOff => fdevice_manager::SystemPowerState::Poweroff,
-            ShutdownRequest::Reboot(reasons) => {
-                if reasons.as_ref().contains(&fpower::RebootReason2::OutOfMemory) {
-                    fdevice_manager::SystemPowerState::RebootKernelInitiated
-                } else {
-                    fdevice_manager::SystemPowerState::Reboot
-                }
-            }
-            ShutdownRequest::RebootBootloader => {
-                fdevice_manager::SystemPowerState::RebootBootloader
-            }
-            ShutdownRequest::RebootRecovery => fdevice_manager::SystemPowerState::RebootRecovery,
-            ShutdownRequest::SuspendToRam => fdevice_manager::SystemPowerState::SuspendRam,
-        }
     }
 }
 

@@ -1,14 +1,17 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+mod reboot_reasons;
+mod shutdown_watcher;
 
+use crate::reboot_reasons::RebootReasons;
+use crate::shutdown_watcher::ShutdownWatcher;
 use anyhow::{format_err, Context};
-use fidl::endpoints::{self, DiscoverableProtocolMarker, ServerEnd};
+use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
 use fidl::HandleBased;
 use fidl_fuchsia_hardware_power_statecontrol::{
-    AdminMarker, AdminMexecRequest, AdminProxy, AdminRequest, AdminRequestStream,
-    RebootMethodsWatcherRegisterMarker, RebootOptions, RebootReason, RebootReason2,
-    RebootWatcherMarker, RebootWatcherRequest,
+    AdminMexecRequest, AdminRequest, AdminRequestStream, RebootMethodsWatcherRegisterRequestStream,
+    RebootOptions, RebootReason, RebootReason2,
 };
 use fidl_fuchsia_power::CollaborativeRebootInitiatorRequestStream;
 use fidl_fuchsia_power_internal::{
@@ -23,19 +26,15 @@ use fuchsia_component::directory::{AsRefDirectory, Directory};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
+use futures::lock::Mutex as AMutex;
 use futures::prelude::*;
 use futures::select;
 use std::pin::pin;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_power_system as fsystem, fuchsia_async as fasync};
 
 mod collaborative_reboot;
-
-// The amount of time that the shim will spend trying to connect to
-// power_manager before giving up.
-// TODO(https://fxbug.dev/42131944): increase this timeout
-const SERVICE_CONNECTION_TIMEOUT: Duration = Duration::from_secs(2);
 
 // The amount of time that the shim will spend waiting for a manually trigger
 // system shutdown to finish before forcefully restarting the system.
@@ -46,10 +45,11 @@ enum IncomingRequest {
     Admin(AdminRequestStream),
     CollaborativeRebootInitiator(CollaborativeRebootInitiatorRequestStream),
     CollaborativeRebootScheduler(CollaborativeRebootSchedulerRequestStream),
+    RebootMethodsWatcherRegister(RebootMethodsWatcherRegisterRequestStream),
 }
 
 pub async fn main(
-    svc: impl Directory + AsRefDirectory + Send + Sync + 'static,
+    svc: impl Directory + AsRefDirectory + 'static,
     directory_request: ServerEnd<fio::DirectoryMarker>,
 ) -> Result<(), anyhow::Error> {
     println!("[shutdown-shim]: started");
@@ -82,6 +82,7 @@ pub async fn main(
 
     let mut service_fs = ServiceFs::new();
     service_fs.dir("svc").add_fidl_service(IncomingRequest::Admin);
+    service_fs.dir("svc").add_fidl_service(IncomingRequest::RebootMethodsWatcherRegister);
     service_fs.dir("svc").add_fidl_service(IncomingRequest::SystemStateTransition);
     service_fs.dir("svc").add_fidl_service(IncomingRequest::CollaborativeRebootInitiator);
     service_fs.dir("svc").add_fidl_service(IncomingRequest::CollaborativeRebootScheduler);
@@ -89,11 +90,22 @@ pub async fn main(
 
     let (abort_tx, mut abort_rx) = mpsc::unbounded::<()>();
     let (cr_state, cr_cancellations) = collaborative_reboot::new(&inspector);
-    let ctx = ProgramContext { svc, abort_tx, collaborative_reboot: cr_state };
+    let ctx = ProgramContext {
+        svc,
+        abort_tx,
+        collaborative_reboot: cr_state,
+        shutdown_pending: Arc::new(AMutex::new(false)),
+        shutdown_watcher: ShutdownWatcher::new(),
+    };
+
+    let shutdown_watcher = ctx.shutdown_watcher.clone();
     let mut service_fut = service_fs
         .for_each_concurrent(None, |request: IncomingRequest| async {
             match request {
                 IncomingRequest::Admin(stream) => ctx.handle_admin_request(stream).await,
+                IncomingRequest::RebootMethodsWatcherRegister(stream) => {
+                    shutdown_watcher.clone().handle_reboot_register_request(stream).await;
+                }
                 IncomingRequest::SystemStateTransition(stream) => {
                     ctx.handle_system_state_transition(stream).await
                 }
@@ -106,19 +118,12 @@ pub async fn main(
             }
         })
         .fuse();
-    let reboot_watcher_fut = pin!(async {
-        ctx.run_reboot_watcher().await;
-        // Don't terminate the program if the reboot watcher finishes.
-        std::future::pending::<()>().await;
-    });
-    let mut reboot_watcher_fut = reboot_watcher_fut.fuse();
     let collaborative_reboot_cancellation_fut = pin!(cr_cancellations.run());
     let mut collaborative_reboot_cancellation_fut = collaborative_reboot_cancellation_fut.fuse();
     let mut abort_fut = abort_rx.next().fuse();
 
     select! {
         () = service_fut => {},
-        () = reboot_watcher_fut => unreachable!(),
         () = collaborative_reboot_cancellation_fut => unreachable!(),
         _ = abort_fut => {},
     };
@@ -126,13 +131,19 @@ pub async fn main(
     Err(format_err!("exited unexpectedly"))
 }
 
-struct ProgramContext<D: Directory + AsRefDirectory + Send + Sync> {
+struct ProgramContext<D: Directory + AsRefDirectory> {
     svc: D,
     abort_tx: mpsc::UnboundedSender<()>,
     collaborative_reboot: collaborative_reboot::State,
+
+    /// Tracks the current shutdown request state. Used to ignore shutdown requests while a current
+    /// request is being processed.
+    shutdown_pending: Arc<AMutex<bool>>,
+
+    shutdown_watcher: Arc<ShutdownWatcher>,
 }
 
-impl<D: Directory + AsRefDirectory + Send + Sync> ProgramContext<D> {
+impl<D: Directory + AsRefDirectory> ProgramContext<D> {
     async fn handle_admin_request(&self, mut stream: AdminRequestStream) {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
@@ -150,7 +161,11 @@ impl<D: Directory + AsRefDirectory + Send + Sync> ProgramContext<D> {
                     };
                     set_system_power_state(target_state);
                     let res = self
-                        .forward_command(target_state, Some(RebootArguments::Reboot(reason)), None)
+                        .forward_command(
+                            target_state,
+                            Some(RebootReasons::from_deprecated(&reason)),
+                            None,
+                        )
                         .await;
                     let _ = responder.send(res.map_err(|s| s.into_raw()));
                 }
@@ -240,43 +255,6 @@ impl<D: Directory + AsRefDirectory + Send + Sync> ProgramContext<D> {
         }
     }
 
-    async fn run_reboot_watcher(&self) {
-        // TODO(https://fxbug.dev/368440548) Fix deeper problems and run this
-        // immediately.
-        fasync::Timer::new(Duration::from_secs(15)).await;
-        match self.connect_to_protocol::<RebootMethodsWatcherRegisterMarker>() {
-            Ok(local) => {
-                let (client, watcher) = endpoints::create_endpoints::<RebootWatcherMarker>();
-                match local.register_watcher(client).await {
-                    Ok(()) => eprintln!("[shutdown-shim]: RegisterWithAck succeeded"),
-                    Err(e) => {
-                        eprintln!("[shutdown-shim]: RegisterWithAck failed: {e}");
-                        return;
-                    }
-                }
-                let mut stream = watcher.into_stream();
-                while let Ok(Some(request)) = stream.try_next().await {
-                    match request {
-                        RebootWatcherRequest::OnReboot { options, responder } => {
-                            let RebootOptions { reasons, __source_breaking: _ } = options;
-                            // Ignore other reasons because they are from shutdown-shim and are
-                            // processed already.
-                            if reasons.is_some_and(|r| r.contains(&RebootReason2::HighTemperature))
-                            {
-                                set_system_power_state(SystemPowerState::Reboot);
-                            }
-                            let _ = responder.send();
-                        }
-                    }
-                }
-            }
-            Err(_) => {
-                // It's fine this is not available in bootstrap
-                eprintln!("[shutdown-shim]: Not able to connect to RebootMethodsWatcherRegister");
-            }
-        }
-    }
-
     // A handler for the `Admin.PerformReboot` method.
     async fn perform_reboot(&self, options: RebootOptions) -> Result<(), zx::Status> {
         let _reboot_control_lease = self.acquire_shutdown_control_lease().await;
@@ -290,41 +268,30 @@ impl<D: Directory + AsRefDirectory + Send + Sync> ProgramContext<D> {
             SystemPowerState::Reboot
         };
         set_system_power_state(target_state);
-        self.forward_command(target_state, Some(RebootArguments::PerformReboot(options)), None)
-            .await
+        let reasons = match options.reasons {
+            Some(reasons) => Some(RebootReasons(reasons)),
+            None => None,
+        };
+        self.forward_command(target_state, reasons, None).await
     }
 
     async fn forward_command(
         &self,
-        fallback_state: SystemPowerState,
-        reboot_arguments: Option<RebootArguments>,
-        mexec_request: Option<AdminMexecRequest>,
+        _fallback_state: SystemPowerState,
+        reboot_reasons: Option<RebootReasons>,
+        _mexec_request: Option<AdminMexecRequest>,
     ) -> Result<(), zx::Status> {
-        let local = self.connect_to_protocol_with_timeout::<AdminMarker>();
-        match local {
-            Ok(local) => {
-                eprintln!("[shutdown-shim]: forwarding command {fallback_state:?}");
-                match self
-                    .send_command(local, fallback_state, reboot_arguments, mexec_request)
-                    .await
-                {
-                    Ok(()) => return Ok(()),
-                    e @ Err(zx::Status::UNAVAILABLE | zx::Status::NOT_SUPPORTED) => {
-                        // Power manager may decide not to support suspend. We should respect that and
-                        // not attempt to suspend manually.
-                        if fallback_state == SystemPowerState::SuspendRam {
-                            return e;
-                        }
-                        eprintln!("[shutdown-shim]: failed to forward command to power_manager");
-                    }
-                    e => return e,
-                }
+        // Return if shutdown is already pending
+        {
+            let mut shutdown_pending = self.shutdown_pending.lock().await;
+            if *shutdown_pending {
+                return Err(zx::Status::ALREADY_EXISTS);
             }
-            Err(e) => {
-                eprintln!(
-                    "[shutdown-shim]: failed to connect to power_manager to forward command: {e}"
-                );
-            }
+            *shutdown_pending = true;
+        }
+
+        if let Some(reasons) = reboot_reasons {
+            self.shutdown_watcher.handle_system_shutdown_message(reasons).await;
         }
 
         self.drive_shutdown_manually().await;
@@ -333,64 +300,6 @@ impl<D: Directory + AsRefDirectory + Send + Sync> ProgramContext<D> {
         // it returns something has gone wrong.
         eprintln!("[shutdown-shim]: we shouldn't still be running, crashing the system");
         Self::abort(self.abort_tx.clone()).await
-    }
-
-    async fn send_command(
-        &self,
-        statecontrol_client: AdminProxy,
-        fallback_state: SystemPowerState,
-        reboot_arguments: Option<RebootArguments>,
-        mexec_request: Option<AdminMexecRequest>,
-    ) -> Result<(), zx::Status> {
-        match fallback_state {
-            SystemPowerState::Reboot | SystemPowerState::RebootKernelInitiated => {
-                if let None = reboot_arguments {
-                    eprintln!("[shutdown-shim]: internal error, no arguments for reboot");
-                    return Err(zx::Status::INTERNAL);
-                }
-                match reboot_arguments.unwrap() {
-                    RebootArguments::Reboot(reason) => statecontrol_client.reboot(reason).await,
-                    RebootArguments::PerformReboot(options) => {
-                        statecontrol_client.perform_reboot(&options).await
-                    }
-                }
-                .map_err(|_| zx::Status::UNAVAILABLE)?
-                .map_err(zx::Status::from_raw)
-            }
-            SystemPowerState::RebootBootloader => statecontrol_client
-                .reboot_to_bootloader()
-                .await
-                .map_err(|_| zx::Status::UNAVAILABLE)?
-                .map_err(zx::Status::from_raw),
-            SystemPowerState::RebootRecovery => statecontrol_client
-                .reboot_to_recovery()
-                .await
-                .map_err(|_| zx::Status::UNAVAILABLE)?
-                .map_err(zx::Status::from_raw),
-            SystemPowerState::Poweroff => statecontrol_client
-                .poweroff()
-                .await
-                .map_err(|_| zx::Status::UNAVAILABLE)?
-                .map_err(zx::Status::from_raw),
-            SystemPowerState::Mexec => {
-                if let None = mexec_request {
-                    eprintln!("[shutdown-shim]: internal error, no reason for mexec");
-                    return Err(zx::Status::INTERNAL);
-                }
-                let AdminMexecRequest { kernel_zbi, data_zbi } = mexec_request.unwrap();
-                statecontrol_client
-                    .mexec(kernel_zbi, data_zbi)
-                    .await
-                    .map_err(|_| zx::Status::UNAVAILABLE)?
-                    .map_err(zx::Status::from_raw)
-            }
-            SystemPowerState::SuspendRam => statecontrol_client
-                .suspend_to_ram()
-                .await
-                .map_err(|_| zx::Status::UNAVAILABLE)?
-                .map_err(zx::Status::from_raw),
-            SystemPowerState::FullyOn => Err(zx::Status::INTERNAL),
-        }
     }
 
     async fn drive_shutdown_manually(&self) {
@@ -453,41 +362,9 @@ impl<D: Directory + AsRefDirectory + Send + Sync> ProgramContext<D> {
     ) -> Result<P::Proxy, anyhow::Error> {
         client::connect_to_protocol_at_dir_root::<P>(&self.svc)
     }
-
-    fn connect_to_protocol_with_timeout<P: DiscoverableProtocolMarker>(
-        &self,
-    ) -> Result<P::Proxy, anyhow::Error> {
-        // TODO: this needs to actually set the timeout.
-        let (channel, server) = zx::Channel::create();
-        self.svc.open(P::PROTOCOL_NAME, fio::Flags::empty(), server.into())?;
-        // We want to use the zx_channel_call syscall directly here, because there's
-        // no way to set the timeout field on the call using the FIDL bindings.
-        let garbage_data: [u8; 6] = [0, 1, 2, 3, 4, 5];
-        let mut handles: [zx::Handle; 0] = [];
-        let mut buf = zx::MessageBuf::new();
-        let timeout = zx::MonotonicInstant::after(SERVICE_CONNECTION_TIMEOUT.into());
-        match channel.call(timeout, &garbage_data, &mut handles, &mut buf) {
-            Err(zx::Status::PEER_CLOSED) => self.connect_to_protocol::<P>(),
-            Err(zx::Status::TIMED_OUT) => {
-                Err(format_err!("timed out connecting to {}", P::DEBUG_NAME))
-            }
-            Err(s) => Err(format_err!("unexpected response from {}: {s}", P::DEBUG_NAME)),
-            Ok(()) => Err(format_err!("unexpected ok from {}", P::DEBUG_NAME)),
-        }
-    }
 }
 
-// The arguments for various reboot methods available on the `Admin` protocol.
-enum RebootArguments {
-    // Corresponds to the deprecated `Admin.Reboot` method.
-    Reboot(RebootReason),
-    // Corresponds to the `Admin.PerformReboot` method.
-    PerformReboot(RebootOptions),
-}
-
-impl<D: Directory + AsRefDirectory + Send + Sync> collaborative_reboot::RebootActuator
-    for ProgramContext<D>
-{
+impl<D: Directory + AsRefDirectory> collaborative_reboot::RebootActuator for ProgramContext<D> {
     async fn perform_reboot(
         &self,
         reasons: Vec<CollaborativeRebootReason>,

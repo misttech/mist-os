@@ -7,25 +7,22 @@
         "syslog/client.shard.cml",
     ],
     capabilities: [
-        { protocol: "fuchsia.system.state.SystemStateTransition" },
         { protocol: "fuchsia.hardware.power.statecontrol.Admin" },
+        { protocol: "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister" },
         { protocol: "fuchsia.power.CollaborativeRebootInitiator" },
         { protocol: "fuchsia.power.internal.CollaborativeRebootScheduler" },
+        { protocol: "fuchsia.system.state.SystemStateTransition" },
     ],
     use: [
         {
             protocol: [
                 "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.power.broker.Topology",
                 "fuchsia.sys2.SystemController",
             ],
         },
         {
-            protocol: [
-                "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
-                "fuchsia.power.system.ActivityGovernor",
-            ],
+            protocol: [ "fuchsia.power.system.ActivityGovernor" ],
             availability: "optional",
         },
     ],
@@ -33,6 +30,7 @@
         {
             protocol: [
                 "fuchsia.hardware.power.statecontrol.Admin",
+                "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
                 "fuchsia.power.CollaborativeRebootInitiator",
                 "fuchsia.power.internal.CollaborativeRebootScheduler",
                 "fuchsia.system.state.SystemStateTransition",

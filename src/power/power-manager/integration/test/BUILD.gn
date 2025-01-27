@@ -13,11 +13,6 @@ resource("thermal-client-service-integration-test-resources") {
   outputs = [ "thermal_client_service_test/{{source_file_part}}" ]
 }
 
-resource("shutdown-integration-test-resources") {
-  sources = [ "config_files/shutdown_test/power_manager_node_config.json5" ]
-  outputs = [ "shutdown_test/{{source_file_part}}" ]
-}
-
 resource("cpu-thermal-model-integration-test-resources") {
   sources = [
     "config_files/cpu_thermal_model_test/cpu_manager_node_config.json5",
@@ -44,7 +39,6 @@ rustc_test("integration-test") {
     "../../rkf45:lib",
     "../../testing/fuchsia.powermanager.driver.fidl:fuchsia.powermanager.driver.temperaturecontrol_rust",
     "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_rust",
-    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/rust/zx",
@@ -56,7 +50,6 @@ rustc_test("integration-test") {
     "//src/lib/test_util",
     "//src/power/power-manager/integration/lib",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:libm",
     "//third_party/rust_crates:log",
     "//third_party/rust_crates:serde_json",
@@ -80,7 +73,6 @@ fuchsia_unittest_package("power-manager-integration-test") {
     ":cpu-thermal-model-integration-test-resources",
     ":cpu-thermal-model-no-jitter-integration-test-resources",
     ":integration-test",
-    ":shutdown-integration-test-resources",
     ":thermal-client-service-integration-test-resources",
     "//src/power/power-manager/testing/fake_driver:component",
     "//src/power/power-manager/testing/fake_driver:fake-cpu-ctrl-component",

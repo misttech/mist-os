@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::TestEnv;
+use fuchsia_component_test::RealmInstance;
 use futures::channel::mpsc;
 use futures::{StreamExt, TryStreamExt};
 use log::*;
@@ -17,15 +17,17 @@ pub struct DeprecatedRebootWatcherClient {
 }
 
 impl DeprecatedRebootWatcherClient {
-    pub async fn new(test_env: &TestEnv) -> Self {
+    pub async fn new(realm: &RealmInstance) -> Self {
         let (mut reboot_reason_sender, reboot_reason_receiver) = mpsc::channel(1);
 
         // Create a new watcher proxy/stream and register the proxy end with Power Manager
-        let watcher_register_proxy =
-            test_env.connect_to_protocol::<fpower::RebootMethodsWatcherRegisterMarker>();
+        let watcher_register_proxy = realm
+            .root
+            .connect_to_protocol_at_exposed_dir::<fpower::RebootMethodsWatcherRegisterMarker>();
         let (watcher_client, mut watcher_request_stream) =
             fidl::endpoints::create_request_stream::<fpower::RebootMethodsWatcherMarker>();
         watcher_register_proxy
+            .expect("Should be able to connect the proxy correctly")
             .register_with_ack(watcher_client)
             .await
             .expect("Failed to register reboot watcher");
@@ -57,15 +59,17 @@ pub struct RebootWatcherClient {
 }
 
 impl RebootWatcherClient {
-    pub async fn new(test_env: &TestEnv) -> Self {
+    pub async fn new(realm: &RealmInstance) -> Self {
         let (mut reboot_options_sender, reboot_options_receiver) = mpsc::channel(1);
 
         // Create a new watcher proxy/stream and register the proxy end with Power Manager
-        let watcher_register_proxy =
-            test_env.connect_to_protocol::<fpower::RebootMethodsWatcherRegisterMarker>();
+        let watcher_register_proxy = realm
+            .root
+            .connect_to_protocol_at_exposed_dir::<fpower::RebootMethodsWatcherRegisterMarker>();
         let (watcher_client, mut watcher_request_stream) =
             fidl::endpoints::create_request_stream::<fpower::RebootWatcherMarker>();
         watcher_register_proxy
+            .expect("Should be able to connect the proxy correctly")
             .register_watcher(watcher_client)
             .await
             .expect("Failed to register reboot watcher");

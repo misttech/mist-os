@@ -56,18 +56,6 @@
             to: "#shutdown_shim",
         },
         {
-            protocol: [ "fuchsia.hardware.power.statecontrol.Admin" ],
-            from: "#power_manager",
-            to: "#shutdown_shim",
-            source_availability: "unknown",
-        },
-        {
-            protocol: "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
-            from: "#power_manager",
-            to: "#shutdown_shim",
-            source_availability: "unknown",
-        },
-        {
             protocol: [ "fuchsia.power.system.ActivityGovernor" ],
             from: "#system-activity-governor",
             to: "#shutdown_shim",
@@ -136,7 +124,10 @@
             source_availability: "unknown",
         },
         {
-            protocol: "fuchsia.hardware.power.statecontrol.Admin",
+            protocol: [
+                "fuchsia.hardware.power.statecontrol.Admin",
+                "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
+            ],
             from: "#shutdown_shim",
         },
 

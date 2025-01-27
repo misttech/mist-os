@@ -350,7 +350,10 @@
     expose: [
         // For reboot_on_terminate
         {
-            protocol: "fuchsia.hardware.power.statecontrol.Admin",
+            protocol: [
+                "fuchsia.hardware.power.statecontrol.Admin",
+                "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
+            ],
             from: "#bootstrap",
         },
     ],

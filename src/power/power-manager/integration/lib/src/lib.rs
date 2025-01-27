@@ -6,9 +6,9 @@ pub mod client_connectors;
 mod mocks;
 
 use crate::mocks::activity_service::MockActivityService;
+use crate::mocks::admin::MockStateControlAdminService;
 use crate::mocks::input_settings_service::MockInputSettingsService;
 use crate::mocks::kernel_service::MockKernelService;
-use crate::mocks::system_controller::MockSystemControllerService;
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, ServiceMarker};
 use fidl::AsHandleRef as _;
 use fuchsia_component::client::Service;
@@ -124,16 +124,16 @@ impl TestEnvBuilder {
             .await
             .expect("Failed to add child: input_settings_service");
 
-        let system_controller_service = MockSystemControllerService::new();
-        let system_controller_service_clone = system_controller_service.clone();
-        let system_controller_service_child = realm_builder
+        let admin_service = MockStateControlAdminService::new();
+        let admin_service_clone = admin_service.clone();
+        let admin_service_child = realm_builder
             .add_local_child(
-                "system_controller_service",
-                move |handles| Box::pin(system_controller_service_clone.clone().run(handles)),
+                "admin_service",
+                move |handles| Box::pin(admin_service_clone.clone().run(handles)),
                 ChildOptions::new(),
             )
             .await
-            .expect("Failed to add child: system_controller_service");
+            .expect("Failed to add child: admin_service");
 
         let kernel_service = MockKernelService::new();
         let kernel_service_clone = kernel_service.clone();
@@ -220,13 +220,12 @@ impl TestEnvBuilder {
             .await
             .unwrap();
 
-        let system_controller_to_power_manager_routes =
-            Route::new().capability(Capability::protocol_by_name("fuchsia.sys2.SystemController"));
+        let shutdown_shim_to_power_manager_routes = Route::new()
+            .capability(Capability::protocol_by_name("fuchsia.hardware.power.statecontrol.Admin"));
+
         realm_builder
             .add_route(
-                system_controller_to_power_manager_routes
-                    .from(&system_controller_service_child)
-                    .to(&power_manager),
+                shutdown_shim_to_power_manager_routes.from(&admin_service_child).to(&power_manager),
             )
             .await
             .unwrap();
@@ -283,13 +282,10 @@ impl TestEnvBuilder {
             .unwrap();
 
         let power_manager_to_parent_routes = Route::new()
-            .capability(Capability::protocol_by_name(
-                "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
-            ))
             .capability(Capability::protocol_by_name("fuchsia.power.profile.Watcher"))
             .capability(Capability::protocol_by_name("fuchsia.thermal.ClientStateConnector"))
-            .capability(Capability::protocol_by_name("fuchsia.power.clientlevel.Connector"))
-            .capability(Capability::protocol_by_name("fuchsia.hardware.power.statecontrol.Admin"));
+            .capability(Capability::protocol_by_name("fuchsia.power.clientlevel.Connector"));
+
         realm_builder
             .add_route(power_manager_to_parent_routes.from(&power_manager).to(Ref::parent()))
             .await
@@ -382,7 +378,7 @@ impl TestEnvBuilder {
             mocks: Mocks {
                 activity_service,
                 input_settings_service,
-                system_controller_service,
+                admin_service,
                 kernel_service,
             },
         }
@@ -454,7 +450,7 @@ impl TestEnv {
     }
 
     pub async fn wait_for_shutdown_request(&self) {
-        self.mocks.system_controller_service.wait_for_shutdown_request().await;
+        self.mocks.admin_service.wait_for_shutdown_request().await;
     }
 
     // Wait for the device to finish enumerating.
@@ -499,7 +495,7 @@ async fn set_fake_time_scale(realm_instance: &RealmInstance, scale: u32) {
 pub struct Mocks {
     pub activity_service: Arc<MockActivityService>,
     pub input_settings_service: Arc<MockInputSettingsService>,
-    pub system_controller_service: Arc<MockSystemControllerService>,
+    pub admin_service: Arc<MockStateControlAdminService>,
     pub kernel_service: Arc<MockKernelService>,
 }
 
@@ -507,21 +503,14 @@ pub struct Mocks {
 /// reaches the provided temperature. The provided TestEnv is consumed because Power Manager
 /// triggers a reboot.
 pub async fn test_thermal_reboot(mut env: TestEnv, sensor_path: &str, temperature: f32) {
-    let mut reboot_watcher = client_connectors::RebootWatcherClient::new(&env).await;
+    // Start Power Manager by connecting to ClientStateConnector
+    let _client = client_connectors::ThermalClient::new(&env, "audio");
 
     // 1) set the mock temperature to the provided temperature
-    // 2) verify the reboot watcher sees the reboot request for 'HighTemperature'
-    // 3) verify the system controller receives the reboot request
-    // 4) verify the Driver Manager receives the termination state request
+    // 2) verify the admin receives the reboot request for `HighTemperature`
     env.set_temperature(sensor_path, temperature).await;
-    assert_eq!(
-        reboot_watcher.get_reboot_options().await,
-        fpower::RebootOptions {
-            reasons: Some(vec![fpower::RebootReason2::HighTemperature]),
-            ..Default::default()
-        }
-    );
-    env.mocks.system_controller_service.wait_for_shutdown_request().await;
+    let result = env.mocks.admin_service.wait_for_shutdown_request().await;
+    assert_eq!(result, fpower::RebootReason::HighTemperature);
 
     env.destroy().await;
 }
