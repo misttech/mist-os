@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 // This trait can a.) probably use more members, and b.) be something that is made public inside of
 // the `target` library.
-#[cfg_attr(test, mockall::automock)]
+#[mockall::automock]
 pub trait DeviceLookup {
     fn target_spec(&self, env: EnvironmentContext) -> LocalBoxFuture<'_, Result<Option<String>>>;
 
@@ -59,28 +59,29 @@ pub struct FhoEnvironment {
 }
 
 impl FhoEnvironment {
-    pub async fn new(context: &EnvironmentContext, ffx: &FfxCommandLine) -> Result<Self> {
+    pub fn new(context: &EnvironmentContext, ffx: &FfxCommandLine) -> Self {
         tracing::info!("FhoEnvironment created");
-        let env = FhoEnvironment {
+        FhoEnvironment {
             behavior: Arc::new(RwLock::new(None)),
             ffx: ffx.clone(),
             context: context.clone(),
             lookup: Arc::new(RwLock::new(None.into())),
-        };
-        Ok(env)
+        }
     }
 
     pub fn new_for_test<T: DeviceLookup + 'static>(
         context: &EnvironmentContext,
         ffx: &FfxCommandLine,
         behavior: FhoConnectionBehavior,
-        lookup: T,
+        lookup: Option<T>,
     ) -> Self {
+        let boxed: Option<Box<dyn DeviceLookup>> =
+            if let Some(l) = lookup { Some(Box::new(l)) } else { None };
         FhoEnvironment {
             behavior: Arc::new(RwLock::new(Some(behavior))),
             ffx: ffx.clone(),
             context: context.clone(),
-            lookup: Arc::new(RwLock::new(Rc::new(Some(Box::new(lookup))))),
+            lookup: Arc::new(RwLock::new(Rc::new(boxed))),
         }
     }
     /// This attempts to wrap errors around a potential failure in the underlying connection being

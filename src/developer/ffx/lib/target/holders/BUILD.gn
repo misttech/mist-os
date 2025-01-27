@@ -21,15 +21,16 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/target:lib",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:futures",
   ]
 
   test_deps = [
     "//src/lib/fuchsia",
-    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:mockall",
   ]
 
   sources = [
+    "src/device_lookup.rs",
     "src/lib.rs",
     "src/target_info.rs",
     "src/target_proxy.rs",

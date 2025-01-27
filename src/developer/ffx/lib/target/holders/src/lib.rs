@@ -9,15 +9,15 @@ use ffx_config::EnvironmentContext;
 use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
 use fho::FhoConnectionBehavior;
 
+mod device_lookup;
 mod target_info;
 mod target_proxy;
 
+pub use device_lookup::DeviceLookupDefaultImpl;
 pub use target_info::TargetInfoHolder;
 pub use target_proxy::TargetProxyHolder;
 
-pub(crate) async fn init_daemon_behavior(
-    context: &EnvironmentContext,
-) -> Result<FhoConnectionBehavior> {
+pub async fn init_daemon_behavior(context: &EnvironmentContext) -> Result<FhoConnectionBehavior> {
     let build_info = context.build_info();
     let overnet_injector = Injection::initialize_overnet(
         context.clone(),

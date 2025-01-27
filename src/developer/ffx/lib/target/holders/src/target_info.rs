@@ -1,10 +1,11 @@
 // Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use crate::DeviceLookupDefaultImpl;
 use async_trait::async_trait;
 use ffx_command_error::{return_user_error, Result};
 use ffx_target::TargetInfoQuery;
-use fho::{DeviceLookupDefaultImpl, FhoEnvironment, TryFromEnv};
+use fho::{FhoEnvironment, TryFromEnv};
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 use std::ops::Deref;
 

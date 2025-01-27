@@ -74,7 +74,7 @@ mod tests {
     // The main testing part will happen in the `main()` function of the tool.
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_run_fake_tool_with_legacy_shim() {
-        let _config_env = ffx_config::test_init().await.expect("Initializing test environment");
+        let config_env = ffx_config::test_init().await.expect("Initializing test environment");
         let injector = ToolEnv::new().take_injector();
         let ffx_cmd_line = FfxCommandLine::new(None, &["ffx", "fake", "stuff"]).unwrap();
         let tool_cmd = ToolCommand::<FakeTool>::from_args(
@@ -105,12 +105,9 @@ mod tests {
 
         let injector: Arc<dyn ffx_core::Injector> = Arc::new(injector);
         let behavior = FhoConnectionBehavior::DaemonConnector(injector.clone());
-        let env = FhoEnvironment::new_for_test(
-            &_config_env.context,
-            &ffx_cmd_line,
-            behavior,
-            crate::from_env::DeviceLookupDefaultImpl,
-        );
+        let env = FhoEnvironment::new(&config_env.context, &ffx_cmd_line);
+
+        env.set_behavior(behavior).await;
 
         ffx_plugin_impl(&env, fake_tool).await.expect("Plugin to run successfully");
 

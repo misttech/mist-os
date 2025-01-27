@@ -270,7 +270,7 @@ async fn run_legacy_subcommand(
     context: EnvironmentContext,
     subcommand: FfxBuiltIn,
 ) -> Result<()> {
-    let env = FhoEnvironment::new(&context, &ffx).await?;
+    let env = FhoEnvironment::new(&context, &ffx);
     ffx_lib_suite::ffx_plugin_impl(&env, subcommand).await
 }
 

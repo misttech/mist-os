@@ -225,7 +225,7 @@ impl ShowToolWrapper {
             .load_context(self.env.environment_context().exe_kind())?;
         let mut new_ffx = self.env.ffx_command().clone();
         new_ffx.global.target = target_spec;
-        let fho_env = FhoEnvironment::new(&context, &new_ffx).await?;
+        let fho_env = FhoEnvironment::new(&context, &new_ffx);
         self.inner.replace(ShowTool::from_env(fho_env, TargetShow::default()).await?);
         Ok(())
     }

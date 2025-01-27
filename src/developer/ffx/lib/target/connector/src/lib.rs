@@ -9,14 +9,12 @@ use ffx_command_error::{bug, return_bug, user_error, Error, Result};
 use ffx_config::{EnvironmentContext, TryFromEnvContext};
 use ffx_target::ssh_connector::SshConnector;
 use ffx_target::{Connection, ConnectionError, TargetConnector};
-use fho::{
-    init_daemon_behavior, DeviceLookupDefaultImpl, DirectConnector, FhoConnectionBehavior,
-    FhoEnvironment, TryFromEnv,
-};
+use fho::{DirectConnector, FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 use std::sync::Arc;
 use std::time::Duration;
+use target_holders::{init_daemon_behavior, DeviceLookupDefaultImpl};
 
 mod network_connector;
 
@@ -297,10 +295,12 @@ mod tests {
         mock_connector.expect_connect().times(1).returning(|| {
             Box::pin(async { Err(Error::Unexpected(anyhow::anyhow!("we're doomed!").into())) })
         });
-        let tool_env = ToolEnv::new().make_environment_with_behavior(
-            config_env.context.clone(),
-            FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)),
-        );
+        let tool_env = ToolEnv::new()
+            .make_environment_with_behavior(
+                config_env.context.clone(),
+                FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)),
+            )
+            .await;
 
         let connector = Connector::<RemoteControlProxy>::try_from_env(&tool_env).await.unwrap();
         let res = connector.try_connect(|_, _| Ok(())).await;
@@ -346,10 +346,12 @@ mod tests {
                 Ok(proxy)
             })
         });
-        let tool_env = fho::testing::ToolEnv::new().make_environment_with_behavior(
-            config_env.context.clone(),
-            FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)),
-        );
+        let tool_env = fho::testing::ToolEnv::new()
+            .make_environment_with_behavior(
+                config_env.context.clone(),
+                FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)),
+            )
+            .await;
 
         let connector = Connector::<RemoteControlProxy>::try_from_env(&tool_env).await.unwrap();
         let res = connector.try_connect(|_, _| Ok(())).await;
@@ -373,10 +375,12 @@ mod tests {
                 Err(Error::Unexpected(anyhow::anyhow!("something critical failed!").into()))
             })
         });
-        let tool_env = ToolEnv::new().make_environment_with_behavior(
-            config_env.context.clone(),
-            FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)),
-        );
+        let tool_env = ToolEnv::new()
+            .make_environment_with_behavior(
+                config_env.context.clone(),
+                FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)),
+            )
+            .await;
 
         let connector = Connector::<RemoteControlProxy>::try_from_env(&tool_env).await.unwrap();
         let res = connector.try_connect(|_, _| Ok(())).await;

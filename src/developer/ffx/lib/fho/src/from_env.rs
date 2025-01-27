@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::connector::DirectConnector;
-use crate::fho_env::{DeviceLookup, FhoConnectionBehavior};
+use crate::fho_env::FhoConnectionBehavior;
 use crate::{FhoEnvironment, TryFromEnv, TryFromEnvWith};
 use async_trait::async_trait;
 use errors::FfxError;
@@ -14,11 +14,9 @@ use fdomain_client::fidl::{
 use ffx_command_error::{return_user_error, FfxContext, Result};
 use ffx_config::EnvironmentContext;
 use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
-use ffx_target::TargetInfoQuery;
 use fidl::encoding::DefaultFuchsiaResourceDialect;
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fidl_fuchsia_developer_ffx as ffx_fidl;
-use futures::future::LocalBoxFuture;
 use rcs::OpenDirType;
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -35,31 +33,6 @@ const DEFAULT_PROXY_TIMEOUT: Duration = Duration::from_secs(15);
 #[async_trait(?Send)]
 pub trait CheckEnv {
     async fn check_env(self, env: &FhoEnvironment) -> Result<()>;
-}
-
-/// The default implementation of device lookup and resolution. Primarily used for simpler testing.
-#[doc(hidden)]
-#[derive(Clone)]
-pub struct DeviceLookupDefaultImpl;
-
-impl DeviceLookup for DeviceLookupDefaultImpl {
-    fn target_spec(&self, env: EnvironmentContext) -> LocalBoxFuture<'_, Result<Option<String>>> {
-        Box::pin(async move {
-            ffx_target::get_target_specifier(&env).await.bug_context("looking up target specifier")
-        })
-    }
-
-    fn resolve_target_query_to_info(
-        &self,
-        query: TargetInfoQuery,
-        ctx: EnvironmentContext,
-    ) -> LocalBoxFuture<'_, Result<Vec<ffx_fidl::TargetInfo>>> {
-        Box::pin(async move {
-            ffx_target::resolve_target_query_to_info(query, &ctx)
-                .await
-                .bug_context("resolving target")
-        })
-    }
 }
 
 /// Checks if the experimental config flag is set. This gates the execution of the command.

@@ -160,7 +160,7 @@ impl<T: FfxTool> FhoTool<T> {
         check_strict_constraints(&ffx.global, T::requires_target())?;
 
         let is_machine_output = ffx.global.machine.is_some();
-        let env = FhoEnvironment::new(context, &ffx).await?;
+        let env = FhoEnvironment::new(context, &ffx);
         let redacted_args = match send_enhanced_analytics().await {
             false => ffx.redact_subcmd(&tool),
             true => ffx.unredacted_args_for_analytics(),

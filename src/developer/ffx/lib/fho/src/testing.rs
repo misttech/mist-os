@@ -84,30 +84,30 @@ impl ToolEnv {
             &context,
             &self.ffx_cmd_line,
             FhoConnectionBehavior::DaemonConnector(injector),
-            lookup,
+            Some(lookup),
         )
     }
     pub fn make_environment(self, context: EnvironmentContext) -> FhoEnvironment {
         let injector = Arc::new(self.injector);
+
         FhoEnvironment::new_for_test(
             &context,
             &self.ffx_cmd_line,
             FhoConnectionBehavior::DaemonConnector(injector),
-            crate::from_env::DeviceLookupDefaultImpl,
+            None::<crate::fho_env::MockDeviceLookup>,
         )
     }
 
-    pub fn make_environment_with_behavior(
+    pub async fn make_environment_with_behavior(
         self,
         context: EnvironmentContext,
         behavior: crate::fho_env::FhoConnectionBehavior,
     ) -> FhoEnvironment {
-        FhoEnvironment::new_for_test(
-            &context,
-            &self.ffx_cmd_line,
-            behavior,
-            crate::from_env::DeviceLookupDefaultImpl,
-        )
+        let env = FhoEnvironment::new(&context, &self.ffx_cmd_line);
+
+        env.set_behavior(behavior).await;
+
+        env
     }
 
     pub async fn build_tool<T: FfxTool>(self, context: EnvironmentContext) -> Result<T> {
