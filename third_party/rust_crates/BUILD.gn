@@ -15540,7 +15540,7 @@ rust_library("tar-v0_4_25") {
   }
   if (true) {
     deps += [ ":libc-v0_2_169" ]
-    deps += [ ":xattr-v0_2_2" ]
+    deps += [ ":xattr-v0_2_3" ]
   }
 
   rustenv = []
@@ -18512,18 +18512,18 @@ rust_library("windows-targets-v0_52_0") {
   applicable_licenses = [ "//build/licenses:fuchsia_license" ]
 }
 
-license("xattr-v0_2_2.license") {
+license("xattr-v0_2_3.license") {
   public_package_name = "xattr"
   license_files = [
-    "//third_party/rust_crates/vendor/xattr-0.2.2/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/xattr-0.2.2/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/xattr-0.2.3/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/xattr-0.2.3/LICENSE-MIT",
   ]
 }
 
-rust_library("xattr-v0_2_2") {
+rust_library("xattr-v0_2_3") {
   crate_name = "xattr"
-  crate_root = "//third_party/rust_crates/vendor/xattr-0.2.2/src/lib.rs"
-  output_name = "xattr-b313ffbe9c2b6197"
+  crate_root = "//third_party/rust_crates/vendor/xattr-0.2.3/src/lib.rs"
+  output_name = "xattr-2a5c4d8adcb30469"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -18534,15 +18534,15 @@ rust_library("xattr-v0_2_2") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=b313ffbe9c2b6197",
-    "-Cextra-filename=-b313ffbe9c2b6197",
+    "-Cmetadata=2a5c4d8adcb30469",
+    "-Cextra-filename=-2a5c4d8adcb30469",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"unsupported\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":xattr-v0_2_2.license" ]
+  applicable_licenses = [ ":xattr-v0_2_3.license" ]
 }
 
 license("xml-rs-v0_8_0.license") {
