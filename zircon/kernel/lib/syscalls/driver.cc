@@ -189,13 +189,6 @@ zx_status_t sys_framebuffer_get_info(zx_handle_t handle, user_out_ptr<uint32_t> 
 #endif
 }
 
-// zx_status_t zx_framebuffer_set_range
-zx_status_t sys_framebuffer_set_range(zx_handle_t hrsrc, zx_handle_t vmo_handle, uint32_t len,
-                                      uint32_t format, uint32_t width, uint32_t height,
-                                      uint32_t stride) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 // zx_status_t zx_iommu_create
 zx_status_t sys_iommu_create(zx_handle_t resource, uint32_t type, user_in_ptr<const void> desc,
                              size_t desc_size, zx_handle_t* out) {

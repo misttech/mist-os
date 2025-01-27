@@ -37,7 +37,6 @@ Symbols:
   - { Name: _zx_fifo_read, Type: Func }
   - { Name: _zx_fifo_write, Type: Func }
   - { Name: _zx_framebuffer_get_info, Type: Func }
-  - { Name: _zx_framebuffer_set_range, Type: Func }
   - { Name: _zx_futex_get_owner, Type: Func }
   - { Name: _zx_futex_requeue, Type: Func }
   - { Name: _zx_futex_requeue_single_owner, Type: Func }
@@ -246,7 +245,6 @@ Symbols:
   - { Name: zx_fifo_read, Type: Func, Weak: true }
   - { Name: zx_fifo_write, Type: Func, Weak: true }
   - { Name: zx_framebuffer_get_info, Type: Func, Weak: true }
-  - { Name: zx_framebuffer_set_range, Type: Func, Weak: true }
   - { Name: zx_futex_get_owner, Type: Func, Weak: true }
   - { Name: zx_futex_requeue, Type: Func, Weak: true }
   - { Name: zx_futex_requeue_single_owner, Type: Func, Weak: true }

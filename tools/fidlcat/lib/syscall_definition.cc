@@ -5534,33 +5534,6 @@ void SyscallDecoderDispatcher::Populate() {
   }
 
   {
-    Syscall* zx_framebuffer_set_range = Add("zx_framebuffer_set_range", SyscallReturnType::kStatus);
-    // Arguments
-    auto resource = zx_framebuffer_set_range->Argument<zx_handle_t>(SyscallType::kHandle);
-    auto vmo = zx_framebuffer_set_range->Argument<zx_handle_t>(SyscallType::kHandle);
-    auto len = zx_framebuffer_set_range->Argument<uint32_t>(SyscallType::kUint32);
-    auto format = zx_framebuffer_set_range->Argument<uint32_t>(SyscallType::kUint32);
-    auto width = zx_framebuffer_set_range->Argument<uint32_t>(SyscallType::kUint32);
-    auto height = zx_framebuffer_set_range->Argument<uint32_t>(SyscallType::kUint32);
-    auto stride = zx_framebuffer_set_range->Argument<uint32_t>(SyscallType::kUint32);
-    // Inputs
-    zx_framebuffer_set_range->Input<zx_handle_t>(
-        "resource", std::make_unique<ArgumentAccess<zx_handle_t>>(resource));
-    zx_framebuffer_set_range->Input<zx_handle_t>(
-        "vmo", std::make_unique<ArgumentAccess<zx_handle_t>>(vmo));
-    zx_framebuffer_set_range->Input<uint32_t>("len",
-                                              std::make_unique<ArgumentAccess<uint32_t>>(len));
-    zx_framebuffer_set_range->Input<uint32_t>("format",
-                                              std::make_unique<ArgumentAccess<uint32_t>>(format));
-    zx_framebuffer_set_range->Input<uint32_t>("width",
-                                              std::make_unique<ArgumentAccess<uint32_t>>(width));
-    zx_framebuffer_set_range->Input<uint32_t>("height",
-                                              std::make_unique<ArgumentAccess<uint32_t>>(height));
-    zx_framebuffer_set_range->Input<uint32_t>("stride",
-                                              std::make_unique<ArgumentAccess<uint32_t>>(stride));
-  }
-
-  {
     Syscall* zx_pci_get_nth_device = Add("zx_pci_get_nth_device", SyscallReturnType::kStatus);
     // Arguments
     auto handle = zx_pci_get_nth_device->Argument<zx_handle_t>(SyscallType::kHandle);
