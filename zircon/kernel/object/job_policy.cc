@@ -19,6 +19,7 @@
 #include <ktl/enforce.h>
 
 namespace {
+
 // It is critical that this array contain all "new object" policies because it's used to implement
 // ZX_NEW_ANY.
 constexpr uint32_t kNewObjectPolicies[]{
@@ -31,94 +32,6 @@ static_assert(
     "please update JobPolicy::AddPartial, JobPolicy::QueryBasicPolicy, kNewObjectPolicies,"
     "and the add_basic_policy_deny_any_new() test");
 
-FBL_BITFIELD_DEF_START(JobPolicyBits, uint64_t)
-FBL_BITFIELD_MEMBER(bad_handle, 0, 3);
-FBL_BITFIELD_MEMBER(bad_handle_override, 3, 1);
-FBL_BITFIELD_MEMBER(wrong_object, 4, 3);
-FBL_BITFIELD_MEMBER(wrong_object_override, 7, 1);
-FBL_BITFIELD_MEMBER(vmar_wx, 8, 3);
-FBL_BITFIELD_MEMBER(vmar_wx_override, 11, 1);
-FBL_BITFIELD_MEMBER(new_vmo, 12, 3);
-FBL_BITFIELD_MEMBER(new_vmo_override, 15, 1);
-FBL_BITFIELD_MEMBER(new_channel, 16, 3);
-FBL_BITFIELD_MEMBER(new_channel_override, 19, 1);
-FBL_BITFIELD_MEMBER(new_event, 20, 3);
-FBL_BITFIELD_MEMBER(new_event_override, 23, 1);
-FBL_BITFIELD_MEMBER(new_eventpair, 24, 3);
-FBL_BITFIELD_MEMBER(new_eventpair_override, 27, 1);
-FBL_BITFIELD_MEMBER(new_port, 28, 3);
-FBL_BITFIELD_MEMBER(new_port_override, 31, 1);
-FBL_BITFIELD_MEMBER(new_socket, 32, 3);
-FBL_BITFIELD_MEMBER(new_socket_override, 35, 1);
-FBL_BITFIELD_MEMBER(new_fifo, 36, 3);
-FBL_BITFIELD_MEMBER(new_fifo_override, 39, 1);
-FBL_BITFIELD_MEMBER(new_timer, 40, 3);
-FBL_BITFIELD_MEMBER(new_timer_override, 43, 1);
-FBL_BITFIELD_MEMBER(new_process, 44, 3);
-FBL_BITFIELD_MEMBER(new_process_override, 47, 1);
-FBL_BITFIELD_MEMBER(new_profile, 48, 3);
-FBL_BITFIELD_MEMBER(new_profile_override, 51, 1);
-FBL_BITFIELD_MEMBER(new_pager, 52, 3);
-FBL_BITFIELD_MEMBER(new_pager_override, 55, 1);
-FBL_BITFIELD_MEMBER(ambient_mark_vmo_exec, 56, 3);
-FBL_BITFIELD_MEMBER(ambient_mark_vmo_exec_override, 59, 1);
-FBL_BITFIELD_MEMBER(new_iob, 60, 3);
-FBL_BITFIELD_MEMBER(new_iob_override, 63, 1);
-FBL_BITFIELD_MEMBER(unused_bits, 64, 0);
-FBL_BITFIELD_DEF_END();
-
-template <uint32_t condition>
-struct FieldSelector {};
-
-#define FIELD_SELECTOR_DEF(id, name)                                           \
-  template <>                                                                  \
-  struct FieldSelector<id> {                                                   \
-    static auto& Action(JobPolicyBits* jpb) { return jpb->name; }              \
-    static auto& Override(JobPolicyBits* jpb) { return jpb->name##_override; } \
-  }
-
-FIELD_SELECTOR_DEF(ZX_POL_BAD_HANDLE, bad_handle);
-FIELD_SELECTOR_DEF(ZX_POL_WRONG_OBJECT, wrong_object);
-FIELD_SELECTOR_DEF(ZX_POL_VMAR_WX, vmar_wx);
-FIELD_SELECTOR_DEF(ZX_POL_NEW_VMO, new_vmo);
-FIELD_SELECTOR_DEF(ZX_POL_NEW_CHANNEL, new_channel);
-FIELD_SELECTOR_DEF(ZX_POL_NEW_EVENT, new_event);
-FIELD_SELECTOR_DEF(ZX_POL_NEW_EVENTPAIR, new_eventpair);
-FIELD_SELECTOR_DEF(ZX_POL_NEW_PORT, new_port);
-FIELD_SELECTOR_DEF(ZX_POL_NEW_SOCKET, new_socket);
-FIELD_SELECTOR_DEF(ZX_POL_NEW_FIFO, new_fifo);
-FIELD_SELECTOR_DEF(ZX_POL_NEW_TIMER, new_timer);
-FIELD_SELECTOR_DEF(ZX_POL_NEW_PROCESS, new_process);
-FIELD_SELECTOR_DEF(ZX_POL_NEW_PROFILE, new_profile);
-FIELD_SELECTOR_DEF(ZX_POL_NEW_PAGER, new_pager);
-FIELD_SELECTOR_DEF(ZX_POL_AMBIENT_MARK_VMO_EXEC, ambient_mark_vmo_exec);
-FIELD_SELECTOR_DEF(ZX_POL_NEW_IOB, new_iob);
-
-#define CASE_RETURN_ACTION(id, bits) \
-  case id:                           \
-    return FieldSelector<id>::Action(bits)
-
-#define CASE_RETURN_OVERRIDE(id, bits) \
-  case id:                             \
-    return FieldSelector<id>::Override(bits)
-
-#define CASE_SET_OVERRIDE(id, bits, override)     \
-  case id:                                        \
-    FieldSelector<id>::Override(bits) = override; \
-    break
-
-#define CASE_SET_ENTRY(id, bits, action, override)                                         \
-  case id: {                                                                               \
-    if (FieldSelector<id>::Override(bits) == ZX_POL_OVERRIDE_ALLOW) {                      \
-      FieldSelector<id>::Action(bits) = action;                                            \
-      FieldSelector<id>::Override(bits) = override;                                        \
-      return ZX_OK;                                                                        \
-    }                                                                                      \
-    if ((FieldSelector<id>::Action(bits) == action) && (override == ZX_POL_OVERRIDE_DENY)) \
-      return ZX_OK;                                                                        \
-    break;                                                                                 \
-  }
-
 bool PolicyOverrideIsValid(uint32_t override) {
   switch (override) {
     case ZX_POL_OVERRIDE_DENY:
@@ -128,128 +41,47 @@ bool PolicyOverrideIsValid(uint32_t override) {
       return false;
   }
 }
+
 zx_status_t AddPartial(uint32_t mode, uint32_t condition, uint32_t action, uint32_t override,
-                       JobPolicyBits* bits) {
-  if (action >= ZX_POL_ACTION_MAX)
+                       JobPolicyCollection& bits) {
+  if (action >= ZX_POL_ACTION_MAX) {
     return ZX_ERR_NOT_SUPPORTED;
-
-  if (!PolicyOverrideIsValid(override))
-    return ZX_ERR_INVALID_ARGS;
-
-  switch (condition) {
-    CASE_SET_ENTRY(ZX_POL_BAD_HANDLE, bits, action, override);
-    CASE_SET_ENTRY(ZX_POL_WRONG_OBJECT, bits, action, override);
-    CASE_SET_ENTRY(ZX_POL_VMAR_WX, bits, action, override);
-    CASE_SET_ENTRY(ZX_POL_NEW_VMO, bits, action, override);
-    CASE_SET_ENTRY(ZX_POL_NEW_CHANNEL, bits, action, override);
-    CASE_SET_ENTRY(ZX_POL_NEW_EVENT, bits, action, override);
-    CASE_SET_ENTRY(ZX_POL_NEW_EVENTPAIR, bits, action, override);
-    CASE_SET_ENTRY(ZX_POL_NEW_PORT, bits, action, override);
-    CASE_SET_ENTRY(ZX_POL_NEW_SOCKET, bits, action, override);
-    CASE_SET_ENTRY(ZX_POL_NEW_FIFO, bits, action, override);
-    CASE_SET_ENTRY(ZX_POL_NEW_TIMER, bits, action, override);
-    CASE_SET_ENTRY(ZX_POL_NEW_PROCESS, bits, action, override);
-    CASE_SET_ENTRY(ZX_POL_NEW_PROFILE, bits, action, override);
-    CASE_SET_ENTRY(ZX_POL_NEW_PAGER, bits, action, override);
-    CASE_SET_ENTRY(ZX_POL_AMBIENT_MARK_VMO_EXEC, bits, action, override);
-    CASE_SET_ENTRY(ZX_POL_NEW_IOB, bits, action, override);
-    default:
-      return ZX_ERR_INVALID_ARGS;
   }
-  // If we are here setting policy failed, which migth not matter
-  // if it is a relative (best effort) mode.
+
+  if (!PolicyOverrideIsValid(override)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  if (condition >= ZX_POL_MAX || condition == ZX_POL_NEW_ANY) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  bool override_bit = override == ZX_POL_OVERRIDE_ALLOW;
+  auto condition_bits = bits[condition];
+  if (condition_bits.override()) {
+    condition_bits.set_action(action);
+    condition_bits.set_override(override_bit);
+    return ZX_OK;
+  }
+
+  if (condition_bits.action() == action && !override_bit) {
+    return ZX_OK;
+  }
+
   return (mode == ZX_JOB_POL_ABSOLUTE) ? ZX_ERR_ALREADY_EXISTS : ZX_OK;
 }
 
-zx_status_t SetOverride(JobPolicyBits* policy, uint32_t condition, uint32_t override) {
-  if (!PolicyOverrideIsValid(override))
-    return ZX_ERR_INVALID_ARGS;
-
-  switch (condition) {
-    CASE_SET_OVERRIDE(ZX_POL_BAD_HANDLE, policy, override);
-    CASE_SET_OVERRIDE(ZX_POL_WRONG_OBJECT, policy, override);
-    CASE_SET_OVERRIDE(ZX_POL_VMAR_WX, policy, override);
-    CASE_SET_OVERRIDE(ZX_POL_NEW_VMO, policy, override);
-    CASE_SET_OVERRIDE(ZX_POL_NEW_CHANNEL, policy, override);
-    CASE_SET_OVERRIDE(ZX_POL_NEW_EVENT, policy, override);
-    CASE_SET_OVERRIDE(ZX_POL_NEW_EVENTPAIR, policy, override);
-    CASE_SET_OVERRIDE(ZX_POL_NEW_PORT, policy, override);
-    CASE_SET_OVERRIDE(ZX_POL_NEW_SOCKET, policy, override);
-    CASE_SET_OVERRIDE(ZX_POL_NEW_FIFO, policy, override);
-    CASE_SET_OVERRIDE(ZX_POL_NEW_TIMER, policy, override);
-    CASE_SET_OVERRIDE(ZX_POL_NEW_PROCESS, policy, override);
-    CASE_SET_OVERRIDE(ZX_POL_NEW_PROFILE, policy, override);
-    CASE_SET_OVERRIDE(ZX_POL_NEW_PAGER, policy, override);
-    CASE_SET_OVERRIDE(ZX_POL_AMBIENT_MARK_VMO_EXEC, policy, override);
-    CASE_SET_OVERRIDE(ZX_POL_NEW_IOB, policy, override);
-    default:
-      return ZX_ERR_INVALID_ARGS;
-  }
-  return ZX_OK;
-}
-
-uint64_t GetAction(JobPolicyBits policy, uint32_t condition) {
-  switch (condition) {
-    CASE_RETURN_ACTION(ZX_POL_BAD_HANDLE, &policy);
-    CASE_RETURN_ACTION(ZX_POL_WRONG_OBJECT, &policy);
-    CASE_RETURN_ACTION(ZX_POL_VMAR_WX, &policy);
-    CASE_RETURN_ACTION(ZX_POL_NEW_VMO, &policy);
-    CASE_RETURN_ACTION(ZX_POL_NEW_CHANNEL, &policy);
-    CASE_RETURN_ACTION(ZX_POL_NEW_EVENT, &policy);
-    CASE_RETURN_ACTION(ZX_POL_NEW_EVENTPAIR, &policy);
-    CASE_RETURN_ACTION(ZX_POL_NEW_PORT, &policy);
-    CASE_RETURN_ACTION(ZX_POL_NEW_SOCKET, &policy);
-    CASE_RETURN_ACTION(ZX_POL_NEW_FIFO, &policy);
-    CASE_RETURN_ACTION(ZX_POL_NEW_TIMER, &policy);
-    CASE_RETURN_ACTION(ZX_POL_NEW_PROCESS, &policy);
-    CASE_RETURN_ACTION(ZX_POL_NEW_PROFILE, &policy);
-    CASE_RETURN_ACTION(ZX_POL_NEW_PAGER, &policy);
-    CASE_RETURN_ACTION(ZX_POL_AMBIENT_MARK_VMO_EXEC, &policy);
-    CASE_RETURN_ACTION(ZX_POL_NEW_IOB, &policy);
-    default:
-      return ZX_POL_ACTION_DENY;
-  }
-}
-
-uint64_t GetOverride(JobPolicyBits policy, uint32_t condition) {
-  switch (condition) {
-    CASE_RETURN_OVERRIDE(ZX_POL_BAD_HANDLE, &policy);
-    CASE_RETURN_OVERRIDE(ZX_POL_WRONG_OBJECT, &policy);
-    CASE_RETURN_OVERRIDE(ZX_POL_VMAR_WX, &policy);
-    CASE_RETURN_OVERRIDE(ZX_POL_NEW_VMO, &policy);
-    CASE_RETURN_OVERRIDE(ZX_POL_NEW_CHANNEL, &policy);
-    CASE_RETURN_OVERRIDE(ZX_POL_NEW_EVENT, &policy);
-    CASE_RETURN_OVERRIDE(ZX_POL_NEW_EVENTPAIR, &policy);
-    CASE_RETURN_OVERRIDE(ZX_POL_NEW_PORT, &policy);
-    CASE_RETURN_OVERRIDE(ZX_POL_NEW_SOCKET, &policy);
-    CASE_RETURN_OVERRIDE(ZX_POL_NEW_FIFO, &policy);
-    CASE_RETURN_OVERRIDE(ZX_POL_NEW_TIMER, &policy);
-    CASE_RETURN_OVERRIDE(ZX_POL_NEW_PROCESS, &policy);
-    CASE_RETURN_OVERRIDE(ZX_POL_NEW_PROFILE, &policy);
-    CASE_RETURN_OVERRIDE(ZX_POL_NEW_PAGER, &policy);
-    CASE_RETURN_OVERRIDE(ZX_POL_AMBIENT_MARK_VMO_EXEC, &policy);
-    CASE_RETURN_OVERRIDE(ZX_POL_NEW_IOB, &policy);
-    default:
-      return ZX_POL_OVERRIDE_DENY;
-  }
-}
-
-#undef CASE_RETURN_ACTION
-#undef CASE_RETURN_OVERRIDE
-#undef CASE_SET_OVERRIDE
-#undef CASE_SET_ENTRY
-
 }  // namespace
 
-JobPolicy::JobPolicy(const JobPolicy& parent) : cookie_(parent.cookie_), slack_(parent.slack_) {}
-JobPolicy::JobPolicy(pol_cookie_t cookie, const TimerSlack& slack)
-    : cookie_(cookie), slack_(slack) {}
+JobPolicy::JobPolicy(const JobPolicy& parent)
+    : collection_(parent.collection_), slack_(parent.slack_) {}
+JobPolicy::JobPolicy(JobPolicyCollection collection, const TimerSlack& slack)
+    : collection_(collection), slack_(slack) {}
 
 // static
 JobPolicy JobPolicy::CreateRootPolicy() {
   static_assert((ZX_POL_ACTION_ALLOW == 0u) && (ZX_POL_OVERRIDE_ALLOW == 0u));
-  constexpr JobPolicyBits policy(0u);
-  return JobPolicy(policy.value, TimerSlack::none());
+  return JobPolicy({}, TimerSlack::none());
 }
 
 zx_status_t JobPolicy::AddBasicPolicy(uint32_t mode, const zx_policy_basic_v2_t* policy_input,
@@ -260,7 +92,7 @@ zx_status_t JobPolicy::AddBasicPolicy(uint32_t mode, const zx_policy_basic_v2_t*
   }
 
   zx_status_t status = ZX_OK;
-  JobPolicyBits pol_new(cookie_);
+  JobPolicyCollection updated_collection = collection_;
   bool has_new_any = false;
   uint32_t new_any_override = 0;
 
@@ -269,39 +101,50 @@ zx_status_t JobPolicy::AddBasicPolicy(uint32_t mode, const zx_policy_basic_v2_t*
 
     if (in.condition == ZX_POL_NEW_ANY) {
       for (auto cond : kNewObjectPolicies) {
-        status = AddPartial(mode, cond, in.action, ZX_POL_OVERRIDE_ALLOW, &pol_new);
-        if (status != ZX_OK)
+        if (status = AddPartial(mode, cond, in.action, ZX_POL_OVERRIDE_ALLOW, updated_collection);
+            status != ZX_OK) {
           return status;
+        }
       }
       has_new_any = true;
       new_any_override = in.flags;
-    } else {
-      status = AddPartial(mode, in.condition, in.action, in.flags, &pol_new);
-      if (status != ZX_OK)
-        return status;
+    } else if (status = AddPartial(mode, in.condition, in.action, in.flags, updated_collection);
+               status != ZX_OK) {
+      return status;
     }
   }
 
   if (has_new_any) {
+    if (!PolicyOverrideIsValid(new_any_override)) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+    bool override_bit = new_any_override == ZX_POL_OVERRIDE_ALLOW;
     for (auto cond : kNewObjectPolicies) {
-      status = SetOverride(&pol_new, cond, new_any_override);
-      if (status != ZX_OK)
-        return status;
+      updated_collection[cond].set_override(override_bit);
     }
   }
 
-  cookie_ = pol_new.value;
+  collection_ = updated_collection;
   return ZX_OK;
 }
 
 uint32_t JobPolicy::QueryBasicPolicy(uint32_t condition) const {
-  JobPolicyBits policy(cookie_);
-  return static_cast<uint32_t>(GetAction(policy, condition));
+  if (condition >= ZX_POL_MAX || condition == ZX_POL_NEW_ANY) [[unlikely]] {
+    return ZX_POL_ACTION_DENY;
+  }
+  // The following const_cast allows us to reuse the JobPolicyCollection without having to resort to
+  // template-ing over const.
+  return const_cast<JobPolicy*>(this)->collection_[condition].action();
 }
 
 uint32_t JobPolicy::QueryBasicPolicyOverride(uint32_t condition) const {
-  JobPolicyBits policy(cookie_);
-  return static_cast<uint32_t>(GetOverride(policy, condition));
+  if (condition >= ZX_POL_MAX || condition == ZX_POL_NEW_ANY) [[unlikely]] {
+    return ZX_POL_OVERRIDE_DENY;
+  }
+  // The following const_cast allows us to reuse the JobPolicyCollection without having to resort to
+  // template-ing over const.
+  return const_cast<JobPolicy*>(this)->collection_[condition].override() ? ZX_POL_OVERRIDE_ALLOW
+                                                                         : ZX_POL_OVERRIDE_DENY;
 }
 
 void JobPolicy::SetTimerSlack(TimerSlack slack) { slack_ = slack; }
@@ -313,7 +156,7 @@ bool JobPolicy::operator==(const JobPolicy& rhs) const {
     return true;
   }
 
-  return cookie_ == rhs.cookie_ && slack_ == rhs.slack_;
+  return collection_ == rhs.collection_ && slack_ == rhs.slack_;
 }
 
 bool JobPolicy::operator!=(const JobPolicy& rhs) const { return !operator==(rhs); }

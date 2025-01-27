@@ -15,6 +15,48 @@
 
 namespace {
 
+// Verify that our helper class fiddles with the bits properly. The interaction and translation to
+// proper constants where needed is checked in the query policy API.
+bool job_policy_collection() {
+  BEGIN_TEST;
+  JobPolicyCollection policies;
+
+  constexpr ktl::array<uint32_t, 4> kActions = {ZX_POL_ACTION_DENY, ZX_POL_ACTION_DENY_EXCEPTION,
+                                                ZX_POL_ACTION_ALLOW_EXCEPTION, ZX_POL_ACTION_KILL};
+  constexpr ktl::array<bool, 2> kOverride = {true, false};
+
+  // Set a policy, then verify that everything before and after remains the same.
+  for (size_t i = 0; i < ZX_POL_MAX; ++i) {
+    if (i == ZX_POL_NEW_ANY) {
+      continue;
+    }
+    policies[i].set_action(kActions[i % 4]);
+    policies[i].set_override(kOverride[i % 2]);
+    for (size_t j = 0; j < i; ++j) {
+      if (j == ZX_POL_NEW_ANY) {
+        continue;
+      }
+      EXPECT_EQ(policies[j].action(), kActions[j % 4]);
+      EXPECT_EQ(policies[j].override(), kOverride[j % 2]);
+    }
+
+    for (size_t j = i + 1; j < ZX_POL_MAX; ++j) {
+      if (j == ZX_POL_NEW_ANY) {
+        continue;
+      }
+      // Arbitrary default values, from being constructed from 0.
+      EXPECT_EQ(policies[j].action(), 0u);
+      EXPECT_EQ(policies[j].override(), true);
+    }
+
+    // After all those ops, check that new state is what we expect.
+    EXPECT_EQ(policies[i].action(), kActions[i % 4]);
+    EXPECT_EQ(policies[i].override(), kOverride[i % 2]);
+  }
+
+  END_TEST;
+}
+
 static bool initial_state() {
   BEGIN_TEST;
 
@@ -329,6 +371,7 @@ static bool add_basic_policy_deny_process_only() {
 
 UNITTEST_START_TESTCASE(job_policy_tests)
 UNITTEST("initial_state", initial_state)
+UNITTEST("job_policy_collection", job_policy_collection)
 UNITTEST("add_basic_policy_no_widening", add_basic_policy_no_widening)
 UNITTEST("add_basic_policy_allow_widening", add_basic_policy_allow_widening)
 UNITTEST("add_basic_policy_no_widening_with_any", add_basic_policy_no_widening_with_any)
