@@ -31,7 +31,8 @@ use starnix_uapi::{
     __NR_exit, __NR_read, __NR_write, errno, errno_from_code, error, seccomp_data, seccomp_notif,
     seccomp_notif_resp, sock_filter, BPF_ABS, BPF_LD, BPF_ST, SECCOMP_IOCTL_NOTIF_ADDFD,
     SECCOMP_IOCTL_NOTIF_ID_VALID, SECCOMP_IOCTL_NOTIF_RECV, SECCOMP_IOCTL_NOTIF_SEND,
-    SECCOMP_RET_ACTION_FULL, SECCOMP_RET_DATA, SECCOMP_USER_NOTIF_FLAG_CONTINUE, SYS_SECCOMP,
+    SECCOMP_MODE_DISABLED, SECCOMP_MODE_FILTER, SECCOMP_MODE_STRICT, SECCOMP_RET_ACTION_FULL,
+    SECCOMP_RET_DATA, SECCOMP_USER_NOTIF_FLAG_CONTINUE, SYS_SECCOMP,
 };
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -315,9 +316,9 @@ impl SeccompFilterContainer {
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum SeccompStateValue {
-    None = 0,
-    UserDefined = 1,
-    Strict = 2,
+    None = SECCOMP_MODE_DISABLED as u8,
+    Strict = SECCOMP_MODE_STRICT as u8,
+    UserDefined = SECCOMP_MODE_FILTER as u8,
 }
 
 /// Per-process state that cannot be stored in the container (e.g., whether there is a container).
@@ -334,9 +335,9 @@ impl SeccompState {
 
     fn from_u8(value: u8) -> SeccompStateValue {
         match value {
-            0 => SeccompStateValue::None,
-            1 => SeccompStateValue::UserDefined,
-            2 => SeccompStateValue::Strict,
+            v if v == SECCOMP_MODE_DISABLED as u8 => SeccompStateValue::None,
+            v if v == SECCOMP_MODE_STRICT as u8 => SeccompStateValue::Strict,
+            v if v == SECCOMP_MODE_FILTER as u8 => SeccompStateValue::UserDefined,
             _ => unreachable!(),
         }
     }
