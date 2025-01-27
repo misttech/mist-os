@@ -12,7 +12,7 @@ use anyhow::Error;
 use async_trait::async_trait;
 use cm_config::RuntimeConfig;
 use cm_rust::FidlIntoNative;
-use cm_types::{Name, OPEN_FLAGS_MAX_POSSIBLE_RIGHTS};
+use cm_types::{Name, FLAGS_MAX_POSSIBLE_RIGHTS};
 use errors::OpenExposedDirError;
 use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
 use futures::prelude::*;
@@ -210,11 +210,8 @@ impl RealmCapabilityProvider {
                     );
                     return fcomponent::Error::InstanceCannotResolve;
                 })?;
-                // open_exposed does not have a rights input parameter, so this
-                // makes use of the  POSIX_[WRITABLE|EXECUTABLE] flags to open
-                // a connection with those rights if available from the parent
-                // directory connection but without failing if not available.
-                let flags = OPEN_FLAGS_MAX_POSSIBLE_RIGHTS | fio::OpenFlags::DIRECTORY;
+                // We request the maximum possible rights from the parent directory connection.
+                let flags = FLAGS_MAX_POSSIBLE_RIGHTS | fio::Flags::PROTOCOL_DIRECTORY;
                 let mut object_request = flags.to_object_request(exposed_dir);
                 child
                     .open_exposed(OpenRequest::new(
@@ -1166,19 +1163,15 @@ mod tests {
             .now_or_never();
         assert!(event.is_none());
 
-        // Check flags on directory opened. These are not exactly the flags we
-        // set in `open_exposed_dir`, because fuchsia.io transforms POSIX_*
-        // flags into their respective {RIGHT_READABLE, RIGHT_WRITABLE,
-        // RIGHT_EXECUTABLE} variants if and only if all intermediate nodes are
-        // readable, writable, or executable. Additionally, we already know
-        // this is a directory, and fuchsia.io does not propagate that flag.
-        let (status, flags) = dir_proxy.get_flags().await.expect("getting exposed dir flags");
-        assert_matches!(zx::Status::ok(status), Ok(()));
+        // Check flags on directory opened. This should match the maximum set of rights for every
+        // directory connection along the open chain.
+        let flags = dir_proxy.get_flags2().await.expect("FIDL error").expect("GetFlags error");
         assert_eq!(
             flags,
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::RIGHT_EXECUTABLE
+            fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::PERM_EXECUTABLE
+                | fio::Flags::PROTOCOL_DIRECTORY
         );
 
         // Now that it was asserted that "system:0" has yet to start,
