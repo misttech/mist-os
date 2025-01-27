@@ -6,6 +6,8 @@ pub use tokio_connection::FuseConnection;
 #[cfg(feature = "tokio-runtime")]
 mod tokio_connection {
     use std::io;
+    use std::os::fd::OwnedFd;
+    use std::os::fd::FromRawFd;
     use std::os::unix::io::AsRawFd;
     use std::os::unix::io::IntoRawFd;
     use std::os::unix::io::RawFd;
@@ -31,7 +33,7 @@ mod tokio_connection {
 
     #[derive(Debug)]
     pub struct FuseConnection {
-        fd: AsyncFd<RawFd>,
+        fd: AsyncFd<OwnedFd>,
         read: Mutex<()>,
         write: Mutex<()>,
     }
@@ -54,7 +56,7 @@ mod tokio_connection {
                     Err(e)
                 }
                 Ok(handle) => {
-                    let fd = handle.into_std().await.into_raw_fd();
+                    let fd = handle.into_std().await.into();
                     Ok(Self {
                         fd: AsyncFd::new(fd)?,
                         read: Mutex::new(()),
@@ -69,7 +71,7 @@ mod tokio_connection {
             mount_options: MountOptions,
             mount_path: impl AsRef<Path>,
         ) -> io::Result<Self> {
-            let (fd0, fd1) = match socket::socketpair(
+            let (sock0, sock1) = match socket::socketpair(
                 AddressFamily::Unix,
                 SockType::SeqPacket,
                 None,
@@ -99,6 +101,7 @@ mod tokio_connection {
             let mount_path = mount_path.as_ref().as_os_str().to_os_string();
 
             let mut child = task::spawn_blocking(move || {
+                let fd0 = sock0.as_raw_fd();
                 Command::new(binary_path)
                     .env(ENV, fd0.to_string())
                     .args(vec![OsString::from("-o"), options, mount_path])
@@ -113,6 +116,8 @@ mod tokio_connection {
                     "fusermount run failed",
                 ));
             }
+
+            let fd1 = sock1.as_raw_fd();
 
             let fd = task::spawn_blocking(move || {
                 // let mut buf = vec![0; 10000]; // buf should large enough
@@ -133,7 +138,12 @@ mod tokio_connection {
                     Ok(msg) => msg,
                 };
 
-                let fd = if let Some(ControlMessageOwned::ScmRights(fds)) = msg.cmsgs().next() {
+                let mut cmsgs = match msg.cmsgs() {
+                    Err(err) => return Err(err.into()),
+                    Ok(cmsgs) => cmsgs,
+                };
+
+                let fd = if let Some(ControlMessageOwned::ScmRights(fds)) = cmsgs.next() {
                     if fds.is_empty() {
                         return Err(io::Error::new(io::ErrorKind::Other, "no fuse fd"));
                     }
@@ -148,15 +158,10 @@ mod tokio_connection {
             .await
             .unwrap()?;
 
-            if let Err(err) = unistd::close(fd0) {
-                return Err(err.into());
-            }
-
-            if let Err(err) = unistd::close(fd1) {
-                return Err(err.into());
-            }
-
             Self::set_fd_non_blocking(fd)?;
+
+            // Safety: fd is valid
+            let fd = unsafe { OwnedFd::from_raw_fd(fd) };
 
             Ok(Self {
                 fd: AsyncFd::new(fd)?,
@@ -193,9 +198,8 @@ mod tokio_connection {
 
         pub async fn write(&self, buf: &[u8]) -> Result<usize, io::Error> {
             let _guard = self.write.lock().await;
-            let fd = self.fd.as_raw_fd();
 
-            unistd::write(fd.as_raw_fd(), buf).map_err(Into::into)
+            unistd::write(&self.fd, buf).map_err(Into::into)
         }
     }
 

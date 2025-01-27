@@ -5834,6 +5834,7 @@ rust_library("fuse3-v0_6_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
+  deps += [ ":nix-v0_29_0" ]
   deps += [ ":async-trait-v0_1_71($host_toolchain)" ]
   deps += [ ":bincode-v1_3_3" ]
   deps += [ ":bytes-v1_6_0" ]
@@ -5841,7 +5842,6 @@ rust_library("fuse3-v0_6_1") {
   deps += [ ":futures-channel-v0_3_30" ]
   deps += [ ":futures-util-v0_3_30" ]
   deps += [ ":libc-v0_2_169" ]
-  deps += [ ":nix-v0_26_2" ]
   deps += [ ":serde-v1_0_204" ]
   deps += [ ":slab-v0_4_9" ]
   deps += [ ":tokio-v1_38_1" ]
@@ -8991,10 +8991,12 @@ rust_library("nix-v0_29_0") {
     "--cfg=feature=\"fs\"",
     "--cfg=feature=\"hostname\"",
     "--cfg=feature=\"memoffset\"",
+    "--cfg=feature=\"mount\"",
     "--cfg=feature=\"net\"",
     "--cfg=feature=\"process\"",
     "--cfg=feature=\"signal\"",
     "--cfg=feature=\"socket\"",
+    "--cfg=feature=\"uio\"",
     "--cfg=feature=\"user\"",
   ]
   if (false) {

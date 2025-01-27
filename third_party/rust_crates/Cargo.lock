@@ -1581,7 +1581,7 @@ dependencies = [
  "futures-channel",
  "futures-util",
  "libc",
- "nix 0.26.2",
+ "nix 0.29.0",
  "serde",
  "slab",
  "tokio",
