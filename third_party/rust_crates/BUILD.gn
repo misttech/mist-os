@@ -1380,7 +1380,7 @@ rust_library("aes-gcm-siv-v0_11_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":zeroize-v1_6_0" ]
+  deps += [ ":zeroize-v1_8_1" ]
   deps += [ ":aead-v0_5_2" ]
   deps += [ ":aes-v0_8_4" ]
   deps += [ ":cipher-v0_4_4" ]
@@ -4014,7 +4014,7 @@ rust_library("crypto-bigint-v0_4_9") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":zeroize-v1_6_0" ]
+  deps += [ ":zeroize-v1_8_1" ]
   deps += [ ":generic-array-v0_14_5" ]
   deps += [ ":rand_core-v0_6_3" ]
   deps += [ ":subtle-v2_6_1" ]
@@ -4491,7 +4491,7 @@ rust_library("der-v0_6_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":zeroize-v1_6_0" ]
+  deps += [ ":zeroize-v1_8_1" ]
   deps += [ ":const-oid-v0_9_2" ]
   deps += [ ":pem-rfc7468-v0_6_0" ]
 
@@ -5031,7 +5031,7 @@ rust_library("elliptic-curve-v0_12_3") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":zeroize-v1_6_0" ]
+  deps += [ ":zeroize-v1_8_1" ]
   deps += [ ":base16ct-v0_1_1" ]
   deps += [ ":crypto-bigint-v0_4_9" ]
   deps += [ ":der-v0_6_1" ]
@@ -12731,7 +12731,7 @@ rust_library("rfc6979-v0_3_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":zeroize-v1_6_0" ]
+  deps += [ ":zeroize-v1_8_1" ]
   deps += [ ":crypto-bigint-v0_4_9" ]
   deps += [ ":hmac-v0_12_1" ]
 
@@ -13916,7 +13916,7 @@ rust_library("sec1-v0_3_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":zeroize-v1_6_0" ]
+  deps += [ ":zeroize-v1_8_1" ]
   deps += [ ":base16ct-v0_1_1" ]
   deps += [ ":der-v0_6_1" ]
   deps += [ ":generic-array-v0_14_5" ]
@@ -18737,7 +18737,7 @@ rust_proc_macro("zerocopy-derive-v0_8_14") {
   applicable_licenses = [ ":zerocopy-derive-v0_8_14.license" ]
 }
 
-license("zeroize-v1_6_0.license") {
+license("zeroize-v1_8_1.license") {
   public_package_name = "zeroize"
   license_files = [
     "//third_party/rust_crates/forks/zeroize/LICENSE-APACHE",
@@ -18745,10 +18745,10 @@ license("zeroize-v1_6_0.license") {
   ]
 }
 
-rust_library("zeroize-v1_6_0") {
+rust_library("zeroize-v1_8_1") {
   crate_name = "zeroize"
   crate_root = "//third_party/rust_crates/forks/zeroize/src/lib.rs"
-  output_name = "zeroize-e56b2a09aaae4a1f"
+  output_name = "zeroize-dcb1c3339d7d0fd8"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -18758,14 +18758,14 @@ rust_library("zeroize-v1_6_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=e56b2a09aaae4a1f",
-    "-Cextra-filename=-e56b2a09aaae4a1f",
+    "-Cmetadata=dcb1c3339d7d0fd8",
+    "-Cextra-filename=-dcb1c3339d7d0fd8",
     "--cfg=feature=\"alloc\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":zeroize-v1_6_0.license" ]
+  applicable_licenses = [ ":zeroize-v1_8_1.license" ]
 }
 
 license("zip-v0_5_5.license") {

@@ -9,29 +9,18 @@ use core::arch::x86::*;
 use core::arch::x86_64::*;
 
 macro_rules! impl_zeroize_for_simd_register {
-    ($type:ty, $feature:expr, $zero_value:ident) => {
-        #[cfg_attr(docsrs, doc(cfg(target_arch = "x86")))] // also `x86_64`
-        #[cfg_attr(docsrs, doc(cfg(target_feature = $feature)))]
-        impl Zeroize for $type {
-            fn zeroize(&mut self) {}
-        }
+    ($($type:ty),* $(,)?) => {
+        $(
+            impl Zeroize for $type {
+                #[inline]
+                fn zeroize(&mut self) {}
+            }
+        )*
     };
 }
 
-#[cfg(target_feature = "sse")]
-impl_zeroize_for_simd_register!(__m128, "sse", _mm_setzero_ps);
+impl_zeroize_for_simd_register!(__m128, __m128d, __m128i, __m256, __m256d, __m256i);
 
-#[cfg(target_feature = "sse2")]
-impl_zeroize_for_simd_register!(__m128d, "sse2", _mm_setzero_pd);
-
-#[cfg(target_feature = "sse2")]
-impl_zeroize_for_simd_register!(__m128i, "sse2", _mm_setzero_si128);
-
-#[cfg(target_feature = "avx")]
-impl_zeroize_for_simd_register!(__m256, "avx", _mm256_setzero_ps);
-
-#[cfg(target_feature = "avx")]
-impl_zeroize_for_simd_register!(__m256d, "avx", _mm256_setzero_pd);
-
-#[cfg(target_feature = "avx")]
-impl_zeroize_for_simd_register!(__m256i, "avx", _mm256_setzero_si256);
+// NOTE: MSRV 1.72
+#[cfg(feature = "simd")]
+impl_zeroize_for_simd_register!(__m512, __m512d, __m512i);
