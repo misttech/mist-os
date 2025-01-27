@@ -42,7 +42,6 @@
 #include <vm/vm_object_physical.h>
 
 #if ARCH_X86
-#include <platform/pc/bootloader.h>
 #include <platform/pc/smbios.h>
 #endif
 
@@ -152,41 +151,6 @@ zx_status_t sys_vmo_create_physical(zx_handle_t hrsrc, zx_paddr_t paddr, size_t 
 
   // create a handle and attach the dispatcher to it
   return up->MakeAndAddHandle(ktl::move(kernel_handle), rights, out);
-}
-
-// zx_status_t zx_framebuffer_get_info
-zx_status_t sys_framebuffer_get_info(zx_handle_t handle, user_out_ptr<uint32_t> format,
-                                     user_out_ptr<uint32_t> width, user_out_ptr<uint32_t> height,
-                                     user_out_ptr<uint32_t> stride) {
-  zx_status_t status;
-  if ((status = validate_resource_kind_base(handle, ZX_RSRC_KIND_SYSTEM,
-                                            ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE)) < 0) {
-    return status;
-  }
-#if ARCH_X86
-  if (!bootloader.fb.base) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  status = format.copy_to_user(bootloader.fb.format);
-  if (status != ZX_OK) {
-    return status;
-  }
-  status = width.copy_to_user(bootloader.fb.width);
-  if (status != ZX_OK) {
-    return status;
-  }
-  status = height.copy_to_user(bootloader.fb.height);
-  if (status != ZX_OK) {
-    return status;
-  }
-  status = stride.copy_to_user(bootloader.fb.stride);
-  if (status != ZX_OK) {
-    return status;
-  }
-  return ZX_OK;
-#else
-  return ZX_ERR_NOT_SUPPORTED;
-#endif
 }
 
 // zx_status_t zx_iommu_create

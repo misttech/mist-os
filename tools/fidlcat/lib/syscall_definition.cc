@@ -5512,28 +5512,6 @@ void SyscallDecoderDispatcher::Populate() {
   }
 
   {
-    Syscall* zx_framebuffer_get_info = Add("zx_framebuffer_get_info", SyscallReturnType::kStatus);
-    // Arguments
-    auto resource = zx_framebuffer_get_info->Argument<zx_handle_t>(SyscallType::kHandle);
-    auto format = zx_framebuffer_get_info->PointerArgument<uint32_t>(SyscallType::kUint32);
-    auto width = zx_framebuffer_get_info->PointerArgument<uint32_t>(SyscallType::kUint32);
-    auto height = zx_framebuffer_get_info->PointerArgument<uint32_t>(SyscallType::kUint32);
-    auto stride = zx_framebuffer_get_info->PointerArgument<uint32_t>(SyscallType::kUint32);
-    // Inputs
-    zx_framebuffer_get_info->Input<zx_handle_t>(
-        "resource", std::make_unique<ArgumentAccess<zx_handle_t>>(resource));
-    // Outputs
-    zx_framebuffer_get_info->Output<uint32_t>(ZX_OK, "format",
-                                              std::make_unique<ArgumentAccess<uint32_t>>(format));
-    zx_framebuffer_get_info->Output<uint32_t>(ZX_OK, "width",
-                                              std::make_unique<ArgumentAccess<uint32_t>>(width));
-    zx_framebuffer_get_info->Output<uint32_t>(ZX_OK, "height",
-                                              std::make_unique<ArgumentAccess<uint32_t>>(height));
-    zx_framebuffer_get_info->Output<uint32_t>(ZX_OK, "stride",
-                                              std::make_unique<ArgumentAccess<uint32_t>>(stride));
-  }
-
-  {
     Syscall* zx_pci_get_nth_device = Add("zx_pci_get_nth_device", SyscallReturnType::kStatus);
     // Arguments
     auto handle = zx_pci_get_nth_device->Argument<zx_handle_t>(SyscallType::kHandle);

@@ -58,18 +58,6 @@
             {
                 source_moniker: "<component_manager>",
                 source: "component",
-                source_name: "fuchsia.kernel.FramebufferResource",
-                capability: "protocol",
-                target_monikers: [
-                    "/bootstrap/boot-drivers:dev",
-                    "/core/sshd-host/shell:**",
-                    "/core/testing/system-tests:**",
-                    "/core/test_manager/system-tests:**",
-                ],
-            },
-            {
-                source_moniker: "<component_manager>",
-                source: "component",
                 source_name: "fuchsia.kernel.HypervisorResource",
                 capability: "protocol",
                 target_monikers: [

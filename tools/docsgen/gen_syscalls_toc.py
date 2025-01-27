@@ -61,7 +61,6 @@ README_SECTIONS = [
     ("Multi-function", "multi-function"),
     ("System", "system"),
     ("Driver", "driver"),
-    ("Display drivers", "framebuffer"),
     ("Tracing", "tracing"),
     ("Restricted Mode (Work in progress)", "restricted"),
     ("Others/Work in progress", "others"),

@@ -15,7 +15,6 @@ fidl("fuchsia.kernel") {
     "debug-resource.fidl",
     "debuglog-resource.fidl",
     "energy-info-resource.fidl",
-    "framebuffer-resource.fidl",
     "hypervisor-resource.fidl",
     "info-resource.fidl",
     "iommu-resource.fidl",

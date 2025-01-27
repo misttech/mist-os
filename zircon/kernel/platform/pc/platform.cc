@@ -49,7 +49,6 @@
 #include <platform/keyboard.h>
 #include <platform/pc.h>
 #include <platform/pc/acpi.h>
-#include <platform/pc/bootloader.h>
 #include <platform/pc/smbios.h>
 #include <platform/ram_mappable_crashlog.h>
 #include <vm/physmap.h>
@@ -62,22 +61,18 @@
 
 #define LOCAL_TRACE 0
 
-pc_bootloader_info_t bootloader;
-
 namespace {
 namespace crashlog_impls {
+
 lazy_init::LazyInit<RamMappableCrashlog, lazy_init::CheckType::None,
                     lazy_init::Destructor::Disabled>
     ram_mappable;
 EfiCrashlog efi;
+
 }  // namespace crashlog_impls
 }  // namespace
 
 static void platform_save_bootloader_data(void) {
-  if (gPhysHandoff->arch_handoff.framebuffer) {
-    bootloader.fb = gPhysHandoff->arch_handoff.framebuffer.value();
-  }
-
   // Record any previous crashlog.
   if (ktl::string_view crashlog = gPhysHandoff->crashlog.get(); !crashlog.empty()) {
     crashlog_impls::efi.SetLastCrashlogLocation(crashlog);

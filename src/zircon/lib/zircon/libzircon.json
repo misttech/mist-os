@@ -33,7 +33,6 @@
     "zx_fifo_create",
     "zx_fifo_read",
     "zx_fifo_write",
-    "zx_framebuffer_get_info",
     "zx_futex_get_owner",
     "zx_futex_requeue",
     "zx_futex_requeue_single_owner",

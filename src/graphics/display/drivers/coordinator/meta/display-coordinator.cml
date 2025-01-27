@@ -20,7 +20,6 @@
             service: [ "fuchsia.hardware.display.engine.Service" ],
             availability: "optional",
         },
-        { protocol: "fuchsia.kernel.FramebufferResource" },
         {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
         },

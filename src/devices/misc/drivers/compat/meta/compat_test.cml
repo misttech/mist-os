@@ -13,7 +13,6 @@
     use: [
         {
             protocol: [
-                "fuchsia.kernel.FramebufferResource",
                 "fuchsia.kernel.InfoResource",
                 "fuchsia.kernel.IommuResource",
                 "fuchsia.kernel.IoportResource",

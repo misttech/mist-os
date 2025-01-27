@@ -77,10 +77,6 @@ __EXPORT zx_handle_t get_iommu_resource(zx_device_t* device) {
   return device->driver()->GetIommuResource();
 }
 
-__EXPORT zx_handle_t get_framebuffer_resource(zx_device_t* device) {
-  return device->driver()->GetFramebufferResource();
-}
-
 __EXPORT zx_handle_t get_ioport_resource(zx_device_t* device) {
   return device->driver()->GetIoportResource();
 }

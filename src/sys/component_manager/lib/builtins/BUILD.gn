@@ -45,7 +45,6 @@ rustc_library("builtins") {
     "src/debuglog_resource.rs",
     "src/energy_info_resource.rs",
     "src/factory_items.rs",
-    "src/framebuffer_resource.rs",
     "src/hypervisor_resource.rs",
     "src/info_resource.rs",
     "src/iommu_resource.rs",

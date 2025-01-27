@@ -552,7 +552,6 @@ TEST_F(InterceptionWorkflowTestX64, SyscallsAutomated) {
       "zx_fifo_create fully automated\n"
       "zx_fifo_read not automated\n"
       "zx_fifo_write not automated\n"
-      "zx_framebuffer_get_info fully automated\n"
       "zx_futex_get_owner fully automated\n"
       "zx_futex_requeue doesn't need automation\n"
       "zx_futex_requeue_single_owner doesn't need automation\n"
@@ -671,7 +670,7 @@ TEST_F(InterceptionWorkflowTestX64, SyscallsAutomated) {
       "zx_vmo_set_cache_policy doesn't need automation\n"
       "zx_vmo_set_size doesn't need automation\n"
       "zx_vmo_write fully automated\n";
-  uint32_t expected_fully_automated = 64;
+  uint32_t expected_fully_automated = 63;
   uint32_t expected_cant_be_automated = 58;
   uint32_t expected_partially_automated = 17;
   uint32_t expected_not_automated = 12;

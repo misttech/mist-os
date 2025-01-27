@@ -46,8 +46,6 @@ class Driver : public fdf::DriverBase {
 
   zx_handle_t GetIommuResource();
 
-  zx_handle_t GetFramebufferResource();
-
   zx_handle_t GetMmioResource();
 
   zx_handle_t GetMsiResource();

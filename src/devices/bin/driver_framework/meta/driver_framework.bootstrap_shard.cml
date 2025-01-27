@@ -208,7 +208,6 @@
             protocol: [
                 "fuchsia.boot.Items",
                 "fuchsia.kernel.CpuResource",
-                "fuchsia.kernel.FramebufferResource",
                 "fuchsia.kernel.IommuResource",
                 "fuchsia.kernel.IoportResource",
                 "fuchsia.kernel.IrqResource",

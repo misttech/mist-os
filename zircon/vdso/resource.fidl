@@ -48,9 +48,9 @@ closed protocol Resource {
     /// `ZX_RSRC_SYSTEM_INFO_BASE`, `ZX_RSRC_SYSTEM_CPU_BASE`,
     /// `ZX_RSRC_SYSTEM_POWER_BASE`, `ZX_RSRC_SYSTEM_MEXEC_BASE`,
     /// `ZX_RSRC_SYSTEM_ENERGY_INFO_BASE`, `ZX_RSRC_SYSTEM_IOMMU_BASE`,
-    /// `ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE`, `ZX_RSRC_SYSTEM_PROFILE_BASE`,
-    /// `ZX_RSRC_SYSTEM_MSI_BASE`, `ZX_RSRC_SYSTEM_DEBUGLOG_BASE` and
-    /// `ZX_RSRC_SYSTEM_STALL_BASE`. These all have *size* 1.
+    /// `ZX_RSRC_SYSTEM_PROFILE_BASE`, / `ZX_RSRC_SYSTEM_MSI_BASE`,
+    /// `ZX_RSRC_SYSTEM_DEBUGLOG_BASE` and `ZX_RSRC_SYSTEM_STALL_BASE`. These all have
+    /// *size* 1.
     /// `ZX_RSRC_KIND_ROOT` must be paired with zero values for *base* and *size*, as
     /// it does not use an address space range.
     ///

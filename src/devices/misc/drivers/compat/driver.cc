@@ -30,7 +30,9 @@
 
 namespace fboot = fuchsia_boot;
 namespace fdf {
+
 using namespace fuchsia_driver_framework;
+
 }
 namespace fio = fuchsia_io;
 namespace fkernel = fuchsia_kernel;
@@ -103,18 +105,6 @@ zx::result<zx::resource> GetPowerResource(fdf::Namespace& ns) {
 
 zx::result<zx::resource> GetIommuResource(fdf::Namespace& ns) {
   zx::result resource = ns.Connect<fkernel::IommuResource>();
-  if (resource.is_error()) {
-    return resource.take_error();
-  }
-  fidl::WireResult result = fidl::WireCall(resource.value())->Get();
-  if (!result.ok()) {
-    return zx::error(result.status());
-  }
-  return zx::ok(std::move(result.value().resource));
-}
-
-zx::result<zx::resource> GetFramebufferResource(fdf::Namespace& ns) {
-  zx::result resource = ns.Connect<fkernel::FramebufferResource>();
   if (resource.is_error()) {
     return resource.take_error();
   }
@@ -455,18 +445,6 @@ zx_handle_t Driver::GetIommuResource() {
     }
   }
   return iommu_resource_.get();
-}
-
-zx_handle_t Driver::GetFramebufferResource() {
-  if (!framebuffer_resource_.is_valid()) {
-    zx::result resource = ::GetFramebufferResource(*incoming());
-    if (resource.is_ok()) {
-      framebuffer_resource_ = std::move(resource.value());
-    } else {
-      logger_->log(fdf::WARN, "Failed to get framebuffer_resource '{}'", resource);
-    }
-  }
-  return framebuffer_resource_.get();
 }
 
 zx_handle_t Driver::GetIoportResource() {

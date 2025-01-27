@@ -24,13 +24,8 @@ void HandoffPrep::ArchHandoff(const ArchPatchInfo& patch_info) {}
 
 void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
                                            ktl::span<const ktl::byte> payload) {
-  ZX_DEBUG_ASSERT(handoff_);
-  ArchPhysHandoff& arch_handoff = handoff_->arch_handoff;
-
   switch (header.type) {
     case ZBI_TYPE_FRAMEBUFFER:
-      ZX_ASSERT(payload.size() >= sizeof(zbi_swfb_t));
-      arch_handoff.framebuffer = *reinterpret_cast<const zbi_swfb_t*>(payload.data());
       SaveForMexec(header, payload);
       break;
   }

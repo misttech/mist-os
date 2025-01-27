@@ -68,7 +68,6 @@ use builtins::debug_resource::DebugResource;
 use builtins::debuglog_resource::DebuglogResource;
 use builtins::energy_info_resource::EnergyInfoResource;
 use builtins::factory_items::FactoryItems;
-use builtins::framebuffer_resource::FramebufferResource;
 use builtins::hypervisor_resource::HypervisorResource;
 use builtins::info_resource::InfoResource;
 use builtins::iommu_resource::IommuResource;
@@ -952,6 +951,7 @@ impl BuiltinEnvironment {
                     .set_store_item(ZbiType::CpuTopology)
                     .set_store_item(ZbiType::AcpiRsdp)
                     .set_store_item(ZbiType::Smbios)
+                    .set_store_item(ZbiType::Framebuffer)
                     .parse()?,
             ),
             None => None,
@@ -1183,29 +1183,6 @@ impl BuiltinEnvironment {
             root_input_builder.add_builtin_protocol_if_enabled::<fkernel::DebuglogResourceMarker>(
                 move |stream| debuglog_resource.clone().serve(stream).boxed(),
             );
-        }
-
-        // Set up the FramebufferResource service.
-        let framebuffer_resource = system_resource_handle
-            .as_ref()
-            .and_then(|handle| {
-                handle
-                    .create_child(
-                        zx::ResourceKind::SYSTEM,
-                        None,
-                        zx::sys::ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE,
-                        1,
-                        b"framebuffer",
-                    )
-                    .ok()
-            })
-            .map(FramebufferResource::new)
-            .and_then(Result::ok);
-        if let Some(framebuffer_resource) = framebuffer_resource {
-            root_input_builder
-                .add_builtin_protocol_if_enabled::<fkernel::FramebufferResourceMarker>(
-                    move |stream| framebuffer_resource.clone().serve(stream).boxed(),
-                );
         }
 
         // Set up the HypervisorResource service.

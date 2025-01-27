@@ -18,15 +18,11 @@ struct ArchPatchInfo {};
 
 // This holds (or points to) all x86-specific data that is handed off from
 // physboot to the kernel proper at boot time.
-struct ArchPhysHandoff {
-  // ZBI_TYPE_FRAMEBUFFER payload.
-  // Framebuffer parameters.
-  std::optional<zbi_swfb_t> framebuffer;
-};
+struct ArchPhysHandoff {};
 
 inline constexpr uint64_t kArchHandoffVirtualAddress = 0xffff'ffff'0000'0000;
 
 // Whether a peripheral range for the UART needs to be synthesized.
 inline constexpr bool kArchHandoffGenerateUartPeripheralRanges = false;
 
-#endif  // ZIRCON_KERNEL_ARCH_X86_PHYS_INCLUDE_PHYS_ARCH_ARCH_HANDOFF_H_
+#endif // ZIRCON_KERNEL_ARCH_X86_PHYS_INCLUDE_PHYS_ARCH_ARCH_HANDOFF_H_
