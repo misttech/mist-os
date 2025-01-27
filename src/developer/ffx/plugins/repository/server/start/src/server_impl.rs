@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::target;
 use anyhow::{anyhow, Context};
-use async_trait::async_trait;
 use camino::{Utf8Path, Utf8PathBuf};
+use ffx_command_error::{bug, return_bug, return_user_error, Result};
 use ffx_config::environment::EnvironmentKind;
 use ffx_config::EnvironmentContext;
-use ffx_repository_serve_args::ServeCommand;
-use fho::{
-    bug, deferred, return_bug, return_user_error, Deferred, FfxMain, FfxTool, Result, SimpleWriter,
-};
+use ffx_repository_server_start_args::{default_address, StartCommand};
+use fho::Deferred;
 use fidl_fuchsia_developer_ffx::{self as ffx, RepositoryRegistryProxy, ServerStatus};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fuchsia_async as fasync;
@@ -32,29 +31,14 @@ use std::io::Write;
 use std::sync::Arc;
 use target_connector::Connector;
 use target_errors::FfxTargetError;
-use target_holders::{daemon_protocol, TargetProxyHolder};
+use target_holders::TargetProxyHolder;
 use tuf::metadata::RawSignedMetadata;
-
-mod target;
 
 const REPO_CONNECT_TIMEOUT_CONFIG: &str = "repository.connect_timeout_secs";
 const DEFAULT_CONNECTION_TIMEOUT_SECS: u64 = 120;
-const REPO_BACKGROUND_FEATURE_FLAG: &str = "repository.server.enabled";
+pub(crate) const REPO_BACKGROUND_FEATURE_FLAG: &str = "repository.server.enabled";
 const REPO_PATH_RELATIVE_TO_BUILD_DIR: &str = "amber-files";
 const CONFIG_KEY_DEFAULT_REPOSITORY: &str = "repository.default";
-
-#[derive(FfxTool)]
-pub struct ServeTool {
-    #[command]
-    pub cmd: ServeCommand,
-    pub context: EnvironmentContext,
-    pub target_proxy_connector: Connector<TargetProxyHolder>,
-    pub rcs_proxy_connector: Connector<RemoteControlProxy>,
-    #[with(deferred(daemon_protocol()))]
-    pub repos: Deferred<ffx::RepositoryRegistryProxy>,
-}
-
-fho::embedded_plugin!(ServeTool);
 
 #[tracing::instrument(skip(conn_quit_tx, server_quit_tx))]
 fn start_signal_monitoring(
@@ -134,41 +118,6 @@ async fn refresh_repository_metadata(path: &Utf8PathBuf) -> Result<()> {
         .map_err(|e| fho::user_error!(format!("failed publishing to repo {}: {}", path, e)))
 }
 
-#[async_trait(?Send)]
-impl FfxMain for ServeTool {
-    type Writer = SimpleWriter;
-    async fn main(self, writer: Self::Writer) -> Result<()> {
-        /* This check is specific to the `ffx repository serve` command and should be ignored
-        if the entry point is `ffx repository server start`.
-         */
-        let bg: bool = self
-            .context
-            .get(REPO_BACKGROUND_FEATURE_FLAG)
-            .context("checking for daemon server flag")?;
-        if bg {
-            return_user_error!(
-                r#"The ffx setting '{}' and the foreground server are mutually incompatible.
-Please disable background serving by running the following commands:
-$ ffx config remove repository.server.enabled
-$ ffx doctor --restart-daemon"#,
-                REPO_BACKGROUND_FEATURE_FLAG,
-            );
-        }
-
-        serve_impl(
-            self.target_proxy_connector,
-            self.rcs_proxy_connector,
-            self.repos,
-            self.cmd,
-            self.context,
-            writer,
-            ServerMode::Foreground,
-        )
-        .await?;
-        Ok(())
-    }
-}
-
 pub fn get_repo_base_name(
     cmd_line: &Option<String>,
     context: &EnvironmentContext,
@@ -187,7 +136,7 @@ pub fn get_repo_base_name(
 }
 
 pub async fn serve_impl_validate_args(
-    cmd: &ServeCommand,
+    cmd: &StartCommand,
     rcs_proxy_connector: &Connector<RemoteControlProxy>,
     repos: Deferred<RepositoryRegistryProxy>,
     context: &EnvironmentContext,
@@ -335,8 +284,10 @@ ffx config remove repository.server.enabled && ffx doctor --restart-daemon
     // Check all the name/path pairs for conflicts. If there is an exact match, return it as
     // an indicator that the server is already running and does not need to be started again.
     let mut already_running_instance: Option<PkgServerInfo> = None;
+    let cmd_address = if let Some(addr) = &cmd.address { addr.clone() } else { default_address() };
+    let repo_name_paths = repo_name_paths.into_iter();
     for (repo_name, repo_path) in repo_name_paths {
-        let addr = cmd.address.clone();
+        let addr = cmd_address.clone();
         let duplicate = running_instances.iter().find(|instance| instance.address == addr);
         if let Some(duplicate) = duplicate {
             // if we're starting using a product bundle, the name will be different so compare the repo_path
@@ -396,7 +347,7 @@ pub async fn serve_impl<W: Write + 'static>(
     target_proxy: Connector<TargetProxyHolder>,
     rcs_proxy: Connector<RemoteControlProxy>,
     repos: Deferred<RepositoryRegistryProxy>,
-    cmd: ServeCommand,
+    cmd: StartCommand,
     context: EnvironmentContext,
     mut writer: W,
     mode: ServerMode,
@@ -494,7 +445,8 @@ pub async fn serve_impl<W: Write + 'static>(
     };
 
     // Serve RepositoryManager over a RepositoryServer
-    let (server_fut, _, server) = RepositoryServer::builder(cmd.address, Arc::clone(&repo_manager))
+    let server_addr = if let Some(addr) = cmd.address.clone() { addr } else { default_address() };
+    let (server_fut, _, server) = RepositoryServer::builder(server_addr, Arc::clone(&repo_manager))
         .start()
         .await
         .with_context(|| format!("starting repository server"))?;
@@ -636,13 +588,14 @@ pub async fn serve_impl<W: Write + 'static>(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::ServerStartTool;
     use assert_matches::assert_matches;
     use ffx_config::keys::TARGET_DEFAULT_KEY;
     use ffx_config::{ConfigLevel, TestEnv};
     use ffx_target::TargetProxy;
     use fho::macro_deps::ffx_writer::TestBuffer;
     use fho::testing::ToolEnv;
-    use fho::{user_error, TryFromEnv};
+    use fho::{user_error, FfxMain, Format, SimpleWriter, TestBuffers, TryFromEnv};
     use fidl::endpoints::DiscoverableProtocolMarker;
     use fidl_fuchsia_developer_ffx::{
         RemoteControlState, RepositoryError, RepositoryRegistrationAliasConflictMode,
@@ -672,6 +625,7 @@ mod test {
     use std::collections::BTreeSet;
     use std::sync::Mutex;
     use std::time;
+    use target_connector::Connector;
     use timeout::timeout;
     use tuf::crypto::Ed25519PrivateKey;
     use tuf::metadata::Metadata;
@@ -1043,12 +997,12 @@ mod test {
         let bundle_path = Utf8PathBuf::from_path_buf(pb_path).expect("utf8 path");
         write_product_bundle(&bundle_path).await;
 
-        let test_cases: Vec<(ServeCommand, Result<Option<PkgServerInfo>>)> = vec![
+        let test_cases: Vec<(StartCommand, Result<Option<PkgServerInfo>>)> = vec![
             (
-                ServeCommand {
+                StartCommand {
                     repository: None,
                     trusted_root: None,
-                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
                     repo_path: Some("/some/repo/path".into()),
                     product_bundle: Some(bundle_path.clone()),
                     alias: vec![],
@@ -1058,14 +1012,18 @@ mod test {
                     no_device: false,
                     refresh_metadata: false,
                     auto_publish: None,
+                    background: false,
+                    daemon: false,
+                    foreground: true,
+                    disconnected: false,
                 },
                 Err(user_error!("Cannot specify both --repo-path and --product-bundle")),
             ),
             (
-                ServeCommand {
+                StartCommand {
                     repository: Some("repo-with-name".into()),
                     trusted_root: None,
-                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
                     repo_path: None,
                     product_bundle: Some(bundle_path.clone()),
                     alias: vec![],
@@ -1075,14 +1033,18 @@ mod test {
                     no_device: false,
                     refresh_metadata: false,
                     auto_publish: None,
+                    background: false,
+                    daemon: false,
+                    foreground: true,
+                    disconnected: false,
                 },
                 Ok(None),
             ),
             (
-                ServeCommand {
+                StartCommand {
                     repository: None,
                     trusted_root: None,
-                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
                     repo_path: None,
                     product_bundle: Some("/missing/product/bundle".into()),
                     alias: vec![],
@@ -1092,14 +1054,18 @@ mod test {
                     no_device: false,
                     refresh_metadata: false,
                     auto_publish: None,
+                    background: false,
+                    daemon: false,
+                    foreground: true,
+                    disconnected: false,
                 },
                 Err(user_error!("product bundle \"/missing/product/bundle\" does not exist")),
             ),
             (
-                ServeCommand {
+                StartCommand {
                     repository: None,
                     trusted_root: None,
-                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
                     repo_path: Some("/missing/repo/path".into()),
                     product_bundle: None,
                     alias: vec![],
@@ -1109,14 +1075,18 @@ mod test {
                     no_device: false,
                     refresh_metadata: false,
                     auto_publish: None,
+                    background: false,
+                    daemon: false,
+                    foreground: true,
+                    disconnected: false,
                 },
                 Err(user_error!("repo-path \"/missing/repo/path\" does not exist")),
             ),
             (
-                ServeCommand {
+                StartCommand {
                     repository: None,
                     trusted_root: None,
-                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
                     repo_path: None,
                     product_bundle: None,
                     alias: vec![],
@@ -1126,14 +1096,18 @@ mod test {
                     no_device: false,
                     refresh_metadata: false,
                     auto_publish: None,
+                    background: false,
+                    daemon: false,
+                    foreground: true,
+                    disconnected: false,
                 },
                 Err(user_error!("Either --repo-path or --product-bundle need to be specified")),
             ),
             (
-                ServeCommand {
+                StartCommand {
                     repository: None,
                     trusted_root: None,
-                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
                     repo_path: None,
                     product_bundle: Some(bundle_path.clone()),
                     alias: vec![],
@@ -1143,14 +1117,18 @@ mod test {
                     no_device: false,
                     refresh_metadata: false,
                     auto_publish: Some(Utf8PathBuf::from("/missing/package-list")),
+                    background: false,
+                    daemon: false,
+                    foreground: true,
+                    disconnected: false,
                 },
                 Err(user_error!("package manifest \"/missing/package-list\" does not exist")),
             ),
             (
-                ServeCommand {
+                StartCommand {
                     repository: None,
                     trusted_root: None,
-                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
                     repo_path: Some(
                         Utf8PathBuf::from_path_buf(env.isolate_root.path().to_path_buf())
                             .expect("repo path"),
@@ -1163,6 +1141,10 @@ mod test {
                     no_device: false,
                     refresh_metadata: false,
                     auto_publish: Some(Utf8PathBuf::from("/missing/package-list")),
+                    background: false,
+                    daemon: false,
+                    foreground: true,
+                    disconnected: false,
                 },
                 Err(user_error!("package manifest \"/missing/package-list\" does not exist")),
             ),
@@ -1212,10 +1194,10 @@ mod test {
     async fn test_serve_impl_validate_args_in_tree() {
         let build_dir = tempfile::tempdir().expect("temp dir");
         let env = ffx_config::test_init_in_tree(build_dir.path()).await.expect("in-tree test env");
-        let cmd = ServeCommand {
+        let cmd = StartCommand {
             repository: None,
             trusted_root: None,
-            address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+            address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
             repo_path: None,
             product_bundle: None,
             alias: vec![],
@@ -1225,6 +1207,10 @@ mod test {
             no_device: false,
             refresh_metadata: false,
             auto_publish: None,
+            background: false,
+            daemon: false,
+            foreground: true,
+            disconnected: false,
         };
         let expected: Result<Option<PkgServerInfo>> = Err(user_error!(
             "build directory relative path {:?} does not exist",
@@ -1308,12 +1294,12 @@ mod test {
         let mgr = PkgServerInstances::new(instance_root);
         mgr.write_instance(&server_info).expect("test instance written");
 
-        let test_cases: Vec<(ServeCommand, Result<Option<PkgServerInfo>>)> = vec![
+        let test_cases: Vec<(StartCommand, Result<Option<PkgServerInfo>>)> = vec![
             (
-         ServeCommand {
+         StartCommand {
             repository: Some("another-name".into()),
             trusted_root: None,
-            address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+            address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
             repo_path: Some(Utf8PathBuf::from_path_buf(repo_path.clone()).expect("utf8 repo_path")),
             product_bundle: None,
             alias: vec![],
@@ -1323,6 +1309,10 @@ mod test {
             no_device: false,
             refresh_metadata: false,
             auto_publish: None,
+            background: false,
+            daemon: false,
+            foreground: true,
+            disconnected: false,
         },
             Err(user_error!("Repository address conflict. \
             Cannot start a server named another-name serving {repo_path:?}. \
@@ -1331,10 +1321,10 @@ mod test {
              addr=server_info.address, name=server_info.name, dupe_path=server_info.repo_path_display()))
     ),
     (
-        ServeCommand {
+        StartCommand {
            repository: Some(instance_name.into()),
            trusted_root: None,
-           address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+           address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
            repo_path: Some(Utf8PathBuf::from_path_buf(repo_path.clone()).expect("utf8 repo_path")),
            product_bundle: None,
            alias: vec![],
@@ -1344,14 +1334,18 @@ mod test {
            no_device: false,
            refresh_metadata: false,
            auto_publish: None,
+           background: false,
+           daemon: false,
+           foreground: true,
+           disconnected: false,
        },
            Ok(Some(server_info.clone()))
    ),
    (
-    ServeCommand {
+    StartCommand {
        repository: Some(instance_name.into()),
        trusted_root: None,
-       address: (REPO_IPV4_ADDR, 8888).into(),
+       address: Some((REPO_IPV4_ADDR, 8888).into()),
        repo_path: Some(Utf8PathBuf::from_path_buf(repo_path.clone()).expect("utf8 repo_path")),
        product_bundle: None,
        alias: vec![],
@@ -1361,6 +1355,10 @@ mod test {
        no_device: false,
        refresh_metadata: false,
        auto_publish: None,
+       background: false,
+       daemon: false,
+       foreground: true,
+       disconnected: false,
    },
        Err(user_error!(
         "Repository name conflict. \
@@ -1476,11 +1474,11 @@ mod test {
             let tmp_repo_path = Utf8Path::from_path(tmp_repo.path()).unwrap();
             test_utils::make_empty_pm_repo_dir(tmp_repo_path);
 
-            let serve_tool = ServeTool {
-                cmd: ServeCommand {
+            let serve_tool = ServerStartTool {
+                cmd: StartCommand {
                     repository: Some(REPO_NAME.to_string()),
                     trusted_root: None,
-                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
                     repo_path: Some(tmp_repo_path.into()),
                     product_bundle: None,
                     alias: vec!["example.com".into(), "fuchsia.com".into()],
@@ -1490,6 +1488,10 @@ mod test {
                     no_device: false,
                     refresh_metadata: refresh_metadata,
                     auto_publish: None,
+                    background: false,
+                    daemon: false,
+                    foreground: true,
+                    disconnected: false,
                 },
                 repos,
                 context: env.environment_context().clone(),
@@ -1501,8 +1503,9 @@ mod test {
                     .expect("Could not make RCS test connector"),
             };
 
-            let test_stdout = TestBuffer::default();
-            let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
+            let buffers = TestBuffers::default();
+            let writer =
+                <ServerStartTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
 
             // Run main in background
             let _task = fasync::Task::local(async move { serve_tool.main(writer).await.unwrap() });
@@ -1642,10 +1645,10 @@ mod test {
                     .expect("Could not make target proxy test connector"),
                 Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
                 repos,
-                ServeCommand {
+                StartCommand {
                     repository: Some(REPO_NAME.to_string()),
                     trusted_root: None,
-                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
                     repo_path: Some(tmp_repo_path.into()),
                     product_bundle: None,
                     alias: vec!["example.com".into(), "fuchsia.com".into()],
@@ -1655,6 +1658,10 @@ mod test {
                     no_device: false,
                     refresh_metadata: false,
                     auto_publish: None,
+                    background: false,
+                    daemon: false,
+                    foreground: true,
+                    disconnected: false,
                 },
                 env.environment_context().clone(),
                 writer,
@@ -1807,10 +1814,10 @@ mod test {
                     .expect("Could not make target proxy test connector"),
                 Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
                 repos,
-                ServeCommand {
+                StartCommand {
                     repository: Some(REPO_NAME.to_string()),
                     trusted_root: None,
-                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
                     repo_path: Some(tmp_repo_path.into()),
                     product_bundle: None,
                     alias: vec!["example.com".into(), "fuchsia.com".into()],
@@ -1820,6 +1827,10 @@ mod test {
                     no_device: false,
                     refresh_metadata: false,
                     auto_publish: None,
+                    background: false,
+                    daemon: false,
+                    foreground: true,
+                    disconnected: false,
                 },
                 env.environment_context().clone(),
                 writer,
@@ -1965,10 +1976,10 @@ mod test {
                     .expect("Could not make target proxy test connector"),
                 Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
                 repos,
-                ServeCommand {
+                StartCommand {
                     repository: None,
                     trusted_root: None,
-                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
                     repo_path: None,
                     product_bundle: Some(pb_dir),
                     alias: vec![],
@@ -1978,6 +1989,10 @@ mod test {
                     no_device: false,
                     refresh_metadata: false,
                     auto_publish: None,
+                    background: false,
+                    daemon: false,
+                    foreground: true,
+                    disconnected: false,
                 },
                 test_env.context.clone(),
                 writer,
@@ -2129,10 +2144,10 @@ mod test {
 
         // Prepare serving the repo without passing the trusted root, and
         // passing of the trusted root 2.root.json explicitly
-        let serve_cmd_without_root = ServeCommand {
+        let serve_cmd_without_root = StartCommand {
             repository: Some(REPO_NAME.to_string()),
             trusted_root: None,
-            address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+            address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
             repo_path: Some(tmp_repo_path.into()),
             product_bundle: None,
             alias: vec![],
@@ -2142,6 +2157,10 @@ mod test {
             no_device: true,
             refresh_metadata: false,
             auto_publish: None,
+            background: false,
+            daemon: false,
+            foreground: true,
+            disconnected: false,
         };
         let mut serve_cmd_with_root = serve_cmd_without_root.clone();
         serve_cmd_with_root.trusted_root = trusted_root_path.clone().into();

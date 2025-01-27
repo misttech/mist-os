@@ -4,7 +4,7 @@
 
 use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
-use ffx_repository_serve::DEFAULT_REPO_NAME;
+use pkg::config::DEFAULT_REPO_NAME;
 use std::path::PathBuf;
 
 #[ffx_command()]
@@ -19,7 +19,7 @@ pub struct AddFromPmCommand {
     /// repositories will be named `NAME`. Defaults to `devhost`.
     #[argh(option, short = 'r', default = "DEFAULT_REPO_NAME.into()")]
     pub repository: String,
-    // LINT.ThenChange(../../serve/src/lib.rs)
+    // LINT.ThenChange(/src/developer/ffx/lib/pkg/src/config.rs)
     /// alias this repository to these names when this repository is registered on a target.
     #[argh(option, long = "alias")]
     pub aliases: Vec<String>,

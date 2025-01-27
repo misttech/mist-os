@@ -5,7 +5,6 @@
 use async_trait::async_trait;
 use daemonize::daemonize;
 use ffx_config::EnvironmentContext;
-use ffx_repository_serve::{serve_impl_validate_args, DEFAULT_REPO_NAME};
 use ffx_repository_server_start_args::StartCommand;
 use fho::{
     bug, deferred, return_bug, return_user_error, Deferred, Error, FfxContext, FfxMain, FfxTool,
@@ -15,6 +14,7 @@ use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx_ext::RepositoryError;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_net_ext::SocketAddress;
+use pkg::config::DEFAULT_REPO_NAME;
 use pkg::{config as pkg_config, ServerMode};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -24,6 +24,10 @@ use target_connector::Connector;
 use target_holders::{daemon_protocol, TargetProxyHolder};
 
 mod server;
+mod server_impl;
+mod target;
+
+use server_impl::serve_impl_validate_args;
 
 // The output is untagged and OK is flattened to match
 // the legacy output. One day, we'll update the schema and
@@ -93,7 +97,7 @@ impl FfxMain for ServerStartTool {
                 // be presented to the user when running in Background mode. If the server is
                 // already running, this returns Ok.
                 if let Some(running) = serve_impl_validate_args(
-                    &server::to_serve_command(&self.cmd),
+                    &self.cmd,
                     &self.rcs_proxy_connector,
                     self.repos,
                     &self.context,
@@ -355,7 +359,8 @@ mod tests {
                 product_bundle: None,
                 alias: vec![],
                 storage_type: None,
-                alias_conflict_mode: ffx_repository_serve_args::default_alias_conflict_mode(),
+                alias_conflict_mode: ffx_repository_server_start_args::default_alias_conflict_mode(
+                ),
                 port_path: None,
                 no_device: false,
                 refresh_metadata: false,
@@ -421,7 +426,8 @@ mod tests {
                 product_bundle: None,
                 alias: vec![],
                 storage_type: None,
-                alias_conflict_mode: ffx_repository_serve_args::default_alias_conflict_mode(),
+                alias_conflict_mode: ffx_repository_server_start_args::default_alias_conflict_mode(
+                ),
                 port_path: None,
                 no_device: false,
                 refresh_metadata: false,
@@ -494,7 +500,8 @@ mod tests {
                 product_bundle: None,
                 alias: vec![],
                 storage_type: None,
-                alias_conflict_mode: ffx_repository_serve_args::default_alias_conflict_mode(),
+                alias_conflict_mode: ffx_repository_server_start_args::default_alias_conflict_mode(
+                ),
                 port_path: None,
                 no_device: false,
                 refresh_metadata: false,
@@ -567,7 +574,8 @@ mod tests {
                 product_bundle: None,
                 alias: vec![],
                 storage_type: None,
-                alias_conflict_mode: ffx_repository_serve_args::default_alias_conflict_mode(),
+                alias_conflict_mode: ffx_repository_server_start_args::default_alias_conflict_mode(
+                ),
                 port_path: None,
                 no_device: false,
                 refresh_metadata: false,
@@ -646,7 +654,8 @@ mod tests {
                 product_bundle: None,
                 alias: vec![],
                 storage_type: None,
-                alias_conflict_mode: ffx_repository_serve_args::default_alias_conflict_mode(),
+                alias_conflict_mode: ffx_repository_server_start_args::default_alias_conflict_mode(
+                ),
                 port_path: None,
                 no_device: false,
                 refresh_metadata: false,

@@ -4,20 +4,20 @@
 
 use argh::{ArgsInfo, FromArgs};
 use camino::Utf8PathBuf;
+use core::net::Ipv6Addr;
 use ffx_core::ffx_command;
 use fidl_fuchsia_developer_ffx::{RepositoryRegistrationAliasConflictMode, RepositoryStorageType};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
 #[ffx_command()]
-#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand, name = "start", description = "Starts the package repository server.")]
 pub struct StartCommand {
-    /// address on which to start the repository.
+    /// address on which to serve the repository.
     /// Note that this can be either IPV4 or IPV6.
     /// For example, [::]:8083 or 127.0.0.1:8083
-    /// Default is read from config `repository.server.listen` or
-    /// `[::]:8083` if not set.
+    /// Default is `[::]:8083`.
     #[argh(option)]
     pub address: Option<SocketAddr>,
 
@@ -47,7 +47,7 @@ pub struct StartCommand {
     /// register this repository.
     /// Default is `devhost`.
     pub repository: Option<String>,
-    // LINT.ThenChange(../../../serve/src/lib.rs)
+    // LINT.ThenChange(/src/developer/ffx/lib/pkg/src/config.rs:devhost_name)
     /// path to the root metadata that was used to sign the
     /// repository TUF metadata. This establishes the root of
     /// trust for this repository. If the TUF metadata was not
@@ -82,8 +82,8 @@ pub struct StartCommand {
     /// Default is `replace`.
     #[argh(
         option,
-        default = "ffx_repository_serve_args::default_alias_conflict_mode()",
-        from_str_fn(ffx_repository_serve_args::parse_alias_conflict_mode)
+        default = "default_alias_conflict_mode()",
+        from_str_fn(parse_alias_conflict_mode)
     )]
     pub alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
 
@@ -110,4 +110,30 @@ pub struct StartCommand {
     /// relative to the directory of the auto-publish manifest.
     #[argh(option)]
     pub auto_publish: Option<Utf8PathBuf>,
+}
+
+pub fn default_address() -> SocketAddr {
+    (Ipv6Addr::UNSPECIFIED, 8083).into()
+}
+
+pub fn parse_storage_type(arg: &str) -> Result<RepositoryStorageType, String> {
+    match arg {
+        "ephemeral" => Ok(RepositoryStorageType::Ephemeral),
+        "persistent" => Ok(RepositoryStorageType::Persistent),
+        _ => Err(format!("unknown storage type {}", arg)),
+    }
+}
+
+pub fn default_alias_conflict_mode() -> RepositoryRegistrationAliasConflictMode {
+    RepositoryRegistrationAliasConflictMode::Replace
+}
+
+pub fn parse_alias_conflict_mode(
+    arg: &str,
+) -> Result<RepositoryRegistrationAliasConflictMode, String> {
+    match arg {
+        "error-out" => Ok(RepositoryRegistrationAliasConflictMode::ErrorOut),
+        "replace" => Ok(RepositoryRegistrationAliasConflictMode::Replace),
+        _ => Err(format!("unknown alias conflict mode {}", arg)),
+    }
 }

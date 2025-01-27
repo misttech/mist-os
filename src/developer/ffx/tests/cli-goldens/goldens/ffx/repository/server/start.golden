@@ -20,7 +20,7 @@
       "optionality": "optional",
       "long": "--address",
       "short": null,
-      "description": "address on which to start the repository. Note that this can be either IPV4 or IPV6. For example, [::]:8083 or 127.0.0.1:8083 Default is read from config `repository.server.listen` or `[::]:8083` if not set.",
+      "description": "address on which to serve the repository. Note that this can be either IPV4 or IPV6. For example, [::]:8083 or 127.0.0.1:8083 Default is `[::]:8083`.",
       "hidden": false
     },
     {

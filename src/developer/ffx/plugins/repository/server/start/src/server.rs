@@ -2,36 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::server_impl::{get_repo_base_name, serve_impl, REPO_BACKGROUND_FEATURE_FLAG};
 use crate::ServerStartTool;
+use ffx_command_error::{bug, return_user_error, user_error, FfxContext as _, Result};
 use ffx_config::EnvironmentContext;
-use ffx_repository_serve::{get_repo_base_name, serve_impl};
-use ffx_repository_serve_args::ServeCommand;
 use ffx_repository_server_start_args::StartCommand;
-use fho::{bug, user_error, Deferred, FfxMain, Result};
+use fho::{Deferred, FfxMain};
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use pkg::{PkgServerInstanceInfo, PkgServerInstances, ServerMode};
 use std::time::Duration;
 use target_connector::Connector;
 use target_holders::TargetProxyHolder;
-
-// map from the start command to the serve command.
-pub(crate) fn to_serve_command(cmd: &StartCommand) -> ServeCommand {
-    ServeCommand {
-        address: cmd.address.unwrap_or_else(ffx_repository_serve_args::default_address),
-        alias: cmd.alias.clone(),
-        alias_conflict_mode: cmd.alias_conflict_mode,
-        port_path: cmd.port_path.clone(),
-        no_device: cmd.no_device,
-        product_bundle: cmd.product_bundle.clone(),
-        repo_path: cmd.repo_path.clone(),
-        repository: cmd.repository.clone(),
-        storage_type: cmd.storage_type,
-        trusted_root: cmd.trusted_root.clone(),
-        refresh_metadata: cmd.refresh_metadata,
-        auto_publish: cmd.auto_publish.clone(),
-    }
-}
 
 pub(crate) fn to_argv(cmd: &StartCommand) -> Vec<String> {
     let mut argv: Vec<String> = vec![];
@@ -90,11 +72,27 @@ pub async fn run_foreground_server(
     w: <ServerStartTool as FfxMain>::Writer,
     mode: ServerMode,
 ) -> Result<()> {
+    /* This check is specific to the `ffx repository serve` command and should be ignored
+        if the entry point is `ffx repository server start`.
+    */
+    // TODO(b/389735589): Remove the daemon based repo server.
+    let bg: bool =
+        context.get(REPO_BACKGROUND_FEATURE_FLAG).bug_context("checking for daemon server flag")?;
+    if bg {
+        return_user_error!(
+            r#"The ffx setting '{}' and the foreground server are mutually incompatible.
+    Please disable background serving by running the following commands:
+    $ ffx config remove repository.server.enabled
+    $ ffx doctor --restart-daemon"#,
+            REPO_BACKGROUND_FEATURE_FLAG,
+        );
+    }
+
     serve_impl(
         target_proxy_connector,
         rcs_proxy_connector,
         repos,
-        to_serve_command(&start_cmd),
+        start_cmd,
         context,
         w.simple_writer(),
         mode,
@@ -146,41 +144,6 @@ mod test {
     use camino::Utf8PathBuf;
     use ffx::{RepositoryRegistrationAliasConflictMode, RepositoryStorageType};
     use std::str::FromStr as _;
-    #[fuchsia::test]
-    fn test_to_serve_command() {
-        let start_cmd = StartCommand {
-            address: Some(([127, 0, 0, 1], 8787).into()),
-            background: true,
-            daemon: false,
-            foreground: false,
-            disconnected: false,
-            repository: Some("repo-name".into()),
-            trusted_root: Some(Utf8PathBuf::from_str("/trusted/root").expect("UTF8 path")),
-            repo_path: Some(Utf8PathBuf::from_str("/repo/path/root").expect("UTF8 path")),
-            product_bundle: Some(Utf8PathBuf::from_str("/product/bundle/path").expect("UTF8 path")),
-            alias: vec!["alias1".into(), "alias2".into()],
-            storage_type: Some(RepositoryStorageType::Ephemeral),
-            alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
-            port_path: Some("/path/port/file".into()),
-            no_device: false,
-            refresh_metadata: true,
-            auto_publish: Some(Utf8PathBuf::from_str("/auto/publish/list").expect("UTF8 path")),
-        };
-        let actual = to_serve_command(&start_cmd);
-
-        assert_eq!(actual.address, start_cmd.address.expect("address"));
-        assert_eq!(actual.alias, start_cmd.alias);
-        assert_eq!(actual.alias_conflict_mode, start_cmd.alias_conflict_mode);
-        assert_eq!(actual.port_path, start_cmd.port_path);
-        assert_eq!(actual.no_device, start_cmd.no_device);
-        assert_eq!(actual.product_bundle, start_cmd.product_bundle);
-        assert_eq!(actual.repo_path, start_cmd.repo_path);
-        assert_eq!(actual.repository, start_cmd.repository);
-        assert_eq!(actual.storage_type, start_cmd.storage_type);
-        assert_eq!(actual.trusted_root, start_cmd.trusted_root);
-        assert_eq!(actual.refresh_metadata, start_cmd.refresh_metadata);
-        assert_eq!(actual.auto_publish, start_cmd.auto_publish);
-    }
 
     #[fuchsia::test]
     fn test_to_argv() {

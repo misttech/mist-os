@@ -19,6 +19,14 @@ const CONFIG_KEY_SERVER_LISTEN: &str = "repository.server.listen";
 const CONFIG_KEY_LAST_USED_ADDRESS: &str = "repository.server.last_used_address";
 const ESCAPE_SET: &AsciiSet = &CONTROLS.add(b'%').add(b'.');
 
+/// Default name used for package repositories in ffx. It is expected that there is no need to
+/// change this constant. But in case this is changed, ensure that it is consistent with the ffx
+/// developer documentation, see
+/// https://cs.opensource.google/search?q=devhost&sq=&ss=fuchsia%2Ffuchsia:src%2Fdeveloper%2Fffx%2F
+// LINT.IfChange
+pub const DEFAULT_REPO_NAME: &str = "devhost";
+// LINT.ThenChange(/src/developer/ffx/plugins/repository/add-from-pm/src/args.rs)
+
 // Try to figure out why the server is not running.
 pub async fn determine_why_repository_server_is_not_running() -> anyhow::Error {
     macro_rules! check {
