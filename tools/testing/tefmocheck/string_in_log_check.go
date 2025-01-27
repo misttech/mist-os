@@ -159,6 +159,7 @@ func (c *stringInLogCheck) Check(to *TestingOutputs) bool {
 			if c.AttributeToTest {
 				c.testName = failedTests[0].name
 				c.outputFile = failedTests[0].outputFile
+				c.line = failedTests[0].line
 			}
 			return true
 		}
