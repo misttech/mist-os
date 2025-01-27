@@ -6,9 +6,9 @@ use argh::{ArgsInfo, FromArgs};
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
 use fho::{Error, FfxMain, FfxTool, Result, SimpleWriter};
-use fidl_fuchsia_developer_ffx::TargetInfo;
 use fidl_fuchsia_developer_remotecontrol as rc;
 use target_connector::Connector;
+use target_holders::TargetInfoHolder;
 
 pub mod common;
 use common::connect_to_rcs;
@@ -38,7 +38,7 @@ pub struct StarnixTool {
     #[command]
     cmd: StarnixCommand,
     rcs_connector: Connector<rc::RemoteControlProxy>,
-    target_info: fho::Result<TargetInfo>,
+    target_info: fho::Result<TargetInfoHolder>,
     context: EnvironmentContext,
 }
 

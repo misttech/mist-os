@@ -19,7 +19,7 @@ pub use from_env::{
     DeviceLookupDefaultImpl,
 };
 
-pub use fho_env::{FhoConnectionBehavior, FhoEnvironment};
+pub use fho_env::{DeviceLookup, FhoConnectionBehavior, FhoEnvironment};
 pub use try_from_env::{deferred, Deferred, TryFromEnv, TryFromEnvWith};
 
 pub use from_env::{toolbox, toolbox_or};

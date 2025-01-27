@@ -24,6 +24,7 @@ use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use target_connector::Connector;
+use target_holders::TargetInfoHolder;
 use tokio::net::{TcpListener, TcpStream};
 use tracing::info;
 use {
@@ -62,11 +63,11 @@ impl StarnixAdbCommand {
         &self,
         context: &EnvironmentContext,
         rcs_connector: &Connector<rc::RemoteControlProxy>,
-        target_info: fho::Result<TargetInfo>,
+        target_info: fho::Result<TargetInfoHolder>,
     ) -> Result<()> {
         match &self.subcommand {
             AdbSubcommand::Connect(args) => {
-                args.run_connect(context, &self.adb, &target_info?).await
+                args.run_connect(context, &self.adb, &*(target_info?)).await
             }
             AdbSubcommand::Proxy(args) => args.run_proxy(&self.adb, rcs_connector).await,
         }

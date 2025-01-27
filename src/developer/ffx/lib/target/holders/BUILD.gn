@@ -19,13 +19,19 @@ rustc_library("lib") {
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/target:lib",
     "//third_party/rust_crates:async-trait",
   ]
 
-  test_deps = []
+  test_deps = [
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:mockall",
+  ]
 
   sources = [
     "src/lib.rs",
+    "src/target_info.rs",
     "src/target_proxy.rs",
   ]
 }

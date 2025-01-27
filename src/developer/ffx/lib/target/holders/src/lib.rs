@@ -9,8 +9,10 @@ use ffx_config::EnvironmentContext;
 use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
 use fho::FhoConnectionBehavior;
 
+mod target_info;
 mod target_proxy;
 
+pub use target_info::TargetInfoHolder;
 pub use target_proxy::TargetProxyHolder;
 
 pub(crate) async fn init_daemon_behavior(
