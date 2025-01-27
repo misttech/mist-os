@@ -18,6 +18,7 @@ use fuchsia_inspect::{
 use fuchsia_inspect_contrib::nodes::NodeTimeExt;
 use futures::future::FutureExt;
 use futures::prelude::*;
+use futures::stream::StreamExt;
 use power_broker_client::{
     basic_update_fn_factory, run_power_element, LeaseHelper, PowerElementContext,
 };
@@ -862,29 +863,36 @@ impl SuspendResumeListener for SystemActivityGovernor {
     }
 
     async fn notify_on_suspend(&self) {
-        log::debug!("notify_on_suspend");
+        log::debug!("notify_on_suspend ");
         // A client may call RegisterListener while handling on_suspend which may cause another
         // mutable borrow of listeners. Clone the listeners to prevent this.
-        let listeners: Vec<_> = self.listeners.borrow_mut().clone();
-        for l in listeners {
-            // Log every 10 seconds while waiting until the `on_suspend_started` responds.
-            let _log_warning_task = fasync::Task::local(async move {
-                loop {
-                    fasync::Timer::new(fasync::MonotonicDuration::from_seconds(10)).await;
-                    log::warn!("No response from on_suspend_started after 10 seconds!");
-                }
-            });
-            let _ = l.on_suspend_started().await;
-        }
+        let listeners_copy: Vec<_> = self.listeners.borrow_mut().clone();
+
+        // Run the callbacks concurrently.
+        futures::stream::iter(listeners_copy)
+            .for_each_concurrent(None, |listener| async move {
+                let _warn_task = fasync::Task::local(async move {
+                    loop {
+                        fasync::Timer::new(fasync::MonotonicDuration::from_seconds(10)).await;
+                        log::warn!("No response from on_suspend_started after 10 seconds!");
+                    }
+                });
+                let _ = listener.on_suspend_started().await;
+            })
+            .await;
     }
 
     async fn notify_on_resume(&self) {
         // A client may call RegisterListener while handling on_resume which may cause another
         // mutable borrow of listeners. Clone the listeners to prevent this.
-        let listeners: Vec<_> = self.listeners.borrow_mut().clone();
-        for l in listeners {
-            let _ = l.on_resume().await;
-        }
+        let listeners_copy: Vec<_> = self.listeners.borrow_mut().clone();
+
+        // Run the callbacks concurrently.
+        futures::stream::iter(listeners_copy)
+            .for_each_concurrent(None, |listener| async move {
+                let _ = listener.on_resume().await;
+            })
+            .await;
     }
 }
 
