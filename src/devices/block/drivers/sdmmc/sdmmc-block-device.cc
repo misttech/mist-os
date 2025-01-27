@@ -168,8 +168,10 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
 
     if (result.is_ok()) {
       FDF_LOGL(INFO, logger(), "Configured power management successfully.");
-    } else if (parent_->config().enable_suspend()) {
-      // Only log and return error on a failed power configuration if enable_suspend was true.
+    } else if (parent_->config().enable_suspend() &&
+               parent_->config().storage_power_management_enabled()) {
+      // Only log and return error on a failed power configuration if enable_suspend and
+      // storage_power_management_enabled were true.
       FDF_LOGL(ERROR, logger(), "Failed to configure power management: %s", result.status_string());
       return result.status_value();
     }

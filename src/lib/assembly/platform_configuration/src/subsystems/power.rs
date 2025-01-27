@@ -162,6 +162,11 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
             Config::new(ConfigValueType::Bool, config.suspend_enabled.into()),
         )?;
 
+        builder.set_config_capability(
+            "fuchsia.power.StoragePowerManagementEnabled",
+            Config::new(ConfigValueType::Bool, config.storage_power_management_enabled.into()),
+        )?;
+
         if let (Some(config), FeatureSupportLevel::Standard) =
             (&context.board_info.configuration.power_metrics_recorder, &context.feature_set_level)
         {

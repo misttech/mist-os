@@ -75,6 +75,7 @@
                 "fuchsia.pkgcache.UseSystemImage",
                 "fuchsia.platform.bus.SoftwareDeviceIds",
                 "fuchsia.platform.bus.SoftwareDeviceNames",
+                "fuchsia.power.StoragePowerManagementEnabled",
                 "fuchsia.power.SuspendEnabled",
                 "fuchsia.power.UseSuspender",
                 "fuchsia.power.WaitForSuspendingToken",
