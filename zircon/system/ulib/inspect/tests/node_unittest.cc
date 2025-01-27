@@ -126,28 +126,29 @@ TEST(Node, Record) {
   auto parsed = inspect::ReadFromVmo(vmo).take_value();
 
   ASSERT_EQ(4, parsed.node().properties().size());
-  EXPECT_EQ("int", parsed.node().properties()[0].name());
-  EXPECT_EQ(1, parsed.node().properties()[0].Get<inspect::IntPropertyValue>().value());
 
-  EXPECT_EQ("uint", parsed.node().properties()[1].name());
-  EXPECT_EQ(2, parsed.node().properties()[1].Get<inspect::UintPropertyValue>().value());
+  EXPECT_EQ("bool", parsed.node().properties()[0].name());
+  EXPECT_EQ(true, parsed.node().properties()[0].Get<inspect::BoolPropertyValue>().value());
 
-  EXPECT_EQ("double", parsed.node().properties()[2].name());
-  EXPECT_EQ(3.25, parsed.node().properties()[2].Get<inspect::DoublePropertyValue>().value());
+  EXPECT_EQ("double", parsed.node().properties()[1].name());
+  EXPECT_EQ(3.25, parsed.node().properties()[1].Get<inspect::DoublePropertyValue>().value());
 
-  EXPECT_EQ("bool", parsed.node().properties()[3].name());
-  EXPECT_EQ(true, parsed.node().properties()[3].Get<inspect::BoolPropertyValue>().value());
+  EXPECT_EQ("int", parsed.node().properties()[2].name());
+  EXPECT_EQ(1, parsed.node().properties()[2].Get<inspect::IntPropertyValue>().value());
+
+  EXPECT_EQ("uint", parsed.node().properties()[3].name());
+  EXPECT_EQ(2, parsed.node().properties()[3].Get<inspect::UintPropertyValue>().value());
 
   ASSERT_EQ(2, parsed.children().size());
   auto& parsedChild = parsed.children()[0];
   ASSERT_EQ(2, parsedChild.node().properties().size());
 
-  EXPECT_EQ("string", parsedChild.node().properties()[0].name());
-  EXPECT_EQ("foo", parsedChild.node().properties()[0].Get<inspect::StringPropertyValue>().value());
-
-  EXPECT_EQ("bytes", parsedChild.node().properties()[1].name());
+  EXPECT_EQ("bytes", parsedChild.node().properties()[0].name());
   EXPECT_EQ(std::vector<uint8_t>({1, 2, 3}),
-            parsedChild.node().properties()[1].Get<inspect::ByteVectorPropertyValue>().value());
+            parsedChild.node().properties()[0].Get<inspect::ByteVectorPropertyValue>().value());
+
+  EXPECT_EQ("string", parsedChild.node().properties()[1].name());
+  EXPECT_EQ("foo", parsedChild.node().properties()[1].Get<inspect::StringPropertyValue>().value());
 
   auto& secondChild = parsed.children()[1];
   ASSERT_EQ(1, secondChild.node().properties().size());

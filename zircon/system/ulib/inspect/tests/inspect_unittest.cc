@@ -103,8 +103,8 @@ TEST(Inspect, CreateNodeWithLongNames) {
   ASSERT_TRUE(result.is_ok());
   auto hierarchy = result.take_value();
   ASSERT_EQ(2u, hierarchy.children().size());
-  EXPECT_EQ(long_one_block, hierarchy.children()[0].name());
-  EXPECT_EQ(long_with_extent, hierarchy.children()[1].name());
+  EXPECT_EQ(long_with_extent, hierarchy.children()[0].name());
+  EXPECT_EQ(long_one_block, hierarchy.children()[1].name());
 }
 
 TEST(Inspect, DeallocateStringReferencesThenAddMore) {
@@ -225,17 +225,17 @@ TEST(Inspect, UsingStringReferencesAsNames) {
 
   // children of root
   ASSERT_EQ(2u, hierarchy.children().size());
-  EXPECT_EQ("one", hierarchy.children()[1].name());
-  EXPECT_EQ("two", hierarchy.children()[0].name());
+  EXPECT_EQ("one", hierarchy.children()[0].name());
+  EXPECT_EQ("two", hierarchy.children()[1].name());
 
   // children of child_one
-  ASSERT_EQ(2u, hierarchy.children()[1].children().size());
-  EXPECT_EQ("two", hierarchy.children()[1].children()[0].name());
-  EXPECT_EQ("a new string reference", hierarchy.children()[1].children()[1].name());
+  ASSERT_EQ(2u, hierarchy.children()[0].children().size());
+  EXPECT_EQ("a new string reference", hierarchy.children()[0].children()[0].name());
+  EXPECT_EQ("two", hierarchy.children()[0].children()[1].name());
 
   // children of child_two
-  ASSERT_EQ(1u, hierarchy.children()[0].children().size());
-  EXPECT_EQ("one", hierarchy.children()[0].children()[0].name());
+  ASSERT_EQ(1u, hierarchy.children()[1].children().size());
+  EXPECT_EQ("one", hierarchy.children()[1].children()[0].name());
 
   // Inspector::State::~Heap will ensure that release is done properly,
   // so this unit test ensures that StringReferences are correctly refcounted
