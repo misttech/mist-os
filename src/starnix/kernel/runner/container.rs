@@ -495,21 +495,27 @@ async fn create_container(
     kernel_node.record_int("created_at", zx::MonotonicInstant::get().into_nanos());
     features.record_inspect(&kernel_node);
 
-    let selinux_exceptions_config = if let Some(ref file_path) = features.selinux.exceptions_path {
-        let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
+    // The SELinux `exceptions_path` may provide a path to an exceptions file to read, or the
+    // special "#strict" value, to run with no exceptions applied.
+    // If no `exceptions_path` is specified then a default set of exceptions are used.
+    let selinux_exceptions_config =
+        match features.selinux.exceptions_path.as_ref().map(|x| x.as_str()) {
+            Some("#strict") => String::new(),
+            Some(file_path) => {
+                let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
 
-        let flags = fio::Flags::PERM_READ | fio::Flags::PROTOCOL_FILE;
+                let flags = fio::Flags::PERM_READ | fio::Flags::PROTOCOL_FILE;
 
-        pkg_dir_proxy
-            .open3(&file_path, flags, &fio::Options::default(), server_end.into_channel())
-            .expect("failed to open security exception file");
+                pkg_dir_proxy
+                    .open3(&file_path, flags, &fio::Options::default(), server_end.into_channel())
+                    .expect("failed to open security exception file");
 
-        let contents =
-            fuchsia_fs::file::read(&file).await.expect("reading security exception file");
-        String::from_utf8(contents).expect("parsing security exception file")
-    } else {
-        String::new()
-    };
+                let contents =
+                    fuchsia_fs::file::read(&file).await.expect("reading security exception file");
+                String::from_utf8(contents).expect("parsing security exception file")
+            }
+            None => security::DEFAULT_EXCEPTIONS_CONFIG.into(),
+        };
     let security_state =
         security::kernel_init_security(features.selinux.enabled, selinux_exceptions_config);
 
