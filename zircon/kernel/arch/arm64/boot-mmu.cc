@@ -240,8 +240,8 @@ zx_status_t arm64_boot_map_v(const vaddr_t vaddr, const paddr_t paddr, const siz
     return reinterpret_cast<pte_t*>(paddr_to_physmap(pa));
   };
 
-  return _arm64_boot_map(arm64_get_kernel_ptable(), vaddr, paddr, len, flags, alloc, phys_to_virt,
-                         allow_large_pages);
+  return _arm64_boot_map(arm64_root_kernel_page_table(), vaddr, paddr, len, flags, alloc,
+                         phys_to_virt, allow_large_pages);
 }
 
 // Walk all the page tables allocated in the boot process and move them from the WIRED to the MMU
@@ -271,5 +271,4 @@ void arm64_boot_mmu_unwire() {
     const paddr_t paddr = paddr_base + i * PAGE_SIZE;
     process_page(paddr);
   }
-  process_page(arm64_get_kernel_ptable_phys());
 }
