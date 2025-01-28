@@ -657,7 +657,11 @@ zx_status_t Remote<Protocol>::AdvisoryLock(advisory_lock_req* req) {
 
 template <typename Protocol>
 zx_status_t Remote<Protocol>::FlagsGetDeprecated(uint32_t* out_flags) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  const fidl::WireResult result = client()->DeprecatedGetFlags();
+#else
   const fidl::WireResult result = client()->GetFlags();
+#endif
   if (!result.ok()) {
     return result.status();
   }
@@ -671,7 +675,12 @@ zx_status_t Remote<Protocol>::FlagsGetDeprecated(uint32_t* out_flags) {
 
 template <typename Protocol>
 zx_status_t Remote<Protocol>::FlagsSetDeprecated(uint32_t flags) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  const fidl::WireResult result =
+      client()->DeprecatedSetFlags(static_cast<fio::wire::OpenFlags>(flags));
+#else
   const fidl::WireResult result = client()->SetFlags(static_cast<fio::wire::OpenFlags>(flags));
+#endif
   if (!result.ok()) {
     return result.status();
   }
@@ -681,8 +690,8 @@ zx_status_t Remote<Protocol>::FlagsSetDeprecated(uint32_t flags) {
 
 template <typename Protocol>
 zx_status_t Remote<Protocol>::FlagsGet(uint64_t* out_flags) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  const fidl::WireResult result = client()->GetFlags2();
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  const fidl::WireResult result = client()->GetFlags();
   if (result.ok()) {
     if (result->is_error()) {
       return result->error_value();
@@ -693,8 +702,8 @@ zx_status_t Remote<Protocol>::FlagsGet(uint64_t* out_flags) {
   if (result.status() != ZX_ERR_NOT_SUPPORTED) {
     return result.status();
   }
-  // Fallback to fuchsia.io/Node.GetFlags if the server doesn't support GetFlags2.
-  // TODO(https://fxbug.dev/376509077): Remove fallback when GetFlags2 is supported by all
+  // Fallback to fuchsia.io/Node.DeprecatedGetFlags if the server doesn't support GetFlags.
+  // TODO(https://fxbug.dev/376509077): Remove fallback when GetFlags is supported by all
   // out-of-tree servers at all API levels.
 #endif
   // fuchsia.io servers only support setting the APPEND flag so we can ignore other flags here.
@@ -711,8 +720,8 @@ zx_status_t Remote<Protocol>::FlagsGet(uint64_t* out_flags) {
 
 template <typename Protocol>
 zx_status_t Remote<Protocol>::FlagsSet(uint64_t flags) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  const fidl::WireResult result = client()->SetFlags2(fio::wire::Flags{flags});
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  const fidl::WireResult result = client()->SetFlags(fio::wire::Flags{flags});
   if (result.ok()) {
     if (result->is_error()) {
       return result->error_value();
@@ -722,8 +731,8 @@ zx_status_t Remote<Protocol>::FlagsSet(uint64_t flags) {
   if (result.status() != ZX_ERR_NOT_SUPPORTED) {
     return result.status();
   }
-  // Fallback to fuchsia.io/Node.SetFlags if the server doesn't support SetFlags2.
-  // TODO(https://fxbug.dev/376509077): Remove fallback when SetFlags2 is supported by all
+  // Fallback to fuchsia.io/Node.DeprecatedSetFlags if the server doesn't support SetFlags.
+  // TODO(https://fxbug.dev/376509077): Remove fallback when SetFlags is supported by all
   // out-of-tree servers at all API levels.
 #endif
   // fuchsia.io servers only support setting the APPEND flag so we can ignore other flags here.

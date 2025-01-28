@@ -52,7 +52,8 @@ async fn verify_package_executability(
     }
 
     async fn verify_flags(dir: &fio::DirectoryProxy, expected_flags: fio::OpenFlags) {
-        let (status, flags) = dir.get_flags().await.unwrap();
+        // TODO(https://fxbug.dev/376509077): Transition to use fuchsia.io/Node.GetFlags.
+        let (status, flags) = dir.deprecated_get_flags().await.unwrap();
         let () = Status::ok(status).unwrap();
         assert_eq!(flags, expected_flags);
     }

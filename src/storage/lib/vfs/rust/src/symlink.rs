@@ -177,9 +177,27 @@ impl<T: Symlink> Connection<T> {
                     return Ok(true);
                 }
             },
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::SymlinkRequest::GetFlags { responder } => {
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::SymlinkRequest::SetFlags { flags: _, responder } => {
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::SymlinkRequest::DeprecatedGetFlags { responder } => {
+                responder.send(Status::NOT_SUPPORTED.into_raw(), fio::OpenFlags::empty())?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::SymlinkRequest::DeprecatedSetFlags { responder, .. } => {
+                responder.send(Status::ACCESS_DENIED.into_raw())?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::SymlinkRequest::GetFlags { responder } => {
                 responder.send(Status::NOT_SUPPORTED.into_raw(), fio::OpenFlags::empty())?;
             }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::SymlinkRequest::SetFlags { responder, .. } => {
                 responder.send(Status::ACCESS_DENIED.into_raw())?;
             }
@@ -191,14 +209,6 @@ impl<T: Symlink> Connection<T> {
                     Err(status) => responder.send(status.into_raw(), None)?,
                     Ok(info) => responder.send(0, Some(&info))?,
                 }
-            }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            fio::SymlinkRequest::GetFlags2 { responder } => {
-                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
-            }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            fio::SymlinkRequest::SetFlags2 { flags: _, responder } => {
-                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::SymlinkRequest::_UnknownMethod { ordinal, .. } => {
                 log::warn!(ordinal; "Received unknown method")

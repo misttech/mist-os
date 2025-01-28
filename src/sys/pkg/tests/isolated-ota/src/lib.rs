@@ -540,16 +540,16 @@ async fn serve_failing_blobfs(mut stream: fio::DirectoryRequestStream) -> Result
             fio::DirectoryRequest::UpdateAttributes { payload: _, responder } => {
                 responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?
             }
-            fio::DirectoryRequest::GetFlags { responder } => {
+            fio::DirectoryRequest::DeprecatedGetFlags { responder } => {
                 responder.send(zx::Status::IO.into_raw(), fio::OpenFlags::empty())?
             }
-            fio::DirectoryRequest::SetFlags { flags: _, responder } => {
+            fio::DirectoryRequest::DeprecatedSetFlags { flags: _, responder } => {
                 responder.send(zx::Status::IO.into_raw())?
             }
-            fio::DirectoryRequest::GetFlags2 { responder } => {
+            fio::DirectoryRequest::GetFlags { responder } => {
                 responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
-            fio::DirectoryRequest::SetFlags2 { flags: _, responder } => {
+            fio::DirectoryRequest::SetFlags { flags: _, responder } => {
                 responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::Open { flags: _, mode: _, path, object, control_handle: _ } => {

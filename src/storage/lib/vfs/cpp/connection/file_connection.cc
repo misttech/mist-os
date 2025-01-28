@@ -200,7 +200,11 @@ void FileConnection::UpdateAttributes(fio::wire::MutableNodeAttributes* request,
   completer.Reply(Connection::NodeUpdateAttributes(update));
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void FileConnection::DeprecatedGetFlags(DeprecatedGetFlagsCompleter::Sync& completer) {
+#else
 void FileConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
+#endif
   fio::OpenFlags flags = {};
   if (rights() & fio::Rights::kReadBytes) {
     flags |= fio::OpenFlags::kRightReadable;
@@ -217,13 +221,18 @@ void FileConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
   completer.Reply(ZX_OK, flags);
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void FileConnection::DeprecatedSetFlags(DeprecatedSetFlagsRequestView request,
+                                        DeprecatedSetFlagsCompleter::Sync& completer) {
+#else
 void FileConnection::SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) {
+#endif
   const bool append = static_cast<bool>(request->flags & fio::OpenFlags::kAppend);
   completer.Reply(SetAppend(append).status_value());
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-void FileConnection::GetFlags2(GetFlags2Completer::Sync& completer) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void FileConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
   fio::Flags flags = fio::Flags::kProtocolFile | RightsToFlags(rights());
   if (GetAppend()) {
     flags |= fio::Flags::kFileAppend;
@@ -231,7 +240,7 @@ void FileConnection::GetFlags2(GetFlags2Completer::Sync& completer) {
   completer.ReplySuccess(flags);
 }
 
-void FileConnection::SetFlags2(SetFlags2RequestView request, SetFlags2Completer::Sync& completer) {
+void FileConnection::SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) {
   // Only the APPEND flag is allowed.
   if (request->flags & ~fio::Flags::kFileAppend) {
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
@@ -308,4 +317,5 @@ void FileConnection::AdvisoryLock(fidl::WireServer<fio::File>::AdvisoryLockReque
 
 void FileConnection::handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_io::File>,
                                            fidl::UnknownMethodCompleter::Sync&) {}
+
 }  // namespace fs::internal

@@ -97,7 +97,7 @@ TEST(FidlTests, TestFidlOpenReadOnly) {
   ASSERT_OK(fdio_open3("/fidltmp-ro/file-ro", static_cast<uint64_t>(fio::wire::kPermReadable),
                        endpoints.server.TakeChannel().release()));
 
-  auto result = fidl::WireCall(endpoints.client)->GetFlags();
+  auto result = fidl::WireCall(endpoints.client)->DeprecatedGetFlags();
   ASSERT_OK(result.status());
   ASSERT_OK(result->s);
   ASSERT_EQ(result->flags, fio::wire::OpenFlags::kRightReadable);

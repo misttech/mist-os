@@ -1165,7 +1165,7 @@ mod tests {
 
         // Check flags on directory opened. This should match the maximum set of rights for every
         // directory connection along the open chain.
-        let flags = dir_proxy.get_flags2().await.expect("FIDL error").expect("GetFlags error");
+        let flags = dir_proxy.get_flags().await.expect("FIDL error").expect("GetFlags error");
         assert_eq!(
             flags,
             fio::PERM_READABLE

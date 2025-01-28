@@ -55,7 +55,12 @@ class DirectoryConnection final : public Connection,
   void GetAttr(GetAttrCompleter::Sync& completer) final;
   void SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync& completer) final;
   void GetFlags(GetFlagsCompleter::Sync& completer) final;
-  void SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) final;
+  void SetFlags(SetFlagsRequestView, SetFlagsCompleter::Sync& completer) final;
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  void DeprecatedGetFlags(DeprecatedGetFlagsCompleter::Sync& completer) final;
+  void DeprecatedSetFlags(DeprecatedSetFlagsRequestView,
+                          DeprecatedSetFlagsCompleter::Sync& completer) final;
+#endif
   void GetAttributes(fuchsia_io::wire::NodeGetAttributesRequest* request,
                      GetAttributesCompleter::Sync& completer) final;
   void UpdateAttributes(fuchsia_io::wire::MutableNodeAttributes* request,
@@ -75,13 +80,6 @@ class DirectoryConnection final : public Connection,
   }
   void RemoveExtendedAttribute(RemoveExtendedAttributeRequestView request,
                                RemoveExtendedAttributeCompleter::Sync& completer) final {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-#endif
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  void GetFlags2(GetFlags2Completer::Sync& completer) final;
-  // SetFlags2 is not supported for directory connections.
-  void SetFlags2(SetFlags2RequestView request, SetFlags2Completer::Sync& completer) final {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 #endif

@@ -107,19 +107,31 @@ void NodeConnection::UpdateAttributes(fio::wire::MutableNodeAttributes* request,
   completer.ReplyError(ZX_ERR_BAD_HANDLE);
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
 void NodeConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
+  completer.ReplySuccess(fio::Flags::kProtocolNode | RightsToFlags(rights()));
+}
+void NodeConnection::SetFlags(SetFlagsRequestView, SetFlagsCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+#endif
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void NodeConnection::DeprecatedGetFlags(DeprecatedGetFlagsCompleter::Sync& completer) {
+#else
+void NodeConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
+#endif
   completer.Reply(ZX_OK, fio::OpenFlags::kNodeReference);
 }
 
-void NodeConnection::SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void NodeConnection::DeprecatedSetFlags(DeprecatedSetFlagsRequestView,
+                                        DeprecatedSetFlagsCompleter::Sync& completer) {
+#else
+void NodeConnection::SetFlags(SetFlagsRequestView, SetFlagsCompleter::Sync& completer) {
+#endif
   completer.Reply(ZX_ERR_BAD_HANDLE);
 }
-
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-void NodeConnection::GetFlags2(GetFlags2Completer::Sync& completer) {
-  completer.ReplySuccess(fio::Flags::kProtocolNode | RightsToFlags(rights()));
-}
-#endif
 
 void NodeConnection::QueryFilesystem(QueryFilesystemCompleter::Sync& completer) {
   zx::result result = Connection::NodeQueryFilesystem();

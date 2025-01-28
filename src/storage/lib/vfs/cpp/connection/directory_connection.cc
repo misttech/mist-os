@@ -174,20 +174,32 @@ void DirectoryConnection::UpdateAttributes(fio::wire::MutableNodeAttributes* req
   completer.Reply(Connection::NodeUpdateAttributes(update));
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
 void DirectoryConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
+  completer.ReplySuccess(fio::Flags::kProtocolDirectory | RightsToFlags(rights()));
+}
+void DirectoryConnection::SetFlags(SetFlagsRequestView, SetFlagsCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+#endif
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void DirectoryConnection::DeprecatedGetFlags(DeprecatedGetFlagsCompleter::Sync& completer) {
+#else
+void DirectoryConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
+#endif
   completer.Reply(ZX_OK, RightsToOpenFlags(rights()));
 }
 
-void DirectoryConnection::SetFlags(SetFlagsRequestView request,
-                                   SetFlagsCompleter::Sync& completer) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void DirectoryConnection::DeprecatedSetFlags(DeprecatedSetFlagsRequestView,
+                                             DeprecatedSetFlagsCompleter::Sync& completer) {
+#else
+void DirectoryConnection::SetFlags(SetFlagsRequestView, SetFlagsCompleter::Sync& completer) {
+#endif
+
   completer.Reply(ZX_ERR_NOT_SUPPORTED);
 }
-
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-void DirectoryConnection::GetFlags2(GetFlags2Completer::Sync& completer) {
-  completer.ReplySuccess(fio::Flags::kProtocolDirectory | RightsToFlags(rights()));
-}
-#endif
 
 void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& completer) {
   // TODO(https://fxbug.dev/346585458): This operation should require the TRAVERSE right.

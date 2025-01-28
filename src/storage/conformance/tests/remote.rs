@@ -116,7 +116,7 @@ async fn open_remote_directory_right_escalation_test() {
 
     // Since the root node only has RW permissions, and even though the remote has RWX,
     // we should only get RW permissions back.
-    let (_, node_flags) = node_proxy.get_flags().await.unwrap();
+    let (_, node_flags) = node_proxy.deprecated_get_flags().await.unwrap();
     assert_eq!(node_flags, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
 }
 

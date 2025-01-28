@@ -392,8 +392,20 @@ open protocol Node {
     /// Acquires the `Directory.Open` rights and flags used to access this file.
     ///
     /// This method does not require any rights.
+    @available(replaced=NEXT, renamed="DeprecatedGetFlags")
     @selector("fuchsia.io1/Node.NodeGetFlags")
     strict GetFlags() -> (struct {
+        s zx.Status;
+        flags OpenFlags;
+    });
+
+    /// [DEPRECATED - Use new GetFlags method instead.]
+    // TODO(https://fxbug.dev/376509077): Remove this when all out-of-tree servers support the new
+    // GetFlags method. We can't gracefully remove this method since changing it to flexible breaks
+    // wire compatibility with older clients.
+    @available(added=NEXT, deprecated=HEAD)
+    @selector("fuchsia.io1/Node.NodeGetFlags")
+    strict DeprecatedGetFlags() -> (struct {
         s zx.Status;
         flags OpenFlags;
     });
@@ -403,8 +415,21 @@ open protocol Node {
     /// - `OpenFlags.APPEND`
     ///
     /// This method does not require any rights.
+    @available(replaced=NEXT, renamed="DeprecatedSetFlags")
     @selector("fuchsia.io1/Node.NodeSetFlags")
     strict SetFlags(struct {
+        flags OpenFlags;
+    }) -> (struct {
+        s zx.Status;
+    });
+
+    /// [DEPRECATED - Use new SetFlags method instead.]
+    // TODO(https://fxbug.dev/376509077): Remove this when all out-of-tree servers support the new
+    // GetFlags method. We can't gracefully remove this method since changing it to flexible breaks
+    // wire compatibility with older clients.
+    @available(added=NEXT, deprecated=HEAD)
+    @selector("fuchsia.io1/Node.NodeSetFlags")
+    strict DeprecatedSetFlags(struct {
         flags OpenFlags;
     }) -> (struct {
         s zx.Status;
@@ -418,9 +443,9 @@ open protocol Node {
     ///  - `Flags.PERM_INHERIT_*`: Only applies when determining connection rights.
     ///  - `Flags.PROTOCOL_*`: Only the protocol of the connection will be present.
     ///  - `Flags.FLAG_*`: Only applies when opening the resource, not part of the connection.
-    @available(added=HEAD)
+    @available(added=NEXT)
     @selector("fuchsia.io/Node.GetFlags")
-    flexible GetFlags2() -> (struct {
+    flexible GetFlags() -> (struct {
         flags Flags;
     }) error zx.Status;
 
@@ -433,9 +458,9 @@ open protocol Node {
     /// Errors:
     ///  - `ZX_ERR_NOT_SUPPORTED`: The object does not support this feature or the specified flags.
     ///  - `ZX_ERR_INVALID_ARGS`: `flags` other than `Flags.FILE_APPEND` were specified.
-    @available(added=HEAD)
+    @available(added=NEXT)
     @selector("fuchsia.io/Node.SetFlags")
-    flexible SetFlags2(struct {
+    flexible SetFlags(struct {
         flags Flags;
     }) -> () error zx.Status;
 

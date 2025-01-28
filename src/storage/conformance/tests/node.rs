@@ -74,7 +74,7 @@ async fn test_open_node_on_file() {
 }
 
 #[fuchsia::test]
-async fn test_set_attr_and_set_flags_on_node() {
+async fn test_set_attr_and_deprecated_set_flags_on_node() {
     let harness = TestHarness::new().await;
     let entries = vec![file("file", vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
@@ -103,13 +103,15 @@ async fn test_set_attr_and_set_flags_on_node() {
         Err(zx::Status::BAD_HANDLE)
     );
     assert_eq!(
-        zx::Status::ok(proxy.set_flags(fio::OpenFlags::APPEND).await.expect("set_flags failed")),
+        zx::Status::ok(
+            proxy.deprecated_set_flags(fio::OpenFlags::APPEND).await.expect("set_flags failed")
+        ),
         Err(zx::Status::BAD_HANDLE)
     );
 }
 
 #[fuchsia::test]
-async fn test_set_flags2_on_node() {
+async fn test_set_flags_on_node() {
     let harness = TestHarness::new().await;
     let entries = vec![file("file", vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
@@ -117,11 +119,7 @@ async fn test_set_flags2_on_node() {
         dir.open3_node::<fio::NodeMarker>("file", fio::Flags::PROTOCOL_NODE, None).await.unwrap();
     assert_eq!(
         zx::Status::ok(
-            proxy
-                .set_flags2(fio::Flags::FILE_APPEND)
-                .await
-                .expect("set_flags2 failed")
-                .unwrap_err()
+            proxy.set_flags(fio::Flags::FILE_APPEND).await.expect("set_flags failed").unwrap_err()
         ),
         Err(zx::Status::NOT_SUPPORTED)
     );

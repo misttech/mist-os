@@ -159,10 +159,32 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 trace::duration!(c"storage", c"Directory::RemoveExtendedAttribute");
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::DirectoryRequest::GetFlags { responder } => {
+                trace::duration!(c"storage", c"Directory::GetFlags");
+                responder.send(Ok(fio::Flags::from(&self.options)))?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::DirectoryRequest::SetFlags { flags: _, responder } => {
+                trace::duration!(c"storage", c"Directory::SetFlags");
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::DirectoryRequest::DeprecatedGetFlags { responder } => {
+                trace::duration!(c"storage", c"Directory::DeprecatedGetFlags");
+                responder.send(Status::OK.into_raw(), self.options.to_io1())?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::DirectoryRequest::DeprecatedSetFlags { flags: _, responder } => {
+                trace::duration!(c"storage", c"Directory::DeprecatedSetFlags");
+                responder.send(Status::NOT_SUPPORTED.into_raw())?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::DirectoryRequest::GetFlags { responder } => {
                 trace::duration!(c"storage", c"Directory::GetFlags");
                 responder.send(Status::OK.into_raw(), self.options.to_io1())?;
             }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::DirectoryRequest::SetFlags { flags: _, responder } => {
                 trace::duration!(c"storage", c"Directory::SetFlags");
                 responder.send(Status::NOT_SUPPORTED.into_raw())?;
@@ -262,15 +284,6 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 // Since open typically spawns a task, yield to the executor now to give that task a
                 // chance to run before we try and process the next request for this directory.
                 yield_to_executor().await;
-            }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            fio::DirectoryRequest::GetFlags2 { responder } => {
-                trace::duration!(c"storage", c"Directory::GetFlags2");
-                responder.send(Ok(fio::Flags::from(&self.options)))?;
-            }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            fio::DirectoryRequest::SetFlags2 { flags: _, responder } => {
-                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::_UnknownMethod { .. } => (),
         }

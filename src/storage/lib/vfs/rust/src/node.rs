@@ -227,9 +227,27 @@ impl<N: Node> Connection<N> {
             fio::NodeRequest::RemoveExtendedAttribute { responder, .. } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::NodeRequest::GetFlags { responder } => {
+                responder.send(Ok(fio::Flags::from(&self.options)))?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::NodeRequest::SetFlags { flags: _, responder } => {
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::NodeRequest::DeprecatedGetFlags { responder } => {
+                responder.send(Status::OK.into_raw(), fio::OpenFlags::NODE_REFERENCE)?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::NodeRequest::DeprecatedSetFlags { flags: _, responder } => {
+                responder.send(Status::BAD_HANDLE.into_raw())?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::NodeRequest::GetFlags { responder } => {
                 responder.send(Status::OK.into_raw(), fio::OpenFlags::NODE_REFERENCE)?;
             }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::NodeRequest::SetFlags { flags: _, responder } => {
                 responder.send(Status::BAD_HANDLE.into_raw())?;
             }
@@ -238,14 +256,6 @@ impl<N: Node> Connection<N> {
             }
             fio::NodeRequest::QueryFilesystem { responder } => {
                 responder.send(Status::NOT_SUPPORTED.into_raw(), None)?;
-            }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            fio::NodeRequest::GetFlags2 { responder } => {
-                responder.send(Ok(fio::Flags::from(&self.options)))?;
-            }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            fio::NodeRequest::SetFlags2 { flags: _, responder } => {
-                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::NodeRequest::_UnknownMethod { .. } => (),
         }

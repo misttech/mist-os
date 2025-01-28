@@ -782,10 +782,42 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 .trace(trace::trace_future_args!(c"storage", c"File::Resize"))
                 .await?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::FileRequest::GetFlags { responder } => {
+                trace::duration!(c"storage", c"File::GetFlags");
+                responder.send(Ok(fio::Flags::from(&self.options)))?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::FileRequest::SetFlags { flags, responder } => {
+                trace::duration!(c"storage", c"File::SetFlags");
+                // The only supported flag is APPEND.
+                if flags.is_empty() || flags == fio::Flags::FILE_APPEND {
+                    self.options.is_append = flags.contains(fio::Flags::FILE_APPEND);
+                    responder.send(self.file.set_flags(flags).map_err(Status::into_raw))?;
+                } else {
+                    responder.send(Err(Status::INVALID_ARGS.into_raw()))?;
+                }
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::FileRequest::DeprecatedGetFlags { responder } => {
+                trace::duration!(c"storage", c"File::DeprecatedGetFlags");
+                responder.send(Status::OK.into_raw(), self.options.to_io1())?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::FileRequest::DeprecatedSetFlags { flags, responder } => {
+                trace::duration!(c"storage", c"File::DeprecatedSetFlags");
+                // The only supported flag is APPEND.
+                let is_append = flags.contains(fio::OpenFlags::APPEND);
+                self.options.is_append = is_append;
+                let flags = if is_append { fio::Flags::FILE_APPEND } else { fio::Flags::empty() };
+                responder.send(Status::from_result(self.file.set_flags(flags)).into_raw())?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::FileRequest::GetFlags { responder } => {
                 trace::duration!(c"storage", c"File::GetFlags");
                 responder.send(Status::OK.into_raw(), self.options.to_io1())?;
             }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::FileRequest::SetFlags { flags, responder } => {
                 trace::duration!(c"storage", c"File::SetFlags");
                 // The only supported flag is APPEND.
@@ -831,22 +863,6 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 }
                 .trace(trace::trace_future_args!(c"storage", c"File::Allocate"))
                 .await?;
-            }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            fio::FileRequest::GetFlags2 { responder } => {
-                trace::duration!(c"storage", c"File::GetFlags2");
-                responder.send(Ok(fio::Flags::from(&self.options)))?;
-            }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            fio::FileRequest::SetFlags2 { flags, responder } => {
-                trace::duration!(c"storage", c"File::SetFlags2");
-                // The only supported flag is APPEND.
-                if flags.is_empty() || flags == fio::Flags::FILE_APPEND {
-                    self.options.is_append = flags.contains(fio::Flags::FILE_APPEND);
-                    responder.send(self.file.set_flags(flags).map_err(Status::into_raw))?;
-                } else {
-                    responder.send(Err(Status::INVALID_ARGS.into_raw()))?;
-                }
             }
             fio::FileRequest::_UnknownMethod { .. } => (),
         }
@@ -1562,14 +1578,14 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_getflags() {
+    async fn test_deprecated_get_flags() {
         let env = init_mock_file(
             Box::new(always_succeed_callback),
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
                 | fio::OpenFlags::TRUNCATE,
         );
-        let (status, flags) = env.proxy.get_flags().await.unwrap();
+        let (status, flags) = env.proxy.deprecated_get_flags().await.unwrap();
         assert_eq!(Status::from_raw(status), Status::OK);
         // OPEN_FLAG_TRUNCATE should get stripped because it only applies at open time.
         assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
@@ -1793,11 +1809,11 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_set_flags() {
+    async fn test_deprecated_set_flags() {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_WRITABLE);
-        let status = env.proxy.set_flags(fio::OpenFlags::APPEND).await.unwrap();
+        let status = env.proxy.deprecated_set_flags(fio::OpenFlags::APPEND).await.unwrap();
         assert_eq!(Status::from_raw(status), Status::OK);
-        let (status, flags) = env.proxy.get_flags().await.unwrap();
+        let (status, flags) = env.proxy.deprecated_get_flags().await.unwrap();
         assert_eq!(Status::from_raw(status), Status::OK);
         assert_eq!(flags, fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::APPEND);
     }
@@ -2141,7 +2157,7 @@ mod tests {
         }
 
         #[fuchsia::test]
-        async fn test_stream_set_flags() {
+        async fn test_stream_deprecated_set_flags() {
             let data = [0, 1, 2, 3, 4];
             let vmo = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 100).unwrap();
             let flags = fio::OpenFlags::RIGHT_WRITABLE;
@@ -2156,7 +2172,7 @@ mod tests {
             assert_eq!(vmo.get_content_size().unwrap(), 100);
 
             // Switch to append mode.
-            zx::ok(env.proxy.set_flags(fio::OpenFlags::APPEND).await.unwrap()).unwrap();
+            zx::ok(env.proxy.deprecated_set_flags(fio::OpenFlags::APPEND).await.unwrap()).unwrap();
             env.proxy
                 .seek(fio::SeekOrigin::Start, 0)
                 .await
@@ -2169,7 +2185,7 @@ mod tests {
             assert_eq!(vmo.get_content_size().unwrap(), 105);
 
             // Switch out of append mode.
-            zx::ok(env.proxy.set_flags(fio::OpenFlags::empty()).await.unwrap()).unwrap();
+            zx::ok(env.proxy.deprecated_set_flags(fio::OpenFlags::empty()).await.unwrap()).unwrap();
             env.proxy
                 .seek(fio::SeekOrigin::Start, 0)
                 .await
