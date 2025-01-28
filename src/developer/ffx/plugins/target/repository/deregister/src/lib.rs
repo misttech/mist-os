@@ -7,7 +7,7 @@ use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
 use ffx_target_repository_deregister_args::DeregisterCommand;
 use fho::{
-    bug, moniker, return_bug, return_user_error, user_error, FfxContext, FfxMain, FfxTool, Result,
+    bug, return_bug, return_user_error, user_error, FfxContext, FfxMain, FfxTool, Result,
     SimpleWriter,
 };
 use fidl_fuchsia_developer_ffx::{
@@ -18,7 +18,7 @@ use fidl_fuchsia_pkg::RepositoryManagerProxy;
 use fidl_fuchsia_pkg_rewrite::EngineProxy;
 use fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule};
 use pkg::{PkgServerInstanceInfo as _, PkgServerInstances, ServerMode};
-use target_holders::daemon_protocol;
+use target_holders::{daemon_protocol, moniker};
 use zx_status::Status;
 
 const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";

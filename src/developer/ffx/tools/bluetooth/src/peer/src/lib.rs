@@ -5,8 +5,8 @@
 use ::async_trait::async_trait;
 use ::ffx_bluetooth_peer_args::{PeerCommand, PeerSubCommand};
 use ::fho::{
-    toolbox, AvailabilityFlag, Error, FfxMain, FfxTool, FhoEnvironment, Result, SimpleWriter,
-    ToolIO, TryFromEnv, TryFromEnvWith,
+    AvailabilityFlag, Error, FfxMain, FfxTool, FhoEnvironment, Result, SimpleWriter, ToolIO,
+    TryFromEnv, TryFromEnvWith,
 };
 use async_utils::hanging_get::client::HangingGetStream;
 use fidl_fuchsia_bluetooth::PeerId as FidlPeerId;
@@ -19,6 +19,7 @@ use regex::Regex;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::time::Duration;
+use target_holders::toolbox;
 
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("bluetooth.enabled"))]

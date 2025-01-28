@@ -12,11 +12,12 @@ use anyhow::Result;
 use async_trait::async_trait;
 use errors::ffx_error;
 use ffx_profile_memory_components_args::ComponentsCommand;
-use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
+use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use futures::AsyncReadExt;
 use json::JsonConvertible;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use target_holders::moniker;
 
 use fidl_fuchsia_memory_attribution_plugin as fplugin;
 

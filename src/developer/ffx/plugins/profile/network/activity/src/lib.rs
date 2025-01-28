@@ -6,8 +6,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use errors::ffx_bail;
 use ffx_network_activity_args as args_mod;
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_power_metrics::{self as fmetrics, Metric, NetworkActivity};
+use target_holders::moniker;
 
 #[derive(FfxTool)]
 pub struct NetworkActivityTool {

@@ -18,12 +18,13 @@ use async_trait::async_trait;
 use digest::{processed, raw};
 use ffx_profile_memory_args::MemoryCommand;
 use ffx_writer::ToolIO;
-use fho::{moniker, FfxMain, FfxTool, MachineWriter};
+use fho::{FfxMain, FfxTool, MachineWriter};
 use fidl_fuchsia_memory_inspection::CollectorProxy;
 use futures::AsyncReadExt;
 use plugin_output::ProfileMemoryOutput;
 use std::io::Write;
 use std::time::Duration;
+use target_holders::moniker;
 
 #[derive(FfxTool)]
 pub struct MemoryTool {

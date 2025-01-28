@@ -41,6 +41,7 @@ ffx_plugin("ffx_audio_device") {
     "//sdk/rust/zx-types",
     "//src/developer/ffx/command/error:lib",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/plugins/audio/common:ffx_audio_common",
     "//src/developer/ffx/plugins/audio/ffx_optional_moniker",
     "//src/lib/fidl/rust/fidl",

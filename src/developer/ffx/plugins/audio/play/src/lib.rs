@@ -6,10 +6,11 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ffx_audio_common::PlayResult;
 use ffx_audio_play_args::{AudioRenderUsageExtended, PlayCommand};
-use fho::{moniker, FfxMain, FfxTool, MachineWriter};
+use fho::{FfxMain, FfxTool, MachineWriter};
 use fidl::HandleBased;
 use fidl_fuchsia_audio_controller as fac;
 use std::io::Read;
+use target_holders::moniker;
 
 #[derive(FfxTool)]
 pub struct PlayTool {

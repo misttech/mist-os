@@ -5,8 +5,9 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use ffx_setui_audio_args::Audio;
-use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
+use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_settings::{AudioProxy, AudioSettings2};
+use target_holders::moniker;
 use utils::{handle_mixed_result, Either, WatchOrSetResult};
 
 #[derive(FfxTool)]

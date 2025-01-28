@@ -14,12 +14,10 @@ pub mod testing;
 pub use subtool::{FfxMain, FfxTool};
 
 // Re-export TryFromEnv related symbols
-pub use from_env::{moniker, moniker_f, AvailabilityFlag, CheckEnv};
+pub use from_env::{AvailabilityFlag, CheckEnv};
 
 pub use fho_env::{DeviceLookup, FhoConnectionBehavior, FhoEnvironment};
 pub use try_from_env::{deferred, Deferred, TryFromEnv, TryFromEnvWith};
-
-pub use from_env::{toolbox, toolbox_or};
 
 // Used for deriving an FFX tool.
 pub use fho_macro::FfxTool;

@@ -5,7 +5,7 @@
 use anyhow::{format_err, Result};
 use async_trait::async_trait;
 use ffx_session_add_args::SessionAddCommand;
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_element::{
     self as felement, Annotation, AnnotationKey, AnnotationValue, ControllerMarker, ManagerProxy,
     Spec,
@@ -15,6 +15,7 @@ use futures::FutureExt;
 use signal_hook::consts::signal::*;
 use signal_hook::iterator::Signals;
 use std::future::Future;
+use target_holders::moniker;
 
 #[derive(FfxTool)]
 pub struct AddTool {

@@ -12,7 +12,7 @@ use anyhow::{Context, Result};
 
 use ffx_config::global_env_context;
 use ffx_process_args::{Args, ProcessCommand, Task};
-use fho::{moniker, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_buildinfo::{BuildInfo, ProviderProxy};
 use fidl_fuchsia_process_explorer::{
     ProcessExplorerGetStackTraceRequest, ProcessExplorerKillTaskRequest, ProcessExplorerProxy,
@@ -24,6 +24,7 @@ use processes_data::{processed, raw};
 use std::collections::HashSet;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
+use target_holders::moniker;
 use write_human_readable_output::{
     pretty_print_invalid_koids, pretty_print_processes_data, pretty_print_processes_name_and_koid,
 };

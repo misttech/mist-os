@@ -17,6 +17,7 @@ ffx_plugin("ffx_profile_memory") {
   deps = [
     "//sdk/fidl/fuchsia.memory.inspection:fuchsia.memory.inspection_rust",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/writer:lib",
     "//src/developer/ffx/plugins/profile/memory/common:ffx_profile_memory_common",
     "//src/lib/fidl/rust/fidl",

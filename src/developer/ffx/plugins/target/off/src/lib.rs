@@ -4,8 +4,9 @@
 
 use async_trait::async_trait;
 use ffx_off_args::OffCommand;
-use fho::{moniker, FfxContext, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_hardware_power_statecontrol::AdminProxy;
+use target_holders::moniker;
 use zx_status as zx;
 
 #[derive(FfxTool)]

@@ -7,9 +7,10 @@ use async_trait::async_trait;
 use component_debug::config::RawConfigEntry;
 use errors::ffx_error;
 use ffx_session_launch_args::SessionLaunchCommand;
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_session::{LaunchConfiguration, LauncherProxy};
 use moniker::Moniker;
+use target_holders::moniker;
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_developer_remotecontrol as rc};
 
 const SESSION_MANAGER_MONIKER: &str = "/core/session-manager";

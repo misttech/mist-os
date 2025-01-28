@@ -11,8 +11,9 @@ use errors::FfxError;
 use ffx_component::rcs::{connect_to_lifecycle_controller, connect_to_realm_query};
 use ffx_component_start_args::ComponentStartCommand;
 use ffx_zxdb::Debugger;
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_remotecontrol as rc;
+use target_holders::moniker;
 
 #[derive(FfxTool)]
 pub struct StartTool {

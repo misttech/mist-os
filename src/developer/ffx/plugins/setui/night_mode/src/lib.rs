@@ -5,8 +5,9 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use ffx_setui_night_mode_args::NightMode;
-use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
+use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_settings::{NightModeProxy, NightModeSettings};
+use target_holders::moniker;
 use utils::{handle_mixed_result, Either, WatchOrSetResult};
 
 #[derive(FfxTool)]

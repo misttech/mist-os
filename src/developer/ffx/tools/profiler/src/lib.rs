@@ -9,18 +9,18 @@ use args::{ProfilerCommand, ProfilerSubCommand};
 use async_fs::File;
 use core::fmt;
 use errors::{ffx_bail, ffx_error};
-use fho::{deferred, moniker, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fuchsia_async::unblock;
+use schemars::JsonSchema;
+use serde::Serialize;
 use std::io::{stdin, BufRead};
 use std::process::Command;
 use std::time::Duration;
+use target_holders::moniker;
 use tempfile::Builder;
 use termion::{color, style};
 use tracing::info;
 use {fidl_fuchsia_cpu_profiler as profiler, fidl_fuchsia_test_manager as test_manager};
-
-use schemars::JsonSchema;
-use serde::Serialize;
 
 #[derive(Serialize, JsonSchema)]
 pub struct ShowCpuProfilerCmd {

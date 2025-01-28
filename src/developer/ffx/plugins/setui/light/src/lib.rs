@@ -5,8 +5,9 @@
 use anyhow::{format_err, Result};
 use async_trait::async_trait;
 use ffx_setui_light_args::LightGroup;
-use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
+use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_settings::{LightProxy, LightState};
+use target_holders::moniker;
 use utils::{handle_mixed_result, Either, WatchOrSetResult};
 
 #[derive(FfxTool)]

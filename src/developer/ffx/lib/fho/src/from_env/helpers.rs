@@ -12,7 +12,7 @@ use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use std::time::Duration;
 
-pub async fn connect_to_rcs(env: &FhoEnvironment) -> Result<RemoteControlProxy> {
+pub(crate) async fn connect_to_rcs(env: &FhoEnvironment) -> Result<RemoteControlProxy> {
     let retry_count = 1;
     let mut tries = 0;
     // TODO(b/287693891): Remove explicit retries/timeouts here so they can be
@@ -28,7 +28,7 @@ pub async fn connect_to_rcs(env: &FhoEnvironment) -> Result<RemoteControlProxy> 
     }
 }
 
-pub async fn connect_to_rcs_fdomain(env: &FhoEnvironment) -> Result<FRemoteControlProxy> {
+pub(crate) async fn connect_to_rcs_fdomain(env: &FhoEnvironment) -> Result<FRemoteControlProxy> {
     let retry_count = 1;
     let mut tries = 0;
     // TODO(b/287693891): Remove explicit retries/timeouts here so they can be

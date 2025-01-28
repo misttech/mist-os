@@ -6,11 +6,12 @@ use anyhow::Result;
 use errors::ffx_error;
 use ffx_config::EnvironmentContext;
 use ffx_debug_connect::{DebugAgentSocket, DebuggerProxy};
-use fho::{deferred, moniker, Deferred, FfxContext, FfxMain, FfxTool, SimpleWriter};
+use fho::{deferred, Deferred, FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_debugger::LauncherProxy;
 use fuchsia_async::unblock;
 use sdk::SdkVersion;
 use std::process::Command;
+use target_holders::moniker;
 
 struct ProcessArguments {
     arguments: Vec<String>,

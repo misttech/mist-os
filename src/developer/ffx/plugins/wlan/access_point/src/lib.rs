@@ -4,9 +4,9 @@
 
 use anyhow::Error;
 use async_trait::async_trait;
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool, SimpleWriter};
+use target_holders::moniker;
 use {ffx_wlan_ap_args as arg_types, fidl_fuchsia_wlan_policy as wlan_policy};
-
 #[derive(FfxTool)]
 pub struct AccessPointTool {
     #[command]

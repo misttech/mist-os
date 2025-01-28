@@ -7,7 +7,7 @@ use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
 use ffx_target::get_target_specifier;
 use ffx_trace_args::{TraceCommand, TraceSubCommand};
-use fho::{deferred, moniker, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_developer_ffx::{self as ffx, RecordingError, TracingProxy};
 use fidl_fuchsia_tracing::{BufferingMode, KnownCategory};
 use fidl_fuchsia_tracing_controller::{
@@ -25,7 +25,7 @@ use std::future::Future;
 use std::io::{stdin, LineWriter, Stdin, Write};
 use std::path::{Component, PathBuf};
 use std::time::Duration;
-use target_holders::daemon_protocol;
+use target_holders::{daemon_protocol, moniker};
 use term_grid::Grid;
 #[cfg_attr(test, allow(unused))]
 use termion::terminal_size;

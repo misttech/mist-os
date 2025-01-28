@@ -7,10 +7,11 @@ use component_debug::cli::explore_cmd;
 use errors::FfxError;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_explore_args::ExploreComponentCommand;
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_dash::LauncherProxy;
 use fidl_fuchsia_developer_remotecontrol as rc;
 use socket_to_stdio::Stdout;
+use target_holders::moniker;
 
 #[derive(FfxTool)]
 pub struct ExploreTool {

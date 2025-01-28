@@ -6,9 +6,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use errors::ffx_bail;
 use ffx_gpu_usage_args as args_mod;
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_power_metrics::{self as fmetrics, GpuUsage, Metric};
-
+use target_holders::moniker;
 #[derive(FfxTool)]
 pub struct GpuUsageTool {
     #[command]

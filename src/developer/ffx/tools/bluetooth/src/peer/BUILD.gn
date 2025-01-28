@@ -16,6 +16,7 @@ ffx_plugin("ffx_bluetooth_peer") {
     "//sdk/fidl/fuchsia.bluetooth.sys:fuchsia.bluetooth.sys_rust",
     "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/lib/async-utils",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",

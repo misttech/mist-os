@@ -4,7 +4,7 @@
 
 use async_trait::async_trait;
 use ffx_target_repository_list_args::ListCommand;
-use fho::{bug, moniker, Error, FfxMain, FfxTool, Result, ToolIO, VerifiedMachineWriter};
+use fho::{bug, Error, FfxMain, FfxTool, Result, ToolIO, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
 use fidl_fuchsia_pkg::RepositoryKeyConfig::Ed25519Key;
 use fidl_fuchsia_pkg::{RepositoryConfig, RepositoryManagerProxy};
@@ -16,7 +16,7 @@ use prettytable::{cell, row, Table};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use target_holders::daemon_protocol;
+use target_holders::{daemon_protocol, moniker};
 
 #[derive(FfxTool)]
 pub struct ListTool {

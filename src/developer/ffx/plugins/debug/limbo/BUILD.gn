@@ -14,6 +14,7 @@ ffx_plugin("ffx_debug_limbo") {
     "//sdk/rust/zx-status",
     "//sdk/rust/zx-types",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
   ]

@@ -5,8 +5,9 @@
 use async_trait::async_trait;
 use errors::ffx_error;
 use ffx_power_debugcmd_args::PowerManagerDebugCommand;
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_power_manager_debug as fdebug;
+use target_holders::moniker;
 
 #[derive(FfxTool)]
 pub struct DebugCmdTool {

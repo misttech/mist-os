@@ -21,13 +21,9 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
 
-mod from_toolbox;
 mod helpers;
 
-pub use from_toolbox::*;
 pub(crate) use helpers::*;
-
-const DEFAULT_PROXY_TIMEOUT: Duration = Duration::from_secs(15);
 
 #[async_trait(?Send)]
 pub trait CheckEnv {
@@ -102,32 +98,6 @@ where
         )
         .await
     }
-}
-
-/// A decorator for proxy types in [`crate::FfxTool`] implementations so you can
-/// specify the moniker for the component exposing the proxy you're loading.
-///
-/// This is actually an alias to [`toolbox_or`], so it will also try
-/// your tool's default toolbox first.
-///
-/// Example:
-///
-/// ```rust
-/// #[derive(FfxTool)]
-/// struct Tool {
-///     #[with(fho::moniker("core/foo/thing"))]
-///     foo_proxy: FooProxy,
-/// }
-/// ```
-pub fn moniker<P: Proxy>(
-    moniker: impl AsRef<str>,
-) -> WithToolbox<P, DefaultFuchsiaResourceDialect> {
-    toolbox_or(moniker)
-}
-
-/// Same as [`moniker`] but for FDomain
-pub fn moniker_f<P: FProxy>(moniker: impl AsRef<str>) -> WithToolbox<P, FDomainResourceDialect> {
-    toolbox_or_f(moniker)
 }
 
 #[async_trait(?Send)]

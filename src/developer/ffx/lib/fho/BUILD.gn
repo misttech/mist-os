@@ -52,7 +52,6 @@ rustc_library("lib") {
     "src/connector.rs",
     "src/fho_env.rs",
     "src/from_env.rs",
-    "src/from_env/from_toolbox.rs",
     "src/from_env/helpers.rs",
     "src/lib.rs",
     "src/subtool.rs",

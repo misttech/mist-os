@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Context, Result};
 use errors::FfxError;
-use fho::{deferred, toolbox, AvailabilityFlag, Deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{deferred, AvailabilityFlag, Deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_feedback::DataProviderProxy;
 use fuchsia_triage::{
     analyze, analyze_structured, ActionResultFormatter, ActionTagDirective, TriageOutput,
@@ -12,6 +12,7 @@ use fuchsia_triage::{
 use std::env;
 use std::io::Write;
 use std::path::PathBuf;
+use target_holders::toolbox;
 use tempfile::tempdir;
 use triage_app_lib::file_io::{config_from_files, diagnostics_from_directory};
 

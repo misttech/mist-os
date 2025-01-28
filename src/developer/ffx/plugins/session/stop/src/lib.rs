@@ -5,8 +5,9 @@
 use anyhow::{format_err, Result};
 use async_trait::async_trait;
 use ffx_session_stop_args::SessionStopCommand;
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_session::LifecycleProxy;
+use target_holders::moniker;
 
 const STOPPING_SESSION: &str = "Stopping the session\n";
 

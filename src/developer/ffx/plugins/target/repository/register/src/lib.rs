@@ -6,8 +6,8 @@ use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
 use ffx_target_repository_register_args::RegisterCommand;
 use fho::{
-    bug, moniker, return_bug, return_user_error, user_error, Error, FfxContext, FfxMain, FfxTool,
-    Result, VerifiedMachineWriter,
+    bug, return_bug, return_user_error, user_error, Error, FfxContext, FfxMain, FfxTool, Result,
+    VerifiedMachineWriter,
 };
 use fidl_fuchsia_developer_ffx::{RepositoryRegistryProxy, RepositoryTarget, TargetInfo};
 use fidl_fuchsia_developer_ffx_ext::{RepositoryError, RepositoryTarget as FfxRepositoryTarget};
@@ -19,7 +19,7 @@ use pkg::{PkgServerInfo, PkgServerInstanceInfo as _, PkgServerInstances, ServerM
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use target_holders::{daemon_protocol, TargetProxyHolder};
+use target_holders::{daemon_protocol, moniker, TargetProxyHolder};
 use timeout::timeout;
 
 const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";

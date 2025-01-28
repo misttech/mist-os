@@ -19,6 +19,7 @@ ffx_plugin("ffx_profile_memory_components") {
     "//sdk/fidl/fuchsia.memory.attribution.plugin:fuchsia.memory.attribution.plugin_rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/plugins/profile/memory/common:ffx_profile_memory_common",
     "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:anyhow",

@@ -4,11 +4,12 @@
 
 use ::async_trait::async_trait;
 use ::ffx_bluetooth_pandora_args::{PandoraCommand, PandoraSubCommand};
-use ::fho::{toolbox, AvailabilityFlag, FfxMain, FfxTool, Result, SimpleWriter, ToolIO};
+use ::fho::{AvailabilityFlag, FfxMain, FfxTool, Result, SimpleWriter, ToolIO};
 use ::fidl_fuchsia_bluetooth_pandora::{
     GrpcServerControllerProxy, GrpcServerControllerStartRequest, RootcanalClientControllerProxy,
     RootcanalClientControllerStartRequest, ServiceError,
 };
+use target_holders::toolbox;
 
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("bluetooth.enabled"))]

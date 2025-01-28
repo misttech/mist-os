@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 use argh::{ArgsInfo, FromArgs};
 use async_trait::async_trait;
-use fho::{deferred, moniker, FfxMain, FfxTool, Result, SimpleWriter};
+use fho::{deferred, FfxMain, FfxTool, Result, SimpleWriter};
+use target_holders::moniker;
 
 mod fxfs;
 

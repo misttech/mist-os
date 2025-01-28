@@ -14,6 +14,7 @@ ffx_plugin("ffx_component_start") {
     "//src/developer/debug/ffx_zxdb",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/plugins/component/common:ffx_component",
     "//src/sys/lib/component_debug",
     "//third_party/rust_crates:anyhow",

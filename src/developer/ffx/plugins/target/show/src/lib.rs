@@ -7,9 +7,7 @@ use addr::TargetAddr;
 use anyhow::{anyhow, bail, Result};
 use async_lock::Mutex;
 use async_trait::async_trait;
-use fho::{
-    deferred, moniker, Deferred, DirectConnector, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter,
-};
+use fho::{deferred, Deferred, DirectConnector, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
 use fidl_fuchsia_buildinfo::ProviderProxy;
 use fidl_fuchsia_developer_ffx::TargetAddrInfo;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
@@ -22,7 +20,7 @@ use show::{
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use target_holders::TargetProxyHolder;
+use target_holders::{moniker, TargetProxyHolder};
 use timeout::timeout;
 use {ffx_target, ffx_target_show_args as args};
 

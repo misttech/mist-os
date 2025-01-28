@@ -6,8 +6,7 @@ use async_trait::async_trait;
 use chrono::{Datelike, Local, Timelike};
 use ffx_snapshot_args::SnapshotCommand;
 use fho::{
-    bug, moniker, return_bug, return_user_error, Error, FfxMain, FfxTool, Result,
-    VerifiedMachineWriter,
+    bug, return_bug, return_user_error, Error, FfxMain, FfxTool, Result, VerifiedMachineWriter,
 };
 use fidl_fuchsia_feedback::{
     Annotation, DataProviderProxy, GetAnnotationsParameters, GetSnapshotParameters,
@@ -21,6 +20,7 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+use target_holders::moniker;
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
