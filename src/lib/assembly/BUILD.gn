@@ -10,6 +10,7 @@ standardized_test_groups("tests") {
     "//src/lib/assembly/base_package:base_package_test",
     "//src/lib/assembly/blob_size:blob_size_test",
     "//src/lib/assembly/blobfs:blobfs_test",
+    "//src/lib/assembly/container:container_test",
     "//src/lib/assembly/memory_buckets:memory_buckets_test",
     "//src/lib/assembly/component_id_index:component_id_index_test",
     "//src/lib/assembly/component_manager_config:component_manager_config_test",
