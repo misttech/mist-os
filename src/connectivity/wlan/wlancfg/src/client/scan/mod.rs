@@ -479,7 +479,9 @@ mod tests {
     use crate::mode_management::iface_manager_api::ConnectAttemptRequest;
     use crate::mode_management::{Defect, IfaceFailure};
     use crate::util::testing::fakes::FakeSavedNetworksManager;
-    use crate::util::testing::{generate_channel, generate_random_sme_scan_result};
+    use crate::util::testing::{
+        generate_channel, generate_random_sme_scan_result, run_until_completion,
+    };
     use fidl::endpoints::{create_proxy, ControlHandle, Responder};
     use futures::future;
     use futures::task::Poll;
@@ -1256,8 +1258,8 @@ mod tests {
 
     #[fuchsia::test]
     fn scan_returns_error_on_timeout() {
-        let mut exec = fasync::TestExecutor::new();
-        let (client, _sme_stream) = exec.run_singlethreaded(create_iface_manager());
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        let (client, _sme_stream) = run_until_completion(&mut exec, create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
 
@@ -1712,8 +1714,8 @@ mod tests {
         error_code: fidl_sme::ScanErrorCode,
         retry_succeeds: bool,
     ) {
-        let mut exec = fasync::TestExecutor::new();
-        let (iface_mgr, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        let (iface_mgr, mut sme_stream) = run_until_completion(&mut exec, create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
         let (location_sensor, _, _) = MockScanResultConsumer::new();
@@ -1812,8 +1814,8 @@ mod tests {
 
     #[fuchsia::test]
     fn scanning_loop_backs_off_after_cancelled_request() {
-        let mut exec = fasync::TestExecutor::new();
-        let (iface_mgr, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        let (iface_mgr, mut sme_stream) = run_until_completion(&mut exec, create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
         let (location_sensor, _, _) = MockScanResultConsumer::new();
