@@ -668,10 +668,8 @@ impl InnerState {
 
     /// Frees a LINK block at the given |index|.
     fn free_lazy_node(&mut self, index: BlockIndex) -> Result<(), Error> {
-        let (content_block_index, content_block_type) = {
-            let block = self.heap.container.block_at(index);
-            (block.link_content_index()?, block.block_type())
-        };
+        let content_block_index = self.heap.container.block_at(index).link_content_index()?;
+        let content_block_type = self.heap.container.block_at(content_block_index).block_type();
         let content = self.load_key_string(content_block_index)?;
         self.delete_value(index)?;
         // Free the name or string reference block used for content.
@@ -1273,12 +1271,31 @@ impl InnerState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::reader::snapshot::{ScannedBlock, Snapshot};
+    use crate::reader::snapshot::{BackingBuffer, ScannedBlock, Snapshot};
     use crate::reader::PartialNodeHierarchy;
     use crate::writer::testing_utils::get_state;
     use assert_matches::assert_matches;
     use diagnostics_assertions::assert_data_tree;
     use futures::prelude::*;
+
+    #[track_caller]
+    fn assert_all_free(blocks: &[Block<&BackingBuffer>]) {
+        let mut errors = vec![];
+        for block in blocks {
+            if block.block_type() != BlockType::Free {
+                errors.push(format!(
+                    "block at {} is {}, expected {}",
+                    block.index(),
+                    block.block_type(),
+                    BlockType::Free
+                ));
+            }
+        }
+
+        if !errors.is_empty() {
+            panic!("{errors:#?}");
+        }
+    }
 
     #[fuchsia::test]
     fn test_create() {
@@ -2421,6 +2438,60 @@ mod tests {
             .unwrap();
         let content_block = state_guard.get_block(6.into());
         assert_eq!(state_guard.load_string(content_block.index()).unwrap(), "link-name-1");
+    }
+
+    #[fuchsia::test]
+    fn free_lazy_node_test() {
+        let state = get_state(4096);
+        let (lazy_index, _int_with_magic_name_index) = {
+            let mut state_guard = state.try_lock().expect("lock state");
+            let lazy_index = state_guard
+                .create_lazy_node("lk".into(), 0.into(), LinkNodeDisposition::Inline, || {
+                    async move { Ok(Inspector::default()) }.boxed()
+                })
+                .unwrap();
+
+            let magic_link_name = StringReference::from("lk-0");
+            let int_with_magic_name_index =
+                state_guard.create_int_metric(magic_link_name, 0, BlockIndex::from(0)).unwrap();
+
+            (lazy_index, int_with_magic_name_index)
+        };
+
+        let snapshot = Snapshot::try_from(state.copy_vmo_bytes().unwrap()).unwrap();
+        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+
+        assert_eq!(blocks[1].block_type(), BlockType::LinkValue);
+        assert_eq!(blocks[2].block_type(), BlockType::StringReference);
+        assert_eq!(blocks[3].block_type(), BlockType::StringReference);
+        assert_eq!(blocks[4].block_type(), BlockType::IntValue);
+        assert_eq!(
+            state.try_lock().unwrap().load_string(blocks[4].name_index().unwrap()).unwrap(),
+            "lk-0"
+        );
+        assert_eq!(
+            state.try_lock().unwrap().load_string(blocks[1].name_index().unwrap()).unwrap(),
+            "lk"
+        );
+        assert_eq!(
+            state.try_lock().unwrap().load_string(blocks[1].link_content_index().unwrap()).unwrap(),
+            "lk-0"
+        );
+        assert_all_free(&blocks[5..]);
+
+        state.try_lock().unwrap().free_lazy_node(lazy_index).unwrap();
+
+        let snapshot = Snapshot::try_from(state.copy_vmo_bytes().unwrap()).unwrap();
+        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+
+        assert_eq!(blocks[1].block_type(), BlockType::Free);
+        assert_eq!(blocks[2].block_type(), BlockType::StringReference);
+        assert_eq!(blocks[3].block_type(), BlockType::IntValue);
+        assert_eq!(
+            state.try_lock().unwrap().load_string(blocks[3].name_index().unwrap()).unwrap(),
+            "lk-0"
+        );
+        assert_all_free(&blocks[4..]);
     }
 
     #[fuchsia::test]
