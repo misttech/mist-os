@@ -2204,6 +2204,69 @@ mod tests {
         bindings_ctx.timers.assert_no_timers_installed();
     }
 
+    #[test]
+    fn temporary_address_conflict() {
+        const ONE_HOUR: NonZeroDuration = NonZeroDuration::from_secs(60 * 60).unwrap();
+        const TEMP_IDGEN_RETRIES: u8 = 0;
+
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
+            SlaacConfiguration {
+                temporary_address_configuration: TemporarySlaacAddressConfiguration::Enabled {
+                    temp_valid_lifetime: ONE_HOUR,
+                    temp_preferred_lifetime: ONE_HOUR,
+                    temp_idgen_retries: TEMP_IDGEN_RETRIES,
+                },
+                ..Default::default()
+            },
+            FakeSlaacAddrs::default(),
+            None,
+            DEFAULT_RETRANS_TIMER,
+        );
+
+        // Consider the address we will generate as already assigned without
+        // SLAAC.
+        let mut dup_rng = bindings_ctx.rng().deep_clone();
+        let seed = dup_rng.gen();
+        let first_attempt = generate_global_temporary_address(&SUBNET, &IID, seed, &SECRET_KEY);
+        core_ctx.state.slaac_addrs.non_slaac_addr = Some(first_attempt.addr());
+
+        // Generate a new temporary SLAAC address.
+        SlaacHandler::apply_slaac_update(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            &FakeDeviceId,
+            SUBNET,
+            Some(NonZeroNdpLifetime::Finite(ONE_HOUR)),
+            Some(NonZeroNdpLifetime::Finite(ONE_HOUR)),
+        );
+
+        // The new address will be regenerated so that it has a unique IID by
+        // incrementing the RNG seed.
+        let seed = seed.wrapping_add(1);
+        let addr_sub = generate_global_temporary_address(&SUBNET, &IID, seed, &SECRET_KEY);
+        assert_ne!(addr_sub, first_attempt);
+        let regen_advance =
+            regen_advance(TEMP_IDGEN_RETRIES, DEFAULT_RETRANS_TIMER, /* dad_transmits */ 0);
+        let desync_factor = desync_factor(&mut dup_rng, ONE_HOUR, regen_advance).unwrap();
+        let preferred_until = {
+            let d = bindings_ctx.now() + ONE_HOUR.into();
+            d - desync_factor
+        };
+        let entry = SlaacAddressEntry {
+            addr_sub,
+            config: Ipv6AddrSlaacConfig {
+                inner: SlaacConfig::Temporary(TemporarySlaacConfig {
+                    valid_until: bindings_ctx.now() + ONE_HOUR.into(),
+                    desync_factor,
+                    creation_time: bindings_ctx.now(),
+                    dad_counter: 0,
+                }),
+                preferred_lifetime: PreferredLifetime::preferred_until(preferred_until),
+            },
+        };
+        assert_eq!(core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
+    }
+
     #[test_case(AddressRemovedReason::Manual; "manual")]
     #[test_case(AddressRemovedReason::DadFailed; "dad failed")]
     fn remove_stable_address(reason: AddressRemovedReason) {
