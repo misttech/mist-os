@@ -53,7 +53,7 @@ func SummaryToResultSink(s *runtests.TestSummary, tags []*resultpb.StringPair, o
 	var ts []string
 	for _, test := range s.Tests {
 		if len(test.Cases) > 0 {
-			testCases, testsSkipped := TestCaseToResultSink(test.Cases, tags, &test, rootPath)
+			testCases, testsSkipped := testCaseToResultSink(test.Cases, tags, &test, rootPath)
 			r = append(r, testCases...)
 			ts = append(ts, testsSkipped...)
 		}
@@ -104,7 +104,7 @@ func ProcessSummaries(summaries []string, tags []*resultpb.StringPair, outputRoo
 			return nil, nil, err
 		}
 		testResults, testsSkipped := SummaryToResultSink(summary, tags, outputRoot)
-		requests = append(requests, CreateTestResultsRequests(testResults, 250)...)
+		requests = append(requests, createTestResultsRequests(testResults, 250)...)
 		allTestsSkipped = append(allTestsSkipped, testsSkipped...)
 	}
 
@@ -169,10 +169,10 @@ func commonRoot(files []string) string {
 	return root
 }
 
-// TestCaseToResultSink converts TestCaseResult defined in //tools/testing/testparser/result.go
+// testCaseToResultSink converts TestCaseResult defined in //tools/testing/testparser/result.go
 // to ResultSink's TestResult. A testcase will not be converted if test result cannot be
 // mapped to result_sink.Status.
-func TestCaseToResultSink(testCases []runtests.TestCaseResult, tags []*resultpb.StringPair, testDetail *runtests.TestDetails, outputRoot string) ([]*sinkpb.TestResult, []string) {
+func testCaseToResultSink(testCases []runtests.TestCaseResult, tags []*resultpb.StringPair, testDetail *runtests.TestDetails, outputRoot string) ([]*sinkpb.TestResult, []string) {
 	var testResult []*sinkpb.TestResult
 	var testsSkipped []string
 
@@ -368,9 +368,9 @@ func truncateString(str string, maxLength int) string {
 	return str
 }
 
-// CreateTestResultsRequests breaks an array of resultpb.TestResult into an array of resultpb.ReportTestResultsRequest
+// createTestResultsRequests breaks an array of resultpb.TestResult into an array of resultpb.ReportTestResultsRequest
 // chunkSize defined the number of TestResult contained in each ReportTrestResultsRequest.
-func CreateTestResultsRequests(results []*sinkpb.TestResult, chunkSize int) []*sinkpb.ReportTestResultsRequest {
+func createTestResultsRequests(results []*sinkpb.TestResult, chunkSize int) []*sinkpb.ReportTestResultsRequest {
 	totalChunks := (len(results)-1)/chunkSize + 1
 	requests := make([]*sinkpb.ReportTestResultsRequest, totalChunks)
 	for i := 0; i < totalChunks; i++ {

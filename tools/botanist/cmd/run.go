@@ -95,9 +95,6 @@ type RunCommand struct {
 	// Args passed to testrunner
 	testrunnerOptions testrunner.Options
 
-	// When true, upload to resultdb from testrunner.
-	uploadToResultDB bool
-
 	// The timeout to wait for an SSH connection after booting the target.
 	bootupTimeout time.Duration
 
@@ -143,8 +140,6 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&r.downloadManifest, "download-manifest", "", "Path to a manifest containing all package server downloads")
 	f.Var(&r.experiments, "experiment", fmt.Sprintf("The name of an experiment to enable. Supported experiments are: %v.", botanist.SupportedExperiments))
 	f.BoolVar(&r.skipSetup, "skip-setup", false, "if set, botanist will not set up a target.")
-	// Temporary flag to enable a soft transition to uploading test results from botanist rather than from the recipe.
-	f.BoolVar(&r.uploadToResultDB, "upload-to-resultdb", false, "if set, test results will be uploaded to ResultDB from testrunner.")
 	f.DurationVar(&r.bootupTimeout, "bootup-timeout", 0, "duration allowed for the command to finish execution, a value of 0 (zero) will fall back to the default.")
 	f.BoolVar(&r.expectsSSH, "expects-ssh", false, "if set, botanist will try to establish an SSH connection before running tests.")
 	f.IntVar(&r.testTimeoutScaleFactor, "test-timeout-scale-factor", 1, "Factor to scale test timeouts by (used for slow bot environments)")

@@ -932,7 +932,7 @@ func TestRunAndOutputTests(t *testing.T) {
 			}()
 			connectionErrorRetryBackoff = &retry.ZeroBackoff{}
 
-			err = runAndOutputTests(ctx, tc.tests, testerForTest, outputs, resultsDir, nil)
+			err = runAndOutputTests(ctx, tc.tests, testerForTest, outputs, resultsDir)
 			if tc.wantErr != (err != nil) {
 				t.Errorf("want err: %t, got %s", tc.wantErr, err)
 			}

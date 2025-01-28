@@ -41,7 +41,6 @@ go_library("lib") {
     "//tools/lib/streams",
     "//tools/lib/subprocess",
     "//tools/net/sshutil",
-    "//tools/testing/resultdb:lib",
     "//tools/testing/runtests",
     "//tools/testing/tap",
     "//tools/testing/testparser",
