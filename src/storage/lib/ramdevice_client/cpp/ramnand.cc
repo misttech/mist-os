@@ -43,9 +43,10 @@ zx_status_t RamNand::Create(fuchsia_hardware_nand::wire::RamNandInfo config,
   const std::string name(response.name.get());
 
   fbl::unique_fd ram_nand_ctl;
-  if (zx_status_t status =
-          fdio_open_fd(kBasePath, static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                       ram_nand_ctl.reset_and_get_address());
+  if (zx_status_t status = fdio_open3_fd(
+          kBasePath,
+          uint64_t{fuchsia_io::wire::kPermReadable | fuchsia_io::Flags::kProtocolDirectory},
+          ram_nand_ctl.reset_and_get_address());
       status != ZX_OK) {
     fprintf(stderr, "Could not open ram_nand_ctl: %s\n", zx_status_get_string(status));
     return status;
