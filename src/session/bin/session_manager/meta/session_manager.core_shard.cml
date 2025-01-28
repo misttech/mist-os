@@ -283,7 +283,10 @@
             availability: "same_as_target",
         },
         {
-            service: "fuchsia.power.broker.ElementInfoProviderService",
+            service: [
+                "fuchsia.hardware.gnss.Service",
+                "fuchsia.power.broker.ElementInfoProviderService",
+            ],
             from: "parent",
             to: "#session-manager",
             availability: "same_as_target",

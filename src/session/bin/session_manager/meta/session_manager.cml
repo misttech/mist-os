@@ -443,7 +443,11 @@
             availability: "same_as_target",
         },
         {
-            service: "fuchsia.power.broker.ElementInfoProviderService",
+            service: [
+                // TODO: b/392629126. Evaluate routing driver FIDL through session_manager.
+                "fuchsia.hardware.gnss.Service",
+                "fuchsia.power.broker.ElementInfoProviderService",
+            ],
             from: "parent",
             to: "#session",
             availability: "same_as_target",
