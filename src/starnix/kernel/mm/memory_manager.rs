@@ -3466,40 +3466,19 @@ impl MemoryManager {
     where
         L: LockBefore<MmDumpable>,
     {
-        // TODO(https://fxbug.dev/42074633): When SNAPSHOT (or equivalent) is supported on pager-backed VMOs
-        // we can remove the hack below (which also won't be performant). For now, as a workaround,
-        // we use SNAPSHOT_AT_LEAST_ON_WRITE on both the child and the parent.
-
-        struct MemoryInfo {
-            memory: Arc<MemoryObject>,
-            size: u64,
-
-            // Indicates whether or not the memory object needs to be replaced on the parent as
-            // well.
-            needs_snapshot_on_parent: bool,
-        }
-
         // Clones the `memory` and returns the `MemoryInfo` with the clone.
         fn clone_memory(
             memory: &Arc<MemoryObject>,
             rights: zx::Rights,
-        ) -> Result<MemoryInfo, Errno> {
+        ) -> Result<Arc<MemoryObject>, Errno> {
             let memory_info = memory.info()?;
             let pager_backed = memory_info.flags.contains(zx::VmoInfoFlags::PAGER_BACKED);
             Ok(if pager_backed && !rights.contains(zx::Rights::WRITE) {
-                MemoryInfo {
-                    memory: memory.clone(),
-                    size: memory_info.size_bytes,
-                    needs_snapshot_on_parent: false,
-                }
+                memory.clone()
             } else {
                 let mut cloned_memory = memory
                     .create_child(
-                        if pager_backed {
-                            zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE
-                        } else {
-                            zx::VmoChildOptions::SNAPSHOT
-                        } | zx::VmoChildOptions::RESIZABLE,
+                        zx::VmoChildOptions::SNAPSHOT_MODIFIED | zx::VmoChildOptions::RESIZABLE,
                         0,
                         memory_info.size_bytes,
                     )
@@ -3509,42 +3488,16 @@ impl MemoryManager {
                         .replace_as_executable(&VMEX_RESOURCE)
                         .map_err(impossible_error)?;
                 }
-                MemoryInfo {
-                    memory: Arc::new(cloned_memory),
-                    size: memory_info.size_bytes,
-                    needs_snapshot_on_parent: pager_backed,
-                }
+
+                Arc::new(cloned_memory)
             })
-        }
-
-        fn snapshot_memory(
-            memory: &MemoryObject,
-            size: u64,
-            rights: zx::Rights,
-        ) -> Result<Arc<MemoryObject>, Errno> {
-            let mut cloned_memory = memory
-                .create_child(
-                    zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE
-                        | zx::VmoChildOptions::RESIZABLE,
-                    0,
-                    size,
-                )
-                .map_err(MemoryManager::get_errno_for_map_err)?;
-
-            if rights.contains(zx::Rights::EXECUTE) {
-                cloned_memory = cloned_memory
-                    .replace_as_executable(&VMEX_RESOURCE)
-                    .map_err(impossible_error)?;
-            }
-            Ok(Arc::new(cloned_memory))
         }
 
         // Hold the lock throughout the operation to uphold memory manager's invariants.
         // See mm/README.md.
         let state: &mut MemoryManagerState = &mut self.state.write();
         let mut target_state = target.state.write();
-        let mut child_memorys = HashMap::<zx::Koid, MemoryInfo>::new();
-        let mut replaced_memorys = HashMap::<zx::Koid, Arc<MemoryObject>>::new();
+        let mut clone_cache = HashMap::<zx::Koid, Arc<MemoryObject>>::new();
 
         #[cfg(feature = "alternate_anon_allocs")]
         {
@@ -3552,11 +3505,11 @@ impl MemoryManager {
             target_state.private_anonymous = state.private_anonymous.snapshot(backing_size)?;
         }
 
-        for (range, mapping) in state.mappings.iter_mut() {
+        for (range, mapping) in state.mappings.iter() {
             if mapping.flags.contains(MappingFlags::DONTFORK) {
                 continue;
             }
-            match &mut mapping.backing {
+            match &mapping.backing {
                 MappingBacking::Memory(backing) => {
                     let memory_offset = backing.memory_offset + (range.start - backing.base) as u64;
                     let length = range.end - range.start;
@@ -3571,37 +3524,12 @@ impl MemoryManager {
                         create_anonymous_mapping_memory(length as u64)?
                     } else {
                         let basic_info = backing.memory.basic_info();
-
-                        let MemoryInfo { memory, size: memory_size, needs_snapshot_on_parent } =
-                            match child_memorys.entry(basic_info.koid) {
-                                Entry::Occupied(o) => o.into_mut(),
-                                Entry::Vacant(v) => {
-                                    v.insert(clone_memory(&backing.memory, basic_info.rights)?)
-                                }
-                            };
-
-                        if *needs_snapshot_on_parent {
-                            let replaced_memory = match replaced_memorys.entry(basic_info.koid) {
-                                Entry::Occupied(o) => o.into_mut(),
-                                Entry::Vacant(v) => v.insert(snapshot_memory(
-                                    &backing.memory,
-                                    *memory_size,
-                                    basic_info.rights,
-                                )?),
-                            };
-                            map_in_vmar(
-                                &state.user_vmar,
-                                &state.user_vmar_info,
-                                SelectedAddress::FixedOverwrite(range.start),
-                                replaced_memory,
-                                memory_offset,
-                                length,
-                                mapping.flags,
-                                false,
-                            )?;
-
-                            backing.memory = replaced_memory.clone();
-                        }
+                        let memory = match clone_cache.entry(basic_info.koid) {
+                            Entry::Occupied(o) => o.into_mut(),
+                            Entry::Vacant(v) => {
+                                v.insert(clone_memory(&backing.memory, basic_info.rights)?)
+                            }
+                        };
                         memory.clone()
                     };
 
