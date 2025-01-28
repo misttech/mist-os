@@ -1987,7 +1987,6 @@ assembly_input_bundle("common_standard") {
             "//src/diagnostics/sampler/meta/sampler.core_shard.cml",
             "//src/connectivity/network/meta/persistence.core_shard.cml",
             "//src/intl/tzdata_provider/meta/tzdata_provider.core_shard.cml",
-            "//src/sys/cache_manager/meta/cache_manager.core_shard.cml",
             "//src/sys/pkg/bin/system-updater/meta/system_updater.core_shard.cml",
             "//src/developer/memory/pressure_signaler/meta/memory_pressure_signaler.core_shard.cml",
           ]
@@ -3163,6 +3162,18 @@ assembly_input_bundle("fshost_fvm_f2fs") {
 #
 assembly_input_bundle("storage_cache_manager") {
   base_packages = [ "//src/sys/cache_manager" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards =
+              [ "//src/sys/cache_manager/meta/cache_manager.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
 }
 
 assembly_input_bundle("system_update_checker") {
