@@ -1948,10 +1948,8 @@ void Thread::Current::BecomeIdle() {
     arch_set_blocking_disallowed(false);
   }
 
-  // Signal that our current CPU is now ready before we re-enable interrupts,
-  // re-enable preemption, and finally drop into our idle routine, and never
-  // return.
-  mp_signal_curr_cpu_ready();
+  // Re-enable interrupts, re-enable preemption, drop into our idle routine, and
+  // never return.
   arch_enable_ints();
   t->preemption_state().PreemptReenable();
   DEBUG_ASSERT(t->preemption_state().PreemptIsEnabled());

@@ -166,6 +166,8 @@ void lk_main(paddr_t handoff_paddr) {
 }
 
 static int bootstrap2(void*) {
+  DEBUG_ASSERT(arch_curr_cpu_num() == BOOT_CPU_ID);
+
   timeline_threading.Set(current_mono_ticks());
 
   dprintf(SPEW, "top of bootstrap2()\n");
@@ -183,10 +185,10 @@ static int bootstrap2(void*) {
   lk_primary_cpu_init_level(LK_INIT_LEVEL_PLATFORM, LK_INIT_LEVEL_ARCH_LATE - 1);
 
   // At this point, other cores in the system have been started (though may
-  // not yet be online).
+  // not yet be online).  Signal that the boot CPU is ready.
+  mp_signal_curr_cpu_ready();
 
   // Perform per-CPU set up on the boot CPU.
-  DEBUG_ASSERT(arch_curr_cpu_num() == BOOT_CPU_ID);
   dprintf(SPEW, "initializing late arch\n");
   arch_late_init_percpu();
   lk_primary_cpu_init_level(LK_INIT_LEVEL_ARCH_LATE, LK_INIT_LEVEL_USER - 1);
