@@ -61,7 +61,7 @@ Resulting product is not supported and may misbehave!
     {
         // If developer overrides are in use, parse to intermediate types so
         // that overrides can be applied.
-        let AssemblyConfigWrapperForOverrides { platform, product, file_relative_paths } =
+        let AssemblyConfigWrapperForOverrides { platform, product, .. } =
             read_config(&product_path).context("Reading product configuration")?;
 
         let developer_overrides = read_config::<DeveloperOverrides>(&overrides_path)
@@ -82,7 +82,7 @@ Resulting product is not supported and may misbehave!
         let product_config_overrides = developer_overrides.product;
         let board_config_overrides = developer_overrides.board;
 
-        let product_config_path = if file_relative_paths { Some(&product_path) } else { None };
+        let product_config_path = Some(&product_path);
 
         let mut platform: PlatformConfig = merge_override_values_with_resolved_paths(
             platform,
@@ -125,13 +125,9 @@ Resulting product is not supported and may misbehave!
     } else {
         let config = read_config::<AssemblyConfig>(&product_path)
             .context("Reading product configuration")?;
-        let config = if config.file_relative_paths {
-            config
-                .resolve_paths_from_file(&product_path)
-                .context("Resolving paths in product config")?
-        } else {
-            config
-        };
+        let config = config
+            .resolve_paths_from_file(&product_path)
+            .context("Resolving paths in product config")?;
         let board_info = read_config::<BoardInformation>(&board_info_path)
             .context("Reading board configuration")?
             .resolve_paths_from_file(&board_info_path)

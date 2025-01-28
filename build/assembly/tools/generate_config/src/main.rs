@@ -75,10 +75,7 @@ fn main() -> Result<()> {
 }
 
 fn generate_product(args: &ProductArgs) -> Result<()> {
-    let mut config = AssemblyConfig::from_config_path(&args.config)?;
-    // TODO(https://fxbug.dev/390189313): Remove this field once a product
-    // config is always relative.
-    config.file_relative_paths = true;
+    let config = AssemblyConfig::from_config_path(&args.config)?;
     config.write_to_dir(&args.output)?;
     Ok(())
 }

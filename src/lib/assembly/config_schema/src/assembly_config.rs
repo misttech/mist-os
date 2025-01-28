@@ -34,7 +34,8 @@ pub struct AssemblyConfig {
     #[walk_paths]
     #[serde(default)]
     pub product: ProductConfig,
-    #[serde(default)]
+    // TOOD(https://fxbug.dev/390189313): Remove once all product configs stop using this field.
+    #[serde(default, skip_serializing)]
     pub file_relative_paths: bool,
 }
 
@@ -50,7 +51,8 @@ pub struct AssemblyConfigWrapperForOverrides {
     // a 'PlatformConfig``
     pub platform: serde_json::Value,
     pub product: serde_json::Value,
-    #[serde(default)]
+    // TOOD(https://fxbug.dev/390189313): Remove once all product configs stop using this field.
+    #[serde(default, skip_serializing)]
     pub file_relative_paths: bool,
 }
 
@@ -393,14 +395,12 @@ mod tests {
               ],
             },
           },
-          file_relative_paths: true,
         }
     "#;
 
         let mut cursor = std::io::Cursor::new(json5);
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
         let config = config.resolve_paths_from_file("path/to/assembly_config.json").unwrap();
-        assert!(config.file_relative_paths);
         assert_eq!(
             config.product.packages.base,
             vec![ProductPackageDetails {
