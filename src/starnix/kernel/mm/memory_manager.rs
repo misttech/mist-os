@@ -17,9 +17,6 @@ use crate::vfs::{
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
-use starnix_types::arch::ArchWidth;
-use starnix_uapi::user_address::MultiArchUserRef;
-
 use rand::{thread_rng, Rng};
 use range_map::RangeMap;
 use smallvec::SmallVec;
@@ -27,6 +24,7 @@ use starnix_logging::{
     impossible_error, log_warn, trace_duration, track_stub, CATEGORY_STARNIX_MM,
 };
 use starnix_sync::{LockBefore, Locked, MmDumpable, OrderedMutex, RwLock};
+use starnix_types::arch::ArchWidth;
 use starnix_types::futex_address::FutexAddress;
 use starnix_types::math::round_up_to_system_page_size;
 use starnix_types::ownership::WeakRef;
@@ -40,7 +38,7 @@ use starnix_uapi::restricted_aspace::{
     RESTRICTED_ASPACE_SIZE,
 };
 use starnix_uapi::signals::{SIGBUS, SIGSEGV};
-use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserCString, UserRef};
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{
     errno, error, MADV_DOFORK, MADV_DONTFORK, MADV_DONTNEED, MADV_KEEPONFORK, MADV_NOHUGEPAGE,
@@ -48,6 +46,7 @@ use starnix_uapi::{
     PROT_EXEC, PROT_GROWSDOWN, PROT_READ, PROT_WRITE, SI_KERNEL, UIO_MAXIOV,
 };
 use static_assertions::const_assert_eq;
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
@@ -3574,17 +3573,22 @@ impl MemoryManager {
                         let basic_info = backing.memory.basic_info();
 
                         let MemoryInfo { memory, size: memory_size, needs_snapshot_on_parent } =
-                            child_memorys
-                                .entry(basic_info.koid)
-                                .or_insert(clone_memory(&backing.memory, basic_info.rights)?);
+                            match child_memorys.entry(basic_info.koid) {
+                                Entry::Occupied(o) => o.into_mut(),
+                                Entry::Vacant(v) => {
+                                    v.insert(clone_memory(&backing.memory, basic_info.rights)?)
+                                }
+                            };
 
                         if *needs_snapshot_on_parent {
-                            let replaced_memory =
-                                replaced_memorys.entry(basic_info.koid).or_insert(snapshot_memory(
+                            let replaced_memory = match replaced_memorys.entry(basic_info.koid) {
+                                Entry::Occupied(o) => o.into_mut(),
+                                Entry::Vacant(v) => v.insert(snapshot_memory(
                                     &backing.memory,
                                     *memory_size,
                                     basic_info.rights,
-                                )?);
+                                )?),
+                            };
                             map_in_vmar(
                                 &state.user_vmar,
                                 &state.user_vmar_info,
