@@ -28,6 +28,7 @@ rustc_binary("bin") {
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
+    "//src/lib/trace/rust:trace-provider",
     "//src/sys/time/timekeeper/alarms",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",

@@ -148,6 +148,7 @@ async fn stop_hrtimer(hrtimer: &ffhh::DeviceProxy) {
             let _ = result.map_err(|e| warn!("stop_hrtimer: driver error: {:?}", e));
         })
         .map_err(|e| warn!("stop_hrtimer: could not stop prior timer: {}", e));
+    debug!("stop_hrtimer: stopped  hardware timer");
 }
 
 // The default size of the channels created in this module.
@@ -325,7 +326,7 @@ async fn handle_request(cid: zx::Koid, mut cmd: mpsc::Sender<Cmd>, request: fta:
 
             // Alarm is not scheduled yet!
             debug!(
-                "handle_request: scheduling alarm_id: \"{}\", cid: {:?}, deadline: {}",
+                "handle_request: scheduling alarm_id: \"{}\"\n\tcid: {:?}\n\tdeadline: {}",
                 alarm_id,
                 cid,
                 format_timer(deadline.into())
@@ -363,6 +364,7 @@ async fn handle_request(cid: zx::Koid, mut cmd: mpsc::Sender<Cmd>, request: fta:
         fta::WakeRequest::GetProperties { responder, .. } => {
             let response =
                 fta::WakeGetPropertiesResponse { is_supported: Some(true), ..Default::default() };
+            debug!("sending: Wake.GetProperties: {:?}", &response);
             responder.send(&response).expect("send success");
         }
         fta::WakeRequest::_UnknownMethod { .. } => {}
@@ -1017,17 +1019,23 @@ async fn wake_timer_loop(
                 defer! {
                     // Must signal once the setup is completed.
                     signal(&setup_done);
+                    debug!("wake_timer_loop: START: setup_done signaled");
                 };
                 if Timers::expired(now, deadline) {
                     trace::duration!(c"alarms", c"Cmd::Start:immediate");
                     // A timer set into now or the past expires right away.
                     let (_lease, keep_alive) = zx::EventPair::create();
+                    debug!(
+                        "[{}] wake_timer_loop: bogus lease {:?}",
+                        line!(),
+                        &keep_alive.get_koid().unwrap()
+                    );
                     responder
                         .send(Ok(keep_alive))
                         .map(|_| {
                             debug!(
                                 concat!(
-                                    "wake_timer_loop: cid: {:?}, alarm: {}: expired immediately: ",
+                                    "wake_timer_loop: cid: {:?}, alarm: {}: EXPIRED IMMEDIATELY\n\t",
                                     "deadline({}) <= now({})"
                                 ),
                                 cid,
@@ -1043,6 +1051,7 @@ async fn wake_timer_loop(
                         })
                         .unwrap_or(());
                 } else {
+                    trace::duration!(c"alarms", c"Cmd::Start:regular");
                     // A timer scheduled for the future gets inserted into the timer heap.
                     let was_empty = timers.is_empty();
 
@@ -1108,6 +1117,8 @@ async fn wake_timer_loop(
                         // No next timer, clean up the hrtimer status.
                         hrtimer_status = None;
                     }
+                } else {
+                    debug!("wake_timer_loop: STOP: no active timer to stop: {}", timer_id);
                 }
                 signal(&done);
             }
@@ -1118,8 +1129,9 @@ async fn wake_timer_loop(
                 // happens for example if the timer can not make the actual
                 // deadline and needs to be re-programmed.
                 debug!(
-                    "wake_timer_loop: ALARM!!! reached deadline: {}, wakey-wakey!",
-                    format_timer(expired_deadline.into())
+                    "wake_timer_loop: ALARM!!! reached deadline: {}, wakey-wakey! {:?}",
+                    format_timer(expired_deadline.into()),
+                    keep_alive.get_koid().unwrap(),
                 );
                 let expired_count =
                     notify_all(&mut timers, &keep_alive, now).expect("notification succeeds");
@@ -1152,6 +1164,7 @@ async fn wake_timer_loop(
                 // Manufacture a fake lease to make the code below work.
                 // Maybe use Option instead?
                 let (_dummy_lease, peer) = zx::EventPair::create();
+                debug!("XXX: [{}] bogus lease: 1 {:?}", line!(), &peer.get_koid().unwrap());
                 notify_all(&mut timers, &peer, now).expect("notification succeeds");
                 hrtimer_status = match timers.peek_deadline() {
                     None => None, // No remaining timers, nothing to schedule.
@@ -1164,6 +1177,7 @@ async fn wake_timer_loop(
             Cmd::AlarmDriverError { expired_deadline, error } => {
                 trace::duration!(c"alarms", c"Cmd::AlarmDriverError");
                 let (_dummy_lease, peer) = zx::EventPair::create();
+                debug!("XXX: [{}] bogus lease: {:?}", line!(), &peer.get_koid().unwrap());
                 notify_all(&mut timers, &peer, now).expect("notification succeeds");
                 match error {
                     fidl_fuchsia_hardware_hrtimer::DriverError::Canceled => {
@@ -1202,7 +1216,8 @@ async fn wake_timer_loop(
         }
 
         {
-            // Print and record diagnostics after each iteration.
+            // Print and record diagnostics after each iteration, record the
+            // duration for performance awareness.
             trace::duration!(c"timekeeper", c"inspect");
             let now_formatted = format_timer(now.into());
             debug!("wake_timer_loop: now:                             {}", &now_formatted);
@@ -1270,7 +1285,7 @@ async fn schedule_hrtimer(
     let hrtimer_scheduled = zx::Event::create();
 
     debug!(
-        "schedule_hrtimer: now: {}, deadline: {}, timeout: {}",
+        "schedule_hrtimer:\n\tnow: {}\n\tdeadline: {}\n\ttimeout: {}",
         format_timer(now.into()),
         format_timer(deadline.into()),
         format_duration(timeout),

@@ -28,6 +28,7 @@ enum Services {
 
 #[fuchsia::main(logging_tags = ["test"])]
 async fn main() -> Result<()> {
+    fuchsia_trace_provider::trace_provider_create_with_fdio();
     log::debug!("starting fake wake alarms service");
 
     // Provide inspect.
