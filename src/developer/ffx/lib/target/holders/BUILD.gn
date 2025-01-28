@@ -41,10 +41,13 @@ rustc_library("lib") {
     "src/device_lookup.rs",
     "src/fdomain.rs",
     "src/fdomain/from_toolbox.rs",
+    "src/fdomain/remote_control_proxy.rs",
     "src/from_toolbox.rs",
     "src/lib.rs",
+    "src/remote_control_proxy.rs",
     "src/target_info.rs",
     "src/target_proxy.rs",
+    "src/with_moniker.rs",
   ]
 }
 

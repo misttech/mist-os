@@ -8,7 +8,6 @@ use ffx_update_args::ForceInstall;
 use fho::{
     bug, deferred, return_user_error, Deferred, FfxContext, FfxMain, FfxTool, Result, SimpleWriter,
 };
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_update::{
     CheckOptions, Initiator, ManagerProxy, MonitorMarker, MonitorRequest, MonitorRequestStream,
 };
@@ -22,7 +21,7 @@ use futures::{pin_mut, select, TryStreamExt};
 use std::path::PathBuf;
 use std::time::Duration;
 use target_connector::Connector;
-use target_holders::{daemon_protocol, moniker, TargetProxyHolder};
+use target_holders::{daemon_protocol, moniker, RemoteControlProxyHolder, TargetProxyHolder};
 use {
     ffx_update_args as args, fidl_fuchsia_developer_ffx as ffx,
     fidl_fuchsia_update_installer_ext as installer,
@@ -42,7 +41,7 @@ pub struct UpdateTool {
     #[with(deferred(moniker("/core/system-update/system-updater")))]
     installer_proxy: Deferred<InstallerProxy>,
     target_proxy_connector: Connector<TargetProxyHolder>,
-    rcs_proxy_connector: Connector<RemoteControlProxy>,
+    rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
     #[with(deferred(daemon_protocol()))]
     repos: Deferred<ffx::RepositoryRegistryProxy>,
 }
@@ -528,6 +527,7 @@ mod tests {
     use fho::testing::ToolEnv;
     use fho::{TestBuffers, TryFromEnv};
     use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
     use fidl_fuchsia_update::ManagerRequest;
     use fidl_fuchsia_update_channelcontrol::ChannelControlRequest;
     use futures::prelude::*;

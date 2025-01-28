@@ -24,13 +24,10 @@ use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use target_connector::Connector;
-use target_holders::TargetInfoHolder;
+use target_holders::{RemoteControlProxyHolder, TargetInfoHolder};
 use tokio::net::{TcpListener, TcpStream};
 use tracing::info;
-use {
-    fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_starnix_container as fstarcontainer,
-    fuchsia_async as fasync,
-};
+use {fidl_fuchsia_starnix_container as fstarcontainer, fuchsia_async as fasync};
 
 use crate::common::*;
 
@@ -62,7 +59,7 @@ impl StarnixAdbCommand {
     pub async fn run(
         &self,
         context: &EnvironmentContext,
-        rcs_connector: &Connector<rc::RemoteControlProxy>,
+        rcs_connector: &Connector<RemoteControlProxyHolder>,
         target_info: fho::Result<TargetInfoHolder>,
     ) -> Result<()> {
         match &self.subcommand {
@@ -221,7 +218,7 @@ impl AdbProxyArgs {
     async fn run_proxy(
         &self,
         adb: &str,
-        rcs_connector: &Connector<rc::RemoteControlProxy>,
+        rcs_connector: &Connector<RemoteControlProxyHolder>,
     ) -> Result<()> {
         let reconnect = || async {
             let rcs_proxy = connect_to_rcs(rcs_connector).await?;

@@ -25,6 +25,7 @@ ffx_plugin("ffx_driver") {
     "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_rust",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/rcs:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/devices/bin/driver_tools:lib",
     "//src/devices/bin/driver_tools/connector:lib",
     "//src/lib/fidl/rust/fidl",

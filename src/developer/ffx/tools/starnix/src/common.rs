@@ -9,6 +9,7 @@ use fidl_fuchsia_starnix_container::{ControllerMarker, ControllerProxy};
 use lazy_static::lazy_static;
 use regex::Regex;
 use target_connector::Connector;
+use target_holders::RemoteControlProxyHolder;
 
 const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
@@ -61,8 +62,8 @@ async fn find_moniker(
 }
 
 pub async fn connect_to_rcs(
-    rcs_connector: &Connector<rc::RemoteControlProxy>,
-) -> Result<rc::RemoteControlProxy> {
+    rcs_connector: &Connector<RemoteControlProxyHolder>,
+) -> Result<RemoteControlProxyHolder> {
     rcs_connector
         .try_connect(|target, _err| {
             eprintln!("Waiting for {target:?}...");

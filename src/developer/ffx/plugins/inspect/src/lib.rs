@@ -13,7 +13,7 @@ use iquery::commands::{Command, ListAccessorsResult, ListResult, SelectorsResult
 use serde::Serialize;
 use std::fmt;
 use std::io::Write;
-use target_holders::toolbox_or;
+use target_holders::{toolbox_or, RemoteControlProxyHolder};
 
 mod accessor_provider;
 mod apply_selectors;
@@ -30,7 +30,7 @@ pub struct InspectTool {
     cmd: InspectCommand,
     #[with(deferred(toolbox_or("bootstrap/archivist")))]
     archive_accessor: Deferred<ArchiveAccessorProxy>,
-    rcs: Deferred<RemoteControlProxy>,
+    rcs: Deferred<RemoteControlProxyHolder>,
 }
 
 #[async_trait(?Send)]
@@ -53,6 +53,7 @@ impl FfxMain for InspectTool {
                 ffx_bail!("{msg}");
             }
         };
+        let rcs = (&*rcs).clone();
         match cmd.sub_command {
             InspectSubCommand::ApplySelectors(cmd) => {
                 apply_selectors::execute(rcs, archive_accessor, cmd).await?;

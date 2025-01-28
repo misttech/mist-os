@@ -10,7 +10,6 @@ use async_trait::async_trait;
 use fho::{deferred, Deferred, DirectConnector, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
 use fidl_fuchsia_buildinfo::ProviderProxy;
 use fidl_fuchsia_developer_ffx::TargetAddrInfo;
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_feedback::{DeviceIdProviderProxy, LastRebootInfoProviderProxy};
 use fidl_fuchsia_hwinfo::{Architecture, BoardProxy, DeviceProxy, ProductProxy};
 use fidl_fuchsia_update_channelcontrol::ChannelControlProxy;
@@ -20,7 +19,7 @@ use show::{
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use target_holders::{moniker, TargetProxyHolder};
+use target_holders::{moniker, RemoteControlProxyHolder, TargetProxyHolder};
 use timeout::timeout;
 use {ffx_target, ffx_target_show_args as args};
 
@@ -30,7 +29,7 @@ mod show;
 pub struct ShowTool {
     #[command]
     cmd: args::TargetShow,
-    rcs_proxy: RemoteControlProxy,
+    rcs_proxy: RemoteControlProxyHolder,
     connector: Option<Arc<dyn DirectConnector>>, // Returns Some(dc) only if we have a direct connection
     target_proxy: Deferred<TargetProxyHolder>,
     #[with(moniker("/core/system-update"))]
@@ -129,7 +128,7 @@ async fn gather_target_info_from_daemon(
 
 /// Determine target information.
 async fn gather_target_show(
-    rcs_proxy: RemoteControlProxy,
+    rcs_proxy: RemoteControlProxyHolder,
     connector: Option<Arc<dyn DirectConnector>>,
     target_proxy: Deferred<TargetProxyHolder>,
     last_reboot_info_proxy: LastRebootInfoProviderProxy,
@@ -264,7 +263,9 @@ mod tests {
     use fho::{Format, TestBuffers};
     use fidl_fuchsia_buildinfo::{BuildInfo, ProviderRequest};
     use fidl_fuchsia_developer_ffx::{TargetInfo, TargetIp, TargetRequest};
-    use fidl_fuchsia_developer_remotecontrol::{IdentifyHostResponse, RemoteControlRequest};
+    use fidl_fuchsia_developer_remotecontrol::{
+        IdentifyHostResponse, RemoteControlProxy, RemoteControlRequest,
+    };
     use fidl_fuchsia_feedback::{
         DeviceIdProviderRequest, LastReboot, LastRebootInfoProviderRequest, RebootReason,
     };
@@ -414,7 +415,7 @@ mod tests {
         let output = VerifiedMachineWriter::<TargetShowInfo>::new_test(None, &buffers);
         let tool = ShowTool {
             cmd: args::TargetShow { ..Default::default() },
-            rcs_proxy: setup_fake_rcs_server(),
+            rcs_proxy: setup_fake_rcs_server().into(),
             connector: None,
             target_proxy: setup_fake_target_server(),
             channel_control_proxy: setup_fake_channel_control_server(),
@@ -568,7 +569,7 @@ mod tests {
             <ShowTool as FfxMain>::Writer::new_test(Some(Format::JsonPretty), &buffers);
         let tool = ShowTool {
             cmd: args::TargetShow { ..Default::default() },
-            rcs_proxy: setup_fake_rcs_server(),
+            rcs_proxy: setup_fake_rcs_server().into(),
             connector: None,
             target_proxy: setup_fake_target_server(),
             channel_control_proxy: setup_fake_channel_control_server(),
@@ -608,7 +609,7 @@ mod tests {
         let output = VerifiedMachineWriter::<TargetShowInfo>::new_test(None, &buffers);
         let tool = ShowTool {
             cmd: args::TargetShow { ..Default::default() },
-            rcs_proxy: setup_fake_rcs_server(),
+            rcs_proxy: setup_fake_rcs_server().into(),
             connector: Some(setup_fake_direct_connector()),
             target_proxy: setup_fake_target_server(),
             channel_control_proxy: setup_fake_channel_control_server(),

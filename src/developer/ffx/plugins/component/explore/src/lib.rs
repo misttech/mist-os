@@ -9,15 +9,14 @@ use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_explore_args::ExploreComponentCommand;
 use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_dash::LauncherProxy;
-use fidl_fuchsia_developer_remotecontrol as rc;
 use socket_to_stdio::Stdout;
-use target_holders::moniker;
+use target_holders::{moniker, RemoteControlProxyHolder};
 
 #[derive(FfxTool)]
 pub struct ExploreTool {
     #[command]
     cmd: ExploreComponentCommand,
-    rcs: rc::RemoteControlProxy,
+    rcs: RemoteControlProxyHolder,
     #[with(moniker("/core/debug-dash-launcher"))]
     dash_launcher: LauncherProxy,
 }

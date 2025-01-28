@@ -10,7 +10,6 @@ ffx_plugin("ffx_component_explore") {
   edition = "2021"
   deps = [
     "//sdk/fidl/fuchsia.dash:fuchsia.dash_rust",
-    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/target/holders:lib",

@@ -8,13 +8,13 @@ use errors::ffx_bail;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_copy_args::CopyComponentCommand;
 use fho::{FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_developer_remotecontrol as rc;
+use target_holders::RemoteControlProxyHolder;
 
 #[derive(FfxTool)]
 pub struct CopyTool {
     #[command]
     cmd: CopyComponentCommand,
-    rcs: rc::RemoteControlProxy,
+    rcs: RemoteControlProxyHolder,
 }
 
 fho::embedded_plugin!(CopyTool);

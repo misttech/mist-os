@@ -23,6 +23,8 @@ use signal_hook::consts::signal::{SIGINT, SIGTERM};
 use signal_hook::iterator::Signals;
 use std::fmt::Debug;
 use std::io::{stdout, Write};
+use std::ops::Deref as _;
+use target_holders::RemoteControlProxyHolder;
 use {
     fidl_fuchsia_developer_remotecontrol as fremotecontrol,
     fidl_fuchsia_test_manager as ftest_manager,
@@ -49,7 +51,7 @@ const SUITE_BATCH_SIZE: usize = 100;
 pub struct TestTool {
     #[command]
     cmd: TestCommand,
-    rcs: fho::Deferred<fremotecontrol::RemoteControlProxy>,
+    rcs: fho::Deferred<RemoteControlProxyHolder>,
 }
 
 fho::embedded_plugin!(TestTool);
@@ -64,12 +66,14 @@ impl FfxMain for TestTool {
         let remote_control =
             self.rcs.await.map_err(|e| ffx_error_with_code!(*SETUP_FAILED_CODE, "{:?}", e))?;
         match self.cmd.subcommand {
-            TestSubCommand::Run(run) => run_test(remote_control, writer, run).await?,
+            TestSubCommand::Run(run) => {
+                run_test(remote_control.deref().clone(), writer, run).await?
+            }
             TestSubCommand::List(list) => {
                 get_tests(&remote_control, writer, list).await?;
             }
             TestSubCommand::EarlyBootProfile(cmd) => {
-                early_boot_profile(remote_control, writer, cmd).await?;
+                early_boot_profile(remote_control.deref().clone(), writer, cmd).await?;
             }
         }
         Ok(())

@@ -6,10 +6,10 @@ use async_trait::async_trait;
 use ffx_command_error::Result;
 use fho::{FhoEnvironment, TryFromEnv, TryFromEnvWith};
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_io as fio;
 use std::marker::PhantomData;
 use std::time::Duration;
+use target_holders::RemoteControlProxyHolder;
 
 const DEFAULT_PROXY_TIMEOUT: Duration = Duration::from_secs(15);
 
@@ -27,7 +27,7 @@ impl TryFromEnvWith for WithExposedDir {
     async fn try_from_env_with(self, env: &FhoEnvironment) -> Result<Self::Output> {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         // It would be better to use connect_to_rcs that retries, but it's private.
-        let rcs = RemoteControlProxy::try_from_env(env).await?;
+        let rcs = RemoteControlProxyHolder::try_from_env(env).await?;
         rcs::open_with_timeout_at(
             DEFAULT_PROXY_TIMEOUT,
             &self.moniker,
@@ -65,7 +65,7 @@ where
 
     async fn try_from_env_with(self, env: &FhoEnvironment) -> Result<Self::Output> {
         // It would be better to use connect_to_rcs that retries, but it's private.
-        let rcs = RemoteControlProxy::try_from_env(env).await?;
+        let rcs = RemoteControlProxyHolder::try_from_env(env).await?;
         let output = match rcs::toolbox::connect_with_timeout::<P::Protocol>(
             &rcs,
             self.backup.as_ref(),

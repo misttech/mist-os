@@ -6,7 +6,6 @@ use async_trait::async_trait;
 use error::LogError;
 use ffx_log_args::LogCommand;
 use fho::{FfxMain, FfxTool, MachineWriter, ToolIO};
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, LogSettingsProxy, StreamParameters};
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
 use fidl_fuchsia_sys2::RealmQueryProxy;
@@ -16,6 +15,7 @@ use log_command::{
 };
 use std::io::Write;
 use target_connector::Connector;
+use target_holders::RemoteControlProxyHolder;
 use transactional_symbolizer::{RealSymbolizerProcess, TransactionalSymbolizer};
 
 mod condition_variable;
@@ -33,7 +33,7 @@ const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 pub struct LogTool {
     #[command]
     cmd: LogCommand,
-    rcs_connector: Connector<RemoteControlProxy>,
+    rcs_connector: Connector<RemoteControlProxyHolder>,
 }
 
 struct NoOpSymoblizer;
@@ -61,7 +61,7 @@ impl FfxMain for LogTool {
 pub async fn log_impl(
     writer: impl ToolIO<OutputItem = LogEntry> + Write + 'static,
     cmd: LogCommand,
-    rcs_connector: Connector<RemoteControlProxy>,
+    rcs_connector: Connector<RemoteControlProxyHolder>,
     include_timestamp: bool,
 ) -> Result<(), LogError> {
     // TODO(b/333908164): We have 3 different flags that all do the same thing.
@@ -89,7 +89,7 @@ async fn log_main<W>(
     writer: W,
     cmd: LogCommand,
     symbolizer: Option<impl Symbolize>,
-    rcs_connector: Connector<RemoteControlProxy>,
+    rcs_connector: Connector<RemoteControlProxyHolder>,
     include_timestamp: bool,
 ) -> Result<(), LogError>
 where
@@ -109,8 +109,8 @@ struct DeviceConnection {
 }
 
 async fn connect_to_rcs(
-    rcs_connector: &Connector<RemoteControlProxy>,
-) -> fho::Result<RemoteControlProxy> {
+    rcs_connector: &Connector<RemoteControlProxyHolder>,
+) -> fho::Result<RemoteControlProxyHolder> {
     rcs_connector.try_connect(|_target, _err| Ok(())).await
 }
 
@@ -119,7 +119,7 @@ async fn connect_to_rcs(
 async fn connect_to_target(
     stream_mode: &mut fidl_fuchsia_diagnostics::StreamMode,
     prev_boot_id: Option<u64>,
-    rcs_connector: &Connector<RemoteControlProxy>,
+    rcs_connector: &Connector<RemoteControlProxyHolder>,
 ) -> Result<DeviceConnection, LogError> {
     // Connect to device
     let rcs_client = connect_to_rcs(rcs_connector).await?;
@@ -186,7 +186,7 @@ async fn log_loop<W>(
     mut cmd: LogCommand,
     mut formatter: DefaultLogFormatter<W>,
     symbolizer: Option<impl Symbolize>,
-    rcs_connector: Connector<RemoteControlProxy>,
+    rcs_connector: Connector<RemoteControlProxyHolder>,
     include_timestamp: bool,
 ) -> Result<(), LogError>
 where

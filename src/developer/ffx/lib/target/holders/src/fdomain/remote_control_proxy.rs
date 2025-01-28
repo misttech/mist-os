@@ -2,16 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::ops::Deref;
-use std::time::Duration;
-
 use crate::init_daemon_behavior;
 use async_trait::async_trait;
 use errors::FfxError;
-use ffx_command_error::{FfxContext as _, Result};
+use fdomain_client::fidl::{
+    DiscoverableProtocolMarker as FDiscoverableProtocolMarker, Proxy as FProxy,
+};
+use fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use ffx_command_error::{Error, FfxContext as _, Result};
 use fho::{FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
-use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use std::ops::Deref;
+use std::time::Duration;
 
 #[derive(Clone, Debug)]
 pub struct RemoteControlProxyHolder(RemoteControlProxy);
@@ -41,7 +42,10 @@ impl TryFromEnv for RemoteControlProxyHolder {
             b
         };
         match behavior {
-            FhoConnectionBehavior::DaemonConnector(daemon) => match daemon.remote_factory().await {
+            FhoConnectionBehavior::DirectConnector(dc) => {
+                dc.rcs_proxy_fdomain().await.map(Into::into).map_err(Into::into)
+            }
+            FhoConnectionBehavior::DaemonConnector(dc) => match dc.remote_factory_fdomain().await {
                 Ok(p) => Ok(p.into()),
                 Err(e) => {
                     if let Some(ffx_e) = &e.downcast_ref::<FfxError>() {
@@ -52,25 +56,23 @@ impl TryFromEnv for RemoteControlProxyHolder {
                     }
                 }
             },
-            FhoConnectionBehavior::DirectConnector(direct) => {
-                direct.rcs_proxy().await.map(Into::into).map_err(Into::into)
-            }
         }
     }
 }
 
-pub async fn open_moniker<P>(
+pub(crate) async fn open_moniker_fdomain<P>(
     rcs: &RemoteControlProxy,
-    capability_set: rcs::OpenDirType,
+    capability_set: rcs_fdomain::OpenDirType,
     moniker: &str,
     timeout: Duration,
 ) -> Result<P>
 where
-    P: Proxy + 'static,
-    P::Protocol: DiscoverableProtocolMarker,
+    P: FProxy + 'static,
+    P::Protocol: FDiscoverableProtocolMarker,
 {
-    let (proxy, server_end) = fidl::endpoints::create_proxy::<P::Protocol>();
-    rcs::open_with_timeout::<P::Protocol>(
+    let (proxy, server_end) =
+        rcs.client().map_err(|e| Error::Unexpected(e.into()))?.create_proxy::<P::Protocol>();
+    rcs_fdomain::open_with_timeout::<P::Protocol>(
         timeout,
         moniker,
         capability_set,

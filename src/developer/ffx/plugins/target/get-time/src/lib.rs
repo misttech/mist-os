@@ -5,14 +5,13 @@
 use async_trait::async_trait;
 use ffx_target_get_time_args::GetTimeCommand;
 use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_developer_remotecontrol as rcs;
-use rcs::RemoteControlProxy;
+use target_holders::RemoteControlProxyHolder;
 
 #[derive(FfxTool)]
 pub struct GetTimeTool {
     #[command]
     cmd: GetTimeCommand,
-    rcs_proxy: RemoteControlProxy,
+    rcs_proxy: RemoteControlProxyHolder,
 }
 
 fho::embedded_plugin!(GetTimeTool);
@@ -26,7 +25,7 @@ impl FfxMain for GetTimeTool {
 }
 
 async fn get_time_impl<W>(
-    rcs_proxy: RemoteControlProxy,
+    rcs_proxy: RemoteControlProxyHolder,
     mut writer: W,
     boot_time: bool,
 ) -> fho::Result<()>
@@ -45,6 +44,7 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
+    use fidl_fuchsia_developer_remotecontrol as rcs;
 
     fn setup_fake_time_server_proxy() -> rcs::RemoteControlProxy {
         fho::testing::fake_proxy(move |req| match req {
@@ -61,7 +61,7 @@ mod test {
     #[fuchsia::test]
     async fn test_get_monotonic() {
         let mut writer = Vec::new();
-        get_time_impl(setup_fake_time_server_proxy(), &mut writer, false).await.unwrap();
+        get_time_impl(setup_fake_time_server_proxy().into(), &mut writer, false).await.unwrap();
 
         let output = String::from_utf8(writer).unwrap();
         assert_eq!(output, "123456789");
@@ -70,7 +70,7 @@ mod test {
     #[fuchsia::test]
     async fn test_get_boot() {
         let mut writer = Vec::new();
-        get_time_impl(setup_fake_time_server_proxy(), &mut writer, true).await.unwrap();
+        get_time_impl(setup_fake_time_server_proxy().into(), &mut writer, true).await.unwrap();
 
         let output = String::from_utf8(writer).unwrap();
         assert_eq!(output, "234567890");

@@ -8,6 +8,7 @@
 use anyhow::Context as _;
 use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use log::error;
+use target_holders::RemoteControlProxyHolder;
 use {
     ffx_net_test_realm_args as ntr_args, fidl_fuchsia_developer_remotecontrol as fremotecontrol,
     fidl_fuchsia_io as fio, fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6,
@@ -42,7 +43,7 @@ async fn connect_to_protocol<S: fidl::endpoints::DiscoverableProtocolMarker>(
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("net.test.realm"))]
 pub struct NetTestRealmTool {
-    remote_control: fremotecontrol::RemoteControlProxy,
+    remote_control: RemoteControlProxyHolder,
     #[command]
     cmd: ntr_args::Command,
 }
@@ -59,7 +60,7 @@ impl FfxMain for NetTestRealmTool {
 }
 
 async fn net_test_realm(
-    remote_control: fremotecontrol::RemoteControlProxy,
+    remote_control: RemoteControlProxyHolder,
     mut cmd: ntr_args::Command,
 ) -> anyhow::Result<()> {
     // The tool was called with a selector, make the arg an moniker.

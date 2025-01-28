@@ -11,7 +11,6 @@ use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx::{
     RepositoryRegistrationAliasConflictMode, RepositoryRegistryProxy,
 };
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_pkg::RepositoryManagerProxy;
 use fidl_fuchsia_pkg_rewrite::EngineProxy;
@@ -24,7 +23,7 @@ use std::path::PathBuf;
 use std::process;
 use std::time::Duration;
 use target_connector::Connector;
-use target_holders::TargetProxyHolder;
+use target_holders::{RemoteControlProxyHolder, TargetProxyHolder};
 use timeout::timeout;
 use zx_status::Status;
 
@@ -63,7 +62,7 @@ pub(crate) struct PackageServerTask {
 
 pub(crate) async fn package_server_task(
     target_proxy_connector: Connector<TargetProxyHolder>,
-    rcs_proxy_connector: Connector<RemoteControlProxy>,
+    rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
     repos: Deferred<RepositoryRegistryProxy>,
     context: EnvironmentContext,
     product_bundle: PathBuf,
@@ -143,7 +142,7 @@ pub(crate) async fn package_server_task(
 
 pub(crate) async fn wait_for_device_task(
     repo_name: String,
-    rcs_proxy_connector: Connector<RemoteControlProxy>,
+    rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
 ) -> Result<()> {
     // Once the server task is running, wait until the registration appears on the device.
     let registered = timeout::<_, fho::Result<()>>(Duration::from_secs(30), async {
@@ -175,7 +174,7 @@ pub(crate) async fn wait_for_device_task(
 /// be rebooting.
 pub(crate) async fn unregister_pb_repo_server(
     repo_name_prefix: &str,
-    rcs_proxy_connector: Connector<RemoteControlProxy>,
+    rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
 ) -> Result<()> {
     let mut retry = true;
 
@@ -248,7 +247,7 @@ pub(crate) async fn unregister_pb_repo_server(
 /// server that has the given prefix.
 async fn is_server_registered(
     repo_name: &str,
-    rcs_proxy_connector: Connector<RemoteControlProxy>,
+    rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
     time_to_wait: Duration,
 ) -> Result<bool> {
     let repo_manager_proxy = get_repo_manager_proxy(rcs_proxy_connector, time_to_wait).await?;
@@ -275,7 +274,7 @@ async fn is_server_registered(
 
 async fn deregister_standalone(
     repo_name: &str,
-    rcs_proxy_connector: Connector<RemoteControlProxy>,
+    rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
     time_to_wait: Duration,
 ) -> Result<()> {
     let repo_url = if repo_name.starts_with("fuchsia-pkg://") {
@@ -365,7 +364,7 @@ async fn remove_aliases(repo_url: &str, rewrite_proxy: EngineProxy) -> Result<()
 }
 
 async fn get_rewrite_proxy(
-    rcs_proxy_connector: Connector<RemoteControlProxy>,
+    rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
     time_to_wait: Duration,
 ) -> Result<EngineProxy> {
     let rcs_proxy = try_rcs_proxy_connection(rcs_proxy_connector, time_to_wait).await?;
@@ -392,7 +391,7 @@ async fn get_rewrite_proxy(
 }
 
 async fn get_repo_manager_proxy(
-    rcs_proxy_connector: Connector<RemoteControlProxy>,
+    rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
     time_to_wait: Duration,
 ) -> Result<RepositoryManagerProxy> {
     let rcs_proxy = try_rcs_proxy_connection(rcs_proxy_connector, time_to_wait).await?;
@@ -418,9 +417,9 @@ async fn get_repo_manager_proxy(
 }
 
 async fn try_rcs_proxy_connection(
-    rcs_proxy_connector: Connector<RemoteControlProxy>,
+    rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
     time_to_wait: Duration,
-) -> Result<RemoteControlProxy> {
+) -> Result<RemoteControlProxyHolder> {
     let rcs_proxy = timeout(
         time_to_wait,
         rcs_proxy_connector.try_connect(|target, _err| {
@@ -448,7 +447,9 @@ mod tests {
     use ffx_target::TargetProxy;
     use fho::testing::ToolEnv;
     use fho::TryFromEnv as _;
-    use fidl_fuchsia_developer_remotecontrol::{ConnectCapabilityError, RemoteControlRequest};
+    use fidl_fuchsia_developer_remotecontrol::{
+        ConnectCapabilityError, RemoteControlProxy, RemoteControlRequest,
+    };
     use fidl_fuchsia_pkg::{
         RepositoryConfig, RepositoryIteratorRequest, RepositoryManagerMarker,
         RepositoryManagerRequest, RepositoryManagerRequestStream,
@@ -460,10 +461,11 @@ mod tests {
     use futures::channel::mpsc;
     use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
     use std::sync::{Arc, Mutex};
+    use target_holders::RemoteControlProxyHolder;
 
     struct FakeTestEnv {
         pub context: EnvironmentContext,
-        pub rcs_proxy_connector: Connector<RemoteControlProxy>,
+        pub rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
         pub target_proxy_connector: Connector<TargetProxyHolder>,
         pub repo_proxy: Deferred<RepositoryRegistryProxy>,
     }

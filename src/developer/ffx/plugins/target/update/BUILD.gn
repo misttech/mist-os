@@ -11,7 +11,6 @@ ffx_plugin("ffx_update") {
   with_unit_tests = true
   args_with_unit_tests = true
   deps = [
-    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
     "//sdk/fidl/fuchsia.pkg.rewrite:fuchsia.pkg.rewrite_rust",
@@ -42,6 +41,7 @@ ffx_plugin("ffx_update") {
   ]
 
   test_deps = [
+    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//src/developer/ffx/lib/target:lib",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",

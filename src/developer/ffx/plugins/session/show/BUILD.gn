@@ -11,9 +11,9 @@ ffx_plugin("ffx_session_show") {
   with_unit_tests = true
 
   deps = [
-    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/rcs:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/sys/lib/component_debug",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",

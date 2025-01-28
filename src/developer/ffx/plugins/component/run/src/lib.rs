@@ -16,16 +16,16 @@ use ffx_core::macro_deps::errors::FfxError;
 use ffx_log::log_impl;
 use ffx_log_args::LogCommand;
 use fho::{FfxMain, FfxTool, MachineWriter};
-use fidl_fuchsia_developer_remotecontrol as rc;
 use futures::FutureExt;
 use log_command::LogEntry;
 use std::io::Write;
+use target_holders::RemoteControlProxyHolder;
 
 async fn cmd_impl(
-    rcs_proxy: rc::RemoteControlProxy,
+    rcs_proxy: RemoteControlProxyHolder,
     args: RunComponentCommand,
     mut writer: MachineWriter<LogEntry>,
-    connector: target_connector::Connector<rc::RemoteControlProxy>,
+    connector: target_connector::Connector<RemoteControlProxyHolder>,
 ) -> Result<(), anyhow::Error> {
     let rcs_proxy_clone = rcs_proxy.clone();
     let lifecycle_controller_factory = move || {
@@ -88,8 +88,8 @@ async fn cmd_impl(
 pub struct RunTool {
     #[command]
     cmd: RunComponentCommand,
-    rcs: rc::RemoteControlProxy,
-    connector: target_connector::Connector<rc::RemoteControlProxy>,
+    rcs: RemoteControlProxyHolder,
+    connector: target_connector::Connector<RemoteControlProxyHolder>,
 }
 
 fho::embedded_plugin!(RunTool);

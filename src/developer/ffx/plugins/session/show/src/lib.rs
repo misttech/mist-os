@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use component_debug::cli::show_cmd_print;
 use ffx_session_show_args::SessionShowCommand;
 use fho::{FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_developer_remotecontrol as rc;
+use target_holders::RemoteControlProxyHolder;
 
 const DETAILS_FAILURE: &str = "Could not get session information from the target. This may be
 because there are no running sessions, or because the target is using a product configuration
@@ -17,7 +17,7 @@ that does not include `session_manager`.";
 pub struct ShowTool {
     #[command]
     cmd: SessionShowCommand,
-    rcs: rc::RemoteControlProxy,
+    rcs: RemoteControlProxyHolder,
 }
 
 fho::embedded_plugin!(ShowTool);
@@ -32,7 +32,7 @@ impl FfxMain for ShowTool {
 }
 
 async fn show_impl<W: std::io::Write>(
-    rcs_proxy: rc::RemoteControlProxy,
+    rcs_proxy: RemoteControlProxyHolder,
     _cmd: SessionShowCommand,
     writer: &mut W,
 ) -> Result<()> {

@@ -11,7 +11,6 @@ use ffx_config::EnvironmentContext;
 use ffx_repository_server_start_args::{default_address, StartCommand};
 use fho::Deferred;
 use fidl_fuchsia_developer_ffx::{self as ffx, RepositoryRegistryProxy, ServerStatus};
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fuchsia_async as fasync;
 use fuchsia_repo::manager::RepositoryManager;
 use fuchsia_repo::repo_client::RepoClient;
@@ -31,7 +30,7 @@ use std::io::Write;
 use std::sync::Arc;
 use target_connector::Connector;
 use target_errors::FfxTargetError;
-use target_holders::TargetProxyHolder;
+use target_holders::{RemoteControlProxyHolder, TargetProxyHolder};
 use tuf::metadata::RawSignedMetadata;
 
 const REPO_CONNECT_TIMEOUT_CONFIG: &str = "repository.connect_timeout_secs";
@@ -137,7 +136,7 @@ pub fn get_repo_base_name(
 
 pub async fn serve_impl_validate_args(
     cmd: &StartCommand,
-    rcs_proxy_connector: &Connector<RemoteControlProxy>,
+    rcs_proxy_connector: &Connector<RemoteControlProxyHolder>,
     repos: Deferred<RepositoryRegistryProxy>,
     context: &EnvironmentContext,
 ) -> Result<Option<PkgServerInfo>> {
@@ -345,7 +344,7 @@ async fn daemon_repo_is_running(repos: ffx::RepositoryRegistryProxy) -> Result<b
 
 pub async fn serve_impl<W: Write + 'static>(
     target_proxy: Connector<TargetProxyHolder>,
-    rcs_proxy: Connector<RemoteControlProxy>,
+    rcs_proxy: Connector<RemoteControlProxyHolder>,
     repos: Deferred<RepositoryRegistryProxy>,
     cmd: StartCommand,
     context: EnvironmentContext,
@@ -602,7 +601,7 @@ mod test {
         RepositoryStorageType, SshHostAddrInfo, TargetAddrInfo, TargetInfo, TargetIpPort,
         TargetRequest, TargetState,
     };
-    use fidl_fuchsia_developer_remotecontrol as frcs;
+    use fidl_fuchsia_developer_remotecontrol::{self as frcs, RemoteControlProxy};
     use fidl_fuchsia_net::{IpAddress, Ipv4Address};
     use fidl_fuchsia_pkg::{
         MirrorConfig, RepositoryConfig, RepositoryManagerMarker, RepositoryManagerRequest,
@@ -965,7 +964,9 @@ mod test {
         ffx_config::test_init().await.expect("test initialization")
     }
 
-    async fn make_fake_rcs_proxy_connector(test_env: &TestEnv) -> Connector<RemoteControlProxy> {
+    async fn make_fake_rcs_proxy_connector(
+        test_env: &TestEnv,
+    ) -> Connector<RemoteControlProxyHolder> {
         let (fake_repo, _) = FakeRepositoryManager::new();
         let (fake_engine, _content) = FakeEngine::new();
         let (_, fake_target_proxy, _) = FakeTarget::new(None);

@@ -284,8 +284,9 @@ mod tests {
     use ffx_target::{TargetConnection, TargetConnectionError, TargetConnector};
     use fho::testing::ToolEnv;
     use fho::MockDirectConnector;
-    use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
+    use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
     use futures::future::LocalBoxFuture;
+    use target_holders::RemoteControlProxyHolder;
 
     #[fuchsia::test]
     async fn test_connector_try_connect_fail_after_critical_connection_error() {
@@ -301,7 +302,8 @@ mod tests {
             )
             .await;
 
-        let connector = Connector::<RemoteControlProxy>::try_from_env(&tool_env).await.unwrap();
+        let connector =
+            Connector::<RemoteControlProxyHolder>::try_from_env(&tool_env).await.unwrap();
         let res = connector.try_connect(|_, _| Ok(())).await;
         assert!(res.is_err(), "Expected failure: {:?}", res);
     }
@@ -352,7 +354,8 @@ mod tests {
             )
             .await;
 
-        let connector = Connector::<RemoteControlProxy>::try_from_env(&tool_env).await.unwrap();
+        let connector =
+            Connector::<RemoteControlProxyHolder>::try_from_env(&tool_env).await.unwrap();
         let res = connector.try_connect(|_, _| Ok(())).await;
         assert!(res.is_ok(), "Expected success: {:?}", res);
     }
@@ -381,7 +384,8 @@ mod tests {
             )
             .await;
 
-        let connector = Connector::<RemoteControlProxy>::try_from_env(&tool_env).await.unwrap();
+        let connector =
+            Connector::<RemoteControlProxyHolder>::try_from_env(&tool_env).await.unwrap();
         let res = connector.try_connect(|_, _| Ok(())).await;
         assert!(res.is_err(), "Expected failure: {:?}", res);
     }

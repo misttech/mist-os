@@ -10,7 +10,6 @@ ffx_plugin("ffx_component_debug") {
   edition = "2021"
   deps = [
     "//sdk/fidl/fuchsia.debugger:fuchsia.debugger_rust",
-    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/rust/zx-types",
     "//src/developer/debug/ffx_zxdb",
     "//src/developer/ffx/lib/errors:lib",

@@ -9,11 +9,10 @@ use ffx_config::EnvironmentContext;
 use ffx_repository_server_start_args::StartCommand;
 use fho::{Deferred, FfxMain};
 use fidl_fuchsia_developer_ffx as ffx;
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use pkg::{PkgServerInstanceInfo, PkgServerInstances, ServerMode};
 use std::time::Duration;
 use target_connector::Connector;
-use target_holders::TargetProxyHolder;
+use target_holders::{RemoteControlProxyHolder, TargetProxyHolder};
 
 pub(crate) fn to_argv(cmd: &StartCommand) -> Vec<String> {
     let mut argv: Vec<String> = vec![];
@@ -67,7 +66,7 @@ pub async fn run_foreground_server(
     start_cmd: StartCommand,
     context: EnvironmentContext,
     target_proxy_connector: Connector<TargetProxyHolder>,
-    rcs_proxy_connector: Connector<RemoteControlProxy>,
+    rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
     repos: Deferred<ffx::RepositoryRegistryProxy>,
     w: <ServerStartTool as FfxMain>::Writer,
     mode: ServerMode,

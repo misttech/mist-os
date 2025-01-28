@@ -4,12 +4,12 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use ffx_target_echo_args::EchoCommand;
 use fho::{FfxMain, FfxTool, VerifiedMachineWriter};
 use schemars::JsonSchema;
 use serde::Serialize;
 use target_connector::Connector;
+use target_holders::fdomain::RemoteControlProxyHolder;
 
 #[derive(Debug, Serialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -26,7 +26,7 @@ pub enum EchoMessage {
 pub struct EchoTool {
     #[command]
     cmd: EchoCommand,
-    rcs_proxy: Connector<RemoteControlProxy>,
+    rcs_proxy: Connector<RemoteControlProxyHolder>,
 }
 
 fho::embedded_plugin!(EchoTool);
@@ -47,7 +47,7 @@ impl FfxMain for EchoTool {
 }
 
 async fn echo_impl(
-    rcs_proxy_connector: Connector<RemoteControlProxy>,
+    rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
     cmd: EchoCommand,
     writer: &mut VerifiedMachineWriter<EchoMessage>,
 ) -> Result<()> {
@@ -121,7 +121,9 @@ async fn echo_impl(
 mod test {
     use super::*;
     use anyhow::Context;
-    use fdomain_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlRequest};
+    use fdomain_fuchsia_developer_remotecontrol::{
+        RemoteControlMarker, RemoteControlProxy, RemoteControlRequest,
+    };
     use fho::testing::ToolEnv;
     use fho::{Format, TestBuffers, TryFromEnv};
     use futures::FutureExt;

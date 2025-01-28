@@ -26,7 +26,7 @@ use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
 use target_connector::Connector;
-use target_holders::TargetProxyHolder;
+use target_holders::{RemoteControlProxyHolder, TargetProxyHolder};
 use timeout::timeout;
 
 const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";
@@ -96,7 +96,7 @@ async fn inner_connect_loop(
     server_addr: core::net::SocketAddr,
     connect_timeout: std::time::Duration,
     repo_manager: &Arc<RepositoryManager>,
-    rcs_proxy: &Connector<RemoteControlProxy>,
+    rcs_proxy: &Connector<RemoteControlProxyHolder>,
     target_proxy: &Connector<TargetProxyHolder>,
     writer: &mut impl Write,
 ) -> Result<()> {
@@ -212,7 +212,7 @@ pub(crate) async fn main_connect_loop(
     connect_timeout: std::time::Duration,
     repo_manager: Arc<RepositoryManager>,
     mut loop_stop_rx: futures::channel::mpsc::Receiver<()>,
-    rcs_proxy: Connector<RemoteControlProxy>,
+    rcs_proxy: Connector<RemoteControlProxyHolder>,
     target_proxy: Connector<TargetProxyHolder>,
     writer: &mut (impl Write + 'static),
 ) -> Result<()> {

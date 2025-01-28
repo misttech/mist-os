@@ -15,6 +15,7 @@ use fuchsia_fs::directory::{open_directory_async, open_file_async};
 use futures::StreamExt;
 use std::io::{BufRead, Write};
 use std::process::Command;
+use target_holders::RemoteControlProxyHolder;
 use tempfile::{NamedTempFile, TempPath};
 use zx_status::Status;
 
@@ -26,7 +27,7 @@ pub struct CoreTool {
     #[command]
     cmd: ffx_debug_core_args::CoreCommand,
     context: ffx_config::EnvironmentContext,
-    rcs: fho::Deferred<RemoteControlProxy>,
+    rcs: fho::Deferred<RemoteControlProxyHolder>,
 }
 
 fho::embedded_plugin!(CoreTool);
@@ -44,7 +45,7 @@ impl FfxMain for CoreTool {
         let minidump = match self.cmd.minidump {
             Some(file) => file,
             None => {
-                let rcs: RemoteControlProxy = self.rcs.await?;
+                let rcs: RemoteControlProxyHolder = self.rcs.await?;
                 _temp_minidump_path = Some(choose_and_copy_remote_minidumps(&rcs).await?);
                 _temp_minidump_path.as_ref().unwrap().to_str().unwrap().to_owned()
             }

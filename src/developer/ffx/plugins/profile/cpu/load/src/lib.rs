@@ -7,17 +7,14 @@ use async_trait::async_trait;
 use errors::ffx_bail;
 use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_power_metrics::{self as fmetrics, CpuLoad, Metric};
-use target_holders::moniker;
-use {
-    ffx_cpu_load_args as args_mod, fidl_fuchsia_developer_remotecontrol as rc,
-    fidl_fuchsia_kernel as fstats,
-};
+use target_holders::{moniker, RemoteControlProxyHolder};
+use {ffx_cpu_load_args as args_mod, fidl_fuchsia_kernel as fstats};
 
 #[derive(FfxTool)]
 pub struct CpuLoadTool {
     #[command]
     cmd: args_mod::CpuLoadCommand,
-    rcs_proxy: rc::RemoteControlProxy,
+    rcs_proxy: RemoteControlProxyHolder,
     #[with(moniker("/core/metrics-logger"))]
     cpu_logger: fmetrics::RecorderProxy,
 }

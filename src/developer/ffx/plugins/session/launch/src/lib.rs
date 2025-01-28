@@ -10,7 +10,7 @@ use ffx_session_launch_args::SessionLaunchCommand;
 use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_session::{LaunchConfiguration, LauncherProxy};
 use moniker::Moniker;
-use target_holders::moniker;
+use target_holders::{moniker, RemoteControlProxyHolder};
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_developer_remotecontrol as rc};
 
 const SESSION_MANAGER_MONIKER: &str = "/core/session-manager";
@@ -19,7 +19,7 @@ const SESSION_MANAGER_MONIKER: &str = "/core/session-manager";
 pub struct LaunchTool {
     #[command]
     cmd: SessionLaunchCommand,
-    rcs: rc::RemoteControlProxy,
+    rcs: RemoteControlProxyHolder,
     #[with(moniker(SESSION_MANAGER_MONIKER))]
     launcher_proxy: LauncherProxy,
 }
@@ -37,7 +37,7 @@ impl FfxMain for LaunchTool {
 
 pub async fn launch_impl<W: std::io::Write>(
     launcher_proxy: LauncherProxy,
-    rcs: rc::RemoteControlProxy,
+    rcs: RemoteControlProxyHolder,
     cmd: SessionLaunchCommand,
     writer: &mut W,
 ) -> Result<()> {
@@ -97,7 +97,8 @@ mod test {
                 let _ = responder.send(Ok(()));
             }
         });
-        let rcs = fho::testing::fake_proxy(|_req| unimplemented!());
+        let rcs =
+            fho::testing::fake_proxy::<rc::RemoteControlProxy>(|_req| unimplemented!()).into();
 
         let launch_cmd = SessionLaunchCommand { url: SESSION_URL.to_string(), config: vec![] };
         let result = launch_impl(proxy, rcs, launch_cmd, &mut std::io::stdout()).await;

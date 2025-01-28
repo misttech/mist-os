@@ -11,19 +11,21 @@ use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
 use fho::{FhoConnectionBehavior, FhoEnvironment, TryFromEnv as _};
 use fidl::encoding::DefaultFuchsiaResourceDialect;
 use fidl::endpoints::Proxy;
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 
 mod daemon_proxy;
 mod device_lookup;
-mod fdomain;
+pub mod fdomain;
 mod from_toolbox;
+mod remote_control_proxy;
 mod target_info;
 mod target_proxy;
+mod with_moniker;
 
 pub use daemon_proxy::{daemon_protocol, DaemonProxyHolder};
 pub use device_lookup::DeviceLookupDefaultImpl;
 use from_toolbox::WithToolbox;
 pub use from_toolbox::{toolbox, toolbox_or};
+pub use remote_control_proxy::RemoteControlProxyHolder;
 pub use target_info::TargetInfoHolder;
 pub use target_proxy::TargetProxyHolder;
 
@@ -62,14 +64,14 @@ pub fn moniker<P: Proxy>(
     toolbox_or(moniker)
 }
 
-pub(crate) async fn connect_to_rcs(env: &FhoEnvironment) -> Result<RemoteControlProxy> {
+pub(crate) async fn connect_to_rcs(env: &FhoEnvironment) -> Result<RemoteControlProxyHolder> {
     let retry_count = 1;
     let mut tries = 0;
     // TODO(b/287693891): Remove explicit retries/timeouts here so they can be
     // configurable instead.
     loop {
         tries += 1;
-        let res = RemoteControlProxy::try_from_env(env).await;
+        let res = RemoteControlProxyHolder::try_from_env(env).await;
         if res.is_ok() || tries > retry_count {
             // Using `TryFromEnv` on `RemoteControlProxy` already contains user error information,
             // which will be propagated after exiting the loop.

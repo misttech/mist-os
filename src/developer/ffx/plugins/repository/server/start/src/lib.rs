@@ -12,7 +12,6 @@ use fho::{
 };
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx_ext::RepositoryError;
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_net_ext::SocketAddress;
 use pkg::config::DEFAULT_REPO_NAME;
 use pkg::{config as pkg_config, ServerMode};
@@ -21,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use std::io::Write as _;
 use std::time::Duration;
 use target_connector::Connector;
-use target_holders::{daemon_protocol, TargetProxyHolder};
+use target_holders::{daemon_protocol, RemoteControlProxyHolder, TargetProxyHolder};
 
 mod server;
 mod server_impl;
@@ -55,7 +54,7 @@ pub struct ServerStartTool {
     pub repos: Deferred<ffx::RepositoryRegistryProxy>,
     pub context: EnvironmentContext,
     pub target_proxy_connector: Connector<TargetProxyHolder>,
-    pub rcs_proxy_connector: Connector<RemoteControlProxy>,
+    pub rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
 }
 
 fho::embedded_plugin!(ServerStartTool);
