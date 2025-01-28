@@ -178,7 +178,7 @@ void UsbCdc::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
     }
   }
 
-  zxlogf(SERIAL, "%s: sending %zu bytes", __func__, length);
+  zxlogf(DEBUG, "%s: sending %zu bytes", __func__, length);
 
   {
     std::lock_guard<std::mutex> tx(tx_mutex_);

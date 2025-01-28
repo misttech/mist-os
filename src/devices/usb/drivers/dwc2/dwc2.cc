@@ -306,7 +306,7 @@ void Dwc2::HandleOutEpInterrupt() {
         DOEPINT::Get(ep_num).ReadFrom(mmio).set_setup(1).WriteTo(mmio);
 
         memcpy(&cur_setup_, ep0_buffer_.virt(), sizeof(cur_setup_));
-        zxlogf(SERIAL,
+        zxlogf(INFO,
                "SETUP bm_request_type: 0x%02x b_request: %u w_value: %u w_index: %u "
                "w_length: %u\n",
                cur_setup_.bm_request_type, cur_setup_.b_request, cur_setup_.w_value,
@@ -352,7 +352,7 @@ zx_status_t Dwc2::HandleSetupRequest(size_t* out_actual) {
     // Handle some special setup requests in this driver
     switch (setup->b_request) {
       case USB_REQ_SET_ADDRESS:
-        zxlogf(SERIAL, "SET_ADDRESS %d", setup->w_value);
+        zxlogf(INFO, "SET_ADDRESS %d", setup->w_value);
         SetAddress(static_cast<uint8_t>(setup->w_value));
         now = zx::clock::get_boot();
         elapsed = now - irq_timestamp_;
@@ -368,7 +368,7 @@ zx_status_t Dwc2::HandleSetupRequest(size_t* out_actual) {
         *out_actual = 0;
         return ZX_OK;
       case USB_REQ_SET_CONFIGURATION:
-        zxlogf(SERIAL, "SET_CONFIGURATION %d", setup->w_value);
+        zxlogf(INFO, "SET_CONFIGURATION %d", setup->w_value);
         configured_ = true;
         if (dci_intf_) {
           status = DciIntfWrapControl(setup, nullptr, 0, nullptr, 0, out_actual);
@@ -1370,7 +1370,7 @@ void Dwc2::UsbDciRequestQueue(usb_request_t* req, const usb_request_complete_cal
     usb_request_complete(req, ZX_ERR_INVALID_ARGS, 0, cb);
     return;
   }
-  zxlogf(SERIAL, "UsbDciRequestQueue ep %u length %zu", ep_num, req->header.length);
+  zxlogf(INFO, "UsbDciRequestQueue ep %u length %zu", ep_num, req->header.length);
 
   endpoints_[ep_num]->QueueRequest(Request(req, *cb, sizeof(usb_request_t)));
 }
