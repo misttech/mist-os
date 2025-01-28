@@ -49,4 +49,17 @@
             path: "/config/data",
         },
     ],
+    expose: [
+        {
+            // Note: this route can go away once all support SDK tools for which
+            // we gurantee forward compatibility are defaulting to use /toolbox
+            // instead of /core/toolbox.
+            protocol: "fuchsia.diagnostics.host.ArchiveAccessor",
+            from: "self/diagnostics-accessors",
+        },
+        {
+            dictionary: "diagnostics-accessors",
+            from: "self",
+        },
+    ],
 }
