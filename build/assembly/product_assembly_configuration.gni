@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/product_assembly_config_file_impl.gni")
+import("//build/compiled_action.gni")
 import("//build/group_with_inputs.gni")
 
 # Create a product assembly config file from the lists of packages and config
@@ -74,7 +75,6 @@ template("product_assembly_configuration") {
   labels = {
     # So it can be reused.
     target_name = target_name
-
     assembly_config = "${target_name}.product_assembly_config.json"
 
     # This is a second target created by the product_assembly_config_file()
@@ -154,7 +154,13 @@ template("product_assembly_configuration") {
 
   files = {
     outdir = "$target_out_dir/$target_name"
-    assembly_config_file = "$outdir/product_assembly_config.json"
+
+    # We nest the hermetic output container so that the other files generated
+    # by this rule do not end up in the container as well.
+    assembly_config_dir = "$outdir/product_assembly_config"
+    assembly_config_file =
+        "$outdir/product_assembly_config/product_configuration.json"
+    assembly_config_file_intermediate = "$outdir/product_assembly_config.json"
 
     # Compute the paths for the package manifests (as files).  This is
     # closely coupled with how fuchsia_package() and prebuilt_package() both
@@ -329,7 +335,7 @@ template("product_assembly_configuration") {
       ":${labels.assembly_config_for_validation}",
       ":${labels.target_name}",
     ]
-    outputs = [ files.assembly_config_file ]
+    outputs = [ files.assembly_config_file_intermediate ]
     product_assembly_config = _assembly_config
   }
 
@@ -384,22 +390,31 @@ template("product_assembly_configuration") {
     deps = labels.cache_package_config_data_deps
   }
 
-  group(labels.target_name) {
+  compiled_action(labels.target_name) {
     forward_variables_from(invoker,
                            [
                              "inputs",
                              "testonly",
                              "visibility",
                            ])
-    if (!defined(public_deps)) {
-      public_deps = []
-    }
-    public_deps += [ ":${labels.assembly_config}" ]
 
-    if (!defined(deps)) {
-      deps = []
-    }
-    deps += [
+    # This will not be resolved except by moving to Bazel.
+    hermetic_deps = false
+
+    tool = "//build/assembly/tools/generate_config"
+    tool_output_name = "assembly_generate_config"
+    outputs = [ files.assembly_config_file ]
+
+    args = [
+      "product",
+      "--config",
+      rebase_path(files.assembly_config_file_intermediate, root_build_dir),
+      "--output",
+      rebase_path(files.assembly_config_dir, root_build_dir),
+    ]
+
+    public_deps = [ ":${labels.assembly_config}" ]
+    deps = [
       # Add the group of inputs found by looking at the known config schema
       # items that contain paths to files, so that they are guaranteed to be
       # added to the ninja deps for the product assembly configuration.

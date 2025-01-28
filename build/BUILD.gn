@@ -123,6 +123,17 @@ group("non_hermetic_deps") {
     "//zircon/system/*",
   ]
 
+  # //build/assembly/product_assembly_configuration.gni needs
+  # `hermetic_deps = false`, and that will not be resolved except by moving to
+  # Bazel.
+  visibility += [
+    "//build/assembly/*",
+    "//build/testing:*",
+    "//products/bringup:*",
+    "//products/core:*",
+    "//products/zedboot:*",
+  ]
+
   # TODO(https://fxbug.dev/42176361): Remove entry when action tracer can handle ld.lld invocations.
   visibility += [ "//src/graphics/lib/magma/src/libmagma:*" ]
 
