@@ -17,7 +17,9 @@ use carnelian::{
     input, AppSender, Point, Size, ViewAssistant, ViewAssistantContext, ViewAssistantPtr, ViewKey,
 };
 use fidl_fuchsia_hardware_display::VirtconMode;
-use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminSynchronousProxy, RebootReason};
+use fidl_fuchsia_hardware_power_statecontrol::{
+    AdminMarker, AdminSynchronousProxy, RebootOptions, RebootReason2,
+};
 use fidl_fuchsia_hardware_pty::WindowSize;
 use fuchsia_component::client::connect_channel_to_protocol;
 
@@ -433,8 +435,11 @@ impl VirtualConsoleViewAssistant {
                         let (server_end, client_end) = zx::Channel::create();
                         connect_channel_to_protocol::<AdminMarker>(server_end)?;
                         let admin = AdminSynchronousProxy::new(client_end);
-                        match admin.reboot(
-                            RebootReason::UserRequest,
+                        match admin.perform_reboot(
+                            &RebootOptions {
+                                reasons: Some(vec![RebootReason2::UserRequest]),
+                                ..Default::default()
+                            },
                             zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(5)),
                         )? {
                             Ok(()) => {
