@@ -890,6 +890,35 @@ bool backtrace_instance_method_test() {
   END_TEST;
 }
 
+// ScopedMemoryStall is currently meant to be a no-op when executed in a kernel-only thread.
+// This test verifies that it, indeed, does not modify the thread's state.
+bool scoped_memory_stall_test() {
+  BEGIN_TEST;
+
+  Thread* const current_thread = Thread::Current::Get();
+
+  // Verify previous state.
+  {
+    AnnotatedAutoPreemptDisabler preempt_disable;
+    ASSERT_EQ(ThreadStallState::IgnoredKernelOnly, current_thread->memory_stall_state());
+  }
+
+  // Enter a memory stall and verify that the state has not changed.
+  {
+    ScopedMemoryStall scoped_memory_stall;
+    AnnotatedAutoPreemptDisabler preempt_disable;
+    ASSERT_EQ(ThreadStallState::IgnoredKernelOnly, current_thread->memory_stall_state());
+  }
+
+  // After exiting the memory stall, verify that the state has not changed.
+  {
+    AnnotatedAutoPreemptDisabler preempt_disable;
+    ASSERT_EQ(ThreadStallState::IgnoredKernelOnly, current_thread->memory_stall_state());
+  }
+
+  END_TEST;
+}
+
 }  // namespace
 
 struct TaskRuntimeStatsTests {
@@ -1012,5 +1041,6 @@ UNITTEST("set_context_switch_fn", set_context_switch_fn_test)
 UNITTEST("scoped_allocation_disabled_test", scoped_allocation_disabled_test)
 UNITTEST("backtrace_static_method_test", backtrace_static_method_test)
 UNITTEST("backtrace_instance_method_test", backtrace_instance_method_test)
+UNITTEST("scoped_memory_stall_test", scoped_memory_stall_test)
 UNITTEST("thread_runtime_test", TaskRuntimeStatsTests::thread_runtime_test)
 UNITTEST_END_TESTCASE(thread_tests, "thread", "thread tests")

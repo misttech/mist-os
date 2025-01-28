@@ -2193,6 +2193,9 @@ struct WaitQueueLockOps {
 };
 
 // RAII class to mark sections of code as memory stalls.
+//
+// Nesting is not allowed. It is a programming error to instantiate this class
+// if there exists another instance on the call stack.
 class ScopedMemoryStall {
  public:
   ScopedMemoryStall();
