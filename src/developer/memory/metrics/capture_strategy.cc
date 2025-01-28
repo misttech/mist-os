@@ -71,7 +71,8 @@ zx_status_t BaseCaptureStrategy::OnNewProcess(OS& os, Process process, zx::handl
   }
   TRACE_DURATION_END("memory_metrics", "BaseCaptureStrategy::OnNewProcess::UniqueVMOs");
 
-  koid_to_process_[process.koid] = std::move(process);
+  zx_koid_t process_koid = process.koid;
+  koid_to_process_[process_koid] = std::move(process);
   return ZX_OK;
 }
 
@@ -89,8 +90,10 @@ zx_status_t StarnixCaptureStrategy::OnNewProcess(OS& os, Process process,
   if (process_name_ == process.name) {
     starnix_jobs_[process.job].kernel_koid = process.koid;
   }
-  process_handles_[process.koid] = std::move(process_handle);
-  koid_to_process_[process.koid] = std::move(process);
+
+  zx_koid_t process_koid = process.koid;
+  process_handles_[process_koid] = std::move(process_handle);
+  koid_to_process_[process_koid] = std::move(process);
   return ZX_OK;
 }
 
