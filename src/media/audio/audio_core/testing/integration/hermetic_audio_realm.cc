@@ -27,6 +27,7 @@
 namespace media::audio::test {
 
 namespace {
+
 class InspectSinkMock : public component_testing::LocalComponentImpl,
                         public fidl::WireServer<fuchsia_inspect::InspectSink> {
  public:
@@ -75,9 +76,10 @@ class InspectSinkMock : public component_testing::LocalComponentImpl,
 void ConnectToVirtualAudio(component_testing::RealmRoot& root,
                            fidl::SynchronousInterfacePtr<fuchsia::virtualaudio::Control>& out) {
   // Connect to dev.
-  fidl::InterfaceHandle<fuchsia::io::Node> dev;
-  ASSERT_EQ(root.component().Connect("dev-topological", dev.NewRequest().TakeChannel()), ZX_OK);
-
+  fidl::InterfaceHandle<fuchsia::io::Directory> dev;
+  ASSERT_EQ(root.component().exposed()->Open3("dev-topological", fuchsia::io::PERM_READABLE, {},
+                                              dev.NewRequest().TakeChannel()),
+            ZX_OK);
   fbl::unique_fd dev_fd;
   ASSERT_EQ(fdio_fd_create(dev.TakeChannel().release(), dev_fd.reset_and_get_address()), ZX_OK);
 

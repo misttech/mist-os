@@ -32,6 +32,7 @@ zx::result<zx::channel> RecursiveWaitForFile(const char* path,
                                              zx::duration timeout = zx::duration::infinite());
 
 using ItemCallback = fit::function<std::optional<std::monostate>(std::string_view)>;
+
 // Call the callback for each item in the directory, and wait for new items.
 //
 // This function will not call the callback for the '.' file in a directory.
@@ -39,14 +40,27 @@ using ItemCallback = fit::function<std::optional<std::monostate>(std::string_vie
 // If the callback returns a status other than `ZX_OK`, watching stops.
 // If the callback returns std::nullopt the watching will continue, otherwise the
 // watching will stop and zx::ok() will be returned to the caller.
-zx::result<> WatchDirectoryForItems(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+zx::result<> WatchDirectoryForItems(fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
                                     ItemCallback callback);
+
+// Call the callback for each item in the directory, and wait for new items.
+//
+// This function will not call the callback for the '.' file in a directory.
+//
+// If the callback returns a status other than `ZX_OK`, watching stops.
+// If the callback returns std::nullopt the watching will continue, otherwise the
+// watching will stop and zx::ok() will be returned to the caller.
+inline zx::result<> WatchDirectoryForItems(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                           ItemCallback callback) {
+  return WatchDirectoryForItems(fidl::UnownedClientEnd<fuchsia_io::Directory>(dir),
+                                std::move(callback));
+}
 
 // A templated version of this function.
 // If the callback returns std::nullopt the watching will continue, otherwise the
 // watching will stop and the return value will be returned to the caller.
 template <typename T>
-zx::result<T> WatchDirectoryForItems(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+zx::result<T> WatchDirectoryForItems(fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
                                      fit::function<std::optional<T>(std::string_view)> callback) {
   std::optional<T> return_value;
   zx::result result =
@@ -67,6 +81,16 @@ zx::result<T> WatchDirectoryForItems(const fidl::ClientEnd<fuchsia_io::Directory
         "Bad state: Watching the directory returned successfully but the return value wasn't set");
   }
   return zx::ok(std::move(return_value.value()));
+}
+
+// A templated version of this function.
+// If the callback returns std::nullopt the watching will continue, otherwise the
+// watching will stop and the return value will be returned to the caller.
+template <typename T>
+zx::result<T> WatchDirectoryForItems(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                     fit::function<std::optional<T>(std::string_view)> callback) {
+  return WatchDirectoryForItems(fidl::UnownedClientEnd<fuchsia_io::Directory>(dir),
+                                std::move(callback));
 }
 
 // DirWatcher can be used to detect when a file has been removed from the filesystem.

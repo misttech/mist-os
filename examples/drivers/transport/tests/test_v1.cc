@@ -33,20 +33,21 @@ TEST(DriverTransportTest, ParentChildExists) {
   ASSERT_EQ(ZX_OK, driver_test_realm->Start(std::move(args), &realm_result));
   ASSERT_FALSE(realm_result.is_err());
 
-  // Connect to dev.
-  fidl::InterfaceHandle<fuchsia::io::Node> dev;
-  zx_status_t status = realm.component().Connect("dev-topological", dev.NewRequest().TakeChannel());
-  ASSERT_EQ(status, ZX_OK);
+  fbl::unique_fd fd;
+  auto exposed = realm.component().CloneExposedDir();
+  ASSERT_EQ(fdio_fd_create(exposed.TakeChannel().release(), fd.reset_and_get_address()), ZX_OK);
 
-  fbl::unique_fd root_fd;
-  status = fdio_fd_create(dev.TakeChannel().release(), root_fd.reset_and_get_address());
-  ASSERT_EQ(status, ZX_OK);
+  {
+    // Wait for parent driver.
+    zx::result channel =
+        device_watcher::RecursiveWaitForFile(fd.get(), "dev-topological/sys/test/transport-child");
+    ASSERT_EQ(channel.status_value(), ZX_OK);
+  }
 
-  // Wait for drivers.
-  ASSERT_EQ(device_watcher::RecursiveWaitForFile(root_fd.get(), "sys/test/transport-child")
-                .status_value(),
-            ZX_OK);
-  ASSERT_EQ(device_watcher::RecursiveWaitForFile(root_fd.get(), "sys/test/transport-child/test")
-                .status_value(),
-            ZX_OK);
+  {
+    // Wait for child driver.
+    zx::result channel = device_watcher::RecursiveWaitForFile(
+        fd.get(), "dev-topological/sys/test/transport-child/test");
+    ASSERT_EQ(channel.status_value(), ZX_OK);
+  }
 }

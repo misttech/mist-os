@@ -32,16 +32,13 @@ TEST_F(DriverTestRealmTest, DriversExist) {
   ASSERT_EQ(ZX_OK, driver_test_realm->Start(fuchsia::driver::test::RealmArgs(), &realm_result));
   ASSERT_FALSE(realm_result.is_err()) << zx_status_get_string(realm_result.err());
 
-  // Connect to dev.
-  fidl::InterfaceHandle<fuchsia::io::Node> dev;
-  ASSERT_EQ(ZX_OK, realm.component().Connect("dev-topological", dev.NewRequest().TakeChannel()));
-
-  fbl::unique_fd root_fd;
-  ASSERT_EQ(ZX_OK, fdio_fd_create(dev.TakeChannel().release(), root_fd.reset_and_get_address()));
+  fbl::unique_fd fd;
+  auto exposed = realm.component().CloneExposedDir();
+  ASSERT_EQ(ZX_OK, fdio_fd_create(exposed.TakeChannel().release(), fd.reset_and_get_address()));
 
   // Wait for driver.
   zx::result channel =
-      device_watcher::RecursiveWaitForFile(root_fd.get(), "sys/test/sample_driver");
+      device_watcher::RecursiveWaitForFile(fd.get(), "dev-topological/sys/test/sample_driver");
   ASSERT_EQ(channel.status_value(), ZX_OK);
 
   // Turn the connection into FIDL.

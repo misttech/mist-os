@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{bail, format_err, Error, Result};
-use fidl::endpoints::{ControlHandle, ServerEnd};
+use fidl::endpoints::ControlHandle;
 use fidl_fuchsia_testing_harness::OperationError;
 use fidl_test_wlan_realm::*;
 use fuchsia_component::client;
@@ -118,11 +118,11 @@ async fn create_realm(mut options: RealmOptions) -> Result<RealmInstance, Error>
         let realm = builder.build().await?;
 
         let devfs = options.devfs_server_end.take().unwrap();
-        realm.root.get_exposed_dir().open(
-            fidl_fuchsia_io::OpenFlags::DIRECTORY,
-            fidl_fuchsia_io::ModeType::empty(),
+        realm.root.get_exposed_dir().open3(
             "dev-topological",
-            ServerEnd::new(devfs.into_channel()),
+            fidl_fuchsia_io::PERM_READABLE | fidl_fuchsia_io::Flags::PROTOCOL_DIRECTORY,
+            &Default::default(),
+            devfs.into_channel(),
         )?;
 
         Ok(realm)
@@ -145,19 +145,19 @@ async fn start_and_connect_to_driver_test_realm(
 
     let dev_topological =
         driver_config.dev_topological.ok_or(format_err!("DriverConfig missing dev_topological"))?;
-    realm.root.get_exposed_dir().open(
-        fidl_fuchsia_io::OpenFlags::DIRECTORY,
-        fidl_fuchsia_io::ModeType::empty(),
+    realm.root.get_exposed_dir().open3(
         "dev-topological",
-        ServerEnd::new(dev_topological.into_channel()),
+        fidl_fuchsia_io::PERM_READABLE | fidl_fuchsia_io::Flags::PROTOCOL_DIRECTORY,
+        &Default::default(),
+        dev_topological.into_channel(),
     )?;
 
     let dev_class = driver_config.dev_class.ok_or(format_err!("DriverConfig missing dev_class"))?;
-    realm.root.get_exposed_dir().open(
-        fidl_fuchsia_io::OpenFlags::DIRECTORY,
-        fidl_fuchsia_io::ModeType::empty(),
+    realm.root.get_exposed_dir().open3(
         "dev-class",
-        ServerEnd::new(dev_class.into_channel()),
+        fidl_fuchsia_io::PERM_READABLE | fidl_fuchsia_io::Flags::PROTOCOL_DIRECTORY,
+        &Default::default(),
+        dev_class.into_channel(),
     )?;
 
     Ok(())

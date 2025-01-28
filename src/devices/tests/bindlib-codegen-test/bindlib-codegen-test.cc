@@ -42,24 +42,18 @@ class BindLibToFidlCodeGenTest : public testing::Test {
     ASSERT_EQ(ZX_OK, driver_test_realm->Start(std::move(args), &realm_result));
     ASSERT_FALSE(realm_result.is_err());
 
-    // Connect to dev.
-    fidl::InterfaceHandle<fuchsia::io::Node> dev;
-    zx_status_t status =
-        realm_->component().Connect("dev-topological", dev.NewRequest().TakeChannel());
-    ASSERT_EQ(status, ZX_OK);
-
-    // Turn it into a file descriptor.
-    fbl::unique_fd dev_fd;
-    ASSERT_EQ(fdio_fd_create(dev.TakeChannel().release(), dev_fd.reset_and_get_address()), ZX_OK);
+    fbl::unique_fd fd;
+    auto exposed = realm_->component().CloneExposedDir();
+    ASSERT_EQ(fdio_fd_create(exposed.TakeChannel().release(), fd.reset_and_get_address()), ZX_OK);
 
     // Wait for the child device to bind and appear. The child device should bind with its string
     // properties.
     zx::result channel =
-        device_watcher::RecursiveWaitForFile(dev_fd.get(), "sys/test/parent/child");
+        device_watcher::RecursiveWaitForFile(fd.get(), "dev-topological/sys/test/parent/child");
     ASSERT_EQ(channel.status_value(), ZX_OK);
 
     // Connect to the DriverDevelopment service.
-    status = realm_->component().Connect(driver_dev_.NewRequest());
+    zx_status_t status = realm_->component().Connect(driver_dev_.NewRequest());
     ASSERT_EQ(status, ZX_OK);
   }
 

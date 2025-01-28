@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use anyhow::{Error, Result};
-use fidl::endpoints::{ClientEnd, ControlHandle, ServerEnd};
+use fidl::endpoints::{ClientEnd, ControlHandle};
 use fidl_fuchsia_driver_testing::*;
 use fidl_fuchsia_testing_harness::OperationError;
 use fuchsia_component::client;
@@ -114,7 +114,11 @@ async fn run_offers_forward(
     let mut fs = ServiceFs::new();
 
     let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-    client.as_ref_directory().open("svc", fio::Flags::empty(), server_end.into_channel().into())?;
+    client.as_ref_directory().open(
+        "svc",
+        fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+        server_end.into_channel().into(),
+    )?;
     fs.add_remote("svc", proxy);
     fs.serve_connection(handles.outgoing_dir)?;
     Ok(fs.collect::<()>().await)
@@ -305,21 +309,21 @@ async fn create_realm(options: RealmOptions) -> Result<RealmInstance, Error> {
     realm.driver_test_realm_start(start_args).await?;
     // Connect dev-class.
     if let Some(dev_class) = options.dev_class {
-        realm.root.get_exposed_dir().open(
-            fio::OpenFlags::DIRECTORY,
-            fio::ModeType::empty(),
+        realm.root.get_exposed_dir().open3(
             "dev-class",
-            ServerEnd::new(dev_class.into_channel()),
+            fidl_fuchsia_io::PERM_READABLE | fidl_fuchsia_io::Flags::PROTOCOL_DIRECTORY,
+            &Default::default(),
+            dev_class.into_channel(),
         )?;
     }
 
     // Connect dev-topological.
     if let Some(dev_topological) = options.dev_topological {
-        realm.root.get_exposed_dir().open(
-            fio::OpenFlags::DIRECTORY,
-            fio::ModeType::empty(),
+        realm.root.get_exposed_dir().open3(
             "dev-topological",
-            ServerEnd::new(dev_topological.into_channel()),
+            fidl_fuchsia_io::PERM_READABLE | fidl_fuchsia_io::Flags::PROTOCOL_DIRECTORY,
+            &Default::default(),
+            dev_topological.into_channel(),
         )?;
     }
 

@@ -34,27 +34,25 @@ TEST_F(DeviceControllerFidl, ControllerTest) {
   ASSERT_EQ(ZX_OK, driver_test_realm->Start(std::move(args), &realm_result));
   ASSERT_FALSE(realm_result.is_err());
 
-  // Connect to dev.
-  fidl::InterfaceHandle<fuchsia::io::Node> dev;
-  zx_status_t status = realm.component().Connect("dev-topological", dev.NewRequest().TakeChannel());
-  ASSERT_EQ(status, ZX_OK);
-
-  fbl::unique_fd root_fd;
-  status = fdio_fd_create(dev.TakeChannel().release(), root_fd.reset_and_get_address());
-  ASSERT_EQ(status, ZX_OK);
+  fbl::unique_fd dev_topo_fd;
+  {
+    zx::channel dev_client, dev_server;
+    ASSERT_EQ(zx::channel::create({}, &dev_client, &dev_server), ZX_OK);
+    ASSERT_EQ(realm.component().exposed()->Open3("dev-topological", fuchsia::io::PERM_READABLE, {},
+                                                 std::move(dev_server)),
+              ZX_OK);
+    ASSERT_EQ(fdio_fd_create(dev_client.release(), dev_topo_fd.reset_and_get_address()), ZX_OK);
+  }
 
   // Wait for driver.
   zx::result dev_channel =
-      device_watcher::RecursiveWaitForFile(root_fd.get(), "sys/test/sample_driver");
+      device_watcher::RecursiveWaitForFile(dev_topo_fd.get(), "sys/test/sample_driver");
   ASSERT_EQ(dev_channel.status_value(), ZX_OK);
 
-  auto endpoints = fidl::Endpoints<fuchsia_device::Controller>::Create();
-
-  fdio_cpp::UnownedFdioCaller caller(root_fd);
+  fdio_cpp::UnownedFdioCaller dev_topo(dev_topo_fd);
   zx::result channel = component::ConnectAt<fuchsia_device::Controller>(
-      caller.directory(), "sys/test/sample_driver/device_controller");
+      dev_topo.directory(), "sys/test/sample_driver/device_controller");
   ASSERT_EQ(ZX_OK, channel.status_value());
-
   auto client = fidl::WireSyncClient(std::move(channel.value()));
 
   auto result = client->GetTopologicalPath();
@@ -76,7 +74,7 @@ TEST_F(DeviceControllerFidl, ControllerTest) {
   // Check the Echo API through the device protocol connector.
   {
     zx::result channel = component::ConnectAt<fuchsia_hardware_sample::Echo>(
-        caller.directory(), "sys/test/sample_driver/device_protocol");
+        dev_topo.directory(), "sys/test/sample_driver/device_protocol");
     ASSERT_EQ(ZX_OK, channel.status_value());
 
     auto echo = fidl::WireSyncClient(std::move(channel.value()));

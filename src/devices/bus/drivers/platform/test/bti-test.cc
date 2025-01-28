@@ -29,7 +29,7 @@ using device_watcher::RecursiveWaitForFile;
 
 using namespace component_testing;
 
-constexpr char kParentPath[] = "sys/platform/bti-test";
+constexpr char kParentPath[] = "dev-topological/sys/platform/bti-test";
 constexpr char kDeviceName[] = "test-bti";
 
 TEST(PbusBtiTest, BtiIsSameAfterCrash) {
@@ -57,16 +57,14 @@ TEST(PbusBtiTest, BtiIsSameAfterCrash) {
   // Connect to the parent directory.
   fbl::unique_fd parent_dir;
   {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints);
-    ASSERT_OK(realm.component().Connect("dev-topological", endpoints->server.TakeChannel()));
-    fbl::unique_fd dev_fd;
-    ASSERT_OK(
-        fdio_fd_create(endpoints->client.TakeChannel().release(), dev_fd.reset_and_get_address()));
-    ASSERT_OK(RecursiveWaitForFile(dev_fd.get(), kParentPath));
-    ASSERT_OK(fdio_open3_fd_at(dev_fd.get(), kParentPath,
-                               static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory),
-                               parent_dir.reset_and_get_address()));
+    fbl::unique_fd fd;
+    auto exposed = realm.component().CloneExposedDir();
+    ASSERT_OK(fdio_fd_create(exposed.TakeChannel().release(), fd.reset_and_get_address()));
+    ASSERT_OK(RecursiveWaitForFile(fd.get(), kParentPath));
+    ASSERT_OK(fdio_open3_fd_at(
+        fd.get(), kParentPath,
+        uint64_t{fuchsia_io::wire::kPermReadable | fuchsia_io::wire::Flags::kProtocolDirectory},
+        parent_dir.reset_and_get_address()));
   }
 
   uint64_t koid1;
