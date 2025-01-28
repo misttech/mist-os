@@ -446,7 +446,7 @@ static void mp_all_cpu_startup_sync_hook(unsigned int rl) {
       for (int i = 0; i < processor.logical_id_count; i++) {
         const cpu_num_t logical_id = node->entity.processor.logical_ids[i];
         if ((cpu_num_to_mask(logical_id) & online_mask) == 0) {
-          zx_status_t dump_status = lockup_internal::DumpRegistersAndBacktrace(logical_id, stdout);
+          zx_status_t dump_status = DumpRegistersAndBacktrace(logical_id, stdout);
           switch (dump_status) {
             case ZX_OK:                  // Successfully dumped the secondary's state...
               panic_after_dumps = true;  // ...so we can now panic with that debug feedback

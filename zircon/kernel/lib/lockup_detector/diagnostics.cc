@@ -26,66 +26,7 @@
 
 #include <ktl/enforce.h>
 
-namespace lockup_internal {
-
 #if defined(__aarch64__)
-
-zx_status_t GetBacktraceFromDapState(const arm64_dap_processor_state& state, Backtrace& out_bt) {
-  // Don't attempt to do any backtracing unless this looks like the thread is in the kernel right
-  // now.  The PC might be completely bogus, but even if it is in a legit user mode process, I'm not
-  // sure of a good way to print the symbolizer context for that process, or to figure out if the
-  // process is using a shadow call stack or not.
-  if (state.get_el_level() != 1u) {
-    return ZX_ERR_BAD_STATE;
-  }
-
-  // Build a backtrace using the PC as frame 0's address and the LR as frame 1's address.
-  out_bt.reset();
-  out_bt.push_back(state.pc);
-  out_bt.set_first_frame_type(Backtrace::FrameType::PreciseLocation);
-  out_bt.push_back(state.r[30]);
-
-  // Is the Shadow Call Stack Pointer (x18) properly aligned?
-  constexpr size_t kPtrSize = sizeof(void*);
-  uintptr_t scsp = state.r[18];
-  if (scsp & (kPtrSize - 1)) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  // SCSP has post-increment semantics so back up one slot so that it points to a stored value.
-  if (scsp == 0) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  scsp -= kPtrSize;
-
-  // Is the address in the kernel's address space?
-  if (!is_kernel_address(scsp)) {
-    return ZX_ERR_OUT_OF_RANGE;
-  }
-
-  // And is it mapped?
-  paddr_t pa_unused;
-  zx_status_t status = arm64_mmu_translate(scsp, &pa_unused, /*user=*/false, /*write=*/false);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  // The SCSP looks legit.  Copy the return address values, but don't cross a page boundary.
-  while (out_bt.size() < Backtrace::kMaxSize) {
-    vaddr_t ret_addr = *reinterpret_cast<vaddr_t*>(scsp);
-    out_bt.push_back(ret_addr);
-
-    // Are we about to cross a page boundary?
-    static_assert(ktl::has_single_bit(static_cast<uint64_t>(PAGE_SIZE)),
-                  "PAGE_SIZE is not a power of 2!  Wut??");
-    if ((scsp & (PAGE_SIZE - 1)) == 0) {
-      break;
-    }
-    scsp -= kPtrSize;
-  }
-
-  return ZX_OK;
-}
 
 zx_status_t DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
   if (!arm64_dap_is_enabled()) {
@@ -107,7 +48,7 @@ zx_status_t DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
 
   if constexpr (__has_feature(shadow_call_stack)) {
     Backtrace bt;
-    zx_status_t status = GetBacktraceFromDapState(state, bt);
+    zx_status_t status = lockup_internal::GetBacktraceFromDapState(state, bt);
     switch (status) {
       case ZX_ERR_BAD_STATE:
         fprintf(output_target, "DAP backtrace: CPU-%u not in kernel mode.\n", cpu);
@@ -169,14 +110,15 @@ zx_status_t DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
 
 #elif defined(__riscv)
 
-// TODO(eieio): implement me
 zx_status_t DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 
 #else
-#error "Unknown architecture! Neither __aarch64__ nor __x86_64__ are defined"
+#error "Unknown architecture!"
 #endif
+
+namespace lockup_internal {
 
 void DumpCommonDiagnostics(cpu_num_t cpu, FILE* output_target, FailureSeverity severity) {
   DEBUG_ASSERT(arch_ints_disabled());
@@ -196,5 +138,64 @@ void DumpCommonDiagnostics(cpu_num_t cpu, FILE* output_target, FailureSeverity s
     }
   }
 }
+
+#if defined(__aarch64__)
+zx_status_t GetBacktraceFromDapState(const arm64_dap_processor_state& state, Backtrace& out_bt) {
+  // Don't attempt to do any backtracing unless this looks like the thread is in the kernel right
+  // now.  The PC might be completely bogus, but even if it is in a legit user mode process, I'm not
+  // sure of a good way to print the symbolizer context for that process, or to figure out if the
+  // process is using a shadow call stack or not.
+  if (state.get_el_level() != 1u) {
+    return ZX_ERR_BAD_STATE;
+  }
+
+  // Build a backtrace using the PC as frame 0's address and the LR as frame 1's address.
+  out_bt.reset();
+  out_bt.push_back(state.pc);
+  out_bt.set_first_frame_type(Backtrace::FrameType::PreciseLocation);
+  out_bt.push_back(state.r[30]);
+
+  // Is the Shadow Call Stack Pointer (x18) properly aligned?
+  constexpr size_t kPtrSize = sizeof(void*);
+  uintptr_t scsp = state.r[18];
+  if (scsp & (kPtrSize - 1)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  // SCSP has post-increment semantics so back up one slot so that it points to a stored value.
+  if (scsp == 0) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  scsp -= kPtrSize;
+
+  // Is the address in the kernel's address space?
+  if (!is_kernel_address(scsp)) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  // And is it mapped?
+  paddr_t pa_unused;
+  zx_status_t status = arm64_mmu_translate(scsp, &pa_unused, /*user=*/false, /*write=*/false);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  // The SCSP looks legit.  Copy the return address values, but don't cross a page boundary.
+  while (out_bt.size() < Backtrace::kMaxSize) {
+    vaddr_t ret_addr = *reinterpret_cast<vaddr_t*>(scsp);
+    out_bt.push_back(ret_addr);
+
+    // Are we about to cross a page boundary?
+    static_assert(ktl::has_single_bit(static_cast<uint64_t>(PAGE_SIZE)),
+                  "PAGE_SIZE is not a power of 2!  Wut??");
+    if ((scsp & (PAGE_SIZE - 1)) == 0) {
+      break;
+    }
+    scsp -= kPtrSize;
+  }
+
+  return ZX_OK;
+}
+#endif  // __aarch64__
 
 }  // namespace lockup_internal
