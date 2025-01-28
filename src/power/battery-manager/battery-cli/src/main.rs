@@ -297,7 +297,7 @@ fn cmd_stream() -> (impl Stream<Item = String>, impl Sink<(), Error = SendError>
                 .completion_type(CompletionType::List)
                 .edit_mode(EditMode::Vi)
                 .build();
-            let mut rl: Editor<CmdHelper> = Editor::with_config(config);
+            let mut rl: Editor<CmdHelper, _> = Editor::with_config(config)?;
             // Add tab completion
             let c = CmdHelper::new();
             rl.set_helper(Some(c));

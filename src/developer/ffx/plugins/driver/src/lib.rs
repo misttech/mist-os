@@ -115,7 +115,7 @@ impl DriverConnector {
                 println!("    {}: {}", i, component)
             }
 
-            let mut line_editor = rustyline::Editor::<()>::new();
+            let mut line_editor = rustyline::Editor::<(), _>::new()?;
             loop {
                 let line = line_editor.readline("$ ")?;
                 let choice = line.trim().parse::<usize>();

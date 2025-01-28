@@ -7,7 +7,8 @@ use rustyline::completion::Completer;
 use rustyline::error::ReadlineError;
 use rustyline::highlight::Highlighter;
 use rustyline::hint::Hinter;
-use rustyline::Helper;
+use rustyline::validate::Validator;
+use rustyline::{Context, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
 use std::fmt;
 use std::str::FromStr;
@@ -213,7 +214,12 @@ impl CmdHelper {
 impl Completer for CmdHelper {
     type Candidate = String;
 
-    fn complete(&self, line: &str, _pos: usize) -> Result<(usize, Vec<String>), ReadlineError> {
+    fn complete(
+        &self,
+        line: &str,
+        _pos: usize,
+        _context: &Context<'_>,
+    ) -> Result<(usize, Vec<String>), ReadlineError> {
         let components: Vec<_> = line.trim_start().split_whitespace().collect();
 
         // Check whether we have entered a command and either whitespace or a partial argument.
@@ -254,8 +260,10 @@ impl Completer for CmdHelper {
 }
 
 impl Hinter for CmdHelper {
+    type Hint = String;
+
     /// CmdHelper provides hints for commands with arguments
-    fn hint(&self, line: &str, _pos: usize) -> Option<String> {
+    fn hint(&self, line: &str, _pos: usize, _context: &Context<'_>) -> Option<String> {
         let needs_space = !line.ends_with(" ");
         line.trim()
             .parse::<Cmd>()
@@ -275,6 +283,8 @@ impl Highlighter for CmdHelper {
     }
 }
 
+impl Validator for CmdHelper {}
+
 /// CmdHelper can be used as an `Editor` helper for entering input commands
 impl Helper for CmdHelper {}
 
@@ -287,6 +297,8 @@ pub enum ReplControl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rustyline::history::MemHistory;
+    use rustyline::Context;
 
     #[test]
     fn test_avc_match_string() {
@@ -304,40 +316,55 @@ mod tests {
 
     #[test]
     fn test_completer() {
+        let history = MemHistory::new();
+        let context = Context::new(&history);
+
         let cmdhelper = CmdHelper::new();
-        assert!(cmdhelper.complete("ke", 0).unwrap().1.contains(&"key".to_string()));
-        assert!(cmdhelper.complete("get", 0).unwrap().1.contains(&"get-media".to_string()));
-        assert!(cmdhelper.complete("key ex", 0).unwrap().1.contains(&"key exit".to_string()));
+        assert!(cmdhelper.complete("ke", 0, &context).unwrap().1.contains(&"key".to_string()));
         assert!(cmdhelper
-            .complete("conne", 0)
+            .complete("get", 0, &context)
+            .unwrap()
+            .1
+            .contains(&"get-media".to_string()));
+        assert!(cmdhelper
+            .complete("key ex", 0, &context)
+            .unwrap()
+            .1
+            .contains(&"key exit".to_string()));
+        assert!(cmdhelper
+            .complete("conne", 0, &context)
             .unwrap()
             .1
             .contains(&"connection-status".to_string()));
         assert!(cmdhelper
-            .complete("send-ra", 0)
+            .complete("send-ra", 0, &context)
             .unwrap()
             .1
             .contains(&"send-raw-vendor-command".to_string()));
         assert!(cmdhelper
-            .complete("get-s", 0)
+            .complete("get-s", 0, &context)
             .unwrap()
             .1
             .contains(&"get-supported-events".to_string()));
         assert!(cmdhelper
-            .complete("get-play-", 0)
+            .complete("get-play-", 0, &context)
             .unwrap()
             .1
             .contains(&"get-play-status".to_string()));
         assert!(cmdhelper
-            .complete("get-playe", 0)
+            .complete("get-playe", 0, &context)
             .unwrap()
             .1
             .contains(&"get-player-application-settings".to_string()));
         assert!(cmdhelper
-            .complete("set", 0)
+            .complete("set", 0, &context)
             .unwrap()
             .1
             .contains(&"set-player-application-settings".to_string()));
-        assert!(cmdhelper.complete("set-v", 0).unwrap().1.contains(&"set-volume".to_string()));
+        assert!(cmdhelper
+            .complete("set-v", 0, &context)
+            .unwrap()
+            .1
+            .contains(&"set-volume".to_string()));
     }
 }

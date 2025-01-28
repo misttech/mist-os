@@ -468,7 +468,7 @@ fn cmd_stream() -> (impl Stream<Item = String>, impl Sink<(), Error = SendError>
                 .completion_type(CompletionType::List)
                 .edit_mode(EditMode::Emacs)
                 .build();
-            let mut rl: Editor<CmdHelper> = Editor::with_config(config);
+            let mut rl: Editor<CmdHelper, _> = Editor::with_config(config)?;
             rl.set_helper(Some(CmdHelper::new()));
             loop {
                 let readline = rl.readline(PROMPT);
