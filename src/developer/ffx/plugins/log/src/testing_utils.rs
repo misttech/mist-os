@@ -385,6 +385,9 @@ async fn handle_log_settings(mut stream: LogSettingsRequestStream, state: Rc<Sta
             LogSettingsRequest::RegisterInterest { .. } => {
                 panic!("fuchsia.diagnostics/LogSettings.RegisterInterest is not supported");
             }
+            LogSettingsRequest::SetComponentInterest { .. } => {
+                panic!("fuchsia.diagnostics/LogSettings.SetComponentInterest is not supported");
+            }
             LogSettingsRequest::SetInterest { selectors, responder } => {
                 let _ = state.event_snd.unbounded_send(TestEvent::SetInterest(selectors));
                 responder.send().unwrap();

@@ -5,7 +5,9 @@
 use anyhow::{Context, Error, Result};
 use diagnostics_reader::{ArchiveReader, Logs};
 use fidl::endpoints::DiscoverableProtocolMarker;
-use fidl_fuchsia_diagnostics::{self as fdiagnostics, Interest, Severity};
+use fidl_fuchsia_diagnostics::{
+    self as fdiagnostics, Interest, LogSettingsSetComponentInterestRequest, Severity,
+};
 use fidl_fuchsia_diagnostics_host as fdiagnostics_host;
 use realm_proxy_client::RealmProxyClient;
 use selectors::{parse_component_selector, VerboseError};
@@ -71,23 +73,34 @@ pub(crate) trait LogSettingsExt {
     ///
     /// Returns an error if `selector` is not a valid component selector.
     /// Returns an error if the call to LogSettings/SetInterest fails.
-    async fn set_component_interest(&self, selector: &str, severity: Severity)
-        -> Result<(), Error>;
+    async fn set_interest_for_component(
+        &self,
+        selector: &str,
+        severity: Severity,
+        persist: bool,
+    ) -> Result<(), Error>;
 }
 
 #[async_trait::async_trait]
 impl LogSettingsExt for fdiagnostics::LogSettingsProxy {
-    async fn set_component_interest(
+    async fn set_interest_for_component(
         &self,
         selector: &str,
         severity: Severity,
+        persist: bool,
     ) -> Result<(), Error> {
         let component_selector = parse_component_selector::<VerboseError>(selector)?;
-        let interests = [fdiagnostics::LogInterestSelector {
+        let interests = vec![fdiagnostics::LogInterestSelector {
             selector: component_selector,
             interest: Interest { min_severity: Some(severity), ..Default::default() },
         }];
-        self.set_interest(&interests).await.context("set interest")?;
+        self.set_component_interest(&LogSettingsSetComponentInterestRequest {
+            selectors: Some(interests),
+            persist: Some(persist),
+            ..Default::default()
+        })
+        .await
+        .context("set interest")?;
         Ok(())
     }
 }

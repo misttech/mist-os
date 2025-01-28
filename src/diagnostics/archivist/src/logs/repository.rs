@@ -81,7 +81,9 @@ impl FromStr for UrlOrMoniker {
     }
 }
 
-static INTEREST_CONNECTION_ID: AtomicUsize = AtomicUsize::new(0);
+/// Static ID, used for persistent changes to interest settings.
+pub const STATIC_CONNECTION_ID: usize = 0;
+static INTEREST_CONNECTION_ID: AtomicUsize = AtomicUsize::new(STATIC_CONNECTION_ID + 1);
 static ARCHIVIST_MONIKER: LazyLock<Moniker> =
     LazyLock::new(|| Moniker::parse_str("bootstrap/archivist").unwrap());
 

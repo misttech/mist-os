@@ -40,8 +40,32 @@ closed protocol LogSettings {
     /// When the connection to `LogSettings` is finished, the interests are
     /// undone. Each matched component minimum interest is updated with the
     /// new minimum interest in the set.
-    @available(added=12)
+    @available(added=12, removed=NEXT)
     strict SetInterest(struct {
         selectors vector<LogInterestSelector>:MAX_LOG_SELECTORS;
+    }) -> ();
+
+    /// Requests a change in interest for the matched components.
+    ///
+    /// Each component holds a set of requested interests.
+    ///
+    /// When a new request on LogSettings#SetComponentInterest is received,
+    /// the sets for matched components receive the new minimum interest.
+    /// If the interest is less than the previous minimum interest, then a
+    /// `SetComponentInterest` request is sent with the new minimum interest.
+    ///
+    /// If a connection to `LogSettings` sends another `SetComponentInterest`
+    /// request, its previous interest request will be undone.
+    ///
+    /// When the connection to `LogSettings` is finished, the interests are
+    /// undone, unless persist is set to true. Each matched component minimum
+    /// interest is updated with the new minimum interest in the set.
+    @available(added=NEXT)
+    strict SetComponentInterest(table {
+        /// List of selectors. Required.
+        1: selectors vector<LogInterestSelector>:MAX_LOG_SELECTORS;
+        /// Whether or not to persist the setting change after disconnection.
+        /// Optional. Defaults to false.
+        2: persist bool;
     }) -> ();
 };
