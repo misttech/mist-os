@@ -159,6 +159,15 @@ pub trait AssemblyContainer {
         .context("Making all the paths absolute")?;
         Ok(self)
     }
+
+    /// Merge the values from `overrides` into self and return a new self.
+    fn apply_overrides(self, overrides: serde_json::Value) -> Result<Self>
+    where
+        Self: Sized + DeserializeOwned + Serialize,
+    {
+        let config = serde_json::to_value(self).context("Parsing the config to a value")?;
+        crate::merge::try_merge_into::<Self>(config, overrides).context("Applying overrides")
+    }
 }
 
 /// The type of the file, which is passed to the `found` function in WalkPaths.

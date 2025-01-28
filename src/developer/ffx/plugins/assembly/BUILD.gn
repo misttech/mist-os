@@ -85,6 +85,7 @@ rustc_library("ffx_assembly") {
     "//src/lib/assembly/config_data",
     "//src/lib/assembly/config_schema",
     "//src/lib/assembly/constants",
+    "//src/lib/assembly/container",
     "//src/lib/assembly/domain_config",
     "//src/lib/assembly/driver_manifest",
     "//src/lib/assembly/file_relative_path",

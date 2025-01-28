@@ -61,23 +61,6 @@ impl AssemblyConfig {
     }
 }
 
-/// Configuration for Product Assembly, when developer overrides are in use.
-///
-/// This deserializes to intermediate types that can be manipulated in order to
-/// apply developer overrides, before being parsed into the PlatformConfig
-/// and ProductConfig types.
-#[derive(Debug, Deserialize, Serialize, SupportsFileRelativePaths)]
-#[serde(deny_unknown_fields)]
-pub struct AssemblyConfigWrapperForOverrides {
-    // The platform and products configs are deserialized as a Value before it is parsed into
-    // a 'PlatformConfig``
-    pub platform: serde_json::Value,
-    pub product: serde_json::Value,
-    // TOOD(https://fxbug.dev/390189313): Remove once all product configs stop using this field.
-    #[serde(default, skip_serializing)]
-    pub file_relative_paths: bool,
-}
-
 /// A typename to represent a package that contains shell command binaries,
 /// and the paths to those binaries
 pub type ShellCommands = BTreeMap<PackageName, BTreeSet<PackageInternalPathBuf>>;
@@ -634,49 +617,26 @@ mod tests {
 
     #[test]
     fn test_assembly_config_wrapper_for_overrides() {
-        let json5 = r#"
-        {
-          platform: {
-            build_type: "eng",
-          },
-          product: {},
-        }
-        "#;
+        let config: AssemblyConfig = serde_json::from_value(serde_json::json!({
+            "platform": {
+                "build_type": "eng",
+            },
+            "product": {},
+        }))
+        .unwrap();
 
         let overrides = serde_json::json!({
-            "media": {
-                "audio": {
-                    "partial_stack": {}
-                }
-            }
+            "platform": {
+                "media": {
+                    "audio": "partial_stack",
+                },
+            },
         });
 
-        let mut cursor = std::io::Cursor::new(json5);
-        let AssemblyConfigWrapperForOverrides { platform, product: _, .. } =
-            util::from_reader(&mut cursor).unwrap();
-
-        // serde_json and serde_json5 have an incompatible handling of how they
-        // serialize / deserialize enums.  So this test validates both the
-        // value merging method but also that the problematic enum syntax is
-        // correctly parsed when bounced through a string as it's done in the
-        // product assembly binary itself.
-
-        // 1. Merge to a 'value', not to the final type, as we need serde_json5
-        //    to do the parsing, not serde_json.
-        let merged_platform_value: serde_json::Value =
-            crate::try_merge_into(platform, overrides).unwrap();
-
-        // 2. Write the value out to a string, using pretty-printing so that
-        // line numbers and such are all sensical.
-        let merged_platform_string = serde_json::to_string_pretty(&merged_platform_value).unwrap();
-
-        // 3. Parse the string using serde_json5, so that enums are handled
-        //    consistently.
-        let merged_platform: PlatformConfig =
-            serde_json5::from_str(&merged_platform_string).unwrap();
+        let config = config.apply_overrides(overrides).unwrap();
 
         assert_eq!(
-            merged_platform.media,
+            config.platform.media,
             PlatformMediaConfig { audio: Some(AudioConfig::PartialStack), ..Default::default() },
         );
     }

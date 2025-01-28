@@ -29,6 +29,7 @@ rustc_library("container") {
   sources = [
     "src/assembly_container.rs",
     "src/lib.rs",
+    "src/merge.rs",
   ]
 }
 
