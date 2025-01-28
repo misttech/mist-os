@@ -104,7 +104,7 @@ macro_rules! register {
         RELEASERS.with(|cell| {
             cell.borrow_mut()
                 .as_mut()
-                .expect("not finalized")
+                .expect("DelayedReleaser hasn't been finalized yet")
                 .releasables
                 .push(Box::new(Some($arg)));
         });
