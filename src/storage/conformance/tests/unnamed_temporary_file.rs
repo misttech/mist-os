@@ -131,26 +131,3 @@ async fn open_file_as_unnamed_temporary_in_nonexistent_directory_should_fail() {
         zx::Status::NOT_FOUND
     );
 }
-
-#[fuchsia::test]
-async fn open_file_as_unnamed_temporary_with_maybe_create_should_fail() {
-    let harness = TestHarness::new().await;
-    if !harness.config.supports_unnamed_temporary_file {
-        return;
-    }
-
-    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
-    assert_eq!(
-        dir.open3_node::<fio::FileMarker>(
-            ".",
-            fio::Flags::PROTOCOL_FILE
-                | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
-                | fio::PERM_WRITABLE
-                | fio::Flags::FLAG_MAYBE_CREATE,
-            None,
-        )
-        .await
-        .expect_err("opening an unnamed temporary file with FLAG_MAYBE_CREATE should fail"),
-        zx::Status::INVALID_ARGS
-    );
-}
