@@ -42,7 +42,6 @@ test_suite(
         "//fuchsia/assembly:partitions_config_golden_test",
         "//fuchsia/assembly:prebuilt_product_config_golden_test",
         "//fuchsia/assembly:product_config_golden_test",
-        "//fuchsia/assembly:product_config_relative_golden_test",
         "//fuchsia/assembly:product_config_with_labels_golden_test",
         "//fuchsia/assembly:product_ota_config_golden_test",
         "//fuchsia/assembly:product_ota_config_golden_test_channel_config",

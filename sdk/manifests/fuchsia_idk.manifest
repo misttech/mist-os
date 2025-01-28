@@ -402,6 +402,7 @@ fidl_library://fidl/fuchsia.wlan.product.deprecatedconfiguration
 fidl_library://fidl/fuchsia.wlan.softmac
 fidl_library://fidl/fuchsia.wlan.stats (unstable)
 fidl_library://fidl/zx
+host_tool://tools/arm64/assembly_generate_config
 host_tool://tools/arm64/bindc
 host_tool://tools/arm64/blobfs-compression
 host_tool://tools/arm64/blobfs_do_not_depend
@@ -429,6 +430,7 @@ host_tool://tools/arm64/symbolizer
 host_tool://tools/arm64/trace2json
 host_tool://tools/arm64/zbi
 host_tool://tools/arm64/zxdb
+host_tool://tools/x64/assembly_generate_config
 host_tool://tools/x64/bindc
 host_tool://tools/x64/blobfs-compression
 host_tool://tools/x64/blobfs_do_not_depend

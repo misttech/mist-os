@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assembly_container::WalkPaths;
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -23,7 +24,14 @@ pub enum ICUType {
 
 /// Platform configuration options for the input area.
 #[derive(
-    Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+    Debug,
+    Default,
+    Deserialize,
+    Serialize,
+    PartialEq,
+    JsonSchema,
+    SupportsFileRelativePaths,
+    WalkPaths,
 )]
 #[serde(default, deny_unknown_fields)]
 pub struct SetUiConfig {
@@ -36,13 +44,16 @@ pub struct SetUiConfig {
 
     #[schemars(schema_with = "crate::option_path_schema")]
     #[file_relative_paths]
+    #[walk_paths]
     pub display: Option<FileRelativePathBuf>,
 
     #[schemars(schema_with = "crate::option_path_schema")]
     #[file_relative_paths]
+    #[walk_paths]
     pub interface: Option<FileRelativePathBuf>,
 
     #[schemars(schema_with = "crate::option_path_schema")]
     #[file_relative_paths]
+    #[walk_paths]
     pub agent: Option<FileRelativePathBuf>,
 }

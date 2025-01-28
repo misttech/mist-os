@@ -1,12 +1,6 @@
 {
+    "file_relative_paths": true,
     "platform": {
-        "another": {
-            "random": {
-                "int": 0,
-                "path1": false,
-                "string2": "false"
-            }
-        },
         "build_type": "user",
         "connectivity": {
             "wlan": {
@@ -23,21 +17,11 @@
             ],
             "archivist": "default"
         },
-        "identity": {
-            "password_pinweaver": "required"
-        },
         "ui": {
             "supported_input_devices": [
                 "button",
                 "keyboard"
             ]
-        },
-        "some": {
-            "random": {
-                "int1": 3234234324231434134141234,
-                "path1": true,
-                "string1": "I have a string"
-            }
         }
     },
     "product": {
@@ -46,7 +30,7 @@
                 "components": [
                     "meta/backlight_driver.cm"
                 ],
-                "package": "bazel-out/x86_64-fastbuild/bin/fuchsia/assembly/prebuilt_driver_fuchsia_package_expanded/rebased_package_manifest.json"
+                "package": "packages/backlight_driver"
             }
         ],
         "packages": {
@@ -54,16 +38,11 @@
                 {
                     "config_data": [
                         {
-                            "destination": "config_data.json",
-                            "source": "fuchsia/assembly/test_data/config_data.json"
+                            "destination": "destination.json",
+                            "source": "product/packages/base/0/config_data/destination.json/config_data.json"
                         }
                     ],
-                    "manifest": "bazel-out/x86_64-fastbuild/bin/fuchsia/assembly/prebuilt_ams_light_fuchsia_package_expanded/rebased_package_manifest.json"
-                }
-            ],
-            "cache": [
-                {
-                    "manifest": "bazel-out/x86_64-fastbuild/bin/fuchsia/assembly/prebuilt_ams_light_fuchsia_package_expanded/rebased_package_manifest.json"
+                    "manifest": "packages/ams-light-test"
                 }
             ]
         },

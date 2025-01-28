@@ -4,13 +4,21 @@
 
 use std::collections::BTreeMap;
 
+use assembly_container::WalkPaths;
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for recovery.
 #[derive(
-    Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+    Debug,
+    Default,
+    Deserialize,
+    Serialize,
+    PartialEq,
+    JsonSchema,
+    SupportsFileRelativePaths,
+    WalkPaths,
 )]
 #[serde(default, deny_unknown_fields)]
 pub struct RecoveryConfig {
@@ -34,12 +42,14 @@ pub struct RecoveryConfig {
     ///
     /// This must be a rive file (.riv).
     #[file_relative_paths]
+    #[walk_paths]
     pub logo: Option<FileRelativePathBuf>,
 
     /// The path to the instructions to display.
     ///
     /// This file must be raw text for displaying.
     #[file_relative_paths]
+    #[walk_paths]
     pub instructions: Option<FileRelativePathBuf>,
 
     /// Perform a managed-mode check before doing an FDR.

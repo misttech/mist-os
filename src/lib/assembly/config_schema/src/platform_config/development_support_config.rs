@@ -2,13 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assembly_container::WalkPaths;
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for enabling development support.
 #[derive(
-    Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+    Debug,
+    Default,
+    Deserialize,
+    Serialize,
+    PartialEq,
+    JsonSchema,
+    SupportsFileRelativePaths,
+    WalkPaths,
 )]
 #[serde(default, deny_unknown_fields)]
 pub struct DevelopmentSupportConfig {
@@ -24,12 +32,14 @@ pub struct DevelopmentSupportConfig {
     /// Path to a file containing ssh keys that are authorized to connect to the
     /// device.
     #[file_relative_paths]
+    #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
     pub authorized_ssh_keys_path: Option<FileRelativePathBuf>,
 
     /// Path to a file containing CA certs that are trusted roots for signed ssh
     /// keys that are authorized to connect to the device.
     #[file_relative_paths]
+    #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
     pub authorized_ssh_ca_certs_path: Option<FileRelativePathBuf>,
 

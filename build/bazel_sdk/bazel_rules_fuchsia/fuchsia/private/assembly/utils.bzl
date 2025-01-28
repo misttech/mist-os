@@ -35,6 +35,22 @@ LOCAL_ONLY_ACTION_KWARGS = {
     },
 }
 
+def select_root_dir(files):
+    """Finds the top-most directory in a set of files.
+
+    Args:
+      files: A list of files.
+
+    Returns:
+      The top-most directory.
+    """
+    shortest = paths.dirname(files[0].path)
+    for file in files:
+        directory = paths.dirname(file.path)
+        if len(directory) < len(shortest):
+            shortest = directory
+    return shortest
+
 def select_single_file(files, basename, error_footer = ""):
     """Finds a single file with a given basename. Multiple matches will fail.
 

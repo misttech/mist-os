@@ -7,70 +7,10 @@
     },
     "blobs": [
         {
-            "source_path": "content/blobs/c8bebb66753e7f66ed228cb610d4ac151db3cc285e6b10c705678123f6e13e06",
+            "source_path": "blobs/c8bebb66753e7f66ed228cb610d4ac151db3cc285e6b10c705678123f6e13e06",
             "path": "meta/",
             "merkle": "c8bebb66753e7f66ed228cb610d4ac151db3cc285e6b10c705678123f6e13e06",
-            "size": 24576
-        },
-        {
-            "source_path": "content/blobs/bee300a0aa26d798723ca029842a4b3f32ae02637d207f49b620fc4f371a0368",
-            "path": "lib/ld.so.1",
-            "merkle": "bee300a0aa26d798723ca029842a4b3f32ae02637d207f49b620fc4f371a0368",
-            "size": 717512
-        },
-        {
-            "source_path": "content/blobs/9cd2c26907d4a75a75d96d790358643266e02da97dd417c0ddfaa84f8751d33a",
-            "path": "lib/libasync-default.so",
-            "merkle": "9cd2c26907d4a75a75d96d790358643266e02da97dd417c0ddfaa84f8751d33a",
-            "size": 9400
-        },
-        {
-            "source_path": "content/blobs/ec8fec8d882d921269cb10895e6ef64838448a655dff87c4252359abbb9b4dee",
-            "path": "lib/libbackend_fuchsia_globals.so",
-            "merkle": "ec8fec8d882d921269cb10895e6ef64838448a655dff87c4252359abbb9b4dee",
-            "size": 13736
-        },
-        {
-            "source_path": "content/blobs/9fd9afd733a93aed961e3d0236d8d4db90fa4acff84d7148eacf379102875b2f",
-            "path": "lib/libc++.so.2",
-            "merkle": "9fd9afd733a93aed961e3d0236d8d4db90fa4acff84d7148eacf379102875b2f",
-            "size": 849656
-        },
-        {
-            "source_path": "content/blobs/a0bb87c87dcc662940b42826f0ba3e58a94348ca2c2f9a3fbdf299c82e53e789",
-            "path": "lib/libc++abi.so.1",
-            "merkle": "a0bb87c87dcc662940b42826f0ba3e58a94348ca2c2f9a3fbdf299c82e53e789",
-            "size": 202272
-        },
-        {
-            "source_path": "content/blobs/a282191611eccbf36c83a8d3d910807be279b41ecd3fb25a055e9286b0e6ba17",
-            "path": "lib/libfdio.so",
-            "merkle": "a282191611eccbf36c83a8d3d910807be279b41ecd3fb25a055e9286b0e6ba17",
-            "size": 587264
-        },
-        {
-            "source_path": "content/blobs/5cdf7cb150111850719bdf5aca1d2ca7ecf8e00b38fd86c351887c81a50e2745",
-            "path": "lib/libsyslog.so",
-            "merkle": "5cdf7cb150111850719bdf5aca1d2ca7ecf8e00b38fd86c351887c81a50e2745",
-            "size": 58880
-        },
-        {
-            "source_path": "content/blobs/b35567ee375ed98c030fd2801a7bac1d3d0be34908be2d2266fc78e9a1dd0bb3",
-            "path": "lib/libtrace-engine.so",
-            "merkle": "b35567ee375ed98c030fd2801a7bac1d3d0be34908be2d2266fc78e9a1dd0bb3",
-            "size": 38488
-        },
-        {
-            "source_path": "content/blobs/bcbef09a907952bfaae44405e5aaff5e79d6388c5325e4d2c51e0fbfab4ed53c",
-            "path": "lib/libunwind.so.1",
-            "merkle": "bcbef09a907952bfaae44405e5aaff5e79d6388c5325e4d2c51e0fbfab4ed53c",
-            "size": 42368
-        },
-        {
-            "source_path": "content/blobs/b26642e3d5892d6cb8c64f940e1177c6db2893ec3f617f92c47fca0ab2520450",
-            "path": "test/ams-light-test",
-            "merkle": "b26642e3d5892d6cb8c64f940e1177c6db2893ec3f617f92c47fca0ab2520450",
-            "size": 409672
+            "size": 1
         }
     ],
     "blob_sources_relative": "file"

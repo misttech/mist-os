@@ -67,6 +67,7 @@ fuchsia_debug_symbols(
 fuchsia_toolchain_info(
     name = "fuchsia_toolchain_info",
     aemu_runfiles = "//tools:aemu_internal_{{HOST_CPU}}",
+    assembly_generate_config = "//tools:{{HOST_CPU}}/assembly_generate_config",
     bindc = "//tools:{{HOST_CPU}}/bindc",
     blobfs = "//tools:{{HOST_CPU}}/blobfs_do_not_depend",
     blobfs_manifest = "//tools:{{HOST_CPU}}/blobfs_do_not_depend-meta.json",

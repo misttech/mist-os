@@ -6,6 +6,7 @@ use crate::image_assembly_config::PartialKernelConfig;
 use crate::platform_config::PlatformConfig;
 use crate::PackageDetails;
 use assembly_constants::{CompiledPackageDestination, FileEntry};
+use assembly_container::{assembly_container, AssemblyContainer, WalkPaths};
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use assembly_package_utils::PackageInternalPathBuf;
 use camino::Utf8PathBuf;
@@ -22,12 +23,15 @@ use crate::product_config::ProductConfig;
 /// what is desired in the assembled product images, and then generates the
 /// complete Image Assembly configuration (`crate::config::ImageAssemblyConfig`)
 /// from that.
-#[derive(Debug, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths)]
+#[derive(Debug, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths, WalkPaths)]
 #[serde(deny_unknown_fields)]
+#[assembly_container(product_configuration.json)]
 pub struct AssemblyConfig {
     #[file_relative_paths]
+    #[walk_paths]
     pub platform: PlatformConfig,
     #[file_relative_paths]
+    #[walk_paths]
     #[serde(default)]
     pub product: ProductConfig,
     #[serde(default)]
@@ -55,7 +59,9 @@ pub struct AssemblyConfigWrapperForOverrides {
 pub type ShellCommands = BTreeMap<PackageName, BTreeSet<PackageInternalPathBuf>>;
 
 /// A bundle of inputs to be used in the assembly of a product.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
+#[derive(
+    Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths, WalkPaths,
+)]
 #[serde(default, deny_unknown_fields)]
 pub struct AssemblyInputBundle {
     /// The parameters that specify which kernel to put into the ZBI.
@@ -103,6 +109,7 @@ pub struct AssemblyInputBundle {
 
     /// Packages to create dynamically as part of the Assembly process.
     #[file_relative_paths]
+    #[walk_paths]
     pub packages_to_compile: Vec<CompiledPackageDefinition>,
 
     /// A package that includes files to include in bootfs.
@@ -110,13 +117,14 @@ pub struct AssemblyInputBundle {
 
     /// A list of memory buckets to pass to memory monitor.
     #[file_relative_paths]
+    #[walk_paths]
     pub memory_buckets: Vec<FileRelativePathBuf>,
 }
 
 /// Contents of a compiled package. The contents provided by all
 /// selected AIBs are merged by `name` into a single package
 /// at assembly time.
-#[derive(Debug, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths, WalkPaths)]
 #[serde(deny_unknown_fields)]
 pub struct CompiledPackageDefinition {
     /// Name of the package to compile.
@@ -124,6 +132,7 @@ pub struct CompiledPackageDefinition {
 
     /// Components to compile and add to the package.
     #[file_relative_paths]
+    #[walk_paths]
     #[serde(default)]
     pub components: Vec<CompiledComponentDefinition>,
 
@@ -144,7 +153,7 @@ pub struct CompiledPackageDefinition {
 /// Contents of a compiled component. The contents provided by all
 /// selected AIBs are merged by `name` into a single package
 /// at assembly time.
-#[derive(Debug, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths, WalkPaths)]
 #[serde(deny_unknown_fields)]
 pub struct CompiledComponentDefinition {
     /// The name of the component to compile.
@@ -152,6 +161,7 @@ pub struct CompiledComponentDefinition {
 
     /// CML file shards to include in the compiled component manifest.
     #[file_relative_paths]
+    #[walk_paths]
     pub shards: Vec<FileRelativePathBuf>,
 }
 
@@ -324,7 +334,9 @@ mod tests {
         assert_eq!(
             config.product.base_drivers,
             vec![DriverDetails {
-                package: "path/to/base/driver/package_manifest.json".into(),
+                package: FileRelativePathBuf::FileRelative(
+                    "path/to/base/driver/package_manifest.json".into()
+                ),
                 components: vec!["meta/path/to/component.cml".into()]
             }]
         )
@@ -559,7 +571,7 @@ mod tests {
         assert_eq!(
             bundle.base_drivers[0],
             DriverDetails {
-                package: Utf8PathBuf::from("path/to/driver"),
+                package: FileRelativePathBuf::FileRelative(Utf8PathBuf::from("path/to/driver")),
                 components: vec!(
                     Utf8PathBuf::from("path/to/1234"),
                     Utf8PathBuf::from("path/to/5678")

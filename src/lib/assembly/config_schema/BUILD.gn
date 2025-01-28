@@ -33,6 +33,7 @@ rustc_library("config_schema") {
   inputs = [ _git_info ]
   deps = [
     "//src/lib/assembly/constants",
+    "//src/lib/assembly/container",
     "//src/lib/assembly/file_relative_path",
     "//src/lib/assembly/images_config",
     "//src/lib/assembly/package_utils",

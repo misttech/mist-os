@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assembly_container::WalkPaths;
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -9,7 +10,15 @@ use serde::{Deserialize, Serialize};
 /// A representative struct of all the configurable details of the software delivery system made
 /// available to a product owner
 #[derive(
-    Default, Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+    Default,
+    Clone,
+    Debug,
+    Deserialize,
+    Serialize,
+    PartialEq,
+    JsonSchema,
+    SupportsFileRelativePaths,
+    WalkPaths,
 )]
 #[serde(default, deny_unknown_fields)]
 #[serde(rename(serialize = "software_delivery"))]
@@ -17,9 +26,11 @@ use serde::{Deserialize, Serialize};
 pub struct SwdConfig {
     pub policy: Option<PolicyLabels>,
     #[file_relative_paths]
+    #[walk_paths]
     pub update_checker: Option<UpdateChecker>,
     pub on_verification_failure: VerificationFailureAction,
     #[file_relative_paths]
+    #[walk_paths]
     #[schemars(schema_with = "crate::vec_path_schema")]
     pub tuf_config_paths: Vec<FileRelativePathBuf>,
     pub include_configurator: bool,
@@ -39,12 +50,23 @@ pub enum PolicyLabels {
 /// The UpdateChecker enum represents the particular implementation of the
 /// update-checker tool on the target that the `update` package depends on
 #[derive(
-    Debug, Serialize, Deserialize, Clone, PartialEq, JsonSchema, SupportsFileRelativePaths,
+    Debug,
+    Serialize,
+    Deserialize,
+    Clone,
+    PartialEq,
+    JsonSchema,
+    SupportsFileRelativePaths,
+    WalkPaths,
 )]
 #[serde(rename_all = "snake_case")]
 pub enum UpdateChecker {
     /// Omaha-client is the default update checker on userdebug and user builds.
-    OmahaClient(#[file_relative_paths] OtaConfigs),
+    OmahaClient(
+        #[file_relative_paths]
+        #[walk_paths]
+        OtaConfigs,
+    ),
     /// “platform” version of an updater
     SystemUpdateChecker,
 }
@@ -62,13 +84,22 @@ pub enum VerificationFailureAction {
 
 /// Configuration for the Omaha Client
 #[derive(
-    Default, Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+    Default,
+    Clone,
+    Debug,
+    Deserialize,
+    Serialize,
+    PartialEq,
+    JsonSchema,
+    SupportsFileRelativePaths,
+    WalkPaths,
 )]
 #[serde(default, deny_unknown_fields, rename_all = "snake_case")]
 pub struct OtaConfigs {
     /// Deserializes to the ChannelConfig struct defined by SWD in
     /// //src/sys/pkg/lib/channel-config
     #[file_relative_paths]
+    #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
     pub channels_path: Option<FileRelativePathBuf>,
 

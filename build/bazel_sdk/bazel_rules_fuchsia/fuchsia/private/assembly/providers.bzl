@@ -27,7 +27,10 @@ FuchsiaConfigDataInfo = provider(
 FuchsiaProductConfigInfo = provider(
     doc = "A product-info used to containing the product_config.json and deps.",
     fields = {
-        "config": "Path to the JSON product configuration file.",
+        # TODO(https://fxbug.dev/390189313): Remove this once all product
+        # configs have a consistent layout.
+        "config_path": "An optional path to the config inside the directory",
+        "directory": "Directory of the product config container",
         "build_type": "The build type of the product.",
         "build_id_dirs": "Directories containing the debug symbols",
     },

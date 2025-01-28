@@ -1564,7 +1564,7 @@ mod tests {
         driver_package_manifest_file.flush()?;
 
         Ok(DriverDetails {
-            package: driver_package_manifest_file_path,
+            package: FileRelativePathBuf::FileRelative(driver_package_manifest_file_path),
             components: vec![Utf8PathBuf::from("meta/foobar.cm")],
         })
     }

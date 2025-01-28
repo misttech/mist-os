@@ -4,20 +4,30 @@
 
 use std::num::NonZeroU8;
 
+use assembly_container::WalkPaths;
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for the connectivity area.
 #[derive(
-    Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+    Debug,
+    Default,
+    Deserialize,
+    Serialize,
+    PartialEq,
+    JsonSchema,
+    SupportsFileRelativePaths,
+    WalkPaths,
 )]
 #[serde(default, deny_unknown_fields)]
 pub struct PlatformConnectivityConfig {
     #[file_relative_paths]
+    #[walk_paths]
     pub network: PlatformNetworkConfig,
     pub wlan: PlatformWlanConfig,
     #[file_relative_paths]
+    #[walk_paths]
     pub mdns: MdnsConfig,
     pub thread: ThreadConfig,
     pub weave: WeaveConfig,
@@ -27,7 +37,14 @@ pub struct PlatformConnectivityConfig {
 
 /// Platform configuration options for the network area.
 #[derive(
-    Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+    Debug,
+    Default,
+    Deserialize,
+    Serialize,
+    PartialEq,
+    JsonSchema,
+    SupportsFileRelativePaths,
+    WalkPaths,
 )]
 #[serde(default, deny_unknown_fields)]
 pub struct PlatformNetworkConfig {
@@ -38,10 +55,12 @@ pub struct PlatformNetworkConfig {
     pub netstack_version: NetstackVersion,
 
     #[file_relative_paths]
+    #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
     pub netcfg_config_path: Option<FileRelativePathBuf>,
 
     #[file_relative_paths]
+    #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
     pub netstack_config_path: Option<FileRelativePathBuf>,
 
@@ -54,6 +73,7 @@ pub struct PlatformNetworkConfig {
     pub netstack_thread_count: Option<NetstackThreadCount>,
 
     #[file_relative_paths]
+    #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
     pub google_maps_api_key_path: Option<FileRelativePathBuf>,
 
@@ -195,7 +215,14 @@ pub enum WlanRoamingMode {
 
 /// Platform configuration options to use for the mdns area.
 #[derive(
-    Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+    Debug,
+    Default,
+    Deserialize,
+    Serialize,
+    PartialEq,
+    JsonSchema,
+    SupportsFileRelativePaths,
+    WalkPaths,
 )]
 #[serde(deny_unknown_fields)]
 pub struct MdnsConfig {
@@ -205,6 +232,7 @@ pub struct MdnsConfig {
 
     /// Service config file.
     #[file_relative_paths]
+    #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
     pub config: Option<FileRelativePathBuf>,
 }

@@ -21,6 +21,11 @@ def parse_args():
         help="Path to the golden file",
         required=True,
     )
+    parser.add_argument(
+        "--subset",
+        help="Whether to check if golden is a subset of generated",
+        action="store_true",
+    )
     return parser.parse_args()
 
 
@@ -32,6 +37,27 @@ def sorting(item):
     return item
 
 
+def is_subset(golden, generated):
+    if isinstance(golden, dict):
+        for key, value in golden.items():
+            if key not in generated:
+                print("Generated file does not contain key: " + key)
+                return False
+            if not is_subset(value, generated[key]):
+                print("Generated value does not match for key: " + key)
+                return False
+        return True
+
+    if isinstance(golden, list):
+        for value in golden:
+            if value not in generated:
+                print("Generated file is missing value in list: " + str(value))
+                return False
+        return True
+
+    return golden == generated
+
+
 def main():
     args = parse_args()
 
@@ -39,7 +65,16 @@ def main():
         gen = json.load(f)
     with open(args.golden, "r") as f:
         golden = json.load(f)
-    if sorting(gen) != sorting(golden):
+
+    is_correct = False
+    if args.subset:
+        if is_subset(golden, gen):
+            is_correct = True
+    else:
+        if sorting(gen) == sorting(golden):
+            is_correct = True
+
+    if not is_correct:
         print(
             "Comparison failure!. \n Golden:\n"
             + str(golden)

@@ -4,6 +4,8 @@
 
 use std::collections::BTreeMap;
 
+use anyhow::Result;
+use assembly_container::{FileType, WalkPaths, WalkPathsFn};
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use assembly_package_utils::{PackageInternalPathBuf, PackageManifestPathBuf};
 use camino::{Utf8Path, Utf8PathBuf};
@@ -13,13 +15,18 @@ use serde::{Deserialize, Serialize};
 use crate::common::DriverDetails;
 
 /// The Product-provided configuration details.
-#[derive(Debug, Default, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths)]
+#[derive(
+    Debug, Default, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths, WalkPaths,
+)]
 #[serde(default, deny_unknown_fields)]
 pub struct ProductConfig {
     #[file_relative_paths]
+    #[walk_paths]
     pub packages: ProductPackagesConfig,
 
     /// List of base drivers to include in the product.
+    #[file_relative_paths]
+    #[walk_paths]
     pub base_drivers: Vec<DriverDetails>,
 
     /// Product-specific session information.
@@ -32,14 +39,18 @@ pub struct ProductConfig {
 
     /// The file paths to various build information.
     #[file_relative_paths]
+    #[walk_paths]
     pub build_info: Option<BuildInfoConfig>,
 
     /// The policy given to component_manager that restricts where sensitive capabilities can be
     /// routed.
     #[file_relative_paths]
+    #[walk_paths]
     pub component_policy: ComponentPolicyConfig,
 
     /// Components which depend on trusted applications running in the TEE.
+    #[file_relative_paths]
+    #[walk_paths]
     pub tee_clients: Vec<TeeClient>,
 
     /// Components which should run as trusted applications in Fuchsia.
@@ -89,13 +100,61 @@ pub struct ProductPackagesConfig {
 #[serde(deny_unknown_fields)]
 pub struct ProductPackageDetails {
     /// Path to the package manifest for this package.
+    #[file_relative_paths]
     pub manifest: FileRelativePathBuf,
 
     /// Map of config_data entries for this package, from the destination path
     /// within the package, to the path where the source file is to be found.
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[file_relative_paths]
     pub config_data: Vec<ProductConfigData>,
+}
+
+fn walk_package_set<F>(
+    set: &mut [ProductPackageDetails],
+    found: &mut F,
+    dest: Utf8PathBuf,
+) -> Result<()>
+where
+    F: WalkPathsFn,
+{
+    for (i, pkg) in set.iter_mut().enumerate() {
+        let manifest_path = pkg.manifest.as_mut_utf8_pathbuf();
+        // Unfortunately, we cannot use the package name as part of the `dest`,
+        // because we cannot open the PackageManifest, because we do not know
+        // the path to the directory.
+        //
+        // For now, we append the index, but in the future we could use a
+        // BTreeSet<PackageName, ProductPackageDetails> instead of a
+        // Vec<ProductPackageDetails> and have the package name ready for use.
+        // TODO(https://fxbug.dev/390189313): Clean this up after keying the
+        // packages by name in the product config.
+        let pkg_dest = dest.join(format!("{}", i));
+        found(manifest_path, pkg_dest.clone(), FileType::PackageManifest)?;
+
+        // Add the config data so that it is identified by package name and destination.
+        // This ensures that we do not have collisions between inputs with the same name.
+        // For example: `{pkg_dest}/config_data/config.txt`
+        for config in &mut pkg.config_data {
+            let config_path = config.source.as_mut_utf8_pathbuf();
+            let config_dest = pkg_dest.join("config_data").join(&config.destination);
+            found(config_path, config_dest, FileType::Unknown)?;
+        }
+    }
+    Ok(())
+}
+
+impl WalkPaths for ProductPackagesConfig {
+    fn walk_paths_with_dest<F: WalkPathsFn>(
+        &mut self,
+        found: &mut F,
+        dest: Utf8PathBuf,
+    ) -> anyhow::Result<()> {
+        walk_package_set(&mut self.base, found, dest.join("base"))?;
+        walk_package_set(&mut self.cache, found, dest.join("cache"))?;
+        Ok(())
+    }
 }
 
 impl From<PackageManifestPathBuf> for ProductPackageDetails {
@@ -112,10 +171,11 @@ impl From<&str> for ProductPackageDetails {
     }
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, JsonSchema)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct ProductConfigData {
     /// Path to the config file on the host.
+    #[file_relative_paths]
     pub source: FileRelativePathBuf,
 
     /// Path to find the file in the package on the target.
@@ -136,26 +196,42 @@ pub struct ProductInfoConfig {
 
 /// Configuration options for build info.
 #[derive(
-    Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+    Clone,
+    Debug,
+    Deserialize,
+    Serialize,
+    PartialEq,
+    JsonSchema,
+    SupportsFileRelativePaths,
+    WalkPaths,
 )]
 #[serde(deny_unknown_fields)]
 pub struct BuildInfoConfig {
     /// Name of the product build target.
     pub name: String,
     /// Path to the version file.
+    #[file_relative_paths]
+    #[walk_paths]
     pub version: FileRelativePathBuf,
     /// Path to the jiri snapshot.
+    #[file_relative_paths]
+    #[walk_paths]
     pub jiri_snapshot: FileRelativePathBuf,
     /// Path to the latest commit date.
+    #[file_relative_paths]
+    #[walk_paths]
     pub latest_commit_date: FileRelativePathBuf,
 }
 
 /// Configuration options for the component policy.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths)]
+#[derive(
+    Clone, Debug, Default, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths, WalkPaths,
+)]
 #[serde(default, deny_unknown_fields)]
 pub struct ComponentPolicyConfig {
     /// The file paths to a product-provided component policies.
     #[file_relative_paths]
+    #[walk_paths]
     pub product_policies: Vec<FileRelativePathBuf>,
 }
 
@@ -173,7 +249,9 @@ pub struct TeeClientFeatures {
 
 /// A configuration for a component which depends on TEE-based protocols.
 /// Examples include components which implement DRM, or authentication services.
-#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
+#[derive(
+    Clone, Debug, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths, WalkPaths,
+)]
 pub struct TeeClient {
     /// The URL of the component.
     pub component_url: String,
@@ -192,7 +270,9 @@ pub struct TeeClient {
     /// Config data files required for this component to work, and which will be inserted into
     /// config data for this package (with a package name based on the component URL)
     #[serde(default)]
-    pub config_data: Option<BTreeMap<String, String>>,
+    #[file_relative_paths]
+    #[walk_paths]
+    pub config_data: Option<BTreeMap<String, FileRelativePathBuf>>,
     /// Additional features required for the component to function.
     #[serde(default)]
     pub additional_required_features: TeeClientFeatures,

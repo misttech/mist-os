@@ -535,6 +535,7 @@ if (is_host) {
     category = "partner"
 
     deps = [
+      "//build/assembly/tools/generate_config:generate_config_sdk",
       "//src/developer/debug/zxdb:zxdb_sdk",
       "//src/developer/ffx:bin_sdk",
       "//src/developer/ffx/plugins/agis:sdk",

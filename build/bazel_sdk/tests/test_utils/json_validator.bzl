@@ -4,6 +4,7 @@
 
 """Convenience function to generate a JSON validating script."""
 
+load("@bazel_skylib//lib:paths.bzl", "paths")
 load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS", "create_python3_shell_wrapper_provider")
 
 # These attributes must be part of any rule() whose implementation
@@ -24,7 +25,8 @@ def create_validation_script_provider(
         generated,
         golden_file,
         relative_path = None,
-        runfiles = None):
+        runfiles = None,
+        is_subset = False):
     """Create a validation script and its related runfiles object.
 
     Create a validation script that invokes json_comparator.py to
@@ -45,12 +47,20 @@ def create_validation_script_provider(
 
       runfiles: an optional runfiles value for extra runtime requirements.
 
+      is_subset: whether the golden is expected to be a subset of the generated
+         file.
+
     Returns:
         A DefaultInfo provider for the script and its runtime requirements.
     """
     validator_path = ctx.executable._json_comparator.short_path
+    initial_runfiles = [golden_file]
 
-    generated_path = generated.short_path
+    if type(generated) == "string":
+        generated_path = paths.relativize(generated, golden_file.root.path)
+    else:
+        generated_path = generated.short_path
+        initial_runfiles += [generated]
     if relative_path:
         generated_path = generated_path + "/" + relative_path
 
@@ -58,12 +68,11 @@ def create_validation_script_provider(
         "--generated={}".format(generated_path),
         "--golden={}".format(golden_file.short_path),
     ]
+    if is_subset:
+        validator_args += ["--subset"]
 
     validator_runfiles = ctx.runfiles(
-        files = [
-            golden_file,
-            generated,
-        ],
+        files = initial_runfiles,
     ).merge(
         ctx.attr._json_comparator[DefaultInfo].default_runfiles,
     )

@@ -231,7 +231,10 @@ fn create_tee_clients(
             for (key, value) in config_data {
                 builder
                     .package(package_name.as_ref())
-                    .config_data(FileEntry { source: value.into(), destination: key.into() })
+                    .config_data(FileEntry {
+                        source: value.as_utf8_pathbuf().clone(),
+                        destination: key.into(),
+                    })
                     .context(format!(
                         "Adding config data file {} to package {}",
                         key, package_name
@@ -583,8 +586,8 @@ mod tests {
             additional_required_protocols: vec!["fuchsia.foo.bar".to_string()],
             capabilities: vec!["fuchsia.baz.bang".to_string()],
             config_data: Some(BTreeMap::from([
-                ("foo".to_string(), "bar".to_string()),
-                ("baz".to_string(), "qux".to_string()),
+                ("foo".to_string(), FileRelativePathBuf::FileRelative("bar".into())),
+                ("baz".to_string(), FileRelativePathBuf::FileRelative("qux".into())),
             ])),
             additional_required_features: TeeClientFeatures {
                 tmp_storage: true,

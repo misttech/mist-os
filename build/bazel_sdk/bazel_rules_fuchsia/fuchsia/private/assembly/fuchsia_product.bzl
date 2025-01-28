@@ -78,10 +78,17 @@ def _fuchsia_product_assembly_impl(ctx):
     board_config_file_path = board_config.config
 
     # Invoke Product Assembly
-    product_config_file_path = ctx.attr.product_config[FuchsiaProductConfigInfo].config
-    build_type = ctx.attr.product_config[FuchsiaProductConfigInfo].build_type
+    # TODO(https://fxbug.dev/391674348): Assembly should take the product config as a directory.
+    product_config = ctx.attr.product_config[FuchsiaProductConfigInfo]
+    product_config_file_path = product_config.directory
+    if product_config.config_path:
+        product_config_file_path += "/" + product_config.config_path
+    else:
+        product_config_file_path += "/product_configuration.json"
+
+    build_type = product_config.build_type
     build_id_dirs = []
-    build_id_dirs += ctx.attr.product_config[FuchsiaProductConfigInfo].build_id_dirs
+    build_id_dirs += product_config.build_id_dirs
     build_id_dirs += ctx.attr.board_config[FuchsiaBoardConfigInfo].build_id_dirs
 
     ffx_inputs = get_ffx_assembly_inputs(fuchsia_toolchain)

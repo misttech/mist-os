@@ -193,18 +193,13 @@ fuchsia_hybrid_board_configuration_test(
 fuchsia_package_with_configs(
     name = "assembled_ams_light",
     configs = {
-        ":test_data/config_data.json": "config_data.json",
+        ":test_data/config_data.json": "destination.json",
     },
     package = ":prebuilt_ams_light",
 )
 
 _testing_product_config_json = {
     "platform": {
-        "another": {"random": {
-            "int": 0,
-            "path1": False,
-            "string2": "false",
-        }},
         "build_type": "user",
         "connectivity": {"wlan": {
             "legacy_privacy_support": True,
@@ -217,16 +212,10 @@ _testing_product_config_json = {
                 "/core/session-manager/session:session",
             ],
         },
-        "identity": {"password_pinweaver": "required"},
         "ui": {"supported_input_devices": [
             "button",
             "keyboard",
         ]},
-        "some": {"random": {
-            "path1": True,
-            "int1": 3234234324231434134141234,
-            "string1": "I have a string",
-        }},
     },
     "product": {
         "session": {
@@ -243,9 +232,6 @@ fuchsia_product_configuration(
     base_packages = [
         ":assembled_ams_light",
     ],
-    cache_packages = [
-        ":prebuilt_ams_light",
-    ],
     base_driver_packages = [
         ":prebuilt_driver",
     ],
@@ -254,41 +240,8 @@ fuchsia_product_configuration(
 
 fuchsia_product_configuration_test(
     name = "product_config_golden_test",
-    # Unfortunately, the golden file contains paths that depend on the target
-    # build configuration (e.g. x86_64-fastbuild/... for x64 builds, and
-    # aarch64-fastbuild/... for arm64 ones), so different golden files need
-    # to be provided.
-    golden_file = select({
-        "@fuchsia_sdk//fuchsia/constraints:cpu_arm64": ":test_data/product_config_golden_file_arm64.json",
-        "@fuchsia_sdk//fuchsia/constraints:cpu_x64": ":test_data/product_config_golden_file_x64.json",
-        "@fuchsia_sdk//fuchsia/constraints:cpu_riscv64": ":test_data/product_config_golden_file_riscv64.json",
-    }),
+    golden_file = ":test_data/product_config_golden_file.json",
     product_config = ":testing_product_config",
-    visibility = ["//visibility:public"],
-)
-
-# buildifier: leave-alone
-fuchsia_product_configuration(
-    name = "testing_relative_product_config",
-    relative_paths = True,
-
-    # Product configuration items
-    base_packages = [
-        ":assembled_ams_light",
-    ],
-    cache_packages = [
-        ":prebuilt_ams_light",
-    ],
-    base_driver_packages = [
-        ":prebuilt_driver",
-    ],
-    product_config_json = _testing_product_config_json,
-)
-
-fuchsia_product_configuration_test(
-    name = "product_config_relative_golden_test",
-    golden_file = ":test_data/product_config_relative_golden_file.json",
-    product_config = ":testing_relative_product_config",
     visibility = ["//visibility:public"],
 )
 
@@ -296,10 +249,15 @@ fuchsia_product_configuration(
     name = "testing_product_config_with_labels",
     product_config_json = {
         "platform": {
-            "foo": "LABEL(test_data/foo.txt)",
+            "build_type": "user",
+            "ui": {
+                "sensor_config": "LABEL(test_data/foo.txt)",
+            },
         },
         "product": {
-            "bar": "LABEL(test_data/bar.txt)",
+            "component_policy": {
+                "product_policies": ["LABEL(test_data/bar.txt)"],
+            },
         },
     },
 )
@@ -335,7 +293,7 @@ fuchsia_product_configuration_test(
 
 fuchsia_product_configuration_test(
     name = "hybrid_product_config_golden_test",
-    golden_file = ":test_data/prebuilt_product_config_golden.json",
+    golden_file = ":test_data/hybrid_product_config_golden.json",
     product_config = ":hybrid_product_config",
     visibility = ["//visibility:public"],
 )
@@ -496,11 +454,7 @@ fuchsia_product_configuration(
 
 fuchsia_product_configuration_test(
     name = "product_ota_config_golden_test",
-    golden_file = select({
-        "@fuchsia_sdk//fuchsia/constraints:cpu_arm64": ":test_data/product_config_with_ota_golden_file_arm64.json",
-        "@fuchsia_sdk//fuchsia/constraints:cpu_x64": ":test_data/product_config_with_ota_golden_file_x64.json",
-        "@fuchsia_sdk//fuchsia/constraints:cpu_riscv64": ":test_data/product_config_with_ota_golden_file_riscv64.json",
-    }),
+    golden_file = ":test_data/product_config_with_ota_golden_file.json",
     product_config = ":test_product_configuration_with_ota_config",
     visibility = ["//visibility:public"],
 )
@@ -508,6 +462,7 @@ fuchsia_product_configuration_test(
 fuchsia_product_ota_config_test(
     name = "product_ota_config_golden_test_channel_config",
     golden_file = ":test_data/channel_config.json",
+    path_in_config = "platform/software_delivery/update_checker/OmahaClient/channels_path/channel_config.json",
     product_config = ":test_product_configuration_with_ota_config",
     visibility = ["//visibility:public"],
 )
@@ -515,6 +470,7 @@ fuchsia_product_ota_config_test(
 fuchsia_product_ota_config_test(
     name = "product_ota_config_golden_test_realm_a_tuf_repo",
     golden_file = ":test_data/some.hostname.com.json",
+    path_in_config = "platform/software_delivery/tuf_config_paths/0/some.hostname.com.json",
     product_config = ":test_product_configuration_with_ota_config",
     visibility = ["//visibility:public"],
 )
@@ -522,6 +478,7 @@ fuchsia_product_ota_config_test(
 fuchsia_product_ota_config_test(
     name = "product_ota_config_golden_test_realm_b_tuf_repo",
     golden_file = ":test_data/some.other_hostname.com.json",
+    path_in_config = "platform/software_delivery/tuf_config_paths/1/some.other_hostname.com.json",
     product_config = ":test_product_configuration_with_ota_config",
     visibility = ["//visibility:public"],
 )
