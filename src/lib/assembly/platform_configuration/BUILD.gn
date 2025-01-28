@@ -45,6 +45,7 @@ rustc_library("platform_configuration") {
     "src/subsystems/storage.rs",
     "src/subsystems/swd.rs",
     "src/subsystems/sysmem.rs",
+    "src/subsystems/system_sounds.rs",
     "src/subsystems/tee_clients.rs",
     "src/subsystems/thermal.rs",
     "src/subsystems/timekeeper.rs",

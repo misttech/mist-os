@@ -93,6 +93,7 @@ rustc_library("config_schema") {
     "src/platform_config/storage_config.rs",
     "src/platform_config/swd_config.rs",
     "src/platform_config/sysmem_config.rs",
+    "src/platform_config/system_sounds_config.rs",
     "src/platform_config/timekeeper_config.rs",
     "src/platform_config/ui_config.rs",
     "src/platform_config/usb_config.rs",

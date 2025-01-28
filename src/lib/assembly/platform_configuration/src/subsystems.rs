@@ -56,6 +56,7 @@ mod starnix;
 mod storage;
 mod swd;
 mod sysmem;
+mod system_sounds;
 mod tee_clients;
 mod thermal;
 mod timekeeper;
@@ -479,6 +480,13 @@ fn configure_subsystems(
         builder,
     )
     .context("Confguring the 'SetUI' subsystem")?;
+
+    system_sounds::SystemSoundsSubsystem::define_configuration(
+        &context_base.for_subsystem("system_sounds"),
+        &platform.system_sounds,
+        builder,
+    )
+    .context("Confguring the 'SystemSounds' subsystem")?;
 
     kernel::KernelSubsystem::define_configuration(
         &context_base.for_subsystem("kernel"),

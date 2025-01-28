@@ -32,6 +32,7 @@ pub mod starnix_config;
 pub mod storage_config;
 pub mod swd_config;
 pub mod sysmem_config;
+pub mod system_sounds_config;
 pub mod timekeeper_config;
 pub mod ui_config;
 pub mod usb_config;
@@ -186,6 +187,14 @@ pub struct PlatformConfig {
     #[file_relative_paths]
     #[walk_paths]
     pub setui: setui_config::SetUiConfig,
+
+    /// System sounds configuration
+    ///
+    /// sounds to play on various system events.
+    #[serde(default)]
+    #[file_relative_paths]
+    #[walk_paths]
+    pub system_sounds: system_sounds_config::SystemSoundsConfig,
 
     /// Assembly option triggering the inclusion of test AIBs
     ///

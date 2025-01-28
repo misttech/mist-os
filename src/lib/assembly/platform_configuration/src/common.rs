@@ -6,6 +6,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use assembly_config_capabilities::CapabilityNamedMap;
 use assembly_config_schema::assembly_config::CompiledPackageDefinition;
 use assembly_config_schema::developer_overrides::DeveloperOnlyOptions;
+use assembly_file_relative_path::FileRelativePathBuf;
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::Serialize;
 use std::collections::btree_map::Entry;
@@ -278,6 +279,12 @@ pub(crate) trait PackageConfigBuilder {
     fn config_data(
         &mut self,
         file_entry: FileEntry<String>,
+    ) -> Result<&mut dyn PackageConfigBuilder>;
+
+    /// Add a set of optionally-present files with their destination paths
+    fn optional_config_data_files(
+        &mut self,
+        paths: Vec<(&Option<FileRelativePathBuf>, &str)>,
     ) -> Result<&mut dyn PackageConfigBuilder>;
 }
 
@@ -704,6 +711,22 @@ impl PackageConfigBuilder for PackageConfiguration {
         self.config_data
             .add_entry(file_entry)
             .context("A config data destination can only be set once for a package")?;
+        Ok(self)
+    }
+
+    fn optional_config_data_files(
+        &mut self,
+        paths: Vec<(&Option<FileRelativePathBuf>, &str)>,
+    ) -> Result<&mut dyn PackageConfigBuilder> {
+        for (source, destination) in paths {
+            if let Some(source) = source {
+                self.config_data(FileEntry {
+                    source: source.clone().to_utf8_pathbuf(),
+                    destination: destination.into(),
+                })
+                .with_context(|| format!("setting {}", destination))?;
+            }
+        }
         Ok(self)
     }
 }
