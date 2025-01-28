@@ -39,6 +39,10 @@ def sorting(item):
 
 def is_subset(golden, generated):
     if isinstance(golden, dict):
+        if not isinstance(generated, dict):
+            print("Generated is expected to be a dict, but is not")
+            return False
+
         for key, value in golden.items():
             if key not in generated:
                 print("Generated file does not contain key: " + key)
@@ -49,6 +53,10 @@ def is_subset(golden, generated):
         return True
 
     if isinstance(golden, list):
+        if not isinstance(generated, list):
+            print("Generated is expected to be a list, but is not")
+            return False
+
         for value in golden:
             if value not in generated:
                 print("Generated file is missing value in list: " + str(value))

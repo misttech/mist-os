@@ -25,11 +25,11 @@
     },
     "product": {
         "packages": {
-            "cache": [
-                {
+            "cache": {
+                "ams-light-test": {
                     "manifest": "packages/ams-light-test"
                 }
-            ]
+            }
         },
         "session": {
             "url": "fuchsia-pkg://fuchsia.com/test_session#meta/test_session.cm"

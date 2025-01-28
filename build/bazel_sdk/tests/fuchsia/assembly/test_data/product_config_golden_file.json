@@ -33,17 +33,17 @@
             }
         ],
         "packages": {
-            "base": [
-                {
+            "base": {
+                "ams-light-test": {
                     "config_data": [
                         {
                             "destination": "destination.json",
-                            "source": "product/packages/base/0/config_data/destination.json/config_data.json"
+                            "source": "product/packages/base/ams-light-test/config_data/destination.json/config_data.json"
                         }
                     ],
                     "manifest": "packages/ams-light-test"
                 }
-            ]
+            }
         },
         "session": {
             "url": "fuchsia-pkg://fuchsia.com/test_session#meta/test_session.cm"

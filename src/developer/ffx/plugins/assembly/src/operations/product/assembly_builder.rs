@@ -582,11 +582,11 @@ impl ImageAssemblyConfigBuilder {
     /// Add a vector of product packages to a specific package set.
     fn add_product_packages_to_set(
         &mut self,
-        entries: Vec<ProductPackageDetails>,
+        entries: BTreeMap<String, ProductPackageDetails>,
         to_package_set: PackageSet,
     ) -> Result<()> {
         let to_package_set = self.map_package_set(&to_package_set, /*is_platform=*/ false)?;
-        for entry in entries {
+        for entry in entries.into_values() {
             // Load the PackageManifest from the given path, in order to get the
             // package name.
             let manifest = PackageManifest::try_load_from(&entry.manifest)
@@ -1985,30 +1985,38 @@ mod tests {
         let base_c_pathbuf: Utf8PathBuf = base_c_path.into();
 
         let packages = ProductPackagesConfig {
-            base: vec![
-                write_empty_pkg(outdir, "base_a", None).into(),
-                ProductPackageDetails {
-                    manifest: FileRelativePathBuf::Resolved(base_b_pathbuf),
-                    config_data: Vec::default(),
-                },
-                ProductPackageDetails {
-                    manifest: FileRelativePathBuf::Resolved(base_c_pathbuf),
-                    config_data: vec![
-                        ProductConfigData {
-                            destination: "dest/path/cfg.txt".into(),
-                            source: config_data_source_a.into(),
-                        },
-                        ProductConfigData {
-                            destination: "other_data.json".into(),
-                            source: config_data_source_b.into(),
-                        },
-                    ],
-                },
-            ],
-            cache: vec![
-                write_empty_pkg(outdir, "cache_a", None).into(),
-                write_empty_pkg(outdir, "cache_b", None).into(),
-            ],
+            base: [
+                ("base_a".to_string(), write_empty_pkg(outdir, "base_a", None).into()),
+                (
+                    "base_b".to_string(),
+                    ProductPackageDetails {
+                        manifest: FileRelativePathBuf::Resolved(base_b_pathbuf),
+                        config_data: Vec::default(),
+                    },
+                ),
+                (
+                    "base_c".to_string(),
+                    ProductPackageDetails {
+                        manifest: FileRelativePathBuf::Resolved(base_c_pathbuf),
+                        config_data: vec![
+                            ProductConfigData {
+                                destination: "dest/path/cfg.txt".into(),
+                                source: config_data_source_a.into(),
+                            },
+                            ProductConfigData {
+                                destination: "other_data.json".into(),
+                                source: config_data_source_b.into(),
+                            },
+                        ],
+                    },
+                ),
+            ]
+            .into(),
+            cache: [
+                ("cache_a".to_string(), write_empty_pkg(outdir, "cache_a", None).into()),
+                ("cache_b".to_string(), write_empty_pkg(outdir, "cache_b", None).into()),
+            ]
+            .into(),
         };
 
         let mut builder = get_minimum_config_builder(
@@ -2177,7 +2185,7 @@ mod tests {
         let outdir = Utf8Path::from_path(tmp.path()).unwrap();
 
         let packages = ProductPackagesConfig {
-            base: vec![write_empty_pkg(outdir, "base_a", None).into()],
+            base: [("base_a".to_string(), write_empty_pkg(outdir, "base_a", None).into())].into(),
             ..ProductPackagesConfig::default()
         };
         let mut builder = get_minimum_config_builder(outdir, vec!["base_a".to_owned()]);

@@ -76,6 +76,12 @@ fn main() -> Result<()> {
 
 fn generate_product(args: &ProductArgs) -> Result<()> {
     let config = AssemblyConfig::from_config_path(&args.config)?;
+
+    // Build systems generally don't add package names to the config, so it
+    // serializes index numbers in place of package names by default.
+    // We add the package names in now, so all the rest of the rules can assume
+    // the config has proper package names.
+    let config = config.add_package_names()?;
     config.write_to_dir(&args.output)?;
     Ok(())
 }
@@ -86,13 +92,10 @@ fn generate_hybrid_product(args: &HybridProductArgs) -> Result<()> {
         None => AssemblyConfig::from_dir(&args.input),
     }?;
 
-    // Write the config to a hermetic directory before we replace packages, so
-    // that the package manifests have consistent locations.
-    // TODO(https://fxbug.dev/391673787): This can go away when the product
-    // config includes the package names.
-    let tempdir = tempfile::tempdir().unwrap();
-    let tempdir_path = Utf8PathBuf::try_from(tempdir.path().to_path_buf())?;
-    let mut config = config.write_to_dir(tempdir_path)?;
+    // Normally this would not be necessary, because all generated configs come
+    // from this tool, which adds the package names above, but we still need to
+    // support older product configs without names.
+    let mut config = config.add_package_names()?;
 
     for package_manifest_path in &args.replace_package {
         let package_manifest = PackageManifest::try_load_from(&package_manifest_path)?;
@@ -112,20 +115,9 @@ fn find_package_in_product<'a>(
     package_name: impl AsRef<str>,
 ) -> Option<&'a mut Utf8PathBuf> {
     config.product.packages.base.iter_mut().chain(&mut config.product.packages.cache).find_map(
-        |pkg| {
-            // We are depending on the fact that PackageCopier copies the
-            // package manifest to a location where the file name equals the
-            // package name.
-            //
-            // In the future, we can consider encoding the package name into
-            // the product config with BTreeMap<PackageName, Utf8PathBuf> to
-            // avoid this.
-            // TODO(https://fxbug.dev/391673787): Remove once the product config
-            // keys packages by their name.
-            if let Some(path) = pkg.manifest.as_utf8_pathbuf().file_name() {
-                if path == package_name.as_ref() {
-                    return Some(pkg.manifest.as_mut_utf8_pathbuf());
-                }
+        |(name, pkg)| {
+            if name == package_name.as_ref() {
+                return Some(pkg.manifest.as_mut_utf8_pathbuf());
             }
             return None;
         },

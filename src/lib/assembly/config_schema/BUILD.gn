@@ -41,6 +41,7 @@ rustc_library("config_schema") {
     "//src/lib/fuchsia-url",
     "//src/lib/include_str_from_working_dir",
     "//src/sys/lib/moniker",
+    "//src/sys/pkg/lib/fuchsia-pkg",
     "//src/ui/lib/input-device-constants:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
@@ -54,6 +55,7 @@ rustc_library("config_schema") {
   test_deps = [
     "//src/lib/assembly/util",
     "//third_party/rust_crates:serde_json5",
+    "//third_party/rust_crates:tempfile",
   ]
 
   non_rust_deps = [ ":git_info_json" ]

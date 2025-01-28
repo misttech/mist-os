@@ -63,11 +63,11 @@ pub struct ProductConfig {
 ///
 /// ```json5
 ///   packages: {
-///     base: [
-///       {
+///     base: {
+///       package_a: {
 ///         manifest: "path/to/package_a/package_manifest.json",
 ///       },
-///       {
+///       package_b: {
 ///         manifest: "path/to/package_b/package_manifest.json",
 ///         config_data: {
 ///           "foo.cfg": "path/to/some/source/file/foo.cfg",
@@ -79,20 +79,58 @@ pub struct ProductConfig {
 ///   }
 /// ```
 ///
-#[derive(Debug, Default, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths)]
-#[serde(default, deny_unknown_fields)]
+#[derive(
+    Debug, Default, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths, PartialEq,
+)]
+#[serde(default, deny_unknown_fields, from = "ProductPackagesConfigDeserializeHelper")]
 pub struct ProductPackagesConfig {
     /// Paths to package manifests, or more detailed json entries for packages
-    /// to add to the 'base' package set.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    /// to add to the 'base' package set, which are keyed by package name.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     #[file_relative_paths]
-    pub base: Vec<ProductPackageDetails>,
+    pub base: BTreeMap<String, ProductPackageDetails>,
 
     /// Paths to package manifests, or more detailed json entries for packages
-    /// to add to the 'cache' package set.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    /// to add to the 'cache' package set, which are keyed by package name.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     #[file_relative_paths]
-    pub cache: Vec<ProductPackageDetails>,
+    pub cache: BTreeMap<String, ProductPackageDetails>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+struct ProductPackagesConfigDeserializeHelper {
+    pub base: MapOrVecOfPackages,
+    pub cache: MapOrVecOfPackages,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum MapOrVecOfPackages {
+    Map(BTreeMap<String, ProductPackageDetails>),
+    Vec(Vec<ProductPackageDetails>),
+}
+
+impl Default for MapOrVecOfPackages {
+    fn default() -> Self {
+        Self::Map(BTreeMap::default())
+    }
+}
+
+fn convert_to_map(map_or_vec: MapOrVecOfPackages) -> BTreeMap<String, ProductPackageDetails> {
+    match map_or_vec {
+        MapOrVecOfPackages::Map(map) => map,
+        // The key in the map defaults to the index in the vector.
+        MapOrVecOfPackages::Vec(vec) => {
+            vec.into_iter().enumerate().map(|(i, s)| (i.to_string(), s)).collect()
+        }
+    }
+}
+
+impl From<ProductPackagesConfigDeserializeHelper> for ProductPackagesConfig {
+    fn from(helper: ProductPackagesConfigDeserializeHelper) -> Self {
+        Self { base: convert_to_map(helper.base), cache: convert_to_map(helper.cache) }
+    }
 }
 
 /// Describes in more detail a package to add to the assembly.
@@ -112,25 +150,16 @@ pub struct ProductPackageDetails {
 }
 
 fn walk_package_set<F>(
-    set: &mut [ProductPackageDetails],
+    set: &mut BTreeMap<String, ProductPackageDetails>,
     found: &mut F,
     dest: Utf8PathBuf,
 ) -> Result<()>
 where
     F: WalkPathsFn,
 {
-    for (i, pkg) in set.iter_mut().enumerate() {
+    for (name, pkg) in set {
         let manifest_path = pkg.manifest.as_mut_utf8_pathbuf();
-        // Unfortunately, we cannot use the package name as part of the `dest`,
-        // because we cannot open the PackageManifest, because we do not know
-        // the path to the directory.
-        //
-        // For now, we append the index, but in the future we could use a
-        // BTreeSet<PackageName, ProductPackageDetails> instead of a
-        // Vec<ProductPackageDetails> and have the package name ready for use.
-        // TODO(https://fxbug.dev/390189313): Clean this up after keying the
-        // packages by name in the product config.
-        let pkg_dest = dest.join(format!("{}", i));
+        let pkg_dest = dest.join(name);
         found(manifest_path, pkg_dest.clone(), FileType::PackageManifest)?;
 
         // Add the config data so that it is identified by package name and destination.
@@ -360,7 +389,7 @@ mod tests {
                             },
                         ]
                     }
-                  ],
+                ],
                 cache: [
                     {
                         manifest: "path/to/cache/package_manifest.json"
@@ -373,13 +402,97 @@ mod tests {
         let packages: ProductPackagesConfig = util::from_reader(&mut cursor).unwrap();
         assert_eq!(
             packages.base,
-            vec![
+            [
+                (
+                    "0".to_string(),
+                    ProductPackageDetails {
+                        manifest: FileRelativePathBuf::FileRelative(
+                            "path/to/base/package_manifest.json".into()
+                        ),
+                        config_data: Vec::default()
+                    }
+                ),
+                (
+                    "1".to_string(),
+                    ProductPackageDetails {
+                        manifest: FileRelativePathBuf::FileRelative(
+                            "some/other/manifest.json".into()
+                        ),
+                        config_data: vec![
+                            ProductConfigData {
+                                destination: "dest/path/cfg.txt".into(),
+                                source: FileRelativePathBuf::FileRelative(
+                                    "source/path/cfg.txt".into()
+                                ),
+                            },
+                            ProductConfigData {
+                                destination: "other_data.json".into(),
+                                source: FileRelativePathBuf::FileRelative(
+                                    "source_other_data.json".into()
+                                ),
+                            },
+                        ]
+                    }
+                ),
+            ]
+            .into()
+        );
+        assert_eq!(
+            packages.cache,
+            [(
+                "0".to_string(),
                 ProductPackageDetails {
                     manifest: FileRelativePathBuf::FileRelative(
-                        "path/to/base/package_manifest.json".into()
+                        "path/to/cache/package_manifest.json".into()
                     ),
                     config_data: Vec::default()
-                },
+                }
+            )]
+            .into()
+        );
+    }
+
+    #[test]
+    fn product_packages_config_deserialization() {
+        let from_list = r#"
+            {
+                base: [{
+                    manifest: "some/other/manifest.json",
+                    config_data: [
+                        {
+                            destination: "dest/path/cfg.txt",
+                            source: "source/path/cfg.txt",
+                        },
+                        {
+                            destination: "other_data.json",
+                            source: "source_other_data.json",
+                        },
+                    ]
+                }]
+            }
+        "#;
+        let from_map = r#"
+            {
+                base: {
+                    "0": {
+                        manifest: "some/other/manifest.json",
+                        config_data: [
+                            {
+                                destination: "dest/path/cfg.txt",
+                                source: "source/path/cfg.txt",
+                            },
+                            {
+                                destination: "other_data.json",
+                                source: "source_other_data.json",
+                            },
+                        ]
+                    }
+                }
+            }
+        "#;
+        let expected = ProductPackagesConfig {
+            base: [(
+                "0".to_string(),
                 ProductPackageDetails {
                     manifest: FileRelativePathBuf::FileRelative("some/other/manifest.json".into()),
                     config_data: vec![
@@ -390,22 +503,23 @@ mod tests {
                         ProductConfigData {
                             destination: "other_data.json".into(),
                             source: FileRelativePathBuf::FileRelative(
-                                "source_other_data.json".into()
+                                "source_other_data.json".into(),
                             ),
                         },
-                    ]
-                }
-            ]
-        );
-        assert_eq!(
-            packages.cache,
-            vec![ProductPackageDetails {
-                manifest: FileRelativePathBuf::FileRelative(
-                    "path/to/cache/package_manifest.json".into()
-                ),
-                config_data: Vec::default()
-            }]
-        );
+                    ],
+                },
+            )]
+            .into(),
+            cache: BTreeMap::default(),
+        };
+
+        let mut cursor = std::io::Cursor::new(from_list);
+        let details: ProductPackagesConfig = util::from_reader(&mut cursor).unwrap();
+        assert_eq!(details, expected);
+
+        let mut cursor = std::io::Cursor::new(from_map);
+        let details: ProductPackagesConfig = util::from_reader(&mut cursor).unwrap();
+        assert_eq!(details, expected);
     }
 
     #[test]

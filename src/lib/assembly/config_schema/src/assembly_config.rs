@@ -5,17 +5,19 @@
 use crate::image_assembly_config::PartialKernelConfig;
 use crate::platform_config::PlatformConfig;
 use crate::PackageDetails;
+use anyhow::Result;
 use assembly_constants::{CompiledPackageDestination, FileEntry};
 use assembly_container::{assembly_container, AssemblyContainer, WalkPaths};
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use assembly_package_utils::PackageInternalPathBuf;
 use camino::Utf8PathBuf;
+use fuchsia_pkg::PackageManifest;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::common::{DriverDetails, PackageName};
-use crate::product_config::ProductConfig;
+use crate::product_config::{ProductConfig, ProductPackageDetails};
 
 /// Configuration for a Product Assembly operation.
 ///
@@ -37,6 +39,26 @@ pub struct AssemblyConfig {
     // TOOD(https://fxbug.dev/390189313): Remove once all product configs stop using this field.
     #[serde(default, skip_serializing)]
     pub file_relative_paths: bool,
+}
+
+impl AssemblyConfig {
+    pub fn add_package_names(mut self) -> Result<Self> {
+        self.product.packages.base = Self::add_package_names_to_set(self.product.packages.base)?;
+        self.product.packages.cache = Self::add_package_names_to_set(self.product.packages.cache)?;
+        Ok(self)
+    }
+
+    fn add_package_names_to_set(
+        set: BTreeMap<String, ProductPackageDetails>,
+    ) -> Result<BTreeMap<String, ProductPackageDetails>> {
+        set.into_values()
+            .map(|pkg| {
+                let manifest = PackageManifest::try_load_from(&pkg.manifest)?;
+                let name = manifest.name().to_string();
+                Ok((name, pkg))
+            })
+            .collect()
+    }
 }
 
 /// Configuration for Product Assembly, when developer overrides are in use.
@@ -176,6 +198,9 @@ mod tests {
     use crate::platform_config::{BuildType, FeatureSupportLevel};
     use crate::product_config::ProductPackageDetails;
     use assembly_util as util;
+    use fuchsia_pkg::{MetaPackage, PackageManifestBuilder, PackageName};
+    use std::str::FromStr;
+    use tempfile::tempdir;
 
     #[test]
     fn test_product_assembly_config_from_json5() {
@@ -299,7 +324,7 @@ mod tests {
                   ],
                   cache: [
                       { manifest: "path/to/cache/package_manifest.json" }
-                  ]
+                  ],
               },
               base_drivers: [
                 {
@@ -317,21 +342,29 @@ mod tests {
         assert_eq!(platform.build_type, BuildType::Eng);
         assert_eq!(
             config.product.packages.base,
-            vec![ProductPackageDetails {
-                manifest: FileRelativePathBuf::FileRelative(
-                    "path/to/base/package_manifest.json".into()
-                ),
-                config_data: Vec::default()
-            }]
+            [(
+                "0".to_string(),
+                ProductPackageDetails {
+                    manifest: FileRelativePathBuf::FileRelative(
+                        "path/to/base/package_manifest.json".into()
+                    ),
+                    config_data: Vec::default()
+                }
+            )]
+            .into()
         );
         assert_eq!(
             config.product.packages.cache,
-            vec![ProductPackageDetails {
-                manifest: FileRelativePathBuf::FileRelative(
-                    "path/to/cache/package_manifest.json".into()
-                ),
-                config_data: Vec::default()
-            }]
+            [(
+                "0".to_string(),
+                ProductPackageDetails {
+                    manifest: FileRelativePathBuf::FileRelative(
+                        "path/to/cache/package_manifest.json".into()
+                    ),
+                    config_data: Vec::default()
+                }
+            )]
+            .into()
         );
         assert_eq!(
             config.product.base_drivers,
@@ -403,17 +436,25 @@ mod tests {
         let config = config.resolve_paths_from_file("path/to/assembly_config.json").unwrap();
         assert_eq!(
             config.product.packages.base,
-            vec![ProductPackageDetails {
-                manifest: "path/to/base/package_manifest.json".into(),
-                config_data: Vec::default()
-            }]
+            [(
+                "0".to_string(),
+                ProductPackageDetails {
+                    manifest: "path/to/base/package_manifest.json".into(),
+                    config_data: Vec::default()
+                }
+            )]
+            .into()
         );
         assert_eq!(
             config.product.packages.cache,
-            vec![ProductPackageDetails {
-                manifest: "path/to/cache/package_manifest.json".into(),
-                config_data: Vec::default()
-            }]
+            [(
+                "0".to_string(),
+                ProductPackageDetails {
+                    manifest: "path/to/cache/package_manifest.json".into(),
+                    config_data: Vec::default()
+                }
+            )]
+            .into()
         );
         assert_eq!(
             config.platform.connectivity.network.netcfg_config_path.unwrap(),
@@ -638,5 +679,43 @@ mod tests {
             merged_platform.media,
             PlatformMediaConfig { audio: Some(AudioConfig::PartialStack), ..Default::default() },
         );
+    }
+
+    #[test]
+    fn test_get_package_names() {
+        // Prepare a directory for temporary files.
+        let dir = tempdir().unwrap();
+        let dir_path = Utf8PathBuf::from_path_buf(dir.path().to_path_buf()).unwrap();
+
+        // Generate a fake package manifest.
+        let package_name = PackageName::from_str("my_pkg").unwrap();
+        let meta_package = MetaPackage::from_name_and_variant_zero(package_name);
+        let package_manifest_builder = PackageManifestBuilder::new(meta_package);
+        let package_manifest = package_manifest_builder.build();
+        let package_manifest_path = dir_path.join("my_pkg_package_manifest.json");
+        package_manifest.write_with_relative_paths(&package_manifest_path).unwrap();
+
+        // Create an assembly config with the package manifest.
+        let json5 = r#"
+        {
+          platform: {
+            build_type: "eng",
+          },
+        }
+        "#;
+        let mut cursor = std::io::Cursor::new(json5);
+        let mut config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
+        config.product.packages.base.insert(
+            "0".to_string(),
+            ProductPackageDetails {
+                manifest: FileRelativePathBuf::Resolved(package_manifest_path.clone()),
+                config_data: vec![],
+            },
+        );
+
+        // Test the logic to add proper package names.
+        let config = config.add_package_names().unwrap();
+        let details = config.product.packages.base.get("my_pkg").unwrap();
+        assert_eq!(details.manifest.as_utf8_pathbuf(), &package_manifest_path);
     }
 }
