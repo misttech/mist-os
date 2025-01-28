@@ -26,10 +26,10 @@ todo_deny https://fxbug.dev/390458405 hal_thermal_default vendor_file file
 // https://fxbug.dev/391136582 - fxlogcat is not correctly labeled.
 todo_deny https://fxbug.dev/391136582 logpersist system_file file
 
-// https://fxbug.dev/368235493 - Some HAL tests/pre-run steps are launched with bad labels.
-todo_deny https://fxbug.dev/368235493 init system_file file
-todo_deny https://fxbug.dev/368235493 init vendor_file file
-todo_deny https://fxbug.dev/368235493 init nativetest_data_file file
+// https://fxbug.dev/392857781 - Some HAL tests/pre-run steps are launched with bad labels.
+todo_deny https://fxbug.dev/392857781 init system_file file
+todo_deny https://fxbug.dev/392857781 init vendor_file file
+todo_deny https://fxbug.dev/392857781 init nativetest_data_file file
 
 // https://fxbug.dev/391664952 - Some test infra attempts to run commands via "sh" without specifying a security domain to transition to, triggering "execute_no_trans" failures.
 todo_deny https://fxbug.dev/391664952 init shell_exec file
