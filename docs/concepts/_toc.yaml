@@ -52,3 +52,6 @@ toc:
 - title: "Versioning"
   section:
   - include: /docs/concepts/versioning/_toc.yaml
+- title: "Power framework"
+  section:
+  - include: /docs/concepts/power/intro/_toc.yaml
