@@ -41,9 +41,7 @@ pub enum SaveConfig {
 // TODO(fxbug/127781) Remove `pub` once library centralized here.
 #[derive(Debug)]
 pub struct ServerInfo {
-    // TODO(fxbug/127781) Remove `pub` once library centralized here.
-    // Used by //src/developer/ffx/daemon/protocols/repo/src/lib.rs
-    pub server: RepositoryServer,
+    server: RepositoryServer,
     task: fasync::Task<()>,
     tunnel_manager: TunnelManager,
 }
@@ -66,6 +64,10 @@ impl ServerInfo {
         let tunnel_manager = TunnelManager::new(server.local_addr(), sink);
 
         Ok(ServerInfo { server, task, tunnel_manager })
+    }
+
+    pub fn local_addr(&self) -> SocketAddr {
+        self.server.local_addr()
     }
 }
 

@@ -674,7 +674,7 @@ impl<
             ffx::RepositoryRegistryRequest::ServerStatus { responder } => {
                 let status = match self.inner.read().await.server {
                     ServerState::Running(ref info) => {
-                        ServerStatus::Running { address: info.server.local_addr() }
+                        ServerStatus::Running { address: info.local_addr() }
                     }
                     ServerState::Stopped => ServerStatus::Stopped,
                     ServerState::Disabled => ServerStatus::Disabled,
