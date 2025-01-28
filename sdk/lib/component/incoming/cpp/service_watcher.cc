@@ -27,7 +27,8 @@ zx_status_t ServiceWatcher::Begin(fidl::ClientEnd<fuchsia_io::Directory> dir,
   if (zx_status_t status = response.s; status != ZX_OK) {
     return status;
   }
-  buf_ = std::make_shared<uint8_t[fuchsia_io::wire::kMaxBuf]>();
+  buf_ = std::shared_ptr<std::array<uint8_t, fuchsia_io::wire::kMaxBuf>>(
+      new std::array<uint8_t, fuchsia_io::wire::kMaxBuf>);
   client_end_ = client.TakeChannel();
   wait_.set_object(client_end_.get());
   wait_.set_trigger(ZX_CHANNEL_READABLE);
@@ -54,13 +55,13 @@ void ServiceWatcher::OnWatchedEvent(async_dispatcher_t* dispatcher, async::WaitB
   }
 
   uint32_t size;
-  status = client_end_.read(0, buf_.get(), nullptr, fuchsia_io::wire::kMaxBuf, 0, &size, nullptr);
+  status = client_end_.read(0, buf_->data(), nullptr, fuchsia_io::wire::kMaxBuf, 0, &size, nullptr);
   if (status != ZX_OK) {
     return;
   }
 
-  std::weak_ptr<uint8_t[fuchsia_io::wire::kMaxBuf]> weak_buf = buf_;
-  uint8_t* msg = buf_.get();
+  std::weak_ptr<std::array<uint8_t, fuchsia_io::wire::kMaxBuf>> weak_buf = buf_;
+  uint8_t* msg = buf_->data();
   while (size >= 2) {
     // Process message structure, as described by fuchsia_io::wire::WatchedEvent.
     auto event = static_cast<fuchsia_io::wire::WatchEvent>(*msg++);

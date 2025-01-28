@@ -49,7 +49,7 @@ class ServiceWatcher final {
                       const zx_packet_signal_t* signal);
 
   Callback callback_;
-  std::shared_ptr<uint8_t[fuchsia_io::wire::kMaxBuf]> buf_;
+  std::shared_ptr<std::array<uint8_t, fuchsia_io::wire::kMaxBuf>> buf_;
   zx::channel client_end_;
   std::string service_path_ = "/svc";
   async::WaitMethod<ServiceWatcher, &ServiceWatcher::OnWatchedEvent> wait_{this};
