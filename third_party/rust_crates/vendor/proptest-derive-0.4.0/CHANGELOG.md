@@ -1,3 +1,11 @@
+## Unreleased
+
+### 0.4.0
+
+### Other Notes
+
+- Upgraded `syn`, `quote`, and `proc-macro2` to 1.0
+
 ## 0.3.0
 
 ### Breaking changes
@@ -20,10 +28,10 @@
 
 ### Other Notes
 
-- Dervied enums now use `LazyTupleUnion` instead of `TupleUnion` for better
+- Derived enums now use `LazyTupleUnion` instead of `TupleUnion` for better
   efficiency.
 
 ## 0.1.1
 
-This is a minor release to correct a packaging error. The licence files are now
+This is a minor release to correct a packaging error. The license files are now
 included in the files published to crates.io.

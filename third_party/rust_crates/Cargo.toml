@@ -174,7 +174,7 @@ pretty = "0.5.2"
 pretty_assertions = "1.2.1"
 prettytable-rs = "0.8.0"
 proptest = "1.5.0"
-proptest-derive = "0.3.0"
+proptest-derive = "0.4.0"
 prost = "0.11.0"
 prost-build = "0.11.1"
 prost-types = "0.11.1"
@@ -932,6 +932,13 @@ rustflags = []
 
 [gn.package.slab."0.4.9"]
 rustflags = []
+
+[gn.package.syn."0.15.26"]
+rustflags = [
+  "--cfg=feature=\\\"extra-traits\\\"",
+  "--cfg=feature=\\\"full\\\"",
+  "--cfg=feature=\\\"visit\\\"",
+]
 
 [gn.package.syn."1.0.98"]
 # Has build script but no config needed.
