@@ -277,6 +277,9 @@ impl TargetCollectionProtocol {
                     .net_addresses(&addrs)
                     .transient_target()
                     .discovered(TargetProtocol::Ssh, TargetTransport::Network)
+                    // Call this "manual" so we don't expire the address if we don't see an mDNS update.
+                    // We don't need an expiry -- the "magic" would just add confusion.
+                    .manual_target(None)
                     .enable();
                 let port = addr.port();
                 if port != 0 {
