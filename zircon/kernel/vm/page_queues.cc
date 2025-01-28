@@ -666,8 +666,8 @@ void PageQueues::LruThread() {
         pending_target_gen = target_gen;
         continue;
       }
-      KERNEL_OOPS("LruThread signal was not seen after %u seconds and queue needs processing\n",
-                  kLruNeedsProcessingPollSeconds);
+      printf("ERROR LruThread signal was not seen after %u seconds and queue needs processing\n",
+             kLruNeedsProcessingPollSeconds);
       Dump();
     }
 
