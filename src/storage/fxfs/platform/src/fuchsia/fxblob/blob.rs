@@ -118,9 +118,9 @@ impl OpenedNode<FxBlob> {
     pub fn create_child_vmo(&self) -> Result<zx::Vmo, Status> {
         let blob = self.0.as_ref();
         let child_vmo = blob.vmo.create_child(
-            zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE | zx::VmoChildOptions::NO_WRITE,
+            zx::VmoChildOptions::REFERENCE | zx::VmoChildOptions::NO_WRITE,
             0,
-            blob.uncompressed_size,
+            0,
         )?;
         if blob.handle.owner().pager().watch_for_zero_children(blob).map_err(map_to_status)? {
             // Take an open count so that we keep this object alive if it is otherwise closed. This
