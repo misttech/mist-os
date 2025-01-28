@@ -4,6 +4,7 @@
 
 mod fs;
 pub mod pid_directory;
+mod pressure_directory;
 mod proc_directory;
 mod sysctl;
 mod sysrq;

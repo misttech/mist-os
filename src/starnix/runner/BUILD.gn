@@ -64,6 +64,7 @@ fuchsia_package("starnix_package") {
     ":starnix_runner_bin",
     ":starnix_runner_component",
     ":starnix_runner_component_manifest",
+    "//src/starnix/psi-provider",
   ]
 }
 

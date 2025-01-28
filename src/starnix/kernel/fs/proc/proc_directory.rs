@@ -4,6 +4,7 @@
 
 use crate::device::DeviceMode;
 use crate::fs::proc::pid_directory::pid_directory;
+use crate::fs::proc::pressure_directory::pressure_directory;
 use crate::fs::proc::sysctl::{net_directory, sysctl_directory};
 use crate::fs::proc::sysrq::SysRqNode;
 use crate::mm::PAGE_SIZE;
@@ -12,12 +13,11 @@ use crate::task::{
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    emit_dotdot, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
-    fileops_impl_noop_sync, fileops_impl_seekless, fs_node_impl_dir_readonly, fs_node_impl_symlink,
-    unbounded_seek, BytesFile, BytesFileOps, DirectoryEntryType, DirentSink, DynamicFile,
-    DynamicFileBuf, DynamicFileSource, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SimpleFileNode, StaticDirectoryBuilder,
-    StubEmptyFile, SymlinkTarget,
+    emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_seekless,
+    fs_node_impl_dir_readonly, fs_node_impl_symlink, unbounded_seek, BytesFile, BytesFileOps,
+    DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject,
+    FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    SeekTarget, SimpleFileNode, StaticDirectoryBuilder, StubEmptyFile, SymlinkTarget,
 };
 use fuchsia_component::client::connect_to_protocol_sync;
 
@@ -54,7 +54,7 @@ impl ProcDirectory {
     pub fn new(current_task: &CurrentTask, fs: &FileSystemHandle) -> Arc<ProcDirectory> {
         let kernel = current_task.kernel();
 
-        let nodes = btreemap! {
+        let mut nodes = btreemap! {
             "cpuinfo".into() => fs.create_node(
                 current_task,
                 CpuinfoFile::new_node(),
@@ -122,7 +122,6 @@ impl ProcDirectory {
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "sys".into() => sysctl_directory(current_task, fs),
-            "pressure".into() => pressure_directory(current_task, fs),
             "net".into() => net_directory(current_task, fs),
             "uptime".into() => fs.create_node(
                 current_task,
@@ -267,6 +266,10 @@ impl ProcDirectory {
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
         };
+
+        if let Some(pressure_directory) = pressure_directory(current_task, fs) {
+            nodes.insert("pressure".into(), pressure_directory);
+        }
 
         Arc::new(ProcDirectory { nodes })
     }
@@ -538,107 +541,6 @@ impl FsNodeOps for MountsSymlink {
         _current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno> {
         Ok(SymlinkTarget::Path("self/mounts".into()))
-    }
-}
-
-/// Creates the /proc/pressure directory. https://docs.kernel.org/accounting/psi.html
-fn pressure_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
-    let mut dir = StaticDirectoryBuilder::new(fs);
-    dir.entry(
-        current_task,
-        "memory",
-        PressureFile::new_node(PressureFileKind::MEMORY),
-        mode!(IFREG, 0o666),
-    );
-    dir.entry(
-        current_task,
-        "cpu",
-        PressureFile::new_node(PressureFileKind::CPU),
-        mode!(IFREG, 0o666),
-    );
-    dir.entry(
-        current_task,
-        "io",
-        PressureFile::new_node(PressureFileKind::IO),
-        mode!(IFREG, 0o666),
-    );
-    dir.build(current_task)
-}
-
-struct PressureFileSource {}
-impl DynamicFileSource for PressureFileSource {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        writeln!(sink, "some avg10={:.2} avg60={:.2} avg300={:.2} total={}", 0, 0, 0, 0)?;
-        writeln!(sink, "full avg10={:.2} avg60={:.2} avg300={:.2} total={}", 0, 0, 0, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Clone, Copy)]
-enum PressureFileKind {
-    MEMORY,
-    CPU,
-    IO,
-}
-
-struct PressureFile {
-    kind: PressureFileKind,
-    source: DynamicFile<PressureFileSource>,
-}
-
-impl PressureFile {
-    pub fn new_node(kind: PressureFileKind) -> impl FsNodeOps {
-        SimpleFileNode::new(move || {
-            Ok(Self { kind, source: DynamicFile::new(PressureFileSource {}) })
-        })
-    }
-}
-
-impl FileOps for PressureFile {
-    fileops_impl_delegate_read_and_seek!(self, self.source);
-    fileops_impl_noop_sync!();
-
-    /// Pressure notifications are configured by writing to the file.
-    fn write(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        // Ignore the request for now.
-
-        track_stub!(
-            TODO("https://fxbug.dev/322873423"),
-            match self.kind {
-                PressureFileKind::MEMORY => "memory pressure notification setup",
-                PressureFileKind::CPU => "cpu pressure notification setup",
-                PressureFileKind::IO => "io pressure notification setup",
-            }
-        );
-        Ok(data.drain())
-    }
-
-    fn wait_async(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        waiter: &Waiter,
-        _events: FdEvents,
-        _handler: EventHandler,
-    ) -> Option<WaitCanceler> {
-        Some(waiter.fake_wait())
-    }
-
-    fn query_events(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-    ) -> Result<FdEvents, Errno> {
-        Ok(FdEvents::empty())
     }
 }
 

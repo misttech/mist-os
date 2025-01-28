@@ -18,7 +18,7 @@ use crate::security;
 use crate::task::{
     AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, HrTimerManager,
     HrTimerManagerHandle, IpTables, KernelStats, KernelThreads, NetstackDevices, PidTable,
-    StopState, Syslog, ThreadGroup, UtsNamespace, UtsNamespaceHandle,
+    PsiProvider, StopState, Syslog, ThreadGroup, UtsNamespace, UtsNamespaceHandle,
 };
 use crate::vdso::vdso_loader::Vdso;
 use crate::vfs::socket::{
@@ -274,6 +274,9 @@ pub struct Kernel {
 
     pub stats: Arc<KernelStats>,
 
+    // Proxy to the PSI provider we received from the runner, if any.
+    pub psi_provider: PsiProvider,
+
     /// Resource limits that are exposed, for example, via sysctl.
     pub system_limits: SystemLimits,
 
@@ -436,6 +439,7 @@ impl Kernel {
             ptrace_scope: AtomicU8::new(0),
             build_version: OnceCell::new(),
             stats: Arc::new(KernelStats::default()),
+            psi_provider: PsiProvider::default(),
             delayed_releaser: Default::default(),
             role_manager,
             syslog: Default::default(),

@@ -11,6 +11,12 @@
         runner: "elf",
         binary: "bin/starnix_runner",
     },
+    children: [
+        {
+            name: "psi-provider",
+            url: "#meta/psi-provider.cm",
+        },
+    ],
     collections: [
         {
             name: "playground",
@@ -137,6 +143,17 @@
             config: [ "fuchsia.ui.VisualDebuggingLevel" ],
             from: "parent",
             to: [ "#kernels" ],
+        },
+        {
+            protocol: [ "fuchsia.kernel.StallResource" ],
+            from: "parent",
+            to: "#psi-provider",
+            availability: "optional",
+        },
+        {
+            protocol: [ "fuchsia.starnix.psi.PsiProvider" ],
+            from: "#psi-provider",
+            to: "#kernels",
         },
     ],
     expose: [

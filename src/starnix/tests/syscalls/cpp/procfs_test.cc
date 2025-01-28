@@ -558,19 +558,6 @@ TEST_F(ProcfsTest, ProcSysKernelRandomBootIdExists) {
   is_valid_uuid(uuid);
 }
 
-// Verify /proc/pressure/{cpu,io,memory} contains something reasonable.
-TEST_F(ProcfsTest, ProcPressure) {
-  for (auto path : {"/proc/pressure/cpu", "/proc/pressure/io", "/proc/pressure/memory"}) {
-    EXPECT_EQ(0, access(path, R_OK));
-    std::string content;
-    EXPECT_TRUE(files::ReadFileToString(path, &content));
-    // Some systems does not eport the `full` statistics for CPU.
-    EXPECT_THAT(content,
-                MatchesRegex("some avg10=[0-9.]+ avg60=[0-9.]+ avg300=[0-9.]+ total=[0-9.]+\n"
-                             "(full avg10=[0-9.]+ avg60=[0-9.]+ avg300=[0-9.]+ total=[0-9.]+\n)?"));
-  }
-}
-
 // Verify that /proc/zoneinfo contains something reasonable.
 TEST_F(ProcfsTest, ZoneInfo) {
   auto path = "/proc/zoneinfo";

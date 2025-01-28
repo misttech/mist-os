@@ -99,6 +99,7 @@
                 "fuchsia.power.system.ActivityGovernor",
                 "fuchsia.recovery.FactoryReset",
                 "fuchsia.scheduler.RoleManager",
+                "fuchsia.starnix.psi.PsiProvider",
                 "fuchsia.starnix.runner.Manager",
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
