@@ -22,19 +22,19 @@
         },
         {
             protocol: "fuchsia.update.verify.BlobfsVerifier",
-            path: "/fs/blob/fuchsia.update.verify.BlobfsVerifier",
+            path: "/fs/blob/svc/fuchsia.update.verify.BlobfsVerifier",
         },
         {
             protocol: "fuchsia.update.verify.ComponentOtaHealthCheck",
-            path: "/fs/blob/fuchsia.update.verify.ComponentOtaHealthCheck",
+            path: "/fs/blob/svc/fuchsia.update.verify.ComponentOtaHealthCheck",
         },
         {
             protocol: "fuchsia.fxfs.BlobCreator",
-            path: "/fs/blob/fuchsia.fxfs.BlobCreator",
+            path: "/fs/blob/svc/fuchsia.fxfs.BlobCreator",
         },
         {
             protocol: "fuchsia.fxfs.BlobReader",
-            path: "/fs/blob/fuchsia.fxfs.BlobReader",
+            path: "/fs/blob/svc/fuchsia.fxfs.BlobReader",
         },
     ],
     use: [

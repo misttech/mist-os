@@ -1097,6 +1097,7 @@ impl Component {
             }
 
             let volume = MountedVolume::new(block_server);
+            let volume_scope = volume.scope.clone();
             let mut fs = Filesystem::new(volume.clone(), ComponentName(caps[1].to_string()));
 
             if format {
@@ -1109,14 +1110,38 @@ impl Component {
 
             self.mounted.lock().unwrap().insert(partition_index, volume);
 
-            let _ = exposed_dir.open3(
+            let outgoing_dir = vfs::directory::immutable::simple();
+            // TODO(https://fxbug.dev/392184892): fxfs volumes have an svc directory instead of the
+            // flat hierarchy a component exposed dir has. We temporarily mimic this structure by
+            // putting the whole exposed dir into an svc directory.
+            let (svc_proxy, svc_server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+            outgoing_dir.add_entry("svc", vfs::remote::remote_dir(svc_proxy))?;
+            exposed_dir.open3(
                 ".",
                 fio::PERM_READABLE
                     | fio::Flags::PERM_INHERIT_EXECUTE
                     | fio::Flags::PERM_INHERIT_WRITE,
                 &fio::Options::default(),
-                server_end,
-            );
+                svc_server_end.into_channel(),
+            )?;
+            let (root_proxy, root_server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+            outgoing_dir.add_entry("root", vfs::remote::remote_dir(root_proxy))?;
+            exposed_dir.open3(
+                "root",
+                fio::PERM_READABLE
+                    | fio::Flags::PERM_INHERIT_EXECUTE
+                    | fio::Flags::PERM_INHERIT_WRITE,
+                &fio::Options::default(),
+                root_server_end.into_channel(),
+            )?;
+            let flags = fio::Flags::PROTOCOL_DIRECTORY
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::PERM_EXECUTABLE;
+            ObjectRequest::new(flags, &fio::Options::default(), server_end)
+                .handle(|request| outgoing_dir.open3(volume_scope, Path::dot(), flags, request));
         } else {
             // Expose the volume as a block device.
             let outgoing_dir = vfs::directory::immutable::simple();
