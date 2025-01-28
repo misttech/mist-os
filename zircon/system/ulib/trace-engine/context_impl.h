@@ -156,6 +156,8 @@ struct trace_context {
   // There must be enough space for at least the initialization record.
   static constexpr size_t kMinDurableBufferSize = 16;
 
+  // LINT.IfChange
+  //
   // The maximum size of the durable buffer.
   // We need enough space for:
   // - initialization record = 16 bytes
@@ -172,7 +174,10 @@ struct trace_context {
   // + 255 * 24 /*threads*/
   // = 726136.
   // We round this up to 1MB.
-  static constexpr size_t kMaxDurableBufferSize = 1024 * 1024;
+  static constexpr size_t kMaxDurableBufferSize = size_t{1024} * 1024;
+  //
+  // trace_manager uses this constant to properly size its buffers
+  // LINT.ThenChange(//src/performance/trace_manager/tracee.cc)
 
   // Given a buffer of size |SIZE| in bytes, not including the header,
   // return how much to use for the durable buffer. This is further adjusted
