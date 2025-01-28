@@ -244,9 +244,11 @@ TEST_P(InspectTest, ValidateInfoNode) {
   EXPECT_NE(info_data.id, ZX_HANDLE_INVALID);
   // The maximum filename length should be set (i.e. > 0).
   EXPECT_GT(info_data.max_filename_length, 0u);
-  // If the filesystem reports oldest_version, ensure it is the correct format (oldest maj/min).
+  // If the filesystem reports oldest_version, ensure it is the correct format (oldest maj/min or
+  // maj.min).
   if (info_data.oldest_version.has_value()) {
-    EXPECT_THAT(info_data.oldest_version.value(), ::testing::MatchesRegex("^[0-9]+\\/[0-9]+$"));
+    EXPECT_THAT(info_data.oldest_version.value(),
+                ::testing::MatchesRegex("^[0-9]+[\\/\\.][0-9]+$"));
   }
 }
 

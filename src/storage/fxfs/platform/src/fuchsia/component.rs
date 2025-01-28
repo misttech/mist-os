@@ -86,7 +86,7 @@ impl FsInspect for InspectedFxFilesystem {
             version_minor: LATEST_VERSION.minor.into(),
             block_size: self.0.block_size() as u64,
             max_filename_length: fio::MAX_FILENAME,
-            oldest_version: Some((earliest_version.major.into(), earliest_version.minor.into())),
+            oldest_version: Some(format!("{}.{}", earliest_version.major, earliest_version.minor)),
         }
     }
 

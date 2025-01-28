@@ -136,7 +136,7 @@ impl FsInspectTree {
     }
 }
 
-/// fs.info Properties
+/// fs.info Properties. This is also exported for minfs and blobfs.
 pub struct InfoData {
     pub id: u64,
     pub fs_type: u64,
@@ -145,10 +145,7 @@ pub struct InfoData {
     pub version_minor: u64,
     pub block_size: u64,
     pub max_filename_length: u64,
-    /// Tracks the oldest on-disk structure that we might find.
-    /// We can't remove support for reading an on-disk struct until oldest_version exceeds it.
-    /// Holds major/minor
-    pub oldest_version: Option<(u64, u64)>,
+    pub oldest_version: Option<String>,
 }
 
 impl InfoData {
@@ -164,9 +161,8 @@ impl InfoData {
         );
         node.record_uint("block_size", self.block_size);
         node.record_uint("max_filename_length", self.max_filename_length);
-        if let Some((major, minor)) = self.oldest_version {
-            node.record_uint("oldest_version_major", major);
-            node.record_uint("oldest_version_minor", minor);
+        if self.oldest_version.is_some() {
+            node.record_string("oldest_version", self.oldest_version.as_ref().unwrap());
         }
     }
 }
