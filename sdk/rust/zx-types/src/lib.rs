@@ -915,7 +915,7 @@ pub enum zx_packet_guest_vcpu_type_t {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct zx_packet_signal_t {
     pub trigger: zx_signals_t,
     pub observed: zx_signals_t,
