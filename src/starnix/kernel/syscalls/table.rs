@@ -144,7 +144,10 @@ pub fn dispatch_syscall(
             sys_rt_sigprocmask as sys_arch32_rt_sigprocmask, sys_tgkill as sys_arch32_tgkill,
             sys_wait4 as sys_arch32_wait4,
         };
-        pub use crate::syscalls::misc::{sys_arch32_uname, sys_getrandom as sys_arch32_getrandom};
+        pub use crate::syscalls::misc::{
+            sys_arch32_uname, sys_getrandom as sys_arch32_getrandom,
+            sys_personality as sys_arch32_personality,
+        };
         pub use crate::syscalls::time::{
             sys_arch32_clock_getres, sys_arch32_clock_gettime, sys_arch32_gettimeofday,
             sys_clock_gettime as sys_arch32_clock_gettime64,
@@ -154,21 +157,22 @@ pub fn dispatch_syscall(
             sys_arch32_setrlimit, sys_arch32_ugetrlimit, sys_capget as sys_arch32_capget,
             sys_capset as sys_arch32_capset, sys_exit as sys_arch32_exit,
             sys_exit_group as sys_arch32_exit_group, sys_getpid as sys_arch32_getpid,
-            sys_gettid as sys_arch32_gettid, sys_prctl as sys_arch32_prctl,
-            sys_prlimit64 as sys_arch32_prlimit64,
+            sys_gettid as sys_arch32_gettid, sys_getuid as sys_arch32_getuid32,
+            sys_prctl as sys_arch32_prctl, sys_prlimit64 as sys_arch32_prlimit64,
+            sys_sched_getscheduler as sys_arch32_sched_getscheduler,
             sys_set_tid_address as sys_arch32_set_tid_address, sys_setuid as sys_arch32_setuid,
         };
         pub use crate::vfs::syscalls::{
             sys_arch32_access, sys_arch32_fstat64, sys_arch32_mkdir, sys_arch32_open,
             sys_arch32_readlink, sys_arch32_rmdir, sys_arch32_stat64,
-            sys_close as sys_arch32_close, sys_fcntl as sys_arch32_fcntl64,
-            sys_getcwd as sys_arch32_getcwd, sys_getdents64 as sys_arch32_getdents64,
-            sys_ioctl as sys_arch32_ioctl, sys_lseek as sys_arch32_lseek,
-            sys_memfd_create as sys_arch32_memfd_create, sys_newfstatat as sys_arch32_fstatat64,
-            sys_openat as sys_arch32_openat, sys_pwritev as sys_arch32_pwritev,
-            sys_read as sys_arch32_read, sys_readlinkat as sys_arch32_readlinkat,
-            sys_umount2 as sys_arch32_umount2, sys_write as sys_arch32_write,
-            sys_writev as sys_arch32_writev,
+            sys_close as sys_arch32_close, sys_faccessat as sys_arch32_faccessat,
+            sys_fcntl as sys_arch32_fcntl64, sys_getcwd as sys_arch32_getcwd,
+            sys_getdents64 as sys_arch32_getdents64, sys_ioctl as sys_arch32_ioctl,
+            sys_lseek as sys_arch32_lseek, sys_memfd_create as sys_arch32_memfd_create,
+            sys_newfstatat as sys_arch32_fstatat64, sys_openat as sys_arch32_openat,
+            sys_pwritev as sys_arch32_pwritev, sys_read as sys_arch32_read,
+            sys_readlinkat as sys_arch32_readlinkat, sys_umount2 as sys_arch32_umount2,
+            sys_write as sys_arch32_write, sys_writev as sys_arch32_writev,
         };
     }
     #[cfg(all(target_arch = "aarch64", feature = "arch32"))]
@@ -206,6 +210,7 @@ pub fn dispatch_syscall(
             close[1],
             exit[1],
             exit_group[1],
+            faccessat[3],
             fcntl64[3],
             fstat64[2],
             fstatat64[4],
@@ -215,6 +220,7 @@ pub fn dispatch_syscall(
             getrandom[3],
             gettid[0],
             gettimeofday[2],
+            getuid32[0],
             ioctl[3],
             lseek[3],
             memfd_create[2],
@@ -224,6 +230,7 @@ pub fn dispatch_syscall(
             munmap[2],
             open[3],
             openat[4],
+            personality[1],
             prctl[5],
             prlimit64[4],
             pwritev[4],
@@ -233,6 +240,7 @@ pub fn dispatch_syscall(
             rmdir[1],
             rt_sigaction[4],
             rt_sigprocmask[4],
+            sched_getscheduler[1],
             set_robust_list[2],
             set_tid_address[1],
             setuid[1],

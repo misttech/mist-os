@@ -22,16 +22,13 @@ syscall_tests = [
 
   "abort_test",
   "custom_artifact_test",
-  "input_test",
   "loop_test",
   "prctl_test",
   "restart_read_test",
   "sysfs_kernel_test",
-  "syslog_test",
   "test_helper_test",
   "time_test",
   "touch_standby_test",
-  "udev_test",
 
   # go/keep-sorted end
 ]
@@ -55,6 +52,7 @@ arch64_syscall_tests = [
   "fuse_test",
   "futex_test",
   "getrandom_test",
+  "input_test",
   "ioctl_test",
   "memfd_test",
   "mmap_test",
@@ -78,6 +76,7 @@ arch64_syscall_tests = [
   "sw_breakpoint_test",
   "symlink_test",
   "sysfs_power_test",
+  "syslog_test",
   "task_test",
   "terminal_test",
   "timerfd_test",
@@ -85,6 +84,7 @@ arch64_syscall_tests = [
   "tmpfs_test",
   "trivial_test",
   "tun_test",
+  "udev_test",
   "uio_test",
   "userfaultfd_test",
   "vdso_test",

@@ -646,6 +646,7 @@ macro_rules! for_each_arch32_syscall {
             getsockopt,
             gettid,
             getuid,
+            getuid32,
             getxattr,
             init_module,
             inotify_add_watch,
