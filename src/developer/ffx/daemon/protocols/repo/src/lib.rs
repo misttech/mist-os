@@ -22,8 +22,8 @@ use fuchsia_repo::repository::{self, RepoProvider, RepositorySpec};
 use futures::{FutureExt as _, StreamExt as _};
 use measure_fuchsia_developer_ffx::Measurable;
 use pkg::repo::{
-    aliases_to_rules, create_repo_host, register_target_with_fidl_proxies, repo_spec_to_backend,
-    update_repository, Registrar, RepoInner, SaveConfig, ServerState,
+    aliases_to_rules, create_repo_host, register_target_with_fidl_proxies, update_repository,
+    Registrar, RepoInner, SaveConfig, ServerState,
 };
 use pkg::{config as pkg_config, metrics, write_instance_info, ServerMode};
 use protocols::prelude::*;
@@ -427,8 +427,7 @@ async fn add_repository(
     tracing::info!("Adding repository {} {:?}", repo_name, repo_spec);
 
     // Create the repository.
-    let http_client = inner.read().await.https_client.clone();
-    let backend = repo_spec_to_backend(repo_spec, http_client)?;
+    let backend = inner.read().await.get_backend(repo_spec)?;
 
     let repo = RepoClient::from_trusted_remote(backend).await.map_err(|err| {
         tracing::error!("Unable to create repository: {:#?}", err);

@@ -134,9 +134,7 @@ pub struct RepoInner {
     // TODO(fxbug/127781) Remove `pub` once library centralized here.
     // Used by //src/developer/ffx/daemon/protocols/repo/src/lib.rs
     pub server: ServerState,
-    // TODO(fxbug/127781) Remove `pub` once library centralized here.
-    // Used by //src/developer/ffx/daemon/protocols/repo/src/lib.rs
-    pub https_client: HttpsClient,
+    https_client: HttpsClient,
 }
 
 // RepoInner can move.
@@ -238,6 +236,13 @@ impl RepoInner {
         tracing::info!("Repository protocol has been stopped");
 
         Ok(())
+    }
+
+    pub fn get_backend(
+        &self,
+        repo_spec: &RepositorySpec,
+    ) -> Result<Box<dyn RepoProvider>, RepositoryError> {
+        repo_spec_to_backend(repo_spec, self.https_client.clone())
     }
 }
 
