@@ -443,7 +443,7 @@ impl<T: Deref<Target = Q>, Q: ReadBytes, S: ArraySlotKind> Block<T, Array<S>> {
         PayloadFields::array_entry_type(self)
     }
 
-    fn entry_type_size(&self) -> Option<usize> {
+    pub fn entry_type_size(&self) -> Option<usize> {
         self.entry_type().and_then(|entry_type| match entry_type {
             BlockType::IntValue | BlockType::UintValue | BlockType::DoubleValue => {
                 Some(std::mem::size_of::<i64>())
