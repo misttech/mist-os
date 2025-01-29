@@ -54,6 +54,7 @@ TYPED_TEST(DlTests, TlsGetAddrStaticStartupModules) {
 // Holds the names for the TLS module and test APIs.
 struct TlsLoadedSymbolNames {
   const char* module;
+  const char* early_module;
   const char* data_symbol;
   const char* bss1_symbol;
   const char* weak_symbol;
@@ -67,6 +68,8 @@ constexpr const char* kTraditionalTlsGdModuleName = "tls-dep-module.so";
 constexpr const char* kTlsDescGdModuleName = "tls-desc-dep-module.so";
 constexpr const char* kTraditionalTlsLdModuleName = "tls-ld-dep-module.so";
 constexpr const char* kTlsDescLdModuleName = "tls-desc-ld-dep-module.so";
+constexpr const char* kTraditionalTlsEarlyLoadedModuleName = "tls-initial-dep-module.so";
+constexpr const char* kTlsDescEarlyLoadedModuleName = "tls-desc-initial-dep-module.so";
 
 // Symbol name differences between GD and LD versions of the module.
 constexpr const char* kGdDataSymbolName = "get_tls_dep_data";
@@ -75,6 +78,8 @@ constexpr const char* kGdWeakSymbolName = "get_tls_dep_weak";
 
 constexpr const char* kLdDataSymbolName = "get_tls_ld_dep_data";
 constexpr const char* kLdBss1SymbolName = "get_tls_ld_dep_bss1";
+
+constexpr const char* kEarlyLoadedModuleSymbolName = "get_tls_initial_dep_data";
 
 // Initial data values for get_tls_dep_data/get_tls_ld_dep_data
 constexpr int kTlsGdDataInitialVal = 42;
@@ -248,16 +253,35 @@ class OpenModule {
   bool skip_ = false;
 };
 
+// A helper function for accessing the TLS data in the 'early' module.
+template <class Test>
+void AccessEarlyLoadedVar(const OpenModule<Test>& early_loaded_module) {
+  EXPECT_THAT(early_loaded_module.template TryAccess<int>(kEarlyLoadedModuleSymbolName),
+              std::optional(std::pair{10, 10 + 1}));
+}
+
 // A routine that exercises the fast path for TLS accesses.
+//
+// This test accesses 2 dynamic TLS modules: an 'early' module and a 'test'
+// module. The 'early' module is a dynamic TLS module that we load before
+// launching any threads to ensure there are dynamic TLS variables that can be
+// accessed at the end of the test. We want to do this so that we can make
+// sure that dlclose is working properly and we aren't accidentally unloading
+// other TLS modules or data. The 'test' module is used for more complex
+// testing and interacts with the launched threads in various ways to ensure
+// particular operations happen deterministically.
 //
 // This test exercises the following sequence of events:
 //  1. The initial thread is created with initial-exec TLS state.
-//  2. dlopen adds dynamic TLS state and bumps DTV generation.
-//  3. The initial thread uses dynamic TLS via the new DTV.
-//  3. New threads are launched.
-//  5. The new threads use dynamic TLS, via the fast path, and wait.
-//  7. The initial thread calls dlclose on the loaded module.
-//  8. The remaining threads complete, potentially accessing pre-existing TLS state.
+//  2. dlopen adds dynamic TLS state with the 'early' module and bumps DTV
+//     generation.
+//  3. dlopen adds dynamic TLS state from the 'test' module and bumps DTV
+//     generation.
+//  4. The initial thread uses dynamic TLS via the new DTV.
+//  4. New threads are launched.
+//  6. The new threads use dynamic TLS, via the fast path, and wait.
+//  8. The initial thread calls dlclose on the loaded module.
+//  9. The remaining threads complete, accessing the pre-existing TLS state.
 //
 // NOTE: Whether the slow path may also be used in this test depends on the
 // implementation. For instance, at the time of writing, musl's dlopen doesn't
@@ -267,6 +291,18 @@ class OpenModule {
 // we can guarantee for all implementations.
 template <class Test>
 void DynamicTlsFastPath(Test& self, const TlsLoadedSymbolNames& names, const TlsTestCtx& ctx) {
+  // Load an 'early' module so that we can check dlclose doesn't cause
+  // existing TLS modules to misbehave at the end of the test.
+  OpenModule early_module(self);
+  early_module.InitModule(names.early_module, RTLD_NOW | RTLD_LOCAL, {"get_tls_initial_dep_data"},
+                          kEarlyLoadedModuleSymbolName);
+  if (early_module.Skip()) {
+    // If the module wasn't compiled to have the right type of TLS relocations,
+    // then the symbols won't exist in the module, and we should skip the rest of
+    // the test.
+    GTEST_SKIP() << "Initial test module disabled at compile time.";
+  }
+
   OpenModule mod(self);
   ASSERT_NO_FATAL_FAILURE(mod.InitModule(names.module, RTLD_NOW | RTLD_LOCAL,
                                          {names.data_symbol, names.bss1_symbol},
@@ -284,6 +320,11 @@ void DynamicTlsFastPath(Test& self, const TlsLoadedSymbolNames& names, const Tls
     mod.InitSymbols({names.weak_symbol});
   }
 
+  // Access TLS data from the 'early' module.
+  auto access_early_var = [&early_module = std::as_const(early_module)] {
+    AccessEarlyLoadedVar(early_module);
+  };
+
   auto access_tls_vars = [&names, &mod = std::as_const(mod), &ctx]() {
     EXPECT_THAT(mod.template TryAccess<int>(names.data_symbol),
                 std::optional(std::pair{ctx.tls_data_initial_val, ctx.tls_data_initial_val + 1}));
@@ -300,10 +341,8 @@ void DynamicTlsFastPath(Test& self, const TlsLoadedSymbolNames& names, const Tls
 
   TestThreadRunner tr;
   auto do_nothing = []() {};
-  // TODO(https://fxbug.dev/376130102): do some other TLS access w/ initial module in the worker,
-  // and then exit.
 
-  tr.StartWorkersNow(do_nothing, access_tls_vars, do_nothing);
+  tr.StartWorkersNow(do_nothing, access_tls_vars, access_early_var);
   tr.MainWaitForWorkerDone();
 
   // Now that the workers have finished, we want to close the module before
@@ -312,7 +351,10 @@ void DynamicTlsFastPath(Test& self, const TlsLoadedSymbolNames& names, const Tls
   mod.CloseHandle();
 
   tr.MainLetWorkersFinish();
-  // TODO(https://fxbug.dev/376130102): access the initial TLS module, and then dlclose it.
+
+  // Access the 'early' module we added at the beginning of the test, and
+  // ensure dlclose works correctly w.r.t. TLS state.
+  access_early_var();
 }
 
 TYPED_TEST(DlTests, TlsDescGlobalDynamicFastPath) {
@@ -323,6 +365,7 @@ TYPED_TEST(DlTests, TlsDescGlobalDynamicFastPath) {
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTlsDescGdModuleName,
+      .early_module = kTlsDescEarlyLoadedModuleName,
       .data_symbol = kGdDataSymbolName,
       .bss1_symbol = kGdBss1SymbolName,
       .weak_symbol = kGdWeakSymbolName,
@@ -345,6 +388,7 @@ TYPED_TEST(DlTests, TlsGetAddrGlobalDynamicFastPath) {
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTraditionalTlsGdModuleName,
+      .early_module = kTraditionalTlsEarlyLoadedModuleName,
       .data_symbol = kGdDataSymbolName,
       .bss1_symbol = kGdBss1SymbolName,
       .weak_symbol = kGdWeakSymbolName,
@@ -368,6 +412,7 @@ TYPED_TEST(DlTests, TlsDescLocalDynamicFastPath) {
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTlsDescLdModuleName,
+      .early_module = kTlsDescEarlyLoadedModuleName,
       .data_symbol = kLdDataSymbolName,
       .bss1_symbol = kLdBss1SymbolName,
       .weak_symbol = nullptr,
@@ -391,6 +436,7 @@ TYPED_TEST(DlTests, TlsGetAddrLocalDynamicFastPath) {
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTraditionalTlsLdModuleName,
+      .early_module = kTraditionalTlsEarlyLoadedModuleName,
       .data_symbol = kLdDataSymbolName,
       .bss1_symbol = kLdBss1SymbolName,
       .weak_symbol = nullptr,
@@ -408,17 +454,41 @@ TYPED_TEST(DlTests, TlsGetAddrLocalDynamicFastPath) {
 
 // A routine that exercises the slow path for TLS accesses.
 //
+// This test accesses 2 dynamic TLS modules: an 'early' module and a 'test'
+// module. The 'early' module is a dynamic TLS module that we load to ensure
+// there are dynamic TLS variables that can be accessed at the end of the test,
+// to make sure that dlclose is working properly and we aren't accidentally
+// unloading other TLS modules. The 'test' module is used for more complex
+// testing and interacts with the launched threads in various ways to ensure
+// particular operations happen deterministically.
+//
 // This test exercises the following sequence of events:
-//  1. The initial thread is created with initial-exec TLS state.
-//  2. New threads are launched with the same initial TLS state.
-//  3. The new threads are parked until all threads are ready.
-//  4. dlopen adds dynamic TLS state and bumps DTV generation.
-//  5. The new threads use dynamic TLS, via the slow path, and wait.
-//  6. The main thread accesses dynamic TLS.
-//  7. The module is dlclosed.
-//  8. The remaining threads complete, potentially accessing any pre-existing TLS state.
+//  1. The initial thread is created with some initial-exec TLS state.
+//  2. dlopen adds dynamic TLS state by opening an 'early' module that will
+//     survive beyond the test lifetime. This ensures that there are some
+//     dynamic TLS variables that can be accessed after we close the test
+//     module.
+//  3. New threads are launched with this TLS state.
+//  4. The new threads are parked until all threads are ready.
+//  5. dlopen adds new dynamic TLS state and bumps DTV generation.
+//  6. The new threads use dynamic TLS, via the slow path, and wait.
+//  7. The main thread accesses dynamic TLS.
+//  8. The module is dlclosed.
+//  9. The remaining threads complete, accessing any pre-existing TLS state.
 template <class Test>
 void DynamicTlsSlowPath(Test& self, const TlsLoadedSymbolNames& names, const TlsTestCtx& ctx) {
+  // Load an 'early' module so that we can check dlclose doesn't cause
+  // existing TLS modules to misbehave at the end of the test.
+  OpenModule early_module(self);
+  early_module.InitModule(names.early_module, RTLD_NOW | RTLD_LOCAL, {"get_tls_initial_dep_data"},
+                          kEarlyLoadedModuleSymbolName);
+  if (early_module.Skip()) {
+    // If the module wasn't compiled to have the right type of TLS relocations,
+    // then the symbols won't exist in the module, and we should skip the rest of
+    // the test.
+    GTEST_SKIP() << "Initial test module disabled at compile time.";
+  }
+
   OpenModule mod(self);
 
   auto access_tls_vars = [&names, &mod = std::as_const(mod), &ctx]() {
@@ -431,11 +501,14 @@ void DynamicTlsSlowPath(Test& self, const TlsLoadedSymbolNames& names, const Tls
     }
   };
 
+  // Access TLS data from the 'early' module.
+  auto access_early_var = [&early_module = std::as_const(early_module)] {
+    AccessEarlyLoadedVar(early_module);
+  };
+
   auto do_nothing = []() {};
   TestThreadRunner tr;
-  tr.StartWorkersWaiting(do_nothing, access_tls_vars, do_nothing);
-  // TODO(https://fxbug.dev/376130102): do some other tls access w/ initial module in the worker,
-  // and then exit.
+  tr.StartWorkersWaiting(do_nothing, access_tls_vars, access_early_var);
 
   // First synchronization (wait until workers are ready).
   tr.MainWaitForWorkerReady();
@@ -467,7 +540,10 @@ void DynamicTlsSlowPath(Test& self, const TlsLoadedSymbolNames& names, const Tls
 
   // Allow workers to finish any remaining work, and then exit.
   tr.MainLetWorkersFinish();
-  // TODO(https://fxbug.dev/376130102): access the initial TLS module, and then dlclose it.
+
+  // Access the 'early' module we added at the beginning of the test, and
+  // ensure dlclose works correctly w.r.t. TLS state.
+  access_early_var();
 }
 
 TYPED_TEST(DlTests, TlsDescGlobalDynamicSlowPath) {
@@ -478,6 +554,7 @@ TYPED_TEST(DlTests, TlsDescGlobalDynamicSlowPath) {
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTlsDescGdModuleName,
+      .early_module = kTlsDescEarlyLoadedModuleName,
       .data_symbol = kGdDataSymbolName,
       .bss1_symbol = kGdBss1SymbolName,
       .weak_symbol = kGdWeakSymbolName,
@@ -501,6 +578,7 @@ TYPED_TEST(DlTests, TlsGetAddrGlobalDynamicSlowPath) {
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTraditionalTlsGdModuleName,
+      .early_module = kTraditionalTlsEarlyLoadedModuleName,
       .data_symbol = kGdDataSymbolName,
       .bss1_symbol = kGdBss1SymbolName,
       .weak_symbol = kGdWeakSymbolName,
@@ -524,6 +602,7 @@ TYPED_TEST(DlTests, TlsDescLocalDynamicSlowPath) {
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTlsDescLdModuleName,
+      .early_module = kTlsDescEarlyLoadedModuleName,
       .data_symbol = kLdDataSymbolName,
       .bss1_symbol = kLdBss1SymbolName,
       .weak_symbol = nullptr,
@@ -547,6 +626,7 @@ TYPED_TEST(DlTests, TlsGetAddrLocalDynamicSlowPath) {
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTraditionalTlsLdModuleName,
+      .early_module = kTraditionalTlsEarlyLoadedModuleName,
       .data_symbol = kLdDataSymbolName,
       .bss1_symbol = kLdBss1SymbolName,
       .weak_symbol = nullptr,
