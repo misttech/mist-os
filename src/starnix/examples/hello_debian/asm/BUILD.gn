@@ -16,6 +16,10 @@ starnix_linux_arch32_executable("bin32") {
   ]
 
   disable_syslog_backend = true
+  remove_configs = [
+    "//build/config/linux:default-pie",
+    "//build/config/linux:implicit-host-libs",
+  ]
 }
 
 starnix_linux_executable("bin") {
@@ -28,6 +32,10 @@ starnix_linux_executable("bin") {
   ]
 
   disable_syslog_backend = true
+  remove_configs = [
+    "//build/config/linux:default-pie",
+    "//build/config/linux:implicit-host-libs",
+  ]
 }
 
 fuchsia_component("hello_debian_asm") {
