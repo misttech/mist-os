@@ -49,6 +49,8 @@ source_set("common_srcs") {
     "dpll-config.h",
     "dpll.cc",
     "dpll.h",
+    "edid-reader.cc",
+    "edid-reader.h",
     "firmware-bridge.cc",
     "firmware-bridge.h",
     "fuse-config.cc",
