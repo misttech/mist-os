@@ -4,6 +4,5 @@
 
 per-file bluetooth/** = jnchang@google.com
 per-file ui/** = chaopeng@google.com
-per-file ui/screenshot.py = yaar@google.com
 per-file session.py = chaopeng@google.com
 per-file rtc.py = hansens@google.com
