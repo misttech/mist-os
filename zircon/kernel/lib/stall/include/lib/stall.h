@@ -25,13 +25,13 @@ class StallAccumulator {
  public:
   struct Stats {
     // Monotonic time spent with num_contributors_stalling > 0.
-    zx_duration_t total_time_stall_some = 0;
+    zx_duration_mono_t total_time_stall_some = 0;
 
     // Monotonic time spent with num_contributors_stalling > 0 && num_contributors_progressing == 0.
-    zx_duration_t total_time_stall_full = 0;
+    zx_duration_mono_t total_time_stall_full = 0;
 
     // Monotonic time spent with num_contributors_progressing > 0 || num_contributors_stalling > 0.
-    zx_duration_t total_time_active = 0;
+    zx_duration_mono_t total_time_active = 0;
   };
 
   // Alter contributor counts by the given amount.
@@ -60,7 +60,7 @@ class StallAccumulator {
   size_t num_contributors_stalling_ TA_GUARDED(lock_) = 0;
 
   // Timestamp of the last Consolidate() call.
-  zx_instant_mono_ticks_t last_consolidate_time_ TA_GUARDED(lock_) = 0;
+  zx_instant_mono_t last_consolidate_time_ TA_GUARDED(lock_) = 0;
 
   // Accumulated totals at the time of the last update.
   Stats accumulated_stats_ TA_GUARDED(lock_);
@@ -72,10 +72,10 @@ class StallAggregator {
  public:
   struct Stats {
     // Total monotonic time spent with at least one memory-stalled thread.
-    zx_duration_t stalled_time_some = 0;
+    zx_duration_mono_t stalled_time_some = 0;
 
     // Total monotonic time spent with all threads memory-stalled.
-    zx_duration_t stalled_time_full = 0;
+    zx_duration_mono_t stalled_time_full = 0;
   };
 
   // Gets this class' singleton instance.
