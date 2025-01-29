@@ -216,7 +216,6 @@ template("toolchain_runtime_deps") {
       metadata = {
         binaries = []
         distribution_entries = []
-        runtime_deps_manifest_lines = []
       }
 
       _label = get_label_info(":$target_name", "label_with_toolchain")
@@ -266,11 +265,6 @@ template("toolchain_runtime_deps") {
             _soname = get_path_info(lib.dist, "file")
           }
 
-          # Used by runtime_deps_manifest().
-          metadata.runtime_deps_manifest_lines +=
-              [ "lib/${toolchain_variant.libprefix}${_soname}=" +
-                rebase_path(lib.dist, root_build_dir, toolchain_spec.lib_dir) ]
-
           # Used by the distribution_manifest() template.
           metadata.distribution_entries += [
             {
@@ -282,42 +276,5 @@ template("toolchain_runtime_deps") {
         }
       }
     }
-  }
-}
-
-# Generate a fini manifest that lists all toolchain runtime dependencies and their
-# installation location.
-#
-# deps, data_deps, public_deps (optional)
-#   [list of labels] The targets to generate a manifest for.
-#
-# testonly, visibility (optional)
-#   See `gn help`.
-#
-# outputs (optional)
-#   Singleton list containing the path to the manifest file.
-#   Defaults to `[ "$target_gen_dir/$target_name.runtime_deps" ]`.
-template("toolchain_runtime_deps_manifest") {
-  # Build the name of the output file.
-  if (defined(invoker.outputs)) {
-    _outputs = invoker.outputs
-    assert(_outputs != [] && _outputs == [ _outputs[0] ],
-           "Outputs list must have exactly one element.")
-    manifest_file = _outputs[0]
-  } else {
-    manifest_file = "$target_gen_dir/$target_name.runtime_deps"
-  }
-
-  generated_file(target_name) {
-    forward_variables_from(invoker,
-                           [
-                             "data_deps",
-                             "deps",
-                             "public_deps",
-                             "testonly",
-                           ])
-    data_keys = [ "runtime_deps_manifest_lines" ]
-    walk_keys = [ "runtime_deps_manifest_barrier" ]
-    outputs = [ manifest_file ]
   }
 }
