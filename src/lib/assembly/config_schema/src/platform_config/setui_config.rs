@@ -52,8 +52,25 @@ pub struct SetUiConfig {
     #[walk_paths]
     pub interface: Option<FileRelativePathBuf>,
 
+    /// The setui agents to start
     #[schemars(schema_with = "crate::option_path_schema")]
     #[file_relative_paths]
     #[walk_paths]
     pub agent: Option<FileRelativePathBuf>,
+
+    /// If an external brightness controller is being used (as opposed to
+    /// brightness being controlled by setui)
+    pub external_brightness_controller: bool,
+
+    /// The input devices used with settings UI
+    #[schemars(schema_with = "crate::option_path_schema")]
+    #[file_relative_paths]
+    #[walk_paths]
+    pub input_device_config: Option<FileRelativePathBuf>,
+
+    /// The lights (LEDs) controlled by settings UI
+    #[schemars(schema_with = "crate::option_path_schema")]
+    #[file_relative_paths]
+    #[walk_paths]
+    pub light_hardware_config: Option<FileRelativePathBuf>,
 }
