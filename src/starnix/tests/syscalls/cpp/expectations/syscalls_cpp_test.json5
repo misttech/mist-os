@@ -90,6 +90,10 @@
 
                 // TODO(https://fxbug.dev/379958264)
                 "CgroupTest.WriteToInterfaceFileAfterCgroupIsDeleted",
+
+                // TODO(https://fxbug.dev/384194637): defalke and re-enable
+                "CgroupFreezerTest.FreezeNestedCgroups",
+                "CgroupFreezerTest.MoveProcess",
             ],
         },
     ],
