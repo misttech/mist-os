@@ -18,8 +18,9 @@ use crate::experimental::clock::Timed;
 
 pub use crate::experimental::event::builder::{sample_data_record, SampleDataRecord};
 pub use crate::experimental::event::reactor::{
-    and, fail, map_data_record, on_data_record, or, respond, then, And, AndChain, Fail, Inspect,
-    IntoReactor, MapError, MapResponse, Or, OrChain, Reactor, Respond, Then, ThenChain,
+    and, fail, filter_map_data_record, map_data_record, on_data_record, or, respond, then, And,
+    AndChain, Fail, FilterMapDataRecord, Inspect, IntoReactor, MapError, MapResponse, Or, OrChain,
+    Reactor, Respond, Then, ThenChain,
 };
 
 impl<T> Timed<Event<T>> {
@@ -44,6 +45,13 @@ impl<T> Timed<Event<T>> {
         F: FnOnce(T) -> U,
     {
         self.map(move |event| event.map_data_record(f))
+    }
+
+    pub fn filter_map_data_record<U, F>(self, f: F) -> Option<Timed<Event<U>>>
+    where
+        F: FnOnce(T) -> Option<U>,
+    {
+        self.map_data_record(f).map(Event::transpose).transpose()
     }
 }
 
@@ -76,6 +84,15 @@ impl<T> Event<T> {
         match self {
             Event::System(_) => None,
             Event::Data(ref event) => Some(&event.record),
+        }
+    }
+}
+
+impl<T> Event<Option<T>> {
+    pub fn transpose(self) -> Option<Event<T>> {
+        match self {
+            Event::System(event) => Some(Event::System(event)),
+            Event::Data(event) => event.record.map(|record| Event::Data(DataEvent { record })),
         }
     }
 }
@@ -502,6 +519,65 @@ mod tests {
         ));
         let _ = reactor.react_to_data_record(&thread);
         assert_eq!(observed, Some(8));
+    }
+
+    #[test]
+    fn retain_record_with_filter_map_data_record_then_subtree_reacts_to_mapped_record() {
+        const RECORD: i8 = 0;
+
+        let _executor = harness::executor_at_time_zero();
+
+        let mut observed = None;
+        let mut reactor = event::on_data_record::<usize, _>(event::filter_map_data_record(
+            // Ignore the `usize` data record and map to `Some` constant `i8`.
+            |_: usize| Some(RECORD),
+            |event: Timed<Event<i8>>| {
+                let (_, event) = event.into();
+                if let Event::Data(DataEvent { record, .. }) = event {
+                    observed = Some(record);
+                }
+                Ok::<_, ()>(())
+            },
+        ));
+        let _ = reactor.react_to_data_record(0usize);
+        assert_eq!(observed, Some(RECORD));
+    }
+
+    #[test]
+    fn discard_record_with_filter_map_data_record_then_subtree_does_not_react_to_mapped_record() {
+        let _executor = harness::executor_at_time_zero();
+
+        let mut reactor = event::on_data_record::<usize, _>(event::filter_map_data_record(
+            // Ignore the `usize` data record, map to `()`, and return `None`.
+            |_: usize| None::<()>,
+            harness::respond.assert_reacts_times(0),
+        ));
+        let _ = reactor.react_to_data_record(0usize);
+    }
+
+    // It is important that discarding data events does not interfere with the observation of
+    // system events.
+    #[test]
+    fn discard_record_with_filter_map_data_record_then_subtree_reacts_to_system_event() {
+        const SYSTEM_EVENT: SystemEvent = SystemEvent::Suspend(SuspendEvent::Sleep);
+
+        let _executor = harness::executor_at_time_zero();
+
+        let mut observed = None;
+        let mut reactor = event::on_data_record::<usize, _>(event::filter_map_data_record(
+            // Ignore the `usize` data record, map to `i8`, and return `None`.
+            |_: usize| None::<i8>,
+            |event: Timed<Event<i8>>| {
+                let (_, event) = event.into();
+                if let Event::System(event) = event {
+                    observed = Some(event);
+                }
+                Ok::<_, ()>(())
+            },
+        ));
+        let _ = reactor.react(Timed::now(SYSTEM_EVENT.into()));
+        // Despite discarding any and all data records, the system event must be observed.
+        assert_eq!(observed, Some(SYSTEM_EVENT));
     }
 
     #[test]

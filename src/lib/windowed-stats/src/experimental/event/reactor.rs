@@ -247,6 +247,28 @@ where
 }
 
 #[derive(Clone, Copy, Debug)]
+pub struct FilterMapDataRecord<R, F> {
+    reactor: R,
+    f: F,
+}
+
+impl<T, U, R, F> Reactor<U> for FilterMapDataRecord<R, F>
+where
+    R: Reactor<T>,
+    F: FnMut(U) -> Option<T>,
+{
+    type Response = Option<R::Response>;
+    type Error = R::Error;
+
+    fn react(&mut self, event: Timed<Event<U>>) -> Result<Self::Response, Self::Error> {
+        event
+            .filter_map_data_record(|record| (self.f)(record))
+            .map(|event| self.reactor.react(event))
+            .transpose()
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 pub struct Respond<R, P> {
     reactor: R,
     response: P,
@@ -543,6 +565,14 @@ where
     R: Reactor<U>,
 {
     MapDataRecord { reactor, f }
+}
+
+pub fn filter_map_data_record<T, U, F, R>(f: F, reactor: R) -> FilterMapDataRecord<R, F>
+where
+    F: FnMut(T) -> Option<U>,
+    R: Reactor<U>,
+{
+    FilterMapDataRecord { reactor, f }
 }
 
 /// Reacts with the given reactors in order (regardless of outputs).
