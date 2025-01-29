@@ -267,6 +267,7 @@
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.paver.Paver",
                 "fuchsia.power.button.Monitor",
+                "fuchsia.power.CollaborativeRebootInitiator",
                 "fuchsia.power.profile.Watcher",
                 "fuchsia.power.systemmode.ClientConfigurator",
                 "fuchsia.process.Launcher",
