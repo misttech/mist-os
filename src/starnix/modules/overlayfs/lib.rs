@@ -8,6 +8,7 @@ use once_cell::sync::OnceCell;
 use rand::Rng;
 use starnix_core::fs::tmpfs::{TmpFs, TmpfsDirectory};
 use starnix_core::mm::memory::MemoryObject;
+use starnix_core::security;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::fs_args::MountParams;
 use starnix_core::vfs::rw_queue::RwQueueReadGuard;
@@ -339,6 +340,8 @@ impl OverlayNode {
                 info.clone()
             };
             let cred = info.cred();
+
+            let _scoped_fs_create = security::fs_node_copy_up(current_task, &lower.entry.node);
 
             let res = if info.mode.is_lnk() {
                 let link_target = lower.entry().node.readlink(locked, current_task)?;

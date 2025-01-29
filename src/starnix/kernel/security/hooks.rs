@@ -425,6 +425,24 @@ pub fn check_file_ioctl_access(
     })
 }
 
+/// Sets the security context of `CurrentTask` to be appropriate for a copy up operation
+/// on `fs_node`.
+///
+/// The task's security context will be reset when the `ScopedFsCreate` is dropped.
+///
+/// Returns `None` if SELinux is not enabled.
+///
+/// Corresponds to the `security_inode_copy_up()` LSM hook.
+pub fn fs_node_copy_up<'a>(
+    current_task: &'a CurrentTask,
+    fs_node: &FsNode,
+) -> Result<Option<selinux_hooks::ScopedFsCreate<'a>>, Errno> {
+    profile_duration!("security.hooks.fs_node_copy_up");
+    if_selinux_else_default_ok(current_task, |_security_server| {
+        Ok(Some(selinux_hooks::fs_node_copy_up(current_task, fs_node)))
+    })
+}
+
 /// Return the default initial `TaskState` for kernel tasks.
 /// Corresponds to the `task_alloc()` LSM hook, in the special case when current_task is null.
 pub fn task_alloc_for_kernel() -> TaskState {

@@ -971,6 +971,14 @@ pub(super) fn check_file_ioctl_access(
     )
 }
 
+pub(super) fn fs_node_copy_up<'a>(
+    current_task: &'a CurrentTask,
+    fs_node: &FsNode,
+) -> ScopedFsCreate<'a> {
+    let file_sid = fs_node_effective_sid_and_class(fs_node).sid;
+    scoped_fs_create(current_task, file_sid)
+}
+
 /// If `fs_node` is in a filesystem without xattr support, returns the xattr name for the security
 /// label (i.e. "security.selinux"). Otherwise returns None.
 pub(super) fn fs_node_listsecurity(fs_node: &FsNode) -> Option<FsString> {
@@ -1538,8 +1546,6 @@ pub struct ScopedFsCreate<'a> {
     old_fscreate_sid: Option<SecurityId>,
 }
 
-/// TODO(https://fxbug.dev/364568931) - Remove `dead_code` allowance once this is used by production hooks.
-#[allow(dead_code)]
 pub(super) fn scoped_fs_create<'a>(
     task: &'a CurrentTask,
     fscreate_sid: SecurityId,
