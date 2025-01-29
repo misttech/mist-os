@@ -823,6 +823,29 @@ where
             .await
             .unwrap();
         builder
+            .add_capability(
+                cm_rust::ConfigurationDecl {
+                    name: "fuchsia.system-update-committer.StopOnIdleTimeoutMillis"
+                        .parse()
+                        .unwrap(),
+                    value: (-1).into(),
+                }
+                .into(),
+            )
+            .await
+            .unwrap();
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::configuration(
+                        "fuchsia.system-update-committer.StopOnIdleTimeoutMillis",
+                    ))
+                    .from(Ref::self_())
+                    .to(&system_update_committer),
+            )
+            .await
+            .unwrap();
+        builder
             .add_route(
                 Route::new()
                     .capability(Capability::protocol::<fupdate::CommitStatusProviderMarker>())

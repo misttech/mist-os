@@ -9,9 +9,13 @@
     program: {
         runner: "elf",
         binary: "bin/system_update_committer",
+        lifecycle: { stop_event: "notify" },
     },
     capabilities: [
-        { protocol: "fuchsia.update.CommitStatusProvider" },
+        {
+            protocol: "fuchsia.update.CommitStatusProvider",
+            delivery: "on_readable",
+        },
     ],
     use: [
         {
@@ -21,6 +25,22 @@
                 "fuchsia.update.verify.BlobfsVerifier",
                 "fuchsia.update.verify.NetstackVerifier",
             ],
+        },
+        {
+            protocol: "fuchsia.component.sandbox.CapabilityStore",
+            from: "framework",
+        },
+        {
+            protocol: "fuchsia.update.CommitStatusProvider",
+            from: "self",
+            path: "/escrow/fuchsia.update.CommitStatusProvider",
+        },
+        {
+            config: "fuchsia.system-update-committer.StopOnIdleTimeoutMillis",
+            key: "stop_on_idle_timeout_millis",
+
+            // Negative value indicates an infinite timeout, i.e. the component will never stop.
+            type: "int64",
         },
         {
             directory: "config-data",
