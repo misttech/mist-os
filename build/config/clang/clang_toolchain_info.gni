@@ -27,7 +27,10 @@ if (current_toolchain == default_toolchain) {
                     "${rebased_clang_prefix}/..",
                   ],
                   "json",
-                  [ _clang_toolchain_info_generator ])
+                  [
+                    _clang_toolchain_info_generator,
+                    "${clang_prefix}/../lib/runtime.json",
+                  ])
 } else {
   _clang_toolchain_info = {
   }

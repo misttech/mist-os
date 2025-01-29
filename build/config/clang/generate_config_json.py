@@ -53,9 +53,13 @@ from pathlib import Path
 #       },
 #       ... for different <variant> values.
 #    }
-#  }
+#  },
+#  "runtimes": <runtimes>
 #
 # Where all paths are relative to the Clang installation directory, and where:
+#
+# - <runtimes> is the content of the $clang_dir/lib/runtime.json which is currently
+#   a list of scopes. See //build/toolchain/runtime/toolchain_runtime_deps.gni for details.
 #
 # - <clang_target_key> is a clang target tuple, with all dashes replaced
 #   with underscores, to make them readable by GN (e.g. "x86_64_unknown_fuchsia"
@@ -392,6 +396,13 @@ def main() -> int:
             f"Missing Clang++ binary: {clangxx_bin} (cwd={os.getcwd()})"
         )
 
+    # Read lib/runtime.json file.
+    runtime_json_path = args.clang_dir / "lib" / "runtime.json"
+    if not runtime_json_path.exists():
+        parser.error(f"Missing input file: {runtime_json_path}")
+    with runtime_json_path.open("rb") as f:
+        runtime_json = json.load(f)
+
     result: T.Dict[str, T.Any] = {}
 
     command_pool = CommandPool(args.jobs)
@@ -468,6 +479,10 @@ def main() -> int:
     # This simplifies the GN code paths.
     for clang_target, values in result.items():
         values.setdefault("variants", {})
+
+    # LINT.IfChange
+    result["runtimes"] = runtime_json
+    # LINT.ThenChange(//build/toolchain/runtime/toolchain_runtime_deps.gni)
 
     # For Fuchsia targets, parse the ELF binary to compute its debug and breakpad file paths,
     # which depend on its embedded GNU build-id.
