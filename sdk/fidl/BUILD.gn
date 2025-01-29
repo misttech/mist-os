@@ -29,6 +29,7 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.bluetooth.host:fuchsia.bluetooth.host",
   "//sdk/fidl/fuchsia.bluetooth.le:fuchsia.bluetooth.le",
   "//sdk/fidl/fuchsia.bluetooth.sys:fuchsia.bluetooth.sys",
+  "//sdk/fidl/fuchsia.boot.metadata:fuchsia.boot.metadata",
   "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo",
   "//sdk/fidl/fuchsia.buildinfo.test:fuchsia.buildinfo.test",
   "//sdk/fidl/fuchsia.buttons:fuchsia.buttons",

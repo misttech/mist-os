@@ -215,6 +215,7 @@ fidl_library://fidl/fuchsia.bluetooth.hfp
 fidl_library://fidl/fuchsia.bluetooth.host
 fidl_library://fidl/fuchsia.bluetooth.le
 fidl_library://fidl/fuchsia.bluetooth.sys
+fidl_library://fidl/fuchsia.boot.metadata (unstable)
 fidl_library://fidl/fuchsia.buildinfo
 fidl_library://fidl/fuchsia.buildinfo.test
 fidl_library://fidl/fuchsia.buttons (unstable)
