@@ -316,11 +316,15 @@ zx::result<> ClockImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
         return zx::error(encoded_metadata.error_value().status());
       }
 
-      fuchsia_hardware_platform_bus::Metadata metadata = {{
+      node.AddMetadata({{
           .id = std::to_string(DEVICE_METADATA_CLOCK_INIT),
           .data = encoded_metadata.value(),
-      }};
-      node.AddMetadata(std::move(metadata));
+      }});
+      node.AddMetadata({{
+          .id = fuchsia_hardware_clockimpl::InitMetadata::kSerializableName,
+          .data = std::move(encoded_metadata.value()),
+      }});
+
       FDF_LOG(DEBUG, "Clock init steps metadata added to node '%s'", node.name().c_str());
     }
 
