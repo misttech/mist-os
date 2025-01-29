@@ -77,3 +77,25 @@ impl From<crate::rlimit> for crate::arch32::rlimit {
         }
     }
 }
+
+impl From<crate::arch32::sigaltstack> for crate::sigaltstack {
+    fn from(sigaltstack: crate::arch32::sigaltstack) -> Self {
+        Self {
+            ss_sp: sigaltstack.ss_sp.into(),
+            ss_flags: sigaltstack.ss_flags.into(),
+            ss_size: sigaltstack.ss_size.into(),
+            __bindgen_padding_0: Default::default(),
+        }
+    }
+}
+
+impl TryFrom<crate::sigaltstack> for crate::arch32::sigaltstack {
+    type Error = ();
+    fn try_from(sigaltstack: crate::sigaltstack) -> Result<Self, ()> {
+        Ok(Self {
+            ss_sp: sigaltstack.ss_sp.try_into().map_err(|_| ())?,
+            ss_flags: sigaltstack.ss_flags.try_into().map_err(|_| ())?,
+            ss_size: sigaltstack.ss_size.try_into().map_err(|_| ())?,
+        })
+    }
+}

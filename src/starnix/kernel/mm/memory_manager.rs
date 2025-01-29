@@ -2955,7 +2955,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 
     fn write_multi_arch_object<
         T64: IntoBytes + Immutable,
-        T32: IntoBytes + Immutable + From<T64>,
+        T32: IntoBytes + Immutable + TryFrom<T64>,
     >(
         &self,
         user: MultiArchUserRef<T64, T32>,
@@ -2964,7 +2964,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         match user {
             MultiArchUserRef::<T64, T32>::Arch64(user) => self.write_object(user, &object),
             MultiArchUserRef::<T64, T32>::Arch32(user) => {
-                self.write_object(user, &T32::from(object))
+                self.write_object(user, &T32::try_from(object).map_err(|_| errno!(EINVAL))?)
             }
         }
     }

@@ -94,7 +94,14 @@ pub struct uaddr32 {
 
 impl From<uaddr32> for uaddr {
     fn from(addr32: uaddr32) -> Self {
-        Self { addr: addr32.addr as u64 }
+        Self { addr: addr32.addr.into() }
+    }
+}
+
+impl TryFrom<uaddr> for uaddr32 {
+    type Error = ();
+    fn try_from(addr: uaddr) -> Result<Self, ()> {
+        Ok(Self { addr: addr.addr.try_into().map_err(|_| ())? })
     }
 }
 
