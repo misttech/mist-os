@@ -12,7 +12,7 @@ use starnix_uapi::errors::{Errno, ENOSPC};
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::user_address::UserAddress;
-use starnix_uapi::{errno, error, ino_t, off_t};
+use starnix_uapi::{error, ino_t, off_t};
 
 #[derive(Debug, Default, Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub struct DirectoryEntryType(u8);
@@ -101,9 +101,7 @@ impl<'a> BaseDirentSink<'a> {
         if self.actual + buffer.len() > self.user_capacity {
             return error!(ENOSPC);
         }
-        self.current_task
-            .write_memory(self.user_buffer + self.actual, buffer)
-            .map_err(|_| errno!(ENOSPC))?;
+        self.current_task.write_memory(self.user_buffer + self.actual, buffer)?;
         self.actual += buffer.len();
         *self.offset = offset;
         Ok(())
@@ -125,7 +123,7 @@ impl<'a> BaseDirentSink<'a> {
     fn map_result_with_actual(&self, result: Result<(), Errno>) -> Result<usize, Errno> {
         match result {
             Ok(()) => Ok(self.actual),
-            Err(errno) if errno == ENOSPC && self.actual > 0 => Ok(self.actual),
+            Err(_) if self.actual > 0 => Ok(self.actual),
             Err(errno) if errno == ENOSPC => error!(EINVAL),
             Err(e) => Err(e),
         }

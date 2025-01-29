@@ -286,11 +286,6 @@
 
                 // TODO(http://fxbuf.dev/390870202): Re-enable once flake is resolved.
                 "clock_nanosleep02",
-
-                // TODO(https://fxbug.dev/391669044): Enable or move to the failure list after
-                // LTP tests roll.
-                "getdents02",
-                "mmap09",
             ],
         },
     ],
