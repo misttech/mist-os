@@ -1,9 +1,7 @@
 // Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-// TODO(https://fxbug.dev/380873116): Expose this to partners once an
-// implementation is available.
-@available(added=HEAD)
+@available(added=NEXT)
 library fuchsia.power;
 
 /// An initiator of collaborative device reboots.
@@ -24,6 +22,7 @@ library fuchsia.power;
 /// Later, when the product identifies that it is an appropriate time for the
 /// device to reboot (say, after it's observed a sufficient period of user
 /// inactivity), it can initate the collaborative reboot.
+@available(added=NEXT)
 @discoverable(server="platform")
 closed protocol CollaborativeRebootInitiator {
     /// Initiates a collaborative reboot.

@@ -5,7 +5,11 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.power") {
+  sdk_category = "partner"
+  stable = true
   sdk_area = "Power"
+
+  api = "fuchsia.power.api"
 
   sources = [ "collaborative_reboot.fidl" ]
 }

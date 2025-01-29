@@ -153,6 +153,7 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.net.mdns:fuchsia.net.mdns",
   "//sdk/fidl/fuchsia.net.reachability:fuchsia.net.reachability",
   "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes",
+  "//sdk/fidl/fuchsia.power:fuchsia.power",
   "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker",
   "//sdk/fidl/fuchsia.power.clientlevel:fuchsia.power.clientlevel",
   "//sdk/fidl/fuchsia.power.profile:fuchsia.power.profile",

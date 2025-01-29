@@ -339,6 +339,7 @@ fidl_library://fidl/fuchsia.net.mdns
 fidl_library://fidl/fuchsia.net.reachability
 fidl_library://fidl/fuchsia.net.routes
 fidl_library://fidl/fuchsia.net.stackmigrationdeprecated
+fidl_library://fidl/fuchsia.power
 fidl_library://fidl/fuchsia.power.broker (unstable)
 fidl_library://fidl/fuchsia.power.clientlevel
 fidl_library://fidl/fuchsia.power.profile
