@@ -81,6 +81,8 @@ struct VmCowRange {
   bool IsBoundedBy(uint64_t max) const;
 };
 
+class ScopedPageFreedList;
+
 // Implements a copy-on-write hierarchy of pages in a VmPageList.
 // VmCowPages have a life cycle where they start in an Init state to allow them to have
 // initialization finished outside the constructor. A VmCowPages in the Init state may be
@@ -1218,7 +1220,8 @@ class VmCowPages final : public VmHierarchyBase,
   // considered owned by this VMO.
   // If applicable this method will update the parent_limit_ to reflect that it has removed any
   // reference to its parent range.
-  void ReleaseOwnedPagesLocked(uint64_t start) TA_REQ(lock());
+  // The caller is responsible for actually freeing the pages, which are returned in freed_list.
+  void ReleaseOwnedPagesLocked(uint64_t start, ScopedPageFreedList* freed_list) TA_REQ(lock());
 
   // When cleaning up a hidden vmo, merges the hidden vmo's content (e.g. page list, view
   // of the parent) into the remaining child.

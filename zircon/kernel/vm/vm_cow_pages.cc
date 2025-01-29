@@ -295,6 +295,20 @@ class BatchPQUpdateBacklink {
   uint64_t offsets_[kMaxPages];
 };
 
+class ScopedPageFreedList {
+ public:
+  explicit ScopedPageFreedList() { list_initialize(&list_); }
+
+  ~ScopedPageFreedList() { ASSERT(list_is_empty(&list_)); }
+
+  void FreePagesLocked(VmCowPages* cow_pages) TA_REQ(cow_pages->lock()) {
+    cow_pages->FreePagesLocked(&list_, owned_pages_);
+  }
+
+  bool owned_pages_ = true;
+  list_node_t list_;
+};
+
 bool VmCowRange::IsBoundedBy(uint64_t max) const { return InRange(offset, len, max); }
 
 // Allocates a new page and populates it with the data at |parent_paddr|.
@@ -504,7 +518,10 @@ void VmCowPages::DeadTransition(Guard<CriticalMutex>& guard) {
   if (!is_hidden()) {
     // Clear out all content that we can see. This means dropping references to any pages in our
     // parents, as well as removing any pages in our own page list.
-    ReleaseOwnedPagesLocked(0);
+    ScopedPageFreedList freed_list;
+    ReleaseOwnedPagesLocked(0, &freed_list);
+    freed_list.FreePagesLocked(this);
+
     if (parent_) {
       parent_locked().RemoveChildLocked(this);
     }
@@ -1864,7 +1881,7 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
   return ZX_OK;
 }
 
-void VmCowPages::ReleaseOwnedPagesLocked(uint64_t start) {
+void VmCowPages::ReleaseOwnedPagesLocked(uint64_t start, ScopedPageFreedList* freed_list) {
   DEBUG_ASSERT(!is_hidden());
   DEBUG_ASSERT(start <= size_);
 
@@ -1872,9 +1889,7 @@ void VmCowPages::ReleaseOwnedPagesLocked(uint64_t start) {
   // via call to |FreePagesLocked|.
   __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
 
-  list_node_t freed_list;
-  list_initialize(&freed_list);
-  __UNINITIALIZED BatchPQRemove page_remover(&freed_list);
+  __UNINITIALIZED BatchPQRemove page_remover(&freed_list->list_);
 
   // If we know that the only pages in this range that need to be freed are from our own page list,
   // and we no longer need to consider our parent, then just remove them.
@@ -1886,13 +1901,16 @@ void VmCowPages::ReleaseOwnedPagesLocked(uint64_t start) {
       page_list_.RemovePages(page_remover.RemovePagesCallback(), start, size_);
     }
     page_remover.Flush();
-    FreePagesLocked(&freed_list, /*freeing_owned_pages=*/true);
     // Potentially trim the parent limit to reflect the range that has been freed.
     parent_limit_ = ktl::min(parent_limit_, start);
     return;
   }
 
   VmCompression* compression = Pmm::Node().GetPageCompression();
+
+  // We are freeing a mixture of owned and non-owned pages, but this is fine since we know all pages
+  // are from an anonymous hidden hierarchy and so none of these pages are owned by a page source.
+  freed_list->owned_pages_ = false;
 
   // Decrement the share count on all pages, both directly owned by us and shared via our parents,
   // that this node can see, and free any pages with a zero ref count.
@@ -1931,9 +1949,6 @@ void VmCowPages::ReleaseOwnedPagesLocked(uint64_t start) {
   parent_limit_ = start;
 
   page_remover.Flush();
-  // We are freeing a mixture of owned and non-owned pages, but this is fine since we know all pages
-  // are from an anonymous hidden hierarchy and so none of these pages are owned by a page source.
-  FreePagesLocked(&freed_list, /*freeing_owned_pages=*/false);
 }
 
 template <typename T>
@@ -4323,18 +4338,15 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
       }
     }
 
-    // We might need to free pages from an ancestor and/or this object.
-    list_node_t freed_list;
-    list_initialize(&freed_list);
-    __UNINITIALIZED BatchPQRemove page_remover(&freed_list);
-
     // Clip the parent limit and release any pages, if any, in this node or the parents.
     //
     // It should never exceed this node's size, either the current size (which is `end`) or the new
     // size (which is `start`).
     DEBUG_ASSERT(parent_limit_ <= end);
 
-    ReleaseOwnedPagesLocked(start);
+    ScopedPageFreedList freed_list;
+    ReleaseOwnedPagesLocked(start, &freed_list);
+    freed_list.FreePagesLocked(this);
 
     // If the tail of a parent disappears, the children shouldn't be able to see that region again,
     // even if the parent is later reenlarged. So update the children's parent limits.
