@@ -301,9 +301,6 @@ mod tests {
     fn test_define_configuration_default() {
         let temp_dir = TempDir::new().unwrap();
         let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-        let buckets_path = resource_dir.join("buckets.json");
-        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
-        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
 
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Standard,
@@ -351,9 +348,6 @@ mod tests {
     fn test_define_configuration_additional_serial_log_components() {
         let temp_dir = TempDir::new().unwrap();
         let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-        let buckets_path = resource_dir.join("buckets.json");
-        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
-        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
 
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Standard,
@@ -383,9 +377,6 @@ mod tests {
     fn test_define_configuration_low_mem() {
         let temp_dir = TempDir::new().unwrap();
         let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-        let buckets_path = resource_dir.join("buckets.json");
-        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
-        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
 
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Standard,
@@ -417,9 +408,6 @@ mod tests {
     fn test_default_on_bootstrap() {
         let temp_dir = TempDir::new().unwrap();
         let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-        let buckets_path = resource_dir.join("buckets.json");
-        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
-        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
 
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Bootstrap,
@@ -447,9 +435,6 @@ mod tests {
     fn test_default_for_user() {
         let temp_dir = TempDir::new().unwrap();
         let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-        let buckets_path = resource_dir.join("buckets.json");
-        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
-        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
 
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Standard,
@@ -479,9 +464,6 @@ mod tests {
     fn test_fire_config() {
         let temp_dir = TempDir::new().unwrap();
         let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-        let buckets_path = resource_dir.join("buckets.json");
-        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
-        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
 
         let fire_config_path = resource_dir.join("fire_config.json");
         let mut fire_config = std::fs::File::create(&fire_config_path).unwrap();
@@ -519,9 +501,6 @@ mod tests {
     fn test_invalid_fire_config() {
         let temp_dir = TempDir::new().unwrap();
         let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-        let buckets_path = resource_dir.join("buckets.json");
-        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
-        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
 
         let fire_config_path = resource_dir.join("fire_config.json");
         let mut fire_config = std::fs::File::create(&fire_config_path).unwrap();
@@ -555,9 +534,6 @@ mod tests {
     fn test_define_configuration_initial_log_interests() {
         let temp_dir = TempDir::new().unwrap();
         let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-        let buckets_path = resource_dir.join("buckets.json");
-        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
-        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
 
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Standard,
