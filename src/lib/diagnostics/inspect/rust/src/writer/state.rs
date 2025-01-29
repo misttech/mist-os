@@ -1304,7 +1304,7 @@ mod tests {
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
         assert_eq!(blocks.len(), 8);
         assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert!(blocks[1..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[1..]);
     }
 
     #[fuchsia::test]
@@ -1414,7 +1414,7 @@ mod tests {
         assert_eq!(blocks[1].block_type(), BlockType::NodeValue);
         assert_eq!(blocks[2].block_type(), BlockType::Free);
         assert_eq!(blocks[3].block_type(), BlockType::StringReference);
-        assert!(blocks[4..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[4..]);
 
         {
             let mut state = core_state.try_lock().expect("lock state");
@@ -1453,7 +1453,7 @@ mod tests {
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert!(blocks[1..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[1..]);
     }
 
     #[fuchsia::test]
@@ -1482,7 +1482,7 @@ mod tests {
         assert_eq!(blocks[0].block_type(), BlockType::Header);
         assert_eq!(blocks[1].block_type(), BlockType::IntValue);
         assert_eq!(blocks[2].block_type(), BlockType::StringReference);
-        assert!(blocks[3..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[3..]);
 
         {
             let mut state = core_state.try_lock().expect("lock state");
@@ -1508,7 +1508,7 @@ mod tests {
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert!(blocks[1..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[1..]);
     }
 
     #[fuchsia::test]
@@ -1539,7 +1539,7 @@ mod tests {
         assert_eq!(blocks[0].block_type(), BlockType::Header);
         assert_eq!(blocks[1].block_type(), BlockType::UintValue);
         assert_eq!(blocks[2].block_type(), BlockType::StringReference);
-        assert!(blocks[3..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[3..]);
 
         {
             let mut state = core_state.try_lock().expect("try lock");
@@ -1565,7 +1565,7 @@ mod tests {
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert!(blocks[1..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[1..]);
     }
 
     #[fuchsia::test]
@@ -1596,7 +1596,7 @@ mod tests {
         assert_eq!(blocks[0].block_type(), BlockType::Header);
         assert_eq!(blocks[1].block_type(), BlockType::DoubleValue);
         assert_eq!(blocks[2].block_type(), BlockType::StringReference);
-        assert!(blocks[3..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[3..]);
 
         {
             let mut state = core_state.try_lock().expect("lock state");
@@ -1615,7 +1615,7 @@ mod tests {
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert!(blocks[1..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[1..]);
     }
 
     #[fuchsia::test]
@@ -1642,7 +1642,7 @@ mod tests {
 
         // if cleanup happened correctly, the name + extent and property + extent have been freed
         assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert!(blocks[1..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[1..]);
     }
 
     #[fuchsia::test]
@@ -1681,7 +1681,7 @@ mod tests {
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
         assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert!(blocks[1..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[1..]);
     }
 
     #[fuchsia::test]
@@ -1768,7 +1768,7 @@ mod tests {
         assert_eq!(blocks[1].block_type(), BlockType::BufferValue);
         assert_eq!(blocks[2].block_type(), BlockType::StringReference);
         assert_eq!(blocks[3].block_type(), BlockType::StringReference);
-        assert!(blocks[4..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[4..]);
 
         {
             let mut state = core_state.try_lock().expect("lock state");
@@ -1777,9 +1777,7 @@ mod tests {
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        for b in blocks[1..].iter() {
-            assert_eq!(b.block_type(), BlockType::Free);
-        }
+        assert_all_free(&blocks[1..]);
     }
 
     #[fuchsia::test]
@@ -1811,7 +1809,7 @@ mod tests {
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert!(blocks[1..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[1..]);
     }
 
     #[fuchsia::test]
@@ -1983,7 +1981,7 @@ mod tests {
         assert_eq!(blocks[1].block_type(), BlockType::BufferValue);
         assert_eq!(blocks[2].block_type(), BlockType::StringReference);
         assert_eq!(blocks[3].block_type(), BlockType::Extent);
-        assert!(blocks[4..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[4..]);
 
         // Free property.
         {
@@ -1992,7 +1990,7 @@ mod tests {
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert!(blocks[1..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[1..]);
     }
 
     #[fuchsia::test]
@@ -2023,7 +2021,7 @@ mod tests {
         assert_eq!(blocks[0].block_type(), BlockType::Header);
         assert_eq!(blocks[1].block_type(), BlockType::BoolValue);
         assert_eq!(blocks[2].block_type(), BlockType::StringReference);
-        assert!(blocks[3..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[3..]);
 
         // Free metric.
         {
@@ -2032,7 +2030,7 @@ mod tests {
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert!(blocks[1..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[1..]);
     }
 
     #[fuchsia::test]
@@ -2074,7 +2072,7 @@ mod tests {
         assert_eq!(blocks[1].block_type(), BlockType::StringReference);
         assert_eq!(blocks[2].block_type(), BlockType::Free);
         assert_eq!(blocks[3].block_type(), BlockType::ArrayValue);
-        assert!(blocks[4..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[4..]);
 
         // Free the array.
         {
@@ -2083,7 +2081,7 @@ mod tests {
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert!(blocks[1..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[1..]);
     }
 
     #[fuchsia::test]
@@ -2196,7 +2194,7 @@ mod tests {
         assert_eq!(blocks[0].block_type(), BlockType::Header);
         assert_eq!(blocks[1].block_type(), BlockType::BufferValue);
         assert_eq!(blocks[2].block_type(), BlockType::StringReference);
-        assert!(blocks[3..8].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[3..8]);
         assert_eq!(blocks[8].block_type(), BlockType::Extent);
         assert_eq!(blocks[9].block_type(), BlockType::Extent);
         assert_eq!(blocks[10].block_type(), BlockType::Extent);
@@ -2207,7 +2205,7 @@ mod tests {
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert!(blocks[1..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[1..]);
     }
 
     #[fuchsia::test]
@@ -2276,7 +2274,7 @@ mod tests {
         assert_eq!(blocks[1].block_type(), BlockType::NodeValue);
         assert_eq!(blocks[2].block_type(), BlockType::Free);
         assert_eq!(blocks[3].block_type(), BlockType::StringReference);
-        assert!(blocks[4..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[4..]);
     }
 
     #[fuchsia::test]
@@ -2314,7 +2312,7 @@ mod tests {
         assert_eq!(blocks[2].block_type(), BlockType::NodeValue);
         assert_eq!(blocks[3].block_type(), BlockType::Free);
         assert_eq!(blocks[4].block_type(), BlockType::StringReference);
-        assert!(blocks[5..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[5..]);
 
         // Freeing the child, causes all blocks to be freed.
         {
@@ -2323,7 +2321,7 @@ mod tests {
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert!(blocks[1..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[1..]);
     }
 
     #[fuchsia::test]
@@ -2415,7 +2413,7 @@ mod tests {
         assert_eq!(blocks[2].block_type(), BlockType::Free);
         assert_eq!(blocks[3].block_type(), BlockType::StringReference);
         assert_eq!(blocks[4].block_type(), BlockType::StringReference);
-        assert!(blocks[5..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[5..]);
 
         // Free link
         {
@@ -2427,7 +2425,7 @@ mod tests {
         }
         let snapshot = Snapshot::try_from(state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert!(blocks[1..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[1..]);
 
         // Verify adding another link generates a different ID regardless of the params.
         let mut state_guard = state.try_lock().expect("lock state");
@@ -2607,7 +2605,7 @@ mod tests {
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert!(blocks[1..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert_all_free(&blocks[1..]);
     }
 
     #[fuchsia::test]
