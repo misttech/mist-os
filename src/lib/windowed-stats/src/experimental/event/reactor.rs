@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::experimental::clock::Timed;
-use crate::experimental::event::{DataEvent, Event};
+use crate::experimental::event::Event;
 
 /// A type that can be converted into a [`Reactor`].
 ///
@@ -15,8 +15,8 @@ use crate::experimental::event::{DataEvent, Event};
 /// [`Reactor`]: crate::experimental::event::Reactor
 /// [`then`]: crate::experimental::event::then
 /// [`ThenChain`]: crate::experimental::event::ThenChain
-pub trait IntoReactor<T> {
-    type Reactor: Reactor<T>;
+pub trait IntoReactor<T, S = ()> {
+    type Reactor: Reactor<T, S>;
 
     fn into_reactor(self) -> Self::Reactor;
 }
@@ -30,7 +30,7 @@ pub trait IntoReactor<T> {
 /// [`Event`]: crate::experimental::event::Event
 /// [`SystemEvent`]: crate::experimental::event::SystemEvent
 /// [`Timed`]: crate::experimental::clock::Timed
-pub trait Reactor<T> {
+pub trait Reactor<T, S = ()> {
     /// The output type of successful responses from the reactor.
     type Response;
     /// The error type of failed responses from the reactor.
@@ -45,19 +45,11 @@ pub trait Reactor<T> {
     ///
     /// [`Event`]: crate::experimental::event::Event
     /// [`Timed`]: crate::experimental::clock::Timed
-    fn react(&mut self, event: Timed<Event<T>>) -> Result<Self::Response, Self::Error>;
-
-    /// Reacts to a [data record][`DataEvent::record`].
-    ///
-    /// This function constructs and [reacts to][`Reactor::react`] a data event with the given
-    /// record at [`Timestamp::now`].
-    ///
-    /// [`DataEvent::record`]: crate::experimental::event::DataEvent::record
-    /// [`Reactor::react`]: crate::experimental::event::Reactor::react
-    /// [`Timestamp::now`]: crate::experimental::clock::Timed
-    fn react_to_data_record(&mut self, record: T) -> Result<Self::Response, Self::Error> {
-        self.react(Timed::now(DataEvent { record }.into()))
-    }
+    fn react(
+        &mut self,
+        event: Timed<Event<T>>,
+        context: Context<'_, S>,
+    ) -> Result<Self::Response, Self::Error>;
 
     fn map_response<P, F>(self, f: F) -> MapResponse<Self, F>
     where
@@ -105,7 +97,7 @@ pub trait Reactor<T> {
     where
         Self: Sized,
         T: Clone,
-        R: Reactor<T>,
+        R: Reactor<T, S>,
     {
         Then { reactor: self, then: reactor }
     }
@@ -122,7 +114,7 @@ pub trait Reactor<T> {
         Self: Sized,
         Self::Error: From<R::Error>,
         T: Clone,
-        R: Reactor<T>,
+        R: Reactor<T, S>,
     {
         And { reactor: self, and: reactor }
     }
@@ -138,14 +130,14 @@ pub trait Reactor<T> {
     where
         Self: Sized,
         T: Clone,
-        R: Reactor<T, Response = Self::Response>,
+        R: Reactor<T, S, Response = Self::Response>,
     {
         Or { reactor: self, or: reactor }
     }
 
     /// Constructs a `Reactor` that inspects the event and output of `self` with the given
     /// function.
-    fn inspect<F>(self, f: F) -> impl Reactor<T, Response = Self::Response, Error = Self::Error>
+    fn inspect<F>(self, f: F) -> impl Reactor<T, S, Response = Self::Response, Error = Self::Error>
     where
         Self: Sized,
         T: Clone,
@@ -155,15 +147,48 @@ pub trait Reactor<T> {
     }
 }
 
-impl<T, R, E, F> Reactor<T> for F
+impl<T, S, R, E, F> Reactor<T, S> for F
 where
-    F: FnMut(Timed<Event<T>>) -> Result<R, E>,
+    F: FnMut(Timed<Event<T>>, Context<'_, S>) -> Result<R, E>,
 {
     type Response = R;
     type Error = E;
 
-    fn react(&mut self, event: Timed<Event<T>>) -> Result<Self::Response, Self::Error> {
-        (self)(event)
+    fn react(
+        &mut self,
+        event: Timed<Event<T>>,
+        context: Context<'_, S>,
+    ) -> Result<Self::Response, Self::Error> {
+        (self)(event, context)
+    }
+}
+
+#[derive(Debug)]
+pub struct Context<'s, S = ()> {
+    pub state: &'s mut S,
+}
+
+impl<'s, S> Context<'s, S> {
+    pub fn from_state(state: &'s mut S) -> Self {
+        Context { state }
+    }
+
+    pub fn with_state<'q, U>(self, state: &'q mut U) -> Context<'q, U> {
+        Context { state }
+    }
+
+    // Note too that this function must copy or clone any non-reference fields.
+    /// Reborrows the interior of the `Context`.
+    ///
+    /// This function constructs a `Context` from this one by reborrowing its reference fields. In
+    /// particular, this reborrows `state` and provides an ergonomic way to forward a `Context`
+    /// from one `Reactor` to another. It is **not** the `Context` that is borrowed in
+    /// `Reactor::react`, but the **fields** (`state`).
+    pub fn reborrow<'q>(&'q mut self) -> Context<'q, S>
+    where
+        's: 'q,
+    {
+        Context { state: self.state }
     }
 }
 
@@ -176,16 +201,20 @@ pub struct OnDataRecord<R> {
     reactor: R,
 }
 
-impl<T, R> Reactor<T> for OnDataRecord<R>
+impl<T, S, R> Reactor<T, S> for OnDataRecord<R>
 where
-    R: Reactor<T>,
+    R: Reactor<T, S>,
 {
     type Response = R::Response;
     type Error = R::Error;
 
     #[inline(always)]
-    fn react(&mut self, event: Timed<Event<T>>) -> Result<Self::Response, Self::Error> {
-        self.reactor.react(event)
+    fn react(
+        &mut self,
+        event: Timed<Event<T>>,
+        context: Context<'_, S>,
+    ) -> Result<Self::Response, Self::Error> {
+        self.reactor.react(event, context)
     }
 }
 
@@ -195,16 +224,20 @@ pub struct MapResponse<R, F> {
     f: F,
 }
 
-impl<T, P, R, F> Reactor<T> for MapResponse<R, F>
+impl<T, S, R, O, F> Reactor<T, S> for MapResponse<R, F>
 where
-    R: Reactor<T>,
-    F: FnMut(R::Response) -> P,
+    R: Reactor<T, S>,
+    F: FnMut(R::Response) -> O,
 {
-    type Response = P;
+    type Response = O;
     type Error = R::Error;
 
-    fn react(&mut self, event: Timed<Event<T>>) -> Result<Self::Response, Self::Error> {
-        self.reactor.react(event).map(|response| (self.f)(response))
+    fn react(
+        &mut self,
+        event: Timed<Event<T>>,
+        context: Context<'_, S>,
+    ) -> Result<Self::Response, Self::Error> {
+        self.reactor.react(event, context).map(|response| (self.f)(response))
     }
 }
 
@@ -214,16 +247,20 @@ pub struct MapError<R, F> {
     f: F,
 }
 
-impl<T, E, R, F> Reactor<T> for MapError<R, F>
+impl<T, S, R, O, F> Reactor<T, S> for MapError<R, F>
 where
-    R: Reactor<T>,
-    F: FnMut(R::Error) -> E,
+    R: Reactor<T, S>,
+    F: FnMut(R::Error) -> O,
 {
     type Response = R::Response;
-    type Error = E;
+    type Error = O;
 
-    fn react(&mut self, event: Timed<Event<T>>) -> Result<Self::Response, Self::Error> {
-        self.reactor.react(event).map_err(|error| (self.f)(error))
+    fn react(
+        &mut self,
+        event: Timed<Event<T>>,
+        context: Context<'_, S>,
+    ) -> Result<Self::Response, Self::Error> {
+        self.reactor.react(event, context).map_err(|error| (self.f)(error))
     }
 }
 
@@ -233,16 +270,21 @@ pub struct MapDataRecord<R, F> {
     f: F,
 }
 
-impl<T, U, R, F> Reactor<U> for MapDataRecord<R, F>
+impl<U, S, R, O, F> Reactor<U, S> for MapDataRecord<R, F>
 where
-    R: Reactor<T>,
-    F: FnMut(U) -> T,
+    R: Reactor<O, S>,
+    F: FnMut(U, Context<'_, S>) -> O,
 {
     type Response = R::Response;
     type Error = R::Error;
 
-    fn react(&mut self, event: Timed<Event<U>>) -> Result<Self::Response, Self::Error> {
-        self.reactor.react(event.map_data_record(|record| (self.f)(record)))
+    fn react(
+        &mut self,
+        event: Timed<Event<U>>,
+        mut context: Context<'_, S>,
+    ) -> Result<Self::Response, Self::Error> {
+        let event = event.map_data_record(|record| (self.f)(record, context.reborrow()));
+        self.reactor.react(event, context)
     }
 }
 
@@ -252,19 +294,69 @@ pub struct FilterMapDataRecord<R, F> {
     f: F,
 }
 
-impl<T, U, R, F> Reactor<U> for FilterMapDataRecord<R, F>
+impl<U, S, R, O, F> Reactor<U, S> for FilterMapDataRecord<R, F>
 where
-    R: Reactor<T>,
-    F: FnMut(U) -> Option<T>,
+    R: Reactor<O, S>,
+    F: FnMut(U, Context<'_, S>) -> Option<O>,
 {
     type Response = Option<R::Response>;
     type Error = R::Error;
 
-    fn react(&mut self, event: Timed<Event<U>>) -> Result<Self::Response, Self::Error> {
+    fn react(
+        &mut self,
+        event: Timed<Event<U>>,
+        mut context: Context<'_, S>,
+    ) -> Result<Self::Response, Self::Error> {
         event
-            .filter_map_data_record(|record| (self.f)(record))
-            .map(|event| self.reactor.react(event))
+            .filter_map_data_record(|record| (self.f)(record, context.reborrow()))
+            .map(|event| self.reactor.react(event, context.reborrow()))
             .transpose()
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct WithState<R, S> {
+    reactor: R,
+    state: S,
+}
+
+impl<T, S, U, R> Reactor<T, U> for WithState<R, S>
+where
+    R: Reactor<T, S>,
+{
+    type Response = R::Response;
+    type Error = R::Error;
+
+    fn react(
+        &mut self,
+        event: Timed<Event<T>>,
+        context: Context<'_, U>,
+    ) -> Result<Self::Response, Self::Error> {
+        self.reactor.react(event, context.with_state(&mut self.state))
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct MapState<R, F> {
+    reactor: R,
+    f: F,
+}
+
+impl<T, S, U, R, F> Reactor<T, S> for MapState<R, F>
+where
+    R: Reactor<T, U>,
+    F: FnMut(&mut S) -> U,
+{
+    type Response = R::Response;
+    type Error = R::Error;
+
+    fn react(
+        &mut self,
+        event: Timed<Event<T>>,
+        context: Context<'_, S>,
+    ) -> Result<Self::Response, Self::Error> {
+        let mut state = (self.f)(context.state);
+        self.reactor.react(event, context.with_state(&mut state))
     }
 }
 
@@ -274,16 +366,20 @@ pub struct Respond<R, P> {
     response: P,
 }
 
-impl<T, P, R> Reactor<T> for Respond<R, P>
+impl<T, S, P, R> Reactor<T, S> for Respond<R, P>
 where
     P: Clone,
-    R: Reactor<T>,
+    R: Reactor<T, S>,
 {
     type Response = P;
     type Error = R::Error;
 
-    fn react(&mut self, event: Timed<Event<T>>) -> Result<Self::Response, Self::Error> {
-        let _ = self.reactor.react(event);
+    fn react(
+        &mut self,
+        event: Timed<Event<T>>,
+        context: Context<'_, S>,
+    ) -> Result<Self::Response, Self::Error> {
+        let _ = self.reactor.react(event, context);
         Ok(self.response.clone())
     }
 }
@@ -294,16 +390,20 @@ pub struct Fail<R, E> {
     error: E,
 }
 
-impl<T, E, R> Reactor<T> for Fail<R, E>
+impl<T, S, E, R> Reactor<T, S> for Fail<R, E>
 where
     E: Clone,
-    R: Reactor<T>,
+    R: Reactor<T, S>,
 {
     type Response = R::Response;
     type Error = E;
 
-    fn react(&mut self, event: Timed<Event<T>>) -> Result<Self::Response, Self::Error> {
-        let _ = self.reactor.react(event);
+    fn react(
+        &mut self,
+        event: Timed<Event<T>>,
+        context: Context<'_, S>,
+    ) -> Result<Self::Response, Self::Error> {
+        let _ = self.reactor.react(event, context);
         Err(self.error.clone())
     }
 }
@@ -314,18 +414,22 @@ pub struct Then<R1, R2> {
     then: R2,
 }
 
-impl<T, R1, R2> Reactor<T> for Then<R1, R2>
+impl<T, S, R1, R2> Reactor<T, S> for Then<R1, R2>
 where
     T: Clone,
-    R1: Reactor<T>,
-    R2: Reactor<T>,
+    R1: Reactor<T, S>,
+    R2: Reactor<T, S>,
 {
     type Response = R2::Response;
     type Error = R2::Error;
 
-    fn react(&mut self, event: Timed<Event<T>>) -> Result<Self::Response, Self::Error> {
-        let _ = self.reactor.react(event.clone());
-        self.then.react(event)
+    fn react(
+        &mut self,
+        event: Timed<Event<T>>,
+        mut context: Context<'_, S>,
+    ) -> Result<Self::Response, Self::Error> {
+        let _ = self.reactor.react(event.clone(), context.reborrow());
+        self.then.react(event, context)
     }
 }
 
@@ -335,18 +439,24 @@ pub struct And<R1, R2> {
     and: R2,
 }
 
-impl<T, R1, R2> Reactor<T> for And<R1, R2>
+impl<T, S, R1, R2> Reactor<T, S> for And<R1, R2>
 where
     T: Clone,
-    R1: Reactor<T>,
+    R1: Reactor<T, S>,
     R1::Error: From<R2::Error>,
-    R2: Reactor<T>,
+    R2: Reactor<T, S>,
 {
     type Response = R2::Response;
     type Error = R1::Error;
 
-    fn react(&mut self, event: Timed<Event<T>>) -> Result<Self::Response, Self::Error> {
-        self.reactor.react(event.clone()).and_then(|_| self.and.react(event).map_err(From::from))
+    fn react(
+        &mut self,
+        event: Timed<Event<T>>,
+        mut context: Context<'_, S>,
+    ) -> Result<Self::Response, Self::Error> {
+        self.reactor
+            .react(event.clone(), context.reborrow())
+            .and_then(|_| self.and.react(event, context.reborrow()).map_err(From::from))
     }
 }
 
@@ -356,19 +466,23 @@ pub struct Or<R1, R2> {
     or: R2,
 }
 
-impl<T, R1, R2> Reactor<T> for Or<R1, R2>
+impl<T, S, R1, R2> Reactor<T, S> for Or<R1, R2>
 where
     T: Clone,
-    R1: Reactor<T>,
-    R2: Reactor<T, Response = R1::Response>,
+    R1: Reactor<T, S>,
+    R2: Reactor<T, S, Response = R1::Response>,
 {
     type Response = R1::Response;
     type Error = R2::Error;
 
-    fn react(&mut self, event: Timed<Event<T>>) -> Result<Self::Response, Self::Error> {
-        match self.reactor.react(event.clone()) {
+    fn react(
+        &mut self,
+        event: Timed<Event<T>>,
+        mut context: Context<'_, S>,
+    ) -> Result<Self::Response, Self::Error> {
+        match self.reactor.react(event.clone(), context.reborrow()) {
             Ok(response) => Ok(response),
-            Err(_) => self.or.react(event),
+            Err(_) => self.or.react(event, context.reborrow()),
         }
     }
 }
@@ -379,17 +493,21 @@ pub struct Inspect<R, F> {
     f: F,
 }
 
-impl<T, R, F> Reactor<T> for Inspect<R, F>
+impl<T, S, R, F> Reactor<T, S> for Inspect<R, F>
 where
     T: Clone,
-    R: Reactor<T>,
+    R: Reactor<T, S>,
     F: FnMut(&Timed<Event<T>>, &Result<R::Response, R::Error>),
 {
     type Response = R::Response;
     type Error = R::Error;
 
-    fn react(&mut self, event: Timed<Event<T>>) -> Result<Self::Response, Self::Error> {
-        let output = self.reactor.react(event.clone());
+    fn react(
+        &mut self,
+        event: Timed<Event<T>>,
+        mut context: Context<'_, S>,
+    ) -> Result<Self::Response, Self::Error> {
+        let output = self.reactor.react(event.clone(), context.reborrow());
         (self.f)(&event, &output);
         output
     }
@@ -427,10 +545,10 @@ pub struct Dynamic<R>(R);
 #[repr(transparent)]
 pub struct ThenChain<R>(R);
 
-impl<T, R> IntoReactor<T> for ThenChain<Vec<R>>
+impl<T, S, R> IntoReactor<T, S> for ThenChain<Vec<R>>
 where
     T: Clone,
-    R: Reactor<T>,
+    R: Reactor<T, S>,
 {
     type Reactor = ThenChain<Dynamic<Vec<R>>>;
 
@@ -439,19 +557,23 @@ where
     }
 }
 
-impl<T, R> Reactor<T> for ThenChain<Dynamic<Vec<R>>>
+impl<T, S, R> Reactor<T, S> for ThenChain<Dynamic<Vec<R>>>
 where
     T: Clone,
-    R: Reactor<T>,
+    R: Reactor<T, S>,
 {
     type Response = R::Response;
     type Error = R::Error;
 
-    fn react(&mut self, event: Timed<Event<T>>) -> Result<Self::Response, Self::Error> {
+    fn react(
+        &mut self,
+        event: Timed<Event<T>>,
+        mut context: Context<'_, S>,
+    ) -> Result<Self::Response, Self::Error> {
         self.0
              .0
             .iter_mut()
-            .map(|reactor| reactor.react(event.clone()))
+            .map(|reactor| reactor.react(event.clone(), context.reborrow()))
             .next_back()
             .expect("empty `then` combinator")
     }
@@ -466,10 +588,10 @@ where
 #[repr(transparent)]
 pub struct AndChain<R>(R);
 
-impl<T, R> IntoReactor<T> for AndChain<Vec<R>>
+impl<T, S, R> IntoReactor<T, S> for AndChain<Vec<R>>
 where
     T: Clone,
-    R: Reactor<T>,
+    R: Reactor<T, S>,
 {
     type Reactor = AndChain<Dynamic<Vec<R>>>;
 
@@ -478,16 +600,24 @@ where
     }
 }
 
-impl<T, R> Reactor<T> for AndChain<Dynamic<Vec<R>>>
+impl<T, S, R> Reactor<T, S> for AndChain<Dynamic<Vec<R>>>
 where
     T: Clone,
-    R: Reactor<T>,
+    R: Reactor<T, S>,
 {
     type Response = Vec<R::Response>;
     type Error = R::Error;
 
-    fn react(&mut self, event: Timed<Event<T>>) -> Result<Self::Response, Self::Error> {
-        self.0 .0.iter_mut().map(|reactor| reactor.react(event.clone())).collect()
+    fn react(
+        &mut self,
+        event: Timed<Event<T>>,
+        mut context: Context<'_, S>,
+    ) -> Result<Self::Response, Self::Error> {
+        self.0
+             .0
+            .iter_mut()
+            .map(|reactor| reactor.react(event.clone(), context.reborrow()))
+            .collect()
     }
 }
 
@@ -500,10 +630,10 @@ where
 #[repr(transparent)]
 pub struct OrChain<R>(R);
 
-impl<T, R> IntoReactor<T> for OrChain<Vec<R>>
+impl<T, S, R> IntoReactor<T, S> for OrChain<Vec<R>>
 where
     T: Clone,
-    R: Reactor<T>,
+    R: Reactor<T, S>,
 {
     type Reactor = OrChain<Dynamic<Vec<R>>>;
 
@@ -512,16 +642,21 @@ where
     }
 }
 
-impl<T, R> Reactor<T> for OrChain<Dynamic<Vec<R>>>
+impl<T, S, R> Reactor<T, S> for OrChain<Dynamic<Vec<R>>>
 where
     T: Clone,
-    R: Reactor<T>,
+    R: Reactor<T, S>,
 {
     type Response = R::Response;
     type Error = R::Error;
 
-    fn react(&mut self, event: Timed<Event<T>>) -> Result<Self::Response, Self::Error> {
-        let mut outputs = self.0 .0.iter_mut().map(|reactor| reactor.react(event.clone()));
+    fn react(
+        &mut self,
+        event: Timed<Event<T>>,
+        mut context: Context<'_, S>,
+    ) -> Result<Self::Response, Self::Error> {
+        let mut outputs =
+            self.0 .0.iter_mut().map(|reactor| reactor.react(event.clone(), context.reborrow()));
         let error = outputs.by_ref().take_while(Result::is_err).last();
         outputs.next().or(error).expect("empty `or` combinator")
     }
@@ -538,41 +673,56 @@ where
 /// [`then`]: crate::experimental::event::then
 pub fn on_data_record<T, R>(reactor: R) -> OnDataRecord<R>
 where
-    R: Reactor<T>,
+    R: Reactor<T, ()>,
 {
     OnDataRecord { reactor }
 }
 
-pub fn respond<T, P, R>(response: P, reactor: R) -> Respond<R, P>
+pub fn respond<T, S, P, R>(response: P, reactor: R) -> Respond<R, P>
 where
     P: Clone,
-    R: Reactor<T>,
+    R: Reactor<T, S>,
 {
     reactor.respond(response)
 }
 
-pub fn fail<T, E, R>(error: E, reactor: R) -> Fail<R, E>
+pub fn fail<T, S, E, R>(error: E, reactor: R) -> Fail<R, E>
 where
     E: Clone,
-    R: Reactor<T>,
+    R: Reactor<T, S>,
 {
     reactor.fail(error)
 }
 
-pub fn map_data_record<T, U, F, R>(f: F, reactor: R) -> MapDataRecord<R, F>
+pub fn map_data_record<T, S, O, F, R>(f: F, reactor: R) -> MapDataRecord<R, F>
 where
-    F: FnMut(T) -> U,
-    R: Reactor<U>,
+    F: FnMut(T, Context<'_, S>) -> O,
+    R: Reactor<O, S>,
 {
     MapDataRecord { reactor, f }
 }
 
-pub fn filter_map_data_record<T, U, F, R>(f: F, reactor: R) -> FilterMapDataRecord<R, F>
+pub fn filter_map_data_record<T, U, S, O, F, R>(f: F, reactor: R) -> FilterMapDataRecord<R, F>
 where
-    F: FnMut(T) -> Option<U>,
-    R: Reactor<U>,
+    F: FnMut(T, Context<'_, S>) -> Option<O>,
+    R: Reactor<U, S>,
 {
     FilterMapDataRecord { reactor, f }
+}
+
+pub fn with_state<T, S, R>(state: S, reactor: R) -> WithState<R, S>
+where
+    R: Reactor<T, S>,
+{
+    WithState { reactor, state }
+}
+
+pub fn map_state<T, S, O, F, R>(f: F, reactor: R) -> MapState<R, F>
+where
+    F: FnMut(&mut S) -> O,
+    R: Reactor<T, O>,
+{
+    MapState { reactor, f }
 }
 
 /// Reacts with the given reactors in order (regardless of outputs).
@@ -588,9 +738,9 @@ where
 /// [`Reactor`]: crate::experimental::event::Reactor
 /// [`Reactor::then`]: crate::experimental::event::Reactor::then
 /// [`ThenChain`]: crate::experimental::event::ThenChain
-pub fn then<T, R>(reactors: R) -> <ThenChain<R> as IntoReactor<T>>::Reactor
+pub fn then<T, S, R>(reactors: R) -> <ThenChain<R> as IntoReactor<T, S>>::Reactor
 where
-    ThenChain<R>: IntoReactor<T>,
+    ThenChain<R>: IntoReactor<T, S>,
     T: Clone,
 {
     ThenChain(reactors).into_reactor()
@@ -609,9 +759,9 @@ where
 /// [`IntoReactor`]: crate::experimental::event::IntoReactor
 /// [`Reactor`]: crate::experimental::event::Reactor
 /// [`Reactor::and`]: crate::experimental::event::Reactor::and
-pub fn and<T, R>(reactors: R) -> <AndChain<R> as IntoReactor<T>>::Reactor
+pub fn and<T, S, R>(reactors: R) -> <AndChain<R> as IntoReactor<T, S>>::Reactor
 where
-    AndChain<R>: IntoReactor<T>,
+    AndChain<R>: IntoReactor<T, S>,
     T: Clone,
 {
     AndChain(reactors).into_reactor()
@@ -630,9 +780,9 @@ where
 /// [`OrChain`]: crate::experimental::event::OrChain
 /// [`Reactor`]: crate::experimental::event::Reactor
 /// [`Reactor::or`]: crate::experimental::event::Reactor::or
-pub fn or<T, R>(reactors: R) -> <OrChain<R> as IntoReactor<T>>::Reactor
+pub fn or<T, S, R>(reactors: R) -> <OrChain<R> as IntoReactor<T, S>>::Reactor
 where
-    OrChain<R>: IntoReactor<T>,
+    OrChain<R>: IntoReactor<T, S>,
     T: Clone,
 {
     OrChain(reactors).into_reactor()
@@ -700,12 +850,12 @@ macro_rules! forward_combinator_chain_tuple_output_type {
 /// [`ThenChain`]: crate::experimental::event::ThenChain
 macro_rules! impl_into_reactor_for_then_chain_tuple {
     (( $head:ident, $($tail:ident $(,)?)+ )) => {
-        impl<T, $head $(,$tail)+> IntoReactor<T> for ThenChain<($head $(,$tail)+)>
+        impl<T, S, $head $(,$tail)+> IntoReactor<T, S> for ThenChain<($head $(,$tail)+)>
         where
             T: Clone,
-            $head: Reactor<T>,
+            $head: Reactor<T, S>,
             $(
-                $tail: Reactor<T, Response = $head::Response>,
+                $tail: Reactor<T, S, Response = $head::Response>,
                 $head::Error: From<$tail::Error>,
             )+
         {
@@ -731,12 +881,12 @@ with_reactor_combinator_chain_tuples!(impl_into_reactor_for_then_chain_tuple);
 /// [`IntoReactor`]: crate::experimental::event::IntoReactor
 macro_rules! impl_into_reactor_for_and_chain_tuple {
     (( $head:ident, $($tail:ident $(,)?)+ )) => {
-        impl<T, $head $(,$tail)+> IntoReactor<T> for AndChain<($head $(,$tail)+)>
+        impl<T, S, $head $(,$tail)+> IntoReactor<T, S> for AndChain<($head $(,$tail)+)>
         where
             T: Clone,
-            $head: Reactor<T>,
+            $head: Reactor<T, S>,
             $(
-                $tail: Reactor<T>,
+                $tail: Reactor<T, S>,
                 $head::Error: From<$tail::Error>,
             )+
         {
@@ -762,12 +912,12 @@ with_reactor_combinator_chain_tuples!(impl_into_reactor_for_and_chain_tuple);
 /// [`OrChain`]: crate::experimental::event::OrChain
 macro_rules! impl_into_reactor_for_or_chain_tuple {
     (( $head:ident, $($tail:ident $(,)?)+ )) => {
-        impl<T, $head $(,$tail)+> IntoReactor<T> for OrChain<($head $(,$tail)+)>
+        impl<T, S, $head $(,$tail)+> IntoReactor<T, S> for OrChain<($head $(,$tail)+)>
         where
             T: Clone,
-            $head: Reactor<T>,
+            $head: Reactor<T, S>,
             $(
-                $tail: Reactor<T, Response = $head::Response>,
+                $tail: Reactor<T, S, Response = $head::Response>,
                 $head::Error: From<$tail::Error>,
             )+
         {

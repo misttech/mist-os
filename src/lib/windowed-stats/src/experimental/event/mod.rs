@@ -18,10 +18,30 @@ use crate::experimental::clock::Timed;
 
 pub use crate::experimental::event::builder::{sample_data_record, SampleDataRecord};
 pub use crate::experimental::event::reactor::{
-    and, fail, filter_map_data_record, map_data_record, on_data_record, or, respond, then, And,
-    AndChain, Fail, FilterMapDataRecord, Inspect, IntoReactor, MapError, MapResponse, Or, OrChain,
-    Reactor, Respond, Then, ThenChain,
+    and, fail, filter_map_data_record, map_data_record, map_state, on_data_record, or, respond,
+    then, with_state, And, AndChain, Context, Fail, FilterMapDataRecord, Inspect, IntoReactor,
+    MapError, MapResponse, Or, OrChain, Reactor, Respond, Then, ThenChain, WithState,
 };
+
+/// Extension methods for [`Reactor`] types.
+pub trait ReactorExt<T, S = ()>: Reactor<T, S> {
+    /// Reacts to a [data record][`DataEvent::record`].
+    ///
+    /// This function constructs and [reacts to][`Reactor::react`] a data event with the given
+    /// record at [`Timestamp::now`].
+    ///
+    /// [`DataEvent::record`]: crate::experimental::event::DataEvent::record
+    /// [`Reactor::react`]: crate::experimental::event::Reactor::react
+    /// [`Timestamp::now`]: crate::experimental::clock::Timed
+    fn react_to_data_record(&mut self, record: T) -> Result<Self::Response, Self::Error>
+    where
+        S: Default,
+    {
+        self.react(Timed::now(DataEvent { record }.into()), Context::from_state(&mut S::default()))
+    }
+}
+
+impl<R, T> ReactorExt<T> for R where R: Reactor<T, ()> {}
 
 impl<T> Timed<Event<T>> {
     pub(crate) fn to_timed_sample(&self) -> Option<Timed<T>>
@@ -181,7 +201,7 @@ pub(crate) mod harness {
     use std::pin::Pin;
 
     use crate::experimental::clock::Timed;
-    use crate::experimental::event::{self, Event, Reactor};
+    use crate::experimental::event::{self, Context, Event, Reactor};
     use crate::experimental::series::interpolation::LastSample;
     use crate::experimental::series::statistic::{Max, Sum};
     use crate::experimental::series::{FoldError, SamplingProfile};
@@ -193,7 +213,7 @@ pub(crate) mod harness {
 
     pub const TEST_NODE_NAME: &str = "event_test_node";
 
-    pub trait ReactorExt<T>: Reactor<T> {
+    pub trait ReactorExt<T, S = ()>: Reactor<T, S> {
         /// Asserts that `self` observes the given [`Event`] at least once.
         ///
         /// If `self` is leaked, then this function asserts nothing.
@@ -205,7 +225,7 @@ pub(crate) mod harness {
         fn assert_observes_event(
             self,
             expected: Event<T>,
-        ) -> impl Reactor<T, Response = Self::Response, Error = Self::Error>
+        ) -> impl Reactor<T, S, Response = Self::Response, Error = Self::Error>
         where
             Self: Sized,
             T: Clone + Debug + PartialEq,
@@ -233,19 +253,23 @@ pub(crate) mod harness {
                 }
             }
 
-            impl<T, R> Reactor<T> for Assertion<T, R>
+            impl<T, S, R> Reactor<T, S> for Assertion<T, R>
             where
                 T: Debug + PartialEq,
-                R: Reactor<T>,
+                R: Reactor<T, S>,
             {
                 type Response = R::Response;
                 type Error = R::Error;
 
-                fn react(&mut self, event: Timed<Event<T>>) -> Result<Self::Response, Self::Error> {
+                fn react(
+                    &mut self,
+                    event: Timed<Event<T>>,
+                    context: Context<'_, S>,
+                ) -> Result<Self::Response, Self::Error> {
                     if &self.expected == event.inner() {
                         self.is_observed = true;
                     }
-                    self.reactor.react(event)
+                    self.reactor.react(event, context)
                 }
             }
 
@@ -264,7 +288,7 @@ pub(crate) mod harness {
         fn assert_reacts_times(
             self,
             n: usize,
-        ) -> impl Reactor<T, Response = Self::Response, Error = Self::Error>
+        ) -> impl Reactor<T, S, Response = Self::Response, Error = Self::Error>
         where
             Self: Sized,
         {
@@ -288,14 +312,18 @@ pub(crate) mod harness {
                 }
             }
 
-            impl<T, R> Reactor<T> for Assertion<T, R>
+            impl<T, S, R> Reactor<T, S> for Assertion<T, R>
             where
-                R: Reactor<T>,
+                R: Reactor<T, S>,
             {
                 type Response = R::Response;
                 type Error = R::Error;
 
-                fn react(&mut self, event: Timed<Event<T>>) -> Result<Self::Response, Self::Error> {
+                fn react(
+                    &mut self,
+                    event: Timed<Event<T>>,
+                    context: Context<'_, S>,
+                ) -> Result<Self::Response, Self::Error> {
                     self.observed =
                         self.observed.checked_add(1).expect("overflow in observed event count");
                     assert!(
@@ -305,7 +333,7 @@ pub(crate) mod harness {
                         self.observed,
                         self.expected,
                     );
-                    self.reactor.react(event)
+                    self.reactor.react(event, context)
                 }
             }
 
@@ -313,7 +341,7 @@ pub(crate) mod harness {
         }
     }
 
-    impl<T, R> ReactorExt<T> for R where R: Reactor<T> {}
+    impl<T, S, R> ReactorExt<T, S> for R where R: Reactor<T, S> {}
 
     /// A data record with counts of transmission outcomes.
     #[derive(Clone, Copy, Debug)]
@@ -341,10 +369,10 @@ pub(crate) mod harness {
     /// Constructs a `Reactor` that samples `TxCount` fields.
     pub fn sample_tx_count<'client, 'record>(
         client: &'client TimeMatrixClient,
-    ) -> impl Reactor<&'record TxCount, Response = (), Error = FoldError> {
+    ) -> impl Reactor<&'record TxCount, (), Response = (), Error = FoldError> {
         event::on_data_record::<&TxCount, _>(event::then((
             event::map_data_record(
-                |count: &TxCount| count.failed,
+                |count: &TxCount, _| count.failed,
                 event::then((
                     event::sample_data_record(Sum::<u64>::default()).in_time_matrix::<LastSample>(
                         &client,
@@ -361,7 +389,7 @@ pub(crate) mod harness {
                 )),
             ),
             event::map_data_record(
-                |count: &TxCount| count.retried,
+                |count: &TxCount, _| count.retried,
                 event::sample_data_record(Sum::<u64>::default()).in_time_matrix::<LastSample>(
                     &client,
                     "tx_retried_sum",
@@ -373,12 +401,12 @@ pub(crate) mod harness {
     }
 
     /// A `Reactor` of only the unit type `()` that always responds with `Ok`.
-    pub const fn respond(_: Timed<Event<()>>) -> Result<(), ()> {
+    pub const fn respond(_: Timed<Event<()>>, _: Context<'_, ()>) -> Result<(), ()> {
         Ok(())
     }
 
     /// A `Reactor` of only the unit type `()` that always fails with `Err`.
-    pub const fn fail(_: Timed<Event<()>>) -> Result<(), ()> {
+    pub const fn fail(_: Timed<Event<()>>, _: Context<'_, ()>) -> Result<(), ()> {
         Err(())
     }
 
@@ -400,7 +428,9 @@ mod tests {
 
     use crate::experimental::clock::Timed;
     use crate::experimental::event::harness::{self, ReactorExt as _};
-    use crate::experimental::event::{self, DataEvent, Event, Reactor, SuspendEvent, SystemEvent};
+    use crate::experimental::event::{
+        self, Context, DataEvent, Event, Reactor, ReactorExt as _, SuspendEvent, SystemEvent,
+    };
     use crate::experimental::series::interpolation::LastSample;
     use crate::experimental::series::metadata::BitSetMap;
     use crate::experimental::series::statistic::{Max, Sum, Union};
@@ -413,7 +443,10 @@ mod tests {
         let _executor = harness::executor_at_time_zero();
 
         let mut reactor = harness::respond.assert_observes_event(Event::from_data_record(()));
-        let _ = reactor.react(Timed::now(SystemEvent::Suspend(SuspendEvent::Sleep).into()));
+        let _ = reactor.react(
+            Timed::now(SystemEvent::Suspend(SuspendEvent::Sleep).into()),
+            Context::from_state(&mut ()),
+        );
     }
 
     #[test]
@@ -508,8 +541,8 @@ mod tests {
         let thread = Thread { nominal: 1, tpi: 8 };
         let mut observed = None;
         let mut reactor = event::on_data_record::<&Thread, _>(event::map_data_record(
-            |thread: &Thread| &thread.tpi,
-            |event: Timed<Event<&u128>>| {
+            |thread: &Thread, _| &thread.tpi,
+            |event: Timed<Event<&u128>>, _: Context<'_, ()>| {
                 let (_, event) = event.into();
                 if let Event::Data(DataEvent { record: tpi, .. }) = event {
                     observed = Some(*tpi);
@@ -530,8 +563,8 @@ mod tests {
         let mut observed = None;
         let mut reactor = event::on_data_record::<usize, _>(event::filter_map_data_record(
             // Ignore the `usize` data record and map to `Some` constant `i8`.
-            |_: usize| Some(RECORD),
-            |event: Timed<Event<i8>>| {
+            |_: usize, _| Some(RECORD),
+            |event: Timed<Event<i8>>, _: Context<'_, ()>| {
                 let (_, event) = event.into();
                 if let Event::Data(DataEvent { record, .. }) = event {
                     observed = Some(record);
@@ -549,7 +582,7 @@ mod tests {
 
         let mut reactor = event::on_data_record::<usize, _>(event::filter_map_data_record(
             // Ignore the `usize` data record, map to `()`, and return `None`.
-            |_: usize| None::<()>,
+            |_: usize, _| None::<()>,
             harness::respond.assert_reacts_times(0),
         ));
         let _ = reactor.react_to_data_record(0usize);
@@ -566,8 +599,8 @@ mod tests {
         let mut observed = None;
         let mut reactor = event::on_data_record::<usize, _>(event::filter_map_data_record(
             // Ignore the `usize` data record, map to `i8`, and return `None`.
-            |_: usize| None::<i8>,
-            |event: Timed<Event<i8>>| {
+            |_: usize, _| None::<i8>,
+            |event: Timed<Event<i8>>, _: Context<'_, ()>| {
                 let (_, event) = event.into();
                 if let Event::System(event) = event {
                     observed = Some(event);
@@ -575,9 +608,78 @@ mod tests {
                 Ok::<_, ()>(())
             },
         ));
-        let _ = reactor.react(Timed::now(SYSTEM_EVENT.into()));
+        let _ = reactor.react(Timed::now(SYSTEM_EVENT.into()), Context::from_state(&mut ()));
         // Despite discarding any and all data records, the system event must be observed.
         assert_eq!(observed, Some(SYSTEM_EVENT));
+    }
+
+    #[test]
+    fn with_state_then_subtree_reacts_to_state() {
+        let _executor = harness::executor_at_time_zero();
+
+        #[derive(Debug, Eq, PartialEq)]
+        struct ReactorState {
+            n: u128,
+        }
+
+        let mut observed = None;
+        let mut reactor = event::on_data_record::<(), _>(event::with_state(
+            ReactorState { n: 8 },
+            |_: Timed<Event<()>>, context: Context<'_, ReactorState>| {
+                observed = Some(context.state.n);
+                Ok::<_, ()>(())
+            },
+        ));
+        let _ = reactor.react_to_data_record(());
+        assert_eq!(observed, Some(8));
+    }
+
+    #[test]
+    fn write_state_then_subtree_reacts_to_written_state() {
+        let _executor = harness::executor_at_time_zero();
+
+        let mut reactor = event::on_data_record::<(), _>(event::with_state(
+            String::from("hello"),
+            event::then((
+                {
+                    |_: Timed<Event<()>>, context: Context<'_, String>| {
+                        assert_eq!(context.state, "hello");
+                        *context.state = String::from("goodbye");
+                        Ok::<_, ()>(())
+                    }
+                }
+                .assert_reacts_times(1),
+                {
+                    |_: Timed<Event<()>>, context: Context<'_, String>| {
+                        assert_eq!(context.state, "goodbye");
+                        Ok::<_, ()>(())
+                    }
+                }
+                .assert_reacts_times(1),
+            )),
+        ));
+        let _ = reactor.react_to_data_record(());
+    }
+
+    #[test]
+    fn map_state_then_subtree_reacts_to_mapped_state() {
+        let _executor = harness::executor_at_time_zero();
+
+        #[derive(Debug, Eq, PartialEq)]
+        struct ReactorState {
+            n: u128,
+        }
+
+        let mut observed = None;
+        let mut reactor = event::on_data_record::<(), _>(event::map_state(
+            |_| ReactorState { n: 8 },
+            |_: Timed<Event<()>>, context: Context<'_, ReactorState>| {
+                observed = Some(context.state.n);
+                Ok::<_, ()>(())
+            },
+        ));
+        let _ = reactor.react_to_data_record(());
+        assert_eq!(observed, Some(8));
     }
 
     #[test]
@@ -630,7 +732,7 @@ mod tests {
         let (client, server) = serve::serve_time_matrix_inspection(node);
         let mut server = pin!(server);
         let _reactor = event::on_data_record::<Connectivity, _>(event::map_data_record(
-            |connectivity| connectivity as u64,
+            |connectivity, _| connectivity as u64,
             event::sample_data_record(Union::<u64>::default())
                 .with_metadata(BitSetMap::from_ordered(["idle", "disconnected", "connected"]))
                 .in_time_matrix::<LastSample>(
@@ -671,7 +773,7 @@ mod tests {
         let (client, _server) = serve::serve_time_matrix_inspection(node);
         let mut reactor = event::on_data_record::<&harness::TxCount, _>(event::then((
             event::map_data_record(
-                |count: &harness::TxCount| count.failed,
+                |count: &harness::TxCount, _| count.failed,
                 event::then((
                     event::sample_data_record(Sum::<u64>::default())
                         .in_time_matrix::<LastSample>(
@@ -694,7 +796,7 @@ mod tests {
                 )),
             ),
             event::map_data_record(
-                |count: &harness::TxCount| count.retried,
+                |count: &harness::TxCount, _| count.retried,
                 event::sample_data_record(Sum::<u64>::default())
                     .in_time_matrix::<LastSample>(
                         &client,
