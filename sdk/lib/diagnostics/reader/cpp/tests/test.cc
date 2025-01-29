@@ -296,8 +296,7 @@ TEST_F(ArchiveReaderTest, Sort) {
   EXPECT_EQ(CM2_EXPECTED_DATA, cm2_expected_json);
 }
 
-// TODO(b/379968491): Re-enable once flake has been fixed.
-TEST_F(ArchiveReaderTest, DISABLED_ReadLogs) {
+TEST_F(ArchiveReaderTest, ReadLogs) {
   diagnostics::reader::ArchiveReader reader(dispatcher(), {cm1_selector()});
 
   auto subscription = reader.GetLogs(fuchsia_diagnostics::StreamMode::kSnapshotThenSubscribe);

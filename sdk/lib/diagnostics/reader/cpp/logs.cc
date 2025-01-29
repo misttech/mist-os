@@ -41,7 +41,7 @@ inline fuchsia_diagnostics::Severity StringToSeverity(const std::string& input) 
 LogsSubscription::LogsSubscription(fidl::SharedClient<fuchsia_diagnostics::BatchIterator> iterator,
                                    async::Executor& executor)
     : iterator_(std::move(iterator)),
-      pending_(std::make_shared<std::queue<LogsData>>()),
+      pending_(std::make_shared<std::deque<LogsData>>()),
       done_(std::make_shared<bool>(false)) {}
 
 bool LogsSubscription::Done() { return *done_; }
@@ -54,7 +54,7 @@ LogsSubscription::Promise LogsSubscription::ReadBatch() {
   fpromise::bridge<std::optional<LogsData>, std::string> bridge;
   if (!pending_->empty()) {
     auto result = std::make_optional(std::move(pending_->front()));
-    pending_->pop();
+    pending_->pop_front();
     return fpromise::make_result_promise<std::optional<LogsData>, std::string>(
         fpromise::ok(std::move(result)));
   } else if (*done_) {
@@ -88,14 +88,22 @@ LogsSubscription::Promise LogsSubscription::ReadBatch() {
       }
       rapidjson::Document document;
       document.Parse(json);
-      completer.complete_ok(LoadJson(std::move(document), pending, done));
+      auto maybe_json = LoadJson(std::move(document), pending, done);
+      if (maybe_json) {
+        pending->push_front(std::move(*maybe_json));
+      }
+    }
+    if (!pending->empty()) {
+      auto result = std::make_optional(std::move(pending->front()));
+      pending->pop_front();
+      completer.complete_ok(std::move(result));
     }
   });
   return bridge.consumer.promise_or(fpromise::error("Failed to obtain consumer promise"));
 }
 
 std::optional<LogsData> LogsSubscription::LoadJson(rapidjson::Document document,
-                                                   std::shared_ptr<std::queue<LogsData>> pending,
+                                                   std::shared_ptr<std::deque<LogsData>> pending,
                                                    std::shared_ptr<bool> done) {
   if (document.IsArray()) {
     for (auto& value : document.GetArray()) {
@@ -107,16 +115,16 @@ std::optional<LogsData> LogsSubscription::LoadJson(rapidjson::Document document,
       rapidjson::Document value_document;
       rapidjson::Value temp(value.Move(), value_document.GetAllocator());
       value_document.Swap(temp);
-      pending->push(LogsData(std::move(value_document)));
+      pending->push_back(LogsData(std::move(value_document)));
     }
   } else {
-    pending->push(LogsData(std::move(document)));
+    pending->push_back(LogsData(std::move(document)));
   }
   if (pending->empty()) {
     return std::nullopt;
   }
   auto result = std::make_optional(std::move(pending->front()));
-  pending->pop();
+  pending->pop_front();
   return result;
 }
 
