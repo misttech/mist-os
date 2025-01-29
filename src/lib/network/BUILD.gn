@@ -22,6 +22,7 @@ group("tests") {
     "fidl_fuchsia_net_filter_ext:tests",
     "fidl_fuchsia_net_interfaces_ext:tests",
     "fidl_fuchsia_net_multicast_ext:tests",
+    "fidl_fuchsia_net_ndp_ext:tests",
     "fidl_fuchsia_net_routes_ext:tests",
     "fidl_fuchsia_posix_socket_ext:tests",
     "netsvc-proto:tests",
