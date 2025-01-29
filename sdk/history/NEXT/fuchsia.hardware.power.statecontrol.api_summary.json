@@ -39,16 +39,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.hardware.power.statecontrol/Admin.Reboot",
-        "strictness": "strict",
-        "ordinal": "2446115116927251304",
-        "direction": "two_way",
-        "request": "fuchsia.hardware.power.statecontrol/AdminRebootRequest",
-        "response": "fuchsia.hardware.power.statecontrol/Admin_Reboot_Response",
-        "error": "int32"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.hardware.power.statecontrol/Admin.RebootToBootloader",
         "strictness": "strict",
         "ordinal": "494519861703575210",
@@ -108,16 +98,6 @@
         "name": "fuchsia.hardware.power.statecontrol/AdminPerformRebootRequest"
     },
     {
-        "kind": "struct/member",
-        "name": "fuchsia.hardware.power.statecontrol/AdminRebootRequest.reason",
-        "ordinal": "1",
-        "type": "fuchsia.hardware.power.statecontrol/RebootReason"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.hardware.power.statecontrol/AdminRebootRequest"
-    },
-    {
         "kind": "const",
         "name": "fuchsia.hardware.power.statecontrol/MAX_REBOOT_REASONS",
         "type": "uint8",
@@ -131,38 +111,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.hardware.power.statecontrol/RebootMethodsWatcher.OnReboot",
-        "strictness": "strict",
-        "ordinal": "2475395614677539603",
-        "direction": "two_way",
-        "request": "fuchsia.hardware.power.statecontrol/RebootMethodsWatcherOnRebootRequest"
-    },
-    {
-        "kind": "protocol",
-        "name": "fuchsia.hardware.power.statecontrol/RebootMethodsWatcher",
-        "openness": "closed",
-        "transport": "channel"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.hardware.power.statecontrol/RebootMethodsWatcherOnRebootRequest.reason",
-        "ordinal": "1",
-        "type": "fuchsia.hardware.power.statecontrol/RebootReason"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.hardware.power.statecontrol/RebootMethodsWatcherOnRebootRequest"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.hardware.power.statecontrol/RebootMethodsWatcherRegister.Register",
-        "strictness": "strict",
-        "ordinal": "2294465123362142519",
-        "direction": "one_way",
-        "request": "fuchsia.hardware.power.statecontrol/RebootMethodsWatcherRegisterRegisterRequest"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.hardware.power.statecontrol/RebootMethodsWatcherRegister.RegisterWatcher",
         "strictness": "strict",
         "ordinal": "281018741532594744",
@@ -170,29 +118,10 @@
         "request": "fuchsia.hardware.power.statecontrol/RebootMethodsWatcherRegisterRegisterWatcherRequest"
     },
     {
-        "kind": "protocol/member",
-        "name": "fuchsia.hardware.power.statecontrol/RebootMethodsWatcherRegister.RegisterWithAck",
-        "strictness": "strict",
-        "ordinal": "2611169462919632876",
-        "direction": "two_way",
-        "request": "fuchsia.hardware.power.statecontrol/RebootMethodsWatcherRegisterRegisterWithAckRequest"
-    },
-    {
         "kind": "protocol",
         "name": "fuchsia.hardware.power.statecontrol/RebootMethodsWatcherRegister",
         "openness": "closed",
         "transport": "channel"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.hardware.power.statecontrol/RebootMethodsWatcherRegisterRegisterRequest.watcher",
-        "ordinal": "1",
-        "type": "client_end:fuchsia.hardware.power.statecontrol/RebootMethodsWatcher"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.hardware.power.statecontrol/RebootMethodsWatcherRegisterRegisterRequest",
-        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -206,17 +135,6 @@
         "resourceness": "resource"
     },
     {
-        "kind": "struct/member",
-        "name": "fuchsia.hardware.power.statecontrol/RebootMethodsWatcherRegisterRegisterWithAckRequest.watcher",
-        "ordinal": "1",
-        "type": "client_end:fuchsia.hardware.power.statecontrol/RebootMethodsWatcher"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.hardware.power.statecontrol/RebootMethodsWatcherRegisterRegisterWithAckRequest",
-        "resourceness": "resource"
-    },
-    {
         "kind": "table/member",
         "name": "fuchsia.hardware.power.statecontrol/RebootOptions.reasons",
         "ordinal": "1",
@@ -225,62 +143,6 @@
     {
         "kind": "table",
         "name": "fuchsia.hardware.power.statecontrol/RebootOptions"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.hardware.power.statecontrol/RebootReason.CRITICAL_COMPONENT_FAILURE",
-        "value": "7"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.hardware.power.statecontrol/RebootReason.FACTORY_DATA_RESET",
-        "value": "6"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.hardware.power.statecontrol/RebootReason.HIGH_TEMPERATURE",
-        "value": "3"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.hardware.power.statecontrol/RebootReason.OUT_OF_MEMORY",
-        "value": "10"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.hardware.power.statecontrol/RebootReason.RETRY_SYSTEM_UPDATE",
-        "value": "8"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.hardware.power.statecontrol/RebootReason.SESSION_FAILURE",
-        "value": "4"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.hardware.power.statecontrol/RebootReason.SYSMGR_FAILURE",
-        "value": "5"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.hardware.power.statecontrol/RebootReason.SYSTEM_UPDATE",
-        "value": "2"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.hardware.power.statecontrol/RebootReason.USER_REQUEST",
-        "value": "1"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.hardware.power.statecontrol/RebootReason.ZBI_SWAP",
-        "value": "9"
-    },
-    {
-        "kind": "enum",
-        "name": "fuchsia.hardware.power.statecontrol/RebootReason",
-        "strictness": "strict",
-        "type": "uint32"
     },
     {
         "kind": "enum/member",

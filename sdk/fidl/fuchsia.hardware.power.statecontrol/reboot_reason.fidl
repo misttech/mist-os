@@ -5,10 +5,10 @@ library fuchsia.hardware.power.statecontrol;
 
 /// Why the system reboots.
 ///
-/// Deprecated: Replaced by `RebootReason2`.
+/// Replaced by `RebootReason2`.
 // TODO(https://fxbug.dev/385742868): Delete this once "deprecated" propagates
 // to the SDK.
-@available(deprecated=26)
+@available(deprecated=26, removed=NEXT)
 type RebootReason = strict enum {
     USER_REQUEST = 1;
 

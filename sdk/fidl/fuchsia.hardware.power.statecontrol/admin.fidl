@@ -46,10 +46,10 @@ closed protocol Admin {
 
     /// Asks the device to reboot.
     ///
-    /// Deprecated: Replaced by `PerformReboot`.
+    /// Replaced by `PerformReboot`.
     // TODO(https://fxbug.dev/385742868): Delete this once "deprecated" propagates
     // to the SDK.
-    @available(deprecated=26)
+    @available(deprecated=26, removed=NEXT)
     strict Reboot(struct {
         reason RebootReason;
     }) -> () error zx.Status;
@@ -118,10 +118,10 @@ closed protocol RebootMethodsWatcherRegister {
     ///
     /// Watchers can unregister by closing the underlying channel.
     ///
-    /// Deprecated: Replaced by `RegisterWatcher`.
+    /// Replaced by `RegisterWatcher`.
     // TODO(https://fxbug.dev/385742868): Delete this once "deprecated" propagates
     // to the SDK.
-    @available(deprecated=26)
+    @available(deprecated=26, removed=NEXT)
     strict Register(resource struct {
         watcher client_end:RebootMethodsWatcher;
     });
@@ -142,10 +142,10 @@ closed protocol RebootMethodsWatcherRegister {
     ///
     /// Watchers can unregister by closing their `RebootMethodsWatcher` channel.
     ///
-    /// Deprecated: Replaced by `RegisterWatcher`.
+    /// Replaced by `RegisterWatcher`.
     // TODO(https://fxbug.dev/385742868): Delete this once "deprecated" propagates
     // to the SDK.
-    @available(added=26, deprecated=26)
+    @available(added=26, deprecated=26, removed=NEXT)
     strict RegisterWithAck(resource struct {
         watcher client_end:RebootMethodsWatcher;
     }) -> ();
@@ -177,10 +177,10 @@ closed protocol RebootMethodsWatcherRegister {
 /// send a notification to the watcher. Once the watcher responds or the timeout
 /// expires, the channel will be closed by the client of RebootMethodsWatcher.
 ///
-/// Deprecated: Replaced by `RebootWatcher`
+/// Replaced by `RebootWatcher`
 // TODO(https://fxbug.dev/385742868): Delete this once "deprecated" propagates
 // to the SDK.
-@available(deprecated=26)
+@available(deprecated=26, removed=NEXT)
 closed protocol RebootMethodsWatcher {
     strict OnReboot(struct {
         reason RebootReason;
