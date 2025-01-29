@@ -445,10 +445,10 @@ impl<T: Deref<Target = Q>, Q: ReadBytes, S: ArraySlotKind> Block<T, Array<S>> {
 
     pub fn entry_type_size(&self) -> Option<usize> {
         self.entry_type().and_then(|entry_type| match entry_type {
-            BlockType::IntValue | BlockType::UintValue | BlockType::DoubleValue => {
-                Some(std::mem::size_of::<i64>())
-            }
-            BlockType::StringReference => Some(std::mem::size_of::<u32>()),
+            BlockType::IntValue => Some(Int::array_entry_type_size()),
+            BlockType::UintValue => Some(Uint::array_entry_type_size()),
+            BlockType::DoubleValue => Some(Double::array_entry_type_size()),
+            BlockType::StringReference => Some(StringRef::array_entry_type_size()),
             _ => None,
         })
     }
@@ -459,8 +459,7 @@ impl<T: Deref<Target = Q>, Q: ReadBytes> Block<T, Array<StringRef>> {
         if slot_index >= self.slots() {
             return None;
         }
-        let entry_type_size: usize = std::mem::size_of::<u32>();
-        let offset = (self.index + 1).offset() + slot_index * entry_type_size;
+        let offset = (self.index + 1).offset() + slot_index * StringRef::array_entry_type_size();
         self.container.get_value(offset).map(|i| BlockIndex::new(*i))
     }
 }
