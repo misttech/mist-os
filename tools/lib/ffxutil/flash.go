@@ -9,11 +9,11 @@ import (
 )
 
 // Flash flashes the target.
-func (f *FFXInstance) Flash(ctx context.Context, serialNum, sshKey, productBundle string) error {
+func (f *FFXInstance) Flash(ctx context.Context, target, sshKey, productBundle string, tcp bool) error {
 	if err := f.ConfigSet(ctx, "fastboot.flash.timeout_rate", "4"); err != nil {
 		return err
 	}
-	ffxArgs := []string{"-v", "--target", serialNum,
+	ffxArgs := []string{"-v", "--target", target,
 		"--config", "{\"ffx\": {\"fastboot\": {\"inline_target\": true}}}",
 		"target", "flash"}
 	if sshKey != "" {
@@ -21,5 +21,9 @@ func (f *FFXInstance) Flash(ctx context.Context, serialNum, sshKey, productBundl
 	}
 
 	ffxArgs = append(ffxArgs, "--product-bundle", productBundle)
+	if tcp {
+		// Rebooting while flashing over TCP will error out.
+		ffxArgs = append(ffxArgs, "--no-bootloader-reboot")
+	}
 	return f.RunWithTimeout(ctx, 0, ffxArgs...)
 }

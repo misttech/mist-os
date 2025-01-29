@@ -426,9 +426,9 @@ func (f *FFXInstance) Stop() error {
 }
 
 // BootloaderBoot RAM boots the target.
-func (f *FFXInstance) BootloaderBoot(ctx context.Context, serialNum, productBundle string) error {
+func (f *FFXInstance) BootloaderBoot(ctx context.Context, target, productBundle string) error {
 	args := []string{
-		"--target", serialNum,
+		"--target", target,
 		"--config", "{\"ffx\": {\"fastboot\": {\"inline_target\": true}}}",
 		"target", "bootloader",
 	}
