@@ -857,4 +857,112 @@ TEST_P(FsMountTest, CreateAndRenameDirectory) {
   EXPECT_THAT(rename(old_name.c_str(), new_name.c_str()), SyscallSucceeds());
 }
 
+class OtmpfileTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    char *dir = getenv("MUTABLE_STORAGE");
+    test_folder_ = dir == nullptr ? "/tmp/XXXXXX" : std::string(dir) + "/XXXXXX";
+    ASSERT_NE(mkdtemp(&test_folder_[0]), nullptr)
+        << "failed to create test folder: " << std::strerror(errno);
+
+    test_file1_ = test_folder_ + "/testfile1";
+    test_file2_ = test_folder_ + "/testfile2";
+  }
+
+  void TearDown() override {
+    if (tmpfile_fd_ != -1) {
+      tmpfile_fd_.reset();
+    }
+    // These files may have been created, attempt to remove them in case they were.
+    remove(test_file1_.c_str());
+    remove(test_file2_.c_str());
+    if (test_folder_.length() != 0) {
+      ASSERT_EQ(rmdir(test_folder_.c_str()), 0);
+    }
+  }
+
+  fbl::unique_fd tmpfile_fd_;
+  std::string test_folder_;
+  std::string test_file1_;
+  std::string test_file2_;
+};
+
+TEST_F(OtmpfileTest, TmpFileLinkIntoAfter) {
+  // CAP_DAC_READ_SEARCH capability is required to use AT_EMPTY_PATH with linkat
+  if (!test_helper::HasCapability(CAP_DAC_READ_SEARCH)) {
+    GTEST_SKIP() << "Not running with CAP_DAC_READ_SEARCH capabilities, skipping.";
+  }
+  tmpfile_fd_ = fbl::unique_fd(open(test_folder_.c_str(), O_RDWR | O_TMPFILE));
+  ASSERT_TRUE(tmpfile_fd_.is_valid()) << "open() with O_TMPFILE failed:" << strerror(errno);
+  struct stat stat_tmpfile;
+  SAFE_SYSCALL(fstat(tmpfile_fd_.get(), &stat_tmpfile));
+  ASSERT_EQ(stat_tmpfile.st_nlink, nlink_t{0}) << "Link count should be 0.";
+
+  // Write to file. The contents are used later to verify that linkat worked.
+  ASSERT_EQ(write(tmpfile_fd_.get(), "hello", 5), 5)
+      << "Write to tmpfile failed:" << strerror(errno);
+
+  // Test that we can link.
+  SAFE_SYSCALL(linkat(tmpfile_fd_.get(), "", AT_FDCWD, test_file1_.c_str(), AT_EMPTY_PATH));
+  struct stat stat_linked_tmpfile;
+  SAFE_SYSCALL(fstat(tmpfile_fd_.get(), &stat_linked_tmpfile));
+  ASSERT_EQ(stat_linked_tmpfile.st_nlink, nlink_t{1}) << "Link count should be 1.";
+
+  // Test that we can link again.
+  SAFE_SYSCALL(linkat(tmpfile_fd_.get(), "", AT_FDCWD, test_file2_.c_str(), AT_EMPTY_PATH));
+  SAFE_SYSCALL(fstat(tmpfile_fd_.get(), &stat_linked_tmpfile));
+  ASSERT_EQ(stat_linked_tmpfile.st_nlink, nlink_t{2}) << "Link count should be 2.";
+
+  // Verify contents.
+  fbl::unique_fd test_file_fd(open(test_file1_.c_str(), O_RDONLY));
+  ASSERT_TRUE(test_file_fd.is_valid()) << "Failed to open file:" << strerror(errno);
+  char buffer[10];
+  ASSERT_EQ(read(test_file_fd.get(), buffer, 10), 5)
+      << "Failed to read from file:" << strerror(errno);
+  ASSERT_EQ(strncmp(buffer, "hello", 5), 0)
+      << "Contents do not match the contents written to the tmpfile.";
+
+  // If we try to link into a path that is already used, this should fail with EEXIST.
+  int result = linkat(tmpfile_fd_.get(), "", AT_FDCWD, test_file1_.c_str(), AT_EMPTY_PATH);
+  int saved_errno = errno;
+  ASSERT_EQ(result, -1);
+  EXPECT_EQ(saved_errno, EEXIST) << "Link to an existing path should fail with EEXIST:"
+                                 << std::strerror(saved_errno);
+}
+
+TEST_F(OtmpfileTest, TmpFileWithOExclShouldFailLinkInto) {
+  // CAP_DAC_READ_SEARCH capability is required to use AT_EMPTY_PATH with linkat
+  if (!test_helper::HasCapability(CAP_DAC_READ_SEARCH)) {
+    GTEST_SKIP() << "Not running with CAP_DAC_READ_SEARCH capabilities, skipping.";
+  }
+
+  tmpfile_fd_ = fbl::unique_fd(open(test_folder_.c_str(), O_RDWR | O_TMPFILE | O_EXCL));
+  ASSERT_TRUE(tmpfile_fd_.is_valid()) << "open() with O_TMPFILE failed:" << strerror(errno);
+
+  int result = linkat(tmpfile_fd_.get(), "", AT_FDCWD, test_file1_.c_str(), AT_EMPTY_PATH);
+  int saved_errno = errno;
+  ASSERT_EQ(result, -1);
+  EXPECT_EQ(saved_errno, ENOENT)
+      << "linkat() should fail when file was opened with O_TMPFILE | O_EXCL with ENOENT:"
+      << std::strerror(saved_errno);
+}
+
+TEST_F(OtmpfileTest, TmpFileFailWithRdOnlyAccessMode) {
+  tmpfile_fd_ = fbl::unique_fd(open(test_folder_.c_str(), O_RDONLY | O_TMPFILE));
+  int saved_errno = errno;
+  ASSERT_FALSE(tmpfile_fd_.is_valid());
+  EXPECT_EQ(saved_errno, EINVAL)
+      << "open() with O_TMPFILE not specified with O_RDWR and O_WRONLY should fail with EINVAL:"
+      << std::strerror(saved_errno);
+}
+
+TEST_F(OtmpfileTest, TmpFileWithOCreatShouldFail) {
+  tmpfile_fd_ = fbl::unique_fd(open(test_folder_.c_str(), O_RDWR | O_CREAT | O_TMPFILE));
+  int saved_errno = errno;
+  ASSERT_FALSE(tmpfile_fd_.is_valid());
+  EXPECT_EQ(saved_errno, EINVAL)
+      << "open() with O_TMPFILE and O_CREAT are not compatible. Should fail with EINVAL:"
+      << std::strerror(saved_errno);
+}
+
 }  // namespace

@@ -73,6 +73,11 @@
 
                 // TODO(https://fxbug.dev/365763270)
                 "EpollTest.EpollIsPollable",
+
+                // TODO(https://fxbug.dev/293950309)
+                "OtmpfileTest.TmpFileLinkIntoAfter",
+                "OtmpfileTest.TmpFileWithOExclShouldFailLinkInto",
+                "OtmpfileTest.TmpFileWithOCreatShouldFail",
             ],
         },
         {

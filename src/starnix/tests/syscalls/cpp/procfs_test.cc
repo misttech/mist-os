@@ -16,6 +16,7 @@
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
+#include <linux/capability.h>
 
 #include "src/lib/files/directory.h"
 #include "src/lib/files/file.h"
@@ -723,6 +724,29 @@ TEST_F(ProcSelfFdTest, TmpFileFdName) {
   std::string result = read_fd_link(tmpfile_fd.get());
   EXPECT_TRUE(result.starts_with(kTmpPath)) << " target: " << result;
   EXPECT_TRUE(result.ends_with(" (deleted)")) << " target: " << result;
+}
+
+// Validate naming of O_TMPFILE descriptors, and the naming of the file that it is linked into.
+TEST_F(ProcSelfFdTest, TmpFileLinkIntoAfterFdName) {
+  // CAP_DAC_READ_SEARCH capability is required to use AT_EMPTY_PATH with linkat
+  if (!test_helper::HasCapability(CAP_DAC_READ_SEARCH)) {
+    GTEST_SKIP() << "Not running with CAP_DAC_READ_SEARCH capabilities, skipping.";
+  }
+  constexpr char kTmpPath[] = "/tmp";
+  fbl::unique_fd tmpfile_fd(SAFE_SYSCALL(open(kTmpPath, O_RDWR | O_TMPFILE)));
+  ASSERT_TRUE(tmpfile_fd.is_valid()) << "open(tmpfile) failed:" << strerror(errno);
+
+  std::string filename("/tmp/procfs_test_file");
+  SAFE_SYSCALL(linkat(tmpfile_fd.get(), "", AT_FDCWD, filename.c_str(), AT_EMPTY_PATH));
+  fbl::unique_fd linked_file_fd(open(filename.c_str(), O_RDONLY));
+  ASSERT_TRUE(linked_file_fd.is_valid()) << "Failed to open file:" << strerror(errno);
+
+  std::string result_linked_file = read_fd_link(linked_file_fd.get());
+  EXPECT_EQ(result_linked_file, filename);
+
+  std::string result_tmp_fd = read_fd_link(tmpfile_fd.get());
+  EXPECT_TRUE(result_tmp_fd.starts_with(kTmpPath)) << " target: " << result_tmp_fd;
+  EXPECT_TRUE(result_tmp_fd.ends_with(" (deleted)")) << " target: " << result_tmp_fd;
 }
 
 // Validate naming of a file that is created, and opened, but then unlinked.
