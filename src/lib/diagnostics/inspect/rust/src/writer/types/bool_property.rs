@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::writer::{Inner, InnerValueType, InspectType, Property};
-use log::error;
 
 /// Inspect API Bool Property data type.
 ///
@@ -21,13 +20,9 @@ impl Property<'_> for BoolProperty {
 
     fn set(&self, value: bool) {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
-            inner_ref
-                .state
-                .try_lock()
-                .and_then(|mut state| state.set_bool(inner_ref.block_index, value))
-                .unwrap_or_else(|e| {
-                    error!("Failed to set property. Error: {:?}", e);
-                });
+            if let Ok(mut state) = inner_ref.state.try_lock() {
+                state.set_bool(inner_ref.block_index, value);
+            }
         }
     }
 }
@@ -41,7 +36,7 @@ mod tests {
     use super::*;
     use crate::writer::testing_utils::{get_state, GetBlockExt};
     use crate::writer::Node;
-    use inspect_format::BlockType;
+    use inspect_format::{BlockType, Bool};
 
     #[fuchsia::test]
     fn bool_property() {
@@ -54,21 +49,21 @@ mod tests {
         let node = root.create_child("node");
         {
             let property = node.create_bool("property", true);
-            property.get_block(|block| {
-                assert_eq!(block.block_type(), BlockType::BoolValue);
-                assert!(block.bool_value().unwrap());
+            property.get_block::<_, Bool>(|block| {
+                assert_eq!(block.block_type(), Some(BlockType::BoolValue));
+                assert!(block.value());
             });
-            node.get_block(|block| {
-                assert_eq!(block.child_count().unwrap(), 1);
+            node.get_block::<_, inspect_format::Node>(|block| {
+                assert_eq!(block.child_count(), 1);
             });
 
             property.set(false);
-            property.get_block(|block| {
-                assert!(!block.bool_value().unwrap());
+            property.get_block::<_, Bool>(|block| {
+                assert!(!block.value());
             });
         }
-        node.get_block(|block| {
-            assert_eq!(block.child_count().unwrap(), 0);
+        node.get_block::<_, inspect_format::Node>(|block| {
+            assert_eq!(block.child_count(), 0);
         });
     }
 }

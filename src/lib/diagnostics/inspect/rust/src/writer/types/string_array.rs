@@ -97,17 +97,11 @@ mod tests {
     impl StringArrayProperty {
         pub fn load_string_slot(&self, slot: usize) -> Option<String> {
             self.inner.inner_ref().and_then(|inner_ref| {
-                inner_ref
-                    .state
-                    .try_lock()
-                    .and_then(|state| {
-                        state.load_string(
-                            state
-                                .get_block(self.block_index().unwrap())
-                                .array_get_string_index_slot(slot)?,
-                        )
-                    })
-                    .ok()
+                inner_ref.state.try_lock().ok().and_then(|state| {
+                    let index =
+                        state.get_block(self.block_index().unwrap()).get_string_index_at(slot)?;
+                    state.load_string(index).ok()
+                })
             })
         }
     }
@@ -121,8 +115,8 @@ mod tests {
         {
             let array = node.create_string_array("string_array", 5);
             assert_eq!(array.len().unwrap(), 5);
-            node.get_block(|node_block| {
-                assert_eq!(node_block.child_count().unwrap(), 1);
+            node.get_block::<_, inspect_format::Node>(|node_block| {
+                assert_eq!(node_block.child_count(), 1);
             });
 
             array.set(0, "0");
@@ -157,8 +151,8 @@ mod tests {
             assert!(array.load_string_slot(5).is_none());
         }
 
-        node.get_block(|node_block| {
-            assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block::<_, inspect_format::Node>(|node_block| {
+            assert_eq!(node_block.child_count(), 0);
         });
     }
 

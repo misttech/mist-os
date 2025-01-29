@@ -49,6 +49,11 @@ rustc_library("lib") {
 
 fuchsia_unittest_package("inspect-format-tests") {
   deps = [ ":lib_test" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 group("inspect-format-host-tests") {

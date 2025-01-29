@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{constants, BlockType};
+use crate::constants;
 
 /// Returns the smallest order such that (MIN_ORDER_SHIFT << order) >= size.
 /// Size must be non zero.
@@ -27,16 +27,6 @@ pub fn block_size_for_payload(payload_size: usize) -> usize {
 /// Get the size in bytes for the payload section of a block of the given |order|.
 pub fn payload_size_for_order(order: u8) -> usize {
     order_to_size(order) - constants::HEADER_SIZE_BYTES
-}
-
-/// Get the array capacity size for the given |order|.
-pub fn array_capacity(order: u8, entry_type: BlockType) -> Option<usize> {
-    entry_type.array_element_size().map(|size| {
-        (order_to_size(order)
-            - constants::HEADER_SIZE_BYTES
-            - constants::ARRAY_PAYLOAD_METADATA_SIZE_BYTES)
-            / size
-    })
 }
 
 #[cfg(test)]
@@ -79,45 +69,5 @@ mod test {
                 order
             );
         }
-    }
-
-    #[test]
-    fn array_capacity_numeric() {
-        assert_eq!(2, array_capacity(1, BlockType::IntValue).expect("get size"));
-        assert_eq!(2 + 4, array_capacity(2, BlockType::IntValue).expect("get size"));
-        assert_eq!(2 + 4 + 8, array_capacity(3, BlockType::IntValue).expect("get size"));
-        assert_eq!(2 + 4 + 8 + 16, array_capacity(4, BlockType::IntValue).expect("get size"));
-        assert_eq!(2 + 4 + 8 + 16 + 32, array_capacity(5, BlockType::IntValue).expect("get size"));
-        assert_eq!(
-            2 + 4 + 8 + 16 + 32 + 64,
-            array_capacity(6, BlockType::IntValue).expect("get size")
-        );
-        assert_eq!(
-            2 + 4 + 8 + 16 + 32 + 64 + 128,
-            array_capacity(7, BlockType::IntValue).expect("get size")
-        );
-    }
-
-    #[test]
-    fn array_capacity_string_reference() {
-        assert_eq!(4, array_capacity(1, BlockType::StringReference).expect("get size"));
-        assert_eq!(4 + 8, array_capacity(2, BlockType::StringReference).expect("get size"));
-        assert_eq!(4 + 8 + 16, array_capacity(3, BlockType::StringReference).expect("get size"));
-        assert_eq!(
-            4 + 8 + 16 + 32,
-            array_capacity(4, BlockType::StringReference).expect("get size")
-        );
-        assert_eq!(
-            4 + 8 + 16 + 32 + 64,
-            array_capacity(5, BlockType::StringReference).expect("get size")
-        );
-        assert_eq!(
-            4 + 8 + 16 + 32 + 64 + 128,
-            array_capacity(6, BlockType::StringReference).expect("get size")
-        );
-        assert_eq!(
-            4 + 8 + 16 + 32 + 64 + 128 + 256,
-            array_capacity(7, BlockType::StringReference).expect("get size")
-        );
     }
 }

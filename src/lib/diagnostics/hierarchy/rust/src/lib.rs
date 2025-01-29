@@ -35,7 +35,7 @@ pub const LINEAR_HISTOGRAM_EXTRA_SLOTS: usize = 4;
 pub const EXPONENTIAL_HISTOGRAM_EXTRA_SLOTS: usize = 5;
 
 /// Format in which the array will be read.
-#[derive(Clone, Debug, PartialEq, Eq, FromPrimitive, ToPrimitive)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, FromPrimitive, ToPrimitive)]
 #[repr(u8)]
 pub enum ArrayFormat {
     /// Regular array, it stores N values in N slots.

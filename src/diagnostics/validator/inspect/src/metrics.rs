@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Error;
+use anyhow::{format_err, Error};
 use fuchsia_inspect::reader::snapshot::ScannedBlock;
-use inspect_format::{BlockType, PropertyFormat};
+use inspect_format::{Array, BlockType, Buffer, Extent, Name, PropertyFormat, StringRef, Unknown};
 use serde::Serialize;
 use std::collections::HashMap;
 
@@ -88,27 +88,6 @@ pub struct Metrics {
     pub block_statistics: HashMap<String, BlockStatistics>,
 }
 
-trait Description {
-    fn description(&self) -> Result<String, Error>;
-}
-
-// Describes the block, distinguishing array and histogram types.
-impl Description for ScannedBlock<'_> {
-    fn description(&self) -> Result<String, Error> {
-        match self.block_type_or()? {
-            BlockType::ArrayValue => {
-                Ok(format!("ARRAY({:?}, {})", self.array_format()?, self.array_entry_type()?))
-            }
-            BlockType::BufferValue => match self.property_format()? {
-                PropertyFormat::String => Ok("STRING".to_owned()),
-                PropertyFormat::Bytes => Ok("BYTES".to_owned()),
-                PropertyFormat::StringReference => Ok("STRING_REFERENCE".to_owned()),
-            },
-            _ => Ok(format!("{}", self.block_type_or()?)),
-        }
-    }
-}
-
 impl Metrics {
     pub fn new() -> Metrics {
         Self::default()
@@ -128,32 +107,56 @@ impl Metrics {
 
     // Process (in a single operation) a block of a type that will never be part of the Inspect
     // data tree.
-    pub fn process(&mut self, block: ScannedBlock<'_>) -> Result<(), Error> {
+    pub fn process(&mut self, block: ScannedBlock<'_, Unknown>) -> Result<(), Error> {
         self.record(&Metrics::analyze(block)?, BlockStatus::Used);
         Ok(())
     }
 
-    pub fn analyze(block: ScannedBlock<'_>) -> Result<BlockMetrics, Error> {
-        let description = block.description()?;
-        let block_type = block.block_type_or()?;
+    pub fn analyze(block: ScannedBlock<'_, Unknown>) -> Result<BlockMetrics, Error> {
+        let block_type = block.block_type().ok_or_else(|| format_err!("Missing block type"))?;
+        let mut description = None;
 
+        let total_bytes = inspect_format::constants::MIN_ORDER_SIZE << block.order();
         let data_bytes = match block_type {
             BlockType::Header => 4,
             BlockType::Reserved
             | BlockType::NodeValue
             | BlockType::Free
-            | BlockType::BufferValue
             | BlockType::Tombstone
             | BlockType::LinkValue => 0,
             BlockType::IntValue
             | BlockType::UintValue
             | BlockType::DoubleValue
             | BlockType::BoolValue => NUMERIC_TYPE_SIZE,
-
-            BlockType::ArrayValue => NUMERIC_TYPE_SIZE * block.array_slots()?,
-            BlockType::Name => block.name_length()?,
-            BlockType::Extent => block.extent_contents()?.len(),
-            BlockType::StringReference => block.total_length()?,
+            BlockType::BufferValue => {
+                let block = block.cast::<Buffer>().unwrap();
+                description =
+                    Some(match block.format().ok_or(format_err!("Missing property format"))? {
+                        PropertyFormat::String => "STRING".to_owned(),
+                        PropertyFormat::Bytes => "BYTES".to_owned(),
+                        PropertyFormat::StringReference => "STRING_REFERENCE".to_owned(),
+                    });
+                0
+            }
+            BlockType::ArrayValue => {
+                let block = block.cast::<Array<Unknown>>().unwrap();
+                let entry_type = block.entry_type().ok_or(format_err!("format missing"))?;
+                let format = block.format().ok_or(format_err!("format missing"))?;
+                description = Some(format!("ARRAY({format:?}, {entry_type})"));
+                NUMERIC_TYPE_SIZE * block.slots()
+            }
+            BlockType::Name => {
+                let block = block.cast::<Name>().unwrap();
+                block.length()
+            }
+            BlockType::Extent => {
+                let block = block.cast::<Extent>().unwrap();
+                block.contents()?.len()
+            }
+            BlockType::StringReference => {
+                let block = block.cast::<StringRef>().unwrap();
+                block.total_length()
+            }
         };
 
         let header_bytes = match block_type {
@@ -174,8 +177,12 @@ impl Metrics {
             | BlockType::Extent => 8,
         };
 
-        let total_bytes = 16 << block.order();
-        Ok(BlockMetrics { description, data_bytes, header_bytes, total_bytes })
+        Ok(BlockMetrics {
+            description: description.unwrap_or_else(|| format!("{block_type}")),
+            data_bytes,
+            header_bytes,
+            total_bytes,
+        })
     }
 }
 
@@ -185,7 +192,9 @@ mod tests {
     use crate::results::Results;
     use crate::{data, puppet};
     use anyhow::{bail, format_err};
-    use inspect_format::{constants, ArrayFormat, Block, BlockIndex, HeaderFields, PayloadFields};
+    use inspect_format::{
+        constants, ArrayFormat, BlockAccessorMutExt, BlockIndex, HeaderFields, PayloadFields,
+    };
 
     #[fuchsia::test]
     async fn metrics_work() -> Result<(), Error> {
@@ -269,14 +278,14 @@ mod tests {
         const HEADER_INDEX: usize = 0;
 
         let mut container = [0u8; 16];
-        let mut header = Block::new(&mut container, BlockIndex::EMPTY);
+        let mut header = container.block_at_mut(BlockIndex::EMPTY);
         HeaderFields::set_order(&mut header, constants::HEADER_ORDER);
         set_type!(header, Header);
         HeaderFields::set_header_magic(&mut header, constants::HEADER_MAGIC_NUMBER);
         HeaderFields::set_header_version(&mut header, constants::HEADER_VERSION_NUMBER);
         put_header!(header, HEADER_INDEX, &mut buffer);
         let mut container = [0u8; 16];
-        let mut name_header = Block::new(&mut container, BlockIndex::EMPTY);
+        let mut name_header = container.block_at_mut(BlockIndex::EMPTY);
         set_type!(name_header, Name);
         HeaderFields::set_name_length(&mut name_header, 4);
         put_header!(name_header, NAME_INDEX as usize, &mut buffer);
@@ -297,7 +306,7 @@ mod tests {
         let mut buffer = [0u8; 256];
         init_vmo_contents(&mut buffer);
         let mut container = [0u8; 16];
-        let mut reserved_header = Block::new(&mut container, BlockIndex::EMPTY);
+        let mut reserved_header = container.block_at_mut(BlockIndex::EMPTY);
         set_type!(reserved_header, Reserved);
         HeaderFields::set_order(&mut reserved_header, 1);
         put_header!(reserved_header, 2, &mut buffer);
@@ -310,7 +319,7 @@ mod tests {
         let mut buffer = [0u8; 256];
         init_vmo_contents(&mut buffer);
         let mut container = [0u8; 16];
-        let mut node_header = Block::new(&mut container, BlockIndex::EMPTY);
+        let mut node_header = container.block_at_mut(BlockIndex::EMPTY);
         set_type!(node_header, NodeValue);
         HeaderFields::set_value_parent_index(&mut node_header, 1);
         put_header!(node_header, 2, &mut buffer);
@@ -334,7 +343,7 @@ mod tests {
         macro_rules! test_number {
             ($number_type:ident, $parent:expr, $block_string:expr, $data_size:expr, $data_percent:expr) => {
                 let mut container = [0u8; 16];
-                let mut value = Block::new(&mut container, BlockIndex::EMPTY);
+                let mut value = container.block_at_mut(BlockIndex::EMPTY);
                 set_type!(value, $number_type);
                 HeaderFields::set_value_name_index(&mut value, NAME_INDEX);
                 HeaderFields::set_value_parent_index(&mut value, $parent);
@@ -356,7 +365,7 @@ mod tests {
         let mut buffer = [0u8; 256];
         init_vmo_contents(&mut buffer);
         let mut container = [0u8; 16];
-        let mut value = Block::new(&mut container, BlockIndex::EMPTY);
+        let mut value = container.block_at_mut(BlockIndex::EMPTY);
         set_type!(value, BufferValue);
         HeaderFields::set_value_name_index(&mut value, NAME_INDEX);
         HeaderFields::set_value_parent_index(&mut value, 0);
@@ -366,7 +375,7 @@ mod tests {
         PayloadFields::set_property_flags(&mut value, PropertyFormat::String as u8);
         put_payload!(value, 2, &mut buffer);
         let mut container = [0u8; 16];
-        let mut extent = Block::new(&mut container, BlockIndex::EMPTY);
+        let mut extent = container.block_at_mut(BlockIndex::EMPTY);
         set_type!(extent, Extent);
         HeaderFields::set_extent_next_index(&mut extent, 5);
         put_header!(extent, 4, &mut buffer);
@@ -390,7 +399,7 @@ mod tests {
         let mut buffer = [0u8; 256];
         init_vmo_contents(&mut buffer);
         let mut container = [0u8; 16];
-        let mut value = Block::new(&mut container, BlockIndex::EMPTY);
+        let mut value = container.block_at_mut(BlockIndex::EMPTY);
         set_type!(value, ArrayValue);
         HeaderFields::set_order(&mut value, 3);
         HeaderFields::set_value_name_index(&mut value, NAME_INDEX);

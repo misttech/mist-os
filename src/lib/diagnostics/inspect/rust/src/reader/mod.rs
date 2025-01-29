@@ -31,9 +31,12 @@
 //! let hierarchy = reader::read(&inspector)?;
 //! ```
 
-use crate::reader::snapshot::{ScannedBlock, Snapshot};
+use crate::reader::snapshot::{MakePrimitiveProperty, ScannedBlock, Snapshot};
 use diagnostics_hierarchy::*;
-use inspect_format::{BlockIndex, BlockType};
+use inspect_format::{
+    Array, BlockIndex, BlockType, Bool, Buffer, Double, Int, Link, Node, Uint, Unknown,
+    ValueBlockKind,
+};
 use maplit::btreemap;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -179,31 +182,41 @@ fn read_snapshot(snapshot: &Snapshot) -> Result<PartialNodeHierarchy, ReaderErro
 fn scan_blocks(snapshot: &Snapshot) -> Result<ScanResult<'_>, ReaderError> {
     let mut result = ScanResult::new(snapshot);
     for block in snapshot.scan() {
-        if block.index() == BlockIndex::ROOT
-            && block.block_type_or().map_err(ReaderError::VmoFormat)? != BlockType::Header
-        {
+        if block.index() == BlockIndex::ROOT && block.block_type() != Some(BlockType::Header) {
             return Err(ReaderError::MissingHeader);
         }
-        match block.block_type_or().map_err(ReaderError::VmoFormat)? {
+        match block.block_type().ok_or(ReaderError::InvalidVmo)? {
             BlockType::NodeValue => {
-                result.parse_node(&block)?;
+                result.parse_node(block.cast_unchecked::<Node>())?;
             }
-            BlockType::IntValue | BlockType::UintValue | BlockType::DoubleValue => {
-                result.parse_numeric_property(&block)?;
+            BlockType::IntValue => {
+                result.parse_primitive_property(block.cast_unchecked::<Int>())?;
+            }
+            BlockType::UintValue => {
+                result.parse_primitive_property(block.cast_unchecked::<Uint>())?;
+            }
+            BlockType::DoubleValue => {
+                result.parse_primitive_property(block.cast_unchecked::<Double>())?;
             }
             BlockType::BoolValue => {
-                result.parse_bool_property(&block)?;
+                result.parse_primitive_property(block.cast_unchecked::<Bool>())?;
             }
             BlockType::ArrayValue => {
-                result.parse_array_property(&block)?;
+                result.parse_array_property(block.cast_unchecked::<Array<Unknown>>())?;
             }
             BlockType::BufferValue => {
-                result.parse_property(&block)?;
+                result.parse_property(block.cast_unchecked::<Buffer>())?;
             }
             BlockType::LinkValue => {
-                result.parse_link(&block)?;
+                result.parse_link(block.cast_unchecked::<Link>())?;
             }
-            _ => {}
+            BlockType::Free
+            | BlockType::Reserved
+            | BlockType::Header
+            | BlockType::Extent
+            | BlockType::Name
+            | BlockType::Tombstone
+            | BlockType::StringReference => {}
         }
     }
     Ok(result)
@@ -345,10 +358,10 @@ impl<'a> ScanResult<'a> {
         self.snapshot.get_name(index)
     }
 
-    fn parse_node(&mut self, block: &ScannedBlock<'_>) -> Result<(), ReaderError> {
-        let name_index = block.name_index()?;
+    fn parse_node(&mut self, block: ScannedBlock<'_, Node>) -> Result<(), ReaderError> {
+        let name_index = block.name_index();
         let name = self.get_name(name_index).ok_or(ReaderError::ParseName(name_index))?;
-        let parent_index = block.parent_index()?;
+        let parent_index = block.parent_index();
         get_or_create_scanned_node!(self.parsed_nodes, block.index())
             .initialize(name, parent_index);
         if parent_index != block.index() {
@@ -359,37 +372,47 @@ impl<'a> ScanResult<'a> {
 
     fn push_property(
         &mut self,
-        block: &ScannedBlock<'_>,
+        parent_index: BlockIndex,
         property: Property,
     ) -> Result<(), ReaderError> {
-        let parent_index = block.parent_index()?;
         let parent = get_or_create_scanned_node!(self.parsed_nodes, parent_index);
         parent.partial_hierarchy.properties.push(property);
         Ok(())
     }
 
-    fn parse_numeric_property(&mut self, block: &ScannedBlock<'_>) -> Result<(), ReaderError> {
-        self.push_property(block, self.snapshot.parse_numeric_property(block)?)?;
+    fn parse_primitive_property<'b, K>(
+        &mut self,
+        block: ScannedBlock<'b, K>,
+    ) -> Result<(), ReaderError>
+    where
+        K: ValueBlockKind,
+        ScannedBlock<'b, K>: MakePrimitiveProperty,
+    {
+        let parent_index = block.parent_index();
+        let property = self.snapshot.parse_primitive_property(block)?;
+        self.push_property(parent_index, property)?;
         Ok(())
     }
 
-    fn parse_bool_property(&mut self, block: &ScannedBlock<'_>) -> Result<(), ReaderError> {
-        self.push_property(block, self.snapshot.parse_bool_property(block)?)?;
+    fn parse_array_property(
+        &mut self,
+        block: ScannedBlock<'_, Array<Unknown>>,
+    ) -> Result<(), ReaderError> {
+        let parent_index = block.parent_index();
+        let property = self.snapshot.parse_array_property(block)?;
+        self.push_property(parent_index, property)?;
         Ok(())
     }
 
-    fn parse_array_property(&mut self, block: &ScannedBlock<'_>) -> Result<(), ReaderError> {
-        self.push_property(block, self.snapshot.parse_array_property(block)?)?;
+    fn parse_property(&mut self, block: ScannedBlock<'_, Buffer>) -> Result<(), ReaderError> {
+        let parent_index = block.parent_index();
+        let property = self.snapshot.parse_property(block)?;
+        self.push_property(parent_index, property)?;
         Ok(())
     }
 
-    fn parse_property(&mut self, block: &ScannedBlock<'_>) -> Result<(), ReaderError> {
-        self.push_property(block, self.snapshot.parse_property(block)?)?;
-        Ok(())
-    }
-
-    fn parse_link(&mut self, block: &ScannedBlock<'_>) -> Result<(), ReaderError> {
-        let parent_index = block.parent_index()?;
+    fn parse_link(&mut self, block: ScannedBlock<'_, Link>) -> Result<(), ReaderError> {
+        let parent_index = block.parent_index();
         let parent = get_or_create_scanned_node!(self.parsed_nodes, parent_index);
         parent.partial_hierarchy.links.push(self.snapshot.parse_link(block)?);
         Ok(())
@@ -690,11 +713,14 @@ mod tests {
         // purpose to produce an invalid UTF8 string in the property.
         let vmo = inspector.vmo().await.unwrap();
         let snapshot = Snapshot::try_from(&vmo).expect("getting snapshot");
-        let block = snapshot.get_block(prop.block_index().unwrap()).expect("getting block");
+        let block = snapshot
+            .get_block(prop.block_index().unwrap())
+            .expect("getting block")
+            .cast::<Buffer>()
+            .unwrap();
 
         // The first byte of the actual property string is at this byte offset in the VMO.
-        let byte_offset = constants::MIN_ORDER_SIZE
-            * (*block.property_extent_index().unwrap() as usize)
+        let byte_offset = constants::MIN_ORDER_SIZE * (*block.extent_index() as usize)
             + constants::HEADER_SIZE_BYTES
             + constants::STRING_REFERENCE_TOTAL_LENGTH_BYTES;
 
@@ -723,7 +749,7 @@ mod tests {
         let array = root.create_int_array("int-array", 3);
 
         // Mess up with the block slots by setting them to a too big number.
-        array.get_block_mut(|array_block| {
+        array.get_block_mut::<_, Array<Int>>(|array_block| {
             PayloadFields::set_array_slots_count(array_block, 255);
         });
 

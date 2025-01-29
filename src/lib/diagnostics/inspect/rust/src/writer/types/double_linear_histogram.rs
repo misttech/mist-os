@@ -82,6 +82,7 @@ mod tests {
     use super::*;
     use crate::writer::testing_utils::GetBlockExt;
     use crate::writer::Inspector;
+    use inspect_format::{Array, Double};
 
     #[fuchsia::test]
     fn double_linear_histogram() {
@@ -96,19 +97,19 @@ mod tests {
             double_histogram.insert_multiple(0.0, 2); // underflow
             double_histogram.insert(25.3);
             double_histogram.insert(500.0); // overflow
-            double_histogram.array.get_block(|block| {
+            double_histogram.array.get_block::<_, Array<Double>>(|block| {
                 for (i, value) in [10.0, 5.0, 2.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0].iter().enumerate()
                 {
-                    assert_eq!(block.array_get_double_slot(i).unwrap(), *value);
+                    assert_eq!(block.get(i).unwrap(), *value);
                 }
             });
 
-            node.get_block(|node_block| {
-                assert_eq!(node_block.child_count().unwrap(), 1);
+            node.get_block::<_, inspect_format::Node>(|node_block| {
+                assert_eq!(node_block.child_count(), 1);
             });
         }
-        node.get_block(|node_block| {
-            assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block::<_, inspect_format::Node>(|node_block| {
+            assert_eq!(node_block.child_count(), 0);
         });
     }
 }

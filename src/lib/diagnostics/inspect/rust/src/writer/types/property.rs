@@ -42,11 +42,8 @@ pub trait Length {
 impl<T: ArrayProperty + InspectTypeInternal> Length for T {
     fn len(&self) -> Option<usize> {
         if let Ok(state) = self.state()?.try_lock() {
-            if let Ok(size) = state.get_array_size(self.block_index()?) {
-                return Some(size);
-            }
+            return Some(state.get_array_size(self.block_index()?));
         }
-
         None
     }
 }

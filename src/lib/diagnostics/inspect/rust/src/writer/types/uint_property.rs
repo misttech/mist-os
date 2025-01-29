@@ -25,13 +25,12 @@ impl Property<'_> for UintProperty {
 
     fn set(&self, value: u64) {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
-            inner_ref
-                .state
-                .try_lock()
-                .and_then(|mut state| state.set_uint_metric(inner_ref.block_index, value))
-                .unwrap_or_else(|err| {
-                    error!(err:?; "Failed to set property");
-                });
+            match inner_ref.state.try_lock() {
+                Ok(mut state) => {
+                    state.set_uint_metric(inner_ref.block_index, value);
+                }
+                Err(err) => error!(err:?; "Failed to set property"),
+            }
         }
     }
 }
@@ -39,34 +38,26 @@ impl Property<'_> for UintProperty {
 impl NumericProperty<'_> for UintProperty {
     fn add(&self, value: u64) -> Option<u64> {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
-            inner_ref
-                .state
-                .try_lock()
-                .and_then(|mut state| state.add_uint_metric(inner_ref.block_index, value))
-                .map(Option::from)
-                .unwrap_or_else(|err| {
-                    error!(err:?; "Failed to set property");
-                    None
-                })
-        } else {
-            None
+            match inner_ref.state.try_lock() {
+                Ok(mut state) => {
+                    return Some(state.add_uint_metric(inner_ref.block_index, value));
+                }
+                Err(err) => error!(err:?; "Failed to set property"),
+            }
         }
+        None
     }
 
     fn subtract(&self, value: u64) -> Option<u64> {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
-            inner_ref
-                .state
-                .try_lock()
-                .and_then(|mut state| state.subtract_uint_metric(inner_ref.block_index, value))
-                .map(Option::from)
-                .unwrap_or_else(|err| {
-                    error!(err:?; "Failed to set property");
-                    None
-                })
-        } else {
-            None
+            match inner_ref.state.try_lock() {
+                Ok(mut state) => {
+                    return Some(state.subtract_uint_metric(inner_ref.block_index, value));
+                }
+                Err(err) => error!(err:?; "Failed to set property"),
+            }
         }
+        None
     }
 }
 
@@ -75,7 +66,7 @@ mod tests {
     use super::*;
     use crate::writer::testing_utils::{get_state, GetBlockExt};
     use crate::writer::Node;
-    use inspect_format::BlockType;
+    use inspect_format::{BlockType, Uint};
 
     #[fuchsia::test]
     fn uint_property() {
@@ -88,31 +79,31 @@ mod tests {
         let node = root.create_child("node");
         {
             let property = node.create_uint("property", 1);
-            property.get_block(|block| {
-                assert_eq!(block.block_type(), BlockType::UintValue);
-                assert_eq!(block.uint_value().unwrap(), 1);
+            property.get_block::<_, Uint>(|block| {
+                assert_eq!(block.block_type(), Some(BlockType::UintValue));
+                assert_eq!(block.value(), 1);
             });
-            node.get_block(|block| {
-                assert_eq!(block.child_count().unwrap(), 1);
+            node.get_block::<_, inspect_format::Node>(|block| {
+                assert_eq!(block.child_count(), 1);
             });
 
             property.set(5);
-            property.get_block(|block| {
-                assert_eq!(block.uint_value().unwrap(), 5);
+            property.get_block::<_, Uint>(|block| {
+                assert_eq!(block.value(), 5);
             });
 
             assert_eq!(property.subtract(3).unwrap(), 2);
-            property.get_block(|block| {
-                assert_eq!(block.uint_value().unwrap(), 2);
+            property.get_block::<_, Uint>(|block| {
+                assert_eq!(block.value(), 2);
             });
 
             assert_eq!(property.add(8).unwrap(), 10);
-            property.get_block(|block| {
-                assert_eq!(block.uint_value().unwrap(), 10);
+            property.get_block::<_, Uint>(|block| {
+                assert_eq!(block.value(), 10);
             });
         }
-        node.get_block(|block| {
-            assert_eq!(block.child_count().unwrap(), 0);
+        node.get_block::<_, inspect_format::Node>(|block| {
+            assert_eq!(block.child_count(), 0);
         });
     }
 }

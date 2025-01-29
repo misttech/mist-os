@@ -8,7 +8,7 @@
 //!
 //! [inspect-vmo]: https://fuchsia.dev/fuchsia-src/reference/diagnostics/inspect/vmo-format
 
-use crate::block::Block;
+use crate::block::{Block, BlockKind};
 use crate::container::{ReadBytes, WriteBytes};
 use std::ops::{Deref, DerefMut};
 
@@ -24,7 +24,7 @@ macro_rules! bitfield_fields {
             $(#[$attr])*
             #[inline]
             #[allow(clippy::identity_op)]
-            pub fn $name<T: Deref<Target=Q>, Q: ReadBytes>(b: &Block<T>) -> $type {
+            pub fn $name<T: Deref<Target=Q>, Q: ReadBytes, K: BlockKind>(b: &Block<T, K>) -> $type {
                 if let Some(value) = b.container.get_value::<u64>(b.$offset_fn()) {
                     static MASK : u64 = (1 << ($msb - $lsb + 1)) - 1;
                     // This cast is fine. We only deal with u8, u16, u32, u64 here.
@@ -36,8 +36,8 @@ macro_rules! bitfield_fields {
             $(#[$attr])*
             #[inline]
             #[allow(clippy::identity_op)]
-            pub fn [<set_ $name>]<T: Deref<Target=Q> + DerefMut<Target=Q>, Q: WriteBytes + ReadBytes>(
-                   b: &mut Block<T>, value: $type) {
+            pub fn [<set_ $name>]<T: Deref<Target=Q> + DerefMut<Target=Q>, Q: WriteBytes + ReadBytes, K: BlockKind>(
+                   b: &mut Block<T, K>, value: $type) {
                 let offset = b.$offset_fn();
                 if let Some(num_ref) = b.container.get_value_mut::<u64>(offset) {
                     static MASK : u64 = (1u64 << ($msb - $lsb + 1)) - 1;
@@ -59,14 +59,14 @@ macro_rules! block_bitfield {
             bitfield_fields!{$offset_fn, $($rest)*}
 
             /// Get the raw 64 bits of the header section of the block.
-            pub fn value<T: Deref<Target=Q>, Q: ReadBytes>(b: &Block<T>) -> u64 {
+            pub fn value<T: Deref<Target=Q>, Q: ReadBytes, K: BlockKind>(b: &Block<T, K>) -> u64 {
                 b.container.get_value::<u64>(b.$offset_fn()).map(|x| *x).unwrap_or(0)
             }
 
             /// Set the raw 64 bits of the header section of the block.
             #[inline]
-            pub fn set_value<T: Deref<Target=Q> + DerefMut<Target=Q>, Q: WriteBytes + ReadBytes>(
-                b: &mut Block<T>, value: u64
+            pub fn set_value<T: Deref<Target=Q> + DerefMut<Target=Q>, Q: WriteBytes + ReadBytes, K: BlockKind>(
+                b: &mut Block<T, K>, value: u64
             ) {
                 let offset = b.$offset_fn();
                 if let Some(num_ref) = b.container.get_value_mut::<u64>(offset) {
@@ -181,75 +181,15 @@ block_bitfield! {
     u8, disposition_flags: 63, 60;
 }
 
-impl PayloadFields {
-    /// Only for `INT/UINT/DOUBLE_VALUE` blocks. The numeric value of the block, this number has to
-    /// be casted to its type for `INT` and `DOUBLE` blocks.
-    #[inline]
-    pub fn numeric_value<T: Deref<Target = Q>, Q: ReadBytes>(b: &Block<T>) -> u64 {
-        Self::value(b)
-    }
-
-    /// Only for `INT/UINT/DOUBLE_VALUE` blocks. The numeric value of the block, this number has to
-    /// be casted to its type for `INT` and `DOUBLE` blocks.
-    #[inline]
-    pub fn set_numeric_value<
-        T: Deref<Target = Q> + DerefMut<Target = Q>,
-        Q: WriteBytes + ReadBytes,
-    >(
-        b: &mut Block<T>,
-        value: u64,
-    ) {
-        Self::set_value(b, value);
-    }
-
-    /// Only for the `HEADER` block. The generation count of the header, used for implementing
-    /// locking.
-    #[inline]
-    pub fn header_generation_count<T: Deref<Target = Q>, Q: ReadBytes>(b: &Block<T>) -> u64 {
-        Self::value(b)
-    }
-
-    /// Only for the `HEADER` block. The generation count of the header, used for implementing
-    /// locking.
-    #[inline]
-    pub fn set_header_generation_count<
-        T: Deref<Target = Q> + DerefMut<Target = Q>,
-        Q: WriteBytes + ReadBytes,
-    >(
-        b: &mut Block<T>,
-        value: u64,
-    ) {
-        Self::set_value(b, value);
-    }
-
-    /// Only for NODE blocks
-    #[inline]
-    pub fn child_count<T: Deref<Target = Q>, Q: ReadBytes>(b: &Block<T>) -> u64 {
-        Self::value(b)
-    }
-
-    /// Only for NODE blocks
-    #[inline]
-    pub fn set_child_count<
-        T: Deref<Target = Q> + DerefMut<Target = Q>,
-        Q: WriteBytes + ReadBytes,
-    >(
-        b: &mut Block<T>,
-        value: u64,
-    ) {
-        Self::set_value(b, value);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::BlockIndex;
+    use crate::{BlockIndex, Buffer, Header};
 
     #[fuchsia::test]
     fn test_header() {
         let mut container = [0u8; 16];
-        let mut block = Block::new(&mut container, BlockIndex::EMPTY);
+        let mut block = Block::<_, Header>::new(&mut container, BlockIndex::EMPTY);
         let magic = 0x494e5350;
         HeaderFields::set_order(&mut block, 13);
         HeaderFields::set_block_type(&mut block, 3);
@@ -264,7 +204,7 @@ mod tests {
     #[fuchsia::test]
     fn test_payload() {
         let mut container = [0u8; 16];
-        let mut block = Block::new(&mut container, BlockIndex::EMPTY);
+        let mut block = Block::<_, Buffer>::new(&mut container, BlockIndex::EMPTY);
         PayloadFields::set_property_total_length(&mut block, 0xab);
         PayloadFields::set_property_extent_index(&mut block, 0x1234);
         PayloadFields::set_property_flags(&mut block, 3);

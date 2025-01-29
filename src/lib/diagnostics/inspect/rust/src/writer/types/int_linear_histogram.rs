@@ -82,6 +82,7 @@ mod tests {
     use super::*;
     use crate::writer::testing_utils::GetBlockExt;
     use crate::writer::Inspector;
+    use inspect_format::{Array, Int};
 
     #[fuchsia::test]
     fn int_linear_histogram() {
@@ -96,18 +97,18 @@ mod tests {
             int_histogram.insert_multiple(-1, 2); // underflow
             int_histogram.insert(25);
             int_histogram.insert(500); // overflow
-            int_histogram.array.get_block(|block| {
+            int_histogram.array.get_block::<_, Array<Int>>(|block| {
                 for (i, value) in [10, 5, 2, 0, 0, 0, 1, 0, 1].iter().enumerate() {
-                    assert_eq!(block.array_get_int_slot(i).unwrap(), *value);
+                    assert_eq!(block.get(i).unwrap(), *value);
                 }
             });
 
-            node.get_block(|node_block| {
-                assert_eq!(node_block.child_count().unwrap(), 1);
+            node.get_block::<_, inspect_format::Node>(|node_block| {
+                assert_eq!(node_block.child_count(), 1);
             });
         }
-        node.get_block(|node_block| {
-            assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block::<_, inspect_format::Node>(|node_block| {
+            assert_eq!(node_block.child_count(), 0);
         });
     }
 }

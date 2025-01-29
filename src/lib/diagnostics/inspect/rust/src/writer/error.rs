@@ -5,7 +5,7 @@
 use inspect_format::{BlockIndex, BlockType, Error as FormatError};
 
 /// Errors that Inspect API functions can return.
-#[derive(Clone, Debug, thiserror::Error)]
+#[derive(Clone, Debug, PartialEq, thiserror::Error)]
 pub enum Error {
     #[error("FIDL error: {0}")]
     Fidl(String),
@@ -55,7 +55,7 @@ pub enum Error {
     BlockSizeTooBig(usize),
 
     #[error("Invalid block type at index {0}: {1:?}")]
-    InvalidBlockType(BlockIndex, BlockType),
+    InvalidBlockType(BlockIndex, u8),
 
     #[error("Invalid block type at index {0}: {1}")]
     InvalidBlockTypeNumber(BlockIndex, u8),
@@ -80,6 +80,9 @@ pub enum Error {
 
     #[error("Expected a valid entry type for the array at index {0}")]
     InvalidArrayType(BlockIndex),
+
+    #[error("Invalid array index: {0}")]
+    InvalidArrayIndex(usize),
 
     #[error("{slots} exceeds the maximum number of slots for order {order}: {max_capacity}")]
     ArrayCapacityExceeded { slots: usize, order: u8, max_capacity: usize },

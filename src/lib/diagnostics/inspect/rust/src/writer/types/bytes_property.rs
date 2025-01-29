@@ -39,7 +39,7 @@ mod tests {
     use super::*;
     use crate::writer::testing_utils::{get_state, GetBlockExt};
     use crate::writer::Node;
-    use inspect_format::{BlockType, PropertyFormat};
+    use inspect_format::{BlockType, Buffer, PropertyFormat};
 
     #[fuchsia::test]
     fn bytes_property() {
@@ -52,22 +52,22 @@ mod tests {
         let node = root.create_child("node");
         {
             let property = node.create_bytes("property", b"test");
-            property.get_block(|block| {
-                assert_eq!(block.block_type(), BlockType::BufferValue);
-                assert_eq!(block.total_length().unwrap(), 4);
-                assert_eq!(block.property_format().unwrap(), PropertyFormat::Bytes);
+            property.get_block::<_, Buffer>(|block| {
+                assert_eq!(block.block_type(), Some(BlockType::BufferValue));
+                assert_eq!(block.total_length(), 4);
+                assert_eq!(block.format(), Some(PropertyFormat::Bytes));
             });
-            node.get_block(|block| {
-                assert_eq!(block.child_count().unwrap(), 1);
+            node.get_block::<_, inspect_format::Node>(|block| {
+                assert_eq!(block.child_count(), 1);
             });
 
             property.set(b"test-set");
-            property.get_block(|block| {
-                assert_eq!(block.total_length().unwrap(), 8);
+            property.get_block::<_, Buffer>(|block| {
+                assert_eq!(block.total_length(), 8);
             });
         }
-        node.get_block(|block| {
-            assert_eq!(block.child_count().unwrap(), 0);
+        node.get_block::<_, inspect_format::Node>(|block| {
+            assert_eq!(block.child_count(), 0);
         });
     }
 }

@@ -25,15 +25,12 @@ impl ArrayProperty for DoubleArrayProperty {
 
     fn set(&self, index: usize, value: impl Into<Self::Type>) {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
-            inner_ref
-                .state
-                .try_lock()
-                .and_then(|mut state| {
+            match inner_ref.state.try_lock() {
+                Ok(mut state) => {
                     state.set_array_double_slot(inner_ref.block_index, index, value.into())
-                })
-                .unwrap_or_else(|err| {
-                    error!(err:?; "Failed to set property");
-                });
+                }
+                Err(err) => error!(err:?; "Failed to set property"),
+            }
         }
     }
 
@@ -53,29 +50,23 @@ impl ArrayProperty for DoubleArrayProperty {
 impl ArithmeticArrayProperty for DoubleArrayProperty {
     fn add(&self, index: usize, value: f64) {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
-            inner_ref
-                .state
-                .try_lock()
-                .and_then(|mut state| {
-                    state.add_array_double_slot(inner_ref.block_index, index, value)
-                })
-                .unwrap_or_else(|err| {
-                    error!(err:?; "Failed to add property");
-                });
+            match inner_ref.state.try_lock() {
+                Ok(mut state) => {
+                    state.add_array_double_slot(inner_ref.block_index, index, value);
+                }
+                Err(err) => error!(err:?; "Failed to add property"),
+            }
         }
     }
 
     fn subtract(&self, index: usize, value: f64) {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
-            inner_ref
-                .state
-                .try_lock()
-                .and_then(|mut state| {
-                    state.subtract_array_double_slot(inner_ref.block_index, index, value)
-                })
-                .unwrap_or_else(|err| {
-                    error!(err:?; "Failed to subtract property");
-                });
+            match inner_ref.state.try_lock() {
+                Ok(mut state) => {
+                    state.subtract_array_double_slot(inner_ref.block_index, index, value);
+                }
+                Err(err) => error!(err:?; "Failed to subtract property"),
+            }
         }
     }
 }
@@ -86,6 +77,7 @@ mod tests {
     use crate::writer::testing_utils::GetBlockExt;
     use crate::writer::Inspector;
     use crate::Length;
+    use inspect_format::{Array, Double};
 
     #[fuchsia::test]
     fn test_double_array() {
@@ -101,42 +93,42 @@ mod tests {
             assert_eq!(array.len().unwrap(), 5);
 
             array.set(0, 5.0);
-            array.get_block(|block| {
-                assert_eq!(block.array_get_double_slot(0).unwrap(), 5.0);
+            array.get_block::<_, Array<Double>>(|block| {
+                assert_eq!(block.get(0).unwrap(), 5.0);
             });
 
             array.add(0, 5.3);
-            array.get_block(|array_block| {
-                assert_eq!(array_block.array_get_double_slot(0).unwrap(), 10.3);
+            array.get_block::<_, Array<Double>>(|array_block| {
+                assert_eq!(array_block.get(0).unwrap(), 10.3);
             });
 
             array.subtract(0, 3.4);
-            array.get_block(|array_block| {
-                assert_eq!(array_block.array_get_double_slot(0).unwrap(), 6.9);
+            array.get_block::<_, Array<Double>>(|array_block| {
+                assert_eq!(array_block.get(0).unwrap(), 6.9);
             });
 
             array.set(1, 2.5);
             array.set(3, -3.1);
 
-            array.get_block(|array_block| {
+            array.get_block::<_, Array<Double>>(|array_block| {
                 for (i, value) in [6.9, 2.5, 0.0, -3.1, 0.0].iter().enumerate() {
-                    assert_eq!(array_block.array_get_double_slot(i).unwrap(), *value);
+                    assert_eq!(array_block.get(i).unwrap(), *value);
                 }
             });
 
             array.clear();
-            array.get_block(|array_block| {
+            array.get_block::<_, Array<Double>>(|array_block| {
                 for i in 0..5 {
-                    assert_eq!(0.0, array_block.array_get_double_slot(i).unwrap());
+                    assert_eq!(0.0, array_block.get(i).unwrap());
                 }
             });
 
-            node.get_block(|block| {
-                assert_eq!(block.child_count().unwrap(), 1);
+            node.get_block::<_, inspect_format::Node>(|block| {
+                assert_eq!(block.child_count(), 1);
             });
         }
-        node.get_block(|block| {
-            assert_eq!(block.child_count().unwrap(), 0);
+        node.get_block::<_, inspect_format::Node>(|block| {
+            assert_eq!(block.child_count(), 0);
         });
     }
 }

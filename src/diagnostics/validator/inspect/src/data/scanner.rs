@@ -4,11 +4,11 @@
 
 use super::{Data, LazyNode, Metrics, Node, Payload, Property, ROOT_NAME};
 use crate::metrics::{BlockMetrics, BlockStatus};
-use anyhow::{bail, format_err, Error};
+use anyhow::{bail, format_err, Context, Error};
 use fuchsia_inspect::reader as ireader;
 use fuchsia_inspect::reader::snapshot::ScannedBlock;
 use inspect_format::constants::MIN_ORDER_SIZE;
-use inspect_format::{ArrayFormat, BlockIndex, BlockType, LinkNodeDisposition, PropertyFormat};
+use inspect_format::*;
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use zx::Vmo;
@@ -105,7 +105,7 @@ fn order_to_size(order: u8) -> usize {
 // Checks if these bits (start...end) are 0. Restricts the range checked to the given block.
 fn check_zero_bits(
     buffer: &[u8],
-    block: &ScannedBlock<'_>,
+    block: &ScannedBlock<'_, Unknown>,
     start: usize,
     end: usize,
 ) -> Result<(), Error> {
@@ -126,10 +126,10 @@ fn check_zero_bits(
         match bottom_bits & top_bits {
             0 => return Ok(()),
             nonzero => bail!(
-                "Bits {}...{} of block type {} at {} have nonzero value {}",
+                "Bits {}...{} of block type {:?} at {} have nonzero value {}",
                 start,
                 end,
-                block.block_type_or()?,
+                block.block_type(),
                 block.index(),
                 nonzero
             ),
@@ -137,29 +137,29 @@ fn check_zero_bits(
     }
     if bottom_bits != 0 {
         bail!(
-            "Non-zero value {} for bits {}.. of block type {} at {}",
+            "Non-zero value {} for bits {}.. of block type {:?} at {}",
             bottom_bits,
             start,
-            block.block_type_or()?,
+            block.block_type(),
             block.index()
         );
     }
     if top_bits != 0 {
         bail!(
-            "Non-zero value {} for bits ..{} of block type {} at {}",
+            "Non-zero value {} for bits ..{} of block type {:?} at {}",
             top_bits,
             end,
-            block.block_type_or()?,
+            block.block_type(),
             block.index()
         );
     }
     for byte in low_byte + 1..high_byte {
         if buffer[byte + block_offset] != 0 {
             bail!(
-                "Non-zero value {} for byte {} of block type {} at {}",
+                "Non-zero value {} for byte {} of block type {:?} at {}",
                 buffer[byte],
                 byte,
-                block.block_type_or()?,
+                block.block_type(),
                 block.index()
             );
         }
@@ -197,28 +197,27 @@ impl Scanner {
     }
 
     fn scan(mut self, snapshot: ireader::snapshot::Snapshot, buffer: &[u8]) -> Result<Self, Error> {
-        let mut link_blocks: Vec<ScannedBlock<'_>> = Vec::new();
+        let mut link_blocks: Vec<ScannedBlock<'_, Unknown>> = Vec::new();
         let mut string_references: Vec<ScannedStringReference> = Vec::new();
         for block in snapshot.scan() {
-            match block.block_type_or() {
-                Ok(BlockType::Free) => self.process_free(block)?,
-                Ok(BlockType::Reserved) => self.process_reserved(block)?,
-                Ok(BlockType::Header) => self.process_header(block)?,
-                Ok(BlockType::NodeValue) => self.process_node(block)?,
-                Ok(BlockType::IntValue)
-                | Ok(BlockType::UintValue)
-                | Ok(BlockType::DoubleValue)
-                | Ok(BlockType::ArrayValue)
-                | Ok(BlockType::BufferValue)
-                | Ok(BlockType::BoolValue) => self.process_property(block, buffer)?,
-                Ok(BlockType::LinkValue) => link_blocks.push(block),
-                Ok(BlockType::Extent) => self.process_extent(block, buffer)?,
-                Ok(BlockType::Name) => self.process_name(block, buffer)?,
-                Ok(BlockType::Tombstone) => self.process_tombstone(block)?,
-                Ok(BlockType::StringReference) => {
+            match block.block_type().ok_or(format_err!("invalid block type"))? {
+                BlockType::Free => self.process_free(block)?,
+                BlockType::Reserved => self.process_reserved(block)?,
+                BlockType::Header => self.process_header(block)?,
+                BlockType::NodeValue => self.process_node(block)?,
+                BlockType::IntValue => self.process_property::<Int>(block, buffer)?,
+                BlockType::UintValue => self.process_property::<Uint>(block, buffer)?,
+                BlockType::DoubleValue => self.process_property::<Double>(block, buffer)?,
+                BlockType::ArrayValue => self.process_property::<Array<Unknown>>(block, buffer)?,
+                BlockType::BufferValue => self.process_property::<Buffer>(block, buffer)?,
+                BlockType::BoolValue => self.process_property::<Bool>(block, buffer)?,
+                BlockType::LinkValue => link_blocks.push(block),
+                BlockType::Extent => self.process_extent(block, buffer)?,
+                BlockType::Name => self.process_name(block, buffer)?,
+                BlockType::Tombstone => self.process_tombstone(block)?,
+                BlockType::StringReference => {
                     string_references.push(self.process_string_reference(block)?);
                 }
-                Err(error) => return Err(format_err!("Failed to read block type: {:?}", error)),
             }
         }
 
@@ -231,7 +230,7 @@ impl Scanner {
         // We defer processing LINK blocks after because the population of the
         // ScannedPayload::Link depends on all NAME blocks having been read.
         for block in link_blocks.into_iter() {
-            self.process_property(block, buffer)?
+            self.process_property::<Link>(block, buffer)?
         }
 
         let (mut new_nodes, mut new_properties) = self.make_valid_node_tree(BlockIndex::ROOT)?;
@@ -347,57 +346,59 @@ impl Scanner {
     // Note: process_ functions are only called from the scan() iterator on the
     // VMO's blocks, so indexes of the blocks themselves will never be duplicated; that's one
     // thing we don't have to verify.
-    fn process_free(&mut self, block: ScannedBlock<'_>) -> Result<(), Error> {
+    fn process_free(&mut self, block: ScannedBlock<'_, Unknown>) -> Result<(), Error> {
         // TODO(https://fxbug.dev/42115894): Uncomment or delete this line depending on the resolution of https://fxbug.dev/42115938.
         // check_zero_bits(buffer, &block, 64, MAX_BLOCK_BITS)?;
         self.metrics.process(block)?;
         Ok(())
     }
 
-    fn process_header(&mut self, block: ScannedBlock<'_>) -> Result<(), Error> {
+    fn process_header(&mut self, block: ScannedBlock<'_, Unknown>) -> Result<(), Error> {
         self.metrics.process(block)?;
         Ok(())
     }
 
-    fn process_tombstone(&mut self, block: ScannedBlock<'_>) -> Result<(), Error> {
+    fn process_tombstone(&mut self, block: ScannedBlock<'_, Unknown>) -> Result<(), Error> {
         self.metrics.process(block)?;
         Ok(())
     }
 
-    fn process_reserved(&mut self, block: ScannedBlock<'_>) -> Result<(), Error> {
+    fn process_reserved(&mut self, block: ScannedBlock<'_, Unknown>) -> Result<(), Error> {
         self.metrics.process(block)?;
         Ok(())
     }
 
-    fn process_extent(&mut self, block: ScannedBlock<'_>, buffer: &[u8]) -> Result<(), Error> {
+    fn process_extent(
+        &mut self,
+        block: ScannedBlock<'_, Unknown>,
+        buffer: &[u8],
+    ) -> Result<(), Error> {
         check_zero_bits(buffer, &block, 40, 63)?;
-        self.extents.insert(
-            block.index(),
-            ScannedExtent {
-                next: block.next_extent()?,
-                data: block.extent_contents()?.to_vec(),
-                metrics: Metrics::analyze(block)?,
-            },
-        );
+        let extent = block.clone().cast::<Extent>().unwrap();
+        let next = extent.next_extent();
+        let data = extent.contents()?.to_vec();
+        self.extents
+            .insert(block.index(), ScannedExtent { next, data, metrics: Metrics::analyze(block)? });
         Ok(())
     }
 
-    fn process_name(&mut self, block: ScannedBlock<'_>, buffer: &[u8]) -> Result<(), Error> {
+    fn process_name(
+        &mut self,
+        block: ScannedBlock<'_, Unknown>,
+        buffer: &[u8],
+    ) -> Result<(), Error> {
         check_zero_bits(buffer, &block, 28, 63)?;
-        self.names.insert(
-            block.index(),
-            ScannedName {
-                name: block.name_contents()?.to_string(),
-                metrics: Metrics::analyze(block)?,
-            },
-        );
+        let name_block = block.clone().cast::<Name>().unwrap();
+        let name = name_block.contents()?.to_string();
+        self.names.insert(block.index(), ScannedName { name, metrics: Metrics::analyze(block)? });
         Ok(())
     }
 
-    fn process_node(&mut self, block: ScannedBlock<'_>) -> Result<(), Error> {
-        let parent = block.parent_index()?;
-        let id = block.index();
-        let name = block.name_index()?;
+    fn process_node(&mut self, block: ScannedBlock<'_, Unknown>) -> Result<(), Error> {
+        let node_block = block.clone().cast::<inspect_format::Node>().unwrap();
+        let parent = node_block.parent_index();
+        let id = node_block.index();
+        let name = node_block.name_index();
         let mut node;
         let metrics = Some(Metrics::analyze(block)?);
         if let Some(placeholder) = self.nodes.remove(&id) {
@@ -441,122 +442,40 @@ impl Scanner {
         }
     }
 
-    fn build_scanned_payload(
-        &mut self,
-        block: &ScannedBlock<'_>,
-        block_type: BlockType,
-    ) -> Result<ScannedPayload, Error> {
-        Ok(match block_type {
-            BlockType::IntValue => ScannedPayload::Int(block.int_value()?),
-            BlockType::UintValue => ScannedPayload::Uint(block.uint_value()?),
-            BlockType::DoubleValue => ScannedPayload::Double(block.double_value()?),
-            BlockType::BoolValue => ScannedPayload::Bool(block.bool_value()?),
-            BlockType::BufferValue => {
-                let format = block.property_format()?;
-                let link = block.property_extent_index()?;
-                match format {
-                    PropertyFormat::String => {
-                        let length = Some(block.total_length()?);
-                        ScannedPayload::String { length, link }
-                    }
-                    PropertyFormat::Bytes => {
-                        let length = block.total_length()?;
-                        ScannedPayload::Bytes { length, link }
-                    }
-                    PropertyFormat::StringReference => {
-                        ScannedPayload::String { link, length: None }
-                    }
-                }
-            }
-            BlockType::ArrayValue => {
-                let entry_type = block.array_entry_type()?;
-                let slots = block.array_slots()?;
-                match entry_type {
-                    BlockType::IntValue => {
-                        let array_format = block.array_format()?;
-                        let numbers: Result<Vec<i64>, _> =
-                            (0..slots).map(|i| block.array_get_int_slot(i)).collect();
-                        ScannedPayload::IntArray(numbers?, array_format)
-                    }
-                    BlockType::UintValue => {
-                        let array_format = block.array_format()?;
-                        let numbers: Result<Vec<u64>, _> =
-                            (0..slots).map(|i| block.array_get_uint_slot(i)).collect();
-                        ScannedPayload::UintArray(numbers?, array_format)
-                    }
-                    BlockType::DoubleValue => {
-                        let array_format = block.array_format()?;
-                        let numbers: Result<Vec<f64>, _> =
-                            (0..slots).map(|i| block.array_get_double_slot(i)).collect();
-                        ScannedPayload::DoubleArray(numbers?, array_format)
-                    }
-                    BlockType::StringReference => {
-                        let indexes: Result<Vec<BlockIndex>, _> =
-                            (0..slots).map(|i| block.array_get_string_index_slot(i)).collect();
-                        ScannedPayload::StringArray(indexes?)
-                    }
-                    illegal_type => {
-                        return Err(format_err!(
-                            "No way I should see {:?} for ArrayEntryType",
-                            illegal_type
-                        ))
-                    }
-                }
-            }
-            BlockType::LinkValue => {
-                let child_name =
-                    self.lookup_name_or_string_reference(block.link_content_index()?).ok().ok_or(
-                        format_err!("Child name not found for LinkValue block {}.", block.index()),
-                    )?;
-                let child_trees = self
-                    .child_trees
-                    .as_mut()
-                    .ok_or(format_err!("LinkValue encountered without child tree."))?;
-                let child_tree = child_trees.remove(&child_name).ok_or(format_err!(
-                    "Lazy node not found for LinkValue block {} with name {}.",
-                    block.index(),
-                    child_name
-                ))?;
-                ScannedPayload::Link {
-                    disposition: block.link_node_disposition()?,
-                    scanned_tree: Box::new(Scanner::try_from(child_tree)?),
-                }
-            }
-            illegal_type => {
-                return Err(format_err!("No way I should see {:?} for BlockType", illegal_type))
-            }
-        })
-    }
-
     fn process_string_reference(
         &mut self,
-        block: ScannedBlock<'_>,
+        block: ScannedBlock<'_, Unknown>,
     ) -> Result<ScannedStringReference, Error> {
+        let string_ref = block.clone().cast::<StringRef>().unwrap();
         let scanned = ScannedStringReference {
             index: block.index(),
-            value: block.inline_string_reference()?.to_vec(),
-            length: block.total_length()?,
-            next_extent: block.next_extent()?,
+            value: string_ref.inline_data()?.to_vec(),
+            length: string_ref.total_length(),
+            next_extent: string_ref.next_extent(),
         };
 
         self.metrics.process(block)?;
         Ok(scanned)
     }
 
-    fn process_property(&mut self, block: ScannedBlock<'_>, buffer: &[u8]) -> Result<(), Error> {
-        if block.block_type_or()? == BlockType::ArrayValue {
+    fn process_property<K>(
+        &mut self,
+        block: ScannedBlock<'_, Unknown>,
+        buffer: &[u8],
+    ) -> Result<(), Error>
+    where
+        K: ValueBlockKind + Clone,
+        ScannedPayload: BuildScannedPayload<K>,
+    {
+        if block.block_type() == Some(BlockType::ArrayValue) {
             check_zero_bits(buffer, &block, 80, 127)?;
         }
-        let id = block.index();
-        let parent = block.parent_index()?;
-        let block_type = block.block_type_or()?;
-        let payload = self.build_scanned_payload(&block, block_type)?;
-        let property = ScannedProperty {
-            name: block.name_index()?,
-            parent,
-            payload,
-            metrics: Metrics::analyze(block)?,
-        };
+        let property_block = block.clone().cast::<K>().unwrap();
+        let id = property_block.index();
+        let parent = property_block.parent_index();
+        let name = property_block.name_index();
+        let payload = ScannedPayload::build(property_block, self)?;
+        let property = ScannedProperty { name, parent, payload, metrics: Metrics::analyze(block)? };
         self.properties.insert(id, property);
         self.add_to_parent(parent, id, |node| &mut node.properties);
         Ok(())
@@ -745,13 +664,129 @@ enum ScannedPayload {
     },
 }
 
+trait BuildScannedPayload<K> {
+    fn build(block: ScannedBlock<'_, K>, _scanner: &mut Scanner) -> Result<ScannedPayload, Error>;
+}
+
+impl BuildScannedPayload<Int> for ScannedPayload {
+    fn build(block: ScannedBlock<'_, Int>, _scanner: &mut Scanner) -> Result<Self, Error> {
+        Ok(Self::Int(block.value()))
+    }
+}
+
+impl BuildScannedPayload<Uint> for ScannedPayload {
+    fn build(block: ScannedBlock<'_, Uint>, _scanner: &mut Scanner) -> Result<Self, Error> {
+        Ok(Self::Uint(block.value()))
+    }
+}
+
+impl BuildScannedPayload<Double> for ScannedPayload {
+    fn build(block: ScannedBlock<'_, Double>, _scanner: &mut Scanner) -> Result<Self, Error> {
+        Ok(Self::Double(block.value()))
+    }
+}
+
+impl BuildScannedPayload<Bool> for ScannedPayload {
+    fn build(block: ScannedBlock<'_, Bool>, _scanner: &mut Scanner) -> Result<Self, Error> {
+        Ok(Self::Bool(block.value()))
+    }
+}
+
+impl BuildScannedPayload<Buffer> for ScannedPayload {
+    fn build(block: ScannedBlock<'_, Buffer>, _scanner: &mut Scanner) -> Result<Self, Error> {
+        let format = block.format().ok_or(format_err!("invalid format"))?;
+        let link = block.extent_index();
+        Ok(match format {
+            PropertyFormat::String => {
+                let length = Some(block.total_length());
+                ScannedPayload::String { length, link }
+            }
+            PropertyFormat::Bytes => {
+                let length = block.total_length();
+                ScannedPayload::Bytes { length, link }
+            }
+            PropertyFormat::StringReference => ScannedPayload::String { link, length: None },
+        })
+    }
+}
+
+impl BuildScannedPayload<Array<Unknown>> for ScannedPayload {
+    fn build(
+        block: ScannedBlock<'_, Array<Unknown>>,
+        _scanner: &mut Scanner,
+    ) -> Result<Self, Error> {
+        let entry_type = block.entry_type().ok_or(format_err!("unknown array entry type"))?;
+        let array_format = block.format().ok_or(format_err!("unknown array format"))?;
+        let slots = block.slots();
+        match entry_type {
+            BlockType::IntValue => {
+                let block = block.cast_array::<Int>().unwrap();
+                let numbers: Result<Vec<i64>, _> = (0..slots)
+                    .map(|i| block.get(i).ok_or(format_err!("no entry at index: {i}")))
+                    .collect();
+                Ok(ScannedPayload::IntArray(numbers?, array_format))
+            }
+            BlockType::UintValue => {
+                let block = block.cast_array::<Uint>().unwrap();
+                let numbers: Result<Vec<u64>, _> = (0..slots)
+                    .map(|i| block.get(i).ok_or(format_err!("no entry at index: {i}")))
+                    .collect();
+                Ok(ScannedPayload::UintArray(numbers?, array_format))
+            }
+            BlockType::DoubleValue => {
+                let block = block.cast_array::<Double>().unwrap();
+                let numbers: Result<Vec<f64>, _> = (0..slots)
+                    .map(|i| block.get(i).ok_or(format_err!("no entry at index: {i}")))
+                    .collect();
+                Ok(ScannedPayload::DoubleArray(numbers?, array_format))
+            }
+            BlockType::StringReference => {
+                let block = block.cast_array::<StringRef>().unwrap();
+                let indexes: Result<Vec<BlockIndex>, _> = (0..slots)
+                    .map(|i| {
+                        block.get_string_index_at(i).ok_or(format_err!("no entry at index: {i}"))
+                    })
+                    .collect();
+                Ok(ScannedPayload::StringArray(indexes?))
+            }
+            illegal_type => {
+                Err(format_err!("No way I should see {:?} for ArrayEntryType", illegal_type))
+            }
+        }
+    }
+}
+
+impl BuildScannedPayload<Link> for ScannedPayload {
+    fn build(block: ScannedBlock<'_, Link>, scanner: &mut Scanner) -> Result<Self, Error> {
+        let child_name = scanner
+            .lookup_name_or_string_reference(block.content_index())
+            .context(format_err!("Child name not found for LinkValue block {}.", block.index()))?;
+        let child_trees = scanner
+            .child_trees
+            .as_mut()
+            .ok_or(format_err!("LinkValue encountered without child tree."))?;
+        let child_tree = child_trees.remove(&child_name).ok_or(format_err!(
+            "Lazy node not found for LinkValue block {} with name {}.",
+            block.index(),
+            child_name
+        ))?;
+        Ok(ScannedPayload::Link {
+            disposition: block.link_node_disposition().ok_or(format_err!("invalid disposition"))?,
+            scanned_tree: Box::new(Scanner::try_from(child_tree)?),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::*;
     use fidl_diagnostics_validate::*;
     use fuchsia_inspect::reader::snapshot::BackingBuffer;
-    use inspect_format::{constants, Block, HeaderFields, PayloadFields, ReadBytes};
+    use inspect_format::{
+        constants, Block, BlockAccessorExt, BlockAccessorMutExt, HeaderFields, PayloadFields,
+        ReadBytes,
+    };
     use num_traits::ToPrimitive;
 
     // TODO(https://fxbug.dev/42115894): Depending on the resolution of https://fxbug.dev/42115938, move this const out of mod test.
@@ -817,11 +852,15 @@ mod tests {
         buffer[location] = previous;
     }
 
-    fn put_header<T: ReadBytes>(header: &Block<&mut T>, buffer: &mut [u8], index: usize) {
+    fn put_header<T: ReadBytes>(header: &Block<&mut T, Unknown>, buffer: &mut [u8], index: usize) {
         copy_into(&HeaderFields::value(header).to_le_bytes(), buffer, index * 16);
     }
 
-    fn put_payload<T: ReadBytes>(payload: &Block<&mut T>, buffer: &mut [u8], index: usize) {
+    fn put_payload<T: ReadBytes>(
+        payload: &Block<&mut T, Unknown>,
+        buffer: &mut [u8],
+        index: usize,
+    ) {
         copy_into(&PayloadFields::value(payload).to_le_bytes(), buffer, index * 16 + 8);
     }
 
@@ -834,7 +873,7 @@ mod tests {
 
         // VMO Header block (index 0)
         let mut container = [0u8; 16];
-        let mut header = Block::new(&mut container, BlockIndex::EMPTY);
+        let mut header = container.block_at_mut(BlockIndex::EMPTY);
         HeaderFields::set_order(&mut header, 0);
         HeaderFields::set_block_type(&mut header, BlockType::Header.to_u8().unwrap());
         HeaderFields::set_header_magic(&mut header, constants::HEADER_MAGIC_NUMBER);
@@ -856,7 +895,7 @@ mod tests {
         copy_into(&[6, 0, 0, 0], &mut buffer, (*NUMBER_NAME * 16 + 8).try_into().unwrap());
         copy_into(b"numb", &mut buffer, (*NUMBER_NAME * 16 + 12).try_into().unwrap());
         let mut container = [0u8; 16];
-        let mut number_extent = Block::new(&mut container, BlockIndex::EMPTY);
+        let mut number_extent = container.block_at_mut(BlockIndex::EMPTY);
         HeaderFields::set_order(&mut number_extent, 0);
         HeaderFields::set_block_type(&mut number_extent, BlockType::Extent.to_u8().unwrap());
         HeaderFields::set_extent_next_index(&mut number_extent, 0);
@@ -873,7 +912,7 @@ mod tests {
         const HEADER: usize = 0;
         {
             let mut container = [0u8; 16];
-            let mut header = Block::new(&mut container, BlockIndex::EMPTY);
+            let mut header = container.block_at_mut(BlockIndex::EMPTY);
             HeaderFields::set_order(&mut header, 0);
             HeaderFields::set_block_type(&mut header, BlockType::Header.to_u8().unwrap());
             HeaderFields::set_header_magic(&mut header, constants::HEADER_MAGIC_NUMBER);
@@ -883,7 +922,7 @@ mod tests {
         const ROOT: usize = 1;
         {
             let mut container = [0u8; 16];
-            let mut header = Block::new(&mut container, BlockIndex::EMPTY);
+            let mut header = container.block_at_mut(BlockIndex::EMPTY);
             HeaderFields::set_order(&mut header, 0);
             HeaderFields::set_block_type(&mut header, BlockType::NodeValue.to_u8().unwrap());
             HeaderFields::set_value_name_index(&mut header, 2);
@@ -895,7 +934,7 @@ mod tests {
         const ROOT_NAME: usize = 2;
         {
             let mut container = [0u8; 16];
-            let mut header = Block::new(&mut container, BlockIndex::EMPTY);
+            let mut header = container.block_at_mut(BlockIndex::EMPTY);
             HeaderFields::set_order(&mut header, 0);
             HeaderFields::set_block_type(&mut header, BlockType::Name.to_u8().unwrap());
             HeaderFields::set_name_length(&mut header, 4);
@@ -917,7 +956,7 @@ mod tests {
         // Let's give it a property.
         const NUMBER: usize = 4;
         let mut container = [0u8; 16];
-        let mut number_header = Block::new(&mut container, BlockIndex::EMPTY);
+        let mut number_header = container.block_at_mut(BlockIndex::EMPTY);
         HeaderFields::set_order(&mut number_header, 0);
         HeaderFields::set_block_type(&mut number_header, BlockType::IntValue.to_u8().unwrap());
         HeaderFields::set_value_name_index(&mut number_header, 3);
@@ -926,7 +965,7 @@ mod tests {
         const NUMBER_NAME: usize = 3;
         {
             let mut container = [0u8; 16];
-            let mut header = Block::new(&mut container, BlockIndex::EMPTY);
+            let mut header = container.block_at_mut(BlockIndex::EMPTY);
             HeaderFields::set_order(&mut header, 0);
             HeaderFields::set_block_type(&mut header, BlockType::Name.to_u8().unwrap());
             HeaderFields::set_name_length(&mut header, 6);
@@ -1108,7 +1147,7 @@ mod tests {
         }
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());
-            let block = Block::new(&backing_buffer, 1.into());
+            let block = backing_buffer.block_at(1.into());
             assert!(check_zero_bits(&buffer, &block, 1, 0).is_err());
             assert!(check_zero_bits(&buffer, &block, 0, 0).is_ok());
             assert!(check_zero_bits(&buffer, &block, 0, MAX_BLOCK_BITS).is_ok());
@@ -1121,7 +1160,7 @@ mod tests {
         // error (even single-bit 8...8). Other ranges should succeed.
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());
-            let block = Block::new(&backing_buffer, 1.into());
+            let block = backing_buffer.block_at(1.into());
             assert!(check_zero_bits(&buffer, &block, 8, 8).is_err());
             assert!(check_zero_bits(&buffer, &block, 8, MAX_BLOCK_BITS).is_err());
             assert!(check_zero_bits(&buffer, &block, 9, MAX_BLOCK_BITS).is_ok());
@@ -1131,7 +1170,7 @@ mod tests {
         // 9...22 and 24...MAX_BLOCK_BITS should succeed. So should 24...63.
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());
-            let block = Block::new(&backing_buffer, 1.into());
+            let block = backing_buffer.block_at(1.into());
             assert!(check_zero_bits(&buffer, &block, 9, MAX_BLOCK_BITS).is_err());
             assert!(check_zero_bits(&buffer, &block, 9, 22).is_ok());
             assert!(check_zero_bits(&buffer, &block, 24, MAX_BLOCK_BITS).is_ok());
@@ -1141,7 +1180,7 @@ mod tests {
         // Now bits 8 and 21 are 1. This tests bit-checks in the middle of the byte.
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());
-            let block = Block::new(&backing_buffer, 1.into());
+            let block = backing_buffer.block_at(1.into());
             assert!(check_zero_bits(&buffer, &block, 16, 20).is_ok());
             assert!(check_zero_bits(&buffer, &block, 21, 21).is_err());
             assert!(check_zero_bits(&buffer, &block, 22, 63).is_ok());
@@ -1150,7 +1189,7 @@ mod tests {
         // Now bits 8, 21, and 63 are 1. Checking 22...63 should fail; 22...62 should succeed.
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());
-            let block = Block::new(&backing_buffer, 1.into());
+            let block = backing_buffer.block_at(1.into());
             assert!(check_zero_bits(&buffer, &block, 22, 63).is_err());
             assert!(check_zero_bits(&buffer, &block, 22, 62).is_ok());
         }
@@ -1159,28 +1198,28 @@ mod tests {
         // detected (cause the check to fail) (to make sure my loop doesn't have an off by 1 error).
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());
-            let block = Block::new(&backing_buffer, 1.into());
+            let block = backing_buffer.block_at(1.into());
             assert!(check_zero_bits(&buffer, &block, 22, 62).is_err());
         }
         buffer[3 + 16] = 0;
         buffer[4 + 16] = 0x10;
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());
-            let block = Block::new(&backing_buffer, 1.into());
+            let block = backing_buffer.block_at(1.into());
             assert!(check_zero_bits(&buffer, &block, 22, 62).is_err());
         }
         buffer[4 + 16] = 0;
         buffer[5 + 16] = 0x10;
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());
-            let block = Block::new(&backing_buffer, 1.into());
+            let block = backing_buffer.block_at(1.into());
             assert!(check_zero_bits(&buffer, &block, 22, 62).is_err());
         }
         buffer[5 + 16] = 0;
         buffer[6 + 16] = 0x10;
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());
-            let block = Block::new(&backing_buffer, 1.into());
+            let block = backing_buffer.block_at(1.into());
             assert!(check_zero_bits(&buffer, &block, 22, 62).is_err());
         }
         buffer[1 + 16] = 0x81;
@@ -1188,7 +1227,7 @@ mod tests {
         // the specified range, and detect 1 bits that are inside the range.
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());
-            let block = Block::new(&backing_buffer, 1.into());
+            let block = backing_buffer.block_at(1.into());
             assert!(check_zero_bits(&buffer, &block, 9, 14).is_ok());
             assert!(check_zero_bits(&buffer, &block, 8, 14).is_err());
             assert!(check_zero_bits(&buffer, &block, 9, 15).is_err());
@@ -1203,7 +1242,7 @@ mod tests {
         const HEADER: usize = 0;
         {
             let mut container = [0u8; 16];
-            let mut header = Block::new(&mut container, BlockIndex::EMPTY);
+            let mut header = container.block_at_mut(BlockIndex::EMPTY);
             HeaderFields::set_order(&mut header, 0);
             HeaderFields::set_block_type(&mut header, BlockType::Header.to_u8().unwrap());
             HeaderFields::set_header_magic(&mut header, constants::HEADER_MAGIC_NUMBER);
@@ -1212,7 +1251,7 @@ mod tests {
         }
         const VALUE: usize = 1;
         let mut container = [0u8; 16];
-        let mut value_header = Block::new(&mut container, BlockIndex::EMPTY);
+        let mut value_header = container.block_at_mut(BlockIndex::EMPTY);
         HeaderFields::set_order(&mut value_header, 0);
         HeaderFields::set_block_type(&mut value_header, BlockType::NodeValue.to_u8().unwrap());
         HeaderFields::set_value_name_index(&mut value_header, 2);
@@ -1222,7 +1261,7 @@ mod tests {
         const VALUE_NAME: usize = 2;
         {
             let mut buf = [0; 16];
-            let mut header = Block::new(&mut buf, 0.into());
+            let mut header = buf.block_at_mut(0.into());
             HeaderFields::set_order(&mut header, 0);
             HeaderFields::set_block_type(&mut header, BlockType::Name.to_u8().unwrap());
             HeaderFields::set_name_length(&mut header, 5);
@@ -1233,7 +1272,7 @@ mod tests {
         const EXTENT: usize = 3;
         {
             let mut container = [0u8; 16];
-            let mut header = Block::new(&mut container, BlockIndex::EMPTY);
+            let mut header = container.block_at_mut(BlockIndex::EMPTY);
             HeaderFields::set_order(&mut header, 0);
             HeaderFields::set_block_type(&mut header, BlockType::Extent.to_u8().unwrap());
             HeaderFields::set_extent_next_index(&mut header, 0);
@@ -1254,7 +1293,7 @@ mod tests {
         put_header(&value_header, &mut buffer, VALUE);
         {
             let mut container = [0u8; 16];
-            let mut array_subheader = Block::new(&mut container, BlockIndex::EMPTY);
+            let mut array_subheader = container.block_at_mut(BlockIndex::EMPTY);
             PayloadFields::set_array_entry_type(
                 &mut array_subheader,
                 BlockType::IntValue.to_u8().unwrap(),

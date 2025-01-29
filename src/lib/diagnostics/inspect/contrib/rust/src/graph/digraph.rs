@@ -1135,8 +1135,8 @@ mod tests {
         let snapshot = Snapshot::try_from(inspector).unwrap();
         snapshot
             .scan()
-            .filter(|block| block.block_type() != BlockType::Free)
-            .map(|b| (b.index(), b.block_type()))
+            .filter(|block| block.block_type() != Some(BlockType::Free))
+            .map(|b| (b.index(), b.block_type().unwrap()))
             .collect::<BTreeSet<_>>()
     }
 }

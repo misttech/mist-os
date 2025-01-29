@@ -9,10 +9,11 @@ use derivative::Derivative;
 use fuchsia_sync::{Mutex, MutexGuard};
 use futures::future::BoxFuture;
 use inspect_format::{
-    constants, utils, ArrayFormat, Block, BlockAccessorExt, BlockAccessorMutExt, BlockContainer,
-    BlockIndex, BlockType, Container, Error as FormatError, LinkNodeDisposition, PropertyFormat,
+    constants, utils, Array, ArrayFormat, ArraySlotKind, Block, BlockAccessorExt,
+    BlockAccessorMutExt, BlockContainer, BlockIndex, BlockType, Bool, Buffer, Container, Double,
+    Error as FormatError, Extent, Int, Link, LinkNodeDisposition, Name, Node, PropertyFormat,
+    Reserved, StringRef, Tombstone, Uint, Unknown,
 };
-use log::error;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -65,18 +66,15 @@ macro_rules! locked_state_metric_fns {
                 self.inner_lock.[<create_ $name _metric>](name, value, parent_index)
             }
 
-            pub fn [<set_ $name _metric>](&mut self, block_index: BlockIndex, value: $type)
-                -> Result<(), Error> {
-                self.inner_lock.[<set_ $name _metric>](block_index, value)
+            pub fn [<set_ $name _metric>](&mut self, block_index: BlockIndex, value: $type) {
+                self.inner_lock.[<set_ $name _metric>](block_index, value);
             }
 
-            pub fn [<add_ $name _metric>](&mut self, block_index: BlockIndex, value: $type)
-                -> Result<$type, Error> {
+            pub fn [<add_ $name _metric>](&mut self, block_index: BlockIndex, value: $type) -> $type {
                 self.inner_lock.[<add_ $name _metric>](block_index, value)
             }
 
-            pub fn [<subtract_ $name _metric>](&mut self, block_index: BlockIndex, value: $type)
-                -> Result<$type, Error> {
+            pub fn [<subtract_ $name _metric>](&mut self, block_index: BlockIndex, value: $type) -> $type {
                 self.inner_lock.[<subtract_ $name _metric>](block_index, value)
             }
         }
@@ -85,7 +83,7 @@ macro_rules! locked_state_metric_fns {
 
 /// Generate create, set, add and subtract methods for a metric.
 macro_rules! metric_fns {
-    ($name:ident, $type:ident) => {
+    ($name:ident, $type:ident, $marker:ident) => {
         paste::paste! {
             fn [<create_ $name _metric>](
                 &mut self,
@@ -95,34 +93,30 @@ macro_rules! metric_fns {
             ) -> Result<BlockIndex, Error> {
                 let (block_index, name_block_index) = self.allocate_reserved_value(
                     name, parent_index, constants::MIN_ORDER_SIZE)?;
-                self.heap.container.block_at_mut(block_index)
-                    .[<become_ $name _value>](value, name_block_index, parent_index)?;
+                self.heap.container.block_at_unchecked_mut::<Reserved>(block_index)
+                    .[<become_ $name _value>](value, name_block_index, parent_index);
                 Ok(block_index)
             }
 
-            fn [<set_ $name _metric>](&mut self, block_index: BlockIndex, value: $type)
-                -> Result<(), Error> {
-                let mut block = self.heap.container.block_at_mut(block_index);
-                block.[<set_ $name _value>](value)?;
-                Ok(())
+            fn [<set_ $name _metric>](&mut self, block_index: BlockIndex, value: $type) {
+                let mut block = self.heap.container.block_at_unchecked_mut::<$marker>(block_index);
+                block.set(value);
             }
 
-            fn [<add_ $name _metric>](&mut self, block_index: BlockIndex, value: $type)
-                -> Result<$type, Error> {
-                let mut block = self.heap.container.block_at_mut(block_index);
-                let current_value = block.[<$name _value>]()?;
+            fn [<add_ $name _metric>](&mut self, block_index: BlockIndex, value: $type) -> $type {
+                let mut block = self.heap.container.block_at_unchecked_mut::<$marker>(block_index);
+                let current_value = block.value();
                 let new_value = current_value.safe_add(value);
-                block.[<set_ $name _value>](new_value)?;
-                Ok(new_value)
+                block.set(new_value);
+                new_value
             }
 
-            fn [<subtract_ $name _metric>](&mut self, block_index: BlockIndex, value: $type)
-                -> Result<$type, Error> {
-                let mut block = self.heap.container.block_at_mut(block_index);
-                let current_value = block.[<$name _value>]()?;
+            fn [<subtract_ $name _metric>](&mut self, block_index: BlockIndex, value: $type) -> $type {
+                let mut block = self.heap.container.block_at_unchecked_mut::<$marker>(block_index);
+                let current_value = block.value();
                 let new_value = current_value.safe_sub(value);
-                block.[<set_ $name _value>](new_value)?;
-                Ok(new_value)
+                block.set(new_value);
+                new_value
             }
         }
     };
@@ -142,19 +136,19 @@ macro_rules! locked_state_array_fns {
 
             pub fn [<set_array_ $name _slot>](
                 &mut self, block_index: BlockIndex, slot_index: usize, value: $type
-            ) -> Result<(), Error> {
-                self.inner_lock.[<set_array_ $name _slot>](block_index, slot_index, value)
+            ) {
+                self.inner_lock.[<set_array_ $name _slot>](block_index, slot_index, value);
             }
 
             pub fn [<add_array_ $name _slot>](
                 &mut self, block_index: BlockIndex, slot_index: usize, value: $type
-            ) -> Result<(), Error> {
+            ) -> Option<$type> {
                 self.inner_lock.[<add_array_ $name _slot>](block_index, slot_index, value)
             }
 
             pub fn [<subtract_array_ $name _slot>](
                 &mut self, block_index: BlockIndex, slot_index: usize, value: $type
-            ) -> Result<(), Error> {
+            ) -> Option<$type> {
                 self.inner_lock.[<subtract_array_ $name _slot>](block_index, slot_index, value)
             }
         }
@@ -162,7 +156,7 @@ macro_rules! locked_state_array_fns {
 }
 
 macro_rules! arithmetic_array_fns {
-    ($name:ident, $type:ident, $value:ident) => {
+    ($name:ident, $type:ident, $value:ident, $marker:ident) => {
         paste::paste! {
             pub fn [<create_ $name _array>](
                 &mut self,
@@ -178,37 +172,42 @@ macro_rules! arithmetic_array_fns {
                 }
                 let (block_index, name_block_index) = self.allocate_reserved_value(
                     name, parent_index, block_size)?;
-                self.heap.container.block_at_mut(block_index).become_array_value(
-                    slots, array_format, BlockType::$value, name_block_index, parent_index)?;
+                self.heap.container
+                    .block_at_unchecked_mut::<Reserved>(block_index)
+                    .become_array_value::<$marker>(
+                        slots, array_format, name_block_index, parent_index
+                    )?;
                 Ok(block_index)
             }
 
             pub fn [<set_array_ $name _slot>](
                 &mut self, block_index: BlockIndex, slot_index: usize, value: $type
-            ) -> Result<(), Error> {
-                let mut block = self.heap.container.block_at_mut(block_index);
-                block.[<array_set_ $name _slot>](slot_index, value)?;
-                Ok(())
+            ) {
+                let mut block = self.heap.container
+                    .block_at_unchecked_mut::<Array<$marker>>(block_index);
+                block.set(slot_index, value);
             }
 
             pub fn [<add_array_ $name _slot>](
                 &mut self, block_index: BlockIndex, slot_index: usize, value: $type
-            ) -> Result<(), Error> {
-                let mut block = self.heap.container.block_at_mut(block_index);
-                let previous_value = block.[<array_get_ $name _slot>](slot_index)?;
+            ) -> Option<$type> {
+                let mut block = self.heap.container
+                    .block_at_unchecked_mut::<Array<$marker>>(block_index);
+                let previous_value = block.get(slot_index)?;
                 let new_value = previous_value.safe_add(value);
-                block.[<array_set_ $name _slot>](slot_index, new_value)?;
-                Ok(())
+                block.set(slot_index, new_value);
+                Some(new_value)
             }
 
             pub fn [<subtract_array_ $name _slot>](
                 &mut self, block_index: BlockIndex, slot_index: usize, value: $type
-            ) -> Result<(), Error> {
-                let mut block = self.heap.container.block_at_mut(block_index);
-                let previous_value = block.[<array_get_ $name _slot>](slot_index)?;
+            ) -> Option<$type> {
+                let mut block = self.heap.container
+                    .block_at_unchecked_mut::<Array<$marker>>(block_index);
+                let previous_value = block.get(slot_index)?;
                 let new_value = previous_value.safe_sub(value);
-                block.[<array_set_ $name _slot>](slot_index, new_value)?;
-                Ok(())
+                block.set(slot_index, new_value);
+                Some(new_value)
             }
         }
     };
@@ -276,29 +275,33 @@ impl State {
 impl State {
     pub(crate) fn with_current_header<F, R>(&self, callback: F) -> R
     where
-        F: FnOnce(&Block<&Container>) -> R,
+        F: FnOnce(&Block<&Container, inspect_format::Header>) -> R,
     {
         // A lock guard for the test, which doesn't execute its drop impl as well as that would
         // cause changes in the VMO generation count.
         let lock_guard = LockedStateGuard::without_gen_count_changes(self.inner.lock());
-        let block = lock_guard.get_block(BlockIndex::HEADER);
+        let block = lock_guard.header();
         callback(&block)
     }
 
-    pub(crate) fn get_block<F>(&self, index: BlockIndex, callback: F)
+    #[track_caller]
+    pub(crate) fn get_block<F, K>(&self, index: BlockIndex, callback: F)
     where
-        F: FnOnce(&Block<&Container>),
+        K: inspect_format::BlockKind,
+        F: FnOnce(&Block<&Container, K>),
     {
         let state_lock = self.try_lock().unwrap();
-        callback(&state_lock.get_block(index))
+        callback(&state_lock.get_block::<K>(index))
     }
 
-    pub(crate) fn get_block_mut<F>(&self, index: BlockIndex, callback: F)
+    #[track_caller]
+    pub(crate) fn get_block_mut<F, K>(&self, index: BlockIndex, callback: F)
     where
-        F: FnOnce(&mut Block<&mut Container>),
+        K: inspect_format::BlockKind,
+        F: FnOnce(&mut Block<&mut Container, K>),
     {
         let mut state_lock = self.try_lock().unwrap();
-        callback(&mut state_lock.get_block_mut(index))
+        callback(&mut state_lock.get_block_mut::<K>(index))
     }
 }
 
@@ -342,8 +345,7 @@ impl LockedStateGuard<'_> {
 impl<'a> LockedStateGuard<'a> {
     fn new(mut inner_lock: MutexGuard<'a, InnerState>) -> Result<Self, Error> {
         if inner_lock.transaction_count == 0 {
-            let mut header = inner_lock.heap.container.block_at_mut(BlockIndex::HEADER);
-            header.lock_header()?;
+            inner_lock.header_mut().lock();
         }
         Ok(Self {
             inner_lock,
@@ -463,7 +465,7 @@ impl<'a> LockedStateGuard<'a> {
         self.inner_lock.create_bool(name, value, parent_index)
     }
 
-    pub fn set_bool(&mut self, block_index: BlockIndex, value: bool) -> Result<(), Error> {
+    pub fn set_bool(&mut self, block_index: BlockIndex, value: bool) {
         self.inner_lock.set_bool(block_index, value)
     }
 
@@ -493,7 +495,7 @@ impl<'a> LockedStateGuard<'a> {
         self.inner_lock.create_string_array(name, slots, parent_index)
     }
 
-    pub fn get_array_size(&self, block_index: BlockIndex) -> Result<usize, Error> {
+    pub fn get_array_size(&self, block_index: BlockIndex) -> usize {
         self.inner_lock.get_array_size(block_index)
     }
 
@@ -516,14 +518,7 @@ impl Drop for LockedStateGuard<'_> {
             }
         }
         if self.inner_lock.transaction_count == 0 {
-            self.inner_lock
-                .heap
-                .container
-                .block_at_mut(BlockIndex::HEADER)
-                .unlock_header()
-                .unwrap_or_else(|e| {
-                    error!(e:?; "Failed to unlock header");
-                });
+            self.inner_lock.header_mut().unlock();
         }
     }
 }
@@ -548,16 +543,24 @@ impl<'a> LockedStateGuard<'a> {
         self.inner_lock.allocate_link(name, content, disposition, parent_index)
     }
 
-    pub(crate) fn get_block(&self, index: BlockIndex) -> Block<&Container> {
-        self.inner_lock.heap.container.block_at(index)
+    #[track_caller]
+    pub(crate) fn get_block<K: inspect_format::BlockKind>(
+        &self,
+        index: BlockIndex,
+    ) -> Block<&Container, K> {
+        self.inner_lock.heap.container.maybe_block_at::<K>(index).unwrap()
     }
 
-    fn header(&self) -> Block<&Container> {
+    fn header(&self) -> Block<&Container, inspect_format::Header> {
         self.get_block(BlockIndex::HEADER)
     }
 
-    fn get_block_mut(&mut self, index: BlockIndex) -> Block<&mut Container> {
-        self.inner_lock.heap.container.block_at_mut(index)
+    #[track_caller]
+    fn get_block_mut<K: inspect_format::BlockKind>(
+        &mut self,
+        index: BlockIndex,
+    ) -> Block<&mut Container, K> {
+        self.inner_lock.heap.container.maybe_block_at_mut::<K>(index).unwrap()
     }
 }
 
@@ -586,8 +589,7 @@ impl InnerState {
             return Ok(None);
         }
 
-        let mut header = self.heap.container.block_at_mut(BlockIndex::HEADER);
-        let old = header.freeze_header()?;
+        let old = self.header_mut().freeze();
         let ret = self
             .storage
             .create_child(
@@ -596,7 +598,7 @@ impl InnerState {
                 self.storage.get_size().map_err(Error::VmoSize)?,
             )
             .ok();
-        header.thaw_header(old)?;
+        self.header_mut().thaw(old);
         Ok(ret)
     }
 }
@@ -617,10 +619,14 @@ impl InnerState {
         }
     }
 
+    #[inline]
+    fn header_mut(&mut self) -> Block<&mut Container, inspect_format::Header> {
+        self.heap.container.block_at_unchecked_mut(BlockIndex::HEADER)
+    }
+
     fn lock_header(&mut self) {
         if self.transaction_count == 0 {
-            let res = self.heap.container.block_at_mut(BlockIndex::HEADER).lock_header();
-            debug_assert!(res.is_ok());
+            self.header_mut().lock();
         }
         self.transaction_count += 1;
     }
@@ -628,8 +634,7 @@ impl InnerState {
     fn unlock_header(&mut self) {
         self.transaction_count -= 1;
         if self.transaction_count == 0 {
-            let res = self.heap.container.block_at_mut(BlockIndex::HEADER).unlock_header();
-            debug_assert!(res.is_ok());
+            self.header_mut().unlock();
         }
     }
 
@@ -643,8 +648,8 @@ impl InnerState {
             self.allocate_reserved_value(name, parent_index, constants::MIN_ORDER_SIZE)?;
         self.heap
             .container
-            .block_at_mut(block_index)
-            .become_node(name_block_index, parent_index)?;
+            .block_at_unchecked_mut::<Reserved>(block_index)
+            .become_node(name_block_index, parent_index);
         Ok(block_index)
     }
 
@@ -668,13 +673,14 @@ impl InnerState {
 
     /// Frees a LINK block at the given |index|.
     fn free_lazy_node(&mut self, index: BlockIndex) -> Result<(), Error> {
-        let content_block_index = self.heap.container.block_at(index).link_content_index()?;
+        let content_block_index =
+            self.heap.container.block_at_unchecked::<Link>(index).content_index();
         let content_block_type = self.heap.container.block_at(content_block_index).block_type();
         let content = self.load_key_string(content_block_index)?;
         self.delete_value(index)?;
         // Free the name or string reference block used for content.
         match content_block_type {
-            BlockType::StringReference => {
+            Some(BlockType::StringReference) => {
                 self.release_string_reference(content_block_index)?;
             }
             _ => {
@@ -700,19 +706,18 @@ impl InnerState {
     ) -> Result<BlockIndex, Error> {
         let (value_block_index, name_block_index) =
             self.allocate_reserved_value(name, parent_index, constants::MIN_ORDER_SIZE)?;
-        let result = self.get_or_create_string_reference(content).and_then(|content_block_index| {
-            self.heap
-                .container
-                .block_at_mut(content_block_index)
-                .increment_string_reference_count()?;
-            self.heap.container.block_at_mut(value_block_index).become_link(
-                name_block_index,
-                parent_index,
-                content_block_index,
-                disposition,
-            )?;
-            Ok(())
-        });
+        let result =
+            self.get_or_create_string_reference(content).and_then(|content_block_index| {
+                self.heap
+                    .container
+                    .block_at_unchecked_mut::<StringRef>(content_block_index)
+                    .increment_ref_count()?;
+                self.heap
+                    .container
+                    .block_at_unchecked_mut::<Reserved>(value_block_index)
+                    .become_link(name_block_index, parent_index, content_block_index, disposition);
+                Ok(())
+            });
         match result {
             Ok(()) => Ok(value_block_index),
             Err(err) => {
@@ -737,11 +742,11 @@ impl InnerState {
     ) -> Result<BlockIndex, Error> {
         let (block_index, name_block_index) =
             self.allocate_reserved_value(name, parent_index, constants::MIN_ORDER_SIZE)?;
-        self.heap.container.block_at_mut(block_index).become_property(
+        self.heap.container.block_at_unchecked_mut::<Reserved>(block_index).become_property(
             name_block_index,
             parent_index,
             PropertyFormat::Bytes,
-        )?;
+        );
         if let Err(err) = self.inner_set_buffer_property_value(block_index, value) {
             self.heap.free_block(block_index)?;
             self.release_string_reference(name_block_index)?;
@@ -760,15 +765,18 @@ impl InnerState {
     ) -> Result<BlockIndex, Error> {
         let (block_index, name_block_index) =
             self.allocate_reserved_value(name, parent_index, constants::MIN_ORDER_SIZE)?;
-        self.heap.container.block_at_mut(block_index).become_property(
+        self.heap.container.block_at_unchecked_mut::<Reserved>(block_index).become_property(
             name_block_index,
             parent_index,
             PropertyFormat::StringReference,
-        )?;
+        );
 
         let value_block_index = match self.get_or_create_string_reference(value) {
             Ok(b_index) => {
-                self.heap.container.block_at_mut(b_index).increment_string_reference_count()?;
+                self.heap
+                    .container
+                    .block_at_unchecked_mut::<StringRef>(b_index)
+                    .increment_ref_count()?;
                 b_index
             }
             Err(err) => {
@@ -777,9 +785,9 @@ impl InnerState {
             }
         };
 
-        let mut block = self.heap.container.block_at_mut(block_index);
-        block.set_property_extent_index(value_block_index)?;
-        block.set_total_length(0)?;
+        let mut block = self.heap.container.block_at_unchecked_mut::<Buffer>(block_index);
+        block.set_extent_index(value_block_index);
+        block.set_total_length(0);
 
         Ok(block_index)
     }
@@ -797,7 +805,10 @@ impl InnerState {
                 let block_index = self.heap.allocate_block(utils::block_size_for_payload(
                     string_reference.len() + constants::STRING_REFERENCE_TOTAL_LENGTH_BYTES,
                 ))?;
-                self.heap.container.block_at_mut(block_index).become_string_reference()?;
+                self.heap
+                    .container
+                    .block_at_unchecked_mut::<Reserved>(block_index)
+                    .become_string_reference();
                 self.write_string_reference_payload(block_index, &string_reference)?;
                 self.string_reference_block_indexes.insert(string_reference, block_index);
                 Ok(block_index)
@@ -812,52 +823,45 @@ impl InnerState {
         value: &str,
     ) -> Result<(), Error> {
         let value_bytes = value.as_bytes();
-        let (head_extent, bytes_written) = match self
-            .inline_string_reference(block_index, value.as_bytes())
-        {
-            Ok(inlined) if (inlined as usize) < value.len() => {
-                let (head, in_extents) = self.write_extents(&value_bytes[inlined as usize..])?;
+        let (head_extent, bytes_written) = {
+            let inlined = self.inline_string_reference(block_index, value.as_bytes());
+            if inlined < value.len() {
+                let (head, in_extents) = self.write_extents(&value_bytes[inlined..])?;
                 (head, inlined + in_extents)
+            } else {
+                (BlockIndex::EMPTY, inlined)
             }
-            Ok(inlined) => (BlockIndex::EMPTY, inlined),
-            Err(e) => return Err(e),
         };
-        let mut block = self.heap.container.block_at_mut(block_index);
-        block.set_extent_next_index(head_extent)?;
-        block.set_total_length(bytes_written)?;
+        let mut block = self.heap.container.block_at_unchecked_mut::<StringRef>(block_index);
+        block.set_next_index(head_extent);
+        block.set_total_length(bytes_written.try_into().unwrap_or(u32::MAX));
         Ok(())
     }
 
     /// Given a string, write the portion that can be inlined to the given block.
     /// Return the number of bytes written.
-    fn inline_string_reference(
-        &mut self,
-        block_index: BlockIndex,
-        value: &[u8],
-    ) -> Result<u32, Error> {
-        // only returns an error if you call with wrong block type
-        // Safety: we convert from usize to u32 here, because we know that there are fewer
-        // than u32::MAX bytes written inline in even the largest string reference block.
-        // This allows safe promotion to usize anywhere necessary later.
-        Ok(self.heap.container.block_at_mut(block_index).write_string_reference_inline(value)?
-            as u32)
+    fn inline_string_reference(&mut self, block_index: BlockIndex, value: &[u8]) -> usize {
+        self.heap.container.block_at_unchecked_mut::<StringRef>(block_index).write_inline(value)
     }
 
     /// Decrement the reference count on the block and free it if the count is 0.
     /// This is the function to call if you want to give up your hold on a StringReference.
     fn release_string_reference(&mut self, block_index: BlockIndex) -> Result<(), Error> {
-        self.heap.container.block_at_mut(block_index).decrement_string_reference_count()?;
+        self.heap
+            .container
+            .block_at_unchecked_mut::<StringRef>(block_index)
+            .decrement_ref_count()?;
         self.maybe_free_string_reference(block_index)
     }
 
     /// Free a STRING_REFERENCE if the count is 0. This should not be
     /// directly called outside of tests.
     fn maybe_free_string_reference(&mut self, block_index: BlockIndex) -> Result<(), Error> {
-        let block = self.heap.container.block_at(block_index);
-        if block.string_reference_count()? != 0 {
+        let block = self.heap.container.block_at_unchecked::<StringRef>(block_index);
+        if block.reference_count() != 0 {
             return Ok(());
         }
-        let first_extent = block.next_extent()?;
+        let first_extent = block.next_extent();
         self.heap.free_block(block_index)?;
         self.string_reference_block_indexes.retain(|_, vmo_index| *vmo_index != block_index);
 
@@ -870,37 +874,50 @@ impl InnerState {
     fn load_key_string(&self, index: BlockIndex) -> Result<String, Error> {
         let block = self.heap.container.block_at(index);
         match block.block_type() {
-            BlockType::StringReference => self.read_string_reference(block),
-            BlockType::Name => {
-                block.name_contents().map(|s| s.to_string()).map_err(|_| Error::NameNotUtf8)
+            Some(BlockType::StringReference) => {
+                self.read_string_reference(block.cast::<StringRef>().unwrap())
             }
-            wrong_type => Err(Error::InvalidBlockType(index, wrong_type)),
+            Some(BlockType::Name) => block
+                .cast::<Name>()
+                .unwrap()
+                .contents()
+                .map(|s| s.to_string())
+                .map_err(|_| Error::NameNotUtf8),
+            _ => Err(Error::InvalidBlockTypeNumber(index, block.block_type_raw())),
         }
     }
 
     /// Read a StringReference
-    fn read_string_reference(&self, block: Block<&Container>) -> Result<String, Error> {
-        let mut content = block.inline_string_reference()?.to_vec();
-        let mut next = block.next_extent()?;
+    fn read_string_reference(&self, block: Block<&Container, StringRef>) -> Result<String, Error> {
+        let mut content = block.inline_data()?.to_vec();
+        let mut next = block.next_extent();
         while next != BlockIndex::EMPTY {
-            let next_block = self.heap.container.block_at(next);
-            content.extend_from_slice(next_block.extent_contents()?);
-            next = next_block.next_extent()?;
+            let next_block = self.heap.container.block_at_unchecked::<Extent>(next);
+            content.extend_from_slice(next_block.contents()?);
+            next = next_block.next_extent();
         }
 
-        content.truncate(block.total_length()?);
+        content.truncate(block.total_length());
         String::from_utf8(content).ok().ok_or(Error::NameNotUtf8)
     }
 
     /// Free a BUFFER_VALUE block.
     fn free_string_or_bytes_buffer_property(&mut self, index: BlockIndex) -> Result<(), Error> {
-        let data_index = self.heap.container.block_at(index).property_extent_index()?;
-        match self.heap.container.block_at(index).property_format()? {
-            PropertyFormat::String | PropertyFormat::Bytes => {
+        let (format, data_index) = {
+            let block = self.heap.container.block_at_unchecked::<Buffer>(index);
+            (block.format(), block.extent_index())
+        };
+        match format {
+            Some(PropertyFormat::String) | Some(PropertyFormat::Bytes) => {
                 self.free_extents(data_index)?;
             }
-            PropertyFormat::StringReference => {
+            Some(PropertyFormat::StringReference) => {
                 self.release_string_reference(data_index)?;
+            }
+            _ => {
+                return Err(Error::VmoFormat(FormatError::InvalidBufferFormat(
+                    self.heap.container.block_at_unchecked(index).format_raw(),
+                )));
             }
         }
 
@@ -939,8 +956,10 @@ impl InnerState {
             if being_checked == being_reparented {
                 return Err(Error::AdoptAncestor);
             }
-
-            being_checked = self.heap.container.block_at(being_checked).parent_index()?;
+            // Note: all values share the parent_index in the same position, so we can just assume
+            // we have ANY_VALUE here, so just using a Node.
+            being_checked =
+                self.heap.container.block_at_unchecked::<Node>(being_checked).parent_index();
         }
 
         Ok(())
@@ -952,19 +971,22 @@ impl InnerState {
         new_parent: BlockIndex,
     ) -> Result<(), Error> {
         self.check_lineage(being_reparented, new_parent)?;
-        let original_parent_idx = self.heap.container.block_at(being_reparented).parent_index()?;
+        let original_parent_idx =
+            self.heap.container.block_at_unchecked::<Node>(being_reparented).parent_index();
         if original_parent_idx != BlockIndex::ROOT {
-            let mut original_parent_block = self.heap.container.block_at_mut(original_parent_idx);
-            let child_count = original_parent_block.child_count()? - 1;
-            original_parent_block.set_child_count(child_count)?;
+            let mut original_parent_block =
+                self.heap.container.block_at_unchecked_mut::<Node>(original_parent_idx);
+            let child_count = original_parent_block.child_count() - 1;
+            original_parent_block.set_child_count(child_count);
         }
 
-        self.heap.container.block_at_mut(being_reparented).set_parent(new_parent)?;
+        self.heap.container.block_at_unchecked_mut::<Node>(being_reparented).set_parent(new_parent);
 
         if new_parent != BlockIndex::ROOT {
-            let mut new_parent_block = self.heap.container.block_at_mut(new_parent);
-            let child_count = new_parent_block.child_count()? + 1;
-            new_parent_block.set_child_count(child_count)?;
+            let mut new_parent_block =
+                self.heap.container.block_at_unchecked_mut::<Node>(new_parent);
+            let child_count = new_parent_block.child_count() + 1;
+            new_parent_block.set_child_count(child_count);
         }
 
         Ok(())
@@ -978,27 +1000,26 @@ impl InnerState {
     ) -> Result<BlockIndex, Error> {
         let (block_index, name_block_index) =
             self.allocate_reserved_value(name, parent_index, constants::MIN_ORDER_SIZE)?;
-        self.heap.container.block_at_mut(block_index).become_bool_value(
+        self.heap.container.block_at_unchecked_mut::<Reserved>(block_index).become_bool_value(
             value,
             name_block_index,
             parent_index,
-        )?;
+        );
         Ok(block_index)
     }
 
-    fn set_bool(&mut self, block_index: BlockIndex, value: bool) -> Result<(), Error> {
-        let mut block = self.heap.container.block_at_mut(block_index);
-        block.set_bool_value(value)?;
-        Ok(())
+    fn set_bool(&mut self, block_index: BlockIndex, value: bool) {
+        let mut block = self.heap.container.block_at_unchecked_mut::<Bool>(block_index);
+        block.set(value);
     }
 
-    metric_fns!(int, i64);
-    metric_fns!(uint, u64);
-    metric_fns!(double, f64);
+    metric_fns!(int, i64, Int);
+    metric_fns!(uint, u64, Uint);
+    metric_fns!(double, f64, Double);
 
-    arithmetic_array_fns!(int, i64, IntValue);
-    arithmetic_array_fns!(uint, u64, UintValue);
-    arithmetic_array_fns!(double, f64, DoubleValue);
+    arithmetic_array_fns!(int, i64, IntValue, Int);
+    arithmetic_array_fns!(uint, u64, UintValue, Uint);
+    arithmetic_array_fns!(double, f64, DoubleValue, Double);
 
     fn create_string_array(
         &mut self,
@@ -1006,27 +1027,27 @@ impl InnerState {
         slots: usize,
         parent_index: BlockIndex,
     ) -> Result<BlockIndex, Error> {
-        // Safety: array_element_size will never fail for BlockType::StringReference.
-        let block_size = slots * BlockType::StringReference.array_element_size().unwrap()
-            + constants::MIN_ORDER_SIZE;
+        let block_size = slots * StringRef::array_entry_type_size() + constants::MIN_ORDER_SIZE;
         if block_size > constants::MAX_ORDER_SIZE {
             return Err(Error::BlockSizeTooBig(block_size));
         }
         let (block_index, name_block_index) =
             self.allocate_reserved_value(name, parent_index, block_size)?;
-        self.heap.container.block_at_mut(block_index).become_array_value(
-            slots,
-            ArrayFormat::Default,
-            BlockType::StringReference,
-            name_block_index,
-            parent_index,
-        )?;
+        self.heap
+            .container
+            .block_at_unchecked_mut::<Reserved>(block_index)
+            .become_array_value::<StringRef>(
+                slots,
+                ArrayFormat::Default,
+                name_block_index,
+                parent_index,
+            )?;
         Ok(block_index)
     }
 
-    fn get_array_size(&self, block_index: BlockIndex) -> Result<usize, Error> {
-        let block = self.heap.container.block_at(block_index);
-        block.array_slots().map_err(Error::VmoFormat)
+    fn get_array_size(&self, block_index: BlockIndex) -> usize {
+        let block = self.heap.container.block_at_unchecked::<Array<Unknown>>(block_index);
+        block.slots()
     }
 
     fn set_array_string_slot(
@@ -1035,28 +1056,37 @@ impl InnerState {
         slot_index: usize,
         value: StringReference,
     ) -> Result<(), Error> {
-        if self.heap.container.block_at(block_index).array_slots()? <= slot_index {
+        if self.heap.container.block_at_unchecked_mut::<Array<StringRef>>(block_index).slots()
+            <= slot_index
+        {
             return Err(Error::VmoFormat(FormatError::ArrayIndexOutOfBounds(slot_index)));
         }
 
         let reference_index = if !value.is_empty() {
             let reference_index = self.get_or_create_string_reference(value)?;
-            self.heap.container.block_at_mut(reference_index).increment_string_reference_count()?;
+            self.heap
+                .container
+                .block_at_unchecked_mut::<StringRef>(reference_index)
+                .increment_ref_count()?;
             reference_index
         } else {
             BlockIndex::EMPTY
         };
 
-        let existing_index =
-            self.heap.container.block_at(block_index).array_get_string_index_slot(slot_index)?;
+        let existing_index = self
+            .heap
+            .container
+            .block_at_unchecked::<Array<StringRef>>(block_index)
+            .get_string_index_at(slot_index)
+            .ok_or(Error::InvalidArrayIndex(slot_index))?;
         if existing_index != BlockIndex::EMPTY {
             self.release_string_reference(existing_index)?;
         }
 
         self.heap
             .container
-            .block_at_mut(block_index)
-            .array_set_string_slot(slot_index, reference_index)?;
+            .block_at_unchecked_mut::<Array<StringRef>>(block_index)
+            .set_string_slot(slot_index, reference_index);
         Ok(())
     }
 
@@ -1067,20 +1097,30 @@ impl InnerState {
         block_index: BlockIndex,
         start_slot_index: usize,
     ) -> Result<(), Error> {
-        match self.heap.container.block_at(block_index).array_entry_type()? {
-            value if value.is_numeric_value() => {
-                self.heap.container.block_at_mut(block_index).array_clear(start_slot_index)?
+        // TODO(https://fxbug.dev/392965471): this should be cleaner. Technically we can know
+        // statically what kind of block we are dealing with.
+        let block = self.heap.container.block_at_unchecked_mut::<Array<Unknown>>(block_index);
+        match block.entry_type() {
+            Some(value) if value.is_numeric_value() => {
+                self.heap
+                    .container
+                    .block_at_unchecked_mut::<Array<Unknown>>(block_index)
+                    .clear(start_slot_index);
             }
-            BlockType::StringReference => {
-                let array_slots = self.heap.container.block_at(block_index).array_slots()?;
+            Some(BlockType::StringReference) => {
+                let array_slots = block.slots();
                 for i in start_slot_index..array_slots {
                     let index = {
-                        let mut block = self.heap.container.block_at_mut(block_index);
-                        let index = block.array_get_string_index_slot(i)?;
+                        let mut block = self
+                            .heap
+                            .container
+                            .block_at_unchecked_mut::<Array<StringRef>>(block_index);
+                        let index =
+                            block.get_string_index_at(i).ok_or(Error::InvalidArrayIndex(i))?;
                         if index == BlockIndex::EMPTY {
                             continue;
                         }
-                        block.array_set_string_slot(i, BlockIndex::EMPTY)?;
+                        block.set_string_slot(i, BlockIndex::EMPTY);
                         index
                     };
                     self.release_string_reference(index)?;
@@ -1102,7 +1142,10 @@ impl InnerState {
         let block_index = self.heap.allocate_block(block_size)?;
         let name_block_index = match self.get_or_create_string_reference(name) {
             Ok(b_index) => {
-                self.heap.container.block_at_mut(b_index).increment_string_reference_count()?;
+                self.heap
+                    .container
+                    .block_at_unchecked_mut::<StringRef>(b_index)
+                    .increment_ref_count()?;
                 b_index
             }
             Err(err) => {
@@ -1112,16 +1155,16 @@ impl InnerState {
         };
 
         let result = {
-            let mut parent_block = self.heap.container.block_at_mut(parent_index);
+            // Safety: NodeValues and Tombstones always have child_count
+            let mut parent_block = self.heap.container.block_at_unchecked_mut::<Node>(parent_index);
             let parent_block_type = parent_block.block_type();
             match parent_block_type {
-                BlockType::NodeValue | BlockType::Tombstone => {
-                    // Safety: NodeValues and Tombstones always have child_count
-                    parent_block.set_child_count(parent_block.child_count().unwrap() + 1)?;
+                Some(BlockType::NodeValue) | Some(BlockType::Tombstone) => {
+                    parent_block.set_child_count(parent_block.child_count() + 1);
                     Ok(())
                 }
-                BlockType::Header => Ok(()),
-                _ => Err(Error::InvalidBlockType(parent_index, parent_block_type)),
+                Some(BlockType::Header) => Ok(()),
+                _ => Err(Error::InvalidBlockType(parent_index, parent_block.block_type_raw())),
             }
         };
         match result {
@@ -1135,24 +1178,40 @@ impl InnerState {
     }
 
     fn delete_value(&mut self, block_index: BlockIndex) -> Result<(), Error> {
-        let block = self.heap.container.block_at(block_index);
-        let parent_index = block.parent_index()?;
-        let name_index = block.name_index()?;
+        // For our purposes here, we just need "ANY_VALUE". Using "node".
+        let block = self.heap.container.block_at_unchecked::<Node>(block_index);
+        let parent_index = block.parent_index();
+        let name_index = block.name_index();
 
         // Decrement parent child count.
         if parent_index != BlockIndex::ROOT {
-            let mut parent = self.heap.container.block_at_mut(parent_index);
-            let child_count = parent.child_count()? - 1;
-            if parent.block_type() == BlockType::Tombstone && child_count == 0 {
-                self.heap.free_block(parent_index).expect("Failed to free block");
-            } else {
-                parent.set_child_count(child_count)?;
+            let parent = self.heap.container.block_at_mut(parent_index);
+            match parent.block_type() {
+                Some(BlockType::Tombstone) => {
+                    let mut parent = parent.cast::<Tombstone>().unwrap();
+                    let child_count = parent.child_count() - 1;
+                    if child_count == 0 {
+                        self.heap.free_block(parent_index).expect("Failed to free block");
+                    } else {
+                        parent.set_child_count(child_count);
+                    }
+                }
+                Some(BlockType::NodeValue) => {
+                    let mut parent = parent.cast::<Node>().unwrap();
+                    let child_count = parent.child_count() - 1;
+                    parent.set_child_count(child_count);
+                }
+                other => {
+                    unreachable!(
+                        "the parent of any value is either tombstone or node. Saw: {other:?}"
+                    );
+                }
             }
         }
 
         // Free the name block.
         match self.heap.container.block_at(name_index).block_type() {
-            BlockType::StringReference => {
+            Some(BlockType::StringReference) => {
                 self.release_string_reference(name_index)?;
             }
             _ => self.heap.free_block(name_index).expect("Failed to free block"),
@@ -1160,11 +1219,14 @@ impl InnerState {
 
         // If the block is a NODE and has children, make it a TOMBSTONE so that
         // it's freed when the last of its children is freed. Otherwise, free it.
-        let mut block = self.heap.container.block_at_mut(block_index);
-        if block.block_type() == BlockType::NodeValue && block.child_count()? != 0 {
-            block.become_tombstone()?;
-        } else {
-            self.heap.free_block(block_index)?;
+        let block = self.heap.container.block_at_mut(block_index);
+        match block.cast::<Node>() {
+            Some(block) if block.child_count() != 0 => {
+                let _ = block.become_tombstone();
+            }
+            _ => {
+                self.heap.free_block(block_index)?;
+            }
         }
         Ok(())
     }
@@ -1175,10 +1237,13 @@ impl InnerState {
         value: impl Into<StringReference>,
     ) -> Result<(), Error> {
         let old_string_ref_idx =
-            self.heap.container.block_at(block_index).property_extent_index()?;
+            self.heap.container.block_at_unchecked::<Buffer>(block_index).extent_index();
         let new_string_ref_idx = match self.get_or_create_string_reference(value.into()) {
             Ok(b_index) => {
-                self.heap.container.block_at_mut(b_index).increment_string_reference_count()?;
+                self.heap
+                    .container
+                    .block_at_unchecked_mut::<StringRef>(b_index)
+                    .increment_ref_count()?;
                 b_index
             }
             Err(err) => {
@@ -1189,8 +1254,8 @@ impl InnerState {
 
         self.heap
             .container
-            .block_at_mut(block_index)
-            .set_property_extent_index(new_string_ref_idx)?;
+            .block_at_unchecked_mut::<Buffer>(block_index)
+            .set_extent_index(new_string_ref_idx);
         self.release_string_reference(old_string_ref_idx)?;
         Ok(())
     }
@@ -1200,28 +1265,30 @@ impl InnerState {
         block_index: BlockIndex,
         value: &[u8],
     ) -> Result<(), Error> {
-        self.free_extents(self.heap.container.block_at(block_index).property_extent_index()?)?;
+        self.free_extents(
+            self.heap.container.block_at_unchecked::<Buffer>(block_index).extent_index(),
+        )?;
         let (result, (extent_index, written)) = match self.write_extents(value) {
             Ok((e, w)) => (Ok(()), (e, w)),
             Err(err) => (Err(err), (BlockIndex::ROOT, 0)),
         };
-        let mut block = self.heap.container.block_at_mut(block_index);
-        block.set_total_length(written)?;
-        block.set_property_extent_index(extent_index)?;
+        let mut block = self.heap.container.block_at_unchecked_mut::<Buffer>(block_index);
+        block.set_total_length(written.try_into().unwrap_or(u32::MAX));
+        block.set_extent_index(extent_index);
         result
     }
 
     fn free_extents(&mut self, head_extent_index: BlockIndex) -> Result<(), Error> {
         let mut index = head_extent_index;
         while index != BlockIndex::ROOT {
-            let next_index = self.heap.container.block_at(index).next_extent()?;
+            let next_index = self.heap.container.block_at_unchecked::<Extent>(index).next_extent();
             self.heap.free_block(index)?;
             index = next_index;
         }
         Ok(())
     }
 
-    fn write_extents(&mut self, value: &[u8]) -> Result<(BlockIndex, u32), Error> {
+    fn write_extents(&mut self, value: &[u8]) -> Result<(BlockIndex, usize), Error> {
         if value.is_empty() {
             // Invalid index
             return Ok((BlockIndex::ROOT, 0));
@@ -1233,9 +1300,12 @@ impl InnerState {
         let mut extent_block_index = head_extent_index;
         while offset < total_size {
             let bytes_written = {
-                let mut extent_block = self.heap.container.block_at_mut(extent_block_index);
-                extent_block.become_extent(BlockIndex::EMPTY)?;
-                extent_block.extent_set_contents(&value[offset..])?
+                let mut extent_block = self
+                    .heap
+                    .container
+                    .block_at_unchecked_mut::<Reserved>(extent_block_index)
+                    .become_extent(BlockIndex::EMPTY);
+                extent_block.set_contents(&value[offset..])
             };
             offset += bytes_written;
             if offset < total_size {
@@ -1243,28 +1313,16 @@ impl InnerState {
                     self.heap.allocate_block(utils::block_size_for_payload(total_size - offset))
                 else {
                     // If we fail to allocate, just take what was written already and bail.
-                    // Safety: See the below safety comment. In general, if the VMO could be
-                    // larger than u32::MAX bytes, but the max size block could not be,
-                    // this would still safely truncate the data and be an accurate count of
-                    // how many bytes were actually written, because the heap has not
-                    // allocated and we have written exactly `offset` bytes.
-                    return Ok((head_extent_index, offset as u32));
+                    return Ok((head_extent_index, offset));
                 };
                 self.heap
                     .container
-                    .block_at_mut(extent_block_index)
-                    .set_extent_next_index(block_index)?;
+                    .block_at_unchecked_mut::<Extent>(extent_block_index)
+                    .set_next_index(block_index);
                 extent_block_index = block_index;
             }
         }
-
-        // TODO(https://fxbug.dev/42075779): we can remove cast
-        // Safety: each max sized block has fewer than u32::MAX bytes, so an individual
-        // block cannot have more than u32::MAX bytes written. The max VMO is also smaller
-        // than u32::MAX bytes, so the sum of the bytes of all the blocks in the VMO
-        // is smaller than u32::MAX. That means that the total length written to extents
-        // is smaller than u32::MAX, and demotion from usize is always safe.
-        Ok((head_extent_index, offset as u32))
+        Ok((head_extent_index, offset))
     }
 }
 
@@ -1277,14 +1335,15 @@ mod tests {
     use assert_matches::assert_matches;
     use diagnostics_assertions::assert_data_tree;
     use futures::prelude::*;
+    use inspect_format::Header;
 
     #[track_caller]
-    fn assert_all_free(blocks: &[Block<&BackingBuffer>]) {
+    fn assert_all_free<'a>(blocks: impl Iterator<Item = Block<&'a BackingBuffer, Unknown>>) {
         let mut errors = vec![];
         for block in blocks {
-            if block.block_type() != BlockType::Free {
+            if block.block_type() != Some(BlockType::Free) {
                 errors.push(format!(
-                    "block at {} is {}, expected {}",
+                    "block at {} is {:?}, expected {}",
                     block.index(),
                     block.block_type(),
                     BlockType::Free
@@ -1301,10 +1360,10 @@ mod tests {
     fn test_create() {
         let state = get_state(4096);
         let snapshot = Snapshot::try_from(state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
         assert_eq!(blocks.len(), 8);
-        assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert_all_free(&blocks[1..]);
+        assert_eq!(blocks[0].block_type(), Some(BlockType::Header));
+        assert_all_free(blocks.into_iter().skip(1));
     }
 
     #[fuchsia::test]
@@ -1337,49 +1396,49 @@ mod tests {
         let a_index = state.create_node("a".into(), 0.into()).unwrap();
         let b_index = state.create_node("b".into(), 0.into()).unwrap();
 
-        let a = state.get_block(a_index);
-        let b = state.get_block(b_index);
-        assert_eq!(*a.parent_index().unwrap(), 0);
-        assert_eq!(*b.parent_index().unwrap(), 0);
+        let a = state.get_block::<Node>(a_index);
+        let b = state.get_block::<Node>(b_index);
+        assert_eq!(*a.parent_index(), 0);
+        assert_eq!(*b.parent_index(), 0);
 
-        assert_eq!(a.child_count().unwrap(), 0);
-        assert_eq!(b.child_count().unwrap(), 0);
+        assert_eq!(a.child_count(), 0);
+        assert_eq!(b.child_count(), 0);
 
         state.reparent(b_index, a_index).unwrap();
 
-        let a = state.get_block(a_index);
-        let b = state.get_block(b_index);
-        assert_eq!(*a.parent_index().unwrap(), 0);
-        assert_eq!(b.parent_index().unwrap(), a.index());
+        let a = state.get_block::<Node>(a_index);
+        let b = state.get_block::<Node>(b_index);
+        assert_eq!(*a.parent_index(), 0);
+        assert_eq!(b.parent_index(), a.index());
 
-        assert_eq!(a.child_count().unwrap(), 1);
-        assert_eq!(b.child_count().unwrap(), 0);
+        assert_eq!(a.child_count(), 1);
+        assert_eq!(b.child_count(), 0);
 
         let c_index = state.create_node("c".into(), a_index).unwrap();
 
-        let a = state.get_block(a_index);
-        let b = state.get_block(b_index);
-        let c = state.get_block(c_index);
-        assert_eq!(*a.parent_index().unwrap(), 0);
-        assert_eq!(b.parent_index().unwrap(), a.index());
-        assert_eq!(c.parent_index().unwrap(), a.index());
+        let a = state.get_block::<Node>(a_index);
+        let b = state.get_block::<Node>(b_index);
+        let c = state.get_block::<Node>(c_index);
+        assert_eq!(*a.parent_index(), 0);
+        assert_eq!(b.parent_index(), a.index());
+        assert_eq!(c.parent_index(), a.index());
 
-        assert_eq!(a.child_count().unwrap(), 2);
-        assert_eq!(b.child_count().unwrap(), 0);
-        assert_eq!(c.child_count().unwrap(), 0);
+        assert_eq!(a.child_count(), 2);
+        assert_eq!(b.child_count(), 0);
+        assert_eq!(c.child_count(), 0);
 
         state.reparent(c_index, b_index).unwrap();
 
-        let a = state.get_block(a_index);
-        let b = state.get_block(b_index);
-        let c = state.get_block(c_index);
-        assert_eq!(*a.parent_index().unwrap(), 0);
-        assert_eq!(b.parent_index().unwrap(), a_index);
-        assert_eq!(c.parent_index().unwrap(), b_index);
+        let a = state.get_block::<Node>(a_index);
+        let b = state.get_block::<Node>(b_index);
+        let c = state.get_block::<Node>(c_index);
+        assert_eq!(*a.parent_index(), 0);
+        assert_eq!(b.parent_index(), a_index);
+        assert_eq!(c.parent_index(), b_index);
 
-        assert_eq!(a.child_count().unwrap(), 1);
-        assert_eq!(b.child_count().unwrap(), 1);
-        assert_eq!(c.child_count().unwrap(), 0);
+        assert_eq!(a.child_count(), 1);
+        assert_eq!(b.child_count(), 1);
+        assert_eq!(c.child_count(), 0);
     }
 
     #[fuchsia::test]
@@ -1390,17 +1449,17 @@ mod tests {
 
             // Create a node value and verify its fields
             let block_index = state.create_node("test-node".into(), 0.into()).unwrap();
-            let block = state.get_block(block_index);
-            assert_eq!(block.block_type(), BlockType::NodeValue);
+            let block = state.get_block::<Node>(block_index);
+            assert_eq!(block.block_type(), Some(BlockType::NodeValue));
             assert_eq!(*block.index(), 2);
-            assert_eq!(block.child_count().unwrap(), 0);
-            assert_eq!(*block.name_index().unwrap(), 4);
-            assert_eq!(*block.parent_index().unwrap(), 0);
+            assert_eq!(block.child_count(), 0);
+            assert_eq!(*block.name_index(), 4);
+            assert_eq!(*block.parent_index(), 0);
 
             // Verify name block.
-            let name_block = state.get_block(block.name_index().unwrap());
-            assert_eq!(name_block.block_type(), BlockType::StringReference);
-            assert_eq!(name_block.total_length().unwrap(), 9);
+            let name_block = state.get_block::<StringRef>(block.name_index());
+            assert_eq!(name_block.block_type(), Some(BlockType::StringReference));
+            assert_eq!(name_block.total_length(), 9);
             assert_eq!(name_block.order(), 1);
             assert_eq!(state.load_string(name_block.index()).unwrap(), "test-node");
             block_index
@@ -1408,52 +1467,52 @@ mod tests {
 
         // Verify blocks.
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
         assert_eq!(blocks.len(), 10);
-        assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert_eq!(blocks[1].block_type(), BlockType::NodeValue);
-        assert_eq!(blocks[2].block_type(), BlockType::Free);
-        assert_eq!(blocks[3].block_type(), BlockType::StringReference);
-        assert_all_free(&blocks[4..]);
+        assert_eq!(blocks[0].block_type(), Some(BlockType::Header));
+        assert_eq!(blocks[1].block_type(), Some(BlockType::NodeValue));
+        assert_eq!(blocks[2].block_type(), Some(BlockType::Free));
+        assert_eq!(blocks[3].block_type(), Some(BlockType::StringReference));
+        assert_all_free(blocks.into_iter().skip(4));
 
         {
             let mut state = core_state.try_lock().expect("lock state");
             let child_block_index = state.create_node("child1".into(), block_index).unwrap();
-            assert_eq!(state.get_block(block_index).child_count().unwrap(), 1);
+            assert_eq!(state.get_block::<Node>(block_index).child_count(), 1);
 
             // Create a child of the child and verify child counts.
             let child11_block_index =
                 state.create_node("child1-1".into(), child_block_index).unwrap();
             {
-                assert_eq!(state.get_block(child11_block_index).child_count().unwrap(), 0);
-                assert_eq!(state.get_block(child_block_index).child_count().unwrap(), 1);
-                assert_eq!(state.get_block(block_index).child_count().unwrap(), 1);
+                assert_eq!(state.get_block::<Node>(child11_block_index).child_count(), 0);
+                assert_eq!(state.get_block::<Node>(child_block_index).child_count(), 1);
+                assert_eq!(state.get_block::<Node>(block_index).child_count(), 1);
             }
 
             assert!(state.free_value(child11_block_index).is_ok());
             {
-                let child_block = state.get_block(child_block_index);
-                assert_eq!(child_block.child_count().unwrap(), 0);
+                let child_block = state.get_block::<Node>(child_block_index);
+                assert_eq!(child_block.child_count(), 0);
             }
 
             // Add a couple more children to the block and verify count.
             let child_block2_index = state.create_node("child2".into(), block_index).unwrap();
             let child_block3_index = state.create_node("child3".into(), block_index).unwrap();
-            assert_eq!(state.get_block(block_index).child_count().unwrap(), 3);
+            assert_eq!(state.get_block::<Node>(block_index).child_count(), 3);
 
             // Free children and verify count.
             assert!(state.free_value(child_block_index).is_ok());
             assert!(state.free_value(child_block2_index).is_ok());
             assert!(state.free_value(child_block3_index).is_ok());
-            assert_eq!(state.get_block(block_index).child_count().unwrap(), 0);
+            assert_eq!(state.get_block::<Node>(block_index).child_count(), 0);
 
             // Free node.
             assert!(state.free_value(block_index).is_ok());
         }
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert_all_free(&blocks[1..]);
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
+        assert_all_free(blocks.into_iter().skip(1));
     }
 
     #[fuchsia::test]
@@ -1462,53 +1521,53 @@ mod tests {
         let block_index = {
             let mut state = core_state.try_lock().expect("lock state");
             let block_index = state.create_int_metric("test".into(), 3, 0.into()).unwrap();
-            let block = state.get_block(block_index);
-            assert_eq!(block.block_type(), BlockType::IntValue);
+            let block = state.get_block::<Int>(block_index);
+            assert_eq!(block.block_type(), Some(BlockType::IntValue));
             assert_eq!(*block.index(), 2);
-            assert_eq!(block.int_value().unwrap(), 3);
-            assert_eq!(*block.name_index().unwrap(), 3);
-            assert_eq!(*block.parent_index().unwrap(), 0);
+            assert_eq!(block.value(), 3);
+            assert_eq!(*block.name_index(), 3);
+            assert_eq!(*block.parent_index(), 0);
 
-            let name_block = state.get_block(block.name_index().unwrap());
-            assert_eq!(name_block.block_type(), BlockType::StringReference);
-            assert_eq!(name_block.total_length().unwrap(), 4);
+            let name_block = state.get_block::<StringRef>(block.name_index());
+            assert_eq!(name_block.block_type(), Some(BlockType::StringReference));
+            assert_eq!(name_block.total_length(), 4);
             assert_eq!(state.load_string(name_block.index()).unwrap(), "test");
             block_index
         };
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
         assert_eq!(blocks.len(), 9);
-        assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert_eq!(blocks[1].block_type(), BlockType::IntValue);
-        assert_eq!(blocks[2].block_type(), BlockType::StringReference);
-        assert_all_free(&blocks[3..]);
+        assert_eq!(blocks[0].block_type(), Some(BlockType::Header));
+        assert_eq!(blocks[1].block_type(), Some(BlockType::IntValue));
+        assert_eq!(blocks[2].block_type(), Some(BlockType::StringReference));
+        assert_all_free(blocks.into_iter().skip(3));
 
         {
             let mut state = core_state.try_lock().expect("lock state");
-            assert!(state.add_int_metric(block_index, 10).is_ok());
-            assert_eq!(state.get_block(block_index).int_value().unwrap(), 13);
+            assert_eq!(state.add_int_metric(block_index, 10), 13);
+            assert_eq!(state.get_block::<Int>(block_index).value(), 13);
 
-            assert!(state.subtract_int_metric(block_index, 5).is_ok());
-            assert_eq!(state.get_block(block_index).int_value().unwrap(), 8);
+            assert_eq!(state.subtract_int_metric(block_index, 5), 8);
+            assert_eq!(state.get_block::<Int>(block_index).value(), 8);
 
-            assert!(state.set_int_metric(block_index, -6).is_ok());
-            assert_eq!(state.get_block(block_index).int_value().unwrap(), -6);
+            state.set_int_metric(block_index, -6);
+            assert_eq!(state.get_block::<Int>(block_index).value(), -6);
 
-            assert!(state.subtract_int_metric(block_index, i64::MAX).is_ok());
-            assert_eq!(state.get_block(block_index).int_value().unwrap(), i64::MIN);
-            assert!(state.set_int_metric(block_index, i64::MAX).is_ok());
+            assert_eq!(state.subtract_int_metric(block_index, i64::MAX), i64::MIN);
+            assert_eq!(state.get_block::<Int>(block_index).value(), i64::MIN);
+            state.set_int_metric(block_index, i64::MAX);
 
-            assert!(state.add_int_metric(block_index, 2).is_ok());
-            assert_eq!(state.get_block(block_index).int_value().unwrap(), i64::MAX);
+            assert_eq!(state.add_int_metric(block_index, 2), i64::MAX);
+            assert_eq!(state.get_block::<Int>(block_index).value(), i64::MAX);
 
             // Free metric.
             assert!(state.free_value(block_index).is_ok());
         }
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert_all_free(&blocks[1..]);
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
+        assert_all_free(blocks.into_iter().skip(1));
     }
 
     #[fuchsia::test]
@@ -1519,53 +1578,53 @@ mod tests {
         let block_index = {
             let mut state = core_state.try_lock().expect("try lock");
             let block_index = state.create_uint_metric("test".into(), 3, 0.into()).unwrap();
-            let block = state.get_block(block_index);
-            assert_eq!(block.block_type(), BlockType::UintValue);
+            let block = state.get_block::<Uint>(block_index);
+            assert_eq!(block.block_type(), Some(BlockType::UintValue));
             assert_eq!(*block.index(), 2);
-            assert_eq!(block.uint_value().unwrap(), 3);
-            assert_eq!(*block.name_index().unwrap(), 3);
-            assert_eq!(*block.parent_index().unwrap(), 0);
+            assert_eq!(block.value(), 3);
+            assert_eq!(*block.name_index(), 3);
+            assert_eq!(*block.parent_index(), 0);
 
-            let name_block = state.get_block(block.name_index().unwrap());
-            assert_eq!(name_block.block_type(), BlockType::StringReference);
-            assert_eq!(name_block.total_length().unwrap(), 4);
+            let name_block = state.get_block::<StringRef>(block.name_index());
+            assert_eq!(name_block.block_type(), Some(BlockType::StringReference));
+            assert_eq!(name_block.total_length(), 4);
             assert_eq!(state.load_string(name_block.index()).unwrap(), "test");
             block_index
         };
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
         assert_eq!(blocks.len(), 9);
-        assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert_eq!(blocks[1].block_type(), BlockType::UintValue);
-        assert_eq!(blocks[2].block_type(), BlockType::StringReference);
-        assert_all_free(&blocks[3..]);
+        assert_eq!(blocks[0].block_type(), Some(BlockType::Header));
+        assert_eq!(blocks[1].block_type(), Some(BlockType::UintValue));
+        assert_eq!(blocks[2].block_type(), Some(BlockType::StringReference));
+        assert_all_free(blocks.into_iter().skip(3));
 
         {
             let mut state = core_state.try_lock().expect("try lock");
-            assert!(state.add_uint_metric(block_index, 10).is_ok());
-            assert_eq!(state.get_block(block_index).uint_value().unwrap(), 13);
+            assert_eq!(state.add_uint_metric(block_index, 10), 13);
+            assert_eq!(state.get_block::<Uint>(block_index).value(), 13);
 
-            assert!(state.subtract_uint_metric(block_index, 5).is_ok());
-            assert_eq!(state.get_block(block_index).uint_value().unwrap(), 8);
+            assert_eq!(state.subtract_uint_metric(block_index, 5), 8);
+            assert_eq!(state.get_block::<Uint>(block_index).value(), 8);
 
-            assert!(state.set_uint_metric(block_index, 0).is_ok());
-            assert_eq!(state.get_block(block_index).uint_value().unwrap(), 0);
+            state.set_uint_metric(block_index, 0);
+            assert_eq!(state.get_block::<Uint>(block_index).value(), 0);
 
-            assert!(state.subtract_uint_metric(block_index, u64::MAX).is_ok());
-            assert_eq!(state.get_block(block_index).uint_value().unwrap(), 0);
+            assert_eq!(state.subtract_uint_metric(block_index, u64::MAX), 0);
+            assert_eq!(state.get_block::<Uint>(block_index).value(), 0);
 
-            assert!(state.set_uint_metric(block_index, 3).is_ok());
-            assert!(state.add_uint_metric(block_index, u64::MAX).is_ok());
-            assert_eq!(state.get_block(block_index).uint_value().unwrap(), u64::MAX);
+            state.set_uint_metric(block_index, 3);
+            assert_eq!(state.add_uint_metric(block_index, u64::MAX), u64::MAX);
+            assert_eq!(state.get_block::<Uint>(block_index).value(), u64::MAX);
 
             // Free metric.
             assert!(state.free_value(block_index).is_ok());
         }
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert_all_free(&blocks[1..]);
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
+        assert_all_free(blocks.into_iter().skip(1));
     }
 
     #[fuchsia::test]
@@ -1576,46 +1635,46 @@ mod tests {
         let block_index = {
             let mut state = core_state.try_lock().expect("lock state");
             let block_index = state.create_double_metric("test".into(), 3.0, 0.into()).unwrap();
-            let block = state.get_block(block_index);
-            assert_eq!(block.block_type(), BlockType::DoubleValue);
+            let block = state.get_block::<Double>(block_index);
+            assert_eq!(block.block_type(), Some(BlockType::DoubleValue));
             assert_eq!(*block.index(), 2);
-            assert_eq!(block.double_value().unwrap(), 3.0);
-            assert_eq!(*block.name_index().unwrap(), 3);
-            assert_eq!(*block.parent_index().unwrap(), 0);
+            assert_eq!(block.value(), 3.0);
+            assert_eq!(*block.name_index(), 3);
+            assert_eq!(*block.parent_index(), 0);
 
-            let name_block = state.get_block(block.name_index().unwrap());
-            assert_eq!(name_block.block_type(), BlockType::StringReference);
-            assert_eq!(name_block.total_length().unwrap(), 4);
+            let name_block = state.get_block::<StringRef>(block.name_index());
+            assert_eq!(name_block.block_type(), Some(BlockType::StringReference));
+            assert_eq!(name_block.total_length(), 4);
             assert_eq!(state.load_string(name_block.index()).unwrap(), "test");
             block_index
         };
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
         assert_eq!(blocks.len(), 9);
-        assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert_eq!(blocks[1].block_type(), BlockType::DoubleValue);
-        assert_eq!(blocks[2].block_type(), BlockType::StringReference);
-        assert_all_free(&blocks[3..]);
+        assert_eq!(blocks[0].block_type(), Some(BlockType::Header));
+        assert_eq!(blocks[1].block_type(), Some(BlockType::DoubleValue));
+        assert_eq!(blocks[2].block_type(), Some(BlockType::StringReference));
+        assert_all_free(blocks.into_iter().skip(3));
 
         {
             let mut state = core_state.try_lock().expect("lock state");
-            assert!(state.add_double_metric(block_index, 10.5).is_ok());
-            assert_eq!(state.get_block(block_index).double_value().unwrap(), 13.5);
+            assert_eq!(state.add_double_metric(block_index, 10.5), 13.5);
+            assert_eq!(state.get_block::<Double>(block_index).value(), 13.5);
 
-            assert!(state.subtract_double_metric(block_index, 5.1).is_ok());
-            assert_eq!(state.get_block(block_index).double_value().unwrap(), 8.4);
+            assert_eq!(state.subtract_double_metric(block_index, 5.1), 8.4);
+            assert_eq!(state.get_block::<Double>(block_index).value(), 8.4);
 
-            assert!(state.set_double_metric(block_index, -6.0).is_ok());
-            assert_eq!(state.get_block(block_index).double_value().unwrap(), -6.0);
+            state.set_double_metric(block_index, -6.0);
+            assert_eq!(state.get_block::<Double>(block_index).value(), -6.0);
 
             // Free metric.
             assert!(state.free_value(block_index).is_ok());
         }
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert_all_free(&blocks[1..]);
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
+        assert_all_free(blocks.into_iter().skip(1));
     }
 
     #[fuchsia::test]
@@ -1638,11 +1697,11 @@ mod tests {
         drop(state);
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
 
         // if cleanup happened correctly, the name + extent and property + extent have been freed
-        assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert_all_free(&blocks[1..]);
+        assert_eq!(blocks[0].block_type(), Some(BlockType::Header));
+        assert_all_free(blocks.into_iter().skip(1));
     }
 
     #[fuchsia::test]
@@ -1661,9 +1720,9 @@ mod tests {
             assert!(state.inner_lock.string_reference_block_indexes.contains_key(sf));
 
             assert_eq!(state.stats().allocated_blocks, 102);
-            let block = state.get_block(collected[0]);
-            let sf_block = state.get_block(block.name_index().unwrap());
-            assert_eq!(sf_block.string_reference_count().unwrap(), 100);
+            let block = state.get_block::<Node>(collected[0]);
+            let sf_block = state.get_block::<StringRef>(block.name_index());
+            assert_eq!(sf_block.reference_count(), 100);
 
             collected.into_iter().for_each(|b| {
                 assert!(state.inner_lock.string_reference_block_indexes.contains_key(sf));
@@ -1679,9 +1738,9 @@ mod tests {
         }
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert_all_free(&blocks[1..]);
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
+        assert_eq!(blocks[0].block_type(), Some(BlockType::Header));
+        assert_all_free(blocks.into_iter().skip(1));
     }
 
     #[fuchsia::test]
@@ -1691,14 +1750,14 @@ mod tests {
 
         // 4 bytes (4 ASCII characters in UTF-8) will fit inlined with a minimum block size
         let block_index = state.inner_lock.get_or_create_string_reference("abcd".into()).unwrap();
-        let block = state.get_block(block_index);
-        assert_eq!(block.block_type(), BlockType::StringReference);
+        let block = state.get_block::<StringRef>(block_index);
+        assert_eq!(block.block_type(), Some(BlockType::StringReference));
         assert_eq!(block.order(), 0);
         assert_eq!(state.stats().allocated_blocks, 2);
         assert_eq!(state.stats().deallocated_blocks, 0);
-        assert_eq!(block.string_reference_count().unwrap(), 0);
-        assert_eq!(block.total_length().unwrap(), 4);
-        assert_eq!(*block.next_extent().unwrap(), 0);
+        assert_eq!(block.reference_count(), 0);
+        assert_eq!(block.total_length(), 4);
+        assert_eq!(*block.next_extent(), 0);
         assert_eq!(block.order(), 0);
         assert_eq!(state.load_string(block.index()).unwrap(), "abcd");
 
@@ -1706,30 +1765,30 @@ mod tests {
         assert_eq!(state.stats().deallocated_blocks, 1);
 
         let block_index = state.inner_lock.get_or_create_string_reference("longer".into()).unwrap();
-        let block = state.get_block(block_index);
-        assert_eq!(block.block_type(), BlockType::StringReference);
+        let block = state.get_block::<StringRef>(block_index);
+        assert_eq!(block.block_type(), Some(BlockType::StringReference));
         assert_eq!(block.order(), 1);
-        assert_eq!(block.string_reference_count().unwrap(), 0);
-        assert_eq!(block.total_length().unwrap(), 6);
+        assert_eq!(block.reference_count(), 0);
+        assert_eq!(block.total_length(), 6);
         assert_eq!(state.stats().allocated_blocks, 3);
         assert_eq!(state.stats().deallocated_blocks, 1);
         assert_eq!(state.load_string(block.index()).unwrap(), "longer");
 
-        let idx = block.next_extent().unwrap();
+        let idx = block.next_extent();
         assert_eq!(*idx, 0);
 
         state.inner_lock.maybe_free_string_reference(block_index).unwrap();
         assert_eq!(state.stats().deallocated_blocks, 2);
 
         let block_index = state.inner_lock.get_or_create_string_reference("longer".into()).unwrap();
-        let mut block = state.get_block_mut(block_index);
+        let mut block = state.get_block_mut::<StringRef>(block_index);
         assert_eq!(block.order(), 1);
-        block.increment_string_reference_count().unwrap();
+        block.increment_ref_count().unwrap();
         // not an error to try and free
         assert!(state.inner_lock.maybe_free_string_reference(block_index).is_ok());
 
         let mut block = state.get_block_mut(block_index);
-        block.decrement_string_reference_count().unwrap();
+        block.decrement_ref_count().unwrap();
         state.inner_lock.maybe_free_string_reference(block_index).unwrap();
     }
 
@@ -1743,32 +1802,33 @@ mod tests {
             let block_index = state
                 .create_string("test".into(), "test-property".into(), BlockIndex::from(0))
                 .unwrap();
-            let block = state.get_block(block_index);
-            assert_eq!(block.block_type(), BlockType::BufferValue);
+            let block = state.get_block::<Buffer>(block_index);
+            assert_eq!(block.block_type(), Some(BlockType::BufferValue));
             assert_eq!(*block.index(), 2);
-            assert_eq!(*block.parent_index().unwrap(), 0);
-            assert_eq!(*block.name_index().unwrap(), 3);
-            assert_eq!(block.property_format().unwrap(), PropertyFormat::StringReference);
+            assert_eq!(*block.parent_index(), 0);
+            assert_eq!(*block.name_index(), 3);
+            assert_eq!(block.total_length(), 0);
+            assert_eq!(block.format(), Some(PropertyFormat::StringReference));
 
-            let name_block = state.get_block(block.name_index().unwrap());
-            assert_eq!(name_block.block_type(), BlockType::StringReference);
-            assert_eq!(name_block.total_length().unwrap(), 4);
+            let name_block = state.get_block::<StringRef>(block.name_index());
+            assert_eq!(name_block.block_type(), Some(BlockType::StringReference));
+            assert_eq!(name_block.total_length(), 4);
             assert_eq!(state.load_string(name_block.index()).unwrap(), "test");
 
-            let data_block = state.get_block(block.property_extent_index().unwrap());
-            assert_eq!(data_block.block_type(), BlockType::StringReference);
+            let data_block = state.get_block::<StringRef>(block.extent_index());
+            assert_eq!(data_block.block_type(), Some(BlockType::StringReference));
             assert_eq!(state.load_string(data_block.index()).unwrap(), "test-property");
             block_index
         };
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
         assert_eq!(blocks.len(), 10);
-        assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert_eq!(blocks[1].block_type(), BlockType::BufferValue);
-        assert_eq!(blocks[2].block_type(), BlockType::StringReference);
-        assert_eq!(blocks[3].block_type(), BlockType::StringReference);
-        assert_all_free(&blocks[4..]);
+        assert_eq!(blocks[0].block_type(), Some(BlockType::Header));
+        assert_eq!(blocks[1].block_type(), Some(BlockType::BufferValue));
+        assert_eq!(blocks[2].block_type(), Some(BlockType::StringReference));
+        assert_eq!(blocks[3].block_type(), Some(BlockType::StringReference));
+        assert_all_free(blocks.into_iter().skip(4));
 
         {
             let mut state = core_state.try_lock().expect("lock state");
@@ -1776,8 +1836,8 @@ mod tests {
             assert!(state.free_string_or_bytes_buffer_property(block_index).is_ok());
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert_all_free(&blocks[1..]);
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
+        assert_all_free(blocks.into_iter().skip(1));
     }
 
     #[fuchsia::test]
@@ -1786,30 +1846,45 @@ mod tests {
         {
             let mut state = core_state.try_lock().expect("lock state");
             let array_index = state.create_string_array("array".into(), 4, 0.into()).unwrap();
-            state.set_array_string_slot(array_index, 0, "0".into()).unwrap();
-            state.set_array_string_slot(array_index, 1, "1".into()).unwrap();
-            state.set_array_string_slot(array_index, 2, "2".into()).unwrap();
-            state.set_array_string_slot(array_index, 3, "3".into()).unwrap();
+            assert_eq!(state.set_array_string_slot(array_index, 0, "0".into()), Ok(()));
+            assert_eq!(state.set_array_string_slot(array_index, 1, "1".into()), Ok(()));
+            assert_eq!(state.set_array_string_slot(array_index, 2, "2".into()), Ok(()));
+            assert_eq!(state.set_array_string_slot(array_index, 3, "3".into()), Ok(()));
 
             // size is 4
-            assert!(state.set_array_string_slot(array_index, 4, "".into()).is_err());
-            assert!(state.set_array_string_slot(array_index, 5, "".into()).is_err());
+            assert_matches!(
+                state.set_array_string_slot(array_index, 4, "".into()),
+                Err(Error::VmoFormat(FormatError::ArrayIndexOutOfBounds(4)))
+            );
+            assert_matches!(
+                state.set_array_string_slot(array_index, 5, "".into()),
+                Err(Error::VmoFormat(FormatError::ArrayIndexOutOfBounds(5)))
+            );
 
             for i in 0..4 {
-                let idx = state.get_block(array_index).array_get_string_index_slot(i).unwrap();
+                let idx = state
+                    .get_block::<Array<StringRef>>(array_index)
+                    .get_string_index_at(i)
+                    .unwrap();
                 assert_eq!(i.to_string(), state.load_string(idx).unwrap());
             }
 
-            assert!(state.get_block(array_index).array_get_string_index_slot(4).is_err());
-            assert!(state.get_block(array_index).array_get_string_index_slot(5).is_err());
+            assert_eq!(
+                state.get_block::<Array<StringRef>>(array_index).get_string_index_at(4),
+                None
+            );
+            assert_eq!(
+                state.get_block::<Array<StringRef>>(array_index).get_string_index_at(5),
+                None
+            );
 
             state.clear_array(array_index, 0).unwrap();
             state.free_value(array_index).unwrap();
         }
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert_all_free(&blocks[1..]);
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
+        assert_all_free(blocks.into_iter().skip(1));
     }
 
     #[fuchsia::test]
@@ -1819,16 +1894,16 @@ mod tests {
             let mut state = core_state.try_lock().expect("lock state");
             let array_index = state.create_string_array("array".into(), 2, 0.into()).unwrap();
 
-            state.set_array_string_slot(array_index, 0, "abc".into()).unwrap();
-            state.set_array_string_slot(array_index, 1, "def".into()).unwrap();
+            assert_eq!(state.set_array_string_slot(array_index, 0, "abc".into()), Ok(()));
+            assert_eq!(state.set_array_string_slot(array_index, 1, "def".into()), Ok(()));
 
-            state.set_array_string_slot(array_index, 0, "cba".into()).unwrap();
-            state.set_array_string_slot(array_index, 1, "fed".into()).unwrap();
+            assert_eq!(state.set_array_string_slot(array_index, 0, "cba".into()), Ok(()));
+            assert_eq!(state.set_array_string_slot(array_index, 1, "fed".into()), Ok(()));
 
             let cba_index_slot =
-                state.get_block(array_index).array_get_string_index_slot(0).unwrap();
+                state.get_block::<Array<StringRef>>(array_index).get_string_index_at(0).unwrap();
             let fed_index_slot =
-                state.get_block(array_index).array_get_string_index_slot(1).unwrap();
+                state.get_block::<Array<StringRef>>(array_index).get_string_index_at(1).unwrap();
             assert_eq!("cba".to_string(), state.load_string(cba_index_slot).unwrap());
             assert_eq!("fed".to_string(), state.load_string(fed_index_slot).unwrap(),);
 
@@ -1837,9 +1912,9 @@ mod tests {
         }
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
         blocks[1..].iter().enumerate().for_each(|(i, b)| {
-            assert!(b.block_type() == BlockType::Free, "index is {}", i + 1);
+            assert!(b.block_type() == Some(BlockType::Free), "index is {}", i + 1);
         });
     }
 
@@ -1860,40 +1935,32 @@ mod tests {
             state.set_array_string_slot(array_index, 0, abc.clone()).unwrap();
             state.set_array_string_slot(array_index, 1, def.clone()).unwrap();
 
-            let abc_index_slot =
-                state.get_block(array_index).array_get_string_index_slot(0).unwrap();
-            let def_index_slot =
-                state.get_block(array_index).array_get_string_index_slot(1).unwrap();
+            let abc_index_slot = state.get_block(array_index).get_string_index_at(0).unwrap();
+            let def_index_slot = state.get_block(array_index).get_string_index_at(1).unwrap();
             assert_eq!("abc".to_string(), state.load_string(abc_index_slot).unwrap(),);
             assert_eq!("def".to_string(), state.load_string(def_index_slot).unwrap(),);
 
             state.set_array_string_slot(array_index, 0, cba.clone()).unwrap();
             state.set_array_string_slot(array_index, 1, fed.clone()).unwrap();
 
-            let cba_index_slot =
-                state.get_block(array_index).array_get_string_index_slot(0).unwrap();
-            let fed_index_slot =
-                state.get_block(array_index).array_get_string_index_slot(1).unwrap();
+            let cba_index_slot = state.get_block(array_index).get_string_index_at(0).unwrap();
+            let fed_index_slot = state.get_block(array_index).get_string_index_at(1).unwrap();
             assert_eq!("cba".to_string(), state.load_string(cba_index_slot).unwrap(),);
             assert_eq!("fed".to_string(), state.load_string(fed_index_slot).unwrap(),);
 
             state.set_array_string_slot(array_index, 0, abc.clone()).unwrap();
             state.set_array_string_slot(array_index, 1, def.clone()).unwrap();
 
-            let abc_index_slot =
-                state.get_block(array_index).array_get_string_index_slot(0).unwrap();
-            let def_index_slot =
-                state.get_block(array_index).array_get_string_index_slot(1).unwrap();
+            let abc_index_slot = state.get_block(array_index).get_string_index_at(0).unwrap();
+            let def_index_slot = state.get_block(array_index).get_string_index_at(1).unwrap();
             assert_eq!("abc".to_string(), state.load_string(abc_index_slot).unwrap(),);
             assert_eq!("def".to_string(), state.load_string(def_index_slot).unwrap(),);
 
             state.set_array_string_slot(array_index, 0, cba.clone()).unwrap();
             state.set_array_string_slot(array_index, 1, fed.clone()).unwrap();
 
-            let cba_index_slot =
-                state.get_block(array_index).array_get_string_index_slot(0).unwrap();
-            let fed_index_slot =
-                state.get_block(array_index).array_get_string_index_slot(1).unwrap();
+            let cba_index_slot = state.get_block(array_index).get_string_index_at(0).unwrap();
+            let fed_index_slot = state.get_block(array_index).get_string_index_at(1).unwrap();
             assert_eq!("cba".to_string(), state.load_string(cba_index_slot).unwrap(),);
             assert_eq!("fed".to_string(), state.load_string(fed_index_slot).unwrap(),);
 
@@ -1902,9 +1969,9 @@ mod tests {
         }
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
         blocks[1..].iter().enumerate().for_each(|(i, b)| {
-            assert!(b.block_type() == BlockType::Free, "index is {}", i + 1);
+            assert!(b.block_type() == Some(BlockType::Free), "index is {}", i + 1);
         });
     }
 
@@ -1924,17 +1991,18 @@ mod tests {
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let state = core_state.try_lock().expect("lock state");
 
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
         for b in blocks {
-            if b.block_type() == BlockType::StringReference
+            if b.block_type() == Some(BlockType::StringReference)
                 && state.load_string(b.index()).unwrap() == "array"
             {
                 continue;
             }
 
-            assert!(
-                b.block_type() != BlockType::StringReference,
-                "Got unexpected StringReference, index: {}, value (wrapped in single quotes): '{}'",
+            assert_ne!(
+                b.block_type(),
+                Some(BlockType::StringReference),
+                "Got unexpected StringReference, index: {}, value (wrapped in single quotes): '{:?}'",
                 b.index(),
                 b.block_type()
             );
@@ -1950,38 +2018,38 @@ mod tests {
             let mut state = core_state.try_lock().expect("lock state");
             let block_index =
                 state.create_buffer_property("test".into(), b"test-property", 0.into()).unwrap();
-            let block = state.get_block(block_index);
-            assert_eq!(block.block_type(), BlockType::BufferValue);
+            let block = state.get_block::<Buffer>(block_index);
+            assert_eq!(block.block_type(), Some(BlockType::BufferValue));
             assert_eq!(*block.index(), 2);
-            assert_eq!(*block.parent_index().unwrap(), 0);
-            assert_eq!(*block.name_index().unwrap(), 3);
-            assert_eq!(block.total_length().unwrap(), 13);
-            assert_eq!(*block.property_extent_index().unwrap(), 4);
-            assert_eq!(block.property_format().unwrap(), PropertyFormat::Bytes);
+            assert_eq!(*block.parent_index(), 0);
+            assert_eq!(*block.name_index(), 3);
+            assert_eq!(block.total_length(), 13);
+            assert_eq!(*block.extent_index(), 4);
+            assert_eq!(block.format(), Some(PropertyFormat::Bytes));
 
-            let name_block = state.get_block(block.name_index().unwrap());
-            assert_eq!(name_block.block_type(), BlockType::StringReference);
-            assert_eq!(name_block.total_length().unwrap(), 4);
+            let name_block = state.get_block::<StringRef>(block.name_index());
+            assert_eq!(name_block.block_type(), Some(BlockType::StringReference));
+            assert_eq!(name_block.total_length(), 4);
             assert_eq!(state.load_string(name_block.index()).unwrap(), "test");
 
-            let extent_block = state.get_block(4.into());
-            assert_eq!(extent_block.block_type(), BlockType::Extent);
-            assert_eq!(*extent_block.next_extent().unwrap(), 0);
+            let extent_block = state.get_block::<Extent>(4.into());
+            assert_eq!(extent_block.block_type(), Some(BlockType::Extent));
+            assert_eq!(*extent_block.next_extent(), 0);
             assert_eq!(
-                std::str::from_utf8(extent_block.extent_contents().unwrap()).unwrap(),
+                std::str::from_utf8(extent_block.contents().unwrap()).unwrap(),
                 "test-property\0\0\0\0\0\0\0\0\0\0\0"
             );
             block_index
         };
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
         assert_eq!(blocks.len(), 10);
-        assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert_eq!(blocks[1].block_type(), BlockType::BufferValue);
-        assert_eq!(blocks[2].block_type(), BlockType::StringReference);
-        assert_eq!(blocks[3].block_type(), BlockType::Extent);
-        assert_all_free(&blocks[4..]);
+        assert_eq!(blocks[0].block_type(), Some(BlockType::Header));
+        assert_eq!(blocks[1].block_type(), Some(BlockType::BufferValue));
+        assert_eq!(blocks[2].block_type(), Some(BlockType::StringReference));
+        assert_eq!(blocks[3].block_type(), Some(BlockType::Extent));
+        assert_all_free(blocks.into_iter().skip(4));
 
         // Free property.
         {
@@ -1989,8 +2057,8 @@ mod tests {
             assert!(state.free_string_or_bytes_buffer_property(block_index).is_ok());
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert_all_free(&blocks[1..]);
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
+        assert_all_free(blocks.into_iter().skip(1));
     }
 
     #[fuchsia::test]
@@ -2001,27 +2069,27 @@ mod tests {
 
             // Creates with value
             let block_index = state.create_bool("test".into(), true, 0.into()).unwrap();
-            let block = state.get_block(block_index);
-            assert_eq!(block.block_type(), BlockType::BoolValue);
+            let block = state.get_block::<Bool>(block_index);
+            assert_eq!(block.block_type(), Some(BlockType::BoolValue));
             assert_eq!(*block.index(), 2);
-            assert!(block.bool_value().unwrap());
-            assert_eq!(*block.name_index().unwrap(), 3);
-            assert_eq!(*block.parent_index().unwrap(), 0);
+            assert!(block.value());
+            assert_eq!(*block.name_index(), 3);
+            assert_eq!(*block.parent_index(), 0);
 
-            let name_block = state.get_block(block.name_index().unwrap());
-            assert_eq!(name_block.block_type(), BlockType::StringReference);
-            assert_eq!(name_block.total_length().unwrap(), 4);
+            let name_block = state.get_block::<StringRef>(block.name_index());
+            assert_eq!(name_block.block_type(), Some(BlockType::StringReference));
+            assert_eq!(name_block.total_length(), 4);
             assert_eq!(state.load_string(name_block.index()).unwrap(), "test");
             block_index
         };
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
         assert_eq!(blocks.len(), 9);
-        assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert_eq!(blocks[1].block_type(), BlockType::BoolValue);
-        assert_eq!(blocks[2].block_type(), BlockType::StringReference);
-        assert_all_free(&blocks[3..]);
+        assert_eq!(blocks[0].block_type(), Some(BlockType::Header));
+        assert_eq!(blocks[1].block_type(), Some(BlockType::BoolValue));
+        assert_eq!(blocks[2].block_type(), Some(BlockType::StringReference));
+        assert_all_free(blocks.into_iter().skip(3));
 
         // Free metric.
         {
@@ -2029,8 +2097,8 @@ mod tests {
             assert!(state.free_value(block_index).is_ok());
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert_all_free(&blocks[1..]);
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
+        assert_all_free(blocks.into_iter().skip(1));
     }
 
     #[fuchsia::test]
@@ -2040,39 +2108,36 @@ mod tests {
             let mut state = core_state.try_lock().expect("lock state");
             let block_index =
                 state.create_int_array("test".into(), 5, ArrayFormat::Default, 0.into()).unwrap();
-            let block = state.get_block(block_index);
-            assert_eq!(block.block_type(), BlockType::ArrayValue);
+            let block = state.get_block::<Array<Int>>(block_index);
+            assert_eq!(block.block_type(), Some(BlockType::ArrayValue));
             assert_eq!(block.order(), 2);
             assert_eq!(*block.index(), 4);
-            assert_eq!(*block.name_index().unwrap(), 2);
-            assert_eq!(*block.parent_index().unwrap(), 0);
-            assert_eq!(block.array_slots().unwrap(), 5);
-            assert_eq!(block.array_format().unwrap(), ArrayFormat::Default);
-            assert_eq!(block.array_entry_type().unwrap(), BlockType::IntValue);
+            assert_eq!(*block.name_index(), 2);
+            assert_eq!(*block.parent_index(), 0);
+            assert_eq!(block.slots(), 5);
+            assert_eq!(block.format(), Some(ArrayFormat::Default));
+            assert_eq!(block.entry_type(), Some(BlockType::IntValue));
 
-            let name_block = state.get_block(BlockIndex::from(2));
-            assert_eq!(name_block.block_type(), BlockType::StringReference);
-            assert_eq!(name_block.total_length().unwrap(), 4);
+            let name_block = state.get_block::<StringRef>(BlockIndex::from(2));
+            assert_eq!(name_block.block_type(), Some(BlockType::StringReference));
+            assert_eq!(name_block.total_length(), 4);
             assert_eq!(state.load_string(name_block.index()).unwrap(), "test");
             for i in 0..5 {
-                state.set_array_int_slot(block_index, i, 3 * i as i64).unwrap();
+                state.set_array_int_slot(block_index, i, 3 * i as i64);
             }
             for i in 0..5 {
-                assert_eq!(
-                    state.get_block(block_index).array_get_int_slot(i).unwrap(),
-                    3 * i as i64
-                );
+                assert_eq!(state.get_block::<Array<Int>>(block_index).get(i), Some(3 * i as i64));
             }
             block_index
         };
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert_eq!(blocks[1].block_type(), BlockType::StringReference);
-        assert_eq!(blocks[2].block_type(), BlockType::Free);
-        assert_eq!(blocks[3].block_type(), BlockType::ArrayValue);
-        assert_all_free(&blocks[4..]);
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
+        assert_eq!(blocks[0].block_type(), Some(BlockType::Header));
+        assert_eq!(blocks[1].block_type(), Some(BlockType::StringReference));
+        assert_eq!(blocks[2].block_type(), Some(BlockType::Free));
+        assert_eq!(blocks[3].block_type(), Some(BlockType::ArrayValue));
+        assert_all_free(blocks.into_iter().skip(4));
 
         // Free the array.
         {
@@ -2080,8 +2145,8 @@ mod tests {
             assert!(state.free_value(block_index).is_ok());
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert_all_free(&blocks[1..]);
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
+        assert_all_free(blocks.into_iter().skip(1));
     }
 
     #[fuchsia::test]
@@ -2096,7 +2161,7 @@ mod tests {
             .inner_lock
             .write_extents(&[4u8; TRIED_TO_WRITE])
             .unwrap();
-        assert_eq!(written as usize, EXPECTED_WRITTEN);
+        assert_eq!(written, EXPECTED_WRITTEN);
     }
 
     #[fuchsia::test]
@@ -2110,26 +2175,26 @@ mod tests {
         let data = "X".repeat(SIZE * 2);
         let block_index =
             state.create_buffer_property("test".into(), data.as_bytes(), 0.into()).unwrap();
-        let block = state.get_block(block_index);
-        assert_eq!(block.block_type(), BlockType::BufferValue);
+        let block = state.get_block::<Buffer>(block_index);
+        assert_eq!(block.block_type(), Some(BlockType::BufferValue));
         assert_eq!(*block.index(), 2);
-        assert_eq!(*block.parent_index().unwrap(), 0);
-        assert_eq!(*block.name_index().unwrap(), 3);
-        assert_eq!(block.total_length().unwrap(), EXPECTED_WRITTEN);
-        assert_eq!(*block.property_extent_index().unwrap(), 128);
-        assert_eq!(block.property_format().unwrap(), PropertyFormat::Bytes);
+        assert_eq!(*block.parent_index(), 0);
+        assert_eq!(*block.name_index(), 3);
+        assert_eq!(block.total_length(), EXPECTED_WRITTEN);
+        assert_eq!(*block.extent_index(), 128);
+        assert_eq!(block.format(), Some(PropertyFormat::Bytes));
 
-        let name_block = state.get_block(block.name_index().unwrap());
-        assert_eq!(name_block.block_type(), BlockType::StringReference);
-        assert_eq!(name_block.total_length().unwrap(), 4);
+        let name_block = state.get_block::<StringRef>(block.name_index());
+        assert_eq!(name_block.block_type(), Some(BlockType::StringReference));
+        assert_eq!(name_block.total_length(), 4);
         assert_eq!(state.load_string(name_block.index()).unwrap(), "test");
 
-        let extent_block = state.get_block(128.into());
-        assert_eq!(extent_block.block_type(), BlockType::Extent);
+        let extent_block = state.get_block::<Extent>(128.into());
+        assert_eq!(extent_block.block_type(), Some(BlockType::Extent));
         assert_eq!(extent_block.order(), 7);
-        assert_eq!(*extent_block.next_extent().unwrap(), *BlockIndex::EMPTY);
+        assert_eq!(*extent_block.next_extent(), *BlockIndex::EMPTY);
         assert_eq!(
-            extent_block.extent_contents().unwrap(),
+            extent_block.contents().unwrap(),
             data.chars().take(EXPECTED_WRITTEN).map(|c| c as u8).collect::<Vec<u8>>()
         );
     }
@@ -2144,68 +2209,68 @@ mod tests {
             let data = chars.iter().cycle().take(6000).collect::<String>();
             let block_index =
                 state.create_buffer_property("test".into(), data.as_bytes(), 0.into()).unwrap();
-            let block = state.get_block(block_index);
-            assert_eq!(block.block_type(), BlockType::BufferValue);
+            let block = state.get_block::<Buffer>(block_index);
+            assert_eq!(block.block_type(), Some(BlockType::BufferValue));
             assert_eq!(*block.index(), 2);
-            assert_eq!(*block.parent_index().unwrap(), 0);
-            assert_eq!(*block.name_index().unwrap(), 3);
-            assert_eq!(block.total_length().unwrap(), 6000);
-            assert_eq!(*block.property_extent_index().unwrap(), 128);
-            assert_eq!(block.property_format().unwrap(), PropertyFormat::Bytes);
+            assert_eq!(*block.parent_index(), 0);
+            assert_eq!(*block.name_index(), 3);
+            assert_eq!(block.total_length(), 6000);
+            assert_eq!(*block.extent_index(), 128);
+            assert_eq!(block.format(), Some(PropertyFormat::Bytes));
 
-            let name_block = state.get_block(block.name_index().unwrap());
-            assert_eq!(name_block.block_type(), BlockType::StringReference);
-            assert_eq!(name_block.total_length().unwrap(), 4);
+            let name_block = state.get_block::<StringRef>(block.name_index());
+            assert_eq!(name_block.block_type(), Some(BlockType::StringReference));
+            assert_eq!(name_block.total_length(), 4);
             assert_eq!(state.load_string(name_block.index()).unwrap(), "test");
 
-            let extent_block = state.get_block(128.into());
-            assert_eq!(extent_block.block_type(), BlockType::Extent);
+            let extent_block = state.get_block::<Extent>(128.into());
+            assert_eq!(extent_block.block_type(), Some(BlockType::Extent));
             assert_eq!(extent_block.order(), 7);
-            assert_eq!(*extent_block.next_extent().unwrap(), 256);
+            assert_eq!(*extent_block.next_extent(), 256);
             assert_eq!(
-                extent_block.extent_contents().unwrap(),
+                extent_block.contents().unwrap(),
                 chars.iter().cycle().take(2040).map(|&c| c as u8).collect::<Vec<u8>>()
             );
 
-            let extent_block = state.get_block(256.into());
-            assert_eq!(extent_block.block_type(), BlockType::Extent);
+            let extent_block = state.get_block::<Extent>(256.into());
+            assert_eq!(extent_block.block_type(), Some(BlockType::Extent));
             assert_eq!(extent_block.order(), 7);
-            assert_eq!(*extent_block.next_extent().unwrap(), 384);
+            assert_eq!(*extent_block.next_extent(), 384);
             assert_eq!(
-                extent_block.extent_contents().unwrap(),
+                extent_block.contents().unwrap(),
                 chars.iter().cycle().skip(2040).take(2040).map(|&c| c as u8).collect::<Vec<u8>>()
             );
 
-            let extent_block = state.get_block(384.into());
-            assert_eq!(extent_block.block_type(), BlockType::Extent);
+            let extent_block = state.get_block::<Extent>(384.into());
+            assert_eq!(extent_block.block_type(), Some(BlockType::Extent));
             assert_eq!(extent_block.order(), 7);
-            assert_eq!(*extent_block.next_extent().unwrap(), 0);
+            assert_eq!(*extent_block.next_extent(), 0);
             assert_eq!(
-                extent_block.extent_contents().unwrap()[..1920],
+                extent_block.contents().unwrap()[..1920],
                 chars.iter().cycle().skip(4080).take(1920).map(|&c| c as u8).collect::<Vec<u8>>()[..]
             );
-            assert_eq!(extent_block.extent_contents().unwrap()[1920..], [0u8; 120][..]);
+            assert_eq!(extent_block.contents().unwrap()[1920..], [0u8; 120][..]);
             block_index
         };
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
         assert_eq!(blocks.len(), 11);
-        assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert_eq!(blocks[1].block_type(), BlockType::BufferValue);
-        assert_eq!(blocks[2].block_type(), BlockType::StringReference);
-        assert_all_free(&blocks[3..8]);
-        assert_eq!(blocks[8].block_type(), BlockType::Extent);
-        assert_eq!(blocks[9].block_type(), BlockType::Extent);
-        assert_eq!(blocks[10].block_type(), BlockType::Extent);
+        assert_eq!(blocks[0].block_type(), Some(BlockType::Header));
+        assert_eq!(blocks[1].block_type(), Some(BlockType::BufferValue));
+        assert_eq!(blocks[2].block_type(), Some(BlockType::StringReference));
+        assert_eq!(blocks[8].block_type(), Some(BlockType::Extent));
+        assert_eq!(blocks[9].block_type(), Some(BlockType::Extent));
+        assert_eq!(blocks[10].block_type(), Some(BlockType::Extent));
+        assert_all_free(blocks.into_iter().skip(3).take(5));
         // Free property.
         {
             let mut state = core_state.try_lock().expect("lock state");
             assert!(state.free_string_or_bytes_buffer_property(block_index).is_ok());
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert_all_free(&blocks[1..]);
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
+        assert_all_free(blocks.into_iter().skip(1));
     }
 
     #[fuchsia::test]
@@ -2217,8 +2282,8 @@ mod tests {
 
             let block0_index = state.create_node("abcd123456789".into(), 0.into()).unwrap();
             let block0_name_index = {
-                let block0_name_index = state.get_block(block0_index).name_index().unwrap();
-                let block0_name = state.get_block(block0_name_index);
+                let block0_name_index = state.get_block::<Node>(block0_index).name_index();
+                let block0_name = state.get_block::<StringRef>(block0_name_index);
                 assert_eq!(block0_name.order(), 1);
                 block0_name_index
             };
@@ -2227,18 +2292,18 @@ mod tests {
             let block1_index =
                 state.inner_lock.get_or_create_string_reference("abcd".into()).unwrap();
             assert_eq!(state.stats().allocated_blocks, 4);
-            assert_eq!(state.get_block(block1_index).order(), 0);
+            assert_eq!(state.get_block::<StringRef>(block1_index).order(), 0);
 
             // no allocation!
             let block2_index =
                 state.inner_lock.get_or_create_string_reference("abcd123456789".into()).unwrap();
-            assert_eq!(state.get_block(block2_index).order(), 1);
+            assert_eq!(state.get_block::<StringRef>(block2_index).order(), 1);
             assert_eq!(block0_name_index, block2_index);
             assert_eq!(state.stats().allocated_blocks, 4);
 
             let block3_index = state.create_node("abcd12345678".into(), 0.into()).unwrap();
-            let block3 = state.get_block(block3_index);
-            let block3_name = state.get_block(block3.name_index().unwrap());
+            let block3 = state.get_block::<Node>(block3_index);
+            let block3_name = state.get_block::<StringRef>(block3.name_index());
             assert_eq!(block3_name.order(), 1);
             assert_eq!(block3.order(), 0);
             assert_eq!(state.stats().allocated_blocks, 6);
@@ -2249,10 +2314,10 @@ mod tests {
             }
 
             let block4_index = state.create_node(long_name.into(), 0.into()).unwrap();
-            let block4 = state.get_block(block4_index);
-            let block4_name = state.get_block(block4.name_index().unwrap());
+            let block4 = state.get_block::<Node>(block4_index);
+            let block4_name = state.get_block::<StringRef>(block4.name_index());
             assert_eq!(block4_name.order(), 7);
-            assert!(*block4_name.next_extent().unwrap() != 0);
+            assert!(*block4_name.next_extent() != 0);
             assert_eq!(state.stats().allocated_blocks, 9);
 
             assert!(state.inner_lock.maybe_free_string_reference(block1_index).is_ok());
@@ -2268,13 +2333,13 @@ mod tests {
 
         // Current expected layout of VMO:
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
 
-        assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert_eq!(blocks[1].block_type(), BlockType::NodeValue);
-        assert_eq!(blocks[2].block_type(), BlockType::Free);
-        assert_eq!(blocks[3].block_type(), BlockType::StringReference);
-        assert_all_free(&blocks[4..]);
+        assert_eq!(blocks[0].block_type(), Some(BlockType::Header));
+        assert_eq!(blocks[1].block_type(), Some(BlockType::NodeValue));
+        assert_eq!(blocks[2].block_type(), Some(BlockType::Free));
+        assert_eq!(blocks[3].block_type(), Some(BlockType::StringReference));
+        assert_all_free(blocks.into_iter().skip(4));
     }
 
     #[fuchsia::test]
@@ -2286,7 +2351,7 @@ mod tests {
             // Create a node value and verify its fields
             let block_index = state.create_node("root-node".into(), 0.into()).unwrap();
             let block_name_as_string_ref =
-                state.get_block(state.get_block(block_index).name_index().unwrap());
+                state.get_block::<StringRef>(state.get_block::<Node>(block_index).name_index());
             assert_eq!(block_name_as_string_ref.order(), 1);
             assert_eq!(state.stats().allocated_blocks, 3);
             assert_eq!(state.stats().deallocated_blocks, 0);
@@ -2303,16 +2368,16 @@ mod tests {
         };
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
 
         // Note that the way Extents get allocated means that they aren't necessarily
         // put in the buffer where it would seem they should based on the literal order of allocation.
-        assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert_eq!(blocks[1].block_type(), BlockType::Tombstone);
-        assert_eq!(blocks[2].block_type(), BlockType::NodeValue);
-        assert_eq!(blocks[3].block_type(), BlockType::Free);
-        assert_eq!(blocks[4].block_type(), BlockType::StringReference);
-        assert_all_free(&blocks[5..]);
+        assert_eq!(blocks[0].block_type(), Some(BlockType::Header));
+        assert_eq!(blocks[1].block_type(), Some(BlockType::Tombstone));
+        assert_eq!(blocks[2].block_type(), Some(BlockType::NodeValue));
+        assert_eq!(blocks[3].block_type(), Some(BlockType::Free));
+        assert_eq!(blocks[4].block_type(), Some(BlockType::StringReference));
+        assert_all_free(blocks.into_iter().skip(5));
 
         // Freeing the child, causes all blocks to be freed.
         {
@@ -2320,8 +2385,8 @@ mod tests {
             assert!(state.free_value(child_block_index).is_ok());
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert_all_free(&blocks[1..]);
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
+        assert_all_free(blocks.into_iter().skip(1));
     }
 
     #[fuchsia::test]
@@ -2329,23 +2394,23 @@ mod tests {
         let state = get_state(4096);
         // Initial generation count is 0
         state.with_current_header(|header| {
-            assert_eq!(header.header_generation_count().unwrap(), 0);
+            assert_eq!(header.generation_count(), 0);
         });
 
         // Lock the state
         let mut lock_guard = state.try_lock().expect("lock state");
-        assert!(lock_guard.header().check_locked(true).is_ok());
-        assert_eq!(lock_guard.header().header_generation_count().unwrap(), 1);
+        assert!(lock_guard.header().is_locked());
+        assert_eq!(lock_guard.header().generation_count(), 1);
         // Operations on the lock guard do not change the generation counter.
         let _ = lock_guard.create_node("test".into(), 0.into()).unwrap();
         let _ = lock_guard.create_node("test2".into(), 2.into()).unwrap();
-        assert_eq!(lock_guard.header().header_generation_count().unwrap(), 1);
+        assert_eq!(lock_guard.header().generation_count(), 1);
 
         // Dropping the guard releases the lock.
         drop(lock_guard);
         state.with_current_header(|header| {
-            assert_eq!(header.header_generation_count().unwrap(), 2);
-            assert!(header.check_locked(false).is_ok());
+            assert_eq!(header.generation_count(), 2);
+            assert!(!header.is_locked());
         });
     }
 
@@ -2382,38 +2447,38 @@ mod tests {
             }
 
             // Verify link block.
-            let block = state_guard.get_block(block_index);
-            assert_eq!(block.block_type(), BlockType::LinkValue);
+            let block = state_guard.get_block::<Link>(block_index);
+            assert_eq!(block.block_type(), Some(BlockType::LinkValue));
             assert_eq!(*block.index(), 2);
-            assert_eq!(*block.parent_index().unwrap(), 0);
-            assert_eq!(*block.name_index().unwrap(), 4);
-            assert_eq!(*block.link_content_index().unwrap(), 6);
-            assert_eq!(block.link_node_disposition().unwrap(), LinkNodeDisposition::Inline);
+            assert_eq!(*block.parent_index(), 0);
+            assert_eq!(*block.name_index(), 4);
+            assert_eq!(*block.content_index(), 6);
+            assert_eq!(block.link_node_disposition(), Some(LinkNodeDisposition::Inline));
 
             // Verify link's name block.
-            let name_block = state_guard.get_block(block.name_index().unwrap());
-            assert_eq!(name_block.block_type(), BlockType::StringReference);
-            assert_eq!(name_block.total_length().unwrap(), 9);
+            let name_block = state_guard.get_block::<StringRef>(block.name_index());
+            assert_eq!(name_block.block_type(), Some(BlockType::StringReference));
+            assert_eq!(name_block.total_length(), 9);
             assert_eq!(state_guard.load_string(name_block.index()).unwrap(), "link-name");
 
             // Verify link's content block.
-            let content_block = state_guard.get_block(block.link_content_index().unwrap());
-            assert_eq!(content_block.block_type(), BlockType::StringReference);
-            assert_eq!(content_block.total_length().unwrap(), 11);
+            let content_block = state_guard.get_block::<StringRef>(block.content_index());
+            assert_eq!(content_block.block_type(), Some(BlockType::StringReference));
+            assert_eq!(content_block.total_length(), 11);
             assert_eq!(state_guard.load_string(content_block.index()).unwrap(), "link-name-0");
             block_index
         };
 
         // Verify all the VMO blocks.
         let snapshot = Snapshot::try_from(state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
         assert_eq!(blocks.len(), 10);
-        assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert_eq!(blocks[1].block_type(), BlockType::LinkValue);
-        assert_eq!(blocks[2].block_type(), BlockType::Free);
-        assert_eq!(blocks[3].block_type(), BlockType::StringReference);
-        assert_eq!(blocks[4].block_type(), BlockType::StringReference);
-        assert_all_free(&blocks[5..]);
+        assert_eq!(blocks[0].block_type(), Some(BlockType::Header));
+        assert_eq!(blocks[1].block_type(), Some(BlockType::LinkValue));
+        assert_eq!(blocks[2].block_type(), Some(BlockType::Free));
+        assert_eq!(blocks[3].block_type(), Some(BlockType::StringReference));
+        assert_eq!(blocks[4].block_type(), Some(BlockType::StringReference));
+        assert_all_free(blocks.into_iter().skip(5));
 
         // Free link
         {
@@ -2424,8 +2489,8 @@ mod tests {
             assert!(state_guard.callbacks().get("link-name-0").is_none());
         }
         let snapshot = Snapshot::try_from(state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert_all_free(&blocks[1..]);
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
+        assert_all_free(blocks.into_iter().skip(1));
 
         // Verify adding another link generates a different ID regardless of the params.
         let mut state_guard = state.try_lock().expect("lock state");
@@ -2434,7 +2499,7 @@ mod tests {
                 async move { Ok(Inspector::default()) }.boxed()
             })
             .unwrap();
-        let content_block = state_guard.get_block(6.into());
+        let content_block = state_guard.get_block::<StringRef>(6.into());
         assert_eq!(state_guard.load_string(content_block.index()).unwrap(), "link-name-1");
     }
 
@@ -2457,39 +2522,32 @@ mod tests {
         };
 
         let snapshot = Snapshot::try_from(state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        let mut blocks = snapshot.scan();
+        assert_eq!(blocks.next().unwrap().block_type(), Some(BlockType::Header));
 
-        assert_eq!(blocks[1].block_type(), BlockType::LinkValue);
-        assert_eq!(blocks[2].block_type(), BlockType::StringReference);
-        assert_eq!(blocks[3].block_type(), BlockType::StringReference);
-        assert_eq!(blocks[4].block_type(), BlockType::IntValue);
-        assert_eq!(
-            state.try_lock().unwrap().load_string(blocks[4].name_index().unwrap()).unwrap(),
-            "lk-0"
-        );
-        assert_eq!(
-            state.try_lock().unwrap().load_string(blocks[1].name_index().unwrap()).unwrap(),
-            "lk"
-        );
-        assert_eq!(
-            state.try_lock().unwrap().load_string(blocks[1].link_content_index().unwrap()).unwrap(),
-            "lk-0"
-        );
-        assert_all_free(&blocks[5..]);
+        let block = blocks.next().and_then(|b| b.cast::<Link>()).unwrap();
+        assert_eq!(block.block_type(), Some(BlockType::LinkValue));
+        assert_eq!(state.try_lock().unwrap().load_string(block.name_index()).unwrap(), "lk");
+        assert_eq!(state.try_lock().unwrap().load_string(block.content_index()).unwrap(), "lk-0");
+        assert_eq!(blocks.next().unwrap().block_type(), Some(BlockType::StringReference));
+        assert_eq!(blocks.next().unwrap().block_type(), Some(BlockType::StringReference));
+        let block = blocks.next().and_then(|b| b.cast::<Int>()).unwrap();
+        assert_eq!(block.block_type(), Some(BlockType::IntValue));
+        assert_eq!(state.try_lock().unwrap().load_string(block.name_index()).unwrap(), "lk-0");
+        assert_all_free(blocks);
 
         state.try_lock().unwrap().free_lazy_node(lazy_index).unwrap();
 
         let snapshot = Snapshot::try_from(state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        let mut blocks = snapshot.scan();
 
-        assert_eq!(blocks[1].block_type(), BlockType::Free);
-        assert_eq!(blocks[2].block_type(), BlockType::StringReference);
-        assert_eq!(blocks[3].block_type(), BlockType::IntValue);
-        assert_eq!(
-            state.try_lock().unwrap().load_string(blocks[3].name_index().unwrap()).unwrap(),
-            "lk-0"
-        );
-        assert_all_free(&blocks[4..]);
+        assert_eq!(blocks.next().unwrap().block_type(), Some(BlockType::Header));
+        assert_eq!(blocks.next().unwrap().block_type(), Some(BlockType::Free));
+        assert_eq!(blocks.next().unwrap().block_type(), Some(BlockType::StringReference));
+        let block = blocks.next().and_then(|b| b.cast::<Int>()).unwrap();
+        assert_eq!(block.block_type(), Some(BlockType::IntValue));
+        assert_eq!(state.try_lock().unwrap().load_string(block.name_index()).unwrap(), "lk-0");
+        assert_all_free(blocks);
     }
 
     #[fuchsia::test]
@@ -2527,52 +2585,52 @@ mod tests {
         let state = get_state(4096);
         // Initial generation count is 0
         state.with_current_header(|header| {
-            assert_eq!(header.header_generation_count().unwrap(), 0);
+            assert_eq!(header.generation_count(), 0);
         });
 
         // Begin a transaction
         state.begin_transaction();
         state.with_current_header(|header| {
-            assert_eq!(header.header_generation_count().unwrap(), 1);
-            assert!(header.check_locked(true).is_ok());
+            assert_eq!(header.generation_count(), 1);
+            assert!(header.is_locked());
         });
 
         // Operations on the lock  guard do not change the generation counter.
         let mut lock_guard1 = state.try_lock().expect("lock state");
         assert_eq!(lock_guard1.inner_lock.transaction_count, 1);
-        assert_eq!(lock_guard1.header().header_generation_count().unwrap(), 1);
-        assert!(lock_guard1.header().check_locked(true).is_ok());
-        let _ = lock_guard1.create_node("test".into(), 0.into()).unwrap();
+        assert_eq!(lock_guard1.header().generation_count(), 1);
+        assert!(lock_guard1.header().is_locked());
+        let _ = lock_guard1.create_node("test".into(), 0.into());
         assert_eq!(lock_guard1.inner_lock.transaction_count, 1);
-        assert_eq!(lock_guard1.header().header_generation_count().unwrap(), 1);
+        assert_eq!(lock_guard1.header().generation_count(), 1);
 
         // Dropping the guard releases the mutex lock but the header remains locked.
         drop(lock_guard1);
         state.with_current_header(|header| {
-            assert_eq!(header.header_generation_count().unwrap(), 1);
-            assert!(header.check_locked(true).is_ok());
+            assert_eq!(header.generation_count(), 1);
+            assert!(header.is_locked());
         });
 
         // When the transaction finishes, the header is unlocked.
         state.end_transaction();
 
         state.with_current_header(|header| {
-            assert_eq!(header.header_generation_count().unwrap(), 2);
-            assert!(header.check_locked(false).is_ok());
+            assert_eq!(header.generation_count(), 2);
+            assert!(!header.is_locked());
         });
 
         // Operations under no transaction work as usual.
         let lock_guard2 = state.try_lock().expect("lock state");
-        assert!(lock_guard2.header().check_locked(true).is_ok());
-        assert_eq!(lock_guard2.header().header_generation_count().unwrap(), 3);
+        assert!(lock_guard2.header().is_locked());
+        assert_eq!(lock_guard2.header().generation_count(), 3);
         assert_eq!(lock_guard2.inner_lock.transaction_count, 0);
     }
 
     #[fuchsia::test]
     async fn update_header_vmo_size() {
         let core_state = get_state(3 * 4096);
-        core_state.get_block(BlockIndex::HEADER, |header| {
-            assert_eq!(header.header_vmo_size().unwrap().unwrap(), 4096);
+        core_state.get_block(BlockIndex::HEADER, |header: &Block<_, Header>| {
+            assert_eq!(header.vmo_size(), Ok(Some(4096)));
         });
         let block1_index = {
             let mut state = core_state.try_lock().expect("lock state");
@@ -2581,7 +2639,7 @@ mod tests {
             let data = chars.iter().cycle().take(6000).collect::<String>();
             let block_index =
                 state.create_buffer_property("test".into(), data.as_bytes(), 0.into()).unwrap();
-            assert_eq!(state.header().header_vmo_size().unwrap().unwrap(), 2 * 4096);
+            assert_eq!(state.header().vmo_size(), Ok(Some(2 * 4096)));
 
             block_index
         };
@@ -2593,7 +2651,7 @@ mod tests {
             let data = chars.iter().cycle().take(3000).collect::<String>();
             let block_index =
                 state.create_buffer_property("test".into(), data.as_bytes(), 0.into()).unwrap();
-            assert_eq!(state.header().header_vmo_size().unwrap().unwrap(), 3 * 4096);
+            assert_eq!(state.header().vmo_size(), Ok(Some(3 * 4096)));
 
             block_index
         };
@@ -2604,8 +2662,8 @@ mod tests {
             assert!(state.free_string_or_bytes_buffer_property(block2_index).is_ok());
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert_all_free(&blocks[1..]);
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
+        assert_all_free(blocks.into_iter().skip(1));
     }
 
     #[fuchsia::test]
@@ -2629,28 +2687,27 @@ mod tests {
 
             // We now expect the length of the payload, as well as the property extent index to be
             // reset.
-            let block = state.get_block(block_index);
-            assert_eq!(block.block_type(), BlockType::BufferValue);
+            let block = state.get_block::<Buffer>(block_index);
+            assert_eq!(block.block_type(), Some(BlockType::BufferValue));
             assert_eq!(*block.index(), 2);
-            assert_eq!(*block.parent_index().unwrap(), 0);
-            assert_eq!(*block.name_index().unwrap(), 3);
-            assert_eq!(block.total_length().unwrap(), 0);
-            assert_eq!(*block.property_extent_index().unwrap(), 0);
-            assert_eq!(block.property_format().unwrap(), PropertyFormat::Bytes);
+            assert_eq!(*block.parent_index(), 0);
+            assert_eq!(*block.name_index(), 3);
+            assert_eq!(block.total_length(), 0);
+            assert_eq!(*block.extent_index(), 0);
+            assert_eq!(block.format(), Some(PropertyFormat::Bytes));
 
             block_index
         };
 
         // We also expect no extents to be present.
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
         assert_eq!(blocks.len(), 251);
-        assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert_eq!(blocks[1].block_type(), BlockType::BufferValue);
-        assert_eq!(blocks[2].block_type(), BlockType::StringReference);
-        assert!(blocks[3..]
-            .iter()
-            .all(|b| b.block_type() == BlockType::Reserved || b.block_type() == BlockType::Free));
+        assert_eq!(blocks[0].block_type(), Some(BlockType::Header));
+        assert_eq!(blocks[1].block_type(), Some(BlockType::BufferValue));
+        assert_eq!(blocks[2].block_type(), Some(BlockType::StringReference));
+        assert!(blocks[3..].iter().all(|b| b.block_type() == Some(BlockType::Reserved)
+            || b.block_type() == Some(BlockType::Free)));
 
         {
             let mut state = core_state.try_lock().expect("lock state");
@@ -2658,9 +2715,8 @@ mod tests {
             assert_matches!(state.free_string_or_bytes_buffer_property(block_index), Ok(()));
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
-        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
-        assert!(blocks[1..]
-            .iter()
-            .all(|b| b.block_type() == BlockType::Reserved || b.block_type() == BlockType::Free));
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
+        assert!(blocks[1..].iter().all(|b| b.block_type() == Some(BlockType::Reserved)
+            || b.block_type() == Some(BlockType::Free)));
     }
 }

@@ -6,7 +6,7 @@ use crate::block_index::BlockIndex;
 use crate::block_type::BlockType;
 
 /// Errors that Inspect API functions can return.
-#[derive(Clone, Debug, thiserror::Error)]
+#[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
 pub enum Error {
     #[error("{slots} exceeds the maximum number of slots for order {order}: {max_capacity}")]
     ArrayCapacityExceeded { slots: usize, order: u8, max_capacity: usize },
@@ -46,6 +46,9 @@ pub enum Error {
 
     #[error("Invalid reference count. Reference count must be in range (0, 2^32)")]
     InvalidReferenceCount,
+
+    #[error("invalid buffer format: {0}")]
+    InvalidBufferFormat(u8),
 
     #[error("Size (={0}) of the inspect VMO could not be written to the header")]
     SizeNotWritten(u32),

@@ -4,7 +4,7 @@
 
 use crate::writer::Error as WriterError;
 use diagnostics_hierarchy::Error as HierarchyError;
-use inspect_format::{BlockIndex, BlockType, Error as FormatError};
+use inspect_format::{BlockIndex, Error as FormatError};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -27,11 +27,14 @@ pub enum ReaderError {
     #[error("VMO format error")]
     VmoFormat(#[from] FormatError),
 
+    #[error("The VMO is in an invalid format")]
+    InvalidVmo,
+
     #[error("Tried to read more slots than available at block index {0}")]
     AttemptedToReadTooManyArraySlots(BlockIndex),
 
     #[error("unexpected array entry type format: {0:?}")]
-    UnexpectedArrayEntryFormat(BlockType),
+    UnexpectedArrayEntryFormat(u8),
 
     #[error("Failed to parse name at index {0}")]
     ParseName(BlockIndex),
