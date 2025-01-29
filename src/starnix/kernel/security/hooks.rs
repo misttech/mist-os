@@ -8,7 +8,7 @@ use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
     DirEntryHandle, FileHandle, FileObject, FileSystem, FileSystemHandle, FsNode, FsStr, FsString,
-    NamespaceNode, ValueOrSize, XattrOp,
+    Mount, NamespaceNode, ValueOrSize, XattrOp,
 };
 use fuchsia_inspect_contrib::profile_duration;
 use selinux::{SecurityPermission, SecurityServer};
@@ -123,7 +123,7 @@ pub fn kernel_init_security(enabled: bool, exceptions_config: String) -> KernelS
     KernelState { state: enabled.then(|| selinux_hooks::kernel_init_security(exceptions_config)) }
 }
 
-/// Return security state to associate with a filesystem based on the supplied mount options.
+/// Returns security state to associate with a filesystem based on the supplied mount options.
 /// This sits somewhere between `fs_context_parse_param()` and `sb_set_mnt_opts()` in function.
 pub fn file_system_init_security(
     name: &'static FsStr,
@@ -721,6 +721,19 @@ pub fn sb_mount(
             path,
             flags,
         )
+    })
+}
+
+/// Checks permission before remounting `mount` with `new_mount_params`.
+/// Corresponds to the `sb_remount()` LSM hook.
+pub fn sb_remount(
+    current_task: &CurrentTask,
+    mount: &Mount,
+    new_mount_params: &MountParams,
+) -> Result<(), Errno> {
+    profile_duration!("security.hooks.sb_remount");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::superblock::sb_remount(security_server, mount, new_mount_params)
     })
 }
 

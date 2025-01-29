@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::mutable_state::{state_accessor, state_implementation};
+use crate::security;
 use crate::task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter};
 use crate::time::utc;
 use crate::vfs::buffers::InputBuffer;
@@ -489,6 +490,16 @@ impl Mount {
         let mountpoint = self.mountpoint().ok_or_else(|| errno!(EINVAL))?;
         let parent_mount = mountpoint.mount.as_ref().expect("a mountpoint must be part of a mount");
         parent_mount.remove_submount(mountpoint.mount_hash_key(), propagate)
+    }
+
+    /// Returns the security state of the fs.
+    pub fn security_state(&self) -> &security::FileSystemState {
+        &self.fs.security_state
+    }
+
+    /// Returns the name of the fs.
+    pub fn fs_name(&self) -> &'static FsStr {
+        self.fs.name()
     }
 
     state_accessor!(Mount, state, Arc<Mount>);

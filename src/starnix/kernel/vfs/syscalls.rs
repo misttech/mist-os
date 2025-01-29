@@ -1723,7 +1723,7 @@ pub fn sys_mount(
     security::sb_mount(current_task, &target, flags)?;
 
     if flags.contains(MountFlags::REMOUNT) {
-        do_mount_remount(target, flags, data_addr)
+        do_mount_remount(current_task, target, flags, data_addr)
     } else if flags.contains(MountFlags::BIND) {
         do_mount_bind(locked, current_task, source_addr, target, flags)
     } else if flags.intersects(MountFlags::SHARED | MountFlags::PRIVATE | MountFlags::DOWNSTREAM) {
@@ -1742,6 +1742,7 @@ pub fn sys_mount(
 }
 
 fn do_mount_remount(
+    current_task: &CurrentTask,
     target: NamespaceNode,
     flags: MountFlags,
     data_addr: UserCString,
@@ -1750,6 +1751,10 @@ fn do_mount_remount(
         track_stub!(TODO("https://fxbug.dev/322875506"), "MS_REMOUNT: Updating data");
     }
     let mount = target.mount_if_root()?;
+
+    let mut data_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
+    let data = current_task.read_c_string_if_non_null(data_addr, &mut data_buf)?;
+    security::sb_remount(current_task, &mount, &MountParams::parse(data)?)?;
     let updated_flags = flags & MountFlags::CHANGEABLE_WITH_REMOUNT;
     mount.update_flags(updated_flags);
     if !flags.contains(MountFlags::BIND) {
@@ -1834,11 +1839,7 @@ fn do_mount_create(
     let mut fs_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
     let fs_type = current_task.read_c_string(filesystemtype_addr, &mut fs_buf)?;
     let mut data_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
-    let data = if data_addr.is_null() {
-        Default::default()
-    } else {
-        current_task.read_c_string(data_addr, &mut data_buf)?
-    };
+    let data = current_task.read_c_string_if_non_null(data_addr, &mut data_buf)?;
     log_trace!(
         source:%,
         target:% = target.path(current_task),
@@ -1850,7 +1851,7 @@ fn do_mount_create(
     let options = FileSystemOptions {
         source: source.into(),
         flags: flags & MountFlags::STORED_ON_FILESYSTEM,
-        params: MountParams::parse(&data)?,
+        params: MountParams::parse(data)?,
     };
 
     let fs = current_task.create_filesystem(locked, fs_type, options)?;

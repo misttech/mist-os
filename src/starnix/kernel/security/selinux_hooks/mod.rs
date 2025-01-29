@@ -1219,11 +1219,10 @@ pub(super) fn kernel_init_security(exceptions_config: String) -> KernelState {
     }
 }
 
-/// Return security state to associate with a filesystem based on the supplied mount options.
-pub(super) fn file_system_init_security(
-    name: &'static FsStr,
-    mount_params: &MountParams,
-) -> Result<FileSystemState, Errno> {
+/// Returns the security mount options for the given `MountParams`
+/// Equivalent to the `sb_eat_lsm_opts` hook.
+/// TODO(https://fxbug.dev/378835348): Consume the SELinux mount options from the supplied `MountParams`.
+fn sb_eat_lsm_opts(mount_params: &MountParams) -> Result<FileSystemMountOptions, Errno> {
     let context = mount_params.get(FsStr::new(b"context")).cloned();
     let def_context = mount_params.get(FsStr::new(b"defcontext")).cloned();
     let fs_context = mount_params.get(FsStr::new(b"fscontext")).cloned();
@@ -1234,15 +1233,41 @@ pub(super) fn file_system_init_security(
     if context.is_some() && (def_context.is_some() || root_context.is_some()) {
         return error!(EINVAL);
     }
-
-    let mount_options = FileSystemMountOptions {
+    Ok(FileSystemMountOptions {
         context: context.map(Into::into),
         def_context: def_context.map(Into::into),
         fs_context: fs_context.map(Into::into),
         root_context: root_context.map(Into::into),
-    };
+    })
+}
 
-    Ok(FileSystemState::new(name, mount_options))
+/// Returns security state to associate with a filesystem based on the supplied mount options.
+pub(super) fn file_system_init_security(
+    name: &'static FsStr,
+    mount_params: &MountParams,
+) -> Result<FileSystemState, Errno> {
+    Ok(FileSystemState::new(name, sb_eat_lsm_opts(mount_params)?))
+}
+
+/// Returns the security label to be applied to a file system with the name `fs_name`
+/// that is to be mounted with `mount_options`.
+fn label_from_mount_options_and_name(
+    security_server: &SecurityServer,
+    mount_options: &FileSystemMountOptions,
+    fs_name: &'static FsStr,
+) -> FileSystemLabel {
+    // TODO: https://fxbug.dev/361297862 - Replace this workaround with more
+    // general handling of these special Fuchsia filesystems.
+    let effective_name: &FsStr = if *fs_name == "remotefs" || *fs_name == "remote_bundle" {
+        track_stub!(
+            TODO("https://fxbug.dev/361297862"),
+            "Applying ext4 labeling configuration to remote filesystems"
+        );
+        "ext4".into()
+    } else {
+        fs_name
+    };
+    security_server.resolve_fs_label(effective_name.into(), mount_options)
 }
 
 /// Resolves the labeling scheme and arguments for the `file_system`, based on the loaded policy.
@@ -1259,27 +1284,22 @@ where
     // Security Context values that are not valid in the loaded policy.
     let pending_entries = {
         let mut label_state = file_system.security_state.state.0.lock();
-        let (resolved_label, pending_entries) = match &mut *label_state {
+        let (resolved_label_state, pending_entries) = match &mut *label_state {
             FileSystemLabelState::Labeled { .. } => return Ok(()),
             FileSystemLabelState::Unlabeled { name, mount_options, pending_entries } => (
                 {
-                    // TODO: https://fxbug.dev/361297862 - Replace this workaround with more
-                    // general handling of these special Fuchsia filesystems.
-                    let effective_name = if *name == "remotefs" || *name == "remote_bundle" {
-                        track_stub!(
-                            TODO("https://fxbug.dev/361297862"),
-                            "Applying ext4 labeling configuration to remote filesystems"
-                        );
-                        "ext4".into()
-                    } else {
-                        *name
-                    };
-                    security_server.resolve_fs_label(effective_name.into(), mount_options)
+                    FileSystemLabelState::Labeled {
+                        label: label_from_mount_options_and_name(
+                            security_server,
+                            mount_options,
+                            name,
+                        ),
+                    }
                 },
                 std::mem::take(pending_entries),
             ),
         };
-        *label_state = FileSystemLabelState::Labeled { label: resolved_label };
+        *label_state = resolved_label_state;
         pending_entries
     };
 
@@ -1443,7 +1463,7 @@ impl FileSystemState {
     fn new(name: &'static FsStr, mount_options: FileSystemMountOptions) -> Self {
         Self(Mutex::new(FileSystemLabelState::Unlabeled {
             name,
-            mount_options,
+            mount_options: mount_options,
             pending_entries: HashSet::new(),
         }))
     }
@@ -1457,6 +1477,29 @@ impl FileSystemState {
             }
         }
         return false;
+    }
+
+    /// Returns true if the security state of `self` is equivalent to the one derived from
+    /// `other_mount_options` for the filesystem named `fs_name`.
+    fn equivalent_to_options(
+        &self,
+        security_server: &SecurityServer,
+        other_mount_options: &FileSystemMountOptions,
+        fs_name: &'static FsStr,
+    ) -> bool {
+        let guard = self.0.lock();
+        match &*guard {
+            FileSystemLabelState::Unlabeled { name: _, mount_options, pending_entries: _ } => {
+                return *other_mount_options == *mount_options
+            }
+            FileSystemLabelState::Labeled { label } => {
+                return label_from_mount_options_and_name(
+                    security_server,
+                    other_mount_options,
+                    fs_name.into(),
+                ) == *label
+            }
+        }
     }
 }
 

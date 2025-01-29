@@ -2923,6 +2923,20 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         error!(ENAMETOOLONG)
     }
 
+    /// Returns a default initialized string if `addr` is null, otherwise
+    /// behaves as `read_c_string`.
+    fn read_c_string_if_non_null<'a>(
+        &self,
+        addr: UserCString,
+        buffer: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a FsStr, Errno> {
+        if addr.is_null() {
+            Ok(Default::default())
+        } else {
+            self.read_c_string(addr, buffer)
+        }
+    }
+
     fn write_object<T: IntoBytes + Immutable>(
         &self,
         user: UserRef<T>,
