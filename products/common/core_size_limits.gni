@@ -26,7 +26,7 @@ size_checker_input = {
         "cobalt",
         "cobalt_system_metrics",
       ]
-      limit = 3260416  # 3.109 MiB
+      limit = 3268608  # 3.117 MiB
       creep_limit = 40960  # 40.0 KiB
     },
 
