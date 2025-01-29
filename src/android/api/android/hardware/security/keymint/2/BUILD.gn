@@ -1,0 +1,40 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//src/lib/android/aidl/aidl.gni")
+
+aidl("2") {
+  base = "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2"
+  stability = "vintf"
+  version = "2"
+  parcelables = [
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/Algorithm.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/AttestationKey.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/BeginResult.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/BlockMode.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/Certificate.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/Digest.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/EcCurve.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/ErrorCode.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/HardwareAuthToken.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/HardwareAuthenticatorType.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/KeyCharacteristics.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/KeyCreationResult.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/KeyFormat.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/KeyMintHardwareInfo.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/KeyOrigin.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/KeyParameter.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/KeyParameterValue.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/KeyPurpose.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/PaddingMode.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/SecurityLevel.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/Tag.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/TagType.aidl",
+  ]
+  interfaces = [
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/IKeyMintDevice.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/2/android/hardware/security/keymint/IKeyMintOperation.aidl",
+  ]
+  deps = [ "//src/android/api/android/hardware/security/secureclock/1" ]
+}

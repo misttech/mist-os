@@ -1,0 +1,19 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//src/lib/android/aidl/aidl.gni")
+
+aidl("3") {
+  base = "//third_party/android/platform/hardware/interfaces/security/rkp/aidl/aidl_api/android.hardware.security.rkp/3"
+  rust_crate_name = "android_hardware_security_rkp"
+  stability = "vintf"
+  version = "3"
+  parcelables = [
+    "//third_party/android/platform/hardware/interfaces/security/rkp/aidl/aidl_api/android.hardware.security.rkp/3/android/hardware/security/keymint/DeviceInfo.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/rkp/aidl/aidl_api/android.hardware.security.rkp/3/android/hardware/security/keymint/MacedPublicKey.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/rkp/aidl/aidl_api/android.hardware.security.rkp/3/android/hardware/security/keymint/ProtectedData.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/rkp/aidl/aidl_api/android.hardware.security.rkp/3/android/hardware/security/keymint/RpcHardwareInfo.aidl",
+  ]
+  interfaces = [ "//third_party/android/platform/hardware/interfaces/security/rkp/aidl/aidl_api/android.hardware.security.rkp/3/android/hardware/security/keymint/IRemotelyProvisionedComponent.aidl" ]
+}

@@ -1,0 +1,16 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//src/lib/android/aidl/aidl.gni")
+
+aidl("1") {
+  base = "//third_party/android/platform/hardware/interfaces/security/secureclock/aidl/aidl_api/android.hardware.security.secureclock/1"
+  stability = "vintf"
+  version = "1"
+  parcelables = [
+    "//third_party/android/platform/hardware/interfaces/security/secureclock/aidl/aidl_api/android.hardware.security.secureclock/1/android/hardware/security/secureclock/Timestamp.aidl",
+    "//third_party/android/platform/hardware/interfaces/security/secureclock/aidl/aidl_api/android.hardware.security.secureclock/1/android/hardware/security/secureclock/TimeStampToken.aidl",
+  ]
+  interfaces = [ "//third_party/android/platform/hardware/interfaces/security/secureclock/aidl/aidl_api/android.hardware.security.secureclock/1/android/hardware/security/secureclock/ISecureClock.aidl" ]
+}
