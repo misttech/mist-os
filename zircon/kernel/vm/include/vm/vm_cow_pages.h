@@ -43,6 +43,7 @@ enum class VmCowPagesOptions : uint32_t {
   kNone = 0u,
   kUserPagerBackedRoot = (1u << 0),
   kPreservingPageContentRoot = (1u << 1),
+  kPageSourceRoot = (1u << 2),
 
   // With this clear, zeroing a page tries to decommit the page.  With this set, zeroing never
   // decommits the page.  Currently this is only set for contiguous VMOs.
@@ -53,10 +54,10 @@ enum class VmCowPagesOptions : uint32_t {
   // pages aren't pinned, but that mitigation should be sufficient (even assuming such a client) to
   // allow implicit decommit when zeroing or when zero scanning, as long as no clients are doing DMA
   // to/from contiguous while not pinned.
-  kCannotDecommitZeroPages = (1u << 2),
+  kCannotDecommitZeroPages = (1u << 3),
 
   // Internal-only flags:
-  kHidden = (1u << 3),
+  kHidden = (1u << 4),
 
   kInternalOnlyMask = kHidden,
 };
@@ -131,12 +132,19 @@ class VmCowPages final : public VmHierarchyBase,
     return !!(options_ & VmCowPagesOptions::kUserPagerBackedRoot);
   }
 
+  // Returns whether the root of the cow pages hierarchy has non-null page_source_.
+  bool root_has_page_source() const {
+    canary_.Assert();
+    return !!(options_ & VmCowPagesOptions::kPageSourceRoot);
+  }
+
   // Helper function for CowPage cloning methods. Returns any options that should be passed down to
   // the child.
   VmCowPagesOptions inheritable_options() const {
     canary_.Assert();
     return VmCowPagesOptions::kNone | (options_ & (VmCowPagesOptions::kUserPagerBackedRoot |
-                                                   VmCowPagesOptions::kPreservingPageContentRoot));
+                                                   VmCowPagesOptions::kPreservingPageContentRoot |
+                                                   VmCowPagesOptions::kPageSourceRoot));
   }
 
   bool is_root_source_preserving_page_content() const {

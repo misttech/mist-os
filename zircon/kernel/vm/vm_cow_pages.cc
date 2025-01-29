@@ -2881,15 +2881,13 @@ zx_status_t VmCowPages::CommitRangeLocked(VmCowRange range, uint64_t* committed_
   DEBUG_ASSERT(range.IsBoundedBy(size_));
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
-  fbl::RefPtr<PageSource> root_source = GetRootPageSourceLocked();
-
   // If this vmo has a direct page source, then the source will provide the backing memory. For
   // children that eventually depend on a page source, we skip preallocating memory to avoid
   // potentially overallocating pages if something else touches the vmo while we're blocked on the
   // request. Otherwise we optimize things by preallocating all the pages.
   list_node page_list;
   list_initialize(&page_list);
-  if (root_source == nullptr) {
+  if (!root_has_page_source()) {
     // make a pass through the list to find out how many pages we need to allocate
     size_t count = range.len / PAGE_SIZE;
     page_list_.ForEveryPageInRange(

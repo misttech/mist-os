@@ -548,6 +548,8 @@ zx_status_t VmObjectPaged::CreateWithSourceCommon(fbl::RefPtr<PageSource> src,
   options |= kCanBlockOnPageRequests;
 
   VmCowPagesOptions cow_options = VmCowPagesOptions::kNone;
+  cow_options |= VmCowPagesOptions::kPageSourceRoot;
+
   if (options & kContiguous) {
     cow_options |= VmCowPagesOptions::kCannotDecommitZeroPages;
   }
