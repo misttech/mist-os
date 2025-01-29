@@ -254,6 +254,11 @@
             to: "#network",
         },
         {
+            protocol: [ "fuchsia.power.internal.CollaborativeRebootScheduler" ],
+            from: "parent",
+            to: "#network",
+        },
+        {
             protocol: [ "fuchsia.pkg.PackageCache" ],
             from: "parent",
             to: "#pkg-resolver",

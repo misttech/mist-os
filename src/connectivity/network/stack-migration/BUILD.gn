@@ -13,6 +13,8 @@ network_unified_binary("bin") {
   deps = [
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//sdk/fidl/fuchsia.net.stackmigrationdeprecated:fuchsia.net.stackmigrationdeprecated_rust",
+    "//sdk/fidl/fuchsia.power.internal:fuchsia.power.internal_rust",
+    "//sdk/rust/zx",
     "//src/connectivity/network/metrics:networking_metrics_registry_rustlib",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",

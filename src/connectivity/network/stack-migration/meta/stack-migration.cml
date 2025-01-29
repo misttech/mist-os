@@ -24,6 +24,9 @@
             path: "/data",
         },
         { protocol: "fuchsia.metrics.MetricEventLoggerFactory" },
+        {
+            protocol: [ "fuchsia.power.internal.CollaborativeRebootScheduler" ],
+        },
     ],
     expose: [
         {
