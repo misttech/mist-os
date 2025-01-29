@@ -270,9 +270,10 @@ mod test {
     use fidl_fuchsia_pkg_rewrite::{EditTransactionRequest, EngineRequest, RuleIteratorRequest};
     use fuchsia_async as fasync;
     use futures::{StreamExt, TryStreamExt};
+    use target_holders::fake_proxy;
 
     async fn empty_repo_proxy() -> RepositoryRegistryProxy {
-        fho::testing::fake_proxy(move |req| {
+        fake_proxy(move |req| {
             fasync::Task::spawn(async move {
                 match req {
                     RepositoryRegistryRequest::ListRegisteredTargets { iterator, .. } => {
@@ -293,7 +294,7 @@ mod test {
     }
 
     async fn repo_proxy() -> RepositoryRegistryProxy {
-        fho::testing::fake_proxy(move |req| {
+        fake_proxy(move |req| {
             fasync::Task::spawn(async move {
                 let mut sent = false;
                 match req {
@@ -345,7 +346,7 @@ mod test {
     }
 
     async fn setup_fake_repo_proxy() -> RepositoryManagerProxy {
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             RepositoryManagerRequest::Add { repo: _, responder } => {
                 responder.send(Ok(())).unwrap();
             }
@@ -365,7 +366,7 @@ mod test {
     }
 
     async fn setup_fake_engine_proxy() -> EngineProxy {
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             EngineRequest::StartEditTransaction { transaction, control_handle: _ } => {
                 fuchsia_async::Task::local(async move {
                     let mut tx_stream = transaction.into_stream();

@@ -65,13 +65,14 @@ async fn command(
 mod test {
     use super::*;
     use fidl_fuchsia_settings::FactoryResetRequest;
+    use target_holders::fake_proxy;
     use test_case::test_case;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_run_command() {
         const ALLOWED: bool = true;
 
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             FactoryResetRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -97,7 +98,7 @@ mod test {
     async fn validate_factory_reset_set_output(
         expected_is_local_reset_allowed: bool,
     ) -> Result<()> {
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             FactoryResetRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -136,7 +137,7 @@ mod test {
     async fn validate_factory_reset_watch_output(
         expected_is_local_reset_allowed: Option<bool>,
     ) -> Result<()> {
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             FactoryResetRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }

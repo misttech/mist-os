@@ -254,6 +254,7 @@ mod test {
     use futures::TryStreamExt;
     use std::collections::BTreeSet;
     use std::net::IpAddr;
+    use target_holders::fake_proxy;
 
     const REPO_NAME: &str = "some-name";
     const TARGET_NAME: &str = "some-target";
@@ -261,7 +262,7 @@ mod test {
     async fn setup_fake_server() -> (RepositoryRegistryProxy, Receiver<RepositoryTarget>) {
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::RegisterTarget {
                 target_info,
                 responder,
@@ -282,7 +283,7 @@ mod test {
     ) -> (RepositoryManagerProxy, Receiver<Result<(), i32>>) {
         let (sender, receiver) = channel();
         let mut _sender = Some(sender);
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             RepositoryManagerRequest::Add { repo, responder } => {
                 if let Some(expected) = &expected_config {
                     if expected.repo_url != repo.repo_url {
@@ -348,7 +349,7 @@ mod test {
     ) -> (EngineProxy, Receiver<Result<(), i32>>) {
         let (sender, receiver) = channel();
         let mut _sender = Some(sender);
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             EngineRequest::StartEditTransaction { transaction, control_handle: _ } => {
                 let expected_rule = expected_rule.clone();
                 fuchsia_async::Task::local(async move {
@@ -426,7 +427,7 @@ mod test {
     async fn setup_fake_target_proxy() -> (TargetProxy, Receiver<Result<(), i32>>) {
         let (sender, receiver) = channel();
         let mut _sender = Some(sender);
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             TargetRequest::Identity { responder } => {
                 let addr: TargetAddr = TargetAddr::new(
                     IpAddr::from([0xfe80, 0x0, 0x0, 0x0, 0xdead, 0xbeef, 0xbeef, 0xbeef]),
@@ -875,7 +876,7 @@ mod test {
         .await
         .expect("repo server instance");
 
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::RegisterTarget {
                 target_info: _,
                 responder,
@@ -934,7 +935,7 @@ mod test {
         .await
         .expect("repo server instance");
 
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::RegisterTarget {
                 target_info: _,
                 responder,

@@ -17,6 +17,7 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//src/developer/ffx/command/error:lib",
     "//src/developer/ffx/config:lib",
+    "//src/developer/ffx/core:lib",
     "//src/developer/ffx/daemon/proxy:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/errors:lib",
@@ -27,6 +28,8 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/target_errors:lib",
     "//src/lib/fdomain/client",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
   ]
@@ -39,6 +42,7 @@ rustc_library("lib") {
   sources = [
     "src/daemon_proxy.rs",
     "src/device_lookup.rs",
+    "src/fake_injector.rs",
     "src/fdomain.rs",
     "src/fdomain/from_toolbox.rs",
     "src/fdomain/remote_control_proxy.rs",

@@ -139,6 +139,7 @@ mod tests {
     use std::collections::HashMap;
     use std::fs;
     use std::path::Path;
+    use target_holders::fake_proxy;
 
     macro_rules! test_file {
         (config $filename:expr) => {
@@ -182,7 +183,7 @@ mod tests {
     }
 
     fn setup_fake_data_provider_server() -> DataProviderProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             DataProviderRequest::GetSnapshot { params, responder } => {
                 let _channel = params.response_channel.unwrap();
 

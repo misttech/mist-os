@@ -40,10 +40,11 @@ pub async fn restart_impl<W: std::io::Write>(
 mod test {
     use super::*;
     use fidl_fuchsia_session::RestarterRequest;
+    use target_holders::fake_proxy;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_restart_session() {
-        let proxy = fho::testing::fake_proxy(|req| match req {
+        let proxy = fake_proxy(|req| match req {
             RestarterRequest::Restart { responder } => {
                 let _ = responder.send(Ok(()));
             }

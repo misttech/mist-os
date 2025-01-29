@@ -57,6 +57,7 @@ async fn command(proxy: DoNotDisturbProxy, do_not_disturb: DoNotDisturb) -> Watc
 mod test {
     use super::*;
     use fidl_fuchsia_settings::DoNotDisturbRequest;
+    use target_holders::fake_proxy;
     use test_case::test_case;
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -64,7 +65,7 @@ mod test {
         const USER: bool = true;
         const NIGHT_MODE: bool = false;
 
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             DoNotDisturbRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -103,7 +104,7 @@ mod test {
     async fn validate_do_not_disturb_set_output(
         expected_do_not_disturb: DoNotDisturb,
     ) -> Result<()> {
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             DoNotDisturbRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -138,7 +139,7 @@ mod test {
     async fn validate_do_not_disturb_watch_output(
         expected_do_not_disturb: DoNotDisturb,
     ) -> Result<()> {
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             DoNotDisturbRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }

@@ -12,6 +12,7 @@ use fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use ffx_command_error::{Error, FfxContext as _, Result};
 use fho::{FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
 use std::ops::Deref;
+use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Clone, Debug)]
@@ -85,4 +86,26 @@ where
         format!("Failed to connect to protocol '{protocol_name}' at moniker '{moniker}' within {} seconds", timeout.as_secs_f64())
     })?;
     Ok(proxy)
+}
+
+/// Sets up a fake FDomain proxy of type `T` handing requests to the given
+/// callback and returning their responses.
+///
+/// This is basically the same thing as `ffx_plugin` used to generate for
+/// each proxy argument, but uses a generic instead of text replacement.
+pub async fn fake_proxy_f<T: fdomain_client::fidl::Proxy>(
+    client: Arc<fdomain_client::Client>,
+    mut handle_request: impl FnMut(fdomain_client::fidl::Request<T::Protocol>) + 'static,
+) -> T {
+    use futures::TryStreamExt;
+    let (proxy, mut stream) = client.create_proxy_and_stream::<T::Protocol>();
+    fuchsia_async::Task::local(async move {
+        // Capture the client so it doesn't go out of scope
+        let _client = client;
+        while let Ok(Some(req)) = stream.try_next().await {
+            handle_request(req);
+        }
+    })
+    .detach();
+    proxy
 }

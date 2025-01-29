@@ -59,6 +59,7 @@ mod tests {
     use fidl_fuchsia_developer_ffx::RepositoryRegistryRequest;
     use futures::channel::oneshot::channel;
     use std::net::Ipv4Addr;
+    use target_holders::fake_proxy;
 
     #[fuchsia::test]
     async fn test_status() {
@@ -66,7 +67,7 @@ mod tests {
 
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::ServerStatus { responder } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder
@@ -91,7 +92,7 @@ mod tests {
         let _test_env = ffx_config::test_init().await.expect("test initialization");
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::ServerStatus { responder } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder.send(&ServerStatus::Disabled.into()).unwrap()
@@ -116,7 +117,7 @@ mod tests {
         let _test_env = ffx_config::test_init().await.expect("test initialization");
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::ServerStatus { responder } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder

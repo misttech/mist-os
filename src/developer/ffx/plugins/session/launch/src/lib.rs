@@ -84,12 +84,13 @@ async fn resolve_config_capabilities(
 mod test {
     use super::*;
     use fidl_fuchsia_session::LauncherRequest;
+    use target_holders::fake_proxy;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_launch_session() {
         const SESSION_URL: &str = "Session URL";
 
-        let proxy = fho::testing::fake_proxy(|req| match req {
+        let proxy = fake_proxy(|req| match req {
             LauncherRequest::Launch { configuration, responder } => {
                 assert!(configuration.session_url.is_some());
                 let session_url = configuration.session_url.unwrap();
@@ -97,8 +98,7 @@ mod test {
                 let _ = responder.send(Ok(()));
             }
         });
-        let rcs =
-            fho::testing::fake_proxy::<rc::RemoteControlProxy>(|_req| unimplemented!()).into();
+        let rcs = fake_proxy::<rc::RemoteControlProxy>(|_req| unimplemented!()).into();
 
         let launch_cmd = SessionLaunchCommand { url: SESSION_URL.to_string(), config: vec![] };
         let result = launch_impl(proxy, rcs, launch_cmd, &mut std::io::stdout()).await;

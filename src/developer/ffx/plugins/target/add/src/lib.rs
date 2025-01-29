@@ -121,12 +121,13 @@ pub async fn add_impl(
 mod test {
     use super::*;
     use fho::{Format, TestBuffers};
+    use target_holders::fake_proxy;
     use {fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_net as net};
 
     fn setup_fake_target_collection<T: 'static + Fn(ffx::TargetAddrInfo) + Send>(
         test: T,
     ) -> TargetCollectionProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             ffx::TargetCollectionRequest::AddTarget {
                 ip, config: _, add_target_responder, ..
             } => {

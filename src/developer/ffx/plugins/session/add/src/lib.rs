@@ -111,12 +111,13 @@ mod test {
     use assert_matches::assert_matches;
     use fidl_fuchsia_element::{self as felement, ManagerRequest};
     use futures::poll;
+    use target_holders::fake_proxy;
 
     #[fuchsia::test]
     async fn test_add_element() {
         const TEST_ELEMENT_URL: &str = "Test Element Url";
 
-        let proxy = fho::testing::fake_proxy(|req| match req {
+        let proxy = fake_proxy(|req| match req {
             ManagerRequest::ProposeElement { spec, responder, .. } => {
                 assert_eq!(spec.component_url.unwrap(), TEST_ELEMENT_URL.to_string());
                 let _ = responder.send(Ok(()));
@@ -139,7 +140,7 @@ mod test {
     async fn test_add_element_args() {
         const TEST_ELEMENT_URL: &str = "Test Element Url";
 
-        let proxy = fho::testing::fake_proxy(|req| match req {
+        let proxy = fake_proxy(|req| match req {
             ManagerRequest::ProposeElement { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -161,7 +162,7 @@ mod test {
     async fn test_add_interactive_element_stop_with_ctrl_c() {
         const TEST_ELEMENT_URL: &str = "Test Element Url";
 
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             ManagerRequest::ProposeElement { responder, .. } => {
                 responder.send(Ok(())).unwrap();
             }
@@ -191,7 +192,7 @@ mod test {
     async fn test_add_element_with_persist_and_name() {
         const TEST_ELEMENT_URL: &str = "Test Element Url";
 
-        let proxy = fho::testing::fake_proxy(|req| match req {
+        let proxy = fake_proxy(|req| match req {
             ManagerRequest::ProposeElement { spec, responder, .. } => {
                 assert_eq!(spec.component_url.unwrap(), TEST_ELEMENT_URL.to_string());
                 let mut got_name = false;

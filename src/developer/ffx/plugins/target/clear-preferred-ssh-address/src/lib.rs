@@ -38,10 +38,12 @@ async fn clear_preferred_ssh_address_impl(
 
 #[cfg(test)]
 mod tests {
+    use target_holders::fake_proxy;
+
     use super::*;
 
     fn setup_fake_target_server() -> ffx::TargetProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             ffx::TargetRequest::ClearPreferredSshAddress { responder } => {
                 responder.send().expect("clear_preferred_ssh_address failed");
             }

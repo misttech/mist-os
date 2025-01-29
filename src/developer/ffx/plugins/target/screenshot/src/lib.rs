@@ -215,6 +215,7 @@ mod test {
     use fidl_fuchsia_ui_composition::{ScreenshotRequest, ScreenshotTakeFileResponse};
     use futures::TryStreamExt;
     use std::os::unix::ffi::OsStrExt;
+    use target_holders::fake_proxy;
     use tempfile::tempdir;
 
     fn serve_fake_file(server: ServerEnd<fio::FileMarker>) {
@@ -253,7 +254,7 @@ mod test {
     }
 
     fn setup_fake_screenshot_server() -> ScreenshotProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             ScreenshotRequest::TakeFile { payload: _, responder } => {
                 let mut screenshot = ScreenshotTakeFileResponse::default();
 

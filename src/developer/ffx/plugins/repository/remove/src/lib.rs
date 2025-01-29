@@ -89,6 +89,7 @@ mod test {
     };
     use futures::channel::oneshot::channel;
     use futures::StreamExt;
+    use target_holders::fake_proxy;
 
     #[fuchsia::test]
     async fn test_remove() {
@@ -96,7 +97,7 @@ mod test {
 
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::RemoveRepository { name, responder } => {
                 sender.take().unwrap().send(name).unwrap();
                 responder.send(true).unwrap()
@@ -110,7 +111,7 @@ mod test {
     #[fuchsia::test]
     async fn test_remove_fail() {
         let _test_env = ffx_config::test_init().await.expect("test initialization");
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::RemoveRepository { responder, .. } => {
                 responder.send(false).unwrap()
             }
@@ -168,7 +169,7 @@ mod test {
     #[fuchsia::test]
     async fn test_remove_all() {
         let _test_env = ffx_config::test_init().await.expect("test initialization");
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::RemoveRepository { responder, .. } => {
                 responder.send(true).unwrap()
             }
@@ -190,7 +191,7 @@ mod test {
     #[fuchsia::test]
     async fn test_remove_all_some_fail() {
         let _test_env = ffx_config::test_init().await.expect("test initialization");
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::RemoveRepository { responder, name } => {
                 responder.send(name == "Test1").unwrap()
             }

@@ -169,6 +169,7 @@ impl<T> Future for Deferred<T> {
 
 #[cfg(test)]
 mod tests {
+    use ffx_command::FfxCommandLine;
     use ffx_command_error::Error;
 
     use super::*;
@@ -185,9 +186,12 @@ mod tests {
     #[fuchsia::test]
     async fn test_deferred_err() {
         let config_env = ffx_config::test_init().await.unwrap();
-        let tool_env = crate::testing::ToolEnv::new().make_environment(config_env.context.clone());
+        let ffx =
+            FfxCommandLine::new(None, &["test", "test_deferred_err"]).expect("ffx command line");
 
-        Deferred::<AlwaysError>::try_from_env(&tool_env)
+        let fho_env = FhoEnvironment::new(&config_env.context, &ffx);
+
+        Deferred::<AlwaysError>::try_from_env(&fho_env)
             .await
             .expect("Deferred result should be Ok")
             .await

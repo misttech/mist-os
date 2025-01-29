@@ -69,6 +69,17 @@ impl FhoEnvironment {
         }
     }
 
+    /// Create new instance for use in tests.
+    pub fn new_with_args(context: &EnvironmentContext, argv: &[impl AsRef<str>]) -> Self {
+        tracing::info!("FhoEnvironment test instance with args created");
+        FhoEnvironment {
+            behavior: Arc::new(RwLock::new(None)),
+            ffx: FfxCommandLine::new(None, argv).unwrap(),
+            context: context.clone(),
+            lookup: Arc::new(RwLock::new(None.into())),
+        }
+    }
+
     pub fn new_for_test<T: DeviceLookup + 'static>(
         context: &EnvironmentContext,
         ffx: &FfxCommandLine,

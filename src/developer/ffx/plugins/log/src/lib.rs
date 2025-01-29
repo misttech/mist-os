@@ -333,7 +333,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn json_logger_test() {
-        let environment = TestEnvironment::new(TestEnvironmentConfig::default());
+        let environment = TestEnvironment::new(TestEnvironmentConfig::default()).await;
         let rcs_connector = environment.rcs_connector().await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
@@ -375,7 +375,8 @@ mod tests {
                 Moniker::try_from("core/other/ambiguous_selector:thing/test").unwrap(),
             ],
             ..Default::default()
-        });
+        })
+        .await;
         let rcs_connector = environment.rcs_connector().await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
@@ -410,7 +411,7 @@ ffx log --force-set-severity.
 
     async fn logger_dump_string(config: TestEnvironmentConfig, cmd: LogCommand) -> String {
         let show_initial_timestamp = config.show_initial_timestamp;
-        let mut environment = TestEnvironment::new(config);
+        let mut environment = TestEnvironment::new(config).await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             symbolize: SymbolizeMode::Off,
@@ -445,7 +446,8 @@ ffx log --force-set-severity.
         let mut environment = TestEnvironment::new(TestEnvironmentConfig {
             instances: vec![Moniker::try_from("core/foo").unwrap()],
             ..Default::default()
-        });
+        })
+        .await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             set_severity: selectors.clone(),
@@ -467,7 +469,7 @@ ffx log --force-set-severity.
 
     #[fuchsia::test]
     async fn logger_prints_error_if_both_dump_and_since_now_are_combined() {
-        let environment = TestEnvironment::new(TestEnvironmentConfig::default());
+        let environment = TestEnvironment::new(TestEnvironmentConfig::default()).await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             symbolize: SymbolizeMode::Off,
@@ -487,7 +489,7 @@ ffx log --force-set-severity.
 
     #[fuchsia::test]
     async fn logger_prints_current_logs_and_exits_on_dump() {
-        let mut environment = TestEnvironment::new(TestEnvironmentConfig::default());
+        let mut environment = TestEnvironment::new(TestEnvironmentConfig::default()).await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             symbolize: SymbolizeMode::Off,
@@ -522,7 +524,8 @@ ffx log --force-set-severity.
             boot_timestamp: BOOT_TIMESTAMP,
             messages: vec![],
             ..Default::default()
-        });
+        })
+        .await;
         let rcs_connector = environment.rcs_connector().await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
@@ -603,7 +606,8 @@ ffx log --force-set-severity.
             ))],
             send_connected_event: true,
             ..Default::default()
-        });
+        })
+        .await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Watch(WatchCommand {})),
             symbolize: SymbolizeMode::Off,
@@ -678,7 +682,8 @@ ffx log --force-set-severity.
             boot_id: None,
             send_connected_event: true,
             ..Default::default()
-        });
+        })
+        .await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Watch(WatchCommand {})),
             symbolize: SymbolizeMode::Off,
@@ -718,7 +723,8 @@ ffx log --force-set-severity.
             ))],
             send_connected_event: true,
             ..Default::default()
-        });
+        })
+        .await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Watch(WatchCommand {})),
             symbolize: SymbolizeMode::Off,
@@ -894,7 +900,8 @@ ffx log --force-set-severity.
         let mut environment = TestEnvironment::new(TestEnvironmentConfig {
             messages: vec![testing_utils::test_log(0)],
             ..Default::default()
-        });
+        })
+        .await;
         let selector =
             vec![OneOrMany::One(parse_log_interest_selector("archivist.cm#TRACE").unwrap())];
         let cmd = LogCommand {

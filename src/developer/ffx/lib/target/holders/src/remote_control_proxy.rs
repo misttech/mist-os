@@ -84,3 +84,22 @@ where
     })?;
     Ok(proxy)
 }
+
+/// Sets up a fake proxy of type `T` handing requests to the given callback and returning
+/// their responses.
+///
+/// This is basically the same thing as `ffx_plugin` used to generate for
+/// each proxy argument, but uses a generic instead of text replacement.
+pub fn fake_proxy<T: fidl::endpoints::Proxy>(
+    mut handle_request: impl FnMut(fidl::endpoints::Request<T::Protocol>) + 'static,
+) -> T {
+    use futures::TryStreamExt;
+    let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<T::Protocol>();
+    fuchsia_async::Task::local(async move {
+        while let Ok(Some(req)) = stream.try_next().await {
+            handle_request(req);
+        }
+    })
+    .detach();
+    proxy
+}

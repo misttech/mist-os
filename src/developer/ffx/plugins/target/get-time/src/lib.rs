@@ -45,9 +45,10 @@ where
 mod test {
     use super::*;
     use fidl_fuchsia_developer_remotecontrol as rcs;
+    use target_holders::fake_proxy;
 
     fn setup_fake_time_server_proxy() -> rcs::RemoteControlProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             rcs::RemoteControlRequest::GetTime { responder } => {
                 responder.send(fidl::MonotonicInstant::from_nanos(123456789)).unwrap();
             }

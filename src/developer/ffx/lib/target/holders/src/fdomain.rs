@@ -11,7 +11,7 @@ mod remote_control_proxy;
 
 use from_toolbox::toolbox_or_f;
 pub(crate) use remote_control_proxy::open_moniker_fdomain;
-pub use remote_control_proxy::RemoteControlProxyHolder;
+pub use remote_control_proxy::{fake_proxy_f, RemoteControlProxyHolder};
 
 /// Same as [`moniker`] but for FDomain
 pub fn moniker_f<P: FProxy>(moniker: impl AsRef<str>) -> WithToolbox<P, FDomainResourceDialect> {

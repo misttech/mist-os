@@ -276,6 +276,7 @@ mod tests {
     use fidl_fuchsia_net::{IpAddress, Ipv4Address};
     use fidl_fuchsia_update_channelcontrol::ChannelControlRequest;
     use serde_json::Value;
+    use target_holders::fake_proxy;
 
     const IPV4_ADDR: [u8; 4] = [127, 0, 0, 1];
 
@@ -326,7 +327,7 @@ mod tests {
 
     fn setup_fake_target_server() -> Deferred<TargetProxyHolder> {
         Deferred::from_output(Ok({
-            fho::testing::fake_proxy::<TargetProxy>(move |req| match req {
+            fake_proxy::<TargetProxy>(move |req| match req {
                 TargetRequest::GetSshAddress { responder, .. } => {
                     responder
                         .send(&TargetAddrInfo::Ip(TargetIp {
@@ -356,7 +357,7 @@ mod tests {
     }
 
     fn setup_fake_device_id_server() -> DeviceIdProviderProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             DeviceIdProviderRequest::GetId { responder } => {
                 responder.send("fake_device_id").unwrap();
             }
@@ -364,7 +365,7 @@ mod tests {
     }
 
     fn setup_fake_build_info_server() -> ProviderProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             ProviderRequest::GetBuildInfo { responder } => {
                 responder
                     .send(&BuildInfo {
@@ -380,7 +381,7 @@ mod tests {
     }
 
     fn setup_fake_board_server() -> BoardProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             BoardRequest::GetInfo { responder } => {
                 responder
                     .send(&BoardInfo {
@@ -395,7 +396,7 @@ mod tests {
     }
 
     fn setup_fake_last_reboot_info_server() -> LastRebootInfoProviderProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             LastRebootInfoProviderRequest::Get { responder } => {
                 responder
                     .send(&LastReboot {
@@ -455,7 +456,7 @@ mod tests {
     }
 
     fn setup_fake_device_server() -> DeviceProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             DeviceRequest::GetInfo { responder } => {
                 responder
                     .send(&DeviceInfo {
@@ -481,7 +482,7 @@ mod tests {
     }
 
     fn setup_fake_product_server() -> ProductProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             ProductRequest::GetInfo { responder } => {
                 responder
                     .send(&ProductInfo {
@@ -523,7 +524,7 @@ mod tests {
     }
 
     fn setup_fake_rcs_server() -> RemoteControlProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             RemoteControlRequest::IdentifyHost { responder } => {
                 let response = IdentifyHostResponse {
                     nodename: Some(String::from("fake_fuchsia_device")),
@@ -536,7 +537,7 @@ mod tests {
     }
 
     fn setup_fake_channel_control_server() -> ChannelControlProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             ChannelControlRequest::GetCurrent { responder } => {
                 responder.send("fake_channel").unwrap();
             }

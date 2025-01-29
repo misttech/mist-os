@@ -103,9 +103,10 @@ mod tests {
                 Ok(vec![ffx_fidl::TargetInfo::default(), ffx_fidl::TargetInfo::default()])
             })
         });
-        let tool_env = fho::testing::ToolEnv::new()
-            .make_environment_with_lookup(config_env.context.clone(), mock);
-        let result = TargetInfoHolder::try_from_env(&tool_env).await;
+        let fho_env =
+            FhoEnvironment::new_with_args(&config_env.context, &["some", "command", "line"]);
+        fho_env.set_lookup(Box::new(mock)).await;
+        let result = TargetInfoHolder::try_from_env(&fho_env).await;
         assert!(result.is_err());
     }
 
@@ -119,9 +120,10 @@ mod tests {
         mock.expect_resolve_target_query_to_info()
             .times(1)
             .returning(|_q, _e| Box::pin(async { Ok(vec![]) }));
-        let tool_env = fho::testing::ToolEnv::new()
-            .make_environment_with_lookup(config_env.context.clone(), mock);
-        let result = TargetInfoHolder::try_from_env(&tool_env).await;
+        let fho_env =
+            FhoEnvironment::new_with_args(&config_env.context, &["some", "command", "line"]);
+        fho_env.set_lookup(Box::new(mock)).await;
+        let result = TargetInfoHolder::try_from_env(&fho_env).await;
         assert!(result.is_err());
     }
 
@@ -133,9 +135,10 @@ mod tests {
         mock.expect_resolve_target_query_to_info()
             .times(1)
             .returning(|_q, _e| Box::pin(async { Ok(vec![ffx_fidl::TargetInfo::default()]) }));
-        let tool_env = fho::testing::ToolEnv::new()
-            .make_environment_with_lookup(config_env.context.clone(), mock);
-        let info = TargetInfoHolder::try_from_env(&tool_env).await.unwrap();
+        let fho_env =
+            FhoEnvironment::new_with_args(&config_env.context, &["some", "command", "line"]);
+        fho_env.set_lookup(Box::new(mock)).await;
+        let info = TargetInfoHolder::try_from_env(&fho_env).await.unwrap();
         assert_eq!(*info, ffx_fidl::TargetInfo::default());
     }
 
@@ -147,10 +150,11 @@ mod tests {
         mock.expect_resolve_target_query_to_info()
             .times(1)
             .returning(|_q, _e| Box::pin(async { Ok(vec![]) }));
-        let tool_env = fho::testing::ToolEnv::new()
-            .make_environment_with_lookup(config_env.context.clone(), mock);
+        let fho_env =
+            FhoEnvironment::new_with_args(&config_env.context, &["some", "command", "line"]);
+        fho_env.set_lookup(Box::new(mock)).await;
 
-        let result = TargetInfoHolder::try_from_env(&tool_env).await;
+        let result = TargetInfoHolder::try_from_env(&fho_env).await;
         assert!(result.is_err());
     }
 }

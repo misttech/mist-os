@@ -43,10 +43,11 @@ pub async fn stop_impl<W: std::io::Write>(
 mod test {
     use super::*;
     use fidl_fuchsia_session::LifecycleRequest;
+    use target_holders::fake_proxy;
 
     #[fuchsia::test]
     async fn test_stop_session() -> Result<()> {
-        let proxy = fho::testing::fake_proxy(|req| match req {
+        let proxy = fake_proxy(|req| match req {
             LifecycleRequest::Stop { responder } => {
                 let _ = responder.send(Ok(()));
             }

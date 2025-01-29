@@ -169,6 +169,7 @@ mod test {
     };
     use futures::{SinkExt, StreamExt, TryStreamExt};
     use serde_json::json;
+    use target_holders::fake_proxy;
 
     struct FakeRepositoryRegistry;
 
@@ -259,9 +260,8 @@ mod test {
         let _test_env = ffx_config::test_init().await.expect("test env init");
         let tmp = tempfile::tempdir().unwrap();
 
-        let repos: ffx::RepositoryRegistryProxy = fho::testing::fake_proxy(move |req| {
-            panic!("should not receive any requests: {:?}", req)
-        });
+        let repos: ffx::RepositoryRegistryProxy =
+            fake_proxy(move |req| panic!("should not receive any requests: {:?}", req));
 
         for (name, want_msg) in [
             ("", "invalid repository name for \"\": url parse error"),
@@ -336,9 +336,8 @@ mod test {
         let _test_env = ffx_config::test_init().await.expect("test env init");
         let tmp = tempfile::tempdir().unwrap();
 
-        let repos: ffx::RepositoryRegistryProxy = fho::testing::fake_proxy(move |req| {
-            panic!("should not receive any requests: {:?}", req)
-        });
+        let repos: ffx::RepositoryRegistryProxy =
+            fake_proxy(move |req| panic!("should not receive any requests: {:?}", req));
 
         for (name, want_msg) in [
             ("", "invalid repository name for \"\": url parse error"),

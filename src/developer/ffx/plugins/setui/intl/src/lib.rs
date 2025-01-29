@@ -55,11 +55,12 @@ mod test {
     use super::*;
     use fidl_fuchsia_intl::{LocaleId, TemperatureUnit, TimeZoneId};
     use fidl_fuchsia_settings::{HourCycle, IntlRequest};
+    use target_holders::fake_proxy;
     use test_case::test_case;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_run_command() {
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             IntlRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -101,7 +102,7 @@ mod test {
     )]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_intl_set_output(expected_intl: Intl) -> Result<()> {
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             IntlRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -138,7 +139,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_intl_watch_output(expected_intl: Intl) -> Result<()> {
         let expected_intl_clone = expected_intl.clone();
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             IntlRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }

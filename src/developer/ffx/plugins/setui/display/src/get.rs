@@ -38,6 +38,7 @@ mod test {
     use super::*;
     use ffx_setui_display_args::SetArgs;
     use fidl_fuchsia_settings::{DisplayRequest, DisplaySettings};
+    use target_holders::fake_proxy;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_get() {
@@ -50,7 +51,7 @@ mod test {
             screen_enabled: None,
         };
 
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             DisplayRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }
@@ -76,7 +77,7 @@ mod test {
             screen_enabled: None,
         };
 
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             DisplayRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }

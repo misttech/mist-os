@@ -62,13 +62,14 @@ async fn command(
 mod test {
     use super::*;
     use fidl_fuchsia_settings::SetupRequest;
+    use target_holders::fake_proxy;
     use test_case::test_case;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_run_command() {
         const INTERFACE: ConfigurationInterfaces = ConfigurationInterfaces::ETHERNET;
 
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             SetupRequest::Set { settings, responder, .. } => {
                 if let Some(val) = settings.enabled_configuration_interfaces {
                     assert_eq!(val, INTERFACE);
@@ -97,7 +98,7 @@ mod test {
     )]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_setup_output(expected_interface: ConfigurationInterfaces) -> Result<()> {
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             SetupRequest::Set { settings, responder, .. } => {
                 if let Some(val) = settings.enabled_configuration_interfaces {
                     assert_eq!(val, expected_interface);
@@ -131,7 +132,7 @@ mod test {
     async fn validate_setup_watch_output(
         expected_interface: Option<ConfigurationInterfaces>,
     ) -> Result<()> {
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             SetupRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }

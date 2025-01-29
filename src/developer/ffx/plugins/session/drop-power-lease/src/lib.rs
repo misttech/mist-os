@@ -47,10 +47,11 @@ pub async fn drop_power_lease_impl<W: std::io::Write>(
 mod test {
     use super::*;
     use fidl_fuchsia_session_power::HandoffRequest;
+    use target_holders::fake_proxy;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_drop_power_lease() {
-        let proxy = fho::testing::fake_proxy(|req| match req {
+        let proxy = fake_proxy(|req| match req {
             HandoffRequest::Take { responder } => {
                 let _ = responder.send(Ok(fidl::Event::create().into()));
             }

@@ -58,6 +58,7 @@ mod test {
     use super::*;
     use fidl_fuchsia_settings::{AccessibilityRequest, CaptionFontFamily, EdgeStyle};
     use fidl_fuchsia_ui_types::ColorRgba;
+    use target_holders::fake_proxy;
     use test_case::test_case;
 
     const TEST_COLOR: ColorRgba = ColorRgba { red: 238.0, green: 23.0, blue: 128.0, alpha: 255.0 };
@@ -65,7 +66,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_add_caption() {
         const TRUE: bool = true;
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             AccessibilityRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -117,7 +118,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_accessibility_add_caption(expected_add: CaptionArgs) -> Result<()> {
         let add_clone = expected_add.clone();
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             AccessibilityRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }

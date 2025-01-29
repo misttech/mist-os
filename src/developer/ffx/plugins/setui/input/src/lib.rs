@@ -74,6 +74,7 @@ mod test {
         DeviceState, DeviceStateSource, DeviceType, InputDevice, InputRequest, InputSettings,
         SourceState, ToggleStateFlags,
     };
+    use target_holders::fake_proxy;
     use test_case::test_case;
 
     /// Creates a one-item list of input devices with the given properties.
@@ -116,7 +117,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_run_command() {
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             InputRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -161,7 +162,7 @@ mod test {
     )]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_input_set_output(mut expected_input: Input) -> Result<()> {
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             InputRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -191,7 +192,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_input_watch_output() -> Result<()> {
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             InputRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }

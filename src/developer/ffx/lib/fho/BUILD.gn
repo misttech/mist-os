@@ -22,9 +22,6 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/fho/metadata:lib",
     "//src/developer/ffx/lib/target:lib",
     "//src/developer/ffx/lib/writer:lib",
-    "//src/lib/fdomain/client",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:async-lock",
@@ -50,7 +47,6 @@ rustc_library("lib") {
     "src/from_env.rs",
     "src/lib.rs",
     "src/subtool.rs",
-    "src/testing.rs",
     "src/try_from_env.rs",
   ]
 }

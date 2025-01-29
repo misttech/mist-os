@@ -524,8 +524,7 @@ mod tests {
     use assert_matches::assert_matches;
     use ffx_target::TargetProxy;
     use ffx_update_args::Update;
-    use fho::testing::ToolEnv;
-    use fho::{TestBuffers, TryFromEnv};
+    use fho::{FhoConnectionBehavior, FhoEnvironment, TestBuffers, TryFromEnv};
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
     use fidl_fuchsia_update::ManagerRequest;
@@ -533,6 +532,7 @@ mod tests {
     use futures::prelude::*;
     use mock_installer::MockUpdateInstallerService;
     use std::sync::Arc;
+    use target_holders::{fake_proxy, FakeInjector};
 
     async fn perform_channel_control_test<V, O>(
         argument: args::channel::Command,
@@ -642,20 +642,19 @@ mod tests {
     async fn test_check_now() {
         let test_env = ffx_config::test_init().await.expect("test env");
 
-        let fake_installer_proxy =
-            Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| {
-                panic!("Unexpected request: {:?}", req)
-            })));
-        let fake_channel_control_proxy =
-            fho::testing::fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
-        let fake_target_proxy: TargetProxy =
-            fho::testing::fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
-        let fake_rcs_proxy: RemoteControlProxy =
-            fho::testing::fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
-        let fake_repo_proxy = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| {
+        let fake_installer_proxy = Deferred::from_output(Ok(fake_proxy(move |req| {
             panic!("Unexpected request: {:?}", req)
         })));
-        let fake_update_manager_proxy = fho::testing::fake_proxy(move |req| {
+        let fake_channel_control_proxy =
+            fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
+        let fake_target_proxy: TargetProxy =
+            fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
+        let fake_rcs_proxy: RemoteControlProxy =
+            fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
+        let fake_repo_proxy = Deferred::from_output(Ok(fake_proxy(move |req| {
+            panic!("Unexpected request: {:?}", req)
+        })));
+        let fake_update_manager_proxy = fake_proxy(move |req| {
             match req {
                 ManagerRequest::CheckNow { responder, .. } => {
                     responder.send(Ok(())).expect("send ok")
@@ -664,17 +663,20 @@ mod tests {
             };
         });
 
-        let tool_env = ToolEnv::new()
-            .remote_factory_closure(move || {
+        let fake_injector = FakeInjector {
+            remote_factory_closure: Box::new(move || {
                 let value = fake_rcs_proxy.clone();
-                async move { Ok(value) }
-            })
-            .target_factory_closure(move || {
+                Box::pin(async move { Ok(value) })
+            }),
+            target_factory_closure: Box::new(move || {
                 let value = fake_target_proxy.clone();
-                async { Ok(value) }
-            });
+                Box::pin(async { Ok(value) })
+            }),
+            ..Default::default()
+        };
 
-        let fho_env = tool_env.make_environment(test_env.context.clone());
+        let fho_env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
+        fho_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
 
         let tool = UpdateTool {
             cmd: Update {
@@ -743,28 +745,31 @@ mod tests {
         };
 
         let fake_update_manager_proxy =
-            fho::testing::fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
+            fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
         let fake_channel_control_proxy =
-            fho::testing::fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
+            fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
         let fake_target_proxy: TargetProxy =
-            fho::testing::fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
+            fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
         let fake_rcs_proxy: RemoteControlProxy =
-            fho::testing::fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
-        let fake_repo_proxy = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| {
+            fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
+        let fake_repo_proxy = Deferred::from_output(Ok(fake_proxy(move |req| {
             panic!("Unexpected request: {:?}", req)
         })));
 
-        let tool_env = ToolEnv::new()
-            .remote_factory_closure(move || {
+        let fake_injector = FakeInjector {
+            remote_factory_closure: Box::new(move || {
                 let value = fake_rcs_proxy.clone();
-                async move { Ok(value) }
-            })
-            .target_factory_closure(move || {
+                Box::pin(async move { Ok(value) })
+            }),
+            target_factory_closure: Box::new(move || {
                 let value = fake_target_proxy.clone();
-                async { Ok(value) }
-            });
+                Box::pin(async { Ok(value) })
+            }),
+            ..Default::default()
+        };
 
-        let fho_env = tool_env.make_environment(test_env.context.clone());
+        let fho_env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
+        fho_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
 
         let tool = UpdateTool {
             cmd: Update { cmd: args::Command::ForceInstall(args.clone()) },

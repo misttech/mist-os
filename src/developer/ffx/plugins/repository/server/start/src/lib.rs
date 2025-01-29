@@ -305,11 +305,12 @@ async fn start_daemon_server(
 mod tests {
     use super::*;
     use ffx_target::TargetProxy;
-    use fho::testing::ToolEnv;
-    use fho::{Format, TestBuffers, TryFromEnv as _};
+    use fho::{FhoConnectionBehavior, FhoEnvironment, Format, TestBuffers, TryFromEnv as _};
     use fidl_fuchsia_developer_ffx::{RepositoryError, RepositoryRegistryRequest};
     use futures::channel::oneshot::channel;
     use std::net::Ipv4Addr;
+    use std::sync::Arc;
+    use target_holders::{fake_proxy, FakeInjector};
 
     #[fuchsia::test]
     async fn test_start_daemon() {
@@ -326,25 +327,28 @@ mod tests {
 
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let repos = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| match req {
+        let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
             RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder.send(Ok(&SocketAddress(address).into())).unwrap()
             }
             other => panic!("Unexpected request: {:?}", other),
         })));
-        let empty_collection: TargetProxy =
-            fho::testing::fake_proxy(move |_| panic!("unepxected call"));
-        let tool_env = ToolEnv::new()
-            .remote_factory_closure(move || async move {
-                Ok(fho::testing::fake_proxy(move |_| panic!("unepxected call")))
-            })
-            .target_factory_closure(move || {
+        let empty_collection: TargetProxy = fake_proxy(move |_| panic!("unepxected call"));
+        let fake_injector = FakeInjector {
+            remote_factory_closure: Box::new(move || {
+                Box::pin(async move { Ok(fake_proxy(move |_| panic!("unepxected call"))) })
+            }),
+            target_factory_closure: Box::new(move || {
                 let fake_target_proxy = empty_collection.clone();
-                async { Ok(fake_target_proxy) }
-            });
+                Box::pin(async { Ok(fake_target_proxy) })
+            }),
+            ..Default::default()
+        };
 
-        let env = tool_env.make_environment(test_env.context.clone());
+        let env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
+        env.set_behavior(fho::FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)))
+            .await;
         let tool = ServerStartTool {
             cmd: StartCommand {
                 background: false,
@@ -393,25 +397,28 @@ mod tests {
 
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let repos = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| match req {
+        let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
             RepositoryRegistryRequest::ServerStart { responder, address: Some(_test) } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder.send(Ok(&SocketAddress(address).into())).unwrap()
             }
             other => panic!("Unexpected request: {:?}", other),
         })));
-        let empty_collection: TargetProxy =
-            fho::testing::fake_proxy(move |_| panic!("unepxected call"));
-        let tool_env = ToolEnv::new()
-            .remote_factory_closure(move || async move {
-                Ok(fho::testing::fake_proxy(move |_| panic!("unepxected call")))
-            })
-            .target_factory_closure(move || {
+        let empty_collection: TargetProxy = fake_proxy(move |_| panic!("unepxected call"));
+        let fake_injector = FakeInjector {
+            remote_factory_closure: Box::new(move || {
+                Box::pin(async move { Ok(fake_proxy(move |_| panic!("unepxected call"))) })
+            }),
+            target_factory_closure: Box::new(move || {
                 let fake_target_proxy = empty_collection.clone();
-                async { Ok(fake_target_proxy) }
-            });
+                Box::pin(async { Ok(fake_target_proxy) })
+            }),
+            ..Default::default()
+        };
 
-        let env = tool_env.make_environment(test_env.context.clone());
+        let env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
+        env.set_behavior(fho::FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)))
+            .await;
         let tool = ServerStartTool {
             cmd: StartCommand {
                 background: false,
@@ -467,25 +474,28 @@ mod tests {
 
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let repos = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| match req {
+        let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
             RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder.send(Ok(&SocketAddress(address).into())).unwrap()
             }
             other => panic!("Unexpected request: {:?}", other),
         })));
-        let empty_collection: TargetProxy =
-            fho::testing::fake_proxy(move |_| panic!("unepxected call"));
-        let tool_env = ToolEnv::new()
-            .remote_factory_closure(move || async move {
-                Ok(fho::testing::fake_proxy(move |_| panic!("unepxected call")))
-            })
-            .target_factory_closure(move || {
+        let empty_collection: TargetProxy = fake_proxy(move |_| panic!("unepxected call"));
+        let fake_injector = FakeInjector {
+            remote_factory_closure: Box::new(move || {
+                Box::pin(async move { Ok(fake_proxy(move |_| panic!("unepxected call"))) })
+            }),
+            target_factory_closure: Box::new(move || {
                 let fake_target_proxy = empty_collection.clone();
-                async { Ok(fake_target_proxy) }
-            });
+                Box::pin(async { Ok(fake_target_proxy) })
+            }),
+            ..Default::default()
+        };
 
-        let env = tool_env.make_environment(test_env.context.clone());
+        let env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
+        env.set_behavior(fho::FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)))
+            .await;
         let tool = ServerStartTool {
             cmd: StartCommand {
                 background: false,
@@ -539,26 +549,28 @@ mod tests {
 
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let repos = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| match req {
+        let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
             RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder.send(Err(RepositoryError::ServerNotRunning)).unwrap()
             }
             other => panic!("Unexpected request: {:?}", other),
         })));
-        let empty_collection: TargetProxy =
-            fho::testing::fake_proxy(move |_| panic!("unepxected call"));
+        let empty_collection: TargetProxy = fake_proxy(move |_| panic!("unepxected call"));
 
-        let tool_env = ToolEnv::new()
-            .remote_factory_closure(move || async move {
-                Ok(fho::testing::fake_proxy(move |_| panic!("unepxected call")))
-            })
-            .target_factory_closure(move || {
+        let fake_injector = FakeInjector {
+            remote_factory_closure: Box::new(move || {
+                Box::pin(async move { Ok(fake_proxy(move |_| panic!("unepxected call"))) })
+            }),
+            target_factory_closure: Box::new(move || {
                 let fake_target_proxy = empty_collection.clone();
-                async { Ok(fake_target_proxy) }
-            });
+                Box::pin(async { Ok(fake_target_proxy) })
+            }),
+            ..Default::default()
+        };
 
-        let env = tool_env.make_environment(test_env.context.clone());
+        let env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
+        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
 
         let tool = ServerStartTool {
             cmd: StartCommand {
@@ -619,26 +631,28 @@ mod tests {
 
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let repos = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| match req {
+        let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
             RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder.send(Ok(&SocketAddress(address).into())).unwrap()
             }
             other => panic!("Unexpected request: {:?}", other),
         })));
-        let empty_collection: TargetProxy =
-            fho::testing::fake_proxy(move |_| panic!("unepxected call"));
+        let empty_collection: TargetProxy = fake_proxy(move |_| panic!("unepxected call"));
 
-        let tool_env = ToolEnv::new()
-            .remote_factory_closure(move || async move {
-                Ok(fho::testing::fake_proxy(move |_| panic!("unepxected call")))
-            })
-            .target_factory_closure(move || {
+        let fake_injector = FakeInjector {
+            remote_factory_closure: Box::new(move || {
+                Box::pin(async move { Ok(fake_proxy(move |_| panic!("unepxected call"))) })
+            }),
+            target_factory_closure: Box::new(move || {
                 let fake_target_proxy = empty_collection.clone();
-                async { Ok(fake_target_proxy) }
-            });
+                Box::pin(async { Ok(fake_target_proxy) })
+            }),
+            ..Default::default()
+        };
 
-        let env = tool_env.make_environment(test_env.context.clone());
+        let env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
+        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
 
         let tool = ServerStartTool {
             cmd: StartCommand {

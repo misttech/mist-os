@@ -60,12 +60,13 @@ async fn set_preferred_ssh_address(
 mod tests {
     use super::*;
     use net_declare::fidl_ip;
+    use target_holders::fake_proxy;
 
     const IPV6_ADDRESS: fnet::IpAddress = fidl_ip!("fe80::1");
     const IPV4_ADDRESS: fnet::IpAddress = fidl_ip!("192.168.0.1");
 
     fn setup_fake_target_server(expected_ip: ffx::TargetIp) -> ffx::TargetProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             ffx::TargetRequest::SetPreferredSshAddress { ip, responder } => {
                 assert_eq!(expected_ip, ip);
                 responder.send(Ok(())).expect("set_preferred_ssh_address failed");

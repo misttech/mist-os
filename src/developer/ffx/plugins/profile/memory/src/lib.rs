@@ -130,6 +130,7 @@ async fn get_output(collector: &CollectorProxy) -> anyhow::Result<raw::MemoryMon
 mod tests {
     use super::*;
     use futures::AsyncWriteExt;
+    use target_holders::fake_proxy;
 
     lazy_static::lazy_static! {
         static ref EXPECTED_CAPTURE: raw::Capture = raw::Capture{
@@ -172,7 +173,7 @@ mod tests {
     }
 
     fn create_fake_collector_proxy() -> CollectorProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             fidl_fuchsia_memory_inspection::CollectorRequest::CollectJsonStats {
                 socket, ..
             } => {

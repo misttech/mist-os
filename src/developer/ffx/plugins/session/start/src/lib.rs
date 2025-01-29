@@ -46,10 +46,11 @@ pub async fn start_impl<W: std::io::Write>(
 mod test {
     use super::*;
     use fidl_fuchsia_session::LifecycleRequest;
+    use target_holders::fake_proxy;
 
     #[fuchsia::test]
     async fn test_start_session() -> Result<()> {
-        let proxy = fho::testing::fake_proxy(|req| match req {
+        let proxy = fake_proxy(|req| match req {
             LifecycleRequest::Start { payload, responder, .. } => {
                 assert_eq!(payload.session_url, None);
                 let _ = responder.send(Ok(()));

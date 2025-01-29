@@ -63,19 +63,75 @@ macro_rules! embedded_plugin {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
+    use crate::macro_deps::fho;
     use crate::subtool::{FhoHandler, ToolCommand};
-    use crate::testing::{FakeTool, ToolEnv, SIMPLE_CHECK_COUNTER};
-    use crate::{FhoConnectionBehavior, FhoEnvironment};
-    use argh::FromArgs;
+    use crate::{CheckEnv, FfxMain, FfxTool, FhoEnvironment, TryFromEnv};
+    use argh::{ArgsInfo, FromArgs};
+    use async_trait::async_trait;
     use ffx_command::FfxCommandLine;
-    use std::sync::Arc;
+    use ffx_command_error::Result;
+    use ffx_writer::ToolIO as _;
+    use std::cell::RefCell;
+
+    #[derive(Debug, ArgsInfo, FromArgs)]
+    #[argh(subcommand, name = "fake", description = "fake command")]
+    pub struct FakeCommand {
+        #[argh(positional)]
+        /// just needs a doc here so the macro doesn't complain.
+        stuff: String,
+    }
+
+    thread_local! {
+        pub static SIMPLE_CHECK_COUNTER: RefCell<u64> = RefCell::new(0);
+    }
+
+    pub struct SimpleCheck(pub bool);
+
+    #[async_trait(?Send)]
+    impl CheckEnv for SimpleCheck {
+        async fn check_env(self, _env: &FhoEnvironment) -> Result<()> {
+            SIMPLE_CHECK_COUNTER.with(|counter| *counter.borrow_mut() += 1);
+            if self.0 {
+                Ok(())
+            } else {
+                Err(anyhow::anyhow!("SimpleCheck was false").into())
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct NewTypeString(String);
+
+    #[async_trait(?Send)]
+    impl TryFromEnv for NewTypeString {
+        async fn try_from_env(_env: &FhoEnvironment) -> Result<Self> {
+            Ok(Self(String::from("foobar")))
+        }
+    }
+    #[derive(FfxTool, Debug)]
+    #[check(SimpleCheck(true))]
+    pub struct FakeTool {
+        from_env_string: NewTypeString,
+        #[command]
+        fake_command: FakeCommand,
+    }
+
+    #[async_trait(?Send)]
+    impl FfxMain for FakeTool {
+        type Writer = ffx_writer::SimpleWriter;
+        async fn main(self, mut writer: Self::Writer) -> Result<()> {
+            assert_eq!(self.from_env_string.0, "foobar");
+            assert_eq!(self.fake_command.stuff, "stuff");
+            writer.line("junk-line").unwrap();
+            Ok(())
+        }
+    }
 
     // The main testing part will happen in the `main()` function of the tool.
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_run_fake_tool_with_legacy_shim() {
         let config_env = ffx_config::test_init().await.expect("Initializing test environment");
-        let injector = ToolEnv::new().take_injector();
         let ffx_cmd_line = FfxCommandLine::new(None, &["ffx", "fake", "stuff"]).unwrap();
         let tool_cmd = ToolCommand::<FakeTool>::from_args(
             &Vec::from_iter(ffx_cmd_line.cmd_iter()),
@@ -103,11 +159,7 @@ mod tests {
             FhoHandler::Metadata(_) => panic!("Not testing metadata generation"),
         };
 
-        let injector: Arc<dyn ffx_core::Injector> = Arc::new(injector);
-        let behavior = FhoConnectionBehavior::DaemonConnector(injector.clone());
         let env = FhoEnvironment::new(&config_env.context, &ffx_cmd_line);
-
-        env.set_behavior(behavior).await;
 
         ffx_plugin_impl(&env, fake_tool).await.expect("Plugin to run successfully");
 

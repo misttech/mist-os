@@ -193,6 +193,7 @@ mod tests {
     use std::os::unix::fs::PermissionsExt as _;
     use std::process::{Child, Command};
     use std::{fs, process};
+    use target_holders::fake_proxy;
 
     const FAKE_SERVER_CONTENTS: &str = r#"#!/bin/bash
        while sleep 1s
@@ -283,7 +284,7 @@ mod tests {
 
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let fake_proxy = fho::testing::fake_proxy(move |req| match req {
+        let fake_proxy = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::ServerStop { responder } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder.send(Ok(())).unwrap()
@@ -322,7 +323,7 @@ mod tests {
             make_standalone_instance("default".into(), None, &env.context, &env)
                 .expect("test daemon instance");
 
-        let fake_proxy = fho::testing::fake_proxy(move |req| panic!("Unexpected request: {req:?}"));
+        let fake_proxy = fake_proxy(move |req| panic!("Unexpected request: {req:?}"));
 
         let repos = Deferred::from_output(Ok(fake_proxy));
 
@@ -362,7 +363,7 @@ mod tests {
         )
         .expect("test daemon instance");
 
-        let fake_proxy = fho::testing::fake_proxy(move |req| panic!("Unexpected request: {req:?}"));
+        let fake_proxy = fake_proxy(move |req| panic!("Unexpected request: {req:?}"));
 
         let repos = Deferred::from_output(Ok(fake_proxy));
 
@@ -404,7 +405,7 @@ mod tests {
 
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let fake_proxy = fho::testing::fake_proxy(move |req| match req {
+        let fake_proxy = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::ServerStop { responder } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder.send(Err(RepositoryError::InternalError.into())).unwrap()
@@ -478,7 +479,7 @@ mod tests {
 
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let fake_proxy = fho::testing::fake_proxy(move |req| match req {
+        let fake_proxy = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::ServerStop { responder } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder.send(Ok(())).unwrap()
@@ -522,7 +523,7 @@ mod tests {
 
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let fake_proxy = fho::testing::fake_proxy(move |req| match req {
+        let fake_proxy = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::ServerStop { responder } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder.send(Err(RepositoryError::InternalError.into())).unwrap()
@@ -568,8 +569,7 @@ mod tests {
         make_daemon_instance("default".into(), &env.context).expect("test daemon instance");
         make_daemon_instance("default2".into(), &env.context).expect("test daemon instance");
 
-        let fake_proxy =
-            fho::testing::fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
+        let fake_proxy = fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
         let repos = Deferred::from_output(Ok(fake_proxy));
 
         let tool = RepoStopTool {
@@ -613,7 +613,7 @@ mod tests {
 
         let (sender, _receiver) = channel();
         let mut sender = Some(sender);
-        let fake_proxy = fho::testing::fake_proxy(move |req| match req {
+        let fake_proxy = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::ServerStop { responder } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder.send(Ok(())).unwrap()
@@ -664,7 +664,7 @@ mod tests {
 
         let (sender, _receiver) = channel();
         let mut sender = Some(sender);
-        let fake_proxy = fho::testing::fake_proxy(move |req| match req {
+        let fake_proxy = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::ServerStop { responder } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder.send(Ok(())).unwrap()

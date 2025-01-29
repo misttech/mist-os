@@ -336,6 +336,7 @@ async fn write_symbolized_stack_traces(mut w: Writer, stack_trace: String) -> Re
 mod tests {
     use super::*;
     use futures::AsyncWriteExt;
+    use target_holders::fake_proxy;
 
     lazy_static::lazy_static! {
     static ref EXPECTED_PROCESSES_DATA: raw::ProcessesData = raw::ProcessesData{
@@ -399,7 +400,7 @@ mod tests {
 
     /// Returns a fake query service that writes `EXPECTED_PROCESSES_DATA` serialized to JSON to the socket when `WriteJsonProcessesData` is called.
     fn setup_fake_query_svc() -> QueryProxy {
-        fho::testing::fake_proxy(|request| match request {
+        fake_proxy(|request| match request {
             QueryRequest::WriteJsonProcessesData { socket, .. } => {
                 let mut s = fidl::AsyncSocket::from_socket(socket);
                 fuchsia_async::Task::local(async move {

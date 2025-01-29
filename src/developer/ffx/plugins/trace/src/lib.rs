@@ -862,6 +862,7 @@ mod tests {
     use pretty_assertions::assert_eq;
     use serde_json::json;
     use std::matches;
+    use target_holders::fake_proxy;
     use tempfile::{Builder, NamedTempFile};
     use {
         fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_tracing as tracing,
@@ -936,7 +937,7 @@ mod tests {
     }
 
     fn setup_fake_service() -> TracingProxy {
-        fho::testing::fake_proxy(|req| match req {
+        fake_proxy(|req| match req {
             ffx::TracingRequest::StartRecording { responder, .. } => responder
                 .send(Ok(&ffx::TargetInfo {
                     nodename: Some("foo".to_owned()),
@@ -999,7 +1000,7 @@ mod tests {
     }
 
     fn setup_fake_controller_proxy() -> fho::Deferred<ProvisionerProxy> {
-        fho::Deferred::from_output(Ok(fho::testing::fake_proxy(|req| match req {
+        fho::Deferred::from_output(Ok(fake_proxy(|req| match req {
             tracing_controller::ProvisionerRequest::GetKnownCategories { responder, .. } => {
                 responder.send(&fake_known_categories()).expect("should respond");
             }
@@ -1056,7 +1057,7 @@ mod tests {
     }
 
     fn setup_closed_fake_controller_proxy() -> fho::Deferred<ProvisionerProxy> {
-        fho::Deferred::from_output(Ok(fho::testing::fake_proxy(|req| match req {
+        fho::Deferred::from_output(Ok(fake_proxy(|req| match req {
             tracing_controller::ProvisionerRequest::GetKnownCategories { responder, .. } => {
                 responder.control_handle().shutdown();
             }

@@ -129,11 +129,12 @@ mod test {
     use ffx_config::ConfigLevel;
     use fho::{Format, TestBuffers};
     use serde_json::json;
+    use target_holders::fake_proxy;
 
     fn setup_fake_target_collection_proxy<T: 'static + Fn(String) -> bool + Send>(
         test: T,
     ) -> ffx::TargetCollectionProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             ffx::TargetCollectionRequest::RemoveTarget { target_id, responder } => {
                 let result = test(target_id);
                 responder.send(result).unwrap();

@@ -48,9 +48,10 @@ async fn off(admin_proxy: AdminProxy, _cmd: OffCommand) -> fho::Result<()> {
 mod test {
     use super::*;
     use fidl_fuchsia_hardware_power_statecontrol::AdminRequest;
+    use target_holders::fake_proxy;
 
     fn setup_fake_admin_server() -> AdminProxy {
-        fho::testing::fake_proxy(|req| match req {
+        fake_proxy(|req| match req {
             AdminRequest::Poweroff { responder } => {
                 responder.send(Ok(())).unwrap();
             }

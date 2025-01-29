@@ -93,7 +93,8 @@ mod test {
     async fn test_background_succeeds_when_daemon_connection_established() {
         let config_env = ffx_config::test_init().await.unwrap();
         let cmd = StartCommand { path: None, background: true };
-        let tool_env = fho::testing::ToolEnv::new().make_environment(config_env.context.clone());
+
+        let tool_env = FhoEnvironment::new_with_args(&config_env.context, &["some", "test"]);
         let tool = DaemonStartTool {
             cmd,
             context: config_env.context.clone(),
@@ -110,7 +111,7 @@ mod test {
     async fn test_background_fails_when_daemon_connection_fails() {
         let config_env = ffx_config::test_init().await.unwrap();
         let cmd = StartCommand { path: None, background: true };
-        let tool_env = fho::testing::ToolEnv::new().make_environment(config_env.context.clone());
+        let tool_env = FhoEnvironment::new_with_args(&config_env.context, &["some", "test"]);
         let tool = DaemonStartTool {
             cmd,
             context: config_env.context.clone(),

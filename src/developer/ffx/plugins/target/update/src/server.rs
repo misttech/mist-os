@@ -445,8 +445,7 @@ mod tests {
     use super::*;
     use ffx_config::TestEnv;
     use ffx_target::TargetProxy;
-    use fho::testing::ToolEnv;
-    use fho::TryFromEnv as _;
+    use fho::{FhoEnvironment, TryFromEnv as _};
     use fidl_fuchsia_developer_remotecontrol::{
         ConnectCapabilityError, RemoteControlProxy, RemoteControlRequest,
     };
@@ -461,7 +460,7 @@ mod tests {
     use futures::channel::mpsc;
     use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
     use std::sync::{Arc, Mutex};
-    use target_holders::RemoteControlProxyHolder;
+    use target_holders::{fake_proxy, FakeInjector, RemoteControlProxyHolder};
 
     struct FakeTestEnv {
         pub context: EnvironmentContext,
@@ -473,22 +472,27 @@ mod tests {
     impl FakeTestEnv {
         async fn new(test_env: &TestEnv) -> Self {
             let fake_rcs_proxy: RemoteControlProxy =
-                fho::testing::fake_proxy(move |req| handle_rcs_proxy_request(req));
+                fake_proxy(move |req| handle_rcs_proxy_request(req));
             let fake_target_proxy: TargetProxy =
-                fho::testing::fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
-            let fake_repo_proxy = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| {
+                fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
+            let fake_repo_proxy = Deferred::from_output(Ok(fake_proxy(move |req| {
                 panic!("Unexpected request: {:?}", req)
             })));
-            let tool_env = ToolEnv::new()
-                .remote_factory_closure(move || {
+            let fake_injector = FakeInjector {
+                remote_factory_closure: Box::new(move || {
                     let value = fake_rcs_proxy.clone();
-                    async move { Ok(value) }
-                })
-                .target_factory_closure(move || {
+                    Box::pin(async move { Ok(value) })
+                }),
+                target_factory_closure: Box::new(move || {
                     let value = fake_target_proxy.clone();
-                    async { Ok(value) }
-                });
-            let fho_env = tool_env.make_environment(test_env.context.clone());
+                    Box::pin(async { Ok(value) })
+                }),
+                ..Default::default()
+            };
+            let fho_env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
+            fho_env
+                .set_behavior(fho::FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)))
+                .await;
 
             let target_proxy_connector = Connector::try_from_env(&fho_env)
                 .await

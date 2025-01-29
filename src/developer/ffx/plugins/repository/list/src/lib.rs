@@ -163,9 +163,10 @@ mod test {
     use fuchsia_async as fasync;
     use futures::StreamExt;
     use pretty_assertions::assert_eq;
+    use target_holders::fake_proxy;
 
     fn fake_repos() -> RepositoryRegistryProxy {
-        fho::testing::fake_proxy(move |req| {
+        fake_proxy(move |req| {
             fasync::Task::spawn(async move {
                 let mut sent = false;
                 match req {

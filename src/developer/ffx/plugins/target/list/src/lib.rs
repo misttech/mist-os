@@ -297,6 +297,7 @@ mod test {
     use fidl_fuchsia_developer_ffx::{TargetInfo as FidlTargetInfo, TargetState};
     use regex::Regex;
     use std::net::IpAddr;
+    use target_holders::fake_proxy;
 
     fn tab_list_cmd(nodename: Option<String>) -> ListCommand {
         ListCommand { nodename, format: Format::Tabular, ..Default::default() }
@@ -319,7 +320,7 @@ mod test {
     }
 
     fn setup_fake_target_collection_server(num_tests: usize) -> ffx::TargetCollectionProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             ffx::TargetCollectionRequest::ListTargets { query, reader, .. } => {
                 let reader = reader.into_proxy();
                 let fidl_values: Vec<FidlTargetInfo> =

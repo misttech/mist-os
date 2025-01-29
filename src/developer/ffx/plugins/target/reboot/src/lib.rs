@@ -70,9 +70,10 @@ fn reboot_state(cmd: &RebootCommand) -> fho::Result<TargetRebootState> {
 mod test {
     use super::*;
     use fidl_fuchsia_developer_ffx::TargetRequest;
+    use target_holders::fake_proxy;
 
     fn setup_fake_target_server(cmd: RebootCommand) -> TargetProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             TargetRequest::Reboot { state: _, responder } => {
                 assert!(!(cmd.bootloader && cmd.recovery));
                 responder.send(Ok(())).unwrap();

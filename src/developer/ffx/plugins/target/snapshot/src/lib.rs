@@ -283,6 +283,7 @@ mod test {
     use fidl::endpoints::ServerEnd;
     use fidl_fuchsia_feedback::{Annotations, DataProviderRequest, Snapshot};
     use futures::TryStreamExt;
+    use target_holders::fake_proxy;
 
     fn serve_fake_file(server: ServerEnd<fio::FileMarker>) {
         fuchsia_async::Task::local(async move {
@@ -326,7 +327,7 @@ mod test {
     }
 
     fn setup_fake_data_provider_server(annotations: Annotations) -> DataProviderProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             DataProviderRequest::GetSnapshot { params, responder } => {
                 let channel = params.response_channel.unwrap();
                 let server_end = ServerEnd::<fio::FileMarker>::new(channel);
