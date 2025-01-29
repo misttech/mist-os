@@ -131,6 +131,7 @@ zx::result<> Vim3Clock::Start() {
   auto offers = compat_server_.CreateOffers2();
   offers.push_back(fdf::MakeOffer2<fuchsia_hardware_clockimpl::Service>());
   offers.push_back(clock_ids_metadata_server_.MakeOffer());
+  offers.push_back(clock_init_metadata_server_.MakeOffer());
 
   std::vector<fuchsia_driver_framework::NodeProperty2> properties = {};
   auto add_child_result = AddChild(child_name, properties, offers);
