@@ -15,6 +15,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fit/function.h>
+#include <lib/zbi-format/partition.h>
 #include <lib/zircon-internal/align.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,6 +38,40 @@ using namespace fuchsia_driver_framework;
 }
 
 namespace {
+
+fuchsia_boot_metadata::SerialNumberMetadata CreateSerialNumberMetadata(
+    const fbl::Array<uint8_t>& bytes) {
+  std::string serial_number{bytes.begin(), bytes.end()};
+  return fuchsia_boot_metadata::SerialNumberMetadata{{.serial_number{std::move(serial_number)}}};
+}
+
+zx::result<fuchsia_boot_metadata::PartitionMapMetadata> CreatePartitionMapMetadata(
+    const fbl::Array<uint8_t>& bytes) {
+  if (bytes.size() != sizeof(zbi_partition_map_t)) {
+    zxlogf(ERROR, "Incorrect number of bytes: Expected %lu bytes but actual is %lu", bytes.size(),
+           sizeof(zbi_partition_map_t));
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  auto* partition_map = reinterpret_cast<zbi_partition_map_t*>(bytes.data());
+  std::array<uint8_t, 32> guid;
+  std::ranges::copy(std::begin(partition_map->guid), std::end(partition_map->guid), guid.begin());
+  return zx::ok(fuchsia_boot_metadata::PartitionMapMetadata{
+      {.partition_map{{partition_map->block_count, partition_map->block_size,
+                       partition_map->partition_count, partition_map->reserved, guid}}}});
+}
+
+zx::result<fuchsia_boot_metadata::MacAddressMetadata> CreateMacAddressMetadata(
+    const fbl::Array<uint8_t>& bytes) {
+  fuchsia_net::MacAddress mac_address;
+  if (bytes.size() != mac_address.octets().size()) {
+    zxlogf(ERROR,
+           "Size of encoded MAC address is incorrect: expected %lu bytes but actual is %lu bytes",
+           mac_address.octets().size(), bytes.size());
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  std::ranges::copy(bytes.begin(), bytes.end(), mac_address.octets().begin());
+  return zx::ok(fuchsia_boot_metadata::MacAddressMetadata{{.mac_address = std::move(mac_address)}});
+}
 
 zx::result<zx_device_str_prop_t> ConvertToDeviceStringProperty(
     const fuchsia_driver_framework::NodeProperty& property) {
@@ -437,6 +472,9 @@ zx_status_t PlatformDevice::Start() {
 
   std::array fidl_service_offers = {
       fuchsia_hardware_platform_device::Service::Name,
+      ddk::MetadataServer<fuchsia_boot_metadata::SerialNumberMetadata>::kFidlServiceName,
+      ddk::MetadataServer<fuchsia_boot_metadata::PartitionMapMetadata>::kFidlServiceName,
+      ddk::MetadataServer<fuchsia_boot_metadata::MacAddressMetadata>::kFidlServiceName,
   };
   std::array runtime_service_offers = {
       fuchsia_hardware_platform_bus::Service::Name,
@@ -488,6 +526,30 @@ zx_status_t PlatformDevice::Start() {
     case Fragment: {
       break;
     }
+  }
+
+  // Setup boot metadata servers.
+  if (zx_status_t status = serial_number_metadata_server_.Serve(
+          outgoing_, fdf::Dispatcher::GetCurrent()->async_dispatcher());
+      status != ZX_OK) {
+    zxlogf(ERROR, "Failed to serve serial number metadata server: %s",
+           zx_status_get_string(status));
+    return status;
+  }
+
+  if (zx_status_t status = partition_map_metadata_server_.Serve(
+          outgoing_, fdf::Dispatcher::GetCurrent()->async_dispatcher());
+      status != ZX_OK) {
+    zxlogf(ERROR, "Failed to serve partition map metadata server: %s",
+           zx_status_get_string(status));
+    return status;
+  }
+
+  if (zx_status_t status = mac_address_metadata_server_.Serve(
+          outgoing_, fdf::Dispatcher::GetCurrent()->async_dispatcher());
+      status != ZX_OK) {
+    zxlogf(ERROR, "Failed to serve mac address metadata server: %s", zx_status_get_string(status));
+    return status;
   }
 
   // Setup the outgoing directory.
@@ -553,8 +615,7 @@ void PlatformDevice::DdkInit(ddk::InitTxn txn) {
     zx_status_t status = data.status_value();
     if (data.is_ok()) {
       // TODO(b/341981272): Remove `DdkAddMetadata()` once all drivers bound to platform devices
-      // do not use `device_get_metadata()` to retrieve metadata. They should be using
-      // fuchsia.hardware.platform.device/Device::GetMetadata().
+      // do not use `device_get_metadata()` to retrieve metadata.
       status = DdkAddMetadata(metadata_zbi_type.value(), data->data(), data->size());
       if (status != ZX_OK) {
         zxlogf(WARNING, "%s failed to add metadata for new device", __func__);
@@ -562,6 +623,55 @@ void PlatformDevice::DdkInit(ddk::InitTxn txn) {
 
       metadata_.emplace(std::to_string(metadata_zbi_type.value()),
                         std::vector<uint8_t>{data->begin(), data->end()});
+
+      switch (metadata_zbi_type.value()) {
+        case ZBI_TYPE_SERIAL_NUMBER: {
+          auto metadata = CreateSerialNumberMetadata(data.value());
+          if (zx_status_t status = serial_number_metadata_server_.SetMetadata(metadata);
+              status != ZX_OK) {
+            zxlogf(ERROR, "Failed to set metadata for serial number metadata server: %s",
+                   zx_status_get_string(status));
+            txn.Reply(status);
+            return;
+          }
+          break;
+        }
+        case ZBI_TYPE_DRV_PARTITION_MAP: {
+          zx::result metadata = CreatePartitionMapMetadata(data.value());
+          if (metadata.is_error()) {
+            zxlogf(ERROR, "Failed to create partition map metadata: %s", metadata.status_string());
+            txn.Reply(metadata.status_value());
+            return;
+          }
+          if (zx_status_t status = partition_map_metadata_server_.SetMetadata(metadata.value());
+              status != ZX_OK) {
+            zxlogf(ERROR, "Failed to set metadata for partition map metadata server: %s",
+                   zx_status_get_string(status));
+            txn.Reply(status);
+            return;
+          }
+          break;
+        }
+        case ZBI_TYPE_DRV_MAC_ADDRESS: {
+          zx::result metadata = CreateMacAddressMetadata(data.value());
+          if (metadata.is_error()) {
+            zxlogf(ERROR, "Failed to create mac address metadata: %s", metadata.status_string());
+            txn.Reply(metadata.status_value());
+            return;
+          }
+          if (zx_status_t status = mac_address_metadata_server_.SetMetadata(metadata.value());
+              status != ZX_OK) {
+            zxlogf(ERROR, "Failed to set metadata for mac address metadata server: %s",
+                   zx_status_get_string(status));
+            txn.Reply(status);
+            return;
+          }
+          break;
+        }
+        default:
+          zxlogf(INFO, "Ignoring boot metadata with zbi type %d", metadata_zbi_type.value());
+          break;
+      }
     }
   }
 
