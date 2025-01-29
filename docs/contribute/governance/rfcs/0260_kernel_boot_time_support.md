@@ -35,6 +35,7 @@ _Reviewers:_
 - adamperry@google.com
 - andresoportus@google.com
 - cja@google.com
+- costan@google.com
 - fmil@google.com
 - gkalsi@google.com
 - harshanv@google.com
@@ -243,48 +244,44 @@ modified to use boot time and its type should be updated to `zx_instant_boot_t`.
 
 #### Interrupt Syscalls
 
-The Zircon Interrupt API contains two syscalls that operate on monotonic
-timestamps:
+The Zircon Interrupt API includes two syscalls that use timestamps:
+`zx_interrupt_wait` and `zx_interrupt_trigger`. Currently, these syscalls use
+the monotonic timeline. However, because interrupts can fire during
+suspend-to-idle, the default timestamp behavior is changing to use the boot
+timeline. This helps ensure that interrupt timestamps are unique, even across
+suspend-resume cycles, though uniqueness is still limited by clock resolution.
+Using the monotonic clock would result in all interrupts that fire during
+suspend-to-idle having the same timestamp, which is the time at which the
+system suspended.
 
+To maintain compatibility with existing drivers that may rely on monotonic
+timestamps, such as the display drivers, a new flag called
+`ZX_INTERRUPT_TIMESTAMP_MONO`, is being added to the `zx_interrupt_create`
+syscall. When this flag is set, the associated interrupt object will continue
+to use monotonic timestamps for `zx_interrupt_wait`, `zx_interrupt_trigger`,
+and the interrupt port packet (discussed below).
+
+#### New `zx_object_get_info` Topic
+
+Because interrupt objects will have their timeline set at creation, it's
+important that we provide userspace with a way to query the timeline of a given
+interrupt handle at runtime. To do this, a new `ZX_INFO_INTERRUPT` topic will
+be added to `zx_object_get_info`. Passing in this topic will return the
+following struct:
 ```
-// Current function signatures.
-
-// Allows users to wait on an interrupt, and returns the timestamp at which the
-// interrupt was triggered.
-zx_status_t zx_interrupt_wait(zx_handle_t handle,
-                              zx_time_t* out_timestamp);
-
-// Triggers a virtual interrupt at the given timestamp.
-zx_status_t zx_interrupt_trigger(zx_handle_t handle,
-                                 uint32_t options,
-                                 zx_time_t timestamp);
+typedef struct zx_info_interrupt {
+  // The options used to create the interrupt object.
+  uint32_t options;
+} zx_info_interrupt_t;
 ```
-
-This presents a problem because interrupts can fire during periods of
-suspension, in which the monotonic clock will be paused. Therefore, these
-timestamps must switch to using the boot timeline. Concretely, the syscall
-signatures will be changed to:
-
-```
-// Proposed function signatures.
-
-zx_status_t zx_interrupt_wait(zx_handle_t handle,
-                              zx_instant_boot_t* out_timestamp);
-zx_status_t zx_interrupt_trigger(zx_handle_t handle,
-                                 uint32_t options,
-                                 zx_instant_boot_t timestamp);
-```
-
-Since both `zx_instant_boot_t` and `zx_time_t` are aliases of `int64_t`, this
-change can be accomplished with a simple search and replace.
+Callers can then check for the presence of `ZX_INTERRUPT_TIMESTAMP_MONO` in the
+`options` field.
 
 #### `libzx` Wrappers
 
 The `libzx` library provides C++ wrappers around the `zx_interrupt_wait` and
 `zx_interrupt_trigger` syscalls. These wrappers will need to be updated to use
-the new boot timestamps. Because these wrappers use strong types for timestamps
-on different timelines, this will require migrating all callsites to use boot
-time.
+both monotonic and boot timestamps.
 
 ### Port Packet Changes
 
@@ -293,22 +290,21 @@ modified.
 
 #### `zx_packet_interrupt_t`
 
-The `zx_interrupt_bind` syscall allows users to bind or unbind an interrupt
-object to a port. When a bound interrupt is triggered, a packet of type
-`ZX_PKT_TYPE_INTERRUPT` is queued on the given port. That packet has the
-following structure:
+The `zx_interrupt_bind` syscall allows binding an interrupt object to a port.
+When a bound interrupt triggers, a `ZX_PKT_TYPE_INTERRUPT` packet is queued on
+the port. This packet includes a `timestamp` field indicating when the
+interrupt occurred.
 
-```
-typedef struct zx_packet_interrupt {
-  // Timestamp at which the interrupt was triggered.
-  zx_time_t timestamp;
-  // ..some reserved fields...
-} zx_packet_interrupt_t;
-```
+To maintain consistency with the updated interrupt API, the `timestamp` field
+in these packets will also transition to using the boot timeline by default.
+This ensures that all interrupt timestamps, whether obtained via syscalls or
+interrupt packets, provide a coherent view of interrupt timing across
+suspend-resume cycles.
 
-The `timestamp` field must switch to using boot time (and therefore become a
-`zx_instant_boot_t`) for the same reason the timestamp returned by
-`zx_interrupt_wait` must be on the boot timeline.
+However, for interrupts created with the `ZX_INTERRUPT_TIMESTAMP_MONO` flag, the
+`timestamp` field in the corresponding packets will continue to use monotonic
+timestamps. This preserves compatibility with drivers that depend on this
+behavior.
 
 #### `zx_packet_signal_t`
 
