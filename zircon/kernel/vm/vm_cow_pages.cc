@@ -5599,14 +5599,6 @@ fbl::RefPtr<VmCowPages> VmCowPages::DebugGetParent() {
   return parent_;
 }
 
-fbl::RefPtr<PageSource> VmCowPages::GetRootPageSourceLocked() const {
-  auto root = GetRootLocked();
-  // The root will never be null. It will either point to a valid parent, or |this| if there's no
-  // parent.
-  DEBUG_ASSERT(root);
-  return root->page_source_;
-}
-
 void VmCowPages::DetachSourceLocked() {
   canary_.Assert();
 

@@ -1312,9 +1312,6 @@ class VmCowPages final : public VmHierarchyBase,
   // UnlockRangeLocked() is valid.
   bool IsLockRangeValidLocked(VmCowRange range) const TA_REQ(lock());
 
-  // Returns the root parent's page source.
-  fbl::RefPtr<PageSource> GetRootPageSourceLocked() const TA_REQ(lock());
-
   bool is_source_handling_free_locked() const TA_REQ(lock()) {
     return page_source_ && page_source_->properties().is_handling_free;
   }
