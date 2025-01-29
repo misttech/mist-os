@@ -12,14 +12,14 @@ pub fn assembly_container(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let config_path = attr.to_string();
+    let config_filename = attr.to_string();
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     proc_macro::TokenStream::from(quote! {
         #input
         impl AssemblyContainer for #name {
-            fn get_config_path() -> &'static str {
-                #config_path
+            fn get_config_filename() -> &'static str {
+                #config_filename
             }
         }
     })

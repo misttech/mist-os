@@ -15,10 +15,10 @@ use serde::Serialize;
 /// Use #[assembly_container(config.json)] to implement this trait.
 /// The struct must derive Deserialize, Serialize, and WalkPaths.
 pub trait AssemblyContainer {
-    /// Get the path to the top-level config, which is used during
+    /// Get the filename of the top-level config, which is used during
     /// serialization and deserialization. This is implemented by the proc-macro
     ///   #[assembly_container(config.json)]
-    fn get_config_path() -> &'static str;
+    fn get_config_filename() -> &'static str;
 
     /// Construct an assembly container from a config file.
     /// It is assumed that the paths in `config_path` are absolute.
@@ -30,9 +30,11 @@ pub trait AssemblyContainer {
     where
         Self: Sized + WalkPaths + DeserializeOwned,
     {
-        let file = std::fs::File::open(config_path.as_ref())
-            .with_context(|| format!("Opening config: {}", config_path.as_ref()))?;
-        let config = serde_json::from_reader(&file)
+        // Read the config to a string first because it offers better
+        // performance for serde.
+        let data = std::fs::read_to_string(config_path.as_ref())
+            .with_context(|| format!("Reading config: {}", config_path.as_ref()))?;
+        let config = serde_json::from_str(&data)
             .with_context(|| format!("Parsing config: {}", config_path.as_ref()))?;
 
         // We assume that the paths are already absolute, because we are loading
@@ -48,7 +50,7 @@ pub trait AssemblyContainer {
     where
         Self: Sized + WalkPaths + DeserializeOwned,
     {
-        Self::from_dir_with_config_path(dir, Self::get_config_path())
+        Self::from_dir_with_config_path(dir, Self::get_config_filename())
     }
 
     /// Parse an assembly container from a hermetic directory on disk, but with
@@ -71,7 +73,7 @@ pub trait AssemblyContainer {
         })?;
 
         // We assume that the paths are relative, because we are loading from a
-        // hermetic directory. They need to be make absolute.
+        // hermetic directory. They need to be made absolute.
         config
             .walk_paths(&mut |path: &mut Utf8PathBuf, _dest: Utf8PathBuf, _filetype: FileType| {
                 *path = dir.as_ref().join(&path);
@@ -145,8 +147,8 @@ pub trait AssemblyContainer {
         })?;
 
         // Write the new config to the `dir`.
-        let config_path = dir.as_ref().join(Self::get_config_path());
-        let config_file = std::fs::File::create(config_path)?;
+        let config_filename = dir.as_ref().join(Self::get_config_filename());
+        let config_file = std::fs::File::create(config_filename)?;
         serde_json::to_writer_pretty(config_file, &self)
             .with_context(|| format!("Writing the config file into: {}", dir.as_ref()))?;
 
