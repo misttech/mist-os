@@ -1013,9 +1013,10 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
 
   // Present an image
   ASSERT_OK(primary_client->ApplyLayers(primary_client->CreateFullscreenLayerConfig()));
-  uint64_t count = primary_client->state().vsync_count();
+  ASSERT_EQ(0u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() > count; }));
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(1u, primary_client->state().vsync_count());
 
   // Set an empty config
   {
@@ -1044,9 +1045,10 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
       ToBanjoDisplayId(primary_client->state().display_id()), 0u, &banjo_config_stamp);
 
   // Send a second vsync, using the config the client applied.
-  count = primary_client->state().vsync_count();
+  ASSERT_EQ(0u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() > count; }));
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(1u, primary_client->state().vsync_count());
 }
 
 TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
@@ -1068,9 +1070,11 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
   // Present an image
   ASSERT_OK(primary_client->ApplyLayers(primary_client->CreateFullscreenLayerConfig()));
 
+  ASSERT_EQ(0u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
-
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(1u, primary_client->state().vsync_count());
+
   // Send the controller a vsync for an image / a config it won't recognize anymore.
   display::ConfigStamp invalid_config_stamp =
       CoordinatorController()->TEST_controller_stamp() - display::ConfigStamp{1};
@@ -1079,6 +1083,7 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
       ToBanjoDisplayId(primary_client->state().display_id()), 0u, &invalid_banjo_config_stamp);
 
   // Send a second vsync, using the config the client applied.
+  ASSERT_EQ(1u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 2; }));
   EXPECT_EQ(2u, primary_client->state().vsync_count());
@@ -1455,6 +1460,7 @@ TEST_F(IntegrationTest, DISABLED_EmptyConfigIsNotApplied) {
   TestFidlClient virtcon_client(&sysmem_client_);
   ASSERT_OK(virtcon_client.OpenCoordinator(DisplayProviderClient(), ClientPriority::kVirtcon,
                                            dispatcher()));
+  ASSERT_OK(virtcon_client.EnableVsyncEventDelivery());
   ASSERT_OK(virtcon_client.SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode::kFallback));
   {
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
@@ -1463,29 +1469,32 @@ TEST_F(IntegrationTest, DISABLED_EmptyConfigIsNotApplied) {
     ASSERT_OK(virtcon_client.SetDisplayLayers(virtcon_display_id, {}));
     ASSERT_OK(virtcon_client.ApplyConfig());
   }
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return IsClientActive(ClientPriority::kVirtcon, VsyncCheck::kNoCheck); }));
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kVirtcon); }));
 
   // Create and bind primary client.
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
 
-  // Virtcon client should remain active until primary client has set a config.
-  uint64_t virtcon_client_vsync_count = virtcon_client.state().vsync_count();
+  // The Virtcon client should receive VSync events while its config is active.
+  // This is the case until the primary client applies a config.
+  EXPECT_EQ(0u, primary_client->state().vsync_count());
+  ASSERT_EQ(0u, virtcon_client.state().vsync_count());
   SendVsyncFromDisplayEngine();
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return virtcon_client.state().vsync_count() > virtcon_client_vsync_count; }));
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() == 0; }));
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client.state().vsync_count() >= 1; }));
+  EXPECT_EQ(0u, primary_client->state().vsync_count());
+  EXPECT_EQ(1u, virtcon_client.state().vsync_count());
 
   // Present an image from the primary client.
   ASSERT_OK(primary_client->ApplyLayers(primary_client->CreateFullscreenLayerConfig()));
 
   // Primary client should have become active after a config was set.
-  const uint64_t primary_vsync_count = primary_client->state().vsync_count();
+  ASSERT_EQ(0u, primary_client->state().vsync_count());
+  EXPECT_EQ(1u, virtcon_client.state().vsync_count());
   SendVsyncFromDisplayEngine();
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return primary_client->state().vsync_count() > primary_vsync_count; }));
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(1u, primary_client->state().vsync_count());
+  EXPECT_EQ(1u, virtcon_client.state().vsync_count());
 }
 
 // This tests the basic behavior of ApplyConfig() and OnVsync() events.
@@ -1522,12 +1531,10 @@ TEST_F(IntegrationTest, VsyncEvent) {
   const display::ConfigStamp apply_config_stamp_0 = apply_config_stamp_0_result.value();
   EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_0);
 
-  {
-    const uint64_t primary_vsync_count = primary_client->state().vsync_count();
-    SendVsyncFromDisplayEngine();
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() > primary_vsync_count; }));
-  }
+  ASSERT_EQ(0u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(1u, primary_client->state().vsync_count());
 
   display::ConfigStamp present_config_stamp_0 = primary_client->state().last_vsync_config_stamp();
   EXPECT_EQ(apply_config_stamp_0, present_config_stamp_0);
@@ -1557,12 +1564,10 @@ TEST_F(IntegrationTest, VsyncEvent) {
   EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_1);
   EXPECT_GT(apply_config_stamp_1, apply_config_stamp_0);
 
-  {
-    const uint64_t primary_vsync_count = primary_client->state().vsync_count();
-    SendVsyncFromDisplayEngine();
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() > primary_vsync_count; }));
-  }
+  ASSERT_EQ(1u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 2; }));
+  EXPECT_EQ(2u, primary_client->state().vsync_count());
 
   display::ConfigStamp present_config_stamp_1 = primary_client->state().last_vsync_config_stamp();
   EXPECT_EQ(apply_config_stamp_1, present_config_stamp_1);
@@ -1578,12 +1583,10 @@ TEST_F(IntegrationTest, VsyncEvent) {
   EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_2);
   EXPECT_GT(apply_config_stamp_2, apply_config_stamp_1);
 
-  {
-    const uint64_t primary_vsync_count = primary_client->state().vsync_count();
-    SendVsyncFromDisplayEngine();
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() > primary_vsync_count; }));
-  }
+  ASSERT_EQ(2u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 3; }));
+  EXPECT_EQ(3u, primary_client->state().vsync_count());
 
   display::ConfigStamp present_config_stamp_2 = primary_client->state().last_vsync_config_stamp();
   EXPECT_EQ(apply_config_stamp_2, present_config_stamp_2);
@@ -1600,12 +1603,10 @@ TEST_F(IntegrationTest, VsyncEvent) {
   EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_3);
   EXPECT_GT(apply_config_stamp_3, apply_config_stamp_2);
 
-  {
-    const uint64_t primary_vsync_count = primary_client->state().vsync_count();
-    SendVsyncFromDisplayEngine();
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() > primary_vsync_count; }));
-  }
+  ASSERT_EQ(3u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 4; }));
+  EXPECT_EQ(4u, primary_client->state().vsync_count());
 
   display::ConfigStamp present_config_stamp_3 = primary_client->state().last_vsync_config_stamp();
   EXPECT_EQ(apply_config_stamp_3, present_config_stamp_3);
@@ -1645,12 +1646,10 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   const display::ConfigStamp apply_config_stamp_0 = apply_config_stamp_0_result.value();
   EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_0);
 
-  {
-    const uint64_t primary_vsync_count = primary_client->state().vsync_count();
-    SendVsyncFromDisplayEngine();
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() > primary_vsync_count; }));
-  }
+  ASSERT_EQ(0u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(1u, primary_client->state().vsync_count());
 
   display::ConfigStamp present_config_stamp_0 = primary_client->state().last_vsync_config_stamp();
   EXPECT_EQ(apply_config_stamp_0, present_config_stamp_0);
@@ -1685,12 +1684,10 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_1);
   EXPECT_GT(apply_config_stamp_1, apply_config_stamp_0);
 
-  {
-    const uint64_t primary_vsync_count = primary_client->state().vsync_count();
-    SendVsyncFromDisplayEngine();
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() > primary_vsync_count; }));
-  }
+  ASSERT_EQ(1u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 2; }));
+  EXPECT_EQ(2u, primary_client->state().vsync_count());
 
   display::ConfigStamp present_config_stamp_1 = primary_client->state().last_vsync_config_stamp();
   EXPECT_EQ(apply_config_stamp_1, present_config_stamp_1);
@@ -1708,12 +1705,10 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_2);
   EXPECT_GE(apply_config_stamp_2, apply_config_stamp_1);
 
-  {
-    const uint64_t primary_vsync_count = primary_client->state().vsync_count();
-    SendVsyncFromDisplayEngine();
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() > primary_vsync_count; }));
-  }
+  ASSERT_EQ(2u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 3; }));
+  EXPECT_EQ(3u, primary_client->state().vsync_count());
 
   display::ConfigStamp present_config_stamp_2 = primary_client->state().last_vsync_config_stamp();
   EXPECT_EQ(present_config_stamp_2, apply_config_stamp_1);
@@ -1727,12 +1722,10 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
     return controller->TEST_controller_stamp() > old_controller_stamp;
   }));
 
-  {
-    const uint64_t primary_vsync_count = primary_client->state().vsync_count();
-    SendVsyncFromDisplayEngine();
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() > primary_vsync_count; }));
-  }
+  ASSERT_EQ(3u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 4; }));
+  EXPECT_EQ(4u, primary_client->state().vsync_count());
 
   display::ConfigStamp present_config_stamp_3 = primary_client->state().last_vsync_config_stamp();
   EXPECT_EQ(present_config_stamp_3, apply_config_stamp_2);
@@ -1773,12 +1766,10 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   const display::ConfigStamp apply_config_stamp_0 = apply_config_stamp_0_result.value();
   EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_0);
 
-  {
-    const uint64_t primary_vsync_count = primary_client->state().vsync_count();
-    SendVsyncFromDisplayEngine();
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() > primary_vsync_count; }));
-  }
+  ASSERT_EQ(0u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(1u, primary_client->state().vsync_count());
 
   display::ConfigStamp present_config_stamp_0 = primary_client->state().last_vsync_config_stamp();
   EXPECT_EQ(apply_config_stamp_0, present_config_stamp_0);
@@ -1813,12 +1804,10 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_1);
   EXPECT_GT(apply_config_stamp_1, apply_config_stamp_0);
 
-  {
-    const uint64_t primary_vsync_count = primary_client->state().vsync_count();
-    SendVsyncFromDisplayEngine();
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() > primary_vsync_count; }));
-  }
+  ASSERT_EQ(1u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 2; }));
+  EXPECT_EQ(2u, primary_client->state().vsync_count());
 
   auto present_config_stamp_1 = primary_client->state().last_vsync_config_stamp();
   EXPECT_EQ(apply_config_stamp_1, present_config_stamp_1);
@@ -1836,12 +1825,10 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_2);
   EXPECT_GE(apply_config_stamp_2, apply_config_stamp_1);
 
-  {
-    const uint64_t primary_vsync_count = primary_client->state().vsync_count();
-    SendVsyncFromDisplayEngine();
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() > primary_vsync_count; }));
-  }
+  ASSERT_EQ(2u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 3; }));
+  EXPECT_EQ(3u, primary_client->state().vsync_count());
 
   display::ConfigStamp present_config_stamp_2 = primary_client->state().last_vsync_config_stamp();
   EXPECT_EQ(present_config_stamp_2, present_config_stamp_1);
@@ -1862,12 +1849,10 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   // On Vsync, the configuration stamp client receives on Vsync event message
   // will be the latest one applied to the display controller, since the pending
   // image has been removed from the configuration.
-  {
-    const uint64_t primary_vsync_count = primary_client->state().vsync_count();
-    SendVsyncFromDisplayEngine();
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() > primary_vsync_count; }));
-  }
+  ASSERT_EQ(3u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 4; }));
+  EXPECT_EQ(4u, primary_client->state().vsync_count());
 
   display::ConfigStamp present_config_stamp_3 = primary_client->state().last_vsync_config_stamp();
   EXPECT_EQ(present_config_stamp_3, apply_config_stamp_3);
@@ -1941,12 +1926,10 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   const display::ConfigStamp apply_config_stamp_0 = apply_config_stamp_0_result.value();
   EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_0);
 
-  {
-    const uint64_t primary_vsync_count = primary_client->state().vsync_count();
-    SendVsyncFromDisplayEngine();
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() > primary_vsync_count; }));
-  }
+  ASSERT_EQ(0u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(1u, primary_client->state().vsync_count());
 
   display::ConfigStamp present_config_stamp_0 = primary_client->state().last_vsync_config_stamp();
   EXPECT_EQ(apply_config_stamp_0, present_config_stamp_0);
@@ -1965,12 +1948,10 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_1);
   EXPECT_GT(apply_config_stamp_1, apply_config_stamp_0);
 
-  {
-    const uint64_t primary_vsync_count = primary_client->state().vsync_count();
-    SendVsyncFromDisplayEngine();
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() > primary_vsync_count; }));
-  }
+  ASSERT_EQ(1u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 2; }));
+  EXPECT_EQ(2u, primary_client->state().vsync_count());
 
   display::ConfigStamp present_config_stamp_1 = primary_client->state().last_vsync_config_stamp();
   EXPECT_EQ(present_config_stamp_1, present_config_stamp_0);
@@ -1988,12 +1969,10 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_2);
   EXPECT_GT(apply_config_stamp_2, apply_config_stamp_1);
 
-  {
-    const uint64_t primary_vsync_count = primary_client->state().vsync_count();
-    SendVsyncFromDisplayEngine();
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() > primary_vsync_count; }));
-  }
+  ASSERT_EQ(2u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 3; }));
+  EXPECT_EQ(3u, primary_client->state().vsync_count());
 
   display::ConfigStamp present_config_stamp_2 = primary_client->state().last_vsync_config_stamp();
   EXPECT_EQ(present_config_stamp_2, present_config_stamp_1);
@@ -2006,12 +1985,10 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   ASSERT_TRUE(PollUntilOnLoop(
       [&]() { return CoordinatorController()->TEST_controller_stamp() > old_controller_stamp; }));
 
-  {
-    const uint64_t primary_vsync_count = primary_client->state().vsync_count();
-    SendVsyncFromDisplayEngine();
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() > primary_vsync_count; }));
-  }
+  ASSERT_EQ(3u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 4; }));
+  EXPECT_EQ(4u, primary_client->state().vsync_count());
 
   display::ConfigStamp present_config_stamp_3 = primary_client->state().last_vsync_config_stamp();
   EXPECT_EQ(present_config_stamp_3, apply_config_stamp_2);
@@ -2023,12 +2000,10 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   old_controller_stamp = CoordinatorController()->TEST_controller_stamp();
   image_1_ready_fence.event.signal(0u, ZX_EVENT_SIGNALED);
 
-  {
-    const uint64_t primary_vsync_count = primary_client->state().vsync_count();
-    SendVsyncFromDisplayEngine();
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return primary_client->state().vsync_count() > primary_vsync_count; }));
-  }
+  ASSERT_EQ(4u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 5; }));
+  EXPECT_EQ(5u, primary_client->state().vsync_count());
 
   display::ConfigStamp present_config_stamp_4 = primary_client->state().last_vsync_config_stamp();
   EXPECT_EQ(present_config_stamp_4, apply_config_stamp_2);
