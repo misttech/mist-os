@@ -14,6 +14,7 @@ use block_server::async_interface::{Interface, SessionManager};
 use block_server::{BlockServer, PartitionInfo};
 use device::Device;
 use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd};
+use fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream};
 use fidl_fuchsia_fs_startup::{
     CompressionAlgorithm, CreateOptions, EvictionPolicyOverride, FormatOptions, MountOptions,
     StartOptions, StartupMarker, StartupRequest, StartupRequestStream, VolumeRequest,
@@ -869,6 +870,18 @@ impl Component {
                 }
             }),
         )?;
+        let weak = Arc::downgrade(self);
+        svc_dir.add_entry(
+            AdminMarker::PROTOCOL_NAME,
+            vfs::service::host(move |requests| {
+                let weak = weak.clone();
+                async move {
+                    if let Some(me) = weak.upgrade() {
+                        let _ = me.handle_admin_requests(requests).await;
+                    }
+                }
+            }),
+        )?;
         let flags = fio::Flags::PROTOCOL_DIRECTORY
             | fio::PERM_READABLE
             | fio::PERM_WRITABLE
@@ -1273,6 +1286,31 @@ impl Component {
         }
 
         Ok(())
+    }
+
+    async fn handle_admin_requests(
+        self: &Arc<Self>,
+        mut stream: AdminRequestStream,
+    ) -> Result<(), Error> {
+        match stream.try_next().await? {
+            None => Ok(()),
+            Some(AdminRequest::Shutdown { responder }) => {
+                info!("Received admin shutdown request");
+                // Shut down any remaining volumes.
+                let volumes = self.mounted.lock().unwrap();
+                for volume in volumes.values() {
+                    volume.scope.shutdown();
+                }
+                // Shut down the main scope. The main thread is waiting on this shutdown to exit,
+                // so it should be the ~last thing we do.
+                self.scope.shutdown();
+                responder
+                    .send()
+                    .unwrap_or_else(|error| warn!(error:?; "Failed to send shutdown response"));
+                info!("Shutdown complete");
+                Ok(())
+            }
+        }
     }
 }
 
@@ -1741,6 +1779,7 @@ mod tests {
     };
     use fake_block_server::{FakeServer, FakeServerOptions};
     use fidl::endpoints::RequestStream;
+    use fidl_fuchsia_fs::AdminMarker;
     use fidl_fuchsia_fs_startup::{
         CheckOptions, CompressionAlgorithm, CreateOptions, EvictionPolicyOverride, MountOptions,
         StartOptions, StartupMarker, VolumeMarker, VolumesMarker,
@@ -2877,5 +2916,38 @@ mod tests {
                 &expected,
             );
         }
+    }
+
+    #[fuchsia::test]
+    async fn test_admin_shutdown_no_volumes() {
+        let fixture = Fixture::new(SLICE_SIZE).await;
+        let admin_proxy =
+            connect_to_protocol_at_dir_svc::<AdminMarker>(&fixture.outgoing_dir).unwrap();
+        admin_proxy.shutdown().await.unwrap();
+        fixture.component.scope.wait().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_admin_shutdown_with_volumes() {
+        let fixture = Fixture::new(SLICE_SIZE).await;
+
+        let (_dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+        let volumes_proxy =
+            connect_to_protocol_at_dir_svc::<VolumesMarker>(&fixture.outgoing_dir).unwrap();
+        volumes_proxy
+            .create(
+                "foo",
+                dir_server_end,
+                CreateOptions { type_guid: Some([1; 16]), ..CreateOptions::default() },
+                MountOptions::default(),
+            )
+            .await
+            .expect("create failed (FIDL)")
+            .expect("create failed");
+
+        let admin_proxy =
+            connect_to_protocol_at_dir_svc::<AdminMarker>(&fixture.outgoing_dir).unwrap();
+        admin_proxy.shutdown().await.unwrap();
+        fixture.component.scope.wait().await;
     }
 }

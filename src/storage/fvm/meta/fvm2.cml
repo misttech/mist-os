@@ -27,6 +27,7 @@
         },
         {
             protocol: [
+                "fuchsia.fs.Admin",
                 "fuchsia.fs.startup.Startup",
                 "fuchsia.fs.startup.Volumes",
             ],
@@ -60,6 +61,7 @@
         },
         {
             protocol: [
+                "fuchsia.fs.Admin",
                 "fuchsia.fs.startup.Startup",
                 "fuchsia.fs.startup.Volumes",
             ],

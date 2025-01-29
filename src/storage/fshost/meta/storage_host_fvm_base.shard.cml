@@ -48,6 +48,13 @@
                 "fuchsia.hardware.ramdisk.Service",
             ],
         },
+
+        // This is only here to facilitate shutdown ordering.
+        {
+            protocol: "fuchsia.fs.startup.Startup",
+            from: "#fvm2",
+            path: "/fvm/svc/fuchsia.fs.startup.Startup",
+        },
     ],
     offer: [
         {
