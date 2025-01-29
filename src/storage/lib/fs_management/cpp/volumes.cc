@@ -76,10 +76,10 @@ zx::result<> OpenVolume(fidl::UnownedClientEnd<fuchsia_io::Directory> exposed_di
     return status.take_error();
   }
 
-  auto client = component::ConnectAt<fuchsia_fs_startup::Volume>(exposed_dir, path.c_str());
+  auto client = component::ConnectAt<fuchsia_fs_startup::Volume>(exposed_dir, path);
   if (client.is_error())
     return client.take_error();
-  auto result = fidl::WireCall(*client)->Mount(std::move(outgoing_dir), std::move(options));
+  auto result = fidl::WireCall(*client)->Mount(std::move(outgoing_dir), options);
   if (!result.ok())
     return zx::error(result.error().status());
   if (result->is_error())
@@ -89,20 +89,20 @@ zx::result<> OpenVolume(fidl::UnownedClientEnd<fuchsia_io::Directory> exposed_di
 }
 
 __EXPORT zx::result<> CheckVolume(fidl::UnownedClientEnd<fuchsia_io::Directory> exposed_dir,
-                                  std::string_view name, zx::channel crypt_client) {
+                                  std::string_view name,
+                                  fidl::ClientEnd<fuchsia_fxfs::Crypt> crypt_client) {
   std::string path = "volumes/" + std::string(name);
   if (auto status = CheckExists(exposed_dir, path); status.is_error()) {
     return status.take_error();
   }
 
-  auto client = component::ConnectAt<fuchsia_fs_startup::Volume>(exposed_dir, path.c_str());
+  auto client = component::ConnectAt<fuchsia_fs_startup::Volume>(exposed_dir, path);
   if (client.is_error())
     return client.take_error();
   fidl::Arena arena;
-  auto check_options = fuchsia_fs_startup::wire::CheckOptions::Builder(arena)
-                           .crypt(fidl::ClientEnd<fuchsia_fxfs::Crypt>(std::move(crypt_client)))
-                           .Build();
-  auto result = fidl::WireCall(*client)->Check(std::move(check_options));
+  auto check_options =
+      fuchsia_fs_startup::wire::CheckOptions::Builder(arena).crypt(std::move(crypt_client)).Build();
+  auto result = fidl::WireCall(*client)->Check(check_options);
   if (!result.ok())
     return zx::error(result.error().status());
   if (result->is_error())

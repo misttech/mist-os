@@ -187,8 +187,10 @@ class __EXPORT StartedMultiVolumeFilesystem {
                                           fuchsia_fs_startup::wire::MountOptions options);
 
   // Verifies the integrity of a volume.  |crypt_client| is an optional connection to a crypt
-  // service used to unlock the volume; if unset, the volume is assumed to be unencrypted.
-  zx::result<> CheckVolume(std::string_view name, zx::channel crypt_client);
+  // service used to unlock the volume. If |crypt_client| is not a valid handle, the volume is
+  // assumed to be unencrypted.
+  zx::result<> CheckVolume(std::string_view name,
+                           fidl::ClientEnd<fuchsia_fxfs::Crypt> crypt_client);
 
   // Returns whether the given volume name exists.
   bool HasVolume(std::string_view name);

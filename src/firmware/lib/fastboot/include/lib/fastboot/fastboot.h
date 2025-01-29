@@ -89,7 +89,7 @@ class __EXPORT Fastboot : public FastbootBase {
   // A static table of fastboot variable name to method mapping.
   static const VariableHashTable &GetVariableTable();
 
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory> *> GetSvcRoot();
+  zx::result<fidl::UnownedClientEnd<fuchsia_io::Directory>> GetSvcRoot();
 
   fuchsia_mem::wire::Buffer GetWireBufferFromDownload();
 

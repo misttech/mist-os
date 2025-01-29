@@ -278,7 +278,7 @@ zx::result<> FsFormat(const std::string& device_path, fs_management::FsComponent
                       const fs_management::MkfsOptions& options, bool create_default_volume) {
   zx::result<> status;
   if (create_default_volume) {
-    auto crypt_client = GetCryptService();
+    zx::result crypt_client = InitializeCryptService();
     if (crypt_client.is_error())
       return crypt_client.take_error();
     status = fs_management::MkfsWithDefault(device_path.c_str(), component, options,

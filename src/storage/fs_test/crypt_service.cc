@@ -14,17 +14,18 @@
 
 namespace fs_test {
 
-zx::result<> SetUpCryptWithRandomKeys(
-    fidl::UnownedClientEnd<fuchsia_io::Directory> service_directory) {
+namespace {
+
+zx::result<> SetUpCryptWithRandomKeys() {
   fidl::WireSyncClient<fuchsia_fxfs::CryptManagement> client;
-  if (auto management_service_or =
-          component::ConnectAt<fuchsia_fxfs::CryptManagement>(service_directory);
-      management_service_or.is_error()) {
-    FX_LOGS(ERROR) << "Unable to connect to crypt management service: "
-                   << management_service_or.status_string();
-    return management_service_or.take_error();
-  } else {
-    client = fidl::WireSyncClient(*std::move(management_service_or));
+  {
+    zx::result management_service = component::Connect<fuchsia_fxfs::CryptManagement>();
+    if (management_service.is_error()) {
+      FX_LOGS(ERROR) << "Unable to connect to crypt management service: "
+                     << management_service.status_string();
+      return management_service.take_error();
+    }
+    client = fidl::WireSyncClient(*std::move(management_service));
   }
   unsigned char key[32];
   zx_cprng_draw(key, sizeof(key));
@@ -57,37 +58,21 @@ zx::result<> SetUpCryptWithRandomKeys(
   return zx::ok();
 }
 
-zx::result<zx::channel> GetCryptService() {
+}  // namespace
+
+zx::result<fidl::ClientEnd<fuchsia_fxfs::Crypt>> InitializeCryptService() {
   static bool initialized = false;
   if (!initialized) {
-    auto service_endpoints_or = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    if (service_endpoints_or.is_error()) {
-      FX_LOGS(ERROR) << "Unable to create endpoints: " << service_endpoints_or.status_string();
-      return service_endpoints_or.take_error();
-    }
-
-    if (zx_status_t status =
-            fdio_service_connect("/svc", service_endpoints_or->server.TakeChannel().release());
-        status != ZX_OK) {
-      FX_LOGS(ERROR) << "Unable to open /svc: " << zx_status_get_string(status);
-      return zx::error(status);
-    }
-
-    if (auto status = SetUpCryptWithRandomKeys(service_endpoints_or->client); status.is_error()) {
+    if (auto status = SetUpCryptWithRandomKeys(); status.is_error()) {
       return status.take_error();
     }
-
     initialized = true;
   }
-
-  if (auto crypt_service_or = component::Connect<fuchsia_fxfs::Crypt>();
-      crypt_service_or.is_error()) {
-    FX_LOGS(ERROR) << "Unable to connect to the crypt service: "
-                   << crypt_service_or.status_string();
-    return crypt_service_or.take_error();
-  } else {
-    return zx::ok(crypt_service_or->TakeChannel());
+  zx::result crypt_service = component::Connect<fuchsia_fxfs::Crypt>();
+  if (crypt_service.is_error()) {
+    FX_LOGS(ERROR) << "Unable to connect to the crypt service: " << crypt_service.status_string();
   }
+  return crypt_service;
 }
 
 }  // namespace fs_test
@@ -96,12 +81,12 @@ extern "C" {
 
 // Exported for Rust
 zx_status_t get_crypt_service(zx_handle_t* handle) {
-  if (auto channel = fs_test::GetCryptService(); channel.is_error()) {
-    return channel.error_value();
-  } else {
-    *handle = channel->release();
-    return ZX_OK;
+  zx::result crypt_service = fs_test::InitializeCryptService();
+  if (crypt_service.is_error()) {
+    return crypt_service.error_value();
   }
+  *handle = crypt_service->TakeChannel().release();
+  return ZX_OK;
 }
 
 }  // extern

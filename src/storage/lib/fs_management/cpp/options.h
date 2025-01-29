@@ -6,6 +6,7 @@
 #define SRC_STORAGE_LIB_FS_MANAGEMENT_CPP_OPTIONS_H_
 
 #include <fidl/fuchsia.fs.startup/cpp/wire.h>
+#include <fidl/fuchsia.fxfs/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/zx/result.h>
 #include <zircon/types.h>
@@ -38,8 +39,8 @@ struct MountOptions {
   // If set, run fsck after every transaction.
   bool fsck_after_every_transaction = false;
 
-  // If set, a callable that returns a handle to the crypt client.
-  std::function<zx::channel()> crypt_client;
+  // If set, a callable that connects and returns a handle to the crypt service.
+  std::function<zx::result<fidl::ClientEnd<fuchsia_fxfs::Crypt>>()> crypt_client;
 
   // Generate a StartOptions fidl struct to pass the a fuchsia.fs.startup.Startup interface based
   // on this set of options.

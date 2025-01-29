@@ -121,7 +121,7 @@ class JsonInstance : public FilesystemInstance {
     // Also check the volume, which requires re-mounting.
     fs_management::MountOptions mount_options{.readonly = true};
     if (filesystem_.GetTraits().uses_crypt) {
-      mount_options.crypt_client = []() { return *GetCryptService(); };
+      mount_options.crypt_client = InitializeCryptService;
     }
     zx::result device = component::Connect<fuchsia_hardware_block::Block>(device_.path());
     if (device.is_error()) {
@@ -131,7 +131,16 @@ class JsonInstance : public FilesystemInstance {
     if (fs.is_error()) {
       return fs.take_error();
     }
-    return fs->CheckVolume(kDefaultVolumeName, mount_options.crypt_client());
+
+    fidl::ClientEnd<fuchsia_fxfs::Crypt> crypt_client;
+    if (mount_options.crypt_client) {
+      zx::result client = mount_options.crypt_client();
+      if (client.is_error()) {
+        return client.take_error();
+      }
+      crypt_client = *std::move(client);
+    }
+    return fs->CheckVolume(kDefaultVolumeName, std::move(crypt_client));
   }
 
   RamDevice* GetRamDevice() override { return &device_; }

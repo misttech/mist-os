@@ -5,11 +5,10 @@
 #ifndef SRC_STORAGE_LIB_FS_MANAGEMENT_CPP_MKFS_WITH_DEFAULT_H_
 #define SRC_STORAGE_LIB_FS_MANAGEMENT_CPP_MKFS_WITH_DEFAULT_H_
 
-#include <lib/zx/channel.h>
+#include <fidl/fuchsia.fxfs/cpp/wire.h>
 #include <lib/zx/result.h>
 
 #include "src/storage/lib/fs_management/cpp/component.h"
-#include "src/storage/lib/fs_management/cpp/format.h"
 #include "src/storage/lib/fs_management/cpp/options.h"
 
 namespace fs_management {
@@ -18,7 +17,8 @@ namespace fs_management {
 // and will be encrypted using `crypt_client`, if set.
 // This should only be used for testing.
 zx::result<> MkfsWithDefault(const char* device_path, FsComponent& component,
-                             const MkfsOptions& options, zx::channel crypt_client);
+                             const MkfsOptions& options,
+                             fidl::ClientEnd<fuchsia_fxfs::Crypt> crypt_client);
 
 }  // namespace fs_management
 
