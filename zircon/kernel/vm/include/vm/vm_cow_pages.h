@@ -1177,6 +1177,14 @@ class VmCowPages final : public VmHierarchyBase,
   static ParentAndRange FindParentAndRangeForCloneLocked(VmCowPages* parent, uint64_t offset,
                                                          uint64_t size, bool parent_must_be_hidden);
 
+  // Helper function for |CloneBidirectionalLocked|.
+  //
+  // Adds the newly created bidirectionally cloned |child| as a child of this node at the location
+  // specified by |location|. The |location.parent| field must be |this| object. Also, updates the
+  // appropriate share counts for the pages that are now shared by the new child.
+  void AddBidirectionallyClonedChildLocked(ParentAndRange location, VmCowPages* child)
+      TA_REQ(lock());
+
   // Helper function for |CreateCloneLocked|.
   //
   // Performs a bidirectional clone operation, creating a new child node. The child behaves as if it
@@ -1260,6 +1268,11 @@ class VmCowPages final : public VmHierarchyBase,
   // Move all the pages from this VmCowPages object into another VmCowPages object.
   // The receiving VmCowPages must not have any pages yet.
   void MovePagesIntoLocked(fbl::RefPtr<VmCowPages> other) TA_REQ(lock());
+
+  // Replaces this node in its parent's child list with a hidden node and makes this node a child
+  // of the newly created hidden node. Moves the pages that were stored at this node into the
+  // newly created hidden node.
+  zx_status_t ReplaceWithHiddenNodeLocked(fbl::RefPtr<VmCowPages>* replacement_node) TA_REQ(lock());
 
   // Removes the specified child from this objects |children_list_| and performs any hierarchy
   // updates that need to happen as a result. This does not modify the |parent_| member of the
