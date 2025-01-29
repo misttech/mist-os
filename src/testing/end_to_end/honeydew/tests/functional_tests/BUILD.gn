@@ -21,15 +21,6 @@
 #         Tests that require SL4F transport, if any
 #         Tests that does not require SL4F transport
 #
-# Note: Each entry in test group should refer to a test case along with its
-# dependencies (if any). For example,
-#   * `affordance_tests/test_session:test_session_ffx` is a group that contains
-#     `affordance_tests/test_session:session_test` test and its dependencies
-#     `affordance_tests/test_session:packages`. So include this group name (not
-#     the test name)
-#   * `affordance_tests/test_rtc:rtc_test_fc` is a test and it does not have any
-#     dependencies. So you can include this test name directly
-#
 # Note: Please refrain from referencing one group in another one (such as
 # including `core_x64_stable_tests` in `workbench_x64_stable_tests`)
 # as it is not guaranteed that every single test case supported by
@@ -55,8 +46,8 @@ group_with_no_dir_target_deps("core_x64_stable_tests") {
     "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:x64_emu_test($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test($host_toolchain)",
+    "transport_tests:test_ffx_on_x64",
     "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
-    "transport_tests/test_ffx:test_ffx_on_x64",
     "transport_tests/test_serial:serial_test($host_toolchain)",
   ]
 }
@@ -70,18 +61,18 @@ group_with_no_dir_target_deps("core_x64_unstable_tests") {
 group_with_no_dir_target_deps("workbench_x64_stable_tests") {
   testonly = true
   public_deps = [
+    "affordance_tests:test_screenshot_ffx",
+    "affordance_tests:test_session_ffx",
+    "affordance_tests:test_user_input_fc",
     "affordance_tests/test_inspect:inspect_test_ffx($host_toolchain)",
     "affordance_tests/test_location:location_test_fc($host_toolchain)",
     "affordance_tests/test_netstack:netstack_test_fc($host_toolchain)",
-    "affordance_tests/test_session:test_session_ffx",
     "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
-    "affordance_tests/test_ui:test_screenshot_ffx",
-    "affordance_tests/test_ui:test_user_input_fc",
     "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:x64_emu_test($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test($host_toolchain)",
+    "transport_tests:test_ffx_on_x64",
     "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
-    "transport_tests/test_ffx:test_ffx_on_x64",
     "transport_tests/test_serial:serial_test($host_toolchain)",
   ]
 }
@@ -99,9 +90,9 @@ group_with_no_dir_target_deps("core_vim3_stable_tests") {
     "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
     "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:vim3_test($host_toolchain)",
+    "transport_tests:test_ffx_on_vim3",
     "transport_tests/test_fastboot:fastboot_using_serial_test($host_toolchain)",
     "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
-    "transport_tests/test_ffx:test_ffx_on_vim3",
     "transport_tests/test_serial:serial_test($host_toolchain)",
   ]
 }
@@ -116,17 +107,17 @@ group_with_no_dir_target_deps("core_vim3_unstable_tests") {
 group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
   testonly = true
   public_deps = [
+    "affordance_tests:test_screenshot_ffx",
+    "affordance_tests:test_session_ffx",
+    "affordance_tests:test_user_input_fc",
     "affordance_tests/test_inspect:inspect_test_ffx($host_toolchain)",
     "affordance_tests/test_rtc:rtc_test_fc($host_toolchain)",
-    "affordance_tests/test_session:test_session_ffx",
     "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
-    "affordance_tests/test_ui:test_screenshot_ffx",
-    "affordance_tests/test_ui:test_user_input_fc",
     "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:vim3_test($host_toolchain)",
+    "transport_tests:test_ffx_on_vim3",
     "transport_tests/test_fastboot:fastboot_using_serial_test($host_toolchain)",
     "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
-    "transport_tests/test_ffx:test_ffx_on_vim3",
     "transport_tests/test_serial:serial_test($host_toolchain)",
   ]
 }
@@ -154,9 +145,9 @@ group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
 group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
   testonly = true
   public_deps = [
-    "affordance_tests/test_session:test_session_ffx",
-    "affordance_tests/test_ui:test_screenshot_ffx",
-    "affordance_tests/test_ui:test_user_input_fc",
+    "affordance_tests:test_screenshot_ffx",
+    "affordance_tests:test_session_ffx",
+    "affordance_tests:test_user_input_fc",
   ]
 }
 
@@ -169,10 +160,10 @@ group_with_no_dir_target_deps("starnix_arm64_stable_tests") {
     "affordance_tests/test_netstack:netstack_test_fc($host_toolchain)",
     "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:vim3_test($host_toolchain)",
+    "transport_tests:test_ffx_on_vim3",
     "transport_tests/test_fastboot:fastboot_test($host_toolchain)",
     "transport_tests/test_fastboot:fastboot_using_serial_test($host_toolchain)",
     "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
-    "transport_tests/test_ffx:test_ffx_on_vim3",
     "transport_tests/test_serial:serial_test($host_toolchain)",
   ]
 }
@@ -186,15 +177,15 @@ group_with_no_dir_target_deps("starnix_arm64_unstable_tests") {
 group_with_no_dir_target_deps("smart_display_nelson_stable_tests") {
   testonly = true
   public_deps = [
+    "affordance_tests:test_screenshot_ffx",
+    "affordance_tests:test_session_ffx",
     "affordance_tests/test_inspect:inspect_test_ffx($host_toolchain)",
     "affordance_tests/test_location:location_test_fc($host_toolchain)",
-    "affordance_tests/test_session:test_session_ffx",
-    "affordance_tests/test_ui:test_screenshot_ffx",
     "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:nelson_test($host_toolchain)",
+    "transport_tests:test_ffx_on_nelson",
     "transport_tests/test_fastboot:fastboot_test($host_toolchain)",
     "transport_tests/test_fastboot:fastboot_using_serial_test($host_toolchain)",
-    "transport_tests/test_ffx:test_ffx_on_nelson",
   ]
 }
 
