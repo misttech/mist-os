@@ -22,12 +22,6 @@ use serde::{Deserialize, Serialize};
 )]
 #[serde(default, deny_unknown_fields)]
 pub struct RecoveryConfig {
-    /// Whether to include the factory-reset-trigger package.
-    ///
-    /// This field is deprecated, and ignored if the 'factory_reset_trigger_config'
-    /// field is provided.
-    pub factory_reset_trigger: bool,
-
     /// Include the factory-reset-trigger package, and configure it using the given file.
     ///
     /// This is a a map of channel names to indices, when the current OTA

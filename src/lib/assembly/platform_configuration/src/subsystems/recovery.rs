@@ -51,12 +51,6 @@ impl DefineSubsystemConfiguration<(&RecoveryConfig, &VolumeConfig)> for Recovery
                     destination: "forced-fdr-channel-indices.config".into(),
                 })
                 .context("Adding factory-reset-trigger config data entry")?;
-        } else {
-            // Otherwise, only include the factory-reset-trigger (without configuration, assuming
-            // it will be provided via the legacy bundle) if explicitly requested.
-            if config.factory_reset_trigger {
-                builder.platform_bundle("factory_reset_trigger");
-            }
         }
 
         if *context.feature_set_level == FeatureSupportLevel::Standard
