@@ -5,6 +5,7 @@
 import("//build/board.gni")
 import("//build/config/build_id.gni")
 import("//build/config/clang/clang.gni")
+import("//build/config/clang/clang_target_toolchain_info.gni")
 import("//build/config/current_target_tuple.gni")
 import("//build/config/fuchsia/target_api_level.gni")
 import("//build/config/sanitizers/sanitizer_default_options.gni")
@@ -69,17 +70,8 @@ config("compiler") {
       configs += [ "//build/config/rust:one_codegen_unit" ]
     }
 
-    # TODO(phosek): this is inefficient, rather this should come from a JSON file.
-    # Relative path makes command-lines remote-portable.
     _clang_resource_dir =
-        rebase_path(exec_script("$clang_prefix/clang",
-                                [
-                                  "--target=$current_target_tuple",
-                                  "-print-resource-dir",
-                                ],
-                                "trim string",
-                                []),
-                    root_build_dir)
+        "${rebased_clang_dir}/${clang_target_toolchain_info.resource_dir}"
 
     # When linking C++ runtime libraries into Rust binaries, we should use
     # the correct multilib variant.
@@ -241,14 +233,12 @@ config("integer-paranoia") {
 # clang_libunwind is only available on fuchsia.
 # See the definition in //build/config/clang/clang.gni.
 if (is_fuchsia) {
-  # TODO(https://fxbug.dev/42135607): Get this information from runtime.json instead.
-  _clang_libunwind = exec_script("$clang_prefix/clang++",
-                                 [
-                                   "--target=$current_target_tuple",
-                                   "-print-file-name=libunwind.so",
-                                 ],
-                                 "trim string",
-                                 [])
+  # LINT.IfChange
+  # TODO(https://fxbug.dev/42135607): Get this information from runtime.json instead
+  _clang_libunwind =
+      "${rebased_clang_prefix}/../${clang_target_toolchain_info.libunwind_so}"
+
+  # LINT.ThenChange(//build/config/clang/generate_config_json.py)
 
   config("libunwind") {
     libs = [ _clang_libunwind ]

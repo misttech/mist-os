@@ -23,6 +23,10 @@ import("//build/toolchain/default_tools.gni")
 # more details).
 template("basic_toolchain") {
   if (current_toolchain == default_toolchain) {
+    # This needs to be passed to basic toolchains because they can
+    # include configs() that depend on it.
+    _pass_through_clang_toolchain_info = clang_toolchain_info
+
     # Basic toolchains should only be expanded once in the default toolchain.
     toolchain(target_name) {
       tool("stamp") {
@@ -49,6 +53,9 @@ template("basic_toolchain") {
                 "Invalid toolchain label $base, expected ${invoker.expected_label}")
           }
         }
+        clang_toolchain_info = {
+        }
+        clang_toolchain_info = _pass_through_clang_toolchain_info
       }
     }
   } else {

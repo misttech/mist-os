@@ -5,6 +5,7 @@
 # NOTE: Event though this file does not directly reference clang_toolchain()
 # nor zircon_toolchain(), invoking it through toolchain_template below, GN will
 # refuse to compile if the template is not previously defined.
+import("//build/config/clang/clang_toolchain_info.gni")
 import("//build/toolchain/clang_toolchain.gni")
 import("//build/toolchain/toolchain_tags.gni")
 import("//build/toolchain/variant_tags.gni")
@@ -60,6 +61,8 @@ template("_variant_toolchain") {
   # See BUILDCONFIG.gn.
   pass_through_select_variant_canonical = select_variant_canonical
   pass_through_all_toolchain_variants = all_toolchain_variants
+
+  pass_through_clang_toolchain_info = clang_toolchain_info
 
   _target_type = invoker.toolchain_template
 
@@ -130,6 +133,10 @@ template("_variant_toolchain") {
       if (defined(this_invoker.toolchain_args)) {
         forward_variables_from(this_invoker.toolchain_args, "*")
       }
+
+      clang_toolchain_info = {
+      }
+      clang_toolchain_info = pass_through_clang_toolchain_info
 
       # See comment above.
       select_variant_canonical = []
