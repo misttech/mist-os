@@ -9,6 +9,8 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 
+#include <cstdio>
+
 namespace {
 
 zx_status_t v1_test_init(void** out_ctx) {

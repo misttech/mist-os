@@ -568,6 +568,12 @@
     },
     {
         "kind": "const",
+        "name": "fuchsia.driver.framework/MAX_MODULE_NAME_LENGTH",
+        "type": "uint8",
+        "value": "128"
+    },
+    {
+        "kind": "const",
         "name": "fuchsia.driver.framework/MAX_NAMESPACE_COUNT",
         "type": "uint32",
         "value": "32"
@@ -921,6 +927,12 @@
         "name": "fuchsia.driver.framework/NodeSymbol.address",
         "ordinal": "2",
         "type": "uint64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/NodeSymbol.module_name",
+        "ordinal": "3",
+        "type": "string:128"
     },
     {
         "kind": "table/member",

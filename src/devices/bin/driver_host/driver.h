@@ -10,6 +10,8 @@
 #include <lib/driver/symbols/symbols.h>
 #include <lib/fdf/cpp/dispatcher.h>
 
+#include <unordered_map>
+
 #include <fbl/auto_lock.h>
 #include <fbl/intrusive_double_list.h>
 #include <fbl/mutex.h>
@@ -22,14 +24,32 @@ namespace driver_host {
 
 using DriverHooks = const DriverRegistration*;
 
+using OverrideMap = std::unordered_map<std::string, fidl::ClientEnd<fuchsia_io::File>>;
+
+struct Module {
+  zx::vmo module_vmo;
+  OverrideMap overrides;
+  std::vector<std::string> symbols;
+};
+
+using ModuleMap = std::unordered_map<std::string, Module>;
+
+struct Symbol {
+  std::string module_name;
+  std::string symbol_name;
+  void* address;
+};
+
 class Driver : public fidl::Server<fuchsia_driver_host::Driver>,
                public fbl::RefCounted<Driver>,
                public fbl::DoublyLinkedListable<fbl::RefPtr<Driver>> {
  public:
   static zx::result<fbl::RefPtr<Driver>> Load(std::string url, zx::vmo vmo,
-                                              std::string_view relative_binary_path);
+                                              std::string_view relative_binary_path,
+                                              ModuleMap modules);
 
-  Driver(std::string url, void* library, DriverHooks hooks);
+  Driver(std::string url, void* library, std::vector<void*> modules, std::vector<Symbol> symbols,
+         DriverHooks hooks);
   ~Driver() override;
 
   const std::string& url() const { return url_; }
@@ -57,6 +77,8 @@ class Driver : public fidl::Server<fuchsia_driver_host::Driver>,
  private:
   std::string url_;
   void* library_;
+  std::vector<void*> modules_;
+  std::vector<Symbol> symbols_;
 
   fbl::Mutex lock_;
 

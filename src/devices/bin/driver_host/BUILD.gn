@@ -18,6 +18,24 @@ group("tests") {
   deps = [ ":driver-host2-test" ]
 }
 
+source_set("loader") {
+  sources = [
+    "loader.cc",
+    "loader.h",
+  ]
+
+  deps = [
+    "//sdk/lib/async-default",
+    "//src/devices/lib/log",
+    "//zircon/system/ulib/zx",
+  ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_cpp",
+  ]
+}
+
 source_set("driver") {
   sources = [
     "driver.cc",
@@ -27,17 +45,21 @@ source_set("driver") {
   ]
 
   deps = [
+    ":loader",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
     "//sdk/lib/fit",
     "//src/devices/lib/log",
     "//src/lib/driver_symbols:driver_symbols",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zircon-internal",
   ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.driver.host:fuchsia.driver.host_cpp",
     "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-default",
     "//sdk/lib/async_patterns/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
@@ -117,11 +139,15 @@ cc_test_executable("unittests") {
   testonly = true
   output_name = "driver_host_test"
 
-  sources = [ "driver_host_test.cc" ]
+  sources = [
+    "driver_host_test.cc",
+    "loader_test.cc",
+  ]
 
   deps = [
     ":fuchsia.driverhost.test_cpp",
     ":lib",
+    ":loader",
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
@@ -131,6 +157,7 @@ cc_test_executable("unittests") {
     "//sdk/lib/inspect/testing/cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture:gtest",
     "//src/storage/lib/vfs/cpp:cpp",
   ]
 

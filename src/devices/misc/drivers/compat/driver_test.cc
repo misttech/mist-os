@@ -23,6 +23,7 @@
 #include <lib/fdio/directory.h>
 #include <lib/fit/defer.h>
 #include <lib/sync/cpp/completion.h>
+#include <zircon/dlfcn.h>
 
 #include <cstdarg>
 #include <unordered_set>
@@ -31,7 +32,9 @@
 #include <gtest/gtest.h>
 #include <mock-boot-arguments/server.h>
 
+#include "fidl/fuchsia.io/cpp/natural_types.h"
 #include "lib/driver/testing/cpp/driver_runtime.h"
+#include "src/devices/bin/driver_host/loader.h"
 #include "src/devices/misc/drivers/compat/compat_driver_server.h"
 #include "src/devices/misc/drivers/compat/v1_test.h"
 
@@ -498,14 +501,11 @@ class IncomingNamespace {
     boot_args_ = mock_boot_arguments::Server(std::move(arguments));
 
     // Setup and bind "/pkg" directory.
-    compat_file_ = TestFile(compat_file_response, GetVmo("/pkg/driver/compat.so"));
     v1_test_file_ = TestFile(ZX_OK, GetVmo(v1_driver_path));
     firmware_file_ = TestFile(ZX_OK, GetVmo("/pkg/lib/firmware/test"));
     pkg_directory_.SetOpenHandler([this, dispatcher](std::string_view path, auto object) {
       fidl::ServerEnd<fio::File> server_end(object.TakeChannel());
-      if (path == "driver/compat.so") {
-        fidl::BindServer(dispatcher, std::move(server_end), &compat_file_);
-      } else if (path == "driver/v1_test.so") {
+      if (path == "driver/v1_test.so") {
         fidl::BindServer(dispatcher, std::move(server_end), &v1_test_file_);
       } else if (path == "lib/firmware/test") {
         fidl::BindServer(dispatcher, std::move(server_end), &firmware_file_);
@@ -640,7 +640,6 @@ class IncomingNamespace {
   std::optional<TestRoleManager> role_manager_;
   mock_boot_arguments::Server boot_args_;
   TestItems items_;
-  TestFile compat_file_;
   TestFile v1_test_file_;
   TestFile firmware_file_;
   TestDirectory pkg_directory_;
@@ -703,13 +702,56 @@ class DriverTest : public testing::Test {
     ns_entries.push_back(std::move(entry_pkg));
     ns_entries.push_back(std::move(entry_svc));
 
-    device_ops_ = args.ops;
-    std::vector<fdf::NodeSymbol> symbols({fdf::NodeSymbol(
-        {.name = compat::kOps, .address = reinterpret_cast<uint64_t>(&device_ops_)})});
+    zx::vmo v1_driver_vmo = GetVmo(args.v1_driver_path);
 
-    auto program_entry =
-        fdata::DictionaryEntry("compat", std::make_unique<fdata::DictionaryValue>(
-                                             fdata::DictionaryValue::WithStr("driver/v1_test.so")));
+    async::Loop loader_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+    EXPECT_EQ(loader_loop.StartThread("loader-loop"), ZX_OK);
+
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_ldsvc::Loader>::Create();
+    fidl::ClientEnd<fuchsia_ldsvc::Loader> original_loader(
+        zx::channel(dl_set_loader_service(client_end.channel().release())));
+    auto reset_loader = fit::defer([&original_loader]() {
+      zx::channel l = zx::channel(dl_set_loader_service(original_loader.TakeChannel().release()));
+    });
+
+    // Start loader.
+    auto [file_client, file_server] = fidl::Endpoints<fuchsia_io::File>::Create();
+    fdio_open3("/pkg/driver/compat.so",
+               static_cast<uint64_t>(fuchsia_io::kPermReadable | fuchsia_io::kPermExecutable),
+               file_server.TakeHandle().release());
+    driver_host::Loader::OverrideMap overrides;
+    overrides.emplace("libdriver.so", std::move(file_client));
+    async_patterns::DispatcherBound<driver_host::Loader> loader(
+        loader_loop.dispatcher(), std::in_place, original_loader.borrow(), std::move(overrides));
+    loader.AsyncCall(&driver_host::Loader::Bind, std::move(server_end));
+
+    void* v1_driver_library = dlopen_vmo(v1_driver_vmo.get(), RTLD_NOW);
+    void* note = dlsym(v1_driver_library, "__zircon_driver_note__");
+    void* record = dlsym(v1_driver_library, "__zircon_driver_rec__");
+
+    constexpr char kModuleName[] = "driver/v1_test.so";
+
+    device_ops_ = args.ops;
+    std::vector<fdf::NodeSymbol> symbols({
+        fdf::NodeSymbol{{
+            .name = compat::kOps,
+            .address = reinterpret_cast<uint64_t>(&device_ops_),
+        }},
+        fdf::NodeSymbol{{
+            .name = "__zircon_driver_note__",
+            .address = reinterpret_cast<uint64_t>(note),
+            .module_name = kModuleName,
+        }},
+        fdf::NodeSymbol{{
+            .name = "__zircon_driver_rec__",
+            .address = reinterpret_cast<uint64_t>(record),
+            .module_name = kModuleName,
+        }},
+    });
+
+    auto program_entry = fdata::DictionaryEntry(
+        "compat",
+        std::make_unique<fdata::DictionaryValue>(fdata::DictionaryValue::WithStr(kModuleName)));
     std::vector<fdata::DictionaryEntry> program_vec;
     program_vec.push_back(std::move(program_entry));
     fdata::Dictionary program({.entries = std::move(program_vec)});
@@ -896,22 +938,6 @@ TEST_F(DriverTest, Start_CheckCompatService) {
   ASSERT_EQ(size, 3ul);
   expected_metadata = {4, 5, 6};
   ASSERT_EQ(metadata, expected_metadata);
-
-  UnbindAndFreeDriver(std::move(driver));
-}
-
-TEST_F(DriverTest, Start_GetBackingMemory) {
-  auto driver = StartDriver({
-      .v1_driver_path = "/pkg/driver/v1_test.so",
-      .expected_driver_status = ZX_ERR_UNAVAILABLE,
-      .compat_file_response = ZX_ERR_UNAVAILABLE,
-  });
-
-  // Verify that v1_test.so has not added a child device.
-  EXPECT_TRUE(node().children().empty());
-
-  // Verify that v1_test.so has not set a context.
-  EXPECT_EQ(nullptr, driver->Context());
 
   UnbindAndFreeDriver(std::move(driver));
 }

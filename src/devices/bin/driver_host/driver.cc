@@ -4,21 +4,27 @@
 
 #include "src/devices/bin/driver_host/driver.h"
 
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
+#include <lib/async_patterns/cpp/dispatcher_bound.h>
 #include <lib/driver/component/cpp/internal/start_args.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/cpp/env.h>
 #include <lib/fdio/directory.h>
 #include <lib/fit/defer.h>
+#include <lib/sync/cpp/completion.h>
 #include <zircon/dlfcn.h>
 
 #include <fbl/auto_lock.h>
 
+#include "src/devices/bin/driver_host/loader.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/driver_symbols/symbols.h"
 
 namespace fdh = fuchsia_driver_host;
 namespace fio = fuchsia_io;
+namespace fldsvc = fuchsia_ldsvc;
 
 namespace fdf {
 using namespace fuchsia_driver_framework;
@@ -73,10 +79,184 @@ zx::result<fidl::ClientEnd<fio::File>> OpenDriverFile(const fdf::DriverStartArgs
   return zx::ok(std::move(client_end));
 }
 
+// Parses out the module map from the start arg's program dictionary.
+zx::result<ModuleMap> ParseModuleMap(const fuchsia_driver_framework::DriverStartArgs& start_args) {
+  const std::string& url = *start_args.url();
+  fidl::Arena arena;
+  fuchsia_data::wire::Dictionary wire_program = fidl::ToWire(arena, *start_args.program());
+
+  zx::result modules = fdf_internal::ProgramValueAsObjVector(wire_program, "modules");
+  if (!modules.is_ok()) {
+    return zx::ok(ModuleMap{});
+  }
+  ModuleMap module_map;
+  for (const auto& wire_module : *modules) {
+    zx::result<std::string> module_name = fdf_internal::ProgramValue(wire_module, "module_name");
+    if (module_name.is_error()) {
+      LOGF(ERROR, "Failed to start driver, missing 'module_name' argument: %s",
+           module_name.status_string());
+      return module_name.take_error();
+    }
+
+    // Special case for compat. The syntax could allow more more generic references to other
+    // fields, but we don't need that for now, so we hardcode support for one specific field.
+    if (*module_name == "#program.compat") {
+      module_name = fdf_internal::ProgramValue(wire_program, "compat");
+      if (module_name.is_error()) {
+        LOGF(ERROR, "Failed to start driver, missing 'compat' argument: %s",
+             module_name.status_string());
+        return module_name.take_error();
+      }
+    }
+
+    zx::result module_file = OpenDriverFile(start_args, *module_name);
+    if (module_file.is_error()) {
+      LOGF(ERROR, "Failed to open driver '%s' module file: %s", url.c_str(),
+           module_file.status_string());
+      return module_file.take_error();
+    }
+
+    // Call GetBackingMemory for the module file.
+    auto module_vmo = fidl::Call(*module_file)
+                          ->GetBackingMemory(fio::VmoFlags::kRead | fio::VmoFlags::kExecute |
+                                             fio::VmoFlags::kPrivateClone);
+    if (!module_vmo.is_ok()) {
+      LOGF(ERROR, "Failed to open driver '%s' module VMO: %s", url.c_str(),
+           module_vmo.error_value().FormatDescription().c_str());
+      zx_status_t status = module_vmo.error_value().is_domain_error()
+                               ? module_vmo.error_value().domain_error()
+                               : module_vmo.error_value().framework_error().status();
+      return zx::error(status);
+    }
+
+    // Lookup overrides specific to this module.
+    OverrideMap overrides;
+    zx::result wire_overrides =
+        fdf_internal::ProgramValueAsObjVector(wire_module, "loader_overrides");
+    if (wire_overrides.is_ok()) {
+      for (const auto& wire_override : wire_overrides.value()) {
+        zx::result<std::string> from = fdf_internal::ProgramValue(wire_override, "from");
+        if (from.is_error()) {
+          LOGF(ERROR, "Failed to start driver, missing 'from' argument: %s", from.status_string());
+          return from.take_error();
+        }
+
+        zx::result<std::string> to = fdf_internal::ProgramValue(wire_override, "to");
+        if (to.is_error()) {
+          LOGF(ERROR, "Failed to start driver, missing 'to' argument: %s", to.status_string());
+          return to.take_error();
+        }
+
+        zx::result override_file = OpenDriverFile(start_args, *to);
+        if (override_file.is_error()) {
+          LOGF(ERROR, "Failed to open driver '%s' override file: %s", url.c_str(),
+               module_file.status_string());
+          return module_file.take_error();
+        }
+        overrides.emplace(*from, std::move(*override_file));
+      }
+    }
+
+    // Lookup symbols specific to this module.
+    zx::result symbols = fdf_internal::ProgramValueAsVector(wire_module, "symbols");
+    if (symbols.is_error()) {
+      LOGF(ERROR, "Failed to start driver, missing 'symbols' argument: %s",
+           symbols.status_string());
+      return symbols.take_error();
+    }
+
+    module_map.emplace(*module_name, Module{
+                                         .module_vmo = std::move(module_vmo->vmo()),
+                                         .overrides = std::move(overrides),
+                                         .symbols = std::move(*symbols),
+                                     });
+  }
+  return zx::ok(std::move(module_map));
+}
+struct ModulesAndSymbols {
+  std::vector<void*> modules;
+  std::vector<Symbol> symbols;
+};
+
+zx::result<ModulesAndSymbols> LoadModulesAndSymbols(const std::string& url, ModuleMap modules) {
+  async::Loop loader_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  zx_status_t status = loader_loop.StartThread("loader-loop");
+  if (status != ZX_OK) {
+    LOGF(ERROR, "Failed to load driver '%s', could not start thread for loader loop: %s",
+         url.c_str(), zx::make_result(status).status_string());
+    return zx::error(status);
+  }
+
+  // For each module:
+  // * Replace loader service to load the modules
+  // * Load the module
+  // * Get symbols
+  // * Place the original loader service back
+  ModulesAndSymbols modules_and_symbols;
+  for (auto& [module_name, module_] : modules) {
+    void* module_library = nullptr;
+
+    if (!module_.overrides.empty()) {
+      auto [client_end, server_end] = fidl::Endpoints<fldsvc::Loader>::Create();
+      fidl::ClientEnd<fldsvc::Loader> original_loader(
+          zx::channel(dl_set_loader_service(client_end.channel().release())));
+      auto reset_loader = fit::defer([&original_loader]() {
+        zx::channel(dl_set_loader_service(original_loader.TakeChannel().release()));
+      });
+
+      // Start loader.
+      async_patterns::DispatcherBound<Loader> loader(loader_loop.dispatcher(), std::in_place,
+                                                     original_loader.borrow(),
+                                                     std::move(module_.overrides));
+      loader.AsyncCall(&Loader::Bind, std::move(server_end));
+      // Ensure the Bind call completes. It will assert if the loop is shutdown before the fidl Bind
+      // completes. Posting a task ensures all previously posted tasks are completed as tasks are
+      // executed in fifo order.
+      libsync::Completion completion;
+      async::PostTask(loader_loop.dispatcher(), [&completion]() { completion.Signal(); });
+      completion.Wait();
+      // Open module.
+      module_library = dlopen_vmo(module_.module_vmo.get(), RTLD_NOW);
+      if (module_library == nullptr) {
+        LOGF(ERROR, "Failed to load driver '%s', could not load module: %s", url.c_str(),
+             dlerror());
+        return zx::error(ZX_ERR_INTERNAL);
+      }
+    } else {
+      // Open module.
+      module_library = dlopen_vmo(module_.module_vmo.get(), RTLD_NOW);
+      if (module_library == nullptr) {
+        LOGF(ERROR, "Failed to load driver '%s', could not load module: %s", url.c_str(),
+             dlerror());
+        return zx::error(ZX_ERR_INTERNAL);
+      }
+    }
+
+    // Find symbols.
+    for (const auto& symbol_name : module_.symbols) {
+      void* symbol = dlsym(module_library, symbol_name.c_str());
+      if (symbol == nullptr) {
+        LOGF(ERROR, "Failed to load driver '%s', module symbol '%s' not found", url.c_str(),
+             symbol);
+        return zx::error(ZX_ERR_BAD_STATE);
+      }
+      modules_and_symbols.symbols.emplace_back(Symbol{
+          .module_name = module_name,
+          .symbol_name = symbol_name,
+          .address = symbol,
+      });
+    }
+
+    modules_and_symbols.modules.emplace_back(module_library);
+  }
+  return zx::ok(modules_and_symbols);
+}
+
 }  // namespace
 
 zx::result<fbl::RefPtr<Driver>> Driver::Load(std::string url, zx::vmo vmo,
-                                             std::string_view relative_binary_path) {
+                                             std::string_view relative_binary_path,
+                                             ModuleMap modules) {
   // Give the driver's VMO a name.
   std::string_view vmo_name = GetFilename(relative_binary_path);
   zx_status_t status = vmo.set_property(ZX_PROP_NAME, vmo_name.data(), vmo_name.size());
@@ -128,11 +308,22 @@ zx::result<fbl::RefPtr<Driver>> Driver::Load(std::string url, zx::vmo vmo,
     return zx::error(ZX_ERR_WRONG_TYPE);
   }
 
-  return zx::ok(fbl::MakeRefCounted<Driver>(std::move(url), library, registration));
+  zx::result result = LoadModulesAndSymbols(url, std::move(modules));
+  if (result.is_error()) {
+    return result.take_error();
+  }
+
+  return zx::ok(fbl::MakeRefCounted<Driver>(std::move(url), library, std::move(result->modules),
+                                            std::move(result->symbols), registration));
 }
 
-Driver::Driver(std::string url, void* library, DriverHooks hooks)
-    : url_(std::move(url)), library_(library), hooks_(hooks) {}
+Driver::Driver(std::string url, void* library, std::vector<void*> modules,
+               std::vector<Symbol> symbols, DriverHooks hooks)
+    : url_(std::move(url)),
+      library_(library),
+      modules_(std::move(modules)),
+      symbols_(std::move(symbols)),
+      hooks_(hooks) {}
 
 Driver::~Driver() {
   if (token_.has_value()) {
@@ -142,6 +333,9 @@ Driver::~Driver() {
   }
 
   dlclose(library_);
+  for (const auto& module_ : modules_) {
+    dlclose(module_);
+  }
 }
 
 void Driver::set_binding(fidl::ServerBindingRef<fdh::Driver> binding) {
@@ -158,8 +352,19 @@ void Driver::Stop(StopCompleter::Sync& completer) {
   }
 }
 
-void Driver::Start(fbl::RefPtr<Driver> self, fuchsia_driver_framework::DriverStartArgs start_args,
+void Driver::Start(fbl::RefPtr<Driver> self, fdf::DriverStartArgs start_args,
                    ::fdf::Dispatcher dispatcher, fit::callback<void(zx::result<>)> cb) {
+  if (!start_args.symbols().has_value()) {
+    start_args.symbols(std::vector<fdf::NodeSymbol>());
+  }
+  for (const Symbol& symbol : symbols_) {
+    start_args.symbols()->emplace_back(fdf::NodeSymbol{{
+        .name = symbol.symbol_name,
+        .address = reinterpret_cast<uint64_t>(symbol.address),
+        .module_name = symbol.module_name,
+    }});
+  }
+
   fbl::AutoLock al(&lock_);
   initial_dispatcher_ = std::move(dispatcher);
 
@@ -291,48 +496,57 @@ void LoadDriver(fuchsia_driver_framework::DriverStartArgs start_args,
     }
   }
 
+  // Pre-load all modules and overrides.
+  zx::result<ModuleMap> modules = ParseModuleMap(start_args);
+  if (modules.is_error()) {
+    callback(modules.take_error());
+    return;
+  }
+
   // Once we receive the VMO from the call to GetBackingMemory, we can load the driver into this
   // driver host. We move the storage and encoded for start_args into this callback to extend its
   // lifetime.
   fidl::SharedClient file(std::move(*driver_file), dispatcher,
                           std::make_unique<FileEventHandler>(url));
-  auto vmo_callback = [start_args = std::move(start_args), default_dispatcher_opts,
-                       default_dispatcher_scheduler_role, callback = std::move(callback),
-                       relative_binary_path = *binary, _ = file.Clone()](
-                          fidl::Result<fio::File::GetBackingMemory>& result) mutable {
-    const std::string& url = *start_args.url();
-    if (!result.is_ok()) {
-      LOGF(ERROR, "Failed to start driver '%s', could not get library VMO: %s", url.c_str(),
-           result.error_value().FormatDescription().c_str());
-      zx_status_t status = result.error_value().is_domain_error()
-                               ? result.error_value().domain_error()
-                               : result.error_value().framework_error().status();
-      callback(zx::error(status));
-      return;
-    }
-    auto driver = Driver::Load(url, std::move(result->vmo()), relative_binary_path);
-    if (driver.is_error()) {
-      LOGF(ERROR, "Failed to start driver '%s', could not Load driver: %s", url.c_str(),
-           driver.status_string());
-      callback(driver.take_error());
-      return;
-    }
+  auto vmo_callback =
+      [start_args = std::move(start_args), default_dispatcher_opts,
+       default_dispatcher_scheduler_role, callback = std::move(callback),
+       relative_binary_path = *binary, _ = file.Clone(),
+       modules = std::move(*modules)](fidl::Result<fio::File::GetBackingMemory>& result) mutable {
+        const std::string& url = *start_args.url();
+        if (!result.is_ok()) {
+          LOGF(ERROR, "Failed to start driver '%s', could not get library VMO: %s", url.c_str(),
+               result.error_value().FormatDescription().c_str());
+          zx_status_t status = result.error_value().is_domain_error()
+                                   ? result.error_value().domain_error()
+                                   : result.error_value().framework_error().status();
+          callback(zx::error(status));
+          return;
+        }
+        auto driver =
+            Driver::Load(url, std::move(result->vmo()), relative_binary_path, std::move(modules));
+        if (driver.is_error()) {
+          LOGF(ERROR, "Failed to start driver '%s', could not Load driver: %s", url.c_str(),
+               driver.status_string());
+          callback(driver.take_error());
+          return;
+        }
 
-    zx::result<fdf::Dispatcher> driver_dispatcher =
-        CreateDispatcher(*driver, default_dispatcher_opts, default_dispatcher_scheduler_role);
-    if (driver_dispatcher.is_error()) {
-      LOGF(ERROR, "Failed to start driver '%s', could not create dispatcher: %s", url.c_str(),
-           driver_dispatcher.status_string());
-      callback(driver_dispatcher.take_error());
-      return;
-    }
+        zx::result<fdf::Dispatcher> driver_dispatcher =
+            CreateDispatcher(*driver, default_dispatcher_opts, default_dispatcher_scheduler_role);
+        if (driver_dispatcher.is_error()) {
+          LOGF(ERROR, "Failed to start driver '%s', could not create dispatcher: %s", url.c_str(),
+               driver_dispatcher.status_string());
+          callback(driver_dispatcher.take_error());
+          return;
+        }
 
-    callback(zx::ok(LoadedDriver{
-        .driver = std::move(*driver),
-        .start_args = std::move(start_args),
-        .dispatcher = std::move(*driver_dispatcher),
-    }));
-  };
+        callback(zx::ok(LoadedDriver{
+            .driver = std::move(*driver),
+            .start_args = std::move(start_args),
+            .dispatcher = std::move(*driver_dispatcher),
+        }));
+      };
   file->GetBackingMemory(fio::VmoFlags::kRead | fio::VmoFlags::kExecute |
                          fio::VmoFlags::kPrivateClone)
       .ThenExactlyOnce(std::move(vmo_callback));

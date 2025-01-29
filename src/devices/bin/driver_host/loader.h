@@ -2,14 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_MISC_DRIVERS_COMPAT_LOADER_H_
-#define SRC_DEVICES_MISC_DRIVERS_COMPAT_LOADER_H_
+#ifndef SRC_DEVICES_BIN_DRIVER_HOST_LOADER_H_
+#define SRC_DEVICES_BIN_DRIVER_HOST_LOADER_H_
 
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <fidl/fuchsia.ldsvc/cpp/wire.h>
 
-namespace compat {
+#include <string>
+#include <unordered_map>
 
-constexpr char kLibDriverName[] = "libdriver.so";
+namespace driver_host {
 
 // Loader is a loader service that is used to override the DFv1 driver library
 // with an alternative implementation.
@@ -19,8 +21,11 @@ constexpr char kLibDriverName[] = "libdriver.so";
 // driver's VMO.
 class Loader : public fidl::WireServer<fuchsia_ldsvc::Loader> {
  public:
-  Loader(async_dispatcher_t* dispatcher, fidl::UnownedClientEnd<fuchsia_ldsvc::Loader> loader,
-         zx::vmo driver_vmo);
+  using OverrideMap = std::unordered_map<std::string, fidl::ClientEnd<fuchsia_io::File>>;
+
+  Loader(fidl::UnownedClientEnd<fuchsia_ldsvc::Loader> loader, OverrideMap overrides);
+
+  void Bind(fidl::ServerEnd<fuchsia_ldsvc::Loader> request);
 
  private:
   // fidl::WireServer<fuchsia_ldsvc::Loader>
@@ -31,9 +36,10 @@ class Loader : public fidl::WireServer<fuchsia_ldsvc::Loader> {
 
   async_dispatcher_t* dispatcher_;
   fidl::UnownedClientEnd<fuchsia_ldsvc::Loader> client_;
-  zx::vmo driver_vmo_;
+  OverrideMap overrides_;
+  fidl::ServerBindingGroup<fuchsia_ldsvc::Loader> bindings_;
 };
 
-}  // namespace compat
+}  // namespace driver_host
 
-#endif  // SRC_DEVICES_MISC_DRIVERS_COMPAT_LOADER_H_
+#endif  // SRC_DEVICES_BIN_DRIVER_HOST_LOADER_H_

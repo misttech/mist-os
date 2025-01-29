@@ -105,7 +105,7 @@ class Driver : public fdf::DriverBase {
   zx_status_t RunOnDispatcher(fit::callback<zx_status_t()> task);
 
   // Loads the driver using the provided `vmos`.
-  zx::result<> LoadDriver(zx::vmo loader_vmo, zx::vmo driver_vmo);
+  zx::result<> LoadDriver(std::string_view module_name, zx::vmo driver_vmo);
   // Starts the DFv1 driver.
   zx::result<> StartDriver();
 

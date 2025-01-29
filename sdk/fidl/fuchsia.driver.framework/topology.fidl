@@ -24,6 +24,9 @@ const MAX_PROPERTY_COUNT uint8 = 64;
 const MAX_NODE_NAME_LENGTH uint8 = 128;
 const MAX_SYMBOL_NAME_LENGTH uint8 = 128;
 
+@available(added=NEXT)
+const MAX_MODULE_NAME_LENGTH uint8 = 128;
+
 @available(added=26)
 const MAX_DEVICE_ADDRESS_ARRAY_LEN uint32 = 10;
 @available(added=26)
@@ -44,6 +47,11 @@ alias NodeProperties = vector<NodeProperty2>:MAX_PROPERTY_COUNT;
 /// Definition of a symbol provided by a driver for a node. A symbol is local to
 /// a driver host.
 type NodeSymbol = table {
+    /// Module name that provided the symbol.
+    /// Will not be provided when the symbol originates from the primary parent.
+    @available(added=NEXT)
+    3: module_name string:MAX_MODULE_NAME_LENGTH;
+
     /// Name of the symbol.
     1: name string:MAX_SYMBOL_NAME_LENGTH;
 

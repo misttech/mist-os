@@ -36,11 +36,15 @@ zx::result<T> SymbolValue(
   }
   static_assert(sizeof(T) == sizeof(zx_vaddr_t), "T must match zx_vaddr_t in size");
   for (auto& symbol : *symbols) {
-    if (name == symbol.name().value()) {
-      T value;
-      memcpy(&value, &symbol.address().value(), sizeof(zx_vaddr_t));
-      return zx::ok(value);
+    if (!symbol.name().has_value() || name != symbol.name().value()) {
+      continue;
     }
+    if (!symbol.address().has_value()) {
+      continue;
+    }
+    T value;
+    memcpy(&value, &symbol.address().value(), sizeof(zx_vaddr_t));
+    return zx::ok(value);
   }
   return zx::error(ZX_ERR_NOT_FOUND);
 }
@@ -49,6 +53,38 @@ template <typename T>
 T GetSymbol(const std::optional<std::vector<fuchsia_driver_framework::NodeSymbol>>& symbols,
             std::string_view name, T default_value = nullptr) {
   auto value = SymbolValue<T>(symbols, name);
+  return value.is_ok() ? *value : default_value;
+}
+
+template <typename T>
+zx::result<T> SymbolValue(
+    const std::optional<std::vector<fuchsia_driver_framework::NodeSymbol>>& symbols,
+    std::string_view module_name, std::string_view symbol_name) {
+  if (!symbols.has_value()) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+  static_assert(sizeof(T) == sizeof(zx_vaddr_t), "T must match zx_vaddr_t in size");
+  for (auto& symbol : *symbols) {
+    if (!symbol.module_name().has_value() || module_name != symbol.module_name().value()) {
+      continue;
+    }
+    if (!symbol.name().has_value() || symbol_name != symbol.name().value()) {
+      continue;
+    }
+    if (!symbol.address().has_value()) {
+      continue;
+    }
+    T value;
+    memcpy(&value, &symbol.address().value(), sizeof(zx_vaddr_t));
+    return zx::ok(value);
+  }
+  return zx::error(ZX_ERR_NOT_FOUND);
+}
+
+template <typename T>
+T GetSymbol(const std::optional<std::vector<fuchsia_driver_framework::NodeSymbol>>& symbols,
+            std::string_view module_name, std::string_view symbol_name, T default_value = nullptr) {
+  auto value = SymbolValue<T>(symbols, module_name, symbol_name);
   return value.is_ok() ? *value : default_value;
 }
 

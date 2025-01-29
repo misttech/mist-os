@@ -33,8 +33,6 @@ source_set("lib") {
     "device.h",
     "driver.cc",
     "driver.h",
-    "loader.cc",
-    "loader.h",
     "simple_binding.cc",
     "simple_binding.h",
   ]
@@ -170,7 +168,6 @@ cc_test_executable("unittests") {
   sources = [
     "device_test.cc",
     "driver_test.cc",
-    "loader_test.cc",
     "v1_test.h",
   ]
   deps = [
@@ -192,6 +189,7 @@ cc_test_executable("unittests") {
     "//sdk/lib/driver/compat/cpp:symbols",
     "//sdk/lib/driver/runtime/testing/cpp",
     "//sdk/lib/driver/testing/cpp",
+    "//src/devices/bin/driver_host:loader",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//src/testing/fidl:placeholders_cpp",

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/misc/drivers/compat/loader.h"
+#include "src/devices/bin/driver_host/loader.h"
 
 #include <fidl/fuchsia.ldsvc/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -73,15 +73,12 @@ TEST_F(LoaderTest, LoadObject) {
   fidl::BindServer(backing_loop.dispatcher(), std::move(endpoints->server), &backing_loader);
   ASSERT_EQ(ZX_OK, backing_loop.StartThread("loader-loop"));
 
-  // Create VMO of compat driver for compat loader.
-  zx::vmo loader_vmo;
-  status = zx::vmo::create(zx_system_get_page_size(), 0, &loader_vmo);
-  ASSERT_EQ(ZX_OK, status);
-  zx_koid_t loader_koid = GetKoid(loader_vmo);
-
-  // Create compat loader.
+  fidl::ClientEnd<fuchsia_io::File> file;
+  driver_host::Loader::OverrideMap overrides;
+  overrides.emplace("test_driver.so", std::move(file));
+  // Create loader.
   fidl::ClientEnd loader_client = std::move(endpoints->client);
-  compat::Loader loader(dispatcher(), loader_client.borrow(), std::move(loader_vmo));
+  driver_host::Loader loader(loader_client.borrow(), std::move(overrides));
 
   // Create loader client.
   endpoints = fidl::CreateEndpoints<fldsvc::Loader>();
@@ -99,23 +96,11 @@ TEST_F(LoaderTest, LoadObject) {
 
   ASSERT_TRUE(RunLoopUntilIdle());
 
-  // Test that loading the driver library fetches a VMO from the compat loader.
-  client->LoadObject(compat::kLibDriverName).Then([loader_koid](auto& result) {
+  // Test that loading the driver library fetches a VMO from the loader.
+  client->LoadObject("test_driver.so").Then([](auto& result) {
     ASSERT_EQ(ZX_OK, result.status());
     auto* response = result.Unwrap();
-    EXPECT_EQ(ZX_OK, response->rv);
-    zx_koid_t actual_koid = GetKoid(response->object);
-    EXPECT_EQ(loader_koid, actual_koid);
-  });
-
-  ASSERT_TRUE(RunLoopUntilIdle());
-
-  // Test that loading the driver library a second returns an error. We should
-  // only see a single request for the driver library by the dynamic loader.
-  client->LoadObject(compat::kLibDriverName).Then([](auto& result) {
-    ASSERT_EQ(ZX_OK, result.status());
-    auto* response = result.Unwrap();
-    EXPECT_EQ(ZX_ERR_NOT_FOUND, response->rv);
+    EXPECT_EQ(ZX_ERR_BAD_HANDLE, response->rv);
   });
 
   ASSERT_TRUE(RunLoopUntilIdle());
@@ -130,8 +115,8 @@ TEST_F(LoaderTest, DoneClosesConnection) {
   fidl::BindServer(backing_loop.dispatcher(), std::move(endpoints->server), &backing_loader);
   ASSERT_EQ(ZX_OK, backing_loop.StartThread("loader-loop"));
 
-  // Create compat loader.
-  compat::Loader loader(dispatcher(), endpoints->client.borrow(), zx::vmo());
+  // Create loader.
+  driver_host::Loader loader(endpoints->client.borrow(), {});
 
   // Create event handler.
   TestEventHandler handler;
@@ -158,9 +143,9 @@ TEST_F(LoaderTest, ConfigSucceeds) {
   fidl::BindServer(backing_loop.dispatcher(), std::move(endpoints->server), &backing_loader);
   ASSERT_EQ(ZX_OK, backing_loop.StartThread("loader-loop"));
 
-  // Create compat loader.
+  // Create loader.
   fidl::ClientEnd loader_client = std::move(endpoints->client);
-  compat::Loader loader(dispatcher(), loader_client.borrow(), zx::vmo());
+  driver_host::Loader loader(loader_client.borrow(), {});
 
   // Create loader client.
   endpoints = fidl::CreateEndpoints<fldsvc::Loader>();
@@ -186,8 +171,8 @@ TEST_F(LoaderTest, CloneSucceeds) {
   fidl::BindServer(backing_loop.dispatcher(), std::move(endpoints->server), &backing_loader);
   ASSERT_EQ(ZX_OK, backing_loop.StartThread("loader-loop"));
 
-  // Create compat loader.
-  compat::Loader loader(dispatcher(), endpoints->client.borrow(), zx::vmo());
+  // Create loader.
+  driver_host::Loader loader(endpoints->client.borrow(), {});
 
   // Create loader client.
   endpoints = fidl::CreateEndpoints<fldsvc::Loader>();
@@ -208,8 +193,8 @@ TEST_F(LoaderTest, CloneSucceeds) {
 TEST_F(LoaderTest, NoBackingLoader) {
   auto endpoints = fidl::CreateEndpoints<fldsvc::Loader>();
 
-  // Create compat loader.
-  compat::Loader loader(dispatcher(), endpoints->client.borrow(), zx::vmo());
+  // Create loader.
+  driver_host::Loader loader(endpoints->client.borrow(), {});
 
   // Close the server end of the backing loader channel.
   endpoints->server.reset();

@@ -5,6 +5,27 @@
     program: {
         runner: "driver",
         binary: "driver/compat.so",
+        modules: [
+            {
+                // Special module name that redirects to the module specified by the program.compat
+                // field.
+                module_name: "#program.compat",
+
+                // Redirect symbols from libdriver.so to the compat.so.
+                loader_overrides: [
+                    {
+                        from: "libdriver.so",
+                        to: "driver/compat.so",
+                    },
+                ],
+
+                // Symbols which have their addresses populated in DriverStartArgs's symbols field.
+                symbols: [
+                    "__zircon_driver_note__",
+                    "__zircon_driver_rec__",
+                ],
+            },
+        ],
     },
     capabilities: [
         { service: "fuchsia.driver.compat.Service" },
