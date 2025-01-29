@@ -107,6 +107,68 @@ _HOST_TARGETS = [
 _ALL_TARGETS = _FUCHSIA_TARGETS + _HOST_TARGETS + ["fallback"]
 
 
+def fix_clang_runtime_json(runtime_json: T.Any) -> None:
+    """Fix the content of runtime.json."""
+
+    # As a special case, on Fuchsia and for ASan builds, libclang_rt.asan.so depends
+    # on libc++abi.so even if the generated machine code does not (i.e. when
+    # -static-libstdc++ is also used). libc++abi.so depends on libunwind.so itself.
+    # Linking issues appear because these dependencies are not listed properly, so
+    # work-around this by patching runtime.json for Asan.
+
+    # This is also true for other sanitizer runtime shared libraries.
+
+    # For example, given an input entry like:
+    #
+    #  {
+    #    cflags = [ "-fsanitize=address" ],
+    #    ldflags = [ "-static-libstdc++" ],
+    #    runtime = [ <runtimes> ],
+    #    target = [ "x86_64-unknown-fuchsia", "x86_64-fuchsia" ],
+    #  },
+    #
+    # The <runtimes> value above must be replaced with the one from the
+    # corresponding non-static C++ runtime entry, that looks like:
+    #
+    #  {
+    #    cflags = [ "-fsanitize=address" ],
+    #    ldflags = [],
+    #    runtime = [ <runtimes> ],
+    #    target = [ "x86_64-unknown-fuchsia", "x86_64-fuchsia" ],
+    #  },
+    #
+
+    # This only applies to Fuchsia entries.
+    fuchsia_entries = [
+        entry for entry in runtime_json if "-fuchsia" in entry["target"][0]
+    ]
+
+    def match_static_libstdcxx(entry: T.Dict[str, T.Any]) -> bool:
+        return "-static-libstdc++" in entry["ldflags"]
+
+    def match_sanitizer(entry: T.Dict[str, T.Any]) -> bool:
+        return any(
+            cflags.startswith("-fsanitize=") for cflags in entry["cflags"]
+        )
+
+    static_entries = [e for e in fuchsia_entries if match_static_libstdcxx(e)]
+    shared_entries = [
+        e for e in fuchsia_entries if not match_static_libstdcxx(e)
+    ]
+
+    for static in static_entries:
+        # For sanitized modes, find the corresponding shared entry with the same cflags and
+        # target values, then update the "runtime" value.
+        if match_sanitizer(static):
+            for shared in shared_entries:
+                if (
+                    shared["cflags"] == static["cflags"]
+                    and shared["target"] == static["target"]
+                ):
+                    static["runtime"] = shared["runtime"]
+                    break
+
+
 def get_clang_target_variants(clang_target: str) -> T.Sequence[str]:
     """Get the variants to support for a given clang_target tuple."""
     if "fallback" in clang_target:
@@ -481,6 +543,7 @@ def main() -> int:
         values.setdefault("variants", {})
 
     # LINT.IfChange
+    fix_clang_runtime_json(runtime_json)
     result["runtimes"] = runtime_json
     # LINT.ThenChange(//build/toolchain/runtime/toolchain_runtime_deps.gni)
 
