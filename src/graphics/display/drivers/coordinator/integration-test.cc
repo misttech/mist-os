@@ -102,7 +102,7 @@ class TestClientState {
   display::ConfigStamp last_vsync_config_stamp() const;
   display::VsyncAckCookie last_vsync_ack_cookie() const;
 
-  bool HasOwnershipAndValidDisplay() const;
+  bool HasConnectedDisplay() const;
 
   // The first connected display's ID.
   //
@@ -148,9 +148,9 @@ display::VsyncAckCookie TestClientState::last_vsync_ack_cookie() const {
   return last_vsync_ack_cookie_;
 }
 
-bool TestClientState::HasOwnershipAndValidDisplay() const {
+bool TestClientState::HasConnectedDisplay() const {
   std::lock_guard lock(mutex_);
-  return has_ownership_ && !connected_displays_.empty();
+  return !connected_displays_.empty();
 }
 
 display::DisplayId TestClientState::display_id() const {
@@ -842,15 +842,6 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
 
 class IntegrationTest : public TestBase {
  public:
-  // Configures the VSync event delivery check in `IsClientActive()`.
-  enum class VsyncCheck : bool {
-    // The client may or may not be receiving VSync events.
-    kNoCheck = false,
-
-    // The client is receiving VSync events.
-    kVsyncEnabled = true,
-  };
-
   // Returns null if there is no client connected at `client_priority`.
   static ClientProxy* GetClientProxy(Controller& coordinator_controller,
                                      ClientPriority client_priority)
@@ -866,10 +857,8 @@ class IntegrationTest : public TestBase {
     return nullptr;
   }
 
-  // True iff `client_priority` is the display coordinator's active client
-  // and the client's Vsync delivery configuration matches `vsync_check`.
-  bool IsClientActive(ClientPriority client_priority,
-                      VsyncCheck vsync_check = VsyncCheck::kVsyncEnabled) {
+  // True iff `client_priority` has display ownership and receives vsyncs.
+  bool IsClientActive(ClientPriority client_priority) {
     Controller& coordinator_controller = *CoordinatorController();
     fbl::AutoLock<fbl::Mutex> controller_lock(coordinator_controller.mtx());
     ClientProxy* client_proxy = GetClientProxy(coordinator_controller, client_priority);
@@ -880,11 +869,9 @@ class IntegrationTest : public TestBase {
       return false;
     }
 
-    if (vsync_check == VsyncCheck::kVsyncEnabled) {
-      fbl::AutoLock<fbl::Mutex> client_proxy_lock(&client_proxy->mtx_);
-      if (!client_proxy->vsync_delivery_enabled_) {
-        return false;
-      }
+    fbl::AutoLock<fbl::Mutex> client_proxy_lock(&client_proxy->mtx_);
+    if (!client_proxy->vsync_delivery_enabled_) {
+      return false;
     }
 
     return true;
@@ -929,6 +916,12 @@ class IntegrationTest : public TestBase {
 
   void SendVsyncFromDisplayEngine() { FakeDisplayEngine().SendVsync(); }
 
+  // Sets up a Display Coordinator client connection.
+  //
+  // The returned client is guaranteed to have a connected display. However, the
+  // client is not guaranteed to be the Display Coordinator's active client.
+  //
+  // Crashes if any error occurs during the setup.
   std::unique_ptr<TestFidlClient> OpenCoordinatorTestFidlClient(
       const fidl::WireSyncClient<fuchsia_sysmem2::Allocator>* sysmem_client,
       const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& display_provider_client,
@@ -943,15 +936,13 @@ class IntegrationTest : public TestBase {
     ZX_ASSERT_MSG(open_coordinator_result.is_ok(), "Failed to open coordinator: %s",
                   open_coordinator_result.status_string());
 
-    bool poll_result = PollUntilOnLoop(
-        [&]() { return coordinator_client->state().HasOwnershipAndValidDisplay(); });
-    ZX_ASSERT_MSG(poll_result,
-                  "Failed to wait until client has ownership of the coordinator "
-                  "and has a valid display");
-
     zx::result<> enable_vsync_result = coordinator_client->EnableVsyncEventDelivery();
     ZX_ASSERT_MSG(enable_vsync_result.is_ok(), "Failed to enable Vsync delivery for client: %s",
                   enable_vsync_result.status_string());
+
+    bool poll_success =
+        PollUntilOnLoop([&]() { return coordinator_client->state().HasConnectedDisplay(); });
+    ZX_ASSERT_MSG(poll_success, "Loop shut down while waiting for display info");
 
     return coordinator_client;
   }
@@ -1012,17 +1003,14 @@ TEST_F(IntegrationTest, MustUseUniqueEventIDs) {
 }
 
 TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
-  TestFidlClient virtcon_client(&sysmem_client_);
-  ASSERT_OK(virtcon_client.OpenCoordinator(DisplayProviderClient(), ClientPriority::kVirtcon,
-                                           dispatcher()));
+  std::unique_ptr<TestFidlClient> virtcon_client = OpenCoordinatorTestFidlClient(
+      &sysmem_client_, DisplayProviderClient(), ClientPriority::kVirtcon);
+
   static constexpr display::ConfigStamp kVirtconInitialConfigStamp(1);
   {
-    // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
-    // display events instead.
-    const display::DisplayId virtcon_display_id(1);
-    ASSERT_OK(virtcon_client.SetDisplayLayers(virtcon_display_id, {}));
-    ASSERT_OK(virtcon_client.ApplyConfig(kVirtconInitialConfigStamp));
-    ASSERT_OK(virtcon_client.GetLastAppliedConfigStamp());
+    ASSERT_OK(virtcon_client->SetDisplayLayers(virtcon_client->state().display_id(), {}));
+    ASSERT_OK(virtcon_client->ApplyConfig(kVirtconInitialConfigStamp));
+    ASSERT_OK(virtcon_client->GetLastAppliedConfigStamp());
   }
 
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
@@ -1073,17 +1061,16 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
 }
 
 TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
-  TestFidlClient virtcon_client(&sysmem_client_);
-  ASSERT_OK(virtcon_client.OpenCoordinator(DisplayProviderClient(), ClientPriority::kVirtcon,
-                                           dispatcher()));
+  std::unique_ptr<TestFidlClient> virtcon_client = OpenCoordinatorTestFidlClient(
+      &sysmem_client_, DisplayProviderClient(), ClientPriority::kVirtcon);
+  ASSERT_OK(virtcon_client->SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode::kFallback));
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kVirtcon); }));
+
   static constexpr display::ConfigStamp kVirtconInitialConfigStamp(1);
   {
-    // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
-    // display events instead.
-    const display::DisplayId virtcon_display_id(1);
-    ASSERT_OK(virtcon_client.SetDisplayLayers(virtcon_display_id, {}));
-    ASSERT_OK(virtcon_client.ApplyConfig(kVirtconInitialConfigStamp));
-    ASSERT_OK(virtcon_client.GetLastAppliedConfigStamp());
+    ASSERT_OK(virtcon_client->SetDisplayLayers(virtcon_client->state().display_id(), {}));
+    ASSERT_OK(virtcon_client->ApplyConfig(kVirtconInitialConfigStamp));
+    ASSERT_OK(virtcon_client->GetLastAppliedConfigStamp());
   }
 
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
@@ -1447,16 +1434,14 @@ TEST_F(IntegrationTest, ImportImageWithNonExistentBufferCollectionId) {
 }
 
 TEST_F(IntegrationTest, ClampRgb) {
-  TestFidlClient virtcon_client(&sysmem_client_);
-  ASSERT_OK(virtcon_client.OpenCoordinator(DisplayProviderClient(), ClientPriority::kVirtcon,
-                                           dispatcher()));
+  std::unique_ptr<TestFidlClient> virtcon_client = OpenCoordinatorTestFidlClient(
+      &sysmem_client_, DisplayProviderClient(), ClientPriority::kVirtcon);
+  ASSERT_OK(virtcon_client->SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode::kFallback));
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kVirtcon); }));
+
   {
-    // set mode to Fallback
-    ASSERT_OK(virtcon_client.SetVirtconMode(fuchsia_hardware_display::VirtconMode::kFallback));
-    ASSERT_TRUE(PollUntilOnLoop(
-        [&]() { return IsClientActive(ClientPriority::kVirtcon, VsyncCheck::kNoCheck); }));
     // Clamp RGB to a minimum value
-    ASSERT_OK(virtcon_client.SetMinimumRgb(32));
+    ASSERT_OK(virtcon_client->SetMinimumRgb(32));
     ASSERT_TRUE(PollUntilOnLoop([&]() { return FakeDisplayEngine().GetClampRgbValue() == 32; }));
   }
 
@@ -1470,18 +1455,14 @@ TEST_F(IntegrationTest, ClampRgb) {
 
   // Close the primary client, wait for the virtcon client to become active again.
   primary_client.reset(nullptr);
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return IsClientActive(ClientPriority::kVirtcon, VsyncCheck::kNoCheck); }));
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kVirtcon); }));
 
   // Apply a config so the virtcon client's RGB clamp is set.
   static constexpr display::ConfigStamp kVirtconInitialConfigStamp(1);
   {
-    // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
-    // display events instead.
-    const display::DisplayId virtcon_display_id(1);
-    ASSERT_OK(virtcon_client.SetDisplayLayers(virtcon_display_id, {}));
-    ASSERT_OK(virtcon_client.ApplyConfig(kVirtconInitialConfigStamp));
-    ASSERT_OK(virtcon_client.GetLastAppliedConfigStamp());
+    ASSERT_OK(virtcon_client->SetDisplayLayers(virtcon_client->state().display_id(), {}));
+    ASSERT_OK(virtcon_client->ApplyConfig(kVirtconInitialConfigStamp));
+    ASSERT_OK(virtcon_client->GetLastAppliedConfigStamp());
   }
 
   SendVsyncFromDisplayEngine();
@@ -1497,20 +1478,17 @@ TEST_F(IntegrationTest, ClampRgb) {
 // TODO(https://fxbug.dev/340926351): De-flake and reenable this test.
 TEST_F(IntegrationTest, DISABLED_EmptyConfigIsNotApplied) {
   // Create and bind virtcon client.
-  TestFidlClient virtcon_client(&sysmem_client_);
-  ASSERT_OK(virtcon_client.OpenCoordinator(DisplayProviderClient(), ClientPriority::kVirtcon,
-                                           dispatcher()));
-  ASSERT_OK(virtcon_client.EnableVsyncEventDelivery());
-  ASSERT_OK(virtcon_client.SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode::kFallback));
+  std::unique_ptr<TestFidlClient> virtcon_client = OpenCoordinatorTestFidlClient(
+      &sysmem_client_, DisplayProviderClient(), ClientPriority::kVirtcon);
+  ASSERT_OK(virtcon_client->SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode::kFallback));
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kVirtcon); }));
+
   static constexpr display::ConfigStamp kVirtconInitialConfigStamp(1);
   {
-    // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
-    // display events instead.
-    const display::DisplayId virtcon_display_id(1);
-    ASSERT_OK(virtcon_client.SetDisplayLayers(virtcon_display_id, {}));
-    ASSERT_OK(virtcon_client.ApplyConfig(kVirtconInitialConfigStamp));
+    ASSERT_OK(virtcon_client->SetDisplayLayers(virtcon_client->state().display_id(), {}));
+    ASSERT_OK(virtcon_client->ApplyConfig(kVirtconInitialConfigStamp));
+    ASSERT_OK(virtcon_client->GetLastAppliedConfigStamp());
   }
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kVirtcon); }));
 
   // Create and bind primary client.
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
@@ -1520,12 +1498,12 @@ TEST_F(IntegrationTest, DISABLED_EmptyConfigIsNotApplied) {
   // The Virtcon client should receive VSync events while its config is active.
   // This is the case until the primary client applies a config.
   EXPECT_EQ(0u, primary_client->state().vsync_count());
-  ASSERT_EQ(0u, virtcon_client.state().vsync_count());
+  ASSERT_EQ(0u, virtcon_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client.state().vsync_count() >= 1; }));
-  EXPECT_EQ(kVirtconInitialConfigStamp, virtcon_client.state().last_vsync_config_stamp());
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(kVirtconInitialConfigStamp, virtcon_client->state().last_vsync_config_stamp());
   EXPECT_EQ(0u, primary_client->state().vsync_count());
-  EXPECT_EQ(1u, virtcon_client.state().vsync_count());
+  EXPECT_EQ(1u, virtcon_client->state().vsync_count());
 
   // Present an image from the primary client.
   static constexpr display::ConfigStamp kPrimaryInitialConfigStamp(2);
@@ -1534,12 +1512,12 @@ TEST_F(IntegrationTest, DISABLED_EmptyConfigIsNotApplied) {
 
   // Primary client should have become active after a config was set.
   ASSERT_EQ(0u, primary_client->state().vsync_count());
-  EXPECT_EQ(1u, virtcon_client.state().vsync_count());
+  EXPECT_EQ(1u, virtcon_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
   EXPECT_EQ(kPrimaryInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
-  EXPECT_EQ(1u, virtcon_client.state().vsync_count());
+  EXPECT_EQ(1u, virtcon_client->state().vsync_count());
 }
 
 // This tests the basic behavior of ApplyConfig() and OnVsync() events.
