@@ -133,7 +133,7 @@ impl FidlStorage {
     /// Construct a fidl storage from:
     /// * The iterable item, which will produce the keys for storage
     /// * A generator function that will produce a file proxy for each key. It will return the temp
-    ///     file path and final file path for storing the data for this key.
+    ///   file path and final file path for storing the data for this key.
     ///
     /// On success, returns the FidlStorage as well as the list of background synchronizing tasks.
     /// The background tasks can be awaited or detached.
