@@ -42,6 +42,18 @@ enum {
   DP_REPLY_I2C_DEFER = 8,
 };
 
+// The I2C address for writing the DDC segment.
+//
+// VESA Enhanced Display Data Channel (E-DDC) Standard version 1.3 revised
+// Dec 31 2020, Section 2.2.3 "DDC Addresses", page 17.
+constexpr uint8_t kDdcSegmentI2cTargetAddress = 0x30;
+
+// The I2C address for writing the DDC data offset/reading DDC data.
+//
+// VESA Enhanced Display Data Channel (E-DDC) Standard version 1.3 revised
+// Dec 31 2020, Section 2.2.3 "DDC Addresses", page 17.
+constexpr uint8_t kDdcDataI2cTargetAddress = 0x50;
+
 }  // namespace
 
 zx::result<DdiAuxChannel::ReplyInfo> DpAuxChannelImpl::DoTransaction(
@@ -193,44 +205,60 @@ zx_status_t DpAuxChannelImpl::DpAuxWrite(uint32_t dp_cmd, uint32_t addr, const u
   return ZX_OK;
 }
 
-static constexpr size_t kMaxTransferSize = 255;
-zx_status_t DpAuxChannelImpl::I2cImplGetMaxTransferSize(uint64_t* out_size) {
-  *out_size = kMaxTransferSize;
-  return ZX_OK;
-}
+zx::result<> DpAuxChannelImpl::ReadEdidBlock(int index,
+                                             std::span<uint8_t, edid::kBlockSize> edid_block) {
+  ZX_DEBUG_ASSERT(index >= 0);
+  ZX_DEBUG_ASSERT(index < edid::kMaxEdidBlockCount);
 
-zx_status_t DpAuxChannelImpl::I2cImplSetBitrate(uint32_t bitrate) {
-  // no-op for now
-  return ZX_OK;
-}
-
-zx_status_t DpAuxChannelImpl::I2cImplTransact(const i2c_impl_op_t* ops, size_t count) {
-  for (unsigned i = 0; i < count; i++) {
-    if (ops[i].data_size > kMaxTransferSize) {
-      return ZX_ERR_INVALID_ARGS;
-    }
-  }
-  if (!ops[count - 1].stop) {
-    return ZX_ERR_INVALID_ARGS;
-  }
+  // Size of an E-DDC segment.
+  //
+  // VESA Enhanced Display Data Channel (E-DDC) Standard version 1.3 revised
+  // Dec 31 2020, Section 2.2.5 "Segment Pointer", page 18.
+  static constexpr int kEddcSegmentSize = 256;
+  static_assert(kEddcSegmentSize == edid::kBlockSize * 2);
 
   fbl::AutoLock lock(&lock_);
-  for (unsigned i = 0; i < count; i++) {
-    uint8_t* buf = static_cast<uint8_t*>(ops[i].data_buffer);
-    uint8_t len = static_cast<uint8_t>(ops[i].data_size);
-    zx_status_t status = ops[i].is_read
-                             ? DpAuxRead(DP_REQUEST_I2C_READ, ops[i].address, buf, len)
-                             : DpAuxWrite(DP_REQUEST_I2C_WRITE, ops[i].address, buf, len);
-    if (status != ZX_OK) {
-      return status;
-    }
-  }
-  return ZX_OK;
-}
 
-ddk::I2cImplProtocolClient DpAuxChannelImpl::i2c() {
-  const i2c_impl_protocol_t i2c{.ops = &i2c_impl_protocol_ops_, .ctx = this};
-  return ddk::I2cImplProtocolClient(&i2c);
+  // `index / 2` is in [0, 127], so casting it to uint8_t won't overflow.
+  const uint8_t segment_pointer = static_cast<uint8_t>(index / 2);
+  zx::result<> write_segment_result =
+      zx::make_result(DpAuxWrite(DP_REQUEST_I2C_WRITE, kDdcSegmentI2cTargetAddress,
+                                 /*buf=*/&segment_pointer, /*size=*/1));
+
+  if (write_segment_result.status_value() == ZX_ERR_IO_REFUSED && segment_pointer == 0) {
+    // A display device that doesn't support E-DDC returns an I2C NACK response
+    // when the host writes to the segment pointer. Thus, we ignore the NACK
+    // and perform non-segmented DDC read operations if the segment pointer is
+    // zero.
+    FDF_LOG(INFO, "E-DDC segment pointer is not supported. Will perform DDC read.");
+  } else if (write_segment_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to write E-DDC segment pointer: %s",
+            write_segment_result.status_string());
+    return write_segment_result.take_error();
+  }
+
+  // Segment offset of the first byte in the current block.
+  //
+  // `segment_offset` is either 0 or 128, so casting it to uint8_t won't
+  // overflow.
+  const uint8_t segment_offset = static_cast<uint8_t>((index % 2) * edid::kBlockSize);
+  zx::result<> write_segment_offset_result =
+      zx::make_result(DpAuxWrite(DP_REQUEST_I2C_WRITE, kDdcDataI2cTargetAddress,
+                                 /*buf=*/&segment_offset, /*size=*/1));
+  if (write_segment_offset_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to write E-DDC segment offset: %s",
+            write_segment_offset_result.status_string());
+    return write_segment_offset_result.take_error();
+  }
+
+  zx::result<> read_edid_result = zx::make_result(DpAuxRead(
+      DP_REQUEST_I2C_READ, kDdcDataI2cTargetAddress, edid_block.data(), edid_block.size()));
+  if (read_edid_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to read E-DDC block #%d: %s", index, read_edid_result.status_string());
+    return read_edid_result.take_error();
+  }
+
+  return zx::ok();
 }
 
 bool DpAuxChannelImpl::DpcdRead(uint32_t addr, uint8_t* buf, size_t size) {

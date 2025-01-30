@@ -144,7 +144,8 @@ class DpDisplay final : public DisplayDevice {
   // The backlight brightness coefficient, in the range [min brightness, 1].
   double backlight_brightness_ = 1.0f;
 
-  const ddk::I2cImplProtocolClient i2c_;
+  // Valid iff successfully initialized via Query().
+  fbl::Vector<uint8_t> edid_bytes_;
 
   // Debug
   inspect::Node inspect_node_;

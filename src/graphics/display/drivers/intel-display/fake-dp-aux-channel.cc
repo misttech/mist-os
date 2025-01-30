@@ -4,6 +4,8 @@
 
 #include "src/graphics/display/drivers/intel-display/fake-dp-aux-channel.h"
 
+#include "src/graphics/display/lib/edid-values/edid-values.h"
+
 namespace intel_display {
 namespace testing {
 
@@ -22,6 +24,16 @@ void FakeDpAuxChannel::PopulateLinkRateTable(std::vector<uint16_t> values) {
     registers[offset] = static_cast<uint8_t>(values[i] & 0xFF);
     registers[offset + 1] = (values[i] >> 8);
   }
+}
+
+zx::result<> FakeDpAuxChannel::ReadEdidBlock(int index,
+                                             std::span<uint8_t, edid::kBlockSize> edid_block) {
+  if (index != 0) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+  // HP ZR30W has one EDID block.
+  std::ranges::copy(edid::kHpZr30wEdid, edid_block.begin());
+  return zx::ok();
 }
 
 bool FakeDpAuxChannel::DpcdRead(uint32_t addr, uint8_t* buf, size_t size) {

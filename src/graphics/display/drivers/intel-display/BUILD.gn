@@ -224,6 +224,7 @@ test("intel-display-tests") {
     "//src/devices/pci/testing:pci-protocol-fake",
     "//src/devices/testing/fake-resource",
     "//src/graphics/display/lib/api-types/cpp",
+    "//src/graphics/display/lib/edid-values",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",

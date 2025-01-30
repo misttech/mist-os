@@ -21,6 +21,7 @@
 
 #include "src/graphics/display/drivers/intel-display/ddi-physical-layer-manager.h"
 #include "src/graphics/display/drivers/intel-display/dpll.h"
+#include "src/graphics/display/drivers/intel-display/edid-reader.h"
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 #include "src/graphics/display/drivers/intel-display/intel-display.h"
 #include "src/graphics/display/drivers/intel-display/pch-engine.h"
@@ -1252,8 +1253,7 @@ DpDisplay::DpDisplay(Controller* controller, display::DisplayId id, DdiId ddi_id
     : DisplayDevice(controller, id, ddi_id, std::move(ddi_reference),
                     IsEdp(controller, ddi_id) ? Type::kEdp : Type::kDp),
       dp_aux_channel_(dp_aux_channel),
-      pch_engine_(type() == Type::kEdp ? pch_engine : nullptr),
-      i2c_(dp_aux_channel->i2c()) {
+      pch_engine_(type() == Type::kEdp ? pch_engine : nullptr) {
   ZX_ASSERT(dp_aux_channel);
   if (type() == Type::kEdp) {
     ZX_ASSERT(pch_engine_ != nullptr);
@@ -1330,6 +1330,14 @@ bool DpDisplay::Query() {
 
   ZX_ASSERT(!dp_link_rate_table_idx_.has_value());
   ZX_ASSERT(!capabilities_->supported_link_rates_mbps().empty());
+
+  zx::result<fbl::Vector<uint8_t>> read_extended_edid_result =
+      ReadExtendedEdid(fit::bind_member<&DpAuxChannel::ReadEdidBlock>(dp_aux_channel_));
+  if (read_extended_edid_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to read E-EDID: %s", read_extended_edid_result.status_string());
+    return false;
+  }
+  edid_bytes_ = std::move(read_extended_edid_result).value();
 
   uint8_t last = static_cast<uint8_t>(capabilities_->supported_link_rates_mbps().size() - 1);
   FDF_LOG(INFO, "Found %s monitor (max link rate: %d MHz, lane count: %d)",
@@ -1876,16 +1884,13 @@ int32_t DpDisplay::LoadPixelRateForTranscoderKhz(TranscoderId transcoder_id) {
 }
 
 raw_display_info_t DpDisplay::CreateRawDisplayInfo() {
-  i2c_impl_protocol_t i2c_protocol;
-  i2c_.GetProto(&i2c_protocol);
-
   return raw_display_info_t{
       .display_id = display::ToBanjoDisplayId(id()),
       .preferred_modes_list = nullptr,
       .preferred_modes_count = 0,
-      .edid_bytes_list = nullptr,
-      .edid_bytes_count = 0,
-      .eddc_client = i2c_protocol,
+      .edid_bytes_list = edid_bytes_.data(),
+      .edid_bytes_count = edid_bytes_.size(),
+      .eddc_client = {.ops = nullptr, .ctx = nullptr},
       .pixel_formats_list = kBanjoSupportedPixelFormats.data(),
       .pixel_formats_count = kBanjoSupportedPixelFormats.size(),
   };

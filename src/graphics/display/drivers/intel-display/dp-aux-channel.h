@@ -6,8 +6,12 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_DP_AUX_CHANNEL_H_
 
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
+#include <lib/zx/result.h>
 
 #include <cstdint>
+#include <span>
+
+#include "src/graphics/display/lib/edid/edid.h"
 
 namespace intel_display {
 
@@ -17,8 +21,9 @@ class DpAuxChannel {
  public:
   virtual ~DpAuxChannel() = default;
 
-  // Interface for DDC I2C transactions performed over the DP AUX channel.
-  virtual ddk::I2cImplProtocolClient i2c() = 0;
+  // Reads an E-EDID block over the DP AUX channel.
+  virtual zx::result<> ReadEdidBlock(int index,
+                                     std::span<uint8_t, edid::kBlockSize> edid_block) = 0;
 
   // Reads from DisplayPort Configuration Data (DPCD) registers over the DP AUX
   // channel.

@@ -22,17 +22,13 @@
 
 namespace intel_display {
 
-class DpAuxChannelImpl : public DpAuxChannel, public ddk::I2cImplProtocol<DpAuxChannelImpl> {
+class DpAuxChannelImpl final : public DpAuxChannel {
  public:
   // `mmio_buffer` must outlive this instance.
   DpAuxChannelImpl(fdf::MmioBuffer* mmio_buffer, DdiId ddi_id, uint16_t device_id);
 
-  zx_status_t I2cImplGetMaxTransferSize(uint64_t* out_size);
-  zx_status_t I2cImplSetBitrate(uint32_t bitrate);
-  zx_status_t I2cImplTransact(const i2c_impl_op_t* ops, size_t count);
-
   // `DpAuxChannel`:
-  ddk::I2cImplProtocolClient i2c() final;
+  zx::result<> ReadEdidBlock(int index, std::span<uint8_t, edid::kBlockSize> edid_block) override;
   bool DpcdRead(uint32_t addr, uint8_t* buf, size_t size) final;
   bool DpcdWrite(uint32_t addr, const uint8_t* buf, size_t size) final;
 
