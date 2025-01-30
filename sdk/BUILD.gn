@@ -711,8 +711,11 @@ sdk_molecule("core_dart_library") {
 
 sdk_molecule("core_experimental_python_e2e_tests") {
   category = "partner"
-  deps =
-      [ "//src/tests/end_to_end/rtc:rtc_conformance_test_sdk($host_toolchain)" ]
+  if (host_os == "linux") {
+    deps = [
+      "//src/tests/end_to_end/rtc:rtc_conformance_test_sdk($host_toolchain)",
+    ]
+  }
 }
 
 # C/C++ code that must be provided as prebuilt libraries for each supported API
