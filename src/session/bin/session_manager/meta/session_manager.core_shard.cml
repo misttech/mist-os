@@ -315,7 +315,7 @@
         },
         {
             protocol: [
-                "fuchsia.fxfs.CryptManagement",
+                "fuchsia.fshost.StarnixVolumeProvider",
                 "fuchsia.power.system.ActivityGovernor",
                 "fuchsia.power.system.BootControl",
             ],

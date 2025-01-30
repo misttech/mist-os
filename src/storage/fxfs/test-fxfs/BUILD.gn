@@ -10,17 +10,21 @@ rustc_binary("bin") {
   output_name = "test-fxfs"
   with_unit_tests = true
   deps = [
+    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/storage/fxfs:lib",
+    "//src/storage/fxfs/crypto",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/fxfs/platform",
     "//src/storage/lib/storage_device",
     "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
   ]
   sources = [ "src/main.rs" ]
 }

@@ -24,6 +24,9 @@
             rights: [ "rw*" ],
             path: "/data",
         },
+        {
+            protocol: [ "fuchsia.fshost.StarnixVolumeProvider" ],
+        },
     ],
     expose: [
         {
@@ -31,8 +34,8 @@
             from: "self",
         },
         {
-            protocol: "fuchsia.fxfs.CryptManagement",
-            from: "#fxfs-crypt",
+            protocol: "fuchsia.fshost.StarnixVolumeProvider",
+            from: "self",
         },
     ],
 }

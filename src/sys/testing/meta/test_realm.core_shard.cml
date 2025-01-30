@@ -24,12 +24,6 @@
             to: "#testing",
         },
         {
-            protocol: "fuchsia.fxfs.CryptManagement",
-            from: "parent",
-            to: "#testing",
-            availability: "optional",
-        },
-        {
             protocol: [
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.boot.WriteOnlyLog",

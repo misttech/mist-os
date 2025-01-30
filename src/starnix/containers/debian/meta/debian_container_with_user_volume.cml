@@ -1,4 +1,4 @@
-// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
@@ -15,7 +15,14 @@
             "/sys/fs/bpf:bpf::nosuid,nodev,noexec,relatime",
             "/tmp:tmpfs",
 
-            // LINT.ThenChange(../debian_container_with_user_volume.cml, ../debian_container_profiled.cml)
+            // LINT.ThenChange(../debian_container.cml, ../debian_container_profiled.cml)
+            "/data:remotevol::nosuid,nodev,relatime",
         ],
     },
+    use: [
+        {
+            protocol: "fuchsia.fshost.StarnixVolumeProvider",
+            from: "parent",
+        },
+    ],
 }

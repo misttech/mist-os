@@ -5,7 +5,7 @@
     include: [ "//src/starnix/tests/starnix_test_common.shard.cml" ],
     offer: [
         {
-            protocol: [ "fuchsia.fxfs.CryptManagement" ],
+            protocol: [ "fuchsia.fshost.StarnixVolumeProvider" ],
             from: "parent",
             to: [ "#container" ],
             availability: "optional",

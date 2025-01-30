@@ -184,7 +184,7 @@
         },
         {
             protocol: [
-                "fuchsia.fxfs.CryptManagement",
+                "fuchsia.fshost.StarnixVolumeProvider",
                 "fuchsia.pkg.PackageCache",
             ],
             from: "parent",

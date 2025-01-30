@@ -257,7 +257,7 @@ impl MountedVolumesGuard<'_> {
 
     // Unmounts the volume identified by `store_id`.  The caller should take locks to avoid races if
     // necessary.
-    async fn unmount(&mut self, store_id: u64) -> Result<(), Error> {
+    pub async fn unmount(&mut self, store_id: u64) -> Result<(), Error> {
         let MountedVolume { name, volume, .. } =
             self.mounted_volumes.remove(&store_id).ok_or(FxfsError::NotFound)?;
         if let Some(callback) = self.volumes_directory.on_volume_added.get() {
@@ -441,7 +441,7 @@ impl VolumesDirectory {
     }
 
     // This serves as an exclusive lock for operations that manipulate the set of mounted volumes.
-    async fn lock<'a>(self: &'a Arc<Self>) -> MountedVolumesGuard<'a> {
+    pub async fn lock<'a>(self: &'a Arc<Self>) -> MountedVolumesGuard<'a> {
         MountedVolumesGuard {
             volumes_directory: self.clone(),
             mounted_volumes: self.mounted_volumes.lock().await,

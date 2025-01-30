@@ -198,7 +198,7 @@
         },
         {
             protocol: [
-                "fuchsia.fxfs.CryptManagement",
+                "fuchsia.fshost.StarnixVolumeProvider",
                 "fuchsia.virtualconsole.SessionManager",
             ],
             from: "#bootstrap",

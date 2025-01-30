@@ -21,13 +21,11 @@ use crate::vfs::{
 };
 
 use fidl::HandleBased;
-use fidl_fuchsia_fxfs::CryptManagementMarker;
 use fuchsia_inspect_contrib::profile_duration;
 use hkdf::Hkdf;
 use linux_uapi::{FSCRYPT_MODE_AES_256_CTS, FSCRYPT_MODE_AES_256_XTS};
 use starnix_logging::{
-    impossible_error, log_error, log_info, log_warn, trace_duration, track_stub,
-    CATEGORY_STARNIX_MM,
+    impossible_error, log_error, log_info, trace_duration, track_stub, CATEGORY_STARNIX_MM,
 };
 use starnix_sync::{
     BeforeFsNodeAppend, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, Unlocked,
@@ -54,7 +52,6 @@ use starnix_uapi::{
     FS_IOC_SET_ENCRYPTION_POLICY, FS_VERITY_FL, SEEK_CUR, SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET,
     TCGETS,
 };
-use std::collections::hash_map::Entry;
 use std::collections::HashSet;
 use std::fmt;
 use std::ops::Deref;
@@ -142,7 +139,7 @@ fn add_equivalent_fd_events(mut events: FdEvents) -> FdEvents {
 }
 
 /// Uses an HKDF to derive an fscrypt wrapping key and key identifier from a raw user key.
-fn derive_wrapping_key(
+pub fn derive_wrapping_key(
     raw_key: &[u8],
 ) -> ([u8; FSCRYPT_KEY_IDENTIFIER_SIZE as usize], [u8; AES256_KEY_SIZE]) {
     let hk = Hkdf::<sha2::Sha256>::new(None, raw_key);
@@ -1007,38 +1004,11 @@ pub fn default_ioctl(
             let path_from_root = file.name.path_from_root(Some(&root)).into_path();
             let user_id = current_task.creds().uid;
             let (key_identifier, wrapping_key) = derive_wrapping_key(key.as_bytes());
-
-            match current_task
-                .kernel()
-                .encryption_keys
-                .write()
-                .entry(EncryptionKeyId::from(key_identifier))
-            {
-                Entry::Occupied(mut e) => {
-                    e.get_mut().push(user_id);
-                }
-                Entry::Vacant(e) => {
-                    e.insert(vec![user_id]);
-                    // Connect to the fuchsia.fxfs.CryptManagement service for adding keys.
-                    let crypt_management_proxy = current_task
-                        .kernel()
-                        .connect_to_protocol_at_container_svc::<CryptManagementMarker>()
-                        .map_err(|_| errno!(ENOENT))?
-                        .into_sync_proxy();
-
-                    crypt_management_proxy
-                        .add_wrapping_key(
-                            &key_identifier,
-                            wrapping_key.as_bytes(),
-                            zx::MonotonicInstant::INFINITE,
-                        )
-                        .map_err(|e| errno!(EINVAL, e))?
-                        .map_err(|e| {
-                            log_warn!("add wrapping key failed with {:?}", e);
-                            errno!(EIO, zx::Status::from_raw(e))
-                        })?;
-                }
-            }
+            current_task.kernel().crypt_service.add_wrapping_key(
+                key_identifier,
+                wrapping_key.to_vec(),
+                user_id,
+            )?;
             log_info!(
                 "Adding encryption key {:?} for {:?} for user {:?}",
                 &key_identifier,
@@ -1093,11 +1063,10 @@ pub fn default_ioctl(
                 return error!(EACCES);
             }
 
-            if let Some(users) = &current_task
+            if let Some(users) = current_task
                 .kernel()
-                .encryption_keys
-                .read()
-                .get(&EncryptionKeyId::from(policy.master_key_identifier))
+                .crypt_service
+                .get_users_for_key(EncryptionKeyId::from(policy.master_key_identifier))
             {
                 if !users.contains(&user_id) {
                     return error!(ENOKEY);
@@ -1139,39 +1108,7 @@ pub fn default_ioctl(
             }
             let user_id = current_task.creds().uid;
             let identifier = unsafe { fscrypt_remove_key_arg.key_spec.u.identifier.value };
-            match current_task
-                .kernel()
-                .encryption_keys
-                .write()
-                .entry(EncryptionKeyId::from(identifier))
-            {
-                Entry::Occupied(mut e) => {
-                    let user_ids = e.get_mut();
-                    if !user_ids.contains(&user_id) {
-                        return error!(ENOKEY);
-                    } else {
-                        let index = user_ids.iter().position(|x: &u32| *x == user_id).unwrap();
-                        user_ids.remove(index);
-                        if user_ids.is_empty() {
-                            // Connect to the fuchsia.fxfs.CryptManagement service for forgetting
-                            // keys.
-                            let crypt_management_proxy = current_task
-                                .kernel()
-                                .connect_to_protocol_at_container_svc::<CryptManagementMarker>()
-                                .map_err(|_| errno!(ENOENT))?
-                                .into_sync_proxy();
-                            crypt_management_proxy
-                                .forget_wrapping_key(&identifier, zx::MonotonicInstant::INFINITE)
-                                .map_err(|e| errno!(EINVAL, e))?
-                                .map_err(|e| errno!(EIO, zx::Status::from_raw(e)))?;
-                            e.remove();
-                        }
-                    }
-                }
-                Entry::Vacant(_) => {
-                    return error!(ENOKEY);
-                }
-            }
+            current_task.kernel().crypt_service.forget_wrapping_key(identifier, user_id)?;
             log_info!("Removing encryption key {:?} for user {:?}", &identifier, user_id,);
             Ok(SUCCESS)
         }

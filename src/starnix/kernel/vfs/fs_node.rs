@@ -1296,9 +1296,11 @@ impl FsNode {
     {
         let node_info = self.fetch_and_refresh_info(locked, current_task)?;
         if let Some(wrapping_key_id) = node_info.wrapping_key_id {
-            let encryption_keys = current_task.kernel().encryption_keys.read();
-            // Fail if the user tries to create a child in a locked encrypted directory.
-            if !encryption_keys.contains_key(&EncryptionKeyId::from(wrapping_key_id)) {
+            if !current_task
+                .kernel()
+                .crypt_service
+                .contains_key(EncryptionKeyId::from(wrapping_key_id))
+            {
                 return error!(ENOKEY);
             }
         }

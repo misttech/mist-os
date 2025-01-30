@@ -34,6 +34,10 @@ fuchsia_component("debian_container") {
   manifest = "meta/debian_container.cml"
 }
 
+fuchsia_component("debian_container_with_user_volume") {
+  manifest = "meta/debian_container_with_user_volume.cml"
+}
+
 fuchsia_component("debian_container_profiled") {
   manifest = "meta/debian_container_profiled.cml"
 }
@@ -44,5 +48,6 @@ fuchsia_package("debian_package") {
     ":container_resources",
     ":debian_container",
     ":debian_container_profiled",
+    ":debian_container_with_user_volume",
   ]
 }

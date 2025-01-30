@@ -21,6 +21,7 @@ use crate::task::{
     PsiProvider, StopState, Syslog, ThreadGroup, UtsNamespace, UtsNamespaceHandle,
 };
 use crate::vdso::vdso_loader::Vdso;
+use crate::vfs::crypt_service::CryptService;
 use crate::vfs::socket::{
     GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
     SocketAddress,
@@ -53,7 +54,7 @@ use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::from_status_like_fdio;
 use starnix_uapi::open_flags::OpenFlags;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU8, Ordering};
 use std::sync::{Arc, OnceLock, Weak};
@@ -111,6 +112,12 @@ pub struct EncryptionKeyId([u8; FSCRYPT_KEY_IDENTIFIER_SIZE as usize]);
 impl From<[u8; FSCRYPT_KEY_IDENTIFIER_SIZE as usize]> for EncryptionKeyId {
     fn from(buf: [u8; FSCRYPT_KEY_IDENTIFIER_SIZE as usize]) -> Self {
         Self(buf)
+    }
+}
+
+impl EncryptionKeyId {
+    pub fn as_raw(&self) -> [u8; FSCRYPT_KEY_IDENTIFIER_SIZE as usize] {
+        self.0.clone()
     }
 }
 
@@ -303,11 +310,10 @@ pub struct Kernel {
     /// Handler for crashing Linux processes.
     pub crash_reporter: CrashReporter,
 
-    /// Maps wrapping key ids to lists of users who have added those keys. If a user
-    /// adds a key and the key's associated users list is empty, Starnix will add that key to
-    /// CryptManagement. Similarly, if a user removes a key and that user was the last user in
-    /// that key's users list, Starnix will remove that wrapping key from CryptManagement.
-    pub encryption_keys: RwLock<HashMap<EncryptionKeyId, Vec<u32>>>,
+    /// Implements the fuchsia.fxfs.Crypt protocol. Maintains an internal structure that maps each
+    /// encryption key id to both the set of users that have added that key and the key-derived
+    /// cipher.
+    pub crypt_service: Arc<CryptService>,
 
     /// Vector of functions to be run when procfs is constructed. This is to allow
     /// modules to expose directories into /proc/device-tree.
@@ -447,7 +453,7 @@ impl Kernel {
             hrtimer_manager,
             memory_attribution_manager: MemoryAttributionManager::new(kernel.clone()),
             crash_reporter,
-            encryption_keys: RwLock::new(HashMap::new()),
+            crypt_service: Arc::new(CryptService::new()),
             procfs_device_tree_setup,
             shutting_down: AtomicBool::new(false),
             container_control_handle: Mutex::new(None),

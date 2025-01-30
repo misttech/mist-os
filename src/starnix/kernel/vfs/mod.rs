@@ -29,6 +29,7 @@ mod xattr;
 
 pub mod aio;
 pub mod buffers;
+pub mod crypt_service;
 pub mod directory_file;
 pub mod eventfd;
 pub mod file_server;

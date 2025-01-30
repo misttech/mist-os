@@ -532,9 +532,11 @@ impl FsNodeOps for RemoteNode {
             let node_info = node.fetch_and_refresh_info(locked, current_task)?;
             if node_info.mode.is_dir() {
                 if let Some(wrapping_key_id) = node_info.wrapping_key_id {
-                    let encryption_keys = current_task.kernel().encryption_keys.read();
                     // Locked encrypted directories cannot be opened with write access.
-                    if !encryption_keys.contains_key(&EncryptionKeyId::from(wrapping_key_id))
+                    if !current_task
+                        .kernel()
+                        .crypt_service
+                        .contains_key(EncryptionKeyId::from(wrapping_key_id))
                         && flags.can_write()
                     {
                         return error!(ENOKEY);
