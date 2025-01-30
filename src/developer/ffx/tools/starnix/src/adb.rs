@@ -9,8 +9,8 @@ use emulator_instance::EMU_INSTANCE_ROOT_DIR;
 use ffx_config::EnvironmentContext;
 use ffx_emulator_config::ShowDetail;
 use ffx_emulator_engines::EngineBuilder;
-use fho::{return_bug, FfxContext, Result};
-use fidl_fuchsia_developer_ffx::TargetInfo;
+use fho::{bug, return_bug, FfxContext, Result};
+use fidl_fuchsia_developer_ffx::TargetAddrInfo;
 use futures::io::AsyncReadExt;
 use futures::stream::StreamExt;
 use futures::FutureExt;
@@ -23,8 +23,10 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use target_connector::Connector;
-use target_holders::{RemoteControlProxyHolder, TargetInfoHolder};
+use target_holders::{RemoteControlProxyHolder, TargetProxyHolder};
+use timeout::timeout;
 use tokio::net::{TcpListener, TcpStream};
 use tracing::info;
 use {fidl_fuchsia_starnix_container as fstarcontainer, fuchsia_async as fasync};
@@ -60,11 +62,11 @@ impl StarnixAdbCommand {
         &self,
         context: &EnvironmentContext,
         rcs_connector: &Connector<RemoteControlProxyHolder>,
-        target_info: fho::Result<TargetInfoHolder>,
+        target_proxy: TargetProxyHolder,
     ) -> Result<()> {
         match &self.subcommand {
             AdbSubcommand::Connect(args) => {
-                args.run_connect(context, &self.adb, &*(target_info?)).await
+                args.run_connect(context, &self.adb, &target_proxy).await
             }
             AdbSubcommand::Proxy(args) => args.run_proxy(&self.adb, rcs_connector).await,
         }
@@ -81,13 +83,15 @@ impl AdbConnectArgs {
         &self,
         context: &EnvironmentContext,
         adb: &str,
-        target_info: &TargetInfo,
+        target_proxy: &TargetProxyHolder,
     ) -> Result<()> {
-        let Some(address) = target_info.ssh_address.as_ref() else {
-            return_bug!("Target does not appear to have an ssh address.");
-        };
+        let addr_info: TargetAddrInfo =
+            timeout(Duration::from_secs(1), target_proxy.get_ssh_address())
+                .await
+                .user_message("Timed out getting target ssh address")?
+                .user_message("Failed to get target ssh address")?;
 
-        let ssh_address: TargetAddr = address.into();
+        let ssh_address: TargetAddr = addr_info.into();
         let ssh_address: SocketAddr = ssh_address.into();
 
         let adb_port = if ssh_address.port() == 22 || ssh_address.port() == 8022 {
@@ -98,7 +102,11 @@ impl AdbConnectArgs {
             // If the device doesn't have a standard SSH port, it's likely an emulator
             // instance with user networking. Look up the instance and get its host port mapping
             // to find the port we need.
-            let nodename = target_info.nodename.as_ref().bug_context("getting target name")?;
+            let target_identity = target_proxy.identity().await.map_err(|e| bug!(e))?;
+            let nodename = target_identity
+                .nodename
+                .ok_or(bug!("could not read nodename from device"))
+                .bug_context("getting target name")?;
             get_emu_host_adb_port(context, &nodename)
                 .await
                 .bug_context("Finding host adb port for user networking emulator")?
