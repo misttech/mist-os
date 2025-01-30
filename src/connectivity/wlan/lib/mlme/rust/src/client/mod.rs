@@ -859,12 +859,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             + mem::size_of::<mac::QosControl>()
             + mem::size_of::<mac::LlcHdr>();
         let header_room = MAX_HEADER_SIZE + 100;
-        let arena = Arena::new().map_err(|s| {
-            if !async_id_provided {
-                wtrace::async_end_wlansoftmac_tx(async_id, s);
-            }
-            Error::Status(format!("unable to create arena"), s)
-        })?;
+        let arena = Arena::new();
         let mut buffer = arena.insert_default_slice(header_room + payload.len());
 
         // TODO(https://fxbug.dev/353987692): Remove this clone once we migrate to network device where
@@ -1240,7 +1235,7 @@ impl<'a, D: DeviceOps> BlockAckTx for BoundClient<'a, D> {
     ///
     /// BlockAck frames are described by 802.11-2016, section 9.6.5.2, 9.6.5.3, and 9.6.5.4.
     fn send_block_ack_frame(&mut self, n: usize, body: &[u8]) -> Result<(), Error> {
-        let arena = Arena::new().expect("unable to create arena");
+        let arena = Arena::new();
         let buffer = arena.insert_default_slice::<u8>(n);
         let mut buffer = arena.make_static(buffer);
         let mut writer = BufferWriter::new(&mut buffer[..]);

@@ -301,22 +301,22 @@ mod test {
     #[test]
     #[should_panic]
     fn bad_data_pointer() {
-        let arena = Arena::new().unwrap();
-        let other_arena = Arena::new().unwrap();
+        let arena = Arena::new();
+        let other_arena = Arena::new();
         Message::new(&arena, Some(other_arena.insert(1)), None);
     }
 
     #[test]
     #[should_panic]
     fn bad_handle_pointer() {
-        let arena = Arena::new().unwrap();
-        let other_arena = Arena::new().unwrap();
+        let arena = Arena::new();
+        let other_arena = Arena::new();
         Message::<()>::new(&arena, None, Some(other_arena.insert_boxed_slice(Box::new([]))));
     }
 
     #[test]
     fn round_trip_data() {
-        let arena = Arena::new().unwrap();
+        let arena = Arena::new();
         let data = arena.insert(1);
         let message = Message::new(&arena, Some(data), None);
         let mut arena = None;
@@ -326,7 +326,7 @@ mod test {
 
     #[test]
     fn round_trip_handles() {
-        let arena = Arena::new().unwrap();
+        let arena = Arena::new();
         let zircon_handle = MixedHandle::from_zircon_handle(zx::Port::create().into_handle());
         let (driver_handle1, driver_handle2) = Channel::create().unwrap();
         driver_handle2
@@ -354,7 +354,7 @@ mod test {
 
     #[test]
     fn map_data() {
-        let arena = Arena::new().unwrap();
+        let arena = Arena::new();
         let data = arena.insert(1);
         let message = Message::new(&arena, Some(data), None);
         let message = message.map_data(|arena, i| arena.insert(*i + 1));

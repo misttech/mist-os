@@ -272,7 +272,7 @@ impl {{ $method.Responder }} {
             body: {{ $method.Response.EncodeExpr }},
         };
         fidl::encoding::with_tls_encoded::<fidl::encoding::TransactionMessageType<{{ $method.Response.FidlType "fidl::encoding::DefaultFuchsiaResourceDialect" }}>, fidl::encoding::DefaultFuchsiaResourceDialect, ()>(msg, |body, _handles| {
-            server_handle.write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body)).unwrap();
+            server_handle.write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body)).unwrap();
             Ok(())
         })
     }

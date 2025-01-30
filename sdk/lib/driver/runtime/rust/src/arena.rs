@@ -29,18 +29,14 @@ unsafe impl Sync for Arena {}
 
 impl Arena {
     /// Allocates a new arena for use with the driver runtime
-    pub fn new() -> Result<Self, Status> {
+    pub fn new() -> Self {
         let mut arena = null_mut();
         // SAFETY: the address we pass to fdf_arena_create is allocated on
         // the stack and appropriately sized.
-        let res = unsafe { fdf_arena_create(0, 0, &mut arena) };
-        if res == ZX_OK {
-            // SAFETY: if fdf_arena_create returned ZX_OK, it will have placed
-            // a non-null pointer.
-            Ok(Arena(unsafe { NonNull::new_unchecked(arena) }))
-        } else {
-            Err(Status::from_raw(res))
-        }
+        Status::ok(unsafe { fdf_arena_create(0, 0, &mut arena) }).expect("Failed to create arena");
+        // SAFETY: if fdf_arena_create returned ZX_OK, it will have placed
+        // a non-null pointer.
+        Arena(unsafe { NonNull::new_unchecked(arena) })
     }
 
     /// Creates an arena from a raw pointer to the arena object.
@@ -811,7 +807,7 @@ pub(crate) mod tests {
 
     #[test]
     fn arena_allocations() {
-        let arena = Arena::new().unwrap();
+        let arena = Arena::new();
         let _val = arena.insert(());
         let val = arena.insert(1);
         assert_eq!(*val, 1);
@@ -832,7 +828,7 @@ pub(crate) mod tests {
     #[test]
     #[allow(clippy::unit_cmp)]
     fn arena_take() {
-        let arena = Arena::new().unwrap();
+        let arena = Arena::new();
         let val = arena.insert(());
         assert_eq!(ArenaBox::take(val), ());
         let val = arena.insert(1);
@@ -842,7 +838,7 @@ pub(crate) mod tests {
     #[test]
     #[allow(clippy::unit_cmp)]
     fn arena_take_boxed() {
-        let arena = Arena::new().unwrap();
+        let arena = Arena::new();
         let val = arena.insert(());
         assert_eq!(*ArenaBox::take_boxed(val), ());
         let val = arena.insert(1);
@@ -851,7 +847,7 @@ pub(crate) mod tests {
 
     #[test]
     fn arena_take_boxed_slice() {
-        let arena = Arena::new().unwrap();
+        let arena = Arena::new();
         let val: ArenaBox<'_, [()]> = arena.insert_slice(&[]);
         assert_eq!(&*ArenaBox::take_boxed_slice(val), &[]);
         let val = arena.insert_slice(&[1, 2, 3, 4]);
@@ -861,7 +857,7 @@ pub(crate) mod tests {
     #[test]
     fn arena_drop() {
         let (tx, rx) = mpsc::channel();
-        let arena = Arena::new().unwrap();
+        let arena = Arena::new();
         let val = arena.insert(DropSender::new(1, tx.clone()));
         drop(val);
         assert_eq!(rx.try_recv().unwrap(), 1);
@@ -880,7 +876,7 @@ pub(crate) mod tests {
     #[test]
     fn arena_take_drop() {
         let (tx, rx) = mpsc::channel();
-        let arena = Arena::new().unwrap();
+        let arena = Arena::new();
 
         let val = arena.insert(DropSender::new(1, tx.clone()));
         let inner = ArenaBox::take(val);
@@ -899,8 +895,8 @@ pub(crate) mod tests {
 
     #[test]
     fn arena_contains() {
-        let arena1 = Arena::new().unwrap();
-        let arena2 = Arena::new().unwrap();
+        let arena1 = Arena::new();
+        let arena2 = Arena::new();
 
         let val1 = arena1.insert(1);
         let val2 = arena2.insert(2);
@@ -913,7 +909,7 @@ pub(crate) mod tests {
 
     #[test]
     fn arena_assume() {
-        let arena = Arena::new().unwrap();
+        let arena = Arena::new();
 
         let val = arena.insert(1);
         let val_leaked = unsafe { ArenaBox::into_ptr(val) };
@@ -925,7 +921,7 @@ pub(crate) mod tests {
     #[test]
     #[should_panic]
     fn arena_bad_assume() {
-        let arena = Arena::new().unwrap();
+        let arena = Arena::new();
 
         unsafe { arena.assume(NonNull::<()>::dangling()) };
     }
@@ -933,8 +929,8 @@ pub(crate) mod tests {
     #[test]
     #[should_panic]
     fn bad_static_box_ownership() {
-        let arena1 = Arena::new().unwrap();
-        let arena2 = Arena::new().unwrap();
+        let arena1 = Arena::new();
+        let arena2 = Arena::new();
 
         let val = arena1.insert(1);
         arena2.make_static(val);
@@ -943,8 +939,8 @@ pub(crate) mod tests {
     #[test]
     #[should_panic]
     fn bad_rc_ownership() {
-        let arena1 = Arena::new().unwrap();
-        let arena2 = Arena::new().unwrap();
+        let arena1 = Arena::new();
+        let arena2 = Arena::new();
 
         let val = arena1.insert(1);
         arena2.make_rc(val);
@@ -952,7 +948,7 @@ pub(crate) mod tests {
 
     #[test]
     fn box_lifecycle() {
-        let arena = Arena::new().unwrap();
+        let arena = Arena::new();
 
         // create the initial value and modify it
         let mut val = arena.insert(1);
@@ -995,7 +991,7 @@ pub(crate) mod tests {
 
     #[test]
     fn static_raw_roundtrip() {
-        let arena = Arena::new().unwrap();
+        let arena = Arena::new();
         let val = arena.make_static(arena.insert(1));
 
         // turn it into raw pointers and modify it
@@ -1012,7 +1008,7 @@ pub(crate) mod tests {
 
     #[test]
     fn arena_into_and_from_iter() {
-        let arena = Arena::new().unwrap();
+        let arena = Arena::new();
 
         // empty slice to vec
         let val: ArenaBox<'_, [()]> = arena.insert_slice(&[]);
@@ -1042,7 +1038,7 @@ pub(crate) mod tests {
 
     #[test]
     fn arena_try_from_iter() {
-        let arena = Arena::new().unwrap();
+        let arena = Arena::new();
 
         let val: Vec<Result<_, ()>> = vec![Ok(1), Ok(2), Ok(3), Ok(4)];
         let arena_val = arena.try_insert_from_iter(val).unwrap();

@@ -377,7 +377,7 @@ mod tests {
     #[test]
     fn send_and_receive_bytes_synchronously() {
         let (first, second) = Channel::create().unwrap();
-        let arena = Arena::new().unwrap();
+        let arena = Arena::new();
         assert_eq!(first.try_read_bytes().unwrap_err(), Status::from_raw(ZX_ERR_SHOULD_WAIT));
         first.write_with_data(arena.clone(), |arena| arena.insert_slice(&[1, 2, 3, 4])).unwrap();
         assert_eq!(&*second.try_read_bytes().unwrap().unwrap().data().unwrap(), &[1, 2, 3, 4]);
@@ -396,7 +396,7 @@ mod tests {
     #[test]
     fn send_and_receive_bytes_asynchronously() {
         with_raw_dispatcher("channel async", |dispatcher| {
-            let arena = Arena::new().unwrap();
+            let arena = Arena::new();
             let (fin_tx, fin_rx) = mpsc::channel();
             let (first, second) = Channel::create().unwrap();
 
@@ -412,7 +412,7 @@ mod tests {
 
     #[test]
     fn send_and_receive_objects_synchronously() {
-        let arena = Arena::new().unwrap();
+        let arena = Arena::new();
         let (first, second) = Channel::create().unwrap();
         let (tx, rx) = mpsc::channel();
         first
@@ -431,7 +431,7 @@ mod tests {
         println!("Create channels and write one end of one of the channel pairs to the other");
         let (first, second) = Channel::<()>::create().unwrap();
         let (inner_first, inner_second) = Channel::<String>::create().unwrap();
-        let message = Message::new_with(Arena::new().unwrap(), |arena| {
+        let message = Message::new_with(Arena::new(), |arena| {
             (None, Some(arena.insert_boxed_slice(Box::new([Some(inner_first.into())]))))
         });
         first.write(message).unwrap();
@@ -456,14 +456,14 @@ mod tests {
 
         println!("Send and receive a string across the now-transmitted channel pair.");
         inner_first_received
-            .write_with_data(Arena::new().unwrap(), |arena| arena.insert("boom".to_string()))
+            .write_with_data(Arena::new(), |arena| arena.insert("boom".to_string()))
             .unwrap();
         assert_eq!(inner_second.try_read().unwrap().unwrap().data().unwrap(), &"boom".to_string());
     }
 
     async fn ping(dispatcher: &Dispatcher, chan: Channel<u8>) {
         println!("starting ping!");
-        chan.write_with_data(Arena::new().unwrap(), |arena| arena.insert(0)).unwrap();
+        chan.write_with_data(Arena::new(), |arena| arena.insert(0)).unwrap();
         while let Ok(Some(msg)) = chan.read(dispatcher.as_ref()).await {
             let next = *msg.data().unwrap();
             println!("ping! {next}");
@@ -540,7 +540,7 @@ mod tests {
                         panic!("expected pending state after polling channel read once");
                     };
                     drop(fut);
-                    b.write_with_data(Arena::new().unwrap(), |arena| arena.insert(1)).unwrap();
+                    b.write_with_data(Arena::new(), |arena| arena.insert(1)).unwrap();
                     assert_eq!(
                         a.read(dispatcher.as_ref()).await.unwrap().unwrap().data(),
                         Some(&1)
