@@ -683,7 +683,7 @@ pub enum FileSystemLabelingScheme {
     /// policy. `root_sid` identifies the context for the root of the filesystem and `def_sid`
     /// identifies the context to use for unlabeled files in the filesystem (the "default
     /// context").
-    FsUse { fs_use_type: FsUseType, def_sid: SecurityId, root_sid: SecurityId },
+    FsUse { fs_use_type: FsUseType, def_sid: SecurityId, root_sid: Option<SecurityId> },
     /// This filesystem has one or more "genfscon" statements associated with it in the policy.
     GenFsCon,
 }

@@ -232,7 +232,7 @@ pub fn fs_node_init_on_create(
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
     profile_duration!("security.hooks.fs_node_init_on_create");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::fs_node_init_on_create(security_server, current_task, new_node, parent)
+        selinux_hooks::fs_node_init_on_create(security_server, current_task, new_node, Some(parent))
     })
 }
 

@@ -249,9 +249,11 @@ where
                                 // creation in principle. Distinguishing creation of the root of the
                                 // filesystem from re-instantiation of the `FsNode` representing an
                                 // existing root is tricky, so we work-around the issue by writing
-                                // the `root_sid` label here.
-                                let root_context =
-                                    security_server.sid_to_security_context(root_sid).unwrap();
+                                // the `root_sid` label here, if available, or the filesystem label.
+                                let root_or_fs_sid = root_sid.unwrap_or(label.sid);
+                                let root_context = security_server
+                                    .sid_to_security_context(root_or_fs_sid)
+                                    .unwrap();
                                 fs_node.ops().set_xattr(
                                     &mut locked.cast_locked::<FileOpsCore>(),
                                     fs_node,
@@ -260,7 +262,7 @@ where
                                     root_context.as_slice().into(),
                                     XattrOp::Create,
                                 )?;
-                                Some(root_sid)
+                                Some(root_or_fs_sid)
                             } else {
                                 // TODO: https://fxbug.dev/334094811 - Determine how to handle errors besides
                                 // `ENODATA` (no such xattr).
@@ -284,22 +286,18 @@ where
                     })
                 }
                 _ => {
-                    if let Some(parent) = dir_entry.parent() {
-                        // Ephemeral nodes are then labeled by applying SID computation between their
-                        // SID of the task that created them, and their parent file node's label.
-                        // TODO: https://fxbug.dev/381275592 - Use the SID from the creating task, rather than current_task!
-                        return fs_node_init_on_create(
-                            security_server,
-                            current_task,
-                            fs_node,
-                            &parent.node,
-                        )
-                        .map(|_| ());
-                    } else {
-                        // Ephemeral filesystems' root nodes use the root SID, which will typically
-                        // be the same as that of the filesystem itself.
-                        root_sid
-                    }
+                    // Ephemeral nodes are then labeled by applying SID computation between their
+                    // SID of the task that created them, and their parent file node's label (or
+                    // the filesystem sid if they don't have a parent node).
+                    // TODO: https://fxbug.dev/381275592 - Use the SID from the creating task,
+                    // rather than current_task!
+                    return fs_node_init_on_create(
+                        security_server,
+                        current_task,
+                        fs_node,
+                        dir_entry.parent().as_ref().map(|x| &**x.node),
+                    )
+                    .map(|_| ());
                 }
             }
         }
@@ -435,10 +433,10 @@ pub(super) fn todo_check_permission<P: ClassPermission + Into<Permission> + Clon
 fn compute_new_fs_node_sid(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
-    parent: &FsNode,
+    fs: &FileSystem,
+    parent: Option<&FsNode>,
     new_node_class: FileClass,
 ) -> Result<Option<(SecurityId, FileSystemLabel)>, Errno> {
-    let fs = parent.fs();
     let label = match &*fs.security_state.state.0.lock() {
         FileSystemLabelState::Unlabeled { .. } => {
             return Ok(None);
@@ -454,18 +452,33 @@ fn compute_new_fs_node_sid(
             Ok(Some((label.sid, label)))
         }
         FileSystemLabelingScheme::Mountpoint { sid } => Ok(Some((sid, label))),
-        FileSystemLabelingScheme::FsUse { fs_use_type, .. } => {
+        FileSystemLabelingScheme::FsUse { fs_use_type, root_sid, .. } => {
+            // For root nodes, the specified root_sid takes precedence over all other rules.
+            if parent.is_none() {
+                if let Some(root_sid) = root_sid {
+                    return Ok(Some((root_sid, label)));
+                }
+            }
+
             if let Some(fscreate_sid) = current_task.security_state.lock().fscreate_sid {
                 return Ok(Some((fscreate_sid, label)));
             }
-
+            // TODO: https://fxbug.dev/393086830 For root nodes created when mounting ephemeral
+            // filesystems, this should be the kernel sid. However, for parent-less nodes (e.g.
+            // pipes in pipefs) this should be the task sid.
             let current_task_sid = current_task.security_state.lock().current_sid;
             if fs_use_type == FsUseType::Task {
                 // TODO: https://fxbug.dev/377912777 - verify that this is how fs_use_task is
                 // supposed to work (https://selinuxproject.org/page/NB_ComputingSecurityContexts).
                 Ok(Some((current_task_sid, label)))
             } else {
-                let parent_sid = fs_node_effective_sid_and_class(parent).sid;
+                // If we have a parent, use its sid. Otherwise, compute the sid of root nodes from
+                // the sid of the filesystem.
+                let parent_sid = if let Some(parent) = parent {
+                    fs_node_effective_sid_and_class(parent).sid
+                } else {
+                    label.sid
+                };
                 let sid = security_server
                     .as_permission_check()
                     .compute_new_file_sid(current_task_sid, parent_sid, new_node_class)
@@ -483,7 +496,7 @@ pub(super) fn fs_node_init_on_create(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     new_node: &FsNode,
-    parent: &FsNode,
+    parent: Option<&FsNode>,
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
     // By definition this is a new `FsNode` so should not have already been labeled
     // (unless we're working in the context of overlayfs and affected by
@@ -500,10 +513,13 @@ pub(super) fn fs_node_init_on_create(
     // class, etc. This will only fail if the filesystem containing the nodes does not yet
     // have labeling information resolved.
     let new_node_class = new_node.security_state.lock().class;
-    if let Some((sid, label)) =
-        compute_new_fs_node_sid(security_server, current_task, parent, new_node_class)?
-    {
-        // If the labeling scheme is "fs_use_xattr" then also construct an xattr value
+    if let Some((sid, label)) = compute_new_fs_node_sid(
+        security_server,
+        current_task,
+        &new_node.fs(),
+        parent,
+        new_node_class,
+    )? {
         // for the caller to apply to `new_node`.
         let (sid, xattr) = match label.scheme {
             FileSystemLabelingScheme::FsUse { fs_use_type, .. } => {
@@ -582,10 +598,15 @@ fn may_create(
 
     // Verify that the caller has permission to create new nodes of the desired type.
     let new_file_class = file_class_from_file_mode(new_file_mode)?;
-    let new_file_sid =
-        compute_new_fs_node_sid(security_server, current_task, parent, new_file_class)?
-            .map(|(sid, _)| sid)
-            .unwrap_or_else(|| SecurityId::initial(InitialSid::File));
+    let new_file_sid = compute_new_fs_node_sid(
+        security_server,
+        current_task,
+        &parent.fs(),
+        Some(parent),
+        new_file_class,
+    )?
+    .map(|(sid, _)| sid)
+    .unwrap_or_else(|| SecurityId::initial(InitialSid::File));
     todo_check_permission(
         TODO_DENY!("https://fxbug.dev/375381156", "Check create permission."),
         &permission_check,

@@ -363,7 +363,7 @@ impl SecurityServer {
                     fs_use_type: use_type,
                     def_sid: def_sid_from_mount_option
                         .unwrap_or_else(|| SecurityId::initial(InitialSid::File)),
-                    root_sid: root_sid_from_mount_option.unwrap_or(fs_sid),
+                    root_sid: root_sid_from_mount_option,
                 },
             }
         } else if let Some(context) =
@@ -385,8 +385,7 @@ impl SecurityServer {
                 scheme: FileSystemLabelingScheme::FsUse {
                     fs_use_type: unrecognized_filesystem_type_fs_use_type,
                     def_sid: def_sid_from_mount_option.unwrap_or(unrecognized_filesystem_type_sid),
-                    root_sid: root_sid_from_mount_option
-                        .unwrap_or(unrecognized_filesystem_type_sid),
+                    root_sid: root_sid_from_mount_option,
                 },
             }
         }
