@@ -96,9 +96,7 @@ impl StopTool {
             (false, true, None) => WaitBehavior::NoWait(None),
             (false, false, Some(t)) => WaitBehavior::Timeout(t),
             // TODO(126735) -- eventually change default behavior to Wait or Timeout
-            (false, false, None) => WaitBehavior::NoWait(Some(
-                "No wait behavior specified -- not waiting for daemon to stop.".into(),
-            )),
+            (false, false, None) => WaitBehavior::NoWait(Some("Stopping the daemon now.".into())),
             _ => {
                 return_user_error!("Multiple wait behaviors specified.\nSpecify only one of -w, -t <timeout>, or --no-wait");
             }
