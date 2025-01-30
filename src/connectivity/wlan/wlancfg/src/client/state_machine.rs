@@ -393,7 +393,7 @@ async fn handle_connecting_error_and_retry(
 /// The CONNECTING state requests an SME connect. It handles the SME connect response:
 /// - for a successful connection, transition to CONNECTED state
 /// - for a failed connection, retry connection by passing a next_network to the
-///       DISCONNECTING state, as long as there haven't been too many connection attempts
+///   DISCONNECTING state, as long as there haven't been too many connection attempts
 #[allow(clippy::doc_lazy_continuation, reason = "mass allow for https://fxbug.dev/381896734")]
 /// During this time, incoming ManualRequests are also monitored for:
 /// - duplicate connect requests are deduped
@@ -617,7 +617,7 @@ impl ConnectedOptions {
 /// The CONNECTED state monitors the SME status. It handles the SME status response:
 /// - if still connected to the correct network, no action
 /// - if disconnected, retry connection by passing a next_network to the
-///       DISCONNECTING state
+///   DISCONNECTING state
 #[allow(clippy::doc_lazy_continuation, reason = "mass allow for https://fxbug.dev/381896734")]
 /// During this time, incoming ManualRequests are also monitored for:
 /// - duplicate connect requests are deduped

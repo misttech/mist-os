@@ -179,7 +179,7 @@ impl LinkState {
                 });
                 let (transition, state) = state.release_data();
                 match process_rsna_updates(context, None, update_sink, None) {
-                    RsnaStatus::Unchanged { .. } => Ok(transition.to(state).into()),
+                    RsnaStatus::Unchanged => Ok(transition.to(state).into()),
                     // RSNA progress during start() should only be trivial.
                     RsnaStatus::Progressed {
                         ap_responsive: None,
