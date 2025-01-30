@@ -890,6 +890,63 @@ impl FsNodeOps for OverlayNodeOps {
             length,
         )
     }
+
+    fn get_xattr(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        max_size: usize,
+    ) -> Result<ValueOrSize<FsString>, Errno> {
+        let entry = self
+            .node
+            .upper
+            .get()
+            .or(self.node.lower.as_ref())
+            .expect("expect either lower or upper node");
+        entry.entry().node.get_xattr(locked, current_task, &entry.mount, name, max_size)
+    }
+
+    fn set_xattr(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        value: &FsStr,
+        op: XattrOp,
+    ) -> Result<(), Errno> {
+        let upper = self.node.ensure_upper(locked, current_task)?;
+        upper.entry().node.set_xattr(locked, current_task, &upper.mount, name, value, op)
+    }
+
+    fn remove_xattr(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<(), Errno> {
+        let upper = self.node.ensure_upper(locked, current_task)?;
+        upper.entry().node.remove_xattr(locked, current_task, &upper.mount, name)
+    }
+
+    fn list_xattrs(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+        max_size: usize,
+    ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
+        let entry = self
+            .node
+            .upper
+            .get()
+            .or(self.node.lower.as_ref())
+            .expect("expect either lower or upper node");
+        entry.entry().node.list_xattrs(locked, current_task, max_size)
+    }
 }
 struct OverlayDirectory {
     node: Arc<OverlayNode>,
