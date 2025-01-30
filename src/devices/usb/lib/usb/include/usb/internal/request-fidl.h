@@ -474,13 +474,15 @@ class FidlRequestPool {
 
   // Add: called when adding a new request to the pool.
   void Add(RequestType&& request) {
+    std::lock_guard<std::mutex> _(mutex_);
     size_++;
-    Put(std::move(request));
+    PutLocked(std::move(request));
   }
 
   // Remove: called when removing a request from the pool.
   std::optional<RequestType> Remove() {
-    auto req = Get();
+    std::lock_guard<std::mutex> _(mutex_);
+    auto req = GetLocked();
     if (req.has_value()) {
       size_--;
     }
@@ -489,6 +491,27 @@ class FidlRequestPool {
 
   std::optional<RequestType> Get() {
     std::lock_guard<std::mutex> _(mutex_);
+    return GetLocked();
+  }
+
+  // Put: called when a request (originally obtained from `get`) is returned to the pool.
+  void Put(RequestType&& request) {
+    std::lock_guard<std::mutex> _(mutex_);
+    PutLocked(std::move(request));
+  }
+
+  bool Full() {
+    std::lock_guard<std::mutex> _(mutex_);
+    return free_reqs_.size() == size_;
+  }
+
+  bool Empty() {
+    std::lock_guard<std::mutex> _(mutex_);
+    return free_reqs_.empty();
+  }
+
+ private:
+  std::optional<RequestType> GetLocked() __TA_REQUIRES(mutex_) {
     if (free_reqs_.empty()) {
       return std::nullopt;
     }
@@ -498,27 +521,14 @@ class FidlRequestPool {
     return std::move(req);
   }
 
-  // Put: called when a request (originally obtained from `get`) is returned to the pool.
-  void Put(RequestType&& request) {
-    std::lock_guard<std::mutex> _(mutex_);
+  void PutLocked(RequestType&& request) __TA_REQUIRES(mutex_) {
     free_reqs_.emplace(std::move(request));
     ZX_DEBUG_ASSERT(free_reqs_.size() <= size_);
   }
 
-  bool Full() {
-    std::lock_guard<std::mutex> _(mutex_);
-    return free_reqs_.size() == size_;
-  }
-  bool Empty() {
-    std::lock_guard<std::mutex> _(mutex_);
-    return free_reqs_.empty();
-  }
-
- private:
   std::mutex mutex_;
   std::queue<RequestType> free_reqs_ __TA_GUARDED(mutex_);
-
-  std::atomic_uint32_t size_ = 0;
+  uint32_t size_ __TA_GUARDED(mutex_) = 0;
 };
 
 }  // namespace usb::internal
