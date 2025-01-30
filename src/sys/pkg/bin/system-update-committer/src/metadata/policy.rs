@@ -279,7 +279,7 @@ mod tests {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .insert_hook(mphooks::return_error(|e| match e {
-                    PaverEvent::QueryCurrentConfiguration { .. } => Status::OUT_OF_RANGE,
+                    PaverEvent::QueryCurrentConfiguration => Status::OUT_OF_RANGE,
                     _ => Status::OK,
                 }))
                 .build(),
