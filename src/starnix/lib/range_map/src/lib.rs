@@ -368,6 +368,22 @@ mod test {
         assert_eq!(iter.next().expect("missing elem"), (&(74..92), &-12));
         let mut iter = map.iter_starting_at(75);
         assert_eq!(iter.next(), None);
+
+        assert_eq!(map.iter_ending_at(9).collect::<Vec<_>>(), vec![]);
+        assert_eq!(map.iter_ending_at(34).collect::<Vec<_>>(), vec![(&(10..34), &-14)]);
+        assert_eq!(map.iter_ending_at(74).collect::<Vec<_>>(), vec![(&(10..34), &-14)]);
+        assert_eq!(
+            map.iter_ending_at(75).collect::<Vec<_>>(),
+            vec![(&(10..34), &-14), (&(74..92), &-12)]
+        );
+        assert_eq!(
+            map.iter_ending_at(91).collect::<Vec<_>>(),
+            vec![(&(10..34), &-14), (&(74..92), &-12)]
+        );
+        assert_eq!(
+            map.iter_ending_at(92).collect::<Vec<_>>(),
+            vec![(&(10..34), &-14), (&(74..92), &-12)]
+        );
     }
 
     #[::fuchsia::test]
@@ -502,5 +518,17 @@ mod test {
             map.iter().collect::<Vec<_>>(),
             vec![(&(0..2), &-10), (&(2..3), &-20), (&(3..5), &-10)]
         );
+    }
+
+    #[test]
+    fn test_remove_multiple_ranges_exact_query() {
+        let first = 15..21;
+        let second = first.end..29;
+
+        let mut map = RangeMap::new();
+        map.insert(first.clone(), 1);
+        map.insert(second.clone(), 2);
+
+        assert_eq!(map.remove(first.start..second.end), &[1, 2]);
     }
 }
