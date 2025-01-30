@@ -93,8 +93,48 @@ impl FfxMain for PeerTool {
 
                 Ok(())
             }
+            // ffx bluetooth peer disconnect
+            PeerSubCommand::Disconnect(ref cmd) => {
+                let known_peers = get_known_peers(&mut self).await?;
+                self.state.peers = known_peers;
+
+                let peer_id = match to_identifier(&self.state.clone(), cmd.id_or_addr.clone()) {
+                    Some(id) => id,
+                    None => {
+                        return Err(fho::Error::User(anyhow::anyhow!(
+                            "Unable to disconnect: Unknown address {}",
+                            cmd.id_or_addr
+                        )))
+                    }
+                };
+
+                match disconnect(&self.access_proxy, peer_id).await {
+                    Ok(_) => {
+                        writer.line(format!("Successfully disconnected from peer {}", peer_id))?;
+                    }
+                    Err(e) => {
+                        return Err(fho::Error::User(anyhow::anyhow!(
+                            "Failed to disconnect from peer {}: {}",
+                            peer_id,
+                            e
+                        )));
+                    }
+                }
+
+                Ok(())
+            }
         }
     }
+}
+
+/// Disconnects an active BR/EDR or LE connection by input peer ID.
+pub async fn disconnect(access: &AccessProxy, id: PeerId) -> Result<(), Error> {
+    let fidl_peer_id: FidlPeerId = id.into();
+    let _ = access.disconnect(&fidl_peer_id).await.map_err(|e| {
+        let user_err = anyhow::anyhow!(format!("Disconnect error: {:?}", e));
+        fho::Error::User(user_err)
+    })?;
+    Ok(())
 }
 
 /// Connects over BR/EDR or LE to an input peer ID.
