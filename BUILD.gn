@@ -19,6 +19,8 @@ import("//build/toolchain/rbe.gni")
 import("//build/toolchain/zircon/clang.gni")
 import("//build/zbi/zbi.gni")
 
+# Temporary file used to smooth over a soft transition in //boards/x64.gni.
+import("//src/settings/config/soft_transition.gni")
 declare_args() {
   ## NOTE:  The "legacy_*" versions of these args are part of multi-month
   #         transition to using product assembly and separate the definition of
