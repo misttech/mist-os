@@ -2,8 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::client::roaming::lib::{RoamingPolicy, ROAMING_CHANNEL_BUFFER_SIZE};
+use crate::client::roaming::lib::{
+    RoamingMode, RoamingPolicy, RoamingProfile, ROAMING_CHANNEL_BUFFER_SIZE,
+};
 use crate::client::roaming::local_roam_manager::{serve_local_roam_manager_requests, RoamManager};
+use crate::client::roaming::roam_monitor::stationary_monitor;
 use crate::client::{connection_selection, scan, serve_provider_requests, types};
 use crate::config_management::{SavedNetworksManager, SavedNetworksManagerApi};
 use crate::legacy;
@@ -12,10 +15,11 @@ use crate::mode_management::phy_manager::{PhyManager, PhyManagerApi};
 use crate::mode_management::{create_iface_manager, device_monitor, recovery, DEFECT_CHANNEL_SIZE};
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
 use crate::util::listener;
-use crate::util::testing::{create_inspect_persistence_channel, run_while};
+use crate::util::testing::{create_inspect_persistence_channel, run_until_completion, run_while};
 use anyhow::{format_err, Error};
 use fidl::endpoints::{create_proxy, create_request_stream};
 use fidl_fuchsia_wlan_device_service::DeviceWatcherEvent;
+use fidl_fuchsia_wlan_internal::SignalReportIndication;
 use fuchsia_async::{self as fasync, TestExecutor};
 use fuchsia_inspect::{self as inspect};
 use futures::channel::mpsc;
@@ -146,6 +150,7 @@ struct InternalObjects {
     _saved_networks: Arc<dyn SavedNetworksManagerApi>,
     phy_manager: Arc<Mutex<dyn PhyManagerApi>>,
     iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
+    roaming_policy: RoamingPolicy,
 }
 
 struct ExternalInterfaces {
@@ -167,12 +172,14 @@ fn test_setup(
     exec: &mut TestExecutor,
     recovery_profile: &str,
     recovery_enabled: bool,
+    roaming_policy: RoamingPolicy,
 ) -> TestValues {
     let (monitor_service_proxy, monitor_service_requests) =
         create_proxy::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>();
     let monitor_service_stream = monitor_service_requests.into_stream();
 
-    let saved_networks = exec.run_singlethreaded(SavedNetworksManager::new_for_test());
+    let mut saved_networks_mgt_fut = pin!(SavedNetworksManager::new_for_test());
+    let saved_networks = run_until_completion(exec, &mut saved_networks_mgt_fut);
     let saved_networks = Arc::new(saved_networks);
     let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
     let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
@@ -209,7 +216,7 @@ fn test_setup(
         mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
     let roam_manager_service_fut = Box::pin(
         serve_local_roam_manager_requests(
-            RoamingPolicy::Disabled,
+            roaming_policy,
             roam_service_request_receiver,
             connection_selection_requester.clone(),
             telemetry_sender.clone(),
@@ -322,6 +329,7 @@ fn test_setup(
         _saved_networks: saved_networks,
         phy_manager,
         iface_manager,
+        roaming_policy,
     };
 
     let external_interfaces = ExternalInterfaces {
@@ -364,9 +372,11 @@ fn add_phy(exec: &mut TestExecutor, test_values: &mut TestValues) {
         }
     );
 
-    exec.run_singlethreaded(pin!(
-        add_phy_fut.expect_within(zx::MonotonicDuration::from_seconds(5), "future didn't complete")
-    ));
+    run_until_completion(
+        exec,
+        pin!(add_phy_fut
+            .expect_within(zx::MonotonicDuration::from_seconds(5), "future didn't complete")),
+    );
 }
 
 /// Adds a phy and prepares client interfaces by turning on client connections
@@ -647,7 +657,7 @@ fn save_and_connect(
             bssid: [0, 0, 0, 0, 0, 0],
             ssid: TEST_SSID.clone(),
             rssi_dbm: 10,
-            snr_db: 10,
+            snr_db: 100,
             channel: types::WlanChan::new(1, types::Cbw::Cbw20),
         ),
     }];
@@ -799,7 +809,8 @@ fn test_save_and_connect(
     test_credentials: TestCredentials,
 ) {
     let mut exec = fasync::TestExecutor::new();
-    let mut test_values = test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false);
+    let mut test_values =
+        test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, RoamingPolicy::Disabled);
 
     let _ = save_and_connect(
         TEST_SSID.clone(),
@@ -856,7 +867,8 @@ fn test_save_and_fail_to_connect(
     let saved_credential = test_credentials.policy.clone();
 
     let mut exec = fasync::TestExecutor::new();
-    let mut test_values = test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false);
+    let mut test_values =
+        test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, RoamingPolicy::Disabled);
 
     // No request has been sent yet. Future should be idle.
     assert_variant!(
@@ -992,7 +1004,8 @@ fn test_fail_to_save(
     saved_credential: fidl_policy::Credential,
 ) {
     let mut exec = fasync::TestExecutor::new();
-    let mut test_values = test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false);
+    let mut test_values =
+        test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, RoamingPolicy::Disabled);
 
     // Generate network ID
     let network_id = fidl_policy::NetworkIdentifier { ssid, type_: saved_security };
@@ -1022,7 +1035,8 @@ fn test_fail_to_save(
 #[fuchsia::test]
 fn test_connect_to_new_network() {
     let mut exec = fasync::TestExecutor::new();
-    let mut test_values = test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false);
+    let mut test_values =
+        test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, RoamingPolicy::Disabled);
 
     // Connect to a network initially.
     let mut existing_connection = save_and_connect(
@@ -1214,7 +1228,8 @@ fn test_connect_to_new_network() {
 #[fuchsia::test]
 fn test_autoconnect_to_saved_network() {
     let mut exec = fasync::TestExecutor::new();
-    let mut test_values = test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false);
+    let mut test_values =
+        test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, RoamingPolicy::Disabled);
 
     // No request has been sent yet. Future should be idle.
     assert_variant!(
@@ -1449,7 +1464,8 @@ fn test_autoconnect_to_saved_network() {
 #[fuchsia::test]
 fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
     let mut exec = fasync::TestExecutor::new();
-    let mut test_values = test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false);
+    let mut test_values =
+        test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, RoamingPolicy::Disabled);
 
     // No request has been sent yet. Future should be idle.
     assert_variant!(
@@ -1894,7 +1910,8 @@ fn test_scan_recovery(
     defect_threshold: usize,
 ) {
     let mut exec = fasync::TestExecutor::new();
-    let mut test_values = test_setup(&mut exec, RECOVERY_PROFILE_THRESHOLDED_RECOVERY, true);
+    let mut test_values =
+        test_setup(&mut exec, RECOVERY_PROFILE_THRESHOLDED_RECOVERY, true, RoamingPolicy::Disabled);
 
     // No request has been sent yet. Future should be idle.
     assert_variant!(
@@ -2042,7 +2059,8 @@ fn reject_connect_requests(
 #[fuchsia::test]
 fn test_connect_failure_recovery() {
     let mut exec = fasync::TestExecutor::new();
-    let mut test_values = test_setup(&mut exec, RECOVERY_PROFILE_THRESHOLDED_RECOVERY, true);
+    let mut test_values =
+        test_setup(&mut exec, RECOVERY_PROFILE_THRESHOLDED_RECOVERY, true, RoamingPolicy::Disabled);
 
     // For the purpose of this test, use a mock open network.
     let network_id = fidl_policy::NetworkIdentifier {
@@ -2120,7 +2138,8 @@ fn test_connect_failure_recovery() {
 #[fuchsia::test]
 fn listnr_updates_connecting_networks_correctly_on_removal() {
     let mut exec = fasync::TestExecutor::new();
-    let mut test_values = test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false);
+    let mut test_values =
+        test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, RoamingPolicy::Disabled);
 
     // No request has been sent yet. Future should be idle.
     assert_variant!(
@@ -2203,4 +2222,423 @@ fn listnr_updates_connecting_networks_correctly_on_removal() {
     assert_eq!(network.id.unwrap(), network_id.clone());
     assert_eq!(network.state.unwrap(), types::ConnectionState::Disconnected);
     assert_eq!(network.status, Some(types::DisconnectStatus::ConnectionStopped));
+}
+
+// Trait alias for a roam scan solicit func. Function should emulate a scenario that could trigger a
+// roam scan, and returns the scan request responder if one is triggered, None otherwise. Direct
+// trait aliases exist, but are an unstable feature: https://github.com/rust-lang/rfcs/pull/1733.
+trait RoamScanSolicitFunc:
+    FnMut(
+    &mut fasync::TestExecutor,
+    &mut TestValues,
+    &mut ExistingConnectionSmeObjects,
+) -> Option<fidl_sme::ClientSmeScanResponder>
+{
+}
+impl<F> RoamScanSolicitFunc for F where
+    F: FnMut(
+        &mut fasync::TestExecutor,
+        &mut TestValues,
+        &mut ExistingConnectionSmeObjects,
+    ) -> Option<fidl_sme::ClientSmeScanResponder>
+{
+}
+
+// Helper func for signal related roam scan solicit functions. Repeatedly sends/processes
+// SignalReportIndications, checking if a roam scan has been requested. If so, returns early with
+// scan results responder.
+fn solicit_roam_scan_with_signal_reports(
+    exec: &mut fasync::TestExecutor,
+    test_values: &mut TestValues,
+    existing_connection: &mut ExistingConnectionSmeObjects,
+    signal_report: SignalReportIndication,
+) -> Option<fidl_sme::ClientSmeScanResponder> {
+    // Get the EWMA smoothing factor from the roam profile. This guarantees enough iterations
+    // to drop the EWMA signal to the provided value. This should never use a catch-all branch, to
+    // ensure it is updated for future profiles.
+    let num_iterations = match test_values.internal_objects.roaming_policy {
+        RoamingPolicy::Disabled => 15, // Some arbitrary number of iterations when roaming is disabled.
+        RoamingPolicy::Enabled { profile: RoamingProfile::Stationary, .. } => {
+            stationary_monitor::STATIONARY_ROAMING_EWMA_SMOOTHING_FACTOR
+        }
+    };
+    for _ in 0..num_iterations {
+        // Send the signal report.
+        existing_connection
+            .connect_txn_handle
+            .send_on_signal_report(&signal_report)
+            .expect("failed to send signal report");
+
+        // Run the state machine to process the signal report.
+        assert_variant!(
+            exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+            Poll::Pending
+        );
+
+        // If a roam scan request is received, return the scan results responder.
+        if let Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { responder, .. }))) =
+            exec.run_until_stalled(&mut existing_connection.iface_sme_stream.next())
+        {
+            return Some(responder);
+        }
+    }
+    None
+}
+
+// Roam scan solicit function for RSSI threshold roaming.
+fn solicit_roam_scan_weak_rssi(
+    exec: &mut fasync::TestExecutor,
+    test_values: &mut TestValues,
+    existing_connection: &mut ExistingConnectionSmeObjects,
+) -> Option<fidl_sme::ClientSmeScanResponder> {
+    solicit_roam_scan_with_signal_reports(
+        exec,
+        test_values,
+        existing_connection,
+        SignalReportIndication { rssi_dbm: -91, snr_db: 100 },
+    )
+}
+
+// Roam scan solicit function for SNR threshold roaming.
+fn solicit_roam_scan_poor_snr(
+    exec: &mut fasync::TestExecutor,
+    test_values: &mut TestValues,
+    existing_connection: &mut ExistingConnectionSmeObjects,
+) -> Option<fidl_sme::ClientSmeScanResponder> {
+    solicit_roam_scan_with_signal_reports(
+        exec,
+        test_values,
+        existing_connection,
+        SignalReportIndication { rssi_dbm: -20, snr_db: 0 },
+    )
+}
+
+#[test_case(
+    RoamingPolicy::Enabled { profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam },
+    solicit_roam_scan_weak_rssi,
+    true;
+    "enabled stationary weak rssi should roam scan"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary,mode: RoamingMode::MetricsOnly},
+    solicit_roam_scan_weak_rssi,
+    true;
+    "enabled stationary metrics only weak rssi should roam scan"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
+    solicit_roam_scan_poor_snr,
+    true;
+    "enabled stationary poor snr should roam scan"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::MetricsOnly},
+    solicit_roam_scan_poor_snr,
+    true;
+    "enabled stationary metrics only poor snr should roam scan"
+)]
+#[test_case(
+    RoamingPolicy::Disabled,
+    solicit_roam_scan_weak_rssi,
+    false;
+    "disabled weak rssi should not roam scan"
+)]
+#[test_case(
+    RoamingPolicy::Disabled,
+    solicit_roam_scan_poor_snr,
+    false;
+    "disabled poor snr should not roam scan"
+)]
+#[fuchsia::test(add_test_attr = false)]
+// Tests if roaming policies trigger roam scans in different scenarios.
+fn test_roam_policy_triggers_scan<F>(
+    roaming_policy: RoamingPolicy,
+    mut roam_scan_solicit_func: F,
+    should_trigger_roam_scan: bool,
+) where
+    F: RoamScanSolicitFunc,
+{
+    let mut exec = fasync::TestExecutor::new_with_fake_time();
+    let mut test_values =
+        test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, roaming_policy);
+
+    // Connect to a network.
+    let mut existing_connection = save_and_connect(
+        TEST_SSID.clone(),
+        Saved::None,
+        Scanned::Open,
+        TEST_CREDS.none.clone(),
+        &mut exec,
+        &mut test_values,
+    );
+
+    // Advance fake time to bypass any minimum connect durations for roaming.
+    exec.set_fake_time(fasync::MonotonicInstant::after(fasync::MonotonicDuration::from_hours(24)));
+
+    // Assert that we do/do not trigger a roam scan for the given policy and trigger function.
+    let roam_scan_triggered =
+        roam_scan_solicit_func(&mut exec, &mut test_values, &mut existing_connection).is_some();
+    assert_eq!(roam_scan_triggered, should_trigger_roam_scan);
+}
+
+#[test_case(RoamingProfile::Stationary, solicit_roam_scan_weak_rssi; "stationary weak rssi")]
+#[test_case(RoamingProfile::Stationary, solicit_roam_scan_poor_snr; "stationary poor snr")]
+#[fuchsia::test(add_test_attr = false)]
+// Tests if enabled roam profiles obey the minimum wait times between roam scans.
+fn test_roam_profile_scans_obey_wait_time<F>(
+    roaming_profile: RoamingProfile,
+    mut roam_scan_solicit_func: F,
+) where
+    F: RoamScanSolicitFunc,
+{
+    // Setup with roaming enabled.
+    let mut exec = fasync::TestExecutor::new_with_fake_time();
+    let mut test_values = test_setup(
+        &mut exec,
+        RECOVERY_PROFILE_EMPTY_STRING,
+        false,
+        RoamingPolicy::Enabled { profile: roaming_profile, mode: RoamingMode::CanRoam },
+    );
+
+    // Connect to a network.
+    let mut existing_connection = save_and_connect(
+        TEST_SSID.clone(),
+        Saved::None,
+        Scanned::Open,
+        TEST_CREDS.none.clone(),
+        &mut exec,
+        &mut test_values,
+    );
+
+    // Expect failed attempt to solicit a roam scan, as the connection duration is too short.
+    assert!(roam_scan_solicit_func(&mut exec, &mut test_values, &mut existing_connection).is_none());
+
+    // Advance past the minimum wait time between roam scans. This should never use a catch-all
+    // branch, to ensure it is updated for future profiles.
+    let wait_time = match roaming_profile {
+        RoamingProfile::Stationary => stationary_monitor::MIN_TIME_BETWEEN_ROAM_SCANS,
+    };
+    exec.set_fake_time(
+        fasync::MonotonicInstant::after(wait_time) + fasync::MonotonicDuration::from_seconds(1),
+    );
+
+    // Expect successful attempt to solicit a roam scan.
+    assert_variant!(roam_scan_solicit_func(&mut exec, &mut test_values, &mut existing_connection), Some(responder) => {
+        // Respond to the scan request so the next is not deduped.
+        responder.send(Err(fidl_sme::ScanErrorCode::InternalError)).expect("failed to respond to scan request");
+    });
+
+    // Expect a failed attempt to solicit a roam scan for the same roam reason, as the last roam scan
+    // was too recent.
+    assert!(roam_scan_solicit_func(&mut exec, &mut test_values, &mut existing_connection).is_none());
+
+    // Advance past the maximum backoff time between roam scans. This should never use a catch-all
+    // branch, to ensure it is updated for future profiles.
+    let wait_time = match roaming_profile {
+        RoamingProfile::Stationary => stationary_monitor::TIME_BETWEEN_ROAM_SCANS_MAX,
+    };
+    exec.set_fake_time(
+        fasync::MonotonicInstant::after(wait_time) + fasync::MonotonicDuration::from_seconds(1),
+    );
+
+    // Expect successful attempt to solicit a roam scan.
+    assert!(roam_scan_solicit_func(&mut exec, &mut test_values, &mut existing_connection).is_some());
+}
+
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
+    solicit_roam_scan_weak_rssi,
+    true;
+    "enabled stationary weak rssi should roam"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
+    solicit_roam_scan_poor_snr,
+    true;
+    "enabled stationary poor snr should roam"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::MetricsOnly},
+    solicit_roam_scan_weak_rssi,
+    false;
+    "enabled stationary metrics only weak rssi should not roam"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::MetricsOnly},
+    solicit_roam_scan_poor_snr,
+    false;
+    "enabled stationary metrics only poor snr should not roam"
+)]
+#[test_case(
+    RoamingPolicy::Disabled,
+    solicit_roam_scan_weak_rssi,
+    false;
+    "disabled weak rssi should not roam"
+)]
+#[test_case(
+    RoamingPolicy::Disabled,
+    solicit_roam_scan_poor_snr,
+    false;
+    "disabled poor snr should not roam"
+)]
+#[fuchsia::test(add_test_attr = false)]
+// Tests if roaming policies trigger roam requests in different scenarios.
+fn test_roam_policy_sends_roam_request<F>(
+    roaming_policy: RoamingPolicy,
+    mut roam_scan_solicit_func: F,
+    should_trigger_roam_request: bool,
+) where
+    F: RoamScanSolicitFunc,
+{
+    let mut exec = fasync::TestExecutor::new_with_fake_time();
+    let mut test_values =
+        test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, roaming_policy);
+
+    // Connect to a network.
+    let mut existing_connection = save_and_connect(
+        TEST_SSID.clone(),
+        Saved::None,
+        Scanned::Open,
+        TEST_CREDS.none.clone(),
+        &mut exec,
+        &mut test_values,
+    );
+
+    // Create a mock scan result roam candidate with a very strong BSS.
+    let mock_scan_results = vec![fidl_sme::ScanResult {
+        compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
+            mutual_security_protocols: security_protocols_from_protection(Scanned::Open),
+        }),
+        timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
+        bss_description: random_fidl_bss_description!(
+            protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(Scanned::Open),
+            bssid: [1, 1, 1, 1, 1, 1],
+            ssid: TEST_SSID.clone(),
+            rssi_dbm: -10,
+            snr_db: 80,
+            channel: types::WlanChan::new(36, types::Cbw::Cbw40),
+        ),
+    }];
+
+    // Advance fake time to bypass any minimum connect durations for roaming.
+    exec.set_fake_time(fasync::MonotonicInstant::after(fasync::MonotonicDuration::from_hours(24)));
+
+    // Solicit a roam scan.
+    if let Some(responder) =
+        roam_scan_solicit_func(&mut exec, &mut test_values, &mut existing_connection)
+    {
+        // Respond with the fake roam candidate, if applicable.
+        responder
+            .send(Ok(write_vmo(mock_scan_results).expect("failed to write VMO")))
+            .expect("failed to send scan results");
+    }
+
+    // Run forward internal futures.
+    assert_variant!(
+        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+        Poll::Pending
+    );
+
+    // Assert that we do/do not send a roam request for the given policy and trigger function.
+    let roam_requested =
+        if let Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Roam { req, .. }))) =
+            exec.run_until_stalled(&mut existing_connection.state_machine_sme_stream.next())
+        {
+            assert_eq!(req.bss_description.bssid, [1, 1, 1, 1, 1, 1]);
+            true
+        } else {
+            false
+        };
+    assert_eq!(roam_requested, should_trigger_roam_request);
+}
+
+#[test_case(RoamingProfile::Stationary, solicit_roam_scan_weak_rssi; "stationary weak rssi")]
+#[test_case(RoamingProfile::Stationary, solicit_roam_scan_poor_snr; "stationary poor snr")]
+#[fuchsia::test(add_test_attr = false)]
+// Tests if enabled roaming profiles trigger roam requests up to a max per day threshold.
+fn test_roam_profile_obeys_max_roams_per_day<F>(
+    roaming_profile: RoamingProfile,
+    mut roam_scan_solicit_func: F,
+) where
+    F: RoamScanSolicitFunc,
+{
+    // Setup with roaming enabled.
+    let mut exec = fasync::TestExecutor::new_with_fake_time();
+    let mut test_values = test_setup(
+        &mut exec,
+        RECOVERY_PROFILE_EMPTY_STRING,
+        false,
+        RoamingPolicy::Enabled { profile: roaming_profile, mode: RoamingMode::CanRoam },
+    );
+
+    // Connect to a network.
+    let mut existing_connection = save_and_connect(
+        TEST_SSID.clone(),
+        Saved::None,
+        Scanned::Open,
+        TEST_CREDS.none.clone(),
+        &mut exec,
+        &mut test_values,
+    );
+
+    // Get max roams per day constant. This should never use a catch-all branch, to ensure
+    // it is updated for future profiles.
+    let max_roams_per_day = match roaming_profile {
+        RoamingProfile::Stationary => stationary_monitor::NUM_MAX_ROAMS_PER_DAY,
+    };
+    // Get max backoff time between roam scans constant. This should never use a catch-all branch, to
+    // ensure it is updated for future profiles.
+    let max_roam_scan_backoff_time = match roaming_profile {
+        RoamingProfile::Stationary => stationary_monitor::TIME_BETWEEN_ROAM_SCANS_MAX,
+    };
+
+    // Create a mock scan result with a very strong BSS roam candidate.
+    let scan_results = vec![fidl_sme::ScanResult {
+        compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
+            mutual_security_protocols: security_protocols_from_protection(Scanned::Open),
+        }),
+        timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
+        bss_description: random_fidl_bss_description!(
+            protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(Scanned::Open),
+            bssid: [1, 1, 1, 1, 1, 1],
+            ssid: TEST_SSID.clone(),
+            rssi_dbm: 10,
+            snr_db: 100,
+            channel: types::WlanChan::new(36, types::Cbw::Cbw40),
+        ),
+    }];
+
+    for _ in 0..max_roams_per_day {
+        // Advance fake time past max roam scan backoff time.
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            max_roam_scan_backoff_time + fasync::MonotonicDuration::from_seconds(1),
+        ));
+
+        // Expect a successful attempt to trigger a roam scan.
+        assert_variant!(roam_scan_solicit_func(&mut exec, &mut test_values, &mut existing_connection), Some(responder) => {
+            // Respond with the mock roam candidate.
+            responder
+            .send(Ok(write_vmo(scan_results.clone()).expect("failed to write VMO")))
+            .expect("failed to send scan results");
+        });
+
+        // Run forward internal futures.
+        assert_variant!(
+            exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+            Poll::Pending
+        );
+
+        // Expect that a roam request was sent to SME.
+        assert_variant!(exec.run_until_stalled(&mut existing_connection.state_machine_sme_stream.next()), Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Roam { req, .. }))) => {
+            assert_eq!(req.bss_description.bssid, [1, 1, 1, 1, 1, 1]);
+        });
+    }
+
+    // Advance fake time past max roam scan backoff time.
+    exec.set_fake_time(fasync::MonotonicInstant::after(
+        max_roam_scan_backoff_time + fasync::MonotonicDuration::from_seconds(1),
+    ));
+
+    // Expect a failed attempt to solict a roam scan, since roams per day limit has been reached.
+    assert!(roam_scan_solicit_func(&mut exec, &mut test_values, &mut existing_connection).is_none());
 }
