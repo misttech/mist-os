@@ -96,7 +96,7 @@ fuchsia_structured_config_values("default_config_values") {
   cm_label = ":manifest"
   values = {
     le_privacy = true
-    le_background_scanning = true
+    le_background_scanning = false
     le_security_mode = "Mode1"
     bredr_connectable = true
     bredr_security_mode = "Mode4"
