@@ -75,6 +75,11 @@ import("//build/testing/host_test_data.gni")
 #    Type: string
 #    Default: target_name
 #
+#  test_cases (optional)
+#    List of test cases to run. Defaults to running all test cases.
+#    Type: list(string)
+#    Default: empty list
+#
 #  sources (optional)
 #    Other files that are used in the Mobly test.
 #    Type: list(path)
@@ -431,6 +436,11 @@ template("python_mobly_test") {
 
   if (defined(invoker.extra_args)) {
     _common_host_test_args += invoker.extra_args
+  }
+
+  if (defined(invoker.test_cases)) {
+    _common_host_test_args += [ "--test_cases" ]
+    _common_host_test_args += invoker.test_cases
   }
 
   common_environments = []
