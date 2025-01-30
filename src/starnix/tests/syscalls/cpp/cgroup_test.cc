@@ -4,6 +4,7 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <sys/mount.h>
 #include <unistd.h>
 
@@ -283,6 +284,46 @@ TEST_F(CgroupTest, EventsWithPopulatedChild) {
 
   CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED);
   CheckFileHasLine(grandchild_events_path, EVENTS_NOT_POPULATED);
+}
+
+TEST_F(CgroupTest, PollEvents) {
+  std::string child_path = root_path() + "/child";
+  std::string child_events_path = child_path + "/" + EVENTS_FILE;
+  std::string child_procs_path = child_path + "/" + PROCS_FILE;
+  std::string pid_string = std::to_string(getpid());
+
+  CreateCgroup(child_path);
+
+  fbl::unique_fd events_fd(open(child_events_path.c_str(), O_RDONLY));
+  ASSERT_TRUE(events_fd.is_valid());
+
+  // Initially, the cgroup should not be populated.
+  CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED);
+
+  struct pollfd pfd = {.fd = events_fd.get(), .events = POLLPRI};
+  fbl::unique_fd procs_fd(open(child_procs_path.c_str(), O_WRONLY));
+  ASSERT_TRUE(procs_fd.is_valid());
+  EXPECT_THAT(write(procs_fd.get(), pid_string.c_str(), pid_string.length()), SyscallSucceeds());
+
+  // After adding the process, poll should return with POLLPRI as populated changes to true.
+  EXPECT_THAT(poll(&pfd, 1, -1), SyscallSucceedsWithValue(1));
+  EXPECT_TRUE(pfd.revents & (POLLPRI | POLLERR));
+
+  // Verify the populated state has changed.
+  CheckFileHasLine(child_events_path, EVENTS_POPULATED);
+
+  // Now remove the process from the cgroup.
+  std::string root_procs_path = root_path() + "/" + PROCS_FILE;
+  procs_fd.reset(open(root_procs_path.c_str(), O_WRONLY));
+  ASSERT_TRUE(procs_fd.is_valid());
+  EXPECT_THAT(write(procs_fd.get(), pid_string.c_str(), pid_string.length()), SyscallSucceeds());
+
+  // Poll should return with POLLPRI as populated changes back to false.
+  EXPECT_THAT(poll(&pfd, 1, -1), SyscallSucceedsWithValue(1));
+  EXPECT_TRUE(pfd.revents & (POLLPRI | POLLERR));
+
+  // Verify the populated state has changed.
+  CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED);
 }
 
 TEST_F(CgroupTest, UnlinkCgroupWithProcess) {

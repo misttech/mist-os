@@ -14,10 +14,15 @@ use std::borrow::Cow;
 use std::sync::{Arc, Weak};
 
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::{BytesFile, BytesFileOps, FsNodeOps};
+use starnix_core::vfs::{
+    FileObject, FileOps, FsNodeOps, InputBuffer, OutputBuffer, SimpleFileNode,
+};
+use starnix_core::{fileops_impl_noop_sync, fileops_impl_seekable};
 use starnix_logging::track_stub;
+use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
+use starnix_uapi::vfs::FdEvents;
 
 use crate::cgroup::{Cgroup, CgroupOps};
 
@@ -27,7 +32,7 @@ pub struct EventsFile {
 
 impl EventsFile {
     pub fn new_node(cgroup: Weak<Cgroup>) -> impl FsNodeOps {
-        BytesFile::new_node(Self { cgroup })
+        SimpleFileNode::new(move || Ok(Self { cgroup: cgroup.clone() }))
     }
 
     fn cgroup(&self) -> Result<Arc<Cgroup>, Errno> {
@@ -35,8 +40,29 @@ impl EventsFile {
     }
 }
 
-impl BytesFileOps for EventsFile {
-    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+impl FileOps for EventsFile {
+    fileops_impl_seekable!();
+    fileops_impl_noop_sync!();
+
+    fn write(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        starnix_uapi::error!(EINVAL)
+    }
+
+    fn read(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
         track_stub!(
             TODO("https://fxbug.dev/377755814"),
             "cgroup.events does not check state of parent and children cgroup"
@@ -47,6 +73,19 @@ impl BytesFileOps for EventsFile {
             cgroup.is_populated() as u8,
             cgroup.get_freezer_state().effective_freezer_state
         );
-        Ok(events_str.as_bytes().to_owned().into())
+        let content: Cow<'_, [u8]> = events_str.as_bytes().to_owned().into();
+        if offset >= content.len() {
+            return Ok(0);
+        }
+        data.write(&content[offset..])
+    }
+
+    fn query_events(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        Ok(FdEvents::POLLPRI | FdEvents::POLLERR)
     }
 }
