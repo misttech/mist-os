@@ -223,32 +223,17 @@ zx::result<> GMBusI2c::ReadEdidBlock(int index, std::span<uint8_t, edid::kBlockS
 
   const int segment_pointer = index / 2;
 
-  // The VESA E-DDC standard claims that the segment pointer is reset to its
-  // default value (00h) at the completion of each command sequence.
-  // (Section 2.2.5 "Segment Pointer", Page 18, VESA E-DDC Standard,
-  //  Version 1.3)
-  //
-  // The recommended reading patterns in the E-DDC standard require drivers
-  // to always issue a segment write before each read operation and ignore any
-  // NACKs (Section 5.1.1 "Basic Operation for E-DDC Access of EDID", Section
-  // 6.5 "E-DDC Sequential Read", VESA E-DDC Standard, Version 1.3).
-  //
-  // However, The Intel GMBus I2C controller does not handle NACKs correctly,
-  // which makes it impossible to follow the procedure recommended by the E-DDC
-  // standard. Our workaround is to skip the segment write for segment 0, and
-  // rely on the segment reset logic mandated by the E-DDC standard. This
-  // workaround guarantees we only send segment write command to devices that
-  // support the E-DDC standard.
-  //
-  // It is possible that the driver may fail connecting to monitors that only
-  // recognize some fixed DDC command patterns (for example, segment write
-  // must always precede data read), though we have never encountered such
-  // display in our testing.
-  if (segment_pointer != 0) {
-    // `segment_pointer` is in [0, 127], so casting `segment_pointer` to uint8_t
-    // doesn't change its value.
-    const bool set_ddc_segment_success = SetDdcSegment(static_cast<uint8_t>(segment_pointer));
-    if (!set_ddc_segment_success) {
+  // `segment_pointer` is in [0, 127], so casting `segment_pointer` to
+  // uint8_t doesn't overflow.
+  const bool set_ddc_segment_success = SetDdcSegment(static_cast<uint8_t>(segment_pointer));
+  if (!set_ddc_segment_success) {
+    // A display device that doesn't support E-DDC returns an I2C NACK response
+    // when the host writes to the segment pointer. Thus, we ignore the NACK
+    // and perform non-segmented DDC read operations if the segment pointer is
+    // zero.
+    if (segment_pointer == 0) {
+      FDF_LOG(INFO, "E-DDC segment pointer is not supported. Will perform DDC read.");
+    } else {
       FDF_LOG(ERROR, "Failed to set DDC segment %d for block %d", segment_pointer, index);
       return zx::error(ZX_ERR_IO);
     }
@@ -266,7 +251,7 @@ zx::result<> GMBusI2c::ReadEdidBlock(int index, std::span<uint8_t, edid::kBlockS
   });
 
   // Segment offset of the first byte in the current block.
-  // Its value must be 0 or 128, so it fits in a uint8_t variable.
+  // Its value must be 0 or 128, so casting it to uint8_t doesn't overflow.
   const uint8_t initial_segment_offset =
       static_cast<uint8_t>(index % 2 * static_cast<int>(edid::kBlockSize));
   bool write_offset_result = GMBusWrite(kDdcDataAddress, &initial_segment_offset, 1);
