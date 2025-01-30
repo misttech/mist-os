@@ -487,6 +487,8 @@ Every image has the following properties:
   optional `title` attribute enclosed in double or single quotes.
 * Set of optional classes using [custom attribute syntax](#custom-attributes) `{: .my-custom-css-class}`
 
+For guidelines on diagrams, see [Adding diagrams to documentation](/docs/contribute/docs/adding-diagrams.md).
+
 ### Inline syntax
 
 The following are valid inline image syntax:
