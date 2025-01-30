@@ -504,7 +504,7 @@ fn compute_new_fs_node_sid(
                 };
                 let sid = security_server
                     .as_permission_check()
-                    .compute_new_file_sid(current_task_sid, parent_sid, new_node_class)
+                    .compute_new_file_sid(current_task_sid, parent_sid, new_node_class, "".into())
                     // TODO: https://fxbug.dev/377915452 - is EPERM right here? What does it mean
                     // for compute_new_file_sid to have failed?
                     .map_err(|_| errno!(EPERM))?;
@@ -577,12 +577,8 @@ pub(super) fn fs_node_init_anon(
 ) {
     let task_sid = current_task.security_state.lock().current_sid;
     let sid = security_server
-        .compute_new_file_sid_with_name(
-            task_sid,
-            task_sid,
-            FileClass::AnonFsNode,
-            Some(node_type.into()),
-        )
+        .as_permission_check()
+        .compute_new_file_sid(task_sid, task_sid, FileClass::AnonFsNode, node_type.into())
         .expect("Compute label for anon_inode");
     let mut state = new_node.security_state.lock();
     state.class = FileClass::AnonFsNode;

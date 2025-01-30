@@ -127,25 +127,21 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         })
     }
 
-    /// Returns the [`SecurityContext`] with which to label a new file of the specified `class`,
-    /// based on the supplied `source` and `target` contexts and the policy-defined transition
-    /// rules. This is equivalent to calling `new_security_context()` directly, with the appropriate
-    /// "default" values specified for the role, type and security levels.
-    /// If `name` is non-empty then matching filename-dependent type transitions will be used, if
-    /// available, in preference to non-named ones.
+    /// Returns the security context that should be applied to a newly created file-like SELinux
+    /// object according to `source` and `target` security contexts, as well as the new object's
+    /// `class`. This context should be used only if no filename-transition match is found, via
+    /// [`new_file_security_context_by_name()`].
     pub fn new_file_security_context(
         &self,
         source: &SecurityContext,
         target: &SecurityContext,
         class: &crate::FileClass,
-        name: Option<NullessByteStr<'_>>,
     ) -> SecurityContext {
         let object_class = crate::ObjectClass::from(class.clone());
         self.new_security_context(
             source,
             target,
             &object_class,
-            name,
             // The SELinux notebook states the role component defaults to the object_r role.
             self.cached_object_r_role,
             // The SELinux notebook states the type component defaults to the type of the parent
@@ -156,6 +152,44 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
             source.low_level(),
             None,
         )
+    }
+
+    /// Returns the security context that should be applied to a newly created file-like SELinux
+    /// object according to `source` and `target` security contexts, as well as the new object's
+    /// `class` and `name`. If no filename-transition rule matches the supplied arguments then
+    /// `None` is returned, and the caller should fall-back to filename-independent labeling
+    /// via [`new_file_security_context()`]
+    pub fn new_file_security_context_by_name(
+        &self,
+        source: &SecurityContext,
+        target: &SecurityContext,
+        class: &crate::FileClass,
+        name: NullessByteStr<'_>,
+    ) -> Option<SecurityContext> {
+        let object_class = crate::ObjectClass::from(class.clone());
+        let policy_class = self.class(&object_class)?;
+        let type_id = self.type_transition_new_type_with_name(
+            source.type_(),
+            target.type_(),
+            policy_class,
+            name,
+        )?;
+        Some(self.new_security_context_internal(
+            source,
+            target,
+            &object_class,
+            // The SELinux notebook states the role component defaults to the object_r role.
+            self.cached_object_r_role,
+            // The SELinux notebook states the type component defaults to the type of the parent
+            // directory.
+            target.type_(),
+            // The SELinux notebook states the range/level component defaults to the low/current
+            // level of the creating process.
+            source.low_level(),
+            None,
+            // Override the "type" with the value specified by the filename-transition rules.
+            Some(type_id),
+        ))
     }
 
     /// Calculates a new security context, as follows:
@@ -177,19 +211,43 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
     ///     - otherwise, if the policy contains a default_range for `class`, use that default range
     ///     - lastly, if the policy does not contain either, use the `default_low_level` -
     ///       `default_high_level` range.
-    ///
-    /// For file-like `class`es a non-empty `name` may be included, in which case `type_transition`
-    /// rules dependent on the target name will be taken into account.
     pub fn new_security_context(
         &self,
         source: &SecurityContext,
         target: &SecurityContext,
         class: &crate::ObjectClass,
-        name: Option<NullessByteStr<'_>>,
         default_role: RoleId,
         default_type: TypeId,
         default_low_level: &SecurityLevel,
         default_high_level: Option<&SecurityLevel>,
+    ) -> SecurityContext {
+        self.new_security_context_internal(
+            source,
+            target,
+            class,
+            default_role,
+            default_type,
+            default_low_level,
+            default_high_level,
+            None,
+        )
+    }
+
+    /// Internal implementation used by `new_file_security_context_by_name()` and
+    /// `new_security_context()` to implement the policy transition calculations.
+    /// If `override_type` is specified then the supplied value will be applied rather than a value
+    /// being calculated based on the policy; this is used by `new_file_security_context_by_name()`
+    /// to shortcut the default `type_transition` lookup.
+    fn new_security_context_internal(
+        &self,
+        source: &SecurityContext,
+        target: &SecurityContext,
+        class: &crate::ObjectClass,
+        default_role: RoleId,
+        default_type: TypeId,
+        default_low_level: &SecurityLevel,
+        default_high_level: Option<&SecurityLevel>,
+        override_type: Option<TypeId>,
     ) -> SecurityContext {
         let (user, role, type_, low_level, high_level) = if let Some(policy_class) =
             self.class(&class)
@@ -212,20 +270,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
                     },
                 };
 
-            // If a `name` was specified for the new object then check for a matching name-dependent
-            // type-transition rule in the policy.
-            let type_with_name = name.and_then(|name| {
-                self.type_transition_new_type_with_name(
-                    source.type_(),
-                    target.type_(),
-                    policy_class,
-                    name,
-                )
-            });
-
-            // If no `name` was supplied, or no rule matched it, then search the access vector for
-            // matching (name-independent) type-transition rules.
-            let type_ = type_with_name.unwrap_or_else(|| {
+            let type_ = override_type.unwrap_or_else(|| {
                 match self.type_transition_new_type(source.type_(), target.type_(), policy_class) {
                     Some(new_type) => new_type,
                     None => match class_defaults.type_() {

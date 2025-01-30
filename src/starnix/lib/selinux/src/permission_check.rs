@@ -5,7 +5,7 @@
 use crate::access_vector_cache::{Fixed, Locked, Query, DEFAULT_SHARED_SIZE};
 use crate::policy::{AccessVectorComputer, SELINUX_AVD_FLAGS_PERMISSIVE};
 use crate::security_server::SecurityServer;
-use crate::{ClassPermission, FileClass, Permission, SecurityId};
+use crate::{ClassPermission, FileClass, NullessByteStr, Permission, SecurityId};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_inspect_contrib::profile_duration;
@@ -71,12 +71,26 @@ impl<'a> PermissionCheck<'a> {
         self.security_server
     }
 
+    /// Returns the SID with which to label a new `file_class` instance created by `subject_sid`, with `target_sid`
+    /// as its parent, taking into account role & type transition rules, and filename-transition rules.
+    /// If a filename-transition rule matches the `file_name` then that will be used, otherwise the
+    /// filename-independent computation will be applied.
     pub fn compute_new_file_sid(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
         file_class: FileClass,
+        file_name: NullessByteStr<'_>,
     ) -> Result<SecurityId, anyhow::Error> {
+        // TODO: https://fxbug.dev/385075470 - Stop skipping empty name lookups once by-name lookup is better optimized.
+        if !file_name.as_bytes().is_empty() {
+            if let Some(sid) = self
+                .access_vector_cache
+                .compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
+            {
+                return Ok(sid);
+            }
+        }
         self.access_vector_cache.compute_new_file_sid(source_sid, target_sid, file_class)
     }
 }
@@ -201,6 +215,16 @@ mod tests {
         ) -> Result<SecurityId, anyhow::Error> {
             unreachable!();
         }
+
+        fn compute_new_file_sid_with_name(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _file_class: FileClass,
+            _file_name: NullessByteStr<'_>,
+        ) -> Option<SecurityId> {
+            unreachable!();
+        }
     }
 
     impl AccessVectorComputer for DenyAllPermissions {
@@ -234,6 +258,16 @@ mod tests {
             _target_sid: SecurityId,
             _file_class: FileClass,
         ) -> Result<SecurityId, anyhow::Error> {
+            unreachable!();
+        }
+
+        fn compute_new_file_sid_with_name(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _file_class: FileClass,
+            _file_name: NullessByteStr<'_>,
+        ) -> Option<SecurityId> {
             unreachable!();
         }
     }

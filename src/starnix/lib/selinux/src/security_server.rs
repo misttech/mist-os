@@ -410,9 +410,95 @@ impl SecurityServer {
         Some(active_policy.sid_table.security_context_to_sid(&security_context).unwrap())
     }
 
-    /// Computes the precise access vector for `source_sid` targeting `target_sid` as class
-    /// `target_class`.
-    fn compute_access_vector(
+    /// Returns true if the `bounded_sid` is bounded by the `parent_sid`.
+    /// Bounds relationships are mostly enforced by policy tooling, so this only requires validating
+    /// that the policy entry for the `TypeId` of `bounded_sid` has the `TypeId` of `parent_sid`
+    /// specified in its `bounds`.
+    pub fn is_bounded_by(&self, bounded_sid: SecurityId, parent_sid: SecurityId) -> bool {
+        let locked_state = self.state.lock();
+        let active_policy = locked_state.expect_active_policy();
+        let bounded_type = active_policy.sid_table.sid_to_security_context(bounded_sid).type_();
+        let parent_type = active_policy.sid_table.sid_to_security_context(parent_sid).type_();
+        active_policy.parsed.is_bounded_by(bounded_type, parent_type)
+    }
+
+    /// Assign a [`SeLinuxStatusPublisher`] to be used for pushing updates to the security server's
+    /// policy status. This should be invoked exactly once when `selinuxfs` is initialized.
+    ///
+    /// # Panics
+    ///
+    /// This will panic on debug builds if it is invoked multiple times.
+    pub fn set_status_publisher(&self, status_holder: Box<dyn SeLinuxStatusPublisher>) {
+        self.with_state_and_update_status(|state| {
+            assert!(state.status_publisher.is_none());
+            state.status_publisher = Some(status_holder);
+        });
+    }
+
+    /// Returns a reference to the shared access vector cache that delebates cache misses to `self`.
+    // TODO: Remove this in favour of a higher-level security-lookup interface/impl getter, replacing
+    // `as_permission_check()`.
+    #[allow(dead_code)]
+    pub(super) fn get_shared_avc(&self) -> &impl Query {
+        self.avc_manager.get_shared_cache()
+    }
+
+    /// Returns a newly constructed thread-local access vector cache that delegates cache misses to
+    /// any shared caches owned by `self.avc_manager`, which ultimately delegate to `self`. The
+    /// returned cache will be reset when this security server's policy is reset.
+    // TODO: Remove this in favour of a higher-level security-lookup interface/impl getter, replacing
+    // `as_permission_check()`.
+    #[allow(dead_code)]
+    pub(super) fn new_thread_local_avc(&self) -> impl QueryMut {
+        self.avc_manager.new_thread_local_cache()
+    }
+
+    /// Runs the supplied function with locked `self`, and then updates the SELinux status file
+    /// associated with `self.state.status_publisher`, if any.
+    fn with_state_and_update_status(&self, f: impl FnOnce(&mut SecurityServerState)) {
+        let mut locked_state = self.state.lock();
+        f(locked_state.deref_mut());
+        let new_value = SeLinuxStatus {
+            is_enforcing: locked_state.enforcing,
+            change_count: locked_state.policy_change_count,
+            deny_unknown: locked_state.deny_unknown(),
+        };
+        if let Some(status_publisher) = &mut locked_state.status_publisher {
+            status_publisher.set_status(new_value);
+        }
+    }
+
+    /// Returns the security identifier (SID) with which to label a new object of `target_class`,
+    /// based on the specified source & target security SIDs.
+    /// For file-like classes the `compute_new_file_sid*()` APIs should be used instead.
+    // TODO: Move this API to sit alongside the other `compute_*()` APIs.
+    pub fn compute_new_sid(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: ObjectClass,
+    ) -> Result<SecurityId, anyhow::Error> {
+        let mut locked_state = self.state.lock();
+        let active_policy = locked_state.expect_active_policy_mut();
+
+        // Policy is loaded, so `sid_to_security_context()` will not panic.
+        let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
+        let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
+
+        active_policy
+            .sid_table
+            .security_context_to_sid(&active_policy.parsed.new_security_context(
+                source_context,
+                target_context,
+                &target_class,
+            ))
+            .map_err(anyhow::Error::from)
+            .context("computing new security context from policy")
+    }
+}
+
+impl Query for SecurityServer {
+    fn query(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
@@ -459,100 +545,16 @@ impl SecurityServer {
         }
     }
 
-    pub fn compute_new_sid(
-        &self,
-        source_sid: SecurityId,
-        target_sid: SecurityId,
-        target_class: ObjectClass,
-    ) -> Result<SecurityId, anyhow::Error> {
-        let mut locked_state = self.state.lock();
-        let active_policy = locked_state.expect_active_policy_mut();
-
-        // Policy is loaded, so `sid_to_security_context()` will not panic.
-        let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
-        let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
-
-        active_policy
-            .sid_table
-            .security_context_to_sid(&active_policy.parsed.new_security_context(
-                source_context,
-                target_context,
-                &target_class,
-            ))
-            .map_err(anyhow::Error::from)
-            .context("computing new security context from policy")
-    }
-
-    /// Returns true if the `bounded_sid` is bounded by the `parent_sid`.
-    /// Bounds relationships are mostly enforced by policy tooling, so this only requires validating
-    /// that the policy entry for the `TypeId` of `bounded_sid` has the `TypeId` of `parent_sid`
-    /// specified in its `bounds`.
-    pub fn is_bounded_by(&self, bounded_sid: SecurityId, parent_sid: SecurityId) -> bool {
-        let locked_state = self.state.lock();
-        let active_policy = locked_state.expect_active_policy();
-        let bounded_type = active_policy.sid_table.sid_to_security_context(bounded_sid).type_();
-        let parent_type = active_policy.sid_table.sid_to_security_context(parent_sid).type_();
-        active_policy.parsed.is_bounded_by(bounded_type, parent_type)
-    }
-
-    /// Assign a [`SeLinuxStatusPublisher`] to be used for pushing updates to the security server's
-    /// policy status. This should be invoked exactly once when `selinuxfs` is initialized.
-    ///
-    /// # Panics
-    ///
-    /// This will panic on debug builds if it is invoked multiple times.
-    pub fn set_status_publisher(&self, status_holder: Box<dyn SeLinuxStatusPublisher>) {
-        self.with_state_and_update_status(|state| {
-            assert!(state.status_publisher.is_none());
-            state.status_publisher = Some(status_holder);
-        });
-    }
-
-    /// Returns a reference to the shared access vector cache that delebates cache misses to `self`.
-    pub fn get_shared_avc(&self) -> &impl Query {
-        self.avc_manager.get_shared_cache()
-    }
-
-    /// Returns a newly constructed thread-local access vector cache that delegates cache misses to
-    /// any shared caches owned by `self.avc_manager`, which ultimately delegate to `self`. The
-    /// returned cache will be reset when this security server's policy is reset.
-    pub fn new_thread_local_avc(&self) -> impl QueryMut {
-        self.avc_manager.new_thread_local_cache()
-    }
-
-    /// Runs the supplied function with locked `self`, and then updates the SELinux status file
-    /// associated with `self.state.status_publisher`, if any.
-    fn with_state_and_update_status(&self, f: impl FnOnce(&mut SecurityServerState)) {
-        let mut locked_state = self.state.lock();
-        f(locked_state.deref_mut());
-        let new_value = SeLinuxStatus {
-            is_enforcing: locked_state.enforcing,
-            change_count: locked_state.policy_change_count,
-            deny_unknown: locked_state.deny_unknown(),
-        };
-        if let Some(status_publisher) = &mut locked_state.status_publisher {
-            status_publisher.set_status(new_value);
-        }
-    }
-
-    /// Returns the [`SecurityId`] with which an object of type `file_class` created by `source_sid`
-    /// under a parent object with `target_sid`, should be labeled.
-    /// If `name` is specified then named transition rules will be taken into account. Named
-    /// transitions are currently only applied for "anon_inode" instances.
-    pub fn compute_new_file_sid_with_name(
+    fn compute_new_file_sid(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
         file_class: FileClass,
-        name: Option<NullessByteStr<'_>>,
     ) -> Result<SecurityId, anyhow::Error> {
         let mut locked_state = self.state.lock();
-        let active_policy = match &mut locked_state.active_policy {
-            Some(active_policy) => active_policy,
-            None => {
-                return Err(anyhow::anyhow!("no policy loaded")).context("computing new file sid")
-            }
-        };
+
+        // This interface will not be reached without a policy having been loaded.
+        let active_policy = locked_state.active_policy.as_mut().expect("Policy loaded");
 
         let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
         let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
@@ -562,7 +564,6 @@ impl SecurityServer {
             source_context,
             target_context,
             &file_class,
-            name,
         );
 
         active_policy
@@ -571,25 +572,30 @@ impl SecurityServer {
             .map_err(anyhow::Error::from)
             .context("computing new file security context from policy")
     }
-}
 
-impl Query for SecurityServer {
-    fn query(
-        &self,
-        source_sid: SecurityId,
-        target_sid: SecurityId,
-        target_class: AbstractObjectClass,
-    ) -> AccessDecision {
-        self.compute_access_vector(source_sid, target_sid, target_class)
-    }
-
-    fn compute_new_file_sid(
+    fn compute_new_file_sid_with_name(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
         file_class: FileClass,
-    ) -> Result<SecurityId, anyhow::Error> {
-        self.compute_new_file_sid_with_name(source_sid, target_sid, file_class, None)
+        file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId> {
+        let mut locked_state = self.state.lock();
+
+        // This interface will not be reached without a policy having been loaded.
+        let active_policy = locked_state.active_policy.as_mut().expect("Policy loaded");
+
+        let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
+        let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
+
+        let new_file_context = active_policy.parsed.new_file_security_context_by_name(
+            source_context,
+            target_context,
+            &file_class,
+            file_name,
+        )?;
+
+        active_policy.sid_table.security_context_to_sid(&new_file_context).ok()
     }
 }
 
@@ -654,7 +660,7 @@ mod tests {
         let sid1 = SecurityId::initial(InitialSid::Kernel);
         let sid2 = SecurityId::initial(InitialSid::Unlabeled);
         assert_eq!(
-            security_server.compute_access_vector(sid1, sid2, ObjectClass::Process.into()).allow,
+            security_server.query(sid1, sid2, ObjectClass::Process.into()).allow,
             AccessVector::ALL
         );
     }
@@ -741,20 +747,6 @@ mod tests {
     }
 
     #[test]
-    fn compute_new_file_sid_no_policy() {
-        let security_server = SecurityServer::new();
-
-        // Only initial SIDs can exist, until a policy has been loaded.
-        let source_sid = SecurityId::initial(InitialSid::Kernel);
-        let target_sid = SecurityId::initial(InitialSid::Unlabeled);
-        let error = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
-            .expect_err("expected error");
-        let error_string = format!("{:?}", error);
-        assert!(error_string.contains("no policy"));
-    }
-
-    #[test]
     fn compute_new_file_sid_no_defaults() {
         let security_server = SecurityServer::new();
         let policy_bytes =
@@ -769,7 +761,8 @@ mod tests {
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -795,7 +788,8 @@ mod tests {
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -821,7 +815,8 @@ mod tests {
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -846,7 +841,8 @@ mod tests {
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -872,7 +868,8 @@ mod tests {
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -897,7 +894,8 @@ mod tests {
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -922,7 +920,8 @@ mod tests {
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -948,7 +947,8 @@ mod tests {
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -973,7 +973,8 @@ mod tests {
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -1000,12 +1001,8 @@ mod tests {
 
         const SPECIAL_FILE_NAME: &[u8] = b"special_file";
         let computed_sid = security_server
-            .compute_new_file_sid_with_name(
-                source_sid,
-                target_sid,
-                FileClass::File,
-                Some(SPECIAL_FILE_NAME.into()),
-            )
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, SPECIAL_FILE_NAME.into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -1015,11 +1012,12 @@ mod tests {
         assert_eq!(computed_context, b"source_u:object_r:special_transition_t:s0");
 
         let computed_sid = security_server
-            .compute_new_file_sid_with_name(
+            .as_permission_check()
+            .compute_new_file_sid(
                 source_sid,
                 target_sid,
                 FileClass::Character,
-                Some(SPECIAL_FILE_NAME.into()),
+                SPECIAL_FILE_NAME.into(),
             )
             .expect("new sid computed");
         let computed_context = security_server
@@ -1032,12 +1030,8 @@ mod tests {
 
         const OTHER_FILE_NAME: &[u8] = b"other_file";
         let computed_sid = security_server
-            .compute_new_file_sid_with_name(
-                source_sid,
-                target_sid,
-                FileClass::File,
-                Some(OTHER_FILE_NAME.into()),
-            )
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, OTHER_FILE_NAME.into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)

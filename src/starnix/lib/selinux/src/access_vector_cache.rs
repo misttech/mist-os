@@ -4,13 +4,17 @@
 
 use crate::policy::AccessDecision;
 use crate::sync::Mutex;
-use crate::{AbstractObjectClass, FileClass, ObjectClass, SecurityId};
+use crate::{AbstractObjectClass, FileClass, NullessByteStr, ObjectClass, SecurityId};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 
-/// An interface for computing the rights permitted to a source accessing a target of a particular
-/// SELinux object type. This interface requires implementers to update state via interior mutability.
-pub trait Query {
+/// Interface used internally by the `SecurityServer` implementation to implement policy queries
+/// such as looking up the set of permissions to grant, or the Security Context to apply to new
+/// files, etc.
+///
+/// This trait allows layering of caching, delegation, and thread-safety between the policy-backed
+/// calculations, and the caller-facing permission-check interface.
+pub(super) trait Query {
     /// Computes the [`AccessVector`] permitted to `source_sid` for accessing `target_sid`, an
     /// object of of type `target_class`.
     fn query(
@@ -20,14 +24,28 @@ pub trait Query {
         target_class: AbstractObjectClass,
     ) -> AccessDecision;
 
-    /// Computes the appropriate security identifier (SID) for the security context of a file-like
-    /// object of class `file_class` created by `source_sid` targeting `target_sid`.
+    /// Returns the security identifier (SID) with which to label a new `file_class` instance
+    /// created by `source_sid` in a parent directory labeled `target_sid` should be labeled,
+    /// if no more specific SID was specified by `compute_new_file_sid_with_name()`, based on
+    /// the file's name.
     fn compute_new_file_sid(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
         file_class: FileClass,
     ) -> Result<SecurityId, anyhow::Error>;
+
+    /// Returns the security identifier (SID) with which to label a new `file_class` instance of
+    /// name `file_name`, created by `source_sid` in a parent directory labeled `target_sid`.
+    /// If no filename-transition rules exist for the specified `file_name` then `None` is
+    /// returned.
+    fn compute_new_file_sid_with_name(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+        file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId>;
 }
 
 /// An interface through which statistics may be obtained from each cache.
@@ -48,14 +66,28 @@ pub trait QueryMut {
         target_class: AbstractObjectClass,
     ) -> AccessDecision;
 
-    /// Computes the appropriate security identifier (SID) for the security context of a file-like
-    /// object of class `file_class` created by `source_sid` targeting `target_sid`.
+    /// Returns the security identifier (SID) with which to label a new `file_class` instance
+    /// created by `source_sid` in a parent directory labeled `target_sid` should be labeled,
+    /// if no more specific SID was specified by `compute_new_file_sid_with_name()`, based on
+    /// the file's name.
     fn compute_new_file_sid(
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
         file_class: FileClass,
     ) -> Result<SecurityId, anyhow::Error>;
+
+    /// Returns the security identifier (SID) with which to label a new `file_class` instance of
+    /// name `file_name`, created by `source_sid` in a parent directory labeled `target_sid`.
+    /// If no filename-transition rules exist for the specified `file_name` then `None` is
+    /// returned.
+    fn compute_new_file_sid_with_name(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+        file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId>;
 }
 
 impl<Q: Query> QueryMut for Q {
@@ -75,6 +107,17 @@ impl<Q: Query> QueryMut for Q {
         file_class: FileClass,
     ) -> Result<SecurityId, anyhow::Error> {
         (self as &dyn Query).compute_new_file_sid(source_sid, target_sid, file_class)
+    }
+
+    fn compute_new_file_sid_with_name(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+        file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId> {
+        (self as &dyn Query)
+            .compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
     }
 }
 
@@ -123,6 +166,16 @@ impl Query for DenyAll {
         _target_sid: SecurityId,
         _file_class: FileClass,
     ) -> Result<SecurityId, anyhow::Error> {
+        unreachable!()
+    }
+
+    fn compute_new_file_sid_with_name(
+        &self,
+        _source_sid: SecurityId,
+        _target_sid: SecurityId,
+        _file_class: FileClass,
+        _file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId> {
         unreachable!()
     }
 }
@@ -176,6 +229,16 @@ impl<D: QueryMut> QueryMut for Empty<D> {
         _target_sid: SecurityId,
         _file_class: FileClass,
     ) -> Result<SecurityId, anyhow::Error> {
+        unreachable!()
+    }
+
+    fn compute_new_file_sid_with_name(
+        &mut self,
+        _source_sid: SecurityId,
+        _target_sid: SecurityId,
+        _file_class: FileClass,
+        _file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId> {
         unreachable!()
     }
 }
@@ -344,6 +407,16 @@ impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
             new_file_sid
         }
     }
+
+    fn compute_new_file_sid_with_name(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+        file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId> {
+        self.delegate.compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
+    }
 }
 
 impl<D, const SIZE: usize> HasCacheStats for Fixed<D, SIZE> {
@@ -403,6 +476,18 @@ impl<D: QueryMut> Query for Locked<D> {
         file_class: FileClass,
     ) -> Result<SecurityId, anyhow::Error> {
         self.delegate.lock().compute_new_file_sid(source_sid, target_sid, file_class)
+    }
+
+    fn compute_new_file_sid_with_name(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+        file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId> {
+        self.delegate
+            .lock()
+            .compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
     }
 }
 
@@ -469,6 +554,16 @@ impl<Q: Query> Query for Arc<Q> {
     ) -> Result<SecurityId, anyhow::Error> {
         self.as_ref().compute_new_file_sid(source_sid, target_sid, file_class)
     }
+
+    fn compute_new_file_sid_with_name(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+        file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId> {
+        self.as_ref().compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
+    }
 }
 
 impl<R: Reset> Reset for Arc<R> {
@@ -496,6 +591,17 @@ impl<Q: Query> Query for Weak<Q> {
         self.upgrade()
             .map(|q| q.compute_new_file_sid(source_sid, target_sid, file_class))
             .unwrap_or(Err(anyhow::anyhow!("weak reference failed to resolve")))
+    }
+
+    fn compute_new_file_sid_with_name(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+        file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId> {
+        let delegate = self.upgrade()?;
+        delegate.compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
     }
 }
 
@@ -557,6 +663,17 @@ impl<D: QueryMut + ResetMut> QueryMut for ThreadLocalQuery<D> {
 
         // Allow `self.delegate` to implement caching strategy and prepare response.
         self.delegate.compute_new_file_sid(source_sid, target_sid, file_class)
+    }
+
+    fn compute_new_file_sid_with_name(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+        file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId> {
+        // Allow `self.delegate` to implement caching strategy and prepare response.
+        self.delegate.compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
     }
 }
 
@@ -718,6 +835,16 @@ mod tests {
             _target_sid: SecurityId,
             _file_class: FileClass,
         ) -> Result<SecurityId, anyhow::Error> {
+            unreachable!()
+        }
+
+        fn compute_new_file_sid_with_name(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _file_class: FileClass,
+            _file_name: NullessByteStr<'_>,
+        ) -> Option<SecurityId> {
             unreachable!()
         }
     }
@@ -913,6 +1040,16 @@ mod starnix_tests {
             _target_sid: SecurityId,
             _file_class: FileClass,
         ) -> Result<SecurityId, anyhow::Error> {
+            unreachable!()
+        }
+
+        fn compute_new_file_sid_with_name(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _file_class: FileClass,
+            _file_name: NullessByteStr<'_>,
+        ) -> Option<SecurityId> {
             unreachable!()
         }
     }
@@ -1230,6 +1367,16 @@ mod starnix_tests {
             _target_sid: SecurityId,
             _file_class: FileClass,
         ) -> Result<SecurityId, anyhow::Error> {
+            unreachable!()
+        }
+
+        fn compute_new_file_sid_with_name(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _file_class: FileClass,
+            _file_name: NullessByteStr<'_>,
+        ) -> Option<SecurityId> {
             unreachable!()
         }
     }
