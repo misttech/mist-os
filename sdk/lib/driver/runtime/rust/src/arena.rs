@@ -33,6 +33,8 @@ impl Arena {
         let mut arena = null_mut();
         // SAFETY: the address we pass to fdf_arena_create is allocated on
         // the stack and appropriately sized.
+        // This call cannot fail as the only reason it would fail is due to invalid
+        // option flags, and 0 is a valid option.
         Status::ok(unsafe { fdf_arena_create(0, 0, &mut arena) }).expect("Failed to create arena");
         // SAFETY: if fdf_arena_create returned ZX_OK, it will have placed
         // a non-null pointer.

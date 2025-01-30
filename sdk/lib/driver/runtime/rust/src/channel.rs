@@ -30,6 +30,8 @@ impl<T: ?Sized + 'static> Channel<T> {
     pub fn create() -> (Self, Self) {
         let mut channel1 = 0;
         let mut channel2 = 0;
+        // This call cannot fail as the only reason it would fail is due to invalid
+        // option flags, and 0 is a valid option.
         Status::ok(unsafe { fdf_channel_create(0, &mut channel1, &mut channel2) })
             .expect("failed to create channel pair");
         // SAFETY: if fdf_channel_create returned ZX_OK, it will have placed
