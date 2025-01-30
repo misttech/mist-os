@@ -9,6 +9,7 @@ pub mod metadata;
 pub mod parsed_policy;
 pub mod parser;
 
+mod constraints;
 mod extensible_bitmap;
 mod security_context;
 mod symbols;

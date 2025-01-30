@@ -75,6 +75,12 @@ impl SecurityContext {
         self.high_level.as_ref()
     }
 
+    /// Returns the high level if distinct from the low level, or
+    /// else returns the low level.
+    pub fn effective_high_level(&self) -> &SecurityLevel {
+        self.high_level().map_or(&self.low_level, |x| x)
+    }
+
     /// Returns a `SecurityContext` parsed from `security_context`, against the supplied
     /// `policy`.  The returned structure is guaranteed to be valid for this `policy`.
     ///

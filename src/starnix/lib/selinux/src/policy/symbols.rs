@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::constraints::{evaluate_constraint, ConstraintError};
 use super::error::{ParseError, ValidateError};
 use super::extensible_bitmap::{
     ExtensibleBitmap, ExtensibleBitmapSpan, ExtensibleBitmapSpansIterator,
 };
 use super::parser::ParseStrategy;
-use super::security_context::{CategoryIterator, Level};
+use super::security_context::{CategoryIterator, Level, SecurityContext};
 use super::{
     array_type, array_type_validate_deref_both, array_type_validate_deref_data,
     array_type_validate_deref_metadata_data_vec, array_type_validate_deref_none_data_vec, Array,
@@ -21,27 +22,21 @@ use std::num::NonZeroU32;
 use std::ops::Deref;
 use zerocopy::{little_endian as le, FromBytes, Immutable, KnownLayout, Unaligned};
 
-// TODO: https://fxbug.dev/372400976 - Eliminate `dead_code` guards for constraint-
-// related constants.
 /// The `constraint_term_type` metadata field value for a [`ConstraintTerm`]
 /// that represents the "not" operator.
-#[allow(dead_code)]
 pub(super) const CONSTRAINT_TERM_TYPE_NOT_OPERATOR: u32 = 1;
 
 /// The `constraint_term_type` metadata field value for a [`ConstraintTerm`]
 /// that represents the "and" operator.
-#[allow(dead_code)]
 pub(super) const CONSTRAINT_TERM_TYPE_AND_OPERATOR: u32 = 2;
 
 /// The `constraint_term_type` metadata field value for a [`ConstraintTerm`]
 /// that represents the "or" operator.
-#[allow(dead_code)]
 pub(super) const CONSTRAINT_TERM_TYPE_OR_OPERATOR: u32 = 3;
 
 /// The `constraint_term_type` metadata field value for a [`ConstraintTerm`]
 /// that represents a boolean expression where both arguments are fields of
 /// a source and/or target security context.
-#[allow(dead_code)]
 pub(super) const CONSTRAINT_TERM_TYPE_EXPR: u32 = 4;
 
 /// The `constraint_term_type` metadata field value for a [`ConstraintTerm`]
@@ -56,30 +51,33 @@ pub(super) const CONSTRAINT_TERM_TYPE_EXPR: u32 = 4;
 /// In this case, the [`ConstraintTerm`] contains an [`ExtensibleBitmap`] that
 /// encodes the set of user, role, or type IDs corresponding to the names, and a
 /// [`TypeSet`] encoding the corresponding set of types.
-#[allow(dead_code)]
 pub(super) const CONSTRAINT_TERM_TYPE_EXPR_WITH_NAMES: u32 = 5;
 
 /// Valid `expr_operator_type` metadata field values for a [`ConstraintTerm`]
 /// with `type` equal to `CONSTRAINT_TERM_TYPE_EXPR` or
 /// `CONSTRAINT_TERM_TYPE_EXPR_WITH_NAMES`.
 ///
+/// NB. `EXPR_OPERATOR_TYPE_{DOM,DOMBY,INCOMP}` were previously valid for
+///      constraints on role IDs, but this was deprecated as of SELinux
+///      policy version 26.
+///
 /// The `expr_operator_type` value for an expression of form "A == B".
-#[allow(dead_code)]
-pub(super) const EXPR_OPERATOR_TYPE_EQ: u32 = 1;
+/// Valid for constraints on user, role, and type IDs.
+pub(super) const CONSTRAINT_EXPR_OPERATOR_TYPE_EQ: u32 = 1;
 /// The `expr_operator_type` value for an expression of form "A != B".
-#[allow(dead_code)]
-pub(super) const EXPR_OPERATOR_TYPE_NE: u32 = 2;
+/// Valid for constraints on user, role, and type IDs.
+pub(super) const CONSTRAINT_EXPR_OPERATOR_TYPE_NE: u32 = 2;
 /// The `expr_operator_type` value for an expression of form "A dominates B".
-#[allow(dead_code)]
-pub(super) const EXPR_OPERATOR_TYPE_DOM: u32 = 3;
+/// Valid for constraints on security levels.
+pub(super) const CONSTRAINT_EXPR_OPERATOR_TYPE_DOM: u32 = 3;
 /// The `expr_operator_type` value for an expression of form "A is dominated
 /// by B".
-#[allow(dead_code)]
-pub(super) const EXPR_OPERATOR_TYPE_DOMBY: u32 = 4;
+/// Valid for constraints on security levels.
+pub(super) const CONSTRAINT_EXPR_OPERATOR_TYPE_DOMBY: u32 = 4;
 /// The `expr_operator_type` value for an expression of form "A is
 /// incomparable to B".
-#[allow(dead_code)]
-pub(super) const EXPR_OPERATOR_TYPE_INCOMP: u32 = 5;
+/// Valid for constraints on security levels.
+pub(super) const CONSTRAINT_EXPR_OPERATOR_TYPE_INCOMP: u32 = 5;
 
 /// Valid `expr_operand_type` metadata field values for a [`ConstraintTerm`]
 /// with `constraint_term_type` equal to `CONSTRAINT_TERM_TYPE_EXPR` or
@@ -99,38 +97,29 @@ pub(super) const EXPR_OPERATOR_TYPE_INCOMP: u32 = 5;
 /// the `expr_operand_type` field is set (--> target) or not (--> source).
 ///
 /// The `expr_operand_type` value for an expression comparing user IDs.
-#[allow(dead_code)]
-pub(super) const EXPR_OPERAND_TYPE_USER: u32 = 1;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_USER: u32 = 1;
 /// The `expr_operand_type` value for an expression comparing role IDs.
-#[allow(dead_code)]
-pub(super) const EXPR_OPERAND_TYPE_ROLE: u32 = 2;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_ROLE: u32 = 2;
 /// The `expr_operand_type` value for an expression comparing type IDs.
-#[allow(dead_code)]
-pub(super) const EXPR_OPERAND_TYPE_TYPE: u32 = 4;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_TYPE: u32 = 4;
 /// The `expr_operand_type` value for an expression comparing the source
 /// context's low security level to the target context's low security level.
-#[allow(dead_code)]
-pub(super) const EXPR_OPERAND_TYPE_L1_L2: u32 = 32;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L1_L2: u32 = 32;
 /// The `expr_operand_type` value for an expression comparing the source
 /// context's low security level to the target context's high security level.
-#[allow(dead_code)]
-pub(super) const EXPR_OPERAND_TYPE_L1_H2: u32 = 64;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L1_H2: u32 = 64;
 /// The `expr_operand_type` value for an expression comparing the source
 /// context's high security level to the target context's low security level.
-#[allow(dead_code)]
-pub(super) const EXPR_OPERAND_TYPE_H1_L2: u32 = 128;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_H1_L2: u32 = 128;
 /// The `expr_operand_type` value for an expression comparing the source
 /// context's high security level to the target context's high security level.
-#[allow(dead_code)]
-pub(super) const EXPR_OPERAND_TYPE_H1_H2: u32 = 256;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_H1_H2: u32 = 256;
 /// The `expr_operand_type` value for an expression comparing the source
 /// context's low security level to the source context's high security level.
-#[allow(dead_code)]
-pub(super) const EXPR_OPERAND_TYPE_L1_H1: u32 = 512;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L1_H1: u32 = 512;
 /// The `expr_operand_type` value for an expression comparing the target
 /// context's low security level to the target context's high security level.
-#[allow(dead_code)]
-pub(super) const EXPR_OPERAND_TYPE_L2_H2: u32 = 1024;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L2_H2: u32 = 1024;
 
 /// For a [`ConstraintTerm`] with `constraint_term_type` equal to
 /// `CONSTRAINT_TERM_TYPE_EXPR_WITH_NAMES` the `expr_operand_type` may have the
@@ -144,8 +133,7 @@ pub(super) const EXPR_OPERAND_TYPE_L2_H2: u32 = 1024;
 /// If the bit is not set, then the expression compares the source's
 /// {user,role,type} ID to the set of IDs listed in the [`ConstraintTerm`]'s
 /// `names` field.
-#[allow(dead_code)]
-pub(super) const EXPR_WITH_NAMES_OPERAND_TYPE_TARGET_MASK: u32 = 8;
+pub(super) const CONSTRAINT_EXPR_WITH_NAMES_OPERAND_TYPE_TARGET_MASK: u32 = 8;
 
 /// Exact value of [`Type`] `properties` when the underlying data refers to an SELinux type.
 ///
@@ -497,9 +485,17 @@ impl<PS: ParseStrategy> ValidateArray<ConstraintTermCount, ConstraintTerm<PS>>
     }
 }
 
-// TODO: https://fxbug.dev/372400976 - Eliminate `dead_code` guard.
 impl<PS: ParseStrategy> ConstraintExpr<PS> {
+    // TODO: https://fxbug.dev/372400976 - Remove `dead_code` guard.
     #[allow(dead_code)]
+    pub(super) fn evaluate(
+        &self,
+        source_context: &SecurityContext,
+        target_context: &SecurityContext,
+    ) -> Result<bool, ConstraintError> {
+        evaluate_constraint(&self, source_context, target_context)
+    }
+
     pub(super) fn constraint_terms(&self) -> &[ConstraintTerm<PS>] {
         &self.data
     }
@@ -573,28 +569,26 @@ where
     }
 }
 
-// TODO: https://fxbug.dev/372400976 - Eliminate `dead_code` guards.
 impl<PS: ParseStrategy> ConstraintTerm<PS> {
-    #[allow(dead_code)]
     pub(super) fn constraint_term_type(&self) -> u32 {
         PS::deref(&self.metadata).constraint_term_type.get()
     }
 
-    #[allow(dead_code)]
     pub(super) fn expr_operand_type(&self) -> u32 {
         PS::deref(&self.metadata).expr_operand_type.get()
     }
 
-    #[allow(dead_code)]
     pub(super) fn expr_operator_type(&self) -> u32 {
         PS::deref(&self.metadata).expr_operator_type.get()
     }
 
-    #[allow(dead_code)]
     pub(super) fn names(&self) -> Option<&ExtensibleBitmap<PS>> {
         self.names.as_ref()
     }
 
+    // TODO: https://fxbug.dev/372400976 - Unused, unsure if needed.
+    // Possibly becomes interesting when the policy contains type
+    // attributes.
     #[allow(dead_code)]
     pub(super) fn names_type_set(&self) -> &Option<TypeSet<PS>> {
         &self.names_type_set
@@ -1903,7 +1897,7 @@ mod tests {
 
     #[test]
     fn parse_mls_constrain_statement() {
-        let policy_bytes = include_bytes!("../../testdata/micro_policies/constraint_policy.pp");
+        let policy_bytes = include_bytes!("../../testdata/micro_policies/constraints_policy.pp");
         let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
         let parsed_policy = &policy.0;
         Validate::validate(parsed_policy).expect("validate policy");
@@ -1919,12 +1913,36 @@ mod tests {
         // NB. Constraint statements appear in reverse order in binary policy
         // vs. text policy.
         let expected = [
-            (CONSTRAINT_TERM_TYPE_EXPR, EXPR_OPERATOR_TYPE_INCOMP, EXPR_OPERAND_TYPE_L1_H1),
-            (CONSTRAINT_TERM_TYPE_EXPR, EXPR_OPERATOR_TYPE_INCOMP, EXPR_OPERAND_TYPE_H1_H2),
-            (CONSTRAINT_TERM_TYPE_EXPR, EXPR_OPERATOR_TYPE_DOMBY, EXPR_OPERAND_TYPE_L1_H2),
-            (CONSTRAINT_TERM_TYPE_EXPR, EXPR_OPERATOR_TYPE_DOM, EXPR_OPERAND_TYPE_H1_L2),
-            (CONSTRAINT_TERM_TYPE_EXPR, EXPR_OPERATOR_TYPE_NE, EXPR_OPERAND_TYPE_L2_H2),
-            (CONSTRAINT_TERM_TYPE_EXPR, EXPR_OPERATOR_TYPE_EQ, EXPR_OPERAND_TYPE_L1_L2),
+            (
+                CONSTRAINT_TERM_TYPE_EXPR,
+                CONSTRAINT_EXPR_OPERATOR_TYPE_INCOMP,
+                CONSTRAINT_EXPR_OPERAND_TYPE_L1_H1,
+            ),
+            (
+                CONSTRAINT_TERM_TYPE_EXPR,
+                CONSTRAINT_EXPR_OPERATOR_TYPE_INCOMP,
+                CONSTRAINT_EXPR_OPERAND_TYPE_H1_H2,
+            ),
+            (
+                CONSTRAINT_TERM_TYPE_EXPR,
+                CONSTRAINT_EXPR_OPERATOR_TYPE_DOMBY,
+                CONSTRAINT_EXPR_OPERAND_TYPE_L1_H2,
+            ),
+            (
+                CONSTRAINT_TERM_TYPE_EXPR,
+                CONSTRAINT_EXPR_OPERATOR_TYPE_DOM,
+                CONSTRAINT_EXPR_OPERAND_TYPE_H1_L2,
+            ),
+            (
+                CONSTRAINT_TERM_TYPE_EXPR,
+                CONSTRAINT_EXPR_OPERATOR_TYPE_NE,
+                CONSTRAINT_EXPR_OPERAND_TYPE_L2_H2,
+            ),
+            (
+                CONSTRAINT_TERM_TYPE_EXPR,
+                CONSTRAINT_EXPR_OPERATOR_TYPE_EQ,
+                CONSTRAINT_EXPR_OPERAND_TYPE_L1_L2,
+            ),
         ];
         for (i, constraint) in constraints.iter().enumerate() {
             assert_eq!(constraint.permission_mask(), 1, "constraint {}", i);
@@ -1942,7 +1960,7 @@ mod tests {
 
     #[test]
     fn parse_constrain_statement() {
-        let policy_bytes = include_bytes!("../../testdata/micro_policies/constraint_policy.pp");
+        let policy_bytes = include_bytes!("../../testdata/micro_policies/constraints_policy.pp");
         let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
         let parsed_policy = &policy.0;
         Validate::validate(parsed_policy).expect("validate policy");
@@ -1964,13 +1982,26 @@ mod tests {
         let expected = [
             (
                 CONSTRAINT_TERM_TYPE_EXPR_WITH_NAMES,
-                EXPR_OPERATOR_TYPE_EQ,
-                EXPR_OPERAND_TYPE_USER | EXPR_WITH_NAMES_OPERAND_TYPE_TARGET_MASK,
+                CONSTRAINT_EXPR_OPERATOR_TYPE_EQ,
+                CONSTRAINT_EXPR_OPERAND_TYPE_USER
+                    | CONSTRAINT_EXPR_WITH_NAMES_OPERAND_TYPE_TARGET_MASK,
             ),
-            (CONSTRAINT_TERM_TYPE_EXPR, EXPR_OPERATOR_TYPE_EQ, EXPR_OPERAND_TYPE_ROLE),
+            (
+                CONSTRAINT_TERM_TYPE_EXPR,
+                CONSTRAINT_EXPR_OPERATOR_TYPE_EQ,
+                CONSTRAINT_EXPR_OPERAND_TYPE_ROLE,
+            ),
             (CONSTRAINT_TERM_TYPE_AND_OPERATOR, 0, 0),
-            (CONSTRAINT_TERM_TYPE_EXPR, EXPR_OPERATOR_TYPE_EQ, EXPR_OPERAND_TYPE_USER),
-            (CONSTRAINT_TERM_TYPE_EXPR, EXPR_OPERATOR_TYPE_EQ, EXPR_OPERAND_TYPE_TYPE),
+            (
+                CONSTRAINT_TERM_TYPE_EXPR,
+                CONSTRAINT_EXPR_OPERATOR_TYPE_EQ,
+                CONSTRAINT_EXPR_OPERAND_TYPE_USER,
+            ),
+            (
+                CONSTRAINT_TERM_TYPE_EXPR,
+                CONSTRAINT_EXPR_OPERATOR_TYPE_EQ,
+                CONSTRAINT_EXPR_OPERAND_TYPE_TYPE,
+            ),
             (CONSTRAINT_TERM_TYPE_NOT_OPERATOR, 0, 0),
             (CONSTRAINT_TERM_TYPE_AND_OPERATOR, 0, 0),
             (CONSTRAINT_TERM_TYPE_OR_OPERATOR, 0, 0),
