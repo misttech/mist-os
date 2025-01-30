@@ -38,8 +38,10 @@ class SessionAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         self.device.session.stop()
 
     def teardown_test(self) -> None:
-        self.device.session.stop()
-        super().teardown_test()
+        try:
+            self.device.session.stop()
+        finally:
+            super().teardown_test()
 
     def test_add_component(self) -> None:
         """Test case for session.add_component()"""
