@@ -97,22 +97,13 @@ impl File for VmoBlob {
             return Err(zx::Status::NOT_SUPPORTED);
         }
 
-        // If the VMO we return is not going to be written to then we can return a REFERENCE instead
-        // of a SNAPSHOT child, which has a more efficient kernel representation. A VMO will be
-        // written to if it has the WRITE flag *OR* if it has the EXECUTE flag, since the debugger
-        // will modify read-only code sections, which would be incorrect to do if it were a
-        // REFERENCE.
-        let use_reference = !flags.intersects(fio::VmoFlags::WRITE | fio::VmoFlags::EXECUTE);
-        let mut child_options = if use_reference {
-            zx::VmoChildOptions::REFERENCE
-        } else {
-            zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE
-        };
+        let mut child_options = zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE;
+        // By default, SNAPSHOT includes WRITE, so we explicitly remove it if not required.
         if !flags.contains(fio::VmoFlags::WRITE) {
             child_options |= zx::VmoChildOptions::NO_WRITE
         }
-        let child_size = if use_reference { 0 } else { self.vmo.get_content_size()? };
-        let mut child_vmo = self.vmo.create_child(child_options, 0, child_size)?;
+        let mut child_vmo =
+            self.vmo.create_child(child_options, 0, self.vmo.get_content_size()?)?;
 
         if flags.contains(fio::VmoFlags::EXECUTE) {
             // TODO(https://fxbug.dev/293606235): Filter out other flags.
