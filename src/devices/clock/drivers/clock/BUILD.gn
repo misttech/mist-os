@@ -24,6 +24,7 @@ source_set("common") {
   ]
   sources = [ "clock.cc" ]
   deps = [
+    "//sdk/lib/driver/metadata/cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.clock:fuchsia.clock_cpp",
     "//src/devices/lib/driver:driver_runtime",
@@ -71,6 +72,7 @@ test("clock-test-bin") {
     ":common",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//src/devices/testing/mock-ddk:mock-ddk",
     "//src/lib/ddk:ddk-metadata-headers",

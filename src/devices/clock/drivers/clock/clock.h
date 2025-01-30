@@ -6,7 +6,7 @@
 #define SRC_DEVICES_CLOCK_DRIVERS_CLOCK_CLOCK_H_
 
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
-#include <fidl/fuchsia.hardware.clockimpl/cpp/driver/wire.h>
+#include <fidl/fuchsia.hardware.clockimpl/cpp/driver/fidl.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -62,7 +62,7 @@ class ClockDriver : public fdf::DriverBase {
 
  private:
   static zx_status_t ConfigureClocks(
-      const fuchsia_hardware_clockimpl::wire::InitMetadata& metadata,
+      const fuchsia_hardware_clockimpl::InitMetadata& metadata,
       fdf::ClientEnd<fuchsia_hardware_clockimpl::ClockImpl> clock_impl);
 
   zx_status_t CreateClockDevices();
