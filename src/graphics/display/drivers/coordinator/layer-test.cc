@@ -12,6 +12,8 @@
 #include <lib/sync/cpp/completion.h>
 #include <lib/zx/result.h>
 
+#include <functional>
+
 #include <fbl/auto_lock.h>
 #include <fbl/intrusive_single_list.h>
 #include <fbl/ref_ptr.h>
@@ -83,108 +85,37 @@ class LayerTest : public TestBase {
         std::move(deleter));
   }
 
-  // Helper that waits for asynchronous completion of `layer.ActivateLatestReadyImage()`, which is
-  // invoked on the controller's client dispatcher (as it would be while handling a FIDL request).
+  // Helper struct for `RunOnControllerLoop()`.  `std::optional<void>` is illegal, so we need our
+  // own structs, one for each of the void and non-void cases.
   //
-  // Must not be called on the controller's client loop, otherwise deadlock is guaranteed.
-  bool ActivateLatestReadyImageOnControllerLoop(Layer& layer) {
-    std::optional<bool> return_value;
+  // Note: T must be default-constructable.  This is for simplicity, and meets current use cases.
+  template <typename T>
+  struct RunOnControllerLoopResultHolder {
+    T value;
+  };
+
+  // Specialization for void return type.
+  template <>
+  struct RunOnControllerLoopResultHolder<void> {};
+
+  template <typename ReturnType>
+  ReturnType RunOnControllerLoop(std::function<ReturnType()> func) {
+    RunOnControllerLoopResultHolder<ReturnType> result;
     libsync::Completion completion;
 
     async::PostTask(CoordinatorController()->client_dispatcher()->async_dispatcher(), [&]() {
-      return_value = layer.ActivateLatestReadyImage();
+      if constexpr (std::is_same_v<ReturnType, void>) {
+        func();
+      } else {
+        result.value = func();
+      }
       completion.Signal();
     });
+
     completion.Wait();
-    ZX_ASSERT(return_value.has_value());
-    return return_value.value();
-  }
-
-  // Helper that waits for asynchronous completion of `layer.ResolvePendingImage()`, which is
-  // invoked on the controller's client dispatcher (as it would be while handling a FIDL request).
-  //
-  // Must not be called on the controller's client loop, otherwise deadlock is guaranteed.
-  bool ResolvePendingImageOnControllerLoop(Layer& layer, FenceCollection* fences,
-                                           display::ConfigStamp stamp) {
-    std::optional<bool> return_value;
-    libsync::Completion completion;
-
-    async::PostTask(CoordinatorController()->client_dispatcher()->async_dispatcher(), [&]() {
-      return_value = layer.ResolvePendingImage(fences, stamp);
-      completion.Signal();
-    });
-    completion.Wait();
-    ZX_ASSERT(return_value.has_value());
-    return return_value.value();
-  }
-
-  // Helper that waits for asynchronous completion of `layer.CleanUpAllImages()`, which is invoked
-  // on the controller's client dispatcher (as it would be while handling a FIDL request).
-  //
-  // Must not be called on the controller's client loop, otherwise deadlock is guaranteed.
-  bool CleanUpAllImagesOnControllerLoop(Layer& layer) {
-    std::optional<bool> return_value;
-    libsync::Completion completion;
-
-    async::PostTask(CoordinatorController()->client_dispatcher()->async_dispatcher(), [&]() {
-      fbl::AutoLock lock(CoordinatorController()->mtx());
-      CoordinatorController()->AssertMtxAliasHeld(*layer.mtx());
-      return_value = layer.CleanUpAllImages();
-      completion.Signal();
-    });
-    completion.Wait();
-    ZX_ASSERT(return_value.has_value());
-    return return_value.value();
-  }
-
-  // Helper that waits for asynchronous completion of `layer.CleanUpImage()`, which is invoked
-  // on the controller's client dispatcher (as it would be while handling a FIDL request).
-  //
-  // Must not be called on the controller's client loop, otherwise deadlock is guaranteed.
-  bool CleanUpImageOnControllerLoop(Layer& layer, const Image& image) {
-    std::optional<bool> return_value;
-    libsync::Completion completion;
-
-    async::PostTask(CoordinatorController()->client_dispatcher()->async_dispatcher(), [&]() {
-      fbl::AutoLock lock(CoordinatorController()->mtx());
-      CoordinatorController()->AssertMtxAliasHeld(*layer.mtx());
-      return_value = layer.CleanUpImage(image);
-      completion.Signal();
-    });
-    completion.Wait();
-    ZX_ASSERT(return_value.has_value());
-    return return_value.value();
-  }
-
-  // Helper that waits for asynchronous completion of `fences->ImportEvent()`, which is invoked
-  // on the controller's client dispatcher (as it would be while handling a FIDL request).
-  // This is necessary because there are ASSERTs that verify that the fence is being used on the
-  // loop it was created on.
-  //
-  // Must not be called on the controller's client loop, otherwise deadlock is guaranteed.
-  void ImportEventOnControllerLoop(FenceCollection* fences, zx::event event,
-                                   display::EventId event_id) {
-    libsync::Completion completion;
-    async::PostTask(CoordinatorController()->client_dispatcher()->async_dispatcher(), [&]() {
-      fences_->ImportEvent(std::move(event), event_id);
-      completion.Signal();
-    });
-    completion.Wait();
-  }
-
-  // Helper that waits for asynchronous completion of `fences->ReleaseEvent()`, which is invoked
-  // on the controller's client dispatcher (as it would be while handling a FIDL request).
-  // This is necessary because there are ASSERTs that verify that the fence is being used on the
-  // loop it was created on.
-  //
-  // Must not be called on the controller's client loop, otherwise deadlock is guaranteed.
-  void ReleaseEventOnControllerLoop(FenceCollection* fences, display::EventId event_id) {
-    libsync::Completion completion;
-    async::PostTask(CoordinatorController()->client_dispatcher()->async_dispatcher(), [&]() {
-      fences_->ReleaseEvent(event_id);
-      completion.Signal();
-    });
-    completion.Wait();
+    if constexpr (!std::is_same_v<ReturnType, void>) {
+      return std::move(result).value;
+    }
   }
 
  protected:
@@ -228,42 +159,62 @@ TEST_F(LayerTest, CleanUpImage) {
   auto displayed_image = CreateReadyImage();
   layer->SetImage(displayed_image, display::kInvalidEventId);
   layer->ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-  ASSERT_TRUE(ResolvePendingImageOnControllerLoop(*layer, fences_.get(), display::ConfigStamp(1)));
+
+  ASSERT_TRUE(RunOnControllerLoop<bool>(
+      [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(1)); }));
 
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
   constexpr display::EventId kWaitFenceId(1);
-  ImportEventOnControllerLoop(fences_.get(), std::move(event), kWaitFenceId);
-  auto fence_release = fit::defer(
-      [this, kWaitFenceId] { ReleaseEventOnControllerLoop(fences_.get(), kWaitFenceId); });
+  RunOnControllerLoop<void>([&]() { fences_->ImportEvent(std::move(event), kWaitFenceId); });
+  auto fence_release = fit::defer([this, kWaitFenceId] {
+    RunOnControllerLoop<void>([&]() { fences_->ReleaseEvent(kWaitFenceId); });
+  });
 
   auto waiting_image = CreateReadyImage();
   layer->SetImage(waiting_image, kWaitFenceId);
-  ASSERT_TRUE(ResolvePendingImageOnControllerLoop(*layer, fences_.get(), display::ConfigStamp(2)));
+  ASSERT_TRUE(RunOnControllerLoop<bool>(
+      [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(2)); }));
 
   auto pending_image = CreateReadyImage();
   layer->SetImage(pending_image, display::kInvalidEventId);
 
-  ASSERT_TRUE(ActivateLatestReadyImageOnControllerLoop(*layer));
+  ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
   EXPECT_TRUE(layer->current_image());
 
   // Nothing should happen if image doesn't match.
   auto not_matching_image = CreateReadyImage();
-  EXPECT_FALSE(CleanUpImageOnControllerLoop(*layer, *not_matching_image));
+  EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+    fbl::AutoLock lock(CoordinatorController()->mtx());
+    CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
+    return layer->CleanUpImage(*not_matching_image);
+  }));
   EXPECT_TRUE(layer->current_image());
 
   // Test cleaning up a waiting image.
-  EXPECT_FALSE(CleanUpImageOnControllerLoop(*layer, *waiting_image));
+  EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+    fbl::AutoLock lock(CoordinatorController()->mtx());
+    CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
+    return layer->CleanUpImage(*waiting_image);
+  }));
   EXPECT_TRUE(layer->current_image());
 
   // Test cleaning up a pending image.
-  EXPECT_FALSE(CleanUpImageOnControllerLoop(*layer, *pending_image));
+  EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+    fbl::AutoLock lock(CoordinatorController()->mtx());
+    CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
+    return layer->CleanUpImage(*pending_image);
+  }));
   EXPECT_TRUE(layer->current_image());
 
   // Test cleaning up the displayed image.
   // layer is not labeled current, so it doesn't change the current config.
-  EXPECT_FALSE(CleanUpImageOnControllerLoop(*layer, *displayed_image));
+  EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+    fbl::AutoLock lock(CoordinatorController()->mtx());
+    CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
+    return layer->CleanUpImage(*displayed_image);
+  }));
   EXPECT_FALSE(layer->current_image());
 }
 
@@ -286,14 +237,18 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
     auto image = CreateReadyImage();
     layer->SetImage(image, display::kInvalidEventId);
     layer->ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-    ASSERT_TRUE(
-        ResolvePendingImageOnControllerLoop(*layer, fences_.get(), display::ConfigStamp(1)));
-    ASSERT_TRUE(ActivateLatestReadyImageOnControllerLoop(*layer));
+    ASSERT_TRUE(RunOnControllerLoop<bool>(
+        [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(1)); }));
+    ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
     EXPECT_TRUE(layer->current_image());
     // layer is not labeled current, so image cleanup doesn't change the current
     // config.
-    EXPECT_FALSE(CleanUpImageOnControllerLoop(*layer, *image));
+    EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+      fbl::AutoLock lock(CoordinatorController()->mtx());
+      CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
+      return layer->CleanUpImage(*image);
+    }));
     EXPECT_FALSE(layer->current_image());
   }
 
@@ -304,13 +259,17 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
     auto image = CreateReadyImage();
     layer->SetImage(image, display::kInvalidEventId);
     layer->ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-    ASSERT_TRUE(
-        ResolvePendingImageOnControllerLoop(*layer, fences_.get(), display::ConfigStamp(2)));
-    ASSERT_TRUE(ActivateLatestReadyImageOnControllerLoop(*layer));
+    ASSERT_TRUE(RunOnControllerLoop<bool>(
+        [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(2)); }));
+    ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
     EXPECT_TRUE(layer->current_image());
     // layer is labeled current, so image cleanup will change the current config.
-    EXPECT_TRUE(CleanUpImageOnControllerLoop(*layer, *image));
+    EXPECT_TRUE(RunOnControllerLoop<bool>([&]() {
+      fbl::AutoLock lock(CoordinatorController()->mtx());
+      CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
+      return layer->CleanUpImage(*image);
+    }));
     EXPECT_FALSE(layer->current_image());
 
     current_layers.clear();
@@ -332,26 +291,33 @@ TEST_F(LayerTest, CleanUpAllImages) {
   auto displayed_image = CreateReadyImage();
   layer->SetImage(displayed_image, display::kInvalidEventId);
   layer->ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-  ASSERT_TRUE(ResolvePendingImageOnControllerLoop(*layer, fences_.get(), display::ConfigStamp(1)));
+  ASSERT_TRUE(RunOnControllerLoop<bool>(
+      [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(1)); }));
 
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
   constexpr display::EventId kWaitFenceId(1);
-  ImportEventOnControllerLoop(fences_.get(), std::move(event), kWaitFenceId);
-  auto fence_release = fit::defer(
-      [this, kWaitFenceId] { ReleaseEventOnControllerLoop(fences_.get(), kWaitFenceId); });
+  RunOnControllerLoop<void>([&]() { fences_->ImportEvent(std::move(event), kWaitFenceId); });
+  auto fence_release = fit::defer([this, kWaitFenceId] {
+    RunOnControllerLoop<void>([&]() { fences_->ReleaseEvent(kWaitFenceId); });
+  });
 
   auto waiting_image = CreateReadyImage();
   layer->SetImage(waiting_image, kWaitFenceId);
-  ASSERT_TRUE(ResolvePendingImageOnControllerLoop(*layer, fences_.get(), display::ConfigStamp(2)));
+  ASSERT_TRUE(RunOnControllerLoop<bool>(
+      [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(2)); }));
 
   auto pending_image = CreateReadyImage();
   layer->SetImage(pending_image, display::kInvalidEventId);
 
-  ASSERT_TRUE(ActivateLatestReadyImageOnControllerLoop(*layer));
+  ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
   // layer is not labeled current, so it doesn't change the current config.
-  EXPECT_FALSE(CleanUpAllImagesOnControllerLoop(*layer));
+  EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+    fbl::AutoLock lock(CoordinatorController()->mtx());
+    CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
+    return layer->CleanUpAllImages();
+  }));
   EXPECT_FALSE(layer->current_image());
 }
 
@@ -374,14 +340,18 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
     auto image = CreateReadyImage();
     layer->SetImage(image, display::kInvalidEventId);
     layer->ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-    ASSERT_TRUE(
-        ResolvePendingImageOnControllerLoop(*layer, fences_.get(), display::ConfigStamp(1)));
-    ASSERT_TRUE(ActivateLatestReadyImageOnControllerLoop(*layer));
+    ASSERT_TRUE(RunOnControllerLoop<bool>(
+        [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(1)); }));
+    ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
     EXPECT_TRUE(layer->current_image());
     // layer is not labeled current, so image cleanup doesn't change the current
     // config.
-    EXPECT_FALSE(CleanUpAllImagesOnControllerLoop(*layer));
+    EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+      fbl::AutoLock lock(CoordinatorController()->mtx());
+      CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
+      return layer->CleanUpAllImages();
+    }));
     EXPECT_FALSE(layer->current_image());
   }
 
@@ -392,13 +362,17 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
     auto image = CreateReadyImage();
     layer->SetImage(image, display::kInvalidEventId);
     layer->ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-    ASSERT_TRUE(
-        ResolvePendingImageOnControllerLoop(*layer, fences_.get(), display::ConfigStamp(2)));
-    ASSERT_TRUE(ActivateLatestReadyImageOnControllerLoop(*layer));
+    ASSERT_TRUE(RunOnControllerLoop<bool>(
+        [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(2)); }));
+    ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
     EXPECT_TRUE(layer->current_image());
     // layer is labeled current, so image cleanup will change the current config.
-    EXPECT_TRUE(CleanUpAllImagesOnControllerLoop(*layer));
+    EXPECT_TRUE(RunOnControllerLoop<bool>([&]() {
+      fbl::AutoLock lock(CoordinatorController()->mtx());
+      CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
+      return layer->CleanUpAllImages();
+    }));
     EXPECT_FALSE(layer->current_image());
 
     current_layers.clear();
