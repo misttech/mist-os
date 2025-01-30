@@ -328,7 +328,7 @@ mod test {
     fn round_trip_handles() {
         let arena = Arena::new();
         let zircon_handle = MixedHandle::from_zircon_handle(zx::Port::create().into_handle());
-        let (driver_handle1, driver_handle2) = Channel::create().unwrap();
+        let (driver_handle1, driver_handle2) = Channel::create();
         driver_handle2
             .write(Message::new_with_data(arena.clone(), |arena| arena.insert(1)))
             .unwrap();

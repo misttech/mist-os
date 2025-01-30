@@ -233,7 +233,7 @@ mod tests {
         let destroy_func = __fuchsia_driver_registration__.v1.destroy.expect("destroy function");
 
         let (fin_tx, fin_rx) = mpsc::channel();
-        let (server_chan, client_chan) = fdf::Channel::<[u8]>::create().unwrap();
+        let (server_chan, client_chan) = fdf::Channel::<[u8]>::create();
         with_raw_dispatcher("driver registration", move |dispatcher| {
             dispatcher
                 .spawn_task(async move {

@@ -167,7 +167,7 @@ mod tests {
 
     /// Creates a valid `DriverHandle` by creating a driver channel pair and returning one of them.
     fn make_driver_handle() -> DriverHandle {
-        let (left, right) = fdf::Channel::<()>::create().unwrap();
+        let (left, right) = fdf::Channel::<()>::create();
         drop(right);
         left.into_driver_handle()
     }
