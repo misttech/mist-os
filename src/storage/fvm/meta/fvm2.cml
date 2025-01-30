@@ -38,20 +38,11 @@
             protocol: [
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.scheduler.RoleManager",
+                "fuchsia.tracing.provider.Registry",
             ],
             from: "parent",
             to: "#blobfs-collection",
-        },
-        {
-            protocol: "fuchsia.tracing.provider.Registry",
-            from: "parent",
-            to: "#blobfs-collection",
             availability: "optional",
-        },
-        {
-            protocol: "fuchsia.scheduler.RoleManager",
-            from: "parent",
-            to: "#fs-collection",
         },
     ],
     expose: [

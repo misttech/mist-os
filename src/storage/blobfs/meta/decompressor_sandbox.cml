@@ -9,17 +9,16 @@
     program: {
         runner: "elf",
         binary: "bin/decompressor",
-        args: [],
     },
     capabilities: [
         { protocol: "fuchsia.blobfs.internal.DecompressorCreator" },
     ],
     use: [
         {
-            protocol: [ "fuchsia.scheduler.RoleManager" ],
-        },
-        {
-            protocol: "fuchsia.tracing.provider.Registry",
+            protocol: [
+                "fuchsia.scheduler.RoleManager",
+                "fuchsia.tracing.provider.Registry",
+            ],
             availability: "optional",
         },
     ],

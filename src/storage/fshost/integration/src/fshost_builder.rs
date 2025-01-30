@@ -211,6 +211,28 @@ impl FshostBuilder {
             .await
             .unwrap();
 
+        realm_builder
+            .add_route(
+                Route::new()
+                    .capability(
+                        Capability::protocol_by_name("fuchsia.scheduler.RoleManager").optional(),
+                    )
+                    .capability(
+                        Capability::protocol_by_name("fuchsia.tracing.provider.Registry")
+                            .optional(),
+                    )
+                    .capability(
+                        Capability::protocol_by_name("fuchsia.kernel.VmexResource").optional(),
+                    )
+                    .capability(
+                        Capability::protocol_by_name("fuchsia.memorypressure.Provider").optional(),
+                    )
+                    .from(Ref::void())
+                    .to(&fshost),
+            )
+            .await
+            .unwrap();
+
         fshost
     }
 }

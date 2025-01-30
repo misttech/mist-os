@@ -16,7 +16,8 @@
     ],
     use: [
         {
-            protocol: [ "fuchsia.scheduler.RoleManager" ],
+            protocol: "fuchsia.scheduler.RoleManager",
+            availability: "optional",
         },
     ],
     expose: [

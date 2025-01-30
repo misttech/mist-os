@@ -21,11 +21,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.kernel.VmexResource",
-                "fuchsia.scheduler.RoleManager",
-            ],
+            protocol: "fuchsia.boot.WriteOnlyLog",
             from: "parent",
             to: "#blobfs",
         },

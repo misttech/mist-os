@@ -12,11 +12,6 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.scheduler.RoleManager" ],
-            from: "parent",
-            to: "#f2fs",
-        },
-        {
             protocol: [
                 "fuchsia.memorypressure.Provider",
                 "fuchsia.tracing.provider.Registry",

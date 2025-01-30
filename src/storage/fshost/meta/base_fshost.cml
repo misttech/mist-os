@@ -67,7 +67,8 @@
         {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
             from: "parent",
-            to: [ "#tmpfs" ],
+            to: "#tmpfs",
+            availability: "optional",
         },
     ],
     expose: [

@@ -58,10 +58,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.kernel.VmexResource",
-                "fuchsia.tracing.provider.Registry",
-            ],
+            protocol: "fuchsia.tracing.provider.Registry",
             from: "parent",
             to: [ "#fvm2" ],
             availability: "optional",

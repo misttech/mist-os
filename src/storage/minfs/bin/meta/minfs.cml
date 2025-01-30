@@ -25,10 +25,10 @@
     ],
     use: [
         {
-            protocol: [ "fuchsia.scheduler.RoleManager" ],
-        },
-        {
-            protocol: "fuchsia.tracing.provider.Registry",
+            protocol: [
+                "fuchsia.scheduler.RoleManager",
+                "fuchsia.tracing.provider.Registry",
+            ],
             availability: "optional",
         },
     ],
