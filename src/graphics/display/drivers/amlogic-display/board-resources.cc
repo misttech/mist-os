@@ -85,7 +85,8 @@ zx::result<zx::interrupt> GetInterrupt(
   ZX_DEBUG_ASSERT(platform_device.is_valid());
   fidl::WireResult<fuchsia_hardware_platform_device::Device::GetInterruptByName> result =
       fidl::WireCall(platform_device)
-          ->GetInterruptByName(fidl::StringView::FromExternal(interrupt_name), /*flags=*/0);
+          ->GetInterruptByName(fidl::StringView::FromExternal(interrupt_name),
+                               ZX_INTERRUPT_MODE_EDGE_HIGH | ZX_INTERRUPT_TIMESTAMP_MONO);
   if (result.status() != ZX_OK) {
     FDF_LOG(ERROR, "Failed to get interrupt resource '%.*s': FIDL failed %s",
             static_cast<int>(interrupt_name.size()), interrupt_name.data(), result.status_string());
