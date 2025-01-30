@@ -1053,7 +1053,7 @@ impl StackOffset {
     }
 
     fn checked_add<T: TryInto<i64>>(self, rhs: T) -> Option<Self> {
-        Some(Self(self.0.overflowing_add_signed(rhs.try_into().ok()?).0))
+        (self.0 as i64).checked_add(rhs.try_into().ok()?).map(|v| Self(v as u64))
     }
 }
 
