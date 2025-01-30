@@ -226,7 +226,7 @@
       "optionality": "repeating",
       "long": "--set-severity",
       "short": null,
-      "description": "configure the log settings on the target device for components matching the given selector. This modifies the minimum log severity level emitted by components during the logging session. Specify using the format <component-selector>#<log-level>, with level as one of FATAL|ERROR|WARN|INFO|DEBUG|TRACE. May be repeated. Cannot be used in conjunction with --set-severity-persist.",
+      "description": "configure the log settings on the target device for components matching the given selector. This modifies the minimum log severity level emitted by components during the logging session. Specify using the format <component-selector>#<log-level>, with level as one of FATAL|ERROR|WARN|INFO|DEBUG|TRACE. May be repeated and it's also possible to pass multiple comma-separated strings per invocation. Cannot be used in conjunction with --set-severity-persist.",
       "hidden": false
     },
     {

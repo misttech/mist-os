@@ -277,7 +277,8 @@ pub struct LogCommand {
     /// by components during the logging session.
     /// Specify using the format <component-selector>#<log-level>, with level
     /// as one of FATAL|ERROR|WARN|INFO|DEBUG|TRACE.
-    /// May be repeated.
+    /// May be repeated and it's also possible to pass multiple comma-separated
+    /// strings per invocation.
     /// Cannot be used in conjunction with --set-severity-persist.
     #[argh(option, from_str_fn(log_interest_selector))]
     pub set_severity: Vec<OneOrMany<LogInterestSelector>>,
