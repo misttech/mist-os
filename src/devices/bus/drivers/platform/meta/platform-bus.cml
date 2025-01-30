@@ -39,9 +39,6 @@
         { service: "fuchsia.hardware.platform.bus.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
         { service: "fuchsia.sysinfo.Service" },
-        { service: "fuchsia.boot.metadata.SerialNumberMetadata" },
-        { service: "fuchsia.boot.metadata.PartitionMapMetadata" },
-        { service: "fuchsia.boot.metadata.MacAddressMetadata" },
     ],
     use: [
         {
@@ -95,18 +92,6 @@
         },
         {
             service: "fuchsia.sysinfo.Service",
-            from: "self",
-        },
-        {
-            service: "fuchsia.boot.metadata.SerialNumberMetadata",
-            from: "self",
-        },
-        {
-            service: "fuchsia.boot.metadata.PartitionMapMetadata",
-            from: "self",
-        },
-        {
-            service: "fuchsia.boot.metadata.MacAddressMetadata",
             from: "self",
         },
     ],
