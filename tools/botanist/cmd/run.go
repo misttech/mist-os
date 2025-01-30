@@ -177,9 +177,6 @@ func (r *RunCommand) setupFFX(ctx context.Context) (*ffxutil.FFXInstance, func()
 	stdout, stderr, flush := botanist.NewStdioWriters(ctx, "ffx")
 	defer flush()
 	ffx.SetStdoutStderr(stdout, stderr)
-	if err := ffx.SetLogLevel(ctx, ffxutil.Debug); err != nil {
-		return ffx, cleanup, err
-	}
 	if err := ffx.Run(ctx, "config", "env"); err != nil {
 		return ffx, cleanup, err
 	}
