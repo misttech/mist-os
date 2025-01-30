@@ -924,7 +924,7 @@ impl MemoryManagerState {
     // from `mmap_top` downwards.
     pub fn find_next_unused_range(&self, length: usize) -> Option<UserAddress> {
         // Iterate over existing mappings within range, in descending order
-        let mut map_iter = self.mappings.iter_ending_at(&self.mmap_top);
+        let mut map_iter = self.mappings.iter_ending_at(self.mmap_top);
         // Currently considered range. Will be moved downwards if it intersects the current mapping.
         let mut candidate = Range { start: self.mmap_top.checked_sub(length)?, end: self.mmap_top };
 
@@ -1271,7 +1271,7 @@ impl MemoryManagerState {
 
         // There is space to grow in-place. The old range must be one contiguous mapping.
         let (original_range, mapping) =
-            self.mappings.get(&old_addr).ok_or_else(|| errno!(EINVAL))?;
+            self.mappings.get(old_addr).ok_or_else(|| errno!(EINVAL))?;
 
         if old_range.end > original_range.end {
             return error!(EFAULT);
@@ -1358,7 +1358,7 @@ impl MemoryManagerState {
     ) -> Result<UserAddress, Errno> {
         let src_range = src_addr..src_addr.checked_add(src_length).ok_or_else(|| errno!(EINVAL))?;
         let (original_range, src_mapping) =
-            self.mappings.get(&src_addr).ok_or_else(|| errno!(EINVAL))?;
+            self.mappings.get(src_addr).ok_or_else(|| errno!(EINVAL))?;
         let original_range = original_range.clone();
         let src_mapping = src_mapping.clone();
 
@@ -1636,14 +1636,14 @@ impl MemoryManagerState {
                         .zero(unmapped_range.start, unmapped_range.end - unmapped_range.start)?;
                 }
             }
-            released_mappings.extend(self.mappings.remove(&unmap_range));
+            released_mappings.extend(self.mappings.remove(unmap_range));
             return Ok(());
         }
 
         #[cfg(not(feature = "alternate_anon_allocs"))]
         {
             // Find the private, anonymous mapping that will get its tail cut off by this unmap call.
-            let truncated_head = match self.mappings.get(&addr) {
+            let truncated_head = match self.mappings.get(addr) {
                 Some((range, mapping)) if range.start != addr && mapping.private_anonymous() => {
                     Some((range.start..addr, mapping.clone()))
                 }
@@ -1653,7 +1653,7 @@ impl MemoryManagerState {
             // Find the private, anonymous mapping that will get its head cut off by this unmap call.
             // A mapping that starts exactly at `end_addr` is excluded since it is not affected by
             // the unmapping.
-            let truncated_tail = match self.mappings.get(&end_addr) {
+            let truncated_tail = match self.mappings.get(end_addr) {
                 Some((range, mapping))
                     if range.start != end_addr && mapping.private_anonymous() =>
                 {
@@ -1663,7 +1663,7 @@ impl MemoryManagerState {
             };
 
             // Remove the original range of mappings from our map.
-            released_mappings.extend(self.mappings.remove(&(addr..end_addr)));
+            released_mappings.extend(self.mappings.remove(addr..end_addr));
 
             if let Some((range, mut mapping)) = truncated_tail {
                 let MappingBacking::Memory(backing) = &mut mapping.backing;
@@ -1742,7 +1742,7 @@ impl MemoryManagerState {
 
         let prot_range = if prot_flags.contains(ProtectionFlags::GROWSDOWN) {
             let mut start = addr;
-            let Some((range, mapping)) = self.mappings.get(&start) else {
+            let Some((range, mapping)) = self.mappings.get(start) else {
                 return error!(EINVAL);
             };
             // Ensure that the mapping has GROWSDOWN if PROT_GROWSDOWN was specified.
@@ -1759,7 +1759,7 @@ impl MemoryManagerState {
             //     set).
             start = range.start;
             while let Some((range, mapping)) =
-                self.mappings.get(&start.saturating_sub(page_size as usize))
+                self.mappings.get(start.saturating_sub(page_size as usize))
             {
                 if !mapping.flags.contains(MappingFlags::GROWSDOWN)
                     || mapping.flags.access_flags() != access_flags
@@ -2036,7 +2036,7 @@ impl MemoryManagerState {
     /// If such a mapping exists, this function returns the address at which that mapping starts
     /// and the mapping itself.
     fn next_mapping_if_growsdown(&self, addr: UserAddress) -> Option<(UserAddress, &Mapping)> {
-        match self.mappings.iter_starting_at(&addr).next() {
+        match self.mappings.iter_starting_at(addr).next() {
             Some((range, mapping)) => {
                 if range.contains(&addr) {
                     // |addr| is already contained within a mapping, nothing to grow.
@@ -2336,7 +2336,7 @@ impl MemoryManagerState {
     }
 
     fn get_aio_context(&self, addr: UserAddress) -> Option<(Range<UserAddress>, Arc<AioContext>)> {
-        let Some((range, mapping)) = self.mappings.get(&addr) else {
+        let Some((range, mapping)) = self.mappings.get(addr) else {
             return None;
         };
         let MappingName::AioContext(ref aio_context) = mapping.name else {
@@ -3343,7 +3343,7 @@ impl MemoryManager {
             // extend that mapping, rather than making a new allocation.
             let existing = if old_end > brk_base {
                 let last_page = old_end - *PAGE_SIZE;
-                state.mappings.get(&last_page).filter(|(_, m)| m.name == MappingName::Heap)
+                state.mappings.get(last_page).filter(|(_, m)| m.name == MappingName::Heap)
             } else {
                 None
             };
@@ -4073,7 +4073,7 @@ impl MemoryManager {
         perms: ProtectionFlags,
     ) -> Result<(Arc<MemoryObject>, u64), Errno> {
         let state = self.state.read();
-        let (_, mapping) = state.mappings.get(&addr).ok_or_else(|| errno!(EFAULT))?;
+        let (_, mapping) = state.mappings.get(addr).ok_or_else(|| errno!(EFAULT))?;
         if !mapping.flags.access_flags().contains(perms) {
             return error!(EACCES);
         }
@@ -4156,7 +4156,7 @@ impl MemoryManager {
     #[cfg(test)]
     pub fn get_mapping_name(&self, addr: UserAddress) -> Result<Option<FsString>, Errno> {
         let state = self.state.read();
-        let (_, mapping) = state.mappings.get(&addr).ok_or_else(|| errno!(EFAULT))?;
+        let (_, mapping) = state.mappings.get(addr).ok_or_else(|| errno!(EFAULT))?;
         if let MappingName::Vma(name) = &mapping.name {
             Ok(Some(name.clone()))
         } else {
@@ -4200,7 +4200,7 @@ impl MemoryManager {
             let Some(zx_details) = zx_details.as_mapping() else { continue };
             let (_, mm_mapping) = state
                 .mappings
-                .get(&UserAddress::from(zx_mapping.base as u64))
+                .get(UserAddress::from(zx_mapping.base as u64))
                 .expect("mapping bookkeeping must be consistent with zircon's");
             debug_assert_eq!(
                 match &mm_mapping.backing {
@@ -4433,7 +4433,7 @@ impl SequenceFileSource for ProcMapsFile {
             return Ok(None);
         };
         let state = mm.state.read();
-        let mut iter = state.mappings.iter_starting_at(&cursor);
+        let mut iter = state.mappings.iter_starting_at(cursor);
         if let Some((range, map)) = iter.next() {
             write_map(&task, sink, range, map)?;
             return Ok(Some(range.end));
@@ -4465,7 +4465,7 @@ impl SequenceFileSource for ProcSmapsFile {
             return Ok(None);
         };
         let state = mm.state.read();
-        let mut iter = state.mappings.iter_starting_at(&cursor);
+        let mut iter = state.mappings.iter_starting_at(cursor);
         if let Some((range, map)) = iter.next() {
             write_map(&task, sink, range, map)?;
 
@@ -4595,7 +4595,7 @@ mod tests {
         // Look up the given addr in the mappings table.
         let get_range = |addr: UserAddress| {
             let state = mm.state.read();
-            state.mappings.get(&addr).map(|(range, mapping)| (range.clone(), mapping.clone()))
+            state.mappings.get(addr).map(|(range, mapping)| (range.clone(), mapping.clone()))
         };
 
         // Initialize the program break.
@@ -4655,7 +4655,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm().unwrap();
 
-        let has = |addr: &UserAddress| -> bool {
+        let has = |addr: UserAddress| -> bool {
             let state = mm.state.read();
             state.mappings.get(addr).is_some()
         };
@@ -4667,18 +4667,18 @@ mod tests {
 
         // Allocate a single page of BRK space, so that the break base address is mapped.
         let _ = mm.set_brk(&current_task, brk_addr + 1u64).expect("failed to grow program break");
-        assert!(has(&brk_addr));
+        assert!(has(brk_addr));
 
         let mapped_addr =
             map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         assert!(mapped_addr > UserAddress::default());
-        assert!(has(&mapped_addr));
+        assert!(has(mapped_addr));
 
         let node = current_task.lookup_path_from_root(&mut locked, "/".into()).unwrap();
         mm.exec(node, ArchWidth::Arch64).expect("failed to exec memory manager");
 
-        assert!(!has(&brk_addr));
-        assert!(!has(&mapped_addr));
+        assert!(!has(brk_addr));
+        assert!(!has(mapped_addr));
 
         // Check that the old addresses are actually available for mapping.
         let brk_addr2 = map_memory(&mut locked, &current_task, brk_addr, *PAGE_SIZE);
@@ -5303,7 +5303,7 @@ mod tests {
         let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 2);
 
         let state = mm.state.read();
-        let (range, mapping) = state.mappings.get(&addr).expect("mapping");
+        let (range, mapping) = state.mappings.get(addr).expect("mapping");
         assert_eq!(range.start, addr);
         assert_eq!(range.end, addr + (*PAGE_SIZE * 2));
         #[cfg(feature = "alternate_anon_allocs")]
@@ -5327,10 +5327,10 @@ mod tests {
             let state = mm.state.read();
 
             // The first page should be unmapped.
-            assert!(state.mappings.get(&addr).is_none());
+            assert!(state.mappings.get(addr).is_none());
 
             // The second page should be a new child COW memory object.
-            let (range, mapping) = state.mappings.get(&(addr + *PAGE_SIZE)).expect("second page");
+            let (range, mapping) = state.mappings.get(addr + *PAGE_SIZE).expect("second page");
             assert_eq!(range.start, addr + *PAGE_SIZE);
             assert_eq!(range.end, addr + *PAGE_SIZE * 2);
             #[cfg(feature = "alternate_anon_allocs")]
@@ -5357,7 +5357,7 @@ mod tests {
         let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 2);
 
         let state = mm.state.read();
-        let (range, mapping) = state.mappings.get(&addr).expect("mapping");
+        let (range, mapping) = state.mappings.get(addr).expect("mapping");
         assert_eq!(range.start, addr);
         assert_eq!(range.end, addr + (*PAGE_SIZE * 2));
         #[cfg(feature = "alternate_anon_allocs")]
@@ -5381,10 +5381,10 @@ mod tests {
             let state = mm.state.read();
 
             // The second page should be unmapped.
-            assert!(state.mappings.get(&(addr + *PAGE_SIZE)).is_none());
+            assert!(state.mappings.get(addr + *PAGE_SIZE).is_none());
 
             // The first page's memory object should be the same as the original, only shrunk.
-            let (range, mapping) = state.mappings.get(&addr).expect("first page");
+            let (range, mapping) = state.mappings.get(addr).expect("first page");
             assert_eq!(range.start, addr);
             assert_eq!(range.end, addr + *PAGE_SIZE);
             #[cfg(feature = "alternate_anon_allocs")]
@@ -5426,10 +5426,10 @@ mod tests {
             MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED,
         );
         let state = mm.state.read();
-        let (range1, _) = state.mappings.get(&addr1).expect("mapping");
+        let (range1, _) = state.mappings.get(addr1).expect("mapping");
         assert_eq!(range1.start, addr1);
         assert_eq!(range1.end, addr1 + *PAGE_SIZE);
-        let (range2, mapping2) = state.mappings.get(&addr2).expect("mapping");
+        let (range2, mapping2) = state.mappings.get(addr2).expect("mapping");
         assert_eq!(range2.start, addr2);
         assert_eq!(range2.end, addr2 + *PAGE_SIZE);
         #[cfg(feature = "alternate_anon_allocs")]
@@ -5452,10 +5452,10 @@ mod tests {
         let state = mm.state.read();
 
         // The first page should be unmapped.
-        assert!(state.mappings.get(&addr1).is_none());
+        assert!(state.mappings.get(addr1).is_none());
 
         // The second page should remain unchanged.
-        let (range2, mapping2) = state.mappings.get(&addr2).expect("second page");
+        let (range2, mapping2) = state.mappings.get(addr2).expect("second page");
         assert_eq!(range2.start, addr2);
         assert_eq!(range2.end, addr2 + *PAGE_SIZE);
         #[cfg(feature = "alternate_anon_allocs")]
@@ -5482,7 +5482,7 @@ mod tests {
         let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 3);
 
         let state = mm.state.read();
-        let (range, mapping) = state.mappings.get(&addr).expect("mapping");
+        let (range, mapping) = state.mappings.get(addr).expect("mapping");
         assert_eq!(range.start, addr);
         assert_eq!(range.end, addr + (*PAGE_SIZE * 3));
         #[cfg(feature = "alternate_anon_allocs")]
@@ -5506,9 +5506,9 @@ mod tests {
             let state = mm.state.read();
 
             // The middle page should be unmapped.
-            assert!(state.mappings.get(&(addr + *PAGE_SIZE)).is_none());
+            assert!(state.mappings.get(addr + *PAGE_SIZE).is_none());
 
-            let (range, mapping) = state.mappings.get(&addr).expect("first page");
+            let (range, mapping) = state.mappings.get(addr).expect("first page");
             assert_eq!(range.start, addr);
             assert_eq!(range.end, addr + *PAGE_SIZE);
             #[cfg(feature = "alternate_anon_allocs")]
@@ -5524,7 +5524,7 @@ mod tests {
                 }
             }
 
-            let (range, mapping) = state.mappings.get(&(addr + *PAGE_SIZE * 2)).expect("last page");
+            let (range, mapping) = state.mappings.get(addr + *PAGE_SIZE * 2).expect("last page");
             assert_eq!(range.start, addr + *PAGE_SIZE * 2);
             assert_eq!(range.end, addr + *PAGE_SIZE * 3);
             #[cfg(feature = "alternate_anon_allocs")]
@@ -5912,10 +5912,10 @@ mod tests {
             let state = current_task.mm().unwrap().state.read();
 
             // The name should apply to both mappings.
-            let (_, mapping) = state.mappings.get(&first_mapping_addr).unwrap();
+            let (_, mapping) = state.mappings.get(first_mapping_addr).unwrap();
             assert_eq!(mapping.name, MappingName::Vma("foo".into()));
 
-            let (_, mapping) = state.mappings.get(&second_mapping_addr).unwrap();
+            let (_, mapping) = state.mappings.get(second_mapping_addr).unwrap();
             assert_eq!(mapping.name, MappingName::Vma("foo".into()));
         }
     }
@@ -5953,7 +5953,7 @@ mod tests {
         {
             let state = current_task.mm().unwrap().state.read();
 
-            let (_, mapping) = state.mappings.get(&mapping_addr).unwrap();
+            let (_, mapping) = state.mappings.get(mapping_addr).unwrap();
             assert_eq!(mapping.name, MappingName::Vma("foo".into()));
         }
     }
@@ -5992,7 +5992,7 @@ mod tests {
         {
             let state = current_task.mm().unwrap().state.read();
 
-            let (_, mapping) = state.mappings.get(&second_page).unwrap();
+            let (_, mapping) = state.mappings.get(second_page).unwrap();
             assert_eq!(mapping.name, MappingName::None);
         }
     }
@@ -6026,13 +6026,13 @@ mod tests {
         {
             let state = current_task.mm().unwrap().state.read();
 
-            let (_, mapping) = state.mappings.get(&mapping_addr).unwrap();
+            let (_, mapping) = state.mappings.get(mapping_addr).unwrap();
             assert_eq!(mapping.name, MappingName::None);
 
-            let (_, mapping) = state.mappings.get(&(mapping_addr + *PAGE_SIZE)).unwrap();
+            let (_, mapping) = state.mappings.get(mapping_addr + *PAGE_SIZE).unwrap();
             assert_eq!(mapping.name, MappingName::Vma("foo".into()));
 
-            let (_, mapping) = state.mappings.get(&(mapping_addr + 2 * *PAGE_SIZE)).unwrap();
+            let (_, mapping) = state.mappings.get(mapping_addr + 2 * *PAGE_SIZE).unwrap();
             assert_eq!(mapping.name, MappingName::None);
         }
     }
@@ -6072,7 +6072,7 @@ mod tests {
         {
             let state = target.mm().unwrap().state.read();
 
-            let (_, mapping) = state.mappings.get(&mapping_addr).unwrap();
+            let (_, mapping) = state.mappings.get(mapping_addr).unwrap();
             assert_eq!(mapping.name, MappingName::Vma("foo".into()));
         }
     }

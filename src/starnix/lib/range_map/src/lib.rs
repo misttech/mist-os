@@ -17,7 +17,7 @@ struct RangeStart<T> {
     range: Range<T>,
 }
 
-impl<T: Clone> RangeStart<T> {
+impl<T: Copy> RangeStart<T> {
     /// Wrap the given range in a RangeStart.
     ///
     /// Used in the BTreeMap to order the entries by the start of the range but
@@ -29,8 +29,8 @@ impl<T: Clone> RangeStart<T> {
     /// An empty range with both endpoints at the start.
     ///
     /// Used for queries into the BTreeMap, but never stored in the BTreeMap.
-    fn from_point(point: &T) -> Self {
-        RangeStart { range: Range { start: point.clone(), end: point.clone() } }
+    fn from_point(point: T) -> Self {
+        RangeStart { range: Range { start: point, end: point } }
     }
 }
 
@@ -66,7 +66,7 @@ impl<T: Ord> Ord for RangeStart<T> {
 /// A given range can be split into two separate ranges if some of the
 /// intermediate values are removed from the map of if another value is
 /// inserted over the intermediate values. When that happens, the value
-/// for the split range is cloned using the Clone trait.
+/// for the split range is cloned using the Copy trait.
 ///
 /// Adjacent ranges are not merged. Even if the value is "the same" (for some
 /// definition of "the same"), the ranges are kept separately.
@@ -80,7 +80,7 @@ pub struct RangeMap<K, V> {
 
 impl<K, V> Default for RangeMap<K, V>
 where
-    K: Ord + Clone,
+    K: Ord + Copy,
     V: Clone + Eq,
 {
     /// By default, a RangeMap is empty.
@@ -91,7 +91,7 @@ where
 
 impl<K, V> RangeMap<K, V>
 where
-    K: Ord + Clone,
+    K: Ord + Copy,
     V: Clone + Eq,
 {
     /// Returns an empty RangeMap.
@@ -108,11 +108,11 @@ where
     /// Empty ranges do not contain any points and therefore cannot be found
     /// using this method. Rather than being stored in the map, values
     /// associated with empty ranges are dropped.
-    pub fn get(&self, point: &K) -> Option<(&Range<K>, &V)> {
+    pub fn get(&self, point: K) -> Option<(&Range<K>, &V)> {
         self.map
             .range(..=RangeStart::from_point(point))
             .next_back()
-            .filter(|(k, _)| k.range.contains(point))
+            .filter(|(k, _)| k.range.contains(&point))
             .map(|(k, v)| (&k.range, v))
     }
 
@@ -132,12 +132,12 @@ where
         if range.end <= range.start {
             return;
         }
-        self.remove(&range);
+        self.remove(range.clone());
 
         // Check for a range directly before this one. If it exists, it will be the last range with
         // start < range.start.
         if let Some((prev_range, prev_value)) =
-            self.map.range(..RangeStart::from_point(&range.start)).next_back()
+            self.map.range(..RangeStart::from_point(range.start)).next_back()
         {
             let prev_range = &prev_range.range;
             if prev_range.end == range.start && &value == prev_value {
@@ -148,7 +148,7 @@ where
         // Check for a range directly after. If it exists, we can look it up by exact start value
         // of range.end.
         if let Some((next_range, next_value)) =
-            self.map.get_key_value(&RangeStart::from_point(&range.end))
+            self.map.get_key_value(&RangeStart::from_point(range.end))
         {
             let next_range = &next_range.range;
             if next_range.start == range.end && &value == next_value {
@@ -169,7 +169,7 @@ where
     /// associated with those values are contained within the given range.
     ///
     /// Returns any removed values.
-    pub fn remove(&mut self, range: &Range<K>) -> Vec<V> {
+    pub fn remove(&mut self, range: Range<K>) -> Vec<V> {
         let mut removed_values = vec![];
         // If the given range is empty, there is nothing to do.
         if range.end <= range.start {
@@ -181,7 +181,7 @@ where
         // There can be at most one such range because we maintain the
         // invariant that the ranges stored in the map are non-overlapping.
         if let Some((old_range, v)) =
-            self.get(&range.start).map(|(range, v)| (range.clone(), v.clone()))
+            self.get(range.start).map(|(range, v)| (range.clone(), v.clone()))
         {
             // Remove that range from the map.
             if let Some(value) = self.remove_exact_range(old_range.clone()) {
@@ -217,7 +217,7 @@ where
         // range.
         if let Some((old_range, v)) = self
             .map
-            .range(RangeStart::from_point(&range.start)..RangeStart::from_point(&range.end))
+            .range(RangeStart::from_point(range.start)..RangeStart::from_point(range.end))
             .next_back()
             .filter(|(k, _)| k.range.contains(&range.end))
             .map(|(k, v)| (k.range.clone(), v.clone()))
@@ -244,7 +244,7 @@ where
         // during the iteration.
         let doomed: Vec<_> = self
             .map
-            .range(RangeStart::from_point(&range.start)..RangeStart::from_point(&range.end))
+            .range(RangeStart::from_point(range.start)..RangeStart::from_point(range.end))
             .map(|(k, _)| k.clone())
             .collect();
 
@@ -271,12 +271,12 @@ where
     }
 
     /// Iterate over the ranges in the map, starting at the first range starting after or at the given point.
-    pub fn iter_starting_at(&self, point: &K) -> impl Iterator<Item = (&Range<K>, &V)> {
+    pub fn iter_starting_at(&self, point: K) -> impl Iterator<Item = (&Range<K>, &V)> {
         self.map.range(RangeStart::from_point(point)..).map(|(k, value)| (&k.range, value))
     }
 
     /// Iterate over the ranges in the map, starting at the last range starting before or at the given point.
-    pub fn iter_ending_at(&self, point: &K) -> impl DoubleEndedIterator<Item = (&Range<K>, &V)> {
+    pub fn iter_ending_at(&self, point: K) -> impl DoubleEndedIterator<Item = (&Range<K>, &V)> {
         self.map.range(..RangeStart::from_point(point)).map(|(k, value)| (&k.range, value))
     }
 
@@ -286,9 +286,9 @@ where
         R: Borrow<Range<K>>,
     {
         let range = range.borrow();
-        let start = self.get(&range.start).map(|(r, _)| &r.start).unwrap_or(&range.start);
+        let start = self.get(range.start).map(|(r, _)| r.start).unwrap_or(range.start);
         self.map
-            .range(RangeStart::from_point(start)..RangeStart::from_point(&range.end))
+            .range(RangeStart::from_point(start)..RangeStart::from_point(range.end))
             .map(|(k, value)| (&k.range, value))
     }
 
@@ -326,11 +326,11 @@ mod test {
     fn test_empty() {
         let mut map = RangeMap::<u32, i32>::new();
 
-        assert!(map.get(&12).is_none());
-        map.remove(&(10..34));
+        assert!(map.get(12).is_none());
+        map.remove(10..34);
         // This is a test to make sure we can handle reversed ranges
         #[allow(clippy::reversed_empty_ranges)]
-        map.remove(&(34..10));
+        map.remove(34..10);
     }
 
     #[::fuchsia::test]
@@ -339,11 +339,11 @@ mod test {
 
         map.insert(10..34, -14);
 
-        assert_eq!((&(10..34), &-14), map.get(&12).unwrap());
-        assert_eq!((&(10..34), &-14), map.get(&10).unwrap());
-        assert!(map.get(&9).is_none());
-        assert_eq!((&(10..34), &-14), map.get(&33).unwrap());
-        assert!(map.get(&34).is_none());
+        assert_eq!((&(10..34), &-14), map.get(12).unwrap());
+        assert_eq!((&(10..34), &-14), map.get(10).unwrap());
+        assert!(map.get(9).is_none());
+        assert_eq!((&(10..34), &-14), map.get(33).unwrap());
+        assert!(map.get(34).is_none());
     }
 
     #[::fuchsia::test]
@@ -360,13 +360,13 @@ mod test {
 
         assert!(iter.next().is_none());
 
-        let mut iter = map.iter_starting_at(&10);
+        let mut iter = map.iter_starting_at(10);
         assert_eq!(iter.next().expect("missing elem"), (&(10..34), &-14));
-        let mut iter = map.iter_starting_at(&11);
+        let mut iter = map.iter_starting_at(11);
         assert_eq!(iter.next().expect("missing elem"), (&(74..92), &-12));
-        let mut iter = map.iter_starting_at(&74);
+        let mut iter = map.iter_starting_at(74);
         assert_eq!(iter.next().expect("missing elem"), (&(74..92), &-12));
-        let mut iter = map.iter_starting_at(&75);
+        let mut iter = map.iter_starting_at(75);
         assert_eq!(iter.next(), None);
     }
 
@@ -376,11 +376,11 @@ mod test {
 
         map.insert(10..34, -14);
 
-        map.remove(&(2..11));
-        assert_eq!((&(11..34), &-14), map.get(&11).unwrap());
+        map.remove(2..11);
+        assert_eq!((&(11..34), &-14), map.get(11).unwrap());
 
-        map.remove(&(33..42));
-        assert_eq!((&(11..33), &-14), map.get(&12).unwrap());
+        map.remove(33..42);
+        assert_eq!((&(11..33), &-14), map.get(12).unwrap());
     }
 
     #[::fuchsia::test]
@@ -388,10 +388,10 @@ mod test {
         let mut map = RangeMap::<u32, i32>::new();
 
         map.insert(10..34, -14);
-        map.remove(&(15..18));
+        map.remove(15..18);
 
-        assert_eq!((&(10..15), &-14), map.get(&12).unwrap());
-        assert_eq!((&(18..34), &-14), map.get(&20).unwrap());
+        assert_eq!((&(10..15), &-14), map.get(12).unwrap());
+        assert_eq!((&(18..34), &-14), map.get(20).unwrap());
     }
 
     #[::fuchsia::test]
@@ -399,12 +399,12 @@ mod test {
         let mut map = RangeMap::<u32, i32>::new();
 
         map.insert(10..34, -14);
-        map.remove(&(15..18));
+        map.remove(15..18);
         map.insert(2..7, -21);
-        map.remove(&(20..42));
+        map.remove(20..42);
 
-        assert_eq!((&(2..7), &-21), map.get(&5).unwrap());
-        assert_eq!((&(10..15), &-14), map.get(&12).unwrap());
+        assert_eq!((&(2..7), &-21), map.get(5).unwrap());
+        assert_eq!((&(10..15), &-14), map.get(12).unwrap());
     }
 
     #[::fuchsia::test]
@@ -416,10 +416,10 @@ mod test {
         map.insert(1..3, -43);
         map.insert(6..8, -44);
 
-        assert_eq!((&(1..3), &-43), map.get(&2).unwrap());
-        assert_eq!((&(3..5), &-21), map.get(&4).unwrap());
-        assert_eq!((&(5..6), &-42), map.get(&5).unwrap());
-        assert_eq!((&(6..8), &-44), map.get(&7).unwrap());
+        assert_eq!((&(1..3), &-43), map.get(2).unwrap());
+        assert_eq!((&(3..5), &-21), map.get(4).unwrap());
+        assert_eq!((&(5..6), &-42), map.get(5).unwrap());
+        assert_eq!((&(6..8), &-44), map.get(7).unwrap());
     }
 
     #[::fuchsia::test]

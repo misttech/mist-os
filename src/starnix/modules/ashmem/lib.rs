@@ -294,7 +294,7 @@ impl FileOps for Ashmem {
 
                 match request {
                     ASHMEM_PIN => {
-                        for is_purged in state.unpinned.remove(&(lo..hi)).iter() {
+                        for is_purged in state.unpinned.remove(lo..hi).iter() {
                             if *is_purged {
                                 return Ok(ASHMEM_WAS_PURGED.into());
                             }
