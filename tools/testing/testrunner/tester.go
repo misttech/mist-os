@@ -1114,6 +1114,9 @@ func (t *FFXTester) RunSnapshot(ctx context.Context, snapshotFile string) error 
 		logger.Errorf(ctx, "%s: %s", constants.FailedToRunSnapshotMsg, err)
 		// TODO(https://fxbug.dev/387497485): For debugging. Remove when issue is fixed.
 		target := os.Getenv(botanistconstants.NodenameEnvKey)
+		if err := t.ffx.Run(ctx, "doctor", "--verbose", "--record", "--no-config"); err != nil {
+			logger.Errorf(ctx, "failed to run `ffx doctor`: %s", err)
+		}
 		if err := t.ffx.Run(ctx, "target", "list", target); err != nil {
 			logger.Errorf(ctx, "failed to run `ffx target list`: %s", err)
 		}
