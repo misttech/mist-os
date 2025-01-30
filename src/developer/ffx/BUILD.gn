@@ -92,8 +92,11 @@ if (current_toolchain == default_toolchain) {
             root = "!!BUILD_DIR"
           }
 
-          product = {
-            index = "!!BUILD_DIR/product_bundles.json"
+          pbms = {
+            base_urls = [
+              "file://!!BUILD_DIR",
+              "gs://fuchsia/development",
+            ]
           }
 
           # The "main" product bundle
@@ -101,8 +104,9 @@ if (current_toolchain == default_toolchain) {
           # that do not build any product bundles. In those builds, there is no product, so
           # it is OK to not set this value.
           if (defined(_product_path)) {
-            product.path =
-                "!!BUILD_DIR/" + rebase_path(_product_path, root_out_dir)
+            product = {
+              path = "!!BUILD_DIR/" + rebase_path(_product_path, root_out_dir)
+            }
           }
 
           # package repository

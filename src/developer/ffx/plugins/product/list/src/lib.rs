@@ -7,7 +7,7 @@
 
 use ::gcs::client::{Client, ProgressResponse};
 use anyhow::{Context, Result};
-use ffx_config::sdk::SdkVersion;
+use ffx_config::sdk::{in_tree_sdk_version, SdkVersion};
 use ffx_config::EnvironmentContext;
 use ffx_product_list_args::ListCommand;
 use fho::{bug, return_user_error, FfxMain, FfxTool, MachineWriter, ToolIO as _};
@@ -20,13 +20,11 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{stderr, stdin, stdout, Write};
-use std::path::Path;
 use std::str::FromStr;
 use structured_ui::{Notice, Presentation};
 
 const PB_MANIFEST_NAME: &'static str = "product_bundles.json";
 const CONFIG_BASE_URLS: &'static str = "pbms.base_urls";
-const PRODUCT_BUNDLE_INDEX_KEY: &str = "product.index";
 
 lazy_static! {
     static ref BRANCH_TO_PREFIX_MAPPING: HashMap<&'static str, &'static str> = hashmap! {
@@ -109,6 +107,7 @@ pub async fn resolve_branch_to_base_urls<I>(
 where
     I: structured_ui::Interface,
 {
+    let mut use_in_tree_sdk = false;
     let prefix = match (branch, version) {
         (Some(_), Some(_)) => {
             return_user_error!("Cannot provide version and branch at the same time")
@@ -127,9 +126,8 @@ where
                 // does not always align with the sdk version.
                 SdkVersion::Version(version) => version[..11].to_string(),
                 SdkVersion::InTree => {
-                    return_user_error!(
-                        "Using in-tree sdk. Please specify the version through '--version'"
-                    )
+                    use_in_tree_sdk = true;
+                    in_tree_sdk_version()
                 }
                 SdkVersion::Unknown => {
                     return_user_error!(
@@ -138,12 +136,22 @@ where
             }
         }
     };
-    let prefix = format!("development/{}", &prefix);
 
     let mut result = Vec::new();
-    let base_urls: Vec<String> = context.get(CONFIG_BASE_URLS).unwrap_or(vec![]);
+    let mut base_urls: Vec<String> = context.get(CONFIG_BASE_URLS).unwrap_or(vec![]);
+    base_urls.sort();
+    base_urls.dedup();
     for base_url in base_urls {
-        let (bucket, _) = split_gs_url(&base_url).context("Splitting gs URL.")?;
+        if base_url.starts_with("file://") {
+            result.push(base_url.to_owned());
+            continue;
+        }
+        if use_in_tree_sdk {
+            continue;
+        }
+
+        let (bucket, path) = split_gs_url(&base_url).context("Splitting gs URL.")?;
+        let prefix = format!("{}/{}", &path, &prefix);
         if let Some(version) = get_latest_version(bucket, &prefix, auth, ui, &client).await? {
             result.push(format!("{}/{}", base_url, version));
         } else {
@@ -194,38 +202,25 @@ where
     I: structured_ui::Interface,
 {
     let mut products = Vec::new();
-    // If the product.index is specified, we will use local product_bundles.json
-    let index: String = context.get(PRODUCT_BUNDLE_INDEX_KEY)?;
-    if Path::new(&index).is_file() {
-        let pm = std::fs::read_to_string(index)?;
-        let mut prods = serde_json::from_str::<ProductManifest>(&pm)
-            .map_err(|e| bug!("Parsing json {:?}: {e}", pm))?;
-        if let Some(product_version) = &version {
-            prods.retain(|p| p.product_version == *product_version);
-        }
-        products.extend(prods);
-
-        // If version is not explicitly passed in, directly return
-        if version.is_none() && branch.is_none() {
-            return Ok(products);
-        }
-    }
-
     let client = Client::initial()?;
 
     let base_urls = if let Some(base_url) = override_base_url {
         vec![base_url]
     } else {
-        resolve_branch_to_base_urls(version, branch, auth, ui, &client, &context).await?
+        resolve_branch_to_base_urls(version.clone(), branch, auth, ui, &client, &context).await?
     };
 
     for base_url in &base_urls {
-        let prods = pb_gather_from_url(base_url, auth, ui, &client).await.unwrap_or_else(|_| {
-            let mut notice: Notice = Notice::builder();
-            notice.message(format!("Failed to fetch from base_url: {base_url}"));
-            ui.present(&Presentation::Notice(notice)).expect("presenting to work");
-            Vec::new()
-        });
+        let mut prods =
+            pb_gather_from_url(base_url, auth, ui, &client).await.unwrap_or_else(|_| {
+                let mut notice: Notice = Notice::builder();
+                notice.message(format!("Failed to fetch from base_url: {base_url}"));
+                ui.present(&Presentation::Notice(notice)).expect("presenting to work");
+                Vec::new()
+            });
+        if let Some(product_version) = &version {
+            prods.retain(|p| p.product_version == *product_version);
+        }
         products.extend(prods);
     }
     products.sort_by(|a, b| {
@@ -284,16 +279,9 @@ mod test {
     use ffx_config::{ConfigLevel, TestEnv};
     use fho::{Format, TestBuffers};
     use std::fs::File;
-    use std::path::Path;
 
-    async fn setup_test_env(path: &Path) -> TestEnv {
+    async fn setup_test_env() -> TestEnv {
         let env = ffx_config::test_init().await.unwrap();
-        env.context
-            .query(PRODUCT_BUNDLE_INDEX_KEY)
-            .level(Some(ConfigLevel::User))
-            .set(path.to_str().unwrap().into())
-            .await
-            .unwrap();
 
         env.context
             .query(CONFIG_BASE_URLS)
@@ -309,7 +297,7 @@ mod test {
     async fn test_pb_list_impl() {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join(PB_MANIFEST_NAME);
-        let env = setup_test_env(&path).await;
+        let env = setup_test_env().await;
         let mut f = File::create(&path).expect("file create");
         f.write_all(
             r#"[{
@@ -346,7 +334,7 @@ mod test {
     async fn test_pb_list_impl_filter_based_on_version() {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join(PB_MANIFEST_NAME);
-        let env = setup_test_env(&path).await;
+        let env = setup_test_env().await;
         let mut f = File::create(&path).expect("file create");
         f.write_all(
             r#"[{
@@ -376,7 +364,7 @@ mod test {
     async fn test_pb_list_impl_machine_code() {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join(PB_MANIFEST_NAME);
-        let env = setup_test_env(&path).await;
+        let env = setup_test_env().await;
         let mut f = File::create(&path).expect("file create");
         f.write_all(
             r#"[{
@@ -417,7 +405,7 @@ mod test {
     async fn test_pb_list_impl_machine_code_ignore_unknown_fields() {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join(PB_MANIFEST_NAME);
-        let env: TestEnv = setup_test_env(&path).await;
+        let env: TestEnv = setup_test_env().await;
         let mut f = File::create(&path).expect("file create");
         f.write_all(
             r#"[{
