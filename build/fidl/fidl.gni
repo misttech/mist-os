@@ -348,9 +348,10 @@ template("fidl") {
       is_allowed_for_host_test = host_test_fidl_allowlist + [ label_name ] -
                                  [ label_name ] != host_test_fidl_allowlist
       if (is_allowed_for_host_test) {
-        assert(marker_category != "partner" &&
-                   marker_category != "partner_internal",
-               "Update //src/testing/end_to_end/host_test_allowlist.gni.")
+        assert(
+            marker_category != "partner" &&
+                marker_category != "partner_internal",
+            "Remove `${label_name}` from //src/testing/end_to_end/host_test_allowlist.gni.")
         marker_category = "allowed-for-host-test"
       }
       deps += [ "//sdk/categories:marker-${marker_category}" ]
@@ -453,6 +454,9 @@ template("fidl") {
                              [ label_name ] != ffx_subtool_fidl_allowlist
         marker_category = "not-in-idk"
         if (defined(invoker.sdk_category)) {
+          assert(
+              !is_allowed_for_ffx,
+              "Remove `${label_name}` from //src/developer/ffx/build/ffx_subtool_allowlist.gni.")
           marker_category = invoker.sdk_category
 
           # TODO(https://fxbug.dev/333907192): Remove when fuchsia.boot is promoted.
