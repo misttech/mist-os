@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/amlogic-display/hdmi-transmitter.h"
 
-#include <fuchsia/hardware/i2cimpl/c/banjo.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
@@ -184,16 +183,6 @@ zx::result<> HdmiTransmitter::ModeSet(const display::DisplayTiming& timing,
   designware_controller_->SetupScdc(p.is4K);
   designware_controller_->ResetFc();
 
-  return zx::ok();
-}
-
-zx::result<> HdmiTransmitter::I2cTransact(const i2c_impl_op_t* i2c_ops, size_t i2c_op_count) {
-  fbl::AutoLock lock(&dw_lock_);
-  zx_status_t status = designware_controller_->EdidTransfer(i2c_ops, i2c_op_count);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to transfer EDID: %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
   return zx::ok();
 }
 

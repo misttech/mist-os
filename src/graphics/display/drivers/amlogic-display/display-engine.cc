@@ -1066,7 +1066,12 @@ void DisplayEngine::OnHotPlugStateChange(HotPlugDetectionState current_state) {
     // ApplyConfiguration().
     current_display_timing_ = {};
 
-    vout_->DisplayConnected();
+    zx::result<> update_vout_display_state_result = vout_->UpdateStateOnDisplayConnected();
+    if (update_vout_display_state_result.is_error()) {
+      FDF_LOG(ERROR, "Failed to update Vout display state: %s",
+              update_vout_display_state_result.status_string());
+      return;
+    }
 
     const raw_display_info_t banjo_display_info =
         vout_->CreateRawDisplayInfo(display_id_, kSupportedBanjoPixelFormats);

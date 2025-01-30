@@ -675,6 +675,8 @@ zx_status_t HdmiTransmitterControllerImpl::EdidTransfer(const i2c_impl_op_t* op_
         registers::DdcControllerWordOffset::Get().FromValue(0).set_word_offset(offset).WriteTo(
             &controller_mmio_);
 
+        // Experiments on VIM3 show that the E-DDC 8-byte read command works
+        // for DDC-only display devices as well.
         registers::DdcControllerCommand::Get().FromValue(0).set_eddc_read_8bytes(true).WriteTo(
             &controller_mmio_);
         offset = static_cast<uint8_t>(offset + 8);

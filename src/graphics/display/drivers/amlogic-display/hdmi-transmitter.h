@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_HDMI_TRANSMITTER_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_HDMI_TRANSMITTER_H_
 
-#include <fuchsia/hardware/i2cimpl/c/banjo.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
@@ -60,7 +59,6 @@ class HdmiTransmitter {
   zx::result<> Reset();
   zx::result<> ModeSet(const display::DisplayTiming& timing,
                        const designware_hdmi::ColorParam& color);
-  zx::result<> I2cTransact(const i2c_impl_op_t* i2c_ops, size_t i2c_op_count);
 
   zx::result<fbl::Vector<uint8_t>> ReadExtendedEdid();
 
