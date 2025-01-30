@@ -14,6 +14,7 @@ pub mod development_support_config;
 pub mod diagnostics_config;
 pub mod driver_framework_config;
 pub mod example_config;
+pub mod factory_store_providers_config;
 pub mod fonts_config;
 pub mod forensics_config;
 pub mod graphics_config;
@@ -98,6 +99,12 @@ pub struct PlatformConfig {
     /// Platform configuration options for the driver framework area.
     #[serde(default)]
     pub driver_framework: driver_framework_config::DriverFrameworkConfig,
+
+    /// Platform configuration for the factory store providers
+    #[serde(default)]
+    #[file_relative_paths]
+    #[walk_paths]
+    pub factory_store_providers: factory_store_providers_config::FactoryStoreProvidersConfig,
 
     /// Platform configuration options for the forensics area.
     #[serde(default)]

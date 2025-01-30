@@ -30,12 +30,15 @@ factory_store_provider_config("widevine") {
   config = rebase_path("fuchsia.factory.WidevineFactoryStoreProvider.config")
 }
 
+import("//src/factory/factory_store_providers/soft_transition.gni")
 group("qemu") {
-  deps = [
-    ":alpha",
-    ":cast",
-    ":misc",
-    ":playready",
-    ":widevine",
-  ]
+  if (!product_provides_factory_store_provider_configs) {
+    deps = [
+      ":alpha",
+      ":cast",
+      ":misc",
+      ":playready",
+      ":widevine",
+    ]
+  }
 }

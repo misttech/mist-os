@@ -35,6 +35,7 @@ mod development;
 mod diagnostics;
 mod driver_framework;
 mod example;
+mod factory_store_providers;
 mod fonts;
 mod forensics;
 mod graphics;
@@ -466,6 +467,13 @@ fn configure_subsystems(
         builder,
     )
     .context("Configuring the 'fonts' subsystem")?;
+
+    factory_store_providers::FactoryStoreProvidersSubsystem::define_configuration(
+        &context_base.for_subsystem("factory_store_providers"),
+        &platform.factory_store_providers,
+        builder,
+    )
+    .context("Configuring the 'factory_store_providers' subsystem")?;
 
     intl::IntlSubsystem::define_configuration(
         &context_base.for_subsystem("intl"),
