@@ -402,43 +402,6 @@ TEST(ProcessConfigLoaderTest, AllowConfigWithoutUltrasound) {
   ASSERT_TRUE(result.is_ok()) << result.error();
 }
 
-// TODO(https://fxbug.dev/388190715): Remove this test case once clients and products have been
-// updated to include AudioRenderUsage2::ACCESSIBILITY.
-TEST(ProcessConfigLoaderTest, AllowConfigWithoutAccessibility) {
-  // render:accessibility is missing from "supported_stream_types".
-  static const std::string kConfigWithRoutingPolicy =
-      R"JSON({
-    "volume_curve": [
-      {
-          "level": 0.0,
-          "db": -160.0
-      },
-      {
-          "level": 1.0,
-          "db": 0.0
-      }
-    ],
-    "output_devices": [
-      {
-        "device_id": "34384e7da9d52c8062a9765baeb6053a",
-        "supported_stream_types": [
-          "render:background",
-          "render:communication",
-          "render:interruption",
-          "render:media",
-          "render:system_agent",
-          "capture:loopback"
-        ]
-      }
-    ]
-  })JSON";
-  ASSERT_TRUE(files::WriteFile(kTestAudioCoreConfigFilename, kConfigWithRoutingPolicy.data(),
-                               kConfigWithRoutingPolicy.size()));
-
-  auto result = ProcessConfigLoader::LoadProcessConfig(kTestAudioCoreConfigFilename);
-  ASSERT_TRUE(result.is_ok()) << result.error();
-}
-
 TEST(ProcessConfigLoaderTest, LoadProcessConfigWithOutputGains) {
   static const std::string kConfigWithDriverGain =
       R"JSON({

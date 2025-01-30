@@ -489,11 +489,6 @@ fpromise::result<void, std::string> ParseOutputDevicePoliciesFromJsonObject(
     config_builder->AddDeviceProfile(result.take_value());
   }
 
-  // Give out-of-tree output devices a little help during the soft transition.
-  // TODO(https://fxbug.dev/388190715): remove the workaround once products have absorbed a11y.
-  const auto supported_usage = StreamUsageFromString("render:accessibility");
-  all_supported_usages.insert(*supported_usage);
-
   // We expect all the usages that clients can select are supported.
   for (const auto& render_usage : kFidlRenderUsages) {
     auto stream_usage = StreamUsage::WithRenderUsage(render_usage);
