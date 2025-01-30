@@ -40,7 +40,6 @@ rustc_library("fshost_test_fixture") {
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
     "//src/storage/blobfs/bin:blobfs-component",
-    "//src/storage/crypt/fxfs",
     "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/lib/blob_writer:blob-writer",
@@ -66,6 +65,8 @@ rustc_library("fshost_test_fixture") {
     "//third_party/rust_crates:zstd",
     "//third_party/zstd",
   ]
+
+  data_deps = [ "//src/storage/crypt/fxfs" ]
 }
 
 # Generates an fshost integration test component based on one of the integration test files. The
@@ -248,7 +249,7 @@ template("fshost_integration_test_package") {
     if (defined(invoker.extra_deps)) {
       deps += invoker.extra_deps
     }
-    if (data_filesystem_format == "fxfs") {
+    if (data_filesystem_variant == "fxblob") {
       deps += [ "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust" ]
     }
     if (defined(fshost_options.storage_host) && fshost_options.storage_host) {
@@ -381,7 +382,6 @@ template("fshost_integration_test_package") {
       # We need to make sure we have all the filesystems available in the package for various tests
       # of the migration paths.
       "//src/storage/blobfs/bin:component",
-      "//src/storage/crypt/fxfs",
       "//src/storage/f2fs/bin:f2fs-component",
       "//src/storage/fxfs:fxfs_component",
       "//src/storage/minfs/bin:minfs-component",

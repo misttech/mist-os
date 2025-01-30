@@ -96,5 +96,10 @@
             from: "self",
             availability: "same_as_target",
         },
+        {
+            protocol: "fuchsia.fshost.StarnixVolumeProvider",
+            from: "void",
+            availability: "optional",
+        },
     ],
 }

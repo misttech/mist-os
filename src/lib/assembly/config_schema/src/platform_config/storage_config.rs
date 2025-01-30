@@ -37,6 +37,8 @@ pub struct StorageConfig {
 
     /// Enable the automatic garbage collection of mutable storage.
     pub mutable_storage_garbage_collection: bool,
+
+    pub starnix_volume: StarnixVolumeConfig,
 }
 
 /// Platform configuration options for the component id index
@@ -69,4 +71,14 @@ pub struct ComponentIdIndexConfig {
 #[serde(default)]
 pub struct FactoryDataConfig {
     pub enabled: bool,
+}
+
+/// Platform configuration options for the main Starnix volume.
+///
+/// If set, this field specifies the name of the volume which the main Starnix component will store
+/// its mutable data in.  If unset, Starnix will rely on a storage capability instead.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(default)]
+pub struct StarnixVolumeConfig {
+    pub name: Option<String>,
 }

@@ -32,6 +32,7 @@ pub fn default_config() -> fshost_config::Config {
         no_zxcrypt: false,
         storage_host: false,
         use_disk_migration: false,
+        starnix_volume_name: "".to_string(),
         disable_automount: false,
         blobfs_write_compression_algorithm: "".to_string(),
         blobfs_cache_eviction_policy: "".to_string(),

@@ -237,10 +237,6 @@ impl CryptService {
             .into_zx_channel()
             .into()
     }
-
-    pub fn exposed_dir(&self) -> &fio::DirectoryProxy {
-        &self.exposed_dir
-    }
 }
 
 impl Drop for CryptService {

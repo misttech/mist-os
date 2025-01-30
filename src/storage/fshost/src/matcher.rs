@@ -567,13 +567,13 @@ mod tests {
         GPT_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH,
     };
     use crate::device::{DeviceTag, RegisteredDevices};
-    use crate::environment::{Filesystem, FilesystemQueue};
+    use crate::environment::Filesystem;
     use anyhow::{anyhow, Error};
     use async_trait::async_trait;
     use fidl_fuchsia_device::ControllerProxy;
     use fidl_fuchsia_hardware_block::{BlockInfo, BlockProxy, Flag};
     use fidl_fuchsia_hardware_block_volume::VolumeProxy;
-    use fs_management::filesystem::BlockConnector;
+    use fs_management::filesystem::{BlockConnector, ServingMultiVolumeFilesystem};
     use fs_management::format::constants::{
         ALL_FVM_LABELS, FUCHSIA_FVM_PARTITION_LABEL, FVM_PARTITION_LABEL,
     };
@@ -852,7 +852,7 @@ mod tests {
                 true,
                 "Unexpected call to format_data"
             );
-            Ok(Filesystem::Queue(FilesystemQueue::default()))
+            Ok(Filesystem::Queue(vec![]))
         }
 
         fn bind_data(&mut self, mut _fs: Filesystem) -> Result<(), Error> {
@@ -910,6 +910,10 @@ mod tests {
 
         fn registered_devices(&self) -> &Arc<RegisteredDevices> {
             &self.registered_devices
+        }
+
+        fn get_container(&mut self) -> Option<&mut ServingMultiVolumeFilesystem> {
+            unreachable!();
         }
     }
 

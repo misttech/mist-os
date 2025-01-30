@@ -112,7 +112,6 @@ async fn main() -> Result<(), Error> {
         .await;
     let blob_exposed_dir = env.blobfs_exposed_dir()?;
     let data_exposed_dir = env.data_exposed_dir()?;
-    let crypt_service_exposed_dir = env.crypt_service_exposed_dir()?;
     let export = vfs::pseudo_directory! {
         "fs" => vfs::pseudo_directory! {
             "blob" => remote_dir(blob_exposed_dir),
@@ -140,6 +139,15 @@ async fn main() -> Result<(), Error> {
             ),
     };
     if config.fxfs_blob {
+        export
+            .add_entry(
+                "user_volumes",
+                vfs::pseudo_directory! {
+                    "starnix" =>
+                        service::fshost_volume_provider(env.clone(), config.clone()),
+                },
+            )
+            .unwrap();
         svc_dir
             .add_entry(
                 fidl_fuchsia_update_verify::BlobfsVerifierMarker::PROTOCOL_NAME,
@@ -152,24 +160,6 @@ async fn main() -> Result<(), Error> {
                 fxblob::ota_health_check_service(),
             )
             .unwrap();
-    }
-    if config.data_filesystem_format == "fxfs" {
-        if let Some(dir) = crypt_service_exposed_dir {
-            svc_dir
-                .add_entry(
-                    fidl_fuchsia_fxfs::CryptManagementMarker::PROTOCOL_NAME,
-                    vfs::service::endpoint(move |_scope, server_end| {
-                        dir.open3(
-                            fidl_fuchsia_fxfs::CryptManagementMarker::PROTOCOL_NAME,
-                            fio::Flags::PROTOCOL_SERVICE,
-                            &fio::Options::default(),
-                            server_end.into(),
-                        )
-                        .unwrap();
-                    }),
-                )
-                .unwrap();
-        }
     }
     export.add_entry("svc", svc_dir).unwrap();
 

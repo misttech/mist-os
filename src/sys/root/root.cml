@@ -67,6 +67,7 @@
                 "fuchsia.fshost.Netboot",
                 "fuchsia.fshost.NoZxcrypt",
                 "fuchsia.fshost.RamdiskImage",
+                "fuchsia.fshost.StarnixVolumeName",
                 "fuchsia.fshost.StorageHost",
                 "fuchsia.fshost.UseDiskMigration",
                 "fuchsia.pkgcache.AllPackagesExecutable",

@@ -14,8 +14,10 @@ use crate::environment::{
 };
 use anyhow::{anyhow, ensure, Context, Error};
 use device_watcher::recursive_wait_and_open;
-use fidl::endpoints::{Proxy, RequestStream, ServerEnd};
+use fidl::endpoints::{ClientEnd, Proxy, RequestStream, ServerEnd};
 use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
+use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
+use fidl_fuchsia_fxfs::CryptMarker;
 use fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy};
 use fidl_fuchsia_hardware_block_volume::VolumeManagerMarker;
 use fidl_fuchsia_io::{self as fio, DirectoryMarker};
@@ -128,6 +130,59 @@ async fn find_data_partition(ramdisk_prefix: Option<String>) -> Result<Controlle
     Err(anyhow!("Data partition not found"))
 }
 
+async fn mount_starnix_volume(
+    environment: &Arc<Mutex<dyn Environment>>,
+    config: &fshost_config::Config,
+    crypt: ClientEnd<CryptMarker>,
+    exposed_dir: ServerEnd<fio::DirectoryMarker>,
+) -> Result<(), Error> {
+    ensure!(
+        !config.starnix_volume_name.is_empty(),
+        "mount_starnix_volume called without the starnix_volume_name config set"
+    );
+    let mut env = environment.lock().await;
+    if let Some(multi_vol_fs) = env.get_container() {
+        let starnix_volume_name = config.starnix_volume_name.clone();
+        let mounted_vol = if multi_vol_fs.has_volume(&starnix_volume_name).await? {
+            multi_vol_fs
+                .open_volume(
+                    &starnix_volume_name,
+                    MountOptions { crypt: Some(crypt), ..MountOptions::default() },
+                )
+                .await?
+        } else {
+            multi_vol_fs
+                .create_volume(
+                    &starnix_volume_name,
+                    CreateOptions::default(),
+                    MountOptions { crypt: Some(crypt), ..MountOptions::default() },
+                )
+                .await?
+        };
+        mounted_vol.exposed_dir().clone(exposed_dir.into_channel().into())?;
+        Ok(())
+    } else {
+        Err(anyhow!("Tried to mount starnix volume without container set"))
+    }
+}
+
+async fn unmount_starnix_volume(
+    environment: &Arc<Mutex<dyn Environment>>,
+    config: &fshost_config::Config,
+) -> Result<(), Error> {
+    ensure!(
+        !config.starnix_volume_name.is_empty(),
+        "unmount_starnix_volume called without the starnix_volume_name config set"
+    );
+    let starnix_volume_name = config.starnix_volume_name.clone();
+    let mut env = environment.lock().await;
+    let fs = env.get_container().ok_or_else(|| {
+        log::error!("Tried to unmount starnix volume without container set");
+        zx::Status::NOT_FOUND
+    })?;
+    fs.shutdown_volume(&starnix_volume_name).await
+}
+
 async fn wipe_storage(
     environment: &Arc<Mutex<dyn Environment>>,
     config: &fshost_config::Config,
@@ -195,8 +250,8 @@ async fn wipe_storage_fxblob(
     let blob_volume = serving_fxfs
         .create_volume(
             BLOB_VOLUME_LABEL,
-            fidl_fuchsia_fs_startup::CreateOptions::default(),
-            fidl_fuchsia_fs_startup::MountOptions { as_blob: Some(true), ..Default::default() },
+            CreateOptions::default(),
+            MountOptions { as_blob: Some(true), ..Default::default() },
         )
         .await
         .context("making blob volume")?;
@@ -668,6 +723,57 @@ async fn init_system_partition_table(
             Err(zx::Status::PEER_CLOSED)
         })?
         .map_err(zx::Status::from_raw)
+}
+
+pub fn fshost_volume_provider(
+    environment: Arc<Mutex<dyn Environment>>,
+    config: Arc<fshost_config::Config>,
+) -> Arc<service::Service> {
+    service::host(move |mut stream: fshost::StarnixVolumeProviderRequestStream| {
+        let env = environment.clone();
+        let config = config.clone();
+        async move {
+            while let Some(request) = stream.next().await {
+                match request {
+                    Ok(fshost::StarnixVolumeProviderRequest::Mount {
+                        crypt,
+                        exposed_dir,
+                        responder,
+                    }) => {
+                        log::info!("volume provider mount called");
+                        let res =
+                            match mount_starnix_volume(&env, &config, crypt, exposed_dir).await {
+                                Ok(()) => Ok(()),
+                                Err(e) => {
+                                    log::error!("volume provider service: mount failed: {:?}", e);
+                                    Err(zx::Status::INTERNAL.into_raw())
+                                }
+                            };
+                        responder.send(res).unwrap_or_else(|e| {
+                            log::error!("failed to send Mount response. error: {:?}", e);
+                        });
+                    }
+                    Ok(fshost::StarnixVolumeProviderRequest::Unmount { responder }) => {
+                        log::info!("volume provider unmount called");
+                        let res = match unmount_starnix_volume(&env, &config).await {
+                            Ok(()) => Ok(()),
+                            Err(e) => {
+                                log::error!("volume provider service: unmount failed: {:?}", e);
+                                Err(zx::Status::INTERNAL.into_raw())
+                            }
+                        };
+                        responder.send(res).unwrap_or_else(|e| {
+                            log::error!("failed to send Unmount response. error: {:?}", e);
+                        });
+                    }
+                    Err(e) => {
+                        log::error!("volume provider server failed: {:?}", e);
+                        return;
+                    }
+                }
+            }
+        }
+    })
 }
 
 /// Make a new vfs service node that implements fuchsia.fshost.Admin

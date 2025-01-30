@@ -126,17 +126,13 @@ pub trait Environment: Send + Sync {
 
     /// Returns the registered devices.
     fn registered_devices(&self) -> &Arc<RegisteredDevices>;
-}
 
-// Before a filesystem is mounted, we queue requests.
-#[derive(Default)]
-pub struct FilesystemQueue {
-    exposed_dir_queue: Vec<ServerEnd<fio::DirectoryMarker>>,
-    crypt_service_exposed_dir: Vec<ServerEnd<fio::DirectoryMarker>>,
+    /// Returns the container's ServingMultiVolumeFilesystem if the container has been set.
+    fn get_container(&mut self) -> Option<&mut ServingMultiVolumeFilesystem>;
 }
 
 pub enum Filesystem {
-    Queue(FilesystemQueue),
+    Queue(Vec<ServerEnd<fio::DirectoryMarker>>),
     Serving(ServingSingleVolumeFilesystem),
     ServingMultiVolume(
         // We hold onto crypt service here to avoid it prematurely shutting down.
@@ -164,33 +160,13 @@ impl Filesystem {
         }
     }
 
-    pub fn crypt_service(&mut self) -> Result<Option<fio::DirectoryProxy>, Error> {
-        let (proxy, server) = create_proxy::<fio::DirectoryMarker>();
-        match self {
-            Filesystem::Queue(queue) => queue.crypt_service_exposed_dir.push(server),
-            Filesystem::Serving(_) => bail!(anyhow!("filesystem doesn't have crypt service")),
-            Filesystem::ServingMultiVolume(crypt_service, ..) => {
-                crypt_service.exposed_dir().clone(server.into_channel().into())?
-            }
-            Filesystem::ServingVolumeInMultiVolume(crypt_service_option, ..) => {
-                match crypt_service_option {
-                    Some(s) => s.exposed_dir().clone(server.into_channel().into())?,
-                    None => return Ok(None),
-                }
-            }
-            Filesystem::ServingGpt(..) => bail!(anyhow!("GPT has no crypt service")),
-            Filesystem::Shutdown => bail!(anyhow!("filesystem is shutting down")),
-        }
-        Ok(Some(proxy))
-    }
-
     pub fn exposed_dir(
         &mut self,
         serving_fs: Option<&mut ServingMultiVolumeFilesystem>,
     ) -> Result<fio::DirectoryProxy, Error> {
         let (proxy, server) = create_proxy::<fio::DirectoryMarker>();
         match self {
-            Filesystem::Queue(queue) => queue.exposed_dir_queue.push(server),
+            Filesystem::Queue(queue) => queue.push(server),
             Filesystem::Serving(fs) => fs.exposed_dir().clone(server.into_channel().into())?,
             Filesystem::ServingMultiVolume(_, fs, data_volume_name) => fs
                 .volume(&data_volume_name)
@@ -230,7 +206,7 @@ impl Filesystem {
         }
     }
 
-    fn queue(&mut self) -> Option<&mut FilesystemQueue> {
+    fn queue(&mut self) -> Option<&mut Vec<ServerEnd<fio::DirectoryMarker>>> {
         match self {
             Filesystem::Queue(queue) => Some(queue),
             _ => None,
@@ -374,10 +350,10 @@ impl FshostEnvironment {
         let corruption_events = inspector.root().create_child("corruption_events");
         Self {
             config: config.clone(),
-            gpt: Filesystem::Queue(FilesystemQueue::default()),
+            gpt: Filesystem::Queue(Vec::new()),
             container: None,
-            blobfs: Filesystem::Queue(FilesystemQueue::default()),
-            data: Filesystem::Queue(FilesystemQueue::default()),
+            blobfs: Filesystem::Queue(Vec::new()),
+            data: Filesystem::Queue(Vec::new()),
             fvm: None,
             launcher: Arc::new(FilesystemLauncher { config, corruption_events }),
             matcher_lock,
@@ -408,13 +384,6 @@ impl FshostEnvironment {
     /// "/data" is mounted and it will get routed once the data partition is mounted.
     pub fn data_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
         self.data.exposed_dir(self.container.maybe_fs())
-    }
-
-    /// Returns a proxy for the exposed dir of the data filesystem's crypt service. This can be
-    /// called before "/data" is mounted and it will get routed once the data partition is
-    /// mounted and the crypt service becomes available. Fails for single volume filesystems.
-    pub fn crypt_service_exposed_dir(&mut self) -> Result<Option<fio::DirectoryProxy>, Error> {
-        self.data.crypt_service()
     }
 
     /// Returns a proxy for the root of the data filesystem.  This can be called before "/data" is
@@ -628,7 +597,7 @@ impl FshostEnvironment {
         let mut fs = self.launcher.serve_blobfs(device).await?;
 
         let exposed_dir = fs.exposed_dir(None)?;
-        for server in queue.exposed_dir_queue.drain(..) {
+        for server in queue.drain(..) {
             exposed_dir.clone(server.into_channel().into())?;
         }
         self.blobfs = fs;
@@ -745,7 +714,7 @@ impl Environment for FshostEnvironment {
         .context("Failed to start GPT")?;
         let queue = self.gpt.queue().unwrap();
         let exposed_dir = filesystem.exposed_dir();
-        for server in queue.exposed_dir_queue.drain(..) {
+        for server in queue.drain(..) {
             exposed_dir.clone(server.into_channel().into())?;
         }
         let partitions_dir = fuchsia_fs::directory::open_directory(
@@ -845,7 +814,7 @@ impl Environment for FshostEnvironment {
             .context("Failed to open the blob volume")?;
         let exposed_dir = blobfs.exposed_dir();
         let queue = self.blobfs.queue().ok_or_else(|| anyhow!("blobfs already mounted"))?;
-        for server in queue.exposed_dir_queue.drain(..) {
+        for server in queue.drain(..) {
             exposed_dir.clone(server.into_channel().into())?;
         }
         self.blobfs = Filesystem::ServingVolumeInMultiVolume(None, label.to_string());
@@ -867,13 +836,8 @@ impl Environment for FshostEnvironment {
         }
         let queue = self.data.queue().unwrap();
         let exposed_dir = filesystem.exposed_dir(Some(container.fs()))?;
-        for server in queue.exposed_dir_queue.drain(..) {
+        for server in queue.drain(..) {
             exposed_dir.clone(server.into_channel().into())?;
-        }
-        if let Some(crypt_service) = filesystem.crypt_service()? {
-            for server in queue.crypt_service_exposed_dir.drain(..) {
-                crypt_service.clone(server.into_channel().into())?;
-            }
         }
         self.data = filesystem;
         Ok(())
@@ -1031,20 +995,9 @@ impl Environment for FshostEnvironment {
 
         let queue = self.data.queue().unwrap();
         let exposed_dir = filesystem.exposed_dir(None)?;
-        for server in queue.exposed_dir_queue.drain(..) {
+        for server in queue.drain(..) {
             exposed_dir.clone(server.into_channel().into())?;
         }
-        match &filesystem {
-            Filesystem::ServingMultiVolume(..) | Filesystem::ServingVolumeInMultiVolume(..) => {
-                if let Some(crypt_service_exposed_dir) = filesystem.crypt_service()? {
-                    for server in queue.crypt_service_exposed_dir.drain(..) {
-                        crypt_service_exposed_dir.clone(server.into_channel().into())?;
-                    }
-                }
-            }
-            _ => {}
-        }
-
         self.data = filesystem;
         Ok(())
     }
@@ -1090,6 +1043,10 @@ impl Environment for FshostEnvironment {
 
     fn registered_devices(&self) -> &Arc<RegisteredDevices> {
         &self.registered_devices
+    }
+
+    fn get_container(&mut self) -> Option<&mut ServingMultiVolumeFilesystem> {
+        self.container.maybe_fs()
     }
 }
 

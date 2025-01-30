@@ -90,5 +90,12 @@
             ],
             from: "self",
         },
+
+        // TODO(https://fxbug.dev/391474592): Remove after per-container volumes land.
+        {
+            protocol: "fuchsia.fxfs.CryptManagement",
+            from: "void",
+            availability: "optional",
+        },
     ],
 }

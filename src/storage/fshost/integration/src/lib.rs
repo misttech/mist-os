@@ -6,7 +6,10 @@ use assert_matches::assert_matches;
 use diagnostics_assertions::assert_data_tree;
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl::endpoints::{create_proxy, ServiceMarker as _};
-use fidl_fuchsia_fxfs::BlobReaderMarker;
+use fidl_fuchsia_fxfs::{
+    BlobReaderMarker, CryptManagementMarker, CryptManagementProxy, CryptMarker, CryptProxy,
+    KeyPurpose,
+};
 use fuchsia_component::client::connect_to_protocol_at_dir_root;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use futures::channel::mpsc::{self};
@@ -37,6 +40,7 @@ pub const BLOBFS_MAX_BYTES: u64 = 8765432;
 // (defined in device/constants.rs) to ensure that when f2fs is
 // the data filesystem format, we don't run out of space
 pub const DATA_MAX_BYTES: u64 = 109876543;
+pub const STARNIX_VOLUME_NAME: &str = "starnix_volume";
 
 pub struct TestFixtureBuilder {
     netboot: bool,
@@ -397,6 +401,40 @@ impl TestFixture {
         )
         .unwrap();
         self.ramdisks.push(ramdisk);
+    }
+
+    pub async fn setup_starnix_crypt(&self) -> (CryptProxy, CryptManagementProxy) {
+        let crypt_management =
+            self.realm.root.connect_to_protocol_at_exposed_dir::<CryptManagementMarker>().expect(
+                "connect_to_protocol_at_exposed_dir failed for the CryptManagement protocol",
+            );
+        let crypt = self
+            .realm
+            .root
+            .connect_to_protocol_at_exposed_dir::<CryptMarker>()
+            .expect("connect_to_protocol_at_exposed_dir failed for the Crypt protocol");
+        let key = vec![0xABu8; 32];
+        crypt_management
+            .add_wrapping_key(&u128::to_le_bytes(0), key.as_slice())
+            .await
+            .expect("fidl transport error")
+            .expect("add wrapping key failed");
+        crypt_management
+            .add_wrapping_key(&u128::to_le_bytes(1), key.as_slice())
+            .await
+            .expect("fidl transport error")
+            .expect("add wrapping key failed");
+        crypt_management
+            .set_active_key(KeyPurpose::Data, &u128::to_le_bytes(0))
+            .await
+            .expect("fidl transport error")
+            .expect("set metadata key failed");
+        crypt_management
+            .set_active_key(KeyPurpose::Metadata, &u128::to_le_bytes(1))
+            .await
+            .expect("fidl transport error")
+            .expect("set metadata key failed");
+        (crypt, crypt_management)
     }
 
     /// This must be called if any crash reports are expected, since spurious reports will cause a

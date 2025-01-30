@@ -95,7 +95,7 @@ impl ObjectStore {
         if trace {
             info!(store_id = self.store_object_id(); "OS: end flush");
         }
-        if let Some(callback) = self.flush_callback.get() {
+        if let Some(callback) = &*self.flush_callback.lock().unwrap() {
             callback(self);
         }
 

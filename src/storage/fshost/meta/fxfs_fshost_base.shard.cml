@@ -9,11 +9,6 @@
             durability: "transient",
         },
     ],
-    capabilities: [
-        {
-            protocol: [ "fuchsia.fxfs.CryptManagement" ],
-        },
-    ],
     use: [
         {
             protocol: "fuchsia.fs.startup.Startup",
@@ -51,8 +46,9 @@
             from: "#fxfs",
         },
         {
-            protocol: "fuchsia.fxfs.CryptManagement",
-            from: "self",
+            protocol: "fuchsia.fshost.StarnixVolumeProvider",
+            from: "void",
+            availability: "optional",
         },
     ],
 }

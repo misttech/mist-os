@@ -5,6 +5,7 @@
 use fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobReaderMarker};
 use fuchsia_component_test::{Capability, ChildOptions, ChildRef, RealmBuilder, Ref, Route};
 use std::collections::HashMap;
+
 use {
     fidl_fuchsia_fshost as ffshost, fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio,
     fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fprocess,
@@ -111,9 +112,30 @@ impl FshostBuilder {
             ("fxfs_crypt_url", "fuchsia.fshost.FxfsCryptUrl"),
             ("storage_host", "fuchsia.fshost.StorageHost"),
             ("disable_automount", "fuchsia.fshost.DisableAutomount"),
+            ("starnix_volume_name", "fuchsia.fshost.StarnixVolumeName"),
             ("blobfs_write_compression_algorithm", "fuchsia.blobfs.WriteCompressionAlgorithm"),
             ("blobfs_cache_eviction_policy", "fuchsia.blobfs.CacheEvictionPolicy"),
         ]);
+
+        // Note that the `starnix_volume_name` config should not be set in the fshost integration
+        // test package because the builder is not aware of those and won't know to setup the crypt
+        // service.
+        if self.config_values.contains_key("starnix_volume_name") {
+            let user_fxfs_crypt = realm_builder
+                .add_child("user_fxfs_crypt", "#meta/fxfs-crypt.cm", ChildOptions::new().eager())
+                .await
+                .unwrap();
+            realm_builder
+                .add_route(
+                    Route::new()
+                        .capability(Capability::protocol::<ffxfs::CryptMarker>())
+                        .capability(Capability::protocol::<ffxfs::CryptManagementMarker>())
+                        .from(&user_fxfs_crypt)
+                        .to(Ref::parent()),
+                )
+                .await
+                .unwrap();
+        }
 
         // Add the overrides as capabilities and route them.
         self.config_values.insert("fxfs_crypt_url", "#meta/fxfs-crypt.cm".into_value_spec());
@@ -163,7 +185,7 @@ impl FshostBuilder {
                     .capability(Capability::protocol::<ffshost::RecoveryMarker>())
                     .capability(Capability::protocol::<ffuv::BlobfsVerifierMarker>())
                     .capability(Capability::protocol::<ffuv::ComponentOtaHealthCheckMarker>())
-                    .capability(Capability::protocol::<ffxfs::CryptManagementMarker>())
+                    .capability(Capability::protocol::<ffshost::StarnixVolumeProviderMarker>())
                     .capability(Capability::protocol::<fpartitions::PartitionsManagerMarker>())
                     .capability(Capability::protocol::<BlobCreatorMarker>())
                     .capability(Capability::protocol::<BlobReaderMarker>())
