@@ -45,7 +45,7 @@ pub(crate) fn to_argv(cmd: &StartCommand) -> Vec<String> {
     if let Some(s) = cmd.storage_type {
         let st = match s {
             ffx::RepositoryStorageType::Ephemeral => "ephemeral",
-            ffx::RepositoryStorageType::Persistent => "Persistent",
+            ffx::RepositoryStorageType::Persistent => "persistent",
         };
         argv.extend_from_slice(&["--storage-type".into(), st.to_string()]);
     }
