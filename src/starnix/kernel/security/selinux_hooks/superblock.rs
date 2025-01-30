@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::security::selinux_hooks;
 use crate::security::selinux_hooks::{
     check_permission, fs_node_effective_sid_and_class, todo_check_permission, FileSystemLabelState,
     FsNodeSidAndClass,
 };
 use crate::task::CurrentTask;
-use crate::vfs::fs_args::MountParams;
 use crate::vfs::{FileSystem, Mount, NamespaceNode};
 use crate::TODO_DENY;
 use selinux::permission_check::PermissionCheck;
-use selinux::{CommonFilePermission, FileSystemPermission, SecurityId, SecurityServer};
+use selinux::{
+    CommonFilePermission, FileSystemMountOptions, FileSystemPermission, SecurityId, SecurityServer,
+};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
@@ -70,9 +70,8 @@ pub fn sb_mount(
 pub fn sb_remount(
     security_server: &SecurityServer,
     mount: &Mount,
-    new_mount_params: &MountParams,
+    new_mount_options: FileSystemMountOptions,
 ) -> Result<(), Errno> {
-    let new_mount_options = selinux_hooks::sb_eat_lsm_opts(new_mount_params)?;
     let fs_name = mount.fs_name();
     if !mount.security_state().state.equivalent_to_options(
         security_server,

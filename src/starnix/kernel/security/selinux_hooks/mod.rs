@@ -1240,14 +1240,15 @@ pub(super) fn kernel_init_security(exceptions_config: String) -> KernelState {
     }
 }
 
-/// Returns the security mount options for the given `MountParams`
-/// Equivalent to the `sb_eat_lsm_opts` hook.
-/// TODO(https://fxbug.dev/378835348): Consume the SELinux mount options from the supplied `MountParams`.
-fn sb_eat_lsm_opts(mount_params: &MountParams) -> Result<FileSystemMountOptions, Errno> {
-    let context = mount_params.get(FsStr::new(b"context")).cloned();
-    let def_context = mount_params.get(FsStr::new(b"defcontext")).cloned();
-    let fs_context = mount_params.get(FsStr::new(b"fscontext")).cloned();
-    let root_context = mount_params.get(FsStr::new(b"rootcontext")).cloned();
+/// Consumes the SELinux mount options from the supplied `MountParams` and returns the security
+/// mount options for the given `MountParams`.
+pub(super) fn sb_eat_lsm_opts(
+    mount_params: &mut MountParams,
+) -> Result<FileSystemMountOptions, Errno> {
+    let context = mount_params.remove(FsStr::new(b"context"));
+    let def_context = mount_params.remove(FsStr::new(b"defcontext"));
+    let fs_context = mount_params.remove(FsStr::new(b"fscontext"));
+    let root_context = mount_params.remove(FsStr::new(b"rootcontext"));
 
     // If a "context" is specified then it is used for all nodes in the filesystem, so the other
     // security context options would not be meaningful to combine with it, except "fscontext".
@@ -1265,9 +1266,9 @@ fn sb_eat_lsm_opts(mount_params: &MountParams) -> Result<FileSystemMountOptions,
 /// Returns security state to associate with a filesystem based on the supplied mount options.
 pub(super) fn file_system_init_security(
     name: &'static FsStr,
-    mount_params: &MountParams,
+    mount_options: &FileSystemMountOptions,
 ) -> Result<FileSystemState, Errno> {
-    Ok(FileSystemState::new(name, sb_eat_lsm_opts(mount_params)?))
+    Ok(FileSystemState::new(name, mount_options.clone()))
 }
 
 /// Returns the security label to be applied to a file system with the name `fs_name`

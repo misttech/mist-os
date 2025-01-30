@@ -1754,7 +1754,9 @@ fn do_mount_remount(
 
     let mut data_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
     let data = current_task.read_c_string_if_non_null(data_addr, &mut data_buf)?;
-    security::sb_remount(current_task, &mount, &MountParams::parse(data)?)?;
+    let mount_options =
+        security::sb_eat_lsm_opts(current_task.kernel(), &mut MountParams::parse(data)?)?;
+    security::sb_remount(current_task, &mount, mount_options)?;
     let updated_flags = flags & MountFlags::CHANGEABLE_WITH_REMOUNT;
     mount.update_flags(updated_flags);
     if !flags.contains(MountFlags::BIND) {

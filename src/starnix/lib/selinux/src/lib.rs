@@ -691,7 +691,7 @@ pub enum FileSystemLabelingScheme {
 /// SELinux security context-related filesystem mount options. These options are documented in the
 /// `context=context, fscontext=context, defcontext=context, and rootcontext=context` section of
 /// the `mount(8)` manpage.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct FileSystemMountOptions {
     /// Specifies the effective security context to use for all nodes in the filesystem, and the
     /// filesystem itself. If the filesystem already contains security attributes then these are

@@ -11,7 +11,7 @@ use crate::vfs::{
     Mount, NamespaceNode, ValueOrSize, XattrOp,
 };
 use fuchsia_inspect_contrib::profile_duration;
-use selinux::{SecurityPermission, SecurityServer};
+use selinux::{FileSystemMountOptions, SecurityPermission, SecurityServer};
 use starnix_logging::log_debug;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_types::ownership::TempRef;
@@ -123,14 +123,30 @@ pub fn kernel_init_security(enabled: bool, exceptions_config: String) -> KernelS
     KernelState { state: enabled.then(|| selinux_hooks::kernel_init_security(exceptions_config)) }
 }
 
+/// Consumes the mount options from the supplied `MountParams` and returns the security mount
+/// options for the given `MountParams`.
+/// Corresponds to the `sb_eat_lsm_opts` hook.
+pub fn sb_eat_lsm_opts(
+    kernel: &Kernel,
+    mount_params: &mut MountParams,
+) -> Result<FileSystemMountOptions, Errno> {
+    profile_duration!("security.hooks.sb_eat_lsm_opts");
+    if let Some(state) = &kernel.security_state.state {
+        if state.server.has_policy() {
+            return selinux_hooks::sb_eat_lsm_opts(mount_params);
+        }
+    }
+    Ok(FileSystemMountOptions::default())
+}
+
 /// Returns security state to associate with a filesystem based on the supplied mount options.
 /// This sits somewhere between `fs_context_parse_param()` and `sb_set_mnt_opts()` in function.
 pub fn file_system_init_security(
     name: &'static FsStr,
-    mount_params: &MountParams,
+    mount_options: &FileSystemMountOptions,
 ) -> Result<FileSystemState, Errno> {
     profile_duration!("security.hooks.file_system_init_security");
-    Ok(FileSystemState { state: selinux_hooks::file_system_init_security(name, mount_params)? })
+    Ok(FileSystemState { state: selinux_hooks::file_system_init_security(name, mount_options)? })
 }
 
 /// Gives the hooks subsystem an opportunity to note that the new `file_system` needs labeling, if
@@ -729,11 +745,11 @@ pub fn sb_mount(
 pub fn sb_remount(
     current_task: &CurrentTask,
     mount: &Mount,
-    new_mount_params: &MountParams,
+    new_mount_options: FileSystemMountOptions,
 ) -> Result<(), Errno> {
     profile_duration!("security.hooks.sb_remount");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::superblock::sb_remount(security_server, mount, new_mount_params)
+        selinux_hooks::superblock::sb_remount(security_server, mount, new_mount_options)
     })
 }
 
