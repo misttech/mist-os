@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.utils.common.py."""
 
+import time
 import unittest
 from collections.abc import Callable
 from typing import Any
@@ -218,3 +219,21 @@ class CommonUtilsTests(unittest.TestCase):
                 ),
                 should_exist=True,
             )
+
+    def test_time_limit(self) -> None:
+        """Test case for common.time_limit() where the underlying method finishes successfully"""
+        with common.time_limit(timeout=1):
+            print("hello world!")
+
+    def test_time_limit_error_1(self) -> None:
+        """Test case for common.time_limit() where the underlying method raises an exception"""
+        with self.assertRaises(RuntimeError):
+            with common.time_limit(timeout=1):
+                raise RuntimeError("run time error")
+
+    # This test will take at-least 1 sec to execute, not ideal for an unit test.
+    def test_time_limit_error_2(self) -> None:
+        """Test case for common.time_limit() where the underlying method times out"""
+        with self.assertRaises(errors.HoneydewTimeoutError):
+            with common.time_limit(timeout=1):
+                time.sleep(2)

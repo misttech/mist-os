@@ -70,6 +70,10 @@ class FastbootCommandError(HoneydewError):
     """Exception for errors raised by Fastboot commands."""
 
 
+class HealthCheckError(HoneydewError):
+    """Raised when health_check fails."""
+
+
 class TransportConnectionError(HoneydewError):
     """Raised when transport's check_connection fails."""
 

@@ -319,7 +319,11 @@ class FuchsiaDevice(abc.ABC):
 
     @abc.abstractmethod
     def health_check(self) -> None:
-        """Ensure device is healthy."""
+        """Ensure device is healthy.
+
+        Raises:
+            errors.HealthCheckError
+        """
 
     @abc.abstractmethod
     def log_message_to_device(

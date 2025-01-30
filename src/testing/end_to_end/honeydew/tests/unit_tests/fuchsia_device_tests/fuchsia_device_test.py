@@ -748,6 +748,29 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             self.fd_sl4f_obj.sl4f
         )
 
+    @mock.patch.object(
+        fuchsia_controller_transport.FuchsiaController,
+        "check_connection",
+        autospec=True,
+    )
+    @mock.patch.object(
+        ffx_transport.FFX,
+        "check_connection",
+        side_effect=errors.FfxConnectionError("ffx connection error"),
+        autospec=True,
+    )
+    def test_health_check_exception(
+        self,
+        mock_ffx_check_connection: mock.Mock,
+        mock_fc_check_connection: mock.Mock,
+    ) -> None:
+        """Testcase for FuchsiaDevice.health_check() raising HealthCheckError"""
+        with self.assertRaises(errors.HealthCheckError):
+            self.fd_fc_obj.health_check()
+
+        mock_ffx_check_connection.assert_called_once_with(self.fd_fc_obj.ffx)
+        mock_fc_check_connection.assert_not_called()
+
     @parameterized.expand(
         [
             (

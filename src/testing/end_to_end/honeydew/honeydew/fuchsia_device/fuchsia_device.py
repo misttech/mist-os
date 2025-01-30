@@ -617,14 +617,38 @@ class FuchsiaDevice(
         """Ensure device is healthy.
 
         Raises:
-            errors.FfxConnectionError
-            errors.FuchsiaControllerConnectionError
+            errors.HealthCheckError
         """
-        # Note - FFX need to be invoked first before FC as FC depends on the daemon that will be created by FFX
-        self.ffx.check_connection()
-        self.fuchsia_controller.check_connection()
-        if self._is_sl4f_needed:
-            self.sl4f.check_connection()
+        try:
+            with common.time_limit(
+                timeout=60,
+                exception_message=f"Timeout occurred during the health check of '{self._device_info.name}'",
+            ):
+                _LOGGER.info(
+                    "Starting the health check on %s...",
+                    self.device_name,
+                )
+
+                # Note - FFX need to be invoked first before FC as FC depends on the daemon that
+                # will be created by FFX
+                self.ffx.check_connection()
+
+                self.fuchsia_controller.check_connection()
+
+                if self._is_sl4f_needed:
+                    self.sl4f.check_connection()
+
+                _LOGGER.info(
+                    "Completed the health check successfully on %s...",
+                    self.device_name,
+                )
+        except (
+            errors.HoneydewTimeoutError,
+            errors.TransportConnectionError,
+        ) as err:
+            raise errors.HealthCheckError(
+                f"health check failed on '{self._device_info.name}'"
+            ) from err
 
     def log_message_to_device(
         self, message: str, level: custom_types.LEVEL
