@@ -5,6 +5,7 @@
 //! Testing-only code for persistent Timekeeper behavior changes around
 //! real-time clock (RTC) handling.
 
+use anyhow::Result;
 use fuchsia_runtime::UtcTimeline;
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
@@ -91,49 +92,43 @@ impl State {
     }
 
     /// Reads the persistent state, updating the testing-only components.
-    ///
-    /// Any errors are logged only, and defaults are returned.
-    pub fn read_and_update() -> Self {
+    pub fn read_and_update() -> Result<Self> {
         Self::read_and_update_internal(PERSISTENT_STATE_PATH)
     }
 
-    pub fn read_and_update_internal<P: AsRef<Path>>(path: P) -> Self {
+    pub fn read_and_update_internal<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
-        let state: State = fs::read_to_string(path)
-            .as_ref()
-            .map(|s| {
-                serde_json::from_str(s)
-                    .map_err(|e| error!("while deserializing: {:?}: {:?}", path, e))
-                    .unwrap_or_else(|_| Default::default())
-            })
-            .map_err(|e| debug!("while reading: {:?}", e))
-            .unwrap_or_else(|_| Default::default());
+        let maybe_state_str: String = fs::read_to_string(path).map_err(|e| {
+            debug!("while reading: {:?}", e);
+            e
+        })?;
+        let state: State = serde_json::from_str(&maybe_state_str).map_err(|e| {
+            debug!("while deserializing: {:?}", e);
+            e
+        })?;
         debug!("read persistent state: {:?}", &state);
-
         let mut next = state.clone();
         next.spend_one_reboot_count();
-        Self::write_internal(path, &next);
-
-        // Return the previous state.
-        state
+        Self::write_internal(path, &next)?;
+        Ok(state)
     }
 
     /// Write the persistent state to mutable persistent storage.
-    pub fn write(state: &Self) {
+    pub fn write(state: &Self) -> Result<()> {
         Self::write_internal(PERSISTENT_STATE_PATH, state)
     }
 
-    fn write_internal<P: AsRef<Path>>(path: P, state: &Self) {
+    fn write_internal<P: AsRef<Path>>(path: P, state: &Self) -> Result<()> {
         let path = path.as_ref();
         debug!("writing persistent state: {:?} to {:?}", state, path);
-        serde_json::to_string(state)
-            .map(|s| {
-                fs::write(path, s)
-                    .map_err(|e| error!("while writing persistent state: {:?}: {:?}", path, e))
-                    .map_err(|e| error!("while serializing state from: {:?}: {:?}", path, e))
-                    .unwrap_or(())
-            })
-            .unwrap_or(())
+        let state_str = serde_json::to_string(state).map_err(|e| {
+            error!("while serializing state: {:?}", e);
+            e
+        })?;
+        fs::write(path, state_str).map_err(|e| {
+            error!("while writing persistent state: {:?}: {:?}", path, e);
+            e.into()
+        })
     }
 }
 

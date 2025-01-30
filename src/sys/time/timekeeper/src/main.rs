@@ -30,6 +30,8 @@ use anyhow::{Context as _, Result};
 use chrono::prelude::*;
 use fidl::AsHandleRef;
 use fuchsia_component::server::ServiceFs;
+use fuchsia_inspect::health;
+use fuchsia_inspect::health::Reporter;
 use fuchsia_runtime::{UtcClock, UtcClockDetails, UtcClockUpdate, UtcDuration, UtcTimeline};
 use futures::channel::mpsc;
 use futures::future::{self, OptionFuture};
@@ -238,10 +240,13 @@ async fn main() -> Result<()> {
         clock: Arc::new(create_monitor_clock(&primary_track.clock)),
     });
 
+    // The root inspect node in the inspect hierarchy.
+    let inspector_root = diagnostics::INSPECTOR.root();
+
     info!("initializing diagnostics and serving inspect on servicefs");
     let cobalt_experiment = COBALT_EXPERIMENT;
     let diagnostics = Arc::new(CompositeDiagnostics::new(
-        InspectDiagnostics::new(diagnostics::INSPECTOR.root(), &primary_track, &monitor_track),
+        InspectDiagnostics::new(inspector_root, &primary_track, &monitor_track),
         CobaltDiagnostics::new(cobalt_experiment, &primary_track, &monitor_track),
     ));
 
@@ -261,7 +266,19 @@ async fn main() -> Result<()> {
         }
     };
 
-    let persistent_state = Rc::new(RefCell::new(persistence::State::read_and_update()));
+    let persistence_node = inspector_root.create_child("persistence");
+    let persistence_health = Rc::new(RefCell::new(health::Node::new(&persistence_node)));
+    persistence_health.borrow_mut().set_ok();
+
+    let persistent_state = Rc::new(RefCell::new(
+        persistence::State::read_and_update()
+            .map_err(|e| {
+                persistence_health
+                    .borrow_mut()
+                    .set_unhealthy(&format!("at startup: {:?}; use #DEBUG logs for details", e))
+            })
+            .unwrap_or_else(|_| Default::default()),
+    ));
 
     let (cmd_send, cmd_rcv) = mpsc::channel(1);
 
@@ -284,7 +301,7 @@ async fn main() -> Result<()> {
     })
     .detach();
 
-    let loop_inspect = diagnostics::INSPECTOR.root().create_child("wake_alarms");
+    let loop_inspect = inspector_root.create_child("wake_alarms");
 
     let _inspect_server_task = inspect_runtime::publish(
         &diagnostics::INSPECTOR,
@@ -327,11 +344,13 @@ async fn main() -> Result<()> {
     // of timer clients the system may have.
     const MAX_CONCURRENT_HANDLERS: usize = 100;
 
+    let rtc_test_server = Rc::new(rtc_testing::Server::new(persistence_health, persistent_state));
+
     // fuchsia::main can only return () or Result<()>.
     let result = fs
         .for_each_concurrent(MAX_CONCURRENT_HANDLERS, |request: Rpcs| {
+            let rtc_test_server = rtc_test_server.clone();
             let time_test_mutex = time_test_mutex.clone();
-            let allow_update_rtc = persistent_state.clone();
             let timer_loop = timer_loop.clone();
             fuchsia_trace::instant!(c"timekeeper", c"request", fuchsia_trace::Scope::Process);
             async move {
@@ -341,7 +360,8 @@ async fn main() -> Result<()> {
                         // This is because conflicting instructions from different clients
                         // can end up being confusing for the test fixture.
                         if let Ok(_only_one_please) = time_test_mutex.try_borrow_mut() {
-                            rtc_testing::serve(allow_update_rtc, stream)
+                            rtc_test_server
+                                .serve(stream)
                                 .await
                                 .map_err(|e| {
                                     log::error!("while serving fuchsia.time.test/RPC: {:?}", e)
