@@ -4,19 +4,24 @@
 
 """Defines a WORKSPACE rule for loading a version of clang."""
 
-load("//fuchsia/workspace:utils.bzl", "fetch_cipd_contents", "normalize_arch", "normalize_os", "workspace_path")
 load("//common:toolchains/clang/repository_utils.bzl", "prepare_clang_repository")
+load("//fuchsia/workspace:utils.bzl", "fetch_cipd_contents", "normalize_arch", "normalize_os", "workspace_path")
 
 # Base URL for Fuchsia clang archives.
-_CLANG_URL_TEMPLATE = "https://chrome-infra-packages.appspot.com/dl/fuchsia/third_party/clang/{os}-amd64/+/{tag}"
+_CLANG_URL_TEMPLATE = "https://chrome-infra-packages.appspot.com/dl/fuchsia/third_party/clang/{os}-{arch}/+/{tag}"
 
 _LOCAL_FUCHSIA_PLATFORM_BUILD = "LOCAL_FUCHSIA_PLATFORM_BUILD"
 _LOCAL_FUCHSIA_CLANG_VERSION_FILE = "LOCAL_FUCHSIA_CLANG_VERSION_FILE"
 _LOCAL_FUCHSIA_CLANG_DIR = "../../prebuilt/third_party/clang"
 
-def _clang_url(os, tag):
-    # Return the URL of clang given an Operating System string and a CIPD tag.
-    return _CLANG_URL_TEMPLATE.format(os = os, tag = tag)
+def _clang_url(os, arch, tag):
+    # Return the URL of clang given an Operating System string, arch string,
+    # and a CIPD tag.  Note that sadly the set of arch names used in CIPD don't
+    # match the "normalized" arches: they're either amd64 or arm64.
+    cipd_arch = "amd64"
+    if arch == "arm64":
+        cipd_arch = "arm64"
+    return _CLANG_URL_TEMPLATE.format(os = os, arch = cipd_arch, tag = tag)
 
 def _instantiate_local_archive(ctx):
     # Extracts the clang from a local archive file.
@@ -108,7 +113,7 @@ def _fuchsia_clang_repository_impl(ctx):
         if ctx.attr.sha256:
             sha256 = ctx.attr.sha256[normalized_os]
         ctx.download_and_extract(
-            _clang_url(normalized_os, ctx.attr.cipd_tag),
+            _clang_url(normalized_os, normalized_arch, ctx.attr.cipd_tag),
             type = "zip",
             sha256 = sha256,
         )
