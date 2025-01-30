@@ -21,7 +21,7 @@ template("ffx_e2e_test") {
   _host_test_config = "${invoker.target_name}_path_config"
 
   # Exported SDK with ffx binary.
-  _sdk_label = "//sdk:core($default_toolchain)"
+  _sdk_label = "//sdk:exported_idk_for_ffx_tests($default_toolchain)"
   _sdk_outdir = get_label_info(_sdk_label, "root_out_dir")
   _sdk_path = _sdk_outdir + "/sdk/exported/core"
 

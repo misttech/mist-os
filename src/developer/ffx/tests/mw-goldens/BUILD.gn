@@ -11,7 +11,7 @@ assert(is_host, "ffx mw-golden tests are only valid with the host toolchain.")
 
 if (has_board) {
   # Exported SDK with ffx binary.
-  _sdk_label = "//sdk:core($default_toolchain)"
+  _sdk_label = "//sdk:exported_idk_for_ffx_tests($default_toolchain)"
   _sdk_outdir = get_label_info(_sdk_label, "root_out_dir")
   _sdk_path = _sdk_outdir + "/sdk/exported/core"
 

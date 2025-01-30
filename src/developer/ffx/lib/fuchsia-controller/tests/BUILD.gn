@@ -26,10 +26,10 @@ host_test_data("fuchsia_controller_host_test_data") {
 }
 
 host_test_data("core_sdk_host_test_data") {
-  _sdk_out_dir =
-      get_label_info("//sdk:core($default_toolchain)", "root_out_dir")
-  sources = [ _sdk_out_dir + "/sdk/exported/core" ]
-  deps = [ "//sdk:core($default_toolchain)" ]
+  _sdk_label = "//sdk:exported_idk_for_ffx_tests($default_toolchain)"
+  sources =
+      [ get_label_info(_sdk_label, "root_out_dir") + "/sdk/exported/core" ]
+  deps = [ _sdk_label ]
 }
 
 group("fuchsia_controller_test_data") {
