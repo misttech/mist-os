@@ -15,7 +15,7 @@ mod file;
 mod node;
 
 fn repeat_by_n(seed: char, n: usize) -> String {
-    std::iter::repeat(seed).take(n).collect()
+    std::iter::repeat_n(seed, n).collect()
 }
 
 async fn dirs_to_test() -> impl Iterator<Item = PackageSource> {

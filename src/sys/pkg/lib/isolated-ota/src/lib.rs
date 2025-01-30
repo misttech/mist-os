@@ -96,7 +96,7 @@ pub async fn download_and_apply_update_with_updater(
 /// * `channel_name` - The channel to update from.
 /// * `version` - Version to report as the current installed version.
 /// * `omaha_cfg` - The |OmahaConfig| to use for Omaha. If None, the update will not use Omaha to
-///     determine the updater URL.
+///   determine the updater URL.
 pub async fn download_and_apply_update(
     channel_name: &str,
     version: &str,

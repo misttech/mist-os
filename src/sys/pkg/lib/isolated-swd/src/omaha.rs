@@ -159,7 +159,7 @@ mod tests {
     /// * `app_set`: AppSet for use by Omaha.
     /// * `config`: Omaha client configuration.
     /// * `mock_responses`: In-order list of responses Omaha should get for each HTTP request it
-    ///     makes.
+    ///   makes.
     async fn run_omaha(
         updater: UpdaterForTest,
         app_set: VecAppSet,
