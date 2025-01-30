@@ -290,17 +290,15 @@ mod tests {
     use super::{set_session, stop_session, SESSION_CHILD_COLLECTION, SESSION_NAME};
     use anyhow::Error;
     use fidl::endpoints::{create_endpoints, spawn_stream_handler};
-    use lazy_static::lazy_static;
     use session_testing::{spawn_directory_server, spawn_server};
+    use std::sync::LazyLock;
     use test_util::Counter;
     use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio};
 
     #[fuchsia::test]
     async fn set_session_calls_realm_methods_in_appropriate_order() -> Result<(), Error> {
-        lazy_static! {
-            // The number of realm calls which have been made so far.
-            static ref NUM_REALM_REQUESTS: Counter = Counter::new(0);
-        }
+        // The number of realm calls which have been made so far.
+        static NUM_REALM_REQUESTS: LazyLock<Counter> = LazyLock::new(|| Counter::new(0));
 
         let session_url = "session";
 
@@ -355,7 +353,7 @@ mod tests {
                     let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
-            };
+            }
             NUM_REALM_REQUESTS.inc();
         });
 
@@ -367,9 +365,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn set_session_starts_component() -> Result<(), Error> {
-        lazy_static! {
-            static ref NUM_START_CALLS: Counter = Counter::new(0);
-        }
+        static NUM_START_CALLS: LazyLock<Counter> = LazyLock::new(|| Counter::new(0));
 
         let session_url = "session";
 
@@ -403,7 +399,7 @@ mod tests {
                     let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
-            };
+            }
         });
 
         let (_exposed_dir, exposed_dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
@@ -415,9 +411,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn stop_session_calls_destroy_child() -> Result<(), Error> {
-        lazy_static! {
-            static ref NUM_DESTROY_CHILD_CALLS: Counter = Counter::new(0);
-        }
+        static NUM_DESTROY_CHILD_CALLS: LazyLock<Counter> = LazyLock::new(|| Counter::new(0));
 
         let realm = spawn_stream_handler(move |realm_request| async move {
             match realm_request {
@@ -429,7 +423,7 @@ mod tests {
                     let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
-            };
+            }
             NUM_DESTROY_CHILD_CALLS.inc();
         });
 

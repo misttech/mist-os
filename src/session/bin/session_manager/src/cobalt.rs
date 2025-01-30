@@ -43,7 +43,7 @@ pub fn get_logger() -> Result<MetricEventLoggerProxy, Error> {
 /// - `logger_proxy`: The cobalt logger.
 /// - `start_time`: The time when `session_manager` starts launching a session.
 /// - `end_time`: The time when `session_manager` has bound to a session. This must be strictly after
-///               `start_time`.
+///   `start_time`.
 ///
 /// # Returns
 /// `Ok` if the time elapsed was logged successfully.

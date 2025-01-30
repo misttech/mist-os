@@ -409,7 +409,7 @@ impl SessionManager {
                     let result = self.handle_launch_request(configuration).await;
                     let _ = responder.send(result);
                 }
-            };
+            }
         }
         Ok(())
     }
@@ -433,7 +433,7 @@ impl SessionManager {
                     let result = self.handle_restart_request().await;
                     let _ = responder.send(result);
                 }
-            };
+            }
         }
         Ok(())
     }
@@ -468,7 +468,7 @@ impl SessionManager {
                 fsession::LifecycleRequest::_UnknownMethod { ordinal, .. } => {
                     warn!(ordinal:%; "Lifecycle received an unknown method");
                 }
-            };
+            }
         }
         Ok(())
     }
@@ -554,8 +554,8 @@ mod tests {
     use fidl::endpoints::{create_proxy_and_stream, spawn_stream_handler, ServerEnd};
     use futures::channel::mpsc;
     use futures::prelude::*;
-    use lazy_static::lazy_static;
     use session_testing::{spawn_directory_server, spawn_noop_directory_server, spawn_server};
+    use std::sync::LazyLock;
     use test_util::Counter;
     use {
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
@@ -664,7 +664,7 @@ mod tests {
                     let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
-            };
+            }
         });
 
         let inspector = fuchsia_inspect::Inspector::default();
@@ -707,7 +707,7 @@ mod tests {
                     let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
-            };
+            }
         });
 
         let inspector = fuchsia_inspect::Inspector::default();
@@ -779,7 +779,7 @@ mod tests {
                     let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
-            };
+            }
         });
 
         let inspector = fuchsia_inspect::Inspector::default();
@@ -822,7 +822,7 @@ mod tests {
                     let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
-            };
+            }
         });
 
         let inspector = fuchsia_inspect::Inspector::default();
@@ -846,9 +846,7 @@ mod tests {
     /// Verifies that Lifecycle.Stop stops an existing session by destroying its component.
     #[fuchsia::test]
     async fn test_stop_destroys_component() {
-        lazy_static! {
-            static ref NUM_DESTROY_CHILD_CALLS: Counter = Counter::new(0);
-        }
+        static NUM_DESTROY_CHILD_CALLS: LazyLock<Counter> = LazyLock::new(|| Counter::new(0));
 
         let session_url = "session";
 
@@ -868,7 +866,7 @@ mod tests {
                     let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
-            };
+            }
         });
 
         let inspector = fuchsia_inspect::Inspector::default();
@@ -916,7 +914,7 @@ mod tests {
                     let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
-            };
+            }
         });
 
         let inspector = fuchsia_inspect::Inspector::default();
@@ -979,7 +977,7 @@ mod tests {
                         let _ = responder.send(Ok(()));
                     }
                     _ => panic!("Realm handler received an unexpected request"),
-                };
+                }
             }
         });
 
@@ -1040,7 +1038,7 @@ mod tests {
                         let _ = responder.send(Ok(()));
                     }
                     _ => panic!("Realm handler received an unexpected request"),
-                };
+                }
             }
         });
 
