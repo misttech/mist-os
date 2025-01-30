@@ -33,6 +33,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         legacy_bundle,
         package_validation,
         custom_kernel_aib,
+        suppress_overrides_warning,
         developer_overrides,
     } = args;
 
@@ -78,8 +79,10 @@ Resulting product is not supported and may misbehave!
             "Merging developer-provided file paths into developer-provided configuration.",
         )?;
 
-        print_developer_overrides_banner(&developer_overrides, &overrides_path)
-            .context("Displaying developer overrides.")?;
+        if !suppress_overrides_warning {
+            print_developer_overrides_banner(&developer_overrides, &overrides_path)
+                .context("Displaying developer overrides.")?;
+        }
 
         // Apply the platform and product overrides.
         let product_config_overrides = serde_json::json!({

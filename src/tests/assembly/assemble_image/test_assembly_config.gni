@@ -61,8 +61,12 @@ template("test_assembly_config") {
     # These are all evaluated only in the host toolchain
 
     group("${target_name}") {
+      forward_variables_from(invoker, [ "deps" ])
+      if (!defined(deps)) {
+        deps = []
+      }
       testonly = true
-      deps = [
+      deps += [
         # Assembly should only be performed in the default toolchain, so depend on
         # that task in the default toolchain.
         ":${target_name}($default_toolchain)",
@@ -159,6 +163,10 @@ template("test_assembly_config") {
     outdir = "$target_out_dir/outdir"
     image_assembly_config = "$outdir/image_assembly.json"
     python_action(target_name) {
+      forward_variables_from(invoker, [ "deps" ])
+      if (!defined(deps)) {
+        deps = []
+      }
       testonly = true
 
       # This will not be resolved except by moving to Bazel.
@@ -180,13 +188,13 @@ template("test_assembly_config") {
                "--stamp",
                rebase_path(stamp, root_build_dir),
              ] + additional_args_param
-      deps = [
-               ":${fuchsia_labels.board_information}",
-               ":${product_config_label}",
-               ":input_bundle",
-               labels.ffx_tool,
-               platform_bundles_target,
-             ] + additional_deps_param
+      deps += [
+                ":${fuchsia_labels.board_information}",
+                ":${product_config_label}",
+                ":input_bundle",
+                labels.ffx_tool,
+                platform_bundles_target,
+              ] + additional_deps_param
       inputs = [
         files.ffx_tool,
         fuchsia_files.assembly_config,

@@ -108,6 +108,14 @@
       "hidden": false
     },
     {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--suppress-overrides-warning",
+      "short": null,
+      "description": "whether to hide the warning that shows the overrides that are enabled. This can be helpful to disable for test assemblies.",
+      "hidden": false
+    },
+    {
       "kind": {
         "Option": {
           "arg_name": "developer-overrides"
