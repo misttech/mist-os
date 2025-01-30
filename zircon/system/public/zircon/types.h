@@ -358,6 +358,7 @@ typedef struct zx_iovec {
 #define ZX_INTERRUPT_MODE_EDGE_BOTH  ((uint32_t)5u << 1)
 #define ZX_INTERRUPT_MODE_MASK       ((uint32_t)0xe)
 #define ZX_INTERRUPT_VIRTUAL         ((uint32_t)0x10)
+#define ZX_INTERRUPT_TIMESTAMP_MONO  ((uint32_t)1u << 6)
 
 // interrupt_bind flags
 #define ZX_INTERRUPT_BIND            ((uint32_t)0x0u)

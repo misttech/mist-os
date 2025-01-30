@@ -66,6 +66,7 @@ typedef uint32_t zx_object_info_topic_t;
 #define ZX_INFO_IOB_REGIONS                 ((zx_object_info_topic_t) 35u) // zx_iob_region_info_t[n]
 #define ZX_INFO_VMAR_MAPS                   ((zx_object_info_topic_t) 36u) // zx_info_maps_t[n]
 #define ZX_INFO_POWER_DOMAINS               ((zx_object_info_topic_t) 37u) // zx_info_power_domain_info_t[n] - next syscall.
+#define ZX_INFO_INTERRUPT                   ((zx_object_info_topic_t) 39u) // zx_info_interrupt_t[1].
 
 // Return codes set when a task is killed.
 #define ZX_TASK_RETCODE_SYSCALL_KILL            ((int64_t) -1024)   // via zx_task_kill().
@@ -1091,6 +1092,11 @@ typedef struct zx_iob_region_info {
   /// The koid of the underlying memory object.
   zx_koid_t koid;
 } zx_iob_region_info_t;
+
+typedef struct zx_info_interrupt {
+  // The options used to create the interrupt.
+  uint32_t options;
+} zx_info_interrupt_t;
 
 // Object properties.
 

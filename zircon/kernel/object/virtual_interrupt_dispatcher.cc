@@ -20,12 +20,21 @@ KCOUNTER(dispatcher_virtual_interrupt_destroy_count, "dispatcher.virtual_interru
 
 zx_status_t VirtualInterruptDispatcher::Create(KernelHandle<InterruptDispatcher>* handle,
                                                zx_rights_t* rights, uint32_t options) {
-  if (options != ZX_INTERRUPT_VIRTUAL)
+  if (!(options & ZX_INTERRUPT_VIRTUAL)) {
     return ZX_ERR_INVALID_ARGS;
+  }
+  if (options & ~(ZX_INTERRUPT_VIRTUAL | ZX_INTERRUPT_TIMESTAMP_MONO)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  Flags flags = INTERRUPT_VIRTUAL;
+  if (options & ZX_INTERRUPT_TIMESTAMP_MONO) {
+    flags = Flags(flags | INTERRUPT_TIMESTAMP_MONO);
+  }
 
   // Attempt to construct the dispatcher.
   fbl::AllocChecker ac;
-  KernelHandle new_handle(fbl::AdoptRef(new (&ac) VirtualInterruptDispatcher()));
+  KernelHandle new_handle(fbl::AdoptRef(new (&ac) VirtualInterruptDispatcher(flags, options)));
   if (!ac.check())
     return ZX_ERR_NO_MEMORY;
 
@@ -46,8 +55,8 @@ void VirtualInterruptDispatcher::DeactivateInterrupt() {}
 
 void VirtualInterruptDispatcher::UnregisterInterruptHandler() {}
 
-VirtualInterruptDispatcher::VirtualInterruptDispatcher()
-    : InterruptDispatcher(InterruptDispatcher::INTERRUPT_VIRTUAL) {
+VirtualInterruptDispatcher::VirtualInterruptDispatcher(Flags flags, uint32_t options)
+    : InterruptDispatcher(flags, options) {
   kcounter_add(dispatcher_virtual_interrupt_create_count, 1);
 }
 

@@ -33,6 +33,7 @@
 #include <object/diagnostics.h>
 #include <object/exception_dispatcher.h>
 #include <object/handle.h>
+#include <object/interrupt_dispatcher.h>
 #include <object/io_buffer_dispatcher.h>
 #include <object/job_dispatcher.h>
 #include <object/msi_dispatcher.h>
@@ -1298,6 +1299,17 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       };
 
       return single_record_result(_buffer, buffer_size, _actual, _avail, info);
+    }
+
+    case ZX_INFO_INTERRUPT: {
+      fbl::RefPtr<InterruptDispatcher> interrupt;
+      zx_status_t error =
+          up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_INSPECT, &interrupt);
+      if (error != ZX_OK) {
+        return error;
+      }
+
+      return single_record_result(_buffer, buffer_size, _actual, _avail, interrupt->GetInfo());
     }
 
     default:

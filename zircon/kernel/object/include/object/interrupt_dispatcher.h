@@ -36,8 +36,8 @@ class InterruptDispatcher : public SoloDispatcher<InterruptDispatcher, ZX_DEFAUL
 
   bool is_wake_vector() const { return flags_ & INTERRUPT_WAKE_VECTOR; }
 
-  zx_status_t WaitForInterrupt(zx_instant_boot_t* out_timestamp);
-  zx_status_t Trigger(zx_instant_boot_t timestamp);
+  zx_status_t WaitForInterrupt(zx_time_t* out_timestamp);
+  zx_status_t Trigger(zx_time_t timestamp);
   zx_status_t Ack();
   zx_status_t Destroy();
   void InterruptHandler();
@@ -51,6 +51,9 @@ class InterruptDispatcher : public SoloDispatcher<InterruptDispatcher, ZX_DEFAUL
     diagnostics_out.enabled = false;
     diagnostics_out.koid = get_koid();
   }
+
+  // Returns information about this interrupt in a zx_object_get_info call.
+  zx_info_interrupt_t GetInfo() const;
 
  protected:
   virtual void MaskInterrupt() = 0;
@@ -75,13 +78,17 @@ class InterruptDispatcher : public SoloDispatcher<InterruptDispatcher, ZX_DEFAUL
     // The interrupt may wake the system from suspend.
     INTERRUPT_WAKE_VECTOR = (1u << 5),
     // Allow kernel tests to call Ack() without binding to a port.
-    INTERRUPT_ALLOW_ACK_WITHOUT_PORT_FOR_TEST = (1u << 6)
+    INTERRUPT_ALLOW_ACK_WITHOUT_PORT_FOR_TEST = (1u << 6),
+    // The interrupt should use monotonic timestamps instead of the default,
+    // which is boot timestamps.
+    INTERRUPT_TIMESTAMP_MONO = (1u << 7),
   };
 
   // It is an error to specify both INTERRUPT_UNMASK_PREWAIT and INTERRUPT_UNMASK_PREWAIT_UNLOCKED.
-  explicit InterruptDispatcher(Flags flags);
+  explicit InterruptDispatcher(Flags flags) : InterruptDispatcher(flags, 0) {}
+  explicit InterruptDispatcher(Flags flags, uint32_t options);
   void Signal() { event_.Signal(); }
-  bool SendPacketLocked(zx_instant_boot_t timestamp) TA_REQ(spinlock_);
+  bool SendPacketLocked(zx_time_t timestamp) TA_REQ(spinlock_);
 
   // Allow subclasses to add/remove the wake event instance from the global diagnostics list at the
   // appropriate times during initialization and teardown. These methods do not need to be called
@@ -93,8 +100,9 @@ class InterruptDispatcher : public SoloDispatcher<InterruptDispatcher, ZX_DEFAUL
  private:
   AutounsignalEvent event_;
 
-  zx_instant_boot_t timestamp_ TA_GUARDED(spinlock_);
+  zx_time_t timestamp_ TA_GUARDED(spinlock_);
   const Flags flags_;
+  const uint32_t options_;
   // Current state of the interrupt object
   InterruptState state_ TA_GUARDED(spinlock_);
   PortInterruptPacket port_packet_ TA_GUARDED(spinlock_) = {};

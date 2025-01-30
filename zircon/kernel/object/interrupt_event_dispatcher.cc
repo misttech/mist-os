@@ -28,7 +28,8 @@ zx_status_t InterruptEventDispatcher::Create(KernelHandle<InterruptDispatcher>* 
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (options & ~(ZX_INTERRUPT_REMAP_IRQ | ZX_INTERRUPT_MODE_MASK | ZX_INTERRUPT_WAKE_VECTOR)) {
+  if (options & ~(ZX_INTERRUPT_REMAP_IRQ | ZX_INTERRUPT_MODE_MASK | ZX_INTERRUPT_WAKE_VECTOR |
+                  ZX_INTERRUPT_TIMESTAMP_MONO)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -65,6 +66,10 @@ zx_status_t InterruptEventDispatcher::Create(KernelHandle<InterruptDispatcher>* 
 
   Flags interrupt_flags{};
 
+  if (options & ZX_INTERRUPT_TIMESTAMP_MONO) {
+    interrupt_flags = Flags(interrupt_flags | INTERRUPT_TIMESTAMP_MONO);
+  }
+
   if (tm == IRQ_TRIGGER_MODE_LEVEL) {
     interrupt_flags = Flags(interrupt_flags | INTERRUPT_UNMASK_PREWAIT | INTERRUPT_MASK_POSTWAIT);
   }
@@ -82,7 +87,7 @@ zx_status_t InterruptEventDispatcher::Create(KernelHandle<InterruptDispatcher>* 
   // if an interrupt already exists on |vector| our on_zero_handles() would
   // tear down the existing interrupt when creation fails.
   fbl::AllocChecker ac;
-  auto disp = fbl::AdoptRef(new (&ac) InterruptEventDispatcher(vector, interrupt_flags));
+  auto disp = fbl::AdoptRef(new (&ac) InterruptEventDispatcher(vector, interrupt_flags, options));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -132,8 +137,8 @@ void InterruptEventDispatcher::IrqHandler(void* ctx) {
   self->InterruptHandler();
 }
 
-InterruptEventDispatcher::InterruptEventDispatcher(uint32_t vector, Flags flags)
-    : InterruptDispatcher(flags), vector_(vector) {
+InterruptEventDispatcher::InterruptEventDispatcher(uint32_t vector, Flags flags, uint32_t options)
+    : InterruptDispatcher(flags, options), vector_(vector) {
   kcounter_add(dispatcher_interrupt_event_create_count, 1);
   InitializeWakeEvent();
 }
