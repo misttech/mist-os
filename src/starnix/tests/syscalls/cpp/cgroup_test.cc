@@ -359,3 +359,19 @@ TEST_F(CgroupTest, UnlinkCgroupWithChildren) {
 
   ASSERT_THAT(rmdir(child_path.c_str()), SyscallFailsWithErrno(EBUSY));
 }
+
+TEST_F(CgroupTest, EventsFileSeekable) {
+  std::string child_path = root_path() + "/child";
+  std::string events_path = child_path + "/" + EVENTS_FILE;
+
+  CreateCgroup(child_path);
+  fbl::unique_fd events_fd(open(events_path.c_str(), O_RDONLY));
+  ASSERT_TRUE(events_fd.is_valid());
+  // Seek exactly 10 bytes over, skipping "populated ". The next byte read should be 1 or 0
+  // indicating whether the cgroup is populated or not, respectively.
+  EXPECT_THAT(lseek(events_fd.get(), 10, SEEK_SET), SyscallSucceeds());
+
+  char buffer;
+  EXPECT_THAT(read(events_fd.get(), &buffer, 1), SyscallSucceeds());
+  EXPECT_EQ(buffer, '0');
+}
