@@ -367,9 +367,7 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       if (error != ZX_OK)
         return error;
 
-      zx_info_process_t info = {};
-      process->GetInfo(&info);
-      return single_record_result(_buffer, buffer_size, _actual, _avail, info);
+      return single_record_result(_buffer, buffer_size, _actual, _avail, process->GetInfo());
     }
     case ZX_INFO_PROCESS_THREADS: {
       // grab a reference to the dispatcher
@@ -446,21 +444,15 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       // TODO(https://fxbug.dev/42105279): Handle forward/backward compatibility issues
       // with changes to the struct.
 
-      // grab a reference to the dispatcher
+      // Grab a reference to the dispatcher.
       fbl::RefPtr<ThreadDispatcher> thread;
       auto error =
           up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_INSPECT, &thread);
       if (error != ZX_OK)
         return error;
 
-      // build the info structure
-      zx_info_thread_t info = {};
-
-      auto err = thread->GetInfoForUserspace(&info);
-      if (err != ZX_OK)
-        return err;
-
-      return single_record_result(_buffer, buffer_size, _actual, _avail, info);
+      return single_record_result(_buffer, buffer_size, _actual, _avail,
+                                  thread->GetInfoForUserspace());
     }
     case ZX_INFO_THREAD_EXCEPTION_REPORT_V1:
     case ZX_INFO_THREAD_EXCEPTION_REPORT: {
@@ -1092,10 +1084,7 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       if (status != ZX_OK)
         return status;
 
-      zx_info_socket_t info = {};
-      socket->GetInfo(&info);
-
-      return single_record_result(_buffer, buffer_size, _actual, _avail, info);
+      return single_record_result(_buffer, buffer_size, _actual, _avail, socket->GetInfo());
     }
 
     case ZX_INFO_JOB: {
@@ -1104,10 +1093,7 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       if (error != ZX_OK)
         return error;
 
-      zx_info_job info = {};
-      job->GetInfo(&info);
-
-      return single_record_result(_buffer, buffer_size, _actual, _avail, info);
+      return single_record_result(_buffer, buffer_size, _actual, _avail, job->GetInfo());
     }
 
     case ZX_INFO_TIMER: {
@@ -1117,10 +1103,7 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       if (error != ZX_OK)
         return error;
 
-      zx_info_timer info = {};
-      timer->GetInfo(&info);
-
-      return single_record_result(_buffer, buffer_size, _actual, _avail, info);
+      return single_record_result(_buffer, buffer_size, _actual, _avail, timer->GetInfo());
     }
 
     case ZX_INFO_STREAM: {
@@ -1131,10 +1114,7 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
         return status;
       }
 
-      zx_info_stream_t info = {};
-      stream->GetInfo(&info);
-
-      return single_record_result(_buffer, buffer_size, _actual, _avail, info);
+      return single_record_result(_buffer, buffer_size, _actual, _avail, stream->GetInfo());
     }
 
     case ZX_INFO_HANDLE_TABLE: {
@@ -1185,10 +1165,7 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
         return status;
       }
 
-      zx_info_msi_t info = {};
-      allocation->GetInfo(&info);
-
-      return single_record_result(_buffer, buffer_size, _actual, _avail, info);
+      return single_record_result(_buffer, buffer_size, _actual, _avail, allocation->GetInfo());
     }
 
     case ZX_INFO_VCPU: {
@@ -1199,10 +1176,7 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
         return status;
       }
 
-      zx_info_vcpu_t info = {};
-      vcpu->GetInfo(&info);
-
-      return single_record_result(_buffer, buffer_size, _actual, _avail, info);
+      return single_record_result(_buffer, buffer_size, _actual, _avail, vcpu->GetInfo());
     }
 
     case ZX_INFO_IOB: {
@@ -1653,17 +1627,13 @@ zx_status_t sys_object_set_property(zx_handle_t handle_value, uint32_t property,
       }
 
       // Invalid if the exception handle is not held by a debugger.
-      zx_info_thread_t info = {};
-      zx_status_t status = exception->thread()->GetInfoForUserspace(&info);
-      if (status != ZX_OK) {
-        return status;
-      }
+      const zx_info_thread_t info = exception->thread()->GetInfoForUserspace();
       if (info.wait_exception_channel_type != ZX_EXCEPTION_CHANNEL_TYPE_DEBUGGER) {
         return ZX_ERR_BAD_STATE;
       }
 
       uint32_t value = 0;
-      status = _value.reinterpret<const uint32_t>().copy_from_user(&value);
+      const zx_status_t status = _value.reinterpret<const uint32_t>().copy_from_user(&value);
       if (status != ZX_OK) {
         return status;
       }

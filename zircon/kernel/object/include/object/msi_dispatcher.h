@@ -33,7 +33,7 @@ class MsiDispatcher final : public SoloDispatcher<MsiDispatcher, ZX_DEFAULT_MSI_
   }
 
   zx_obj_type_t get_type() const final { return ZX_OBJ_TYPE_MSI; }
-  void GetInfo(zx_info_msi_t* info) const { msi_alloc_->GetInfo(info); }
+  zx_info_msi_t GetInfo() const { return msi_alloc_->GetInfo(); }
   const fbl::RefPtr<MsiAllocation>& msi_allocation() const { return msi_alloc_; }
 
  private:

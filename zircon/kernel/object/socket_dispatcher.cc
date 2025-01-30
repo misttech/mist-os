@@ -345,10 +345,10 @@ zx_status_t SocketDispatcher::Read(ReadType type, user_out_ptr<char> dst, size_t
   return ZX_OK;
 }
 
-void SocketDispatcher::GetInfo(zx_info_socket_t* info) const {
+zx_info_socket_t SocketDispatcher::GetInfo() const {
   canary_.Assert();
   Guard<CriticalMutex> guard{get_lock()};
-  *info = zx_info_socket_t{
+  zx_info_socket_t info = {
       .options = flags_,
       .padding1 = {},
       .rx_buf_max = data_.max_size(),
@@ -359,9 +359,10 @@ void SocketDispatcher::GetInfo(zx_info_socket_t* info) const {
   };
   if (peer()) {
     AssertHeld(*peer()->get_lock());  // Alias of this->get_lock().
-    info->tx_buf_max = peer()->data_.max_size();
-    info->tx_buf_size = peer()->data_.size();
+    info.tx_buf_max = peer()->data_.max_size();
+    info.tx_buf_size = peer()->data_.size();
   }
+  return info;
 }
 
 size_t SocketDispatcher::GetReadThreshold() const {

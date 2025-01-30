@@ -573,30 +573,30 @@ static zx_thread_state_t ThreadLifecycleToState(ThreadState::Lifecycle lifecycle
   }
 }
 
-zx_status_t ThreadDispatcher::GetInfoForUserspace(zx_info_thread_t* info) {
+zx_info_thread_t ThreadDispatcher::GetInfoForUserspace() const {
   canary_.Assert();
 
-  *info = {};
+  zx_info_thread_t info = {};
 
   Guard<CriticalMutex> guard{get_lock()};
-  info->state =
+  info.state =
       ThreadLifecycleToState(state_.lifecycle(), blocked_reason_.load(ktl::memory_order_acquire));
-  info->wait_exception_channel_type = exceptionate_type_;
+  info.wait_exception_channel_type = exceptionate_type_;
 
   // If we've exited then return with the lifecycle and exception type, and keep
   // the cpu_affinity_mask at 0.
   if (core_thread_ == nullptr) {
-    return ZX_OK;
+    return info;
   }
 
   // Get CPU affinity.
   //
   // We assume that we can fit the entire mask in the first word of
   // cpu_affinity_mask.
-  static_assert(SMP_MAX_CPUS <= sizeof(info->cpu_affinity_mask.mask[0]) * 8);
-  info->cpu_affinity_mask.mask[0] = core_thread_->GetSoftCpuAffinity();
+  static_assert(SMP_MAX_CPUS <= sizeof(info.cpu_affinity_mask.mask[0]) * 8);
+  info.cpu_affinity_mask.mask[0] = core_thread_->GetSoftCpuAffinity();
 
-  return ZX_OK;
+  return info;
 }
 
 zx_status_t ThreadDispatcher::GetStatsForUserspace(zx_info_thread_stats_t* info) {

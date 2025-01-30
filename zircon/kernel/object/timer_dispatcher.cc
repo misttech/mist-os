@@ -216,12 +216,14 @@ void TimerDispatcher::OnTimerFired() {
     delete this;
 }
 
-void TimerDispatcher::GetInfo(zx_info_timer_t* info) const {
+zx_info_timer_t TimerDispatcher::GetInfo() const {
   canary_.Assert();
 
   Guard<CriticalMutex> guard{get_lock()};
-  info->options = options_;
-  info->clock_id = clock_id_;
-  info->deadline = deadline_;
-  info->slack = slack_amount_;
+  return {
+      .options = options_,
+      .clock_id = clock_id_,
+      .deadline = deadline_,
+      .slack = slack_amount_,
+  };
 }

@@ -168,7 +168,7 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
                                  const arch_exception_context_t& context) TA_EXCL(get_lock());
 
   // Fetch the state of the thread for userspace tools.
-  zx_status_t GetInfoForUserspace(zx_info_thread_t* info);
+  zx_info_thread_t GetInfoForUserspace() const;
 
   // Fetch per thread stats for userspace.
   zx_status_t GetStatsForUserspace(zx_info_thread_stats_t* info) TA_EXCL(get_lock());

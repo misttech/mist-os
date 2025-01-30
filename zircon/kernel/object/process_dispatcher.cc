@@ -598,7 +598,7 @@ bool ProcessDispatcher::CriticalToRootJob() const {
   return critical_to_job_ == GetRootJobDispatcher();
 }
 
-void ProcessDispatcher::GetInfo(zx_info_process_t* info) const {
+zx_info_process_t ProcessDispatcher::GetInfo() const {
   canary_.Assert();
 
   State state;
@@ -630,7 +630,7 @@ void ProcessDispatcher::GetInfo(zx_info_process_t* info) const {
       break;
   }
 
-  *info = zx_info_process_t{
+  return {
       .return_code = return_code,
       .start_time = start_time,
       .flags = flags,

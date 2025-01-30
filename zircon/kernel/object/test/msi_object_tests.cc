@@ -105,8 +105,7 @@ bool allocation_creation_and_info_test() {
   fbl::RefPtr<MsiAllocation> alloc;
   ASSERT_EQ(ZX_OK, create_allocation(&alloc, test_irq_cnt));
 
-  zx_info_msi_t info = {};
-  alloc->GetInfo(&info);
+  const zx_info_msi_t info = alloc->GetInfo();
 
   // Grab the lock and compare the block values and info values to both our test
   // data and info data.

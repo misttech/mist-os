@@ -34,7 +34,7 @@ class VcpuDispatcher final : public SoloDispatcher<VcpuDispatcher, ZX_DEFAULT_VC
   zx_status_t WriteState(const zx_vcpu_state_t& vcpu_state);
   zx_status_t WriteState(const zx_vcpu_io_t& io_state);
 
-  void GetInfo(zx_info_vcpu_t* info);
+  zx_info_vcpu_t GetInfo() const;
 
  private:
   VcpuDispatcher(fbl::RefPtr<GuestDispatcher> guest_dispatcher, ktl::unique_ptr<Vcpu> vcpu);

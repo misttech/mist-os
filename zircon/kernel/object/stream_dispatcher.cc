@@ -429,25 +429,28 @@ bool StreamDispatcher::IsInAppendMode() const {
   return options_ & kModeAppend;
 }
 
-void StreamDispatcher::GetInfo(zx_info_stream_t* info) const {
+zx_info_stream_t StreamDispatcher::GetInfo() const {
   canary_.Assert();
 
   Guard<CriticalMutex> options_guard{get_lock()};
   Guard<Mutex> seek_guard{&seek_lock_};
 
-  info->options = 0;
+  uint32_t options = 0;
   if (options_ & kModeRead) {
-    info->options |= ZX_STREAM_MODE_READ;
+    options |= ZX_STREAM_MODE_READ;
   }
   if (options_ & kModeWrite) {
-    info->options |= ZX_STREAM_MODE_WRITE;
+    options |= ZX_STREAM_MODE_WRITE;
   }
   if (options_ & kModeAppend) {
-    info->options |= ZX_STREAM_MODE_APPEND;
+    options |= ZX_STREAM_MODE_APPEND;
   }
 
-  info->seek = seek_;
-  info->content_size = content_size_mgr_->GetContentSize();
+  return {
+      .options = options,
+      .seek = seek_,
+      .content_size = content_size_mgr_->GetContentSize(),
+  };
 }
 
 bool StreamDispatcher::CanResizeVmo() const {

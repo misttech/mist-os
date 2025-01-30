@@ -57,7 +57,7 @@ class SocketDispatcher final : public PeeredDispatcher<SocketDispatcher, ZX_DEFA
   size_t GetWriteThreshold() const;
   zx_status_t SetWriteThreshold(size_t value);
 
-  void GetInfo(zx_info_socket_t* info) const;
+  zx_info_socket_t GetInfo() const;
 
   // PeeredDispatcher implementation.
   void on_zero_handles_locked() TA_REQ(get_lock());

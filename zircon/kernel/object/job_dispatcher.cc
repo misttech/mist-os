@@ -761,14 +761,16 @@ bool JobDispatcher::get_kill_on_oom() const {
   return kill_on_oom_;
 }
 
-void JobDispatcher::GetInfo(zx_info_job_t* info) const {
+zx_info_job_t JobDispatcher::GetInfo() const {
   canary_.Assert();
 
   Guard<CriticalMutex> guard{get_lock()};
-  info->return_code = return_code_;
-  info->exited = (state_ == State::DEAD) || (state_ == State::KILLING);
-  info->kill_on_oom = kill_on_oom_;
-  info->debugger_attached = !debug_exceptionates_.is_empty();
+  return {
+      .return_code = return_code_,
+      .exited = (state_ == State::DEAD) || (state_ == State::KILLING),
+      .kill_on_oom = kill_on_oom_,
+      .debugger_attached = !debug_exceptionates_.is_empty(),
+  };
 }
 
 TaskRuntimeStats JobDispatcher::GetTaskRuntimeStats() const {

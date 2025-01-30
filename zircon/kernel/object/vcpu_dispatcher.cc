@@ -96,7 +96,7 @@ zx_status_t VcpuDispatcher::WriteState(const zx_vcpu_io_t& io_state) {
   return ZX_ERR_INVALID_ARGS;
 }
 
-void VcpuDispatcher::GetInfo(zx_info_vcpu_t* info) {
+zx_info_vcpu_t VcpuDispatcher::GetInfo() const {
   canary_.Assert();
-  vcpu_->GetInfo(info);
+  return vcpu_->GetInfo();
 }

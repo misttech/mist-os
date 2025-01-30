@@ -64,7 +64,7 @@ class Vcpu {
   zx::result<> WriteState(const zx_vcpu_state_t& state) { return zx::error(ZX_ERR_NOT_SUPPORTED); }
   zx::result<> WriteState(const zx_vcpu_io_t& io_state) { return zx::error(ZX_ERR_NOT_SUPPORTED); }
 
-  void GetInfo(zx_info_vcpu_t* info) { *info = {}; }
+  zx_info_vcpu_t GetInfo() const { return {}; }
 };
 
 using NormalVcpu = Vcpu;

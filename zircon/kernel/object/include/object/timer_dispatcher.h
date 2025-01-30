@@ -32,7 +32,7 @@ class TimerDispatcher final : public SoloDispatcher<TimerDispatcher, ZX_DEFAULT_
   // Timer callback.
   void OnTimerFired();
 
-  void GetInfo(zx_info_timer_t* info) const;
+  zx_info_timer_t GetInfo() const;
 
  private:
   explicit TimerDispatcher(uint32_t options, zx_clock_t clock_id);

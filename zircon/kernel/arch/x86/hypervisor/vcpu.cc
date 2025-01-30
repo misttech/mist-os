@@ -1038,10 +1038,11 @@ zx::result<> Vcpu::WriteState(const zx_vcpu_state_t& vcpu_state) {
   return zx::ok();
 }
 
-void Vcpu::GetInfo(zx_info_vcpu_t* info) {
+zx_info_vcpu_t Vcpu::GetInfo() const {
   if (kicked_.load()) {
-    info->flags |= ZX_INFO_VCPU_FLAG_KICKED;
+    return {.flags = ZX_INFO_VCPU_FLAG_KICKED};
   }
+  return {};
 }
 
 // static

@@ -105,7 +105,7 @@ class Vcpu {
   zx::result<> ReadState(zx_vcpu_state_t& vcpu_state);
   zx::result<> WriteState(const zx_vcpu_state_t& vcpu_state);
 
-  void GetInfo(zx_info_vcpu_t* info);
+  zx_info_vcpu_t GetInfo() const;
 
  protected:
   template <typename V, typename G>

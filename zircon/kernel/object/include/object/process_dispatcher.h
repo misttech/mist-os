@@ -190,7 +190,7 @@ class ProcessDispatcher final
   void Resume();
 
   // Syscall helpers
-  void GetInfo(zx_info_process_t* info) const;
+  zx_info_process_t GetInfo() const;
   zx_status_t GetStats(zx_info_task_stats_t* stats) const;
 
   // Get the runtime of all threads that previously ran or are currently running under this process.
