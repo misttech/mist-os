@@ -27,7 +27,7 @@ struct Driver {
   struct config_type {};
 
   static constexpr std::array<std::string_view, 0> kDevicetreeBindings = {};
-  static constexpr std::string_view config_name() { return "none"; }
+  static constexpr std::string_view kConfigName = "none";
   static constexpr IoRegisterType kIoType = IoRegisterType::kNone;
   static constexpr uint32_t kType = 0;
   static constexpr uint32_t kExtra = 0;
@@ -46,7 +46,7 @@ struct Driver {
 
   // API to match and reproduce configuration strings.
   static std::optional<Driver> MaybeCreate(std::string_view string) {
-    if (string == "none") {
+    if (string == kConfigName) {
       return Driver{};
     }
     return {};
@@ -59,7 +59,9 @@ struct Driver {
   // API to match devicetree node compatible list.
   static bool MatchDevicetree(const devicetree::PropertyDecoder&) { return false; }
 
-  void Unparse(FILE* out) const { fprintf(out, "none"); }
+  void Unparse(FILE* out) const {
+    fprintf(out, "%.*s", static_cast<int>(kConfigName.size()), kConfigName.data());
+  }
 
   // uart::KernelDriver UartDriver API
   //
