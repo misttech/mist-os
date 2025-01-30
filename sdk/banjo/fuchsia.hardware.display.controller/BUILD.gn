@@ -9,9 +9,6 @@ fidl("fuchsia.hardware.display.controller") {
     "display-controller.fidl",
     "pixel-format.fidl",
   ]
-  public_deps = [
-    "//sdk/banjo/fuchsia.hardware.i2cimpl",
-    "//zircon/vdso/zx",
-  ]
+  public_deps = [ "//zircon/vdso/zx" ]
   enable_banjo = true
 }

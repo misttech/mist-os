@@ -106,7 +106,6 @@ raw_display_info_t CreateRawDisplayInfo(const display_mode_t* banjo_display_mode
       .preferred_modes_count = 1,
       .edid_bytes_list = nullptr,
       .edid_bytes_count = 0,
-      .eddc_client = {.ops = nullptr, .ctx = nullptr},
       .pixel_formats_list = kSupportedPixelFormats,
       .pixel_formats_count = std::size(kSupportedPixelFormats),
   };

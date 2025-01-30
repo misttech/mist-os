@@ -1890,7 +1890,6 @@ raw_display_info_t DpDisplay::CreateRawDisplayInfo() {
       .preferred_modes_count = 0,
       .edid_bytes_list = edid_bytes_.data(),
       .edid_bytes_count = edid_bytes_.size(),
-      .eddc_client = {.ops = nullptr, .ctx = nullptr},
       .pixel_formats_list = kBanjoSupportedPixelFormats.data(),
       .pixel_formats_count = kBanjoSupportedPixelFormats.size(),
   };

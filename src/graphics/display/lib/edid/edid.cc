@@ -13,7 +13,6 @@
 #include <cstdio>
 #include <cstring>
 #include <iterator>
-#include <memory>
 #include <sstream>
 
 #include <fbl/algorithm.h>
@@ -145,101 +144,6 @@ bool CeaEdidTimingExtension::validate() const {
     }
   }
   return true;
-}
-
-ReadEdidResult ReadEdidFromDdcForTesting(void* ctx, ddc_i2c_transact transact) {
-  uint8_t segment_address = 0;
-  uint8_t segment_offset = 0;
-  ddc_i2c_msg_t msgs[3] = {
-      {.is_read = false, .addr = kDdcSegmentI2cAddress, .buf = &segment_address, .length = 1},
-      {.is_read = false, .addr = kDdcDataI2cAddress, .buf = &segment_offset, .length = 1},
-      {.is_read = true, .addr = kDdcDataI2cAddress, .buf = nullptr, .length = kBlockSize},
-  };
-
-  BaseEdid base_edid;
-  msgs[2].buf = reinterpret_cast<uint8_t*>(&base_edid);
-
-  // The VESA E-DDC standard claims that the segment pointer is reset to its
-  // default value (00h) at the completion of each command sequence.
-  // (Section 2.2.5 "Segment Pointer", Page 18, VESA E-DDC Standard,
-  //  Version 1.3)
-  //
-  // Note that we are not following the recommended reading patterns in the
-  // E-DDC standard, which requires drivers always issue segment writes for
-  // each read and ignore the NACKs (Section 5.1.1 "Basic Operation for E-DDC
-  // Access of EDID", S 6.5 "E-DDC Sequential Read", VESA E-DDC Standard,
-  // Version 1.3). Instead, when reading the first block (base EDID), we skip
-  // writing the segment address register and rely on display devices' reset
-  // mechanism.
-  //
-  // This makes the following EDID read procedure compatible with display
-  // devices that don't support Enhanced DDC standard; otherwise these devices
-  // will issue NACKs and some display controllers (e.g. Intel HD Display)
-  // might not be able to handle it correctly. It is possible that drivers may
-  // fail connecting to monitors that only recognizes some fixed structures or
-  // I2C command patterns (segment write always precedes data read), though the
-  // chance is rare.
-  if (!transact(ctx, msgs + 1, 2)) {
-    return fit::error("Failed to read base edid");
-  }
-  if (!base_edid.validate()) {
-    return fit::error("Failed to validate base edid");
-  }
-
-  uint16_t edid_length = static_cast<uint16_t>((base_edid.num_extensions + 1) * kBlockSize);
-
-  fbl::AllocChecker ac;
-  fbl::Vector<uint8_t> edid;
-  edid.resize(edid_length, &ac);
-  if (!ac.check()) {
-    return fit::error("Failed to allocate edid storage");
-  }
-
-  memcpy(edid.data(), reinterpret_cast<void*>(&base_edid), kBlockSize);
-  for (uint8_t i = 1; i && i <= base_edid.num_extensions; i++) {
-    segment_address = i / 2;
-    segment_offset = i % 2 ? kBlockSize : 0;
-    msgs[2].buf = edid.data() + i * kBlockSize;
-
-    // The segment pointer is reset to zero every time after a command sequence.
-    // As long as the segment number is not zero, we should issue a DDC segment
-    // read before we read / write a piece of data.
-    bool include_segment = segment_address != 0;
-
-    bool transact_success = include_segment ? transact(ctx, msgs, 3) : transact(ctx, msgs + 1, 2);
-    if (!transact_success) {
-      return fit::error("Failed to read full edid");
-    }
-  }
-
-  return fit::ok(std::move(edid));
-}
-
-// static
-fit::result<const char*, Edid> Edid::Create(void* ctx, ddc_i2c_transact transact) {
-  auto read_edid_result = ReadEdidFromDdcForTesting(ctx, transact);
-  if (read_edid_result.is_error()) {
-    return read_edid_result.take_error();
-  }
-  fbl::Vector<uint8_t> bytes = std::move(read_edid_result).value();
-
-  if (bytes.is_empty()) {
-    return fit::error("EDID is empty");
-  }
-  if (bytes.size() % kBlockSize != 0) {
-    return fit::error("EDID size is not a multiple of block size");
-  }
-  static constexpr int kMaxAllowedEdidBytesSize = kBlockSize * kMaxEdidBlockCount;
-  if (bytes.size() > kMaxAllowedEdidBytesSize) {
-    return fit::error("EDID size exceeds the maximum allowed size");
-  }
-
-  Edid edid(std::move(bytes));
-  fit::result<const char*> validate_result = edid.Validate();
-  if (validate_result.is_error()) {
-    return validate_result.take_error();
-  }
-  return fit::ok(std::move(edid));
 }
 
 // static

@@ -68,7 +68,6 @@ class FakeDisplay final : public DisplayDevice {
         .preferred_modes_count = 0,
         .edid_bytes_list = nullptr,
         .edid_bytes_count = 0,
-        .eddc_client = {.ops = nullptr, .ctx = nullptr},
         .pixel_formats_list = nullptr,
         .pixel_formats_count = 0,
     };

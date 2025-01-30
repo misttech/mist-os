@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_DP_AUX_CHANNEL_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_DP_AUX_CHANNEL_H_
 
-#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/zx/result.h>
 
 #include <cstdint>

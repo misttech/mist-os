@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_DP_AUX_CHANNEL_IMPL_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_DP_AUX_CHANNEL_IMPL_H_
 
-#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/stdcompat/span.h>

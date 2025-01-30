@@ -172,7 +172,6 @@ raw_display_info_t Vout::CreateRawDisplayInfo(
           .preferred_modes_count = 1,
           .edid_bytes_list = nullptr,
           .edid_bytes_count = 0,
-          .eddc_client = {.ops = nullptr, .ctx = nullptr},
           .pixel_formats_list = pixel_formats.data(),
           .pixel_formats_count = pixel_formats.size(),
       };
@@ -185,7 +184,6 @@ raw_display_info_t Vout::CreateRawDisplayInfo(
           .preferred_modes_count = 0,
           .edid_bytes_list = hdmi_.current_display_edid.data(),
           .edid_bytes_count = hdmi_.current_display_edid.size(),
-          .eddc_client = {.ops = nullptr, .ctx = nullptr},
           .pixel_formats_list = pixel_formats.data(),
           .pixel_formats_count = pixel_formats.size(),
       };

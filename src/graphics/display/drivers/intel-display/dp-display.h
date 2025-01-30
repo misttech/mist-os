@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_DP_DISPLAY_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_DP_DISPLAY_H_
 
-#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/result.h>
 #include <zircon/compiler.h>

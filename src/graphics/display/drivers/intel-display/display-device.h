@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.backlight/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
-#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>

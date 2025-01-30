@@ -4,7 +4,6 @@
 @available(added=HEAD)
 library fuchsia.hardware.display.controller;
 
-using fuchsia.hardware.i2cimpl;
 using zx;
 
 type ImageTilingType = strict enum : uint32 {
@@ -87,10 +86,9 @@ type RawDisplayInfo = resource struct {
     /// Operational modes known to be supported by the display.
     ///
     /// When this vector is not empty, the display modes here take precedence
-    /// over the modes retrieved from `edid_bytes` and from `eddc_client`. The
-    /// modes are ordered by suitability. The first mode is most preferred. The
-    /// display modes here may overlap with the modes encoded in the display's
-    /// E-EDID.
+    /// over the modes retrieved from `edid_bytes`. The modes are ordered by
+    /// suitability. The first mode is most preferred. The display modes here
+    /// may overlap with the modes encoded in the display's E-EDID.
     ///
     /// Drivers for internal (embedded) displays typically report the display's
     /// only supported operational mode in this member. Drivers that support
@@ -105,26 +103,11 @@ type RawDisplayInfo = resource struct {
     /// data blocks.
     ///
     /// When this vector is not empty and contains valid E-EDID information, it
-    /// is used as the definitive description of the display's capabilities. In
-    /// this case, the `eddc_client` connection is not used to read E-EDID
-    /// information.
+    /// is used as the definitive description of the display's capabilities.
     ///
     /// Drivers for external (connected) displays use this member to report the
     /// display's E-EDID, when it is exposed in a non-standard manner.
     edid_bytes vector<uint8>:MAX_COUNT_EDID_BYTES;
-
-    /// Connection to the display's implementation of the E-DDC standard.
-    ///
-    /// E-DDC (Enhanced Display Data Channel) is a VESA standard that describes
-    /// exposing display information over an I2C bus. The information is encoded
-    /// using the VESA E-EDID or DisplayID standards. Displays that offer an
-    /// E-DDC connection may also support DDC/CI (DDC Command Interface) over
-    /// the connection.
-    ///
-    /// When this client is valid, the E-DDC connection may be used to retrieve
-    /// the display's E-EDID information, and may be used to issue DDC/CI
-    /// commands.
-    eddc_client client_end:fuchsia.hardware.i2cimpl.I2cImpl;
 
     /// A list of pixel formats supported by the display.
     ///

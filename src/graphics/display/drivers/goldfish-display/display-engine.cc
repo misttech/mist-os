@@ -144,7 +144,6 @@ void DisplayEngine::DisplayEngineSetListener(
       .preferred_modes_count = 1,
       .edid_bytes_list = nullptr,
       .edid_bytes_count = 0,
-      .eddc_client = {.ops = nullptr, .ctx = nullptr},
       .pixel_formats_list = kPixelFormats,
       .pixel_formats_count = sizeof(kPixelFormats) / sizeof(kPixelFormats[0]),
   };

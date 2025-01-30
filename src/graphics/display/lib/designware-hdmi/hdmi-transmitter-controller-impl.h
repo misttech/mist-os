@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_HDMI_HDMI_TRANSMITTER_CONTROLLER_IMPL_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_HDMI_HDMI_TRANSMITTER_CONTROLLER_IMPL_H_
 
-#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/result.h>
 
@@ -33,7 +32,6 @@ class HdmiTransmitterControllerImpl : public HdmiTransmitterController {
   ~HdmiTransmitterControllerImpl() override = default;
 
   zx_status_t InitHw() override;
-  zx_status_t EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count) override;
 
   zx::result<fbl::Vector<uint8_t>> ReadExtendedEdid() override;
 

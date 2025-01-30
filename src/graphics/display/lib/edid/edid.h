@@ -11,11 +11,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <memory>
-#include <optional>
 #include <string>
-#include <string_view>
-#include <variant>
 
 #include <fbl/vector.h>
 #include <hwreg/bitfields.h>
@@ -304,46 +300,14 @@ struct DataBlock {
 };
 static_assert(sizeof(DataBlock) == 32, "Bad size for DataBlock");
 
-typedef struct ddc_i2c_msg {
-  bool is_read;
-  uint8_t addr;
-  uint8_t* buf;
-  uint8_t length;
-} ddc_i2c_msg_t;
-
-typedef bool (*ddc_i2c_transact)(void* ctx, ddc_i2c_msg_t* msgs, uint32_t msg_count);
-// The I2C address for writing the DDC segment
-static constexpr uint8_t kDdcSegmentI2cAddress = 0x30;
-// The I2C address for writing the DDC data offset/reading DDC data
-static constexpr uint8_t kDdcDataI2cAddress = 0x50;
-
 // Returns an EISA vendor name based on its 2 bytes manufacturer name code.
 // Returned string is a statically allocated constant. Returns NULL if no match is found.
 const char* GetEisaVendorName(uint16_t manufacturer_name_code);
-
-using ReadEdidResult = fit::result<const char*, fbl::Vector<uint8_t>>;
-
-// Reads EDID bytes over DDC I2C bus using `transact()` function.
-//
-// On error, returns a `const char*` string of static storage duration
-// containing the error message.
-// Otherwise, returns the vector containing the raw EDID bytes, including all
-// extension blocks.
-ReadEdidResult ReadEdidFromDdcForTesting(void* ctx, ddc_i2c_transact transact);
 
 class timing_iterator;
 
 class Edid {
  public:
-  // Factory function preferred for production use.
-  //
-  // Reads the EDID bytes from the EdidDdcSource; then creates and validates
-  // an Edid object from the bytes read.
-  //
-  // On error, returns a `const char*` string of static storage duration
-  // containing the error message.
-  static fit::result<const char*, Edid> Create(void* ctx, ddc_i2c_transact edid_source);
-
   // Factory function preferred for production use.
   //
   // Creates and validates an Edid from raw bytes.

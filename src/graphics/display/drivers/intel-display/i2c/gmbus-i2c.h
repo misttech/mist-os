@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_I2C_GMBUS_I2C_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_I2C_GMBUS_I2C_H_
 
-#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <threads.h>
 #include <zircon/assert.h>
