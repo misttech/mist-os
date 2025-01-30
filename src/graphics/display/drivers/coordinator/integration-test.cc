@@ -241,7 +241,7 @@ class TestFidlClient {
   zx::result<> SetLayerImage(display::LayerId layer_id, display::ImageId image_id,
                              display::EventId event_id);
   zx::result<> CheckConfig();
-  zx::result<> ApplyConfig();
+  zx::result<> ApplyConfig(display::ConfigStamp config_stamp);
   zx::result<> AcknowledgeVsync(display::VsyncAckCookie vsync_ack_cookie);
   zx::result<> SetMinimumRgb(uint8_t minimum_rgb);
   zx::result<display::ConfigStamp> GetLastAppliedConfigStamp();
@@ -268,13 +268,12 @@ class TestFidlClient {
   // Applies a configuration to the first connected display.
   //
   // Blocks until the Display Coordinator processes the underlying ApplyConfig()
-  // call, and returns the most recently applied ConfigStamp.
-  //
-  // Crashes if no display is connected.
+  // call. Crashes if no display is connected.
   //
   // The std::vector can be converted to std::span once we adopt C++23, which has
   // more ergonoic span handling.
-  zx::result<display::ConfigStamp> ApplyLayers(const std::vector<LayerConfig>& layer_configs);
+  zx::result<> ApplyLayers(display::ConfigStamp config_stamp,
+                           const std::vector<LayerConfig>& layer_configs);
 
  private:
   display::ImageId next_imported_image_id_{1};
@@ -498,10 +497,18 @@ zx::result<> TestFidlClient::CheckConfig() {
   return zx::ok();
 }
 
-zx::result<> TestFidlClient::ApplyConfig() {
+zx::result<> TestFidlClient::ApplyConfig(display::ConfigStamp config_stamp) {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fidl::OneWayStatus fidl_status = coordinator_fidl_client_->ApplyConfig();
+  const fuchsia_hardware_display_types::wire::ConfigStamp fidl_config_stamp =
+      display::ToFidlConfigStamp(config_stamp);
+  fidl::Arena arena;
+  fuchsia_hardware_display::wire::CoordinatorApplyConfig3Request request =
+      fidl::WireRequest<fuchsia_hardware_display::Coordinator::ApplyConfig3>::Builder(arena)
+          .stamp(fidl_config_stamp)
+          .Build();
+
+  const fidl::OneWayStatus fidl_status = coordinator_fidl_client_->ApplyConfig3(std::move(request));
   if (!fidl_status.ok()) {
     FDF_LOG(ERROR, "ApplyConfig() failed: %s", fidl_status.status_string());
     return zx::error(fidl_status.status());
@@ -604,12 +611,12 @@ zx::result<> TestFidlClient::EnableVsyncEventDelivery() {
   return zx::make_result(coordinator_fidl_client_->SetVsyncEventDelivery(true).status());
 }
 
-zx::result<display::ConfigStamp> TestFidlClient::ApplyLayers(
-    const std::vector<LayerConfig>& layer_configs) {
+zx::result<> TestFidlClient::ApplyLayers(display::ConfigStamp config_stamp,
+                                         const std::vector<LayerConfig>& layer_configs) {
   zx::result<> set_display_layers_result = SetDisplayLayers(state_.display_id(), layer_configs);
   if (set_display_layers_result.is_error()) {
     // SetDisplayLayers() has already logged the error.
-    return set_display_layers_result.take_error();
+    return set_display_layers_result;
   }
 
   for (const LayerConfig& layer_config : layer_configs) {
@@ -618,24 +625,34 @@ zx::result<display::ConfigStamp> TestFidlClient::ApplyLayers(
                       layer_config.image_ready_wait_event_id.value_or(display::kInvalidEventId));
     if (set_layer_image_result.is_error()) {
       // SetLayerImage() has already logged the error.
-      return set_layer_image_result.take_error();
+      return set_layer_image_result;
     }
   }
 
   zx::result<> check_config_result = CheckConfig();
   if (check_config_result.is_error()) {
     // CheckConfig() has already logged the error.
-    return check_config_result.take_error();
+    return check_config_result;
   }
 
-  zx::result<> apply_config_result = ApplyConfig();
+  zx::result<> apply_config_result = ApplyConfig(config_stamp);
   if (apply_config_result.is_error()) {
     // ApplyConfig() has already logged the error.
-    return apply_config_result.take_error();
+    return apply_config_result;
   }
 
   zx::result<display::ConfigStamp> get_last_config_stamp_result = GetLastAppliedConfigStamp();
-  return get_last_config_stamp_result;
+  if (get_last_config_stamp_result.is_error()) {
+    // GetLastAppliedConfigStamp() has already logged the error.
+    return get_last_config_stamp_result.take_error();
+  }
+
+  if (get_last_config_stamp_result.value() != config_stamp) {
+    FDF_LOG(ERROR, "GetLastAppliedConfigStamp() returned %" PRIu64 ", expected %" PRIu64,
+            get_last_config_stamp_result->value(), config_stamp.value());
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  return zx::ok();
 }
 
 zx::result<display::ConfigStamp> TestFidlClient::GetLastAppliedConfigStamp() {
@@ -998,12 +1015,13 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
   TestFidlClient virtcon_client(&sysmem_client_);
   ASSERT_OK(virtcon_client.OpenCoordinator(DisplayProviderClient(), ClientPriority::kVirtcon,
                                            dispatcher()));
+  static constexpr display::ConfigStamp kVirtconInitialConfigStamp(1);
   {
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
     // display events instead.
     const display::DisplayId virtcon_display_id(1);
     ASSERT_OK(virtcon_client.SetDisplayLayers(virtcon_display_id, {}));
-    ASSERT_OK(virtcon_client.ApplyConfig());
+    ASSERT_OK(virtcon_client.ApplyConfig(kVirtconInitialConfigStamp));
     ASSERT_OK(virtcon_client.GetLastAppliedConfigStamp());
   }
 
@@ -1012,21 +1030,22 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
   ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
 
   // Present an image
-  ASSERT_OK(primary_client->ApplyLayers(primary_client->CreateFullscreenLayerConfig()));
+  static constexpr display::ConfigStamp kPrimary1InitialConfigStamp(2);
+  ASSERT_OK(primary_client->ApplyLayers(kPrimary1InitialConfigStamp,
+                                        primary_client->CreateFullscreenLayerConfig()));
   ASSERT_EQ(0u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(kPrimary1InitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
 
   // Set an empty config
+  static constexpr display::ConfigStamp kPrimary1SecondConfigStamp(3);
   {
     ASSERT_OK(primary_client->SetDisplayLayers(primary_client->state().display_id(), {}));
-    ASSERT_OK(primary_client->ApplyConfig());
+    ASSERT_OK(primary_client->ApplyConfig(kPrimary1SecondConfigStamp));
+    ASSERT_OK(primary_client->GetLastAppliedConfigStamp());
   }
-  zx::result<display::ConfigStamp> empty_config_stamp_result =
-      primary_client->GetLastAppliedConfigStamp();
-  ASSERT_OK(empty_config_stamp_result);
-  const display::ConfigStamp empty_config_stamp = empty_config_stamp_result.value();
 
   // The old client disconnects
   primary_client.reset();
@@ -1036,18 +1055,20 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
   primary_client = OpenCoordinatorTestFidlClient(&sysmem_client_, DisplayProviderClient(),
                                                  ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
-  // ... and presents before the previous client's empty vsync
-  ASSERT_OK(primary_client->ApplyLayers(primary_client->CreateFullscreenLayerConfig()));
 
-  // Empty vsync for last client. Nothing should be sent to the new client.
-  const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(empty_config_stamp);
-  CoordinatorController()->DisplayEngineListenerOnDisplayVsync(
-      ToBanjoDisplayId(primary_client->state().display_id()), 0u, &banjo_config_stamp);
+  // The VSync must be routed to the client that applied the configuration,
+  // which is now disconnected. Nothing should be sent to the new client.
+  SendVsyncFromDisplayEngine();
 
-  // Send a second vsync, using the config the client applied.
+  static constexpr display::ConfigStamp kPrimary2InitialConfigStamp(4);
+  ASSERT_OK(primary_client->ApplyLayers(kPrimary2InitialConfigStamp,
+                                        primary_client->CreateFullscreenLayerConfig()));
+
+  // Send a VSync using the config the client applied.
   ASSERT_EQ(0u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(kPrimary2InitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
 }
 
@@ -1055,12 +1076,14 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
   TestFidlClient virtcon_client(&sysmem_client_);
   ASSERT_OK(virtcon_client.OpenCoordinator(DisplayProviderClient(), ClientPriority::kVirtcon,
                                            dispatcher()));
+  static constexpr display::ConfigStamp kVirtconInitialConfigStamp(1);
   {
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
     // display events instead.
     const display::DisplayId virtcon_display_id(1);
     ASSERT_OK(virtcon_client.SetDisplayLayers(virtcon_display_id, {}));
-    ASSERT_OK(virtcon_client.ApplyConfig());
+    ASSERT_OK(virtcon_client.ApplyConfig(kVirtconInitialConfigStamp));
+    ASSERT_OK(virtcon_client.GetLastAppliedConfigStamp());
   }
 
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
@@ -1068,14 +1091,24 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
   ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
 
   // Present an image
-  ASSERT_OK(primary_client->ApplyLayers(primary_client->CreateFullscreenLayerConfig()));
+  static constexpr display::ConfigStamp kPrimaryInitialConfigStamp(2);
+  ASSERT_OK(primary_client->ApplyLayers(kPrimaryInitialConfigStamp,
+                                        primary_client->CreateFullscreenLayerConfig()));
 
   ASSERT_EQ(0u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(kPrimaryInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
 
   // Send the controller a vsync for an image / a config it won't recognize anymore.
+  //
+  // TODO(https://fxbug.dev/388885807): The comment above describes the behavior
+  // of a misbehaving display engine driver. Consider whether it's suitable to
+  // disconnect the driver, rather than working around the error.
+  //
+  // TODO(https://fxbug.dev/388885807): The call below assumes that engine
+  // driver-side config stamps match client-managed config stamps.
   display::ConfigStamp invalid_config_stamp =
       CoordinatorController()->TEST_controller_stamp() - display::ConfigStamp{1};
   const config_stamp_t invalid_banjo_config_stamp = ToBanjoConfigStamp(invalid_config_stamp);
@@ -1086,6 +1119,7 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
   ASSERT_EQ(1u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 2; }));
+  EXPECT_EQ(kPrimaryInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(2u, primary_client->state().vsync_count());
 }
 
@@ -1440,16 +1474,22 @@ TEST_F(IntegrationTest, ClampRgb) {
       [&]() { return IsClientActive(ClientPriority::kVirtcon, VsyncCheck::kNoCheck); }));
 
   // Apply a config so the virtcon client's RGB clamp is set.
+  static constexpr display::ConfigStamp kVirtconInitialConfigStamp(1);
   {
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
     // display events instead.
     const display::DisplayId virtcon_display_id(1);
     ASSERT_OK(virtcon_client.SetDisplayLayers(virtcon_display_id, {}));
-    ASSERT_OK(virtcon_client.ApplyConfig());
+    ASSERT_OK(virtcon_client.ApplyConfig(kVirtconInitialConfigStamp));
     ASSERT_OK(virtcon_client.GetLastAppliedConfigStamp());
   }
 
   SendVsyncFromDisplayEngine();
+  // TODO(https://fxbug.dev/388885807): This test is racy. There's no guarantee
+  // that the VSync has reached the Display Coordinator. Figure out the right
+  // contract for RGB clamp application, and write the test against that
+  // contract.
+
   // make sure clamp value was restored
   ASSERT_TRUE(PollUntilOnLoop([&]() { return FakeDisplayEngine().GetClampRgbValue() == 32; }));
 }
@@ -1462,12 +1502,13 @@ TEST_F(IntegrationTest, DISABLED_EmptyConfigIsNotApplied) {
                                            dispatcher()));
   ASSERT_OK(virtcon_client.EnableVsyncEventDelivery());
   ASSERT_OK(virtcon_client.SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode::kFallback));
+  static constexpr display::ConfigStamp kVirtconInitialConfigStamp(1);
   {
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
     // display events instead.
     const display::DisplayId virtcon_display_id(1);
     ASSERT_OK(virtcon_client.SetDisplayLayers(virtcon_display_id, {}));
-    ASSERT_OK(virtcon_client.ApplyConfig());
+    ASSERT_OK(virtcon_client.ApplyConfig(kVirtconInitialConfigStamp));
   }
   ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kVirtcon); }));
 
@@ -1482,17 +1523,21 @@ TEST_F(IntegrationTest, DISABLED_EmptyConfigIsNotApplied) {
   ASSERT_EQ(0u, virtcon_client.state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client.state().vsync_count() >= 1; }));
+  EXPECT_EQ(kVirtconInitialConfigStamp, virtcon_client.state().last_vsync_config_stamp());
   EXPECT_EQ(0u, primary_client->state().vsync_count());
   EXPECT_EQ(1u, virtcon_client.state().vsync_count());
 
   // Present an image from the primary client.
-  ASSERT_OK(primary_client->ApplyLayers(primary_client->CreateFullscreenLayerConfig()));
+  static constexpr display::ConfigStamp kPrimaryInitialConfigStamp(2);
+  ASSERT_OK(primary_client->ApplyLayers(kPrimaryInitialConfigStamp,
+                                        primary_client->CreateFullscreenLayerConfig()));
 
   // Primary client should have become active after a config was set.
   ASSERT_EQ(0u, primary_client->state().vsync_count());
   EXPECT_EQ(1u, virtcon_client.state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(kPrimaryInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
   EXPECT_EQ(1u, virtcon_client.state().vsync_count());
 }
@@ -1506,12 +1551,12 @@ TEST_F(IntegrationTest, DISABLED_EmptyConfigIsNotApplied) {
 //
 // Here we test the following case:
 //
-//  * ApplyConfig({layerA: img0}) ==> config_stamp_1
-//  - Vsync now should have config_stamp_1
-//  * ApplyConfig({layerA: img1}) ==> config_stamp_2
-//  - Vsync now should have config_stamp_2
-//  * ApplyConfig({}) ==> config_stamp_3
-//  - Vsync now should have config_stamp_3
+//  * ApplyConfig({layer1: image1}) ==> kNoFence1ConfigStamp
+//  - Vsync now should have kNoFence1ConfigStamp
+//  * ApplyConfig({layer1: image2}) ==> kNoFence2ConfigStamp
+//  - Vsync now should have kNoFence2ConfigStamp
+//  * ApplyConfig({}) ==> kNoImageConfigStamp
+//  - Vsync now should have kNoImageConfigStamp
 //
 // Both images are ready at ApplyConfig() time, i.e. no fences are provided.
 TEST_F(IntegrationTest, VsyncEvent) {
@@ -1521,113 +1566,90 @@ TEST_F(IntegrationTest, VsyncEvent) {
   ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
 
   // Apply a config so the client starts receiving VSync events.
+  static constexpr display::ConfigStamp kInitialConfigStamp(1);
   {
     ASSERT_OK(primary_client->SetDisplayLayers(primary_client->state().display_id(), {}));
-    ASSERT_OK(primary_client->ApplyConfig());
+    ASSERT_OK(primary_client->ApplyConfig(kInitialConfigStamp));
+    ASSERT_OK(primary_client->GetLastAppliedConfigStamp());
   }
-  zx::result<display::ConfigStamp> apply_config_stamp_0_result =
-      primary_client->GetLastAppliedConfigStamp();
-  ASSERT_OK(apply_config_stamp_0_result);
-  const display::ConfigStamp apply_config_stamp_0 = apply_config_stamp_0_result.value();
-  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_0);
 
   ASSERT_EQ(0u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(kInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
 
-  display::ConfigStamp present_config_stamp_0 = primary_client->state().last_vsync_config_stamp();
-  EXPECT_EQ(apply_config_stamp_0, present_config_stamp_0);
-  EXPECT_NE(display::kInvalidConfigStamp, present_config_stamp_0);
+  zx::result<display::LayerId> create_layer1_result = primary_client->CreateFullscreenLayer();
+  zx::result<display::ImageId> create_image1_result = primary_client->CreateFullscreenImage();
+  zx::result<display::ImageId> create_image2_result = primary_client->CreateFullscreenImage();
 
-  zx::result<display::LayerId> create_default_layer_result =
-      primary_client->CreateFullscreenLayer();
-  zx::result<display::ImageId> create_image_0_result = primary_client->CreateFullscreenImage();
-  zx::result<display::ImageId> create_image_1_result = primary_client->CreateFullscreenImage();
+  ASSERT_OK(create_layer1_result);
+  ASSERT_OK(create_image1_result);
+  ASSERT_OK(create_image2_result);
 
-  EXPECT_OK(create_default_layer_result);
-  EXPECT_OK(create_image_0_result);
-  EXPECT_OK(create_image_1_result);
-
-  display::LayerId default_layer_id = create_default_layer_result.value();
-  display::ImageId image_0_id = create_image_0_result.value();
-  display::ImageId image_1_id = create_image_1_result.value();
+  display::LayerId layer1_id = create_layer1_result.value();
+  display::ImageId image1_id = create_image1_result.value();
+  display::ImageId image2_id = create_image2_result.value();
 
   // Present one single image without wait.
-  zx::result<display::ConfigStamp> apply_config_stamp_1_result = primary_client->ApplyLayers({
-      {.layer_id = default_layer_id,
-       .image_id = image_0_id,
-       .image_ready_wait_event_id = std::nullopt},
-  });
-  ASSERT_OK(apply_config_stamp_1_result);
-  const display::ConfigStamp apply_config_stamp_1 = apply_config_stamp_1_result.value();
-  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_1);
-  EXPECT_GT(apply_config_stamp_1, apply_config_stamp_0);
+  static constexpr display::ConfigStamp kNoFence1ConfigStamp(2);
+  ASSERT_OK(primary_client->ApplyLayers(
+      kNoFence1ConfigStamp,
+      {
+          {.layer_id = layer1_id, .image_id = image1_id, .image_ready_wait_event_id = std::nullopt},
+      }));
 
   ASSERT_EQ(1u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 2; }));
+  EXPECT_EQ(kNoFence1ConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(2u, primary_client->state().vsync_count());
 
-  display::ConfigStamp present_config_stamp_1 = primary_client->state().last_vsync_config_stamp();
-  EXPECT_EQ(apply_config_stamp_1, present_config_stamp_1);
-
-  // Present another image layer without wait.
-  zx::result<display::ConfigStamp> apply_config_stamp_2_result = primary_client->ApplyLayers({
-      {.layer_id = default_layer_id,
-       .image_id = image_1_id,
-       .image_ready_wait_event_id = std::nullopt},
-  });
-  ASSERT_OK(apply_config_stamp_2_result);
-  const display::ConfigStamp apply_config_stamp_2 = apply_config_stamp_2_result.value();
-  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_2);
-  EXPECT_GT(apply_config_stamp_2, apply_config_stamp_1);
+  // Present another image layer without a wait fence.
+  static constexpr display::ConfigStamp kNoFence2ConfigStamp(3);
+  ASSERT_OK(primary_client->ApplyLayers(
+      kNoFence2ConfigStamp,
+      {
+          {.layer_id = layer1_id, .image_id = image2_id, .image_ready_wait_event_id = std::nullopt},
+      }));
 
   ASSERT_EQ(2u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 3; }));
+  EXPECT_EQ(kNoFence2ConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(3u, primary_client->state().vsync_count());
 
-  display::ConfigStamp present_config_stamp_2 = primary_client->state().last_vsync_config_stamp();
-  EXPECT_EQ(apply_config_stamp_2, present_config_stamp_2);
-
   // Hide the existing layer.
+  static constexpr display::ConfigStamp kNoImageConfigStamp(4);
   {
     ASSERT_OK(primary_client->SetDisplayLayers(primary_client->state().display_id(), {}));
-    ASSERT_OK(primary_client->ApplyConfig());
+    ASSERT_OK(primary_client->ApplyConfig(kNoImageConfigStamp));
+    ASSERT_OK(primary_client->GetLastAppliedConfigStamp());
   }
-  zx::result<display::ConfigStamp> apply_config_stamp_3_result =
-      primary_client->GetLastAppliedConfigStamp();
-  ASSERT_OK(apply_config_stamp_3_result);
-  const display::ConfigStamp apply_config_stamp_3 = apply_config_stamp_3_result.value();
-  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_3);
-  EXPECT_GT(apply_config_stamp_3, apply_config_stamp_2);
 
   ASSERT_EQ(3u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 4; }));
+  EXPECT_EQ(kNoImageConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(4u, primary_client->state().vsync_count());
-
-  display::ConfigStamp present_config_stamp_3 = primary_client->state().last_vsync_config_stamp();
-  EXPECT_EQ(apply_config_stamp_3, present_config_stamp_3);
 }
 
 // This tests the behavior of ApplyConfig() and OnVsync() events when images
 // come with wait fences, which is a common use case in Scenic when using GPU
 // composition.
 //
-// When applying configurations with pending images, the config_stamp returned
-// from OnVsync() should not be updated unless the image becomes ready and
+// When applying configurations with pending images, the ConfigStamp reported
+// by OnVsync() should not be updated unless the image becomes ready and
 // triggers a ReapplyConfig().
 //
 // Here we test the following case:
 //
-//  * ApplyConfig({layerA: img0}) ==> config_stamp_1
-//  - Vsync now should have config_stamp_1
-//  * ApplyConfig({layerA: img1, wait on fence1}) ==> config_stamp_2
-//  - Vsync now should have config_stamp_1
-//  * Signal fence1
-//  - Vsync now should have config_stamp_2
+//  * ApplyConfig({layer1: image_without_fence}) ==> kImageWithoutFenceConfigStamp
+//  - Vsync now should have kImageWithoutFenceConfigStamp
+//  * ApplyConfig({layer1: image_with_fence}) ==> kImageWithFenceConfigStamp
+//  - Vsync now should have kImageWithoutFenceConfigStamp
+//  * Signal kImageWithoutFenceConfigStamp
+//  - Vsync now should have kImageWithFenceConfigStamp
 //
 TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   // Create and bind primary client.
@@ -1636,99 +1658,88 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
 
   // Apply a config so the client starts receiving VSync events.
+  static constexpr display::ConfigStamp kInitialConfigStamp(1);
   {
     ASSERT_OK(primary_client->SetDisplayLayers(primary_client->state().display_id(), {}));
-    ASSERT_OK(primary_client->ApplyConfig());
+    ASSERT_OK(primary_client->ApplyConfig(kInitialConfigStamp));
+    ASSERT_OK(primary_client->GetLastAppliedConfigStamp());
   }
-  zx::result<display::ConfigStamp> apply_config_stamp_0_result =
-      primary_client->GetLastAppliedConfigStamp();
-  ASSERT_OK(apply_config_stamp_0_result);
-  const display::ConfigStamp apply_config_stamp_0 = apply_config_stamp_0_result.value();
-  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_0);
 
   ASSERT_EQ(0u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(kInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
 
-  display::ConfigStamp present_config_stamp_0 = primary_client->state().last_vsync_config_stamp();
-  EXPECT_EQ(apply_config_stamp_0, present_config_stamp_0);
-  EXPECT_NE(display::kInvalidConfigStamp, present_config_stamp_0);
-
-  zx::result<display::LayerId> create_default_layer_result =
-      primary_client->CreateFullscreenLayer();
-  zx::result<display::ImageId> create_image_0_result = primary_client->CreateFullscreenImage();
-  zx::result<display::ImageId> create_image_1_result = primary_client->CreateFullscreenImage();
-  zx::result<TestFidlClient::EventInfo> create_image_1_ready_fence_result =
+  zx::result<display::LayerId> create_layer1_result = primary_client->CreateFullscreenLayer();
+  zx::result<display::ImageId> create_image_without_fence_result =
+      primary_client->CreateFullscreenImage();
+  zx::result<display::ImageId> create_image_with_fence_result =
+      primary_client->CreateFullscreenImage();
+  zx::result<TestFidlClient::EventInfo> create_image_ready_fence_result =
       primary_client->CreateEvent();
 
-  EXPECT_OK(create_default_layer_result);
-  EXPECT_OK(create_image_0_result);
-  EXPECT_OK(create_image_1_result);
-  EXPECT_OK(create_image_1_ready_fence_result);
+  ASSERT_OK(create_layer1_result);
+  ASSERT_OK(create_image_without_fence_result);
+  ASSERT_OK(create_image_with_fence_result);
+  ASSERT_OK(create_image_ready_fence_result);
 
-  display::LayerId default_layer_id = create_default_layer_result.value();
-  display::ImageId image_0_id = create_image_0_result.value();
-  display::ImageId image_1_id = create_image_1_result.value();
-  TestFidlClient::EventInfo image_1_ready_fence =
-      std::move(create_image_1_ready_fence_result.value());
+  display::LayerId layer1_id = create_layer1_result.value();
+  display::ImageId image_without_fence_id = create_image_without_fence_result.value();
+  display::ImageId image_with_fence_id = create_image_with_fence_result.value();
+  TestFidlClient::EventInfo image_ready_fence = std::move(create_image_ready_fence_result.value());
 
-  // Present one single image without wait.
-  zx::result<display::ConfigStamp> apply_config_stamp_1_result = primary_client->ApplyLayers({
-      {.layer_id = default_layer_id,
-       .image_id = image_0_id,
-       .image_ready_wait_event_id = std::nullopt},
-  });
-  ASSERT_OK(apply_config_stamp_1_result);
-  const display::ConfigStamp apply_config_stamp_1 = apply_config_stamp_1_result.value();
-  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_1);
-  EXPECT_GT(apply_config_stamp_1, apply_config_stamp_0);
+  // Present one image layer without a wait event.
+  static constexpr display::ConfigStamp kImageWithoutFenceConfigStamp(2);
+  ASSERT_OK(primary_client->ApplyLayers(kImageWithoutFenceConfigStamp,
+                                        {
+                                            {.layer_id = layer1_id,
+                                             .image_id = image_without_fence_id,
+                                             .image_ready_wait_event_id = std::nullopt},
+                                        }));
 
   ASSERT_EQ(1u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 2; }));
+  EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(2u, primary_client->state().vsync_count());
 
-  display::ConfigStamp present_config_stamp_1 = primary_client->state().last_vsync_config_stamp();
-  EXPECT_EQ(apply_config_stamp_1, present_config_stamp_1);
-
-  // Present another image layer; but the image is not ready yet. So the
-  // configuration applied to display device will be still the old one. On Vsync
-  // the |presented_config_stamp| is still |config_stamp_1|.
-  zx::result<display::ConfigStamp> apply_config_stamp_2_result = primary_client->ApplyLayers({
-      {.layer_id = default_layer_id,
-       .image_id = image_1_id,
-       .image_ready_wait_event_id = std::make_optional(image_1_ready_fence.id)},
-  });
-  ASSERT_OK(apply_config_stamp_2_result);
-  const display::ConfigStamp apply_config_stamp_2 = apply_config_stamp_2_result.value();
-  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_2);
-  EXPECT_GE(apply_config_stamp_2, apply_config_stamp_1);
+  // Present an image layer with a wait event that's not signaled (ready) yet. So the
+  // configuration applied to display device will be still the old one. VSync events
+  // must report the previously applied config stamp.
+  static constexpr display::ConfigStamp kImageWithFenceConfigStamp(3);
+  ASSERT_OK(primary_client->ApplyLayers(
+      kImageWithFenceConfigStamp,
+      {
+          {.layer_id = layer1_id,
+           .image_id = image_with_fence_id,
+           .image_ready_wait_event_id = std::make_optional(image_ready_fence.id)},
+      }));
 
   ASSERT_EQ(2u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 3; }));
+  EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(3u, primary_client->state().vsync_count());
-
-  display::ConfigStamp present_config_stamp_2 = primary_client->state().last_vsync_config_stamp();
-  EXPECT_EQ(present_config_stamp_2, apply_config_stamp_1);
 
   // Signal the event. Display Fence callback will be signaled, and new
   // configuration with new config stamp (config_stamp_2) will be used.
   // On next Vsync, the |presented_config_stamp| will be updated.
   auto old_controller_stamp = CoordinatorController()->TEST_controller_stamp();
-  image_1_ready_fence.event.signal(0u, ZX_EVENT_SIGNALED);
+  image_ready_fence.event.signal(0u, ZX_EVENT_SIGNALED);
   ASSERT_TRUE(PollUntilOnLoop([controller = CoordinatorController(), old_controller_stamp]() {
     return controller->TEST_controller_stamp() > old_controller_stamp;
   }));
+  // TODO(https://fxbug.dev/388885807): The check above is racy. Although the
+  // Coordinator processed the new configuration, there is no guarantee that it
+  // was submitted to the display engine driver. The raciness will get worse
+  // when we migrate from Banjo to FIDL.
 
   ASSERT_EQ(3u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 4; }));
+  EXPECT_EQ(kImageWithFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(4u, primary_client->state().vsync_count());
-
-  display::ConfigStamp present_config_stamp_3 = primary_client->state().last_vsync_config_stamp();
-  EXPECT_EQ(present_config_stamp_3, apply_config_stamp_2);
 }
 
 // This tests the behavior of ApplyConfig() and OnVsync() events when images
@@ -1740,12 +1751,12 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
 //
 // Here we test the following case:
 //
-//  * ApplyConfig({layerA: img0}) ==> config_stamp_1
-//  - Vsync now should have config_stamp_1
-//  * ApplyConfig({layerA: img1, waiting on fence1}) ==> config_stamp_2
-//  - Vsync now should have config_stamp_1
-//  * ApplyConfig({}) ==> config_stamp_3
-//  - Vsync now should have config_stamp_3
+//  * ApplyConfig({layer1: image_without_fence}) ==> kImageWithoutFenceConfigStamp
+//  - Vsync now should have kImageWithoutFenceConfigStamp
+//  * ApplyConfig({layerA: img1, waiting on fence1}) ==> kImageWithFenceConfigStamp
+//  - Vsync now should have kImageWithoutFenceConfigStamp
+//  * ApplyConfig({}) ==> kNoImageConfigStamp
+//  - Vsync now should have kNoImageConfigStamp
 //
 // Note that fence1 is never signaled.
 //
@@ -1756,95 +1767,77 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
 
   // Apply a config so the client starts receiving VSync events.
+  static constexpr display::ConfigStamp kInitialConfigStamp(1);
   {
     ASSERT_OK(primary_client->SetDisplayLayers(primary_client->state().display_id(), {}));
-    ASSERT_OK(primary_client->ApplyConfig());
+    ASSERT_OK(primary_client->ApplyConfig(kInitialConfigStamp));
+    ASSERT_OK(primary_client->GetLastAppliedConfigStamp());
   }
-  zx::result<display::ConfigStamp> apply_config_stamp_0_result =
-      primary_client->GetLastAppliedConfigStamp();
-  ASSERT_OK(apply_config_stamp_0_result);
-  const display::ConfigStamp apply_config_stamp_0 = apply_config_stamp_0_result.value();
-  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_0);
 
   ASSERT_EQ(0u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(kInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
 
-  display::ConfigStamp present_config_stamp_0 = primary_client->state().last_vsync_config_stamp();
-  EXPECT_EQ(apply_config_stamp_0, present_config_stamp_0);
-  EXPECT_NE(display::kInvalidConfigStamp, present_config_stamp_0);
-
-  zx::result<display::LayerId> create_default_layer_result =
-      primary_client->CreateFullscreenLayer();
-  zx::result<display::ImageId> create_image_0_result = primary_client->CreateFullscreenImage();
-  zx::result<display::ImageId> create_image_1_result = primary_client->CreateFullscreenImage();
-  zx::result<TestFidlClient::EventInfo> create_image_1_ready_fence_result =
+  zx::result<display::LayerId> create_layer1_result = primary_client->CreateFullscreenLayer();
+  zx::result<display::ImageId> create_image_without_fence_result =
+      primary_client->CreateFullscreenImage();
+  zx::result<display::ImageId> create_image_with_fence_result =
+      primary_client->CreateFullscreenImage();
+  zx::result<TestFidlClient::EventInfo> create_image_ready_fence_result =
       primary_client->CreateEvent();
 
-  EXPECT_OK(create_default_layer_result);
-  EXPECT_OK(create_image_0_result);
-  EXPECT_OK(create_image_1_result);
-  EXPECT_OK(create_image_1_ready_fence_result);
+  ASSERT_OK(create_layer1_result);
+  ASSERT_OK(create_image_without_fence_result);
+  ASSERT_OK(create_image_with_fence_result);
+  ASSERT_OK(create_image_ready_fence_result);
 
-  display::LayerId default_layer_id = create_default_layer_result.value();
-  display::ImageId image_0_id = create_image_0_result.value();
-  display::ImageId image_1_id = create_image_1_result.value();
-  TestFidlClient::EventInfo image_1_ready_fence =
-      std::move(create_image_1_ready_fence_result.value());
+  display::LayerId layer1_id = create_layer1_result.value();
+  display::ImageId image_without_fence_id = create_image_without_fence_result.value();
+  display::ImageId image_with_fence_id = create_image_with_fence_result.value();
+  TestFidlClient::EventInfo image_ready_fence = std::move(create_image_ready_fence_result.value());
 
   // Present an image layer.
-  zx::result<display::ConfigStamp> apply_config_stamp_1_result = primary_client->ApplyLayers({
-      {.layer_id = default_layer_id,
-       .image_id = image_0_id,
-       .image_ready_wait_event_id = std::nullopt},
-  });
-  ASSERT_OK(apply_config_stamp_1_result);
-  const display::ConfigStamp apply_config_stamp_1 = apply_config_stamp_1_result.value();
-  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_1);
-  EXPECT_GT(apply_config_stamp_1, apply_config_stamp_0);
+  static constexpr display::ConfigStamp kImageWithoutFenceConfigStamp(2);
+  ASSERT_OK(primary_client->ApplyLayers(kImageWithoutFenceConfigStamp,
+                                        {
+                                            {.layer_id = layer1_id,
+                                             .image_id = image_without_fence_id,
+                                             .image_ready_wait_event_id = std::nullopt},
+                                        }));
 
   ASSERT_EQ(1u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 2; }));
+  EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(2u, primary_client->state().vsync_count());
-
-  auto present_config_stamp_1 = primary_client->state().last_vsync_config_stamp();
-  EXPECT_EQ(apply_config_stamp_1, present_config_stamp_1);
 
   // Present another image layer; but the image is not ready yet. Display
   // controller will wait on the fence and Vsync will return the previous
   // configuration instead.
-  zx::result<display::ConfigStamp> apply_config_stamp_2_result = primary_client->ApplyLayers({
-      {.layer_id = default_layer_id,
-       .image_id = image_1_id,
-       .image_ready_wait_event_id = image_1_ready_fence.id},
-  });
-  ASSERT_OK(apply_config_stamp_2_result);
-  const display::ConfigStamp apply_config_stamp_2 = apply_config_stamp_2_result.value();
-  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_2);
-  EXPECT_GE(apply_config_stamp_2, apply_config_stamp_1);
+  static constexpr display::ConfigStamp kImageWithFenceConfigStamp(3);
+  ASSERT_OK(primary_client->ApplyLayers(kImageWithFenceConfigStamp,
+                                        {
+                                            {.layer_id = layer1_id,
+                                             .image_id = image_with_fence_id,
+                                             .image_ready_wait_event_id = image_ready_fence.id},
+                                        }));
 
   ASSERT_EQ(2u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 3; }));
+  EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(3u, primary_client->state().vsync_count());
-
-  display::ConfigStamp present_config_stamp_2 = primary_client->state().last_vsync_config_stamp();
-  EXPECT_EQ(present_config_stamp_2, present_config_stamp_1);
 
   // Hide the image layer. Display controller will not care about the fence
   // and thus use the latest configuration stamp.
+  static constexpr display::ConfigStamp kNoImageConfigStamp(4);
   {
     ASSERT_OK(primary_client->SetDisplayLayers(primary_client->state().display_id(), {}));
-    ASSERT_OK(primary_client->ApplyConfig());
+    ASSERT_OK(primary_client->ApplyConfig(kNoImageConfigStamp));
+    ASSERT_OK(primary_client->GetLastAppliedConfigStamp());
   }
-  zx::result<display::ConfigStamp> apply_config_stamp_3_result =
-      primary_client->GetLastAppliedConfigStamp();
-  ASSERT_OK(apply_config_stamp_3_result);
-  const display::ConfigStamp apply_config_stamp_3 = apply_config_stamp_3_result.value();
-  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_3);
-  EXPECT_GT(apply_config_stamp_3, apply_config_stamp_2);
 
   // On Vsync, the configuration stamp client receives on Vsync event message
   // will be the latest one applied to the display controller, since the pending
@@ -1852,10 +1845,8 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   ASSERT_EQ(3u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 4; }));
+  EXPECT_EQ(kNoImageConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(4u, primary_client->state().vsync_count());
-
-  display::ConfigStamp present_config_stamp_3 = primary_client->state().last_vsync_config_stamp();
-  EXPECT_EQ(present_config_stamp_3, apply_config_stamp_3);
 }
 
 // This tests the behavior of ApplyConfig() and OnVsync() events when images
@@ -1870,16 +1861,17 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
 //
 // Here we test the following case:
 //
-//  * ApplyConfig({layerA: img0}) ==> config_stamp_1
-//  - Vsync now should have config_stamp_1
-//  * ApplyConfig({layerA: img1, waiting on fence1}) ==> config_stamp_2
-//  - Vsync now should have config_stamp_1 since img1 is not ready yet
-//  * ApplyConfig({layerA: img2, waiting on fence2}) ==> config_stamp_3
-//  - Vsync now should have config_stamp_1 since img1 and img2 are not ready
+//  * ApplyConfig({layer1: image_without_fence}) ==> kImageWithoutFenceConfigStamp
+//  - Vsync now should have kImageWithoutFenceConfigStamp
+//  * ApplyConfig({layer1: image_with_fence1, waiting on fence1}) ==> kImageWithFence1ConfigStamp
+//  - Vsync now should have kImageWithoutFenceConfigStamp since fence1 is not signaled
+//  * ApplyConfig({layerA: image_with_fence2, waiting on fence2}) ==> kImageWithFence2ConfigStamp
+//  - Vsync now should have kImageWithoutFenceConfigStamp since fence1 and fence2 are not
+//  signaled
 //  * Signal fence2
-//  - Vsync now should have config_stamp_3.
+//  - Vsync now should have kImageWithFence2ConfigStamp.
 //  * Signal fence1
-//  - Vsync .
+//  - Vsync should still have kImageWithFence2ConfigStamp.
 //
 // Note that fence1 is never signaled.
 TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
@@ -1888,125 +1880,110 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
 
-  zx::result<display::LayerId> create_default_layer_result =
-      primary_client->CreateFullscreenLayer();
-  zx::result<display::ImageId> create_image_0_result = primary_client->CreateFullscreenImage();
-  zx::result<display::ImageId> create_image_1_result = primary_client->CreateFullscreenImage();
-  zx::result<display::ImageId> create_image_2_result = primary_client->CreateFullscreenImage();
-  zx::result<TestFidlClient::EventInfo> create_image_1_ready_fence_result =
+  zx::result<display::LayerId> create_layer1_result = primary_client->CreateFullscreenLayer();
+  zx::result<display::ImageId> create_image_without_fence_result =
+      primary_client->CreateFullscreenImage();
+  zx::result<display::ImageId> create_image_with_fence1_result =
+      primary_client->CreateFullscreenImage();
+  zx::result<display::ImageId> create_image_with_fence2_result =
+      primary_client->CreateFullscreenImage();
+  zx::result<TestFidlClient::EventInfo> create_image_ready_fence1_result =
       primary_client->CreateEvent();
-  zx::result<TestFidlClient::EventInfo> create_image_2_ready_fence_result =
+  zx::result<TestFidlClient::EventInfo> create_image_ready_fence2_result =
       primary_client->CreateEvent();
 
-  EXPECT_OK(create_default_layer_result);
-  EXPECT_OK(create_image_0_result);
-  EXPECT_OK(create_image_1_result);
-  EXPECT_OK(create_image_2_result);
-  EXPECT_OK(create_image_1_ready_fence_result);
-  EXPECT_OK(create_image_2_ready_fence_result);
+  ASSERT_OK(create_layer1_result);
+  ASSERT_OK(create_image_without_fence_result);
+  ASSERT_OK(create_image_with_fence1_result);
+  ASSERT_OK(create_image_with_fence2_result);
+  ASSERT_OK(create_image_ready_fence1_result);
+  ASSERT_OK(create_image_ready_fence2_result);
 
-  display::LayerId default_layer_id = create_default_layer_result.value();
-  display::ImageId image_0_id = create_image_0_result.value();
-  display::ImageId image_1_id = create_image_1_result.value();
-  display::ImageId image_2_id = create_image_2_result.value();
-  TestFidlClient::EventInfo image_1_ready_fence =
-      std::move(create_image_1_ready_fence_result.value());
-  TestFidlClient::EventInfo image_2_ready_fence =
-      std::move(create_image_2_ready_fence_result.value());
+  display::LayerId layer1_id = create_layer1_result.value();
+  display::ImageId image_without_fence_id = create_image_without_fence_result.value();
+  display::ImageId image_with_fence1_id = create_image_with_fence1_result.value();
+  display::ImageId image_with_fence2_id = create_image_with_fence2_result.value();
+  TestFidlClient::EventInfo image_ready_fence1 =
+      std::move(create_image_ready_fence1_result.value());
+  TestFidlClient::EventInfo image_ready_fence2 =
+      std::move(create_image_ready_fence2_result.value());
 
   // Apply a config so the client starts receiving VSync events.
-  ASSERT_OK(primary_client->ApplyLayers({
-      {.layer_id = default_layer_id,
-       .image_id = image_0_id,
-       .image_ready_wait_event_id = std::nullopt},
-  }));
-  zx::result<display::ConfigStamp> apply_config_stamp_0_result =
-      primary_client->GetLastAppliedConfigStamp();
-  ASSERT_OK(apply_config_stamp_0_result);
-  const display::ConfigStamp apply_config_stamp_0 = apply_config_stamp_0_result.value();
-  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_0);
+  static constexpr display::ConfigStamp kImageWithoutFenceConfigStamp(2);
+  ASSERT_OK(primary_client->ApplyLayers(kImageWithoutFenceConfigStamp,
+                                        {
+                                            {.layer_id = layer1_id,
+                                             .image_id = image_without_fence_id,
+                                             .image_ready_wait_event_id = std::nullopt},
+                                        }));
 
   ASSERT_EQ(0u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
 
-  display::ConfigStamp present_config_stamp_0 = primary_client->state().last_vsync_config_stamp();
-  EXPECT_EQ(apply_config_stamp_0, present_config_stamp_0);
-  EXPECT_NE(0u, present_config_stamp_0.value());
-
-  // Present another image layer (image #1, wait_event #0); but the image is not
-  // ready yet. Display controller will wait on the fence and Vsync will return
-  // the previous configuration instead.
-  zx::result<display::ConfigStamp> apply_config_stamp_1_result = primary_client->ApplyLayers({
-      {.layer_id = default_layer_id,
-       .image_id = image_1_id,
-       .image_ready_wait_event_id = image_1_ready_fence.id},
-  });
-  ASSERT_OK(apply_config_stamp_1_result);
-  const display::ConfigStamp apply_config_stamp_1 = apply_config_stamp_1_result.value();
-  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_1);
-  EXPECT_GT(apply_config_stamp_1, apply_config_stamp_0);
+  // Present an image layer whose image is not ready yet. The Display
+  // Coordinator must wait on the fence. VSync events must report the previous
+  // configuration.
+  static constexpr display::ConfigStamp kImageWithFence1ConfigStamp(3);
+  ASSERT_OK(primary_client->ApplyLayers(kImageWithFence1ConfigStamp,
+                                        {
+                                            {.layer_id = layer1_id,
+                                             .image_id = image_with_fence1_id,
+                                             .image_ready_wait_event_id = image_ready_fence1.id},
+                                        }));
 
   ASSERT_EQ(1u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 2; }));
+  EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(2u, primary_client->state().vsync_count());
 
-  display::ConfigStamp present_config_stamp_1 = primary_client->state().last_vsync_config_stamp();
-  EXPECT_EQ(present_config_stamp_1, present_config_stamp_0);
-
-  // Present another image layer (image #2, wait_event #1); the image is not
-  // ready as well. We should still see current |presented_config_stamp| to be
-  // equal to |present_config_stamp_0|.
-  zx::result<display::ConfigStamp> apply_config_stamp_2_result = primary_client->ApplyLayers({
-      {.layer_id = default_layer_id,
-       .image_id = image_2_id,
-       .image_ready_wait_event_id = image_2_ready_fence.id},
-  });
-  ASSERT_OK(apply_config_stamp_2_result);
-  const display::ConfigStamp apply_config_stamp_2 = apply_config_stamp_2_result.value();
-  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_2);
-  EXPECT_GT(apply_config_stamp_2, apply_config_stamp_1);
+  // Present another image layer whose image is not ready. By the same
+  // reasoning as above, VSync events must still report the same
+  // configuration as above.
+  static constexpr display::ConfigStamp kImageWithFence2ConfigStamp(4);
+  ASSERT_OK(primary_client->ApplyLayers(kImageWithFence2ConfigStamp,
+                                        {
+                                            {.layer_id = layer1_id,
+                                             .image_id = image_with_fence2_id,
+                                             .image_ready_wait_event_id = image_ready_fence2.id},
+                                        }));
 
   ASSERT_EQ(2u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 3; }));
+  EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(3u, primary_client->state().vsync_count());
 
-  display::ConfigStamp present_config_stamp_2 = primary_client->state().last_vsync_config_stamp();
-  EXPECT_EQ(present_config_stamp_2, present_config_stamp_1);
-
-  // Signal the event #1. Display Fence callback will be signaled, and
-  // configuration with new config stamp (apply_config_stamp_2) will be used.
-  // On next Vsync, the |presented_config_stamp| will be updated.
+  // Signal the second image's event. VSync events must report the second
+  // image's configuration.
   auto old_controller_stamp = CoordinatorController()->TEST_controller_stamp();
-  image_2_ready_fence.event.signal(0u, ZX_EVENT_SIGNALED);
+  image_ready_fence2.event.signal(0u, ZX_EVENT_SIGNALED);
   ASSERT_TRUE(PollUntilOnLoop(
       [&]() { return CoordinatorController()->TEST_controller_stamp() > old_controller_stamp; }));
 
   ASSERT_EQ(3u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 4; }));
+  EXPECT_EQ(kImageWithFence2ConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(4u, primary_client->state().vsync_count());
-
-  display::ConfigStamp present_config_stamp_3 = primary_client->state().last_vsync_config_stamp();
-  EXPECT_EQ(present_config_stamp_3, apply_config_stamp_2);
 
   // Signal the event #0. Since we have displayed a newer image, signaling the
   // old event associated with the old image shouldn't trigger ReapplyConfig().
   // We should still see |apply_config_stamp_2| as the latest presented config
   // stamp in the client.
   old_controller_stamp = CoordinatorController()->TEST_controller_stamp();
-  image_1_ready_fence.event.signal(0u, ZX_EVENT_SIGNALED);
+  image_ready_fence1.event.signal(0u, ZX_EVENT_SIGNALED);
+  // TODO(https://fxbug.dev/388885807): This test is racy. There's no guarantee
+  // that the fence's ready event was processed by the Display Coordinator.
 
   ASSERT_EQ(4u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 5; }));
+  EXPECT_EQ(kImageWithFence2ConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(5u, primary_client->state().vsync_count());
-
-  display::ConfigStamp present_config_stamp_4 = primary_client->state().last_vsync_config_stamp();
-  EXPECT_EQ(present_config_stamp_4, apply_config_stamp_2);
 }
 
 // TODO(https://fxbug.dev/42171874): Currently the fake-display driver only supports one
