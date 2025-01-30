@@ -60,30 +60,28 @@ if (is_host) {
   # Marker for the allow list for use in a subtool.
   # Using this marker avoids depending on a disallowed marker above.
   idk_category_marker_template("allowed-for-ffx-subtool") {
+    # Limit visibility to the sub-targets, which actually take the dependency,
+    # of the Rust targets in the allowlist.
     import("//src/developer/ffx/build/ffx_subtool_allowlist.gni")
-    visibility =
-        ffx_subtool_fidl_allowlist + [
-          # The allowlist does not include all sub-targets generated
-          # for Rust libraries, so add broader scopes to allow them.
-          "//sdk/fidl/*",
-          "//src/connectivity/network/testing/network-test-realm/fidl:*",
-          "//src/developer/ffx/fidl:*",
-          "//src/storage/fxfs/fidl/fuchsia.fxfs:*",
-          "//src/sys/fuzzing/fidl:*",
-          "//src/sys/pkg/fidl/fuchsia.update.installer:*",
-        ]
+    visibility = []
+    foreach(target, ffx_subtool_fidl_allowlist) {
+      visibility += [
+        "${target}_fdomain.actual",
+        "${target}_rust.actual",
+      ]
+    }
   }
 
   # Marker for the allow list for use in Lacewing.
   # Using this marker avoids depending on a disallowed marker above.
   idk_category_marker_template("allowed-for-host-test") {
+    # Limit visibility to the host test data targets for the FIDL library
+    # targets in the allowlist.
     import("//src/testing/end_to_end/host_test_allowlist.gni")
-    visibility = host_test_fidl_allowlist + [
-                   # The allowlist does not include all sub-targets generated
-                   # for Rust libraries, so add broader scopes to allow them.
-                   "//sdk/fidl/*",
-                   "//src/developer/ffx/fidl:*",
-                 ]
+    visibility = []
+    foreach(target, host_test_fidl_allowlist) {
+      visibility += [ "${target}_host_test_data_" ]
+    }
   }
 }
 

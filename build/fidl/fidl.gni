@@ -317,7 +317,8 @@ template("fidl") {
       }
     }
 
-    host_test_data("_${target_name}_host_test_data") {
+    # See https://fxrev.dev/931429 for context.
+    host_test_data("${target_name}_host_test_data_") {
       forward_variables_from(invoker,
                              [
                                "applicable_licenses",
@@ -357,7 +358,7 @@ template("fidl") {
 
     group("${target_name}_host_test_data") {
       forward_variables_from(invoker, [ "testonly" ])
-      deps = [ ":_${target_name}" ]
+      deps = [ ":${target_name}_" ]
       if (defined(invoker.public_deps)) {
         foreach(pdep, invoker.public_deps) {
           label = get_label_info(pdep, "label_no_toolchain")
