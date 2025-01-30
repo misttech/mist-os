@@ -15,7 +15,7 @@ use ffx_core::ffx_command;
     example = "ffx bluetooth peer"
 )]
 pub struct PeerCommand {
-    /// list or show
+    /// list, show, connect
     #[argh(subcommand)]
     pub subcommand: PeerSubCommand,
 }
@@ -25,6 +25,7 @@ pub struct PeerCommand {
 pub enum PeerSubCommand {
     List(ListCommand),
     Show(ShowCommand),
+    Connect(ConnectCommand),
 }
 
 /// ffx bluetooth peer list
@@ -56,5 +57,19 @@ pub struct ListCommand {
 pub struct ShowCommand {
     /// specify peer by id or address
     #[argh(positional)]
-    pub id_or_addr: String,
+    pub id_or_addr: ffx_bluetooth_common::PeerIdOrAddr,
+}
+
+/// ffx bluetooth peer connect
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq, Clone)]
+#[argh(
+    subcommand,
+    name = "connect",
+    description = "Connect to a peer.",
+    example = "ffx bluetooth peer connect <id|addr>"
+)]
+pub struct ConnectCommand {
+    /// specify peer by id or address
+    #[argh(positional)]
+    pub id_or_addr: ffx_bluetooth_common::PeerIdOrAddr,
 }

@@ -9,13 +9,13 @@ use ::fho::{
     TryFromEnv, TryFromEnvWith,
 };
 use async_utils::hanging_get::client::HangingGetStream;
+use ffx_bluetooth_common::PeerIdOrAddr;
 use fidl_fuchsia_bluetooth::PeerId as FidlPeerId;
 use fidl_fuchsia_bluetooth_sys::{AccessProxy, Peer as FidlPeer};
 use fuchsia_async::TimeoutExt;
 use fuchsia_bluetooth::types::{Address, Peer, PeerId};
 use futures::stream::StreamExt;
 use prettytable::{cell, format, row, Row, Table};
-use regex::Regex;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -28,6 +28,8 @@ pub struct PeerTool {
     cmd: PeerCommand,
     peer_watcher_stream: PeerWatcherStream,
     state: State,
+    #[with(toolbox())]
+    access_proxy: AccessProxy,
 }
 
 fho::embedded_plugin!(PeerTool);
@@ -55,11 +57,39 @@ impl FfxMain for PeerTool {
             PeerSubCommand::Show(ref cmd) => {
                 let known_peers = get_known_peers(&mut self).await?;
 
-                let args: &[&str] = &[&cmd.id_or_addr];
-
                 self.state.peers = known_peers;
 
-                writer.line(get_peer(args, self.state))?;
+                writer.line(get_peer(&cmd.id_or_addr, self.state))?;
+
+                Ok(())
+            }
+            // ffx bluetooth peer connect
+            PeerSubCommand::Connect(ref cmd) => {
+                let known_peers = get_known_peers(&mut self).await?;
+                self.state.peers = known_peers;
+
+                let peer_id = match to_identifier(&self.state.clone(), cmd.id_or_addr.clone()) {
+                    Some(id) => id,
+                    None => {
+                        return Err(fho::Error::User(anyhow::anyhow!(
+                            "Unable to connect: Unknown address {}",
+                            cmd.id_or_addr
+                        )))
+                    }
+                };
+
+                match connect(&self.access_proxy, peer_id).await {
+                    Ok(_) => {
+                        writer.line(format!("Successfully connected to peer {}", peer_id))?;
+                    }
+                    Err(e) => {
+                        return Err(fho::Error::User(anyhow::anyhow!(
+                            "Failed to connect to peer {}: {}",
+                            peer_id,
+                            e
+                        )));
+                    }
+                }
 
                 Ok(())
             }
@@ -67,9 +97,19 @@ impl FfxMain for PeerTool {
     }
 }
 
+/// Connects over BR/EDR or LE to an input peer ID.
+async fn connect(access: &AccessProxy, id: PeerId) -> Result<(), fho::Error> {
+    let fidl_peer_id: FidlPeerId = id.into();
+    let _ = access.connect(&fidl_peer_id).await.map_err(|e| {
+        let user_err = anyhow::anyhow!(format!("Connect error: {:?}", e));
+        fho::Error::User(user_err)
+    })?;
+    Ok(())
+}
+
 /// Get the string representation of a peer from either an identifier or address
-fn get_peer<'a>(args: &'a [&'a str], state: State) -> String {
-    to_identifier(state.clone(), args[0])
+fn get_peer<'a>(key: &PeerIdOrAddr, state: State) -> String {
+    to_identifier(&state, key.clone())
         .and_then(|id| state.peers.get(&id).map(|peer| peer.to_string()))
         .unwrap_or_else(|| String::from("No known peer"))
 }
@@ -139,17 +179,16 @@ fn peer_to_table_row(peer: &Peer) -> Row {
     ]
 }
 
-// Find the identifier for a `Peer` based on a `key` that is either an identifier or an
-// address.
+// Find the identifier for a `Peer` based on a `key` that is either an identifier or an address.
 // Returns `None` if the given address does not belong to a known peer.
-fn to_identifier(state: State, key: &str) -> Option<PeerId> {
-    // Compile regex inline because it is not ever expected to be a bottleneck
-    let address_pattern = Regex::new(r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$")
-        .expect("Could not compile mac address regex pattern.");
-    if address_pattern.is_match(key) {
-        state.peers.values().find(|peer| &peer.address == key).map(|peer| peer.id)
-    } else {
-        key.parse().ok()
+fn to_identifier(state: &State, key: PeerIdOrAddr) -> Option<PeerId> {
+    match key {
+        PeerIdOrAddr::PeerId(id) => Some(id),
+        PeerIdOrAddr::BdAddr(addr) => state
+            .peers
+            .values()
+            .find(|peer| peer.address.as_hex_string() == addr.0)
+            .map(|peer| peer.id),
     }
 }
 
@@ -230,8 +269,10 @@ impl TryFromEnv for State {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ffx_bluetooth_common::{BdAddr, PeerIdOrAddr};
     use fuchsia_bluetooth::types::Address;
     use regex::Regex;
+    use std::str::FromStr;
     use {fidl_fuchsia_bluetooth as fbt, fidl_fuchsia_bluetooth_sys as fsys};
 
     fn named_peer(id: PeerId, address: Address, name: Option<String>) -> Peer {
@@ -413,25 +454,71 @@ mod tests {
         let _ = state.peers.insert(peer_id2, peer2.clone());
 
         // Valid ID
-        let result = get_peer(&[&peer_id1.to_string()], state.clone());
+        let result =
+            get_peer(&PeerIdOrAddr::from_str(&peer_id1.to_string()).unwrap(), state.clone());
         assert_eq!(result, peer1.to_string());
 
         // Valid Address
-        let result = get_peer(&[&address2.as_hex_string()], state.clone());
+        let result =
+            get_peer(&PeerIdOrAddr::from_str(&address2.as_hex_string()).unwrap(), state.clone());
         assert_eq!(result, peer2.to_string());
 
         // Invalid ID
         let invalid_peer_id = PeerId(0x1234);
-        let result = get_peer(&[&invalid_peer_id.to_string()], state.clone());
+        let result =
+            get_peer(&PeerIdOrAddr::from_str(&invalid_peer_id.to_string()).unwrap(), state.clone());
         assert_eq!(result, "No known peer");
 
         // Invalid Address Format
-        let result = get_peer(&["invalid_address_format"], state.clone());
+        let result = get_peer(
+            &PeerIdOrAddr::from_str("invalid_address_format")
+                .unwrap_or(PeerIdOrAddr::PeerId(PeerId(0))),
+            state.clone(),
+        );
         assert_eq!(result, "No known peer");
 
         // Empty State
         let empty_state = State::new();
-        let result = get_peer(&[&peer_id1.to_string()], empty_state);
+        let result = get_peer(&PeerIdOrAddr::from_str(&peer_id1.to_string()).unwrap(), empty_state);
         assert_eq!(result, "No known peer");
+    }
+
+    #[test]
+    fn test_to_identifier() {
+        let mut state = State::new();
+        let peer_id1 = PeerId(0xabcd);
+        let address1 = Address::Public([0xAB, 0x89, 0x67, 0x45, 0x23, 0x01]);
+        let peer1 = named_peer(peer_id1, address1.clone(), Some("Sapphire".to_string()));
+        state.peers.insert(peer_id1, peer1);
+
+        let peer_id2 = PeerId(0xbeef);
+        let address2 = Address::Public([0x11, 0x22, 0x33, 0x44, 0x55, 0x66]);
+        let peer2 = named_peer(peer_id2, address2.clone(), None);
+        state.peers.insert(peer_id2, peer2);
+
+        // Valid ID Input
+        let result = to_identifier(&state, PeerIdOrAddr::PeerId(peer_id1));
+        assert_eq!(result, Some(peer_id1));
+
+        // Valid Address Input
+        let bd_addr2 = PeerIdOrAddr::BdAddr(BdAddr(address2.as_hex_string()));
+        let result = to_identifier(&state, bd_addr2);
+        assert_eq!(result, Some(peer_id2));
+
+        // Invalid Address Input
+        let invalid_address = PeerIdOrAddr::BdAddr(BdAddr("00:00:00:00:00:00".to_string()));
+        let result = to_identifier(&state, invalid_address);
+        assert_eq!(result, None);
+
+        // Invalid Address Format
+        let invalid_format = PeerIdOrAddr::BdAddr(BdAddr("invalid-format".to_string()));
+        let result = to_identifier(&state, invalid_format);
+        assert_eq!(result, None);
+
+        // Empty State
+        let empty_state = State::new();
+        let bd_addr1 = PeerIdOrAddr::BdAddr(BdAddr(address1.as_hex_string()));
+        let result = to_identifier(&empty_state, bd_addr1);
+        assert_eq!(result, None);
     }
 }
