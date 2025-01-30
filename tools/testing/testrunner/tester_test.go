@@ -554,6 +554,54 @@ func TestFFXTester(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("profile merging failed", func(t *testing.T) {
+		ctx := context.Background()
+		localOutputDir := t.TempDir()
+		tester, err := NewFFXTester(ctx, &ffxutil.MockFFXInstance{}, nil, localOutputDir, botanist.Experiments{}, "llvm-profdata")
+		if err != nil {
+			t.Fatalf("NewFFXTester got unexpected error: %s", err)
+		}
+		oldMergeProfiles := mergeProfiles
+		defer func() {
+			mergeProfiles = oldMergeProfiles
+		}()
+		mergeProfiles = func(_ context.Context, _ string, _ []string, _, _, _ string, _ int, _ []string, _ string) error {
+			return fmt.Errorf("failed to merge")
+		}
+		sinkDirA := t.TempDir()
+		sinkDirB := t.TempDir()
+		sinkFile := filepath.Join("llvm-profile", "sinkfile")
+		for _, dir := range []string{sinkDirA, sinkDirB} {
+			profile := filepath.Join(dir, sinkFile)
+			if err := os.MkdirAll(filepath.Dir(profile), os.ModePerm); err != nil {
+				t.Fatalf("failed to create dir of %s: %s", profile, err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, sinkFile), []byte("data"), os.ModePerm); err != nil {
+				t.Fatalf("failed to write profile: %s", err)
+			}
+		}
+		dest, err := tester.moveProfileToOutputDir(ctx, sinkDirA, sinkFile, "test1")
+		expectedDest := sinkFile
+		if err != nil {
+			t.Errorf("failed to move profile %s to %s: %s", sinkFile, expectedDest, err)
+		} else if dest != expectedDest {
+			t.Errorf("got dest %s, want %s", dest, expectedDest)
+		}
+		if _, err := os.Stat(filepath.Join(localOutputDir, "v2", expectedDest)); err != nil {
+			t.Errorf("failed to move proifle to v2 dir: %s", err)
+		}
+		dest, err = tester.moveProfileToOutputDir(ctx, sinkDirB, sinkFile, "test2")
+		expectedDest = filepath.Join("llvm-profile", "test2", "sinkfile")
+		if err != nil {
+			t.Errorf("failed to move profile %s to %s: %s", sinkFile, expectedDest, err)
+		} else if dest != expectedDest {
+			t.Errorf("got dest %s, want %s", dest, expectedDest)
+		}
+		if _, err := os.Stat(filepath.Join(localOutputDir, "v2", expectedDest)); err != nil {
+			t.Errorf("failed to move proifle to v2 dir: %s", err)
+		}
+	})
 }
 
 // for testability

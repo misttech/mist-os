@@ -15,6 +15,7 @@ import (
 	"io/fs"
 	"math"
 	"net"
+	"net/url"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -1019,11 +1020,15 @@ func (t *FFXTester) getSinksFromArtifactDir(ctx context.Context, artifactDir str
 // the sinks in sinksPerTest.
 func (t *FFXTester) getSinksPerTest(ctx context.Context, sinkDir string, summary runtests.TestSummary, sinksPerTest map[string]runtests.DataSinkReference, seen map[string]struct{}) error {
 	for _, details := range summary.Tests {
-		for _, sinks := range details.DataSinks {
-			for _, sink := range sinks {
+		for i, sinks := range details.DataSinks {
+			for j, sink := range sinks {
 				if _, ok := seen[sink.File]; !ok {
-					if err := t.moveProfileToOutputDir(ctx, sinkDir, sink.File); err != nil {
+					dest, err := t.moveProfileToOutputDir(ctx, sinkDir, sink.File, details.Name)
+					if err != nil {
 						return err
+					}
+					if dest != sink.File {
+						details.DataSinks[i][j].File = dest
 					}
 					seen[sink.File] = struct{}{}
 				}
@@ -1052,8 +1057,12 @@ func (t *FFXTester) getEarlyBootSinks(ctx context.Context, sinkDir string, sinks
 			return err
 		}
 		if _, ok := seen[path]; !ok {
-			if err := t.moveProfileToOutputDir(ctx, sinkDir, sinkFile); err != nil {
+			dest, err := t.moveProfileToOutputDir(ctx, sinkDir, sinkFile, earlyBootSinksTestName)
+			if err != nil {
 				return err
+			}
+			if dest != sinkFile {
+				sinkFile = dest
 			}
 			seen[path] = struct{}{}
 		}
@@ -1074,32 +1083,44 @@ func (t *FFXTester) getEarlyBootSinks(ctx context.Context, sinkDir string, sinks
 	})
 }
 
+// for testability
+var mergeProfiles = covargs.MergeSameVersionProfiles
+
 // moveProfileToOutputDir moves the profile from the sinkDir to the local output directory.
 // If a profile of the same name already exists, then the two are merged.
-func (t *FFXTester) moveProfileToOutputDir(ctx context.Context, sinkDir, sinkFile string) error {
+func (t *FFXTester) moveProfileToOutputDir(ctx context.Context, sinkDir, sinkFile, testName string) (string, error) {
 	profile := filepath.Join(sinkDir, sinkFile)
 	destProfile := filepath.Join(t.localOutputDir, "v2", sinkFile)
 	if _, err := os.Stat(destProfile); err == nil && t.llvmProfdata != "" {
 		// Merge profiles.
 		logger.Debugf(ctx, "merging profile %s to %s", profile, destProfile)
-		if err := covargs.MergeSameVersionProfiles(ctx, sinkDir, []string{destProfile, profile}, destProfile, t.llvmProfdata, t.llvmVersion, 0, t.debuginfodServers, t.debuginfodCache); err != nil {
+		if err := mergeProfiles(ctx, sinkDir, []string{destProfile, profile}, destProfile, t.llvmProfdata, t.llvmVersion, 0, t.debuginfodServers, t.debuginfodCache); err != nil {
 			logger.Debugf(ctx, "failed to merge profiles: %s", err)
 			// TODO(https://fxbug.dev/368375861): Return err once missing build id issue is resolved.
-			return nil
+			// TODO(https://fxbug.dev/374146495): Remove following code once issue is fixed.
+			testName = url.PathEscape(strings.ReplaceAll(testName, ":", ""))
+			dest := filepath.Join(filepath.Dir(sinkFile), testName, filepath.Base(sinkFile))
+			if err := os.MkdirAll(filepath.Dir(filepath.Join(t.localOutputDir, "v2", dest)), os.ModePerm); err != nil {
+				return sinkFile, err
+			}
+			if err := os.Rename(profile, filepath.Join(t.localOutputDir, "v2", dest)); err != nil {
+				return sinkFile, err
+			}
+			return dest, nil
 		}
 		// Remove old profile.
 		if err := os.Remove(profile); err != nil {
-			return err
+			return sinkFile, err
 		}
 	} else {
 		if err := os.MkdirAll(filepath.Dir(destProfile), os.ModePerm); err != nil {
-			return err
+			return sinkFile, err
 		}
 		if err := os.Rename(profile, destProfile); err != nil {
-			return err
+			return sinkFile, err
 		}
 	}
-	return nil
+	return sinkFile, nil
 }
 
 func (t *FFXTester) RunSnapshot(ctx context.Context, snapshotFile string) error {
