@@ -6,6 +6,7 @@ use crate::fs::fuchsia::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline};
 use crate::fs::fuchsia::RemoteUnixDomainSocket;
 use crate::mm::memory::MemoryObject;
 use crate::mm::{ProtectionFlags, VMEX_RESOURCE};
+use crate::security;
 use crate::task::{CurrentTask, EncryptionKeyId, Kernel};
 use crate::vfs::buffers::{with_iovec_segments, InputBuffer, OutputBuffer};
 use crate::vfs::fsverity::FsVerityState;
@@ -38,6 +39,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{
     __kernel_fsid_t, errno, error, from_status_like_fdio, fsverity_descriptor, ino_t, off_t, statfs,
 };
+use std::mem::MaybeUninit;
 use std::sync::Arc;
 use syncio::zxio::{
     zxio_get_posix_mode, zxio_node_attr, ZXIO_NODE_PROTOCOL_FILE, ZXIO_NODE_PROTOCOL_SYMLINK,
@@ -47,7 +49,8 @@ use syncio::zxio::{
 };
 use syncio::{
     zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, AllocateMode,
-    DirentIterator, XattrSetMode, Zxio, ZxioDirent, ZxioOpenOptions, ZXIO_ROOT_HASH_LENGTH,
+    DirentIterator, SelinuxContextAttr, XattrSetMode, Zxio, ZxioDirent, ZxioOpenOptions,
+    ZXIO_ROOT_HASH_LENGTH,
 };
 use zx::{HandleBased, Status};
 use {
@@ -728,9 +731,17 @@ impl FsNodeOps for RemoteNode {
             },
             ..Default::default()
         };
+        let mut options = ZxioOpenOptions::new(Some(&mut attrs), None);
+        let mut selinux_context_buffer =
+            MaybeUninit::<[u8; fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize]>::uninit();
+        let mut cached_context = security::fs_is_xattr_labeled(node.fs())
+            .then(|| SelinuxContextAttr::new(&mut selinux_context_buffer));
+        if let Some(buffer) = &mut cached_context {
+            options = options.with_selinux_context_read(buffer).unwrap();
+        }
         zxio = Arc::new(
             self.zxio
-                .open(name, self.rights, ZxioOpenOptions::new(Some(&mut attrs), None))
+                .open(name, self.rights, options)
                 .map_err(|status| from_status_like_fdio!(status, name))?,
         );
         mode = get_mode(&attrs);
@@ -744,7 +755,7 @@ impl FsNodeOps for RemoteNode {
         }
         let casefold = attrs.casefold;
 
-        fs.get_or_create_node(
+        let node = fs.get_or_create_node(
             current_task,
             if fs_ops.use_remote_ids {
                 if node_id == fio::INO_UNKNOWN {
@@ -772,9 +783,19 @@ impl FsNodeOps for RemoteNode {
                 if fsverity_enabled {
                     *child.fsverity.lock() = FsVerityState::FsVerity;
                 }
+                if let Some(buffer) = cached_context.as_ref().and_then(|buffer| buffer.get()) {
+                    // This is valid to fail if we're using mount point labelling or the
+                    // provided context string is invalid.
+                    let _ = security::fs_node_notify_security_context(
+                        current_task,
+                        &child,
+                        FsStr::new(buffer),
+                    );
+                }
                 Ok(child)
             },
-        )
+        )?;
+        Ok(node)
     }
 
     fn truncate(

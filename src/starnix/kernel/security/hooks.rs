@@ -232,6 +232,26 @@ where
     }
 }
 
+/// Applies the given label to the given node without checking any permissions.
+/// Used by file-system implementations to set the label for a node, for example when it has
+/// prefetched the label in the xattr rather than letting it get fetched by
+/// `fs_node_init_with_dentry` later. Calling this doesn't need to exclude the use of
+/// `fs_node_init_with_dentry`, it will just turn that call into a fast no-op.
+/// Corresponds to the `inode_notifysecctx` LSM hook.
+pub fn fs_node_notify_security_context(
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+    context: &FsStr,
+) -> Result<(), Errno> {
+    if_selinux_else(
+        current_task,
+        |security_server| {
+            selinux_hooks::fs_node_notify_security_context(security_server, fs_node, context)
+        },
+        || error!(ENOTSUP),
+    )
+}
+
 /// Called by file-system implementations when creating the `FsNode` for a new file, to determine the
 /// correct label based on the `CurrentTask` and `parent` node, and the policy-defined transition
 /// rules, and to initialize the `FsNode`'s security state accordingly.
@@ -1019,6 +1039,11 @@ pub fn set_procattr(
         // If SELinux is disabled then no writes are accepted.
         || error!(EINVAL),
     )
+}
+
+/// Returns true if SELinux is enabled on the kernel for this task.
+pub fn fs_is_xattr_labeled(fs: FileSystemHandle) -> bool {
+    fs.security_state.state.supports_xattr()
 }
 
 /// Stashes a reference to the selinuxfs null file for later use by hooks that remap

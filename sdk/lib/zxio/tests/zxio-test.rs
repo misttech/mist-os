@@ -6,10 +6,11 @@ use assert_matches::assert_matches;
 use fidl::endpoints::{create_endpoints, ServerEnd};
 use fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions, MerkleTreeBuilder};
 use fxfs_testing::TestFixture;
+use std::mem::MaybeUninit;
 use std::sync::Arc;
 use syncio::{
     zxio, zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, SeekOrigin,
-    XattrSetMode, Zxio, ZxioOpenOptions, ZXIO_ROOT_HASH_LENGTH,
+    SelinuxContextAttr, XattrSetMode, Zxio, ZxioOpenOptions, ZXIO_ROOT_HASH_LENGTH,
 };
 use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::directory::entry_container::Directory;
@@ -335,7 +336,7 @@ async fn test_xattr_dir() {
 
         {
             let names = foo_zxio.xattr_list().unwrap();
-            assert_eq!(names, Vec::<Vec<u8>>::new());
+            assert_eq!(names, Vec::<Vec::<u8>>::new());
         }
     })
     .await;
@@ -427,7 +428,7 @@ async fn test_xattr_symlink() {
 
         {
             let names = symlink_zxio.xattr_list().unwrap();
-            assert_eq!(names, Vec::<Vec<u8>>::new());
+            assert_eq!(names, Vec::<Vec::<u8>>::new());
         }
     })
     .await;
@@ -1133,7 +1134,9 @@ async fn test_open_selinux_context_attr() {
         // Set value during creation.
         {
             let write_buf = CONTEXT_STRING.as_bytes().to_vec();
-            let mut read_buf = [0u8; fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize];
+            let mut selinux_context_buffer =
+                MaybeUninit::<[u8; fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize]>::uninit();
+            let mut read_buf = SelinuxContextAttr::new(&mut selinux_context_buffer);
             // Verify that we can still fetch attributes properly at the same time.
             let mut attr: zxio_node_attributes_t = Default::default();
             let _file = dir_zxio
@@ -1155,16 +1158,15 @@ async fn test_open_selinux_context_attr() {
             assert!(attr.has.selinux_context);
             assert_eq!(attr.selinux_context_state, zxio::ZXIO_SELINUX_CONTEXT_STATE_DATA);
             assert_eq!(attr.selinux_context_length as usize, CONTEXT_STRING.as_bytes().len());
-            assert_eq!(
-                &read_buf[..attr.selinux_context_length as usize],
-                CONTEXT_STRING.as_bytes()
-            );
+            assert_eq!(read_buf.get().unwrap(), CONTEXT_STRING.as_bytes());
         }
 
         // Retrieve the value on reopen
         {
             let mut attr: zxio_node_attributes_t = Default::default();
-            let mut buf = [0u8; fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize];
+            let mut selinux_context_buffer =
+                MaybeUninit::<[u8; fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize]>::uninit();
+            let mut read_buf = SelinuxContextAttr::new(&mut selinux_context_buffer);
             let file = dir_zxio
                 .open(
                     TEST_FILE,
@@ -1174,7 +1176,7 @@ async fn test_open_selinux_context_attr() {
                         | fio::Flags::PERM_GET_ATTRIBUTES
                         | fio::Flags::PERM_SET_ATTRIBUTES,
                     ZxioOpenOptions::new(Some(&mut attr), None)
-                        .with_selinux_context_read(&mut buf)
+                        .with_selinux_context_read(&mut read_buf)
                         .unwrap(),
                 )
                 .expect("Opening file");
@@ -1182,7 +1184,7 @@ async fn test_open_selinux_context_attr() {
             assert!(attr.has.selinux_context);
             assert_eq!(attr.selinux_context_state, zxio::ZXIO_SELINUX_CONTEXT_STATE_DATA);
             assert_eq!(attr.selinux_context_length as usize, CONTEXT_STRING.as_bytes().len());
-            assert_eq!(&buf[..attr.selinux_context_length as usize], CONTEXT_STRING.as_bytes());
+            assert_eq!(read_buf.get().unwrap(), CONTEXT_STRING.as_bytes());
 
             // Make the value too long to fetch.
             file.xattr_set(
@@ -1196,7 +1198,9 @@ async fn test_open_selinux_context_attr() {
         // Value is too long to return on open, so it says so.
         {
             let mut attr: zxio_node_attributes_t = Default::default();
-            let mut buf = [0u8; fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize];
+            let mut selinux_context_buffer =
+                MaybeUninit::<[u8; fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize]>::uninit();
+            let mut read_buf = SelinuxContextAttr::new(&mut selinux_context_buffer);
             let _file = dir_zxio
                 .open(
                     TEST_FILE,
@@ -1206,7 +1210,7 @@ async fn test_open_selinux_context_attr() {
                         | fio::Flags::PERM_GET_ATTRIBUTES
                         | fio::Flags::PERM_SET_ATTRIBUTES,
                     ZxioOpenOptions::new(Some(&mut attr), None)
-                        .with_selinux_context_read(&mut buf)
+                        .with_selinux_context_read(&mut read_buf)
                         .unwrap(),
                 )
                 .expect("Opening file");

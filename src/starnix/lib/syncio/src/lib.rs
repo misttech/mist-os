@@ -10,9 +10,10 @@ use bitflags::bitflags;
 use bstr::BString;
 use fidl::encoding::const_assert_eq;
 use fidl_fuchsia_io as fio;
+use std::cell::OnceCell;
 use std::ffi::CStr;
 use std::marker::PhantomData;
-use std::mem::{size_of, size_of_val};
+use std::mem::{size_of, size_of_val, MaybeUninit};
 use std::num::TryFromIntError;
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::pin::Pin;
@@ -368,17 +369,49 @@ pub struct RecvMessageInfo {
     pub flags: i32,
 }
 
+/// Holder type for the resulting context, ensuring that it
+pub struct SelinuxContextAttr<'a> {
+    buf: &'a mut MaybeUninit<[u8; fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize]>,
+    size: OnceCell<usize>,
+}
+
+impl<'a> SelinuxContextAttr<'a> {
+    /// Creates a holder type for managing the buffer init, where the buffer is backed by the
+    /// provided `buf`.
+    pub fn new(
+        buf: &'a mut MaybeUninit<[u8; fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize]>,
+    ) -> Self {
+        Self { buf, size: OnceCell::new() }
+    }
+
+    /// The number of bytes initialized.
+    fn init(&mut self, size: usize) {
+        let res = self.size.set(size);
+        debug_assert!(res.is_ok());
+    }
+
+    /// If a context string was recorded, this returns a slice to it.
+    pub fn get(&self) -> Option<&[u8]> {
+        let size = self.size.get()?;
+        // SAFETY: The OnceCell contains the number of bytes initialized.
+        Some(unsafe { self.buf.assume_init_ref()[..*size].as_ref() })
+    }
+}
+
 /// Options for Open3.
 #[derive(Default)]
-pub struct ZxioOpenOptions<'a> {
+pub struct ZxioOpenOptions<'a, 'b> {
     attributes: Option<&'a mut zxio_node_attributes_t>,
 
     /// If an object is to be created, attributes that should be stored with the object at creation
     /// time. Not all servers support all attributes.
     create_attributes: Option<zxio::zxio_node_attr>,
+
+    /// If requesting the SELinux context as part of open, this manages the lifetime.
+    selinux_context_read: Option<&'a mut SelinuxContextAttr<'b>>,
 }
 
-impl<'a> ZxioOpenOptions<'a> {
+impl<'a, 'b> ZxioOpenOptions<'a, 'b> {
     /// Consumes the `create_attributes`` but the `attributes` is passed as a mutable ref, since the
     /// retrieved attributes will be written back into it. If any pointer fields are non-null, this
     /// will fail assertions.
@@ -392,7 +425,7 @@ impl<'a> ZxioOpenOptions<'a> {
         if let Some(attrs) = &create_attributes {
             validate_pointer_fields(attrs);
         }
-        Self { attributes, create_attributes }
+        Self { attributes, create_attributes, selinux_context_read: None }
     }
 
     /// Attaches the provided selinux context buffer to the `create_attributes`
@@ -418,17 +451,29 @@ impl<'a> ZxioOpenOptions<'a> {
     /// fail if no attributes query was attached, since the success of the fetch cannot be verified.
     pub fn with_selinux_context_read(
         mut self,
-        context: &'a mut [u8; fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize],
+        context: &'a mut SelinuxContextAttr<'b>,
     ) -> Result<Self, zx::Status> {
         if let Some(attributes_query) = &mut self.attributes {
-            attributes_query.selinux_context = context.as_mut_ptr();
+            attributes_query.selinux_context = context.buf.as_mut_ptr().cast::<u8>();
             attributes_query.has.selinux_context = true;
+            self.selinux_context_read = Some(context);
         } else {
             // If the value attributes query wasn't passed in we can't populate it, and the caller
             // can't get a response back to see if it worked anyways. Fail the request.
             return Err(zx::Status::INVALID_ARGS);
         }
         Ok(self)
+    }
+
+    /// Called inside the open method to confirm that some bytes were recorded into the buffer.
+    fn init_context_from_read(&mut self) {
+        if let (Some(attributes), Some(context)) =
+            (&self.attributes, &mut self.selinux_context_read)
+        {
+            if attributes.selinux_context_state == ZXIO_SELINUX_CONTEXT_STATE_DATA {
+                context.init(attributes.selinux_context_length as usize);
+            }
+        }
     }
 }
 
@@ -626,7 +671,7 @@ impl Zxio {
         &self,
         path: &str,
         flags: fio::Flags,
-        mut options: ZxioOpenOptions<'_>,
+        mut options: ZxioOpenOptions<'_, '_>,
     ) -> Result<Self, zx::Status> {
         let zxio = Zxio::default();
 
@@ -650,6 +695,7 @@ impl Zxio {
                 zxio.as_storage_ptr(),
             )
         };
+        options.init_context_from_read();
         if let Some(attributes) = options.attributes {
             clean_pointer_fields(attributes);
         }

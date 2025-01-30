@@ -174,6 +174,29 @@ fn get_fs_relative_path(dir_entry: &DirEntryHandle) -> FsString {
     path_builder.build_absolute()
 }
 
+/// Verifies that the file system labelling is `FsUse`, and if so then it attempts to
+/// apply the given context string to the node.
+pub(super) fn fs_node_notify_security_context(
+    security_server: &SecurityServer,
+    fs_node: &FsNode,
+    security_context: &FsStr,
+) -> Result<(), Errno> {
+    let fs = fs_node.fs();
+    if !matches!(
+        *fs.security_state.state.0.lock(),
+        FileSystemLabelState::Labeled {
+            label: FileSystemLabel { scheme: FileSystemLabelingScheme::FsUse { .. }, .. }
+        }
+    ) {
+        return error!(ENOTSUP);
+    }
+    let sid = security_server
+        .security_context_to_sid(security_context.into())
+        .map_err(|_| errno!(EINVAL))?;
+    set_cached_sid(fs_node, sid);
+    Ok(())
+}
+
 /// Called by the VFS to initialize the security state for an `FsNode` that is being linked at
 /// `dir_entry`.
 pub(super) fn fs_node_init_with_dentry<L>(
@@ -1492,7 +1515,7 @@ impl FileSystemState {
 
     /// Returns true if this `FileSystemState` is labeled with `fs_use_xattr` and thus supports
     /// xattr.
-    fn supports_xattr(&self) -> bool {
+    pub fn supports_xattr(&self) -> bool {
         if let FileSystemLabelState::Labeled { label } = &mut *self.0.lock() {
             if let FileSystemLabelingScheme::FsUse { fs_use_type, .. } = label.scheme {
                 return fs_use_type == FsUseType::Xattr;
