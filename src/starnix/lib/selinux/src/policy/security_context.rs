@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::policy::arrays::Context;
 use crate::policy::extensible_bitmap::ExtensibleBitmapSpan;
 use crate::policy::index::PolicyIndex;
+use crate::policy::symbols::MlsLevel;
 use crate::policy::{
     CategoryId, ParseStrategy, ParsedPolicy, RoleId, SensitivityId, TypeId, UserId,
 };
@@ -48,6 +50,23 @@ impl SecurityContext {
         high_level: Option<SecurityLevel>,
     ) -> Self {
         Self { user, role, type_, low_level, high_level }
+    }
+
+    /// Returns a [`SecurityContext`] based on the supplied policy-defined `context`.
+    pub(super) fn new_from_policy_context<PS: ParseStrategy>(
+        context: &Context<PS>,
+    ) -> SecurityContext {
+        let low_level = SecurityLevel::new_from_mls_level(context.low_level());
+        let high_level =
+            context.high_level().as_ref().map(|x| SecurityLevel::new_from_mls_level(x));
+
+        SecurityContext::new(
+            context.user_id(),
+            context.role_id(),
+            context.type_id(),
+            low_level,
+            high_level,
+        )
     }
 
     /// Returns the user component of the security context.
@@ -247,6 +266,15 @@ pub struct SecurityLevel {
 impl SecurityLevel {
     pub(super) fn new(sensitivity: SensitivityId, categories: Vec<CategorySpan>) -> Self {
         Self { sensitivity, categories }
+    }
+
+    /// Helper used by `initial_context()` to create a
+    /// [`crate::SecurityLevel`] instance from the policy fields.
+    pub(super) fn new_from_mls_level<PS: ParseStrategy>(level: &MlsLevel<PS>) -> SecurityLevel {
+        SecurityLevel::new(
+            level.sensitivity(),
+            level.category_spans().map(|span| span.into()).collect(),
+        )
     }
 
     /// Returns a new instance parsed from the supplied string slice.

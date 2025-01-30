@@ -475,8 +475,8 @@ impl<PS: ParseStrategy> ValidateArray<ConstraintTermCount, ConstraintTerm<PS>>
     type Error = anyhow::Error;
 
     /// [`ConstraintExpr`] has no internal constraints beyond those imposed by
-    /// [`Array`]. Any validation of relationships between constraint terms is
-    /// done by `ConstraintTerms`.
+    /// [`Array`]. The `ParsedPolicy::validate()` function separately validates
+    /// that the constraint expression is well-formed.
     fn validate_array<'a>(
         _metadata: &'a ConstraintTermCount,
         _data: &'a [ConstraintTerm<PS>],
@@ -523,10 +523,9 @@ impl<PS: ParseStrategy> Validate for ConstraintTerms<PS> {
     type Error = anyhow::Error;
 
     /// [`ConstraintTerms`] have no internal constraints beyond those imposed by
-    /// individual [`ConstraintTerm`] objects.
-    // TODO: https://fxbug.dev/372400976 - There some conditions on type and
-    // sequence of `ConstraintTerm`s that might make sense to validate here
-    // (e.g. correct number of operands is present for each operator term).
+    /// individual [`ConstraintTerm`] objects. The `ParsedPolicy::validate()`
+    /// function separately validates that the constraint expression is
+    /// well-formed.
     fn validate(&self) -> Result<(), Self::Error> {
         Ok(())
     }
@@ -606,6 +605,8 @@ pub(super) struct ConstraintTermMetadata {
 impl Validate for ConstraintTermMetadata {
     type Error = anyhow::Error;
 
+    /// Further validation is done by the `ParsedPolicy::validate()` function,
+    /// which separately validates that constraint expressions are well-formed.
     fn validate(&self) -> Result<(), Self::Error> {
         if !(self.constraint_term_type > 0
             && self.constraint_term_type <= CONSTRAINT_TERM_TYPE_EXPR_WITH_NAMES)

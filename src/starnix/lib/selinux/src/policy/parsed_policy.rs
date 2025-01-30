@@ -13,7 +13,7 @@ use super::error::{ParseError, QueryError, ValidateError};
 use super::extensible_bitmap::ExtensibleBitmap;
 use super::metadata::{Config, Counts, HandleUnknown, Magic, PolicyVersion, Signature};
 use super::parser::ParseStrategy;
-use super::security_context::Level;
+use super::security_context::{Level, SecurityContext};
 use super::symbols::{
     find_class_by_name, find_class_permission_by_name, Category, Class, Classes, CommonSymbol,
     CommonSymbols, ConditionalBoolean, MlsLevel, Permission, Role, Sensitivity, SymbolList, Type,
@@ -882,6 +882,21 @@ impl<PS: ParseStrategy> Validate for ParsedPolicy<PS> {
         for access_vector in &self.access_vectors.data {
             if let Some(type_id) = access_vector.new_type() {
                 validate_id(&type_ids, type_id, "new_type")?;
+            }
+        }
+
+        // Validate that constraints are well-formed by evaluating against
+        // a source and target security context.
+        let initial_context = SecurityContext::new_from_policy_context(
+            self.initial_context(crate::InitialSid::Kernel),
+        );
+        for class in self.classes() {
+            for constraint in class.constraints() {
+                constraint
+                    .constraint_expr()
+                    .evaluate(&initial_context, &initial_context)
+                    .map_err(Into::<anyhow::Error>::into)
+                    .context("validating constraints")?;
             }
         }
 

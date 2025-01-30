@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::arrays::{Context, FsContext, FsUseType};
+use super::arrays::{FsContext, FsUseType};
 use super::metadata::HandleUnknown;
 use super::parser::ParseStrategy;
-use super::security_context::{Level, SecurityContext, SecurityLevel};
+use super::security_context::{SecurityContext, SecurityLevel};
 use super::symbols::{
-    Class, ClassDefault, ClassDefaultRange, Classes, CommonSymbol, CommonSymbols, MlsLevel,
-    Permission,
+    Class, ClassDefault, ClassDefaultRange, Classes, CommonSymbol, CommonSymbols, Permission,
 };
 use super::{ClassId, ParsedPolicy, RoleId, TypeId};
 
@@ -105,7 +104,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
 
         // Validate the contexts used in fs_use statements.
         for fs_use in index.parsed_policy.fs_uses() {
-            index.security_context_from_policy_context(fs_use.context());
+            SecurityContext::new_from_policy_context(fs_use.context());
         }
 
         Ok(index)
@@ -309,7 +308,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
             .iter()
             .find(|fs_use| fs_use.fs_type() == fs_type.as_bytes())
             .map(|fs_use| FsUseLabelAndType {
-                context: self.security_context_from_policy_context(fs_use.context()),
+                context: SecurityContext::new_from_policy_context(fs_use.context()),
                 use_type: fs_use.behavior(),
             })
     }
@@ -365,38 +364,13 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         // The returned SecurityContext must be valid with respect to the policy, since otherwise
         // we'd have rejected the policy load.
         result.and_then(|fs_context| {
-            Some(self.security_context_from_policy_context(fs_context.context()))
+            Some(SecurityContext::new_from_policy_context(fs_context.context()))
         })
     }
 
     /// Helper used to construct and validate well-known [`SecurityContext`] values.
     fn resolve_initial_context(&self, id: crate::InitialSid) -> SecurityContext {
-        self.security_context_from_policy_context(self.parsed_policy().initial_context(id))
-    }
-
-    /// Returns a [`SecurityContext`] based on the supplied policy-defined `context`.
-    fn security_context_from_policy_context(&self, context: &Context<PS>) -> SecurityContext {
-        let low_level = self.security_level(context.low_level());
-        let high_level = context.high_level().as_ref().map(|x| self.security_level(x));
-
-        // Creation of the new [`SecurityContext`] will fail if the fields are inconsistent
-        // with the policy-defined constraints (e.g. on user roles, etc).
-        SecurityContext::new(
-            context.user_id(),
-            context.role_id(),
-            context.type_id(),
-            low_level,
-            high_level,
-        )
-    }
-
-    /// Helper used by `initial_context()` to create a [`crate::SecurityLevel`] instance from
-    /// the policy fields.
-    fn security_level(&self, level: &MlsLevel<PS>) -> SecurityLevel {
-        SecurityLevel::new(
-            level.sensitivity(),
-            level.category_spans().map(|span| span.into()).collect(),
-        )
+        SecurityContext::new_from_policy_context(self.parsed_policy().initial_context(id))
     }
 
     fn role_transition_new_role(
@@ -480,9 +454,11 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
                 && range_transition.target_class() == class.id()
             {
                 let mls_range = range_transition.mls_range();
-                let low_level = self.security_level(mls_range.low());
-                let high_level =
-                    mls_range.high().as_ref().map(|high_level| self.security_level(high_level));
+                let low_level = SecurityLevel::new_from_mls_level(mls_range.low());
+                let high_level = mls_range
+                    .high()
+                    .as_ref()
+                    .map(|high_level| SecurityLevel::new_from_mls_level(high_level));
                 return Some((low_level, high_level));
             }
         }
