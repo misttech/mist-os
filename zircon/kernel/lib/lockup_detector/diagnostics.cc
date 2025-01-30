@@ -28,8 +28,10 @@
 
 #if defined(__aarch64__)
 
+bool CanDumpRegistersAndBacktrace() { return arm64_dap_is_enabled(); }
+
 zx_status_t DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
-  if (!arm64_dap_is_enabled()) {
+  if (!CanDumpRegistersAndBacktrace()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -76,14 +78,26 @@ zx_status_t DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
 
 #elif defined(__x86_64__)
 
-zx_status_t DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
-  DEBUG_ASSERT(arch_ints_disabled());
+namespace {
 
-  zx_duration_t timeout = ZX_MSEC(gBootOptions->lockup_detector_diagnostic_query_timeout_ms);
+// A value <= 0 means the diagnostic query is disabled.
+zx_duration_t GetTimeout() {
+  return ZX_MSEC(gBootOptions->lockup_detector_diagnostic_query_timeout_ms);
+}
+
+}  // namespace
+
+bool CanDumpRegistersAndBacktrace() { return (GetTimeout() > 0); }
+
+zx_status_t DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
+  zx_duration_t timeout = GetTimeout();
   if (timeout == 0) {
     fprintf(output_target, "diagnostic query disabled (timeout is 0)\n");
-    return ZX_OK;
+    return ZX_ERR_NOT_SUPPORTED;
   }
+
+  // Make sure interrupts are disabled before calling |RequestContext|.
+  InterruptDisableGuard irqd;
 
   // First, dump the context for the unresponsive CPU.  Then, dump the contexts of the other CPUs.
   cpu_num_t target_cpu = cpu;
@@ -109,6 +123,8 @@ zx_status_t DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
 }
 
 #elif defined(__riscv)
+
+bool CanDumpRegistersAndBacktrace() { return false; }
 
 zx_status_t DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
   return ZX_ERR_NOT_SUPPORTED;
