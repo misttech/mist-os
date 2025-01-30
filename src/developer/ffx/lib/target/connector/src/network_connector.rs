@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use async_lock::Mutex;
-use fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy as FRemoteControlProxy;
 use ffx_command_error::{FfxContext as _, Result};
 use ffx_config::{EnvironmentContext, TryFromEnvContext};
 use ffx_target::{Connection, TargetConnector};
@@ -67,20 +66,6 @@ impl<T: TryFromEnvContext + TargetConnector + 'static> DirectConnector for Netwo
                 .as_ref()
                 .ok_or(crate::Error::Unexpected(anyhow::anyhow!("Connection not yet initialized")))?
                 .rcs_proxy()
-                .await
-                .bug()
-                .map_err(Into::into)
-        })
-    }
-
-    fn rcs_proxy_fdomain(&self) -> LocalBoxFuture<'_, Result<FRemoteControlProxy>> {
-        Box::pin(async {
-            self.maybe_connect().await?;
-            let conn = self.connection.lock().await;
-            (*conn)
-                .as_ref()
-                .ok_or(crate::Error::Unexpected(anyhow::anyhow!("Connection not yet initialized")))?
-                .rcs_proxy_fdomain()
                 .await
                 .bug()
                 .map_err(Into::into)

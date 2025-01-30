@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy as FRemoteControlProxy;
 use ffx_command_error::Result;
 use ffx_target::connection::Connection;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
@@ -30,10 +29,6 @@ pub trait DirectConnector {
     /// Gets the RCS proxy from the device via the underlying connector. Starts a connection if one
     /// hasn't been initiated.
     fn rcs_proxy(&self) -> LocalBoxFuture<'_, Result<RemoteControlProxy>>;
-
-    /// Gets the RCS proxy from the device via the underlying connector. Starts a connection if one
-    /// hasn't been initiated.
-    fn rcs_proxy_fdomain(&self) -> LocalBoxFuture<'_, Result<FRemoteControlProxy>>;
 
     /// Attempts to pull any errors off of the connection and wrap the passed error in one larger
     /// error encompassing the entire connection failure. This is usually done after something

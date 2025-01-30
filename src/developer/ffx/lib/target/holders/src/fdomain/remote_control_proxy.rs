@@ -10,7 +10,7 @@ use fdomain_client::fidl::{
 };
 use fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use ffx_command_error::{Error, FfxContext as _, Result};
-use fho::{FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
+use fho::{bug, FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
 use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
@@ -44,7 +44,17 @@ impl TryFromEnv for RemoteControlProxyHolder {
         };
         match behavior {
             FhoConnectionBehavior::DirectConnector(dc) => {
-                dc.rcs_proxy_fdomain().await.map(Into::into).map_err(Into::into)
+                let conn = dc.connection().await?;
+                let cc = conn.lock().await;
+                let c = cc.deref();
+                return c
+                    .as_ref()
+                    .ok_or(bug!("Connection not yet initialized"))?
+                    .rcs_proxy_fdomain()
+                    .await
+                    .bug()
+                    .map(Into::into)
+                    .map_err(Into::into);
             }
             FhoConnectionBehavior::DaemonConnector(dc) => match dc.remote_factory_fdomain().await {
                 Ok(p) => Ok(p.into()),
