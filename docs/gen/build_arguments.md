@@ -79,7 +79,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2110
+From //build/config/BUILDCONFIG.gn:2111
 
 ### allowed_test_device_types
 
@@ -731,7 +731,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8724498961011507953"`
+**Current value for `target_cpu = "arm64"`:** `"8724363042167926961"`
 
 From //out/not-default/args.gn:10
 
@@ -739,7 +739,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8724498961011507953"`
+**Current value for `target_cpu = "riscv64"`:** `"8724363042167926961"`
 
 From //out/not-default/args.gn:10
 
@@ -747,7 +747,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8724498961011507953"`
+**Current value for `target_cpu = "x64"`:** `"8724363042167926961"`
 
 From //out/not-default/args.gn:10
 
@@ -1016,6 +1016,902 @@ This toolchain is expected to support both Fuchsia targets and the host.
 **Current value (from the default):** `""`
 
 From //build/toolchain/zircon/clang.gni:11
+
+### clang_toolchain_info
+
+A scope that contains information about the current Clang toolchain.
+This should never be set as a build argument.
+
+**Current value (from the default):**
+
+```none
+{
+  aarch64_unknown_fuchsia = {
+  libclang_rt_profile_a = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.profile.a"
+  libunwind_so = "lib/aarch64-unknown-fuchsia/libunwind.so.1.0"
+  resource_dir = "lib/clang/20"
+  variants = {
+  asan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.asan.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.asan.a"
+  clang_rt_cxx = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.asan_cxx.a"
+}
+}
+  hwasan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.hwasan.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.hwasan.a"
+  clang_rt_cxx = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.hwasan_cxx.a"
+}
+}
+  lsan = {
+  shared = {
+  clang_rt = ""
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.lsan.a"
+  clang_rt_cxx = ""
+}
+}
+  tsan = {
+  shared = {
+  clang_rt = ""
+}
+  static = {
+  clang_rt = ""
+  clang_rt_cxx = ""
+}
+}
+  ubsan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.ubsan_standalone.a"
+  clang_rt_cxx = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.ubsan_standalone_cxx.a"
+}
+}
+}
+}
+  aarch64_unknown_linux_gnu = {
+  libclang_rt_profile_a = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.profile.a"
+  libunwind_so = ""
+  resource_dir = "lib/clang/20"
+  variants = {
+  asan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.asan.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.asan.a"
+  clang_rt_cxx = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.asan_cxx.a"
+}
+}
+  hwasan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.hwasan.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.hwasan.a"
+  clang_rt_cxx = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.hwasan_cxx.a"
+}
+}
+  lsan = {
+  shared = {
+  clang_rt = ""
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.lsan.a"
+  clang_rt_cxx = ""
+}
+}
+  tsan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.tsan.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.tsan.a"
+  clang_rt_cxx = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.tsan_cxx.a"
+}
+}
+  ubsan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.ubsan_standalone.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.ubsan_standalone.a"
+  clang_rt_cxx = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.ubsan_standalone_cxx.a"
+}
+}
+}
+}
+  armv7_unknown_linux_gnueabihf = {
+  libclang_rt_profile_a = "lib/clang/20/lib/armv7-unknown-linux-gnueabihf/libclang_rt.profile.a"
+  libunwind_so = ""
+  resource_dir = "lib/clang/20"
+  variants = {
+  asan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/armv7-unknown-linux-gnueabihf/libclang_rt.asan.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/armv7-unknown-linux-gnueabihf/libclang_rt.asan.a"
+  clang_rt_cxx = "lib/clang/20/lib/armv7-unknown-linux-gnueabihf/libclang_rt.asan_cxx.a"
+}
+}
+  hwasan = {
+  shared = {
+  clang_rt = ""
+}
+  static = {
+  clang_rt = ""
+  clang_rt_cxx = ""
+}
+}
+  lsan = {
+  shared = {
+  clang_rt = ""
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/armv7-unknown-linux-gnueabihf/libclang_rt.lsan.a"
+  clang_rt_cxx = ""
+}
+}
+  tsan = {
+  shared = {
+  clang_rt = ""
+}
+  static = {
+  clang_rt = ""
+  clang_rt_cxx = ""
+}
+}
+  ubsan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/armv7-unknown-linux-gnueabihf/libclang_rt.ubsan_standalone.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/armv7-unknown-linux-gnueabihf/libclang_rt.ubsan_standalone.a"
+  clang_rt_cxx = "lib/clang/20/lib/armv7-unknown-linux-gnueabihf/libclang_rt.ubsan_standalone_cxx.a"
+}
+}
+}
+}
+  fallback = {
+  libclang_rt_profile_a = ""
+  libunwind_so = ""
+  resource_dir = "lib/clang/20"
+  variants = { }
+}
+  riscv64_unknown_fuchsia = {
+  libclang_rt_profile_a = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.profile.a"
+  libunwind_so = "lib/riscv64-unknown-fuchsia/libunwind.so.1.0"
+  resource_dir = "lib/clang/20"
+  variants = {
+  asan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.asan.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.asan.a"
+  clang_rt_cxx = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.asan_cxx.a"
+}
+}
+  hwasan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.hwasan.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.hwasan.a"
+  clang_rt_cxx = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.hwasan_cxx.a"
+}
+}
+  lsan = {
+  shared = {
+  clang_rt = ""
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.lsan.a"
+  clang_rt_cxx = ""
+}
+}
+  tsan = {
+  shared = {
+  clang_rt = ""
+}
+  static = {
+  clang_rt = ""
+  clang_rt_cxx = ""
+}
+}
+  ubsan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.ubsan_standalone.a"
+  clang_rt_cxx = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.ubsan_standalone_cxx.a"
+}
+}
+}
+}
+  riscv64_unknown_linux_gnu = {
+  libclang_rt_profile_a = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.profile.a"
+  libunwind_so = ""
+  resource_dir = "lib/clang/20"
+  variants = {
+  asan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.asan.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.asan.a"
+  clang_rt_cxx = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.asan_cxx.a"
+}
+}
+  hwasan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.hwasan.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.hwasan.a"
+  clang_rt_cxx = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.hwasan_cxx.a"
+}
+}
+  lsan = {
+  shared = {
+  clang_rt = ""
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.lsan.a"
+  clang_rt_cxx = ""
+}
+}
+  tsan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.tsan.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.tsan.a"
+  clang_rt_cxx = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.tsan_cxx.a"
+}
+}
+  ubsan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.ubsan_standalone.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.ubsan_standalone.a"
+  clang_rt_cxx = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.ubsan_standalone_cxx.a"
+}
+}
+}
+}
+  runtimes = [{
+  cflags = []
+  ldflags = []
+  runtime = [{
+  breakpad = "debug/.build-id/67/0452a91275a5d569ecd4808265347c934d80da.sym"
+  debug = "debug/.build-id/67/0452a91275a5d569ecd4808265347c934d80da.debug"
+  dist = "aarch64-unknown-fuchsia/libc++.so.2"
+  name = "libc++"
+  soname = "libc++.so.2"
+}, {
+  breakpad = "debug/.build-id/c9/ef4f7717a1fc06e8b1fbbf029935ddb69c6f95.sym"
+  debug = "debug/.build-id/c9/ef4f7717a1fc06e8b1fbbf029935ddb69c6f95.debug"
+  dist = "aarch64-unknown-fuchsia/libc++abi.so.1"
+  name = "libc++abi"
+  soname = "libc++abi.so.1"
+}, {
+  breakpad = "debug/.build-id/c1/b637ea09260aa022071f850e293bb59c059ddc.sym"
+  debug = "debug/.build-id/c1/b637ea09260aa022071f850e293bb59c059ddc.debug"
+  dist = "aarch64-unknown-fuchsia/libunwind.so.1"
+  name = "libunwind"
+  soname = "libunwind.so.1"
+}]
+  target = ["aarch64-unknown-fuchsia", "aarch64-fuchsia"]
+}, {
+  cflags = ["-fsanitize=address"]
+  ldflags = []
+  runtime = [{
+  breakpad = "debug/.build-id/51/28949c7e244bbb1a06bace9cf8faa1b9dab281.sym"
+  debug = "debug/.build-id/51/28949c7e244bbb1a06bace9cf8faa1b9dab281.debug"
+  dist = "clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.asan.so"
+  soname = "libclang_rt.asan.so"
+}, {
+  breakpad = "debug/.build-id/68/31fdddf58e819bc9793c4ab9bd8d92ffc73fb8.sym"
+  debug = "debug/.build-id/68/31fdddf58e819bc9793c4ab9bd8d92ffc73fb8.debug"
+  dist = "aarch64-unknown-fuchsia/asan/libc++.so.2"
+  name = "libc++"
+  soname = "libc++.so.2"
+}, {
+  breakpad = "debug/.build-id/19/a0521bacda22ba6a02611dc3698561655eb422.sym"
+  debug = "debug/.build-id/19/a0521bacda22ba6a02611dc3698561655eb422.debug"
+  dist = "aarch64-unknown-fuchsia/asan/libc++abi.so.1"
+  name = "libc++abi"
+  soname = "libc++abi.so.1"
+}, {
+  breakpad = "debug/.build-id/fc/e5178a6f1df173079747bbc6e0e9a67457275c.sym"
+  debug = "debug/.build-id/fc/e5178a6f1df173079747bbc6e0e9a67457275c.debug"
+  dist = "aarch64-unknown-fuchsia/asan/libunwind.so.1"
+  name = "libunwind"
+  soname = "libunwind.so.1"
+}]
+  target = ["aarch64-unknown-fuchsia", "aarch64-fuchsia"]
+}, {
+  cflags = ["-fsanitize=undefined"]
+  ldflags = []
+  runtime = [{
+  breakpad = "debug/.build-id/a8/76eeaedee8b8aae38cf3a2b5a817ec377d43d1.sym"
+  debug = "debug/.build-id/a8/76eeaedee8b8aae38cf3a2b5a817ec377d43d1.debug"
+  dist = "clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
+  soname = "libclang_rt.ubsan_standalone.so"
+}, {
+  breakpad = "debug/.build-id/67/0452a91275a5d569ecd4808265347c934d80da.sym"
+  debug = "debug/.build-id/67/0452a91275a5d569ecd4808265347c934d80da.debug"
+  dist = "aarch64-unknown-fuchsia/libc++.so.2"
+  name = "libc++"
+  soname = "libc++.so.2"
+}, {
+  breakpad = "debug/.build-id/c9/ef4f7717a1fc06e8b1fbbf029935ddb69c6f95.sym"
+  debug = "debug/.build-id/c9/ef4f7717a1fc06e8b1fbbf029935ddb69c6f95.debug"
+  dist = "aarch64-unknown-fuchsia/libc++abi.so.1"
+  name = "libc++abi"
+  soname = "libc++abi.so.1"
+}, {
+  breakpad = "debug/.build-id/c1/b637ea09260aa022071f850e293bb59c059ddc.sym"
+  debug = "debug/.build-id/c1/b637ea09260aa022071f850e293bb59c059ddc.debug"
+  dist = "aarch64-unknown-fuchsia/libunwind.so.1"
+  name = "libunwind"
+  soname = "libunwind.so.1"
+}]
+  target = ["aarch64-unknown-fuchsia", "aarch64-fuchsia"]
+}, {
+  cflags = ["-fsanitize=hwaddress"]
+  ldflags = []
+  runtime = [{
+  breakpad = "debug/.build-id/07/0d57669bd13dfb9d57f7493e8f1e5636a00fa3.sym"
+  debug = "debug/.build-id/07/0d57669bd13dfb9d57f7493e8f1e5636a00fa3.debug"
+  dist = "clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.hwasan.so"
+  soname = "libclang_rt.hwasan.so"
+}, {
+  breakpad = "debug/.build-id/c9/6a0feb39d8354fbfd4ef274a9aa84997b9dd80.sym"
+  debug = "debug/.build-id/c9/6a0feb39d8354fbfd4ef274a9aa84997b9dd80.debug"
+  dist = "aarch64-unknown-fuchsia/hwasan/libc++.so.2"
+  name = "libc++"
+  soname = "libc++.so.2"
+}, {
+  breakpad = "debug/.build-id/36/c1ddc8cef71e3d8c845ea8e0aab59d3f38a577.sym"
+  debug = "debug/.build-id/36/c1ddc8cef71e3d8c845ea8e0aab59d3f38a577.debug"
+  dist = "aarch64-unknown-fuchsia/hwasan/libc++abi.so.1"
+  name = "libc++abi"
+  soname = "libc++abi.so.1"
+}, {
+  breakpad = "debug/.build-id/53/3fd58dd6846586af1f5bee6c6e68ee149996fd.sym"
+  debug = "debug/.build-id/53/3fd58dd6846586af1f5bee6c6e68ee149996fd.debug"
+  dist = "aarch64-unknown-fuchsia/hwasan/libunwind.so.1"
+  name = "libunwind"
+  soname = "libunwind.so.1"
+}]
+  target = ["aarch64-unknown-fuchsia", "aarch64-fuchsia"]
+}, {
+  cflags = []
+  ldflags = ["-static-libstdc++"]
+  runtime = []
+  target = ["aarch64-unknown-fuchsia", "aarch64-fuchsia"]
+}, {
+  cflags = ["-fsanitize=address"]
+  ldflags = ["-static-libstdc++"]
+  runtime = [{
+  breakpad = "debug/.build-id/51/28949c7e244bbb1a06bace9cf8faa1b9dab281.sym"
+  debug = "debug/.build-id/51/28949c7e244bbb1a06bace9cf8faa1b9dab281.debug"
+  dist = "clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.asan.so"
+  soname = "libclang_rt.asan.so"
+}, {
+  breakpad = "debug/.build-id/68/31fdddf58e819bc9793c4ab9bd8d92ffc73fb8.sym"
+  debug = "debug/.build-id/68/31fdddf58e819bc9793c4ab9bd8d92ffc73fb8.debug"
+  dist = "aarch64-unknown-fuchsia/asan/libc++.so.2"
+  name = "libc++"
+  soname = "libc++.so.2"
+}, {
+  breakpad = "debug/.build-id/19/a0521bacda22ba6a02611dc3698561655eb422.sym"
+  debug = "debug/.build-id/19/a0521bacda22ba6a02611dc3698561655eb422.debug"
+  dist = "aarch64-unknown-fuchsia/asan/libc++abi.so.1"
+  name = "libc++abi"
+  soname = "libc++abi.so.1"
+}, {
+  breakpad = "debug/.build-id/fc/e5178a6f1df173079747bbc6e0e9a67457275c.sym"
+  debug = "debug/.build-id/fc/e5178a6f1df173079747bbc6e0e9a67457275c.debug"
+  dist = "aarch64-unknown-fuchsia/asan/libunwind.so.1"
+  name = "libunwind"
+  soname = "libunwind.so.1"
+}]
+  target = ["aarch64-unknown-fuchsia", "aarch64-fuchsia"]
+}, {
+  cflags = ["-fsanitize=undefined"]
+  ldflags = ["-static-libstdc++"]
+  runtime = [{
+  breakpad = "debug/.build-id/a8/76eeaedee8b8aae38cf3a2b5a817ec377d43d1.sym"
+  debug = "debug/.build-id/a8/76eeaedee8b8aae38cf3a2b5a817ec377d43d1.debug"
+  dist = "clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
+  soname = "libclang_rt.ubsan_standalone.so"
+}, {
+  breakpad = "debug/.build-id/67/0452a91275a5d569ecd4808265347c934d80da.sym"
+  debug = "debug/.build-id/67/0452a91275a5d569ecd4808265347c934d80da.debug"
+  dist = "aarch64-unknown-fuchsia/libc++.so.2"
+  name = "libc++"
+  soname = "libc++.so.2"
+}, {
+  breakpad = "debug/.build-id/c9/ef4f7717a1fc06e8b1fbbf029935ddb69c6f95.sym"
+  debug = "debug/.build-id/c9/ef4f7717a1fc06e8b1fbbf029935ddb69c6f95.debug"
+  dist = "aarch64-unknown-fuchsia/libc++abi.so.1"
+  name = "libc++abi"
+  soname = "libc++abi.so.1"
+}, {
+  breakpad = "debug/.build-id/c1/b637ea09260aa022071f850e293bb59c059ddc.sym"
+  debug = "debug/.build-id/c1/b637ea09260aa022071f850e293bb59c059ddc.debug"
+  dist = "aarch64-unknown-fuchsia/libunwind.so.1"
+  name = "libunwind"
+  soname = "libunwind.so.1"
+}]
+  target = ["aarch64-unknown-fuchsia", "aarch64-fuchsia"]
+}, {
+  cflags = ["-fsanitize=hwaddress"]
+  ldflags = ["-static-libstdc++"]
+  runtime = [{
+  breakpad = "debug/.build-id/07/0d57669bd13dfb9d57f7493e8f1e5636a00fa3.sym"
+  debug = "debug/.build-id/07/0d57669bd13dfb9d57f7493e8f1e5636a00fa3.debug"
+  dist = "clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.hwasan.so"
+  soname = "libclang_rt.hwasan.so"
+}, {
+  breakpad = "debug/.build-id/c9/6a0feb39d8354fbfd4ef274a9aa84997b9dd80.sym"
+  debug = "debug/.build-id/c9/6a0feb39d8354fbfd4ef274a9aa84997b9dd80.debug"
+  dist = "aarch64-unknown-fuchsia/hwasan/libc++.so.2"
+  name = "libc++"
+  soname = "libc++.so.2"
+}, {
+  breakpad = "debug/.build-id/36/c1ddc8cef71e3d8c845ea8e0aab59d3f38a577.sym"
+  debug = "debug/.build-id/36/c1ddc8cef71e3d8c845ea8e0aab59d3f38a577.debug"
+  dist = "aarch64-unknown-fuchsia/hwasan/libc++abi.so.1"
+  name = "libc++abi"
+  soname = "libc++abi.so.1"
+}, {
+  breakpad = "debug/.build-id/53/3fd58dd6846586af1f5bee6c6e68ee149996fd.sym"
+  debug = "debug/.build-id/53/3fd58dd6846586af1f5bee6c6e68ee149996fd.debug"
+  dist = "aarch64-unknown-fuchsia/hwasan/libunwind.so.1"
+  name = "libunwind"
+  soname = "libunwind.so.1"
+}]
+  target = ["aarch64-unknown-fuchsia", "aarch64-fuchsia"]
+}, {
+  cflags = []
+  ldflags = []
+  runtime = [{
+  debug = "debug/.build-id/b3/ad089bcb7a9719115c0a15fb32ac8bc017e937.debug"
+  dist = "riscv64-unknown-fuchsia/libc++.so.2"
+  name = "libc++"
+  soname = "libc++.so.2"
+}, {
+  debug = "debug/.build-id/ca/7b75de111320efec1c17df60ee6e7ebdc01452.debug"
+  dist = "riscv64-unknown-fuchsia/libc++abi.so.1"
+  name = "libc++abi"
+  soname = "libc++abi.so.1"
+}, {
+  debug = "debug/.build-id/dd/15a7759f9f2c961b1f837ff64f9618dbe14113.debug"
+  dist = "riscv64-unknown-fuchsia/libunwind.so.1"
+  name = "libunwind"
+  soname = "libunwind.so.1"
+}]
+  target = ["riscv64-unknown-fuchsia", "riscv64-fuchsia"]
+}, {
+  cflags = ["-fsanitize=address"]
+  ldflags = []
+  runtime = [{
+  debug = "debug/.build-id/4f/6ff7258920f9f032a90a2ca83ac3aac67fdf05.debug"
+  dist = "clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.asan.so"
+  soname = "libclang_rt.asan.so"
+}, {
+  debug = "debug/.build-id/04/f8fcdbc6f830b292e87f285a15f024bf5685f3.debug"
+  dist = "riscv64-unknown-fuchsia/asan/libc++.so.2"
+  name = "libc++"
+  soname = "libc++.so.2"
+}, {
+  debug = "debug/.build-id/c6/2451ae9c6fdc9ffbdcdbf778f6a15ca2099ebd.debug"
+  dist = "riscv64-unknown-fuchsia/asan/libc++abi.so.1"
+  name = "libc++abi"
+  soname = "libc++abi.so.1"
+}, {
+  debug = "debug/.build-id/a9/bf620d03e8cdb81f48ee62c1c0032d08bc77ae.debug"
+  dist = "riscv64-unknown-fuchsia/asan/libunwind.so.1"
+  name = "libunwind"
+  soname = "libunwind.so.1"
+}]
+  target = ["riscv64-unknown-fuchsia", "riscv64-fuchsia"]
+}, {
+  cflags = ["-fsanitize=undefined"]
+  ldflags = []
+  runtime = [{
+  debug = "debug/.build-id/bf/fe4883d75a535a6c5aac2f2f2c33ee6d9d9871.debug"
+  dist = "clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
+  soname = "libclang_rt.ubsan_standalone.so"
+}, {
+  debug = "debug/.build-id/b3/ad089bcb7a9719115c0a15fb32ac8bc017e937.debug"
+  dist = "riscv64-unknown-fuchsia/libc++.so.2"
+  name = "libc++"
+  soname = "libc++.so.2"
+}, {
+  debug = "debug/.build-id/ca/7b75de111320efec1c17df60ee6e7ebdc01452.debug"
+  dist = "riscv64-unknown-fuchsia/libc++abi.so.1"
+  name = "libc++abi"
+  soname = "libc++abi.so.1"
+}, {
+  debug = "debug/.build-id/dd/15a7759f9f2c961b1f837ff64f9618dbe14113.debug"
+  dist = "riscv64-unknown-fuchsia/libunwind.so.1"
+  name = "libunwind"
+  soname = "libunwind.so.1"
+}]
+  target = ["riscv64-unknown-fuchsia", "riscv64-fuchsia"]
+}, {
+  cflags = ["-fsanitize=hwaddress"]
+  ldflags = []
+  runtime = [{
+  debug = "debug/.build-id/95/f19580cf8e44355462ffc4ed0f4c1ff02c6896.debug"
+  dist = "clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.hwasan.so"
+  soname = "libclang_rt.hwasan.so"
+}, {
+  debug = "debug/.build-id/b3/ad089bcb7a9719115c0a15fb32ac8bc017e937.debug"
+  dist = "riscv64-unknown-fuchsia/hwasan/libc++.so.2"
+  name = "libc++"
+  soname = "libc++.so.2"
+}, {
+  debug = "debug/.build-id/ca/7b75de111320efec1c17df60ee6e7ebdc01452.debug"
+  dist = "riscv64-unknown-fuchsia/hwasan/libc++abi.so.1"
+  name = "libc++abi"
+  soname = "libc++abi.so.1"
+}, {
+  debug = "debug/.build-id/5b/101c3326960cac0500a64363fbac1b21405d2a.debug"
+  dist = "riscv64-unknown-fuchsia/hwasan/libunwind.so.1"
+  name = "libunwind"
+  soname = "libunwind.so.1"
+}]
+  target = ["riscv64-unknown-fuchsia", "riscv64-fuchsia"]
+}, {
+  cflags = []
+  ldflags = ["-static-libstdc++"]
+  runtime = []
+  target = ["riscv64-unknown-fuchsia", "riscv64-fuchsia"]
+}, {
+  cflags = ["-fsanitize=address"]
+  ldflags = ["-static-libstdc++"]
+  runtime = [{
+  debug = "debug/.build-id/4f/6ff7258920f9f032a90a2ca83ac3aac67fdf05.debug"
+  dist = "clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.asan.so"
+  soname = "libclang_rt.asan.so"
+}, {
+  debug = "debug/.build-id/04/f8fcdbc6f830b292e87f285a15f024bf5685f3.debug"
+  dist = "riscv64-unknown-fuchsia/asan/libc++.so.2"
+  name = "libc++"
+  soname = "libc++.so.2"
+}, {
+  debug = "debug/.build-id/c6/2451ae9c6fdc9ffbdcdbf778f6a15ca2099ebd.debug"
+  dist = "riscv64-unknown-fuchsia/asan/libc++abi.so.1"
+  name = "libc++abi"
+  soname = "libc++abi.so.1"
+}, {
+  debug = "debug/.build-id/a9/bf620d03e8cdb81f48ee62c1c0032d08bc77ae.debug"
+  dist = "riscv64-unknown-fuchsia/asan/libunwind.so.1"
+  name = "libunwind"
+  soname = "libunwind.so.1"
+}]
+  target = ["riscv64-unknown-fuchsia", "riscv64-fuchsia"]
+}, {
+  cflags = ["-fsanitize=undefined"]
+  ldflags = ["-static-libstdc++"]
+  runtime = [{
+  debug = "debug/.build-id/bf/fe4883d75a535a6c5aac2f2f2c33ee6d9d9871.debug"
+  dist = "clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
+  soname = "libclang_rt.ubsan_standalone.so"
+}, {
+  debug = "debug/.build-id/b3/ad089bcb7a9719115c0a15fb32ac8bc017e937.debug"
+  dist = "riscv64-unknown-fuchsia/libc++.so.2"
+  name = "libc++"
+  soname = "libc++.so.2"
+}, {
+  debug = "debug/.build-id/ca/7b75de111320efec1c17df60ee6e7ebdc01452.debug"
+  dist = "riscv64-unknown-fuchsia/libc++abi.so.1"
+  name = "libc++abi"
+  soname = "libc++abi.so.1"
+}, {
+  debug = "debug/.build-id/dd/15a7759f9f2c961b1f837ff64f9618dbe14113.debug"
+  dist = "riscv64-unknown-fuchsia/libunwind.so.1"
+  name = "libunwind"
+  soname = "libunwind.so.1"
+}]
+  target = ["riscv64-unknown-fuchsia", "riscv64-fuchsia"]
+}, {
+  cflags = ["-fsanitize=hwaddress"]
+  ldflags = ["-static-libstdc++"]
+  runtime = [{
+  debug = "debug/.build-id/95/f19580cf8e44355462ffc4ed0f4c1ff02c6896.debug"
+  dist = "clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.hwasan.so"
+  soname = "libclang_rt.hwasan.so"
+}, {
+  debug = "debug/.build-id/b3/ad089bcb7a9719115c0a15fb32ac8bc017e937.debug"
+  dist = "riscv64-unknown-fuchsia/hwasan/libc++.so.2"
+  name = "libc++"
+  soname = "libc++.so.2"
+}, {
+  debug = "debug/.build-id/ca/7b75de111320efec1c17df60ee6e7ebdc01452.debug"
+  dist = "riscv64-unknown-fuchsia/hwasan/libc++abi.so.1"
+  name = "libc++abi"
+  soname = "libc++abi.so.1"
+}, {
+  debug = "debug/.build-id/5b/101c3326960cac0500a64363fbac1b21405d2a.debug"
+  dist = "riscv64-unknown-fuchsia/hwasan/libunwind.so.1"
+  name = "libunwind"
+  soname = "libunwind.so.1"
+}]
+  target = ["riscv64-unknown-fuchsia", "riscv64-fuchsia"]
+}, {
+  cflags = []
+  ldflags = []
+  runtime = [{
+  breakpad = "debug/.build-id/bb/72c0c73c0bb3aee8ad05aaf7df44d9229821e5.sym"
+  debug = "debug/.build-id/bb/72c0c73c0bb3aee8ad05aaf7df44d9229821e5.debug"
+  dist = "x86_64-unknown-fuchsia/libc++.so.2"
+  name = "libc++"
+  soname = "libc++.so.2"
+}, {
+  breakpad = "debug/.build-id/fc/0ff1bf330b3d1b77feb3a2aaaca77f30e7e982.sym"
+  debug = "debug/.build-id/fc/0ff1bf330b3d1b77feb3a2aaaca77f30e7e982.debug"
+  dist = "x86_64-unknown-fuchsia/libc++abi.so.1"
+  name = "libc++abi"
+  soname = "libc++abi.so.1"
+}, {
+  breakpad = "debug/.build-id/14/f192090ad8327994b6601b98cdad612b8401de.sym"
+  debug = "debug/.build-id/14/f192090ad8327994b6601b98cdad612b8401de.debug"
+  dist = "x86_64-unknown-fuchsia/libunwind.so.1"
+  name = "libunwind"
+  soname = "libunwind.so.1"
+}]
+  target = ["x86_64-unknown-fuchsia", "x86_64-fuchsia"]
+}, {
+  cflags = ["-fsanitize=address"]
+  ldflags = []
+  runtime = [{
+  breakpad = "debug/.build-id/56/62ab4a28d34d6acef4c2eb7d6eca8ef566c5c5.sym"
+  debug = "debug/.build-id/56/62ab4a28d34d6acef4c2eb7d6eca8ef566c5c5.debug"
+  dist = "clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.asan.so"
+  soname = "libclang_rt.asan.so"
+}, {
+  breakpad = "debug/.build-id/af/7a4e3d3227e073cfa8f33762be84dfbb165cf6.sym"
+  debug = "debug/.build-id/af/7a4e3d3227e073cfa8f33762be84dfbb165cf6.debug"
+  dist = "x86_64-unknown-fuchsia/asan/libc++.so.2"
+  name = "libc++"
+  soname = "libc++.so.2"
+}, {
+  breakpad = "debug/.build-id/fd/51aa37a274b658c95c2c0c5ee5f13f6239b29c.sym"
+  debug = "debug/.build-id/fd/51aa37a274b658c95c2c0c5ee5f13f6239b29c.debug"
+  dist = "x86_64-unknown-fuchsia/asan/libc++abi.so.1"
+  name = "libc++abi"
+  soname = "libc++abi.so.1"
+}, {
+  breakpad = "debug/.build-id/bb/d7440d2d8b3df8fa40ddd362916a88520484e7.sym"
+  debug = "debug/.build-id/bb/d7440d2d8b3df8fa40ddd362916a88520484e7.debug"
+  dist = "x86_64-unknown-fuchsia/asan/libunwind.so.1"
+  name = "libunwind"
+  soname = "libunwind.so.1"
+}]
+  target = ["x86_64-unknown-fuchsia", "x86_64-fuchsia"]
+}, {
+  cflags = ["-fsanitize=undefined"]
+  ldflags = []
+  runtime = [{
+  breakpad = "debug/.build-id/15/de2f635f92c84c5645207e2bdeeb06c5187857.sym"
+  debug = "debug/.build-id/15/de2f635f92c84c5645207e2bdeeb06c5187857.debug"
+  dist = "clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
+  soname = "libclang_rt.ubsan_standalone.so"
+}, {
+  breakpad = "debug/.build-id/bb/72c0c73c0bb3aee8ad05aaf7df44d9229821e5.sym"
+  debug = "debug/.build-id/bb/72c0c73c0bb3aee8ad05aaf7df44d9229821e5.debug"
+  dist = "x86_64-unknown-fuchsia/libc++.so.2"
+  name = "libc++"
+  soname = "libc++.so.2"
+}, {
+  breakpad = "debug/.build-id/fc/0ff1bf330b3d1b77feb3a2aaaca77f30e7e982.sym"
+  debug = "debug/.build-id/fc/0ff1bf330b3d1b77feb3a2aaaca77f30e7e982.debug"
+  dist = "x86_64-unknown-fuchsia/libc++abi.so.1"
+  name = "libc++abi"
+  soname = "libc++abi.so.1"
+}, {
+  breakpad = "debug/.build-id/14/f192090ad8327994b6601b98cdad612b8401de.sym"
+  debug = "debug/.build-id/14/f192090ad8327994b6601b98cdad612b8401de.debug"
+  dist = "x86_64-unknown-fuchsia/libunwind.so.1"
+  name = "libunwind"
+  soname = "libunwind.so.1"
+}]
+  target = ["x86_64-unknown-fuchsia", "x86_64-fuchsia"]
+}, {
+  cflags = []
+  ldflags = ["-static-libstdc++"]
+  runtime = []
+  target = ["x86_64-unknown-fuchsia", "x86_64-fuchsia"]
+}, {
+  cflags = ["-fsanitize=address"]
+  ldflags = ["-static-libstdc++"]
+  runtime = [{
+  breakpad = "debug/.build-id/56/62ab4a28d34d6acef4c2eb7d6eca8ef566c5c5.sym"
+  debug = "debug/.build-id/56/62ab4a28d34d6acef4c2eb7d6eca8ef566c5c5.debug"
+  dist = "clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.asan.so"
+  soname = "libclang_rt.asan.so"
+}, {
+  breakpad = "debug/.build-id/af/7a4e3d3227e073cfa8f33762be84dfbb165cf6.sym"
+  debug = "debug/.build-id/af/7a4e3d3227e073cfa8f33762be84dfbb165cf6.debug"
+  dist = "x86_64-unknown-fuchsia/asan/libc++.so.2"
+  name = "libc++"
+  soname = "libc++.so.2"
+}, {
+  breakpad = "debug/.build-id/fd/51aa37a274b658c95c2c0c5ee5f13f6239b29c.sym"
+  debug = "debug/.build-id/fd/51aa37a274b658c95c2c0c5ee5f13f6239b29c.debug"
+  dist = "x86_64-unknown-fuchsia/asan/libc++abi.so.1"
+  name = "libc++abi"
+  soname = "libc++abi.so.1"
+}, {
+  breakpad = "debug/.build-id/bb/d7440d2d8b3df8fa40ddd362916a88520484e7.sym"
+  debug = "debug/.build-id/bb/d7440d2d8b3df8fa40ddd362916a88520484e7.debug"
+  dist = "x86_64-unknown-fuchsia/asan/libunwind.so.1"
+  name = "libunwind"
+  soname = "libunwind.so.1"
+}]
+  target = ["x86_64-unknown-fuchsia", "x86_64-fuchsia"]
+}, {
+  cflags = ["-fsanitize=undefined"]
+  ldflags = ["-static-libstdc++"]
+  runtime = [{
+  breakpad = "debug/.build-id/15/de2f635f92c84c5645207e2bdeeb06c5187857.sym"
+  debug = "debug/.build-id/15/de2f635f92c84c5645207e2bdeeb06c5187857.debug"
+  dist = "clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
+  soname = "libclang_rt.ubsan_standalone.so"
+}, {
+  breakpad = "debug/.build-id/bb/72c0c73c0bb3aee8ad05aaf7df44d9229821e5.sym"
+  debug = "debug/.build-id/bb/72c0c73c0bb3aee8ad05aaf7df44d9229821e5.debug"
+  dist = "x86_64-unknown-fuchsia/libc++.so.2"
+  name = "libc++"
+  soname = "libc++.so.2"
+}, {
+  breakpad = "debug/.build-id/fc/0ff1bf330b3d1b77feb3a2aaaca77f30e7e982.sym"
+  debug = "debug/.build-id/fc/0ff1bf330b3d1b77feb3a2aaaca77f30e7e982.debug"
+  dist = "x86_64-unknown-fuchsia/libc++abi.so.1"
+  name = "libc++abi"
+  soname = "libc++abi.so.1"
+}, {
+  breakpad = "debug/.build-id/14/f192090ad8327994b6601b98cdad612b8401de.sym"
+  debug = "debug/.build-id/14/f192090ad8327994b6601b98cdad612b8401de.debug"
+  dist = "x86_64-unknown-fuchsia/libunwind.so.1"
+  name = "libunwind"
+  soname = "libunwind.so.1"
+}]
+  target = ["x86_64-unknown-fuchsia", "x86_64-fuchsia"]
+}]
+  x86_64_pc_windows_msvc = {
+  libclang_rt_profile_a = ""
+  libunwind_so = ""
+  resource_dir = "lib/clang/20"
+  variants = { }
+}
+  x86_64_unknown_fuchsia = {
+  libclang_rt_profile_a = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.profile.a"
+  libunwind_so = "lib/x86_64-unknown-fuchsia/libunwind.so.1.0"
+  resource_dir = "lib/clang/20"
+  variants = {
+  asan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.asan.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.asan.a"
+  clang_rt_cxx = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.asan_cxx.a"
+}
+}
+  hwasan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.hwasan.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.hwasan.a"
+  clang_rt_cxx = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.hwasan_cxx.a"
+}
+}
+  lsan = {
+  shared = {
+  clang_rt = ""
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.lsan.a"
+  clang_rt_cxx = ""
+}
+}
+  tsan = {
+  shared = {
+  clang_rt = ""
+}
+  static = {
+  clang_rt = ""
+  clang_rt_cxx = ""
+}
+}
+  ubsan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.ubsan_standalone.a"
+  clang_rt_cxx = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.ubsan_standalone_cxx.a"
+}
+}
+}
+}
+  x86_64_unknown_linux_gnu = {
+  libclang_rt_profile_a = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.profile.a"
+  libunwind_so = ""
+  resource_dir = "lib/clang/20"
+  variants = {
+  asan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.a"
+  clang_rt_cxx = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan_cxx.a"
+}
+}
+  hwasan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.hwasan.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.hwasan.a"
+  clang_rt_cxx = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.hwasan_cxx.a"
+}
+}
+  lsan = {
+  shared = {
+  clang_rt = ""
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.lsan.a"
+  clang_rt_cxx = ""
+}
+}
+  tsan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.tsan.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.tsan.a"
+  clang_rt_cxx = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.tsan_cxx.a"
+}
+}
+  ubsan = {
+  shared = {
+  clang_rt = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.ubsan_standalone.so"
+}
+  static = {
+  clang_rt = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.ubsan_standalone.a"
+  clang_rt_cxx = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.ubsan_standalone_cxx.a"
+}
+}
+}
+}
+}
+```
+
+From //build/config/clang/clang_toolchain_info.gni:42
 
 ### clippy_cause_failure
 
@@ -1989,7 +2885,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1890
+From //build/config/BUILDCONFIG.gn:1891
 
 ### fastboot_product
 
@@ -2618,7 +3514,7 @@ and the analysis overhead turned off by default.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:26
+From //build/config/BUILDCONFIG.gn:27
 
 ### is_debug
 
@@ -2958,7 +3854,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1686
+From //build/config/BUILDCONFIG.gn:1687
 
 ### legacy_base_package_labels
 
@@ -3805,7 +4701,7 @@ Sets if we should output breakpad symbols for Fuchsia binaries.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:29
+From //build/config/BUILDCONFIG.gn:30
 
 ### output_gsym
 
@@ -3813,7 +4709,7 @@ Controls whether we should output GSYM files for Fuchsia binaries.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:32
+From //build/config/BUILDCONFIG.gn:33
 
 ### override_idk_buildable_api_levels
 
@@ -4789,7 +5685,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2100
+From //build/config/BUILDCONFIG.gn:2101
 
 ### select_variant_canonical
 
@@ -4799,7 +5695,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2105
+From //build/config/BUILDCONFIG.gn:2106
 
 ### select_variant_shortcuts
 
@@ -4864,7 +5760,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1897
+From //build/config/BUILDCONFIG.gn:1898
 
 ### size_checker_input
 
@@ -5318,7 +6214,7 @@ for details and documentation for each field.
 }
 ```
 
-From //build/config/BUILDCONFIG.gn:98
+From //build/config/BUILDCONFIG.gn:99
 
 ### truncate_build_info_commit_date
 
@@ -5829,7 +6725,7 @@ From //build/images/args.gni:98
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/BUILD.gn:179
+From //build/config/fuchsia/BUILD.gn:171
 
 ### zircon_b_partition
 
@@ -5885,7 +6781,7 @@ This allows testing for a Zircon-specific toolchain with:
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:115
+From //build/config/BUILDCONFIG.gn:116
 
 ### zircon_tracelog
 
@@ -6952,7 +7848,7 @@ created at "$dir_pw_third_party/chre".
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/chre/src"`
 
-From //.gn:136
+From //.gn:134
 
 **Overridden from the default:** `""`
 
@@ -6960,7 +7856,7 @@ From //third_party/pigweed/src/third_party/chre/chre.gni:19
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/chre/src"`
 
-From //.gn:136
+From //.gn:134
 
 **Overridden from the default:** `""`
 
@@ -6973,7 +7869,7 @@ source code.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/github.com/google/emboss/src"`
 
-From //.gn:105
+From //.gn:103
 
 **Overridden from the default:** `""`
 
@@ -6981,7 +7877,7 @@ From //third_party/pigweed/src/third_party/emboss/emboss.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/github.com/google/emboss/src"`
 
-From //.gn:105
+From //.gn:103
 
 **Overridden from the default:** `""`
 
@@ -6994,7 +7890,7 @@ mirror of the few Fuchsia source files it uses.
 
 **Current value for `target_cpu = "arm64"`:** `"//"`
 
-From //.gn:99
+From //.gn:97
 
 **Overridden from the default:** `"//third_party/pigweed/src/third_party/fuchsia/repo"`
 
@@ -7002,7 +7898,7 @@ From //third_party/pigweed/src/third_party/fuchsia/fuchsia.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//"`
 
-From //.gn:99
+From //.gn:97
 
 **Overridden from the default:** `"//third_party/pigweed/src/third_party/fuchsia/repo"`
 
@@ -7415,7 +8311,7 @@ Backend for the pw_assert module's CHECK facade.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_assert"`
 
-From //.gn:73
+From //.gn:71
 
 **Overridden from the default:** `""`
 
@@ -7423,7 +8319,7 @@ From //third_party/pigweed/src/pw_assert/backend.gni:19
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_assert"`
 
-From //.gn:73
+From //.gn:71
 
 **Overridden from the default:** `""`
 
@@ -7466,7 +8362,7 @@ WARNING: This is experimental and *not* guaranteed to work.
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/backends/pw_async_fuchsia:*", "//third_party/pigweed:*", "//src/connectivity/bluetooth/core/bt-host/*"]`
 
-From //.gn:108
+From //.gn:106
 
 **Overridden from the default:** `[]`
 
@@ -7474,7 +8370,7 @@ From //third_party/pigweed/src/pw_async/async.gni:21
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/backends/pw_async_fuchsia:*", "//third_party/pigweed:*", "//src/connectivity/bluetooth/core/bt-host/*"]`
 
-From //.gn:108
+From //.gn:106
 
 **Overridden from the default:** `[]`
 
@@ -7486,7 +8382,7 @@ Configures the backend to use for the //pw_async:fake_dispatcher facade.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:fake_dispatcher"`
 
-From //.gn:117
+From //.gn:115
 
 **Overridden from the default:** `""`
 
@@ -7494,7 +8390,7 @@ From //third_party/pigweed/src/pw_async/backend.gni:22
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:fake_dispatcher"`
 
-From //.gn:117
+From //.gn:115
 
 **Overridden from the default:** `""`
 
@@ -7506,7 +8402,7 @@ Configures the backend to use for the //pw_async:task facade.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:task"`
 
-From //.gn:114
+From //.gn:112
 
 **Overridden from the default:** `""`
 
@@ -7514,7 +8410,7 @@ From //third_party/pigweed/src/pw_async/backend.gni:19
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:task"`
 
-From //.gn:114
+From //.gn:112
 
 **Overridden from the default:** `""`
 
@@ -7641,7 +8537,7 @@ libraries such as pw_assert.
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/src/pw_assert:impl", "//third_party/pigweed/src/pw_log:impl"]`
 
-From //.gn:93
+From //.gn:91
 
 **Overridden from the default:** `[]`
 
@@ -7649,7 +8545,7 @@ From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:26
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/src/pw_assert:impl", "//third_party/pigweed/src/pw_log:impl"]`
 
-From //.gn:93
+From //.gn:91
 
 **Overridden from the default:** `[]`
 
@@ -7683,7 +8579,7 @@ Default gn build virtualenv target.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed:fuchsia_pigweed_python_venv"`
 
-From //.gn:120
+From //.gn:118
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_env_setup:pigweed_build_venv"`
 
@@ -7691,7 +8587,7 @@ From //third_party/pigweed/src/pw_build/python_gn_args.gni:23
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed:fuchsia_pigweed_python_venv"`
 
-From //.gn:120
+From //.gn:118
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_env_setup:pigweed_build_venv"`
 
@@ -7822,7 +8718,7 @@ The configuration for building CHRE.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/chre:chre_config"`
 
-From //.gn:137
+From //.gn:135
 
 **Overridden from the default:** `"//third_party/chre:default_chre_config"`
 
@@ -7830,7 +8726,7 @@ From //third_party/pigweed/src/third_party/chre/chre.gni:22
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/chre:chre_config"`
 
-From //.gn:137
+From //.gn:135
 
 **Overridden from the default:** `"//third_party/chre:default_chre_config"`
 
@@ -7842,7 +8738,7 @@ CHRE's platform backend implementation. The default is the Pigweed backend.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_chre:chre_backend"`
 
-From //.gn:138
+From //.gn:136
 
 **Overridden from the default:** `"//pw_chre:chre_backend"`
 
@@ -7850,7 +8746,7 @@ From //third_party/pigweed/src/third_party/chre/chre.gni:28
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_chre:chre_backend"`
 
-From //.gn:138
+From //.gn:136
 
 **Overridden from the default:** `"//pw_chre:chre_backend"`
 
@@ -7862,7 +8758,7 @@ CHRE's platform backend headers. The default is the Pigweed backend.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_chre:chre_backend_headers"`
 
-From //.gn:140
+From //.gn:138
 
 **Overridden from the default:** `"//pw_chre:chre_backend_headers"`
 
@@ -7870,7 +8766,7 @@ From //third_party/pigweed/src/third_party/chre/chre.gni:25
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_chre:chre_backend_headers"`
 
-From //.gn:140
+From //.gn:138
 
 **Overridden from the default:** `"//pw_chre:chre_backend_headers"`
 
@@ -7882,7 +8778,7 @@ Backend for the pw_chrono module's system_clock.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_chrono_stl:system_clock"`
 
-From //.gn:76
+From //.gn:74
 
 **Overridden from the default:** `""`
 
@@ -7890,7 +8786,7 @@ From //third_party/pigweed/src/pw_chrono/backend.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_chrono_stl:system_clock"`
 
-From //.gn:76
+From //.gn:74
 
 **Overridden from the default:** `""`
 
@@ -7902,7 +8798,7 @@ Backend for the pw_chrono module's system_timer.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_chrono_stl:system_timer"`
 
-From //.gn:84
+From //.gn:82
 
 **Overridden from the default:** `""`
 
@@ -7910,7 +8806,7 @@ From //third_party/pigweed/src/pw_chrono/backend.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_chrono_stl:system_timer"`
 
-From //.gn:84
+From //.gn:82
 
 **Overridden from the default:** `""`
 
@@ -8002,7 +8898,7 @@ public config (which may -include a file or add defines directly).
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_function:enable_dynamic_allocation"`
 
-From //.gn:90
+From //.gn:88
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_build:empty"`
 
@@ -8010,7 +8906,7 @@ From //third_party/pigweed/src/pw_function/function.gni:22
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_function:enable_dynamic_allocation"`
 
-From //.gn:90
+From //.gn:88
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_build:empty"`
 
@@ -8022,7 +8918,7 @@ Backend for the pw_log module.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_log"`
 
-From //.gn:74
+From //.gn:72
 
 **Overridden from the default:** `""`
 
@@ -8030,7 +8926,7 @@ From //third_party/pigweed/src/pw_log/backend.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_log"`
 
-From //.gn:74
+From //.gn:72
 
 **Overridden from the default:** `""`
 
@@ -8107,7 +9003,7 @@ to be available on the PATH.
 
 **Current value for `target_cpu = "arm64"`:** `false`
 
-From //.gn:133
+From //.gn:131
 
 **Overridden from the default:** `true`
 
@@ -8115,7 +9011,7 @@ From //third_party/pigweed/src/pw_protobuf_compiler/toolchain.gni:40
 
 **Current value for `target_cpu = "x64"`:** `false`
 
-From //.gn:133
+From //.gn:131
 
 **Overridden from the default:** `true`
 
@@ -8146,7 +9042,7 @@ root_build_dir, to the protoc binary.
 
 **Current value for `target_cpu = "arm64"`:** `"host_x64/protoc"`
 
-From //.gn:124
+From //.gn:122
 
 **Overridden from the default:** `""`
 
@@ -8154,7 +9050,7 @@ From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:58
 
 **Current value for `target_cpu = "x64"`:** `"host_x64/protoc"`
 
-From //.gn:124
+From //.gn:122
 
 **Overridden from the default:** `""`
 
@@ -8166,7 +9062,7 @@ Optional Python package dependencies to include when running protoc.
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/backends/pw_protobuf_compiler:protoc_python_package"]`
 
-From //.gn:127
+From //.gn:125
 
 **Overridden from the default:** `[]`
 
@@ -8174,7 +9070,7 @@ From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:41
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/backends/pw_protobuf_compiler:protoc_python_package"]`
 
-From //.gn:127
+From //.gn:125
 
 **Overridden from the default:** `[]`
 
@@ -8187,7 +9083,7 @@ the protobuf compiler.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/protobuf:protoc"`
 
-From //.gn:123
+From //.gn:121
 
 **Overridden from the default:** `""`
 
@@ -8195,7 +9091,7 @@ From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:38
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/protobuf:protoc"`
 
-From //.gn:123
+From //.gn:121
 
 **Overridden from the default:** `""`
 
@@ -8287,7 +9183,7 @@ Backend for the pw_sync module's binary semaphore.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_sync_stl:binary_semaphore_backend"`
 
-From //.gn:86
+From //.gn:84
 
 **Overridden from the default:** `""`
 
@@ -8295,7 +9191,7 @@ From //third_party/pigweed/src/pw_sync/backend.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_sync_stl:binary_semaphore_backend"`
 
-From //.gn:86
+From //.gn:84
 
 **Overridden from the default:** `""`
 
@@ -8331,7 +9227,7 @@ Backend for the pw_sync module's mutex.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_sync_stl:mutex_backend"`
 
-From //.gn:77
+From //.gn:75
 
 **Overridden from the default:** `""`
 
@@ -8339,7 +9235,7 @@ From //third_party/pigweed/src/pw_sync/backend.gni:26
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_sync_stl:mutex_backend"`
 
-From //.gn:77
+From //.gn:75
 
 **Overridden from the default:** `""`
 
@@ -8369,7 +9265,7 @@ Backend for the pw_sync module's thread notification.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_sync:binary_semaphore_thread_notification_backend"`
 
-From //.gn:81
+From //.gn:79
 
 **Overridden from the default:** `""`
 
@@ -8377,7 +9273,7 @@ From //third_party/pigweed/src/pw_sync/backend.gni:38
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_sync:binary_semaphore_thread_notification_backend"`
 
-From //.gn:81
+From //.gn:79
 
 **Overridden from the default:** `""`
 
@@ -8397,7 +9293,7 @@ Backend for the pw_sync module's timed thread notification.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_sync:binary_semaphore_timed_thread_notification_backend"`
 
-From //.gn:82
+From //.gn:80
 
 **Overridden from the default:** `""`
 
@@ -8405,7 +9301,7 @@ From //third_party/pigweed/src/pw_sync/backend.gni:41
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_sync:binary_semaphore_timed_thread_notification_backend"`
 
-From //.gn:82
+From //.gn:80
 
 **Overridden from the default:** `""`
 
@@ -8420,7 +9316,7 @@ use Pigweed's boringssl exclusively.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/boringssl"`
 
-From //.gn:102
+From //.gn:100
 
 **Overridden from the default:** `""`
 
@@ -8428,7 +9324,7 @@ From //third_party/pigweed/src/third_party/boringssl/boringssl.gni:25
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/boringssl"`
 
-From //.gn:102
+From //.gn:100
 
 **Overridden from the default:** `""`
 
@@ -8494,7 +9390,7 @@ Backend for the pw_thread module's pw::thread::sleep_{for,until}.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_thread_stl:sleep"`
 
-From //.gn:79
+From //.gn:77
 
 **Overridden from the default:** `""`
 
@@ -8502,7 +9398,7 @@ From //third_party/pigweed/src/pw_thread/backend.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_thread_stl:sleep"`
 
-From //.gn:79
+From //.gn:77
 
 **Overridden from the default:** `""`
 
@@ -8745,7 +9641,7 @@ Usage: toolchain-controlled only
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_unit_test:googletest"`
 
-From //.gn:144
+From //.gn:142
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:light"`
 
@@ -8753,7 +9649,7 @@ From //third_party/pigweed/src/pw_unit_test/test.gni:31
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_unit_test:googletest"`
 
-From //.gn:144
+From //.gn:142
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:light"`
 
@@ -8808,7 +9704,7 @@ Usage: toolchain-controlled only
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/googletest:gmock_no_testonly"`
 
-From //.gn:143
+From //.gn:141
 
 **Overridden from the default:** `"//third_party/pigweed/src/third_party/googletest"`
 
@@ -8816,7 +9712,7 @@ From //third_party/pigweed/src/pw_unit_test/test.gni:41
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/googletest:gmock_no_testonly"`
 
-From //.gn:143
+From //.gn:141
 
 **Overridden from the default:** `"//third_party/pigweed/src/third_party/googletest"`
 
@@ -8832,7 +9728,7 @@ Usage: toolchain-controlled only
 
 **Current value for `target_cpu = "arm64"`:** `"//src/lib/fxl/test:gtest_main"`
 
-From //.gn:142
+From //.gn:140
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:simple_printing_main"`
 
@@ -8840,7 +9736,7 @@ From //third_party/pigweed/src/pw_unit_test/test.gni:48
 
 **Current value for `target_cpu = "x64"`:** `"//src/lib/fxl/test:gtest_main"`
 
-From //.gn:142
+From //.gn:140
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:simple_printing_main"`
 
@@ -8887,7 +9783,7 @@ compatibility.
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //.gn:145
+From //.gn:143
 
 **Overridden from the default:** `false`
 
@@ -8895,7 +9791,7 @@ From //third_party/pigweed/src/pw_unit_test/test.gni:117
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //.gn:145
+From //.gn:143
 
 **Overridden from the default:** `false`
 
@@ -8905,7 +9801,7 @@ From //third_party/pigweed/src/pw_unit_test/test.gni:117
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/src/pw_build:reduced_size"]`
 
-From //.gn:154
+From //.gn:152
 
 **Overridden from the default:** `[]`
 
@@ -8913,7 +9809,7 @@ From //third_party/pigweed/src/pw_build/gn_internal/defaults.gni:36
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/src/pw_build:reduced_size"]`
 
-From //.gn:154
+From //.gn:152
 
 **Overridden from the default:** `[]`
 
