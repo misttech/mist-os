@@ -80,7 +80,7 @@ impl ContainerNamespace {
             if !self.has_channel_entry(path) {
                 let last_segment = path
                     .components()
-                    .last()
+                    .next_back()
                     .and_then(|component| component.as_os_str().to_str())
                     .unwrap_or("");
                 remaining_subdir.insert_str(0, &format!("{last_segment}/"));
