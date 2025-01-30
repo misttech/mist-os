@@ -150,3 +150,26 @@ void LegacyBootInitMemory(AddressSpace* aspace) {
     ArchSetUpAddressSpace(*aspace);
   }
 }
+
+ktl::optional<uart::ns8250::PioDriver> LegacyUartFromTty(const boot_shim::Tty& tty) {
+  constexpr auto kUartConfig = ktl::to_array<zbi_dcfg_simple_pio_t>({
+      {.base = 0x3F8, .irq = 4},
+      {.base = 0x2F8, .irq = 3},
+      {.base = 0x3E8, .irq = 4},
+      {.base = 0x2E8, .irq = 3},
+  });
+
+  switch (tty.type) {
+    case boot_shim::TtyType::kSerial:
+    case boot_shim::TtyType::kAny:
+      break;
+    default:
+      return ktl::nullopt;
+  }
+
+  if (tty.index >= kUartConfig.size()) {
+    return ktl::nullopt;
+  }
+
+  return uart::ns8250::PioDriver(kUartConfig[tty.index]);
+}

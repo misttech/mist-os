@@ -7,11 +7,13 @@
 #ifndef ZIRCON_KERNEL_ARCH_X86_PHYS_LEGACY_BOOT_H_
 #define ZIRCON_KERNEL_ARCH_X86_PHYS_LEGACY_BOOT_H_
 
+#include <lib/boot-shim/tty.h>
 #include <lib/stdcompat/span.h>
 #include <lib/uart/all.h>
 #include <lib/zbi-format/memory.h>
 
 #include <cstdint>
+#include <optional>
 #include <string_view>
 
 class AddressSpace;
@@ -45,5 +47,15 @@ void LegacyBootSetUartConsole(const uart::all::Driver& uart);
 // This is a subroutine of InitMemory().  It primes the allocator and reserves
 // ranges based on the data in gLegacyBoot, then sets up paging.
 void LegacyBootInitMemory(AddressSpace* aspace);
+
+// Returns a legacy uart Pio driver from `tty` or `std::nullopt` if `tty` does not match a valid COM
+// port.
+//
+// This is meant to be used in legacy system relying on Port I/O instructions.`tty.index` is matched
+// against known COM ports.
+//
+// `tty.type` must be either `kSerial` or `kAny`.
+//
+std::optional<uart::ns8250::PioDriver> LegacyUartFromTty(const boot_shim::Tty& tty);
 
 #endif  // ZIRCON_KERNEL_ARCH_X86_PHYS_LEGACY_BOOT_H_

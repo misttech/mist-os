@@ -34,6 +34,8 @@ dts_synthetic = [
   "synthetic/arm_timer.dts",
   "synthetic/arm_timer_no_frequency_override.dts",
   "synthetic/chosen.dts",
+  "synthetic/chosen_with_console.dts",
+  "synthetic/chosen_with_console_and_stdout_path.dts",
   "synthetic/chosen_with_reg_offset.dts",
   "synthetic/chosen_with_translation.dts",
   "synthetic/chosen_unknown_intc.dts",

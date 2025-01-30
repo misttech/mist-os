@@ -13,6 +13,83 @@
 
 namespace boot_shim {
 
+devicetree::ScanState DevicetreeChosenNodeMatcherBase::HandleTtyNode(
+    const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
+  auto [compatible, status, interrupts, reg_property, reg_offset] =
+      decoder.FindProperties("compatible", "status", "interrupts", "reg", "reg-offset");
+  // Without this we cant figure out what driver to use.
+  if (!compatible) {
+    return devicetree::ScanState::kActive;
+  }
+
+  if (status && status->AsString() != "okay") {
+    return devicetree::ScanState::kActive;
+  }
+
+  // No MMIO region, we cant do anything.
+  if (!reg_property) {
+    return devicetree::ScanState::kActive;
+  }
+
+  auto reg = reg_property->AsReg(decoder);
+  if (!reg) {
+    return devicetree::ScanState::kActive;
+  }
+
+  if (!uart_matcher_(decoder)) {
+    return devicetree::ScanState::kActive;
+  }
+
+  if (tty_->index > tty_index_) {
+    (*tty_index_)++;
+    return devicetree::ScanState::kActive;
+  }
+  // We matched a uart driver AND we are the right index.
+  return SetUpUart(decoder, *reg, reg_offset, interrupts);
+}
+
+devicetree::ScanState DevicetreeChosenNodeMatcherBase::SetUpUart(
+    const devicetree::PropertyDecoder& decoder, devicetree::RegProperty& reg,
+    const std::optional<devicetree::PropertyValue>& reg_offset,
+    const std::optional<devicetree::PropertyValue>& interrupts) {
+  auto addr = reg[0].address();
+  if (addr) {
+    auto translated_addr = decoder.TranslateAddress(*addr);
+    if (!translated_addr) {
+      return devicetree::ScanState::kDone;
+    }
+
+    if (!uart_matcher_(decoder)) {
+      return devicetree::ScanState::kDone;
+    }
+
+    uart_dcfg_.mmio_phys = *translated_addr;
+    uart_dcfg_.irq = 0;
+
+    if (reg_offset) {
+      if (auto offset = reg_offset->AsUint32()) {
+        uart_dcfg_.mmio_phys += *offset;
+      } else {
+        OnError("Failed to parse 'reg-offset' property from UART node.");
+      }
+    }
+
+    if (!interrupts) {
+      OnError("UART Device does not provide interrupt cells.");
+      return devicetree::ScanState::kDone;
+    }
+
+    uart_irq_ = DevicetreeIrqResolver(interrupts->AsBytes());
+    if (auto result = uart_irq_.ResolveIrqController(decoder); result.is_ok()) {
+      if (!*result) {
+        return devicetree::ScanState::kActive;
+      }
+      UpdateUart();
+    }
+  }
+  return devicetree::ScanState::kDone;
+}
+
 devicetree::ScanState DevicetreeChosenNodeMatcherBase::HandleBootstrapStdout(
     const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
   auto resolved_path = decoder.ResolvePath(stdout_path_);
@@ -54,42 +131,7 @@ devicetree::ScanState DevicetreeChosenNodeMatcherBase::HandleBootstrapStdout(
     return devicetree::ScanState::kDone;
   }
 
-  auto addr = (*reg)[0].address();
-  if (addr) {
-    auto translated_addr = decoder.TranslateAddress(*addr);
-    if (!translated_addr) {
-      return devicetree::ScanState::kDone;
-    }
-
-    if (!uart_matcher_(decoder)) {
-      return devicetree::ScanState::kDone;
-    }
-
-    uart_dcfg_.mmio_phys = *translated_addr;
-    uart_dcfg_.irq = 0;
-
-    if (reg_offset) {
-      if (auto offset = reg_offset->AsUint32()) {
-        uart_dcfg_.mmio_phys += *offset;
-      } else {
-        OnError("Failed to parse 'reg-offset' property from UART node.");
-      }
-    }
-
-    if (!interrupts) {
-      OnError("UART Device does not provide interrupt cells.");
-      return devicetree::ScanState::kDone;
-    }
-
-    uart_irq_ = DevicetreeIrqResolver(interrupts->AsBytes());
-    if (auto result = uart_irq_.ResolveIrqController(decoder); result.is_ok()) {
-      if (!*result) {
-        return devicetree::ScanState::kActive;
-      }
-      UpdateUart();
-    }
-  }
-  return devicetree::ScanState::kDone;
+  return SetUpUart(decoder, *reg, reg_offset, interrupts);
 }
 
 devicetree::ScanState DevicetreeChosenNodeMatcherBase::OnNode(
@@ -107,6 +149,13 @@ devicetree::ScanState DevicetreeChosenNodeMatcherBase::OnNode(
 
     if (!stdout_path_.empty()) {
       return HandleBootstrapStdout(path, decoder);
+    }
+
+    if (tty_) {
+      if (tty_index_) {
+        return HandleTtyNode(path, decoder);
+      }
+      return devicetree::ScanState::kDoneWithSubtree;
     }
     return devicetree::ScanState::kDone;
   }
@@ -145,6 +194,8 @@ devicetree::ScanState DevicetreeChosenNodeMatcherBase::OnNode(
   // format.
   if (!stdout_path_.empty()) {
     stdout_path_ = stdout_path_.substr(0, stdout_path_.find(':'));
+  } else {
+    tty_ = boot_shim::TtyFromCmdline(cmdline_);
   }
 
   if (ramdisk_start && ramdisk_end) {

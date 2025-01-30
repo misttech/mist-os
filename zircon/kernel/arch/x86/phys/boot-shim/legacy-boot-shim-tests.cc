@@ -9,11 +9,7 @@
 #include <lib/uart/ns8250.h>
 #include <stdio.h>
 
-#include <algorithm>
 #include <initializer_list>
-#include <memory>
-#include <string>
-#include <vector>
 
 #include <zxtest/zxtest.h>
 
