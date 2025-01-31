@@ -61,6 +61,7 @@ class PropEncodedArrayElement {
 
   constexpr PropEncodedArrayElement() = default;
   constexpr PropEncodedArrayElement(const PropEncodedArrayElement&) = default;
+  constexpr PropEncodedArrayElement& operator=(const PropEncodedArrayElement&) = default;
   constexpr PropEncodedArrayElement(ByteView raw_element, const std::array<size_t, N>& num_cells) {
     size_t offset = 0;
     for (size_t i = 0; i < N; ++i) {

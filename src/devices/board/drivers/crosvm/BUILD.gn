@@ -19,7 +19,7 @@ driver_bind_rules("bind") {
 
 group("tests") {
   testonly = true
-  deps = [ ":crosvm_bind_test" ]
+  deps = [ ":bind_test" ]
 }
 
 fuchsia_cc_driver("driver") {
