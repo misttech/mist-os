@@ -8,7 +8,7 @@ use std::time::Duration;
 use crate::init_daemon_behavior;
 use async_trait::async_trait;
 use errors::FfxError;
-use ffx_command_error::{FfxContext as _, Result};
+use ffx_command_error::{bug, FfxContext as _, Result};
 use fho::{FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
@@ -53,7 +53,16 @@ impl TryFromEnv for RemoteControlProxyHolder {
                 }
             },
             FhoConnectionBehavior::DirectConnector(direct) => {
-                direct.rcs_proxy().await.map(Into::into).map_err(Into::into)
+                let conn = direct.connection().await?;
+                let cc = conn.lock().await;
+                let c = cc.deref();
+                c.as_ref()
+                    .ok_or(bug!("Connection not yet initialized"))?
+                    .rcs_proxy()
+                    .await
+                    .bug()
+                    .map(Into::into)
+                    .map_err(Into::into)
             }
         }
     }

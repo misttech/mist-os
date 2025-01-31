@@ -12,7 +12,6 @@ rustc_library("lib") {
 
   deps = [
     "macro:lib",
-    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//src/developer/ffx/command:lib",
     "//src/developer/ffx/command/error:lib",
     "//src/developer/ffx/config:lib",

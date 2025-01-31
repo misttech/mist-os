@@ -254,20 +254,6 @@ async fn direct_connector_try_connect<T: TryFromEnv>(
                 let e = conn_error.downcast_non_fatal()?;
                 tracing::debug!("error when trying to connect using TryFromEnv: {e}");
                 log_target_wait(&dc.target_spec(), &Some(Error::User(e)))?;
-                if let Err(e) = dc.rcs_proxy().await {
-                    tracing::debug!("unable to get RCS proxy after TryFromEnv failure: {e}");
-                } else {
-                    // This state is really only possible if:
-                    //
-                    // a.) There is a bug. This just shouldn't happen with regular usage of FHO.
-                    // b.) A user has created a `impl TryFromEnv` structure that returns a
-                    //     non-fatal error implying a "retry" must happen.
-                    //
-                    // Hence log a warning, as both cases are odd behavior.
-                    tracing::warn!(
-                        "despite TryFromEnv failure, able to get RCS proxy from device connection"
-                    );
-                }
                 continue;
             }
             Ok(res) => Ok(res),
@@ -277,13 +263,15 @@ async fn direct_connector_try_connect<T: TryFromEnv>(
 
 #[cfg(test)]
 mod tests {
+    use std::marker::PhantomData;
+
     use super::*;
+    use async_lock::Mutex;
     use ffx_command_error::NonFatalError;
     use ffx_config::{EnvironmentContext, TryFromEnvContext};
     use ffx_target::connection::testing::{FakeOvernet, FakeOvernetBehavior};
     use ffx_target::{TargetConnection, TargetConnectionError, TargetConnector};
     use fho::MockDirectConnector;
-    use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
     use futures::future::LocalBoxFuture;
     use target_holders::RemoteControlProxyHolder;
 
@@ -320,32 +308,7 @@ mod tests {
                 Err(Error::User(NonFatalError(anyhow::anyhow!("we just need to try again")).into()))
             })
         });
-        mock_connector
-            .expect_connect()
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(|| Box::pin(async { Ok(()) }));
-        mock_connector.expect_rcs_proxy().times(2).in_sequence(&mut seq).returning(|| {
-            Box::pin(async {
-                Err(Error::User(
-                    NonFatalError(anyhow::anyhow!("we must retry connecting to RCS!").into())
-                        .into(),
-                ))
-            })
-        });
-        mock_connector
-            .expect_connect()
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(|| Box::pin(async { Ok(()) }));
-        mock_connector.expect_rcs_proxy().times(1).in_sequence(&mut seq).returning(|| {
-            Box::pin(async {
-                // This will return an unusable proxy, but we're not going to use it so it's not
-                // important.
-                let (proxy, _) = fidl::endpoints::create_proxy::<RemoteControlMarker>();
-                Ok(proxy)
-            })
-        });
+        mock_connector.expect_connect().returning(|| Box::pin(async { Ok(()) }));
 
         let fho_env =
             FhoEnvironment::new_with_args(&config_env.context, &["some", "connector", "test"]);
@@ -353,8 +316,7 @@ mod tests {
             .set_behavior(FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)))
             .await;
 
-        let connector =
-            Connector::<RemoteControlProxyHolder>::try_from_env(&fho_env).await.unwrap();
+        let connector = Connector::<PhantomData<String>>::try_from_env(&fho_env).await.unwrap();
         let res = connector.try_connect(|_, _| Ok(())).await;
         assert!(res.is_ok(), "Expected success: {:?}", res);
     }
@@ -371,11 +333,10 @@ mod tests {
             .times(1)
             .in_sequence(&mut seq)
             .returning(|| Box::pin(async { Ok(()) }));
-        mock_connector.expect_rcs_proxy().times(1).in_sequence(&mut seq).returning(|| {
-            Box::pin(async {
-                Err(Error::Unexpected(anyhow::anyhow!("something critical failed!").into()))
-            })
-        });
+        mock_connector
+            .expect_connection()
+            .times(1)
+            .returning(|| Box::pin(async { Ok(Arc::new(Mutex::new(None))) }));
 
         let fho_env =
             FhoEnvironment::new_with_args(&config_env.context, &["some", "connector", "test"]);
@@ -396,7 +357,6 @@ mod tests {
         let connector = NetworkConnector::<FromContextFailer>::new(env).await.unwrap();
         assert!(connector.connect().await.is_err());
         assert!(connector.connect().await.is_err());
-        assert!(connector.rcs_proxy().await.is_err());
         let err = bug!("foo");
         assert_eq!(err.to_string(), connector.wrap_connection_errors(err).await.to_string());
     }

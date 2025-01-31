@@ -4,7 +4,6 @@
 
 use ffx_command_error::Result;
 use ffx_target::connection::Connection;
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use futures::future::LocalBoxFuture;
 use mockall::automock;
 use std::net::SocketAddr;
@@ -25,10 +24,6 @@ pub trait DirectConnector {
     /// once it succeeds running this function again will takes the current connection, tear it
     /// down, then create a new connection.
     fn connect(&self) -> LocalBoxFuture<'_, Result<()>>;
-
-    /// Gets the RCS proxy from the device via the underlying connector. Starts a connection if one
-    /// hasn't been initiated.
-    fn rcs_proxy(&self) -> LocalBoxFuture<'_, Result<RemoteControlProxy>>;
 
     /// Attempts to pull any errors off of the connection and wrap the passed error in one larger
     /// error encompassing the entire connection failure. This is usually done after something
