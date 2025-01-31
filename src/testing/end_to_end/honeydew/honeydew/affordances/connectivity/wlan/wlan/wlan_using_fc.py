@@ -259,23 +259,18 @@ class Wlan(AsyncAdapter, wlan.Wlan):
                 "No MAC provided in args of create_iface, using %s", sta_addr
             )
 
-        req = f_wlan_device_service.CreateIfaceRequest(
-            phy_id=phy_id,
-            role=role.to_fidl(),
-            sta_addr=MacAddress(sta_addr).bytes(),
-        )
         try:
             create_iface = await self._device_monitor_proxy.create_iface(
-                req=req
+                phy_id=phy_id,
+                role=role.to_fidl(),
+                sta_addr=MacAddress(sta_addr).bytes(),
             )
-            if create_iface.status != ZxStatus.ZX_OK:
-                raise ZxStatus(create_iface.status)
         except ZxStatus as status:
             raise wlan_errors.HoneydewWlanError(
                 f"DeviceMonitor.CreateIface() error {status}"
             ) from status
 
-        return create_iface.resp.iface_id
+        return create_iface.iface_id
 
     @asyncmethod
     # pylint: disable-next=invalid-overridden-method
