@@ -469,8 +469,16 @@ mod test {
             "host_arm64/gen/tools/symbol-index/symbol_index_sdk.meta.json"
         );
         put_file!(r, "../test_data/core-sdk-root", "sdk/manifest/core");
-        put_file!(r, "../test_data/core-sdk-root", "host_x64/sdk/manifest/host_tools.internal");
-        put_file!(r, "../test_data/core-sdk-root", "host_arm64/sdk/manifest/host_tools.internal");
+        put_file!(
+            r,
+            "../test_data/core-sdk-root",
+            "host_x64/sdk/manifest/host_tools_used_by_ffx_action_during_build"
+        );
+        put_file!(
+            r,
+            "../test_data/core-sdk-root",
+            "host_arm64/sdk/manifest/host_tools_used_by_ffx_action_during_build"
+        );
         put_file!(
             r,
             "../test_data/core-sdk-root",
@@ -509,7 +517,7 @@ mod test {
         assert!(SdkRoot::Full(core_root.path().to_owned()).manifest_exists());
         assert!(SdkRoot::Modular {
             manifest: core_root.path().to_owned(),
-            module: "host_tools.internal".to_owned()
+            module: "host_tools_used_by_ffx_action_during_build".to_owned()
         }
         .manifest_exists());
         assert!(SdkRoot::Full(release_root.path().to_owned()).manifest_exists());

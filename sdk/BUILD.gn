@@ -1011,12 +1011,11 @@ if (is_host) {
   # build when running ffx tools via the `ffx_action()` template. This allows
   # "ffx-assembly" to find the tools it needs via an IDK manifest just as it
   # would when used with a real IDK.
-  sdk_collection("host_tools.internal") {
+  sdk_collection("host_tools_used_by_ffx_action_during_build") {
     # This (sorta) restricts the use of this group to instances of the
-    # `ffx_action()` template, which uses the group below (which doesn't have
-    # visibility restrictions to have a dependency on this group.)
+    # `ffx_action()` template, which uses the group below.
     visibility = []
-    visibility = [ "//src/developer/ffx/build:internal_sdk_tools_for_ffx" ]
+    visibility = [ "//src/developer/ffx/build:host_tools_used_by_ffx_action" ]
 
     # TODO(https://fxbug.dev/317385989): Find a solution that doesn't depend on
     # sdk_* templates.
@@ -1037,7 +1036,7 @@ if (is_host) {
     ]
 
     deps = [
-      # DO NOT ADD TO THIS LIST.
+      # Do not add to this list.
       # Prefer solutions that do not require locating tool dependencies via an
       # IDK manifest.
       "//src/storage/bin/fvm:fvm_sdk",

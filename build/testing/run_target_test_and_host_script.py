@@ -31,7 +31,7 @@ def run_target_test(
         "assembly_enabled=true",
         "sdk.root=" + root_build_dir,
         "sdk.type=in-tree",
-        "sdk.module=host_tools.internal",
+        "sdk.module=host_tools_used_by_ffx_action_during_build",
     ]
 
     args = [ffx_bin]

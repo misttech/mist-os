@@ -4,11 +4,39 @@
 
 import("//build/python/python_binary.gni")
 
-# This group exists to provide a visibility  bridge from `ffx_action()`
-# instances trhoughout the tree to the visibility-restricted sdk molecule used
-# to provide additional host tools to those actions.
-group("internal_sdk_tools_for_ffx") {
-  public_deps = [ "//sdk:host_tools.internal" ]
+# These groups exist to provide a visibility  bridge from `ffx_action()`
+# instances throughout the tree to the visibility-restricted IDK collection used
+# to locate host tools for those actions.
+group("host_tools_used_by_ffx_action") {
+  # Limit visibility to avoid improper use.
+  # `ffx_action()` is used by .gni files that are used in other directories.
+  visibility = [
+    ":host_tools_used_by_ffx_action_testonly",
+    "//boards/*",
+    "//build/images/*",
+    "//src/firmware/gigaboot/*",
+    "//vendor/*",
+  ]
+
+  public_deps = [ "//sdk:host_tools_used_by_ffx_action_during_build" ]
+}
+group("host_tools_used_by_ffx_action_testonly") {
+  testonly = true
+
+  # Limit visibility to avoid improper use. This test-only target has more
+  # relaxed visibility than the production target above, allowing `ffx_action()`
+  # and the .gni files that use it to be used in tests without listing them all
+  # here while still preventing use in production code outside the narrower set
+  # of locations above.
+  visibility = [
+    "//build/images/*",
+    "//src/*",
+    "//vendor/*",
+    "//zircon/kernel/*",
+    "//zircon/system/*",
+  ]
+
+  public_deps = [ ":host_tools_used_by_ffx_action" ]
 }
 
 python_binary("gn_generate_plugins") {

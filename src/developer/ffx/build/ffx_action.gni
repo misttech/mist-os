@@ -6,17 +6,19 @@ import("//build/compiled_action.gni")
 
 # This is the actual label for the sdk host tools, and is used to provide the
 # path to the sdk molecule manifest.
-_sdk_host_tools_label = "//sdk:host_tools.internal($host_toolchain)"
+_sdk_host_tools_label =
+    "//sdk:host_tools_used_by_ffx_action_during_build($host_toolchain)"
 sdk_host_tools_manifest =
     get_label_info(_sdk_host_tools_label, "root_out_dir") +
-    "/sdk/manifest/host_tools.internal"
+    "/sdk/manifest/host_tools_used_by_ffx_action_during_build"
 
 # This is a group that has a public dependency on the above, which is visibility
 # restricted to only this group, because ffx_action() instances can be anywhere
 # in the tree, and there isn't a way to otherwise say "only visible to actions
 # defined by template X".
 sdk_host_tools_visibility_bridge_label =
-    "//src/developer/ffx/build:internal_sdk_tools_for_ffx($host_toolchain)"
+    "//src/developer/ffx/build:host_tools_used_by_ffx_action($host_toolchain)"
+sdk_host_tools_visibility_bridge_label_testonly = "//src/developer/ffx/build:host_tools_used_by_ffx_action_testonly($host_toolchain)"
 
 # Executes an ffx command as an action during the build.
 #
@@ -177,7 +179,11 @@ template("ffx_action") {
       ]
 
       if (_needs_sdk) {
-        deps += [ sdk_host_tools_visibility_bridge_label ]
+        if (defined(invoker.testonly) && invoker.testonly) {
+          deps += [ sdk_host_tools_visibility_bridge_label_testonly ]
+        } else {
+          deps += [ sdk_host_tools_visibility_bridge_label ]
+        }
         inputs += [ sdk_host_tools_manifest ]
         args += [
           "--sdk-manifest",
@@ -251,11 +257,16 @@ template("ffx_action") {
     inputs += [ env_file ]
 
     if (_needs_sdk) {
-      deps += [ sdk_host_tools_visibility_bridge_label ]
+      if (defined(invoker.testonly) && invoker.testonly) {
+        deps += [ sdk_host_tools_visibility_bridge_label_testonly ]
+      } else {
+        deps += [ sdk_host_tools_visibility_bridge_label ]
+      }
+
       inputs += [ sdk_host_tools_manifest ]
       _ffx_config += [
         "sdk.root=" + rebase_path(root_build_dir, root_build_dir),
-        "sdk.module=host_tools.internal",
+        "sdk.module=host_tools_used_by_ffx_action_during_build",
       ]
     }
 

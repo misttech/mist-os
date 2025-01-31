@@ -5,6 +5,8 @@
 import("//build/python/python_library.gni")
 
 python_library("run_assembly") {
+  testonly = true
+
   # TODO(b/366268742): Enable MyPy type checking
   enable_mypy = false
   sources = [
@@ -12,7 +14,8 @@ python_library("run_assembly") {
     "lib.py",
   ]
   deps = [
-    # We need the sdk since ffx assembly product uses the cmc tool
-    "//src/developer/ffx/build:internal_sdk_tools_for_ffx",
+    # The same dependency as in //src/developer/ffx/build/ffx_action.gni, which
+    # the script imitates.
+    "//src/developer/ffx/build:host_tools_used_by_ffx_action_testonly",
   ]
 }
