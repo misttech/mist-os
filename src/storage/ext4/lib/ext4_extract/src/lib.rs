@@ -31,12 +31,17 @@ pub fn ext4_extract(path: &str, out_dir: &str) -> Result<HashMap<String, String>
     let parser = ExtParser::new(reader);
 
     let inode = parser.inode(ROOT_INODE_NUM as u32).unwrap();
+    let root_xattrs: ExtendedAttributes = parser
+        .inode_xattrs(ROOT_INODE_NUM as u32)?
+        .into_iter()
+        .map(|(k, v)| (k.into(), v.into()))
+        .collect();
     let mut writer = Writer::new(
         &out_dir,
         ROOT_INODE_NUM,
         inode.e2di_mode.get(),
         Owner::from_inode(&inode),
-        ExtendedAttributes::new(),
+        root_xattrs,
     )?;
 
     parser.index(
