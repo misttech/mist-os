@@ -578,7 +578,7 @@ impl GetVmo for FxFile {
 #[cfg(test)]
 mod tests {
     use crate::fuchsia::testing::{
-        close_file_checked, open_file_checked, TestFixture, TestFixtureOptions,
+        close_file_checked, open_file, open_file_checked, TestFixture, TestFixtureOptions,
     };
     use anyhow::format_err;
     use fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions};
@@ -1724,11 +1724,60 @@ mod tests {
             .expect("FIDL transport error")
             .expect("enable verity failed");
 
+        // Writes via FIDL
         file.write(&[2; 8192])
             .await
             .expect("FIDL transport error")
             .map_err(Status::from_raw)
             .expect_err("write succeeded on fsverity-enabled file");
+        // Writes via the pager
+        let vmo = file
+            .get_backing_memory(fio::VmoFlags::READ | fio::VmoFlags::WRITE)
+            .await
+            .expect("FIDL transport error")
+            .map_err(Status::from_raw)
+            .expect("get_backing_memory failed");
+        fasync::unblock(move || {
+            vmo.write(&[2; 8192], 0).expect_err("write via VMO succeeded on fsverity-enabled file");
+        })
+        .await;
+        // Truncation
+        file.resize(1)
+            .await
+            .expect("FIDL transport error")
+            .map_err(Status::from_raw)
+            .expect_err("resize succeeded on fsverity-enabled file");
+
+        // Ensure that new writable handles can't be created
+        open_file(&root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
+            .await
+            .expect_err("open writable succeeded on fsverity-enabled file");
+
+        // Close the file and ensure that it cannot be reopened for writing
+        close_file_checked(file).await;
+        open_file(&root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
+            .await
+            .expect_err("open writable succeeded on fsverity-enabled file");
+
+        // Reopen the filesystem and ensure that the file can't be opened for writing
+        let device = fixture.close().await;
+        device.ensure_unique();
+        device.reopen(false);
+        let fixture = TestFixture::open(
+            device,
+            TestFixtureOptions {
+                format: false,
+                encrypted: true,
+                as_blob: false,
+                serve_volume: false,
+            },
+        )
+        .await;
+
+        let root = fixture.root();
+        open_file(&root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
+            .await
+            .expect_err("open writable succeeded on fsverity-enabled file");
 
         fixture.close().await;
     }
