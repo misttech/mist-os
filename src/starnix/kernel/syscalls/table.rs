@@ -140,8 +140,10 @@ pub fn dispatch_syscall(
             sys_brk as sys_arch32_brk, sys_mprotect as sys_arch32_mprotect,
         };
         pub use crate::signals::syscalls::{
-            sys_arch32_sigaltstack, sys_rt_sigaction as sys_arch32_rt_sigaction,
-            sys_rt_sigprocmask as sys_arch32_rt_sigprocmask, sys_tgkill as sys_arch32_tgkill,
+            sys_arch32_sigaltstack, sys_kill as sys_arch32_kill,
+            sys_rt_sigaction as sys_arch32_rt_sigaction,
+            sys_rt_sigprocmask as sys_arch32_rt_sigprocmask,
+            sys_rt_tgsigqueueinfo as sys_arch32_rt_tgsigqueueinfo, sys_tgkill as sys_arch32_tgkill,
             sys_wait4 as sys_arch32_wait4,
         };
         pub use crate::syscalls::misc::{
@@ -166,16 +168,18 @@ pub fn dispatch_syscall(
             sys_connect as sys_arch32_connect, sys_socket as sys_arch32_socket,
         };
         pub use crate::vfs::syscalls::{
-            sys_arch32_access, sys_arch32_fstat64, sys_arch32_mkdir, sys_arch32_open,
-            sys_arch32_readlink, sys_arch32_rmdir, sys_arch32_stat64,
-            sys_close as sys_arch32_close, sys_faccessat as sys_arch32_faccessat,
+            sys_arch32__llseek, sys_arch32_access, sys_arch32_dup2, sys_arch32_fstat64,
+            sys_arch32_mkdir, sys_arch32_open, sys_arch32_readlink, sys_arch32_rmdir,
+            sys_arch32_stat64, sys_arch32_unlink, sys_close as sys_arch32_close,
+            sys_dup as sys_arch32_dup, sys_faccessat as sys_arch32_faccessat,
             sys_fcntl as sys_arch32_fcntl64, sys_getcwd as sys_arch32_getcwd,
             sys_getdents64 as sys_arch32_getdents64, sys_ioctl as sys_arch32_ioctl,
             sys_lseek as sys_arch32_lseek, sys_memfd_create as sys_arch32_memfd_create,
             sys_newfstatat as sys_arch32_fstatat64, sys_openat as sys_arch32_openat,
-            sys_pwritev as sys_arch32_pwritev, sys_read as sys_arch32_read,
-            sys_readlinkat as sys_arch32_readlinkat, sys_umount2 as sys_arch32_umount2,
-            sys_write as sys_arch32_write, sys_writev as sys_arch32_writev,
+            sys_pipe2 as sys_arch32_pipe2, sys_pwritev as sys_arch32_pwritev,
+            sys_read as sys_arch32_read, sys_readlinkat as sys_arch32_readlinkat,
+            sys_umount2 as sys_arch32_umount2, sys_write as sys_arch32_write,
+            sys_writev as sys_arch32_writev,
         };
     }
     #[cfg(all(target_arch = "aarch64", feature = "arch32"))]
@@ -212,6 +216,8 @@ pub fn dispatch_syscall(
             clone[5],
             close[1],
             connect[3],
+            dup[1],
+            dup2[2],
             exit[1],
             exit_group[1],
             faccessat[3],
@@ -226,6 +232,8 @@ pub fn dispatch_syscall(
             gettimeofday[2],
             getuid32[0],
             ioctl[3],
+            kill[2],
+            _llseek[5],
             lseek[3],
             memfd_create[2],
             mkdir[2],
@@ -235,6 +243,7 @@ pub fn dispatch_syscall(
             open[3],
             openat[4],
             personality[1],
+            pipe2[2],
             prctl[5],
             prlimit64[4],
             pwritev[4],
@@ -244,6 +253,7 @@ pub fn dispatch_syscall(
             rmdir[1],
             rt_sigaction[4],
             rt_sigprocmask[4],
+            rt_tgsigqueueinfo[4],
             sched_getscheduler[1],
             setrlimit[2],
             set_robust_list[2],
@@ -257,6 +267,7 @@ pub fn dispatch_syscall(
             ugetrlimit[2],
             umount2[2],
             uname[1],
+            unlink[1],
             wait4[4],
             write[3],
             writev[3],

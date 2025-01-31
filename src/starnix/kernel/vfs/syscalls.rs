@@ -3163,10 +3163,11 @@ pub fn sys_io_uring_register(
 mod arch32 {
     use crate::mm::MemoryAccessorExt;
     use crate::vfs::syscalls::{
-        lookup_at, sys_faccessat, sys_mkdirat, sys_openat, sys_readlinkat, sys_unlinkat,
-        LookupFlags,
+        lookup_at, sys_dup3, sys_faccessat, sys_lseek, sys_mkdirat, sys_openat, sys_readlinkat,
+        sys_unlinkat, LookupFlags,
     };
     use crate::vfs::{CurrentTask, FdNumber, FsNode};
+    use linux_uapi::off_t;
     use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::errors::Errno;
     use starnix_uapi::file_mode::FileMode;
@@ -3249,6 +3250,48 @@ mod arch32 {
         user_path: UserCString,
     ) -> Result<(), Errno> {
         sys_unlinkat(locked, current_task, FdNumber::AT_FDCWD, user_path, AT_REMOVEDIR)
+    }
+
+    #[allow(non_snake_case)]
+    pub fn sys_arch32__llseek(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+        offset_high: u32,
+        offset_low: u32,
+        result: UserRef<off_t>,
+        whence: u32,
+    ) -> Result<(), Errno> {
+        let offset = ((offset_high as off_t) << 32) | (offset_low as off_t);
+        let result_value = sys_lseek(locked, current_task, fd, offset, whence)?;
+        current_task.write_object(result, &result_value).map(|_| ())
+    }
+
+    pub fn sys_arch32_dup2(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        oldfd: FdNumber,
+        newfd: FdNumber,
+    ) -> Result<FdNumber, Errno> {
+        if oldfd == newfd {
+            // O_PATH allowed for:
+            //
+            //  Duplicating the file descriptor (dup(2), fcntl(2)
+            //  F_DUPFD, etc.).
+            //
+            // See https://man7.org/linux/man-pages/man2/open.2.html
+            current_task.files.get_allowing_opath(oldfd)?;
+            return Ok(newfd);
+        }
+        sys_dup3(locked, current_task, oldfd, newfd, 0)
+    }
+
+    pub fn sys_arch32_unlink(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_path: UserCString,
+    ) -> Result<(), Errno> {
+        sys_unlinkat(locked, current_task, FdNumber::AT_FDCWD, user_path, 0)
     }
 }
 
