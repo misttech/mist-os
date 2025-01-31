@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "inspect/offer.shard.cml" ],
     collections: [
         {
             name: "fxfs-crypt",
@@ -22,10 +21,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.memorypressure.Provider",
-                "fuchsia.tracing.provider.Registry",
-            ],
+            protocol: "fuchsia.memorypressure.Provider",
             from: "parent",
             to: "#fxfs",
             availability: "optional",

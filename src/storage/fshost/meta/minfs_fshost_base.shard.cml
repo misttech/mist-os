@@ -2,20 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "inspect/offer.shard.cml" ],
     use: [
         {
             protocol: "fuchsia.fs.startup.Startup",
             from: "#minfs",
             path: "/minfs/svc/fuchsia.fs.startup.Startup",
-        },
-    ],
-    offer: [
-        {
-            protocol: "fuchsia.tracing.provider.Registry",
-            from: "parent",
-            to: "#minfs",
-            availability: "optional",
         },
     ],
 }

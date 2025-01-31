@@ -2,10 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "inspect/offer.shard.cml",
-        "syslog/offer.shard.cml",
-    ],
     capabilities: [
         {
             directory: "blob",
@@ -54,14 +50,6 @@
             protocol: "fuchsia.fs.startup.Startup",
             from: "#fvm2",
             path: "/fvm/svc/fuchsia.fs.startup.Startup",
-        },
-    ],
-    offer: [
-        {
-            protocol: "fuchsia.tracing.provider.Registry",
-            from: "parent",
-            to: [ "#fvm2" ],
-            availability: "optional",
         },
     ],
     expose: [

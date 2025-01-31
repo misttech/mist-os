@@ -5,6 +5,7 @@
     include: [
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
+        "trace/client.shard.cml",
     ],
     program: {
         runner: "elf",
@@ -56,9 +57,6 @@
                 // Without this, blobfs won't be able to set the deadline profile for it's pager
                 // threads, which may degrade performance.
                 "fuchsia.scheduler.RoleManager",
-
-                // Without this, blobfs won't be able to provide traces.
-                "fuchsia.tracing.provider.Registry",
             ],
             availability: "optional",
         },
@@ -69,10 +67,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.scheduler.RoleManager",
-                "fuchsia.tracing.provider.Registry",
-            ],
+            protocol: "fuchsia.scheduler.RoleManager",
             from: "parent",
             to: "#decompressor",
             availability: "optional",

@@ -5,6 +5,7 @@
     include: [
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
+        "trace/client.shard.cml",
     ],
     program: {
         runner: "elf",
@@ -41,10 +42,7 @@
     ],
     use: [
         {
-            protocol: [
-                "fuchsia.memorypressure.Provider",
-                "fuchsia.tracing.provider.Registry",
-            ],
+            protocol: "fuchsia.memorypressure.Provider",
             availability: "optional",
         },
 

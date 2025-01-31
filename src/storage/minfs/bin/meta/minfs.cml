@@ -5,6 +5,7 @@
     include: [
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
+        "trace/client.shard.cml",
     ],
     program: {
         runner: "elf",
@@ -25,10 +26,7 @@
     ],
     use: [
         {
-            protocol: [
-                "fuchsia.scheduler.RoleManager",
-                "fuchsia.tracing.provider.Registry",
-            ],
+            protocol: "fuchsia.scheduler.RoleManager",
             availability: "optional",
         },
     ],

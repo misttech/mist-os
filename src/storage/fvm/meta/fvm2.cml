@@ -4,9 +4,8 @@
 {
     include: [
         "//src/storage/lib/fs_management/client.shard.cml",
-        "inspect/offer.shard.cml",
+        "inspect/client.shard.cml",
         "syslog/client.shard.cml",
-        "syslog/offer.shard.cml",
         "trace/client.shard.cml",
     ],
     program: {
@@ -38,7 +37,6 @@
             protocol: [
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.scheduler.RoleManager",
-                "fuchsia.tracing.provider.Registry",
             ],
             from: "parent",
             to: "#blobfs-collection",
