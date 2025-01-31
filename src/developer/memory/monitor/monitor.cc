@@ -670,15 +670,8 @@ void Monitor::WaitForImminentOom() {
     return;
   }
 
-  // Force the current state to be written as the high_waters. Later is better.
-  memory::Capture c;
-  auto s = capture_maker_->GetCapture(&c, CaptureLevel::VMO);
-  if (s == ZX_OK) {
-    high_water_->RecordHighWater(c);
-    high_water_->RecordHighWaterDigest(c);
-  } else {
-    FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(s);
-  }
+  // Don't force a capture on IMMINENT_OOM: we will capture in any case on level change, if we are
+  // configured this way.
 
   OnLevelChanged(pressure_signaler::Level::kImminentOOM);
 }
