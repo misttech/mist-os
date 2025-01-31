@@ -130,12 +130,21 @@ impl Interpreter {
             else {
                 unreachable!("cd setter wasn't an invocable");
             };
+            let inner_weak = Arc::downgrade(&self.inner);
             let pwd_getter = pwd_getter_clone.clone();
+            let fs_root_getter = fs_root_getter_clone.clone();
             self.add_command("cd", move |args, _| {
                 let pwd_setter = pwd_setter.clone();
                 let pwd_getter = pwd_getter.clone();
+                let inner_weak = inner_weak.clone();
+                let fs_root_getter = fs_root_getter.clone();
                 async move {
-                    let pwd = pwd_getter().await?;
+                    let Some(inner) = inner_weak.upgrade() else {
+                        return Err(anyhow!("Interpreter died"));
+                    };
+
+                    let mut pwd = pwd_getter().await?;
+                    let fs_root = fs_root_getter().await?;
 
                     let Result::<[Value; 1], _>::Ok([path]) = args.try_into() else {
                         return Err(anyhow!("cd takes exactly one argument"));
@@ -145,7 +154,17 @@ impl Interpreter {
                         return Err(anyhow!("path must be a string"));
                     };
 
-                    let path = canonicalize_path(path, pwd)?;
+                    let path = canonicalize_path(path, pwd.duplicate())?;
+                    let _ = inner
+                        .path_info(
+                            path.clone(),
+                            fs_root,
+                            pwd,
+                            fio::NodeAttributesQuery::empty(),
+                            SymlinkPolicy::Follow,
+                        )
+                        .await
+                        .map_err(|e| anyhow!("Cannot access {path}: {e}"))?;
 
                     let _ = pwd_setter
                         .invoke(vec![Value::String(path)], None)
@@ -681,6 +700,19 @@ mod test {
                 assert_eq!("/test/foo", &b);
                 assert_eq!("/", &c);
             }).await
+    }
+
+    #[fuchsia::test]
+    async fn cd_bad_dir() {
+        Test::test("cd /this_folder_doesnt_exist")
+            .with_fidl()
+            .with_standard_test_dirs()
+            .check_fails(|e| {
+                let e = format!("{e}");
+                assert!(e.contains("Cannot access /this_folder_doesnt_exist"));
+                assert!(e.contains("NOT_FOUND"));
+            })
+            .await
     }
 
     #[fuchsia::test]
