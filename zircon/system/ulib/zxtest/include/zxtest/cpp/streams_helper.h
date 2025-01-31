@@ -92,9 +92,11 @@ class StreamableAssertion : public StreamableBase {
         expected_symbol_(expected_symbol),
         is_fatal_(is_fatal),
         traces_(traces) {
-    actual_value_ = print_actual(actual);
-    expected_value_ = print_expected(expected);
     is_triggered_ = !compare(actual, expected);
+    if (is_triggered_) {
+      actual_value_ = print_actual(actual);
+      expected_value_ = print_expected(expected);
+    }
   }
 
   ~StreamableAssertion() {
