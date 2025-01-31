@@ -1768,7 +1768,7 @@ fn test_host_generate_temporary_slaac_address(
     let interface_identifier = OpaqueIid::new(
         subnet,
         &config.local_mac.to_eui64()[..],
-        [],
+        None::<[_; 0]>,
         // Clone the RNG so we can see what the next value (which will be
         // used to generate the temporary address) will be.
         OpaqueIidNonce::Random(ctx.bindings_ctx.rng().deep_clone().gen()),
@@ -2933,7 +2933,7 @@ fn test_host_temporary_slaac_lifetime_updates_respect_max() {
     let interface_identifier = OpaqueIid::new(
         subnet,
         &Ipv6::TEST_ADDRS.local_mac.to_eui64()[..],
-        [],
+        None::<[_; 0]>,
         // Clone the RNG so we can see what the next value (which will be
         // used to generate the temporary address) will be.
         OpaqueIidNonce::Random(ctx.bindings_ctx.rng().deep_clone().gen()),

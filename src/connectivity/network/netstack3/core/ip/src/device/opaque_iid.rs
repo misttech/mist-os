@@ -78,7 +78,7 @@ impl OpaqueIid {
     pub fn new<IF, ID>(
         prefix: Subnet<Ipv6Addr>,
         net_iface: IF,
-        net_id: ID,
+        net_id: Option<ID>,
         dad_counter: OpaqueIidNonce,
         secret_key: &IidSecret,
     ) -> Self
@@ -188,9 +188,18 @@ impl OpaqueIid {
         // call `net_iface.as_ref()` once and then use its return value in case the
         // `AsRef::as_ref` implementation doesn't always return the same number of
         // bytes, which would break the security of this algorithm.
-        let net_id = net_id.as_ref();
-        write_usize(&mut hmac, net_id.len());
-        hmac.update(net_id);
+        if let Some(net_id) = net_id {
+            let net_id = net_id.as_ref();
+            write_usize(&mut hmac, net_id.len());
+            hmac.update(net_id);
+        } else {
+            // In a previous version of this function, `net_id` was not optional, and to
+            // signify its absence a caller would pass an empty byte slice or array. The
+            // zero length would then have been written to `hmac`. To maintain compatibility
+            // with `OpaqueIid`s generated before this change, write zero for an unspecified
+            // `net_id`.
+            write_usize(&mut hmac, 0);
+        }
 
         write_u64(&mut hmac, dad_counter.into());
 
@@ -248,14 +257,14 @@ mod tests {
         let iid0 = OpaqueIid::new(
             default_prefix,
             default_net_iface,
-            default_net_id,
+            Some(default_net_id),
             default_dad_counter,
             default_secret_key,
         );
         let iid1 = OpaqueIid::new(
             default_prefix,
             default_net_iface,
-            default_net_id,
+            Some(default_net_id),
             default_dad_counter,
             default_secret_key,
         );
@@ -267,7 +276,7 @@ mod tests {
         let iid0 = OpaqueIid::new(
             default_prefix,
             &net_iface[..],
-            default_net_id,
+            Some(default_net_id),
             default_dad_counter,
             default_secret_key,
         );
@@ -276,7 +285,7 @@ mod tests {
             let iid1 = OpaqueIid::new(
                 default_prefix,
                 &net_iface[..],
-                default_net_id,
+                Some(default_net_id),
                 default_dad_counter,
                 default_secret_key,
             );
@@ -290,7 +299,7 @@ mod tests {
         let iid0 = OpaqueIid::new(
             default_prefix,
             default_net_iface,
-            &net_id[..],
+            Some(&net_id[..]),
             default_dad_counter,
             default_secret_key,
         );
@@ -299,7 +308,7 @@ mod tests {
             let iid1 = OpaqueIid::new(
                 default_prefix,
                 default_net_iface,
-                &net_id[..],
+                Some(&net_id[..]),
                 default_dad_counter,
                 default_secret_key,
             );
@@ -312,21 +321,21 @@ mod tests {
         let iid0 = OpaqueIid::new(
             default_prefix,
             &[0, 1, 2],
-            &[3, 4, 5],
+            Some(&[3, 4, 5]),
             default_dad_counter,
             default_secret_key,
         );
         let iid1 = OpaqueIid::new(
             default_prefix,
             &[0, 1, 2, 3],
-            &[4, 5],
+            Some(&[4, 5]),
             default_dad_counter,
             default_secret_key,
         );
         let iid2 = OpaqueIid::new(
             default_prefix,
             &[0, 1],
-            &[2, 3, 4, 5],
+            Some(&[2, 3, 4, 5]),
             default_dad_counter,
             default_secret_key,
         );
@@ -338,14 +347,14 @@ mod tests {
         let iid0 = OpaqueIid::new(
             default_prefix,
             default_net_iface,
-            default_net_id,
+            Some(default_net_id),
             default_dad_counter,
             default_secret_key,
         );
         let iid1 = OpaqueIid::new(
             default_prefix,
             default_net_iface,
-            default_net_id,
+            Some(default_net_id),
             OpaqueIidNonce::DadCounter(1),
             default_secret_key,
         );
@@ -355,7 +364,7 @@ mod tests {
         let iid0 = OpaqueIid::new(
             default_prefix,
             default_net_iface,
-            default_net_id,
+            Some(default_net_id),
             default_dad_counter,
             default_secret_key,
         );
@@ -364,7 +373,7 @@ mod tests {
         let iid1 = OpaqueIid::new(
             default_prefix,
             default_net_iface,
-            default_net_id,
+            Some(default_net_id),
             default_dad_counter,
             &secret_key,
         );
@@ -377,12 +386,17 @@ mod tests {
         // codebase versions. This test case asserts that, and should not be changed!
         const PREFIX: Subnet<Ipv6Addr> = Ipv6::SITE_LOCAL_UNICAST_SUBNET;
         const NET_IFACE: &[u8] = &[0, 1, 2];
-        const NET_ID: &[u8] = &[3, 4, 5];
+        const NET_ID: Option<&[u8]> = Some(&[3, 4, 5]);
         const DAD_COUNTER: OpaqueIidNonce = OpaqueIidNonce::DadCounter(0);
 
         assert_eq!(
             OpaqueIid::new(PREFIX, NET_IFACE, NET_ID, DAD_COUNTER, &IidSecret::ALL_ONES),
             OpaqueIid(255541303695013087662815070945404751656),
+        );
+
+        assert_eq!(
+            OpaqueIid::new(PREFIX, NET_IFACE, None::<[_; 0]>, DAD_COUNTER, &IidSecret::ALL_ONES),
+            OpaqueIid(195123822206027417085233478881498908845),
         );
     }
 }

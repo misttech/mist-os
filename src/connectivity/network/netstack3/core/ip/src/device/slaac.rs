@@ -1521,7 +1521,7 @@ fn generate_global_temporary_address(
     let interface_identifier = OpaqueIid::new(
         /* prefix */ *prefix,
         /* net_iface */ iid,
-        /* net_id */ [],
+        /* net_id */ None::<[_; 0]>,
         /* nonce */ OpaqueIidNonce::Random(seed),
         /* secret_key */ secret_key,
     );
