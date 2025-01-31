@@ -294,7 +294,6 @@ _partner_internal_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.power.metrics:fuchsia.power.metrics",
   "//sdk/fidl/fuchsia.session.power:fuchsia.session.power",
   "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container",
-  "//sdk/fidl/fuchsia.starnix.runner:fuchsia.starnix.runner",
   "//sdk/fidl/fuchsia.sys2:fuchsia.sys2",
   "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager",
   "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness",

@@ -213,7 +213,6 @@ template("fidl_library") {
     "fuchsia.media2",
     "fuchsia.memory.attribution.plugin",
     "fuchsia.session.power",
-    "fuchsia.starnix.runner",
   ]
   _is_unstable_partner_internal =
       _unstable_partner_internal_libraries + [ library_name ] -

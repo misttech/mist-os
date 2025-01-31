@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.starnix.runner") {
-  sdk_category = "partner_internal"
-  stable = false
   sdk_area = "Unknown"
   sources = [ "manager.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
