@@ -29,6 +29,15 @@ struct SocketMarks {
     mark_2: OptionalUint32,
 }
 
+impl From<SocketMarks> for Vec<fposix_socket::Marks> {
+    fn from(SocketMarks { mark_1, mark_2 }: SocketMarks) -> Self {
+        vec![
+            fposix_socket::Marks { domain: fposix_socket::MarkDomain::Mark1, mark: mark_1 },
+            fposix_socket::Marks { domain: fposix_socket::MarkDomain::Mark2, mark: mark_2 },
+        ]
+    }
+}
+
 impl SocketMarks {
     fn has_value(&self) -> bool {
         match (self.mark_1, self.mark_2) {

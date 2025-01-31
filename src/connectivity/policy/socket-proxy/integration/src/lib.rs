@@ -258,6 +258,98 @@ async fn inner_provider_mock(
                                         }
                                     }
                                 }
+                                fposix_socket::ProviderRequest::StreamSocketWithOptions {
+                                    domain: _,
+                                    proto: _,
+                                    opts,
+                                    responder,
+                                } => {
+                                    let mut mark_1 = OptionalUint32::Unset(fposix_socket::Empty);
+                                    let mut mark_2 = OptionalUint32::Unset(fposix_socket::Empty);
+                                    for fposix_socket::Marks { domain, mark } in opts.marks.unwrap()
+                                    {
+                                        match domain {
+                                            fposix_socket::MarkDomain::Mark1 => {
+                                                mark_1 = mark;
+                                            }
+                                            fposix_socket::MarkDomain::Mark2 => {
+                                                mark_2 = mark;
+                                            }
+                                        }
+                                    }
+                                    marks.lock().await.push((
+                                        Arc::new(Mutex::new(mark_1)),
+                                        Arc::new(Mutex::new(mark_2)),
+                                    ));
+                                    let (client, server) =
+                                        create_endpoints::<fposix_socket::StreamSocketMarker>();
+                                    responder.send(Ok(client)).expect(
+                                        "could not respond to StreamSocketWithOptions call",
+                                    );
+                                    run_stream_socket(
+                                        server.into_stream(),
+                                        Arc::new(Mutex::new(mark_1)),
+                                        Arc::new(Mutex::new(mark_2)),
+                                    )
+                                    .await?;
+                                }
+                                fposix_socket::ProviderRequest::DatagramSocketWithOptions {
+                                    domain: _,
+                                    proto,
+                                    opts,
+                                    responder,
+                                } => {
+                                    use fposix_socket::ProviderDatagramSocketWithOptionsResponse::*;
+                                    let mut mark_1 = OptionalUint32::Unset(fposix_socket::Empty);
+                                    let mut mark_2 = OptionalUint32::Unset(fposix_socket::Empty);
+                                    for fposix_socket::Marks { domain, mark } in opts.marks.unwrap()
+                                    {
+                                        match domain {
+                                            fposix_socket::MarkDomain::Mark1 => {
+                                                mark_1 = mark;
+                                            }
+                                            fposix_socket::MarkDomain::Mark2 => {
+                                                mark_2 = mark;
+                                            }
+                                        }
+                                    }
+                                    marks.lock().await.push((
+                                        Arc::new(Mutex::new(mark_1)),
+                                        Arc::new(Mutex::new(mark_2)),
+                                    ));
+                                    match proto {
+                                        fposix_socket::DatagramSocketProtocol::Udp => {
+                                            let (client, server) = create_endpoints::<
+                                                fposix_socket::DatagramSocketMarker,
+                                            >(
+                                            );
+                                            responder
+                                                .send(Ok(DatagramSocket(client)))
+                                                .expect("could not respond to DatagramSocketWithOptions call");
+                                            run_stream_socket(
+                                                server.into_stream(),
+                                                Arc::new(Mutex::new(mark_1)),
+                                                Arc::new(Mutex::new(mark_2)),
+                                            )
+                                            .await?;
+                                        }
+                                        fposix_socket::DatagramSocketProtocol::IcmpEcho => {
+                                            let (client, server) = create_endpoints::<
+                                                fposix_socket::SynchronousDatagramSocketMarker,
+                                            >(
+                                            );
+                                            responder
+                                                .send(Ok(SynchronousDatagramSocket(client)))
+                                                .expect("could not respond to DatagramSocketWithOptions call");
+                                            run_stream_socket(
+                                                server.into_stream(),
+                                                Arc::new(Mutex::new(mark_1)),
+                                                Arc::new(Mutex::new(mark_2)),
+                                            )
+                                            .await?;
+                                        }
+                                    }
+                                }
                                 _ => unimplemented!("this method is not used in this test"),
                             }
                             Ok(())
@@ -291,7 +383,41 @@ async fn inner_provider_mock(
                                         .expect("could not respond to StreamSocket call");
                                     run_stream_socket(server.into_stream(), mark_1, mark_2).await?;
                                 }
-                                r => unimplemented!("{r:?} not used in this test"),
+                                fposix_socket_raw::ProviderRequest::SocketWithOptions {
+                                    domain: _,
+                                    proto: _,
+                                    opts,
+                                    responder,
+                                } => {
+                                    let mut mark_1 = OptionalUint32::Unset(fposix_socket::Empty);
+                                    let mut mark_2 = OptionalUint32::Unset(fposix_socket::Empty);
+                                    for fposix_socket::Marks { domain, mark } in opts.marks.unwrap()
+                                    {
+                                        match domain {
+                                            fposix_socket::MarkDomain::Mark1 => {
+                                                mark_1 = mark;
+                                            }
+                                            fposix_socket::MarkDomain::Mark2 => {
+                                                mark_2 = mark;
+                                            }
+                                        }
+                                    }
+                                    marks.lock().await.push((
+                                        Arc::new(Mutex::new(mark_1)),
+                                        Arc::new(Mutex::new(mark_2)),
+                                    ));
+                                    let (client, server) =
+                                        create_endpoints::<fposix_socket_raw::SocketMarker>();
+                                    responder
+                                        .send(Ok(client))
+                                        .expect("could not respond to SocketWithOptions call");
+                                    run_stream_socket(
+                                        server.into_stream(),
+                                        Arc::new(Mutex::new(mark_1)),
+                                        Arc::new(Mutex::new(mark_2)),
+                                    )
+                                    .await?;
+                                }
                             }
                             Ok(())
                         }

@@ -150,10 +150,40 @@ impl SocketProvider {
                         metrics.sockets += 1;
                         metrics.stream.track(marks);
                         responder.send(
-                            match inner_provider.stream_socket(domain, proto).await? {
-                                Ok(socket) => socket.marked(marks).await?,
-                                e => e,
-                            },
+                            inner_provider
+                                .stream_socket_with_options(domain, proto, &fposix_socket::SocketCreationOptions {
+                                    marks: Some(marks.into()),
+                                    ..Default::default()
+                                })
+                                .await?,
+                        )?;
+                    }
+                    fposix_socket::ProviderRequest::StreamSocketWithOptions {
+                        domain,
+                        proto,
+                        responder,
+                        opts,
+                    } => {
+                        let marks = *self.marks.lock().await;
+                        let mut metrics_lock = self.metrics.lock().await;
+                        let mut metrics = metrics_lock.as_mut();
+                        metrics.sockets += 1;
+                        metrics.stream.track(marks);
+                        if let Some(opts_marks) = opts.marks {
+                            log::warn!(
+                                "stream socket marks supplied by creation opts {:?} \
+                                will be overriden by {:?}",
+                                opts_marks,
+                                marks
+                            );
+                        }
+                        responder.send(
+                            inner_provider
+                                .stream_socket_with_options(domain, proto, &fposix_socket::SocketCreationOptions {
+                                    marks: Some(marks.into()),
+                                    ..opts
+                                })
+                                .await?,
                         )?;
                     }
                     fposix_socket::ProviderRequest::DatagramSocketDeprecated {
@@ -174,23 +204,59 @@ impl SocketProvider {
                         )?;
                     }
                     fposix_socket::ProviderRequest::DatagramSocket { domain, proto, responder } => {
-                        use fposix_socket::ProviderDatagramSocketResponse::*;
                         let marks = *self.marks.lock().await;
                         let mut metrics_lock = self.metrics.lock().await;
                         let mut metrics = metrics_lock.as_mut();
                         metrics.sockets += 1;
+                        use fposix_socket::{
+                            ProviderDatagramSocketResponse, ProviderDatagramSocketWithOptionsResponse,
+                        };
+                        let response = inner_provider
+                            .datagram_socket_with_options(domain, proto, &fposix_socket::SocketCreationOptions {
+                                marks: Some(marks.into()),
+                                ..Default::default()
+                            })
+                            .await?
+                            .map(|response| {
+                                match response {
+                                ProviderDatagramSocketWithOptionsResponse::DatagramSocket(client_end)
+                                => {
+                                    ProviderDatagramSocketResponse::DatagramSocket(client_end)
+                                }
+                                ProviderDatagramSocketWithOptionsResponse::SynchronousDatagramSocket(
+                                    client_end,
+                                ) => ProviderDatagramSocketResponse::SynchronousDatagramSocket(
+                                    client_end,
+                                ),
+                            }
+                            });
+                        responder.send(response)?
+                    }
+                    fposix_socket::ProviderRequest::DatagramSocketWithOptions {
+                        domain,
+                        proto,
+                        opts,
+                        responder,
+                    } => {
+                        let marks = *self.marks.lock().await;
+                        let mut metrics_lock = self.metrics.lock().await;
+                        let mut metrics = metrics_lock.as_mut();
+                        metrics.sockets += 1;
+                        if let Some(opts_marks) = opts.marks {
+                            log::warn!(
+                                "datagram marks supplied by creation opts {:?} \
+                                will be overriden by {:?}",
+                                opts_marks,
+                                marks
+                            );
+                        }
                         responder.send(
-                            match inner_provider.datagram_socket(domain, proto).await? {
-                                Ok(DatagramSocket(socket)) => {
-                                    metrics.datagram.track(marks);
-                                    socket.marked(marks).await?.map(DatagramSocket)
-                                }
-                                Ok(SynchronousDatagramSocket(socket)) => {
-                                    metrics.synchronous_datagram.track(marks);
-                                    socket.marked(marks).await?.map(SynchronousDatagramSocket)
-                                }
-                                e => e,
-                            },
+                            inner_provider
+                                .datagram_socket_with_options(domain, proto, &fposix_socket::SocketCreationOptions {
+                                    marks: Some(marks.into()),
+                                    ..opts
+                                })
+                                .await?,
                         )?
                     }
                     fposix_socket::ProviderRequest::InterfaceIndexToName { index, responder } => {
@@ -208,10 +274,6 @@ impl SocketProvider {
                     }
                     fposix_socket::ProviderRequest::GetInterfaceAddresses { responder } => {
                         responder.send(&inner_provider.get_interface_addresses().await?)?
-                    }
-                    fposix_socket::ProviderRequest::StreamSocketWithOptions { .. }
-                    | fposix_socket::ProviderRequest::DatagramSocketWithOptions { .. } => {
-                        todo!("https://fxbug.dev/383136579: Implement socket marks")
                     }
                 }
 
@@ -237,13 +299,50 @@ impl SocketProvider {
                         let mut metrics = metrics_lock.as_mut();
                         metrics.sockets += 1;
                         metrics.raw.track(marks);
-                        responder.send(match inner_provider.socket(domain, &proto).await? {
-                            Ok(socket) => socket.marked(marks).await?,
-                            e => e,
-                        })?
+                        responder.send(
+                            inner_provider
+                                .socket_with_options(
+                                    domain,
+                                    &proto,
+                                    &fposix_socket::SocketCreationOptions {
+                                        marks: Some(marks.into()),
+                                        ..Default::default()
+                                    },
+                                )
+                                .await?,
+                        )?
                     }
-                    fposix_socket_raw::ProviderRequest::SocketWithOptions { .. } => {
-                        todo!("https://fxbug.dev/383136579: Implement socket marks")
+                    fposix_socket_raw::ProviderRequest::SocketWithOptions {
+                        domain,
+                        proto,
+                        opts,
+                        responder,
+                    } => {
+                        let marks = *self.marks.lock().await;
+                        let mut metrics_lock = self.metrics.lock().await;
+                        let mut metrics = metrics_lock.as_mut();
+                        metrics.sockets += 1;
+                        metrics.raw.track(marks);
+                        if let Some(opts_marks) = opts.marks {
+                            log::warn!(
+                                "raw socket marks supplied by creation opts {:?} \
+                                will be overriden by {:?}",
+                                opts_marks,
+                                marks
+                            );
+                        }
+                        responder.send(
+                            inner_provider
+                                .socket_with_options(
+                                    domain,
+                                    &proto,
+                                    &fposix_socket::SocketCreationOptions {
+                                        marks: Some(marks.into()),
+                                        ..opts
+                                    },
+                                )
+                                .await?,
+                        )?
                     }
                 }
 
