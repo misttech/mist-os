@@ -161,15 +161,39 @@ config("target") {
 }
 
 config("cap_lints") {
-  rustflags = [ "--cap-lints=$rust_cap_lints" ]
+  if (rust_rbe_exec_strategy == "local") {
+    # The local exec strategy tries to see if there's an RBE cache hit before running the command
+    # locally. The RBE cache is often populated by infra builders which never have this flag, so we
+    # want to include it *only* when checking for a cache hit. This flag doesn't affect the output
+    # of the artifact, so it's safe to reuse it.
+    rustflags = [ "--remote-only=--cap-lints=$rust_cap_lints" ]
+  } else {
+    rustflags = [ "--cap-lints=$rust_cap_lints" ]
+  }
 }
 
 config("cap_lints_warn") {
-  rustflags = [ "--cap-lints=warn" ]
+  if (rust_rbe_exec_strategy == "local") {
+    # The local exec strategy tries to see if there's an RBE cache hit before running the command
+    # locally. The RBE cache is often populated by infra builders which never have this flag, so we
+    # want to include it *only* when checking for a cache hit. This flag doesn't affect the output
+    # of the artifact, so it's safe to reuse it.
+    rustflags = [ "--remote-only=--cap-lints=warn" ]
+  } else {
+    rustflags = [ "--cap-lints=warn" ]
+  }
 }
 
 config("cap_lints_allow") {
-  rustflags = [ "--cap-lints=allow" ]
+  if (rust_rbe_exec_strategy == "local") {
+    # The local exec strategy tries to see if there's an RBE cache hit before running the command
+    # locally. The RBE cache is often populated by infra builders which never have this flag, so we
+    # want to include it *only* when checking for a cache hit. This flag doesn't affect the output
+    # of the artifact, so it's safe to reuse it.
+    rustflags = [ "--remote-only=--cap-lints=allow" ]
+  } else {
+    rustflags = [ "--cap-lints=allow" ]
+  }
 }
 
 config("panic_abort") {

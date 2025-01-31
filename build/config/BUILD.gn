@@ -15,6 +15,7 @@ import("//build/toolchain/ccache.gni")
 import("//build/toolchain/concurrent_jobs.gni")
 import("//build/toolchain/ifs_shared_library.gni")
 import("//build/toolchain/rbe.gni")
+import("//build/toolchain/rbe_modes.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/variant.gni")
 
@@ -1357,6 +1358,12 @@ config("werror") {
 
   if (deny_warnings) {
     rustflags += [ "-Dwarnings" ]
+  } else if (rust_rbe_exec_strategy == "local") {
+    # The local exec strategy tries to see if there's an RBE cache hit before running the command
+    # locally. The RBE cache is often populated by infra builders which never have this flag, so we
+    # want to include it *only* when checking for a cache hit. This flag doesn't affect the output
+    # of the artifact, so it's safe to reuse it.
+    rustflags += [ "--remote-only=-Dwarnings" ]
   }
 }
 
