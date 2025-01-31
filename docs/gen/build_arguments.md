@@ -731,7 +731,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8724317736778206065"`
+**Current value for `target_cpu = "arm64"`:** `"8724227127725344913"`
 
 From //out/not-default/args.gn:10
 
@@ -739,7 +739,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8724317736778206065"`
+**Current value for `target_cpu = "riscv64"`:** `"8724227127725344913"`
 
 From //out/not-default/args.gn:10
 
@@ -747,7 +747,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8724317736778206065"`
+**Current value for `target_cpu = "x64"`:** `"8724227127725344913"`
 
 From //out/not-default/args.gn:10
 
@@ -2320,7 +2320,7 @@ Controls whether to promote warnings to errors.
 
 **Current value (from the default):** `true`
 
-From //build/config/BUILD.gn:27
+From //build/config/BUILD.gn:28
 
 ### developer_test_labels
 
@@ -4814,7 +4814,7 @@ From //build/board.gni:48
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/x64.gni:50
+From //boards/x64.gni:45
 
 **Overridden from the default:** `false`
 
