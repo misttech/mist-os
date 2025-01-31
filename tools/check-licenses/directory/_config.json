@@ -75,6 +75,15 @@
                     "See b/382185999 for more info."
                 ],
                 "paths": [
+                    "build/secondary/third_party/glslang",
+                    "build/secondary/third_party/shaderc",
+                    "build/secondary/third_party/spirv-cross",
+                    "build/secondary/third_party/spirv-headers",
+                    "build/secondary/third_party/spirv-tools",
+                    "build/secondary/third_party/Vulkan-Headers",
+                    "build/secondary/third_party/Vulkan-Loader",
+                    "build/secondary/third_party/Vulkan-Tools",
+                    "build/secondary/third_party/Vulkan-ValidationLayers",
                     "third_party/glslang",
                     "third_party/shaderc",
                     "third_party/spirv-cross",
