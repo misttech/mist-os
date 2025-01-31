@@ -1258,6 +1258,7 @@ pub(super) fn spawn_worker(
     events: fposix_socket::SynchronousDatagramSocketRequestStream,
     properties: SocketWorkerProperties,
     spawner: &worker::ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
+    creation_opts: fposix_socket::SocketCreationOptions,
 ) -> Result<(), fposix::Errno> {
     match (domain, proto) {
         (fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::Udp) => {
@@ -1266,7 +1267,7 @@ pub(super) fn spawn_worker(
                 BindingData::<Ipv4, Udp>::new,
                 properties,
                 events,
-                (),
+                creation_opts,
                 spawner.clone(),
             ));
             Ok(())
@@ -1277,7 +1278,7 @@ pub(super) fn spawn_worker(
                 BindingData::<Ipv6, Udp>::new,
                 properties,
                 events,
-                (),
+                creation_opts,
                 spawner.clone(),
             ));
             Ok(())
@@ -1288,7 +1289,7 @@ pub(super) fn spawn_worker(
                 BindingData::<Ipv4, IcmpEcho>::new,
                 properties,
                 events,
-                (),
+                creation_opts,
                 spawner.clone(),
             ));
             Ok(())
@@ -1299,7 +1300,7 @@ pub(super) fn spawn_worker(
                 BindingData::<Ipv6, IcmpEcho>::new,
                 properties,
                 events,
-                (),
+                creation_opts,
                 spawner.clone(),
             ));
             Ok(())
@@ -1326,8 +1327,20 @@ where
     type Request = fposix_socket::SynchronousDatagramSocketRequest;
     type RequestStream = fposix_socket::SynchronousDatagramSocketRequestStream;
     type CloseResponder = fposix_socket::SynchronousDatagramSocketCloseResponder;
-    type SetupArgs = ();
+    type SetupArgs = fposix_socket::SocketCreationOptions;
     type Spawner = ();
+
+    fn setup(
+        &mut self,
+        ctx: &mut Ctx,
+        options: fposix_socket::SocketCreationOptions,
+        _spawners: &worker::TaskSpawnerCollection<()>,
+    ) {
+        let fposix_socket::SocketCreationOptions { marks, __source_breaking } = options;
+        for fposix_socket::Marks { domain, mark } in marks.iter().flat_map(|m| m.iter()) {
+            T::set_mark(ctx, &self.info.id, (*domain).into_core(), (*mark).into_core())
+        }
+    }
 
     async fn handle_request(
         &mut self,

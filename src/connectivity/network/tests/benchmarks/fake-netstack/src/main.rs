@@ -103,41 +103,71 @@ async fn handle_provider_request(
         Tagged<StreamSocketCell, fposix_socket::StreamSocketRequestStream>,
     >,
 ) -> Result<(), anyhow::Error> {
+    let mut new_datagram_socket = |domain, proto| {
+        let (client_end, request_stream) = fidl::endpoints::create_request_stream::<
+            fposix_socket::SynchronousDatagramSocketMarker,
+        >();
+        let socket = Rc::new(RefCell::new(
+            DatagramSocket::new(proto, domain, request_stream.control_handle())
+                .context("create socket")?,
+        ));
+        datagram_requests.push(request_stream.tagged(socket));
+        match proto {
+            fposix_socket::DatagramSocketProtocol::Udp => {
+                info!("opened new UDP socket");
+            }
+            fposix_socket::DatagramSocketProtocol::IcmpEcho => {
+                info!("opened new ICMP echo socket");
+            }
+        }
+        Ok::<_, anyhow::Error>(client_end)
+    };
+    let mut new_stream_socket = |domain, proto| {
+        let (client_end, request_stream) =
+            fidl::endpoints::create_request_stream::<fposix_socket::StreamSocketMarker>();
+        let socket = Rc::new(RefCell::new(StreamSocket::new(
+            proto,
+            domain,
+            request_stream.control_handle(),
+        )));
+        info!("opened new stream socket");
+        stream_requests.push(request_stream.tagged(socket));
+        Ok::<_, anyhow::Error>(client_end)
+    };
     match request.context("receive request")? {
         fposix_socket::ProviderRequest::DatagramSocket { domain, proto, responder } => {
-            let (client_end, request_stream) = fidl::endpoints::create_request_stream::<
-                fposix_socket::SynchronousDatagramSocketMarker,
-            >();
+            let client_end = new_datagram_socket(domain, proto)?;
             responder
                 .send(Ok(fposix_socket::ProviderDatagramSocketResponse::SynchronousDatagramSocket(
                     client_end,
                 )))
                 .context("send DatagramSocket response")?;
-            let socket = Rc::new(RefCell::new(
-                DatagramSocket::new(proto, domain, request_stream.control_handle())
-                    .context("create socket")?,
-            ));
-            datagram_requests.push(request_stream.tagged(socket));
-            match proto {
-                fposix_socket::DatagramSocketProtocol::Udp => {
-                    info!("opened new UDP socket");
-                }
-                fposix_socket::DatagramSocketProtocol::IcmpEcho => {
-                    info!("opened new ICMP echo socket");
-                }
-            }
+        }
+        fidl_fuchsia_posix_socket::ProviderRequest::DatagramSocketWithOptions {
+            domain,
+            proto,
+            opts: _,
+            responder,
+        } => {
+            let client_end = new_datagram_socket(domain, proto)?;
+            let response =
+                fposix_socket::ProviderDatagramSocketWithOptionsResponse::SynchronousDatagramSocket(
+                    client_end,
+                );
+            responder.send(Ok(response)).context("send DatagramSocket response")?;
         }
         fposix_socket::ProviderRequest::StreamSocket { domain, proto, responder } => {
-            let (client_end, request_stream) =
-                fidl::endpoints::create_request_stream::<fposix_socket::StreamSocketMarker>();
+            let client_end = new_stream_socket(domain, proto)?;
             responder.send(Ok(client_end)).context("send StreamSocket response")?;
-            let socket = Rc::new(RefCell::new(StreamSocket::new(
-                proto,
-                domain,
-                request_stream.control_handle(),
-            )));
-            info!("opened new stream socket");
-            stream_requests.push(request_stream.tagged(socket));
+        }
+        fidl_fuchsia_posix_socket::ProviderRequest::StreamSocketWithOptions {
+            domain,
+            proto,
+            opts: _,
+            responder,
+        } => {
+            let client_end = new_stream_socket(domain, proto)?;
+            responder.send(Ok(client_end)).context("send StreamSocket response")?;
         }
         request @ (fposix_socket::ProviderRequest::InterfaceIndexToName { .. }
         | fposix_socket::ProviderRequest::InterfaceNameToIndex { .. }

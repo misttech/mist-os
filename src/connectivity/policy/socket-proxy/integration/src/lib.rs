@@ -291,6 +291,7 @@ async fn inner_provider_mock(
                                         .expect("could not respond to StreamSocket call");
                                     run_stream_socket(server.into_stream(), mark_1, mark_2).await?;
                                 }
+                                r => unimplemented!("{r:?} not used in this test"),
                             }
                             Ok(())
                         }

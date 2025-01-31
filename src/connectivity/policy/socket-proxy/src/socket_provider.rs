@@ -209,6 +209,10 @@ impl SocketProvider {
                     fposix_socket::ProviderRequest::GetInterfaceAddresses { responder } => {
                         responder.send(&inner_provider.get_interface_addresses().await?)?
                     }
+                    fposix_socket::ProviderRequest::StreamSocketWithOptions { .. }
+                    | fposix_socket::ProviderRequest::DatagramSocketWithOptions { .. } => {
+                        todo!("https://fxbug.dev/383136579: Implement socket marks")
+                    }
                 }
 
                 Ok(())
@@ -237,6 +241,9 @@ impl SocketProvider {
                             Ok(socket) => socket.marked(marks).await?,
                             e => e,
                         })?
+                    }
+                    fposix_socket_raw::ProviderRequest::SocketWithOptions { .. } => {
+                        todo!("https://fxbug.dev/383136579: Implement socket marks")
                     }
                 }
 

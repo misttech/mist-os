@@ -1198,6 +1198,21 @@ type InterfaceFlags = strict bits : uint16 {
     DYNAMIC = 0x8000;
 };
 
+/// The maximum number of socket marks that can be specified in [`SocketCreationOptions`].
+@available(added=HEAD)
+const MAX_SOCKET_CREATION_MARKS uint32 = 2;
+
+/// Options that can be provided at socket creation.
+@available(added=HEAD)
+type SocketCreationOptions = table {
+    /// The marks for the created socket. The marks are operated in order and if there are
+    /// multiple marks for the same domain, the last value wins.
+    1: marks vector<struct {
+        domain MarkDomain;
+        mark OptionalUint32;
+    }>:MAX_SOCKET_CREATION_MARKS;
+};
+
 /// Provider implements the POSIX sockets API.
 ///
 /// *Warning:* This protocol is not yet ready for direct use by clients.
@@ -1206,6 +1221,17 @@ type InterfaceFlags = strict bits : uint16 {
 /// directly to this protocol will make those changes more difficult.
 @discoverable
 closed protocol Provider {
+    /// Requests a stream socket with the specifed parameters and the creation
+    /// options.
+    @available(added=HEAD)
+    strict StreamSocketWithOptions(struct {
+        domain Domain;
+        proto StreamSocketProtocol;
+        opts SocketCreationOptions;
+    }) -> (resource struct {
+        s client_end:StreamSocket;
+    }) error fuchsia.posix.Errno;
+
     /// Requests a stream socket with the specified parameters.
     strict StreamSocket(struct {
         domain Domain;
@@ -1227,6 +1253,18 @@ closed protocol Provider {
     strict DatagramSocket(struct {
         domain Domain;
         proto DatagramSocketProtocol;
+    }) -> (strict resource union {
+        1: datagram_socket client_end:DatagramSocket;
+        2: synchronous_datagram_socket client_end:SynchronousDatagramSocket;
+    }) error fuchsia.posix.Errno;
+
+    /// Requests a datagram socket with the specifed parameters and the creation
+    /// options.
+    @available(added=HEAD)
+    strict DatagramSocketWithOptions(struct {
+        domain Domain;
+        proto DatagramSocketProtocol;
+        opts SocketCreationOptions;
     }) -> (strict resource union {
         1: datagram_socket client_end:DatagramSocket;
         2: synchronous_datagram_socket client_end:SynchronousDatagramSocket;

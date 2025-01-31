@@ -121,7 +121,31 @@ pub(crate) async fn serve(
                 }
                 psocket::ProviderRequest::StreamSocket { domain, proto, responder } => {
                     let (client, request_stream) = create_request_stream();
-                    stream::spawn_worker(domain, proto, ctx.clone(), request_stream, &task_spawner);
+                    stream::spawn_worker(
+                        domain,
+                        proto,
+                        ctx.clone(),
+                        request_stream,
+                        &task_spawner,
+                        Default::default(),
+                    );
+                    responder.send(Ok(client)).unwrap_or_log("failed to respond");
+                }
+                psocket::ProviderRequest::StreamSocketWithOptions {
+                    domain,
+                    proto,
+                    opts,
+                    responder,
+                } => {
+                    let (client, request_stream) = create_request_stream();
+                    stream::spawn_worker(
+                        domain,
+                        proto,
+                        ctx.clone(),
+                        request_stream,
+                        &task_spawner,
+                        opts,
+                    );
                     responder.send(Ok(client)).unwrap_or_log("failed to respond");
                 }
                 psocket::ProviderRequest::DatagramSocketDeprecated { domain, proto, responder } => {
@@ -133,6 +157,7 @@ pub(crate) async fn serve(
                         request_stream,
                         SocketWorkerProperties {},
                         &task_spawner,
+                        Default::default(),
                     )
                     .map(|()| client);
                     responder.send(response).unwrap_or_log("failed to respond");
@@ -146,9 +171,33 @@ pub(crate) async fn serve(
                         request_stream,
                         SocketWorkerProperties {},
                         &task_spawner,
+                        Default::default(),
                     )
                     .map(|()| {
-                        psocket::ProviderDatagramSocketResponse::SynchronousDatagramSocket(client)
+                        use psocket::ProviderDatagramSocketResponse;
+                        ProviderDatagramSocketResponse::SynchronousDatagramSocket(client)
+                    });
+                    responder.send(response).unwrap_or_log("failed to respond");
+                }
+                psocket::ProviderRequest::DatagramSocketWithOptions {
+                    domain,
+                    proto,
+                    responder,
+                    opts,
+                } => {
+                    let (client, request_stream) = create_request_stream();
+                    let response = datagram::spawn_worker(
+                        domain,
+                        proto,
+                        ctx.clone(),
+                        request_stream,
+                        SocketWorkerProperties {},
+                        &task_spawner,
+                        opts,
+                    )
+                    .map(|()| {
+                        use psocket::ProviderDatagramSocketWithOptionsResponse;
+                        ProviderDatagramSocketWithOptionsResponse::SynchronousDatagramSocket(client)
                     });
                     responder.send(response).unwrap_or_log("failed to respond");
                 }

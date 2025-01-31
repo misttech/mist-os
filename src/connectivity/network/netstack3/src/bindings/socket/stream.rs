@@ -245,7 +245,7 @@ impl CloseResponder for fposix_socket::StreamSocketCloseResponder {
 }
 
 enum InitialSocketState {
-    Unbound,
+    Unbound(fposix_socket::SocketCreationOptions),
     Connected,
 }
 
@@ -264,7 +264,15 @@ impl<I: IpExt + IpSockAddrExt> worker::SocketWorkerHandler for BindingData<I> {
         spawners: &worker::TaskSpawnerCollection<crate::bindings::util::TaskWaitGroupSpawner>,
     ) {
         match args {
-            InitialSocketState::Unbound => (),
+            InitialSocketState::Unbound(fposix_socket::SocketCreationOptions {
+                marks,
+                __source_breaking: _,
+            }) => {
+                let Self { id, .. } = self;
+                for fposix_socket::Marks { domain, mark } in marks.iter().flatten() {
+                    ctx.api().tcp().set_mark(&id, (*domain).into_core(), (*mark).into_core());
+                }
+            }
             InitialSocketState::Connected => {
                 let Self { id, peer: _, task_data, task_control } = self;
                 let task_data =
@@ -303,6 +311,7 @@ pub(super) fn spawn_worker(
     ctx: crate::bindings::Ctx,
     request_stream: fposix_socket::StreamSocketRequestStream,
     spawner: &worker::ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
+    creation_opts: fposix_socket::SocketCreationOptions,
 ) {
     match (domain, proto) {
         (fposix_socket::Domain::Ipv4, fposix_socket::StreamSocketProtocol::Tcp) => {
@@ -311,7 +320,7 @@ pub(super) fn spawn_worker(
                 BindingData::<Ipv4>::new,
                 SocketWorkerProperties {},
                 request_stream,
-                InitialSocketState::Unbound,
+                InitialSocketState::Unbound(creation_opts),
                 spawner.clone(),
             ))
         }
@@ -321,7 +330,7 @@ pub(super) fn spawn_worker(
                 BindingData::<Ipv6>::new,
                 SocketWorkerProperties {},
                 request_stream,
-                InitialSocketState::Unbound,
+                InitialSocketState::Unbound(creation_opts),
                 spawner.clone(),
             ))
         }
