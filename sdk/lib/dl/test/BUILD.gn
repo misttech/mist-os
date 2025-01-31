@@ -33,6 +33,7 @@ test("dl-unittests") {
     sources += [
       "dl-impl-tests.cc",
       "dl-impl-tests.h",
+      "dl-iterate-phdr-tests.cc",
       "dl-load-tests-base.cc",
       "dl-load-tests-base.h",
       "dl-load-tests-basic.cc",

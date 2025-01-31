@@ -2,18 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// Avoid symbol conflict between <ld/abi/abi.h> and <link.h>
-#pragma push_macro("_r_debug")
-#undef _r_debug
-#define _r_debug not_using_system_r_debug
-#include <link.h>
-#pragma pop_macro("_r_debug")
+#include "dl-impl-tests.h"
 
 #include <lib/elfldltl/container.h>
 #include <lib/elfldltl/dynamic.h>
 #include <lib/elfldltl/testing/diagnostics.h>
-
-#include "dl-impl-tests.h"
 
 namespace dl::testing {
 namespace {
@@ -95,7 +88,7 @@ std::optional<TlsModule> SetTls(auto& diag, const Elf::Phdr& tls_phdr, auto& mem
   };
 }
 
-// Decode an AbiModule from the provided `struct dl_phdr_info`.
+// Decode an AbiModule from the provided `dl_phdr_info`.
 DecodedModule DecodeModule(const dl_phdr_info& phdr_info) {
   static const size_t kPageSize = sysconf(_SC_PAGE_SIZE);
 
@@ -157,7 +150,7 @@ DecodedModule DecodeModule(const dl_phdr_info& phdr_info) {
   return {.abi_module = module, .tls_module = tls_module, .tls_offset = tls_offset};
 }
 
-int AddModule(struct dl_phdr_info* phdr_info, size_t size, void* data) {
+int AddModule(dl_phdr_info* phdr_info, size_t size, void* data) {
   assert(size >= sizeof(*phdr_info));
   DecodedModule decoded = DecodeModule(*phdr_info);
   gModuleStorage.push_back(decoded.abi_module);

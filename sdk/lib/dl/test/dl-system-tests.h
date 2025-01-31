@@ -5,11 +5,11 @@
 #ifndef LIB_DL_TEST_DL_SYSTEM_TESTS_H_
 #define LIB_DL_TEST_DL_SYSTEM_TESTS_H_
 
+#include "dl-load-tests-base.h"
+
 #ifdef __Fuchsia__
 #include "dl-load-zircon-tests-base.h"
 #endif
-
-#include "dl-load-tests-base.h"
 
 namespace dl::testing {
 
@@ -35,6 +35,7 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   static constexpr bool kEmitsSymbolNotFound = true;
   // Fuchsia's dlclose is a no-op.
   static constexpr bool kDlCloseCanRunFinalizers = false;
+  static constexpr bool kDlCloseUnloadsModules = false;
 #endif
 
   fit::result<Error, void*> DlOpen(const char* file, int mode);
@@ -42,6 +43,8 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   fit::result<Error> DlClose(void* module);
 
   static fit::result<Error, void*> DlSym(void* module, const char* ref);
+
+  static int DlIteratePhdr(DlIteratePhdrCallback, void* data);
 
   // ExpectRootModule or Needed are called by tests when a file is expected to
   // be loaded from the file system for the first time. The following functions
