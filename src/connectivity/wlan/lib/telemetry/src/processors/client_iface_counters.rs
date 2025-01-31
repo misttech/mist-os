@@ -4,7 +4,7 @@
 
 use fidl_fuchsia_wlan_stats as fidl_stats;
 use fuchsia_async::TimeoutExt;
-use fuchsia_sync::Mutex;
+use futures::lock::Mutex;
 
 use log::{error, warn};
 use std::sync::Arc;
@@ -61,19 +61,18 @@ impl ClientIfaceCountersLogger {
                 None
             }
         };
-        *self.iface_state.lock() = IfaceState::Created { iface_id, telemetry_proxy }
+        *self.iface_state.lock().await = IfaceState::Created { iface_id, telemetry_proxy }
     }
 
     pub async fn handle_iface_destroyed(&self, iface_id: u16) {
-        let destroyed = matches!(*self.iface_state.lock(), IfaceState::Created { iface_id: existing_iface_id, .. } if iface_id == existing_iface_id);
+        let destroyed = matches!(*self.iface_state.lock().await, IfaceState::Created { iface_id: existing_iface_id, .. } if iface_id == existing_iface_id);
         if destroyed {
-            *self.iface_state.lock() = IfaceState::NotAvailable;
+            *self.iface_state.lock().await = IfaceState::NotAvailable;
         }
     }
 
-    #[allow(clippy::await_holding_lock, reason = "mass allow for https://fxbug.dev/381896734")]
     pub async fn handle_periodic_telemetry(&self, is_connected: bool) {
-        match &*self.iface_state.lock() {
+        match &*self.iface_state.lock().await {
             IfaceState::NotAvailable => (),
             IfaceState::Created { telemetry_proxy, .. } => {
                 if let Some(telemetry_proxy) = &telemetry_proxy {
