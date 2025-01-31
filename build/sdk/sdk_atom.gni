@@ -179,8 +179,6 @@ template("sdk_atom") {
   category = invoker.category
 
   _allowed_categories = [
-    # "excluded" is deprecated.
-    # "experimental" is deprecated.
     # "internal" is deprecated; only specific legacy cases below are allowed.
     "cts",
     "partner_internal",

@@ -87,8 +87,6 @@ template("sdk_source_set") {
 
   # Only categories that are included in an IDK makes sense.
   valid_categories = [
-    # "excluded" is deprecated.
-    # "experimental" is deprecated.
     # "internal" is deprecated; only specific legacy cases below are allowed.
     # "cts" is only for ABI compatibility and thus not applicable.
     # "partner_internal" is only for ABI compatibility and thus not applicable.

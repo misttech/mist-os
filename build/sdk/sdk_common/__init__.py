@@ -95,8 +95,6 @@ def detect_collisions(atoms: Sequence[Atom]) -> Iterator[str]:
 
 
 CATEGORIES = [
-    # "excluded" is deprecated.
-    # "experimental" is deprecated.
     "internal",
     "cts",
     "partner_internal",

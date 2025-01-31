@@ -149,9 +149,6 @@ template("sdk_shared_library") {
 
   # Only categories that are included in an IDK makes sense.
   valid_categories = [
-    # "excluded" is deprecated.
-    # "experimental" is deprecated.
-    # "internal" does not apply to shared libraries.
     # "cts" is only for ABI compatibility and thus not applicable.
     # "partner_internal" is only for ABI compatibility and thus not applicable.
     "partner",
