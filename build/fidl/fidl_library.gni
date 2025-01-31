@@ -200,19 +200,25 @@ template("fidl_library") {
   # the build targets are created, the resulting API summery file will be empty.
   assert(!is_stable || requires_compatibility_tests)
 
-  # TODO(https://fxbug.dev/364727245): Make these stable or remove them from partner_internal.
   _unstable_partner_internal_libraries = [
+    # Do not add to this list.
+    # If the ffx tool or plugin is not included in an IDK, try removing the
+    # category from its build rule. If you really must use an unstable API from
+    # an ffx tool or plugin in the IDK, add the library to
+    # `//src/developer/ffx/build/ffx_subtool_allowlist.gni` instead.
+
+    # TODO(https://fxbug.dev/364727245): Make these stable or remove them from partner_internal.
     "fuchsia.audio",
     "fuchsia.audio.controller",
     "fuchsia.audio.device",
     "fuchsia.bluetooth.pandora",
     "fuchsia.drm",
-
-    # TODO(https://fxbug.dev/377756547): Remove this when FDomain passes API review.
-    "fuchsia.fdomain",
     "fuchsia.media2",
     "fuchsia.memory.attribution.plugin",
     "fuchsia.session.power",
+
+    # TODO(https://fxbug.dev/377756547): Remove this when FDomain passes API review.
+    "fuchsia.fdomain",
   ]
   _is_unstable_partner_internal =
       _unstable_partner_internal_libraries + [ library_name ] -
