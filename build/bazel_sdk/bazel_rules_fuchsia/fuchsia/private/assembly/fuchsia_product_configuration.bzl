@@ -4,13 +4,12 @@
 
 """Rule for declaring a Fuchsia product configuration."""
 
+# buildifier: disable=module-docstring
+load("@bazel_skylib//lib:paths.bzl", "paths")
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:fuchsia_package.bzl", "get_driver_component_manifests")
 load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
-
-# buildifier: disable=module-docstring
-load("@bazel_skylib//lib:paths.bzl", "paths")
 load(
     ":providers.bzl",
     "FuchsiaAssembledPackageInfo",
@@ -19,6 +18,7 @@ load(
 )
 load(
     ":utils.bzl",
+    "LOCAL_ONLY_ACTION_KWARGS",
     "combine_directories",
     "extract_labels",
     "replace_labels_with_files",
@@ -153,6 +153,7 @@ def _fuchsia_product_configuration_impl(ctx):
         arguments = args,
         inputs = input_files + ctx.files.product_config_labels + ctx.files.deps,
         outputs = [product_config_dir],
+        **LOCAL_ONLY_ACTION_KWARGS
     )
 
     return [
@@ -364,6 +365,7 @@ def fuchsia_hybrid_product_configuration_impl(ctx):
         arguments = args,
         inputs = ctx.files.packages + ctx.files.replace_packages + ctx.files.product_configuration,
         outputs = [product_config_dir],
+        **LOCAL_ONLY_ACTION_KWARGS
     )
 
     return [
