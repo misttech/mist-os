@@ -224,14 +224,18 @@ static zx_duration_mono_t rand_duration(zx_duration_mono_t max) {
 static int timer_stress_worker(void* void_arg) {
   timer_stress_args* args = reinterpret_cast<timer_stress_args*>(void_arg);
   while (!args->timer_stress_done.load()) {
-    Timer t;
-    zx_duration_mono_t timer_duration = rand_duration(ZX_MSEC(5));
+    // Create a timer on either the monotonic or boot timeline.
+    // The timeline will be chosen randomly.
+    const zx_clock_t timeline = rand() % 2 == 0 ? ZX_CLOCK_MONOTONIC : ZX_CLOCK_BOOT;
+    const zx_duration_t timer_duration = rand_duration(ZX_MSEC(5));
+    const Deadline deadline = timeline == ZX_CLOCK_MONOTONIC ? Deadline::after_mono(timer_duration)
+                                                             : Deadline::after_boot(timer_duration);
+    Timer t{timeline};
 
     // Set a timer, then switch to a different CPU to ensure we race with it.
     {
       InterruptDisableGuard block_interrupts;
       cpu_num_t timer_cpu = arch_curr_cpu_num();
-      const Deadline deadline = Deadline::after_mono(timer_duration);
       t.Set(deadline, timer_stress_cb, void_arg);
       Thread::Current::Get()->SetCpuAffinity(~cpu_num_to_mask(timer_cpu));
       DEBUG_ASSERT(arch_curr_cpu_num() != timer_cpu);
@@ -243,7 +247,8 @@ static int timer_stress_worker(void* void_arg) {
 
     // Sleep for the timer duration so that this thread's timer_cancel races with the timer
     // callback. We want to race to ensure there are no synchronization or memory visibility
-    // issues.
+    // issues. Note that we will not race if the system suspends while we sleep, so we must
+    // ensure that we do not suspend.
     Thread::Current::SleepRelative(timer_duration);
     t.Cancel();
   }
@@ -615,6 +620,18 @@ static bool mono_to_raw_ticks_overflow() {
   END_TEST;
 }
 
+// Ensure that a boot timer fires.
+static bool boot_timer() {
+  BEGIN_TEST;
+  timer_args arg{};
+  Timer t{ZX_CLOCK_BOOT};
+  const Deadline deadline = Deadline::no_slack(current_boot_time());
+  t.Set(deadline, timer_cb, &arg);
+  while (!arg.timer_fired.load()) {
+  }
+  END_TEST;
+}
+
 UNITTEST_START_TESTCASE(timer_tests)
 UNITTEST("cancel_before_deadline", cancel_before_deadline)
 UNITTEST("cancel_after_fired", cancel_after_fired)
@@ -625,4 +642,5 @@ UNITTEST("trylock_or_cancel_get_lock", trylock_or_cancel_get_lock)
 UNITTEST("print_timer_queue", print_timer_queues)
 UNITTEST("Deadline::after", deadline_after)
 UNITTEST("mono_to_raw_ticks_overflow", mono_to_raw_ticks_overflow)
+UNITTEST("boot_timer", boot_timer)
 UNITTEST_END_TESTCASE(timer_tests, "timer", "timer tests")
