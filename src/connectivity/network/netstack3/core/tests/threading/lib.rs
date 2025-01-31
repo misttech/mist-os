@@ -32,6 +32,7 @@ use packet_formats::testutil::parse_ip_packet_in_ethernet_frame;
 use packet_formats::udp::{UdpPacket, UdpParseArgs};
 
 mod device_socket;
+mod sndbuf;
 mod tcp;
 
 /// Spawns a loom thread with a safe stack size.

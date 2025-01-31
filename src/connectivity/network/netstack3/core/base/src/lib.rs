@@ -23,6 +23,7 @@ mod frame;
 mod inspect;
 mod ip;
 mod matchers;
+mod num;
 mod port_alloc;
 mod resource_references;
 mod rng;
@@ -60,6 +61,7 @@ pub use ip::{
     IpTypesIpExt, Mms, WrapBroadcastMarker,
 };
 pub use matchers::{DeviceNameMatcher, Matcher, SubnetMatcher};
+pub use num::PositiveIsize;
 pub use port_alloc::{simple_randomized_port_alloc, EphemeralPort, PortAllocImpl};
 pub use resource_references::{
     DeferredResourceRemovalContext, ReferenceNotifiers, ReferenceNotifiersExt,
@@ -90,6 +92,7 @@ pub mod ref_counted_hash_map {
 pub mod socket {
     mod address;
     mod base;
+    mod sndbuf;
 
     pub use address::{
         AddrIsMappedError, AddrVecIter, ConnAddr, ConnInfoAddr, ConnIpAddr, DualStackConnIpAddr,
@@ -104,6 +107,9 @@ pub mod socket {
         SocketIpAddrExt, SocketIpExt, SocketMapAddrSpec, SocketMapAddrStateSpec,
         SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy, SocketMapStateSpec,
         SocketMapUpdateSharingPolicy, SocketStateEntry, SocketZonedAddrExt, UpdateSharingError,
+    };
+    pub use sndbuf::{
+        SendBufferFullError, SendBufferSpace, SendBufferTracking, SocketWritableListener,
     };
 }
 
