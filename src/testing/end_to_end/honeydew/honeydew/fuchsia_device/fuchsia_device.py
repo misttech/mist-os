@@ -42,7 +42,6 @@ from honeydew.affordances.connectivity.wlan.wlan_policy_ap import (
     wlan_policy_ap_using_fc,
 )
 from honeydew.affordances.ffx import inspect as inspect_ffx
-from honeydew.affordances.ffx import session as session_ffx
 from honeydew.affordances.ffx.ui import screenshot as screenshot_ffx
 from honeydew.affordances.fuchsia_controller import location as location_fc
 from honeydew.affordances.fuchsia_controller import netstack as netstack_fc
@@ -57,8 +56,9 @@ from honeydew.affordances.power.system_power_state_controller import (
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller_using_starnix,
 )
+from honeydew.affordances.session import session, session_using_ffx
 from honeydew.interfaces.affordances import inspect as inspect_interface
-from honeydew.interfaces.affordances import rtc, session, tracing
+from honeydew.interfaces.affordances import rtc, tracing
 from honeydew.interfaces.affordances.ui import screenshot, user_input
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
@@ -386,7 +386,9 @@ class FuchsiaDevice(
         Returns:
             session.Session object
         """
-        return session_ffx.Session(device_name=self.device_name, ffx=self.ffx)
+        return session_using_ffx.SessionUsingFfx(
+            device_name=self.device_name, ffx=self.ffx
+        )
 
     @properties.Affordance
     def screenshot(self) -> screenshot.Screenshot:

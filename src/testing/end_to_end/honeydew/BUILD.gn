@@ -66,7 +66,6 @@ python_library("honeydew_no_testonly") {
     "affordances/connectivity/wlan/wlan_policy_ap/wlan_policy_ap_using_fc.py",
     "affordances/ffx/__init__.py",
     "affordances/ffx/inspect.py",
-    "affordances/ffx/session.py",
     "affordances/ffx/ui/__init__.py",
     "affordances/ffx/ui/screenshot.py",
     "affordances/fuchsia_controller/__init__.py",
@@ -80,6 +79,10 @@ python_library("honeydew_no_testonly") {
     "affordances/power/system_power_state_controller/__init__.py",
     "affordances/power/system_power_state_controller/system_power_state_controller.py",
     "affordances/power/system_power_state_controller/system_power_state_controller_using_starnix.py",
+    "affordances/session/__init__.py",
+    "affordances/session/errors.py",
+    "affordances/session/session.py",
+    "affordances/session/session_using_ffx.py",
     "auxiliary_devices/__init__.py",
     "auxiliary_devices/power_switch_dmc.py",
     "errors.py",
@@ -91,7 +94,6 @@ python_library("honeydew_no_testonly") {
     "interfaces/affordances/location.py",
     "interfaces/affordances/netstack.py",
     "interfaces/affordances/rtc.py",
-    "interfaces/affordances/session.py",
     "interfaces/affordances/tracing.py",
     "interfaces/affordances/ui/__init__.py",
     "interfaces/affordances/ui/screenshot.py",
@@ -219,6 +221,7 @@ group("unit_tests") {
       "honeydew/affordances/connectivity/wlan/wlan_policy/tests/unit_tests:tests",
       "honeydew/affordances/connectivity/wlan/wlan_policy_ap/tests/unit_tests:tests",
       "honeydew/affordances/power/system_power_state_controller/tests/unit_tests:tests",
+      "honeydew/affordances/session/tests/unit_tests:tests",
       "tests/unit_tests:tests",
     ]
   }
@@ -237,6 +240,7 @@ group("functional_tests") {
       "honeydew/affordances/connectivity/wlan/wlan_policy/tests/functional_tests:tests",
       "honeydew/affordances/connectivity/wlan/wlan_policy_ap/tests/functional_tests:tests",
       "honeydew/affordances/power/system_power_state_controller/tests/functional_tests/test_system_power_state_controller:tests",
+      "honeydew/affordances/session/tests/functional_tests:tests",
       "tests/functional_tests:tests",
     ]
   }

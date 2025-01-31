@@ -15,12 +15,12 @@ from honeydew.affordances.connectivity.wlan.wlan_policy_ap import wlan_policy_ap
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller,
 )
+from honeydew.affordances.session import session
 from honeydew.interfaces.affordances import (
     inspect,
     location,
     netstack,
     rtc,
-    session,
     tracing,
 )
 from honeydew.interfaces.affordances.ui import screenshot, user_input

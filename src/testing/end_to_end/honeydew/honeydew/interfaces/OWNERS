@@ -3,5 +3,4 @@
 # https://android-review.googlesource.com/plugins/code-owners/Documentation/path-expressions.html#findOwnersCaveat
 
 per-file ui/** = chaopeng@google.com
-per-file session.py = chaopeng@google.com
 per-file rtc.py = hansens@google.com

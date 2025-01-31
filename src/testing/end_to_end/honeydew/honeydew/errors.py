@@ -138,10 +138,6 @@ class FuchsiaDeviceError(HoneydewError):
     """Base exception for errors raised by fuchsia device."""
 
 
-class SessionError(HoneydewError):
-    """Exception for errors raised by Session."""
-
-
 class DeviceNotConnectedError(HoneydewError):
     """Exception to be raised when device is not connected to host."""
 

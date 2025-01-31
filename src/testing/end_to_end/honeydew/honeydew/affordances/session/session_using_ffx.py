@@ -4,11 +4,12 @@
 """Session affordance implementation using ffx."""
 
 from honeydew import errors
-from honeydew.interfaces.affordances import session
+from honeydew.affordances.session import errors as session_errors
+from honeydew.affordances.session import session
 from honeydew.transports import ffx as ffx_transport
 
 
-class Session(session.Session):
+class SessionUsingFfx(session.Session):
     """Session affordance implementation using ffx.
 
     Args:
@@ -28,13 +29,13 @@ class Session(session.Session):
         started.
 
         Raises:
-            honeydew.errors.SessionError: session failed to start.
+            SessionError: session failed to start.
         """
 
         try:
             self._ffx.run(["session", "start"])
         except errors.FfxCommandError as err:
-            raise errors.SessionError(err)
+            raise session_errors.SessionError(err)
 
         self._started = True
 
@@ -45,26 +46,25 @@ class Session(session.Session):
             url: url of the component
 
         Raises:
-            honeydew.errors.SessionError: Session failed to launch component
-                with given url. Session is not started.
+            SessionError: Session failed to launch component with given url. Session is not started.
         """
         if not self._started:
-            raise errors.SessionError("session is not started.")
+            raise session_errors.SessionError("session is not started.")
 
         try:
             self._ffx.run(["session", "add", url])
         except errors.FfxCommandError as err:
-            raise errors.SessionError(err)
+            raise session_errors.SessionError(err)
 
     def stop(self) -> None:
         """Stop the session.
 
         Raises:
-            honeydew.errors.SessionError: Session failed stop to the session.
+            SessionError: Session failed stop to the session.
         """
 
         try:
             self._ffx.run(["session", "stop"])
         except errors.FfxCommandError as err:
-            raise errors.SessionError(err)
+            raise session_errors.SessionError(err)
         self._started = False

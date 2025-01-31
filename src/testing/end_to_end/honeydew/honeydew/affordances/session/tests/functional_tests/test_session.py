@@ -9,7 +9,7 @@ import time
 from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, test_runner
 
-from honeydew import errors
+from honeydew.affordances.session import errors as session_errors
 from honeydew.interfaces.device_classes import fuchsia_device
 
 _LOGGER = logging.getLogger(__name__)
@@ -56,7 +56,7 @@ class SessionAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         Ensure it is not a timeout error.
         """
 
-        with asserts.assert_raises(errors.SessionError):
+        with asserts.assert_raises(session_errors.SessionError):
             self.device.session.add_component(TILE_URL)
 
     def test_add_component_wrong_url(self) -> None:
@@ -66,7 +66,7 @@ class SessionAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
 
         wrong_url = "INVALID_URL"
 
-        with asserts.assert_raises(errors.SessionError):
+        with asserts.assert_raises(session_errors.SessionError):
             self.device.session.add_component(wrong_url)
 
     def test_add_component_twice(self) -> None:

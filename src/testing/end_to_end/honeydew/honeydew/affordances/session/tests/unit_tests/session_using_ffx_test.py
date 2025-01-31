@@ -8,7 +8,8 @@ import unittest
 from unittest import mock
 
 from honeydew import errors
-from honeydew.affordances.ffx import session as ffx_session
+from honeydew.affordances.session import errors as session_errors
+from honeydew.affordances.session import session_using_ffx
 from honeydew.transports import ffx as ffx_transport
 
 TILE_URL = "fuchsia-pkg://fuchsia.com/foo#meta/bar.cm"
@@ -22,7 +23,7 @@ class SessionFFXTests(unittest.TestCase):
         super().setUp()
 
         self.ffx_obj = mock.MagicMock(spec=ffx_transport.FFX)
-        self.session_obj = ffx_session.Session(
+        self.session_obj = session_using_ffx.SessionUsingFfx(
             device_name="fuchsia-emulator", ffx=self.ffx_obj
         )
 
@@ -35,7 +36,7 @@ class SessionFFXTests(unittest.TestCase):
         """Test for ffx raise ffx error in Session.start()."""
         self.ffx_obj.run.side_effect = errors.FfxCommandError("ffx error")
 
-        with self.assertRaises(errors.SessionError):
+        with self.assertRaises(session_errors.SessionError):
             self.session_obj.start()
 
     def test_start_timeout_error(self) -> None:
@@ -55,7 +56,7 @@ class SessionFFXTests(unittest.TestCase):
 
     def test_add_component_not_started_error(self) -> None:
         """Test for session not started in Session.add_component()."""
-        with self.assertRaises(errors.SessionError):
+        with self.assertRaises(session_errors.SessionError):
             self.session_obj.add_component(TILE_URL)
 
     def test_add_component_ffx_error(self) -> None:
@@ -64,7 +65,7 @@ class SessionFFXTests(unittest.TestCase):
 
         self.ffx_obj.run.side_effect = errors.FfxCommandError("ffx error")
 
-        with self.assertRaises(errors.SessionError):
+        with self.assertRaises(session_errors.SessionError):
             self.session_obj.add_component(TILE_URL)
 
     def test_add_component_timeout_error(self) -> None:
@@ -90,7 +91,7 @@ class SessionFFXTests(unittest.TestCase):
 
         self.ffx_obj.run.side_effect = errors.FfxCommandError("ffx error")
 
-        with self.assertRaises(errors.SessionError):
+        with self.assertRaises(session_errors.SessionError):
             self.session_obj.stop()
 
     def test_stop_timeout_error(self) -> None:

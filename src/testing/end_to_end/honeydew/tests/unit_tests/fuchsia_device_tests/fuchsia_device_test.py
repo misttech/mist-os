@@ -30,7 +30,6 @@ from honeydew.affordances.connectivity.wlan.wlan import wlan_using_fc
 from honeydew.affordances.connectivity.wlan.wlan_policy import (
     wlan_policy_using_fc,
 )
-from honeydew.affordances.ffx import session as session_ffx
 from honeydew.affordances.ffx.ui import screenshot as screenshot_ffx
 from honeydew.affordances.fuchsia_controller import rtc as rtc_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
@@ -40,6 +39,7 @@ from honeydew.affordances.fuchsia_controller.ui import (
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller_using_starnix,
 )
+from honeydew.affordances.session import session_using_ffx
 from honeydew.fuchsia_device import fuchsia_device
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
@@ -338,7 +338,9 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
     def test_session(self) -> None:
         """Test case to make sure fuchsia_device supports session
         affordance implemented using FFX"""
-        self.assertIsInstance(self.fd_fc_obj.session, session_ffx.Session)
+        self.assertIsInstance(
+            self.fd_fc_obj.session, session_using_ffx.SessionUsingFfx
+        )
 
     def test_screenshot(self) -> None:
         """Test case to make sure fuchsia_device supports screenshot
