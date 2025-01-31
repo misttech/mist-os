@@ -245,6 +245,8 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
           fuchsia_component_test::Service{{.name = "fuchsia.hardware.block.volume.Service"}}),
       fuchsia_component_test::Capability::WithService(
           fuchsia_component_test::Service{{.name = "fuchsia.hardware.ramdisk.Service"}}),
+      fuchsia_component_test::Capability::WithService(
+          fuchsia_component_test::Service{{.name = "fuchsia.storage.ftl.Service"}}),
   }};
   driver_test_realm::AddDtrExposes(realm_builder, exposes);
 
@@ -276,6 +278,9 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
           .device_id = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_RAM_NAND,
       },
   });
+  realm_args.mutable_exposes()->emplace_back(
+      fuchsia::driver::test::Expose{.service_name = "fuchsia.storage.ftl.Service",
+                                    .collection = fuchsia::driver::test::Collection::BOOT_DRIVERS});
   if (zx_status_t status = driver_test_realm->Start(std::move(realm_args), &realm_result);
       status != ZX_OK) {
     return status;
