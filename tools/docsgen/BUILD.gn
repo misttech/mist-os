@@ -103,20 +103,9 @@ action("invoke_fidldoc") {
 
 clidoc_tarfile = "${target_out_dir}/clidoc_out.tar.gz"
 
-# Some SDK dependencies lifted from //src/developer/ffx/build/ffx_action.
-# This is the actual label for the sdk host tools, and is used to provide the
-# path to the sdk molecule manifest.
-sdk_host_tools_visibility_bridge_label =
-    "//src/developer/ffx/build:internal_sdk_tools_for_ffx($host_toolchain)"
-
-_sdk_host_tools_label = "//sdk:host_tools.internal($host_toolchain)"
-sdk_host_tools_manifest =
-    get_label_info(_sdk_host_tools_label, "root_out_dir") +
-    "/sdk/manifest/host_tools.internal"
-
-# The list of tools to be documented comes from the sdk_host_tools_for_single_toolchain
-# This label expected to be a "sdk_molecule" so there is a manifest generated and the tool
-# executables are dependencies. This means they are built before clidoc runs.
+# The list of tools to be documented comes from the
+# `sdk_host_tools_for_single_toolchain` target, which generates a manifest we
+# can use and ensures the tool executables are built before clidoc runs.
 _sdk_host_tools_for_single_toolchain_label =
     "//sdk:host_tools_for_single_toolchain($host_toolchain)"
 _sdk_host_tools_for_single_toolchain_gen_dir =
@@ -135,7 +124,6 @@ action("invoke_clidoc") {
     "//src/developer/ffx/frontends/ffx:ffx_bin_unversioned($host_toolchain)",
     "//tools/clidoc:clidoc_bin($host_toolchain)",
     _sdk_host_tools_for_single_toolchain_label,
-    sdk_host_tools_visibility_bridge_label,
   ]
 
   metadata = {
@@ -155,7 +143,6 @@ action("invoke_clidoc") {
   inputs = [
     _clidoc_path,
     "${root_out_dir}/ffx_tools.json",
-    sdk_host_tools_manifest,
     _sdk_host_tools_for_single_toolchain_manifest,
   ]
   outputs = [ clidoc_tarfile ]
@@ -171,7 +158,7 @@ action("invoke_clidoc") {
     "--sdk-root",
     rebase_path(root_build_dir, root_build_dir),
     "--sdk-manifest",
-    rebase_path(sdk_host_tools_manifest, root_build_dir),
+    rebase_path(_sdk_host_tools_for_single_toolchain_manifest, root_build_dir),
     "--isolate-dir",
     rebase_path(target_gen_dir, root_build_dir),
     "--subtool-manifest",
