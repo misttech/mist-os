@@ -219,7 +219,7 @@ async fn wipe_storage_fxblob(
             zx::Status::NOT_FOUND
         })
         .on_timeout(FIND_PARTITION_DURATION, || {
-            log::error!("Failed to find fxfs within timeout");
+            log::warn!("Failed to find fxfs within timeout");
             Err(zx::Status::NOT_FOUND)
         })
         .await?;
@@ -296,7 +296,7 @@ async fn wipe_storage_fvm(
             zx::Status::NOT_FOUND
         })
         .on_timeout(FIND_PARTITION_DURATION, || {
-            log::error!("Failed to find FVM within timeout");
+            log::warn!("Failed to find FVM within timeout");
             Err(zx::Status::NOT_FOUND)
         })
         .await?;
@@ -849,7 +849,7 @@ pub fn fshost_admin(
                     }) => {
                         log::info!("admin wipe storage called");
                         let res = if !config.ramdisk_image {
-                            log::error!(
+                            log::warn!(
                                 "Can't WipeStorage from a non-recovery build; \
                                 ramdisk_image must be set."
                             );
@@ -867,7 +867,7 @@ pub fn fshost_admin(
                             {
                                 Ok(()) => Ok(()),
                                 Err(e) => {
-                                    log::error!(e:?; "admin service: wipe_storage failed");
+                                    log::warn!(e:?; "admin service: wipe_storage failed");
                                     Err(zx::Status::INTERNAL.into_raw())
                                 }
                             }

@@ -1013,8 +1013,17 @@ impl Component {
                     self.handle_mount(partition_index, outgoing_directory, options, false)
                         .await
                         .map_err(|error| {
-                            error!(error:?, partition_index; "Failed to mount volume");
-                            map_to_raw_status(error)
+                            let error = map_to_status(error);
+                            if error == zx::Status::WRONG_TYPE {
+                                warn!(
+                                    error:?,
+                                    partition_index;
+                                    "Volume had unexpected format. Not continuing mount."
+                                );
+                            } else {
+                                error!(error:?, partition_index; "Failed to mount volume");
+                            }
+                            error.into_raw()
                         }),
                 )?,
                 VolumeRequest::SetLimit { responder, bytes } => {

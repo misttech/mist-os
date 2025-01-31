@@ -169,6 +169,13 @@ template("fshost_integration_test_component") {
 #     [bool] Enable additional fshost integration tests for more specific things. Default to
 #            enabled, but some configurations don't support them.
 #
+#   allow_error_severity_logs (default: false)
+#     [bool] Configure the test package to allow error-severity logs for this suite of integration
+#            tests. These errors can indicate real issues, so this should be used sparingly.
+#            TODO(https://fxbug.dev/391891190): Remove this option. Tests with expected error logs
+#            we can't get around (e.g. tests with intentional filesystem corruption) should go into
+#            the corrupt integration component.
+#
 #   data_filesystem_variant (optional)
 #     [string] A variant string passed to the integration test harness. Defaults to the
 #              data_filesystem_format.
@@ -202,6 +209,9 @@ template("fshost_integration_test_package") {
   }
   if (!defined(invoker.enable_corrupt_tests)) {
     invoker.enable_corrupt_tests = true
+  }
+  if (!defined(invoker.allow_error_severity_logs)) {
+    invoker.allow_error_severity_logs = false
   }
 
   _fshost_target = "test-fshost-${target_name}"
@@ -368,10 +378,12 @@ template("fshost_integration_test_package") {
   fuchsia_test_package(_main_test_package) {
     package_name = _main_test_package_name
     test_specs = {
-      log_settings = {
-        max_severity = "ERROR"
-      }
       parallel = 1
+      if (invoker.allow_error_severity_logs) {
+        log_settings = {
+          max_severity = "ERROR"
+        }
+      }
     }
     test_components = _test_components
 
@@ -409,6 +421,9 @@ fshost_integration_test_package("fshost_integration_tests_fxfs") {
 
 fshost_integration_test_package("fshost_integration_tests_storage_host_fxfs") {
   enable_migration_tests = false
+
+  # TODO(https://fxbug.dev/391891190): Enable failing on error logs when errors are fixed.
+  allow_error_severity_logs = true
   data_filesystem_variant = "fxblob"
   options = {
     data_filesystem_format = "fxfs"
@@ -428,6 +443,9 @@ fshost_integration_test_package(
   enable_migration_tests = false
   enable_wipe_storage_tests = false
   enable_write_data_file_tests = false
+
+  # TODO(https://fxbug.dev/391891190): Enable failing on error logs when errors are fixed.
+  allow_error_severity_logs = true
   options = {
     data_filesystem_format = "minfs"
     use_disk_migration = false
@@ -446,6 +464,9 @@ fshost_integration_test_package(
   enable_migration_tests = false
   enable_wipe_storage_tests = false
   enable_write_data_file_tests = false
+
+  # TODO(https://fxbug.dev/391891190): Enable failing on error logs when errors are fixed.
+  allow_error_severity_logs = true
   data_filesystem_variant = "minfs-no-zxcrypt"
   options = {
     data_filesystem_format = "minfs"

@@ -1241,6 +1241,9 @@ async fn initialized_gpt() {
 
     assert_eq!(gpt_num_partitions(&fixture).await, 1);
 
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
     fixture.tear_down().await;
 }
 

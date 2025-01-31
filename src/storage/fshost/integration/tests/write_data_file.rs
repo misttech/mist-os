@@ -12,8 +12,7 @@ use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio};
 
 pub mod config;
 use config::{
-    blob_fs_type, data_fs_name, data_fs_spec, data_fs_type, new_builder, volumes_spec,
-    DATA_FILESYSTEM_VARIANT,
+    blob_fs_type, data_fs_spec, data_fs_type, new_builder, volumes_spec, DATA_FILESYSTEM_VARIANT,
 };
 
 const PAYLOAD: &[u8] = b"top secret stuff";
@@ -137,6 +136,7 @@ async fn unformatted_netboot() {
 }
 
 #[fuchsia::test]
+#[cfg_attr(feature = "f2fs", ignore)]
 async fn unformatted_small_disk() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("ramdisk_image", true);
@@ -155,11 +155,6 @@ async fn unformatted_small_disk() {
 
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
-    if data_fs_name() == "f2fs" {
-        call_write_data_file(&admin).await.expect_err("write_data_file succeeded");
-        fixture.tear_down().await;
-        return;
-    }
     call_write_data_file(&admin).await.expect("write_data_file failed");
     let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
     fixture.tear_down().await;

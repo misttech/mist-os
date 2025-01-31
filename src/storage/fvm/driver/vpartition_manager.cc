@@ -166,7 +166,7 @@ zx_status_t VPartitionManager::DoIoLocked(zx_handle_t vmo, size_t off, size_t le
   const bool flushing = opcode == BLOCK_OPCODE_WRITE;
   const size_t num_txns = num_data_txns + (flushing ? 1 : 0);
 
-  fbl::Array<uint8_t> buffer(new uint8_t[block_op_size_ * num_txns], block_op_size_ * num_txns);
+  fbl::Array<uint8_t> buffer(new uint8_t[block_op_size_ * num_txns], block_op_size_* num_txns);
 
   VpmIoCookie cookie;
   cookie.num_txns.store(num_txns);
@@ -377,7 +377,7 @@ zx_status_t VPartitionManager::Load() {
     }
     VPartitionEntry* entry = GetAllocatedVPartEntry(i);
     if (entry->IsInactive()) {
-      zxlogf(ERROR, "Freeing %u slices from inactive partition %zu (%s)", entry->slices, i,
+      zxlogf(WARNING, "Freeing %u slices from inactive partition %zu (%s)", entry->slices, i,
              entry->name().c_str());
       FreeSlices(vpartitions[i].get(), 0, VSliceMax());
       continue;
@@ -398,7 +398,8 @@ zx_status_t VPartitionManager::Load() {
       .slice_size = header->slice_size,
       .num_slices = header->pslice_count,
       .partition_table_entries = header->GetPartitionTableEntryCount(),
-      // TODO(https://fxbug.dev/42116137): Set to the actual value when partition table size is configurable
+      // TODO(https://fxbug.dev/42116137): Set to the actual value when partition table size is
+      // configurable
       .partition_table_reserved_entries = header->GetPartitionTableEntryCount(),
       .allocation_table_entries = header->GetAllocationTableUsedEntryCount(),
       .allocation_table_reserved_entries = header->GetAllocationTableAllocatedEntryCount(),
