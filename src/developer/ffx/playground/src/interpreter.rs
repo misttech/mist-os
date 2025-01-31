@@ -138,6 +138,31 @@ pub enum MessageError {
     DecodeRequestFailed(Arc<fidl_codec::Error>),
 }
 
+/// Information about a path in the interpreter's namespace.
+pub struct PathInfo {
+    /// The actual path of the file after canonicalization and, if requested,
+    /// following all symlinks.
+    pub hard_path: String,
+
+    /// Information about the file itself.
+    pub attributes: fio::NodeAttributes2,
+}
+
+/// Suggests what to do when opening a path and encountering a symlink.
+pub enum SymlinkPolicy {
+    /// Follow symlinks.
+    Follow,
+    /// Do not follow symlinks.
+    DontFollow,
+}
+
+impl SymlinkPolicy {
+    /// Whether this policy says to follow symlinks.
+    pub fn follow(&self) -> bool {
+        matches!(self, SymlinkPolicy::Follow)
+    }
+}
+
 /// Maximum number of symlinks we can follow on path lookup before exploding.
 pub(crate) const SYMLINK_RECURSION_LIMIT: usize = 40;
 
@@ -444,10 +469,35 @@ impl InterpreterInner {
         Ok(node)
     }
 
-    /// Open a file in this interpreter's namespace.
-    pub async fn open(&self, path: String, fs_root: Value, pwd: Value) -> Result<Value> {
+    /// Get information about a file in this interpreter's namespace.
+    pub async fn path_info(
+        &self,
+        path: String,
+        fs_root: Value,
+        pwd: Value,
+        query: fio::NodeAttributesQuery,
+        symlink_policy: SymlinkPolicy,
+    ) -> Result<PathInfo> {
         let Some(fs_root) = fs_root.to_in_use_handle() else {
             return Err(FSError::FSRootNotHandle.into());
+        };
+
+        self.path_info_impl(path, &fs_root, pwd, query, symlink_policy).await
+    }
+
+    /// Like `path_info` but takes a `&InUseHandle` for `fs_root`.
+    async fn path_info_impl(
+        &self,
+        path: String,
+        fs_root: &InUseHandle,
+        pwd: Value,
+        query: fio::NodeAttributesQuery,
+        symlink_policy: SymlinkPolicy,
+    ) -> Result<PathInfo> {
+        let query = if symlink_policy.follow() {
+            query | fio::NodeAttributesQuery::PROTOCOLS
+        } else {
+            query
         };
 
         let mut path = canonicalize_path(path, pwd)?;
@@ -467,7 +517,7 @@ impl InterpreterInner {
                 &fs_root,
                 &path,
                 fio::Flags::PROTOCOL_NODE | fio::Flags::FLAG_SEND_REPRESENTATION,
-                Some(fio::NodeAttributesQuery::PROTOCOLS),
+                Some(query),
             )?;
             let event = node
                 .take_event_stream()
@@ -475,27 +525,17 @@ impl InterpreterInner {
                 .await
                 .ok_or_else(|| FSError::NoRepresentation(path.to_owned()))?
                 .map_err(|e| FSError::RepresentationFailed(path.to_owned(), e))?;
-            let protocols = match event {
+
+            let attributes = match event {
                 fio::NodeEvent::OnOpen_ { .. } => {
                     return Err(FSError::UnexpectedOnOpenEvent(path.to_owned()).into())
                 }
                 fio::NodeEvent::OnRepresentation { payload } => match payload {
-                    fidl_fuchsia_io::Representation::Connector(connector_info) => {
-                        if let Some(attributes) = connector_info.attributes {
-                            attributes
-                                .immutable_attributes
-                                .protocols
-                                .unwrap_or(fio::NodeProtocolKinds::CONNECTOR)
-                        } else {
-                            fio::NodeProtocolKinds::CONNECTOR
-                        }
-                    }
-                    fidl_fuchsia_io::Representation::Directory(_) => {
-                        fio::NodeProtocolKinds::DIRECTORY
-                    }
-                    fidl_fuchsia_io::Representation::File(_) => fio::NodeProtocolKinds::FILE,
-                    fidl_fuchsia_io::Representation::Symlink(_) => fio::NodeProtocolKinds::SYMLINK,
-                    _ => fio::NodeProtocolKinds::CONNECTOR,
+                    fidl_fuchsia_io::Representation::Connector(info) => info.attributes,
+                    fidl_fuchsia_io::Representation::Directory(info) => info.attributes,
+                    fidl_fuchsia_io::Representation::File(info) => info.attributes,
+                    fidl_fuchsia_io::Representation::Symlink(info) => info.attributes,
+                    _ => None,
                 },
                 fio::NodeEvent::_UnknownEvent { ordinal, .. } => {
                     return Err(FSError::UnexpectedEventInsteadOfRepresentation(
@@ -506,31 +546,18 @@ impl InterpreterInner {
                 }
             };
 
-            let (proto, node) = if protocols.contains(fio::NodeProtocolKinds::DIRECTORY) {
-                (
-                    fio::DIRECTORY_PROTOCOL_NAME.to_owned(),
-                    self.send_open_request(
-                        &fs_root,
-                        &path,
-                        fio::Flags::PROTOCOL_DIRECTORY
-                            | fio::PERM_READABLE
-                            | fio::Flags::PERM_INHERIT_WRITE,
-                        None,
-                    )?,
-                )
-            } else if protocols.contains(fio::NodeProtocolKinds::FILE) {
-                (
-                    fio::FILE_PROTOCOL_NAME.to_owned(),
-                    self.send_open_request(
-                        &fs_root,
-                        &path,
-                        fio::Flags::PROTOCOL_FILE
-                            | fio::PERM_READABLE
-                            | fio::Flags::PERM_INHERIT_WRITE,
-                        None,
-                    )?,
-                )
-            } else if protocols.contains(fio::NodeProtocolKinds::SYMLINK) {
+            let attributes = attributes.unwrap_or_else(|| fio::NodeAttributes2 {
+                mutable_attributes: Default::default(),
+                immutable_attributes: Default::default(),
+            });
+
+            let is_symlink = attributes
+                .immutable_attributes
+                .protocols
+                .unwrap_or_default()
+                .contains(fio::NodeProtocolKinds::SYMLINK);
+
+            if symlink_policy.follow() && is_symlink {
                 let symlink = self.send_open_request(
                     &fs_root,
                     &path,
@@ -557,37 +584,117 @@ impl InterpreterInner {
                 // basically start the whole circus over.
                 path = canonicalize_path_dont_check_pwd(target, prefix);
                 continue;
-            } else if protocols.contains(fio::NodeProtocolKinds::CONNECTOR) {
-                let end = path.rfind('/').expect("Canonicalized path wasn't absolute!");
+            }
 
-                let name = &path[end + 1..];
-                if name.starts_with("fuchsia.") {
-                    let mut ret = name.to_owned();
-                    let dot = ret.rfind('.').unwrap();
-                    ret.replace_range(dot..dot + 1, "/");
-                    (
-                        ret,
-                        self.send_open_request(
-                            &fs_root,
-                            &path,
-                            fio::Flags::PROTOCOL_SERVICE,
-                            None,
-                        )?,
-                    )
-                } else {
-                    (fio::NODE_PROTOCOL_NAME.to_owned(), node)
-                }
-            } else {
-                (fio::NODE_PROTOCOL_NAME.to_owned(), node)
-            };
-
-            return Ok(Value::ClientEnd(
-                node.into_channel().expect("Could not tear down proxy").into_zx_channel(),
-                proto,
-            ));
+            return Ok(PathInfo { hard_path: path, attributes });
         }
 
         Err(FSError::SymlinkRecursionExceeded(orig_path).into())
+    }
+
+    /// Open a path which is known to be a directory.
+    ///
+    /// You should already have verified that the path is a directory with
+    /// `path_info`. Opening things that aren't directories with this is an
+    /// untested code path.
+    ///
+    /// The path must also be canonicalized already.
+    pub(crate) async fn open_directory(
+        &self,
+        path: String,
+        fs_root: Value,
+    ) -> Result<fio::DirectoryProxy> {
+        debug_assert!(path.starts_with("/"));
+
+        let Some(fs_root) = fs_root.to_in_use_handle() else {
+            return Err(FSError::FSRootNotHandle.into());
+        };
+
+        let node = self.send_open_request(
+            &fs_root,
+            &path,
+            fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::Flags::PERM_INHERIT_WRITE,
+            None,
+        )?;
+        Ok(fio::DirectoryProxy::from_channel(
+            node.into_channel().expect("Could not tear down proxy"),
+        ))
+    }
+
+    /// Open a file in this interpreter's namespace.
+    pub async fn open(&self, path: String, fs_root: Value, pwd: Value) -> Result<Value> {
+        let Some(fs_root) = fs_root.to_in_use_handle() else {
+            return Err(FSError::FSRootNotHandle.into());
+        };
+
+        let info = self
+            .path_info_impl(
+                path,
+                &fs_root,
+                pwd,
+                fio::NodeAttributesQuery::PROTOCOLS,
+                SymlinkPolicy::Follow,
+            )
+            .await?;
+
+        let protocols = info
+            .attributes
+            .immutable_attributes
+            .protocols
+            .unwrap_or(fio::NodeProtocolKinds::empty());
+
+        let path = info.hard_path;
+
+        let (proto, node) = if protocols.contains(fio::NodeProtocolKinds::DIRECTORY) {
+            (
+                fio::DIRECTORY_PROTOCOL_NAME.to_owned(),
+                self.send_open_request(
+                    &fs_root,
+                    &path,
+                    fio::Flags::PROTOCOL_DIRECTORY
+                        | fio::PERM_READABLE
+                        | fio::Flags::PERM_INHERIT_WRITE,
+                    None,
+                )?,
+            )
+        } else if protocols.contains(fio::NodeProtocolKinds::FILE) {
+            (
+                fio::FILE_PROTOCOL_NAME.to_owned(),
+                self.send_open_request(
+                    &fs_root,
+                    &path,
+                    fio::Flags::PROTOCOL_FILE | fio::PERM_READABLE | fio::Flags::PERM_INHERIT_WRITE,
+                    None,
+                )?,
+            )
+        } else if protocols.contains(fio::NodeProtocolKinds::SYMLINK) {
+            unreachable!("path_info was supposed to traverse symlinks but didn't!");
+        } else if protocols.contains(fio::NodeProtocolKinds::CONNECTOR) {
+            let end = path.rfind('/').expect("Canonicalized path wasn't absolute!");
+
+            let name = &path[end + 1..];
+            if name.starts_with("fuchsia.") {
+                let mut ret = name.to_owned();
+                let dot = ret.rfind('.').unwrap();
+                ret.replace_range(dot..dot + 1, "/");
+                (ret, self.send_open_request(&fs_root, &path, fio::Flags::PROTOCOL_SERVICE, None)?)
+            } else {
+                (
+                    fio::NODE_PROTOCOL_NAME.to_owned(),
+                    self.send_open_request(&fs_root, &path, fio::Flags::PROTOCOL_NODE, None)?,
+                )
+            }
+        } else {
+            (
+                fio::NODE_PROTOCOL_NAME.to_owned(),
+                self.send_open_request(&fs_root, &path, fio::Flags::PROTOCOL_NODE, None)?,
+            )
+        };
+
+        Ok(Value::ClientEnd(
+            node.into_channel().expect("Could not tear down proxy").into_zx_channel(),
+            proto,
+        ))
     }
 }
 

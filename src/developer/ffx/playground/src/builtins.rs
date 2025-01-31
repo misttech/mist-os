@@ -17,7 +17,7 @@ use std::task::{Poll, Waker};
 use crate::error::{Result, RuntimeError};
 use crate::interpreter::{
     canonicalize_path, Exception, FSError, IOError, Interpreter, InterpreterInner, MessageError,
-    SYMLINK_RECURSION_LIMIT,
+    SymlinkPolicy,
 };
 use crate::value::{
     InUseHandle, Invocable, PlaygroundValue, ReplayableIterator, ReplayableIteratorCursor, Value,
@@ -33,6 +33,7 @@ impl Interpreter {
                 self.get_runnable("$fs_root").await.expect("Could not compile fs_root getter");
             let pwd_getter = self.get_runnable("$pwd").await.expect("Could not compile pwd getter");
             let pwd_getter_clone = pwd_getter.clone();
+            let fs_root_getter_clone = fs_root_getter.clone();
             self.add_command("open", move |mut args, underscore| {
                 let inner_weak = inner_weak.clone();
                 let fs_root_getter = fs_root_getter.clone();
@@ -157,27 +158,21 @@ impl Interpreter {
 
             let inner_weak = Arc::downgrade(&self.inner);
             let pwd_getter = pwd_getter_clone.clone();
-            let fs_root_copy_getter = self
-                .get_runnable(&format!(
-                    "req \\o fs_root @Open {{ flags: {}, mode: 0, path: \".\", object: $o }}",
-                    fio::OpenFlags::RIGHT_READABLE.bits()
-                ))
-                .await
-                .expect("fs_root open call failed to compile");
             // Returns an iterator of objects of the form
             // { "name": Value::String, "kind": Value::String }
             self.add_command("ls", move |args, _| {
                 let pwd_getter = pwd_getter.clone();
                 let inner_weak = inner_weak.clone();
-                let fs_root_copy_getter = fs_root_copy_getter.clone();
+                let fs_root_getter = fs_root_getter_clone.clone();
                 async move {
                     let Some(inner) = inner_weak.upgrade() else {
                         return Err(anyhow!("Interpreter died"));
                     };
 
-                    let mut pwd = pwd_getter().await?;
+                    let pwd = pwd_getter().await?;
+                    let mut fs_root = fs_root_getter().await?;
 
-                    let mut path_initial = if args.is_empty() {
+                    let path = if args.is_empty() {
                         ".".to_owned()
                     } else if args.len() > 1 {
                         return Err(anyhow!("ls takes at most one argument"));
@@ -191,97 +186,60 @@ impl Interpreter {
                         path
                     };
 
-                    let fs_root = fs_root_copy_getter()
-                        .await?
-                        .try_client_channel(inner.lib_namespace(), "fuchsia.io/Node")
-                        .map_err(|_| anyhow!("$fs_root is not a directory"))?;
+                    let info = inner
+                        .path_info(
+                            path.clone(),
+                            fs_root.duplicate(),
+                            pwd,
+                            fio::NodeAttributesQuery::PROTOCOLS | fio::NodeAttributesQuery::MODE,
+                            SymlinkPolicy::Follow,
+                        )
+                        .await?;
+                    let protocols = info
+                        .attributes
+                        .immutable_attributes
+                        .protocols
+                        .unwrap_or(fio::NodeProtocolKinds::empty());
 
-                    let fs_root = fuchsia_async::Channel::from_channel(fs_root);
-                    let fs_root = fio::NodeProxy::from_channel(fs_root);
-
-                    if fs_root.get_attr().await?.1.mode & fio::MODE_TYPE_MASK
-                        != fio::MODE_TYPE_DIRECTORY
-                    {
-                        return Err(anyhow!("$fs_root is not a directory"));
-                    }
-
-                    let fs_root =
-                        fio::DirectoryProxy::from_channel(fs_root.into_channel().unwrap());
-
-                    for _ in 0..SYMLINK_RECURSION_LIMIT {
-                        let path = canonicalize_path(path_initial, pwd.duplicate())?;
-                        let (node, server) = fidl::endpoints::create_proxy();
-                        fs_root.open(
-                            fio::OpenFlags::NODE_REFERENCE,
-                            fio::ModeType::empty(),
-                            &path,
-                            server,
-                        )?;
-
-                        let mode = node.get_attr().await?.1.mode;
-
-                        return if mode & fio::MODE_TYPE_MASK == fio::MODE_TYPE_DIRECTORY {
-                            let (dir, server) =
-                                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-                            let server = fidl::endpoints::ServerEnd::new(server.into_channel());
-                            fs_root.open(
-                                fio::OpenFlags::RIGHT_READABLE,
-                                fio::ModeType::empty(),
-                                &path,
-                                server,
-                            )?;
-                            Ok(Value::List(
-                                fuchsia_fs::directory::readdir(&dir)
-                                    .await?
-                                    .into_iter()
-                                    .map(|x| {
-                                        Value::Object(vec![
-                                            ("name".to_owned(), Value::String(x.name)),
-                                            (
-                                                "kind".to_owned(),
-                                                Value::String(format!("{:?}", x.kind)),
-                                            ),
-                                        ])
-                                    })
-                                    .collect(),
-                            ))
-                        } else if mode & fio::MODE_TYPE_MASK == fio::MODE_TYPE_SYMLINK {
-                            let (client, server) =
-                                fidl::endpoints::create_proxy::<fio::SymlinkMarker>();
-                            let server = fidl::endpoints::ServerEnd::new(server.into_channel());
-                            fs_root.open(
-                                fio::OpenFlags::RIGHT_READABLE,
-                                fio::ModeType::empty(),
-                                &path,
-                                server,
-                            )?;
-
-                            let info = client.describe().await?;
-                            let target = info
-                                .target
-                                .ok_or_else(|| anyhow!("Symlink at {path} has no target"))?;
-                            let target = String::from_utf8(target)
-                                .map_err(|_| anyhow!("Symlink at {path} has non-utf8 target"))?;
-                            path_initial = target;
-                            pwd = Value::String(path);
-                            continue;
-                        } else {
-                            let name = path.rsplit_once("/").unwrap().1.to_owned();
-                            let kind = match mode & fio::MODE_TYPE_MASK {
-                                fio::MODE_TYPE_BLOCK_DEVICE => fio::DirentType::BlockDevice,
-                                fio::MODE_TYPE_SERVICE => fio::DirentType::Service,
-                                fio::MODE_TYPE_FILE => fio::DirentType::File,
-                                _ => fio::DirentType::Unknown,
-                            };
-
-                            Ok(Value::Object(vec![
-                                ("name".to_owned(), Value::String(name)),
-                                ("kind".to_owned(), Value::String(format!("{:?}", kind))),
-                            ]))
+                    return if protocols.contains(fio::NodeProtocolKinds::DIRECTORY) {
+                        let dir = inner.open_directory(info.hard_path, fs_root).await?;
+                        Ok(Value::List(
+                            fuchsia_fs::directory::readdir(&dir)
+                                .await?
+                                .into_iter()
+                                .map(|x| {
+                                    Value::Object(vec![
+                                        ("name".to_owned(), Value::String(x.name)),
+                                        ("kind".to_owned(), Value::String(format!("{:?}", x.kind))),
+                                    ])
+                                })
+                                .collect(),
+                        ))
+                    } else if protocols.contains(fio::NodeProtocolKinds::SYMLINK) {
+                        unreachable!("path_info was supposed to traverse symlinks but didn't!");
+                    } else {
+                        let mode = info.attributes.mutable_attributes.mode.unwrap_or(0);
+                        let name = path.rsplit_once("/").unwrap().1.to_owned();
+                        let kind = match mode & fio::MODE_TYPE_MASK {
+                            fio::MODE_TYPE_BLOCK_DEVICE => fio::DirentType::BlockDevice,
+                            fio::MODE_TYPE_SERVICE => fio::DirentType::Service,
+                            fio::MODE_TYPE_FILE => fio::DirentType::File,
+                            _ => {
+                                if protocols.contains(fio::NodeProtocolKinds::FILE) {
+                                    fio::DirentType::File
+                                } else if protocols.contains(fio::NodeProtocolKinds::CONNECTOR) {
+                                    fio::DirentType::Service
+                                } else {
+                                    fio::DirentType::Unknown
+                                }
+                            }
                         };
-                    }
 
-                    Err(anyhow!("Symlink recursion depth exceeded"))
+                        Ok(Value::Object(vec![
+                            ("name".to_owned(), Value::String(name)),
+                            ("kind".to_owned(), Value::String(format!("{:?}", kind))),
+                        ]))
+                    };
                 }
             })
             .await;
