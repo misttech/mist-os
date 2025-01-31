@@ -408,6 +408,7 @@ impl TestServer {
         };
 
         debug!("parse output file for {}", test);
+        debug!("Contents are:\n{}", result_str);
         let test_list: TestOutput =
             serde_json::from_str(&result_str).map_err(RunTestError::JsonParse)?;
         debug!("parsed output file for {}", test);
