@@ -167,9 +167,10 @@ open protocol ActivityGovernorListener {
     /// Called when the activity governor detects a system resume.
     ///
     /// This is only called when the wakeup reason returned by the platform
-    /// requires a full system resume.
-    /// The server is expected to respond once it has performed the operations
-    /// required to keep the system awake, if needed.
+    /// requires a full system resume. All dependencies of
+    /// ExecutionStateLevel::SUSPENDING are guaranteed to be satisified when
+    /// this call is issued, and the listener's OnSuspendStarted method will be
+    /// invoked before that guarantee is removed.
     ///
     /// SAG does not block on the response to this method, so the listener may
     /// safely take actions that block on raising Execution State's power level.
@@ -179,7 +180,9 @@ open protocol ActivityGovernorListener {
     /// Called before the activity governor initiates a system suspension.
     ///
     /// The server is expected to respond once it has performed the operations
-    /// it needs to prepare itself for suspend, if any.
+    /// it needs to prepare itself for suspend, if any. All dependencies of
+    /// ExecutionStateLevel::SUSPENDING are guaranteed to be satisified for the
+    /// duration of this call.
     ///
     /// It is not safe for this method to call
     /// ActivityGovernor.TakeApplicationActivityLease or to perform any
