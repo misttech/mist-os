@@ -23,7 +23,6 @@ fpromise::result<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> OpenWith
   return fpromise::ok(std::move(client));
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(24)
 fpromise::result<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> OpenWithResult(
     const fdf::Namespace& ns, async_dispatcher_t* dispatcher, const char* path,
     fuchsia_io::Flags flags) {
@@ -35,7 +34,6 @@ fpromise::result<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> OpenWith
   return fpromise::ok(std::move(client));
 }
 
-#endif
 }  // namespace internal
 
 fpromise::promise<void, fuchsia_driver_framework::wire::NodeError> AddChild(
