@@ -184,6 +184,7 @@ pub fn sys_fcntl(
         }
         F_GETOWN => {
             let file = current_task.files.get(fd)?;
+            security::check_file_fcntl_access(current_task, &file, cmd, arg)?;
             match file.get_async_owner() {
                 FileAsyncOwner::Unowned => Ok(0.into()),
                 FileAsyncOwner::Thread(tid) => Ok(tid.into()),
@@ -223,6 +224,7 @@ pub fn sys_fcntl(
                 }
             };
             owner.validate(current_task)?;
+            security::check_file_fcntl_access(current_task, &file, cmd, arg)?;
             file.set_async_owner(owner);
             Ok(SUCCESS)
         }
@@ -259,6 +261,7 @@ pub fn sys_fcntl(
             //
             // See https://man7.org/linux/man-pages/man2/open.2.html
             let file = current_task.files.get_allowing_opath(fd)?;
+            security::check_file_fcntl_access(current_task, &file, cmd, arg)?;
             Ok(file.flags().into())
         }
         F_SETFL => {
@@ -270,6 +273,7 @@ pub fn sys_fcntl(
             let requested_flags =
                 OpenFlags::from_bits_truncate((arg as u32) & settable_flags.bits());
             let file = current_task.files.get(fd)?;
+            security::check_file_fcntl_access(current_task, &file, cmd, arg)?;
 
             // If `NOATIME` flag is being set then check that it's allowed.
             if requested_flags.contains(OpenFlags::NOATIME)
@@ -283,6 +287,7 @@ pub fn sys_fcntl(
         }
         F_SETLK | F_SETLKW | F_GETLK | F_OFD_GETLK | F_OFD_SETLK | F_OFD_SETLKW => {
             let file = current_task.files.get(fd)?;
+            security::check_file_fcntl_access(current_task, &file, cmd, arg)?;
             let flock_ref = UserRef::<uapi::flock>::new(arg.into());
             let flock = current_task.read_object(flock_ref)?;
             let cmd = RecordLockCommand::from_raw(cmd).ok_or_else(|| errno!(EINVAL))?;

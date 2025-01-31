@@ -35,7 +35,8 @@ use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{
     errno, error, FIGETBSZ, FIOASYNC, FIONBIO, FIONREAD, FS_IOC_GETFLAGS, FS_IOC_GETVERSION,
-    FS_IOC_SETFLAGS, FS_IOC_SETVERSION,
+    FS_IOC_SETFLAGS, FS_IOC_SETVERSION, F_GETFL, F_GETLK, F_GETOWN, F_SETFL, F_SETLK, F_SETLKW,
+    F_SETOWN,
 };
 use std::collections::HashSet;
 use std::sync::{Arc, OnceLock};
@@ -1017,6 +1018,75 @@ pub(super) fn fs_node_copy_up<'a>(
 ) -> ScopedFsCreate<'a> {
     let file_sid = fs_node_effective_sid_and_class(fs_node).sid;
     scoped_fs_create(current_task, file_sid)
+}
+
+/// This hook is called by the `fcntl` syscall. Returns whether `current_task` can perform
+/// `fcntl_cmd` on the given file.
+pub(super) fn check_file_fcntl_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    file: &FileObject,
+    fcntl_cmd: u32,
+    fcntl_arg: u64,
+) -> Result<(), Errno> {
+    let permission_check = security_server.as_permission_check();
+    let subject_sid = current_task.security_state.lock().current_sid;
+    let fs_node_class = file.node().security_state.lock().class;
+
+    match fcntl_cmd {
+        F_GETLK | F_SETLK | F_SETLKW => {
+            // Checks both the Lock and Use permissions.
+            has_file_permissions(
+                &permission_check,
+                subject_sid,
+                file,
+                &[CommonFilePermission::Lock.for_class(fs_node_class)],
+            )?;
+        }
+        F_SETFL | F_SETOWN | F_GETFL | F_GETOWN => {
+            // Only checks the Use permission.
+            has_file_permissions(&permission_check, subject_sid, file, &[])?;
+        }
+        _ => {}
+    }
+
+    if fcntl_cmd != F_SETFL {
+        return Ok(());
+    }
+
+    // Based on documentation additional checks are necessary for F_SETFL, since it updates the file
+    // permissions.
+    let new_flags = OpenFlags::from_bits_truncate(fcntl_arg as u32);
+    let old_flags = file.flags();
+    let changed_flags = old_flags.symmetric_difference(new_flags);
+    if !changed_flags.contains(OpenFlags::APPEND) {
+        // The append value wasn't updated: no further checks are necessary.
+        return Ok(());
+    }
+    if new_flags.contains(OpenFlags::APPEND) {
+        if !old_flags.can_write() {
+            // The file was previously opened with read-only access. Since append is now requested,
+            // we need to check for permission.
+            todo_has_fs_node_permissions(
+                TODO_DENY!("https://fxbug.dev/385121365", "Enforce file_permission() checks"),
+                &security_server.as_permission_check(),
+                subject_sid,
+                file.node(),
+                &permissions_from_flags(PermissionFlags::APPEND, fs_node_class),
+            )?;
+        }
+    } else if old_flags.can_write() {
+        // If a file is opened with the WRITE and APPEND permissions, only the APPEND permission is
+        // checked. Now that the append flag was cleared we need to check the WRITE permission.
+        todo_has_fs_node_permissions(
+            TODO_DENY!("https://fxbug.dev/385121365", "Enforce file_permission() checks"),
+            &security_server.as_permission_check(),
+            subject_sid,
+            file.node(),
+            &permissions_from_flags(PermissionFlags::WRITE, fs_node_class),
+        )?;
+    }
+    Ok(())
 }
 
 /// If `fs_node` is in a filesystem without xattr support, returns the xattr name for the security

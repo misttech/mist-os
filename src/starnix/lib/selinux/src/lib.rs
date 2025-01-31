@@ -345,6 +345,8 @@ common_permission_enum! {
         Ioctl("ioctl"),
         /// Permissions to create hard link.
         Link("link"),
+        /// Permission to set and unset file locks.
+        Lock("lock"),
         /// Permission to use as mount point; only useful for directories and files.
         MountOn("mounton"),
         /// Permission to open a file.

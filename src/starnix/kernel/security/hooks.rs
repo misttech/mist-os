@@ -479,6 +479,26 @@ pub fn fs_node_copy_up<'a>(
     })
 }
 
+/// Returns whether `current_task` has the permissions to execute this fcntl syscall.
+/// Corresponds to the `file_fcntl()` LSM hook.
+pub fn check_file_fcntl_access(
+    current_task: &CurrentTask,
+    file: &FileObject,
+    fcntl_cmd: u32,
+    fcntl_arg: u64,
+) -> Result<(), Errno> {
+    profile_duration!("security.hooks.check_file_fcntl_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_file_fcntl_access(
+            security_server,
+            current_task,
+            file,
+            fcntl_cmd,
+            fcntl_arg,
+        )
+    })
+}
+
 /// Return the default initial `TaskState` for kernel tasks.
 /// Corresponds to the `task_alloc()` LSM hook, in the special case when current_task is null.
 pub fn task_alloc_for_kernel() -> TaskState {
