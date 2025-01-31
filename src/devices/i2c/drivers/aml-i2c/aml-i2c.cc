@@ -364,15 +364,16 @@ zx::result<> AmlI2c::Start() {
   }
   auto compat_client = fidl::WireSyncClient(std::move(compat_result.value()));
 
-  zx::result pdev_result =
-      incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>("pdev");
-  if (pdev_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to connect to pdev protocol: %s", pdev_result.status_string());
-    return pdev_result.take_error();
+  fdf::PDev pdev;
+  {
+    zx::result result =
+        incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>("pdev");
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to connect to pdev protocol: %s", result.status_string());
+      return result.take_error();
+    }
+    pdev = fdf::PDev{std::move(result.value())};
   }
-
-  fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev(
-      std::move(pdev_result.value()));
 
   if (auto mmio = MapMmio(pdev); mmio.is_error()) {
     return mmio.take_error();
@@ -393,17 +394,12 @@ zx::result<> AmlI2c::Start() {
   }
 
   {
-    auto result = pdev->GetInterruptById(0, 0);
-    if (!result.ok()) {
-      zxlogf(ERROR, "Call to GetInterruptById failed: %s", result.FormatDescription().c_str());
-      return zx::error(result->error_value());
+    zx::result interrupt = pdev.GetInterrupt(0);
+    if (interrupt.is_error()) {
+      FDF_LOG(ERROR, "Failed to get interrupt: %s", interrupt.status_string());
+      return interrupt.take_error();
     }
-    if (result->is_error()) {
-      zxlogf(ERROR, "GetInterruptById failed: %s", zx_status_get_string(result->error_value()));
-      return result->take_error();
-    }
-
-    irq_ = std::move(result->value()->irq);
+    irq_ = std::move(interrupt.value());
   }
 
   status = zx::event::create(0, &event_);
@@ -441,33 +437,7 @@ void AmlI2c::PrepareStop(fdf::PrepareStopCompleter completer) {
   irq_dispatcher_->ShutdownAsync();
 }
 
-zx::result<fdf::MmioBuffer> AmlI2c::MapMmio(
-    const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev) {
-  auto mmio = pdev->GetMmioById(0);
-  if (!mmio.ok()) {
-    FDF_LOG(ERROR, "Call to GetMmioById failed: %s", mmio.FormatDescription().c_str());
-    return zx::error(mmio.status());
-  }
-  if (mmio->is_error()) {
-    FDF_LOG(ERROR, "GetMmioById failed: %s", zx_status_get_string(mmio->error_value()));
-    return mmio->take_error();
-  }
-
-  if (!mmio->value()->has_vmo() || !mmio->value()->has_size() || !mmio->value()->has_offset()) {
-    FDF_LOG(ERROR, "GetMmioById returned invalid MMIO");
-    return zx::error(ZX_ERR_BAD_STATE);
-  }
-
-  zx::result mmio_buffer =
-      fdf::MmioBuffer::Create(mmio->value()->offset(), mmio->value()->size(),
-                              std::move(mmio->value()->vmo()), ZX_CACHE_POLICY_UNCACHED_DEVICE);
-  if (mmio_buffer.is_error()) {
-    FDF_LOG(ERROR, "Failed to map MMIO: %s", mmio_buffer.status_string());
-    return zx::error(mmio_buffer.error_value());
-  }
-
-  return mmio_buffer.take_value();
-}
+zx::result<fdf::MmioBuffer> AmlI2c::MapMmio(fdf::PDev& pdev) { return pdev.MapMmio(0); }
 
 zx_status_t AmlI2c::ServeI2cImpl() {
   auto handler = fuchsia_hardware_i2cimpl::Service::InstanceHandler(
@@ -492,26 +462,16 @@ zx_status_t AmlI2c::CreateChildNode() {
     return controller_endpoints.status_value();
   }
 
-  fidl::Arena arena;
-  std::vector<fuchsia_driver_framework::wire::Offer> offers = device_server_.CreateOffers2(arena);
-  offers.push_back(
-      fdf::MakeOffer2<fuchsia_hardware_i2cimpl::Service>(arena, component::kDefaultInstance));
+  std::vector<fuchsia_driver_framework::Offer> offers = device_server_.CreateOffers2();
+  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_i2cimpl::Service>(component::kDefaultInstance));
 
-  const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
-                        .name(arena, kChildNodeName)
-                        .offers2(offers)
-                        .Build();
-  fidl::WireResult result =
-      fidl::WireCall(node())->AddChild(args, std::move(controller_endpoints->server), {});
-  if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to send request to add child: %s", result.status_string());
-    return result.status();
+  zx::result child =
+      AddChild(kChildNodeName, std::vector<fuchsia_driver_framework::NodeProperty2>{}, offers);
+  if (child.is_error()) {
+    FDF_LOG(ERROR, "Failed to add child: %s", child.status_string());
+    return child.status_value();
   }
-  if (result->is_error()) {
-    FDF_LOG(ERROR, "Failed to add child: %u", static_cast<uint32_t>(result->error_value()));
-    return ZX_ERR_INTERNAL;
-  }
-  child_controller_.Bind(std::move(controller_endpoints->client));
+  child_controller_.Bind(std::move(child.value()));
 
   return ZX_OK;
 }
