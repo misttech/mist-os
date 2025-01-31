@@ -32,11 +32,6 @@ board_is_emu = true
 add_qemu_to_build_archives = true
 
 board_package_labels = [
-  # The following are all config_data entries, only.
-  "//src/factory/factory_store_providers/config/qemu",
-]
-
-board_package_labels += [
   "//src/settings/config:qemu_agent_config",
   "//src/settings/config:qemu_input_device_config",
   "//src/settings/config:qemu_light_hardware_config",
