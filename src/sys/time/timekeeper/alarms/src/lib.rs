@@ -29,6 +29,7 @@ use anyhow::{anyhow, Result};
 use fidl::encoding::ProxyChannelBox;
 use fidl::endpoints::RequestStream;
 use fidl::HandleBased;
+use fuchsia_inspect::HistogramProperty;
 use futures::channel::mpsc;
 use futures::sink::SinkExt;
 use futures::StreamExt;
@@ -998,6 +999,18 @@ async fn wake_timer_loop(
     #[allow(clippy::collection_is_never_read)]
     let mut hrtimer_status: Option<TimerState> = None;
 
+    let deadline_histogram = inspect.create_int_exponential_histogram(
+        "requested_deadlines_ns",
+        finspect::ExponentialHistogramParams {
+            floor: 0,
+            initial_step: zx::BootDuration::from_micros(1).into_nanos(),
+            // Step one SI prefix at a time.
+            step_multiplier: 1000,
+            // Should capture durations up to the order of many days.
+            buckets: 5,
+        },
+    );
+
     while let Some(cmd) = cmds.next().await {
         trace::duration!(c"alarms", c"Cmd");
         // Use a consistent notion of "now" across commands.
@@ -1021,6 +1034,7 @@ async fn wake_timer_loop(
                     signal(&setup_done);
                     debug!("wake_timer_loop: START: setup_done signaled");
                 };
+                deadline_histogram.insert((deadline - now).into_nanos());
                 if Timers::expired(now, deadline) {
                     trace::duration!(c"alarms", c"Cmd::Start:immediate");
                     // A timer set into now or the past expires right away.
