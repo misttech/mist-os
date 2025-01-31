@@ -46,6 +46,9 @@ ffx_tool("ffx_scrutiny_tool") {
 
   sdk_target_name = "sdk"
   sdk_category = "partner"
+
+  # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
+  exclude_toolchain_tags = [ "profile" ]
 }
 
 group("scrutiny") {
