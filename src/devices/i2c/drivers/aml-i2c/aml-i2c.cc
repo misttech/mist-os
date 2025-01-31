@@ -349,6 +349,7 @@ void AmlI2c::Transact(TransactRequestView request, fdf::Arena& arena,
 zx::result<> AmlI2c::Start() {
   // Initialize our compat server.
   {
+    // TODO(b/385164506): Don't forward DEVICE_METADATA_I2C_CHANNELS once no longer referenced.
     zx::result<> result =
         device_server_.Initialize(incoming(), outgoing(), node_name(), kChildNodeName,
                                   compat::ForwardMetadata::Some({DEVICE_METADATA_I2C_CHANNELS}));
@@ -400,6 +401,23 @@ zx::result<> AmlI2c::Start() {
       return interrupt.take_error();
     }
     irq_ = std::move(interrupt.value());
+  }
+
+  {
+    zx::result metadata = pdev.GetFidlMetadata<fuchsia_hardware_i2c_businfo::I2CBusMetadata>(
+        fuchsia_hardware_i2c_businfo::I2CBusMetadata::kSerializableName);
+    if (metadata.is_error()) {
+      FDF_LOG(ERROR, "Failed to get metadata: %s", metadata.status_string());
+      return metadata.take_error();
+    }
+    if (zx::result result = metadata_server_.SetMetadata(metadata.value()); result.is_error()) {
+      FDF_LOG(ERROR, "Failed to set metadata for metadata server: %s", result.status_string());
+      return result.take_error();
+    }
+    if (zx::result result = metadata_server_.Serve(*outgoing(), dispatcher()); result.is_error()) {
+      FDF_LOG(ERROR, "Failed to serve metadata: %s", result.status_string());
+      return result.take_error();
+    }
   }
 
   status = zx::event::create(0, &event_);
@@ -464,6 +482,7 @@ zx_status_t AmlI2c::CreateChildNode() {
 
   std::vector<fuchsia_driver_framework::Offer> offers = device_server_.CreateOffers2();
   offers.push_back(fdf::MakeOffer2<fuchsia_hardware_i2cimpl::Service>(component::kDefaultInstance));
+  offers.push_back(metadata_server_.MakeOffer());
 
   zx::result child =
       AddChild(kChildNodeName, std::vector<fuchsia_driver_framework::NodeProperty2>{}, offers);

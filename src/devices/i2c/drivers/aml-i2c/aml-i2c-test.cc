@@ -14,6 +14,7 @@
 #include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
+#include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/clock.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -196,6 +197,8 @@ class Environment {
     std::map<uint32_t, zx::interrupt> irqs;
     irqs[0] = std::move(interrupt);
     pdev_server_.SetConfig({.irqs = std::move(irqs)});
+    pdev_server_.AddFidlMetadata(fuchsia_hardware_i2c_businfo::I2CBusMetadata::kSerializableName,
+                                 fuchsia_hardware_i2c_businfo::I2CBusMetadata{});
     zx::result add_service_result = test_environment_.incoming_directory()
                                         .AddService<fuchsia_hardware_platform_device::Service>(
                                             pdev_server_.GetInstanceHandler(dispatcher), "pdev");

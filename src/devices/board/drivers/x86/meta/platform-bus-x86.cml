@@ -16,6 +16,7 @@
     },
     capabilities: [
         { service: "fuchsia.hardware.acpi.Service" },
+        { service: "fuchsia.hardware.i2c.businfo.I2CBusMetadata" },
     ],
     use: [
         {
@@ -39,6 +40,10 @@
     expose: [
         {
             service: "fuchsia.hardware.acpi.Service",
+            from: "self",
+        },
+        {
+            service: "fuchsia.hardware.i2c.businfo.I2CBusMetadata",
             from: "self",
         },
     ],

@@ -36,7 +36,8 @@ type I2CChannel = table {
     9: name string:fuchsia.hardware.i2c.MAX_I2C_NAME_LEN;
 };
 
-/// Passed to the i2c driver in metadata as DEVICE_METADATA_I2C_CHANNELS.
+/// Provided by the i2c platform device as metadata.
+@serializable
 type I2CBusMetadata = table {
     1: channels vector<I2CChannel>:MAX_I2C_CHANNEL;
     /// ID of the bus that these devices are on. Set as a bind property on the

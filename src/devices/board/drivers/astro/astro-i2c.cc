@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/debug.h>
@@ -95,18 +96,21 @@ constexpr I2cBus buses[]{
 
 zx_status_t AddI2cBus(const I2cBus& bus,
                       const fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
-  auto i2c_metadata_fidl = fidl_metadata::i2c::I2CChannelsToFidl(bus.bus_id, bus.channels);
-  if (i2c_metadata_fidl.is_error()) {
-    zxlogf(ERROR, "Failed to FIDL encode I2C channels: %s", i2c_metadata_fidl.status_string());
-    return i2c_metadata_fidl.error_value();
+  auto encoded_i2c_metadata = fidl_metadata::i2c::I2CChannelsToFidl(bus.bus_id, bus.channels);
+  if (encoded_i2c_metadata.is_error()) {
+    zxlogf(ERROR, "Failed to FIDL encode I2C channels: %s", encoded_i2c_metadata.status_string());
+    return encoded_i2c_metadata.error_value();
   }
 
-  auto& data = i2c_metadata_fidl.value();
-
   std::vector<fpbus::Metadata> i2c_metadata{
+      // TODO(b/385164506): Remove once no longer referenced.
       {{
           .id = std::to_string(DEVICE_METADATA_I2C_CHANNELS),
-          .data = std::move(data),
+          .data = encoded_i2c_metadata.value(),
+      }},
+      {{
+          .id = fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata::kSerializableName,
+          .data = std::move(encoded_i2c_metadata.value()),
       }},
   };
 
