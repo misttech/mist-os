@@ -38,7 +38,7 @@ pub enum SaveConfig {
     DoNotSave,
 }
 
-// TODO(fxbug/127781) Remove `pub` once library centralized here.
+// TODO(https://fxbug.dev/391921340) Refactor / trim when the repo daemon protocol is retired
 #[derive(Debug)]
 pub struct ServerInfo {
     server: RepositoryServer,
@@ -71,7 +71,7 @@ impl ServerInfo {
     }
 }
 
-// TODO(fxbug/127781) Remove `pub` once library centralized here.
+// TODO(https://fxbug.dev/391921340) Refactor / trim when the repo daemon protocol is retired
 #[derive(Debug)]
 pub enum ServerState {
     Running(ServerInfo),
@@ -127,12 +127,9 @@ impl ServerState {
     }
 }
 
+// TODO(https://fxbug.dev/391921340) Refactor / trim when the repo daemon protocol is retired
 pub struct RepoInner {
-    // TODO(fxbug/127781) Remove `pub` once library centralized here.
-    // Used by //src/developer/ffx/daemon/protocols/repo/src/lib.rs
     pub manager: Arc<RepositoryManager>,
-    // TODO(fxbug/127781) Remove `pub` once library centralized here.
-    // Used by //src/developer/ffx/daemon/protocols/repo/src/lib.rs
     pub server: ServerState,
     https_client: HttpsClient,
 }
