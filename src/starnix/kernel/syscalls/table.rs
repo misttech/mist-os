@@ -162,6 +162,9 @@ pub fn dispatch_syscall(
             sys_sched_getscheduler as sys_arch32_sched_getscheduler,
             sys_set_tid_address as sys_arch32_set_tid_address, sys_setuid as sys_arch32_setuid,
         };
+        pub use crate::vfs::socket::syscalls::{
+            sys_connect as sys_arch32_connect, sys_socket as sys_arch32_socket,
+        };
         pub use crate::vfs::syscalls::{
             sys_arch32_access, sys_arch32_fstat64, sys_arch32_mkdir, sys_arch32_open,
             sys_arch32_readlink, sys_arch32_rmdir, sys_arch32_stat64,
@@ -208,6 +211,7 @@ pub fn dispatch_syscall(
             clock_gettime64[2],
             clone[5],
             close[1],
+            connect[3],
             exit[1],
             exit_group[1],
             faccessat[3],
@@ -241,11 +245,12 @@ pub fn dispatch_syscall(
             rt_sigaction[4],
             rt_sigprocmask[4],
             sched_getscheduler[1],
+            setrlimit[2],
             set_robust_list[2],
             set_tid_address[1],
             setuid[1],
-            setrlimit[2],
             sigaltstack[2],
+            socket[3],
             stat64[2],
             tgkill[3],
             timer_gettime64[2],
