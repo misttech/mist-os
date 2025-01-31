@@ -588,7 +588,7 @@ if (host_os == "linux") {
 e2e_lib_unit_tests = [
   "//sdk/testing/sl4f/client:tests",
   "//tools/emulator:tests",
-  "//src/testing/end_to_end/honeydew/tests/unit_tests:tests",
+  "//src/testing/end_to_end/honeydew:unit_tests",
   "//src/testing/end_to_end/mobly_driver/tests/unit_tests:tests",
 ]
 
