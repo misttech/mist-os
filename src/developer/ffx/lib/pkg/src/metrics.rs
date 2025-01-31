@@ -29,18 +29,15 @@ async fn add_event(action: &'static str, label: Option<String>) {
         .await;
 }
 
-// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
-pub async fn server_started_event() {
+pub(crate) async fn server_started_event() {
     add_event("server.state", Some("started".into())).await
 }
 
-// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
-pub async fn server_failed_to_start_event(msg: &str) {
+pub(crate) async fn server_failed_to_start_event(msg: &str) {
     add_event("server.state", Some(msg.into())).await
 }
 
-// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
-pub async fn server_disabled_event() {
+pub(crate) async fn server_disabled_event() {
     add_event("server.state", Some("disabled".into())).await
 }
 
