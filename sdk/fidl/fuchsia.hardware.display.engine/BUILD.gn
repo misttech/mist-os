@@ -5,6 +5,10 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.display.engine") {
+  sdk_area = "Graphics"
+
+  contains_drivers = true
+
   sources = [
     "engine.fidl",
     "ids.fidl",
@@ -16,5 +20,4 @@ fidl("fuchsia.hardware.display.engine") {
     "//sdk/fidl/fuchsia.sysmem2",
     "//zircon/vdso/zx",
   ]
-  contains_drivers = true
 }
