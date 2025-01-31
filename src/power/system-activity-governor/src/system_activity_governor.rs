@@ -232,7 +232,17 @@ impl LeaseManager {
 
     async fn create_wake_lease(&self, name: String) -> Result<fsystem::LeaseToken> {
         let (server_token, client_token) = fsystem::LeaseToken::create();
-        let suspend_blocker = self.suspend_block_manager.get_suspend_blocker().await;
+
+        let suspend_blocker = match self.suspend_block_manager.try_get_blocker() {
+            None => {
+                log::info!(
+                    "Acquisition of wake lease {} temporarily blocked by suspend attempt",
+                    &name
+                );
+                self.suspend_block_manager.get_blocker().await
+            }
+            Some(blocker) => blocker,
+        };
 
         let lease_helper =
             LeaseHelper::new(
@@ -863,18 +873,25 @@ impl SuspendResumeListener for SystemActivityGovernor {
     }
 
     async fn notify_on_suspend(&self) {
-        log::debug!("notify_on_suspend ");
         // A client may call RegisterListener while handling on_suspend which may cause another
         // mutable borrow of listeners. Clone the listeners to prevent this.
-        let listeners_copy: Vec<_> = self.listeners.borrow_mut().clone();
+        let listeners: Vec<_> = self.listeners.borrow_mut().clone();
+
+        log::info!("Running on-suspend callbacks ({} listeners)", listeners.len());
 
         // Run the callbacks concurrently.
-        futures::stream::iter(listeners_copy)
-            .for_each_concurrent(None, |listener| async move {
+        // TODO(b/393212343): Include listeners' names in log messages once we have names for them.
+        futures::stream::iter(listeners)
+            .enumerate()
+            .for_each_concurrent(None, |(i, listener)| async move {
                 let _warn_task = fasync::Task::local(async move {
                     loop {
                         fasync::Timer::new(fasync::MonotonicDuration::from_seconds(10)).await;
-                        log::warn!("No response from on_suspend_started after 10 seconds!");
+                        log::warn!(
+                            "No response from on_suspend_started from listener {} after 10 \
+                            seconds!",
+                            i
+                        );
                     }
                 });
                 let _ = listener.on_suspend_started().await;
@@ -885,11 +902,26 @@ impl SuspendResumeListener for SystemActivityGovernor {
     async fn notify_on_resume(&self) {
         // A client may call RegisterListener while handling on_resume which may cause another
         // mutable borrow of listeners. Clone the listeners to prevent this.
-        let listeners_copy: Vec<_> = self.listeners.borrow_mut().clone();
+        let listeners: Vec<_> = self.listeners.borrow_mut().clone();
+
+        log::info!("Running on-resume callbacks ({} listeners)", listeners.len());
 
         // Run the callbacks concurrently.
-        futures::stream::iter(listeners_copy)
-            .for_each_concurrent(None, |listener| async move {
+        // TODO(b/393212343): Include listeners' names in log messages once we have names for them.
+        futures::stream::iter(listeners)
+            .enumerate()
+            .for_each_concurrent(None, |(i, listener)| async move {
+                // Arguably, OnResume shouldn't yield a response at all, but given that it does,
+                // we'll log if a call takes a very long time to complete.
+                let _warn_task = fasync::Task::local(async move {
+                    loop {
+                        fasync::Timer::new(fasync::MonotonicDuration::from_seconds(10)).await;
+                        log::warn!(
+                            "No response from on_resume from listener {} after 10 seconds!",
+                            i,
+                        );
+                    }
+                });
                 let _ = listener.on_resume().await;
             })
             .await;

@@ -62,14 +62,21 @@ impl SuspendBlockManager {
         SuspendBlockManager { marker: Mutex::new(Rc::new(())) }
     }
 
-    /// Returns a reference that, as long as it is held, causes suspend_allowed() to return None.
-    pub async fn get_suspend_blocker(&self) -> std::rc::Weak<()> {
+    /// Returns a suspend blocker, possibly needing to wait until an in-flight suspend attempt
+    /// completes.
+    pub async fn get_blocker(&self) -> std::rc::Weak<()> {
         let marker = self.marker.lock().await;
         Rc::downgrade(&marker)
     }
 
-    /// If suspend is allowed, returns a guard that blocks further get_suspend_blocker() calls
-    /// as long as it is held. Otherwise, returns None.
+    /// Attempts to acquire a suspend blocker immediately, returning None if the system is currently
+    /// executing a suspend attempt.
+    pub fn try_get_blocker(&self) -> Option<std::rc::Weak<()>> {
+        self.marker.try_lock().map(|marker| Rc::downgrade(&marker))
+    }
+
+    /// If suspend is allowed, returns a guard that blocks further get_blocker() calls as long as it
+    /// is held. Otherwise, returns None.
     pub(crate) fn suspend_allowed(&self) -> Option<futures::lock::MutexGuard<'_, Rc<()>>> {
         match self.marker.try_lock() {
             None => None,
