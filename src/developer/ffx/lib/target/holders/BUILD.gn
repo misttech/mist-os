@@ -34,10 +34,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:futures",
   ]
 
-  test_deps = [
-    "//src/lib/fuchsia",
-    "//third_party/rust_crates:mockall",
-  ]
+  test_deps = []
 
   sources = [
     "src/daemon_proxy.rs",
@@ -49,7 +46,6 @@ rustc_library("lib") {
     "src/from_toolbox.rs",
     "src/lib.rs",
     "src/remote_control_proxy.rs",
-    "src/target_info.rs",
     "src/target_proxy.rs",
     "src/with_moniker.rs",
   ]
