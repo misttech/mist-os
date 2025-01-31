@@ -20,6 +20,7 @@ use log_command::{
     Timestamp, WriterContainer,
 };
 use log_utils::{BootTimeAccessor, LogCommand, LogSubCommand};
+use std::future::pending;
 use std::io::Write;
 
 /// Target-side symbolizer implementation.
@@ -89,6 +90,15 @@ async fn main() -> Result<(), Error> {
         writeln!(formatter.writer().stderr(), "{warning}")?;
     }
     cmd.maybe_set_interest(&log_settings, &realm_proxy).await?;
+    if let Some(LogSubCommand::SetSeverity(options)) = cmd.sub_command {
+        if options.no_persist {
+            // Block forever.
+            pending::<()>().await;
+        } else {
+            // Interest persisted, exit.
+            return Ok(());
+        }
+    }
     formatter.set_boot_timestamp(boot_ts);
     let _ = read_logs_from_socket(
         fuchsia_async::Socket::from_socket(receiver),

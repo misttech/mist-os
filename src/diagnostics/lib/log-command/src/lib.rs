@@ -36,6 +36,34 @@ pub use log_socket_stream::{JsonDeserializeError, LogsDataStream};
 pub enum LogSubCommand {
     Watch(WatchCommand),
     Dump(DumpCommand),
+    SetSeverity(SetSeverityCommand),
+}
+
+#[derive(ArgsInfo, FromArgs, Clone, PartialEq, Debug, Default)]
+/// Sets the severity, but doesn't view any logs.
+#[argh(subcommand, name = "set-severity")]
+pub struct SetSeverityCommand {
+    /// if true, doesn't persist the interest setting
+    /// and blocks forever, keeping the connection open.
+    /// Interest settings will be reset when the command exits.
+    #[argh(switch)]
+    pub no_persist: bool,
+
+    /// if enabled, selectors will be passed directly to Archivist without any filtering.
+    /// If disabled and no matching components are found, the user will be prompted to
+    /// either enable this or be given a list of selectors to choose from.
+    #[argh(switch)]
+    pub force: bool,
+
+    /// configure the log settings on the target device for components matching
+    /// the given selector. This modifies the minimum log severity level emitted
+    /// by components during the logging session.
+    /// Specify using the format <component-selector>#<log-level>, with level
+    /// as one of FATAL|ERROR|WARN|INFO|DEBUG|TRACE.
+    /// May be repeated.
+    /// Cannot be used in conjunction with --set-severity-persist.
+    #[argh(option, from_str_fn(log_interest_selector))]
+    pub component: Vec<OneOrMany<LogInterestSelector>>,
 }
 
 #[derive(ArgsInfo, FromArgs, Clone, PartialEq, Debug)]
@@ -298,18 +326,6 @@ pub struct LogCommand {
     #[argh(switch)]
     pub force_set_severity: bool,
 
-    /// configure the log settings on the target device for components matching
-    /// the given selector. This modifies the minimum log severity level emitted
-    /// by components during the logging session.
-    /// Specify using the format <component-selector>#<log-level>, with level
-    /// as one of FATAL|ERROR|WARN|INFO|DEBUG|TRACE.
-    /// May be repeated.
-    /// This is different from set-severity in that it persists the configuration
-    /// after the command exits.
-    /// Cannot be used in conjunction with --set-severity.
-    #[argh(option, from_str_fn(log_interest_selector))]
-    pub set_severity_persist: Vec<OneOrMany<LogInterestSelector>>,
-
     /// enables structured JSON logs.
     #[cfg(target_os = "fuchsia")]
     #[argh(switch)]
@@ -346,7 +362,6 @@ impl Default for LogCommand {
             json: false,
             #[cfg(not(target_os = "fuchsia"))]
             symbolize: SymbolizeMode::Pretty,
-            set_severity_persist: vec![],
         }
     }
 }
@@ -514,43 +529,35 @@ impl LogCommand {
         log_settings_client: &LogSettingsProxy,
         realm_query: &impl InstanceGetter,
     ) -> Result<(), LogError> {
-        if !self.set_severity.is_empty() && !self.set_severity_persist.is_empty() {
-            ffx_bail!(
-                "Cannot use both --set-severity and --set-severity-persist in the same invocation."
-            );
-        }
-        if !self.set_severity.is_empty() {
-            let selectors = if self.force_set_severity {
-                self.set_severity.clone().into_iter().flatten().collect::<Vec<_>>()
+        let (set_severity, force_set_severity, persist) =
+            if let Some(LogSubCommand::SetSeverity(options)) = &self.sub_command {
+                // No other argument can exist in conjunction with SetSeverity
+                let default_cmd = LogCommand {
+                    sub_command: Some(LogSubCommand::SetSeverity(options.clone())),
+                    ..Default::default()
+                };
+                if &default_cmd != self {
+                    ffx_bail!("Cannot combine set-severity with other options.");
+                }
+                (&options.component, options.force, !options.no_persist)
+            } else {
+                (&self.set_severity, self.force_set_severity, false)
+            };
+        if persist {
+            let selectors = if force_set_severity {
+                set_severity.clone().into_iter().flatten().collect::<Vec<_>>()
             } else {
                 let new_selectors =
-                    Self::map_interest_selectors(realm_query, self.set_severity.iter().flatten())
+                    Self::map_interest_selectors(realm_query, set_severity.iter().flatten())
                         .await?
                         .map(|s| s.into_owned())
                         .collect::<Vec<_>>();
                 if new_selectors.is_empty() {
-                    self.set_severity.clone().into_iter().flatten().collect::<Vec<_>>()
+                    set_severity.clone().into_iter().flatten().collect::<Vec<_>>()
                 } else {
                     new_selectors
                 }
             };
-
-            log_settings_client.set_interest(&selectors).await?;
-        }
-
-        if !self.set_severity_persist.is_empty() {
-            let selectors = if self.force_set_severity {
-                self.set_severity_persist.clone().into_iter().flatten().collect::<Vec<_>>()
-            } else {
-                Self::map_interest_selectors(
-                    realm_query,
-                    self.set_severity_persist.iter().flatten(),
-                )
-                .await?
-                .map(|s| s.into_owned())
-                .collect::<Vec<_>>()
-            };
-
             log_settings_client
                 .set_component_interest(
                     &fidl_fuchsia_diagnostics::LogSettingsSetComponentInterestRequest {
@@ -560,6 +567,23 @@ impl LogCommand {
                     },
                 )
                 .await?;
+        } else if !set_severity.is_empty() {
+            let selectors = if force_set_severity {
+                set_severity.clone().into_iter().flatten().collect::<Vec<_>>()
+            } else {
+                let new_selectors =
+                    Self::map_interest_selectors(realm_query, set_severity.iter().flatten())
+                        .await?
+                        .map(|s| s.into_owned())
+                        .collect::<Vec<_>>();
+                if new_selectors.is_empty() {
+                    set_severity.clone().into_iter().flatten().collect::<Vec<_>>()
+                } else {
+                    new_selectors
+                }
+            };
+
+            log_settings_client.set_interest(&selectors).await?;
         }
 
         Ok(())
@@ -651,7 +675,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn maybe_set_interest_errors_if_both_set_severity_and_set_severity_persist_used() {
+    async fn maybe_set_interest_errors_additional_arguments_passed_to_set_interest() {
         let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>();
         let getter = FakeInstanceGetter {
             expected_selector: Some("ambiguous_selector".into()),
@@ -663,13 +687,14 @@ mod test {
         // Main should return an error
 
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            set_severity_persist: vec![OneOrMany::One(
-                parse_log_interest_selector("ambiguous_selector#INFO").unwrap(),
-            )],
-            set_severity: vec![OneOrMany::One(
-                parse_log_interest_selector("ambiguous_selector#INFO").unwrap(),
-            )],
+            sub_command: Some(LogSubCommand::SetSeverity(SetSeverityCommand {
+                component: vec![OneOrMany::One(
+                    parse_log_interest_selector("ambiguous_selector#INFO").unwrap(),
+                )],
+                force: false,
+                no_persist: false,
+            })),
+            hide_file: true,
             ..LogCommand::default()
         };
         let mut set_interest_result = None;
@@ -689,60 +714,7 @@ mod test {
 
         let error = format!("{}", set_interest_result.unwrap().unwrap_err());
 
-        const EXPECTED_INTEREST_ERROR: &str =
-            "Cannot use both --set-severity and --set-severity-persist in the same invocation.";
-        assert_eq!(error, EXPECTED_INTEREST_ERROR);
-    }
-
-    #[fuchsia::test]
-    async fn maybe_set_interest_errors_if_ambiguous_selector_with_persistence() {
-        let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>();
-        let getter = FakeInstanceGetter {
-            expected_selector: Some("ambiguous_selector".into()),
-            output: vec![
-                Moniker::try_from("core/some/ambiguous_selector:thing/test").unwrap(),
-                Moniker::try_from("core/other/ambiguous_selector:thing/test").unwrap(),
-            ],
-        };
-        // Main should return an error
-
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            set_severity_persist: vec![OneOrMany::One(
-                parse_log_interest_selector("ambiguous_selector#INFO").unwrap(),
-            )],
-            ..LogCommand::default()
-        };
-        let mut set_interest_result = None;
-
-        let mut scheduler = FuturesUnordered::new();
-        scheduler.push(Either::Left(async {
-            set_interest_result = Some(cmd.maybe_set_interest(&settings_proxy, &getter).await);
-            drop(settings_proxy);
-        }));
-        scheduler.push(Either::Right(async {
-            let request = settings_server.into_stream().next().await;
-            // The channel should be closed without sending any requests.
-            assert_matches!(request, None);
-        }));
-        while scheduler.next().await.is_some() {}
-        drop(scheduler);
-
-        let error = format!("{}", set_interest_result.unwrap().unwrap_err());
-
-        const EXPECTED_INTEREST_ERROR: &str = r#"WARN: One or more of your selectors appears to be ambiguous
-and may not match any components on your system.
-
-If this is unintentional you can explicitly match using the
-following command:
-
-ffx log \
-	--set-severity core/some/ambiguous_selector\\:thing/test#INFO \
-	--set-severity core/other/ambiguous_selector\\:thing/test#INFO
-
-If this is intentional, you can disable this with
-ffx log --force-set-severity.
-"#;
+        const EXPECTED_INTEREST_ERROR: &str = "Cannot combine set-severity with other options.";
         assert_eq!(error, EXPECTED_INTEREST_ERROR);
     }
 
@@ -880,11 +852,13 @@ ffx log --force-set-severity.
     #[fuchsia::test]
     async fn logger_prints_ignores_ambiguity_if_force_set_severity_is_used() {
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            set_severity: vec![OneOrMany::One(
-                parse_log_interest_selector("ambiguous_selector#INFO").unwrap(),
-            )],
-            force_set_severity: true,
+            sub_command: Some(LogSubCommand::SetSeverity(SetSeverityCommand {
+                no_persist: true,
+                component: vec![OneOrMany::One(
+                    parse_log_interest_selector("ambiguous_selector#INFO").unwrap(),
+                )],
+                force: true,
+            })),
             ..LogCommand::default()
         };
         let getter = FakeInstanceGetter {
@@ -922,11 +896,13 @@ ffx log --force-set-severity.
     #[fuchsia::test]
     async fn logger_prints_ignores_ambiguity_if_force_set_severity_is_used_persistent() {
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            set_severity_persist: vec![OneOrMany::One(
-                parse_log_interest_selector("ambiguous_selector#INFO").unwrap(),
-            )],
-            force_set_severity: true,
+            sub_command: Some(LogSubCommand::SetSeverity(SetSeverityCommand {
+                no_persist: false,
+                component: vec![log_socket_stream::OneOrMany::One(
+                    parse_log_interest_selector("ambiguous_selector#INFO").unwrap(),
+                )],
+                force: true,
+            })),
             ..LogCommand::default()
         };
         let getter = FakeInstanceGetter {
@@ -950,6 +926,7 @@ ffx log --force-set-severity.
                 Some(Ok(LogSettingsRequest::SetComponentInterest { payload, responder })) =>
                 (payload, responder)
             );
+            assert_eq!(payload.persist, Some(true));
             responder.send().unwrap();
             assert_eq!(
                 payload.selectors.unwrap(),

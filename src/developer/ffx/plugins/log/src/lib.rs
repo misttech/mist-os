@@ -246,6 +246,15 @@ where
         }
 
         cmd.maybe_set_interest(&connection.log_settings_client, &connection.realm_query).await?;
+        if let Some(LogSubCommand::SetSeverity(ref options)) = cmd.sub_command {
+            if options.no_persist {
+                // Block forever.
+                futures::future::pending::<()>().await;
+            } else {
+                // Interest persisted, exit.
+                return Ok(());
+            }
+        }
         formatter.set_boot_timestamp(Timestamp::from_nanos(
             connection.boot_timestamp.try_into().unwrap(),
         ));

@@ -260,18 +260,6 @@
       "short": null,
       "description": "if enabled, selectors will be passed directly to Archivist without any filtering. If disabled and no matching components are found, the user will be prompted to either enable this or be given a list of selectors to choose from. This applies to both --set-severity and --set-severity-persist.",
       "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
-          "arg_name": "set-severity-persist"
-        }
-      },
-      "optionality": "repeating",
-      "long": "--set-severity-persist",
-      "short": null,
-      "description": "configure the log settings on the target device for components matching the given selector. This modifies the minimum log severity level emitted by components during the logging session. Specify using the format <component-selector>#<log-level>, with level as one of FATAL|ERROR|WARN|INFO|DEBUG|TRACE. May be repeated. This is different from set-severity in that it persists the configuration after the command exits. Cannot be used in conjunction with --set-severity.",
-      "hidden": false
     }
   ],
   "notes": [
