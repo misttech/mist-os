@@ -1,5 +1,5 @@
 {
-    "short_description": "Virtual audio DFv1 driver used for integration testing",
+    "short_description": "Virtual audio DFv2 driver used for integration testing",
     "manufacturer": "",
     "families": [],
     "models": [],

@@ -250,6 +250,7 @@ size_checker_input = {
         "audio-capture-timestamp-validator",
         "audio_ffx_daemon",
         "virtual_audio",
+        "virtual-audio-dfv2",
         "audio-codec-ctl",
         "audio-effects-ctl",
         "audio_listener",

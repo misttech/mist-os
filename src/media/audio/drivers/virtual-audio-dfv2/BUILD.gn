@@ -1,0 +1,70 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
+
+import("//build/bind/bind.gni")
+import("//build/components.gni")
+import("//build/drivers.gni")
+import("//build/test.gni")
+import("//build/zbi/kernel_cmdline.gni")
+
+driver_bind_rules("virtual-audio-dfv2-bind") {
+  rules = "meta/virtual-audio-dfv2.bind"
+  tests = "meta/bind-tests.json"
+  deps = [ "//src/devices/bind/fuchsia.platform" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":virtual-audio-dfv2-test" ]
+}
+
+source_set("common") {
+  sources = [
+    "virtual-audio-dfv2.cc",
+    "virtual-audio-dfv2.h",
+  ]
+  deps = [ "//src/devices/lib/driver:driver_runtime" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.virtualaudio:fuchsia.virtualaudio_cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/devfs/cpp",
+  ]
+}
+
+fuchsia_cc_driver("virtual-audio-dfv2-driver") {
+  deps = [ ":common" ]
+}
+
+fuchsia_driver_component("virtual-audio-dfv2-driver-component") {
+  component_name = "virtual-audio-dfv2-driver"
+  deps = [
+    ":virtual-audio-dfv2-bind",
+    ":virtual-audio-dfv2-driver",
+  ]
+  info = "meta/virtual-audio-dfv2-info.json"
+  manifest = "meta/virtual-audio-dfv2-driver.cml"
+}
+
+fuchsia_driver_package("virtual-audio-dfv2") {
+  driver_components = [ ":virtual-audio-dfv2-driver-component" ]
+}
+
+test("virtual-audio-dfv2-test-bin") {
+  sources = [ "virtual-audio-dfv2-test.cc" ]
+  deps = [
+    ":common",
+    "//sdk/lib/driver/testing/cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+  ]
+}
+
+fuchsia_unittest_package("virtual-audio-dfv2-test") {
+  deps = [ ":virtual-audio-dfv2-test-bin" ]
+  test_specs = {
+    environments = basic_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
