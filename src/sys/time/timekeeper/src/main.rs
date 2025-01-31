@@ -691,6 +691,7 @@ mod tests {
             serve_test_protocols,
             has_real_time_clock: true,
             serve_fuchsia_time_alarms: false,
+            has_always_on_counter: false,
         }))
     }
 

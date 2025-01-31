@@ -77,8 +77,12 @@
         // Set if the underlying board has a real time clock (RTC) device.
         has_real_time_clock: { type: "bool" },
 
-        /// If set, Timekeeper will serve `fuchsia.time.alarms` and will connect
-        /// to the appropriate hardware device to do so.
+        // If set, Timekeeper will serve `fuchsia.time.alarms` and will connect
+        // to the appropriate hardware device to do so.
         serve_fuchsia_time_alarms: { type: "bool" },
+
+        // If set, the hardware has a counter that is always on and operates even
+        // if the rest of the hardware system is in a low power state.
+        has_always_on_counter: { type: "bool" },
     },
 }
