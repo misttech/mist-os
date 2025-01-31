@@ -132,21 +132,10 @@ async fn data_formatted_no_fuchsia_boot() {
 async fn data_formatted_with_small_initial_volume() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec()).data_volume_size(1);
-
-    #[allow(unused_mut)]
-    let mut fixture = builder.build().await;
+    let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
-
-    // With the storage-host configuration, the FVM driver is responsible for mounting the data
-    // volume, and we use the error code returned to decide whether to generate a crash report.
-    // Specifically, we look for the `WRONG_TYPE` error code and if we get that, we assume it's most
-    // likely due to FDR or flashing.  In this test, the error is something other than `WRONG_TYPE`
-    // so it generates a crash report, which is arguably the right thing to do, but you won't get a
-    // crash report for the non storage-host configuration or for fxfs.
-    #[cfg(all(feature = "storage-host", not(feature = "fxfs")))]
-    fixture.ignore_crash_reports();
 
     fixture.tear_down().await;
 }
@@ -161,21 +150,10 @@ async fn data_formatted_with_small_initial_volume_big_target() {
         fshost_test_fixture::disk_builder::DEFAULT_DISK_SIZE * 2,
     );
     builder.with_disk().format_volumes(volumes_spec()).data_volume_size(1);
-
-    #[allow(unused_mut)]
-    let mut fixture = builder.build().await;
+    let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
-
-    // With the storage-host configuration, the FVM driver is responsible for mounting the data
-    // volume, and we use the error code returned to decide whether to generate a crash report.
-    // Specifically, we look for the `WRONG_TYPE` error code and if we get that, we assume it's most
-    // likely due to FDR or flashing.  In this test, the error is something other than `WRONG_TYPE`
-    // so it generates a crash report, which is arguably the right thing to do, but you won't get a
-    // crash report for the non storage-host configuration or for fxfs.
-    #[cfg(all(feature = "storage-host", not(feature = "fxfs")))]
-    fixture.ignore_crash_reports();
 
     fixture.tear_down().await;
 }

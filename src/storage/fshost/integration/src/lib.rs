@@ -220,7 +220,6 @@ impl TestFixtureBuilder {
             ramdisk_vmo: None,
             crash_reports,
             torn_down: TornDown(false),
-            ignore_crash_reports: false,
             storage_host: self.storage_host,
         };
 
@@ -264,7 +263,6 @@ pub struct TestFixture {
     pub ramdisk_vmo: Option<zx::Vmo>,
     pub crash_reports: mpsc::Receiver<ffeedback::CrashReport>,
     torn_down: TornDown,
-    ignore_crash_reports: bool,
     storage_host: bool,
 }
 
@@ -273,9 +271,7 @@ impl TestFixture {
         log::info!(realm_name:? = self.realm.root.child_name(); "tearing down");
         // Check the crash reports before destroying the realm because tearing down the realm can
         // cause mounting errors that trigger a crash report.
-        if !self.ignore_crash_reports {
-            assert_matches!(self.crash_reports.try_next(), Ok(None) | Err(_));
-        }
+        assert_matches!(self.crash_reports.try_next(), Ok(None) | Err(_));
         self.realm.destroy().await.unwrap();
         self.torn_down.0 = true;
     }
@@ -473,10 +469,5 @@ impl TestFixture {
                 }
             });
         }
-    }
-
-    /// Ignore crash reports when tearing down the fixture.
-    pub fn ignore_crash_reports(&mut self) {
-        self.ignore_crash_reports = true;
     }
 }

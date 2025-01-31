@@ -22,6 +22,7 @@ use fidl_fuchsia_fs_startup::{
 };
 use fidl_fuchsia_hardware_block::BlockMarker;
 use fs_management::filesystem::{BlockConnector, Filesystem};
+use fs_management::format::{detect_disk_format, DiskFormat};
 use fs_management::{ComponentType, FSConfig, Options};
 use fuchsia_runtime::HandleType;
 use futures::future::BoxFuture;
@@ -1111,6 +1112,17 @@ impl Component {
 
             let volume = MountedVolume::new(block_server);
             let volume_scope = volume.scope.clone();
+
+            if !format && caps[1].to_string() == "minfs" {
+                // It's relatively normal to try to mount a filesystem, discover it's not the right
+                // format, and reformat it so it is. If this filesystem is supposed to be minfs,
+                // spot-check that this partition is the right format before we try serving, and
+                // return the proper error without logging scary things if it is not.
+                let block_proxy = volume.connect_block()?.into_proxy();
+                let detected_format = detect_disk_format(block_proxy).await;
+                ensure!(detected_format == DiskFormat::Minfs, zx::Status::WRONG_TYPE);
+            }
+
             let mut fs = Filesystem::new(volume.clone(), ComponentName(caps[1].to_string()));
 
             if format {
