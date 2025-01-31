@@ -1004,10 +1004,9 @@ async fn wake_timer_loop(
         finspect::ExponentialHistogramParams {
             floor: 0,
             initial_step: zx::BootDuration::from_micros(1).into_nanos(),
-            // Step one SI prefix at a time.
-            step_multiplier: 1000,
-            // Should capture durations up to the order of many days.
-            buckets: 5,
+            // Allows capturing deadlines up to dozens of days.
+            step_multiplier: 10,
+            buckets: 16,
         },
     );
 
