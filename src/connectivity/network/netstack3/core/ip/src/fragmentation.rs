@@ -514,14 +514,17 @@ impl<'a, I: FragmentationIpExt, S: FragmentableIpSerializer<I>> IpFragmenter<'a,
         })
     }
 
-    /// Returns the serializer for the next segment, or `None` if all segments
-    /// have been produced.
+    /// Returns the serializer for the next segment and a boolean indicating
+    /// whether more fragments are pending, or `None` if all segments have been
+    /// produced.
     ///
     /// # Panics
     ///
     /// Panics if fragmentation is not necessary for the `serializer` that
     /// created this `IpFragmenter`.
-    pub(crate) fn next(&mut self) -> Option<impl Serializer<Buffer = EmptyBuf> + Capture<'a, '_>> {
+    pub(crate) fn next(
+        &mut self,
+    ) -> Option<(impl Serializer<Buffer = EmptyBuf> + Capture<'a, '_>, bool)> {
         let Self {
             builder,
             body,
@@ -557,9 +560,10 @@ impl<'a, I: FragmentationIpExt, S: FragmentableIpSerializer<I>> IpFragmenter<'a,
             FragmentOffset::new_with_bytes(fragment_offset).expect("invalid offset");
         let fragment_builder = builder.builder_at(fragment_offset, position, *identifier);
         let end = *consumed + take;
+        let has_more = body.len() > take;
         let fragment_body = &body[..take];
         *consumed = end;
-        Some(fragment_body.into_serializer().encapsulate(fragment_builder))
+        Some((fragment_body.into_serializer().encapsulate(fragment_builder), has_more))
     }
 }
 
@@ -636,6 +640,7 @@ mod tests {
         fn next_serialized(&mut self) -> Buf<Vec<u8>> {
             self.next()
                 .expect("no more fragments")
+                .0
                 .serialize_vec_outer()
                 .map_err(|(err, _serializer)| err)
                 .unwrap()

@@ -140,6 +140,7 @@ fn send_frame<I: TestIpExt + IpExt>(tx_queue_config: TransmitQueueConfiguration)
             &device,
             IpPacketDestination::<I, _>::from_addr(I::TEST_ADDRS.local_ip),
             default_ip_packet::<I>(),
+            Default::default(),
         )
         .expect("send should succeed");
     }

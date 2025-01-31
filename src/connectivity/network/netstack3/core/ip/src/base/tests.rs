@@ -69,13 +69,13 @@ impl<I: IpLayerIpExt> IpDeviceMtuContext<I> for FakeCoreCtx<I> {
     }
 }
 
-impl<I: IpLayerIpExt, BC> IpDeviceSendContext<I, BC> for FakeCoreCtx<I> {
+impl<I: IpLayerIpExt, BC: TxMetadataBindingsTypes> IpDeviceSendContext<I, BC> for FakeCoreCtx<I> {
     fn send_ip_frame<S>(
         &mut self,
         _bindings_ctx: &mut BC,
         _device_id: &Self::DeviceId,
         _destination: IpPacketDestination<I, &Self::DeviceId>,
-        _ip_layer_metadata: DeviceIpLayerMetadata,
+        _ip_layer_metadata: DeviceIpLayerMetadata<BC>,
         body: S,
         _egress_proof: filter::ProofOfEgressCheck,
     ) -> Result<(), netstack3_base::SendFrameError<S>>

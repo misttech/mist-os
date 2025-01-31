@@ -234,9 +234,11 @@ pub use marker::{BindingsContext, BindingsTypes, CoreContext, IpBindingsContext,
 pub use netstack3_base::{
     CtxPair, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
     ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TracingContext,
+    TxMetadataBindingsTypes,
 };
 pub use state::{StackState, StackStateBuilder};
 pub use time::{AtomicInstant, Instant, TimerId};
+pub use transport::TxMetadata;
 
 // Re-export useful macros.
 pub use netstack3_device::for_any_device_id;

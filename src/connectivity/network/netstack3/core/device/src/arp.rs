@@ -13,7 +13,7 @@ use net_types::{SpecifiedAddr, UnicastAddr, Witness as _};
 use netstack3_base::{
     CoreTimerContext, Counter, CounterContext, DeviceIdContext, EventContext, FrameDestination,
     InstantBindingsTypes, LinkDevice, SendFrameContext, SendFrameError, TimerContext,
-    TracingContext, WeakDeviceIdentifier,
+    TracingContext, TxMetadataBindingsTypes, WeakDeviceIdentifier,
 };
 use netstack3_ip::nud::{
     self, ConfirmationFlags, DynamicNeighborUpdateSource, LinkResolutionContext, NudBindingsTypes,
@@ -78,6 +78,7 @@ pub trait ArpSenderContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceI
         bindings_ctx: &mut BC,
         dst_link_address: D::Address,
         body: S,
+        meta: BC::TxMetadata,
     ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
@@ -109,6 +110,7 @@ pub trait ArpBindingsContext<D: ArpDevice, DeviceId>:
     + TracingContext
     + LinkResolutionContext<D>
     + EventContext<nud::Event<D::Address, DeviceId, Ipv4, <Self as InstantBindingsTypes>::Instant>>
+    + TxMetadataBindingsTypes
 {
 }
 
@@ -120,7 +122,7 @@ impl<
             + LinkResolutionContext<D>
             + EventContext<
                 nud::Event<D::Address, DeviceId, Ipv4, <Self as InstantBindingsTypes>::Instant>,
-            >,
+            > + TxMetadataBindingsTypes,
     > ArpBindingsContext<D, DeviceId> for BC
 {
 }
@@ -291,13 +293,14 @@ impl<D: ArpDevice, BC: ArpBindingsContext<D, CC::DeviceId>, CC: ArpSenderContext
         bindings_ctx: &mut BC,
         dst_mac: D::Address,
         body: S,
+        meta: BC::TxMetadata,
     ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
         S::Buffer: BufferMut,
     {
         let Self(core_ctx) = self;
-        core_ctx.send_ip_packet_to_neighbor_link_addr(bindings_ctx, dst_mac, body)
+        core_ctx.send_ip_packet_to_neighbor_link_addr(bindings_ctx, dst_mac, body, meta)
     }
 }
 
@@ -639,7 +642,7 @@ mod tests {
     use netstack3_base::socket::SocketIpAddr;
     use netstack3_base::testutil::{
         assert_empty, FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeInstant, FakeLinkDeviceId,
-        FakeNetworkSpec, FakeTimerId, FakeWeakDeviceId, WithFakeFrameContext,
+        FakeNetworkSpec, FakeTimerId, FakeTxMetadata, FakeWeakDeviceId, WithFakeFrameContext,
     };
     use netstack3_base::{CtxPair, InstantContext as _, IntoCoreTimerCtx, TimerHandler};
     use netstack3_ip::nud::testutil::{
@@ -860,6 +863,7 @@ mod tests {
             _bindings_ctx: &mut FakeBindingsCtxImpl,
             _dst_link_address: Mac,
             _body: S,
+            _tx_meta: FakeTxMetadata,
         ) -> Result<(), SendFrameError<S>> {
             Ok(())
         }
@@ -1011,6 +1015,7 @@ mod tests {
                 &FakeLinkDeviceId,
                 SpecifiedAddr::new(TEST_REMOTE_IPV4).unwrap(),
                 Buf::new([1], ..),
+                FakeTxMetadata::default(),
             ),
             Ok(())
         );
@@ -1179,6 +1184,7 @@ mod tests {
                     &FakeLinkDeviceId,
                     SpecifiedAddr::new(requested_remote_proto_addr).unwrap(),
                     Buf::new([1], ..),
+                    FakeTxMetadata::default(),
                 ),
                 Ok(())
             );
@@ -1292,6 +1298,7 @@ mod tests {
                 &FakeLinkDeviceId,
                 SpecifiedAddr::new(TEST_REMOTE_IPV4).unwrap(),
                 Buf::new([1], ..),
+                FakeTxMetadata::default(),
             ),
             Ok(())
         );

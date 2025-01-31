@@ -530,6 +530,8 @@ pub struct DeviceSocketMetadata<D: DeviceSocketSendTypes, DeviceId> {
     pub device_id: DeviceId,
     /// The metadata required to send that's specific to the device type.
     pub metadata: D::Metadata,
+    // TODO(https://fxbug.dev/391946195): Include send buffer ownership metadata
+    // here.
 }
 
 /// Parameters needed to apply system-framing of an Ethernet frame.

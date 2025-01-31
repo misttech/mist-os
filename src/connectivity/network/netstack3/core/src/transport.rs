@@ -57,6 +57,8 @@
 
 mod integration;
 
+use core::marker::PhantomData;
+
 use derivative::Derivative;
 use net_types::ip::{Ip, Ipv4, Ipv6};
 use netstack3_base::{HandleableTimer, TimerHandler};
@@ -159,5 +161,36 @@ where
 impl<BT: BindingsTypes> From<TcpTimerId<WeakDeviceId<BT>, BT>> for TransportLayerTimerId<BT> {
     fn from(id: TcpTimerId<WeakDeviceId<BT>, BT>) -> Self {
         TransportLayerTimerId::Tcp(id)
+    }
+}
+
+/// The frame metadata type for frames traversing the stack.
+#[derive(Derivative)]
+#[derivative(Debug = "transparent", Debug(bound = ""), Default(bound = ""))]
+#[cfg_attr(any(test, feature = "testutils"), derivative(PartialEq(bound = "")))]
+pub struct TxMetadata<BT: BindingsTypes>(TxMetadataInner<BT>);
+
+/// The internal metadata type.
+///
+/// This is split from [`TxMetadata`] so the outer type is opaque to bindings.
+#[derive(Derivative)]
+#[derivative(Debug(bound = ""), Default(bound = ""))]
+enum TxMetadataInner<BT: BindingsTypes> {
+    #[derivative(Default)]
+    None,
+    // TODO(https://fxbug.dev/42074004): Remove placeholder. It's here for now
+    // to ground the `BT` type parameter. We're using `Timer` here because it
+    // has the appropriate Send, Sync, 'static bounds to satisfy TxMetadata
+    // requirements.
+    _Placeholder(PhantomData<BT::Timer>),
+}
+
+#[cfg(any(test, feature = "testutils"))]
+impl<BT: BindingsTypes> PartialEq for TxMetadataInner<BT> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::None, Self::None) => true,
+            (Self::_Placeholder(_), _) | (_, Self::_Placeholder(_)) => unreachable!(),
+        }
     }
 }

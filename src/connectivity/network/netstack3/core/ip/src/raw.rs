@@ -17,7 +17,8 @@ use netstack3_base::sync::{PrimaryRc, StrongRc, WeakRc};
 use netstack3_base::{
     AnyDevice, ContextPair, DeviceIdContext, Inspector, InspectorDeviceExt, IpDeviceAddr, IpExt,
     ReferenceNotifiers, ReferenceNotifiersExt as _, RemoveResourceResultWithContext,
-    ResourceCounterContext, StrongDeviceIdentifier, WeakDeviceIdentifier, ZonedAddressError,
+    ResourceCounterContext, StrongDeviceIdentifier, TxMetadataBindingsTypes, WeakDeviceIdentifier,
+    ZonedAddressError,
 };
 use netstack3_filter::RawIpBody;
 use packet::{BufferMut, SliceBufViewMut};
@@ -43,7 +44,7 @@ pub(crate) mod protocol;
 pub(crate) mod state;
 
 /// Types provided by bindings used in the raw IP socket implementation.
-pub trait RawIpSocketsBindingsTypes {
+pub trait RawIpSocketsBindingsTypes: TxMetadataBindingsTypes {
     /// The bindings state (opaque to core) associated with a socket.
     type RawIpSocketState<I: Ip>: Send + Sync + Debug;
 }
@@ -196,6 +197,10 @@ where
                     Ok(RawIpBody::new(protocol, src_ip.addr(), remote_ip.addr(), body))
                 };
 
+            // TODO(https://fxbug.dev/392111277): Enforce send buffer for raw ip
+            // sockets.
+            let tx_metadata = Default::default();
+
             core_ctx
                 .send_oneshot_ip_packet_with_fallible_serializer(
                     bindings_ctx,
@@ -204,6 +209,7 @@ where
                     remote_ip,
                     protocol,
                     &send_options,
+                    tx_metadata,
                     build_packet_fn,
                 )
                 .map_err(|e| match e {
@@ -845,7 +851,7 @@ mod test {
     use net_types::ip::{IpVersion, Ipv4, Ipv6};
     use netstack3_base::sync::{DynDebugReferences, Mutex};
     use netstack3_base::testutil::{
-        FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId, TestIpExt,
+        FakeStrongDeviceId, FakeTxMetadata, FakeWeakDeviceId, MultipleDevicesId, TestIpExt,
     };
     use netstack3_base::{ContextProvider, CounterContext, CtxPair};
     use packet::{Buf, InnerPacketBuilder as _, ParseBuffer as _, Serializer as _};
@@ -905,6 +911,10 @@ mod test {
         SendIpPacketMeta<I, D, SpecifiedAddr<<I as Ip>::Addr>>,
         D,
     >;
+
+    impl<D: FakeStrongDeviceId> TxMetadataBindingsTypes for FakeBindingsCtx<D> {
+        type TxMetadata = FakeTxMetadata;
+    }
 
     impl<D: FakeStrongDeviceId> RawIpSocketsBindingsTypes for FakeBindingsCtx<D> {
         type RawIpSocketState<I: Ip> = FakeExternalSocketState<D>;

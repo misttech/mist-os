@@ -14,7 +14,7 @@ use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
 use netstack3_base::sync::RwLock;
 use netstack3_base::{
     Counter, Device, DeviceIdContext, HandleableTimer, Inspectable, Inspector, InstantContext,
-    ReferenceNotifiers, TimerBindingsTypes, TimerHandler,
+    ReferenceNotifiers, TimerBindingsTypes, TimerHandler, TxMetadataBindingsTypes,
 };
 use netstack3_filter::FilterBindingsTypes;
 use netstack3_ip::nud::{LinkResolutionContext, NudCounters};
@@ -419,6 +419,7 @@ pub trait DeviceLayerTypes:
     + LinkResolutionContext<EthernetLinkDevice>
     + TimerBindingsTypes
     + ReferenceNotifiers
+    + TxMetadataBindingsTypes
     + 'static
 {
 }
@@ -428,6 +429,7 @@ impl<
             + LinkResolutionContext<EthernetLinkDevice>
             + TimerBindingsTypes
             + ReferenceNotifiers
+            + TxMetadataBindingsTypes
             + 'static,
     > DeviceLayerTypes for BC
 {

@@ -18,7 +18,7 @@ use netstack3_base::{
     AnyDevice, BroadcastIpExt, CoreTimerContext, Device, DeviceIdAnyCompatContext, DeviceIdContext,
     FrameDestination, RecvFrameContext, RecvIpFrameMeta, ResourceCounterContext, SendFrameError,
     SendFrameErrorReason, SendableFrameMeta, StrongDeviceIdentifier, TimerContext,
-    WeakDeviceIdentifier,
+    TxMetadataBindingsTypes, WeakDeviceIdentifier,
 };
 use netstack3_ip::{DeviceIpLayerMetadata, IpPacketDestination};
 use packet::{Buf, Buffer as _, BufferMut, Serializer};
@@ -71,7 +71,7 @@ pub enum LoopbackDevice {}
 impl Device for LoopbackDevice {}
 
 impl DeviceStateSpec for LoopbackDevice {
-    type State<BT: DeviceLayerTypes> = LoopbackDeviceState<WeakDeviceId<BT>>;
+    type State<BT: DeviceLayerTypes> = LoopbackDeviceState<WeakDeviceId<BT>, BT>;
     type External<BT: DeviceLayerTypes> = BT::LoopbackDeviceState;
     type CreationProperties = LoopbackCreationProperties;
     type Counters = EthernetDeviceCounters;
@@ -105,63 +105,66 @@ pub struct LoopbackCreationProperties {
 }
 
 /// State for a loopback device.
-pub struct LoopbackDeviceState<D: WeakDeviceIdentifier> {
+pub struct LoopbackDeviceState<D: WeakDeviceIdentifier, BT: TxMetadataBindingsTypes> {
     /// Loopback device counters.
     pub counters: EthernetDeviceCounters,
     /// The MTU this device was created with (immutable).
     pub mtu: Mtu,
     /// Loopback device receive queue.
-    pub rx_queue: ReceiveQueue<LoopbackRxQueueMeta<D>, Buf<Vec<u8>>>,
+    pub rx_queue: ReceiveQueue<LoopbackRxQueueMeta<D, BT>, Buf<Vec<u8>>>,
     /// Loopback device transmit queue.
-    pub tx_queue: TransmitQueue<LoopbackTxQueueMeta<D>, Buf<Vec<u8>>, BufVecU8Allocator>,
+    pub tx_queue: TransmitQueue<LoopbackTxQueueMeta<D, BT>, Buf<Vec<u8>>, BufVecU8Allocator>,
 }
 
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 /// Metadata associated with a frame in the Loopback TX queue.
-pub struct LoopbackTxQueueMeta<D: WeakDeviceIdentifier> {
+pub struct LoopbackTxQueueMeta<D: WeakDeviceIdentifier, BT: TxMetadataBindingsTypes> {
     /// Device that should be used to deliver the packet. If not set then the
     /// packet delivered as if it came from the loopback device.
     target_device: Option<D>,
     /// Metadata that is produced and consumed by the IP layer but which traverses
     /// the device layer through the loopback device.
-    ip_layer_metadata: DeviceIpLayerMetadata,
+    ip_layer_metadata: DeviceIpLayerMetadata<BT>,
 }
 
 /// Metadata associated with a frame in the Loopback RX queue.
-#[derive(Debug)]
-pub struct LoopbackRxQueueMeta<D: WeakDeviceIdentifier> {
+#[derive(Derivative)]
+#[derivative(Debug(bound = ""))]
+pub struct LoopbackRxQueueMeta<D: WeakDeviceIdentifier, BT: TxMetadataBindingsTypes> {
     /// Device that should be used to deliver the packet. If not set then the
     /// packet delivered as if it came from the loopback device.
     target_device: Option<D>,
     /// Metadata that is produced and consumed by the IP layer but which traverses
     /// the device layer through the loopback device.
-    ip_layer_metadata: DeviceIpLayerMetadata,
+    ip_layer_metadata: DeviceIpLayerMetadata<BT>,
 }
 
-impl<D: WeakDeviceIdentifier> From<LoopbackTxQueueMeta<D>> for LoopbackRxQueueMeta<D> {
+impl<D: WeakDeviceIdentifier, BT: TxMetadataBindingsTypes> From<LoopbackTxQueueMeta<D, BT>>
+    for LoopbackRxQueueMeta<D, BT>
+{
     fn from(
-        LoopbackTxQueueMeta { target_device, ip_layer_metadata }: LoopbackTxQueueMeta<D>,
+        LoopbackTxQueueMeta { target_device, ip_layer_metadata }: LoopbackTxQueueMeta<D, BT>,
     ) -> Self {
         Self { target_device, ip_layer_metadata }
     }
 }
 
 impl<BT: DeviceLayerTypes>
-    OrderedLockAccess<ReceiveQueueState<LoopbackRxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>>>
+    OrderedLockAccess<ReceiveQueueState<LoopbackRxQueueMeta<WeakDeviceId<BT>, BT>, Buf<Vec<u8>>>>
     for IpLinkDeviceState<LoopbackDevice, BT>
 {
-    type Lock = Mutex<ReceiveQueueState<LoopbackRxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>>>;
+    type Lock = Mutex<ReceiveQueueState<LoopbackRxQueueMeta<WeakDeviceId<BT>, BT>, Buf<Vec<u8>>>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.link.rx_queue.queue)
     }
 }
 
 impl<BT: DeviceLayerTypes>
-    OrderedLockAccess<DequeueState<LoopbackRxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>>>
+    OrderedLockAccess<DequeueState<LoopbackRxQueueMeta<WeakDeviceId<BT>, BT>, Buf<Vec<u8>>>>
     for IpLinkDeviceState<LoopbackDevice, BT>
 {
-    type Lock = Mutex<DequeueState<LoopbackRxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>>>;
+    type Lock = Mutex<DequeueState<LoopbackRxQueueMeta<WeakDeviceId<BT>, BT>, Buf<Vec<u8>>>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.link.rx_queue.deque)
     }
@@ -169,11 +172,19 @@ impl<BT: DeviceLayerTypes>
 
 impl<BT: DeviceLayerTypes>
     OrderedLockAccess<
-        TransmitQueueState<LoopbackTxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>, BufVecU8Allocator>,
+        TransmitQueueState<
+            LoopbackTxQueueMeta<WeakDeviceId<BT>, BT>,
+            Buf<Vec<u8>>,
+            BufVecU8Allocator,
+        >,
     > for IpLinkDeviceState<LoopbackDevice, BT>
 {
     type Lock = Mutex<
-        TransmitQueueState<LoopbackTxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>, BufVecU8Allocator>,
+        TransmitQueueState<
+            LoopbackTxQueueMeta<WeakDeviceId<BT>, BT>,
+            Buf<Vec<u8>>,
+            BufVecU8Allocator,
+        >,
     >;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.link.tx_queue.queue)
@@ -181,10 +192,10 @@ impl<BT: DeviceLayerTypes>
 }
 
 impl<BT: DeviceLayerTypes>
-    OrderedLockAccess<DequeueState<LoopbackTxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>>>
+    OrderedLockAccess<DequeueState<LoopbackTxQueueMeta<WeakDeviceId<BT>, BT>, Buf<Vec<u8>>>>
     for IpLinkDeviceState<LoopbackDevice, BT>
 {
-    type Lock = Mutex<DequeueState<LoopbackTxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>>>;
+    type Lock = Mutex<DequeueState<LoopbackTxQueueMeta<WeakDeviceId<BT>, BT>, Buf<Vec<u8>>>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.link.tx_queue.deque)
     }
@@ -203,21 +214,21 @@ where
         + ReceiveQueueTypes<
             LoopbackDevice,
             BC,
-            Meta = LoopbackRxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+            Meta = LoopbackRxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId, BC>,
         >,
     // Loopback needs to deliver messages to `AnyDevice`.
     CC: DeviceIdAnyCompatContext<LoopbackDevice>
         + RecvFrameContext<
             RecvIpFrameMeta<
                 <CC as DeviceIdContext<AnyDevice>>::DeviceId,
-                DeviceIpLayerMetadata,
+                DeviceIpLayerMetadata<BC>,
                 Ipv4,
             >,
             BC,
         > + RecvFrameContext<
             RecvIpFrameMeta<
                 <CC as DeviceIdContext<AnyDevice>>::DeviceId,
-                DeviceIpLayerMetadata,
+                DeviceIpLayerMetadata<BC>,
                 Ipv6,
             >,
             BC,
@@ -322,7 +333,7 @@ where
     CC: TransmitQueueHandler<
             LoopbackDevice,
             BC,
-            Meta = LoopbackTxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+            Meta = LoopbackTxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId, BC>,
         > + ResourceCounterContext<<CC as DeviceIdContext<LoopbackDevice>>::DeviceId, DeviceCounters>
         + DeviceIdContext<AnyDevice>,
     BC: DeviceLayerTypes,
@@ -360,14 +371,14 @@ pub fn send_ip_frame<CC, BC, I, S>(
     bindings_ctx: &mut BC,
     device_id: &<CC as DeviceIdContext<LoopbackDevice>>::DeviceId,
     destination: IpPacketDestination<I, &<CC as DeviceIdContext<AnyDevice>>::DeviceId>,
-    ip_layer_metadata: DeviceIpLayerMetadata,
+    ip_layer_metadata: DeviceIpLayerMetadata<BC>,
     packet: S,
 ) -> Result<(), SendFrameError<S>>
 where
     CC: TransmitQueueHandler<
             LoopbackDevice,
             BC,
-            Meta = LoopbackTxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+            Meta = LoopbackTxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId, BC>,
         > + ResourceCounterContext<<CC as DeviceIdContext<LoopbackDevice>>::DeviceId, DeviceCounters>
         + DeviceIdContext<AnyDevice>,
     BC: DeviceLayerTypes,
@@ -401,13 +412,13 @@ fn send_as_ethernet_frame_to_dst<CC, BC, S>(
     packet: S,
     protocol: EtherType,
     dst_mac: Mac,
-    meta: LoopbackTxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+    meta: LoopbackTxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId, BC>,
 ) -> Result<(), SendFrameError<S>>
 where
     CC: TransmitQueueHandler<
             LoopbackDevice,
             BC,
-            Meta = LoopbackTxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+            Meta = LoopbackTxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId, BC>,
         > + ResourceCounterContext<<CC as DeviceIdContext<LoopbackDevice>>::DeviceId, DeviceCounters>
         + DeviceIdContext<AnyDevice>,
     BC: DeviceLayerTypes,
@@ -437,13 +448,13 @@ fn send_ethernet_frame<CC, BC, S>(
     bindings_ctx: &mut BC,
     device_id: &<CC as DeviceIdContext<LoopbackDevice>>::DeviceId,
     frame: S,
-    meta: LoopbackTxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+    meta: LoopbackTxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId, BC>,
 ) -> Result<(), SendFrameError<S>>
 where
     CC: TransmitQueueHandler<
             LoopbackDevice,
             BC,
-            Meta = LoopbackTxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+            Meta = LoopbackTxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId, BC>,
         > + ResourceCounterContext<<CC as DeviceIdContext<LoopbackDevice>>::DeviceId, DeviceCounters>
         + DeviceIdContext<AnyDevice>,
     S: Serializer,

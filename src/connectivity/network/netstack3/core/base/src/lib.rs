@@ -53,7 +53,7 @@ pub use error::{
 pub use event::{CoreEventContext, EventContext};
 pub use frame::{
     FrameDestination, ReceivableFrameMeta, RecvFrameContext, RecvIpFrameMeta, SendFrameContext,
-    SendFrameError, SendFrameErrorReason, SendableFrameMeta,
+    SendFrameError, SendFrameErrorReason, SendableFrameMeta, TxMetadataBindingsTypes,
 };
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
 pub use ip::{
@@ -152,7 +152,7 @@ pub mod testutil {
         MultipleDevicesId,
     };
     pub use crate::event::testutil::FakeEventCtx;
-    pub use crate::frame::testutil::{FakeFrameCtx, WithFakeFrameContext};
+    pub use crate::frame::testutil::{FakeFrameCtx, FakeTxMetadata, WithFakeFrameContext};
     pub use crate::rng::testutil::{new_rng, run_with_many_seeds, FakeCryptoRng};
     pub use crate::time::testutil::{
         FakeAtomicInstant, FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, FakeTimerId,

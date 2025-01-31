@@ -31,8 +31,8 @@ use netstack3_base::{
     EventContext, ExistsError, HandleableTimer, Inspectable, Instant, InstantBindingsTypes,
     InstantContext, IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext, IpExt, Ipv4DeviceAddr,
     Ipv6DeviceAddr, NotFoundError, RemoveResourceResultWithContext, RngContext, SendFrameError,
-    StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler, WeakDeviceIdentifier,
-    WeakIpAddressId,
+    StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler,
+    TxMetadataBindingsTypes, WeakDeviceIdentifier, WeakIpAddressId,
 };
 use netstack3_filter::ProofOfEgressCheck;
 use packet::{BufferMut, Serializer};
@@ -1190,14 +1190,16 @@ impl<
 }
 
 /// The execution context for an IP device with a buffer.
-pub trait IpDeviceSendContext<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
+pub trait IpDeviceSendContext<I: IpExt, BC: TxMetadataBindingsTypes>:
+    DeviceIdContext<AnyDevice>
+{
     /// Sends an IP packet through the device.
     fn send_ip_frame<S>(
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         destination: IpPacketDestination<I, &Self::DeviceId>,
-        ip_layer_metadata: DeviceIpLayerMetadata,
+        ip_layer_metadata: DeviceIpLayerMetadata<BC>,
         body: S,
         egress_proof: ProofOfEgressCheck,
     ) -> Result<(), SendFrameError<S>>

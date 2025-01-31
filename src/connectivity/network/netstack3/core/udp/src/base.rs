@@ -40,7 +40,7 @@ use netstack3_base::{
 use netstack3_datagram::{
     self as datagram, BoundSocketState as DatagramBoundSocketState,
     BoundSocketStateType as DatagramBoundSocketStateType, BoundSockets as DatagramBoundSockets,
-    ConnectError, DatagramApi, DatagramBoundStateContext, DatagramFlowId,
+    ConnectError, DatagramApi, DatagramBindingsTypes, DatagramBoundStateContext, DatagramFlowId,
     DatagramIpSpecificSocketOptions, DatagramSocketMapSpec, DatagramSocketSet, DatagramSocketSpec,
     DatagramSpecBoundStateContext, DatagramSpecStateContext, DatagramStateContext,
     DualStackConnState, DualStackConverter, DualStackDatagramBoundStateContext,
@@ -1137,7 +1137,7 @@ pub trait UdpReceiveBindingsContext<I: IpExt, D: StrongDeviceIdentifier>: UdpBin
 /// edge in fake tests bindings contexts that are already parameterized on I
 /// themselves. This is still better than relying on `Box<dyn Any>` to keep the
 /// external data in our references so we take the rough edge.
-pub trait UdpBindingsTypes: Sized + 'static {
+pub trait UdpBindingsTypes: DatagramBindingsTypes + Sized + 'static {
     /// Opaque bindings data held by core for a given IP version.
     type ExternalData<I: Ip>: Debug + Send + Sync + 'static;
 }

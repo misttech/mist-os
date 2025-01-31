@@ -36,7 +36,7 @@ use netstack3_base::{
     AddressResolutionFailed, CtxPair, DeferredResourceRemovalContext, EventContext,
     FrameDestination, InstantBindingsTypes, InstantContext, IpDeviceAddr, LinkDevice,
     NotFoundError, ReferenceNotifiers, RemoveResourceResult, RngContext, TimerBindingsTypes,
-    TimerContext, TimerHandler, TracingContext, WorkQueueReport,
+    TimerContext, TimerHandler, TracingContext, TxMetadataBindingsTypes, WorkQueueReport,
 };
 use netstack3_device::ethernet::{
     EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
@@ -75,7 +75,7 @@ use crate::context::prelude::*;
 use crate::context::UnlockedCoreCtx;
 use crate::state::{StackState, StackStateBuilder};
 use crate::time::{TimerId, TimerIdInner};
-use crate::{BindingsContext, BindingsTypes, IpExt};
+use crate::{BindingsContext, BindingsTypes, IpExt, TxMetadata};
 
 /// The default interface routing metric for test interfaces.
 pub const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
@@ -817,6 +817,10 @@ impl TimerContext for FakeBindingsCtx {
     fn unique_timer_id(&self, timer: &Self::Timer) -> Self::UniqueTimerId {
         self.with_inner_mut(|ctx| ctx.unique_timer_id(timer))
     }
+}
+
+impl TxMetadataBindingsTypes for FakeBindingsCtx {
+    type TxMetadata = TxMetadata<Self>;
 }
 
 impl RngContext for FakeBindingsCtx {

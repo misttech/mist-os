@@ -16,10 +16,10 @@ use netstack3_base::{AnyDevice, DeviceIdContext};
 use netstack3_ip::{MulticastMembershipHandler, TransportIpContext};
 
 use crate::internal::datagram::{
-    BoundSocketsFromSpec, DatagramBoundStateContext, DatagramIpSpecificSocketOptions,
-    DatagramSocketMapSpec, DatagramSocketSet, DatagramSocketSpec, DatagramStateContext,
-    DualStackConverter, DualStackDatagramBoundStateContext, DualStackIpExt, IpExt, IpOptions,
-    NonDualStackConverter, NonDualStackDatagramBoundStateContext, SocketState,
+    BoundSocketsFromSpec, DatagramBindingsTypes, DatagramBoundStateContext,
+    DatagramIpSpecificSocketOptions, DatagramSocketMapSpec, DatagramSocketSet, DatagramSocketSpec,
+    DatagramStateContext, DualStackConverter, DualStackDatagramBoundStateContext, DualStackIpExt,
+    IpExt, IpOptions, NonDualStackConverter, NonDualStackDatagramBoundStateContext, SocketState,
 };
 
 /// A mirror trait of [`DatagramStateContext`] allowing foreign crates to
@@ -31,8 +31,11 @@ use crate::internal::datagram::{
 ///
 /// See [`DatagramStateContext`] for details.
 #[allow(missing_docs)]
-pub trait DatagramSpecStateContext<I: IpExt, CC: DeviceIdContext<AnyDevice>, BC>:
-    DatagramSocketSpec
+pub trait DatagramSpecStateContext<
+    I: IpExt,
+    CC: DeviceIdContext<AnyDevice>,
+    BC: DatagramBindingsTypes,
+>: DatagramSocketSpec
 {
     type SocketsStateCtx<'a>: DatagramBoundStateContext<I, BC, Self>
         + DeviceIdContext<AnyDevice, DeviceId = CC::DeviceId, WeakDeviceId = CC::WeakDeviceId>;
@@ -80,6 +83,7 @@ pub trait DatagramSpecStateContext<I: IpExt, CC: DeviceIdContext<AnyDevice>, BC>
 impl<I, CC, BC, S> DatagramStateContext<I, BC, S> for CC
 where
     I: IpExt,
+    BC: DatagramBindingsTypes,
     CC: DeviceIdContext<AnyDevice>,
     S: DatagramSpecStateContext<I, CC, BC>,
 {
@@ -147,7 +151,7 @@ where
 pub trait DatagramSpecBoundStateContext<
     I: IpExt + DualStackIpExt,
     CC: DeviceIdContext<AnyDevice>,
-    BC,
+    BC: DatagramBindingsTypes,
 >: DatagramSocketSpec
 {
     type IpSocketsCtx<'a>: TransportIpContext<I, BC>
@@ -200,6 +204,7 @@ impl<I, CC, BC, S> DatagramBoundStateContext<I, BC, S> for CC
 where
     I: IpExt + DualStackIpExt,
     CC: DeviceIdContext<AnyDevice>,
+    BC: DatagramBindingsTypes,
     S: DatagramSpecBoundStateContext<I, CC, BC>,
 {
     type IpSocketsCtx<'a> = S::IpSocketsCtx<'a>;
@@ -250,8 +255,11 @@ where
 ///
 /// See [`DualStackDatagramBoundStateContext`] for details.
 #[allow(missing_docs)]
-pub trait DualStackDatagramSpecBoundStateContext<I: IpExt, CC: DeviceIdContext<AnyDevice>, BC>:
-    DatagramSocketSpec
+pub trait DualStackDatagramSpecBoundStateContext<
+    I: IpExt,
+    CC: DeviceIdContext<AnyDevice>,
+    BC: DatagramBindingsTypes,
+>: DatagramSocketSpec
 {
     type IpSocketsCtx<'a>: TransportIpContext<I, BC>
         + DeviceIdContext<AnyDevice, DeviceId = CC::DeviceId, WeakDeviceId = CC::WeakDeviceId>
@@ -311,6 +319,7 @@ impl<I, CC, BC, S> DualStackDatagramBoundStateContext<I, BC, S> for CC
 where
     I: IpExt,
     CC: DeviceIdContext<AnyDevice>,
+    BC: DatagramBindingsTypes,
     S: DualStackDatagramSpecBoundStateContext<I, CC, BC>,
 {
     type IpSocketsCtx<'a> = S::IpSocketsCtx<'a>;

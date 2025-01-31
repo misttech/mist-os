@@ -34,7 +34,7 @@ use netstack3_base::{
     EitherDeviceId, ExistsError, Inspector, InspectorDeviceExt, IpDeviceAddr, LocalAddressError,
     NotFoundError, OwnedOrRefsBidirectionalConverter, ReferenceNotifiers, ReferenceNotifiersExt,
     RemoteAddressError, RemoveResourceResultWithContext, RngContext, SocketError,
-    StrongDeviceIdentifier as _, WeakDeviceIdentifier, ZonedAddressError,
+    StrongDeviceIdentifier as _, TxMetadataBindingsTypes, WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_filter::TransportPacketSerializer;
 use netstack3_ip::socket::{
@@ -221,7 +221,11 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> SocketState<I, D,
     }
 
     /// Gets the [`IpOptions`] and bound device for the socket state.
-    pub fn get_options_device<'a, BC, CC: DatagramBoundStateContext<I, BC, S, WeakDeviceId = D>>(
+    pub fn get_options_device<
+        'a,
+        BC: DatagramBindingsTypes,
+        CC: DatagramBoundStateContext<I, BC, S, WeakDeviceId = D>,
+    >(
         &'a self,
         core_ctx: &mut CC,
     ) -> (&'a IpOptions<I, CC::WeakDeviceId, S>, &'a Option<CC::WeakDeviceId>) {
@@ -260,7 +264,11 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> SocketState<I, D,
         }
     }
 
-    fn get_options_mut<'a, BC, CC: DatagramBoundStateContext<I, BC, S, WeakDeviceId = D>>(
+    fn get_options_mut<
+        'a,
+        BC: DatagramBindingsTypes,
+        CC: DatagramBoundStateContext<I, BC, S, WeakDeviceId = D>,
+    >(
         &'a mut self,
         core_ctx: &mut CC,
     ) -> &'a mut IpOptions<I, CC::WeakDeviceId, S> {
@@ -667,7 +675,7 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> IpOptions<I, D, S
 
     fn other_stack_options_ref<
         'a,
-        BC,
+        BC: DatagramBindingsTypes,
         CC: DualStackDatagramBoundStateContext<I, BC, S, WeakDeviceId = D>,
     >(
         &'a self,
@@ -740,7 +748,7 @@ pub struct DatagramFlowId<A: IpAddress, RI> {
 }
 
 /// The core context providing access to datagram socket state.
-pub trait DatagramStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
+pub trait DatagramStateContext<I: IpExt, BC: DatagramBindingsTypes, S: DatagramSocketSpec>:
     DeviceIdContext<AnyDevice>
 {
     /// The core context passed to the callback provided to methods.
@@ -803,9 +811,16 @@ pub(crate) type BoundSocketsFromSpec<I, CC, S> = BoundSockets<
     <S as DatagramSocketSpec>::SocketMapSpec<I, <CC as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
 >;
 
+/// A marker trait for bindings types traits used by datagram.
+pub trait DatagramBindingsTypes: TxMetadataBindingsTypes {}
+impl<BT> DatagramBindingsTypes for BT where BT: TxMetadataBindingsTypes {}
+
 /// The core context providing access to bound datagram sockets.
-pub trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, BC, S: DatagramSocketSpec>:
-    DeviceIdContext<AnyDevice>
+pub trait DatagramBoundStateContext<
+    I: IpExt + DualStackIpExt,
+    BC: DatagramBindingsTypes,
+    S: DatagramSocketSpec,
+>: DeviceIdContext<AnyDevice>
 {
     /// The core context passed to the callback provided to methods.
     type IpSocketsCtx<'a>: TransportIpContext<I, BC>
@@ -922,8 +937,11 @@ where
 }
 
 /// Provides access to dual-stack socket state.
-pub trait DualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
-    DeviceIdContext<AnyDevice>
+pub trait DualStackDatagramBoundStateContext<
+    I: IpExt,
+    BC: DatagramBindingsTypes,
+    S: DatagramSocketSpec,
+>: DeviceIdContext<AnyDevice>
 {
     /// The core context passed to the callbacks to methods.
     type IpSocketsCtx<'a>: TransportIpContext<I, BC>
@@ -1049,8 +1067,12 @@ pub trait NonDualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSocketS
     fn nds_converter(&self) -> impl NonDualStackConverter<I, Self::WeakDeviceId, S>;
 }
 
-pub trait DatagramStateBindingsContext<I: Ip, S>: RngContext + ReferenceNotifiers {}
-impl<BC: RngContext + ReferenceNotifiers, I: Ip, S> DatagramStateBindingsContext<I, S> for BC {}
+/// Blanket trait for bindings context requirements for datagram sockets.
+pub trait DatagramBindingsContext: RngContext + ReferenceNotifiers + DatagramBindingsTypes {}
+impl<BC> DatagramBindingsContext for BC where
+    BC: RngContext + ReferenceNotifiers + DatagramBindingsTypes
+{
+}
 
 /// Types and behavior for datagram socket demultiplexing map.
 ///
@@ -1765,7 +1787,10 @@ struct DualStackRemoveOperation<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSo
 
 impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, S> {
     /// Constructs the removal operation from existing socket state.
-    fn new_from_state<BC, CC: DualStackDatagramBoundStateContext<I, BC, S, WeakDeviceId = D>>(
+    fn new_from_state<
+        BC: DatagramBindingsTypes,
+        CC: DualStackDatagramBoundStateContext<I, BC, S, WeakDeviceId = D>,
+    >(
         core_ctx: &mut CC,
         socket_id: &S::SocketId<I, D>,
         state: &BoundSocketState<I, D, S>,
@@ -2242,7 +2267,12 @@ fn try_pick_identifier<
     })
 }
 
-fn try_pick_bound_address<I: IpExt, CC: TransportIpContext<I, BC>, BC, LI>(
+fn try_pick_bound_address<
+    I: IpExt,
+    CC: TransportIpContext<I, BC>,
+    BC: DatagramBindingsTypes,
+    LI,
+>(
     addr: Option<ZonedAddr<SocketIpAddr<I::Addr>, CC::DeviceId>>,
     device: &Option<CC::WeakDeviceId>,
     core_ctx: &mut CC,
@@ -2289,7 +2319,7 @@ fn try_pick_bound_address<I: IpExt, CC: TransportIpContext<I, BC>, BC, LI>(
 
 fn listen_inner<
     I: IpExt,
-    BC: DatagramStateBindingsContext<I, S>,
+    BC: DatagramBindingsContext,
     CC: DatagramBoundStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
@@ -2385,7 +2415,7 @@ fn listen_inner<
         I: IpExt,
         S: DatagramSocketSpec,
         CC: TransportIpContext<I, BC>,
-        BC: RngContext,
+        BC: DatagramBindingsContext,
     >(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
@@ -2627,7 +2657,7 @@ fn connect_inner<
     D: WeakDeviceIdentifier,
     S: DatagramSocketSpec,
     R,
-    BC: RngContext,
+    BC: DatagramBindingsContext,
     CC: IpSocketHandler<WireI, BC, WeakDeviceId = D, DeviceId = D::Strong>,
 >(
     connect_params: ConnectParameters<WireI, SocketI, D, S>,
@@ -2842,7 +2872,10 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec>
     ///
     /// Returns a tuple containing the state, and sharing state for the new
     /// connection.
-    fn apply<BC: RngContext, CC: IpSocketHandler<I, BC, WeakDeviceId = D, DeviceId = D::Strong>>(
+    fn apply<
+        BC: DatagramBindingsContext,
+        CC: IpSocketHandler<I, BC, WeakDeviceId = D, DeviceId = D::Strong>,
+    >(
         self,
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
@@ -2879,7 +2912,7 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec>
 {
     /// Constructs the connect operation from existing socket state.
     fn new_from_state<
-        BC,
+        BC: DatagramBindingsContext,
         CC: DualStackDatagramBoundStateContext<I, BC, S, WeakDeviceId = D, DeviceId = D::Strong>,
     >(
         core_ctx: &mut CC,
@@ -3150,7 +3183,7 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec>
     /// Returns a tuple containing the state, and sharing state for the new
     /// connection.
     fn apply<
-        BC: RngContext,
+        BC: DatagramBindingsContext,
         CC: IpSocketHandler<I, BC, WeakDeviceId = D, DeviceId = D::Strong>
             + IpSocketHandler<I::OtherVersion, BC, WeakDeviceId = D, DeviceId = D::Strong>,
     >(
@@ -3258,7 +3291,7 @@ pub struct ExpectedUnboundError;
 /// socket's new state.
 fn disconnect_to_unbound<
     I: IpExt,
-    BC,
+    BC: DatagramBindingsContext,
     CC: DatagramBoundStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
@@ -3293,7 +3326,7 @@ fn disconnect_to_unbound<
 /// socket's new state.
 fn disconnect_to_listener<
     I: IpExt,
-    BC,
+    BC: DatagramBindingsContext,
     CC: DatagramBoundStateContext<I, BC, S>,
     S: DatagramSocketSpec,
 >(
@@ -3429,7 +3462,13 @@ struct SendOneshotParameters<'a, I: IpExt, S: DatagramSocketSpec, D: WeakDeviceI
     options: IpOptionsRef<'a, I, D>,
 }
 
-fn send_oneshot<I: IpExt, S: DatagramSocketSpec, CC: IpSocketHandler<I, BC>, BC, B: BufferMut>(
+fn send_oneshot<
+    I: IpExt,
+    S: DatagramSocketSpec,
+    CC: IpSocketHandler<I, BC>,
+    BC: DatagramBindingsContext,
+    B: BufferMut,
+>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     params: SendOneshotParameters<'_, I, S, CC::WeakDeviceId>,
@@ -3450,6 +3489,10 @@ fn send_oneshot<I: IpExt, S: DatagramSocketSpec, CC: IpSocketHandler<I, BC>, BC,
         Err(e) => return Err(SendToError::Zone(e)),
     };
 
+    // TODO(https://fxbug.dev/42074004): Enforce SNDBUF for all datagram
+    // sockets.
+    let tx_metadata: BC::TxMetadata = Default::default();
+
     core_ctx
         .send_oneshot_ip_packet_with_fallible_serializer(
             bindings_ctx,
@@ -3458,6 +3501,7 @@ fn send_oneshot<I: IpExt, S: DatagramSocketSpec, CC: IpSocketHandler<I, BC>, BC,
             remote_ip,
             S::ip_proto::<I>(),
             &options,
+            tx_metadata,
             |local_ip| {
                 S::make_packet::<I, _>(
                     body,
@@ -3505,7 +3549,7 @@ fn set_bound_device_single_stack<
     SocketI: IpExt,
     D: WeakDeviceIdentifier,
     S: DatagramSocketSpec,
-    BC,
+    BC: DatagramBindingsContext,
     CC: IpSocketHandler<WireI, BC, WeakDeviceId = D, DeviceId = D::Strong>,
 >(
     bindings_ctx: &mut BC,
@@ -3717,7 +3761,7 @@ pub enum SetMulticastMembershipError {
 fn pick_interface_for_addr<
     A: IpAddress,
     S: DatagramSocketSpec,
-    BC: DatagramStateBindingsContext<A::Version, S>,
+    BC: DatagramBindingsContext,
     CC: DatagramBoundStateContext<A::Version, BC, S>,
 >(
     core_ctx: &mut CC,
@@ -3836,7 +3880,7 @@ impl<I, C, S> DatagramApi<I, C, S>
 where
     I: IpExt,
     C: ContextPair,
-    C::BindingsContext: DatagramStateBindingsContext<I, S>,
+    C::BindingsContext: DatagramBindingsContext,
     C::CoreContext: DatagramStateContext<I, C::BindingsContext, S>,
     S: DatagramSocketSpec,
 {
@@ -4143,7 +4187,7 @@ where
                 I: DualStackIpExt,
                 S: DatagramSocketSpec,
                 D: WeakDeviceIdentifier,
-                BC: DatagramStateBindingsContext<I, S>,
+                BC: DatagramBindingsContext,
                 DualStackSC: DualStackDatagramBoundStateContext<I, BC, S>,
                 CC: DatagramBoundStateContext<I, BC, S>,
                 O: SendOptions<I> + RouteResolutionOptions<I>,
@@ -4223,13 +4267,16 @@ where
                 return Err(SendError::NotWriteable);
             }
 
+            // TODO(https://fxbug.dev/42074004): Enforce SNDBUF for
+            // all datagram sockets.
+            let tx_metadata = Default::default();
             match operation {
                 Operation::SendToThisStack((SendParams { socket, ip, options }, core_ctx)) => {
                     let packet =
                         S::make_packet::<I, _>(body, &ip).map_err(SendError::SerializeError)?;
                     DatagramBoundStateContext::with_transport_context(core_ctx, |core_ctx| {
                         core_ctx
-                            .send_ip_packet(bindings_ctx, &socket, packet, &options)
+                            .send_ip_packet(bindings_ctx, &socket, packet, &options, tx_metadata)
                             .map_err(|send_error| SendError::IpSock(send_error))
                     })
                 }
@@ -4240,7 +4287,13 @@ where
                         dual_stack,
                         |core_ctx| {
                             core_ctx
-                                .send_ip_packet(bindings_ctx, &socket, packet, &options)
+                                .send_ip_packet(
+                                    bindings_ctx,
+                                    &socket,
+                                    packet,
+                                    &options,
+                                    tx_metadata,
+                                )
                                 .map_err(|send_error| SendError::IpSock(send_error))
                         },
                     )
@@ -4276,7 +4329,7 @@ where
                 I: DualStackIpExt,
                 S: DatagramSocketSpec,
                 D: WeakDeviceIdentifier,
-                BC: DatagramStateBindingsContext<I, S>,
+                BC: DatagramBindingsContext,
                 DualStackSC: DualStackDatagramBoundStateContext<I, BC, S>,
                 CC: DatagramBoundStateContext<I, BC, S>,
             > {

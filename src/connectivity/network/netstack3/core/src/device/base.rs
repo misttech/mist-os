@@ -164,7 +164,7 @@ where
 }
 
 impl<I, D, L, BC> ReceivableFrameMeta<CoreCtx<'_, BC, L>, BC>
-    for RecvIpFrameMeta<D, DeviceIpLayerMetadata, I>
+    for RecvIpFrameMeta<D, DeviceIpLayerMetadata<BC>, I>
 where
     BC: BindingsContext,
     D: Into<DeviceId<BC>>,
@@ -217,7 +217,7 @@ impl<
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,
         destination: IpPacketDestination<I, &DeviceId<BC>>,
-        ip_layer_metadata: DeviceIpLayerMetadata,
+        ip_layer_metadata: DeviceIpLayerMetadata<BC>,
         body: S,
         ProofOfEgressCheck { .. }: ProofOfEgressCheck,
     ) -> Result<(), SendFrameError<S>>
@@ -242,7 +242,7 @@ impl<
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,
         destination: IpPacketDestination<I, &DeviceId<BC>>,
-        ip_layer_metadata: DeviceIpLayerMetadata,
+        ip_layer_metadata: DeviceIpLayerMetadata<BC>,
         body: S,
         ProofOfEgressCheck { .. }: ProofOfEgressCheck,
     ) -> Result<(), SendFrameError<S>>
@@ -944,7 +944,7 @@ fn send_ip_frame<BC, S, I, L>(
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
     destination: IpPacketDestination<I, &DeviceId<BC>>,
-    ip_layer_metadata: DeviceIpLayerMetadata,
+    ip_layer_metadata: DeviceIpLayerMetadata<BC>,
     body: S,
 ) -> Result<(), SendFrameError<S>>
 where
@@ -957,12 +957,17 @@ where
         + LockBefore<crate::lock_ordering::PureIpDeviceTxQueue>,
     for<'a> CoreCtx<'a, BC, L>: EthernetIpLinkDeviceDynamicStateContext<BC, DeviceId = EthernetDeviceId<BC>>
         + NudHandler<I, EthernetLinkDevice, BC>
-        + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>,
+        + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = BC::TxMetadata>,
 {
     match device {
-        DeviceId::Ethernet(id) => {
-            ethernet::send_ip_frame(core_ctx, bindings_ctx, id, destination, body)
-        }
+        DeviceId::Ethernet(id) => ethernet::send_ip_frame(
+            core_ctx,
+            bindings_ctx,
+            id,
+            destination,
+            body,
+            ip_layer_metadata.into_tx_metadata(),
+        ),
         DeviceId::Loopback(id) => loopback::send_ip_frame(
             core_ctx,
             bindings_ctx,
@@ -971,9 +976,14 @@ where
             ip_layer_metadata,
             body,
         ),
-        DeviceId::PureIp(id) => {
-            pure_ip::send_ip_frame(core_ctx, bindings_ctx, id, destination, body)
-        }
+        DeviceId::PureIp(id) => pure_ip::send_ip_frame(
+            core_ctx,
+            bindings_ctx,
+            id,
+            destination,
+            body,
+            ip_layer_metadata.into_tx_metadata(),
+        ),
         DeviceId::Blackhole(id) => {
             // Just drop the frame.
             debug!("dropping frame in send_ip_frame on blackhole device {id:?}");

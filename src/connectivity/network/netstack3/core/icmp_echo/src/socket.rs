@@ -32,8 +32,8 @@ use netstack3_base::{
     UninstantiableWrapper, WeakDeviceIdentifier,
 };
 use netstack3_datagram::{
-    self as datagram, DatagramApi, DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSet,
-    DatagramSocketSpec, DatagramSpecBoundStateContext, DatagramSpecStateContext,
+    self as datagram, DatagramApi, DatagramBindingsTypes, DatagramFlowId, DatagramSocketMapSpec,
+    DatagramSocketSet, DatagramSocketSpec, DatagramSpecBoundStateContext, DatagramSpecStateContext,
     DatagramStateContext, ExpectedUnboundError, NonDualStackConverter,
     NonDualStackDatagramSpecBoundStateContext,
 };
@@ -240,7 +240,7 @@ pub trait IcmpEchoBindingsContext<I: IpExt, D: StrongDeviceIdentifier>:
 /// edge in fake tests bindings contexts that are already parameterized on I
 /// themselves. This is still better than relying on `Box<dyn Any>` to keep the
 /// external data in our references so we take the rough edge.
-pub trait IcmpEchoBindingsTypes: Sized + 'static {
+pub trait IcmpEchoBindingsTypes: DatagramBindingsTypes + Sized + 'static {
     /// Opaque bindings data held by core for a given IP version.
     type ExternalData<I: Ip>: Debug + Send + Sync + 'static;
 }

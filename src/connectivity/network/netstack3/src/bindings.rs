@@ -104,7 +104,7 @@ use netstack3_core::udp::{
 use netstack3_core::{
     neighbor, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
     IpExt, ReferenceNotifiers, RngContext, StackState, StackStateBuilder, TimerBindingsTypes,
-    TimerContext, TimerId, TracingContext,
+    TimerContext, TimerId, TracingContext, TxMetadata, TxMetadataBindingsTypes,
 };
 
 pub(crate) use inspect::InspectPublisher;
@@ -510,6 +510,10 @@ impl DeviceLayerStateTypes for BindingsCtx {
     type PureIpDeviceState = PureIpDeviceInfo;
     type DeviceIdentifier = DeviceIdAndName;
     type BlackholeDeviceState = BlackholeDeviceInfo;
+}
+
+impl TxMetadataBindingsTypes for BindingsCtx {
+    type TxMetadata = TxMetadata<Self>;
 }
 
 impl ReceiveQueueBindingsContext<LoopbackDeviceId<Self>> for BindingsCtx {
