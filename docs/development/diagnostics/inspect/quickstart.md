@@ -483,20 +483,11 @@ ffx inspect show
 ```
 
 Using the output from `ffx inspect list`, you can specify a
-single component (for example, `my_component.cm`) as input to
+single component (for example, `core/network/netstack`) as input to
 `ffx inspect show`:
 
 ```posix-terminal
-ffx inspect show --component my_component.cm
-```
-
-Specifying `--component` above will return data for all instances
-of your component running on the system. If you know a specific
-moniker of your component (for example, `core/my_component`) you
-may pass that instead:
-
-```posix-terminal
-ffx inspect show core/my_component
+ffx inspect show core/network/netstack
 ```
 
 You may specify multiple components (for example, `core/font_provider`
@@ -513,29 +504,88 @@ list of all possible [selectors], use `ffx inspect selectors`:
 ffx inspect selectors core/my_component
 ```
 
-You may then specify a selector (for example, `core/my_component:root`)
-as input to `ffx inspect show`:
+You may then specify a selector pointing to a node as input to
+`ffx inspect show`:
 
 ```posix-terminal
-ffx inspect show core/my_component:root
+ffx inspect show core/my_component:root/my_node
 ```
 
-If you don't know the moniker for your component, you may use
-`--component` with a selector that applies to a matched component. Note that if
-there are multiple matches, you will be asked to disambiguate (all the monikers will
-be listed).
-
-```posix-terminal
-ffx inspect show --component my_component.cm
-```
-
-This will print out the following if you followed the suggested
-steps above:
+This results result in an output that includes that node and all its children
+and nested properties:
 
 ```none {:.devsite-disable-click-to-copy}
-root:
-  hello = world
+core/my_component:
+  metadata:
+    name = root
+    component_url = fuchsia-pkg://fuchsia.com/my_package#meta/my_component.cm
+    timestamp = 1234567890
+  payload:
+    root:
+      my_node:
+        hello = "goodbye"
+        world = 2
+        a_child:
+          test = 4.2
 ```
+
+You may also specify a selector pointing to a property as input to
+`ffx inspect show`:
+
+```posix-terminal
+ffx inspect show core/my_component:root/my_node:hello
+```
+
+This results result in an output like:
+
+```none {:.devsite-disable-click-to-copy}
+core/my_component:
+  metadata:
+    name = root
+    component_url = fuchsia-pkg://fuchsia.com/my_package#meta/my_component.cm
+    timestamp = 1234567890
+  payload:
+    root:
+      my_node:
+        hello = "goodbye"
+```
+
+If you don't know the moniker for your component, you can pass a string that you
+think is related to your component manifest, url, moniker, etc... The tool then
+does a fuzzy match against all components. If more than one match is found,
+it'll ask for disambiguation, otherwise it'll return the output you expect.
+
+For example, the following may return more than one match:
+
+```posix-terminal
+ffx inspect show network
+```
+
+This returns:
+
+```none {:.devsite-disable-click-to-copy}
+Fuzzy matching failed due to too many matches, please re-try with one of these:
+bootstrap/boot-drivers:dev.sys.platform.pt.PCI0.bus.00_04.0.00_04_0.virtio-net
+core/network
+core/network-tun
+core/network/dhcpd
+core/network/dhcpv6-client
+core/network/dns-resolver
+core/network/http-client
+core/network/netcfg
+core/network/netcfg/netcfg-config
+core/network/netstack
+core/network/netstack/dhcp-client
+core/network/reachability
+```
+
+This example shows an invocation that results in a single match:
+
+```posix-terminal
+ffx inspect show feedback
+```
+
+This example prints out the Inspect data of `core/feedback`:
 
 #### Print your Inspect in a testing context
 
