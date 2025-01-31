@@ -7,7 +7,6 @@
 
 #include <fuchsia/component/cpp/fidl.h>
 #include <fuchsia/fonts/cpp/fidl.h>
-#include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/intl/cpp/fidl.h>
 #include <fuchsia/kernel/cpp/fidl.h>
 #include <fuchsia/memorypressure/cpp/fidl.h>
