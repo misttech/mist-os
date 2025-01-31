@@ -9,7 +9,6 @@ group("tests") {
     ":test_screenshot_ffx",
     ":test_session_ffx",
     ":test_user_input_fc",
-    "test_bluetooth:tests",
     "test_inspect:tests",
     "test_location:tests",
     "test_netstack:tests",

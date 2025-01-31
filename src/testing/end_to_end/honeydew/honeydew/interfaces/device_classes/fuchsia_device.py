@@ -6,6 +6,9 @@
 import abc
 from collections.abc import Callable
 
+from honeydew.affordances.connectivity.bluetooth.avrcp import avrcp
+from honeydew.affordances.connectivity.bluetooth.gap import gap
+from honeydew.affordances.connectivity.bluetooth.le import le
 from honeydew.affordances.connectivity.wlan.wlan import wlan
 from honeydew.affordances.connectivity.wlan.wlan_policy import wlan_policy
 from honeydew.affordances.connectivity.wlan.wlan_policy_ap import wlan_policy_ap
@@ -19,10 +22,6 @@ from honeydew.interfaces.affordances import (
     rtc,
     session,
     tracing,
-)
-from honeydew.interfaces.affordances.bluetooth.profiles import (
-    bluetooth_avrcp,
-    bluetooth_gap,
 )
 from honeydew.interfaces.affordances.ui import screenshot, user_input
 from honeydew.interfaces.auxiliary_devices import (
@@ -183,20 +182,29 @@ class FuchsiaDevice(abc.ABC):
     # List all the affordances
     @properties.Affordance
     @abc.abstractmethod
-    def bluetooth_avrcp(self) -> bluetooth_avrcp.BluetoothAvrcp:
-        """Returns a BluetoothAvrcp affordance object.
+    def bluetooth_avrcp(self) -> avrcp.Avrcp:
+        """Returns a Bluetooth Avrcp affordance object.
 
         Returns:
-            bluetooth_avrcp.BluetoothAvrcp object
+            Bluetooth Avrcp object
         """
 
     @properties.Affordance
     @abc.abstractmethod
-    def bluetooth_gap(self) -> bluetooth_gap.BluetoothGap:
-        """Returns a BluetoothGap affordance object.
+    def bluetooth_gap(self) -> gap.Gap:
+        """Returns a Bluetooth Gap affordance object.
 
         Returns:
-            bluetooth_gap.BluetoothGap object
+            Bluetooth Gap object
+        """
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def bluetooth_le(self) -> le.LE:
+        """Returns a Bluetooth LE affordance object.
+
+        Returns:
+            Bluetooth LE object
         """
 
     @properties.Affordance

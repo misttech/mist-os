@@ -7,6 +7,5 @@ group("tests") {
   public_deps = [
     "ffx:tests",
     "fuchsia_controller:tests",
-    "sl4f:tests",
   ]
 }
