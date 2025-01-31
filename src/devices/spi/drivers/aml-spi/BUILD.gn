@@ -21,12 +21,17 @@ driver_bind_rules("aml_spi_bind") {
   ]
 }
 
-group("common") {
+source_set("common") {
+  sources = [
+    "aml-spi.cc",
+    "aml-spi.h",
+  ]
   public_deps = [
     ":aml_spi_bind",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
+    "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp",
     "//sdk/fidl/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_cpp",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
@@ -51,18 +56,19 @@ group("common") {
 test("aml-spi-test-bin") {
   output_name = "aml-spi-test"
   sources = [
-    "aml-spi.cc",
     "tests/aml-spi-bti-test.cc",
     "tests/aml-spi-clock-mode-test.cc",
     "tests/aml-spi-shutdown-test.cc",
+    "tests/aml-spi-test-env.h",
     "tests/aml-spi-test.cc",
   ]
   deps = [
     ":common",
+    "//sdk/lib/driver/fake-bti/cpp",
+    "//sdk/lib/driver/fake-mmio-reg/cpp",
+    "//sdk/lib/driver/fake-platform-device/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//src/devices/registers/testing/mock-registers",
-    "//src/devices/testing/fake-bti",
-    "//src/devices/testing/fake-mmio-reg",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
   ]
@@ -95,7 +101,6 @@ fuchsia_cc_driver("aml-spi-driver") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "aml-spi.cc" ]
   deps = [ ":common" ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings

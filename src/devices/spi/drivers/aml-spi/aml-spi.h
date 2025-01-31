@@ -150,7 +150,7 @@ class AmlSpi : public fdf::WireServer<fuchsia_hardware_spiimpl::SpiImpl> {
  private:
   void GetChipSelectCount(fdf::Arena& arena,
                           GetChipSelectCountCompleter::Sync& completer) override {
-    completer.buffer(arena).Reply(chips_.size());
+    completer.buffer(arena).Reply(static_cast<uint32_t>(chips_.size()));
   }
   void TransmitVector(fuchsia_hardware_spiimpl::wire::SpiImplTransmitVectorRequest* request,
                       fdf::Arena& arena, TransmitVectorCompleter::Sync& completer) override;
@@ -288,7 +288,7 @@ class AmlSpiDriver : public fdf::DriverBase {
 
  private:
   void OnGetSchedulerRoleName(fdf::StartCompleter completer,
-                              zx::result<fuchsia_scheduler::RoleName> scheduler_role_name);
+                              const zx::result<fuchsia_scheduler::RoleName>& scheduler_role_name);
   void OnCompatServerInitialized(fdf::StartCompleter completer);
   void AddNode(fdf::MmioBuffer mmio, const amlogic_spi::amlspi_config_t& config,
                zx::interrupt interrupt, zx::bti bti, fdf::StartCompleter completer);

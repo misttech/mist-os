@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/driver/fake-bti/cpp/fake-bti.h>
+
 #include "src/devices/spi/drivers/aml-spi/tests/aml-spi-test-env.h"
 
 namespace spi {
@@ -16,15 +18,14 @@ class AmlSpiBtiPaddrEnvironment : public BaseTestEnvironment {
  public:
   static constexpr zx_paddr_t kDmaPaddrs[] = {0x1212'0000, 0xabab'000};
 
-  virtual void SetUpBti() override {
-    zx::bti bti;
-    ASSERT_OK(fake_bti_create_with_paddrs(kDmaPaddrs, std::size(kDmaPaddrs),
-                                          bti.reset_and_get_address()));
-    bti_local_ = bti.borrow();
-    pdev_server_.set_bti(std::move(bti));
+  std::optional<zx::bti> CreateBti() override {
+    zx::result bti = fake_bti::CreateFakeBtiWithPaddrs(kDmaPaddrs);
+    EXPECT_OK(bti);
+    bti_local_ = bti->borrow();
+    return std::move(bti.value());
   }
 
-  zx::unowned_bti& GetBtiLocal() { return bti_local_; }
+  zx::unowned_bti GetBtiLocal() { return bti_local_->borrow(); }
 
  private:
   zx::unowned_bti bti_local_;
@@ -86,17 +87,16 @@ TEST_F(AmlSpiBtiPaddrTest, ExchangeDma) {
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
                                                              fdf::Dispatcher::GetCurrent()->get());
 
-  fake_bti_pinned_vmo_info_t dma_vmos[2] = {};
-  size_t actual_vmos = 0;
-  driver_test().RunInEnvironmentTypeContext(
-      [&dma_vmos, &actual_vmos](AmlSpiBtiPaddrEnvironment& env) {
-        EXPECT_OK(fake_bti_get_pinned_vmos(env.GetBtiLocal()->get(), dma_vmos, std::size(dma_vmos),
-                                           &actual_vmos));
-        EXPECT_EQ(actual_vmos, std::size(dma_vmos));
-      });
+  std::vector<fake_bti::FakeBtiPinnedVmoInfo> dma_vmos;
+  driver_test().RunInEnvironmentTypeContext([&dma_vmos](AmlSpiBtiPaddrEnvironment& env) {
+    zx::result vmos = fake_bti::GetPinnedVmo(env.GetBtiLocal());
+    EXPECT_OK(vmos);
+    dma_vmos = std::move(vmos.value());
+  });
+  ASSERT_EQ(dma_vmos.size(), 2u);
 
-  zx::vmo tx_dma_vmo(dma_vmos[0].vmo);
-  zx::vmo rx_dma_vmo(dma_vmos[1].vmo);
+  zx::vmo tx_dma_vmo{std::move(dma_vmos[0].vmo)};
+  zx::vmo rx_dma_vmo{std::move(dma_vmos[1].vmo)};
 
   // Copy the reversed expected RX data to the RX VMO. The driver should copy this to the user
   // output buffer with the correct endianness.
@@ -142,11 +142,11 @@ class AmlSpiBtiEmptyEnvironment : public BaseTestEnvironment {
  public:
   static constexpr zx_paddr_t kDmaPaddrs[] = {0x1212'0000, 0xabab'000};
 
-  virtual void SetUpBti() override {
-    zx::bti bti;
-    ASSERT_OK(fake_bti_create(bti.reset_and_get_address()));
-    bti_local_ = bti.borrow();
-    pdev_server_.set_bti(std::move(bti));
+  std::optional<zx::bti> CreateBti() override {
+    zx::result bti = fake_bti::CreateFakeBti();
+    EXPECT_OK(bti);
+    bti_local_ = bti->borrow();
+    return std::move(bti.value());
   }
 
   zx::unowned_bti& GetBtiLocal() { return bti_local_; }
@@ -193,14 +193,13 @@ TEST_F(AmlSpiBtiEmptyTest, ExchangeFallBackToPio) {
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
                                                              fdf::Dispatcher::GetCurrent()->get());
 
-  fake_bti_pinned_vmo_info_t dma_vmos[2] = {};
-  size_t actual_vmos = 0;
-  driver_test().RunInEnvironmentTypeContext(
-      [&dma_vmos, &actual_vmos](AmlSpiBtiPaddrEnvironment& env) {
-        EXPECT_OK(fake_bti_get_pinned_vmos(env.GetBtiLocal()->get(), dma_vmos, std::size(dma_vmos),
-                                           &actual_vmos));
-        EXPECT_EQ(actual_vmos, std::size(dma_vmos));
-      });
+  std::vector<fake_bti::FakeBtiPinnedVmoInfo> dma_vmos;
+  driver_test().RunInEnvironmentTypeContext([&dma_vmos](AmlSpiBtiPaddrEnvironment& env) {
+    zx::result vmos = fake_bti::GetPinnedVmo(env.GetBtiLocal());
+    EXPECT_OK(vmos);
+    dma_vmos = std::move(vmos.value());
+  });
+  ASSERT_EQ(dma_vmos.size(), 2u);
 
   zx_paddr_t tx_paddr = 0;
   zx_paddr_t rx_paddr = 0;
@@ -299,17 +298,16 @@ TEST_F(AmlSpiExchangeDmaClientReversesBufferTest, Test) {
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
                                                              fdf::Dispatcher::GetCurrent()->get());
 
-  fake_bti_pinned_vmo_info_t dma_vmos[2] = {};
-  size_t actual_vmos = 0;
-  driver_test().RunInEnvironmentTypeContext(
-      [&dma_vmos, &actual_vmos](AmlSpiBtiPaddrEnvironment& env) {
-        EXPECT_OK(fake_bti_get_pinned_vmos(env.GetBtiLocal()->get(), dma_vmos, std::size(dma_vmos),
-                                           &actual_vmos));
-        EXPECT_EQ(actual_vmos, std::size(dma_vmos));
-      });
+  std::vector<fake_bti::FakeBtiPinnedVmoInfo> dma_vmos;
+  driver_test().RunInEnvironmentTypeContext([&dma_vmos](AmlSpiBtiPaddrEnvironment& env) {
+    zx::result vmos = fake_bti::GetPinnedVmo(env.GetBtiLocal());
+    EXPECT_OK(vmos);
+    dma_vmos = std::move(vmos.value());
+  });
+  ASSERT_EQ(dma_vmos.size(), 2u);
 
-  zx::vmo tx_dma_vmo(dma_vmos[0].vmo);
-  zx::vmo rx_dma_vmo(dma_vmos[1].vmo);
+  zx::vmo tx_dma_vmo{std::move(dma_vmos[0].vmo)};
+  zx::vmo rx_dma_vmo{std::move(dma_vmos[1].vmo)};
 
   rx_dma_vmo.write(kExpectedRxData, 0, sizeof(kExpectedRxData));
 
