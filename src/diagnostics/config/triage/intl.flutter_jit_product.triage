@@ -3,13 +3,13 @@
 {
     select: {
         close_status: [
-            "INSPECT:core/session-manager/session\\:session/flutter_jit_product_runner:root/os:tz_data_close_status",
+            "INSPECT:core/session-manager/session\\:session/assistant_jit_product_runner:root/vm:tz_data_close_status",
         ],
         dst_status: [
-            "INSPECT:core/session-manager/session\\:session/flutter_jit_product_runner:root/os:dst_status",
+            "INSPECT:core/session-manager/session\\:session/assistant_jit_product_runner:root/vm:dst_status",
         ],
         tz_data_status: [
-            "INSPECT:core/session-manager/session\\:session/flutter_jit_product_runner:root/os:tz_data_status",
+            "INSPECT:core/session-manager/session\\:session/assistant_jit_product_runner:root/vm:tz_data_status",
         ],
     },
     eval: {
@@ -21,7 +21,7 @@
         has_error: {
             type: "Warning",
             trigger: "Or(close_error, dst_error, tz_data_error)",
-            print: "flutter_jit_product_runner has had issues loading the timezone data.",
+            print: "assistant_jit_product_runner has had issues loading the timezone data.",
         },
     },
     test: {
