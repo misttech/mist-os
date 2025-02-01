@@ -101,6 +101,12 @@ template("ffx_tool") {
                              "sdk_area",
                              "sdk_deps",
                            ])
+
+    # As these are large libraries that are slow to compile on RBE workers, switch
+    # them to the larger RBE workers.
+    _concurrent_jobs = concurrent_jobs.rust_highmem
+    configs += _concurrent_jobs.configs
+    forward_variables_from(_concurrent_jobs.vars, "*")
   }
 
   # Replace the special linker sections containing the version information with the real values

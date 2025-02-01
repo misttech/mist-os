@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/rust/rustc_library.gni")
+import("//build/toolchain/concurrent_jobs.gni")
 import("//build/tools/json_merge/json_merge.gni")
 import("//sdk/categories/compatibility.gni")
 import("command.gni")
@@ -204,6 +205,12 @@ template("ffx_plugin") {
                                    ])
         assert_no_deps = disallowed_category_markers
         deps += [ category_marker ]
+
+        # As these are large libraries that are slow to compile on RBE workers, switch
+        # them to the larger RBE workers.
+        _concurrent_jobs = concurrent_jobs.rust_highmem
+        configs += _concurrent_jobs.configs
+        forward_variables_from(_concurrent_jobs.vars, "*")
       }
 
       args_deps += [ ":" + sub_cmd ]
@@ -243,10 +250,6 @@ template("ffx_plugin") {
         source_root = "src/args.rs"
       }
 
-      # Due to size constraints, RBE slows down the build of plugins
-      # rather than speeding it up. Disable RBE for plugins.
-      disable_rbe = true
-
       if (defined(invoker.args_deps)) {
         args_deps += invoker.args_deps
       }
@@ -284,6 +287,12 @@ template("ffx_plugin") {
                                  ])
       assert_no_deps = disallowed_category_markers
       deps += [ category_marker ]
+
+      # As these are large libraries that are slow to compile on RBE workers, switch
+      # them to the larger RBE workers.
+      _concurrent_jobs = concurrent_jobs.rust_highmem
+      configs += _concurrent_jobs.configs
+      forward_variables_from(_concurrent_jobs.vars, "*")
     }
     if (defined(invoker.args_with_unit_tests) && invoker.args_with_unit_tests) {
       tests_deps += [ ":" + args_target_name + "_test" ]
@@ -400,6 +409,12 @@ template("ffx_plugin") {
         assert_no_deps = []
       }
       assert_no_deps += disallowed_category_markers
+
+      # As these are large libraries that are slow to compile on RBE workers, switch
+      # them to the larger RBE workers.
+      _concurrent_jobs = concurrent_jobs.rust_highmem
+      configs += _concurrent_jobs.configs
+      forward_variables_from(_concurrent_jobs.vars, "*")
     }
   } else {
     not_needed(invoker, "*")
