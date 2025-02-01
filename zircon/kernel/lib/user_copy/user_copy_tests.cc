@@ -206,77 +206,78 @@ bool test_addresses_outside_user_range(bool capture_faults) {
     bool expected_fault;
   };
   constexpr TestCase kTestCases[] = {
-    // These addresses will result in ZX_ERR_INVALID_ARGS when copying to and
-    // from a user pointer because we fault on bad addresses.
+      // These addresses will result in ZX_ERR_INVALID_ARGS when copying to and
+      // from a user pointer because we fault on bad addresses.
 
-    // Explicit check of null
-    {static_cast<vaddr_t>(0), ZX_ERR_INVALID_ARGS, true},
-    // Entirely before USER_ASPACE_BASE
-    {USER_ASPACE_BASE - (sizeof(test_buffer) * 2), ZX_ERR_INVALID_ARGS, true},
-    // Overlapping USER_ASPACE_BASE
-    {USER_ASPACE_BASE - (sizeof(test_buffer) / 2), ZX_ERR_INVALID_ARGS, true},
+      // Explicit check of null
+      {static_cast<vaddr_t>(0), ZX_ERR_INVALID_ARGS, true},
+      // Entirely before USER_ASPACE_BASE
+      {USER_ASPACE_BASE - (sizeof(test_buffer) * 2), ZX_ERR_INVALID_ARGS, true},
+      // Overlapping USER_ASPACE_BASE
+      {USER_ASPACE_BASE - (sizeof(test_buffer) / 2), ZX_ERR_INVALID_ARGS, true},
 
 #if defined(__aarch64__)
-    // These addresses will result in ZX_ERR_INVALID_ARGS when copying to a
-    // user pointer because we fault on a bad address.
+      // These addresses will result in ZX_ERR_INVALID_ARGS when copying to a
+      // user pointer because we fault on a bad address.
 
-    // Entirely after USER_ASPACE_BASE + USER_ASPACE_SIZE
-    {USER_ASPACE_BASE + USER_ASPACE_SIZE + sizeof(test_buffer), ZX_ERR_INVALID_ARGS, true},
-    // Overlapping USER_ASPACE_BASE + USER_ASPACE_SIZE
-    {USER_ASPACE_BASE + USER_ASPACE_SIZE - (sizeof(test_buffer) / 2), ZX_ERR_INVALID_ARGS, true},
+      // Entirely after USER_ASPACE_BASE + USER_ASPACE_SIZE
+      {USER_ASPACE_BASE + USER_ASPACE_SIZE + sizeof(test_buffer), ZX_ERR_INVALID_ARGS, true},
+      // Overlapping USER_ASPACE_BASE + USER_ASPACE_SIZE
+      {USER_ASPACE_BASE + USER_ASPACE_SIZE - (sizeof(test_buffer) / 2), ZX_ERR_INVALID_ARGS, true},
 
-    // On AArch64, an address is considered accessible to the user if bit 55
-    // is zero. This implies addresses above 2^55 that don't set that bit are
-    // considered accessible to the user, but the user_copy operation would
-    // still fault on them.
-    //
-    // These addresses will result in ZX_ERR_INVALID_ARGS when copying to and
-    // from a user pointer either because bit 55 is not zero or there was a
-    // page fault.
+      // On AArch64, an address is considered accessible to the user if bit 55
+      // is zero. This implies addresses above 2^55 that don't set that bit are
+      // considered accessible to the user, but the user_copy operation would
+      // still fault on them.
+      //
+      // These addresses will result in ZX_ERR_INVALID_ARGS when copying to and
+      // from a user pointer either because bit 55 is not zero or there was a
+      // page fault.
 
-    // Start at 2^55
-    {UINT64_C(1) << 55, ZX_ERR_INVALID_ARGS, false},
-    // Slightly after 2^55 (bit 55 is set)
-    {(UINT64_C(1) << 55) + sizeof(test_buffer), ZX_ERR_INVALID_ARGS, false},
-    // Overlapping 2^55
-    {(UINT64_C(1) << 55) - sizeof(test_buffer) / 2, ZX_ERR_INVALID_ARGS, false},
+      // Start at 2^55
+      {UINT64_C(1) << 55, ZX_ERR_INVALID_ARGS, false},
+      // Slightly after 2^55 (bit 55 is set)
+      {(UINT64_C(1) << 55) + sizeof(test_buffer), ZX_ERR_INVALID_ARGS, false},
+      // Overlapping 2^55
+      {(UINT64_C(1) << 55) - sizeof(test_buffer) / 2, ZX_ERR_INVALID_ARGS, false},
 
-    // These addresses will result in ZX_ERR_INVALID_ARGS when copying to a
-    // user pointer because we fault on a bad address.
+      // These addresses will result in ZX_ERR_INVALID_ARGS when copying to a
+      // user pointer because we fault on a bad address.
 
-    // End right before 2^55
-    {(UINT64_C(1) << 55) - sizeof(test_buffer), ZX_ERR_INVALID_ARGS, true},
-    // Way beyond 2^55 (bit 55 is not set). Note that this is effectively a null
-    // pointer with a tag of 1.
-    {(UINT64_C(1) << 56), ZX_ERR_INVALID_ARGS, true},
+      // End right before 2^55
+      {(UINT64_C(1) << 55) - sizeof(test_buffer), ZX_ERR_INVALID_ARGS, true},
+      // Way beyond 2^55 (bit 55 is not set). Note that this is effectively a null
+      // pointer with a tag of 1.
+      {(UINT64_C(1) << 56), ZX_ERR_INVALID_ARGS, true},
 
 #elif defined(__x86_64__)
-    // On x86_64, an address is considered accessible to the user if everything
-    // above bit 47 is zero. Passing an address that doesn't meet this constraint
-    // will cause the user_copy to fail without performing the copy.
+      // On x86_64, an address is considered accessible to the user if everything
+      // above bit 47 is zero. Passing an address that doesn't meet this constraint
+      // will cause the user_copy to fail without performing the copy.
 
-    // Entirely after USER_ASPACE_BASE + USER_ASPACE_SIZE
-    {USER_ASPACE_BASE + USER_ASPACE_SIZE + sizeof(test_buffer), ZX_ERR_INVALID_ARGS, true},
-    // Overlapping USER_ASPACE_BASE + USER_ASPACE_SIZE
-    {USER_ASPACE_BASE + USER_ASPACE_SIZE - (sizeof(test_buffer) / 2), ZX_ERR_INVALID_ARGS, true},
+      // Entirely after USER_ASPACE_BASE + USER_ASPACE_SIZE
+      {USER_ASPACE_BASE + USER_ASPACE_SIZE + sizeof(test_buffer), ZX_ERR_INVALID_ARGS, true},
+      // Overlapping USER_ASPACE_BASE + USER_ASPACE_SIZE
+      {USER_ASPACE_BASE + USER_ASPACE_SIZE - (sizeof(test_buffer) / 2), ZX_ERR_INVALID_ARGS, true},
 
-    // Start at 2^48
-    {UINT64_C(1) << 48, ZX_ERR_INVALID_ARGS, false},
-    // Overlapping 2^48
-    {(UINT64_C(1) << 48) - sizeof(test_buffer) / 2, ZX_ERR_INVALID_ARGS, false},
+      // Start at 2^48
+      {UINT64_C(1) << 48, ZX_ERR_INVALID_ARGS, false},
+      // Overlapping 2^48
+      {(UINT64_C(1) << 48) - sizeof(test_buffer) / 2, ZX_ERR_INVALID_ARGS, false},
 
-    // Additionally, all virtual addresses (including virtual mode user addresses) must be
-    // "canonical" addresses.  For machines with 48 bit virtual addresses (an assumption currently
-    // validated in "kernel/arch/x86/mmu.cc"), this means that virtual addresses in the range from
-    // [0x0000'8000'0000'0000, 0xFFFF'8000'0000'0000) are considered to be "non-canonical" and will
-    // generate a GPF if they are accessed.  See https://en.wikipedia.org/wiki/X86-64 "Canonical
-    // form addresses" for more details.
-    //
-    // Make sure that user-copy operations consider these addresses to be invalid, and do not
-    // produce faults if we attempt to access them via a user-copy operation.
-    {UINT64_C(0x0000'8000'0000'0000), ZX_ERR_INVALID_ARGS, false},
-    {UINT64_C(0xFFFF'7FFF'FFFF'FFFF), ZX_ERR_INVALID_ARGS, false},
-    {UINT64_C(0x1234'5678'9ABC'DEF0), ZX_ERR_INVALID_ARGS, false},
+      // Additionally, all virtual addresses (including virtual mode user addresses) must be
+      // "canonical" addresses.  For machines with 48 bit virtual addresses (an assumption currently
+      // validated in "kernel/arch/x86/mmu.cc"), this means that virtual addresses in the range from
+      // [0x0000'8000'0000'0000, 0xFFFF'8000'0000'0000) are considered to be "non-canonical" and
+      // will
+      // generate a GPF if they are accessed.  See https://en.wikipedia.org/wiki/X86-64 "Canonical
+      // form addresses" for more details.
+      //
+      // Make sure that user-copy operations consider these addresses to be invalid, and do not
+      // produce faults if we attempt to access them via a user-copy operation.
+      {UINT64_C(0x0000'8000'0000'0000), ZX_ERR_INVALID_ARGS, false},
+      {UINT64_C(0xFFFF'7FFF'FFFF'FFFF), ZX_ERR_INVALID_ARGS, false},
+      {UINT64_C(0x1234'5678'9ABC'DEF0), ZX_ERR_INVALID_ARGS, false},
 #endif
   };
 
@@ -448,6 +449,62 @@ bool test_iovec_foreach() {
   END_TEST;
 }
 
+// Test internal::MemberAccess.  Note this exists only to underlie flex_array.
+// That is used only by one legacy syscall API that is slated to be removed
+// (part of kernel PCI).  When that syscall is retired, then the support for
+// the flex_array case should all be removed.  No new syscall APIs should use
+// difficult struct shapes like this.
+struct FlexArrayTest {
+  int not_an_array;
+  int not_a_flex_array[3];
+  int flex_array[];
+};
+static_assert(!internal::MemberAccess<int>::kValid);  // Not a struct type.
+static_assert(internal::MemberAccess<FlexArrayTest>::kValid);
+static_assert(internal::MemberAccess<const FlexArrayTest>::kValid);
+static_assert(ktl::is_same_v<const int[], typename internal::MemberAccess<const FlexArrayTest>::
+                                              template AccessType<&FlexArrayTest::flex_array>>);
+static_assert(
+    ktl::is_same_v<int, typename internal::MemberAccess<FlexArrayTest>::template ElementAccessType<
+                            &FlexArrayTest::flex_array>>);
+
+bool test_copy_out_flex_array() {
+  BEGIN_TEST;
+
+  auto user = UserMemory::Create(PAGE_SIZE);
+  user_out_ptr<FlexArrayTest> struct_ptr = user->user_out<FlexArrayTest>();
+
+  constexpr size_t kFlexArrayTestSize = sizeof(FlexArrayTest) + sizeof(int[3]);
+  constexpr ktl::array<int, 3> kArrayElts = {1, 2, 3};
+
+  zx::result<user_out_ptr<int>> result =
+      struct_ptr.flex_array<&FlexArrayTest::flex_array>(3, kFlexArrayTestSize);
+  ASSERT_OK(result.status_value());
+  ASSERT_OK(result->copy_array_to_user(kArrayElts.data(), kArrayElts.size()));
+
+  ktl::array<int, kArrayElts.size()> read_back;
+  ASSERT_OK(
+      user->VmoRead(read_back.data(), offsetof(FlexArrayTest, flex_array), sizeof(read_back)));
+  for (size_t i = 0; i < read_back.size(); ++i) {
+    EXPECT_EQ(read_back[i], kArrayElts[i]);
+  }
+
+  // Overflow in count -> bytes.
+  result = struct_ptr.flex_array<&FlexArrayTest::flex_array>(ktl::numeric_limits<size_t>::max(),
+                                                             kFlexArrayTestSize);
+  EXPECT_EQ(result.status_value(), ZX_ERR_INVALID_ARGS);
+
+  // Count too big for byte length.
+  result = struct_ptr.flex_array<&FlexArrayTest::flex_array>(3, kFlexArrayTestSize + sizeof(int));
+  EXPECT_EQ(result.status_value(), ZX_ERR_INVALID_ARGS);
+
+  // Byte length too big for count.
+  result = struct_ptr.flex_array<&FlexArrayTest::flex_array>(4, kFlexArrayTestSize);
+  EXPECT_EQ(result.status_value(), ZX_ERR_INVALID_ARGS);
+
+  END_TEST;
+}
+
 }  // namespace
 
 #define USER_COPY_UNITTEST(fname) UNITTEST(#fname, fname)
@@ -464,4 +521,5 @@ USER_COPY_UNITTEST(capture_faults_test_capture)
 USER_COPY_UNITTEST(capture_faults_test_addresses_outside_user_range)
 USER_COPY_UNITTEST(test_get_total_capacity)
 USER_COPY_UNITTEST(test_iovec_foreach)
+USER_COPY_UNITTEST(test_copy_out_flex_array)
 UNITTEST_END_TESTCASE(user_copy_tests, "user_copy_tests", "User Copy test")

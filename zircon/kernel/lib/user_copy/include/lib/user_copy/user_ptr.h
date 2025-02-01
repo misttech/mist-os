@@ -8,10 +8,13 @@
 #define ZIRCON_KERNEL_LIB_USER_COPY_INCLUDE_LIB_USER_COPY_USER_PTR_H_
 
 #include <lib/user_copy/internal.h>
+#include <lib/zx/result.h>
 #include <stddef.h>
+#include <zircon/assert.h>
 #include <zircon/types.h>
 
 #include <arch/user_copy.h>
+#include <ktl/declval.h>
 #include <ktl/type_traits.h>
 
 // user_*_ptr<> wraps a pointer to user memory, to differentiate it from kernel
@@ -25,6 +28,29 @@ enum InOutPolicy {
   kIn = 1,
   kOut = 2,
   kInOut = kIn | kOut,
+};
+
+template <typename T>
+struct MemberAccess {
+  static constexpr bool kValid = false;
+};
+
+template <typename T>
+  requires(ktl::is_class_v<ktl::remove_const_t<T>>)
+struct MemberAccess<T> {
+  using ValueType = ktl::remove_const_t<T>;
+
+  template <auto ValueType::* Member>
+  using MemberType = ktl::remove_reference_t<decltype(ktl::declval<ValueType>().*Member)>;
+
+  template <auto ValueType::* Member>
+  using AccessType = ktl::conditional_t<ktl::is_const_v<T>, ktl::add_const_t<MemberType<Member>>,
+                                        MemberType<Member>>;
+
+  template <auto ValueType::* Member>
+  using ElementAccessType = ktl::remove_pointer_t<ktl::decay_t<AccessType<Member>>>;
+
+  static constexpr bool kValid = true;
 };
 
 template <typename T, InOutPolicy Policy>
@@ -48,9 +74,44 @@ class user_ptr {
 
   T* get() const { return ptr_; }
 
+  // Only a user_in_ptr<const void> or user_out_ptr<void> can be reinterpreted
+  // as a different type.  Use sparingly and with great care.
   template <typename C>
+    requires(ktl::is_void_v<T>)
   user_ptr<C, Policy> reinterpret() const {
     return user_ptr<C, Policy>(reinterpret_cast<C*>(ptr_));
+  }
+
+  // This requires an explicit template parameter that's a pointer-to-member
+  // for a flexible array member of ValueType and yields a user_ptr to the
+  // first element.  This checks that the element count (first argument)
+  // matches the total size in bytes of the user buffer.  When this succeeds,
+  // it should be safe to use copy_array_* on the returned user_ptr with the
+  // same count.
+  template <auto Member, typename U = T>
+    requires(ktl::is_same_v<T, U> && MemberAccess<U>::kValid &&
+             ktl::is_unbounded_array_v<typename MemberAccess<U>::template AccessType<Member>>)
+  zx::result<user_ptr<typename MemberAccess<U>::template ElementAccessType<Member>, Policy>>
+  flex_array(size_t count, size_t size_bytes) {
+    // The argument is always just `&zx_foo_t::bar`, so ElementT itself is
+    // never const even though the type of ptr_->*member will be const if T is
+    // const.  So the return type must propagate const from T to ElementT,
+    // which is never const by itself.
+    using AccessT = MemberAccess<T>::template ElementAccessType<Member>;
+    static_assert(ktl::is_same_v<AccessT[], ktl::remove_reference_t<decltype(ptr_->*Member)>>);
+
+    // The non-varying parts of the struct should already been examined, so the
+    // pointer can't be null.
+    ZX_ASSERT(ptr_);
+
+    const size_t expected_array_size_bytes = size_bytes - sizeof(ValueType);
+    size_t computed_array_size_bytes;
+    if (mul_overflow(sizeof(AccessT), count, &computed_array_size_bytes) ||
+        computed_array_size_bytes != expected_array_size_bytes) {
+      return zx::error{ZX_ERR_INVALID_ARGS};
+    }
+
+    return zx::ok(user_ptr<AccessT, Policy>(ptr_->*Member));
   }
 
   // special operator to return the nullness of the pointer

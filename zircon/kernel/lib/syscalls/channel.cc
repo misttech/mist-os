@@ -376,7 +376,7 @@ zx_status_t channel_call_noretry(zx_handle_t handle_value, uint32_t options,
   if (status != ZX_OK)
     return status;
 
-  user_in_ptr<const char> user_bytes = make_user_in_ptr(static_cast<const char*>(args.wr_bytes));
+  user_in_ptr<const void> user_bytes = make_user_in_ptr(static_cast<const void*>(args.wr_bytes));
   using WriteHandleType = ktl::remove_pointer_t<decltype(args.wr_handles)>;
   UserPtr<WriteHandleType> user_handles(args.wr_handles);
 
@@ -404,7 +404,8 @@ zx_status_t channel_call_noretry(zx_handle_t handle_value, uint32_t options,
     status = MessagePacket::Create(user_bytes.reinterpret<const zx_channel_iovec_t>(), num_bytes,
                                    num_handles, &msg);
   } else {
-    status = MessagePacket::Create(user_bytes, num_bytes, num_handles, &msg);
+    status =
+        MessagePacket::Create(user_bytes.reinterpret<const char>(), num_bytes, num_handles, &msg);
   }
   if (status != ZX_OK) {
     return status;

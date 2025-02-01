@@ -8,12 +8,14 @@
 #define ZIRCON_KERNEL_INCLUDE_KTL_UNIQUE_PTR_H_
 
 #include <memory>
+#include <new>
 
 #include <fbl/alloc_checker.h>
 #include <ktl/type_traits.h>
 
 namespace ktl {
 
+using std::align_val_t;
 using std::unique_ptr;
 
 template <typename T, typename... Args>

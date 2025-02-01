@@ -45,12 +45,6 @@
 #define LOCAL_TRACE 0
 
 #ifdef WITH_KERNEL_PCIE
-namespace {
-struct FreeDeleter {
-  void operator()(void* ptr) const { ::free(ptr); }
-};
-}  // namespace
-
 // Implementation of a PcieRoot with a look-up table based legacy IRQ swizzler
 // suitable for use with ACPI style swizzle definitions.
 class PcieRootLUTSwizzle : public PcieRoot {
@@ -155,15 +149,27 @@ static inline bool is_designware(const zx_pci_init_arg_t* arg) {
 }
 
 // zx_status_t zx_pci_init
-zx_status_t sys_pci_init(zx_handle_t handle, user_in_ptr<const zx_pci_init_arg_t> _init_buf,
+zx_status_t sys_pci_init(zx_handle_t handle, user_in_ptr<const zx_pci_init_arg_t> init_buf,
                          uint32_t len) {
+  // This can't use plain `new` because it's a variable-sized struct, really a
+  // struct plus an array, but not just a proper array.
+  struct OperatorArrayDeleter {
+    void operator()(void* ptr) const {
+      operator delete[](ptr, ktl::align_val_t{alignof(zx_pci_init_arg_t)});
+    }
+  };
+  using ArgPtr = ktl::unique_ptr<zx_pci_init_arg_t, OperatorArrayDeleter>;
+  auto NewArray = [len](fbl::AllocChecker& ac) {
+    return ArgPtr{static_cast<zx_pci_init_arg_t*>(operator new[](
+        len, ktl::align_val_t{alignof(zx_pci_init_arg_t)}, ac))};
+  };
+
   zx_status_t status;
   if ((status = validate_resource(handle, ZX_RSRC_KIND_MMIO)) < 0) {
     return status;
   }
 
-  ktl::unique_ptr<zx_pci_init_arg_t, FreeDeleter> arg;
-
+  ArgPtr arg;
   if (len < sizeof(*arg) || len > ZX_PCI_INIT_ARG_MAX_SIZE) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -172,37 +178,24 @@ zx_status_t sys_pci_init(zx_handle_t handle, user_in_ptr<const zx_pci_init_arg_t
   if (pcie == nullptr)
     return ZX_ERR_BAD_STATE;
 
-  // we have to malloc instead of new since this is a variable-sized structure
-  arg.reset(static_cast<zx_pci_init_arg_t*>(malloc(len)));
-  if (!arg) {
+  if (fbl::AllocChecker ac; arg = NewArray(ac), !ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
 
   // Copy in the base struct.
-  status = _init_buf.copy_from_user(arg.get());
+  status = init_buf.copy_from_user(arg.get());
   if (status != ZX_OK) {
     return status;
   }
 
-  // Are there any flexible array members (specifically, address windows
-  // descriptors) to copy in?  If so, we need to start by validating the amount
-  // of data we need to copy in from user-space.  Be careful when we do this
-  // check as the user has supplied the value for addr_window_count and it
-  // cannot be fully trusted.
   const uint32_t win_count = arg->addr_window_count;
-  const size_t expected_window_size = len - sizeof(*arg);
-  size_t computed_window_size;
-  if (mul_overflow(sizeof(arg->addr_windows[0]), win_count, &computed_window_size) ||
-      (expected_window_size != computed_window_size)) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
   if (win_count > 0) {
-    // The flexible array member is an unnamed struct so use typedef so we make a user_ptr to it.
-    typedef ktl::remove_reference_t<decltype(zx_pci_init_arg_t::addr_windows[0])> addr_window_t;
-    user_in_ptr<const addr_window_t> addr_windows =
-        _init_buf.byte_offset(sizeof(*arg)).reinterpret<const addr_window_t>();
-    status = addr_windows.copy_array_from_user(arg->addr_windows, win_count);
+    auto addr_windows = init_buf.flex_array<&zx_pci_init_arg_t::addr_windows>(win_count, len);
+    if (addr_windows.is_error()) {
+      return addr_windows.error_value();
+    }
+
+    status = addr_windows->copy_array_from_user(arg->addr_windows, win_count);
     if (status != ZX_OK) {
       return status;
     }

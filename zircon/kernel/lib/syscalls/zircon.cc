@@ -204,7 +204,7 @@ zx_status_t sys_debuglog_write(zx_handle_t log_handle, uint32_t options,
 //
 // Copies at most |len| bytes to |dst|.
 static zx::result<size_t> CopyOutLogRecord(const dlog_record_t& internal_record,
-                                           user_out_ptr<zx_log_record_t> dst, size_t len) {
+                                           user_out_ptr<void> dst, size_t len) {
   zx_log_record_t external_record{};
   external_record.sequence = internal_record.hdr.sequence;
   external_record.datalen = internal_record.hdr.datalen;
@@ -234,7 +234,7 @@ static zx::result<size_t> CopyOutLogRecord(const dlog_record_t& internal_record,
   // There's enough space for the struct so copy it as is.  By not casting to an
   // array, we benefit from user_copy's static_asserts that verify the type
   // (zx_log_record_t) is ABI-safe.
-  status = dst.copy_to_user(external_record);
+  status = dst.reinterpret<zx_log_record_t>().copy_to_user(external_record);
   if (status != ZX_OK) {
     return zx::error(status);
   }
@@ -276,7 +276,7 @@ zx_status_t sys_debuglog_read(zx_handle_t log_handle, uint32_t options, user_out
     return status;
   }
 
-  zx::result<size_t> result = CopyOutLogRecord(record, ptr.reinterpret<zx_log_record_t>(), len);
+  zx::result<size_t> result = CopyOutLogRecord(record, ptr, len);
   if (result.is_error()) {
     return result.error_value();
   }
