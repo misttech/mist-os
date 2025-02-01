@@ -59,7 +59,7 @@ pub mod device {
     };
     pub use crate::internal::device::slaac::{
         InnerSlaacTimerId, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses,
-        SlaacAddrsMutAndConfig, SlaacBindingsContext, SlaacConfiguration, SlaacConfigurationUpdate,
+        SlaacBindingsContext, SlaacConfigAndState, SlaacConfiguration, SlaacConfigurationUpdate,
         SlaacContext, SlaacCounters, SlaacState, SlaacTimerId, TemporarySlaacAddressConfiguration,
         SLAAC_MIN_REGEN_ADVANCE,
     };
