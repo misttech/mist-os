@@ -15,9 +15,7 @@ use crate::mode_management::phy_manager::{PhyManager, PhyManagerApi};
 use crate::mode_management::{create_iface_manager, device_monitor, recovery, DEFECT_CHANNEL_SIZE};
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
 use crate::util::listener;
-use crate::util::testing::{
-    create_inspect_persistence_channel, run_until_completion, run_while, run_while_with_fake_time,
-};
+use crate::util::testing::{create_inspect_persistence_channel, run_until_completion, run_while};
 use anyhow::{format_err, Error};
 use fidl::endpoints::{create_proxy, create_request_stream};
 use fidl_fuchsia_wlan_device_service::DeviceWatcherEvent;
@@ -359,7 +357,7 @@ fn add_phy(exec: &mut TestExecutor, test_values: &mut TestValues) {
     let add_phy_fut = device_monitor::handle_event(&listener, add_phy_event);
     let mut add_phy_fut = pin!(add_phy_fut);
 
-    let device_monitor_req = run_while_with_fake_time(
+    let device_monitor_req = run_while(
         exec,
         &mut add_phy_fut,
         test_values.external_interfaces.monitor_service_stream.next(),
@@ -396,7 +394,7 @@ fn prepare_client_interface(
     assert_variant!(exec.run_until_stalled(&mut start_connections_fut), Poll::Pending);
 
     // Expect an interface creation request
-    let iface_creation_req = run_while_with_fake_time(
+    let iface_creation_req = run_while(
         exec,
         &mut test_values.internal_objects.internal_futures,
         test_values.external_interfaces.monitor_service_stream.next(),
@@ -422,7 +420,7 @@ fn prepare_client_interface(
     );
 
     // Expect an interface query and notify that this is a client interface.
-    let iface_query = run_while_with_fake_time(
+    let iface_query = run_while(
         exec,
         &mut test_values.internal_objects.internal_futures,
         test_values.external_interfaces.monitor_service_stream.next(),
@@ -446,7 +444,7 @@ fn prepare_client_interface(
     );
 
     // Expect that we have requested a client SME proxy as part of interface creation
-    let sme_req = run_while_with_fake_time(
+    let sme_req = run_while(
         exec,
         &mut test_values.internal_objects.internal_futures,
         test_values.external_interfaces.monitor_service_stream.next(),
@@ -465,7 +463,7 @@ fn prepare_client_interface(
     let iface_sme_stream = sme_server.into_stream();
 
     // Expect to get an SME request for the state machine creation
-    let sme_req = run_while_with_fake_time(
+    let sme_req = run_while(
         exec,
         &mut test_values.internal_objects.internal_futures,
         test_values.external_interfaces.monitor_service_stream.next(),
@@ -483,11 +481,8 @@ fn prepare_client_interface(
     let mut sme_stream = sme_server.into_stream();
 
     // State machine does an initial disconnect
-    let sme_req = run_while_with_fake_time(
-        exec,
-        &mut test_values.internal_objects.internal_futures,
-        sme_stream.next(),
-    );
+    let sme_req =
+        run_while(exec, &mut test_values.internal_objects.internal_futures, sme_stream.next());
     assert_variant!(
         sme_req,
         Some(Ok(fidl_sme::ClientSmeRequest::Disconnect {
@@ -505,7 +500,7 @@ fn prepare_client_interface(
     );
 
     // Check for a response to the Policy API start client connections request
-    let start_connections_resp = run_while_with_fake_time(
+    let start_connections_resp = run_while(
         exec,
         &mut test_values.internal_objects.internal_futures,
         &mut start_connections_fut,
@@ -536,8 +531,7 @@ where
     <BackgroundFut as futures::Future>::Output: std::fmt::Debug,
 {
     // Get the next update
-    let next_update_req =
-        run_while_with_fake_time(exec, background_tasks, client_listener_update_requests.next());
+    let next_update_req = run_while(exec, background_tasks, client_listener_update_requests.next());
     let update_request = assert_variant!(
         next_update_req,
         Some(Ok(update_request)) => {
@@ -630,11 +624,7 @@ fn save_and_connect(
     let save_fut = pin!(save_fut);
 
     // Continue processing the save request. Connect process starts, and save request returns once the scan has been queued.
-    let save_resp = run_while_with_fake_time(
-        exec,
-        &mut test_values.internal_objects.internal_futures,
-        save_fut,
-    );
+    let save_resp = run_while(exec, &mut test_values.internal_objects.internal_futures, save_fut);
     assert_variant!(save_resp, Ok(Ok(())));
 
     // Check for a listener update saying we're connecting
@@ -671,7 +661,7 @@ fn save_and_connect(
             channel: types::WlanChan::new(1, types::Cbw::Cbw20),
         ),
     }];
-    let next_sme_stream_req = run_while_with_fake_time(
+    let next_sme_stream_req = run_while(
         exec,
         &mut test_values.internal_objects.internal_futures,
         iface_sme_stream.next(),
@@ -688,7 +678,7 @@ fn save_and_connect(
     );
 
     // Expect to get an SME request for state machine creation.
-    let next_device_monitor_req = run_while_with_fake_time(
+    let next_device_monitor_req = run_while(
         exec,
         &mut test_values.internal_objects.internal_futures,
         test_values.external_interfaces.monitor_service_stream.next(),
@@ -706,7 +696,7 @@ fn save_and_connect(
     let mut state_machine_sme_stream = sme_server.into_stream();
 
     // State machine does an initial disconnect. Ack.
-    let next_sme_req = run_while_with_fake_time(
+    let next_sme_req = run_while(
         exec,
         &mut test_values.internal_objects.internal_futures,
         state_machine_sme_stream.next(),
@@ -722,7 +712,7 @@ fn save_and_connect(
     );
 
     // State machine connects
-    let next_sme_req = run_while_with_fake_time(
+    let next_sme_req = run_while(
         exec,
         &mut test_values.internal_objects.internal_futures,
         state_machine_sme_stream.next(),

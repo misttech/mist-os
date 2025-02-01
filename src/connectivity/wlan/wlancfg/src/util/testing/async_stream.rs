@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 #![cfg(test)]
 
-use fuchsia_async::{self as fasync, TimeoutExt};
+use fuchsia_async::{self as fasync};
 
 use futures::future::Either;
 use futures::prelude::*;
 use futures::stream::StreamFuture;
 use futures::task::Poll;
 use std::pin::pin;
+use std::{thread, time};
 
 /// Run a background task while waiting for a future that should occur.
 /// This is useful for running a task which you expect to produce side effects that
@@ -29,46 +30,20 @@ where
 {
     let result_fut = pin!(result_fut);
 
-    // Set an arbitrary timeout to catch the case where `result_fut` never provides a result.
-    // Even a few milliseconds should be sufficient on all but the slowest hardware.
-    const RESULT_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(5);
-    let result_fut_with_timeout = pin!(result_fut.on_timeout(RESULT_TIMEOUT, || {
-        panic!("Future failed to produce a result within {} seconds", RESULT_TIMEOUT.into_seconds())
-    }));
-
-    // Advance both futures, with the expectation that only `result_fut` will finish.
-    let mut select_fut = futures::future::select(background_fut, result_fut_with_timeout);
-    match exec.run_singlethreaded(pin!(select_fut)) {
-        Either::Left(_) => panic!("Background future finished"),
-        Either::Right((result, _background_fut)) => result,
-    }
-}
-
-/// Version of `run_while` for used with fake time executors, which uses iteration count rather than
-/// timeout. Prefer using the `run_while` when possible.
-#[track_caller]
-pub fn run_while_with_fake_time<BackgroundFut, ResultFut, Out>(
-    exec: &mut fasync::TestExecutor,
-    background_fut: &mut BackgroundFut,
-    result_fut: ResultFut,
-) -> Out
-where
-    BackgroundFut: Future + Unpin,
-    ResultFut: Future<Output = Out>,
-{
-    let result_fut = pin!(result_fut);
-
-    // Advance both futures, with the expectation that only `result_fut` will finish. Set an arbitrary
-    // limit of iterations, in case `result_fut` never provides a result.
+    // Advance both futures, with the expectation that only `result_fut` will finish. Limited to 500
+    // iterations (~5 seconds with a 10ms sleep), in case `result_fut` never provides a result.
     let mut select_fut = futures::future::select(background_fut, result_fut);
-    for _n in 0..500000 {
+    for _ in 0..500 {
         match exec.run_until_stalled(&mut select_fut) {
             Poll::Ready(Either::Left(_)) => panic!("Background future finished"),
-            Poll::Ready(Either::Right((out, _background_fut))) => return out,
+            Poll::Ready(Either::Right((out, _background_fut))) => {
+                return out;
+            }
             Poll::Pending => {}
         }
+        thread::sleep(time::Duration::from_millis(10));
     }
-    panic!("Future failed to produce a result within 500,000 polls");
+    panic!("Future failed to produce a result within ~5 seconds.");
 }
 
 // Run a result future until Poll::Ready. Alternative to `run_singlethreaded`, which is incompatible
@@ -83,7 +58,7 @@ where
 {
     let neverending_background_fut: future::Pending<bool> = future::pending();
     let mut neverending_background_fut = pin!(neverending_background_fut);
-    run_while_with_fake_time(exec, &mut neverending_background_fut, result_fut)
+    run_while(exec, &mut neverending_background_fut, result_fut)
 }
 
 #[track_caller]
