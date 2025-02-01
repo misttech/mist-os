@@ -29,12 +29,11 @@ llvm_libc_source_set("generic") {
     "strtoull",
   ]
 
+  # TODO(https://fxbug.dev/388300636): Enable quick_sort_test.cpp with zxstreams.
   no_test_functions = [ "qsort" ]
-  test_sources = [ "quick_sort_test.cpp" ]
+  functions += no_test_functions
 
   deps = [ ":abort" ]
-
-  functions += no_test_functions
 }
 
 llvm_libc_source_set("abort") {
