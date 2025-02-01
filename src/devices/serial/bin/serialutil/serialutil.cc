@@ -35,6 +35,8 @@ std::string_view ToString(::fuchsia_hardware_serial::Class device_class) {
       return "Console";
     case fuchsia_hardware_serial::Class::kKernelDebug:
       return "Kernel Debug";
+    case fuchsia_hardware_serial::Class::kMcu:
+      return "MCU";
   }
 }
 

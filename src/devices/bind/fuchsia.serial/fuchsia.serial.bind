@@ -18,6 +18,8 @@ extend uint fuchsia.BIND_SERIAL_CLASS {
   CONSOLE = 0x03,
   // Kernel debug serial
   KERNEL_DEBUG = 0x04,
+  // MCU serial connection
+  MCU = 0x05,
 };
 
 string NAME;
