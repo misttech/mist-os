@@ -669,7 +669,7 @@ class VmObject : public VmHierarchyBase,
 
   // Removes the child |child| from this VMO and notifies the child observer if the new child count
   // is zero. The |guard| must be this VMO's lock.
-  void RemoveChild(VmObject* child, Guard<CriticalMutex>&& guard) TA_REQ(lock());
+  void RemoveChild(VmObject* child, Guard<CriticalMutex>::Adoptable adopt);
 
   // Drops |c| from the child list without going through the full removal
   // process. ::RemoveChild is probably what you want here.

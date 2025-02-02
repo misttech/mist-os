@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#pragma once
+#ifndef LOCKDEP_GUARD_H_
+#define LOCKDEP_GUARD_H_
 
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
@@ -228,14 +229,13 @@ class __TA_SCOPED_CAPABILITY
   // Read-only access to the underlying |lock|.
   const LockType* lock() const { return validator_.lock(); }
 
+  class Adoptable;
   // Releases this scoped capability without releasing the underlying lock or
-  // un-tracking the lock in the validator. Returns an rvalue reference to the
+  // un-tracking the lock in the validator. Returns an object holding the
   // lock state and validator state which may be adopted by another Guard.
-  // This is useful in the rare situation where a lock must be released by a
-  // function called in the current protected scope. This is primarily needed
-  // to keep the Clang static lock validator happy; static analysis complains
-  // when a scoped capability is passed by pointer/reference and released in
-  // another scope.
+  // This is useful in the rare situation where a lock wants to be used and
+  // released in a different scope, or if iterating over a data structure that
+  // uses fine-grained locking.
   //
   // Example:
   //  Guard<fbl::Mutex> guard{&lock};
@@ -243,8 +243,25 @@ class __TA_SCOPED_CAPABILITY
   //  // Setup actions...
   //
   //  DoTaskAndReleaseLock(guard.take());
+  //  or
+  //  return guard.take();
   //
-  Guard&& take() __TA_RELEASE() { return std::move(*this); }
+  Adoptable take() __TA_RELEASE() { return Adoptable(std::move(validator_), std::move(state_)); }
+
+  // Adopts the lock state and validate state from a previous take() action.
+  // This requires providing a reference to the actual lock whose guard is being
+  // adopted.
+  //
+  // Example:
+  //  Guard<fbl::Mutex> guard{AdoptLock, &lock, std::move(adopt)};
+  template <typename Lockable>
+  __WARN_UNUSED_CONSTRUCTOR Guard(AdoptLockTag tag, Lockable* lock, Adoptable&& state)
+      __TA_ACQUIRE(lock) __TA_ACQUIRE(lock->capability())
+      : validator_(std::move(state.state_.value().first)),
+        state_(std::move(state.state_.value().second)) {
+    ZX_DEBUG_ASSERT(&lock->lock() == validator_.lock());
+    state.state_.reset();
+  }
 
   // Adopts the lock state and validator state. This constructor uses a type
   // tag argument to avoid automatic move constructor semantics.
@@ -411,7 +428,31 @@ class __TA_SCOPED_CAPABILITY
 
   // State to store in the guard as specified by the lock policy. For example,
   // this may be used to save IRQ state for spinlocks.
-  typename LockPolicy<LockType, Option>::State state_;
+  using State = typename LockPolicy<LockType, Option>::State;
+  State state_;
+};
+
+template <typename LockType, typename Option>
+class Guard<LockType, Option, internal::EnableIfNotShared<LockType, Option>>::Adoptable {
+ public:
+  Adoptable() = default;
+  Adoptable(Adoptable&& other) : state_(std::move(other.state_)) { other.state_.reset(); }
+  Adoptable(const Adoptable& other) = delete;
+  Adoptable& operator=(const Adoptable&) = delete;
+  Adoptable& operator=(Adoptable&& other) {
+    ZX_ASSERT(!state_.has_value());
+    if (other.state_.has_value()) {
+      state_.emplace(std::move(*other.state_));
+      other.state_.reset();
+    }
+    return *this;
+  }
+  ~Adoptable() { ZX_ASSERT(!state_.has_value()); }
+
+ private:
+  Adoptable(Validator&& v, State&& s) : state_({std::move(v), std::move(s)}) {}
+  friend Guard;
+  std::optional<std::pair<Validator, State>> state_;
 };
 
 // Specialization of Guard that acquires the given lock in shared mode.
@@ -515,14 +556,13 @@ class __TA_SCOPED_CAPABILITY Guard<LockType, Option, internal::EnableIfShared<Lo
   // Read-only access to the underlying |lock|.
   const LockType* lock() const { return validator_.lock(); }
 
+  class Adoptable;
   // Releases this scoped capability without releasing the underlying lock or
-  // un-tracking the lock in the validator. Returns an rvalue reference to the
+  // un-tracking the lock in the validator. Returns an object holding the
   // lock state and validator state which may be adopted by another Guard.
-  // This is useful in the rare situation where a lock must be released by a
-  // function called in the current protected scope. This is primarily needed
-  // to keep the Clang static lock validator happy; static analysis complains
-  // when a scoped capability is passed by pointer/reference and released in
-  // another scope.
+  // This is useful in the rare situation where a lock wants to be used and
+  // released in a different scope, or if iterating over a data structure that
+  // uses fine-grained locking.
   //
   // Example:
   //  Guard<fbl::Mutex> guard{&lock};
@@ -530,8 +570,25 @@ class __TA_SCOPED_CAPABILITY Guard<LockType, Option, internal::EnableIfShared<Lo
   //  // Setup actions...
   //
   //  DoTaskAndReleaseLock(guard.take());
+  //  or
+  //  return guard.take();
   //
-  Guard&& take() __TA_RELEASE() { return std::move(*this); }
+  Adoptable take() __TA_RELEASE() { return Adoptable(std::move(validator_), std::move(state_)); }
+
+  // Adopts the lock state and validate state from a previous take() action.
+  // This requires providing a reference to the actual lock whose guard is being
+  // adopted.
+  //
+  // Example:
+  //  Guard<fbl::Mutex> guard{AdoptLock, &lock, std::move(adopt)};
+  template <typename Lockable>
+  __WARN_UNUSED_CONSTRUCTOR Guard(AdoptLockTag tag, Lockable* lock, Adoptable&& state)
+      __TA_ACQUIRE_SHARED(lock) __TA_ACQUIRE_SHARED(lock->capability())
+      : validator_(std::move(state.state_.value().first)),
+        state_(std::move(state.state_.value().second)) {
+    ZX_DEBUG_ASSERT(&lock->lock() == validator_.lock());
+    state.state_.reset();
+  }
 
   // Adopts the lock state and validator state. This constructor uses a type
   // tag argument to avoid automatic move constructor semantics.
@@ -712,7 +769,6 @@ class NullGuard {
 
   template <typename Lockable, typename... Args>
   NullGuard(Lockable* lock, Args&&... state_args) {}
-  NullGuard(lockdep::AdoptLockTag, NullGuard&& other) {}
   template <typename... Args>
   void Release(Args&&... args) {}
 
@@ -727,3 +783,5 @@ class NullGuard {
 };
 
 }  // namespace lockdep
+
+#endif  // LOCKDEP_GUARD_H_
