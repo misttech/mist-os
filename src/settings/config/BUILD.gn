@@ -25,50 +25,6 @@ config_data("workstation_eng_agent_config") {
   sources = [ "workstation_eng_agent_configuration.json" ]
 }
 
-import("//src/settings/config/soft_transition.gni")
-
-if (product_provides_setui_configs) {
-  group("setui_service_external_brightness_flags") {
-  }
-
-  group("qemu_agent_config") {
-  }
-
-  group("qemu_light_hardware_config") {
-  }
-
-  group("qemu_input_device_config") {
-  }
-} else {
-  config_data("setui_service_external_brightness_flags") {
-    for_pkg = "setui_service"
-
-    outputs = [ "service_flags.json" ]
-    sources = [ "brightness_control_flags.json" ]
-  }
-
-  config_data("qemu_agent_config") {
-    for_pkg = "setui_service"
-
-    outputs = [ "board_agent_configuration.json" ]
-    sources = [ "qemu_agent_configuration.json" ]
-  }
-
-  config_data("qemu_light_hardware_config") {
-    for_pkg = "setui_service"
-
-    outputs = [ "light_hardware_config.json" ]
-    sources = [ "qemu_light_hardware_configuration.json" ]
-  }
-
-  config_data("qemu_input_device_config") {
-    for_pkg = "setui_service"
-
-    outputs = [ "input_device_config.json" ]
-    sources = [ "qemu_input_device_configuration.json" ]
-  }
-}
-
 resource("test_jsons") {
   sources = [
     "workstation_eng_agent_configuration.json",
