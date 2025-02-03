@@ -140,7 +140,6 @@ group_with_no_dir_target_deps("starnix_arm64_stable_tests") {
     "affordance_tests/test_netstack:netstack_test_fc($host_toolchain)",
     "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:vim3_test($host_toolchain)",
-    "transport_tests:test_ffx_on_vim3",
     "transport_tests/test_fastboot:fastboot_test($host_toolchain)",
     "transport_tests/test_fastboot:fastboot_using_serial_test($host_toolchain)",
     "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
@@ -150,7 +149,12 @@ group_with_no_dir_target_deps("starnix_arm64_stable_tests") {
 
 group_with_no_dir_target_deps("starnix_arm64_unstable_tests") {
   testonly = true
-  public_deps = [ "affordance_tests/test_rtc:rtc_test_fc($host_toolchain)" ]
+  public_deps = [
+    "affordance_tests/test_rtc:rtc_test_fc($host_toolchain)",
+
+    # TODO(b/393370031): Re-enable once fixed.
+    "transport_tests:test_ffx_on_vim3",
+  ]
 }
 
 # smart_display.nelson
