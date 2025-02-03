@@ -322,7 +322,7 @@ VnodeMinfs::~VnodeMinfs() {
 #endif
   if (indirect_file_) {
     auto status = indirect_file_->Detach(fs_->bc_.get());
-    ZX_DEBUG_ASSERT(status.is_ok());
+    ZX_DEBUG_ASSERT_MSG(status.is_ok(), "indirect_file detach failed: status=%d", status.status_value());
   }
 }
 
