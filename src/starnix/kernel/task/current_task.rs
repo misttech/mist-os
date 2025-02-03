@@ -60,6 +60,8 @@ use std::mem::MaybeUninit;
 use std::sync::Arc;
 use zx::sys::zx_thread_state_general_regs_t;
 
+use super::ThreadGroupLifecycleWaitValue;
+
 pub struct TaskBuilder {
     /// The underlying task object.
     pub task: OwnedRef<Task>,
@@ -338,7 +340,9 @@ impl CurrentTask {
         if self.thread_group.load_stopped().is_stopped() || task_stop_state.is_stopped() {
             // If we've stopped or PTRACE_LISTEN has been sent, wait for a
             // signal or instructions from the tracer.
-            group_state.stopped_waiters.wait_async(&waiter);
+            group_state
+                .lifecycle_waiters
+                .wait_async_value(&waiter, ThreadGroupLifecycleWaitValue::Stopped);
             task_state.wait_on_ptracer(&waiter);
         } else if task_state.can_accept_ptrace_commands() {
             // If we're stopped because a tracer has seen the stop and not taken
@@ -1919,7 +1923,11 @@ impl CurrentTask {
         if !stopped.is_in_progress() {
             let parent = self.thread_group.read().parent.clone();
             if let Some(parent) = parent {
-                parent.upgrade().write().child_status_waiters.notify_all();
+                parent
+                    .upgrade()
+                    .write()
+                    .lifecycle_waiters
+                    .notify_value(ThreadGroupLifecycleWaitValue::ChildStatus);
             }
         }
     }

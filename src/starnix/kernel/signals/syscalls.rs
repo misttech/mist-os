@@ -11,8 +11,8 @@ use crate::signals::{
     SI_HEADER_SIZE,
 };
 use crate::task::{
-    CurrentTask, ProcessEntryRef, ProcessSelector, Task, TaskMutableState, ThreadGroup, WaitResult,
-    WaitableChildResult, Waiter,
+    CurrentTask, ProcessEntryRef, ProcessSelector, Task, TaskMutableState, ThreadGroup,
+    ThreadGroupLifecycleWaitValue, WaitResult, WaitableChildResult, Waiter,
 };
 use crate::vfs::{FdFlags, FdNumber};
 use starnix_uapi::uapi;
@@ -743,7 +743,9 @@ fn wait_on_pid(
                         }
                     }
                 }
-                thread_group.child_status_waiters.wait_async(&waiter);
+                thread_group
+                    .lifecycle_waiters
+                    .wait_async_value(&waiter, ThreadGroupLifecycleWaitValue::ChildStatus);
             }
         }
 

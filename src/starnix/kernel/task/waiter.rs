@@ -1111,6 +1111,29 @@ impl WaitQueue {
     }
 }
 
+/// A wait queue that dispatches events based on the value of an enum.
+pub struct TypedWaitQueue<T: Into<u64>> {
+    wait_queue: WaitQueue,
+    value_type: std::marker::PhantomData<T>,
+}
+
+// We can't #[derive(Default)] on [TypedWaitQueue<T>] as T may not implement the Default trait.
+impl<T: Into<u64>> Default for TypedWaitQueue<T> {
+    fn default() -> Self {
+        Self { wait_queue: Default::default(), value_type: Default::default() }
+    }
+}
+
+impl<T: Into<u64>> TypedWaitQueue<T> {
+    pub fn wait_async_value(&self, waiter: &Waiter, value: T) -> WaitCanceler {
+        self.wait_queue.wait_async_value(waiter, value.into())
+    }
+
+    pub fn notify_value(&self, value: T) {
+        self.wait_queue.notify_value(value.into())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
