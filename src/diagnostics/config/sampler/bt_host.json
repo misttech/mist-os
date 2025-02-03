@@ -1,10 +1,12 @@
 {
     "metrics": [
+
+        // Peer connection event (ID 11)
         {
             "event_codes": [
-                0,
-                0,
-                1
+                0, // LE
+                0, // Success
+                1  // Incoming
             ],
             "metric_id": 11,
             "metric_type": "Occurrence",
@@ -12,9 +14,9 @@
         },
         {
             "event_codes": [
-                0,
-                1,
-                1
+                0, // LE
+                1, // Failure
+                1  // Incoming
             ],
             "metric_id": 11,
             "metric_type": "Occurrence",
@@ -22,9 +24,9 @@
         },
         {
             "event_codes": [
-                0,
-                0,
-                2
+                0, // LE
+                0, // Success
+                2  // Outgoing
             ],
             "metric_id": 11,
             "metric_type": "Occurrence",
@@ -32,9 +34,9 @@
         },
         {
             "event_codes": [
-                0,
-                1,
-                2
+                0, // LE
+                1, // Failure
+                2  // Outgoing
             ],
             "metric_id": 11,
             "metric_type": "Occurrence",
@@ -42,9 +44,9 @@
         },
         {
             "event_codes": [
-                1,
-                0,
-                1
+                1, // BrEdr
+                0, // Success
+                1  // Incoming
             ],
             "metric_id": 11,
             "metric_type": "Occurrence",
@@ -52,9 +54,9 @@
         },
         {
             "event_codes": [
-                1,
-                1,
-                1
+                1, // BrEdr
+                1, // Failure
+                1  // Incoming
             ],
             "metric_id": 11,
             "metric_type": "Occurrence",
@@ -62,9 +64,9 @@
         },
         {
             "event_codes": [
-                1,
-                0,
-                2
+                1, // BrEdr
+                0, // Success
+                2  // Outgoing
             ],
             "metric_id": 11,
             "metric_type": "Occurrence",
@@ -72,17 +74,19 @@
         },
         {
             "event_codes": [
-                1,
-                1,
-                2
+                1, // BrEdr
+                1, // Failure
+                2  // Outgoing
             ],
             "metric_id": 11,
             "metric_type": "Occurrence",
             "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/bredr_connection_manager/outgoing:failed_connections"
         },
+
+        // LE peer disconnection event (ID 18)
         {
             "event_codes": [
-                1
+                1 // ExplicitDisconnect
             ],
             "metric_id": 18,
             "metric_type": "Occurrence",
@@ -90,7 +94,7 @@
         },
         {
             "event_codes": [
-                2
+                2  // LinkError
             ],
             "metric_id": 18,
             "metric_type": "Occurrence",
@@ -98,7 +102,7 @@
         },
         {
             "event_codes": [
-                3
+                3 // ZeroRef
             ],
             "metric_id": 18,
             "metric_type": "Occurrence",
@@ -106,15 +110,17 @@
         },
         {
             "event_codes": [
-                4
+                4 // RemoteDisconnection
             ],
             "metric_id": 18,
             "metric_type": "Occurrence",
             "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/low_energy_connection_manager:disconnect_remote_disconnection_count"
         },
+
+        // BR/EDR peer disconnection event (ID 19)
         {
             "event_codes": [
-                1
+                1 // ApiRequest
             ],
             "metric_id": 19,
             "metric_type": "Occurrence",
@@ -122,7 +128,7 @@
         },
         {
             "event_codes": [
-                2
+                2 // InterrogationFailed
             ],
             "metric_id": 19,
             "metric_type": "Occurrence",
@@ -130,7 +136,7 @@
         },
         {
             "event_codes": [
-                3
+                3 // PairingFailed
             ],
             "metric_id": 19,
             "metric_type": "Occurrence",
@@ -138,7 +144,7 @@
         },
         {
             "event_codes": [
-                4
+                4 // AclLinkError
             ],
             "metric_id": 19,
             "metric_type": "Occurrence",
@@ -146,16 +152,18 @@
         },
         {
             "event_codes": [
-                5
+                5 // PeerDisconnection
             ],
             "metric_id": 19,
             "metric_type": "Occurrence",
             "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/low_energy_connection_manager:disconnect_peer_disconnection_count"
         },
+
+        // Peer bonding event (ID 10)
         {
             "event_codes": [
-                0,
-                0
+                0, // LE
+                0  // Success
             ],
             "metric_id": 10,
             "metric_type": "Occurrence",
@@ -163,8 +171,8 @@
         },
         {
             "event_codes": [
-                0,
-                1
+                0, // LE
+                1  // Failure
             ],
             "metric_id": 10,
             "metric_type": "Occurrence",
@@ -172,8 +180,8 @@
         },
         {
             "event_codes": [
-                1,
-                0
+                1, // BrEdr
+                0  // Success
             ],
             "metric_id": 10,
             "metric_type": "Occurrence",
@@ -181,14 +189,15 @@
         },
         {
             "event_codes": [
-                1,
-                1
+                1, // BrEdr
+                1  // Failure
             ],
             "metric_id": 10,
             "metric_type": "Occurrence",
             "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/peer_cache/metrics/bredr:bond_failure_events"
         }
     ],
+
     "poll_rate_sec": 300,
     "project_id": 2322225253
 }
