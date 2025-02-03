@@ -62,7 +62,7 @@ use netstack3_ip::raw::{RawIpSocketId, RawIpSocketsBindingsContext, RawIpSockets
 use netstack3_ip::{
     self as ip, AddRouteError, AddableEntryEither, AddableMetric, DeviceIpLayerMetadata,
     IpLayerEvent, IpLayerTimerId, Marks, RawMetric, ResolveRouteError, ResolvedRoute,
-    RoutableIpAddr,
+    RoutableIpAddr, RouterAdvertisementEvent,
 };
 use netstack3_tcp::testutil::{ClientBuffers, ProvidedBuffers, RingBuffer, TestSendBuffer};
 use netstack3_tcp::{BufferSizes, TcpBindingsTypes};
@@ -1415,6 +1415,7 @@ pub enum DispatchedEvent {
     IpLayerIpv6(IpLayerEvent<WeakDeviceId<FakeBindingsCtx>, Ipv6>),
     NeighborIpv4(nud::Event<Mac, EthernetWeakDeviceId<FakeBindingsCtx>, Ipv4, FakeInstant>),
     NeighborIpv6(nud::Event<Mac, EthernetWeakDeviceId<FakeBindingsCtx>, Ipv6, FakeInstant>),
+    RouterAdvertisement(RouterAdvertisementEvent<WeakDeviceId<FakeBindingsCtx>>),
 }
 
 /// A tuple of device ID and IP version.
@@ -1456,6 +1457,13 @@ impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeBindingsCtx>, I, FakeInsta
     ) -> DispatchedEvent {
         let e = e.map_device(|d| d.downgrade());
         I::map_ip(e, |e| DispatchedEvent::NeighborIpv4(e), |e| DispatchedEvent::NeighborIpv6(e))
+    }
+}
+
+impl From<RouterAdvertisementEvent<DeviceId<FakeBindingsCtx>>> for DispatchedEvent {
+    fn from(e: RouterAdvertisementEvent<DeviceId<FakeBindingsCtx>>) -> DispatchedEvent {
+        let e = e.map_device(|d| d.downgrade());
+        DispatchedEvent::RouterAdvertisement(e)
     }
 }
 

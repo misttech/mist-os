@@ -82,6 +82,7 @@ pub fn main() {
         .add_fidl_service(Service::MulticastAdminV6)
         .add_fidl_service(Service::FilterState)
         .add_fidl_service(Service::FilterControl)
+        .add_fidl_service(Service::NdpWatcher)
         .add_fidl_service(Service::Neighbor)
         .add_fidl_service(Service::NeighborController)
         .add_fidl_service(Service::Verifier)

@@ -21,6 +21,7 @@ mod interfaces_admin;
 mod interfaces_watcher;
 mod multicast_admin;
 mod name_worker;
+mod ndp_watcher;
 mod neighbor_worker;
 mod netdevice_worker;
 mod persistence;
@@ -71,6 +72,7 @@ use devices::{
 };
 use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceUpdate};
 use multicast_admin::{MulticastAdminEventSinks, MulticastAdminWorkers};
+use ndp_watcher::RouterAdvertisementSinkError;
 use resource_removal::{ResourceRemovalSink, ResourceRemovalWorker};
 
 use crate::bindings::counters::BindingsCounters;
@@ -94,7 +96,7 @@ use netstack3_core::inspect::{InspectableValue, Inspector};
 use netstack3_core::ip::{
     AddIpAddrSubnetError, AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
     IpLayerEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration,
-    Ipv6DeviceConfigurationUpdate, Lifetime, SlaacConfigurationUpdate,
+    Ipv6DeviceConfigurationUpdate, Lifetime, RouterAdvertisementEvent, SlaacConfigurationUpdate,
 };
 use netstack3_core::routes::RawMetric;
 use netstack3_core::sync::{DynDebugReferences, RwLock as CoreRwLock};
@@ -152,12 +154,14 @@ mod ctx {
             routes_change_sink: routes::ChangeSink,
             resource_removal: ResourceRemovalSink,
             multicast_admin: MulticastAdminEventSinks,
+            ndp_ra_sink: ndp_watcher::WorkerRouterAdvertisementSink,
         ) -> Self {
             let mut bindings_ctx = BindingsCtx(Arc::new(BindingsCtxInner::new(
                 config,
                 routes_change_sink,
                 resource_removal,
                 multicast_admin,
+                ndp_ra_sink,
             )));
             let persistence::State { opaque_iid_secret_key } =
                 persistence::State::load_or_create(&mut bindings_ctx.rng());
@@ -208,6 +212,8 @@ mod ctx {
         pub(crate) interfaces_worker: interfaces_watcher::Worker,
         pub(crate) interfaces_watcher_sink: interfaces_watcher::WorkerWatcherSink,
         pub(crate) routes_change_runner: routes::ChangeRunner,
+        pub(crate) ndp_watcher_worker: ndp_watcher::Worker,
+        pub(crate) ndp_watcher_sink: ndp_watcher::WorkerWatcherSink,
         pub(crate) neighbor_worker: neighbor_worker::Worker,
         pub(crate) neighbor_watcher_sink: mpsc::Sender<neighbor_worker::NewWatcher>,
         pub(crate) resource_removal_worker: ResourceRemovalWorker,
@@ -222,8 +228,14 @@ mod ctx {
             let (resource_removal_worker, resource_removal_sink) = ResourceRemovalWorker::new();
             let (multicast_admin_workers, multicast_admin_sinks) =
                 multicast_admin::new_workers_and_sinks();
-            let ctx =
-                Ctx::new(config, routes_change_sink, resource_removal_sink, multicast_admin_sinks);
+            let (ndp_watcher_worker, ndp_watcher_sink, ndp_ra_sink) = ndp_watcher::Worker::new();
+            let ctx = Ctx::new(
+                config,
+                routes_change_sink,
+                resource_removal_sink,
+                multicast_admin_sinks,
+                ndp_ra_sink,
+            );
             let (neighbor_worker, neighbor_watcher_sink, neighbor_event_sink) =
                 neighbor_worker::new_worker();
             Self {
@@ -231,6 +243,8 @@ mod ctx {
                 interfaces_worker,
                 interfaces_watcher_sink,
                 routes_change_runner,
+                ndp_watcher_worker,
+                ndp_watcher_sink,
                 neighbor_worker,
                 neighbor_watcher_sink,
                 resource_removal_worker,
@@ -346,6 +360,7 @@ pub(crate) struct BindingsCtxInner {
     timers: timers::TimerDispatcher<TimerId<BindingsCtx>>,
     devices: Devices<DeviceId<BindingsCtx>>,
     routes: routes::ChangeSink,
+    ndp_ra_sink: ndp_watcher::WorkerRouterAdvertisementSink,
     resource_removal: ResourceRemovalSink,
     multicast_admin: MulticastAdminEventSinks,
     config: GlobalConfig,
@@ -358,11 +373,13 @@ impl BindingsCtxInner {
         routes_change_sink: routes::ChangeSink,
         resource_removal: ResourceRemovalSink,
         multicast_admin: MulticastAdminEventSinks,
+        ndp_ra_sink: ndp_watcher::WorkerRouterAdvertisementSink,
     ) -> Self {
         Self {
             timers: Default::default(),
             devices: Default::default(),
             routes: routes_change_sink,
+            ndp_ra_sink,
             resource_removal,
             multicast_admin,
             config,
@@ -771,6 +788,32 @@ impl<I: Ip> EventContext<neighbor::Event<Mac, EthernetDeviceId<Self>, I, StackTi
                 })
                 .expect("should be able to send neighbor event")
         })
+    }
+}
+
+impl EventContext<RouterAdvertisementEvent<DeviceId<BindingsCtx>>> for BindingsCtx {
+    fn on_event(&mut self, event: RouterAdvertisementEvent<DeviceId<BindingsCtx>>) {
+        let RouterAdvertisementEvent { options_bytes, source, device } = event;
+        // NOTE: one could imagine sending a WeakDeviceId to the NDP watcher
+        // worker instead of a plain scalar ID.
+        // However, the worker itself does some queuing of watch entries that
+        // themselves will keep the device ID as a scalar rather than using the
+        // weak/strong reference-counted IDs.
+        // For this reason, we downgrade straight to a scalar here to avoid
+        // giving off the impression that we are promising anything to do with
+        // device removal.
+        let interface_id: BindingId = device.bindings_id().id;
+        match self.ndp_ra_sink.try_send_router_advertisement(options_bytes, source, interface_id) {
+            Ok(()) => (),
+            Err(err) => match err {
+                RouterAdvertisementSinkError::WorkerClosed(ndp_watcher::WorkerClosedError) => {
+                    warn!("could not send RA to NDP watcher worker: worker closed");
+                }
+                RouterAdvertisementSinkError::SinkFull => {
+                    warn!("could not send RA to NDP watcher worker: sink full");
+                }
+            },
+        }
     }
 }
 
@@ -1184,6 +1227,7 @@ pub(crate) enum Service {
     InterfacesAdmin(fidl_fuchsia_net_interfaces_admin::InstallerRequestStream),
     MulticastAdminV4(fidl_fuchsia_net_multicast_admin::Ipv4RoutingTableControllerRequestStream),
     MulticastAdminV6(fidl_fuchsia_net_multicast_admin::Ipv6RoutingTableControllerRequestStream),
+    NdpWatcher(fidl_fuchsia_net_ndp::RouterAdvertisementOptionWatcherProviderRequestStream),
     NeighborController(fidl_fuchsia_net_neighbor::ControllerRequestStream),
     Neighbor(fidl_fuchsia_net_neighbor::ViewRequestStream),
     PacketSocket(fidl_fuchsia_posix_socket_packet::ProviderRequestStream),
@@ -1266,6 +1310,8 @@ impl NetstackSeed {
             interfaces_worker,
             interfaces_watcher_sink,
             mut routes_change_runner,
+            ndp_watcher_worker,
+            ndp_watcher_sink,
             neighbor_worker,
             neighbor_watcher_sink,
             resource_removal_worker,
@@ -1332,6 +1378,8 @@ impl NetstackSeed {
                 .await;
             info!("all interface watchers closed, interfaces worker shutdown is complete");
         });
+        let ndp_watcher_worker_task =
+            NamedTask::spawn("ndp watcher worker", ndp_watcher_worker.run());
 
         let neighbor_worker_task = NamedTask::spawn("neighbor worker", {
             let ctx = netstack.ctx.clone();
@@ -1340,6 +1388,7 @@ impl NetstackSeed {
 
         let no_finish_tasks = loopback_tasks.into_iter().chain([
             interfaces_worker_task,
+            ndp_watcher_worker_task,
             timers_task,
             neighbor_worker_task,
         ]);
@@ -1434,6 +1483,7 @@ impl NetstackSeed {
 
         // Use a reference to the watcher sink in the services loop.
         let interfaces_watcher_sink_ref = &interfaces_watcher_sink;
+        let ndp_watcher_sink_ref = &ndp_watcher_sink;
         let neighbor_watcher_sink_ref = &neighbor_watcher_sink;
 
         let (route_waitgroup, route_spawner) = TaskWaitGroup::new();
@@ -1623,6 +1673,11 @@ impl NetstackSeed {
                                 })
                                 .await
                         }
+                        Service::NdpWatcher(stream) => {
+                            stream.serve_with(|rs| {
+                                ndp_watcher::serve(rs, ndp_watcher_sink_ref.clone())
+                            }).await
+                        }
                         Service::InterfacesAdmin(installer) => {
                             debug!(
                                 "serving {}",
@@ -1746,6 +1801,8 @@ impl NetstackSeed {
         ctx.bindings_ctx().timers.stop();
         // Stop the interfaces watcher worker.
         std::mem::drop(interfaces_watcher_sink);
+        // Stop the ndp watcher worker.
+        std::mem::drop(ndp_watcher_sink);
         // Stop the neighbor watcher worker.
         std::mem::drop(neighbor_watcher_sink);
 

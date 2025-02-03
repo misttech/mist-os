@@ -4,6 +4,7 @@
 
 //! The Internet Control Message Protocol (ICMP).
 
+use alloc::boxed::Box;
 use core::convert::TryInto as _;
 use core::num::NonZeroU8;
 
@@ -47,8 +48,8 @@ use zerocopy::SplitByteSlice;
 
 use crate::internal::base::{
     AddressStatus, IpDeviceIngressStateContext, IpLayerHandler, IpPacketDestination,
-    IpSendFrameError, IpTransportContext, Ipv6PresentAddressStatus, SendIpPacketMeta,
-    TransportReceiveError, IPV6_DEFAULT_SUBNET,
+    IpSendFrameError, IpTransportContext, Ipv6PresentAddressStatus, NdpBindingsContext,
+    RouterAdvertisementEvent, SendIpPacketMeta, TransportReceiveError, IPV6_DEFAULT_SUBNET,
 };
 use crate::internal::device::nud::{ConfirmationFlags, NudIpHandler};
 use crate::internal::device::route_discovery::Ipv6DiscoveredRoute;
@@ -1146,7 +1147,7 @@ fn send_neighbor_advertisement<
 
 fn receive_ndp_packet<
     B: SplitByteSlice,
-    BC: IcmpBindingsContext,
+    BC: IcmpBindingsContext + NdpBindingsContext<CC::DeviceId>,
     CC: InnerIcmpv6Context<BC>
         + Ipv6DeviceHandler<BC>
         + IpDeviceHandler<Ipv6, BC>
@@ -1546,12 +1547,18 @@ fn receive_ndp_packet<
                     }
                 }
             }
+
+            bindings_ctx.on_event(RouterAdvertisementEvent {
+                options_bytes: Box::from(p.body().bytes()),
+                source: **src_ip,
+                device: device_id.clone(),
+            });
         }
     }
 }
 
 impl<
-        BC: IcmpBindingsContext,
+        BC: IcmpBindingsContext + NdpBindingsContext<CC::DeviceId>,
         CC: InnerIcmpv6Context<BC>
             + InnerIcmpContext<Ipv6, BC>
             + Ipv6DeviceHandler<BC>
@@ -2873,7 +2880,7 @@ mod tests {
     use packet_formats::utils::NonZeroDuration;
 
     use super::*;
-    use crate::internal::base::IpDeviceEgressStateContext;
+    use crate::internal::base::{IpDeviceEgressStateContext, RouterAdvertisementEvent};
     use crate::internal::socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx};
     use crate::internal::socket::{
         IpSock, IpSockCreationError, IpSockSendError, IpSocketHandler, SendOptions,
@@ -2894,7 +2901,12 @@ mod tests {
     }
 
     /// `FakeBindingsCtx` specialized for ICMP.
-    type FakeIcmpBindingsCtx<I> = FakeBindingsCtx<(), (), FakeIcmpBindingsCtxState<I>, ()>;
+    type FakeIcmpBindingsCtx<I> = FakeBindingsCtx<
+        (),
+        RouterAdvertisementEvent<FakeDeviceId>,
+        FakeIcmpBindingsCtxState<I>,
+        (),
+    >;
 
     /// A fake ICMP bindings and core contexts.
     ///

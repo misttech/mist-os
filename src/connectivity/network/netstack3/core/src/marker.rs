@@ -32,7 +32,9 @@ use netstack3_ip::raw::{
     RawIpSocketsBindingsTypes,
 };
 use netstack3_ip::socket::IpSocketContext;
-use netstack3_ip::{self as ip, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt};
+use netstack3_ip::{
+    self as ip, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt, NdpBindingsContext,
+};
 use netstack3_tcp::{self as tcp, TcpBindingsContext, TcpBindingsTypes, TcpContext};
 use netstack3_udp::{self as udp, UdpBindingsContext, UdpBindingsTypes, UdpCounters};
 
@@ -202,5 +204,11 @@ where
 }
 
 /// The execution context provided by bindings.
-pub trait BindingsContext: IpBindingsContext<Ipv4> + IpBindingsContext<Ipv6> {}
-impl<BC> BindingsContext for BC where BC: IpBindingsContext<Ipv4> + IpBindingsContext<Ipv6> {}
+pub trait BindingsContext:
+    IpBindingsContext<Ipv4> + IpBindingsContext<Ipv6> + NdpBindingsContext<DeviceId<Self>>
+{
+}
+impl<BC> BindingsContext for BC where
+    BC: IpBindingsContext<Ipv4> + IpBindingsContext<Ipv6> + NdpBindingsContext<DeviceId<Self>>
+{
+}

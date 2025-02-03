@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use alloc::boxed::Box;
 use alloc::collections::HashMap;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
@@ -997,6 +998,35 @@ impl<DeviceId, I: IpLayerIpExt> IpLayerEvent<DeviceId, I> {
             }
         }
     }
+}
+
+/// An event signifying a router advertisement has been received.
+#[derive(Derivative, PartialEq, Eq, Clone, Hash)]
+#[derivative(Debug)]
+pub struct RouterAdvertisementEvent<D> {
+    /// The raw bytes of the router advertisement message's options.
+    // NB: avoid deriving Debug for this since it could contain PII.
+    #[derivative(Debug = "ignore")]
+    pub options_bytes: Box<[u8]>,
+    /// The source address of the RA message.
+    pub source: net_types::ip::Ipv6Addr,
+    /// The device on which the message was received.
+    pub device: D,
+}
+
+impl<D> RouterAdvertisementEvent<D> {
+    /// Maps the contained device ID type.
+    pub fn map_device<N, F: Fn(D) -> N>(self, map: F) -> RouterAdvertisementEvent<N> {
+        let Self { options_bytes, source, device } = self;
+        RouterAdvertisementEvent { options_bytes, source, device: map(device) }
+    }
+}
+
+/// Ipv6-specific bindings execution context for the IP layer.
+pub trait NdpBindingsContext<DeviceId>: EventContext<RouterAdvertisementEvent<DeviceId>> {}
+impl<DeviceId, BC: EventContext<RouterAdvertisementEvent<DeviceId>>> NdpBindingsContext<DeviceId>
+    for BC
+{
 }
 
 /// The bindings execution context for the IP layer.

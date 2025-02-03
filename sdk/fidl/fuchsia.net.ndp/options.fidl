@@ -79,7 +79,7 @@ closed protocol OptionWatcher {
         /// A count of the number of options dropped since the last time
         /// `WatchOptions` was called (or since the watcher was created if this
         /// is the first time it was called).
-        dropped uint8;
+        dropped uint32;
     });
 };
 

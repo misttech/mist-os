@@ -148,7 +148,7 @@ pub mod ip {
     pub use netstack3_ip::socket::{
         IpSockCreateAndSendError, IpSockCreationError, IpSockSendError,
     };
-    pub use netstack3_ip::{IpLayerEvent, ResolveRouteError};
+    pub use netstack3_ip::{IpLayerEvent, ResolveRouteError, RouterAdvertisementEvent};
 }
 
 /// Types and utilities for dealing with neighbors.

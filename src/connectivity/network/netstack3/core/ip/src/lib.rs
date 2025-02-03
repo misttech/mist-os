@@ -232,9 +232,10 @@ pub use internal::base::{
     IpRouteTableContext, IpRouteTablesContext, IpSendFrameError, IpSendFrameErrorReason,
     IpStateContext, IpStateInner, IpTransportContext, IpTransportDispatchContext,
     Ipv4PresentAddressStatus, Ipv4State, Ipv4StateBuilder, Ipv6PresentAddressStatus, Ipv6State,
-    Ipv6StateBuilder, MulticastMembershipHandler, ReceivePacketAction, ResolveRouteError,
-    RoutingTableId, SendIpPacketMeta, TransportIpContext, TransportReceiveError,
-    DEFAULT_HOP_LIMITS, DEFAULT_TTL, IPV6_DEFAULT_SUBNET,
+    Ipv6StateBuilder, MulticastMembershipHandler, NdpBindingsContext, ReceivePacketAction,
+    ResolveRouteError, RouterAdvertisementEvent, RoutingTableId, SendIpPacketMeta,
+    TransportIpContext, TransportReceiveError, DEFAULT_HOP_LIMITS, DEFAULT_TTL,
+    IPV6_DEFAULT_SUBNET,
 };
 pub use internal::fragmentation::FragmentationCounters;
 pub use internal::local_delivery::{
