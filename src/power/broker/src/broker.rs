@@ -6,8 +6,7 @@ use anyhow::{anyhow, Context, Error};
 use async_utils::hanging_get::server::{HangingGet, Publisher, Subscriber};
 use fidl_fuchsia_power_broker::{
     self as fpb, DependencyType, LeaseStatus, Permissions, RegisterDependencyTokenError,
-    RequiredLevelError, RequiredLevelWatchResponder, StatusError, StatusWatchPowerLevelResponder,
-    UnregisterDependencyTokenError,
+    StatusError, StatusWatchPowerLevelResponder, UnregisterDependencyTokenError,
 };
 use fuchsia_inspect::{InspectType as IType, Node as INode};
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
@@ -32,7 +31,6 @@ type LevelHangingGet<T> =
     HangingGet<IndexedPowerLevel, T, Box<dyn Fn(&IndexedPowerLevel, T) -> bool>>;
 type LevelSubscriber<T> =
     Subscriber<IndexedPowerLevel, T, Box<dyn Fn(&IndexedPowerLevel, T) -> bool>>;
-pub type RequiredLevelSubscriber = LevelSubscriber<RequiredLevelWatchResponder>;
 pub type CurrentLevelSubscriber = LevelSubscriber<StatusWatchPowerLevelResponder>;
 
 /// An internal power level map used to describe the special case of lease elements,
@@ -58,15 +56,6 @@ impl Responder<StatusWatchPowerLevelResponder> for StatusWatchPowerLevelResponde
     }
 }
 
-impl Responder<RequiredLevelWatchResponder> for RequiredLevelWatchResponder {
-    type Error = RequiredLevelError;
-    fn send(
-        responder: RequiredLevelWatchResponder,
-        result: Result<u8, RequiredLevelError>,
-    ) -> Result<(), fidl::Error> {
-        responder.send(result)
-    }
-}
 struct LevelAdmin<T> {
     /// We pass new power level values to the publisher, which takes care of updating the remote
     /// clients using hanging-gets.
@@ -105,7 +94,7 @@ pub struct Broker {
     // The level each element is transitioning to, if it is transitioning.
     in_transition: HashMap<ElementID, IndexedPowerLevel>,
     // The level for each element required by the topology.
-    required: HashMap<ElementID, LevelAdmin<RequiredLevelWatchResponder>>,
+    required: SubscribeMap<ElementID, IndexedPowerLevel>,
     lease_counter: HashMap<ElementID, HashMap<PowerLevel, i64>>,
     _inspect_node: INode,
 }
@@ -117,7 +106,7 @@ impl Broker {
             credentials: Registry::new(),
             current: HashMap::new(),
             in_transition: HashMap::new(),
-            required: HashMap::new(),
+            required: SubscribeMap::new(None),
             lease_counter: HashMap::new(),
             _inspect_node: inspect,
         }
@@ -303,7 +292,7 @@ impl Broker {
         let is_disorderly_update = self
             .required
             .get(&element_id)
-            .is_some_and(|prev_required_level| !level.satisfies(prev_required_level.level));
+            .is_some_and(|prev_required_level| !level.satisfies(prev_required_level));
         let prev_level = self.update_current_level_internal(element_id, level);
         if prev_level.as_ref() == Some(&level) {
             log::debug!("update_current_level({element_id}): level unchanged from {prev_level:?}");
@@ -478,19 +467,14 @@ impl Broker {
     }
 
     pub fn get_required_level(&self, element_id: &ElementID) -> Option<IndexedPowerLevel> {
-        self.required.get(element_id).map(|e| e.level)
+        self.required.get(element_id)
     }
 
-    pub fn new_required_level_subscriber(
+    pub fn watch_required_level(
         &mut self,
         element_id: &ElementID,
-    ) -> RequiredLevelSubscriber {
-        self.required
-            .get_mut(element_id)
-            .ok_or_else(|| anyhow!("Element ({element_id}) not added"))
-            .unwrap()
-            .hanging_get
-            .new_subscriber()
+    ) -> UnboundedReceiver<Option<IndexedPowerLevel>> {
+        self.required.subscribe(element_id)
     }
 
     fn update_required_level(
@@ -505,13 +489,7 @@ impl Broker {
         if self.in_transition.contains_key(element_id) {
             return previous;
         }
-        if let Some(required_level) = self.required.get_mut(element_id) {
-            required_level.publisher.set(level);
-            required_level.level = level;
-        } else {
-            let level_admin = LevelAdmin::<RequiredLevelWatchResponder>::new(level);
-            self.required.insert(element_id.clone(), level_admin);
-        }
+        self.required.update(element_id, level);
         if let Some(current_level) = self.current.get(element_id) {
             if current_level.level != level {
                 log::debug!("update_required_level({element_id}): transitioning to {level}");
@@ -1921,7 +1899,7 @@ mod tests {
         );
         assert_eq!(broker.in_transition.get(&element_id), None, "in_transition not cleaned up");
         assert!(!broker.current.contains_key(&element_id), "current not cleaned up");
-        assert!(!broker.required.contains_key(&element_id), "required not cleaned up");
+        assert_eq!(broker.required.get(&element_id), None, "required not cleaned up");
         assert_eq!(broker.lease_counter.get(&element_id), None, "lease_counter not cleaned up");
     }
 
