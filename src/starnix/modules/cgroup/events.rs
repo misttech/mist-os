@@ -18,7 +18,6 @@ use starnix_core::vfs::{
     FileObject, FileOps, FsNodeOps, InputBuffer, OutputBuffer, SimpleFileNode,
 };
 use starnix_core::{fileops_impl_noop_sync, fileops_impl_seekable};
-use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
@@ -63,10 +62,6 @@ impl FileOps for EventsFile {
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        track_stub!(
-            TODO("https://fxbug.dev/377755814"),
-            "cgroup.events does not check state of parent and children cgroup"
-        );
         let cgroup = self.cgroup()?;
         let events_str = format!(
             "populated {}\nfrozen {}\n",
