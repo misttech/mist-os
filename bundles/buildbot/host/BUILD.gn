@@ -5,7 +5,6 @@
 # "host-tests" targets are for tests which depend on package artifacts such as
 # the FVM. They should be included using `fx set --with-host`.
 
-# TODO(https://fxbug.dev/42175584) use an underscore to match source code layout guidelines
 group("host") {
   testonly = true
 
