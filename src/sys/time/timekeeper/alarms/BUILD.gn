@@ -7,7 +7,7 @@ import("//build/rust/rustc_library.gni")
 
 group("tests") {
   testonly = true
-  public_deps = [ ":alarms_test" ]
+  public_deps = [ ":alarms_test_package" ]
 }
 
 rustc_library("alarms") {
@@ -38,4 +38,8 @@ rustc_library("alarms") {
     "//src/lib/test_util",
     "//third_party/rust_crates:test-case",
   ]
+}
+
+fuchsia_unittest_package("alarms_test_package") {
+  deps = [ ":alarms_test" ]
 }

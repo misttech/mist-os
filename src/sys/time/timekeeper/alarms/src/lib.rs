@@ -1000,7 +1000,11 @@ async fn wake_timer_loop(
     let mut hrtimer_status: Option<TimerState> = None;
 
     // Initialize inspect properties. This must be done only once.
-    // Wake alarm stats.
+    //
+    // Take note that these properties are updated when the `cmds` loop runs.
+    // This means that repeated reads while no `cmds` activity occurs will return
+    // old readings.  This is to ensure a consistent ability to replay the last
+    // loop run if needed.
     let now_prop = inspect.create_int("now_ns", 0);
     let now_formatted_prop = inspect.create_string("now_formatted", "");
     let pending_timers_count_prop = inspect.create_uint("pending_timers_count", 0);
@@ -1454,7 +1458,7 @@ pub fn connect_to_hrtimer_async() -> Result<ffhh::DeviceProxy> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diagnostics_assertions::assert_data_tree;
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use futures::{select, Future};
     use std::task::Poll;
     use test_case::test_case;
@@ -1472,7 +1476,7 @@ mod tests {
         run_for_duration: zx::MonotonicDuration,
         test_fn_factory: F,
     ) where
-        F: FnOnce(fta::WakeProxy) -> U,  // F returns an async closure.
+        F: FnOnce(fta::WakeProxy, finspect::Inspector) -> U, // F returns an async closure.
         U: Future<Output = T> + 'static, // the async closure may return an arbitrary type T.
         T: 'static,
     {
@@ -1480,7 +1484,7 @@ mod tests {
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
         let (mut fake_commands_in, fake_commands_out) = mpsc::channel::<FakeCmd>(0);
         let (hrtimer_proxy, hrtimer_task) = fake_hrtimer_connection(fake_commands_out);
-        let inspector = fuchsia_inspect::component::inspector();
+        let inspector = finspect::component::inspector();
         let alarms = Rc::new(Loop::new(hrtimer_proxy, inspector.root().create_child("test")));
 
         let (_handle, peer) = zx::EventPair::create();
@@ -1509,7 +1513,7 @@ mod tests {
             serve(alarms, wake_stream).await;
         };
 
-        let seq_fn_fut = test_fn_factory(wake_proxy);
+        let seq_fn_fut = test_fn_factory(wake_proxy, inspector.clone());
 
         let test_task = async move {
             // Wait until configuration has completed.
@@ -1568,14 +1572,14 @@ mod tests {
     }
 
     // Human readable duration formatting is useful.
-    #[test_case(0, "0ns" ; "zero")]
-    #[test_case(1000, "1μs" ; "1us positive")]
-    #[test_case(-1000, "-1μs"; "1us negative")]
-    #[test_case(YEAR_IN_NANOS, "1year(s)"; "A year")]
+    #[test_case(0, "0ns (0)" ; "zero")]
+    #[test_case(1000, "1μs (1000)" ; "1us positive")]
+    #[test_case(-1000, "-1μs (-1000)"; "1us negative")]
+    #[test_case(YEAR_IN_NANOS, "1year(s) (31536000000000000)"; "A year")]
     #[test_case(YEAR_IN_NANOS + 8 * DAY_IN_NANOS + 1,
-        "1year(s)_1week(s)_1day(s)_1ns" ; "A weird duration")]
+        "1year(s)_1week(s)_1day(s)_1ns (32227200000000001)" ; "A weird duration")]
     #[test_case(2 * HOUR_IN_NANOS + 8 * MIN_IN_NANOS + 32 * SEC_IN_NANOS + 1,
-        "2h_8min_32s_1ns" ; "A reasonable long duration")]
+        "2h_8min_32s_1ns (7712000000001)" ; "A reasonable long duration")]
     fn test_format_common(value: i64, repr: &str) {
         assert_eq!(format_common(value), repr.to_string());
     }
@@ -1877,7 +1881,7 @@ mod tests {
     fn test_basic_timed_wait() {
         let deadline = zx::BootInstant::from_nanos(100);
         let test_duration = zx::MonotonicDuration::from_nanos(110);
-        run_in_fake_time_and_test_context(test_duration, |wake_proxy| async move {
+        run_in_fake_time_and_test_context(test_duration, |wake_proxy, _| async move {
             let keep_alive = zx::Event::create();
 
             wake_proxy
@@ -1918,7 +1922,7 @@ mod tests {
         // Run the fake time for this long.
         duration: zx::MonotonicDuration,
     ) {
-        run_in_fake_time_and_test_context(duration, |wake_proxy| async move {
+        run_in_fake_time_and_test_context(duration, |wake_proxy, _| async move {
             let lease1 = zx::Event::create();
             let fut1 = wake_proxy.set_and_wait(first_deadline.into(), lease1, "Hello1".into());
 
@@ -1964,7 +1968,7 @@ mod tests {
         // Run the fake time for this long.
         duration: zx::MonotonicDuration,
     ) {
-        run_in_fake_time_and_test_context(duration, |wake_proxy| async move {
+        run_in_fake_time_and_test_context(duration, |wake_proxy, _| async move {
             let lease1 = zx::Event::create();
 
             wake_proxy
@@ -1990,7 +1994,7 @@ mod tests {
         const ALARM_ID: &str = "Hello";
         run_in_fake_time_and_test_context(
             zx::MonotonicDuration::from_nanos(LONG_DEADLINE_NANOS + 50),
-            |wake_proxy| async move {
+            |wake_proxy, _| async move {
                 let wake_proxy = Rc::new(RefCell::new(wake_proxy));
 
                 let keep_alive = zx::Event::create();
@@ -2050,8 +2054,7 @@ mod tests {
         const ALARM_ID: &str = "Hello";
         run_in_fake_time_and_test_context(
             zx::MonotonicDuration::from_nanos(LONG_DEADLINE_NANOS + 50),
-            |wake_proxy| async move {
-                let inspector = finspect::Inspector::default();
+            |wake_proxy, inspector| async move {
                 let wake_proxy = Rc::new(RefCell::new(wake_proxy));
 
                 let keep_alive = zx::Event::create();
@@ -2104,9 +2107,21 @@ mod tests {
                 };
                 futures::join!(long_deadline_fut, short_deadline_fut);
 
-                // Verify that the wake alarms have the expected general structure.
+                // The values in the inspector tree are fixed because the test
+                // runs fully deterministically in fake time.
                 assert_data_tree!(inspector, root: {
-                    a: 0u64,
+                    test: {
+                        hardware: {
+                            // All alarms fired, so this should be "none".
+                            current_deadline: "(none)",
+                            remaining_until_alarm: "(none)",
+                        },
+                        now_formatted: "247ns (247)",
+                        now_ns: 247i64,
+                        pending_timers: "\n\t",
+                        pending_timers_count: 0u64,
+                        requested_deadlines_ns: AnyProperty,
+                    },
                 });
             },
         );
