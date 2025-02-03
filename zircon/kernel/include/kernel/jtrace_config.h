@@ -25,11 +25,16 @@
 #define JTRACE_USE_LARGE_ENTRIES false
 #endif
 
+#ifndef JTRACE_USE_MONO_TIMESTAMPS
+#define JTRACE_USE_MONO_TIMESTAMPS false
+#endif
+
 namespace jtrace {
 
 // enum-class style bools we will use for configuring our jtrace implementation.
 enum class UseLargeEntries { No = 0, Yes };
 enum class IsPersistent { No = 0, Yes };
+enum class UseMonoTimestamps { No = 0, Yes };
 
 }  // namespace jtrace
 
@@ -39,6 +44,8 @@ constexpr jtrace::IsPersistent kJTraceIsPersistent =
     JTRACE_IS_PERSISTENT ? jtrace::IsPersistent::Yes : jtrace::IsPersistent::No;
 constexpr jtrace::UseLargeEntries kJTraceUseLargeEntries =
     JTRACE_USE_LARGE_ENTRIES ? jtrace::UseLargeEntries::Yes : jtrace::UseLargeEntries::No;
+constexpr jtrace::UseMonoTimestamps kJTraceUseMonoTimestamps =
+    JTRACE_USE_MONO_TIMESTAMPS ? jtrace::UseMonoTimestamps::Yes : jtrace::UseMonoTimestamps::No;
 constexpr size_t kJTraceTargetPersistentBufferSize =
     (kJTraceIsPersistent == jtrace::IsPersistent::Yes) ? kJTraceTargetBufferSize : 0;
 

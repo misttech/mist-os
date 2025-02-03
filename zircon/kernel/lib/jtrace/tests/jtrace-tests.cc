@@ -23,6 +23,7 @@ namespace {
 using ::jtrace::IsPersistent;
 using ::jtrace::TraceBufferType;
 using ::jtrace::UseLargeEntries;
+using ::jtrace::UseMonoTimestamps;
 
 class TestHooks final : public ::jtrace::TraceHooks {
  public:
@@ -217,10 +218,14 @@ struct TestEntry : public ::jtrace::Entry<Config::kUseLargeEntries> {
   }
 };
 
-using CfgLargeEntries = jtrace::Config<1024, 0, IsPersistent::No, UseLargeEntries::Yes>;
-using CfgSmallEntries = jtrace::Config<1024, 0, IsPersistent::No, UseLargeEntries::No>;
-using CfgPersistLargeEntries = jtrace::Config<1024, 0, IsPersistent::Yes, UseLargeEntries::Yes>;
-using CfgPersistSmallEntries = jtrace::Config<1024, 0, IsPersistent::Yes, UseLargeEntries::No>;
+using CfgLargeEntries =
+    jtrace::Config<1024, 0, IsPersistent::No, UseLargeEntries::Yes, UseMonoTimestamps::No>;
+using CfgSmallEntries =
+    jtrace::Config<1024, 0, IsPersistent::No, UseLargeEntries::No, UseMonoTimestamps::No>;
+using CfgPersistLargeEntries =
+    jtrace::Config<1024, 0, IsPersistent::Yes, UseLargeEntries::Yes, UseMonoTimestamps::No>;
+using CfgPersistSmallEntries =
+    jtrace::Config<1024, 0, IsPersistent::Yes, UseLargeEntries::No, UseMonoTimestamps::No>;
 
 }  // namespace
 
@@ -587,7 +592,7 @@ struct tests {
     // the storage to be equal to the maximum number of SMP CPUs currently
     // supported.
     using Config = ::jtrace::Config<4096, SMP_MAX_CPUS, BaseConfig::kIsPersistent,
-                                    BaseConfig::kUseLargeEntries>;
+                                    BaseConfig::kUseLargeEntries, BaseConfig::kUseMonoTimestamps>;
 
     // Create our trace instance and configure its storage.
     fbl::AllocChecker ac;

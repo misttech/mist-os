@@ -87,6 +87,8 @@ struct Entry<UseLargeEntries::No> {
         internal::Field32 _a = 0)
       : tag(_tag), a(_a.val) {}
 
+  // This ticks value is generally on the boot timeline, but can be on the monotonic
+  // timeline when the UseMonoTimestamps::Yes is used.
   zx_ticks_t ts_ticks;       //  0 + 8 == 8 bytes
   const char* tag{nullptr};  //  8 + 8 == 16 bytes
   cpu_num_t cpu_id;          // 16 + 4 == 20 bytes
@@ -108,6 +110,8 @@ struct Entry<UseLargeEntries::Yes> {
         c(_c.val),
         d(_d.val) {}
 
+  // This ticks value is generally on the boot timeline, but can be on the monotonic
+  // timeline when the UseMonoTimestamps::Yes is used.
   zx_ticks_t ts_ticks;                                  //  0 +  8 == 8 bytes
   const char* tag{nullptr};                             //  8 +  8 == 16 bytes
   const internal::FileFuncLineInfo* ffl_info{nullptr};  // 16 +  8 == 24 bytes

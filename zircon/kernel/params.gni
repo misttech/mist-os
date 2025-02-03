@@ -119,6 +119,7 @@ declare_args() {
   jtrace_last_entry_storage = 0
   jtrace_target_buffer_size = "auto"
   jtrace_use_large_entries = "auto"
+  jtrace_use_mono_timestamps = false
 
   # Build a kernel with no user-space support, for development only.
   kernel_no_userabi = false

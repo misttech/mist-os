@@ -494,6 +494,7 @@ if (is_kernel) {
         "JTRACE_TARGET_BUFFER_SIZE=$jtrace_target_buffer_size",
         "JTRACE_LAST_ENTRY_STORAGE=$jtrace_last_entry_storage",
         "JTRACE_USE_LARGE_ENTRIES=$jtrace_use_large_entries",
+        "JTRACE_USE_MONO_TIMESTAMPS=$jtrace_use_mono_timestamps",
       ]
 
       if (jtrace_enabled == "persistent") {
