@@ -50,7 +50,7 @@ use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::seal_flags::SealFlags;
 use starnix_uapi::signals::SigSet;
 use starnix_uapi::unmount_flags::UnmountFlags;
-use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserCString, UserRef};
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::vfs::{EpollEvent, FdEvents, ResolveFlags};
 use starnix_uapi::{
@@ -880,6 +880,24 @@ pub fn sys_fstat(
     Ok(())
 }
 
+type StatPtr = MultiArchUserRef<uapi::stat, uapi::arch32::stat64>;
+
+fn fstat64(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    dir_fd: FdNumber,
+    user_path: UserCString,
+    buffer: StatPtr,
+    flags: u32,
+) -> Result<(), Errno> {
+    let flags =
+        LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT)?;
+    let name = lookup_at(locked, current_task, dir_fd, user_path, flags)?;
+    let result = name.entry.node.stat(locked, current_task)?;
+    current_task.write_multi_arch_object(buffer, result)?;
+    Ok(())
+}
+
 pub fn sys_newfstatat(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
@@ -888,12 +906,7 @@ pub fn sys_newfstatat(
     buffer: UserRef<uapi::stat>,
     flags: u32,
 ) -> Result<(), Errno> {
-    let flags =
-        LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT)?;
-    let name = lookup_at(locked, current_task, dir_fd, user_path, flags)?;
-    let result = name.entry.node.stat(locked, current_task)?;
-    current_task.write_object(buffer, &result)?;
-    Ok(())
+    fstat64(locked, current_task, dir_fd, user_path, buffer.into(), flags)
 }
 
 pub fn sys_statx(
@@ -3163,8 +3176,8 @@ pub fn sys_io_uring_register(
 mod arch32 {
     use crate::mm::MemoryAccessorExt;
     use crate::vfs::syscalls::{
-        lookup_at, sys_dup3, sys_faccessat, sys_lseek, sys_mkdirat, sys_openat, sys_readlinkat,
-        sys_unlinkat, LookupFlags,
+        fstat64, lookup_at, sys_dup3, sys_faccessat, sys_lseek, sys_mkdirat, sys_openat,
+        sys_readlinkat, sys_unlinkat, LookupFlags, StatPtr,
     };
     use crate::vfs::{CurrentTask, FdNumber, FsNode};
     use linux_uapi::off_t;
@@ -3292,6 +3305,17 @@ mod arch32 {
         user_path: UserCString,
     ) -> Result<(), Errno> {
         sys_unlinkat(locked, current_task, FdNumber::AT_FDCWD, user_path, 0)
+    }
+
+    pub fn sys_arch32_fstatat64(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        dir_fd: FdNumber,
+        user_path: UserCString,
+        buffer: UserRef<uapi::arch32::stat64>,
+        flags: u32,
+    ) -> Result<(), Errno> {
+        fstat64(locked, current_task, dir_fd, user_path, StatPtr::from_32(buffer), flags)
     }
 }
 
