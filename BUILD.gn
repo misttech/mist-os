@@ -2215,6 +2215,3 @@ group("root_targets") {
 pool("console") {
   depth = 1
 }
-
-# This is temporary, to support a soft transition (it ensures that the build arg is always defined)
-import("//src/factory/factory_store_providers/soft_transition.gni")
