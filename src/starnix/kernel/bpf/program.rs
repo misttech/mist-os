@@ -6,10 +6,10 @@ use crate::bpf::fs::get_bpf_object;
 use crate::task::CurrentTask;
 use crate::vfs::{FdNumber, OutputBuffer};
 use ebpf::{
-    link_program, verify_program, BpfValue, EbpfError, EbpfHelperImpl, EbpfInstruction,
-    EbpfProgram, EbpfProgramContext, MapDescriptor, StructMapping, VerifiedEbpfProgram,
-    VerifierLogger, BPF_LDDW, BPF_PSEUDO_BTF_ID, BPF_PSEUDO_FUNC, BPF_PSEUDO_MAP_FD,
-    BPF_PSEUDO_MAP_IDX, BPF_PSEUDO_MAP_IDX_VALUE, BPF_PSEUDO_MAP_VALUE,
+    link_program, verify_program, EbpfError, EbpfHelperImpl, EbpfInstruction, EbpfProgram,
+    EbpfProgramContext, StructMapping, VerifiedEbpfProgram, VerifierLogger, BPF_LDDW,
+    BPF_PSEUDO_BTF_ID, BPF_PSEUDO_FUNC, BPF_PSEUDO_MAP_FD, BPF_PSEUDO_MAP_IDX,
+    BPF_PSEUDO_MAP_IDX_VALUE, BPF_PSEUDO_MAP_VALUE,
 };
 use ebpf_api::{get_common_helpers, Map, PinnedMap, ProgramType};
 use starnix_logging::{log_error, log_warn, track_stub};
@@ -33,13 +33,7 @@ impl TryFrom<&bpf_attr__bindgen_ty_4> for ProgramInfo {
 #[derive(Debug)]
 pub struct Program {
     pub info: ProgramInfo,
-
     program: VerifiedEbpfProgram,
-
-    // Map references kept to ensure that the maps are not dropped before the program.
-    //
-    // TODO(https://fxbug.dev/378507648): `VerifiedEbpfProgram` should keep these references once
-    // we have maps implementation in the `ebpf` crate.
     maps: Vec<PinnedMap>,
 }
 
@@ -63,7 +57,7 @@ impl Program {
         Ok(Program { info, program, maps })
     }
 
-    pub fn link<C: EbpfProgramContext>(
+    pub fn link<C: EbpfProgramContext<Map = PinnedMap>>(
         &self,
         program_type: ProgramType,
         struct_mappings: &[StructMapping],
@@ -73,17 +67,11 @@ impl Program {
             return error!(EINVAL);
         }
 
-        let maps = self
-            .maps
-            .iter()
-            .map(|m| MapDescriptor { schema: m.schema, ptr: BpfValue::from(&(**m) as *const Map) })
-            .collect::<Vec<MapDescriptor>>();
-
         let mut helpers = HashMap::new();
         helpers.extend(get_common_helpers::<C>().iter().cloned());
         helpers.extend(local_helpers.iter().cloned());
 
-        let program = link_program(&self.program, struct_mappings, &maps[..], helpers)
+        let program = link_program(&self.program, struct_mappings, self.maps.clone(), helpers)
             .map_err(map_ebpf_error)?;
 
         Ok(LinkedProgram { program, _maps: self.maps.clone() })

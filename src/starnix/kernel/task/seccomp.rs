@@ -14,7 +14,7 @@ use crate::vfs::{
 use bstr::ByteSlice;
 use ebpf::{
     bpf_addressing_mode, bpf_class, convert_and_link_cbpf, BpfProgramContext, CbpfConfig,
-    EbpfProgram, MemoryId, ProgramArgument, Type,
+    EbpfProgram, MemoryId, NoMap, ProgramArgument, Type,
 };
 use ebpf_api::SECCOMP_CBPF_CONFIG;
 use starnix_lifecycle::AtomicU64Counter;
@@ -134,6 +134,7 @@ pub struct SeccompData(seccomp_data);
 impl BpfProgramContext for SeccompFilter {
     type RunContext<'a> = ();
     type Packet<'a> = &'a SeccompData;
+    type Map = NoMap;
     const CBPF_CONFIG: &'static CbpfConfig = &SECCOMP_CBPF_CONFIG;
 }
 

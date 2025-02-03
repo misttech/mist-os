@@ -6,7 +6,7 @@
 pub mod test {
     use crate::{
         link_program_dynamic, verify_program, BpfValue, CallingContext, DataWidth, EbpfHelperImpl,
-        EbpfProgramContext, FromBpfValue, FunctionSignature, MemoryId, MemoryParameterSize,
+        EbpfProgramContext, FromBpfValue, FunctionSignature, MemoryId, MemoryParameterSize, NoMap,
         NullVerifierLogger, Packet, ProgramArgument, Type, BPF_ABS, BPF_ADD, BPF_ALU, BPF_ALU64,
         BPF_AND, BPF_ARSH, BPF_ATOMIC, BPF_B, BPF_CALL, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END,
         BPF_EXIT, BPF_FETCH, BPF_H, BPF_IMM, BPF_IND, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE,
@@ -533,6 +533,7 @@ pub mod test {
         type Arg3<'a> = ();
         type Arg4<'a> = ();
         type Arg5<'a> = ();
+        type Map = NoMap;
     }
 
     struct TestCase {
@@ -1066,7 +1067,7 @@ pub mod test {
             let program = link_program_dynamic::<TestEbpfProgramContext>(
                 &verified_program,
                 &[],
-                &[],
+                vec![],
                 helper_impls,
             )
             .expect("failed to link a test program");

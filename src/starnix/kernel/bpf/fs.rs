@@ -20,7 +20,7 @@ use crate::vfs::{
     FsNodeOps, FsStr, MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrStorage as _,
 };
 use ebpf::MapSchema;
-use ebpf_api::{compute_map_storage_size, Map, PinnedMap, RINGBUF_SIGNAL};
+use ebpf_api::{compute_map_storage_size, PinnedMap, RINGBUF_SIGNAL};
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_types::vfs::default_statfs;
@@ -91,9 +91,9 @@ impl From<Program> for BpfHandle {
     }
 }
 
-impl From<Map> for BpfHandle {
-    fn from(map: Map) -> Self {
-        Self::Map(Arc::pin(map))
+impl From<PinnedMap> for BpfHandle {
+    fn from(map: PinnedMap) -> Self {
+        Self::Map(map)
     }
 }
 

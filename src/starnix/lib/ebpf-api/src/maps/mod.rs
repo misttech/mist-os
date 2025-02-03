@@ -9,7 +9,7 @@ mod vmar;
 use vmar::AllocatedVmar;
 
 use dense_map::DenseMap;
-use ebpf::MapSchema;
+use ebpf::{BpfValue, MapReference, MapSchema};
 use fuchsia_sync::Mutex;
 use inspect_stubs::track_stub;
 use linux_uapi::{
@@ -79,16 +79,34 @@ pub struct Map {
 
 /// Maps are normally kept pinned in memory since linked eBPF programs store direct pointers to
 /// the maps they depend on.
-pub type PinnedMap = Pin<Arc<Map>>;
+#[derive(Debug, Clone)]
+pub struct PinnedMap(Pin<Arc<Map>>);
+
+impl Deref for PinnedMap {
+    type Target = Map;
+    fn deref(&self) -> &Self::Target {
+        self.0.deref()
+    }
+}
+
+impl MapReference for PinnedMap {
+    fn schema(&self) -> &MapSchema {
+        &self.0.schema
+    }
+
+    fn as_bpf_value(&self) -> BpfValue {
+        BpfValue::from(self.deref() as *const Map)
+    }
+}
 
 // Avoid allocation for eBPF keys smaller than 16 bytes.
 pub type MapKey = smallvec::SmallVec<[u8; 16]>;
 
 impl Map {
-    pub fn new(schema: MapSchema, flags: u32) -> Result<Self, MapError> {
+    pub fn new(schema: MapSchema, flags: u32) -> Result<PinnedMap, MapError> {
         let id = MAP_IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed).into();
         let store = MapStore::new(&schema)?;
-        Ok(Self { id, schema, flags, entries: Mutex::new(store) })
+        Ok(PinnedMap(Arc::pin(Self { id, schema, flags, entries: Mutex::new(store) })))
     }
 
     pub fn get_raw(&self, key: &[u8]) -> Option<*mut u8> {

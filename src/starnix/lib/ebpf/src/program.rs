@@ -77,6 +77,26 @@ where
     }
 }
 
+/// A strong reference to an eBPF map held for the lifetime of an eBPF linked
+/// with the map. Can be converted to `BpfValue`, which is used by the program
+/// to identify the map when it calls map helpers.
+pub trait MapReference {
+    fn schema(&self) -> &MapSchema;
+    fn as_bpf_value(&self) -> BpfValue;
+}
+
+/// `MapReference` for `EbpfProgramContext` where maps are not used.
+pub enum NoMap {}
+
+impl MapReference for NoMap {
+    fn schema(&self) -> &MapSchema {
+        unreachable!()
+    }
+    fn as_bpf_value(&self) -> BpfValue {
+        unreachable!()
+    }
+}
+
 pub trait EbpfProgramContext {
     /// Context for an invocation of an eBPF program.
     type RunContext<'a>;
@@ -90,6 +110,9 @@ pub trait EbpfProgramContext {
     type Arg3<'a>: ProgramArgument;
     type Arg4<'a>: ProgramArgument;
     type Arg5<'a>: ProgramArgument;
+
+    /// Type used to reference eBPF maps for the lifetime of a program.
+    type Map: MapReference;
 }
 
 /// Trait that should be implemented by packets passed to eBPF programs.
@@ -124,7 +147,7 @@ impl<P: IntoBytes + Immutable> Packet for &P {
 pub trait BpfProgramContext {
     type RunContext<'a>;
     type Packet<'a>: ProgramArgument + Packet + FromBpfValue<Self::RunContext<'a>>;
-
+    type Map: MapReference;
     const CBPF_CONFIG: &'static CbpfConfig;
 
     fn get_arg_types() -> Vec<Type> {
@@ -140,6 +163,7 @@ impl<T: BpfProgramContext + ?Sized> EbpfProgramContext for T {
     type Arg3<'a> = ();
     type Arg4<'a> = ();
     type Arg5<'a> = ();
+    type Map = T::Map;
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -317,12 +341,6 @@ pub struct StructMapping {
     pub fields: Vec<FieldMapping>,
 }
 
-#[derive(Clone, Debug)]
-pub struct MapDescriptor {
-    pub schema: MapSchema,
-    pub ptr: BpfValue,
-}
-
 pub trait ArgumentTypeChecker<C: EbpfProgramContext>: Sized {
     fn link(program: &VerifiedEbpfProgram) -> Result<Self, EbpfError>;
     fn run_time_check<'a>(
@@ -417,6 +435,12 @@ impl<C: EbpfProgramContext> ArgumentTypeChecker<C> for DynamicTypeChecker {
 /// An abstraction over an eBPF program and its registered helper functions.
 pub struct EbpfProgram<C: EbpfProgramContext, T: ArgumentTypeChecker<C> = StaticTypeChecker> {
     pub(crate) code: Vec<EbpfInstruction>,
+
+    /// List of references to the maps used by the program. This field is not used directly,
+    /// but it's kept here to ensure that the maps outlive the program.
+    #[allow(dead_code)]
+    pub(crate) maps: Vec<C::Map>,
+
     pub(crate) helpers: HashMap<u32, EbpfHelperImpl<C>>,
     type_checker: T,
 }
@@ -487,7 +511,7 @@ where
 pub fn link_program_internal<C: EbpfProgramContext, T: ArgumentTypeChecker<C>>(
     program: &VerifiedEbpfProgram,
     struct_mappings: &[StructMapping],
-    maps: &[MapDescriptor],
+    maps: Vec<C::Map>,
     helpers: HashMap<u32, EbpfHelperImpl<C>>,
 ) -> Result<EbpfProgram<C, T>, EbpfError> {
     let type_checker = T::link(program)?;
@@ -556,13 +580,12 @@ pub fn link_program_internal<C: EbpfProgramContext, T: ArgumentTypeChecker<C>>(
                 BPF_PSEUDO_MAP_IDX => {
                     let map_index = usize::try_from(instruction.imm)
                         .expect("negative map index in a verified program");
-                    let MapDescriptor { schema, ptr: map_ptr } =
-                        maps.get(map_index).ok_or_else(|| {
-                            EbpfError::ProgramLinkError(format!("Invalid map_index: {}", map_index))
-                        })?;
-                    assert!(*schema == program.maps[map_index]);
+                    let map = maps.get(map_index).ok_or_else(|| {
+                        EbpfError::ProgramLinkError(format!("Invalid map_index: {}", map_index))
+                    })?;
+                    assert!(*map.schema() == program.maps[map_index]);
 
-                    let map_ptr = map_ptr.as_u64();
+                    let map_ptr = map.as_bpf_value().as_u64();
                     let (high, low) = ((map_ptr >> 32) as i32, map_ptr as i32);
                     instruction.set_src_reg(0);
                     instruction.imm = low;
@@ -581,7 +604,7 @@ pub fn link_program_internal<C: EbpfProgramContext, T: ArgumentTypeChecker<C>>(
         }
     }
 
-    Ok(EbpfProgram { code, helpers, type_checker })
+    Ok(EbpfProgram { code, maps, helpers, type_checker })
 }
 
 /// Rewrites the code to ensure mapped fields are correctly handled. Returns
@@ -589,7 +612,7 @@ pub fn link_program_internal<C: EbpfProgramContext, T: ArgumentTypeChecker<C>>(
 pub fn link_program<C: EbpfProgramContext>(
     program: &VerifiedEbpfProgram,
     struct_mappings: &[StructMapping],
-    maps: &[MapDescriptor],
+    maps: Vec<C::Map>,
     helpers: HashMap<u32, EbpfHelperImpl<C>>,
 ) -> Result<EbpfProgram<C>, EbpfError> {
     link_program_internal::<C, StaticTypeChecker>(program, struct_mappings, maps, helpers)
@@ -599,7 +622,7 @@ pub fn link_program<C: EbpfProgramContext>(
 pub fn link_program_dynamic<C: EbpfProgramContext>(
     program: &VerifiedEbpfProgram,
     struct_mappings: &[StructMapping],
-    maps: &[MapDescriptor],
+    maps: Vec<C::Map>,
     helpers: HashMap<u32, EbpfHelperImpl<C>>,
 ) -> Result<EbpfProgram<C, DynamicTypeChecker>, EbpfError> {
     link_program_internal::<C, DynamicTypeChecker>(program, struct_mappings, maps, helpers)
@@ -780,6 +803,8 @@ mod test {
         type Arg3<'a> = ();
         type Arg4<'a> = ();
         type Arg5<'a> = ();
+
+        type Map = NoMap;
     }
 
     fn initialize_test_program(
@@ -790,7 +815,7 @@ mod test {
             CallingContext { args: vec![TEST_ARG_TYPE.clone()], ..Default::default() },
             &mut NullVerifierLogger,
         )?;
-        link_program(&verified_program, &[], &[], HashMap::default())
+        link_program(&verified_program, &[], vec![], HashMap::default())
     }
 
     struct TestEbpfProgramContext32BitMapped {}
@@ -804,6 +829,8 @@ mod test {
         type Arg3<'a> = ();
         type Arg4<'a> = ();
         type Arg5<'a> = ();
+
+        type Map = NoMap;
     }
 
     fn initialize_test_program_for_32bit_arg(
@@ -817,7 +844,7 @@ mod test {
         link_program(
             &verified_program,
             &[TestArgument32BitMapped::get_mapping()],
-            &[],
+            vec![],
             HashMap::default(),
         )
     }

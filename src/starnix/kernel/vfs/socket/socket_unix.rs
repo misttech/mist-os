@@ -22,7 +22,7 @@ use ebpf::{
     StructMapping, Type,
 };
 use ebpf_api::{
-    get_socket_filter_helpers, ProgramType, SocketFilterContext, SK_BUF_ID, SK_BUF_TYPE,
+    get_socket_filter_helpers, PinnedMap, ProgramType, SocketFilterContext, SK_BUF_ID, SK_BUF_TYPE,
     SOCKET_FILTER_CBPF_CONFIG,
 };
 use starnix_logging::track_stub;
@@ -1036,6 +1036,7 @@ struct UnixSocketEbpfContext {}
 impl BpfProgramContext for UnixSocketEbpfContext {
     type RunContext<'a> = UnixSocketEbpfHelpersContext;
     type Packet<'a> = &'a mut SkBuf;
+    type Map = PinnedMap;
     const CBPF_CONFIG: &'static CbpfConfig = &SOCKET_FILTER_CBPF_CONFIG;
 }
 

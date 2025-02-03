@@ -396,13 +396,13 @@ pub fn convert_and_link_cbpf<C: BpfProgramContext>(
 ) -> Result<EbpfProgram<C>, EbpfError> {
     let verified =
         convert_and_verify_cbpf(bpf_code, C::Packet::get_type().clone(), C::CBPF_CONFIG)?;
-    link_program(&verified, &[], &[], HashMap::new())
+    link_program(&verified, &[], vec![], HashMap::new())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::verifier::MemoryId;
+    use crate::{MemoryId, NoMap};
     use linux_uapi::{
         seccomp_data, sock_filter, AUDIT_ARCH_AARCH64, AUDIT_ARCH_X86_64, SECCOMP_RET_ALLOW,
         SECCOMP_RET_TRAP,
@@ -562,6 +562,7 @@ mod tests {
     impl BpfProgramContext for TestProgramContext {
         type RunContext<'a> = ();
         type Packet<'a> = &'a seccomp_data;
+        type Map = NoMap;
         const CBPF_CONFIG: &'static CbpfConfig = &TEST_CBPF_CONFIG;
     }
 
@@ -808,6 +809,7 @@ mod tests {
     impl BpfProgramContext for VariableLengthPacketContext {
         type RunContext<'a> = ();
         type Packet<'a> = &'a VariableLengthPacket;
+        type Map = NoMap;
         const CBPF_CONFIG: &'static CbpfConfig = &VARIABLE_LENGTH_CBPF_CONFIG;
     }
 

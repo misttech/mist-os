@@ -7,7 +7,7 @@ use ebpf::{
     Packet, ProgramArgument, Type, VerifiedEbpfProgram,
 };
 use ebpf_api::{
-    __sk_buff, SKF_AD_OFF, SKF_AD_PROTOCOL, SKF_LL_OFF, SKF_NET_OFF, SK_BUF_TYPE,
+    PinnedMap, __sk_buff, SKF_AD_OFF, SKF_AD_PROTOCOL, SKF_LL_OFF, SKF_NET_OFF, SK_BUF_TYPE,
     SOCKET_FILTER_CBPF_CONFIG,
 };
 use fidl_fuchsia_posix_socket_packet as fppacket;
@@ -98,6 +98,7 @@ struct SocketFilterContext {}
 impl BpfProgramContext for SocketFilterContext {
     type RunContext<'a> = ();
     type Packet<'a> = &'a IpPacketForBpf<'a>;
+    type Map = PinnedMap;
     const CBPF_CONFIG: &'static CbpfConfig = &SOCKET_FILTER_CBPF_CONFIG;
 }
 
@@ -131,7 +132,7 @@ impl SocketFilterProgram {
         // verification.
         let program =
             VerifiedEbpfProgram::from_verified_code(code, SocketFilterContext::get_arg_types());
-        let program = link_program::<SocketFilterContext>(&program, &[], &[], HashMap::new())
+        let program = link_program::<SocketFilterContext>(&program, &[], vec![], HashMap::new())
             .expect("Failed to link SocketFilter program");
 
         Self { program }

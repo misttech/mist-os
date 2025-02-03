@@ -152,7 +152,8 @@ pub fn sys_bpf(
                 value_size: map_attr.value_size,
                 max_entries: map_attr.max_entries,
             };
-            let mut map = Map::new(schema, map_attr.map_flags).map_err(map_error_to_errno)?;
+
+            let mut flags = map_attr.map_flags;
 
             // To quote
             // https://cs.android.com/android/platform/superproject/+/master:system/bpf/libbpf_android/Loader.cpp;l=670;drc=28e295395471b33e662b7116378d15f1e88f0864
@@ -161,9 +162,10 @@ pub fn sys_bpf(
             if schema.map_type == bpf_map_type_BPF_MAP_TYPE_DEVMAP
                 || schema.map_type == bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH
             {
-                map.flags |= BPF_F_RDONLY_PROG;
+                flags |= BPF_F_RDONLY_PROG;
             }
 
+            let map = Map::new(schema, flags).map_err(map_error_to_errno)?;
             install_bpf_fd(current_task, map)
         }
 
