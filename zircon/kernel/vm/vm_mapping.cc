@@ -1085,6 +1085,11 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
 
       DEBUG_ASSERT(!write || result->writable);
 
+      // We looked up in order to write. Mark as modified. Only need to do this once.
+      if (write && offset == 0) {
+        object_->mark_modified_locked();
+      }
+
       // If we read faulted, and lookup didn't say that this is always writable, then we map or
       // modify the page without any write permissions. This ensures we will fault again if a write
       // is attempted so we can potentially replace this page with a copy or a new one, or update
@@ -1101,11 +1106,6 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
         coalescer.Flush();
         return status;
       }
-    }
-
-    // We looked up in order to write. Mark as modified.
-    if (write) {
-      object_->mark_modified_locked();
     }
 
     // Fault opportunistic pages. If a range is supplied, it is assumed the user knows the
