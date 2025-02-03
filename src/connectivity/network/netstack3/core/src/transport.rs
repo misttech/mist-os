@@ -57,18 +57,16 @@
 
 mod integration;
 
-use core::marker::PhantomData;
-
 use derivative::Derivative;
 use net_types::ip::{Ip, Ipv4, Ipv6};
-use netstack3_base::{HandleableTimer, TimerHandler};
+use netstack3_base::{CoreTxMetadataContext, HandleableTimer, TimerHandler};
 use netstack3_datagram as datagram;
 use netstack3_device::WeakDeviceId;
-use netstack3_icmp_echo::IcmpSockets;
+use netstack3_icmp_echo::{IcmpSocketTxMetadata, IcmpSockets};
 use netstack3_tcp::{self as tcp, TcpCounters, TcpState, TcpTimerId};
-use netstack3_udp::{UdpCounters, UdpState, UdpStateBuilder};
+use netstack3_udp::{UdpCounters, UdpSocketTxMetadata, UdpState, UdpStateBuilder};
 
-use crate::{BindingsContext, BindingsTypes};
+use crate::{BindingsContext, BindingsTypes, CoreCtx, IpExt};
 
 /// A builder for transport layer state.
 #[derive(Default, Clone)]
@@ -175,22 +173,39 @@ pub struct TxMetadata<BT: BindingsTypes>(TxMetadataInner<BT>);
 /// This is split from [`TxMetadata`] so the outer type is opaque to bindings.
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""), Default(bound = ""))]
+#[cfg_attr(any(test, feature = "testutils"), derivative(PartialEq(bound = "")))]
 enum TxMetadataInner<BT: BindingsTypes> {
     #[derivative(Default)]
     None,
-    // TODO(https://fxbug.dev/42074004): Remove placeholder. It's here for now
-    // to ground the `BT` type parameter. We're using `Timer` here because it
-    // has the appropriate Send, Sync, 'static bounds to satisfy TxMetadata
-    // requirements.
-    _Placeholder(PhantomData<BT::Timer>),
+    #[derivative(Debug = "transparent")]
+    Udpv4(UdpSocketTxMetadata<Ipv4, WeakDeviceId<BT>, BT>),
+    #[derivative(Debug = "transparent")]
+    Udpv6(UdpSocketTxMetadata<Ipv6, WeakDeviceId<BT>, BT>),
+    #[derivative(Debug = "transparent")]
+    Icmpv4(IcmpSocketTxMetadata<Ipv4, WeakDeviceId<BT>, BT>),
+    #[derivative(Debug = "transparent")]
+    Icmpv6(IcmpSocketTxMetadata<Ipv6, WeakDeviceId<BT>, BT>),
 }
 
-#[cfg(any(test, feature = "testutils"))]
-impl<BT: BindingsTypes> PartialEq for TxMetadataInner<BT> {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::None, Self::None) => true,
-            (Self::_Placeholder(_), _) | (_, Self::_Placeholder(_)) => unreachable!(),
-        }
+impl<I: IpExt, L, BT: BindingsTypes>
+    CoreTxMetadataContext<UdpSocketTxMetadata<I, WeakDeviceId<BT>, BT>, BT> for CoreCtx<'_, BT, L>
+{
+    fn convert_tx_meta(
+        &self,
+        tx_meta: UdpSocketTxMetadata<I, WeakDeviceId<BT>, BT>,
+    ) -> TxMetadata<BT> {
+        TxMetadata(I::map_ip_in(tx_meta, TxMetadataInner::Udpv4, TxMetadataInner::Udpv6))
+    }
+}
+
+impl<I: IpExt, L, BT: BindingsTypes>
+    CoreTxMetadataContext<IcmpSocketTxMetadata<I, WeakDeviceId<BT>, BT>, BT>
+    for CoreCtx<'_, BT, L>
+{
+    fn convert_tx_meta(
+        &self,
+        tx_meta: IcmpSocketTxMetadata<I, WeakDeviceId<BT>, BT>,
+    ) -> TxMetadata<BT> {
+        TxMetadata(I::map_ip_in(tx_meta, TxMetadataInner::Icmpv4, TxMetadataInner::Icmpv6))
     }
 }

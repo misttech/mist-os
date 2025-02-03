@@ -8,9 +8,6 @@ use std::collections::VecDeque;
 
 use log::{error, trace};
 use thiserror::Error;
-use zx::{self as zx, Peered as _};
-
-use crate::bindings::socket::ZXSIO_SIGNAL_INCOMING;
 
 // These values were picked to match Linux behavior.
 
@@ -28,22 +25,30 @@ pub(crate) const MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE: usize = 256;
 #[error("application buffers are full")]
 pub(crate) struct NoSpace;
 
+/// A trait abstracting types that are notified of the queue being readable.
+///
+/// Upon creation, the listener must assume to be *not* readable.
+pub(crate) trait QueueReadableListener {
+    /// Notifies the listener of a readable change.
+    fn on_readable_changed(&mut self, readable: bool);
+}
+
 #[derive(Debug)]
-pub(crate) struct MessageQueue<M> {
-    local_event: zx::EventPair,
+pub(crate) struct MessageQueue<M, L> {
+    listener: L,
     queue: AvailableMessageQueue<M>,
 }
 
-impl<M> MessageQueue<M> {
-    pub(crate) fn new(local_event: zx::EventPair) -> Self {
+impl<M, L: QueueReadableListener> MessageQueue<M, L> {
+    pub(crate) fn new(listener: L) -> Self {
         Self {
-            local_event,
+            listener,
             queue: AvailableMessageQueue::new(DEFAULT_OUTSTANDING_APPLICATION_MESSAGES_SIZE),
         }
     }
 
     pub(crate) fn peek(&self) -> Option<&M> {
-        let Self { queue, local_event: _ } = self;
+        let Self { queue, listener: _ } = self;
         queue.peek()
     }
 
@@ -51,12 +56,12 @@ impl<M> MessageQueue<M> {
     where
         M: BodyLen,
     {
-        let Self { queue, local_event } = self;
+        let Self { queue, listener } = self;
         let message = queue.pop();
-        if queue.is_empty() {
-            if let Err(e) = local_event.signal_peer(ZXSIO_SIGNAL_INCOMING, zx::Signals::NONE) {
-                error!("socket failed to signal peer: {:?}", e);
-            }
+        // NB: Only notify the listener when the queue was not empty before to
+        // avoid hitting the listener twice with the same signal.
+        if queue.is_empty() && message.is_some() {
+            listener.on_readable_changed(false);
         }
         message
     }
@@ -65,7 +70,7 @@ impl<M> MessageQueue<M> {
     where
         M: BodyLen,
     {
-        let Self { queue, local_event } = self;
+        let Self { queue, listener } = self;
         let body_len = message.body_len();
         let queue_was_empty = queue.is_empty();
         match queue.push(message) {
@@ -78,25 +83,23 @@ impl<M> MessageQueue<M> {
                 // This is a safe optimization because signals are only set
                 // on the event while holding an `&mut MessageQueue`.
                 if queue_was_empty {
-                    local_event
-                        .signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_INCOMING)
-                        .unwrap_or_else(|e| error!("signal peer failed: {:?}", e))
+                    listener.on_readable_changed(true);
                 }
             }
         }
     }
 
-    pub(crate) fn local_event(&self) -> &zx::EventPair {
-        &self.local_event
+    pub(crate) fn listener_mut(&mut self) -> &mut L {
+        &mut self.listener
     }
 
     pub(crate) fn max_available_messages_size(&self) -> usize {
-        let Self { local_event: _, queue } = self;
+        let Self { listener: _, queue } = self;
         queue.max_available_messages_size
     }
 
     pub(crate) fn set_max_available_messages_size(&mut self, new_size: usize) {
-        let Self { local_event: _, queue } = self;
+        let Self { listener: _, queue } = self;
         queue.max_available_messages_size = usize::max(
             usize::min(new_size, MAX_OUTSTANDING_APPLICATION_MESSAGES_SIZE),
             MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE,
@@ -106,7 +109,7 @@ impl<M> MessageQueue<M> {
     #[cfg(test)]
     pub(crate) fn available_messages(&self) -> impl ExactSizeIterator<Item = &M> {
         let Self {
-            local_event: _,
+            listener: _,
             queue:
                 AvailableMessageQueue {
                     available_messages,

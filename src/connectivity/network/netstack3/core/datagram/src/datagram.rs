@@ -25,16 +25,17 @@ use netstack3_base::socket::{
     DualStackListenerIpAddr, DualStackLocalIp, DualStackRemoteIp, EitherStack, InsertError,
     ListenerAddr, ListenerIpAddr, MaybeDualStack, NotDualStackCapableError, Shutdown, ShutdownType,
     SocketDeviceUpdate, SocketDeviceUpdateNotAllowedError, SocketIpAddr, SocketIpExt,
-    SocketMapAddrSpec, SocketMapConflictPolicy, SocketMapStateSpec, SocketZonedAddrExt as _,
-    StrictlyZonedAddr,
+    SocketMapAddrSpec, SocketMapConflictPolicy, SocketMapStateSpec, SocketWritableListener,
+    SocketZonedAddrExt as _, StrictlyZonedAddr,
 };
 use netstack3_base::sync::{self, RwLock};
 use netstack3_base::{
-    AnyDevice, BidirectionalConverter, ContextPair, DeviceIdContext, DeviceIdentifier,
-    EitherDeviceId, ExistsError, Inspector, InspectorDeviceExt, IpDeviceAddr, LocalAddressError,
-    NotFoundError, OwnedOrRefsBidirectionalConverter, ReferenceNotifiers, ReferenceNotifiersExt,
-    RemoteAddressError, RemoveResourceResultWithContext, RngContext, SocketError,
-    StrongDeviceIdentifier as _, TxMetadataBindingsTypes, WeakDeviceIdentifier, ZonedAddressError,
+    AnyDevice, BidirectionalConverter, ContextPair, CoreTxMetadataContext, DeviceIdContext,
+    DeviceIdentifier, EitherDeviceId, ExistsError, Inspector, InspectorDeviceExt, IpDeviceAddr,
+    LocalAddressError, NotFoundError, OwnedOrRefsBidirectionalConverter, ReferenceNotifiers,
+    ReferenceNotifiersExt, RemoteAddressError, RemoveResourceResultWithContext, RngContext,
+    SocketError, StrongDeviceIdentifier as _, TxMetadataBindingsTypes, WeakDeviceIdentifier,
+    ZonedAddressError,
 };
 use netstack3_filter::TransportPacketSerializer;
 use netstack3_ip::socket::{
@@ -51,6 +52,8 @@ use packet_formats::ip::{DscpAndEcn, IpProtoExt};
 use ref_cast::RefCast;
 use thiserror::Error;
 
+use crate::internal::sndbuf::{SendBufferError, SendBufferTracking, TxMetadata};
+
 /// Datagram demultiplexing map.
 pub type BoundSockets<I, D, A, S> = BoundSocketMap<I, D, A, S>;
 
@@ -60,6 +63,7 @@ pub type BoundSockets<I, D, A, S> = BoundSocketMap<I, D, A, S>;
 pub struct ReferenceState<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> {
     pub(crate) state: RwLock<SocketState<I, D, S>>,
     pub(crate) external_data: S::ExternalData<I>,
+    pub(crate) send_buffer: SendBufferTracking<S>,
 }
 
 // Local aliases for brevity.
@@ -824,6 +828,7 @@ pub trait DatagramBoundStateContext<
 {
     /// The core context passed to the callback provided to methods.
     type IpSocketsCtx<'a>: TransportIpContext<I, BC>
+        + CoreTxMetadataContext<TxMetadata<I, Self::WeakDeviceId, S>, BC>
         + MulticastMembershipHandler<I, BC>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>;
 
@@ -945,9 +950,11 @@ pub trait DualStackDatagramBoundStateContext<
 {
     /// The core context passed to the callbacks to methods.
     type IpSocketsCtx<'a>: TransportIpContext<I, BC>
+        + CoreTxMetadataContext<TxMetadata<I, Self::WeakDeviceId, S>, BC>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         // Allow creating IP sockets for the other IP version.
-        + TransportIpContext<I::OtherVersion, BC>;
+        + TransportIpContext<I::OtherVersion, BC>
+        + CoreTxMetadataContext<TxMetadata<I::OtherVersion, Self::WeakDeviceId, S>, BC>;
 
     /// Returns if the socket state indicates dual-stack operation is enabled.
     fn dual_stack_enabled(&self, state: &impl AsRef<IpOptions<I, Self::WeakDeviceId, S>>) -> bool;
@@ -1336,6 +1343,9 @@ pub trait DatagramSocketSpec: Sized + 'static {
         + Borrow<StrongRc<I, D, Self>>
         + From<StrongRc<I, D, Self>>;
 
+    /// The weak version of `SocketId`.
+    type WeakSocketId<I: IpExt, D: WeakDeviceIdentifier>: Clone + Debug + Eq + Send;
+
     /// IP-level options for sending `I::OtherVersion` IP packets.
     type OtherStackIpOptions<I: IpExt, D: WeakDeviceIdentifier>: Clone
         + Debug
@@ -1416,6 +1426,18 @@ pub trait DatagramSocketSpec: Sized + 'static {
     /// inside the socket references.
     type ExternalData<I: Ip>: Debug + Send + Sync + 'static;
 
+    /// The listener type that is notified about the socket writable state.
+    type SocketWritableListener: SocketWritableListener + Debug + Send + Sync + 'static;
+
+    /// The size in bytes of the fixed header for the datagram transport.
+    ///
+    /// This is used to calculate the per-packet send buffer cost of an egress
+    /// datagram.
+    ///
+    /// This value must be the _additional_ bytes wrapped in a body when
+    /// [`DatagramSocketSpec::make_packet`] is called.
+    const FIXED_HEADER_SIZE: usize;
+
     /// Returns the IP protocol of this datagram specification.
     fn ip_proto<I: IpProtoExt>() -> I::Proto;
 
@@ -1467,6 +1489,18 @@ pub trait DatagramSocketSpec: Sized + 'static {
         bindings_ctx: &mut BC,
         flow: DatagramFlowId<I::Addr, <Self::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier>,
     ) -> Option<<Self::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>;
+
+    /// Downgrades a `SocketId` into a `WeakSocketId`.
+    // TODO(https://fxbug.dev/392672414): Replace this with a base trait.
+    fn downgrade_socket_id<I: IpExt, D: WeakDeviceIdentifier>(
+        id: &Self::SocketId<I, D>,
+    ) -> Self::WeakSocketId<I, D>;
+
+    /// Attempts to upgrade a `WeakSocketId` into a `SocketId`.
+    // TODO(https://fxbug.dev/392672414): Replace this with a base trait.
+    fn upgrade_socket_id<I: IpExt, D: WeakDeviceIdentifier>(
+        id: &Self::WeakSocketId<I, D>,
+    ) -> Option<Self::SocketId<I, D>>;
 }
 
 /// The error returned when an identifier (i.e.) port is already in use.
@@ -1475,10 +1509,12 @@ pub struct InUseError;
 /// Creates a primary ID without inserting it into the all socket map.
 pub fn create_primary_id<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec>(
     external_data: S::ExternalData<I>,
+    writable_listener: S::SocketWritableListener,
 ) -> PrimaryRc<I, D, S> {
     PrimaryRc::new(ReferenceState {
         state: RwLock::new(SocketState::Unbound(UnboundSocketState::default())),
         external_data,
+        send_buffer: SendBufferTracking::new(writable_listener),
     })
 }
 
@@ -3431,6 +3467,19 @@ pub enum SendError<SE> {
     IpSock(IpSockSendError),
     /// There was a problem when serializing the packet.
     SerializeError(SE),
+    /// There is no space available on the send buffer.
+    SendBufferFull,
+    /// Invalid message length.
+    InvalidLength,
+}
+
+impl<SE> From<SendBufferError> for SendError<SE> {
+    fn from(err: SendBufferError) -> Self {
+        match err {
+            SendBufferError::SendBufferFull => Self::SendBufferFull,
+            SendBufferError::InvalidLength => Self::InvalidLength,
+        }
+    }
 }
 
 /// An error encountered while sending a datagram packet to an alternate address.
@@ -3449,32 +3498,53 @@ pub enum SendToError<SE> {
     /// The remote address is non-mapped (i.e not an ipv4-mapped-ipv6 address),
     /// but the socket is dual stack enabled and bound to a mapped address.
     RemoteUnexpectedlyNonMapped,
-    /// The provided buffer is not vailid.
+    /// The provided buffer is not valid.
     SerializeError(SE),
+    /// There is no space available on the send buffer.
+    SendBufferFull,
+    /// Invalid message length.
+    InvalidLength,
 }
 
-struct SendOneshotParameters<'a, I: IpExt, S: DatagramSocketSpec, D: WeakDeviceIdentifier> {
-    local_ip: Option<SocketIpAddr<I::Addr>>,
+impl<SE> From<SendBufferError> for SendToError<SE> {
+    fn from(err: SendBufferError) -> Self {
+        match err {
+            SendBufferError::SendBufferFull => Self::SendBufferFull,
+            SendBufferError::InvalidLength => Self::InvalidLength,
+        }
+    }
+}
+
+struct SendOneshotParameters<
+    'a,
+    SockI: IpExt,
+    WireI: IpExt,
+    S: DatagramSocketSpec,
+    D: WeakDeviceIdentifier,
+> {
+    local_ip: Option<SocketIpAddr<WireI::Addr>>,
     local_id: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
-    remote_ip: ZonedAddr<SocketIpAddr<I::Addr>, D::Strong>,
+    remote_ip: ZonedAddr<SocketIpAddr<WireI::Addr>, D::Strong>,
     remote_id: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     device: &'a Option<D>,
-    options: IpOptionsRef<'a, I, D>,
+    options: IpOptionsRef<'a, WireI, D>,
+    id: &'a S::SocketId<SockI, D>,
 }
 
 fn send_oneshot<
-    I: IpExt,
+    SockI: IpExt,
+    WireI: IpExt,
     S: DatagramSocketSpec,
-    CC: IpSocketHandler<I, BC>,
+    CC: IpSocketHandler<WireI, BC> + CoreTxMetadataContext<TxMetadata<SockI, CC::WeakDeviceId, S>, BC>,
     BC: DatagramBindingsContext,
     B: BufferMut,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    params: SendOneshotParameters<'_, I, S, CC::WeakDeviceId>,
+    params: SendOneshotParameters<'_, SockI, WireI, S, CC::WeakDeviceId>,
     body: B,
 ) -> Result<(), SendToError<S::SerializeError>> {
-    let SendOneshotParameters { local_ip, local_id, remote_ip, remote_id, device, options } =
+    let SendOneshotParameters { local_ip, local_id, remote_ip, remote_id, device, options, id } =
         params;
     let device = device.clone().or_else(|| {
         remote_ip
@@ -3489,9 +3559,8 @@ fn send_oneshot<
         Err(e) => return Err(SendToError::Zone(e)),
     };
 
-    // TODO(https://fxbug.dev/42074004): Enforce SNDBUF for all datagram
-    // sockets.
-    let tx_metadata: BC::TxMetadata = Default::default();
+    let tx_metadata = id.borrow().send_buffer.prepare_for_send::<WireI, _, _, _>(id, &body)?;
+    let tx_metadata = core_ctx.convert_tx_meta(tx_metadata);
 
     core_ctx
         .send_oneshot_ip_packet_with_fallible_serializer(
@@ -3499,11 +3568,11 @@ fn send_oneshot<
             device.as_ref().map(|d| d.as_ref()),
             local_ip.and_then(IpDeviceAddr::new_from_socket_ip_addr),
             remote_ip,
-            S::ip_proto::<I>(),
+            S::ip_proto::<WireI>(),
             &options,
             tx_metadata,
             |local_ip| {
-                S::make_packet::<I, _>(
+                S::make_packet::<WireI, _>(
                     body,
                     &ConnIpAddr {
                         local: (local_ip.into(), local_id),
@@ -3902,14 +3971,25 @@ where
     pub fn create(
         &mut self,
         external_data: S::ExternalData<I>,
+        writable_listener: S::SocketWritableListener,
     ) -> S::SocketId<I, DatagramApiWeakDeviceId<C>> {
-        let primary = create_primary_id(external_data);
+        let primary = create_primary_id(external_data, writable_listener);
         let strong = PrimaryRc::clone_strong(&primary);
         self.core_ctx().with_all_sockets_mut(move |socket_set| {
             let strong = PrimaryRc::clone_strong(&primary);
             assert_matches::assert_matches!(socket_set.insert(strong, primary), None);
         });
         strong.into()
+    }
+
+    /// Like [`DatagramApi::create`], but uses default values.
+    #[cfg(any(test, feature = "testutils"))]
+    pub fn create_default(&mut self) -> S::SocketId<I, DatagramApiWeakDeviceId<C>>
+    where
+        S::ExternalData<I>: Default,
+        S::SocketWritableListener: Default,
+    {
+        self.create(Default::default(), Default::default())
     }
 
     /// Collects all currently opened sockets.
@@ -3960,7 +4040,7 @@ where
         core::mem::drop(id);
         <C::BindingsContext as ReferenceNotifiersExt>::unwrap_or_notify_with_new_reference_notifier(
             primary,
-            |ReferenceState { state: _, external_data }| external_data,
+            |ReferenceState { external_data, .. }| external_data,
         )
     }
 
@@ -4267,25 +4347,30 @@ where
                 return Err(SendError::NotWriteable);
             }
 
-            // TODO(https://fxbug.dev/42074004): Enforce SNDBUF for
-            // all datagram sockets.
-            let tx_metadata = Default::default();
             match operation {
                 Operation::SendToThisStack((SendParams { socket, ip, options }, core_ctx)) => {
+                    let tx_metadata =
+                        id.borrow().send_buffer.prepare_for_send::<I, _, _, _>(id, &body)?;
                     let packet =
                         S::make_packet::<I, _>(body, &ip).map_err(SendError::SerializeError)?;
                     DatagramBoundStateContext::with_transport_context(core_ctx, |core_ctx| {
+                        let tx_metadata = core_ctx.convert_tx_meta(tx_metadata);
                         core_ctx
                             .send_ip_packet(bindings_ctx, &socket, packet, &options, tx_metadata)
                             .map_err(|send_error| SendError::IpSock(send_error))
                     })
                 }
                 Operation::SendToOtherStack((SendParams { socket, ip, options }, dual_stack)) => {
+                    let tx_metadata = id
+                        .borrow()
+                        .send_buffer
+                        .prepare_for_send::<I::OtherVersion, _, _, _>(id, &body)?;
                     let packet = S::make_packet::<I::OtherVersion, _>(body, &ip)
                         .map_err(SendError::SerializeError)?;
                     DualStackDatagramBoundStateContext::with_transport_context::<_, _>(
                         dual_stack,
                         |core_ctx| {
+                            let tx_metadata = core_ctx.convert_tx_meta(tx_metadata);
                             core_ctx
                                 .send_ip_packet(
                                     bindings_ctx,
@@ -4333,10 +4418,10 @@ where
                 DualStackSC: DualStackDatagramBoundStateContext<I, BC, S>,
                 CC: DatagramBoundStateContext<I, BC, S>,
             > {
-                SendToThisStack((SendOneshotParameters<'a, I, S, D>, &'a mut CC)),
+                SendToThisStack((SendOneshotParameters<'a, I, I, S, D>, &'a mut CC)),
 
                 SendToOtherStack(
-                    (SendOneshotParameters<'a, I::OtherVersion, S, D>, &'a mut DualStackSC),
+                    (SendOneshotParameters<'a, I, I::OtherVersion, S, D>, &'a mut DualStackSC),
                 ),
                 // Allow `Operation` to be generic over `B` and `C` so that they can
                 // be used in trait bounds for `DualStackSC` and `SC`.
@@ -4367,6 +4452,7 @@ where
                                         remote_id: remote_identifier,
                                         device,
                                         options: ip_options.this_stack_options_ref(),
+                                        id,
                                     },
                                     core_ctx,
                                 )),
@@ -4395,6 +4481,7 @@ where
                                         remote_id: remote_identifier,
                                         device,
                                         options: ip_options.this_stack_options_ref(),
+                                        id,
                                     },
                                     core_ctx,
                                 )),
@@ -4428,6 +4515,7 @@ where
                                     remote_id: remote_identifier,
                                     device,
                                     options: ip_options.this_stack_options_ref(),
+                                    id,
                                 },
                                 core_ctx,
                             )),
@@ -4445,6 +4533,7 @@ where
                                     remote_id: remote_identifier,
                                     device,
                                     options: ip_options.this_stack_options_ref(),
+                                    id,
                                 },
                                 core_ctx,
                             )),
@@ -4465,6 +4554,7 @@ where
                                     remote_id: remote_identifier,
                                     device,
                                     options: ip_options.other_stack_options_ref(ds),
+                                    id,
                                 },
                                 ds,
                             )),
@@ -4482,6 +4572,7 @@ where
                                     remote_id: remote_identifier,
                                     device,
                                     options: ip_options.other_stack_options_ref(ds),
+                                    id,
                                 },
                                 ds,
                             )),
@@ -4525,6 +4616,7 @@ where
                                             remote_id: remote_identifier,
                                             device,
                                             options: ip_options.this_stack_options_ref(),
+                                            id,
                                         },
                                         core_ctx,
                                     )),
@@ -4556,6 +4648,7 @@ where
                                             remote_id: remote_identifier,
                                             device,
                                             options: ip_options.other_stack_options_ref(ds),
+                                            id,
                                         },
                                         ds,
                                     )),
@@ -4576,15 +4669,13 @@ where
             match operation {
                 Operation::SendToThisStack((params, core_ctx)) => {
                     DatagramBoundStateContext::with_transport_context(core_ctx, |core_ctx| {
-                        send_oneshot::<_, S, _, _, _>(core_ctx, bindings_ctx, params, body)
+                        send_oneshot(core_ctx, bindings_ctx, params, body)
                     })
                 }
                 Operation::SendToOtherStack((params, core_ctx)) => {
                     DualStackDatagramBoundStateContext::with_transport_context::<_, _>(
                         core_ctx,
-                        |core_ctx| {
-                            send_oneshot::<_, S, _, _, _>(core_ctx, bindings_ctx, params, body)
-                        },
+                        |core_ctx| send_oneshot(core_ctx, bindings_ctx, params, body),
                     )
                 }
             }
@@ -5146,6 +5237,22 @@ where
             options.socket_options.dscp_and_ecn
         })
     }
+
+    /// Sets the send buffer maximum size to `size`.
+    pub fn set_send_buffer(&mut self, id: &DatagramApiSocketId<I, C, S>, size: usize) {
+        id.borrow().send_buffer.set_capacity(size)
+    }
+
+    /// Returns the current maximum send buffer size.
+    pub fn send_buffer(&mut self, id: &DatagramApiSocketId<I, C, S>) -> usize {
+        id.borrow().send_buffer.capacity()
+    }
+
+    /// Returns the currently available send buffer space on the socket.
+    #[cfg(any(test, feature = "testutils"))]
+    pub fn send_buffer_available(&mut self, id: &DatagramApiSocketId<I, C, S>) -> usize {
+        id.borrow().send_buffer.available()
+    }
 }
 
 #[cfg(any(test, feature = "testutils"))]
@@ -5222,8 +5329,8 @@ mod test {
     };
     use netstack3_base::socketmap::SocketMap;
     use netstack3_base::testutil::{
-        FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,
-        MultipleDevicesId, TestIpExt,
+        FakeDeviceId, FakeReferencyDeviceId, FakeSocketWritableListener, FakeStrongDeviceId,
+        FakeWeakDeviceId, MultipleDevicesId, TestIpExt,
     };
     use netstack3_base::{ContextProvider, CtxPair, UninstantiableWrapper};
     use netstack3_ip::device::IpDeviceStateIpExt;
@@ -5339,6 +5446,9 @@ mod test {
         const NAME: &'static str = "FAKE";
         type AddrSpec = FakeAddrSpec;
         type SocketId<I: IpExt, D: WeakDeviceIdentifier> = Id<I, D>;
+        // NB: We don't have use for real weak IDs here since we only need to be
+        // able to make it upgrade.
+        type WeakSocketId<I: IpExt, D: WeakDeviceIdentifier> = Id<I, D>;
         type OtherStackIpOptions<I: IpExt, D: WeakDeviceIdentifier> =
             DatagramIpSpecificSocketOptions<I::OtherVersion, D>;
         type SocketMapSpec<I: IpExt, D: WeakDeviceIdentifier> = FakeSocketMapStateSpec<I, D>;
@@ -5349,6 +5459,7 @@ mod test {
         type ConnStateExtra = ();
         type ConnState<I: IpExt, D: WeakDeviceIdentifier> = I::DualStackConnState<D, Self>;
         type ExternalData<I: Ip> = ();
+        type SocketWritableListener = FakeSocketWritableListener;
 
         fn ip_proto<I: IpProtoExt>() -> I::Proto {
             I::map_ip((), |()| FAKE_DATAGRAM_IPV4_PROTOCOL, |()| FAKE_DATAGRAM_IPV6_PROTOCOL)
@@ -5363,6 +5474,7 @@ mod test {
 
         type Serializer<I: IpExt, B: BufferMut> = packet::Nested<B, ()>;
         type SerializeError = Never;
+        const FIXED_HEADER_SIZE: usize = 0;
         fn make_packet<I: IpExt, B: BufferMut>(
             body: B,
             _addr: &ConnIpAddr<
@@ -5412,6 +5524,18 @@ mod test {
                     .is_ok()
                     .then_some(identifier)
             })
+        }
+
+        fn upgrade_socket_id<I: IpExt, D: WeakDeviceIdentifier>(
+            id: &Self::WeakSocketId<I, D>,
+        ) -> Option<Self::SocketId<I, D>> {
+            Some(id.clone())
+        }
+
+        fn downgrade_socket_id<I: IpExt, D: WeakDeviceIdentifier>(
+            id: &Self::SocketId<I, D>,
+        ) -> Self::WeakSocketId<I, D> {
+            id.clone()
         }
     }
 
@@ -5961,7 +6085,7 @@ mod test {
         let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::<I, FakeDeviceId>::new());
         let mut api = ctx.datagram_api::<I>();
 
-        let unbound = api.create(());
+        let unbound = api.create_default();
         const EXPECTED_HOP_LIMITS: HopLimits = HopLimits {
             unicast: NonZeroU8::new(45).unwrap(),
             multicast: NonZeroU8::new(23).unwrap(),
@@ -5990,7 +6114,7 @@ mod test {
         ));
         let mut api = ctx.datagram_api::<I>();
 
-        let unbound = api.create(());
+        let unbound = api.create_default();
         api.set_device(&unbound, Some(&device)).unwrap();
 
         let HopLimits { mut unicast, multicast } = DEFAULT_HOP_LIMITS;
@@ -6012,7 +6136,7 @@ mod test {
     fn default_hop_limits<I: DatagramIpExt<FakeDeviceId>>() {
         let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::<I, FakeDeviceId>::new());
         let mut api = ctx.datagram_api::<I>();
-        let unbound = api.create(());
+        let unbound = api.create_default();
         assert_eq!(api.get_ip_hop_limits(&unbound), DEFAULT_HOP_LIMITS);
 
         api.update_ip_hop_limit(&unbound, |limits| {
@@ -6037,7 +6161,7 @@ mod test {
     fn bind_device_unbound<I: DatagramIpExt<FakeDeviceId>>() {
         let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::<I, FakeDeviceId>::new());
         let mut api = ctx.datagram_api::<I>();
-        let unbound = api.create(());
+        let unbound = api.create_default();
 
         api.set_device(&unbound, Some(&FakeDeviceId)).unwrap();
         assert_eq!(api.get_bound_device(&unbound), Some(FakeWeakDeviceId(FakeDeviceId)));
@@ -6057,7 +6181,7 @@ mod test {
                 }]),
             ));
         let mut api = ctx.datagram_api::<I>();
-        let socket = api.create(());
+        let socket = api.create_default();
         let body = Buf::new(Vec::new(), ..);
 
         api.send_to(&socket, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), 1234, body)
@@ -6075,7 +6199,7 @@ mod test {
             }]),
         ));
         let mut api = ctx.datagram_api::<I>();
-        let socket = api.create(());
+        let socket = api.create_default();
         let body = Buf::new(Vec::new(), ..);
 
         assert_matches!(
@@ -6175,7 +6299,7 @@ mod test {
             }]),
         ));
         let mut api = ctx.datagram_api::<I>();
-        let unbound = api.create(());
+        let unbound = api.create_default();
 
         assert!(!api.get_ip_transparent(&unbound));
 
@@ -6198,7 +6322,7 @@ mod test {
             }]),
         ));
         let mut api = ctx.datagram_api::<I>();
-        let socket = api.create(());
+        let socket = api.create_default();
         api.set_ip_transparent(&socket, true);
 
         const LOCAL_PORT: NonZeroU16 = NonZeroU16::new(10).unwrap();
@@ -6280,7 +6404,7 @@ mod test {
             },
         );
         let mut api = ctx.datagram_api::<I>();
-        let socket = api.create(());
+        let socket = api.create_default();
         const LOCAL_PORT: NonZeroU16 = NonZeroU16::new(10).unwrap();
         const ORIGINAL_REMOTE_PORT: u16 = 1234;
         const NEW_REMOTE_PORT: u16 = 5678;
@@ -6388,7 +6512,7 @@ mod test {
         let mut api = ctx.datagram_api::<Ipv6>();
 
         const REMOTE_PORT: u16 = 1234;
-        let socket = api.create(());
+        let socket = api.create_default();
         api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip)), REMOTE_PORT, Default::default())
             .expect("connect should succeed");
         assert_eq!(api.get_shutdown_connected(&socket), None);
@@ -6445,8 +6569,8 @@ mod test {
         const REMOTE_PORT: u16 = 1234;
 
         let mut api = ctx.datagram_api::<I>();
-        let socket1 = api.create(());
-        let socket2 = api.create(());
+        let socket1 = api.create_default();
+        let socket2 = api.create_default();
 
         // Initialize each socket to the `original` state, and verify that their
         // device can be set.

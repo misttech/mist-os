@@ -183,7 +183,7 @@ pub mod socket {
 
     pub use netstack3_base::socket::{
         AddrIsMappedError, NotDualStackCapableError, SetDualStackEnabledError, ShutdownType,
-        StrictlyZonedAddr,
+        SocketWritableListener, StrictlyZonedAddr,
     };
 }
 

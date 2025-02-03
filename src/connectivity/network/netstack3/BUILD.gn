@@ -133,6 +133,7 @@ common_sources = [
   "src/bindings/routes/witness.rs",
   "src/bindings/socket.rs",
   "src/bindings/socket/datagram.rs",
+  "src/bindings/socket/event_pair.rs",
   "src/bindings/socket/packet.rs",
   "src/bindings/socket/queue.rs",
   "src/bindings/socket/raw.rs",

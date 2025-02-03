@@ -111,6 +111,11 @@ impl<L: SocketWritableListener> SendBufferTracking<L> {
         self.inner.lock().capacity
     }
 
+    /// Returns the currently available buffer space.
+    pub fn available(&self) -> Option<PositiveIsize> {
+        PositiveIsize::new(self.available_bytes.load(Ordering::Relaxed))
+    }
+
     /// Updates the tracker's capacity to `new_capacity`.
     ///
     /// Note that upon changing the capacity the socket's writable state may
@@ -205,43 +210,57 @@ pub trait SocketWritableListener {
     fn on_writable_changed(&mut self, writable: bool);
 }
 
-#[cfg(test)]
-mod tests {
+#[cfg(any(test, feature = "testutils"))]
+pub(crate) mod testutil {
     use super::*;
 
-    use alloc::vec::Vec;
-
-    struct Listener {
+    /// A fake [`SocketWritableListener`] implementation.
+    #[derive(Debug)]
+    pub struct FakeSocketWritableListener {
         writable: bool,
     }
 
-    impl Default for Listener {
+    impl FakeSocketWritableListener {
+        /// Returns whether the listener has observed a writable state.
+        pub fn is_writable(&self) -> bool {
+            self.writable
+        }
+    }
+
+    impl Default for FakeSocketWritableListener {
         fn default() -> Self {
             Self { writable: true }
         }
     }
 
-    impl SocketWritableListener for Listener {
+    impl SocketWritableListener for FakeSocketWritableListener {
         fn on_writable_changed(&mut self, writable: bool) {
-            let old = core::mem::replace(&mut self.writable, writable);
-            assert_ne!(old, writable);
+            assert_ne!(core::mem::replace(&mut self.writable, writable), writable);
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use testutil::FakeSocketWritableListener;
+
+    use alloc::vec::Vec;
 
     const SNDBUF: PositiveIsize = PositiveIsize::new(4).unwrap();
     const HALF_SNDBUF: PositiveIsize = PositiveIsize::new(SNDBUF.get() / 2).unwrap();
     const TWO_SNDBUF: PositiveIsize = PositiveIsize::new(SNDBUF.get() * 2).unwrap();
     const ONE: PositiveIsize = PositiveIsize::new(1).unwrap();
 
-    impl SendBufferTracking<Listener> {
+    impl SendBufferTracking<FakeSocketWritableListener> {
         fn listener_writable(&self) -> bool {
-            self.inner.lock().listener.writable
+            self.inner.lock().listener.is_writable()
         }
     }
 
     #[test]
     fn acquire_all_buffer() {
-        let tracking = SendBufferTracking::new(SNDBUF, Listener::default());
+        let tracking = SendBufferTracking::new(SNDBUF, FakeSocketWritableListener::default());
         let acquired = tracking.acquire(SNDBUF).expect("acquire");
         assert_eq!(tracking.available_bytes.load(Ordering::SeqCst), 0);
         assert_eq!(tracking.listener_writable(), false);
@@ -253,7 +272,7 @@ mod tests {
 
     #[test]
     fn acquire_half_buffer() {
-        let tracking = SendBufferTracking::new(SNDBUF, Listener::default());
+        let tracking = SendBufferTracking::new(SNDBUF, FakeSocketWritableListener::default());
         let acquired = tracking.acquire(HALF_SNDBUF).expect("acquire");
         assert_eq!(
             tracking.available_bytes.load(Ordering::SeqCst),
@@ -267,7 +286,7 @@ mod tests {
 
     #[test]
     fn acquire_multiple() {
-        let tracking = SendBufferTracking::new(SNDBUF, Listener::default());
+        let tracking = SendBufferTracking::new(SNDBUF, FakeSocketWritableListener::default());
         let tokens = (0..SNDBUF.get())
             .map(|_| {
                 assert_eq!(tracking.listener_writable(), true);
@@ -289,7 +308,7 @@ mod tests {
 
     #[test]
     fn overcommit_single_buffer() {
-        let tracking = SendBufferTracking::new(SNDBUF, Listener::default());
+        let tracking = SendBufferTracking::new(SNDBUF, FakeSocketWritableListener::default());
         let acquired = tracking.acquire(TWO_SNDBUF).expect("acquire");
         assert_eq!(tracking.listener_writable(), false);
         assert_eq!(
@@ -305,7 +324,7 @@ mod tests {
 
     #[test]
     fn overcommit_two_buffers() {
-        let tracking = SendBufferTracking::new(SNDBUF, Listener::default());
+        let tracking = SendBufferTracking::new(SNDBUF, FakeSocketWritableListener::default());
         let acquired1 = tracking.acquire(ONE).expect("acquire");
         assert_eq!(tracking.listener_writable(), true);
         assert_eq!(tracking.available_bytes.load(Ordering::SeqCst), SNDBUF.get() - 1);
@@ -326,7 +345,7 @@ mod tests {
 
     #[test]
     fn capacity_increase_makes_writable() {
-        let tracking = SendBufferTracking::new(SNDBUF, Listener::default());
+        let tracking = SendBufferTracking::new(SNDBUF, FakeSocketWritableListener::default());
         assert_eq!(tracking.capacity(), SNDBUF);
         let acquired = tracking.acquire(SNDBUF).expect("acquire");
         assert_eq!(tracking.listener_writable(), false);
@@ -343,7 +362,7 @@ mod tests {
 
     #[test]
     fn capacity_decrease_makes_non_writable() {
-        let tracking = SendBufferTracking::new(SNDBUF, Listener::default());
+        let tracking = SendBufferTracking::new(SNDBUF, FakeSocketWritableListener::default());
         assert_eq!(tracking.capacity(), SNDBUF);
         let acquired = tracking.acquire(HALF_SNDBUF).expect("acquire");
         assert_eq!(tracking.listener_writable(), true);

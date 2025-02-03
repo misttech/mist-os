@@ -22,12 +22,13 @@ use netstack3_base::socket::{
     self, AddrIsMappedError, AddrVec, AddrVecIter, ConnAddr, ConnInfoAddr, ConnIpAddr,
     IncompatibleError, InsertError, ListenerAddrInfo, MaybeDualStack, ShutdownType, SocketIpAddr,
     SocketMapAddrSpec, SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
+    SocketWritableListener,
 };
 use netstack3_base::socketmap::{IterShadows as _, SocketMap};
 use netstack3_base::sync::{RwLock, StrongRc};
 use netstack3_base::{
-    AnyDevice, ContextPair, CounterContext, DeviceIdContext, IcmpIpExt, Inspector,
-    InspectorDeviceExt, LocalAddressError, PortAllocImpl, ReferenceNotifiers,
+    AnyDevice, ContextPair, CoreTxMetadataContext, CounterContext, DeviceIdContext, IcmpIpExt,
+    Inspector, InspectorDeviceExt, LocalAddressError, PortAllocImpl, ReferenceNotifiers,
     RemoveResourceResultWithContext, RngContext, SocketError, StrongDeviceIdentifier,
     UninstantiableWrapper, WeakDeviceIdentifier,
 };
@@ -210,6 +211,8 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes> WeakIcmpSocke
 pub type IcmpSocketSet<I, D, BT> = DatagramSocketSet<I, D, Icmp<BT>>;
 /// The state of an ICMP socket.
 pub type IcmpSocketState<I, D, BT> = datagram::SocketState<I, D, Icmp<BT>>;
+/// The tx metadata for an ICMP echo socket.
+pub type IcmpSocketTxMetadata<I, D, BT> = datagram::TxMetadata<I, D, Icmp<BT>>;
 
 /// The context required by the ICMP layer in order to deliver events related to
 /// ICMP sockets.
@@ -243,6 +246,8 @@ pub trait IcmpEchoBindingsContext<I: IpExt, D: StrongDeviceIdentifier>:
 pub trait IcmpEchoBindingsTypes: DatagramBindingsTypes + Sized + 'static {
     /// Opaque bindings data held by core for a given IP version.
     type ExternalData<I: Ip>: Debug + Send + Sync + 'static;
+    /// The listener notified when sockets' writable state changes.
+    type SocketWritableListener: SocketWritableListener + Debug + Send + Sync + 'static;
 }
 
 /// Resolve coherence issues by requiring a trait implementation with no type
@@ -258,7 +263,8 @@ pub trait IcmpEchoBoundStateContext<I: IcmpIpExt + IpExt, BC: IcmpEchoBindingsTy
     type IpSocketsCtx<'a>: TransportIpContext<I, BC>
         + MulticastMembershipHandler<I, BC>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
-        + CounterContext<IcmpRxCounters<I>>;
+        + CounterContext<IcmpRxCounters<I>>
+        + CoreTxMetadataContext<IcmpSocketTxMetadata<I, Self::WeakDeviceId, BC>, BC>;
 
     /// Calls the function with a mutable reference to `IpSocketsCtx` and
     /// a mutable reference to ICMP sockets.
@@ -341,6 +347,7 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
     type AddrSpec = IcmpAddrSpec;
 
     type SocketId<I: datagram::IpExt, D: WeakDeviceIdentifier> = IcmpSocketId<I, D, BT>;
+    type WeakSocketId<I: datagram::IpExt, D: WeakDeviceIdentifier> = WeakIcmpSocketId<I, D, BT>;
 
     type OtherStackIpOptions<I: datagram::IpExt, D: WeakDeviceIdentifier> = ();
 
@@ -368,6 +375,12 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
     type SerializeError = packet_formats::error::ParseError;
 
     type ExternalData<I: Ip> = BT::ExternalData<I>;
+    type SocketWritableListener = BT::SocketWritableListener;
+
+    // NB: `make_packet` does not add any extra bytes because applications send
+    // the ICMP header alongside the message which gets parsed and then rebuilt.
+    // That means we incur 0 extra cost here.
+    const FIXED_HEADER_SIZE: usize = 0;
 
     fn make_packet<I: datagram::IpExt, B: BufferMut>(
         mut body: B,
@@ -444,6 +457,18 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
         let mut rng = bindings_ctx.rng();
         netstack3_base::simple_randomized_port_alloc(&mut rng, &flow, &IcmpPortAlloc(bound), &())
             .map(|p| NonZeroU16::new(p).expect("ephemeral ports should be non-zero"))
+    }
+
+    fn upgrade_socket_id<I: datagram::IpExt, D: WeakDeviceIdentifier>(
+        id: &Self::WeakSocketId<I, D>,
+    ) -> Option<Self::SocketId<I, D>> {
+        id.upgrade()
+    }
+
+    fn downgrade_socket_id<I: datagram::IpExt, D: WeakDeviceIdentifier>(
+        id: &Self::SocketId<I, D>,
+    ) -> Self::WeakSocketId<I, D> {
+        IcmpSocketId::downgrade(id)
     }
 }
 
@@ -761,16 +786,18 @@ where
     pub fn create(&mut self) -> IcmpApiSocketId<I, C>
     where
         <C::BindingsContext as IcmpEchoBindingsTypes>::ExternalData<I>: Default,
+        <C::BindingsContext as IcmpEchoBindingsTypes>::SocketWritableListener: Default,
     {
-        self.create_with(Default::default())
+        self.create_with(Default::default(), Default::default())
     }
 
     /// Creates a new unbound ICMP socket with provided external data.
     pub fn create_with(
         &mut self,
         external_data: <C::BindingsContext as IcmpEchoBindingsTypes>::ExternalData<I>,
+        writable_listener: <C::BindingsContext as IcmpEchoBindingsTypes>::SocketWritableListener,
     ) -> IcmpApiSocketId<I, C> {
-        self.datagram().create(external_data)
+        self.datagram().create(external_data, writable_listener)
     }
 
     /// Connects an ICMP socket to remote IP.
@@ -917,6 +944,16 @@ where
     /// Gets the socket mark for the socket domain.
     pub fn get_mark(&mut self, id: &IcmpApiSocketId<I, C>, domain: MarkDomain) -> Mark {
         self.datagram().get_mark(id, domain)
+    }
+
+    /// Sets the send buffer maximum size to `size`.
+    pub fn set_send_buffer(&mut self, id: &IcmpApiSocketId<I, C>, size: usize) {
+        self.datagram().set_send_buffer(id, size)
+    }
+
+    /// Returns the current maximum send buffer size.
+    pub fn send_buffer(&mut self, id: &IcmpApiSocketId<I, C>) -> usize {
+        self.datagram().send_buffer(id)
     }
 
     /// Sends an ICMP packet through a connection.
@@ -1168,7 +1205,8 @@ mod tests {
     use net_types::Witness;
     use netstack3_base::socket::StrictlyZonedAddr;
     use netstack3_base::testutil::{
-        FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeWeakDeviceId, TestIpExt,
+        FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeSocketWritableListener, FakeWeakDeviceId,
+        TestIpExt,
     };
     use netstack3_base::CtxPair;
     use netstack3_ip::socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx, InnerFakeIpSocketCtx};
@@ -1373,6 +1411,7 @@ mod tests {
 
     impl<I: IpExt> IcmpEchoBindingsTypes for FakeIcmpBindingsCtx<I> {
         type ExternalData<II: Ip> = ();
+        type SocketWritableListener = FakeSocketWritableListener;
     }
 
     #[test]

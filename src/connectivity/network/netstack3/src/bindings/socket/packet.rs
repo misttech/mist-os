@@ -44,7 +44,7 @@ use crate::bindings::{BindingsCtx, Ctx};
 #[derive(Debug)]
 pub(crate) struct SocketState {
     /// The received messages for the socket.
-    queue: Mutex<MessageQueue<Message>>,
+    queue: Mutex<MessageQueue<Message, zx::EventPair>>,
     kind: fppacket::Kind,
     bpf_filter: RwLock<Option<SocketFilterProgram>>,
 }

@@ -252,6 +252,19 @@ pub trait TxMetadataBindingsTypes {
     type TxMetadata: Default + Debug + Send + Sync + 'static;
 }
 
+/// A core context providing tx metadata type conversion.
+///
+/// This trait is used to convert from a core-internal tx metadata type `T` to
+/// the metadata supported by bindings in `BT::TxMetadata`.
+pub trait CoreTxMetadataContext<T, BT: TxMetadataBindingsTypes> {
+    /// Converts the tx metadata `T` into the type set by bindings.
+    ///
+    /// Note that this method takes a `self` receiver so it's easily
+    /// implementable with uninstantiable types. The conversion is expected to
+    /// be stateless otherwise in all implementers.
+    fn convert_tx_meta(&self, tx_meta: T) -> BT::TxMetadata;
+}
+
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
     use super::*;

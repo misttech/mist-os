@@ -52,8 +52,9 @@ pub use error::{
 };
 pub use event::{CoreEventContext, EventContext};
 pub use frame::{
-    FrameDestination, ReceivableFrameMeta, RecvFrameContext, RecvIpFrameMeta, SendFrameContext,
-    SendFrameError, SendFrameErrorReason, SendableFrameMeta, TxMetadataBindingsTypes,
+    CoreTxMetadataContext, FrameDestination, ReceivableFrameMeta, RecvFrameContext,
+    RecvIpFrameMeta, SendFrameContext, SendFrameError, SendFrameErrorReason, SendableFrameMeta,
+    TxMetadataBindingsTypes,
 };
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
 pub use ip::{
@@ -92,7 +93,7 @@ pub mod ref_counted_hash_map {
 pub mod socket {
     mod address;
     mod base;
-    mod sndbuf;
+    pub(crate) mod sndbuf;
 
     pub use address::{
         AddrIsMappedError, AddrVecIter, ConnAddr, ConnInfoAddr, ConnIpAddr, DualStackConnIpAddr,
@@ -154,6 +155,7 @@ pub mod testutil {
     pub use crate::event::testutil::FakeEventCtx;
     pub use crate::frame::testutil::{FakeFrameCtx, FakeTxMetadata, WithFakeFrameContext};
     pub use crate::rng::testutil::{new_rng, run_with_many_seeds, FakeCryptoRng};
+    pub use crate::socket::sndbuf::testutil::FakeSocketWritableListener;
     pub use crate::time::testutil::{
         FakeAtomicInstant, FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, FakeTimerId,
         InstantAndData, WithFakeTimerContext,

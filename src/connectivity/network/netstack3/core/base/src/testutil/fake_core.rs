@@ -10,8 +10,11 @@ use core::marker::PhantomData;
 use derivative::Derivative;
 use packet::{BufferMut, Serializer};
 
-use crate::testutil::{FakeFrameCtx, WithFakeFrameContext};
-use crate::{ContextProvider, CounterContext, SendFrameError, SendableFrameMeta};
+use crate::testutil::{FakeFrameCtx, FakeTxMetadata, WithFakeFrameContext};
+use crate::{
+    ContextProvider, CoreTxMetadataContext, CounterContext, SendFrameError, SendableFrameMeta,
+    TxMetadataBindingsTypes,
+};
 
 /// A test helper used to provide an implementation of a core context.
 #[derive(Derivative)]
@@ -82,5 +85,14 @@ impl<S, Meta, DeviceId> FakeCoreCtx<S, Meta, DeviceId> {
 impl<S, Meta, DeviceId> WithFakeFrameContext<Meta> for FakeCoreCtx<S, Meta, DeviceId> {
     fn with_fake_frame_ctx_mut<O, F: FnOnce(&mut FakeFrameCtx<Meta>) -> O>(&mut self, f: F) -> O {
         f(&mut self.frames)
+    }
+}
+
+impl<T, S, Meta, DeviceId, BT> CoreTxMetadataContext<T, BT> for FakeCoreCtx<S, Meta, DeviceId>
+where
+    BT: TxMetadataBindingsTypes<TxMetadata = FakeTxMetadata>,
+{
+    fn convert_tx_meta(&self, _tx_meta: T) -> FakeTxMetadata {
+        FakeTxMetadata
     }
 }

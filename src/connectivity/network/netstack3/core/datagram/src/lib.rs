@@ -15,6 +15,7 @@ extern crate fakealloc as alloc;
 #[path = "."]
 mod internal {
     pub(super) mod datagram;
+    pub(super) mod sndbuf;
     pub(super) mod spec_context;
     pub(super) mod uninstantiable;
 }
@@ -31,6 +32,7 @@ pub use internal::datagram::{
     SetMulticastMembershipError, SocketInfo, SocketState, StrongRc, WeakRc,
     WrapOtherStackIpOptions, WrapOtherStackIpOptionsMut,
 };
+pub use internal::sndbuf::TxMetadata;
 pub use internal::spec_context::{
     DatagramSpecBoundStateContext, DatagramSpecStateContext,
     DualStackDatagramSpecBoundStateContext, NonDualStackDatagramSpecBoundStateContext,

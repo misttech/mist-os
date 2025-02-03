@@ -63,7 +63,7 @@ impl<I: IpExt> RawIpSocketsBindingsContext<I, DeviceId> for BindingsCtx {
 #[derive(Debug)]
 pub struct SocketState<I: Ip> {
     /// The received IP packets for the socket.
-    rx_queue: Mutex<MessageQueue<ReceivedIpPacket<I>>>,
+    rx_queue: Mutex<MessageQueue<ReceivedIpPacket<I>, zx::EventPair>>,
 }
 
 impl<I: IpExt> SocketState<I> {

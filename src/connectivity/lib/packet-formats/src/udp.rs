@@ -29,7 +29,8 @@ use crate::error::{ParseError, ParseResult};
 use crate::ip::IpProto;
 use crate::{compute_transport_checksum_parts, compute_transport_checksum_serialize};
 
-pub(crate) const HEADER_BYTES: usize = 8;
+/// The size of a UDP header in bytes.
+pub const HEADER_BYTES: usize = 8;
 const CHECKSUM_OFFSET: usize = 6;
 const CHECKSUM_RANGE: Range<usize> = CHECKSUM_OFFSET..CHECKSUM_OFFSET + 2;
 

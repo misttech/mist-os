@@ -14,6 +14,7 @@ rustc_library_with_features("netstack3-datagram") {
   sources = [
     "src/datagram.rs",
     "src/lib.rs",
+    "src/sndbuf.rs",
     "src/spec_context.rs",
     "src/uninstantiable.rs",
   ]

@@ -8,6 +8,7 @@ use std::num::{NonZeroU16, NonZeroU64};
 use std::ops::RangeInclusive;
 use std::os::fd::AsFd;
 use std::pin::pin;
+use std::task::Poll;
 
 use anyhow::{anyhow, Context as _};
 use assert_matches::assert_matches;
@@ -4956,4 +4957,69 @@ async fn raw_socket_mark(
     let proxy = fposix_socket::BaseSocketProxy::new(fidl::AsyncChannel::from_channel(channel));
     proxy.set_mark(mark_domain, &mark).await.expect("fidl error").expect("set mark");
     assert_eq!(proxy.get_mark(mark_domain).await.expect("fidl error").expect("get mark"), mark);
+}
+
+#[netstack_test]
+#[variant(N, Netstack)]
+async fn udp_send_backpressure<N: Netstack>(name: &str) {
+    const CLIENT_ADDR: fnet::Subnet = fidl_subnet!("192.0.2.1/24");
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm = sandbox
+        .create_netstack_realm::<N, _>(format!("{name}_client"))
+        .expect("failed to create client realm");
+
+    let (tun_device, _device) = devices::create_tun_device_with(fnet_tun::DeviceConfig {
+        blocking: Some(true),
+        ..Default::default()
+    });
+    let (port, client_port) =
+        devices::create_ip_tun_port(&tun_device, devices::TUN_DEFAULT_PORT_ID).await;
+    port.set_online(true).await.expect("set port online");
+    let (_id, _interface_control, _device_control) =
+        install_ip_device(&realm, client_port, [CLIENT_ADDR]).await;
+
+    let socket = realm
+        .datagram_socket(fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::Udp)
+        .await
+        .expect("failed to create socket");
+    // Set the send buffer size to the minimum possible.
+    socket.set_send_buffer_size(0).expect("setting send buffer size");
+    // Create an async nonblock socket.
+    let socket = DatagramSocket::new_from_socket(socket).expect("creating async socket");
+    const PAYLOAD: &[u8] = b"Hello";
+
+    let server_addr = std_socket_addr!("192.0.2.2:8080");
+
+    // Write into the socket until we observe EWOULDBLOCK, i.e., the send future
+    // doesn't resolve immediately.
+    let mut sent = 0;
+    while let Some(r) = socket.send_to(PAYLOAD, server_addr.into()).now_or_never() {
+        assert_matches!(r, Ok(_));
+        sent += 1;
+    }
+    // At least one frame must've been sent.
+    assert_ne!(sent, 0);
+
+    // Create a new future that should unblock only when we read frames.
+    let mut fut = socket.send_to(PAYLOAD, server_addr.into());
+    assert_matches!(futures::poll!(&mut fut), Poll::Pending);
+
+    // Wait for all sent frames to show up in the device queue.
+    while sent != 0 {
+        let fnet_tun::Frame { data, frame_type, .. } =
+            tun_device.read_frame().await.expect("got frame").expect("reading frame");
+        let data = data.expect("missing data");
+        let frame_type = frame_type.expect("missing frame type");
+        if frame_type != fhardware_network::FrameType::Ipv4 {
+            continue;
+        }
+        let mut body = &data[..];
+        let ipv4 = Ipv4Packet::parse(&mut body, ()).expect("failed to parse IPv4 packet");
+        if ipv4.proto() == IpProto::Udp.into() {
+            sent -= 1;
+        }
+    }
+    // Future should unblock now that we've allowed the frames to be popped from
+    // the device FIFO.
+    assert_eq!(fut.await.expect("send_to error"), PAYLOAD.len());
 }

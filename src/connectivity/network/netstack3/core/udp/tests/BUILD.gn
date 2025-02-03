@@ -11,15 +11,18 @@ rustc_test("netstack3_udp_integration_test") {
     "src/bindtodevice.rs",
     "src/lib.rs",
     "src/loopback.rs",
+    "src/sndbuf.rs",
   ]
 
   deps = [
     "//src/connectivity/lib/ip-test-macro",
+    "//src/connectivity/lib/net-declare",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/network/netstack3/core:netstack3-core-testutils",
     "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
     "//src/connectivity/network/netstack3/core/macros:netstack3-macros",
     "//src/lib/network/packet",
+    "//src/lib/test_util",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:either",
     "//third_party/rust_crates:test-case",

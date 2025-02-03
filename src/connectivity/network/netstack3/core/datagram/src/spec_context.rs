@@ -12,7 +12,7 @@
 //! * The boilerplate around the mirror traits is mostly out of the way.
 
 use netstack3_base::socket::MaybeDualStack;
-use netstack3_base::{AnyDevice, DeviceIdContext};
+use netstack3_base::{AnyDevice, CoreTxMetadataContext, DeviceIdContext};
 use netstack3_ip::{MulticastMembershipHandler, TransportIpContext};
 
 use crate::internal::datagram::{
@@ -21,6 +21,7 @@ use crate::internal::datagram::{
     DatagramStateContext, DualStackConverter, DualStackDatagramBoundStateContext, DualStackIpExt,
     IpExt, IpOptions, NonDualStackConverter, NonDualStackDatagramBoundStateContext, SocketState,
 };
+use crate::internal::sndbuf::TxMetadata;
 
 /// A mirror trait of [`DatagramStateContext`] allowing foreign crates to
 /// provide blanket impls for it.
@@ -155,6 +156,7 @@ pub trait DatagramSpecBoundStateContext<
 >: DatagramSocketSpec
 {
     type IpSocketsCtx<'a>: TransportIpContext<I, BC>
+        + CoreTxMetadataContext<TxMetadata<I, CC::WeakDeviceId, Self>, BC>
         + MulticastMembershipHandler<I, BC>
         + DeviceIdContext<AnyDevice, DeviceId = CC::DeviceId, WeakDeviceId = CC::WeakDeviceId>;
 
@@ -262,8 +264,10 @@ pub trait DualStackDatagramSpecBoundStateContext<
 >: DatagramSocketSpec
 {
     type IpSocketsCtx<'a>: TransportIpContext<I, BC>
+        + CoreTxMetadataContext<TxMetadata<I, CC::WeakDeviceId, Self>, BC>
         + DeviceIdContext<AnyDevice, DeviceId = CC::DeviceId, WeakDeviceId = CC::WeakDeviceId>
-        + TransportIpContext<I::OtherVersion, BC>;
+        + TransportIpContext<I::OtherVersion, BC>
+        + CoreTxMetadataContext<TxMetadata<I::OtherVersion, CC::WeakDeviceId, Self>, BC>;
 
     fn dual_stack_enabled(
         core_ctx: &CC,
