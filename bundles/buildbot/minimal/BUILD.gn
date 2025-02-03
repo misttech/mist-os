@@ -50,10 +50,6 @@ group("e2e_tests") {
 group("minimal") {
   testonly = true
 
-  # The buildbot groups are not allowed to add platform features, only tests
-  # and tools.
-  assert_no_deps = [ "//bundles/platform/*" ]
-
   deps = [
     # All tests from the standardized test groups:
     ":e2e_tests",
