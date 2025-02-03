@@ -11,7 +11,6 @@ use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use futures::lock::Mutex;
 use futures::prelude::*;
 use futures::TryStreamExt;
-use log::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 use zx::AsHandleRef;
@@ -93,7 +92,7 @@ impl ShutdownWatcher {
             "watcher" => watcher.as_channel().raw_handle()
         );
 
-        info!("Adding a deprecated reboot watcher");
+        println!("[shutdown-shim] Adding a deprecated reboot watcher");
         // If the client closes the watcher channel, remove it from our `reboot_watchers` map and
         // notify all clients
         let key = watcher.as_channel().raw_handle();
@@ -119,7 +118,7 @@ impl ShutdownWatcher {
         );
 
         // If the client closes the watcher channel, remove it from our `reboot_watchers` map
-        info!("Adding a reboot watcher");
+        println!("[shutdown-shim] Adding a reboot watcher");
         let key = watcher.as_channel().raw_handle();
         let proxy = watcher.clone();
         let reboot_watchers = self.reboot_watchers.clone();
@@ -157,7 +156,10 @@ impl ShutdownWatcher {
         let watcher_futures = {
             // Take the current watchers out of the RefCell because we'll be modifying the vector
             let watchers = self.reboot_watchers.lock().await;
-            info!("Notifying {:?} watchers of reboot notification", watchers.len());
+            println!(
+                "[shutdown-shim] Notifying {:?} watchers of reboot notification",
+                watchers.len()
+            );
             watchers.clone().into_iter().map(|(key, watcher_proxy)| {
                 let reasons = reasons.clone();
                 async move {

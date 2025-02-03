@@ -25,7 +25,6 @@ use fuchsia_async::OnSignals;
 use fuchsia_inspect::NumericProperty;
 use fuchsia_sync::Mutex;
 use futures::{StreamExt, TryStreamExt};
-use log::{error, info};
 use std::sync::Arc;
 
 /// The signals that can be used to cancel a scheduled collaborative reboot.
@@ -79,9 +78,9 @@ impl State {
                     {
                         let mut scheduled_requests = self.scheduled_requests.lock();
                         scheduled_requests.schedule(reason);
-                        info!(
-                            "Collaborative reboot scheduled for reason: {reason:?}. \
-                            Current scheduled requests: {scheduled_requests}"
+                        println!(
+                            "[shutdown-shim] Collaborative reboot scheduled for reason: \
+                            {reason:?}. Current scheduled requests: {scheduled_requests}"
                         );
                     }
                     if let Some(cancel) = cancel {
@@ -89,16 +88,16 @@ impl State {
                             .unbounded_send(Cancel { signal: cancel, reason })
                             .expect("receiver should not close");
                     }
-                    println!("about to respond");
                     match responder.send() {
                         Ok(()) => {}
                         Err(e) => {
-                            error!("Failed to respond to 'ScheduleReboot': {e:?}");
+                            eprintln!(
+                                "[shutdown-shim] Failed to respond to 'ScheduleReboot': {e:?}"
+                            );
                             // Returning closes the connection.
                             return;
                         }
                     }
-                    println!("responded");
                 }
             }
         }
@@ -115,8 +114,8 @@ impl State {
                 InitiatorRequest::PerformPendingReboot { responder } => {
                     let reboot_reasons = {
                         let scheduled_requests = self.scheduled_requests.lock();
-                        info!(
-                            "Asked to perform collaborative reboot. \
+                        println!(
+                            "[shutdown-shim] Asked to perform collaborative reboot. \
                             Current scheduled requests: {scheduled_requests}"
                         );
                         scheduled_requests.list_reasons()
@@ -125,11 +124,11 @@ impl State {
                     let rebooting = !reboot_reasons.is_empty();
 
                     if rebooting {
-                        info!("Performing collaborative reboot ...");
+                        println!("[shutdown-shim] Performing collaborative reboot ...");
                         match actuator.perform_reboot(reboot_reasons).await {
                             Ok(()) => {}
                             Err(status) => {
-                                error!("Failed to perform reboot: {status:?}");
+                                eprintln!("[shutdown-shim] Failed to perform reboot: {status:?}");
                                 // Returning closes the connection.
                                 return;
                             }
@@ -142,7 +141,9 @@ impl State {
                     }) {
                         Ok(()) => {}
                         Err(e) => {
-                            error!("Failed to respond to 'PerformPendingReboot': {e:?}");
+                            eprintln!(
+                                "[shutdown-shim] Failed to respond to 'PerformPendingReboot': {e:?}"
+                            );
                             // Returning closes the connection.
                             return;
                         }
@@ -187,9 +188,9 @@ impl Cancellations {
                     {
                         let mut scheduled_requests = scheduled_requests.lock();
                         scheduled_requests.cancel(reason);
-                        info!(
-                            "Collaborative reboot canceled for reason: {reason:?}. \
-                        Current scheduled requests: {scheduled_requests}"
+                        println!(
+                            "[shutdown-shim] Collaborative reboot canceled for reason: {reason:?}. \
+                            Current scheduled requests: {scheduled_requests}"
                         );
                     }
                 }
