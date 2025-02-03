@@ -284,6 +284,24 @@ def main(argv: Sequence[str]):
         default=False,
         action="store_true",
     )
+    parser.add_argument(
+        "--self-test-filter",
+        required=False,
+        help="""If provided will run a self-test on the files that match the filter.
+
+        The self-test will attempt to compile the file given the set of arguments
+        in the compile commands. This check can be very slow because it needs to
+        compile every file that matches the filter. It is directly invoking clang
+        do it does not benefit from the cached results. This flag should only be
+        used for debugging.
+
+        When used in conjunction with --verbose, the command will print out the
+        clang errors.
+
+        The filter will perform a re.search on the file.
+        """,
+        default=None,
+    )
     args = parser.parse_args(argv)
     init_logger(args)
 
@@ -345,6 +363,42 @@ def main(argv: Sequence[str]):
         "w",
     ) as f:
         json.dump(list(compile_commands_dict.values()), f, indent=2)
+
+    if args.self_test_filter:
+        commands_to_check = [
+            c
+            for c in compile_commands
+            if re.search(args.self_test_filter, c["file"])
+        ]
+        info("CHECKING {} commands".format(len(commands_to_check)))
+        info(
+            "SKIPPING {} commands".format(
+                len(compile_commands) - len(commands_to_check)
+            )
+        )
+        num_failures = 0
+
+        for command in commands_to_check:
+            if "arguments" in command:
+                clang_args = command["arguments"]
+            else:
+                clang_args = command["command"].split()
+
+            try:
+                subprocess.check_output(
+                    clang_args,
+                    text=True,
+                    cwd=command["directory"],
+                    stderr=None if args.verbose else subprocess.DEVNULL,
+                )
+            except subprocess.CalledProcessError:
+                num_failures += 1
+
+        if num_failures > 0:
+            info(f"SELF TEST RESULTS: {num_failures} FAILURES")
+            sys.exit(1)
+        else:
+            info("SELF TEST PASSED WITH NO FAILURES")
 
 
 if __name__ == "__main__":
