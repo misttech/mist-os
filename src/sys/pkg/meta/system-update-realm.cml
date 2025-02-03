@@ -16,7 +16,7 @@
         {
             config: "fuchsia.system-update-committer.StopOnIdleTimeoutMillis",
             type: "int64",
-            value: -1,
+            value: 5000,
         },
     ],
     offer: [
