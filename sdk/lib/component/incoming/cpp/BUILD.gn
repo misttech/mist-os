@@ -13,6 +13,7 @@ sdk_source_set("cpp") {
   sources = [
     "clone.h",
     "constants.h",
+    "directory.h",
     "internal.cc",
     "internal.h",
     "protocol.cc",

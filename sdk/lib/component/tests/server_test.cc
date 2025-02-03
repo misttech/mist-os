@@ -6,6 +6,7 @@
 #include <fidl/fidl.service.test/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/component/outgoing/cpp/handlers.h>
@@ -13,8 +14,6 @@
 #include <lib/fdio/directory.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/channel.h>
-
-#include <iostream>
 
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
@@ -69,7 +68,7 @@ class ServerTest : public zxtest::Test {
 };
 
 TEST_F(ServerTest, ConnectsToDefaultMember) {
-  auto svc_local = component::ConnectAt<fuchsia_io::Directory>(local_root_, "svc");
+  auto svc_local = component::OpenDirectoryAt(local_root_, "svc");
   ASSERT_OK(svc_local.status_value());
 
   // Connect to the `EchoService` at the 'default' instance.
@@ -97,7 +96,7 @@ TEST_F(ServerTest, ConnectsToDefaultMember) {
 }
 
 TEST_F(ServerTest, ConnectsToOtherMember) {
-  auto svc_local = component::ConnectAt<fuchsia_io::Directory>(local_root_, "svc");
+  auto svc_local = component::OpenDirectoryAt(local_root_, "svc");
   ASSERT_OK(svc_local.status_value());
 
   // Connect to the `EchoService` at the 'default' instance.

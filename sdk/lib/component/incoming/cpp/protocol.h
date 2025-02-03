@@ -42,6 +42,9 @@ zx::result<fidl::ClientEnd<fuchsia_io::Directory>> OpenServiceRoot(
 //
 //   * `ZX_ERR_INVALID_ARGS`: `path` is too long.
 //   * `ZX_ERR_NOT_FOUND`: A prefix of `path` cannot be found in the namespace.
+// TODO(https://fxbug.dev/324111518): Disallow using this function to open fuchsia.io protocols.
+// Unlike protocol connectors, opening files/directories requires rights to be specified explicitly.
+// Existing callers can use component::OpenDirectory instead.
 template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
 zx::result<> Connect(fidl::ServerEnd<Protocol> server_end,
                      std::string_view path = fidl::DiscoverableProtocolDefaultPath<Protocol>) {
@@ -61,6 +64,9 @@ zx::result<> Connect(fidl::ServerEnd<Protocol> server_end,
 //
 //   * `ZX_ERR_INVALID_ARGS`: `path` is too long.
 //   * `ZX_ERR_NOT_FOUND`: A prefix of `path` cannot be found in the namespace.
+// TODO(https://fxbug.dev/324111518): Disallow using this function to open fuchsia.io protocols.
+// Unlike protocol connectors, opening files/directories requires rights to be specified explicitly.
+// Existing callers can use component::OpenDirectory instead.
 template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
 zx::result<fidl::ClientEnd<Protocol>> Connect(
     std::string_view path = fidl::DiscoverableProtocolDefaultPath<Protocol>) {
@@ -88,6 +94,9 @@ zx::result<fidl::ClientEnd<Protocol>> Connect(
 // # Errors
 //
 //   * `ZX_ERR_INVALID_ARGS`: `name` is too long.
+// TODO(https://fxbug.dev/324111518): Disallow using this function to open fuchsia.io protocols.
+// Unlike protocol connectors, opening files/directories requires rights to be specified explicitly.
+// Existing callers can use component::OpenDirectoryAt instead.
 template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
 zx::result<> ConnectAt(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir,
                        fidl::ServerEnd<Protocol> server_end,
@@ -106,6 +115,9 @@ zx::result<> ConnectAt(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir,
 // # Errors
 //
 //   * `ZX_ERR_INVALID_ARGS`: `name` is too long.
+// TODO(https://fxbug.dev/324111518): Disallow using this function to open fuchsia.io protocols.
+// Unlike protocol connectors, opening files/directories requires rights to be specified explicitly.
+// Existing callers can use component::OpenDirectoryAt instead.
 template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
 zx::result<fidl::ClientEnd<Protocol>> ConnectAt(
     fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir,
