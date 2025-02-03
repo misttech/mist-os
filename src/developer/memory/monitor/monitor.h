@@ -98,7 +98,7 @@ class Monitor : public fuchsia::memory::inspection::Collector,
   trace::TraceObserver trace_observer_;
   memory_monitor_config::Config config_;
   inspect::ComponentInspector inspector_;
-  Logger logger_;
+  std::unique_ptr<Logger> logger_;
   std::unique_ptr<Metrics> metrics_;
   std::unique_ptr<memory::Digester> digester_;
   std::mutex digester_mutex_;

@@ -15,15 +15,19 @@ void Logger::SetPressureLevel(pressure_signaler::Level l) {
   switch (l) {
     case pressure_signaler::kImminentOOM:
       duration_ = zx::sec(config_->imminent_oom_capture_delay_s());
+      capture_high_water_ = true;
       break;
     case pressure_signaler::kCritical:
       duration_ = zx::sec(config_->critical_capture_delay_s());
+      capture_high_water_ = false;
       break;
     case pressure_signaler::kWarning:
       duration_ = zx::sec(config_->warning_capture_delay_s());
+      capture_high_water_ = false;
       break;
     case pressure_signaler::kNormal:
       duration_ = zx::sec(config_->normal_capture_delay_s());
+      capture_high_water_ = false;
       break;
     case pressure_signaler::kNumLevels:
       break;
@@ -53,6 +57,11 @@ void Logger::Log() {
   auto str = std::move(oss).str();
   std::ranges::replace(str, '\n', ' ');
   FX_LOGS(INFO) << str;
+
+  if (capture_high_water_) {
+    high_water_->RecordHighWater(c);
+    high_water_->RecordHighWaterDigest(d);
+  }
 
   task_.PostDelayed(dispatcher_, duration_);
 }

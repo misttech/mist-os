@@ -25,7 +25,7 @@ class HighWater {
   ~HighWater() = default;
 
   void RecordHighWater(const memory::Capture& capture);
-  void RecordHighWaterDigest(const memory::Capture& capture);
+  void RecordHighWaterDigest(const memory::Digest& digest);
   std::string GetHighWater();
   std::string GetPreviousHighWater();
   std::string GetHighWaterDigest();
