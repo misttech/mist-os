@@ -1,13 +1,15 @@
-// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 use anyhow::Error;
 
+mod env;
 mod errors;
 mod opts;
 mod params;
 mod run_tests;
+mod schema;
 mod test_config;
 
 const INVALID_ARGS_CONFIG_EXIT_CODE: i32 = 222;
