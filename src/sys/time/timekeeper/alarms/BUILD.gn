@@ -33,6 +33,7 @@ rustc_library("alarms") {
   ]
 
   test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//src/lib/test_util",
     "//third_party/rust_crates:test-case",

@@ -29,7 +29,7 @@ use anyhow::{anyhow, Result};
 use fidl::encoding::ProxyChannelBox;
 use fidl::endpoints::RequestStream;
 use fidl::HandleBased;
-use fuchsia_inspect::HistogramProperty;
+use fuchsia_inspect::{HistogramProperty, Property};
 use futures::channel::mpsc;
 use futures::sink::SinkExt;
 use futures::StreamExt;
@@ -999,7 +999,13 @@ async fn wake_timer_loop(
     #[allow(clippy::collection_is_never_read)]
     let mut hrtimer_status: Option<TimerState> = None;
 
-    let deadline_histogram = inspect.create_int_exponential_histogram(
+    // Initialize inspect properties. This must be done only once.
+    // Wake alarm stats.
+    let now_prop = inspect.create_int("now_ns", 0);
+    let now_formatted_prop = inspect.create_string("now_formatted", "");
+    let pending_timers_count_prop = inspect.create_uint("pending_timers_count", 0);
+    let pending_timers_prop = inspect.create_string("pending_timers", "");
+    let deadline_histogram_prop = inspect.create_int_exponential_histogram(
         "requested_deadlines_ns",
         finspect::ExponentialHistogramParams {
             floor: 0,
@@ -1009,12 +1015,16 @@ async fn wake_timer_loop(
             buckets: 16,
         },
     );
+    // Internals of what was programmed into the wake alarms hardware.
+    let hw_node = inspect.create_child("hardware");
+    let current_hw_deadline_prop = hw_node.create_string("current_deadline", "");
+    let remaining_until_alarm_prop = hw_node.create_string("remaining_until_alarm", "");
 
     while let Some(cmd) = cmds.next().await {
         trace::duration!(c"alarms", c"Cmd");
         // Use a consistent notion of "now" across commands.
         let now = fasync::BootInstant::now();
-        inspect.record_int("now_ns", now.into_nanos());
+        now_prop.set(now.into_nanos());
         trace::instant!(c"alarms", c"wake_timer_loop", trace::Scope::Process, "now" => now.into_nanos());
         match cmd {
             Cmd::Start { cid, deadline, setup_done, alarm_id, responder } => {
@@ -1033,7 +1043,7 @@ async fn wake_timer_loop(
                     signal(&setup_done);
                     debug!("wake_timer_loop: START: setup_done signaled");
                 };
-                deadline_histogram.insert((deadline - now).into_nanos());
+                deadline_histogram_prop.insert((deadline - now).into_nanos());
                 if Timers::expired(now, deadline) {
                     trace::duration!(c"alarms", c"Cmd::Start:immediate");
                     // A timer set into now or the past expires right away.
@@ -1230,27 +1240,29 @@ async fn wake_timer_loop(
 
         {
             // Print and record diagnostics after each iteration, record the
-            // duration for performance awareness.
+            // duration for performance awareness.  Note that iterations happen
+            // only occasionally, so these stats can remain unchanged for a long
+            // time.
             trace::duration!(c"timekeeper", c"inspect");
             let now_formatted = format_timer(now.into());
             debug!("wake_timer_loop: now:                             {}", &now_formatted);
-            inspect.record_string("now_formatted", now_formatted);
+            now_formatted_prop.set(&now_formatted);
 
             let pending_timers_count: u64 =
                 timers.timer_count().try_into().expect("always convertible");
             debug!("wake_timer_loop: currently pending timer count:   {}", pending_timers_count);
-            inspect.record_uint("pending_timers_count", pending_timers_count);
+            pending_timers_count_prop.set(pending_timers_count);
 
             let pending_timers = format!("{}", timers);
             debug!("wake_timer_loop: currently pending timers:        {}", &timers);
-            inspect.record_string("pending_timers", pending_timers);
+            pending_timers_prop.set(&pending_timers);
 
             let current_deadline: String = hrtimer_status
                 .as_ref()
                 .map(|s| format!("{}", format_timer(s.deadline.into())))
                 .unwrap_or_else(|| "(none)".into());
             debug!("wake_timer_loop: current hardware timer deadline: {:?}", current_deadline);
-            inspect.record_string("current_hw_deadline", current_deadline);
+            current_hw_deadline_prop.set(&current_deadline);
 
             let remaining_duration_until_alarm = hrtimer_status
                 .as_ref()
@@ -1260,7 +1272,7 @@ async fn wake_timer_loop(
                 "wake_timer_loop: remaining duration until alarm:  {}",
                 &remaining_duration_until_alarm
             );
-            inspect.record_string("remaining_until_alarm", remaining_duration_until_alarm);
+            remaining_until_alarm_prop.set(&remaining_duration_until_alarm);
             debug!("---");
         }
     }
@@ -1442,6 +1454,7 @@ pub fn connect_to_hrtimer_async() -> Result<ffhh::DeviceProxy> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use diagnostics_assertions::assert_data_tree;
     use futures::{select, Future};
     use std::task::Poll;
     use test_case::test_case;
@@ -2038,6 +2051,7 @@ mod tests {
         run_in_fake_time_and_test_context(
             zx::MonotonicDuration::from_nanos(LONG_DEADLINE_NANOS + 50),
             |wake_proxy| async move {
+                let inspector = finspect::Inspector::default();
                 let wake_proxy = Rc::new(RefCell::new(wake_proxy));
 
                 let keep_alive = zx::Event::create();
@@ -2089,6 +2103,11 @@ mod tests {
                     assert_gt!(fasync::BootInstant::now().into_nanos(), LONG_DEADLINE_NANOS);
                 };
                 futures::join!(long_deadline_fut, short_deadline_fut);
+
+                // Verify that the wake alarms have the expected general structure.
+                assert_data_tree!(inspector, root: {
+                    a: 0u64,
+                });
             },
         );
     }
