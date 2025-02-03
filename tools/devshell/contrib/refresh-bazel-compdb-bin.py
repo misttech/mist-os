@@ -16,9 +16,47 @@ _OPT_PATTERN = re.compile("[\W]+")
 
 _SHOULD_LOG = False
 
-_FIDL_FUCHSIA_SDK_REGEX_PATTERN = re.compile(
-    ".*bazel-out.*\/fuchsia_sdk\/fidl\/.*\/_virtual_includes\/(.*)_cpp"
-)
+_CPU_MAP = {"aarch64": "arm64", "x86_64": "x64"}
+
+
+def _map_cpu(cpu):
+    return _CPU_MAP.get(cpu, cpu)
+
+
+# These regex patterns are a tuple of compiled regex's to lambdas that will be
+# invoked with the match object if there is on. These regexes are usually used
+# to transform a bazel path to one that is in GN.
+_REGEX_PATH_PATTERNS = [
+    # Fidl libraries defined in GN in the SDK
+    (
+        re.compile(
+            ".*bazel-out.*\/fuchsia_sdk\/fidl\/.*\/_virtual_includes\/(?P<name>.*)_cpp"
+        ),
+        lambda m: "-Ifidling/gen/sdk/fidl/{fidl_lib}/{fidl_lib}/cpp".format(
+            fidl_lib=m["name"]
+        ),
+    ),
+    # Fidl libraries defined in Bazel in the SDK
+    (
+        re.compile(
+            ".*bazel-out.*\/bin\/sdk\/fidl\/.*\/_virtual_includes\/(?P<name>.*)_cpp"
+        ),
+        lambda m: "-Ifidling/gen/sdk/fidl/{fidl_lib}/{fidl_lib}/cpp".format(
+            fidl_lib=m["name"]
+        ),
+    ),
+    # bind libraries defined in tree under //src/devices/bind
+    (
+        re.compile(
+            ".*bazel-out.*\/(?P<arch>[a-zA-Z0-9]+)-.*\/bin\/src\/devices\/bind\/(?P<name>.*)\/_virtual_includes.*"
+        ),
+        # _map_cpu
+        lambda m: "-I{cpu}-shared/gen/src/devices/bind/{name}/{name}/bind_cpp".format(
+            cpu=_map_cpu(m["arch"]),
+            name=m["name"],
+        ),
+    ),
+]
 
 
 class Action:
@@ -85,19 +123,35 @@ class CompDBFormatter:
         # path when we run the original query which does not seem to point to a valid
         # location. Instead we can fall back to the gn generated code. This is currently
         # a best effort attempt.
-        fidl_match = _FIDL_FUCHSIA_SDK_REGEX_PATTERN.match(file_path)
-        if fidl_match:
-            fidl_lib = fidl_match.group(1)
-            return f"-Ifidling/gen/sdk/fidl/{fidl_lib}/{fidl_lib}/cpp"
+        # fidl_match = _FIDL_FUCHSIA_SDK_REGEX_PATTERN.match(file_path)
+        # if fidl_match:
+        #     fidl_lib = fidl_match.group(1)
+        #     return f"-Ifidling/gen/sdk/fidl/{fidl_lib}/{fidl_lib}/cpp"
 
-        # bazel-out needs to be checked first because it contains external/ paths
+        # Check to see if any of our regex path patterns match. These paths often
+        # represent files that are generated and have _virtual_includes in the
+        # path. The _virtual_includes tend to not point to files that exist when
+        # working in our hybrid build system so we end up just pointing to the
+        # GN paths instead.
+        for pattern, replacement in _REGEX_PATH_PATTERNS:
+            match_obj = pattern.match(file_path)
+            if match_obj:
+                return replacement(match_obj)
+
+        # map bazel-out/ paths to that of our output_path
         if "bazel-out/" in file_path:
-            return file_path.replace("bazel-out", "../../bazel-out", 1)
+            return file_path.replace(
+                "bazel-out/", self.output_path_rel + "/", 1
+            )
 
         # Look for arguments to files in external/ paths. This is usually
         # the clang binary and include roots
         if "external/" in file_path:
-            return file_path.replace("external", "../../bazel-repos", 1)
+            return file_path.replace(
+                "external/",
+                os.path.join(self.output_base_rel, "external") + "/",
+                1,
+            )
 
         # Just a regular argument
         return file_path
