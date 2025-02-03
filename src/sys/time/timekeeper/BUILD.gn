@@ -11,6 +11,7 @@ group("timekeeper") {
     ":service",
     ":tests",
     "alarms",
+    "persistence",
   ]
 }
 
@@ -19,6 +20,7 @@ group("tests") {
   deps = [
     ":timekeeper-tests",
     "alarms:tests",
+    "persistence:tests",
   ]
 }
 
@@ -56,7 +58,7 @@ timekeeper_deps = [
   "//src/sys/time/lib/time-util",
   "//src/sys/time/lib/time_metrics_registry",
   "//src/sys/time/timekeeper/alarms",
-  "//src/sys/time/timekeeper/persistence",
+  "//src/sys/time/timekeeper/persistence:lib",
   "//third_party/cobalt/src/lib/client/rust:cobalt-client",
   "//third_party/rust_crates:anyhow",
   "//third_party/rust_crates:async-trait",

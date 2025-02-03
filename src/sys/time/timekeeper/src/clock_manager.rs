@@ -316,7 +316,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         track: Track,
         config: Arc<Config>,
         async_commands: mpsc::Receiver<Command>,
-        allow_update_rtc: Rc<RefCell<persistence::State>>,
+        allow_update_rtc: Rc<RefCell<time_persistence::State>>,
     ) {
         ClockManager::new(clock, time_source_manager, rtc, diagnostics, track, config, None)
             .maintain_clock(async_commands, allow_update_rtc)
@@ -362,7 +362,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
     async fn maintain_clock(
         mut self,
         async_commands: mpsc::Receiver<Command>,
-        allow_update_rtc: Rc<RefCell<persistence::State>>,
+        allow_update_rtc: Rc<RefCell<time_persistence::State>>,
     ) {
         // TIMING NOTES: all delays in the management loops are tied to a monotonic
         // timeline, which means they can pause.
@@ -681,8 +681,8 @@ mod tests {
         static ref START_CLOCK_SOURCE: StartClockSource = StartClockSource::External(TEST_ROLE);
     }
 
-    fn new_state_for_test(value: bool) -> Rc<RefCell<persistence::State>> {
-        Rc::new(RefCell::new(persistence::State::new(value)))
+    fn new_state_for_test(value: bool) -> Rc<RefCell<time_persistence::State>> {
+        Rc::new(RefCell::new(time_persistence::State::new(value)))
     }
 
     /// Creates and starts a new clock with default options.

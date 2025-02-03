@@ -141,11 +141,11 @@ mod tests {
         let d = tempfile::TempDir::new().expect("tempdir created");
         let p = d.path().join("file.json");
         let s = State::new(false);
-        State::write_internal(&p, &s);
+        State::write_internal(&p, &s).unwrap();
 
         // First time around, we may not update the RTC.
-        assert!(!State::read_and_update_internal(&p).may_update_rtc());
+        assert!(!State::read_and_update_internal(&p).unwrap().may_update_rtc());
         // Second time around, we may.
-        assert!(State::read_and_update_internal(&p).may_update_rtc());
+        assert!(State::read_and_update_internal(&p).unwrap().may_update_rtc());
     }
 }

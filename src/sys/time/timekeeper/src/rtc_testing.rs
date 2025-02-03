@@ -6,14 +6,14 @@
 //! real-time clock (RTC) handling.
 
 use anyhow::Result;
+use fidl_fuchsia_time_test as fftt;
 use fuchsia_inspect::health;
 use fuchsia_inspect::health::Reporter;
 use futures::StreamExt;
 use log::{debug, error};
-use persistence::State;
 use std::cell::RefCell;
 use std::rc::Rc;
-use {fidl_fuchsia_time_test as fftt, persistence};
+use time_persistence::{self, State};
 
 #[derive(Debug)]
 pub struct Server {

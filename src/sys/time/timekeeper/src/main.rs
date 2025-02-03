@@ -271,7 +271,7 @@ async fn main() -> Result<()> {
     persistence_health.borrow_mut().set_ok();
 
     let persistent_state = Rc::new(RefCell::new(
-        persistence::State::read_and_update()
+        time_persistence::State::read_and_update()
             .map_err(|e| {
                 persistence_health
                     .borrow_mut()
@@ -504,7 +504,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
     config: Arc<Config>,
     cmd_send: mpsc::Sender<Command>,
     cmd_recv: mpsc::Receiver<Command>,
-    persistent_state: Rc<RefCell<persistence::State>>,
+    persistent_state: Rc<RefCell<time_persistence::State>>,
 ) where
     R: Rtc,
     D: Diagnostics,
@@ -605,7 +605,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
                 Track::Monitor,
                 fut2_cfg_clone,
                 r2,
-                Rc::new(RefCell::new(persistence::State::new(true))),
+                Rc::new(RefCell::new(time_persistence::State::new(true))),
             )
         })
         .into();
@@ -655,8 +655,8 @@ mod tests {
         static ref CLOCK_OPTS: zx::ClockOpts = zx::ClockOpts::empty();
     }
 
-    fn new_state_for_test(value: bool) -> Rc<RefCell<persistence::State>> {
-        Rc::new(RefCell::new(persistence::State::new(value)))
+    fn new_state_for_test(value: bool) -> Rc<RefCell<time_persistence::State>> {
+        Rc::new(RefCell::new(time_persistence::State::new(value)))
     }
 
     /// Creates and starts a new clock with default options, returning a tuple of the clock and its
