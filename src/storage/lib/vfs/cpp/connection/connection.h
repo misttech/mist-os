@@ -143,6 +143,43 @@ class Connection : public fbl::DoublyLinkedListable<Connection*> {
   zx::event token_;
 };
 
+// Encapsulates the state of a node's wire attributes on the stack. Used by connections for sending
+// an OnRepresentation event or responding to a fuchsia.io/Node.GetAttributes call.
+class NodeAttributeBuilder {
+ public:
+  using NodeAttributes2 = fuchsia_io::wire::NodeAttributes2;
+  using ImmutableAttrs = fuchsia_io::wire::ImmutableNodeAttributes;
+  using MutableAttrs = fuchsia_io::wire::MutableNodeAttributes;
+
+  // Create a new builder using the attributes from |vnode|. |query| represents the set of
+  // attributes that the builder will return in the final wire table. Any attributes that |vnode|
+  // doesn't support will be omitted from the result.
+  //
+  // |vnode| **must** outlive this object.
+  explicit NodeAttributeBuilder(const fbl::RefPtr<Vnode>& vnode)
+      : attributes_(vnode->GetAttributes()),
+        abilities_(vnode->GetAbilities()),
+        protocols_(vnode->GetProtocols()) {}
+
+  // Build and return a wire object that uses this object as storage. This object **must** outlive
+  // the returned wire table.
+  zx::result<NodeAttributes2*> Build(fuchsia_io::NodeAttributesQuery query);
+
+ private:
+  // Attributes returned by the Vnode upon construction.
+  // NOTE: This must match the return type of Vnode::GetAttributes to allow in-place construction.
+  zx::result<VnodeAttributes> attributes_;
+  // Attributes queried on demand when building the wire table:
+  fuchsia_io::Abilities abilities_;
+  fuchsia_io::NodeProtocolKinds protocols_;
+  // Table frames the final wire object will be built from. These frames reference the data above.
+  fidl::WireTableFrame<ImmutableAttrs> immutable_frame_;
+  fidl::WireTableFrame<MutableAttrs> mutable_frame_;
+  // Final wire table we build. Stored in this object so we can reply to FIDL requests with the
+  // return value of Build().
+  NodeAttributes2 wire_table_;
+};
+
 }  // namespace fs::internal
 
 #endif  // SRC_STORAGE_LIB_VFS_CPP_CONNECTION_CONNECTION_H_

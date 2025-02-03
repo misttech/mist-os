@@ -163,9 +163,8 @@ void DirectoryConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::
 void DirectoryConnection::GetAttributes(fio::wire::NodeGetAttributesRequest* request,
                                         GetAttributesCompleter::Sync& completer) {
   // TODO(https://fxbug.dev/346585458): This operation should require the GET_ATTRIBUTES right.
-  internal::NodeAttributeBuilder builder;
-  zx::result attrs = builder.Build(*vnode(), request->query);
-  completer.Reply(zx::make_result(attrs.status_value(), attrs.is_ok() ? &*attrs : nullptr));
+  internal::NodeAttributeBuilder builder(vnode());
+  completer.Reply(builder.Build(request->query));
 }
 
 void DirectoryConnection::UpdateAttributes(fio::wire::MutableNodeAttributes* request,
@@ -494,14 +493,14 @@ zx::result<> DirectoryConnection::WithRepresentation(
       fidl::ObjectView<fidl::WireTableFrame<DirectoryRepresentation>>::FromExternal(
           &representation_frame));
 #if FUCHSIA_API_LEVEL_AT_LEAST(18)
-  NodeAttributeBuilder attributes_builder;
-  zx::result<fio::wire::NodeAttributes2> attributes;
+  std::optional<NodeAttributeBuilder> attributes_builder;
   if (query) {
-    attributes = attributes_builder.Build(*vnode(), *query);
+    attributes_builder.emplace(vnode());
+    zx::result<fio::wire::NodeAttributes2*> attributes = attributes_builder->Build(*query);
     if (attributes.is_error()) {
       return attributes.take_error();
     }
-    builder.attributes(fidl::ObjectView<fio::wire::NodeAttributes2>::FromExternal(&(*attributes)));
+    builder.attributes(fidl::ObjectView<fio::wire::NodeAttributes2>::FromExternal(*attributes));
   }
 #endif
   auto representation = builder.Build();

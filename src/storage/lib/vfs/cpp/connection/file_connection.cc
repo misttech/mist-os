@@ -114,14 +114,15 @@ zx::result<> FileConnection::WithRepresentation(
       fidl::ObjectView<fidl::WireTableFrame<FileRepresentation>>::FromExternal(
           &representation_frame));
 #if FUCHSIA_API_LEVEL_AT_LEAST(18)
-  NodeAttributeBuilder attributes_builder;
-  zx::result<fio::wire::NodeAttributes2> attributes;
+  std::optional<NodeAttributeBuilder> attributes_builder;
   if (query) {
-    attributes = attributes_builder.Build(*vnode(), *query);
+    attributes_builder.emplace(vnode());
+    zx::result<fio::wire::NodeAttributes2*> attributes;
+    attributes = attributes_builder->Build(*query);
     if (attributes.is_error()) {
       return attributes.take_error();
     }
-    builder.attributes(fidl::ObjectView<fio::wire::NodeAttributes2>::FromExternal(&(*attributes)));
+    builder.attributes(fidl::ObjectView<fio::wire::NodeAttributes2>::FromExternal(*attributes));
   }
 #endif
   builder.is_append(GetAppend());
@@ -189,9 +190,9 @@ void FileConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync&
 
 void FileConnection::GetAttributes(fio::wire::NodeGetAttributesRequest* request,
                                    GetAttributesCompleter::Sync& completer) {
-  internal::NodeAttributeBuilder builder;
-  zx::result attrs = builder.Build(*vnode(), request->query);
-  completer.Reply(zx::make_result(attrs.status_value(), attrs.is_ok() ? &*attrs : nullptr));
+  // TODO(https://fxbug.dev/346585458): This operation should require the GET_ATTRIBUTES right.
+  internal::NodeAttributeBuilder builder(vnode());
+  completer.Reply(builder.Build(request->query));
 }
 
 void FileConnection::UpdateAttributes(fio::wire::MutableNodeAttributes* request,
