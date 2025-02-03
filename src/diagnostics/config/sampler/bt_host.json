@@ -151,6 +151,42 @@
             "metric_id": 19,
             "metric_type": "Occurrence",
             "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/low_energy_connection_manager:disconnect_peer_disconnection_count"
+        },
+        {
+            "event_codes": [
+                0,
+                0
+            ],
+            "metric_id": 10,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/peer_cache/metrics/le:bond_success_events"
+        },
+        {
+            "event_codes": [
+                0,
+                1
+            ],
+            "metric_id": 10,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/peer_cache/metrics/le:bond_failure_events"
+        },
+        {
+            "event_codes": [
+                1,
+                0
+            ],
+            "metric_id": 10,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/peer_cache/metrics/bredr:bond_success_events"
+        },
+        {
+            "event_codes": [
+                1,
+                1
+            ],
+            "metric_id": 10,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/peer_cache/metrics/bredr:bond_failure_events"
         }
     ],
     "poll_rate_sec": 300,
