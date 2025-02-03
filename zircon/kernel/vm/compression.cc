@@ -44,7 +44,7 @@ VmCompression::CompressorGuard::~CompressorGuard() {
 
 VmCompression::CompressorGuard VmCompression::AcquireCompressor() {
   Guard<Mutex> guard_{&instance_lock_};
-  return CompressorGuard(instance_, ktl::move(guard_));
+  return CompressorGuard(instance_, &guard_);
 }
 
 VmCompression::VmCompression(fbl::RefPtr<VmCompressedStorage> storage,
