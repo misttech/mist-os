@@ -28,8 +28,7 @@ source_set("common") {
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.clock:fuchsia.clock_cpp",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddk",
-    "//src/lib/ddk:ddk-metadata-headers",
+    "//src/lib/ddk:ddk_metadata_only",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
@@ -38,7 +37,7 @@ source_set("common") {
     "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/compat/cpp",
-    "//src/lib/ddktl",
+    "//sdk/lib/driver/metadata/cpp",
   ]
 }
 
@@ -71,7 +70,9 @@ test("clock-test-bin") {
   deps = [
     ":common",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
+    "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//src/devices/testing/mock-ddk:mock-ddk",
