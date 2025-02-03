@@ -668,17 +668,14 @@ debug_utils_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
   return VK_FALSE;
 }
 using UseProtectedMemory = bool;
-using WithCopy = bool;
 using ValidationBeforeLayer = bool;
 
-using ParamType = std::tuple<UseProtectedMemory, WithCopy, ValidationBeforeLayer>;
+using ParamType = std::tuple<UseProtectedMemory, ValidationBeforeLayer>;
 
 static std::string NameFromParam(const testing::TestParamInfo<ParamType>& info) {
   bool protected_mem = std::get<0>(info.param);
-  bool with_copy = std::get<1>(info.param);
-  bool validation_before = std::get<2>(info.param);
+  bool validation_before = std::get<1>(info.param);
   return std::string() + (protected_mem ? "Protected" : "Unprotected") +
-         (with_copy ? "Copy" : "NoCopy") +
          (validation_before ? "ValidationBefore" : "ValidationAfter");
 }
 
@@ -686,21 +683,11 @@ class SwapchainTest : public ::testing::TestWithParam<ParamType> {
  protected:
   void SetUp() override {
     std::vector<const char*> instance_layers;
-    // The copy swapchain doesn't pass validation, so skip this test.
-    // TODO(https://fxbug.dev/42163978): Re-enable when swapchain is fixed.
-    if (with_copy() && validation_before_layer()) {
-      GTEST_SKIP();
-    }
-    if (with_copy()) {
-      instance_layers.push_back("VK_LAYER_FUCHSIA_imagepipe_swapchain_copy");
-    }
     if (validation_before_layer()) {
       instance_layers.push_back("VK_LAYER_KHRONOS_validation");
     }
     instance_layers.push_back("VK_LAYER_FUCHSIA_imagepipe_swapchain");
-    // The copy swapchain doesn't pass validation, so don't enable validation when using it.
-    // TODO(https://fxbug.dev/42163978): Re-enable when swapchain is fixed.
-    if (!validation_before_layer() && !with_copy()) {
+    if (!validation_before_layer()) {
       instance_layers.push_back("VK_LAYER_KHRONOS_validation");
     }
 
@@ -721,9 +708,7 @@ class SwapchainTest : public ::testing::TestWithParam<ParamType> {
 
   bool use_protected_memory() { return std::get<0>(GetParam()); }
 
-  bool with_copy() { return std::get<1>(GetParam()); }
-
-  bool validation_before_layer() { return std::get<2>(GetParam()); }
+  bool validation_before_layer() { return std::get<1>(GetParam()); }
 
   VkSemaphore MakeSingleUseSemaphore() {
     VkSemaphore semaphore;
@@ -814,9 +799,7 @@ TEST_P(SwapchainTest, AcquireFence) {
 }
 
 INSTANTIATE_TEST_SUITE_P(SwapchainTestSuite, SwapchainTest,
-                         ::testing::Combine(::testing::Bool(), ::testing::Bool(),
-                                            ::testing::Bool()),
-                         NameFromParam);
+                         ::testing::Combine(::testing::Bool(), ::testing::Bool()), NameFromParam);
 
 class SwapchainFidlTest : public SwapchainTest {};
 
@@ -895,7 +878,7 @@ TEST_P(SwapchainFidlTest, PresentAndAcquireNoSemaphore) {
 
     // Flatland only releases images after a subsequent Present(), so the first image won't be
     // released right away.
-    if (!with_copy() && i == 0) {
+    if (i == 0) {
       continue;
     }
 
@@ -905,12 +888,8 @@ TEST_P(SwapchainFidlTest, PresentAndAcquireNoSemaphore) {
     EXPECT_EQ(VK_SUCCESS,
               test_->acquire_next_image_khr_(test_->vk_device_, swapchain, kTimeoutNs,
                                              VK_NULL_HANDLE, VK_NULL_HANDLE, &image_index));
-    if (with_copy()) {
-      ASSERT_EQ(present_index, image_index);
-    } else {
-      // The previous present image should be available.
-      ASSERT_EQ(present_index, (image_index + 1) % 3);
-    }
+    // The previous present image should be available.
+    ASSERT_EQ(present_index, (image_index + 1) % 3);
 
     ASSERT_EQ(VK_NOT_READY,
               test_->acquire_next_image_khr_(test_->vk_device_, swapchain, 0, VK_NULL_HANDLE,
@@ -921,13 +900,8 @@ TEST_P(SwapchainFidlTest, PresentAndAcquireNoSemaphore) {
   test_->destroy_swapchain_khr_(test_->vk_device_, swapchain, nullptr);
   vkDestroySurfaceKHR(test_->vk_instance_, surface, nullptr);
 
-  if (with_copy()) {
-    EXPECT_GE(flatland->presented_count(), kFrameCount - 1);
-    EXPECT_GE(flatland->acquire_fences_count(), kFrameCount - 1);
-  } else {
-    EXPECT_EQ(flatland->presented_count(), kFrameCount);
-    EXPECT_EQ(flatland->acquire_fences_count(), kFrameCount);
-  }
+  EXPECT_EQ(flatland->presented_count(), kFrameCount);
+  EXPECT_EQ(flatland->acquire_fences_count(), kFrameCount);
 }
 
 TEST_P(SwapchainFidlTest, ForceQuit) {
@@ -1002,9 +976,6 @@ TEST_P(SwapchainFidlTest, DeviceLostAvoidSemaphoreHang) {
   if (GetVkPhysicalDeviceType(test_->vk_physical_device_) == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU) {
     GTEST_SKIP();
   }
-  // Surface lost isn't seen by the copy swapchain
-  if (with_copy())
-    GTEST_SKIP();
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
@@ -1192,12 +1163,7 @@ TEST_P(SwapchainFidlTest, AcquireZeroTimeout) {
     // Timeout of zero with pending presents
     VkResult result = test_->acquire_next_image_khr_(test_->vk_device_, swapchain, 0,
                                                      VK_NULL_HANDLE, VK_NULL_HANDLE, &image_index);
-    if (with_copy()) {
-      // The copy may have finished and signaled the release fence.
-      EXPECT_TRUE((result == VK_SUCCESS) || (result == VK_NOT_READY));
-    } else {
-      EXPECT_EQ(result, VK_NOT_READY);
-    }
+    EXPECT_EQ(result, VK_NOT_READY);
     test_->allows_validation_errors_ = false;
   }
 
@@ -1210,6 +1176,4 @@ TEST_P(SwapchainFidlTest, AcquireZeroTimeout) {
 }
 
 INSTANTIATE_TEST_SUITE_P(SwapchainFidlTestSuite, SwapchainFidlTest,
-                         ::testing::Combine(::testing::Bool(), ::testing::Bool(),
-                                            ::testing::Bool()),
-                         NameFromParam);
+                         ::testing::Combine(::testing::Bool(), ::testing::Bool()), NameFromParam);
