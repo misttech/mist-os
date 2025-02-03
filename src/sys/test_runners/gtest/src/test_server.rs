@@ -525,6 +525,7 @@ async fn get_tests(
         }
     };
 
+    debug!("Parsing test cases from {}", result_str);
     parse_test_cases(result_str)
 }
 
