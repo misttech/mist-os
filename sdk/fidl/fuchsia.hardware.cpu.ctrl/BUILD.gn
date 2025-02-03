@@ -5,6 +5,9 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.cpu.ctrl") {
+  sdk_category = "partner"
   sources = [ "ctrl.fidl" ]
+  sdk_area = "Drivers"
+  stable = false
   public_deps = [ "//zircon/vdso/zx" ]
 }

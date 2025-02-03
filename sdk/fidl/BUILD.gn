@@ -75,6 +75,7 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth",
   "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock",
   "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl",
+  "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl",
   "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio",
   "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c",
   "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl",
