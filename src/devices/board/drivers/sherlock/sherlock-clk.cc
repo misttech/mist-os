@@ -106,11 +106,6 @@ zx_status_t Sherlock::ClkInit() {
               reinterpret_cast<const uint8_t*>(&kClockIds),
               reinterpret_cast<const uint8_t*>(&kClockIds) + sizeof(kClockIds)),
       }},
-      // TODO(b/373903133): Remove once no longer referenced.
-      {{
-          .id = std::to_string(DEVICE_METADATA_CLOCK_INIT),
-          .data = encoded_clock_init_metadata.value(),
-      }},
       {{
           .id = fuchsia_hardware_clockimpl::wire::InitMetadata::kSerializableName,
           .data = std::move(encoded_clock_init_metadata.value()),

@@ -62,9 +62,9 @@ TEST(ClockImplVisitorTest, TestClocksProperty) {
       // Test metadata properties.
       ASSERT_TRUE(metadata);
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-      ASSERT_EQ(4lu, metadata->size());
-#else
       ASSERT_EQ(3lu, metadata->size());
+#else
+      ASSERT_EQ(2lu, metadata->size());
 #endif
 
       // ID metadata
@@ -77,54 +77,30 @@ TEST(ClockImplVisitorTest, TestClocksProperty) {
       EXPECT_EQ(clock_ids[1].clock_id, static_cast<uint32_t>(CLK_ID2));
       EXPECT_EQ(clock_ids[2].clock_id, static_cast<uint32_t>(CLK_ID6));
 
-      // Init steps metadata (legacy)
-      {
-        std::vector<uint8_t> metadata_blob_2 = std::move(*(*metadata)[1].data());
-        fit::result init_steps =
-            fidl::Unpersist<fuchsia_hardware_clockimpl::InitMetadata>(cpp20::span(metadata_blob_2));
-        ASSERT_TRUE(init_steps.is_ok());
-        // Steps expected - Disable for CLK_ID3, SetInput as CLK_ID5, Enable for CLK_ID3
-        ASSERT_EQ(init_steps->steps().size(), 3lu);
-        EXPECT_EQ(init_steps->steps()[0].id(), static_cast<uint32_t>(CLK_ID3));
-        EXPECT_EQ(init_steps->steps()[0].call()->Which(),
-                  fuchsia_hardware_clockimpl::InitCall::Tag::kDisable);
-        EXPECT_EQ(init_steps->steps()[1].id(), static_cast<uint32_t>(CLK_ID3));
-        EXPECT_EQ(init_steps->steps()[1].call()->Which(),
-                  fuchsia_hardware_clockimpl::InitCall::Tag::kInputIdx);
-        EXPECT_EQ(init_steps->steps()[1].call()->input_idx().value(),
-                  static_cast<uint32_t>(CLK_ID5));
-        EXPECT_EQ(init_steps->steps()[2].id(), static_cast<uint32_t>(CLK_ID3));
-        EXPECT_EQ(init_steps->steps()[2].call()->Which(),
-                  fuchsia_hardware_clockimpl::InitCall::Tag::kEnable);
-      }
-
       // Init steps metadata
-      {
-        std::vector<uint8_t> metadata_blob_3 = std::move(*(*metadata)[2].data());
-        fit::result init_steps =
-            fidl::Unpersist<fuchsia_hardware_clockimpl::InitMetadata>(cpp20::span(metadata_blob_3));
-        ASSERT_TRUE(init_steps.is_ok());
-        // Steps expected - Disable for CLK_ID3, SetInput as CLK_ID5, Enable for CLK_ID3
-        ASSERT_EQ(init_steps->steps().size(), 3lu);
-        EXPECT_EQ(init_steps->steps()[0].id(), static_cast<uint32_t>(CLK_ID3));
-        EXPECT_EQ(init_steps->steps()[0].call()->Which(),
-                  fuchsia_hardware_clockimpl::InitCall::Tag::kDisable);
-        EXPECT_EQ(init_steps->steps()[1].id(), static_cast<uint32_t>(CLK_ID3));
-        EXPECT_EQ(init_steps->steps()[1].call()->Which(),
-                  fuchsia_hardware_clockimpl::InitCall::Tag::kInputIdx);
-        EXPECT_EQ(init_steps->steps()[1].call()->input_idx().value(),
-                  static_cast<uint32_t>(CLK_ID5));
-        EXPECT_EQ(init_steps->steps()[2].id(), static_cast<uint32_t>(CLK_ID3));
-        EXPECT_EQ(init_steps->steps()[2].call()->Which(),
-                  fuchsia_hardware_clockimpl::InitCall::Tag::kEnable);
-      }
+      std::vector<uint8_t> metadata_blob_2 = std::move(*(*metadata)[1].data());
+      fit::result init_steps =
+          fidl::Unpersist<fuchsia_hardware_clockimpl::InitMetadata>(cpp20::span(metadata_blob_2));
+      ASSERT_TRUE(init_steps.is_ok());
+      // Steps expected - Disable for CLK_ID3, SetInput as CLK_ID5, Enable for CLK_ID3
+      ASSERT_EQ(init_steps->steps().size(), 3lu);
+      EXPECT_EQ(init_steps->steps()[0].id(), static_cast<uint32_t>(CLK_ID3));
+      EXPECT_EQ(init_steps->steps()[0].call()->Which(),
+                fuchsia_hardware_clockimpl::InitCall::Tag::kDisable);
+      EXPECT_EQ(init_steps->steps()[1].id(), static_cast<uint32_t>(CLK_ID3));
+      EXPECT_EQ(init_steps->steps()[1].call()->Which(),
+                fuchsia_hardware_clockimpl::InitCall::Tag::kInputIdx);
+      EXPECT_EQ(init_steps->steps()[1].call()->input_idx().value(), static_cast<uint32_t>(CLK_ID5));
+      EXPECT_EQ(init_steps->steps()[2].id(), static_cast<uint32_t>(CLK_ID3));
+      EXPECT_EQ(init_steps->steps()[2].call()->Which(),
+                fuchsia_hardware_clockimpl::InitCall::Tag::kEnable);
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
       // Clock ID's metadata
-      std::vector<uint8_t> metadata_blob_4 = std::move(*(*metadata)[3].data());
+      std::vector<uint8_t> metadata_blob_3 = std::move(*(*metadata)[2].data());
       fit::result clock_ids_metadata =
           fidl::Unpersist<fuchsia_hardware_clockimpl::ClockIdsMetadata>(
-              cpp20::span(metadata_blob_4));
+              cpp20::span(metadata_blob_3));
       const auto& clock_ids2 = clock_ids_metadata->clock_ids();
       ASSERT_TRUE(clock_ids2.has_value());
       ASSERT_EQ(clock_ids2.value().size(), 3lu);
@@ -143,49 +119,26 @@ TEST(ClockImplVisitorTest, TestClocksProperty) {
 
       // Test metadata properties.
       ASSERT_TRUE(metadata);
-      ASSERT_EQ(2lu, metadata->size());
-
-      // Init steps metadata (legacy)
-      {
-        std::vector<uint8_t> metadata_blob = std::move(*(*metadata)[0].data());
-        fit::result init_steps =
-            fidl::Unpersist<fuchsia_hardware_clockimpl::InitMetadata>(cpp20::span(metadata_blob));
-        ASSERT_TRUE(init_steps.is_ok());
-        // Steps expected - Disable for CLK_ID4, SetRateHz as CLK_ID4_RATE, Enable for CLK_ID4
-        ASSERT_EQ(init_steps->steps().size(), 3lu);
-        EXPECT_EQ(init_steps->steps()[0].id(), static_cast<uint32_t>(CLK_ID4));
-        EXPECT_EQ(init_steps->steps()[0].call()->Which(),
-                  fuchsia_hardware_clockimpl::InitCall::Tag::kDisable);
-        EXPECT_EQ(init_steps->steps()[1].id(), static_cast<uint32_t>(CLK_ID4));
-        EXPECT_EQ(init_steps->steps()[1].call()->Which(),
-                  fuchsia_hardware_clockimpl::InitCall::Tag::kRateHz);
-        EXPECT_EQ(init_steps->steps()[1].call()->rate_hz().value(),
-                  static_cast<uint32_t>(CLK_ID4_RATE));
-        EXPECT_EQ(init_steps->steps()[2].id(), static_cast<uint32_t>(CLK_ID4));
-        EXPECT_EQ(init_steps->steps()[2].call()->Which(),
-                  fuchsia_hardware_clockimpl::InitCall::Tag::kEnable);
-      }
+      ASSERT_EQ(1lu, metadata->size());
 
       // Init steps metadata
-      {
-        std::vector<uint8_t> metadata_blob = std::move(*(*metadata)[1].data());
-        fit::result init_steps =
-            fidl::Unpersist<fuchsia_hardware_clockimpl::InitMetadata>(cpp20::span(metadata_blob));
-        ASSERT_TRUE(init_steps.is_ok());
-        // Steps expected - Disable for CLK_ID4, SetRateHz as CLK_ID4_RATE, Enable for CLK_ID4
-        ASSERT_EQ(init_steps->steps().size(), 3lu);
-        EXPECT_EQ(init_steps->steps()[0].id(), static_cast<uint32_t>(CLK_ID4));
-        EXPECT_EQ(init_steps->steps()[0].call()->Which(),
-                  fuchsia_hardware_clockimpl::InitCall::Tag::kDisable);
-        EXPECT_EQ(init_steps->steps()[1].id(), static_cast<uint32_t>(CLK_ID4));
-        EXPECT_EQ(init_steps->steps()[1].call()->Which(),
-                  fuchsia_hardware_clockimpl::InitCall::Tag::kRateHz);
-        EXPECT_EQ(init_steps->steps()[1].call()->rate_hz().value(),
-                  static_cast<uint32_t>(CLK_ID4_RATE));
-        EXPECT_EQ(init_steps->steps()[2].id(), static_cast<uint32_t>(CLK_ID4));
-        EXPECT_EQ(init_steps->steps()[2].call()->Which(),
-                  fuchsia_hardware_clockimpl::InitCall::Tag::kEnable);
-      }
+      std::vector<uint8_t> metadata_blob = std::move(*(*metadata)[0].data());
+      fit::result init_steps =
+          fidl::Unpersist<fuchsia_hardware_clockimpl::InitMetadata>(cpp20::span(metadata_blob));
+      ASSERT_TRUE(init_steps.is_ok());
+      // Steps expected - Disable for CLK_ID4, SetRateHz as CLK_ID4_RATE, Enable for CLK_ID4
+      ASSERT_EQ(init_steps->steps().size(), 3lu);
+      EXPECT_EQ(init_steps->steps()[0].id(), static_cast<uint32_t>(CLK_ID4));
+      EXPECT_EQ(init_steps->steps()[0].call()->Which(),
+                fuchsia_hardware_clockimpl::InitCall::Tag::kDisable);
+      EXPECT_EQ(init_steps->steps()[1].id(), static_cast<uint32_t>(CLK_ID4));
+      EXPECT_EQ(init_steps->steps()[1].call()->Which(),
+                fuchsia_hardware_clockimpl::InitCall::Tag::kRateHz);
+      EXPECT_EQ(init_steps->steps()[1].call()->rate_hz().value(),
+                static_cast<uint32_t>(CLK_ID4_RATE));
+      EXPECT_EQ(init_steps->steps()[2].id(), static_cast<uint32_t>(CLK_ID4));
+      EXPECT_EQ(init_steps->steps()[2].call()->Which(),
+                fuchsia_hardware_clockimpl::InitCall::Tag::kEnable);
 
       node_tested_count++;
     }

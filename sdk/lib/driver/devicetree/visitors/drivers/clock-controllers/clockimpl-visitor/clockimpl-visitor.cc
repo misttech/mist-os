@@ -317,10 +317,6 @@ zx::result<> ClockImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
       }
 
       node.AddMetadata({{
-          .id = std::to_string(DEVICE_METADATA_CLOCK_INIT),
-          .data = encoded_metadata.value(),
-      }});
-      node.AddMetadata({{
           .id = fuchsia_hardware_clockimpl::InitMetadata::kSerializableName,
           .data = std::move(encoded_metadata.value()),
       }});

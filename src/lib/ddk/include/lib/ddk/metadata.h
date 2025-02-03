@@ -68,9 +68,6 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 // type: FIDL fuchsia.hardware.pinimpl/Metadata
 #define DEVICE_METADATA_GPIO_CONTROLLER 0x43495047  // GPIC
 
-// type: FIDL fuchsia.hardware.clockimpl/InitMetadata
-#define DEVICE_METADATA_CLOCK_INIT 0x494B4C43  // CLKI
-
 // type: FIDL fuchsia.hardware.power/DomainMetadata
 #define DEVICE_METADATA_POWER_DOMAINS 0x52574F50  // POWR
 

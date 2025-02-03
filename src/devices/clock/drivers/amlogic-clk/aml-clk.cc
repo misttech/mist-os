@@ -176,11 +176,9 @@ zx::result<> AmlClock::Start() {
   {
     // TODO(b/373903133): Don't forward clock ID's using the legacy method once it is no longer
     // used.
-    // TODO(b/373903133): Don't forward clock init metadat using the legacy method once it is no
-    // longer used.
-    zx::result<> result = compat_server_.Initialize(
-        incoming(), outgoing(), node_name(), kChildNodeName,
-        compat::ForwardMetadata::Some({DEVICE_METADATA_CLOCK_IDS, DEVICE_METADATA_CLOCK_INIT}));
+    zx::result<> result =
+        compat_server_.Initialize(incoming(), outgoing(), node_name(), kChildNodeName,
+                                  compat::ForwardMetadata::Some({DEVICE_METADATA_CLOCK_IDS}));
     if (result.is_error()) {
       FDF_LOG(ERROR, "Failed to initialize compat server: %s", result.status_string());
       return result.take_error();

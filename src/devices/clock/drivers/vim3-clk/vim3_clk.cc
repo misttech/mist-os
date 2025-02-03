@@ -109,9 +109,9 @@ zx::result<> Vim3Clock::Start() {
   {
     // TODO(b/373903133): Don't forward clock ID's using the legacy method once it is no longer
     // used.
-    zx::result<> result = compat_server_.Initialize(
-        incoming(), outgoing(), node_name(), child_name,
-        compat::ForwardMetadata::Some({DEVICE_METADATA_CLOCK_IDS, DEVICE_METADATA_CLOCK_INIT}));
+    zx::result<> result =
+        compat_server_.Initialize(incoming(), outgoing(), node_name(), child_name,
+                                  compat::ForwardMetadata::Some({DEVICE_METADATA_CLOCK_IDS}));
     if (result.is_error()) {
       return result.take_error();
     }
