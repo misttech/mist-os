@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"flag"
 	"io"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,6 +21,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/debug/covargs/api/llvm"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
+	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/osmisc"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 	"go.fuchsia.dev/fuchsia/tools/testing/tap"
@@ -34,6 +34,7 @@ var (
 	coverageTestName   = flag.String("coverage-test-name", "", "Name of coverage test")
 	goldenCoverageFile = flag.String("golden-coverage", "", "Path to golden coverage file")
 	host               = flag.Bool("host", false, "If set, run coverage test on host")
+	ffxPath            = flag.String("ffx", "", "Path to the ffx tool")
 	llvmCov            = flag.String("llvm-cov", "", "Path to llvm-cov tool")
 	llvmProfData       = flag.String("llvm-profdata", "", "Path to version of llvm-profdata tool")
 )
@@ -270,29 +271,23 @@ func getTargetTest() testsharder.Test {
 		},
 		RunAlgorithm: testsharder.StopOnFailure,
 		Runs:         1,
+		// The ffx tester uses ffx test with --test-file which
+		// errors if the tags are empty.
+		Tags: []build.TestTag{{Key: "key", Value: "value"}},
 	}
 	return test
 }
 
 func getTargetTester(t *testing.T, testOutDir string) testrunner.Tester {
-	var addr net.IPAddr
-	if deviceAddr, ok := os.LookupEnv(constants.DeviceAddrEnvKey); ok {
-		addrPtr, err := net.ResolveIPAddr("ip", deviceAddr)
-		if err != nil {
-			t.Fatalf("failed to parse device address: %s", deviceAddr)
-		}
-		addr = *addrPtr
-	}
-
 	ctx := context.Background()
-	// Read SSH key which is required to run a test.
-	sshKeyFile := os.Getenv(constants.SSHKeyEnvKey)
 	// Create a new fuchsia tester that is responsible for executing the test.
-	// TODO(https://fxbug.dev/42157671): When we start treating profiles as artifacts, start using ffx
-	// with testrunner.NewFFXTester().
-	tester, err := testrunner.NewFuchsiaSSHTester(ctx, addr, sshKeyFile, testOutDir, "")
+	ffx, err := ffxutil.NewFFXInstance(ctx, *ffxPath, "", os.Environ(), os.Getenv(constants.DeviceAddrEnvKey), "", testOutDir, ffxutil.ConfigSettings{})
 	if err != nil {
-		t.Fatalf("failed to initialize fuchsia tester: %s", err)
+		t.Fatalf("failed to initialize ffx instance: %s", err)
+	}
+	tester, err := testrunner.NewFFXTester(ctx, ffx, testOutDir, nil, *llvmProfData)
+	if err != nil {
+		t.Fatalf("failed to initialize ffx tester: %s", err)
 	}
 
 	return tester

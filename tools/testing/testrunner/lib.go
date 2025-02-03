@@ -57,10 +57,6 @@ type Options struct {
 	// The output filename for the snapshot. This will be created in the outDir.
 	SnapshotFile string
 
-	// Whether to prefetch test packages. This is only useful when fetching
-	// packages ephemerally.
-	PrefetchPackages bool
-
 	// Whether to use serial to run tests on the target.
 	UseSerial bool
 
@@ -156,7 +152,6 @@ func SetupAndExecute(ctx context.Context, opts Options, testsPath string) error 
 
 // for testability
 var (
-	sshTester    = NewFuchsiaSSHTester
 	serialTester = NewFuchsiaSerialTester
 )
 
@@ -215,12 +210,7 @@ func execute(
 			return err
 		}
 		if ffx != nil {
-			t, err := sshTester(
-				ctx, addr, sshKeyFile, outputs.OutDir, serialSocketPath)
-			if err != nil {
-				return fmt.Errorf("failed to initialize fuchsia tester: %w", err)
-			}
-			ffxTester, err := NewFFXTester(ctx, ffx, t, outputs.OutDir, opts.Experiments, opts.LLVMProfdataPath)
+			ffxTester, err := NewFFXTester(ctx, ffx, outputs.OutDir, opts.Experiments, opts.LLVMProfdataPath)
 			if err != nil {
 				return fmt.Errorf("failed to initialize ffx tester: %w", err)
 			}
@@ -232,33 +222,8 @@ func execute(
 					logger.Debugf(ctx, "%s", err)
 				}
 			}()
-			// Prefetching packages may possibly interfere with test execution and cause tests
-			// to time out or fail, so disable when using `ffx test`.
-			if ffxTester.EnabledForTesting() {
-				opts.PrefetchPackages = false
-			}
 			fuchsiaTester = ffxTester
 		}
-
-		if opts.PrefetchPackages {
-			// TODO(rudymathu): Remove this prefetching of packages once package
-			// delivery is fast enough.
-			resolveCtx, cancel := context.WithCancel(ctx)
-			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				resolveLog := filepath.Join(outDir, "resolve.log")
-				if err := ResolveTestPackages(resolveCtx, tests, addr, sshKeyFile, resolveLog); err != nil {
-					logger.Warningf(ctx, "package pre-fetching routine failed: %s", err)
-				}
-			}()
-			// We wait here to ensure that our log of resolved packages is
-			// correctly saved.
-			defer wg.Wait()
-			defer cancel()
-		}
-
 	}
 
 	// Function to select the tester to use for a test, along with destination
@@ -271,15 +236,10 @@ func execute(
 		case "fuchsia":
 			if fuchsiaTester == nil {
 				var err error
-				if !opts.UseSerial && sshKeyFile != "" {
-					fuchsiaTester, err = sshTester(
-						ctx, addr, sshKeyFile, outputs.OutDir, serialSocketPath)
-				} else {
-					if serialSocketPath == "" {
-						return nil, nil, fmt.Errorf("%q must be set if %q is not set", botanistconstants.SerialSocketEnvKey, botanistconstants.SSHKeyEnvKey)
-					}
-					fuchsiaTester, err = serialTester(ctx, serialSocketPath)
+				if serialSocketPath == "" {
+					return nil, nil, fmt.Errorf("%q must be set if %q is not set", botanistconstants.SerialSocketEnvKey, botanistconstants.SSHKeyEnvKey)
 				}
+				fuchsiaTester, err = serialTester(ctx, serialSocketPath)
 				if err != nil {
 					return nil, nil, fmt.Errorf("failed to initialize fuchsia tester: %w", err)
 				}
@@ -291,16 +251,6 @@ func execute(
 			}
 			if test.OS == "mac" && runtime.GOOS != "darwin" {
 				return nil, nil, fmt.Errorf("cannot run mac tests when GOOS = %q", runtime.GOOS)
-			}
-			// Initialize the fuchsia SSH tester to run the snapshot at the end in case
-			// we ran any host-target interaction tests.
-			if !opts.UseSerial && fuchsiaTester == nil && sshKeyFile != "" {
-				var err error
-				fuchsiaTester, err = sshTester(
-					ctx, addr, sshKeyFile, outputs.OutDir, serialSocketPath)
-				if err != nil {
-					logger.Errorf(ctx, "failed to initialize fuchsia tester: %s", err)
-				}
 			}
 			if localTester == nil {
 				var err error

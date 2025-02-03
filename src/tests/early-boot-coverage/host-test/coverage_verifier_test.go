@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"flag"
 	"io"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,7 +16,6 @@ import (
 	"testing"
 
 	"go.fuchsia.dev/fuchsia/tools/botanist"
-	"go.fuchsia.dev/fuchsia/tools/botanist/targets"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/debug/covargs/api/llvm"
 	"go.fuchsia.dev/fuchsia/tools/emulator"
@@ -134,10 +132,6 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 	if err != nil {
 		t.Fatalf("Cannot get authorized key path. Reason: %s", err)
 	}
-	hostPathSshKey, err := ffxInstance.GetSshPrivateKey(ctx)
-	if err != nil {
-		t.Fatalf("Cannot get private key path. Reason: %s", err)
-	}
 	i := distro.CreateContextWithAuthorizedKeys(ctx, device, config.Bin.ZbiHostTool, hostPathAuthorizedKeys)
 	i.Start()
 	i.WaitForLogMessage("initializing platform")
@@ -146,18 +140,7 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 	// Netstack is up. This would contain the line number of the log message. Lets avoid it.
 	i.WaitForLogMessage("[netstack] INFO: ")
 
-	// Resolve node context.
-	t.Log("Resolving target IP.")
-	_, ipv6, err := targets.ResolveIP(context.Background(), defaultNodename)
-	if err != nil {
-		t.Fatalf("Failed to resolved node IP address. Reason: %s\n", err)
-	}
-
-	// Create an ssh tester.
-	var shard testsharder.Test
-	var sshRunner testrunner.Tester
-
-	shard = testsharder.Test{
+	shard := testsharder.Test{
 		Test: build.Test{
 			Name:       config.Test.Name,
 			PackageURL: config.Test.Name,
@@ -166,27 +149,8 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 		Runs:         1,
 	}
 
-	var address net.IPAddr = ipv6
-
-	t.Log("Establishing SSH Session.")
-
-	sshRunner, err = testrunner.NewFuchsiaSSHTester(runnerCtx, address, hostPathSshKey, outDir, "")
-	if err != nil {
-		t.Fatalf("Error initializing Fuchsia SSH Test. Reason: %s", err)
-	}
-	defer sshRunner.Close()
-
 	// Create a new fuchsia tester that is responsible for executing the test.
-	// This should match what is currently used by the coverage builders. They
-	// currently use an FFXTester which defaults to the SSHTester if the enabled
-	// experiments do not include using `ffx test`. When updating the ffx
-	// experiments on the coverage builders, they should be updated
-	// here as well.
-	// TODO(https://fxbug.dev/42075455): Pass in the llvm-profdata tool when this
-	// gets changed to enable ffx test.
-	ffxExperiments := botanist.Experiments{}
-
-	ffxRunner, err := testrunner.NewFFXTester(runnerCtx, ffxInstance, sshRunner, outDir, ffxExperiments, "")
+	ffxRunner, err := testrunner.NewFFXTester(runnerCtx, ffxInstance, outDir, botanist.Experiments{}, config.Bin.LlvmProfdata)
 	if err != nil {
 		t.Fatalf("Cannot create Ffx Tester. Reason: %s", err)
 	}

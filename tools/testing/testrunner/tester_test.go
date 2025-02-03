@@ -29,7 +29,6 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/iomisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/retry"
 	"go.fuchsia.dev/fuchsia/tools/lib/subprocess"
-	"go.fuchsia.dev/fuchsia/tools/net/sshutil"
 	sshutilconstants "go.fuchsia.dev/fuchsia/tools/net/sshutil/constants"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 )
@@ -393,17 +392,11 @@ func (*fakeDataSinkCopier) Close() error {
 func TestFFXTester(t *testing.T) {
 	cases := []struct {
 		name           string
-		sshRunErrs     []error
 		expectedResult runtests.TestResult
 		connErr        bool
 		experiments    []string
 		output         string
 	}{
-		{
-			name:           "run tests with ssh",
-			sshRunErrs:     []error{nil},
-			expectedResult: runtests.TestSuccess,
-		},
 		{
 			name:           "run v2 tests with ffx",
 			expectedResult: runtests.TestSuccess,
@@ -434,15 +427,6 @@ func TestFFXTester(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			client := &fakeSSHClient{
-				runErrs: c.sshRunErrs,
-			}
-			copier := &fakeDataSinkCopier{remoteDirs: make(map[string]struct{})}
-			sshTester := &FuchsiaSSHTester{
-				client:   client,
-				copier:   copier,
-				testRuns: make(map[string]sshTestRun),
-			}
 			var outcome string
 			switch c.expectedResult {
 			case runtests.TestSuccess:
@@ -457,7 +441,7 @@ func TestFFXTester(t *testing.T) {
 			ffx := &ffxutil.MockFFXInstance{TestOutcome: outcome, Output: c.output}
 			localOutputDir := t.TempDir()
 			experiments := botanist.GetExperiments(c.experiments)
-			tester, err := NewFFXTester(context.Background(), ffx, sshTester, localOutputDir, experiments, "")
+			tester, err := NewFFXTester(context.Background(), ffx, localOutputDir, experiments, "")
 			if err != nil {
 				t.Fatalf("NewFFXTester got unexpected error: %s", err)
 			}
@@ -486,32 +470,26 @@ func TestFFXTester(t *testing.T) {
 				t.Errorf("tester.Test got result: %s, want result: %s", testResult.Result, c.expectedResult)
 			}
 
-			if tester.EnabledForTesting() {
-				testArgs := []string{}
-				if experiments.Contains(botanist.UseFFXTestParallel) {
-					testArgs = append(testArgs, "--experimental-parallel-execution", "8")
-				}
-				if !ffx.ContainsCmd("test", testArgs...) {
-					t.Errorf("failed to call `ffx test`, called: %s", ffx.CmdsCalled)
-				}
-				numRuns := strings.Count(strings.Join(ffx.CmdsCalled, " "), "test:")
-				if numRuns != 1 {
-					t.Errorf("called `ffx test` %d times, expected 1", numRuns)
-				}
-				expectedCaseStatus := runtests.TestSuccess
-				if c.expectedResult != runtests.TestSuccess {
-					expectedCaseStatus = runtests.TestFailure
-				}
-				if len(testResult.Cases) != 1 {
-					t.Errorf("expected 1 test case, got %d", len(testResult.Cases))
-				} else {
-					if testResult.Cases[0].Status != expectedCaseStatus {
-						t.Errorf("test case has status: %s, want: %s", testResult.Cases[0].Status, expectedCaseStatus)
-					}
-				}
+			testArgs := []string{}
+			if experiments.Contains(botanist.UseFFXTestParallel) {
+				testArgs = append(testArgs, "--experimental-parallel-execution", "8")
+			}
+			if !ffx.ContainsCmd("test", testArgs...) {
+				t.Errorf("failed to call `ffx test`, called: %s", ffx.CmdsCalled)
+			}
+			numRuns := strings.Count(strings.Join(ffx.CmdsCalled, " "), "test:")
+			if numRuns != 1 {
+				t.Errorf("called `ffx test` %d times, expected 1", numRuns)
+			}
+			expectedCaseStatus := runtests.TestSuccess
+			if c.expectedResult != runtests.TestSuccess {
+				expectedCaseStatus = runtests.TestFailure
+			}
+			if len(testResult.Cases) != 1 {
+				t.Errorf("expected 1 test case, got %d", len(testResult.Cases))
 			} else {
-				if ffx.ContainsCmd("test") {
-					t.Errorf("unexpectedly called ffx test")
+				if testResult.Cases[0].Status != expectedCaseStatus {
+					t.Errorf("test case has status: %s, want: %s", testResult.Cases[0].Status, expectedCaseStatus)
 				}
 			}
 			p := filepath.Join(t.TempDir(), "testrunner-cmd-test")
@@ -522,35 +500,28 @@ func TestFFXTester(t *testing.T) {
 				t.Errorf("failed to call `ffx target snapshot`, called: %s", ffx.CmdsCalled)
 			}
 
-			wantSSHRunCalls := len(c.sshRunErrs)
-			if wantSSHRunCalls != client.runCalls {
-				t.Errorf("Run() called wrong number of times. Got: %d, Want: %d", client.runCalls, wantSSHRunCalls)
+			// Write the early-boot profiles so EnsureSinks() can find them.
+			if _, err := ffx.WriteRunResult(build.TestList{}, filepath.Join(localOutputDir, "early-boot-profiles")); err != nil {
+				t.Errorf("failed to write early-boot profiles: %s", err)
 			}
-
-			if tester.EnabledForTesting() {
-				// Write the early-boot profiles so EnsureSinks() can find them.
-				if _, err := ffx.WriteRunResult(build.TestList{}, filepath.Join(localOutputDir, "early-boot-profiles")); err != nil {
-					t.Errorf("failed to write early-boot profiles: %s", err)
-				}
-				// Call EnsureSinks() for v2 tests to set the copier.remoteDir to the data output dir for v2 tests.
-				// v1 tests will already have set the appropriate remoteDir value within Test().
-				outputs := &TestOutputs{OutDir: t.TempDir()}
-				if err = tester.EnsureSinks(ctx, []runtests.DataSinkReference{testResult.DataSinks}, outputs); err != nil {
-					t.Errorf("failed to collect sinks: %s", err)
-				}
-				foundEarlyBootSinks := false
-				for _, test := range outputs.Summary.Tests {
-					if test.Name == "early_boot_sinks" {
-						foundEarlyBootSinks = true
-						if len(test.DataSinks["llvm-profile"]) != 1 {
-							t.Errorf("got %d early boot sinks, want 1", len(test.DataSinks["llvm-profile"]))
-						}
-						break
+			// Call EnsureSinks() for v2 tests to set the copier.remoteDir to the data output dir for v2 tests.
+			// v1 tests will already have set the appropriate remoteDir value within Test().
+			outputs := &TestOutputs{OutDir: t.TempDir()}
+			if err = tester.EnsureSinks(ctx, []runtests.DataSinkReference{testResult.DataSinks}, outputs); err != nil {
+				t.Errorf("failed to collect sinks: %s", err)
+			}
+			foundEarlyBootSinks := false
+			for _, test := range outputs.Summary.Tests {
+				if test.Name == "early_boot_sinks" {
+					foundEarlyBootSinks = true
+					if len(test.DataSinks["llvm-profile"]) != 1 {
+						t.Errorf("got %d early boot sinks, want 1", len(test.DataSinks["llvm-profile"]))
 					}
+					break
 				}
-				if !foundEarlyBootSinks {
-					t.Errorf("failed to find early boot sinks")
-				}
+			}
+			if !foundEarlyBootSinks {
+				t.Errorf("failed to find early boot sinks")
 			}
 		})
 	}
@@ -558,7 +529,7 @@ func TestFFXTester(t *testing.T) {
 	t.Run("profile merging failed", func(t *testing.T) {
 		ctx := context.Background()
 		localOutputDir := t.TempDir()
-		tester, err := NewFFXTester(ctx, &ffxutil.MockFFXInstance{}, nil, localOutputDir, botanist.Experiments{}, "llvm-profdata")
+		tester, err := NewFFXTester(ctx, &ffxutil.MockFFXInstance{}, localOutputDir, botanist.Experiments{}, "llvm-profdata")
 		if err != nil {
 			t.Fatalf("NewFFXTester got unexpected error: %s", err)
 		}
@@ -602,174 +573,6 @@ func TestFFXTester(t *testing.T) {
 			t.Errorf("failed to move proifle to v2 dir: %s", err)
 		}
 	})
-}
-
-// for testability
-type fakeSSHExitError struct {
-	exitStatus int
-}
-
-// Statically assert that this error satisfies the sshExitError interface.
-var _ sshExitError = fakeSSHExitError{}
-
-func (e fakeSSHExitError) Error() string   { return fmt.Sprintf("ssh exit status: %d", e.exitStatus) }
-func (e fakeSSHExitError) ExitStatus() int { return e.exitStatus }
-
-func TestSSHTester(t *testing.T) {
-	cases := []struct {
-		name            string
-		runErrs         []error
-		reconErrs       []error
-		copierReconErrs []error
-		expectedResult  runtests.TestResult
-		wantConnErr     bool
-		runSnapshot     bool
-	}{
-		{
-			name:    "success",
-			runErrs: []error{nil},
-		},
-		{
-			name:           "test failure",
-			runErrs:        []error{fakeSSHExitError{exitStatus: 1}},
-			expectedResult: runtests.TestFailure,
-		},
-		{
-			name:           "connection failure",
-			runErrs:        []error{sshutil.ConnectionError{}},
-			expectedResult: runtests.TestFailure,
-			wantConnErr:    true,
-		},
-		{
-			name:        "reconnect before snapshot",
-			runErrs:     []error{nil, sshutil.ConnectionError{}, nil},
-			reconErrs:   []error{nil},
-			runSnapshot: true,
-		},
-		{
-			name:    "get data sinks for tests",
-			runErrs: []error{nil},
-		},
-		{
-			name:           "test timeout",
-			runErrs:        []error{fakeSSHExitError{exitStatus: timeoutExitCode}},
-			expectedResult: runtests.TestAborted,
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			client := &fakeSSHClient{
-				reconnectErrs: c.reconErrs,
-				runErrs:       c.runErrs,
-			}
-			copier := &fakeDataSinkCopier{remoteDirs: make(map[string]struct{})}
-			serialSocket := &fakeSerialClient{}
-			var tester Tester
-			tester = &FuchsiaSSHTester{
-				client:       client,
-				copier:       copier,
-				serialSocket: serialSocket,
-				testRuns:     make(map[string]sshTestRun),
-			}
-
-			defer func() {
-				if err := tester.Close(); err != nil {
-					t.Errorf("Close returned error: %s", err)
-				}
-			}()
-			wantReconnCalls := len(c.reconErrs)
-			wantRunCalls := len(c.runErrs)
-			test := testsharder.Test{
-				Test:         build.Test{PackageURL: "fuchsia-pkg://foo#meta/bar.cm"},
-				Runs:         1,
-				RunAlgorithm: testsharder.StopOnSuccess,
-				Timeout:      time.Second,
-			}
-			outDir := t.TempDir()
-			testResult, err := tester.Test(context.Background(), test, io.Discard, io.Discard, outDir)
-			testResult, err = tester.ProcessResult(context.Background(), test, outDir, testResult, err)
-			expectedResult := runtests.TestSuccess
-			if c.expectedResult != "" {
-				expectedResult = c.expectedResult
-			}
-			if err == nil && c.wantConnErr {
-				t.Errorf("tester.Test got nil error, want non-nil error")
-			} else if err != nil {
-				if !c.wantConnErr {
-					t.Errorf("tester.Test got error: %s, want nil", err)
-				} else if !isConnectionError(err) {
-					t.Errorf("tester.Test got error: %s. want conn err", err)
-				}
-			}
-			if !c.wantConnErr && testResult.Result != expectedResult {
-				t.Errorf("got test result: %s, want: %s", testResult.Result, expectedResult)
-			}
-
-			if c.runSnapshot {
-				p := filepath.Join(t.TempDir(), "testrunner-cmd-test")
-				if err = tester.RunSnapshot(context.Background(), p); err != nil {
-					t.Errorf("failed to run snapshot: %s", err)
-				}
-			}
-			if !c.wantConnErr {
-				outputs := &TestOutputs{OutDir: t.TempDir()}
-				if err = tester.EnsureSinks(context.Background(), []runtests.DataSinkReference{testResult.DataSinks}, outputs); err != nil {
-					t.Errorf("failed to collect v2 sinks: %s", err)
-				}
-				foundEarlyBootSinks := false
-				for _, test := range outputs.Summary.Tests {
-					if test.Name == "early_boot_sinks" {
-						foundEarlyBootSinks = true
-						if len(test.DataSinks["sink_type"]) != 1 {
-							t.Errorf("got %d early boot sinks, want 1", len(test.DataSinks["sink_type"]))
-						}
-						break
-					}
-				}
-				if !foundEarlyBootSinks {
-					t.Errorf("failed to find early boot sinks")
-				}
-			}
-
-			if wantReconnCalls != client.reconnectCalls {
-				t.Errorf("Reconnect() called wrong number of times. Got: %d, Want: %d", client.reconnectCalls, wantReconnCalls)
-			}
-
-			reconnFailures := 0
-			for _, err := range c.reconErrs {
-				if err != nil {
-					reconnFailures++
-				}
-			}
-			// The copier shouldn't be reconnected if reconnecting the ssh
-			// client fails.
-			wantCopierReconnCalls := wantReconnCalls - reconnFailures
-			if wantCopierReconnCalls != copier.reconnectCalls {
-				t.Errorf("Reconnect() called wrong number of times. Got: %d, Want: %d", copier.reconnectCalls, wantReconnCalls)
-			}
-
-			if wantRunCalls != client.runCalls {
-				t.Errorf("Run() called wrong number of times. Got: %d, Want: %d", client.runCalls, wantRunCalls)
-			}
-
-			if reconnFailures > 0 && c.reconErrs[len(c.reconErrs)-1] != nil {
-				if serialSocket.runCalls != 1 {
-					t.Errorf("called RunSerialDiagnostics() %d times", serialSocket.runCalls)
-				}
-			} else if serialSocket.runCalls > 0 {
-				t.Errorf("unexpectedly called RunSerialDiagnostics()")
-			}
-
-			if !c.wantConnErr {
-				expectedRemoteDirs := []string{dataOutputDirV2, dataOutputDirEarlyBoot}
-				for _, dir := range expectedRemoteDirs {
-					if _, ok := copier.remoteDirs[dir]; !ok {
-						t.Errorf("expected sinks in dir: %s, but got: %s", dir, copier.remoteDirs)
-					}
-				}
-			}
-		})
-	}
 }
 
 // Creates pair of ReadWriteClosers that mimics the relationship between serial

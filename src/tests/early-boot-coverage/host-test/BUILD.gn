@@ -20,7 +20,6 @@ go_library("lib") {
   deps = [
     "//third_party/golibs:github.com/google/go-cmp",
     "//tools/botanist:botanist_lib",
-    "//tools/botanist:targets",
     "//tools/debug/covargs:llvm_api",
     "//tools/emulator",
     "//tools/emulator/emulatortest",
