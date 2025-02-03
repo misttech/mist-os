@@ -31,6 +31,7 @@ group("host_tools_used_by_ffx_action_testonly") {
   visibility = [
     "//build/images/*",
     "//src/*",
+    "//third_party/network-conformance/images:*",
     "//vendor/*",
     "//zircon/kernel/*",
     "//zircon/system/*",
