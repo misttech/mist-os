@@ -615,6 +615,7 @@ fn extend_dict_with_config_use<C: ComponentInstanceInterface + 'static>(
         cm_rust::UseSource::Debug => return,
         cm_rust::UseSource::Capability(_) => return,
         cm_rust::UseSource::Framework => return,
+        cm_rust::UseSource::Collection(_) => return,
     };
 
     let metadata = Dict::new();
@@ -760,6 +761,10 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
                     ),
                 )
                 .with_porcelain_type(porcelain_type, moniker.clone())
+        }
+        cm_rust::UseSource::Collection(_) => {
+            // This arm is used for service capabilities, which are not yet supported here.
+            unimplemented!();
         }
     };
     let metadata = Dict::new();

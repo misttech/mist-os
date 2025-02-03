@@ -2291,6 +2291,7 @@ pub enum UseSource {
     Self_,
     Capability(Name),
     Child(Name),
+    Collection(Name),
     #[cfg(fuchsia_api_level_at_least = "HEAD")]
     Environment,
 }
@@ -2304,6 +2305,7 @@ impl std::fmt::Display for UseSource {
             Self::Self_ => write!(f, "self"),
             Self::Capability(c) => write!(f, "capability `{}`", c),
             Self::Child(c) => write!(f, "child `#{}`", c),
+            Self::Collection(c) => write!(f, "collection `#{}`", c),
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Self::Environment => write!(f, "environment"),
         }
@@ -2320,6 +2322,7 @@ impl FidlIntoNative<UseSource> for fdecl::Ref {
             // cm_fidl_validator should have already validated this
             fdecl::Ref::Capability(c) => UseSource::Capability(c.name.parse().unwrap()),
             fdecl::Ref::Child(c) => UseSource::Child(c.name.parse().unwrap()),
+            fdecl::Ref::Collection(c) => UseSource::Collection(c.name.parse().unwrap()),
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fdecl::Ref::Environment(_) => UseSource::Environment,
             _ => panic!("invalid UseSource variant"),
@@ -2339,6 +2342,9 @@ impl NativeIntoFidl<fdecl::Ref> for UseSource {
             }
             UseSource::Child(name) => {
                 fdecl::Ref::Child(fdecl::ChildRef { name: name.to_string(), collection: None })
+            }
+            UseSource::Collection(name) => {
+                fdecl::Ref::Collection(fdecl::CollectionRef { name: name.to_string() })
             }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             UseSource::Environment => fdecl::Ref::Environment(fdecl::EnvironmentRef {}),

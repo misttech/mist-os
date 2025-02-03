@@ -44,6 +44,7 @@ rustc_test("service-routing-test-bin") {
   edition = "2021"
   deps = [
     "//examples/components/services/fidl:fuchsia.examples.services_rust",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
@@ -54,6 +55,8 @@ rustc_test("service-routing-test-bin") {
     "//src/lib/fuchsia-fs",
     "//src/sys/component_manager/tests/fidl:components_rust",
     "//src/sys/component_manager/tests/services/src/fidl:fuchsia.examples_rust",
+    "//src/sys/lib/cm_rust",
+    "//src/sys/lib/cm_types",
     "//src/sys/lib/component-events",
     "//src/sys/lib/moniker",
     "//third_party/rust_crates:anyhow",
@@ -148,6 +151,7 @@ fuchsia_test_package("component-manager-services-tests") {
     ":multi-instance-echo-provider",
     ":service-routing-branch-onecoll",
     ":service-routing-branch-twocoll",
+    "//src/sys/component_manager:component-manager-realm-builder-cmp",
     "//src/sys/component_manager/testing/services_provider:provider-a-cmp",
     "//src/sys/component_manager/testing/services_provider:provider-b-cmp",
   ]
