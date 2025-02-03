@@ -28,7 +28,7 @@ use std::time::Duration;
 use target_holders::{daemon_protocol, moniker};
 use term_grid::Grid;
 #[cfg_attr(test, allow(unused))]
-use termion::terminal_size;
+use termion::{color, terminal_size};
 
 // This is to make the schema make sense as this plugin can output one of these based on the
 // subcommand. An alternative is to break this one plugin into multiple plugins each with their own
@@ -138,8 +138,11 @@ fn stats_to_print(trace_stat: ProviderStats, verbose: bool) -> Vec<String> {
         || (records_dropped != 0)
     {
         if records_dropped != 0 {
-            stats_output
-                .push(format!("WARNING: {provider_name:?} dropped {records_dropped:?} records!"));
+            stats_output.push(format!(
+                "{}WARNING: {provider_name:?} dropped {records_dropped:?} records!{}",
+                color::Fg(color::Yellow),
+                color::Fg(color::Reset)
+            ));
         }
         if verbose {
             stats_output.extend([
@@ -1847,8 +1850,13 @@ Current tracing status:
         stats.records_dropped = Some(10);
         stats.percentage_durable_buffer_used = Some(30.0);
         stats.non_durable_bytes_written = Some(40);
+        let _warn_str = format!(
+            "{}WARNING: \"provider_foo\" dropped 10 records!{}",
+            color::Fg(color::Yellow),
+            color::Fg(color::Reset)
+        );
         let mut expected_output = vec![
-            "WARNING: \"provider_foo\" dropped 10 records!",
+            &_warn_str,
             "\"provider_foo\" (pid: 1234) trace stats",
             "Buffer wrapped count: 10",
             "# records dropped: 10",
@@ -1860,7 +1868,7 @@ Current tracing status:
         assert_eq!(expected_output, actual_output);
 
         // Verify that dropped records warning is printed even if not verbose
-        expected_output = vec!["WARNING: \"provider_foo\" dropped 10 records!"];
+        expected_output = vec![&_warn_str];
         actual_output = stats_to_print(stats.clone(), false);
         assert_eq!(expected_output, actual_output);
 
