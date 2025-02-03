@@ -26,7 +26,8 @@ zx::result<Namespace> Namespace::Create(
     }
   }
   if (zx_status_t status =
-          fdio_ns_service_connect(self.incoming_, "/svc", server_end.TakeChannel().release());
+          fdio_ns_open3(self.incoming_, "/svc", uint64_t{fuchsia_io::wire::kPermReadable},
+                        server_end.TakeChannel().release());
       status != ZX_OK) {
     return zx::error(status);
   }
@@ -55,7 +56,8 @@ zx::result<Namespace> Namespace::Create(
     }
   }
   if (zx_status_t status =
-          fdio_ns_service_connect(self.incoming_, "/svc", server_end.TakeChannel().release());
+          fdio_ns_open3(self.incoming_, "/svc", uint64_t{fuchsia_io::wire::kPermReadable},
+                        server_end.TakeChannel().release());
       status != ZX_OK) {
     return zx::error(status);
   }

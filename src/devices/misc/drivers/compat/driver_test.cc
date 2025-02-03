@@ -608,17 +608,15 @@ class IncomingNamespace {
         }
       }
 
-      zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-      if (endpoints.is_error()) {
-        return endpoints.take_error();
-      }
-      if (zx::result result = outgoing.Serve(std::move(endpoints->server)); result.is_error()) {
+      auto [outgoing_client, outgoing_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+      if (zx::result result = outgoing.Serve(std::move(outgoing_server)); result.is_error()) {
         return result.take_error();
       }
       fidl::OneWayError error =
-          fidl::WireCall(endpoints->client)
-              ->Open(fuchsia_io::wire::OpenFlags::kDirectory, fuchsia_io::ModeType(), "svc",
-                     fidl::ServerEnd<fuchsia_io::Node>(svc_server.TakeChannel()));
+          fidl::WireCall(outgoing_client)
+              ->Open3("svc",
+                      fuchsia_io::wire::kPermReadable | fuchsia_io::wire::Flags::kProtocolDirectory,
+                      {}, svc_server.TakeChannel());
       if (!error.ok()) {
         return zx::error(error.status());
       }
