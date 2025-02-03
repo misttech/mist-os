@@ -52,6 +52,8 @@ class UserMemory {
 
   const fbl::RefPtr<VmAspace>& aspace() const { return mapping_->aspace(); }
 
+  const fbl::RefPtr<VmMapping>& mapping() const { return mapping_; }
+
   template <typename T>
   void put(const T& value, size_t i = 0) {
     zx_status_t status = user_out<T>().element_offset(i).copy_to_user(value);
@@ -87,12 +89,14 @@ class UserMemory {
     return mapping_->MapRange(offset, size, false, true);
   }
 
-  // Changes the mapping permissions to be a Read-Only Executable mapping.
-  zx_status_t MakeRX() {
-    return mapping_->Protect(
-        mapping_->base_locking(), mapping_->size_locking(),
-        ARCH_MMU_FLAG_PERM_USER | ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_EXECUTE);
+  zx_status_t Protect(uint flags, uint64_t offset = 0) {
+    ASSERT(offset < mapping_->size_locking());
+    return mapping_->Protect(mapping_->base_locking() + offset, mapping_->size_locking() - offset,
+                             ARCH_MMU_FLAG_PERM_USER | flags);
   }
+
+  // Changes the mapping permissions to be a Read-Only Executable mapping.
+  zx_status_t MakeRX() { return Protect(ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_EXECUTE); }
 
   // Read or write to the underlying VMO directly, bypassing the mapping.
   zx_status_t VmoRead(void* ptr, uint64_t offset, uint64_t len) {
