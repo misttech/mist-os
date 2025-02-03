@@ -14,7 +14,7 @@ group("tests") {
 
   deps = []
 
-  # TODO(https://fxbug.dev/28607) Re-enable when QEMU is able to detect USB devices
+  # TODO(https://fxbug.dev/42160026) Re-enable when QEMU is able to detect USB devices
   # attached at startup.
   # //tools/emulator only works on linux.
   # The installer only works on x64 targets which use FVM or Fxfs.
