@@ -109,7 +109,7 @@ impl CollectionRequest {
 }
 
 /// Interface for a Zircon job. This is useful to allow for dependency injection in tests.
-pub trait Job {
+pub trait Job: Send {
     /// Returns the Koid of the job.
     fn get_koid(&self) -> Result<zx::Koid, zx::Status>;
     /// Returns the name of the job.
@@ -209,7 +209,7 @@ impl Process for zx::Process {
 
 impl KernelResources {
     pub fn get_resources(
-        root: &Box<dyn Job>,
+        root: &dyn Job,
         attribution_state: &AttributionState,
     ) -> Result<KernelResources, zx::Status> {
         duration!(CATEGORY_MEMORY_CAPTURE, c"get_resources");
@@ -241,7 +241,7 @@ impl KernelResources {
         let mut kr_builder = KernelResourcesBuilder::default();
         let mut cache = Cache::default();
         let root_job_koid = root.get_koid().unwrap();
-        kr_builder.explore_job(&mut cache, &root_job_koid, &root, &process_collection_requests)?;
+        kr_builder.explore_job(&mut cache, &root_job_koid, root, &process_collection_requests)?;
         Ok(kr_builder.kernel_resources)
     }
 }
@@ -252,7 +252,7 @@ impl KernelResourcesBuilder {
         &mut self,
         cache: &mut Cache,
         koid: &zx::Koid,
-        job: &Box<dyn Job>,
+        job: &dyn Job,
         process_mapped: &HashMap<zx::Koid, CollectionRequest>,
     ) -> Result<(), zx::Status> {
         let job_name = job.get_name()?;
@@ -273,7 +273,7 @@ impl KernelResourcesBuilder {
                 }
                 Ok(child) => child,
             };
-            self.explore_job(cache, child_job_koid, &child_job, process_mapped)?;
+            self.explore_job(cache, child_job_koid, child_job.as_ref(), process_mapped)?;
         }
 
         for process_koid in &processes {
@@ -290,7 +290,7 @@ impl KernelResourcesBuilder {
             match self.explore_process(
                 cache,
                 process_koid,
-                child_process,
+                child_process.as_ref(),
                 process_mapped.get(process_koid),
             ) {
                 Err(s) => {
@@ -341,7 +341,7 @@ impl KernelResourcesBuilder {
         &mut self,
         cache: &mut Cache,
         koid: &zx::Koid,
-        process: Box<dyn Process>,
+        process: &dyn Process,
         collection: Option<&CollectionRequest>,
     ) -> Result<(), zx::Status> {
         let process_name = process.get_name()?;
@@ -440,19 +440,18 @@ impl KernelResourcesBuilder {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use std::mem::MaybeUninit;
     use std::vec;
 
-    use crate::attribution_client::{
-        AttributionProvider, AttributionState, LocalPrincipalIdentifier,
-    };
+    use crate::attribution_client::{AttributionProvider, AttributionState};
+    use crate::common::LocalPrincipalIdentifier;
     use fidl_fuchsia_memory_attribution as fattribution;
 
     use super::*;
 
     #[derive(Clone)]
-    struct FakeJob {
+    pub struct FakeJob {
         koid: zx::Koid,
         name: zx::Name,
         children: HashMap<zx::Koid, FakeJob>,
@@ -460,7 +459,7 @@ mod tests {
     }
 
     impl FakeJob {
-        fn new(
+        pub fn new(
             koid: u64,
             name: &str,
             children: Vec<FakeJob>,
@@ -510,7 +509,7 @@ mod tests {
     }
 
     #[derive(Clone)]
-    struct FakeProcess {
+    pub struct FakeProcess {
         koid: zx::Koid,
         name: zx::Name,
         vmos: Vec<zx::VmoInfo>,
@@ -518,7 +517,7 @@ mod tests {
     }
 
     impl FakeProcess {
-        fn new(
+        pub fn new(
             koid: u64,
             name: &str,
             vmos: Vec<zx::VmoInfo>,
@@ -583,7 +582,7 @@ mod tests {
         }
     }
 
-    fn simple_vmo_info(
+    pub fn simple_vmo_info(
         koid: u64,
         name: &str,
         parent: u64,
@@ -683,9 +682,8 @@ mod tests {
                 .collect(),
             },
         );
-        let kernel_resoures =
-            KernelResources::get_resources(&(root_job as Box<dyn Job>), &attribution_state)
-                .expect("Failed to gather resources");
+        let kernel_resoures = KernelResources::get_resources(root_job.as_ref(), &attribution_state)
+            .expect("Failed to gather resources");
 
         if let fplugin::ResourceType::Process(proc11) = kernel_resoures
             .resources

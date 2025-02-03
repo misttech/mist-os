@@ -19,9 +19,9 @@ ffx_plugin("ffx_profile_memory") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/writer:lib",
-    "//src/developer/ffx/plugins/profile/memory/common:ffx_profile_memory_common",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
+    "//src/performance/memory/attribution/processing",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
@@ -60,17 +60,10 @@ ffx_plugin("ffx_profile_memory") {
   ]
 }
 
-if (is_host) {
-  group("host_tests") {
-    testonly = true
-    deps = [ "common:ffx_profile_memory_common_test" ]
-  }
-}
-
 group("tests") {
   testonly = true
   deps = [
     ":ffx_profile_memory_tests($host_toolchain)",
-    "common:ffx_profile_memory_common_test($host_toolchain)",
+    "components:ffx_profile_memory_components_tests($host_toolchain)",
   ]
 }

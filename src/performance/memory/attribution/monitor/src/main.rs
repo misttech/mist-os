@@ -3,9 +3,13 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Error};
+use attribution_data::AttributionDataProviderImpl;
+use attribution_processing::kernel_statistics::KernelStatistics;
+use attribution_processing::AttributionDataProvider;
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
 use fuchsia_component::server::ServiceFs;
+use fuchsia_sync::Mutex;
 use fuchsia_trace::duration;
 use futures::StreamExt;
 use log::{error, warn};
@@ -21,6 +25,7 @@ use {
 };
 
 mod attribution_client;
+mod attribution_data;
 mod common;
 mod resources;
 mod snapshot;
@@ -52,7 +57,7 @@ async fn main() -> Result<(), Error> {
         .context("Error connecting to the root job")?
         .get()
         .await?;
-    let attribution_client = attribution_client::AttributionClient::new(
+    let attribution_client = attribution_client::AttributionClientImpl::new(
         attribution_provider,
         introspector,
         root_job.get_koid().context("Unable to get the root job's koid")?,
@@ -69,16 +74,30 @@ async fn main() -> Result<(), Error> {
         kernel_stats.clone(),
     ));
 
+    let root_job: Mutex<Box<dyn Job>> = Mutex::new(Box::new(
+        connect_to_protocol::<fkernel::RootJobForInspectMarker>()
+            .context("error connecting to the root job")?
+            .get()
+            .await?,
+    ));
+
+    let attribution_data_provider = AttributionDataProviderImpl::new(attribution_client, root_job);
+
     // Serves Fuchsia component inspection protocol
     // https://fuchsia.dev/fuchsia-src/development/diagnostics/inspect
-    let _inspect_nodes_service = inspect_nodes::start_service(kernel_stats.clone())?;
+    let _inspect_nodes_service =
+        inspect_nodes::start_service(attribution_data_provider.clone(), kernel_stats.clone())?;
 
     service_fs
         .for_each_concurrent(None, |stream| async {
             match stream {
                 Service::MemoryMonitor(stream) => {
-                    if let Err(error) =
-                        serve_client_stream(stream, &kernel_stats, attribution_client.clone()).await
+                    if let Err(error) = serve_client_stream(
+                        stream,
+                        attribution_data_provider.clone(),
+                        kernel_stats.clone(),
+                    )
+                    .await
                     {
                         warn!(error:%; "");
                     }
@@ -92,22 +111,18 @@ async fn main() -> Result<(), Error> {
 
 async fn serve_client_stream(
     mut stream: fattribution_plugin::MemoryMonitorRequestStream,
-    kernel_stats: &fidl_fuchsia_kernel::StatsProxy,
-    attribution_client: Arc<attribution_client::AttributionClient>,
+    attribution_data_provider: Arc<AttributionDataProviderImpl>,
+    kernel_stats_proxy: fkernel::StatsProxy,
 ) -> Result<(), Error> {
-    // Connect to root job
-    let root_job = Box::new(
-        connect_to_protocol::<fkernel::RootJobForInspectMarker>()
-            .context("error connecting to the root job")?
-            .get()
-            .await?,
-    ) as Box<dyn resources::Job>;
-
     while let Some(request) = stream.next().await.transpose()? {
         match request {
             fattribution_plugin::MemoryMonitorRequest::GetSnapshot { snapshot, control_handle } => {
-                if let Err(err) =
-                    provide_snapshot(&attribution_client, &root_job, &kernel_stats, snapshot).await
+                if let Err(err) = provide_snapshot(
+                    attribution_data_provider.clone(),
+                    kernel_stats_proxy.clone(),
+                    snapshot,
+                )
+                .await
                 {
                     // Errors from `serve_snapshot` are all internal errors, not client-induced.
                     error!(err:%; "");
@@ -124,25 +139,19 @@ async fn serve_client_stream(
 
 /// Constructs a [Snapshot] and sends it, serialized, through the `snapshot` socket.
 async fn provide_snapshot(
-    attribution_client: &Arc<attribution_client::AttributionClient>,
-    root_job: &Box<dyn resources::Job>,
-    kernel_stats: &fkernel::StatsProxy,
+    attribution_data_provider: Arc<AttributionDataProviderImpl>,
+    kernel_stats_proxy: fkernel::StatsProxy,
     snapshot: zx::Socket,
 ) -> Result<(), Error> {
     duration!(CATEGORY_MEMORY_CAPTURE, c"provide_snapshot");
-    let attribution_state = attribution_client.get_attributions();
-    let kernel_resources =
-        resources::KernelResources::get_resources(&root_job, &attribution_state)?;
+    let attribution_data = attribution_data_provider.get_attribution_data().await?;
 
-    let memory_stats = kernel_stats.get_memory_stats().await?;
-    let compression_stats = kernel_stats.get_memory_stats_compression().await?;
+    let kernel_stats = KernelStatistics {
+        memory_statistics: kernel_stats_proxy.get_memory_stats().await?,
+        compression_statistics: kernel_stats_proxy.get_memory_stats_compression().await?,
+    };
 
-    let attribution_snapshot = AttributionSnapshot::new(
-        attribution_state,
-        kernel_resources,
-        memory_stats,
-        compression_stats,
-    );
+    let attribution_snapshot = AttributionSnapshot::new(attribution_data, kernel_stats);
     attribution_snapshot.serve(snapshot).await;
     Ok(())
 }

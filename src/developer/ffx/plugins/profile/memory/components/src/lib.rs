@@ -7,16 +7,16 @@ mod output;
 
 #[macro_use]
 extern crate prettytable;
-use crate::output::{KernelStatistics, PluginOutput};
 use anyhow::Result;
 use async_trait::async_trait;
+use attribution_processing::kernel_statistics::KernelStatistics;
+use attribution_processing::summary::MemorySummary;
+use attribution_processing::{AttributionData, Principal, Resource};
 use errors::ffx_error;
 use ffx_profile_memory_components_args::ComponentsCommand;
-use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
+use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter, ToolIO};
 use futures::AsyncReadExt;
 use json::JsonConvertible;
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
 use target_holders::moniker;
 
 use fidl_fuchsia_memory_attribution_plugin as fplugin;
@@ -38,7 +38,7 @@ impl FfxMain for MemoryComponentsTool {
 
     /// Forwards the specified memory pressure level to the fuchsia.memory.debug.MemoryPressure FIDL
     /// interface.
-    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         let snapshot = match self.cmd.stdin_input {
             false => self.load_from_device().await?,
             true => {
@@ -49,8 +49,10 @@ impl FfxMain for MemoryComponentsTool {
         if self.cmd.debug_json {
             println!("{}", serde_json::to_string(&snapshot.to_json()).unwrap());
         } else {
-            let output = process_snapshot(snapshot);
-            println!("{}", output);
+            let (output, kernel_statistics) = process_snapshot(snapshot);
+            output::write_summary(&mut writer, &output, kernel_statistics)
+                .or_else(|e| writeln!(writer.stderr(), "Error: {}", e))
+                .map_err(|e| fho::Error::Unexpected(e.into()))?;
         }
         Ok(())
     }
@@ -76,459 +78,35 @@ impl MemoryComponentsTool {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
-struct PrincipalIdentifier(u64);
-
-impl From<fplugin::PrincipalIdentifier> for PrincipalIdentifier {
-    fn from(value: fplugin::PrincipalIdentifier) -> Self {
-        PrincipalIdentifier(value.id)
-    }
-}
-
-/// A Principal, that can use and claim memory.
-struct Principal {
-    // These fields are initialized from [fplugin::Principal].
-    identifier: PrincipalIdentifier,
-    description: fplugin::Description,
-    principal_type: fplugin::PrincipalType,
-
-    /// Principal that declared this Principal. None if this Principal is at the root of the system
-    /// hierarchy (the root principal is a statically defined Principal encompassing all resources
-    /// on the system). The Principal hierarchy forms a tree (no cycles).
-    parent: Option<PrincipalIdentifier>,
-
-    // These fields are computed from the rest of the [fplugin::Snapshot] data.
-    /// Map of attribution claims made about this Principal (this Principal is the subject of the
-    /// claim). This map goes from the source Principal to the attribution claim.
-    attribution_claims: HashMap<PrincipalIdentifier, fplugin::Attribution>,
-    /// KOIDs of resources attributed to this principal, after resolution of sharing and
-    /// reattributions.
-    resources: HashSet<u64>,
-}
-
-/// Creates a new [Principal] from a [fplugin::Principal] object. The [Principal] object will
-/// contain all the data from [fplugin::Principal] and have its other fields initialized empty.
-impl From<fplugin::Principal> for Principal {
-    fn from(value: fplugin::Principal) -> Self {
-        Principal {
-            identifier: value.identifier.unwrap().into(),
-            description: value.description.unwrap(),
-            principal_type: value.principal_type.unwrap(),
-            parent: value.parent.map(Into::into),
-            attribution_claims: HashMap::new(),
-            resources: HashSet::new(),
-        }
-    }
-}
-
-impl Principal {
-    fn name(&self) -> &str {
-        match &self.description {
-            fplugin::Description::Component(component_name) => component_name,
-            fplugin::Description::Part(part_name) => part_name,
-            fplugin::DescriptionUnknown!() => unimplemented!(),
-        }
-    }
-}
-
-/// Type of the claim, that changes depending on how the claim was created.
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
-enum ClaimType {
-    /// A principal claimed this resource directly.
-    Direct,
-    /// A principal claimed a resource that contains this resource (e.g. a process containing a
-    /// VMO).
-    Indirect,
-    /// A principal claimed a child of this resource (e.g. a copy-on-write VMO child of this VMO).
-    Child,
-}
-
-/// Attribution claim of a Principal on a Resource.
-///
-/// Note that this object is slightly different from the [fplugin::Attribution] object: it goes from
-/// a Resource to a Principal, and covers also indirect attribution claims of sub- and parent
-/// resources.
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
-struct Claim {
-    /// Principal to which the resources are attributed.
-    subject: PrincipalIdentifier,
-    /// Principal making the attribution claim.
-    source: PrincipalIdentifier,
-    claim_type: ClaimType,
-}
-
-#[derive(Debug)]
-pub struct Resource {
-    koid: u64,
-    name: String,
-    resource_type: fplugin::ResourceType,
-    claims: HashSet<Claim>,
-}
-
-// Claim with a boolean tag, to help find leaves in the claim assignment graph.
-struct TaggedClaim(Claim, bool);
-
-impl Resource {
-    fn from(value: fplugin::Resource, resource_names: &Vec<String>) -> Self {
-        Resource {
-            koid: value.koid.unwrap(),
-            name: resource_names.get(value.name_index.unwrap() as usize).unwrap().to_owned(),
-            resource_type: value.resource_type.unwrap(),
-            claims: HashSet::new(),
-        }
-    }
-
-    fn children(&self) -> Vec<u64> {
-        match &self.resource_type {
-            fplugin::ResourceType::Job(job) => {
-                let mut r: Vec<u64> = job.child_jobs.iter().flatten().map(|k| *k).collect();
-                r.extend(job.processes.iter().flatten().map(|k| *k));
-                if r.len() == 0 {
-                    eprintln!("{} has no processes", self.name);
-                }
-                r
-            }
-            fplugin::ResourceType::Process(process) => {
-                process.vmos.iter().flatten().map(|k| *k).collect()
-            }
-            fplugin::ResourceType::Vmo(_) => Vec::new(),
-            _ => todo!(),
-        }
-    }
-
-    /// Process the claims made on this resource to disambiguate between reassignment and sharing.
-    ///
-    /// [process_claims] looks at each claim made on this resource, and removes claims that are
-    /// reassigned by another claim. This happens if a principal A gives a resource to principal B,
-    /// and B then gives it to principal C. However, if two independent principals claim this
-    /// resource, then both their claims are kept.
-    /// This is done by:
-    /// (i)  preserving all self claims, and
-    /// (ii) preserving only leaves in the DAG following claim.source to claim.subject edges.
-    fn process_claims(&mut self) {
-        let mut claims_by_source: HashMap<PrincipalIdentifier, RefCell<Vec<TaggedClaim>>> =
-            Default::default();
-        let mut self_claims = Vec::new();
-
-        for claim in self.claims.iter().cloned() {
-            if claim.source == claim.subject {
-                // Self claims are taken out of the graph because they are never transferred. This
-                // is to implement sharing.
-                self_claims.push(claim);
-            } else {
-                claims_by_source
-                    .entry(claim.source)
-                    .or_default()
-                    .borrow_mut()
-                    .push(TaggedClaim(claim, false));
-            }
-        }
-
-        self.claims = self_claims.into_iter().collect();
-        for (_, claimlist_refcell) in claims_by_source.iter() {
-            let mut claimlist = claimlist_refcell.borrow_mut();
-            for tagged_claim in claimlist.iter_mut() {
-                self.claims.extend(
-                    Resource::process_claims_recursive(tagged_claim, &claims_by_source).into_iter(),
-                );
-            }
-        }
-    }
-
-    /// Recursively look at claims to find the ones that are not reassigned.
-    fn process_claims_recursive(
-        tagged_claim: &mut TaggedClaim,
-        claims: &HashMap<PrincipalIdentifier, RefCell<Vec<TaggedClaim>>>,
-    ) -> Vec<Claim> {
-        let claim = match tagged_claim.1 {
-            true => {
-                // We have visited this claim already, we can skip.
-                return vec![];
-            }
-            false => {
-                // We tag visited claims, so we don't visit them again.
-                tagged_claim.1 = true;
-                tagged_claim.0
-            }
-        };
-        let subject = &claim.subject;
-        // We find if this claim has been reassigned.
-        let mut subject_claims = match claims.get(subject) {
-            Some(value_ref) => {
-                // [subject_claims] mutable borrow is held when recursing below, and
-                // [RefCell::try_borrow_mut] returns an error if called when a mutable borrow is
-                // already held. This ensures an error will be thrown at runtime if there is a
-                // cycle.
-                value_ref.try_borrow_mut().expect("Claims form a cycle, this is not supported")
-            }
-            None => {
-                // The claim is not reassigned, we keep the claim.
-                return vec![claim];
-            }
-        };
-        let mut leaves = vec![];
-        for subject_claim in subject_claims.iter_mut() {
-            leaves.append(&mut Resource::process_claims_recursive(subject_claim, claims));
-        }
-        leaves
-    }
-}
-
-/// Process a [fplugin::Snapshot] to resolve claims.
-fn process_snapshot(snapshot: fplugin::Snapshot) -> PluginOutput {
+fn process_snapshot(snapshot: fplugin::Snapshot) -> (MemorySummary, KernelStatistics) {
     // Map from moniker token ID to Principal struct.
-    let principals: HashMap<PrincipalIdentifier, RefCell<Principal>> = snapshot
-        .principals
-        .into_iter()
-        .flatten()
-        .map(|p| (p.identifier.unwrap().into(), RefCell::new(p.into())))
-        .collect();
+    let principals: Vec<Principal> =
+        snapshot.principals.into_iter().flatten().map(|p| p.into()).collect();
 
     // Map from kernel resource koid to Resource struct.
-    let mut resources: HashMap<u64, RefCell<Resource>> = snapshot
-        .resources
-        .into_iter()
-        .flatten()
-        .map(|r| {
-            (
-                r.koid.unwrap(),
-                RefCell::new(Resource::from(r, snapshot.resource_names.as_ref().unwrap())),
-            )
-        })
-        .collect();
+    let resources: Vec<Resource> =
+        snapshot.resources.into_iter().flatten().map(|r| r.into()).collect();
     // Map from subject moniker token ID to Attribution struct.
-    let attributions = snapshot.attributions.unwrap();
+    let attributions = snapshot.attributions.unwrap().into_iter().map(|a| a.into()).collect();
 
-    // Add direct claims to resources.
-    for attribution in attributions {
-        principals.get(&attribution.subject.clone().unwrap().into()).map(|p| {
-            p.borrow_mut()
-                .attribution_claims
-                .insert(attribution.source.unwrap().into(), attribution.clone())
-        });
-        for resource in attribution.resources.unwrap() {
-            match resource {
-                fplugin::ResourceReference::KernelObject(koid) => {
-                    if !resources.contains_key(&koid) {
-                        continue;
-                    }
-                    resources.get_mut(&koid).unwrap().get_mut().claims.insert(Claim {
-                        source: attribution.source.unwrap().into(),
-                        subject: attribution.subject.unwrap().into(),
-                        claim_type: ClaimType::Direct,
-                    });
-                }
-                fplugin::ResourceReference::ProcessMapped(fplugin::ProcessMapped {
-                    process,
-                    base,
-                    len,
-                }) => {
-                    if !resources.contains_key(&process) {
-                        continue;
-                    }
-                    let mut matched_vmos = Vec::new();
-                    if let fplugin::ResourceType::Process(process_data) =
-                        &resources.get(&process).unwrap().borrow().resource_type
-                    {
-                        for mapping in process_data.mappings.iter().flatten() {
-                            // We consider an entire VMO to be matched if it has a mapping
-                            // within the claimed region.
-                            if mapping.address_base.unwrap() >= base
-                                && mapping.address_base.unwrap() + mapping.size.unwrap()
-                                    <= base + len
-                            {
-                                matched_vmos.push(mapping.vmo.unwrap());
-                            }
-                        }
-                    }
-                    for vmo_koid in matched_vmos {
-                        match resources.get_mut(&vmo_koid) {
-                            Some(resource) => {
-                                resource.get_mut().claims.insert(Claim {
-                                    source: attribution.source.unwrap().into(),
-                                    subject: attribution.subject.unwrap().into(),
-                                    claim_type: ClaimType::Direct,
-                                });
-                            }
-                            None => {
-                                // The VMO is unknown. This can happen when a VMO is created between
-                                // the collection of the list of VMOs and the collection of the
-                                // process mappings.
-                            }
-                        }
-                    }
-                }
-                fplugin::ResourceReference::__SourceBreaking { unknown_ordinal: _ } => {}
-            }
-        }
-    }
-
-    // Propagate claims. We propagate direct claims to child resources recursively until we hit a
-    // resource that is directly claimed: this is because we consider that attributors deeper in the
-    // principal hierarchy will not attribute resources higher in the resource hierarchy than the
-    // ones attributed by their ancestors (ie. attribution is always more precise as we go deeper).
-    for (_, resource_refcell) in &resources {
-        let resource = resource_refcell.borrow_mut();
-        // Extract the list of direct claims to propagate.
-        let direct_claims: Vec<&Claim> = resource
-            .claims
-            .iter()
-            .filter(|claim| match claim.claim_type {
-                ClaimType::Direct => true,
-                _ => false,
-            })
-            .collect();
-
-        if direct_claims.is_empty() {
-            // There is no direct claim to propagate, we can skip this resource.
-            continue;
-        }
-
-        let propagated_claims: Vec<Claim> = direct_claims
-            .into_iter()
-            .map(|claim| Claim {
-                source: claim.source,
-                subject: claim.subject,
-                claim_type: ClaimType::Indirect,
-            })
-            .collect();
-        let mut frontier = Vec::new();
-        frontier.extend(resource.children());
-        while !frontier.is_empty() {
-            let child = frontier.pop().unwrap();
-            let mut child_resource = match resources.get(&child) {
-                Some(resource) => resource.borrow_mut(),
-                None => {
-                    // This can happen if a resource is created or disappears while we were
-                    // collecting information about all the resources in the system. This should
-                    // remain a rare event.
-                    println!("Resource {} not found", child);
-                    continue;
-                }
-            };
-            if child_resource.claims.iter().any(|c| c.claim_type == ClaimType::Direct) {
-                // If there is a direct claim on the resource, don't propagate.
-                continue;
-            }
-            child_resource.claims.extend(propagated_claims.clone().iter());
-            frontier.extend(child_resource.children().iter());
-        }
-    }
-
-    for (_, resource_refcell) in &resources {
-        let mut resource = resource_refcell.borrow_mut();
-        resource.process_claims();
-    }
-
-    // Push claimed resources to principals. We are interested in VMOs as the VMOs are the resources
-    // actually holding memory. We also keep track of the process to display its name in the output.
-    for (resource_id, resource_refcell) in &resources {
-        let resource = resource_refcell.borrow();
-        if let fplugin::ResourceType::Vmo(vmo) = &resource.resource_type {
-            let mut ancestors = vec![*resource_id];
-            let mut current_parent = vmo.parent;
-            // Add the parents of a VMO as "Child" claims. This is done so that clones of VMOs,
-            // with possibly no memory of their own, get attributed the resources of their parent.
-            while let Some(parent_koid) = current_parent {
-                if parent_koid == 0 {
-                    panic!("Parent is not None but 0.");
-                }
-                ancestors.push(parent_koid);
-                let mut current_resource = match resources.get(&parent_koid) {
-                    Some(res) => res.borrow_mut(),
-                    None => break,
-                };
-                current_resource.claims.extend(resource.claims.iter().map(|c| Claim {
-                    subject: c.subject,
-                    source: c.source,
-                    claim_type: ClaimType::Child,
-                }));
-                current_parent = match &current_resource.resource_type {
-                    fplugin::ResourceType::Job(_) => panic!("This should not happen"),
-                    fplugin::ResourceType::Process(_) => panic!("This should not happen"),
-                    fplugin::ResourceType::Vmo(current_vmo) => current_vmo.parent,
-                    _ => unimplemented!(),
-                };
-            }
-
-            for claim in &resource.claims {
-                principals
-                    .get(&claim.subject)
-                    .unwrap()
-                    .borrow_mut()
-                    .resources
-                    .extend(ancestors.iter());
-            }
-        } else if let fplugin::ResourceType::Process(_) = &resource.resource_type {
-            for claim in &resource.claims {
-                principals
-                    .get(&claim.subject)
-                    .unwrap()
-                    .borrow_mut()
-                    .resources
-                    .insert(resource.koid);
-            }
-        }
-    }
-
-    let raw_kernel_stats = snapshot.kernel_statistics.unwrap();
-    let kernel_stats = KernelStatistics {
-        total: raw_kernel_stats.memory_stats.as_ref().unwrap().total_bytes.unwrap(),
-        free: raw_kernel_stats.memory_stats.as_ref().unwrap().free_bytes.unwrap(),
-        kernel_total: raw_kernel_stats.memory_stats.as_ref().unwrap().wired_bytes.unwrap()
-            + raw_kernel_stats.memory_stats.as_ref().unwrap().total_heap_bytes.unwrap()
-            + raw_kernel_stats.memory_stats.as_ref().unwrap().mmu_overhead_bytes.unwrap()
-            + raw_kernel_stats.memory_stats.as_ref().unwrap().ipc_bytes.unwrap(),
-        wired: raw_kernel_stats.memory_stats.as_ref().unwrap().wired_bytes.unwrap(),
-        total_heap: raw_kernel_stats.memory_stats.as_ref().unwrap().total_heap_bytes.unwrap(),
-        vmo: raw_kernel_stats.memory_stats.as_ref().unwrap().vmo_bytes.unwrap(),
-        mmu: raw_kernel_stats.memory_stats.as_ref().unwrap().mmu_overhead_bytes.unwrap(),
-        ipc: raw_kernel_stats.memory_stats.as_ref().unwrap().ipc_bytes.unwrap(),
-        other: raw_kernel_stats.memory_stats.as_ref().unwrap().other_bytes.unwrap(),
-        zram_compressed_total: raw_kernel_stats.memory_stats.as_ref().unwrap().zram_bytes.unwrap(),
-        vmo_reclaim_total_bytes: raw_kernel_stats
-            .memory_stats
-            .as_ref()
-            .unwrap()
-            .vmo_reclaim_total_bytes
-            .unwrap(),
-        vmo_reclaim_newest_bytes: raw_kernel_stats
-            .memory_stats
-            .as_ref()
-            .unwrap()
-            .vmo_reclaim_newest_bytes
-            .unwrap(),
-        vmo_reclaim_oldest_bytes: raw_kernel_stats
-            .memory_stats
-            .as_ref()
-            .unwrap()
-            .vmo_reclaim_oldest_bytes
-            .unwrap(),
-        vmo_reclaim_disabled_bytes: raw_kernel_stats
-            .memory_stats
-            .as_ref()
-            .unwrap()
-            .vmo_reclaim_disabled_bytes
-            .unwrap(),
-        vmo_discardable_locked_bytes: raw_kernel_stats
-            .memory_stats
-            .as_ref()
-            .unwrap()
-            .vmo_discardable_locked_bytes
-            .unwrap(),
-        vmo_discardable_unlocked_bytes: raw_kernel_stats
-            .memory_stats
-            .as_ref()
-            .unwrap()
-            .vmo_discardable_unlocked_bytes
-            .unwrap(),
-    };
-    PluginOutput::build(principals, resources, kernel_stats)
+    (
+        attribution_processing::attribute_vmos(AttributionData {
+            principals_vec: principals,
+            resources_vec: resources,
+            resource_names: snapshot.resource_names.unwrap(),
+            attributions,
+        })
+        .summary(),
+        snapshot.kernel_statistics.unwrap().into(),
+    )
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
+    use attribution_processing::summary::{PrincipalSummary, VmoSummary};
     use fidl_fuchsia_memory_attribution_plugin as fplugin;
 
     #[test]
@@ -849,17 +427,17 @@ mod tests {
             ..Default::default()
         };
 
-        let output = process_snapshot(snapshot);
+        let (output, _) = process_snapshot(snapshot);
 
         assert_eq!(output.undigested, 0);
         assert_eq!(output.principals.len(), 4);
 
-        let principals: HashMap<u64, output::PrincipalOutput> =
+        let principals: HashMap<u64, PrincipalSummary> =
             output.principals.into_iter().map(|p| (p.id, p)).collect();
 
         assert_eq!(
             principals.get(&0).unwrap(),
-            &output::PrincipalOutput {
+            &PrincipalSummary {
                 id: 0,
                 name: "root".to_owned(),
                 principal_type: "R".to_owned(),
@@ -874,7 +452,7 @@ mod tests {
                 vmos: vec![
                     (
                         "root_vmo".to_owned(),
-                        output::VmoOutput {
+                        VmoSummary {
                             count: 1,
                             committed_private: 1024,
                             committed_scaled: 1024.0,
@@ -887,7 +465,7 @@ mod tests {
                     ),
                     (
                         "shared_vmo".to_owned(),
-                        output::VmoOutput {
+                        VmoSummary {
                             count: 1,
                             committed_private: 0,
                             committed_scaled: 512.0,
@@ -906,7 +484,7 @@ mod tests {
 
         assert_eq!(
             principals.get(&1).unwrap(),
-            &output::PrincipalOutput {
+            &PrincipalSummary {
                 id: 1,
                 name: "runner".to_owned(),
                 principal_type: "R".to_owned(),
@@ -920,7 +498,7 @@ mod tests {
                 processes: vec!["runner_process (1005)".to_owned()],
                 vmos: vec![(
                     "runner_vmo".to_owned(),
-                    output::VmoOutput {
+                    VmoSummary {
                         count: 1,
                         committed_private: 1024,
                         committed_scaled: 1024.0,
@@ -938,7 +516,7 @@ mod tests {
 
         assert_eq!(
             principals.get(&2).unwrap(),
-            &output::PrincipalOutput {
+            &PrincipalSummary {
                 id: 2,
                 name: "component 2".to_owned(),
                 principal_type: "R".to_owned(),
@@ -953,7 +531,7 @@ mod tests {
                 vmos: vec![
                     (
                         "shared_vmo".to_owned(),
-                        output::VmoOutput {
+                        VmoSummary {
                             count: 1,
                             committed_private: 0,
                             committed_scaled: 512.0,
@@ -966,7 +544,7 @@ mod tests {
                     ),
                     (
                         "2_vmo".to_owned(),
-                        output::VmoOutput {
+                        VmoSummary {
                             count: 1,
                             committed_private: 1024,
                             committed_scaled: 1024.0,
@@ -979,7 +557,7 @@ mod tests {
                     ),
                     (
                         "2_vmo_parent".to_owned(),
-                        output::VmoOutput {
+                        VmoSummary {
                             count: 1,
                             committed_private: 1024,
                             committed_scaled: 1024.0,
@@ -998,7 +576,7 @@ mod tests {
 
         assert_eq!(
             principals.get(&3).unwrap(),
-            &output::PrincipalOutput {
+            &PrincipalSummary {
                 id: 3,
                 name: "component 3".to_owned(),
                 principal_type: "R".to_owned(),
@@ -1013,7 +591,7 @@ mod tests {
                 vmos: vec![
                     (
                         "component_vmo".to_owned(),
-                        output::VmoOutput {
+                        VmoSummary {
                             count: 1,
                             committed_private: 128,
                             committed_scaled: 128.0,
@@ -1026,7 +604,7 @@ mod tests {
                     ),
                     (
                         "component_vmo_mapped".to_owned(),
-                        output::VmoOutput {
+                        VmoSummary {
                             count: 1,
                             committed_private: 1024,
                             committed_scaled: 1024.0,
@@ -1039,7 +617,7 @@ mod tests {
                     ),
                     (
                         "component_vmo_mapped2".to_owned(),
-                        output::VmoOutput {
+                        VmoSummary {
                             count: 1,
                             committed_private: 1024,
                             committed_scaled: 1024.0,
@@ -1209,17 +787,17 @@ mod tests {
             ..Default::default()
         };
 
-        let output = process_snapshot(snapshot);
+        let (output, _) = process_snapshot(snapshot);
 
         assert_eq!(output.undigested, 0);
         assert_eq!(output.principals.len(), 3);
 
-        let principals: HashMap<u64, output::PrincipalOutput> =
+        let principals: HashMap<u64, PrincipalSummary> =
             output.principals.into_iter().map(|p| (p.id, p)).collect();
 
         assert_eq!(
             principals.get(&0).unwrap(),
-            &output::PrincipalOutput {
+            &PrincipalSummary {
                 id: 0,
                 name: "root".to_owned(),
                 principal_type: "R".to_owned(),
@@ -1237,7 +815,7 @@ mod tests {
 
         assert_eq!(
             principals.get(&1).unwrap(),
-            &output::PrincipalOutput {
+            &PrincipalSummary {
                 id: 1,
                 name: "component 1".to_owned(),
                 principal_type: "R".to_owned(),
@@ -1255,7 +833,7 @@ mod tests {
 
         assert_eq!(
             principals.get(&2).unwrap(),
-            &output::PrincipalOutput {
+            &PrincipalSummary {
                 id: 2,
                 name: "component 2".to_owned(),
                 principal_type: "R".to_owned(),
@@ -1269,7 +847,7 @@ mod tests {
                 processes: vec!["component_process (1002)".to_owned()],
                 vmos: vec![(
                     "component_vmo".to_owned(),
-                    output::VmoOutput {
+                    VmoSummary {
                         count: 1,
                         committed_private: 1024,
                         committed_scaled: 1024.0,
