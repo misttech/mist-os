@@ -15,6 +15,7 @@ rustc_library("fidl_fuchsia_net_ndp_ext") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/network/fidl_fuchsia_net_ext",
     "//src/lib/network/packet",
+    "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:thiserror",
   ]
   test_deps = [

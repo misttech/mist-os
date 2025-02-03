@@ -4,6 +4,8 @@
 
 use std::num::NonZeroU64;
 
+use derivative::Derivative;
+
 use {fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_ndp as fnet_ndp};
 
 /// Errors regarding the length of an NDP option body observed in an
@@ -26,38 +28,44 @@ pub enum BodyLengthError {
 /// length is guaranteed to be such that if it were prepended with a type octet
 /// and a length octet to match the format described in RFC 4861 section 4.6,
 /// its length would be a multiple of 8 octets (as required by the RFC).
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct OptionBody {
-    bytes: Vec<u8>,
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Derivative)]
+#[derivative(Debug)]
+pub struct OptionBody<B = Vec<u8>> {
+    // Avoid including this in debug logs in order to avoid defeating privacy
+    // redaction.
+    #[derivative(Debug = "ignore")]
+    bytes: B,
 }
 
-impl OptionBody {
-    pub fn new(bytes: Vec<u8>) -> Result<Self, BodyLengthError> {
-        if bytes.len() > fnet_ndp::MAX_OPTION_BODY_LENGTH as usize {
+impl<B> OptionBody<B> {
+    fn into_inner(self) -> B {
+        self.bytes
+    }
+}
+
+impl<B: AsRef<[u8]>> OptionBody<B> {
+    pub fn new(bytes: B) -> Result<Self, BodyLengthError> {
+        let len = bytes.as_ref().len();
+        if len > fnet_ndp::MAX_OPTION_BODY_LENGTH as usize {
             return Err(BodyLengthError::MaxLengthExceeded);
         }
-        if (bytes.len() + 2) % 8 != 0 {
+        if (len + 2) % 8 != 0 {
             return Err(BodyLengthError::NotMultipleOf8);
         }
         Ok(Self { bytes })
     }
 
-    fn into_inner(self) -> Vec<u8> {
-        self.bytes
-    }
-}
-
-impl AsRef<[u8]> for OptionBody {
     fn as_ref(&self) -> &[u8] {
         self.bytes.as_ref()
     }
-}
 
-impl AsMut<[u8]> for OptionBody {
-    fn as_mut(&mut self) -> &mut [u8] {
-        self.bytes.as_mut()
+    pub fn to_owned(&self) -> OptionBody {
+        let Self { bytes } = self;
+        OptionBody { bytes: bytes.as_ref().to_vec() }
     }
 }
+
+pub type OptionBodyRef<'a> = OptionBody<&'a [u8]>;
 
 /// Errors observed while converting from FIDL types to this extension crate's
 /// domain types.
