@@ -1189,28 +1189,49 @@ pub fn sys_getrlimit(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     resource: u32,
-    user_rlimit: UserRef<rlimit>,
+    user_rlimit: PrLimitRef,
 ) -> Result<(), Errno> {
-    do_prlimit64(locked, current_task, 0, resource, Default::default(), user_rlimit.into())
+    do_prlimit64(locked, current_task, 0, resource, Default::default(), user_rlimit)
 }
 
 pub fn sys_setrlimit(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     resource: u32,
-    user_rlimit: UserRef<rlimit>,
+    user_rlimit: PrLimitRef,
 ) -> Result<(), Errno> {
-    do_prlimit64(locked, current_task, 0, resource, user_rlimit.into(), Default::default())
+    do_prlimit64(locked, current_task, 0, resource, user_rlimit, Default::default())
 }
 
-pub fn do_prlimit64(
+pub fn sys_prlimit64(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    pid: pid_t,
+    user_resource: u32,
+    new_limit_ref: UserRef<uapi::rlimit>,
+    old_limit_ref: UserRef<uapi::rlimit>,
+) -> Result<(), Errno> {
+    do_prlimit64::<uapi::rlimit>(
+        locked,
+        current_task,
+        pid,
+        user_resource,
+        new_limit_ref.into(),
+        old_limit_ref.into(),
+    )
+}
+
+pub fn do_prlimit64<T>(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     user_resource: u32,
-    new_limit_ref: PrLimitRef,
-    old_limit_ref: PrLimitRef,
-) -> Result<(), Errno> {
+    new_limit_ref: MultiArchUserRef<uapi::rlimit, T>,
+    old_limit_ref: MultiArchUserRef<uapi::rlimit, T>,
+) -> Result<(), Errno>
+where
+    T: FromBytes + IntoBytes + Immutable + From<uapi::rlimit> + Into<uapi::rlimit>,
+{
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
 
@@ -1274,24 +1295,6 @@ pub fn do_prlimit64(
         current_task.write_multi_arch_object(old_limit_ref, old_limit)?;
     }
     Ok(())
-}
-
-pub fn sys_prlimit64(
-    locked: &mut Locked<'_, Unlocked>,
-    current_task: &CurrentTask,
-    pid: pid_t,
-    user_resource: u32,
-    user_new_limit: UserRef<rlimit>,
-    user_old_limit: UserRef<rlimit>,
-) -> Result<(), Errno> {
-    do_prlimit64(
-        locked,
-        current_task,
-        pid,
-        user_resource,
-        user_new_limit.into(),
-        user_old_limit.into(),
-    )
 }
 
 pub fn sys_quotactl(
@@ -1896,43 +1899,9 @@ pub fn sys_vhangup(
 // Syscalls for arch32 usage
 #[cfg(feature = "arch32")]
 mod arch32 {
-    use crate::task::syscalls::{do_prlimit64, PrLimitRef};
-    use crate::task::CurrentTask;
-    use starnix_sync::{Locked, Unlocked};
-    use starnix_uapi::errors::Errno;
-    use starnix_uapi::uapi;
-    use starnix_uapi::user_address::UserRef;
-
-    pub fn sys_arch32_ugetrlimit(
-        locked: &mut Locked<'_, Unlocked>,
-        current_task: &CurrentTask,
-        resource: u32,
-        user_rlimit: UserRef<uapi::arch32::rlimit>,
-    ) -> Result<(), Errno> {
-        do_prlimit64(
-            locked,
-            current_task,
-            0,
-            resource,
-            Default::default(),
-            PrLimitRef::from_32(user_rlimit),
-        )
-    }
-    pub fn sys_arch32_setrlimit(
-        locked: &mut Locked<'_, Unlocked>,
-        current_task: &CurrentTask,
-        resource: u32,
-        user_rlimit: UserRef<uapi::arch32::rlimit>,
-    ) -> Result<(), Errno> {
-        do_prlimit64(
-            locked,
-            current_task,
-            0,
-            resource,
-            PrLimitRef::from_32(user_rlimit),
-            Default::default(),
-        )
-    }
+    pub use super::{
+        sys_getrlimit as sys_arch32_ugetrlimit, sys_setrlimit as sys_arch32_setrlimit,
+    };
 }
 
 #[cfg(feature = "arch32")]
