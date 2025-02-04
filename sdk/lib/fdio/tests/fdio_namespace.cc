@@ -13,6 +13,10 @@
 #include <zircon/errors.h>
 #include <zircon/processargs.h>
 
+#include <cstddef>
+#include <latch>
+#include <thread>
+
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
@@ -294,6 +298,47 @@ TEST(NamespaceTest, ConnectOversizedPathComponent) {
   EXPECT_STATUS(fdio_ns_open3(ns, long_path_component.c_str(), 0u, ch0.release()), ZX_ERR_BAD_PATH);
 
   ASSERT_OK(fdio_ns_destroy(ns));
+}
+
+TEST(NamespaceTest, ExportBindUnbindRace) {
+  fdio_ns_t* ns;
+  ASSERT_OK(fdio_ns_create(&ns));
+  auto destroy = fit::defer([ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
+
+  constexpr int8_t num_threads = 5;
+  std::latch latch(static_cast<ptrdiff_t>(2) * num_threads);
+
+  std::vector<std::thread> threads;
+  for (int8_t i = 0; i < num_threads; ++i) {
+    threads.emplace_back(
+        [&](char c) {
+          std::ostringstream path;
+          path << "/" << c;
+          const std::string path_str = path.str();
+
+          zx::channel ch0, ch1;
+          ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
+
+          latch.arrive_and_wait();
+
+          ASSERT_OK(fdio_ns_bind(ns, path_str.c_str(), ch0.release()));
+          ASSERT_OK(fdio_ns_unbind(ns, path_str.c_str()));
+        },
+        'A' + i);
+
+    threads.emplace_back([&]() {
+      fdio_flat_namespace_t* flat;
+
+      latch.arrive_and_wait();
+
+      ASSERT_OK(fdio_ns_export(ns, &flat));
+      fdio_ns_free_flat_ns(flat);
+    });
+  }
+
+  for (auto& thread : threads) {
+    thread.join();
+  }
 }
 
 TEST(NamespaceTest, BindShadowingFails) {
