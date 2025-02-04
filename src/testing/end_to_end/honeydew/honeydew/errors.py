@@ -114,10 +114,6 @@ class HoneydewDataResourceError(HoneydewError):
     """Raised when Honeydew fails to fetch its data resources."""
 
 
-class HoneydewLocationError(HoneydewError):
-    """Raised by location affordance."""
-
-
 class TracingError(HoneydewError):
     """Raised by tracing affordance."""
 

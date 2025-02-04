@@ -46,9 +46,9 @@ from honeydew.affordances.connectivity.wlan.wlan_policy_ap import (
     wlan_policy_ap_using_fc,
 )
 from honeydew.affordances.ffx import inspect as inspect_ffx
-from honeydew.affordances.fuchsia_controller import location as location_fc
 from honeydew.affordances.fuchsia_controller import rtc as rtc_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
+from honeydew.affordances.location import location, location_using_fc
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller as system_power_state_controller_interface,
 )
@@ -572,13 +572,13 @@ class FuchsiaDevice(
         )
 
     @properties.Affordance
-    def location(self) -> location_fc.Location:
+    def location(self) -> location.Location:
         """Returns a location affordance object.
 
         Returns:
             location.Location object
         """
-        return location_fc.Location(
+        return location_using_fc.LocationUsingFc(
             device_name=self.device_name,
             ffx=self.ffx,
             fuchsia_controller=self.fuchsia_controller,

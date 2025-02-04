@@ -21,19 +21,11 @@ if (is_host) {
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
   }
-
-  python_host_test("location_fc_test") {
-    main_source = "location_test.py"
-    libraries = [ "//src/testing/end_to_end/honeydew" ]
-    main_callable = "unittest.main"
-    extra_args = [ "-v" ]
-  }
 }
 
 group("tests") {
   testonly = true
   public_deps = [
-    ":location_fc_test($host_toolchain)",
     ":rtc_fc_test($host_toolchain)",
     ":tracing_fc_test($host_toolchain)",
   ]

@@ -9,7 +9,8 @@ import fidl.fuchsia_location_namedplace as f_location_namedplace
 from fuchsia_controller_py import ZxStatus
 
 from honeydew import errors
-from honeydew.interfaces.affordances import location
+from honeydew.affordances.location import location
+from honeydew.affordances.location.errors import HoneydewLocationError
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.transports import ffx as ffx_transport
 from honeydew.interfaces.transports import fuchsia_controller as fc_transport
@@ -29,7 +30,7 @@ _REGULATORY_REGION_CONFIGURATOR_PROXY = FidlEndpoint(
 )
 
 
-class Location(location.Location):
+class LocationUsingFc(location.Location):
     """Location affordance implemented with Fuchsia Controller."""
 
     def __init__(
@@ -111,7 +112,7 @@ class Location(location.Location):
             self._regulatory_region_configurator.set_region(region=region_code)
         except ZxStatus as status:
             _LOGGER.error("set_region zxstatus error = %s", status)
-            raise errors.HoneydewLocationError(
+            raise HoneydewLocationError(
                 f"RegulatoryRegionConfigurator.SetRegion() error {status}"
             ) from status
 

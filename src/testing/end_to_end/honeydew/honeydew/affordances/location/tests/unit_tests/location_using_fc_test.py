@@ -10,8 +10,9 @@ from unittest import mock
 import fidl.fuchsia_location_namedplace as f_location_namedplace
 from fuchsia_controller_py import ZxStatus
 
-from honeydew.affordances.fuchsia_controller import location
-from honeydew.errors import HoneydewLocationError, NotSupportedError
+from honeydew.affordances.location import location_using_fc
+from honeydew.affordances.location.errors import HoneydewLocationError
+from honeydew.errors import NotSupportedError
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import fuchsia_controller as fc_transport
@@ -44,10 +45,10 @@ class LocationFCTests(unittest.TestCase):
         )
 
         self.ffx_transport_obj.run.return_value = "".join(
-            location._REQUIRED_CAPABILITIES
+            location_using_fc._REQUIRED_CAPABILITIES
         )
 
-        self.location_obj = location.Location(
+        self.location_obj = location_using_fc.LocationUsingFc(
             device_name="fuchsia-emulator",
             ffx=self.ffx_transport_obj,
             fuchsia_controller=self.fc_transport_obj,
@@ -59,7 +60,7 @@ class LocationFCTests(unittest.TestCase):
         self.ffx_transport_obj.run.return_value = ""
 
         with self.assertRaises(NotSupportedError):
-            self.location_obj = location.Location(
+            self.location_obj = location_using_fc.LocationUsingFc(
                 device_name="fuchsia-emulator",
                 ffx=self.ffx_transport_obj,
                 fuchsia_controller=self.fc_transport_obj,
