@@ -297,7 +297,7 @@ zx::result<fbl::RefPtr<Driver>> Driver::Load(std::string url, zx::vmo vmo,
   if (registration == nullptr) {
     LOGF(
         ERROR,
-        "__fuchsia_driver_registration__ symbol not available, falling back to __fuchsia_driver_lifecycle__.",
+        "Failed to start driver '%s': __fuchsia_driver_registration__ symbol not available, does the driver have FUCHSIA_DRIVER_EXPORT?",
         url.data());
     return zx::error(ZX_ERR_NOT_FOUND);
   }
