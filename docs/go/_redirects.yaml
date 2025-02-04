@@ -66,3 +66,7 @@ redirects:
 # Hardware links
 - from: /fuchsia-src/go/intree-drivers
   to: /fuchsia-src/reference/hardware/drivers
+
+# Starnix
+- from: /docs/go/troubleshoot-adb-connect
+  to: /docs/development/starnix/troubleshooting-ffx-starnix-adb-connect.md

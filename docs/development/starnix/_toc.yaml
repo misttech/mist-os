@@ -1,3 +1,5 @@
 toc:
 - title: "Common coding patterns in Starnix"
   path: /docs/development/starnix/common-coding-patterns-in-starnix.md
+- title: "Troubleshooting `ffx starnix adb connect`"
+  path: /docs/development/starnix/troubleshooting_ffx_starnix_adb_connect.md
