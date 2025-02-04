@@ -31,7 +31,14 @@ impl DevTmpFs {
     where
         L: LockBefore<FileOpsCore>,
     {
-        current_task.kernel().dev_tmp_fs.get_or_init(|| Self::init(locked, current_task)).clone()
+        struct DevTmpFsHandle(FileSystemHandle);
+
+        current_task
+            .kernel()
+            .expando
+            .get_or_init(|| DevTmpFsHandle(Self::init(locked, current_task)))
+            .0
+            .clone()
     }
 
     fn init<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask) -> FileSystemHandle

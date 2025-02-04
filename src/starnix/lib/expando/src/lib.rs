@@ -53,6 +53,53 @@ impl Expando {
         assert_eq!(type_id, slot.value.deref().type_id());
         slot.downcast().expect("downcast of expando slot was successful")
     }
+
+    /// Get the slot in the expando associated with the given type, running `init` to initialize
+    /// the slot if needed.
+    ///
+    /// The slot is added to the expando lazily but the same instance is returned every time the
+    /// expando is queried for the same type.
+    pub fn get_or_init<T: Any + Send + Sync + 'static>(&self, init: impl FnOnce() -> T) -> Arc<T> {
+        self.get_or_try_init::<T, ()>(|| Ok(init())).expect("infallible initializer")
+    }
+
+    /// Get the slot in the expando associated with the given type, running `try_init` to initialize
+    /// the slot if needed. Returns an error only if `try_init` returns an error.
+    ///
+    /// The slot is added to the expando lazily but the same instance is returned every time the
+    /// expando is queried for the same type.
+    pub fn get_or_try_init<T: Any + Send + Sync + 'static, E>(
+        &self,
+        try_init: impl FnOnce() -> Result<T, E>,
+    ) -> Result<Arc<T>, E> {
+        let type_id = TypeId::of::<T>();
+
+        // Acquire the lock each time we want to look at the map so that user-provided initializer
+        // can use the expando too.
+        if let Some(slot) = self.properties.lock().get(&type_id) {
+            assert_eq!(type_id, slot.value.deref().type_id());
+            return Ok(slot.downcast().expect("downcast of expando slot was successful"));
+        }
+
+        // Initialize the new value without holding the lock.
+        let newly_init = Arc::new(try_init()?);
+
+        // Only insert the newly-initialized value if no other threads got there first.
+        let mut properties = self.properties.lock();
+        let slot = properties.entry(type_id).or_insert_with(|| ExpandoSlot::new(newly_init));
+        assert_eq!(type_id, slot.value.deref().type_id());
+        Ok(slot.downcast().expect("downcast of expando slot was successful"))
+    }
+
+    /// Get the slot in the expando associated with the given type if it has previously been
+    /// initialized.
+    pub fn peek<T: Any + Send + Sync + 'static>(&self) -> Option<Arc<T>> {
+        let properties = self.properties.lock();
+        let type_id = TypeId::of::<T>();
+        let slot = properties.get(&type_id)?;
+        assert_eq!(type_id, slot.value.deref().type_id());
+        Some(slot.downcast().expect("downcast of expando slot was successful"))
+    }
 }
 
 #[cfg(test)]
@@ -72,5 +119,48 @@ mod tests {
         *first.counter.lock() += 1;
         let second = expando.get::<MyStruct>();
         assert_eq!(*second.counter.lock(), 1);
+    }
+
+    #[test]
+    fn user_initializer() {
+        let expando = Expando::default();
+        let first = expando.get_or_init(|| String::from("hello"));
+        assert_eq!(first.as_str(), "hello");
+        let second = expando.get_or_init(|| String::from("world"));
+        assert_eq!(
+            second.as_str(),
+            "hello",
+            "expando must have preserved value from original initializer"
+        );
+        assert_eq!(Arc::as_ptr(&first), Arc::as_ptr(&second));
+    }
+
+    #[test]
+    fn nested_user_initializer() {
+        let expando = Expando::default();
+        let first = expando.get_or_init(|| expando.get::<u32>().to_string());
+        assert_eq!(first.as_str(), "0");
+        let second = expando.get_or_init(|| expando.get::<u32>().to_string());
+        assert_eq!(Arc::as_ptr(&first), Arc::as_ptr(&second));
+    }
+
+    #[test]
+    fn failed_init_can_be_retried() {
+        let expando = Expando::default();
+        let failed = expando.get_or_try_init::<String, String>(|| Err(String::from("oops")));
+        assert_eq!(failed.unwrap_err().as_str(), "oops");
+
+        let succeeded = expando.get_or_try_init::<String, String>(|| Ok(String::from("hurray")));
+        assert_eq!(succeeded.unwrap().as_str(), "hurray");
+    }
+
+    #[test]
+    fn peek_works() {
+        let expando = Expando::default();
+        assert_eq!(expando.peek::<String>(), None);
+        let from_init = expando.get_or_init(|| String::from("hello"));
+        let from_peek = expando.peek::<String>().unwrap();
+        assert_eq!(from_peek.as_str(), "hello");
+        assert_eq!(Arc::as_ptr(&from_init), Arc::as_ptr(&from_peek));
     }
 }

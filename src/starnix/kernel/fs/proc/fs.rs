@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use super::proc_directory::ProcDirectory;
-use crate::task::CurrentTask;
+use crate::task::{CurrentTask, Kernel};
 use crate::vfs::{
     CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr,
 };
@@ -11,8 +11,13 @@ use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{statfs, PROC_SUPER_MAGIC};
-
 use std::sync::Arc;
+
+struct ProcFsHandle(FileSystemHandle);
+
+pub fn get_proc_fs(kernel: &Arc<Kernel>) -> Option<FileSystemHandle> {
+    kernel.expando.peek::<ProcFsHandle>().map(|h| h.0.clone())
+}
 
 /// Returns `kernel`'s procfs instance, initializing it if needed.
 pub fn proc_fs(
@@ -20,7 +25,12 @@ pub fn proc_fs(
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
-    Ok(current_task.kernel().proc_fs.get_or_init(|| ProcFs::new_fs(current_task, options)).clone())
+    Ok(current_task
+        .kernel()
+        .expando
+        .get_or_init(|| ProcFsHandle(ProcFs::new_fs(current_task, options)))
+        .0
+        .clone())
 }
 
 /// `ProcFs` is a filesystem that exposes runtime information about a `Kernel` instance.

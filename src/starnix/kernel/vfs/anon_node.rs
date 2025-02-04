@@ -85,9 +85,17 @@ impl FileSystemOps for AnonFs {
         "anon".into()
     }
 }
-pub fn anon_fs(kernel: &Arc<Kernel>) -> &FileSystemHandle {
-    kernel.anon_fs.get_or_init(|| {
-        FileSystem::new(kernel, CacheMode::Uncached, AnonFs, FileSystemOptions::default())
-            .expect("anonfs constructed with valid options")
-    })
+pub fn anon_fs(kernel: &Arc<Kernel>) -> FileSystemHandle {
+    struct AnonFsHandle(FileSystemHandle);
+
+    kernel
+        .expando
+        .get_or_init(|| {
+            AnonFsHandle(
+                FileSystem::new(kernel, CacheMode::Uncached, AnonFs, FileSystemOptions::default())
+                    .expect("anonfs constructed with valid options"),
+            )
+        })
+        .0
+        .clone()
 }

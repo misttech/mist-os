@@ -159,28 +159,8 @@ pub struct Kernel {
     /// The kernel command line. Shows up in /proc/cmdline.
     pub cmdline: BString,
 
-    // Owned by anon_node.rs
-    pub anon_fs: OnceLock<FileSystemHandle>,
-    // Owned by pipe.rs
-    pub pipe_fs: OnceLock<FileSystemHandle>,
-    // Owned by socket.rs
-    pub socket_fs: OnceLock<FileSystemHandle>,
-    // Owned by devtmpfs.rs
-    pub dev_tmp_fs: OnceLock<FileSystemHandle>,
-    // Owned by devpts.rs
-    pub dev_pts_fs: OnceLock<FileSystemHandle>,
-    // Owned by procfs.rs
-    pub proc_fs: OnceLock<FileSystemHandle>,
-    // Owned by sysfs.rs
-    pub sys_fs: OnceLock<FileSystemHandle>,
-    // Owned by security/selinux_hooks/fs.rs
-    pub selinux_fs: OnceCell<FileSystemHandle>,
-    // Owned by nmfs.rs
-    pub nmfs: OnceLock<FileSystemHandle>,
     // Global state held by the Linux Security Modules subsystem.
     pub security_state: security::KernelState,
-    // Owned by tracefs/fs.rs
-    pub trace_fs: OnceLock<FileSystemHandle>,
 
     /// The registry of device drivers.
     pub device_registry: DeviceRegistry,
@@ -351,7 +331,9 @@ impl InterfacesHandlerImpl {
         if let Some(kernel) = self.0.upgrade() {
             kernel.kthreads.spawner().spawn(move |_, current_task| {
                 let kernel = current_task.kernel();
-                f(current_task, &kernel.netstack_devices, kernel.proc_fs.get(), kernel.sys_fs.get())
+                let procfs = crate::fs::proc::get_proc_fs(&kernel);
+                let sysfs = crate::fs::sysfs::get_sys_fs(&kernel);
+                f(current_task, &kernel.netstack_devices, procfs.as_ref(), sysfs.as_ref())
             });
         }
     }
@@ -406,17 +388,7 @@ impl Kernel {
                 vsock_address_maker,
             ),
             cmdline,
-            anon_fs: Default::default(),
-            pipe_fs: Default::default(),
-            dev_tmp_fs: Default::default(),
-            dev_pts_fs: Default::default(),
-            proc_fs: Default::default(),
-            socket_fs: Default::default(),
-            sys_fs: Default::default(),
-            selinux_fs: Default::default(),
-            nmfs: Default::default(),
             security_state,
-            trace_fs: Default::default(),
             device_registry: Default::default(),
             container_namespace,
             remote_block_device_registry: Default::default(),

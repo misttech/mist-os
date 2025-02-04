@@ -69,9 +69,16 @@ fn ensure_devpts(
     kernel: &Arc<Kernel>,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
+    struct DevPtsFsHandle(FileSystemHandle);
+
     Ok(kernel
-        .dev_pts_fs
-        .get_or_init(|| init_devpts(kernel, options).expect("Error when creating default devpts"))
+        .expando
+        .get_or_init(|| {
+            DevPtsFsHandle(
+                init_devpts(kernel, options).expect("Error when creating default devpts"),
+            )
+        })
+        .0
         .clone())
 }
 

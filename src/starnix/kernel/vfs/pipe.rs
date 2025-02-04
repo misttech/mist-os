@@ -437,13 +437,18 @@ fn pipe_fs(
     current_task: &CurrentTask,
     _options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
+    struct PipeFsHandle(FileSystemHandle);
+
     let kernel = current_task.kernel();
     Ok(kernel
-        .pipe_fs
+        .expando
         .get_or_init(|| {
-            FileSystem::new(kernel, CacheMode::Uncached, PipeFs, FileSystemOptions::default())
-                .expect("pipefs constructed with valid options")
+            PipeFsHandle(
+                FileSystem::new(kernel, CacheMode::Uncached, PipeFs, FileSystemOptions::default())
+                    .expect("pipefs constructed with valid options"),
+            )
         })
+        .0
         .clone())
 }
 

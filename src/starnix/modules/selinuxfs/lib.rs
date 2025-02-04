@@ -960,12 +960,15 @@ pub fn selinux_fs(
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
+    struct SeLinuxFsHandle(FileSystemHandle);
+
     profile_duration!("selinuxfs.mount");
-    current_task
+    Ok(current_task
         .kernel()
-        .selinux_fs
-        .get_or_try_init(|| SeLinuxFs::new_fs(current_task, options))
-        .cloned()
+        .expando
+        .get_or_try_init(|| Ok(SeLinuxFsHandle(SeLinuxFs::new_fs(current_task, options)?)))?
+        .0
+        .clone())
 }
 
 #[cfg(test)]

@@ -85,8 +85,10 @@ pub fn nmfs(
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
+    struct NmfsHandle(FileSystemHandle);
+
     let kernel = current_task.kernel();
-    Ok(kernel.nmfs.get_or_init(|| Nmfs::new_fs(kernel, options)).clone())
+    Ok(kernel.expando.get_or_init(|| NmfsHandle(Nmfs::new_fs(kernel, options))).0.clone())
 }
 
 pub struct NetworkDirectoryNode;
