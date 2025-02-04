@@ -49,12 +49,6 @@
 #include "src/graphics/display/testing/client-utils/display.h"
 #include "src/graphics/display/testing/client-utils/virtual-layer.h"
 
-namespace fhd = fuchsia_hardware_display;
-namespace fhdt = fuchsia_hardware_display_types;
-namespace images2 = fuchsia_images2;
-namespace sysmem2 = fuchsia_sysmem2;
-namespace sysinfo = fuchsia_sysinfo;
-
 using display_test::ColorLayer;
 using display_test::Display;
 using display_test::PrimaryLayer;
@@ -64,7 +58,8 @@ using display_test::VirtualLayer;
 //
 // This class is thread-unsafe. It must be accessed from a single thread or a
 // dispatcher running on that thread.
-class CoordinatorListener final : public fidl::WireServer<fhd::CoordinatorListener> {
+class CoordinatorListener final
+    : public fidl::WireServer<fuchsia_hardware_display::CoordinatorListener> {
  public:
   CoordinatorListener() = default;
 
@@ -73,7 +68,8 @@ class CoordinatorListener final : public fidl::WireServer<fhd::CoordinatorListen
   CoordinatorListener& operator=(const CoordinatorListener&) = delete;
   CoordinatorListener& operator=(CoordinatorListener&&) = delete;
 
-  void Bind(fidl::ServerEnd<fhd::CoordinatorListener> server, async_dispatcher_t& dispatcher) {
+  void Bind(fidl::ServerEnd<fuchsia_hardware_display::CoordinatorListener> server,
+            async_dispatcher_t& dispatcher) {
     ZX_DEBUG_ASSERT(!binding_.has_value());
     binding_ = fidl::BindServer(&dispatcher, std::move(server), this);
   }
@@ -82,10 +78,10 @@ class CoordinatorListener final : public fidl::WireServer<fhd::CoordinatorListen
   void OnDisplaysChanged(OnDisplaysChangedRequestView request,
                          OnDisplaysChangedCompleter::Sync& completer) override {
     fidl::Arena arena;
-    for (const fhd::wire::Info& display : request->added) {
+    for (const fuchsia_hardware_display::wire::Info& display : request->added) {
       displays_.emplace(display::ToDisplayId(display.id), display);
     }
-    for (const fhdt::wire::DisplayId& display_id : request->removed) {
+    for (const fuchsia_hardware_display_types::wire::DisplayId& display_id : request->removed) {
       displays_.erase(display::ToDisplayId(display_id));
     }
   }
@@ -100,8 +96,9 @@ class CoordinatorListener final : public fidl::WireServer<fhd::CoordinatorListen
                                OnClientOwnershipChangeCompleter::Sync& completer) override {
     has_ownership_ = request->has_ownership;
   }
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fhd::CoordinatorListener> metadata,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_display::CoordinatorListener> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -123,19 +120,19 @@ class CoordinatorListener final : public fidl::WireServer<fhd::CoordinatorListen
   display::ConfigStamp latest_config_stamp_ = display::kInvalidConfigStamp;
   display::VsyncAckCookie pending_vsync_cookie_ = display::kInvalidVsyncAckCookie;
 
-  std::optional<fidl::ServerBindingRef<fhd::CoordinatorListener>> binding_;
+  std::optional<fidl::ServerBindingRef<fuchsia_hardware_display::CoordinatorListener>> binding_;
 };
 
 static CoordinatorListener g_coordinator_listener;
 static zx_handle_t device_handle;
-static fidl::WireSyncClient<fhd::Coordinator> dc;
+static fidl::WireSyncClient<fuchsia_hardware_display::Coordinator> dc;
 
 constexpr display::EventId kEventId(13);
 constexpr display::BufferCollectionId kBufferCollectionId(12);
 // Use a large ID to avoid conflict with Image IDs allocated by VirtualLayers.
 constexpr display::ImageId kCaptureImageId(std::numeric_limits<uint64_t>::max());
 zx::event client_event_;
-fidl::SyncClient<sysmem2::BufferCollection> collection_;
+fidl::SyncClient<fuchsia_sysmem2::BufferCollection> collection_;
 zx::vmo capture_vmo;
 
 enum TestBundle {
@@ -157,7 +154,7 @@ enum Platforms {
 };
 
 Platforms platform = UNKNOWN_PLATFORM;
-fbl::StringBuffer<sysinfo::wire::kBoardNameLen> board_name;
+fbl::StringBuffer<fuchsia_sysinfo::wire::kBoardNameLen> board_name;
 
 Platforms GetPlatform();
 void Usage();
@@ -165,18 +162,21 @@ void Usage();
 static bool bind_display(const char* coordinator, async::Loop& coordinator_listener_loop,
                          fbl::Vector<Display>* displays) {
   printf("Opening coordinator\n");
-  zx::result provider = component::Connect<fhd::Provider>(coordinator);
+  zx::result provider = component::Connect<fuchsia_hardware_display::Provider>(coordinator);
   if (provider.is_error()) {
     printf("Failed to open display coordinator (%s)\n", provider.status_string());
     return false;
   }
 
-  auto [coordinator_client, coordinator_server] = fidl::Endpoints<fhd::Coordinator>::Create();
-  auto [listener_client, listener_server] = fidl::Endpoints<fhd::CoordinatorListener>::Create();
+  auto [coordinator_client, coordinator_server] =
+      fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
+  auto [listener_client, listener_server] =
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
 
   fidl::Arena arena;
   auto open_coordinator_request =
-      fhd::wire::ProviderOpenCoordinatorWithListenerForPrimaryRequest::Builder(arena)
+      fuchsia_hardware_display::wire::ProviderOpenCoordinatorWithListenerForPrimaryRequest::Builder(
+          arena)
           .coordinator(std::move(coordinator_server))
           .coordinator_listener(std::move(listener_client))
           .Build();
@@ -244,7 +244,7 @@ bool update_display_layers(const fbl::Vector<std::unique_ptr<VirtualLayer>>& lay
 
   for (auto& layer : layers) {
     display::LayerId id = layer->id(display.id());
-    if (id.value() != fhdt::wire::kInvalidDispId) {
+    if (id.value() != fuchsia_hardware_display_types::wire::kInvalidDispId) {
       new_layers.push_back(id);
     }
   }
@@ -262,14 +262,15 @@ bool update_display_layers(const fbl::Vector<std::unique_ptr<VirtualLayer>>& lay
   if (layer_change) {
     current_layers->swap(new_layers);
 
-    std::vector<fhd::wire::LayerId> current_layers_fidl_id;
+    std::vector<fuchsia_hardware_display::wire::LayerId> current_layers_fidl_id;
     current_layers_fidl_id.reserve(current_layers->size());
     for (const display::LayerId& layer_id : *current_layers) {
       current_layers_fidl_id.push_back(display::ToFidlLayerId(layer_id));
     }
     if (!dc->SetDisplayLayers(
                ToFidlDisplayId(display.id()),
-               fidl::VectorView<fhd::wire::LayerId>::FromExternal(current_layers_fidl_id))
+               fidl::VectorView<fuchsia_hardware_display::wire::LayerId>::FromExternal(
+                   current_layers_fidl_id))
              .ok()) {
       printf("Failed to set layers\n");
       return false;
@@ -278,14 +279,14 @@ bool update_display_layers(const fbl::Vector<std::unique_ptr<VirtualLayer>>& lay
   return true;
 }
 
-zx_status_t apply_config(fhd::wire::ConfigStamp stamp) {
+zx_status_t apply_config(fuchsia_hardware_display::wire::ConfigStamp stamp) {
   auto check_result = dc->CheckConfig(false);
   if (!check_result.ok()) {
     printf("Failed to make check call: %s\n", check_result.FormatDescription().c_str());
     return check_result.error().status();
   }
 
-  if (check_result.value().res != fhdt::wire::ConfigResult::kOk) {
+  if (check_result.value().res != fuchsia_hardware_display_types::wire::ConfigResult::kOk) {
     printf("Config not valid (%d)\n", static_cast<uint32_t>(check_result.value().res));
     for (const auto& op : check_result.value().ops) {
       printf("Client composition op (display %ld, layer %ld): %hhu\n", op.display_id.value,
@@ -295,7 +296,7 @@ zx_status_t apply_config(fhd::wire::ConfigStamp stamp) {
   }
 
   fidl::Arena arena;
-  auto builder = fhd::wire::CoordinatorApplyConfig3Request::Builder(arena);
+  auto builder = fuchsia_hardware_display::wire::CoordinatorApplyConfig3Request::Builder(arena);
   builder.stamp(stamp);
   auto apply_result = dc->ApplyConfig3(builder.Build());
   if (!apply_result.ok()) {
@@ -307,7 +308,7 @@ zx_status_t apply_config(fhd::wire::ConfigStamp stamp) {
 }
 
 zx_status_t wait_for_vsync(async::Loop& coordinator_listener_loop,
-                           fhd::wire::ConfigStamp expected_stamp) {
+                           fuchsia_hardware_display::wire::ConfigStamp expected_stamp) {
   zx_status_t status = coordinator_listener_loop.Run(zx::time::infinite(), /*once=*/true);
   if (status != ZX_OK) {
     printf("wait_for_vsync(): Failed to run coordinator listener loop: %s",
@@ -370,7 +371,7 @@ zx_status_t capture_setup(Display& display) {
   }
 
   // get connection to sysmem
-  zx::result sysmem_client = component::Connect<sysmem2::Allocator>();
+  zx::result sysmem_client = component::Connect<fuchsia_sysmem2::Allocator>();
   if (sysmem_client.is_error()) {
     printf("Could not connect to sysmem Allocator %s\n", sysmem_client.status_string());
     return sysmem_client.status_value();
@@ -378,7 +379,7 @@ zx_status_t capture_setup(Display& display) {
   auto sysmem_allocator = fidl::SyncClient(std::move(sysmem_client.value()));
 
   // Create and import token
-  zx::result token_endpoints = fidl::CreateEndpoints<sysmem2::BufferCollectionToken>();
+  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   if (token_endpoints.is_error()) {
     printf("Could not create token channel %d\n", token_endpoints.error_value());
     return token_endpoints.error_value();
@@ -386,7 +387,7 @@ zx_status_t capture_setup(Display& display) {
   auto token = fidl::SyncClient(std::move(token_endpoints->client));
 
   // pass token server to sysmem allocator
-  sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
+  fuchsia_sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
   allocate_shared_request.token_request() = std::move(token_endpoints->server);
   auto allocate_shared_result =
       sysmem_allocator->AllocateSharedCollection(std::move(allocate_shared_request));
@@ -397,7 +398,7 @@ zx_status_t capture_setup(Display& display) {
   }
 
   // duplicate the token and pass to display driver
-  zx::result token_dup_endpoints = fidl::CreateEndpoints<sysmem2::BufferCollectionToken>();
+  zx::result token_dup_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   if (token_dup_endpoints.is_error()) {
     printf("Could not create duplicate token channel %d\n", token_dup_endpoints.error_value());
     return token_dup_endpoints.error_value();
@@ -421,8 +422,8 @@ zx_status_t capture_setup(Display& display) {
   }
 
   // set buffer constraints
-  fhdt::wire::ImageBufferUsage image_buffer_usage = {
-      .tiling_type = fhdt::wire::kImageTilingTypeCapture,
+  fuchsia_hardware_display_types::wire::ImageBufferUsage image_buffer_usage = {
+      .tiling_type = fuchsia_hardware_display_types::wire::kImageTilingTypeCapture,
   };
   auto constraints_resp = dc->SetBufferCollectionConstraints(
       display::ToFidlBufferCollectionId(kBufferCollectionId), image_buffer_usage);
@@ -432,7 +433,7 @@ zx_status_t capture_setup(Display& display) {
   }
 
   // setup our our constraints for buffer to be allocated
-  zx::result collection_endpoints = fidl::CreateEndpoints<sysmem2::BufferCollection>();
+  zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollection>();
   if (collection_endpoints.is_error()) {
     printf("Could not create collection channel %d\n", collection_endpoints.error_value());
     return collection_endpoints.error_value();
@@ -451,17 +452,18 @@ zx_status_t capture_setup(Display& display) {
   // finally setup our constraints
   fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
   auto& constraints = set_constraints_request.constraints().emplace();
-  constraints.usage().emplace().cpu() = sysmem2::kCpuUsageReadOften | sysmem2::kCpuUsageWriteOften;
+  constraints.usage().emplace().cpu() =
+      fuchsia_sysmem2::kCpuUsageReadOften | fuchsia_sysmem2::kCpuUsageWriteOften;
   constraints.min_buffer_count_for_camping() = 1;
   constraints.buffer_memory_constraints().emplace().ram_domain_supported() = true;
-  sysmem2::ImageFormatConstraints& image_constraints =
+  fuchsia_sysmem2::ImageFormatConstraints& image_constraints =
       constraints.image_format_constraints().emplace().emplace_back();
   if (platform == AMLOGIC_PLATFORM) {
-    image_constraints.pixel_format() = images2::PixelFormat::kB8G8R8;
+    image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kB8G8R8;
   } else {
-    image_constraints.pixel_format() = images2::PixelFormat::kB8G8R8A8;
+    image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kB8G8R8A8;
   }
-  image_constraints.color_spaces().emplace().emplace_back(images2::ColorSpace::kSrgb);
+  image_constraints.color_spaces().emplace().emplace_back(fuchsia_images2::ColorSpace::kSrgb);
 
   collection_ = fidl::SyncClient(std::move(collection_endpoints->client));
   auto set_constraints_result = collection_->SetConstraints(std::move(set_constraints_request));
@@ -491,14 +493,14 @@ zx_status_t capture_setup(Display& display) {
   // import image for capture
   // TODO(https://fxbug.dev/332521780): Display clients will be required to
   // pass the captured display's mode information.
-  fhdt::wire::ImageMetadata capture_metadata = {
+  fuchsia_hardware_display_types::wire::ImageMetadata capture_metadata = {
       .dimensions = {.width = display.mode().active_area.width,
                      .height = display.mode().active_area.height},
-      .tiling_type = fhdt::wire::kImageTilingTypeCapture,
+      .tiling_type = fuchsia_hardware_display_types::wire::kImageTilingTypeCapture,
   };
   fidl::WireResult import_capture_result = dc->ImportImage(
       capture_metadata,
-      fhd::wire::BufferId{
+      fuchsia_hardware_display::wire::BufferId{
           .buffer_collection_id = display::ToFidlBufferCollectionId(kBufferCollectionId),
           .buffer_index = 0,
       },
@@ -668,7 +670,7 @@ void usage(void) {
 }
 
 Platforms GetPlatform() {
-  zx::result channel = component::Connect<sysinfo::SysInfo>();
+  zx::result channel = component::Connect<fuchsia_sysinfo::SysInfo>();
   if (channel.is_error()) {
     return UNKNOWN_PLATFORM;
   }
@@ -1050,7 +1052,8 @@ int main(int argc, const char* argv[]) {
     printf("Capturing every frame. Verification is %s\n", verify_capture ? "enabled" : "disabled");
   }
 
-  fhd::wire::ConfigStamp last_applied_stamp = {.value = fhd::wire::kInvalidConfigStampValue};
+  fuchsia_hardware_display::wire::ConfigStamp last_applied_stamp = {
+      .value = fuchsia_hardware_display::wire::kInvalidConfigStampValue};
   bool capture_result = true;
   for (int i = 0; !num_frames || i < num_frames; i++) {
     for (auto& layer : layers) {
