@@ -198,6 +198,13 @@ where
         }
     }
 
+    fn get_ref(&self, i: usize) -> NodeRef<'_, K, V, N> {
+        match self {
+            ChildList::Leaf(children) => NodeRef::Leaf(&children[i]),
+            ChildList::Internal(children) => NodeRef::Internal(&children[i]),
+        }
+    }
+
     /// Removes all the entries starting at the given index from the child list.
     ///
     /// The removed entries are returned in a new child list.
@@ -529,6 +536,14 @@ where
         }
     }
 
+    /// Converts a reference into a Node into a NodeRef.
+    fn as_ref(&self) -> NodeRef<'_, K, V, N> {
+        match self {
+            Node::Internal(node) => NodeRef::Internal(node),
+            Node::Leaf(node) => NodeRef::Leaf(node),
+        }
+    }
+
     /// Insert the given value at the given key into this node.
     ///
     /// If the insertion causes this node to split, the node will always split into two instances
@@ -545,6 +560,61 @@ where
             Node::Internal(node) => Arc::make_mut(node).remove(key),
             Node::Leaf(node) => Arc::make_mut(node).remove(key),
         }
+    }
+}
+
+/// A node in the btree.
+#[derive(Clone, Debug)]
+enum NodeRef<'a, K: Ord + Clone, V: Clone, const N: usize> {
+    /// An internal node.
+    Internal(&'a Arc<NodeInternal<K, V, N>>),
+
+    /// A leaf node.
+    Leaf(&'a Arc<NodeLeaf<K, V, N>>),
+}
+
+struct Cursor<'a, K: Ord + Clone, V: Clone, const N: usize> {
+    node: NodeRef<'a, K, V, N>,
+    index: usize,
+}
+
+/// An iterator over the key-value pairs stored in a CowMap.
+pub struct Iter<'a, K: Ord + Clone, V: Clone, const N: usize> {
+    stack: Vec<Cursor<'a, K, V, N>>,
+}
+
+impl<'a, K, V, const N: usize> Iterator for Iter<'a, K, V, N>
+where
+    K: Ord + Clone,
+    V: Clone,
+{
+    type Item = (&'a K, &'a V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(cursor) = self.stack.last_mut() {
+            match cursor.node {
+                NodeRef::Leaf(node) => {
+                    if cursor.index < node.keys.len() {
+                        let key = &node.keys[cursor.index];
+                        let value = &node.values[cursor.index];
+                        cursor.index += 1;
+                        return Some((key, value));
+                    } else {
+                        self.stack.pop();
+                    }
+                }
+                NodeRef::Internal(node) => {
+                    if cursor.index < node.children.len() {
+                        let child = node.children.get_ref(cursor.index);
+                        cursor.index += 1;
+                        self.stack.push(Cursor { node: child, index: 0 });
+                    } else {
+                        self.stack.pop();
+                    }
+                }
+            }
+        }
+        None
     }
 }
 
@@ -647,6 +717,10 @@ where
                 Some(value)
             }
         }
+    }
+
+    pub fn iter(&self) -> Iter<'_, K, V, N> {
+        Iter { stack: vec![Cursor { node: self.node.as_ref(), index: 0 }] }
     }
 }
 
@@ -878,5 +952,113 @@ mod test {
 
         map.remove(&5);
         assert!(map.get(&5).is_none());
+    }
+
+    #[test]
+    fn test_iter() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        map.insert(1, 1);
+        map.insert(2, 2);
+        map.insert(3, 3);
+        map.insert(4, 4);
+        map.insert(5, 5);
+
+        let mut iter = map.iter();
+        assert_eq!(iter.next(), Some((&1, &1)));
+        assert_eq!(iter.next(), Some((&2, &2)));
+        assert_eq!(iter.next(), Some((&3, &3)));
+        assert_eq!(iter.next(), Some((&4, &4)));
+        assert_eq!(iter.next(), Some((&5, &5)));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_iter_order() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        map.insert(1, 1);
+        map.insert(5, 5);
+        map.insert(2, 2);
+        map.insert(3, 3);
+        map.insert(4, 4);
+
+        let collected = map.iter().map(|(&k, &v)| (k, v)).collect::<Vec<_>>();
+
+        assert_eq!(collected, vec![(1, 1), (2, 2), (3, 3), (4, 4), (5, 5)]);
+    }
+
+    #[test]
+    fn test_iter_large() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+
+        for i in 0..100 {
+            map.insert(i, i as i64 * 2);
+        }
+
+        let mut iter = map.iter();
+
+        for i in 0..100 {
+            assert_eq!(iter.next(), Some((&i, &(i as i64 * 2))));
+        }
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_iter_empty() {
+        let map = CowMap::<u32, i64, 4>::default();
+        let mut iter = map.iter();
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_iter_after_remove_all() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        for i in 0..100 {
+            map.insert(i, i as i64 * 2);
+        }
+
+        for i in 0..100 {
+            map.remove(&i);
+        }
+
+        let mut iter = map.iter();
+        assert_eq!(iter.next(), None); // Should be empty after removing everything
+    }
+
+    #[test]
+    fn test_iter_after_split_and_remove() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        for i in 0..10 {
+            map.insert(i, i as i64);
+        }
+        // Force splits.
+        for i in 0..5 {
+            map.remove(&i);
+        }
+
+        let collected: Vec<_> = map.iter().map(|(&k, &v)| (k, v)).collect();
+        assert_eq!(collected, vec![(5, 5), (6, 6), (7, 7), (8, 8), (9, 9)]);
+    }
+
+    #[test]
+    fn test_iter_after_clone_and_remove() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        for i in 0..10 {
+            map.insert(i, i as i64);
+        }
+
+        let mut map2 = map.clone();
+        map2.remove(&5);
+
+        let collected: Vec<_> = map.iter().map(|(&k, &v)| (k, v)).collect();
+        assert_eq!(
+            collected,
+            vec![(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6), (7, 7), (8, 8), (9, 9)]
+        );
+
+        let collected2: Vec<_> = map2.iter().map(|(&k, &v)| (k, v)).collect();
+        assert_eq!(
+            collected2,
+            vec![(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (6, 6), (7, 7), (8, 8), (9, 9)]
+        );
     }
 }
