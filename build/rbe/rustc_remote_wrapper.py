@@ -522,6 +522,9 @@ class RustRemoteAction(object):
                 yield tok.removeprefix(remote_only_prefix)
                 continue
 
+            if tok.startswith("--local-only="):
+                continue
+
             # else
             yield tok
 
