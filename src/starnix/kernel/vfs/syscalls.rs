@@ -517,11 +517,13 @@ pub fn sys_pwritev2(
     do_writev(locked, current_task, fd, iovec_addr, iovec_count, offset, flags)
 }
 
+type StatFsPtr = MultiArchUserRef<uapi::statfs, uapi::arch32::statfs64>;
+
 pub fn sys_fstatfs(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    user_buf: UserRef<statfs>,
+    user_buf: StatFsPtr,
 ) -> Result<(), Errno> {
     // O_PATH allowed for:
     //
@@ -531,7 +533,7 @@ pub fn sys_fstatfs(
     let file = current_task.files.get_allowing_opath(fd)?;
     let mut stat = file.fs.statfs(locked, current_task)?;
     stat.f_flags |= file.name.mount.flags().bits() as i64;
-    current_task.write_object(user_buf, &stat)?;
+    current_task.write_multi_arch_object(user_buf, stat)?;
     Ok(())
 }
 
@@ -3168,7 +3170,7 @@ mod arch32 {
     use crate::mm::MemoryAccessorExt;
     use crate::vfs::syscalls::{
         lookup_at, sys_dup3, sys_faccessat, sys_lseek, sys_mkdirat, sys_openat, sys_readlinkat,
-        sys_unlinkat, LookupFlags,
+        sys_unlinkat, LookupFlags, StatFsPtr,
     };
     use crate::vfs::{CurrentTask, FdNumber, FsNode};
     use linux_uapi::off_t;
@@ -3176,7 +3178,7 @@ mod arch32 {
     use starnix_uapi::errors::Errno;
     use starnix_uapi::file_mode::FileMode;
     use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
-    use starnix_uapi::{uapi, AT_REMOVEDIR};
+    use starnix_uapi::{error, uapi, AT_REMOVEDIR};
 
     pub fn sys_arch32_open(
         locked: &mut Locked<'_, Unlocked>,
@@ -3296,6 +3298,19 @@ mod arch32 {
         user_path: UserCString,
     ) -> Result<(), Errno> {
         sys_unlinkat(locked, current_task, FdNumber::AT_FDCWD, user_path, 0)
+    }
+
+    pub fn sys_arch32_fstatfs64(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+        user_buf_len: u32,
+        user_buf: StatFsPtr,
+    ) -> Result<(), Errno> {
+        if (user_buf_len as usize) < std::mem::size_of::<uapi::arch32::statfs64>() {
+            return error!(EINVAL);
+        }
+        super::sys_fstatfs(locked, current_task, fd, user_buf)
     }
 
     pub use super::sys_fstatat64 as sys_arch32_fstatat64;

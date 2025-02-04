@@ -99,3 +99,29 @@ impl TryFrom<crate::sigaltstack> for crate::arch32::sigaltstack {
         })
     }
 }
+
+impl From<crate::__kernel_fsid_t> for crate::arch32::__kernel_fsid_t {
+    fn from(fsid: crate::__kernel_fsid_t) -> Self {
+        Self { val: fsid.val }
+    }
+}
+
+impl TryFrom<crate::statfs> for crate::arch32::statfs64 {
+    type Error = ();
+    fn try_from(statfs: crate::statfs) -> Result<Self, ()> {
+        Ok(Self {
+            f_type: statfs.f_type.try_into().map_err(|_| ())?,
+            f_bsize: statfs.f_bsize.try_into().map_err(|_| ())?,
+            f_blocks: statfs.f_blocks.try_into().map_err(|_| ())?,
+            f_bfree: statfs.f_bfree.try_into().map_err(|_| ())?,
+            f_bavail: statfs.f_bavail.try_into().map_err(|_| ())?,
+            f_files: statfs.f_files.try_into().map_err(|_| ())?,
+            f_ffree: statfs.f_ffree.try_into().map_err(|_| ())?,
+            f_fsid: statfs.f_fsid.into(),
+            f_namelen: statfs.f_namelen.try_into().map_err(|_| ())?,
+            f_frsize: statfs.f_frsize.try_into().map_err(|_| ())?,
+            f_flags: statfs.f_flags.try_into().map_err(|_| ())?,
+            f_spare: Default::default(),
+        })
+    }
+}

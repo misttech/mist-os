@@ -171,16 +171,17 @@ pub fn dispatch_syscall(
         };
         pub use crate::vfs::syscalls::{
             sys_arch32__llseek, sys_arch32_access, sys_arch32_dup2, sys_arch32_fstat64,
-            sys_arch32_fstatat64, sys_arch32_mkdir, sys_arch32_open, sys_arch32_readlink,
-            sys_arch32_rmdir, sys_arch32_stat64, sys_arch32_unlink, sys_close as sys_arch32_close,
-            sys_dup as sys_arch32_dup, sys_faccessat as sys_arch32_faccessat,
-            sys_fcntl as sys_arch32_fcntl64, sys_getcwd as sys_arch32_getcwd,
-            sys_getdents64 as sys_arch32_getdents64, sys_ioctl as sys_arch32_ioctl,
-            sys_lseek as sys_arch32_lseek, sys_memfd_create as sys_arch32_memfd_create,
-            sys_openat as sys_arch32_openat, sys_pipe2 as sys_arch32_pipe2,
-            sys_pwritev as sys_arch32_pwritev, sys_read as sys_arch32_read,
-            sys_readlinkat as sys_arch32_readlinkat, sys_umount2 as sys_arch32_umount2,
-            sys_write as sys_arch32_write, sys_writev as sys_arch32_writev,
+            sys_arch32_fstatat64, sys_arch32_fstatfs64, sys_arch32_mkdir, sys_arch32_open,
+            sys_arch32_readlink, sys_arch32_rmdir, sys_arch32_stat64, sys_arch32_unlink,
+            sys_close as sys_arch32_close, sys_dup as sys_arch32_dup,
+            sys_faccessat as sys_arch32_faccessat, sys_fcntl as sys_arch32_fcntl64,
+            sys_getcwd as sys_arch32_getcwd, sys_getdents64 as sys_arch32_getdents64,
+            sys_ioctl as sys_arch32_ioctl, sys_lseek as sys_arch32_lseek,
+            sys_memfd_create as sys_arch32_memfd_create, sys_openat as sys_arch32_openat,
+            sys_pipe2 as sys_arch32_pipe2, sys_pwritev as sys_arch32_pwritev,
+            sys_read as sys_arch32_read, sys_readlinkat as sys_arch32_readlinkat,
+            sys_umount2 as sys_arch32_umount2, sys_write as sys_arch32_write,
+            sys_writev as sys_arch32_writev,
         };
     }
     #[cfg(all(target_arch = "aarch64", feature = "arch32"))]
@@ -225,6 +226,7 @@ pub fn dispatch_syscall(
             fcntl64[3],
             fstat64[2],
             fstatat64[4],
+            fstatfs64[3],
             getcwd[2],
             getdents64[3],
             getpid[0],

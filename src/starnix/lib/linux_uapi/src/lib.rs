@@ -41,8 +41,8 @@ pub mod arch32 {
 }
 
 #[cfg(not(feature = "arch32"))]
+mod arch32_stub;
+#[cfg(not(feature = "arch32"))]
 pub mod arch32 {
-    pub use super::*;
-
-    pub type stat64 = crate::stat;
+    pub use crate::arch32_stub::*;
 }
