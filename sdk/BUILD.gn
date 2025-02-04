@@ -395,7 +395,6 @@ if (!is_host) {
           ":core_data",
           ":core_licenses",
           ":version_history_sdk($default_toolchain)",
-          "//sdk/devices",
           "//sdk/docs",
         ]
       }

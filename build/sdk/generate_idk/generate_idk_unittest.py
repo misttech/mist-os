@@ -13,7 +13,6 @@ UNMERGABLE_TYPES = [
     "dart_library",
     "fidl_library",
     "documentation",
-    "device_profile",
     "config",
     "license",
     "component_manifest",

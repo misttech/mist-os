@@ -93,7 +93,6 @@ class UnmergableMeta(TypedDict):
         | Literal["dart_library"]
         | Literal["fidl_library"]
         | Literal["documentation"]
-        | Literal["device_profile"]
         | Literal["config"]
         | Literal["license"]
         | Literal["component_manifest"]
@@ -431,7 +430,6 @@ def _merge_atom_meta(a: AtomMeta, b: AtomMeta) -> AtomMeta:
         "dart_library",
         "fidl_library",
         "documentation",
-        "device_profile",
         "config",
         "license",
         "component_manifest",
