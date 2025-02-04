@@ -897,7 +897,8 @@ def download_from_stub_path(
     download requests via file-lock.
 
     Args:
-      stub_path: is a path to a possible download stub.
+      stub_path: is a path to a possible download stub, relative to the
+        current working dir.
       downloader: remotetool instance used to download.
       working_dir_abs: current working dir.
       verbose: if True, print extra debug information.
@@ -909,7 +910,13 @@ def download_from_stub_path(
     # download requests to the same artifact.
     # If there are concurrent requests to download the same stub,
     # the lock will be granted to one caller, while the other waits.
-    lock_file = Path(str(stub_path) + ".dl-lock")
+    # Locate the corresponding lock file in a separate directory
+    # from the real file because there's no telling what tools may attempt
+    # to glob files from a given directory.  This avoids polluting
+    # directories in the build workspace during a build, which happened
+    # in b/394155554.
+    lock_file = Path(".dl-locks") / stub_path
+    lock_file.parent.mkdir(parents=True, exist_ok=True)
     with cl_utils.BlockingFileLock(lock_file) as lock:
         ok_result = cl_utils.SubprocessResult(0)
         if not stub_path.exists():
@@ -1675,6 +1682,7 @@ exec "${{cmd[@]}}"
           Mapping of path to status.
           Failures are always included, but successes are optional.
         """
+        # stub_paths are relative to the current working dir
         stub_paths = [
             path
             for path in self.inputs_relative_to_working_dir
