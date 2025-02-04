@@ -56,7 +56,7 @@ lazy_static_visibility = [
   # standard library APIs.
   #
   # To regenerate, run:
-  # (cd $FUCHSIA_DIR && git grep  --files-with-matches '//third_party/rust_crates:lazy_static' -- '*BUILD.gn' | sed 's|\(.*\)/BUILD.gn|"\1:*",|')
+  # (cd $FUCHSIA_DIR && git grep  --files-with-matches '//third_party/rust_crates:lazy_static' -- '*BUILD.gn' | sed 's|\(.*\)/BUILD.gn|"//\1:*",|')
   "//examples/components/storage:*",
   "//examples/fidl/new/key_value_store/add_iterator/rust/server:*",
   "//examples/fidl/new/key_value_store/add_read_item/rust/server:*",
@@ -114,7 +114,6 @@ lazy_static_visibility = [
   "//src/lib/assembly/platform_configuration:*",
   "//src/lib/async-utils:*",
   "//src/lib/fuchsia-async:*",
-  "//src/lib/fuchsia-component-test/realm_builder_server:*",
   "//src/lib/fuchsia-url:*",
   "//src/lib/icu_data/rust/icu_data:*",
   "//src/lib/intl/strings:*",
@@ -131,7 +130,6 @@ lazy_static_visibility = [
   "//src/recovery/lib/recovery-ui:*",
   "//src/recovery/lib/recovery-util:*",
   "//src/session/bin/element_manager:*",
-  "//src/session/bin/session_manager:*",
   "//src/session/lib/realm_management:*",
   "//src/storage/fxfs/platform:*",
   "//src/storage/lib/block_client/rust:*",
@@ -140,7 +138,6 @@ lazy_static_visibility = [
   "//src/sys/component_manager/lib/diagnostics:*",
   "//src/sys/component_manager/lib/sandbox:*",
   "//src/sys/lib/cm_fidl_validator:*",
-  "//src/sys/lib/cm_fidl_validator/tests:*",
   "//src/sys/lib/cm_rust:*",
   "//src/sys/lib/cm_types:*",
   "//src/sys/lib/component-events:*",
@@ -179,7 +176,6 @@ lazy_static_visibility = [
 
   # At this time we are not enforcing restrictions on the below.
   "//third_party/*",
-  "//vendor/*",
 ]
 
 once_cell_visibility = [
@@ -222,7 +218,6 @@ once_cell_visibility = [
 
   # At this time we are not enforcing restrictions on the below.
   "//third_party/*",
-  "//vendor/*",
 ]
 
 tracing_visibility = [
