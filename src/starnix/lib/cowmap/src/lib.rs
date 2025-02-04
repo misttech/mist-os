@@ -58,6 +58,32 @@ enum InsertResult<K: Ord + Clone, V: Clone, const N: usize> {
     SplitInternal(K, Arc<NodeInternal<K, V, N>>),
 }
 
+/// The intermediate result of a remove operation.
+///
+/// The root of the CowTree converts this result value into `Option<T>`, per the usual map
+/// interface.
+enum RemoveResult<V: Clone> {
+    /// The key the client asked to remove was not found in the map.
+    NotFound,
+
+    /// The key was successfully removed from the map.
+    ///
+    /// Returns the value previously stored at this key. No further processing is required.
+    Removed(V),
+
+    /// The key was removed from the map but the node that previously contained that node no longer
+    /// has sufficient children.
+    ///
+    /// Returns the value previousoly stored at this key.
+    ///
+    /// The caller is responsible for rebalancing its children to ensure that each node has at
+    /// least this minimum number of children. If the balance invariant can be resolved locally,
+    /// the caller should return `Removed` to its caller. If rebalancing the local children
+    /// causes this node to have fewer than the minimum number of children, the caller should
+    /// return `Underflow` to its caller.
+    Underflow(V),
+}
+
 impl<K, V, const N: usize> NodeLeaf<K, V, N>
 where
     K: Ord + Clone,
@@ -111,6 +137,21 @@ where
             }
         }
     }
+
+    fn remove(&mut self, key: &K) -> RemoveResult<V> {
+        match self.keys.binary_search(key) {
+            Ok(i) => {
+                self.keys.remove(i);
+                let value = self.values.remove(i);
+                if self.keys.len() < N / 2 {
+                    RemoveResult::Underflow(value)
+                } else {
+                    RemoveResult::Removed(value)
+                }
+            }
+            Err(_) => RemoveResult::NotFound,
+        }
+    }
 }
 
 /// The children of an internal node in the btree.
@@ -128,11 +169,32 @@ where
     K: Ord + Clone,
     V: Clone,
 {
+    fn new_empty(&self) -> Self {
+        match self {
+            ChildList::Leaf(_) => ChildList::Leaf(ArrayVec::new()),
+            ChildList::Internal(_) => ChildList::Internal(ArrayVec::new()),
+        }
+    }
+
     /// The number of children for this node.
     fn len(&self) -> usize {
         match self {
             ChildList::Leaf(children) => children.len(),
             ChildList::Internal(children) => children.len(),
+        }
+    }
+
+    fn size_at(&self, i: usize) -> usize {
+        match self {
+            ChildList::Leaf(children) => children[i].keys.len(),
+            ChildList::Internal(children) => children[i].children.len(),
+        }
+    }
+
+    fn get(&self, i: usize) -> Node<K, V, N> {
+        match self {
+            ChildList::Leaf(children) => Node::Leaf(children[i].clone()),
+            ChildList::Internal(children) => Node::Internal(children[i].clone()),
         }
     }
 
@@ -143,6 +205,13 @@ where
         match self {
             ChildList::Leaf(children) => ChildList::Leaf(children.drain(index..).collect()),
             ChildList::Internal(children) => ChildList::Internal(children.drain(index..).collect()),
+        }
+    }
+
+    fn split_off_front(&mut self, index: usize) -> Self {
+        match self {
+            ChildList::Leaf(children) => ChildList::Leaf(children.drain(..index).collect()),
+            ChildList::Internal(children) => ChildList::Internal(children.drain(..index).collect()),
         }
     }
 
@@ -167,6 +236,29 @@ where
             }
         }
     }
+
+    fn remove(&mut self, index: usize) {
+        match self {
+            ChildList::Leaf(children) => {
+                children.remove(index);
+            }
+            ChildList::Internal(children) => {
+                children.remove(index);
+            }
+        }
+    }
+
+    fn extend(&mut self, other: &Self) {
+        match (self, other) {
+            (ChildList::Leaf(self_children), ChildList::Leaf(other_children)) => {
+                self_children.extend(other_children.iter().cloned());
+            }
+            (ChildList::Internal(self_children), ChildList::Internal(other_children)) => {
+                self_children.extend(other_children.iter().cloned());
+            }
+            _ => unreachable!("Type mismatch while extending a child list."),
+        }
+    }
 }
 
 /// An internal node in the btree.
@@ -181,6 +273,25 @@ struct NodeInternal<K: Ord + Clone, V: Clone, const N: usize> {
 
     /// The children of this node.
     children: ChildList<K, V, N>,
+}
+
+/// Get mutable references to two entries in a slice.
+///
+/// When rebalancing nodes, we need to mutate two nodes at the same time. Normally, if you take a
+/// mutable reference to one element of an array, the borrow checker prevents you from taking a
+/// mutable reference to a second element of the same array.
+///
+/// The nightly version of `std::primitive::slice` has `get_many_mut` to let you get mutable
+/// references to multiple elements. However, without that interface, the recommended approach for
+/// avoiding `unsafe` is to use `split_at_mut`.
+fn get_two_mut<T>(slice: &mut [T], i: usize, j: usize) -> (&mut T, &mut T) {
+    if i < j {
+        let (a, b) = slice.split_at_mut(j);
+        (&mut a[i], &mut b[0])
+    } else {
+        let (a, b) = slice.split_at_mut(i);
+        (&mut b[0], &mut a[j])
+    }
 }
 
 impl<K, V, const N: usize> NodeInternal<K, V, N>
@@ -261,6 +372,138 @@ where
             }
         }
     }
+
+    fn select_children_to_rebalance(&self, i: usize) -> (usize, usize) {
+        if i == 0 {
+            (i, i + 1)
+        } else if i == self.children.len() - 1 {
+            (i - 1, i)
+        } else {
+            let left_index = i - 1;
+            let left_size = self.children.size_at(left_index);
+            let right_index = i + 1;
+            let right_size = self.children.size_at(right_index);
+            if left_size > right_size {
+                (left_index, i)
+            } else {
+                (i, right_index)
+            }
+        }
+    }
+
+    fn rebalance_child(&mut self, i: usize) {
+        // Cannot rebalance if we have fewer than two children. This situation occurs only at the
+        // root of the tree.
+        if self.children.len() < 2 {
+            return;
+        }
+        let (left, right) = self.select_children_to_rebalance(i);
+        let n = self.children.size_at(left) + self.children.size_at(right);
+        match &mut self.children {
+            ChildList::Leaf(children) => {
+                let (left_shard_node, right_shared_node) = get_two_mut(children, left, right);
+                let left_node = Arc::make_mut(left_shard_node);
+                if n <= N {
+                    // Merge the right node into the left node.
+                    left_node.keys.extend(right_shared_node.keys.iter().cloned());
+                    left_node.values.extend(right_shared_node.values.iter().cloned());
+                    self.keys.remove(left);
+                    self.children.remove(right);
+                } else {
+                    // Rebalance the elements between the nodes.
+                    let split = n / 2;
+                    let right_node = Arc::make_mut(right_shared_node);
+                    if left_node.values.len() < split {
+                        // Move elements from right to left.
+                        let move_count = split - left_node.values.len();
+                        left_node.keys.extend(right_node.keys.drain(..move_count));
+                        left_node.values.extend(right_node.values.drain(..move_count));
+                    } else {
+                        // Move elements from left to right.
+                        let mut keys = ArrayVec::new();
+                        keys.extend(left_node.keys.drain(split..));
+                        keys.extend(right_node.keys.iter().cloned());
+                        right_node.keys = keys;
+
+                        let mut values = ArrayVec::new();
+                        values.extend(left_node.values.drain(split..));
+                        values.extend(right_node.values.iter().cloned());
+                        right_node.values = values;
+                    }
+                    // Update the split key to reflect the new division between the nodes.
+                    self.keys[left] = right_node.keys[0].clone();
+                }
+            }
+            ChildList::Internal(children) => {
+                let (left_shard_node, right_shared_node) = get_two_mut(children, left, right);
+                let left_node = Arc::make_mut(left_shard_node);
+                let old_split_key = &self.keys[left];
+                if n <= N {
+                    // Merge the right node into the left node.
+                    left_node.keys.push(old_split_key.clone());
+                    left_node.keys.extend(right_shared_node.keys.iter().cloned());
+                    left_node.children.extend(&right_shared_node.children);
+                    assert!(left_node.keys.len() + 1 == left_node.children.len());
+                    self.keys.remove(left);
+                    self.children.remove(right);
+                } else {
+                    // Rebalance the elements between the nodes.
+                    let split = n / 2;
+                    let split_key;
+                    let right_node = Arc::make_mut(right_shared_node);
+                    if left_node.children.len() < split {
+                        // Move elements from right to left.
+                        let move_count = split - left_node.children.len();
+                        left_node.keys.push(old_split_key.clone());
+                        left_node.keys.extend(right_node.keys.drain(..move_count));
+                        split_key =
+                            left_node.keys.pop().expect("must have moved at least one element");
+
+                        left_node.children.extend(&right_node.children.split_off_front(move_count));
+                        assert!(left_node.keys.len() + 1 == left_node.children.len());
+                    } else {
+                        // Move elements from left to right.
+                        let mut it = left_node.keys.drain((split - 1)..);
+                        split_key = it.next().expect("must be moving at least one element");
+                        let mut keys = ArrayVec::new();
+                        keys.extend(it);
+                        keys.push(old_split_key.clone());
+                        keys.extend(right_node.keys.iter().cloned());
+                        right_node.keys = keys;
+
+                        let mut children = right_node.children.new_empty();
+                        children.extend(&left_node.children.split_off(split));
+                        children.extend(&right_node.children);
+                        right_node.children = children;
+                        assert!(left_node.keys.len() + 1 == left_node.children.len());
+                        assert!(right_node.keys.len() + 1 == right_node.children.len());
+                    }
+                    // Update the split key to reflect the new division between the nodes.
+                    self.keys[left] = split_key;
+                }
+            }
+        }
+    }
+
+    fn remove(&mut self, key: &K) -> RemoveResult<V> {
+        let i = self.get_child_index(&key);
+        let result = match &mut self.children {
+            ChildList::Leaf(children) => Arc::make_mut(&mut children[i]).remove(key),
+            ChildList::Internal(children) => Arc::make_mut(&mut children[i]).remove(key),
+        };
+        match result {
+            RemoveResult::NotFound => RemoveResult::NotFound,
+            RemoveResult::Removed(value) => RemoveResult::Removed(value),
+            RemoveResult::Underflow(value) => {
+                self.rebalance_child(i);
+                if self.children.len() < N / 2 {
+                    RemoveResult::Underflow(value)
+                } else {
+                    RemoveResult::Removed(value)
+                }
+            }
+        }
+    }
 }
 
 /// A node in the btree.
@@ -294,6 +537,13 @@ where
         match self {
             Node::Internal(node) => Arc::make_mut(node).insert(key, value),
             Node::Leaf(node) => Arc::make_mut(node).insert(key, value),
+        }
+    }
+
+    fn remove(&mut self, key: &K) -> RemoveResult<V> {
+        match self {
+            Node::Internal(node) => Arc::make_mut(node).remove(key),
+            Node::Leaf(node) => Arc::make_mut(node).remove(key),
         }
     }
 }
@@ -377,6 +627,27 @@ where
             }
         }
     }
+
+    pub fn remove(&mut self, key: &K) -> Option<V> {
+        match self.node.remove(key) {
+            RemoveResult::NotFound => None,
+            RemoveResult::Removed(value) => Some(value),
+            RemoveResult::Underflow(value) => {
+                match &mut self.node {
+                    Node::Leaf(_) => {
+                        // Nothing we can do about an underflow of a single leaf node at the root.
+                    }
+                    Node::Internal(node) => {
+                        // If the root has underflown to a trivial list, we can shrink the tree.
+                        if node.children.len() == 1 {
+                            self.node = node.children.get(0);
+                        }
+                    }
+                }
+                Some(value)
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -385,14 +656,14 @@ mod test {
 
     #[test]
     fn test_empty() {
-        let map = CowMap::<u32, i64, 8>::default();
+        let map = CowMap::<u32, i64, 4>::default();
         assert!(map.is_empty());
         assert!(map.get(&12).is_none());
     }
 
     #[test]
     fn test_insert() {
-        let mut map = CowMap::<u32, i64, 8>::default();
+        let mut map = CowMap::<u32, i64, 4>::default();
         assert!(map.is_empty());
         assert!(map.insert(12, 42).is_none());
         assert!(!map.is_empty());
@@ -403,52 +674,209 @@ mod test {
     }
 
     #[test]
-    fn test_split() {
-        let mut map = CowMap::<u32, i64, 8>::default();
+    fn test_insert_many() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        for i in 0..100 {
+            map.insert(i, i as i64 * 2);
+        }
+        for i in 0..100 {
+            assert_eq!(map.get(&i), Some(&(i as i64 * 2)));
+        }
+    }
+
+    #[test]
+    fn test_remove() {
+        let mut map = CowMap::<u32, i64, 4>::default();
         assert!(map.is_empty());
-        assert!(map.insert(10, -234).is_none());
-        assert!(map.insert(130, -437).is_none());
-        assert!(map.insert(60, -213).is_none());
-        assert!(map.insert(90, -632).is_none());
-        assert!(map.insert(120, -853).is_none());
-        assert!(map.insert(70, -873).is_none());
-        assert!(map.insert(110, -981).is_none());
-        assert!(map.insert(30, -621).is_none());
-        assert!(map.insert(80, -324).is_none());
-        assert!(map.insert(100, -169).is_none());
-        assert!(map.insert(20, -642).is_none());
-        assert!(map.insert(50, -641).is_none());
-        assert!(map.insert(40, -584).is_none());
+        assert!(map.insert(12, 42).is_none());
         assert!(!map.is_empty());
+        assert_eq!(map.remove(&12), Some(42));
+        assert!(map.get(&12).is_none());
+        assert!(map.is_empty());
+    }
 
-        assert_eq!(map.insert(30, 874), Some(-621));
-        assert_eq!(map.insert(110, 713), Some(-981));
+    #[test]
+    fn test_remove_many() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        for i in 0..100 {
+            map.insert(i, i as i64 * 2);
+        }
 
-        assert_eq!(map.get(&10), Some(&-234));
-        assert_eq!(map.get(&20), Some(&-642));
-        assert_eq!(map.get(&30), Some(&874));
-        assert_eq!(map.get(&40), Some(&-584));
-        assert_eq!(map.get(&50), Some(&-641));
-        assert_eq!(map.get(&60), Some(&-213));
-        assert_eq!(map.get(&70), Some(&-873));
-        assert_eq!(map.get(&80), Some(&-324));
-        assert_eq!(map.get(&90), Some(&-632));
-        assert_eq!(map.get(&100), Some(&-169));
-        assert_eq!(map.get(&110), Some(&713));
-        assert_eq!(map.get(&120), Some(&-853));
+        for i in (0..100).step_by(2) {
+            assert_eq!(map.remove(&i), Some(i as i64 * 2));
+        }
 
-        assert!(map.get(&15).is_none());
-        assert!(map.get(&15).is_none());
-        assert!(map.get(&25).is_none());
-        assert!(map.get(&35).is_none());
-        assert!(map.get(&45).is_none());
-        assert!(map.get(&55).is_none());
-        assert!(map.get(&65).is_none());
-        assert!(map.get(&75).is_none());
-        assert!(map.get(&85).is_none());
-        assert!(map.get(&95).is_none());
-        assert!(map.get(&105).is_none());
-        assert!(map.get(&115).is_none());
-        assert!(map.get(&125).is_none());
+        for i in (0..100).step_by(2) {
+            assert!(map.get(&i).is_none());
+        }
+
+        for i in (1..100).step_by(2) {
+            assert_eq!(map.get(&i), Some(&(i as i64 * 2)));
+        }
+    }
+
+    #[test]
+    fn test_split_merge_rebalance() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        for i in 0..100 {
+            map.insert(i * 2, i as i64);
+        }
+        // Remove every other element, forcing merges and rebalances.
+        for i in (0..100).step_by(4) {
+            assert_eq!(map.remove(&(i * 2)), Some(i as i64));
+            assert_eq!(map.remove(&((i + 1) * 2)), Some((i + 1) as i64));
+        }
+        // Ensure remaining values are correct after churn.
+        for i in (2..100).step_by(4) {
+            assert_eq!(map.get(&(i * 2)), Some(&(i as i64)));
+            assert_eq!(map.get(&((i + 1) * 2)), Some(&((i + 1) as i64)));
+        }
+    }
+
+    #[test]
+    fn test_clone() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        for i in 0..100 {
+            map.insert(i, i as i64);
+        }
+        let map2 = map.clone();
+
+        for i in 0..100 {
+            assert_eq!(map.get(&i), Some(&(i as i64)));
+            assert_eq!(map2.get(&i), Some(&(i as i64)));
+        }
+    }
+
+    #[test]
+    fn test_clone_modify() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        for i in 0..100 {
+            map.insert(i, i as i64);
+        }
+        let mut map2 = map.clone();
+
+        for i in 0..50 {
+            map2.insert(i, i as i64 * 2);
+        }
+
+        for i in 0..50 {
+            assert_eq!(map.get(&i), Some(&(i as i64)));
+            assert_eq!(map2.get(&i), Some(&(i as i64 * 2)));
+        }
+
+        for i in 50..100 {
+            assert_eq!(map.get(&i), Some(&(i as i64)));
+            assert_eq!(map2.get(&i), Some(&(i as i64)));
+        }
+    }
+
+    #[test]
+    fn test_remove_root_single_child() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        map.insert(1, 1);
+        map.insert(2, 2);
+        map.insert(3, 3);
+        map.insert(4, 4);
+        map.insert(5, 5); // Causes a split, creating a root internal node.
+
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.remove(&4);
+        // Now only a single child remains, the root should shrink to become that child.
+        map.remove(&5);
+
+        assert!(map.is_empty());
+    }
+
+    #[test]
+    fn test_remove_internal_rebalance_left_heavy() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+
+        for i in 0..10 {
+            map.insert(i, i as i64);
+        }
+
+        // Remove elements in a way to force left-heavy rebalancing.
+        map.remove(&9);
+        map.remove(&8);
+
+        // Check map integrity
+        for i in 0..8 {
+            assert_eq!(map.get(&i), Some(&(i as i64)));
+        }
+
+        assert!(map.get(&8).is_none());
+        assert!(map.get(&9).is_none());
+    }
+
+    #[test]
+    fn test_remove_internal_rebalance_right_heavy() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        for i in 0..10 {
+            map.insert(i, i as i64);
+        }
+
+        // Remove elements to force right-heavy rebalancing within internal node(s)
+        map.remove(&0);
+        map.remove(&1);
+
+        for i in 2..10 {
+            assert_eq!(map.get(&i), Some(&(i as i64)));
+        }
+
+        assert!(map.get(&0).is_none());
+        assert!(map.get(&1).is_none());
+    }
+
+    #[test]
+    fn test_remove_all_from_full_map() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        for i in 0..100 {
+            map.insert(i, i as i64);
+        }
+
+        for i in 0..100 {
+            assert_eq!(map.remove(&i), Some(i as i64));
+        }
+
+        assert!(map.is_empty());
+    }
+
+    #[test]
+    fn test_interleaved_insert_remove() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+
+        for i in 0..50 {
+            map.insert(i, i as i64);
+        }
+        for i in 0..25 {
+            assert_eq!(map.remove(&(i * 2)), Some((i * 2) as i64));
+        }
+
+        for i in 0..25 {
+            map.insert(i + 50, i as i64);
+        }
+
+        for i in 0..25 {
+            assert_eq!(map.get(&((i * 2) + 1)), Some(&((i * 2 + 1) as i64)));
+            assert_eq!(map.get(&(i + 50)), Some(&(i as i64)));
+        }
+    }
+
+    #[test]
+    fn test_remove_from_cloned_map() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        for i in 0..10 {
+            map.insert(i, i as i64);
+        }
+
+        let mut map2 = map.clone();
+        map2.remove(&5);
+        assert!(map2.get(&5).is_none()); // map2 should not have 5
+        assert_eq!(map.get(&5), Some(&5)); // map should still have 5
+
+        map.remove(&5);
+        assert!(map.get(&5).is_none());
     }
 }
