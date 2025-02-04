@@ -32,9 +32,6 @@ import compute_content_hash
 import remote_services_utils
 import workspace_utils
 
-# Assume this script lives under //build/
-_FUCHSIA_DIR = _SCRIPT_DIR.parent.resolve()
-
 _DEFAULT_HOST_TAG = "linux-x64"
 
 
@@ -110,7 +107,6 @@ def main() -> int:
     parser.add_argument(
         "--fuchsia-dir",
         type=Path,
-        default=_FUCHSIA_DIR,
         help="Fuchsia source directory (auto-detected).",
     )
     parser.add_argument(
@@ -182,18 +178,22 @@ def main() -> int:
             log("CMD: %s" % " ".join(shlex.quote(str(a)) for a in args))
         return subprocess.run(args, text=True, **kwd)
 
-    if not args.fuchsia_build_dir:
-        dot_fx_build_dir = args.fuchsia_dir / ".fx-build-dir"
-        if not dot_fx_build_dir.exists():
+    fuchsia_dir = args.fuchsia_dir
+    if fuchsia_dir:
+        fuchsia_dir = fuchsia_dir.resolve()
+    else:
+        fuchsia_dir = workspace_utils.find_fuchsia_dir(_SCRIPT_DIR)
+
+    build_dir = args.fuchsia_build_dir
+    if build_dir:
+        build_dir = build_dir.resolve()
+    else:
+        build_dir = workspace_utils.find_fx_build_dir(fuchsia_dir)
+        if not build_dir:
             parser.error(
                 "Cannot auto-detect build directory, please use --fuchsia-build-dir=DIR option!"
             )
-        args.fuchsia_build_dir = (
-            args.fuchsia_dir / dot_fx_build_dir.read_text().strip()
-        )
 
-    fuchsia_dir = args.fuchsia_dir.resolve()
-    build_dir = args.fuchsia_build_dir.resolve()
     if not build_dir.is_dir():
         parser.error(f"Build directory missing or invalid: {build_dir}")
 
