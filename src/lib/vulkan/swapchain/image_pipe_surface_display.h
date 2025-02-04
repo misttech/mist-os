@@ -56,22 +56,22 @@ class ImagePipeSurfaceDisplay final
  private:
   // `release_fence` will be signaled when a vsync is received with a larger/later config stamp.
   struct ReleaseFenceEntry {
-    fuchsia_hardware_display_types::ConfigStamp config_stamp;
+    fuchsia_hardware_display::ConfigStamp config_stamp;
     zx::event release_fence;
   };
 
   void ControllerOnDisplaysChanged(std::vector<fuchsia_hardware_display::Info>,
                                    std::vector<fuchsia_hardware_display_types::DisplayId>);
   void ControllerOnVsync(fuchsia_hardware_display_types::DisplayId, zx::time timestamp,
-                         fuchsia_hardware_display_types::ConfigStamp applied_config_stamp,
+                         fuchsia_hardware_display::ConfigStamp applied_config_stamp,
                          fuchsia_hardware_display::VsyncAckCookie cookie);
 
   // TODO(https://fxbug.dev/377322342): consider making `display_coordinator_` a sync client,
   // so that it isn't necessary to call `WaitForAsyncMessage()`.
   bool WaitForAsyncMessage();
 
-  fuchsia_hardware_display_types::ConfigStamp NextConfigStamp() {
-    return fuchsia_hardware_display_types::ConfigStamp(++last_applied_config_stamp_);
+  fuchsia_hardware_display::ConfigStamp NextConfigStamp() {
+    return fuchsia_hardware_display::ConfigStamp(++last_applied_config_stamp_);
   }
 
   // This loop is manually pumped in method calls and doesn't have its own
@@ -95,7 +95,7 @@ class ImagePipeSurfaceDisplay final
   fuchsia_hardware_display::LayerId layer_id_{fuchsia_hardware_display_types::kInvalidDispId};
 
   std::atomic_uint64_t last_applied_config_stamp_ =
-      fuchsia_hardware_display_types::kInvalidConfigStampValue;
+      fuchsia_hardware_display::kInvalidConfigStampValue;
   std::queue<ReleaseFenceEntry> pending_release_fences_ __TA_GUARDED(mutex_);
   bool receiving_vsyncs_ __TA_GUARDED(mutex_) = false;
 

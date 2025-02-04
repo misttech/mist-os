@@ -21,7 +21,7 @@ class DisplayCoordinatorListener final
   using OnClientOwnershipChangeCallback = std::function<void(bool has_ownership)>;
   using OnVsyncCallback =
       std::function<void(fuchsia_hardware_display_types::DisplayId display_id, zx::time timestamp,
-                         fuchsia_hardware_display_types::ConfigStamp applied_config_stamp,
+                         fuchsia_hardware_display::ConfigStamp applied_config_stamp,
                          fuchsia_hardware_display::VsyncAckCookie cookie)>;
 
   // `coordinator_listener_server` must be valid.

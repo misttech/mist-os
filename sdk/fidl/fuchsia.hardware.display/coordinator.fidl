@@ -60,7 +60,7 @@ open protocol CoordinatorListener {
         /// ready, that configuration will be only partially applied (without
         /// the pending image). That configuration's stamp will not be reported
         /// here.
-        applied_config_stamp fuchsia.hardware.display.types.ConfigStamp;
+        applied_config_stamp ConfigStamp;
 
         /// Used to acknowledge the receipt of VSync events.
         ///
@@ -411,7 +411,7 @@ closed protocol Coordinator {
     /// because of pending image availability or pending layer changes.
     /// If no configuration was applied before, returns `INVALID_CONFIG_STAMP_VALUE`.
     strict GetLatestAppliedConfigStamp() -> (struct {
-        stamp fuchsia.hardware.display.types.ConfigStamp;
+        stamp ConfigStamp;
     });
 
     /// Applies any pending changes to the current configuration. This will
@@ -422,7 +422,7 @@ closed protocol Coordinator {
     /// CheckConfig.
     strict ApplyConfig3(resource table {
         /// Required. Must be valid and strictly monotonically-increasing.
-        1: stamp fuchsia.hardware.display.types.ConfigStamp;
+        1: stamp ConfigStamp;
     });
 
     /// Configures the client's preferences for VSync event delivery.

@@ -9,6 +9,7 @@ fidl("fuchsia.hardware.display") {
 
   sources = [
     "buffer-collection.fidl",
+    "config.fidl",
     "coordinator.fidl",
     "display.fidl",
     "event.fidl",

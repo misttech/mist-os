@@ -374,7 +374,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     ASSERT_TRUE(config_stamp_result.is_ok())
         << "Failed to call FIDL GetLatestAppliedConfigStamp method: "
         << config_stamp_result.error_value();
-    fuchsia_hardware_display_types::ConfigStamp pending_config_stamp =
+    fuchsia_hardware_display::ConfigStamp pending_config_stamp =
         config_stamp_result.value().stamp();
 
     // The callback will switch this bool to |true| if the two configs match. It is initialized
@@ -382,10 +382,9 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     bool configs_are_equal = false;
     display->SetVsyncCallback(
         [&pending_config_stamp, &configs_are_equal](
-            zx::time timestamp, fuchsia_hardware_display_types::ConfigStamp applied_config_stamp) {
+            zx::time timestamp, fuchsia_hardware_display::ConfigStamp applied_config_stamp) {
           if (pending_config_stamp == applied_config_stamp &&
-              applied_config_stamp.value() !=
-                  fuchsia_hardware_display_types::kInvalidConfigStampValue) {
+              applied_config_stamp.value() != fuchsia_hardware_display::kInvalidConfigStampValue) {
             configs_are_equal = true;
           }
         });

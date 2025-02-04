@@ -183,7 +183,7 @@ class DisplayCompositorTest : public DisplayCompositorTestBase {
     display_compositor_->enable_display_composition_ = !force_renderer_only;
   }
 
-  void SendOnVsyncEvent(fuchsia_hardware_display_types::ConfigStamp stamp) {
+  void SendOnVsyncEvent(fuchsia_hardware_display::ConfigStamp stamp) {
     display_compositor_->OnVsync(zx::time(), stamp);
   }
 
@@ -961,7 +961,7 @@ TEST_F(DisplayCompositorTest, VsyncConfigStampAreProcessed) {
           }));
   EXPECT_CALL(*mock_display_coordinator_, ApplyConfig(_)).Times(2).WillRepeatedly(Return());
 
-  const fuchsia_hardware_display_types::ConfigStamp kConfigStamp1 = {{.value = 234}};
+  const fuchsia_hardware_display::ConfigStamp kConfigStamp1 = {{.value = 234}};
   EXPECT_CALL(*mock_display_coordinator_, GetLatestAppliedConfigStamp(_))
       .Times(1)
       .WillOnce(testing::Invoke(
@@ -970,7 +970,7 @@ TEST_F(DisplayCompositorTest, VsyncConfigStampAreProcessed) {
           }));
   display_compositor_->RenderFrame(1, zx::time(1), {}, {}, [](const scheduling::Timestamps&) {});
 
-  const fuchsia_hardware_display_types::ConfigStamp kConfigStamp2 = {{.value = 123}};
+  const fuchsia_hardware_display::ConfigStamp kConfigStamp2 = {{.value = 123}};
   EXPECT_CALL(*mock_display_coordinator_, GetLatestAppliedConfigStamp(_))
       .Times(1)
       .WillOnce(testing::Invoke(
@@ -1258,7 +1258,7 @@ TEST_F(DisplayCompositorTest, DISABLED_HardwareFrameCorrectnessTest) {
       .Times(1)
       .WillOnce(testing::Invoke(
           [&](MockDisplayCoordinator::GetLatestAppliedConfigStampCompleter::Sync& completer) {
-            const fuchsia_hardware_display_types::ConfigStamp stamp = {1};
+            const fuchsia_hardware_display::ConfigStamp stamp = {1};
             completer.Reply({{.stamp = stamp}});
           }));
 
@@ -1478,7 +1478,7 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
       .Times(1)
       .WillOnce(testing::Invoke(
           [&](MockDisplayCoordinator::GetLatestAppliedConfigStampCompleter::Sync& completer) {
-            const fuchsia_hardware_display_types::ConfigStamp stamp = {1};
+            const fuchsia_hardware_display::ConfigStamp stamp = {1};
             completer.Reply({{.stamp = stamp}});
           }));
 
@@ -1871,7 +1871,7 @@ TEST_F(DisplayCompositorTest, DISABLED_ChecksDisplayImageSignalFences) {
       .Times(1)
       .WillOnce(testing::Invoke(
           [&](MockDisplayCoordinator::GetLatestAppliedConfigStampCompleter::Sync& completer) {
-            const fuchsia_hardware_display_types::ConfigStamp stamp = {1};
+            const fuchsia_hardware_display::ConfigStamp stamp = {1};
             completer.Reply({{.stamp = stamp}});
           }));
 

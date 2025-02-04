@@ -517,7 +517,7 @@ zx::result<> TestFidlClient::CheckConfig() {
 zx::result<> TestFidlClient::ApplyConfig(display::ConfigStamp config_stamp) {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fuchsia_hardware_display_types::wire::ConfigStamp fidl_config_stamp =
+  const fuchsia_hardware_display::wire::ConfigStamp fidl_config_stamp =
       display::ToFidlConfigStamp(config_stamp);
   fidl::Arena arena;
   fuchsia_hardware_display::wire::CoordinatorApplyConfig3Request request =

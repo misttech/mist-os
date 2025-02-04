@@ -70,7 +70,7 @@ class DisplayManager {
                          std::vector<fuchsia_hardware_display_types::DisplayId> removed);
   void OnClientOwnershipChange(bool has_ownership);
   void OnVsync(fuchsia_hardware_display_types::DisplayId display_id, zx::time timestamp,
-               fuchsia_hardware_display_types::ConfigStamp applied_config_stamp,
+               fuchsia_hardware_display::ConfigStamp applied_config_stamp,
                fuchsia_hardware_display::VsyncAckCookie cookie);
 
   // Must outlive `default_display_coordinator_`.

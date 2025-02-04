@@ -132,11 +132,11 @@ TEST_F(DisplayCoordinatorListenerTest, OnVsyncCallback) {
   fuchsia_hardware_display_types::DisplayId last_display_id = {
       {.value = fuchsia_hardware_display_types::kInvalidDispId}};
   zx::time last_timestamp = zx::time::infinite_past();
-  fuchsia_hardware_display_types::ConfigStamp last_config_stamp = {
-      {.value = fuchsia_hardware_display_types::kInvalidConfigStampValue}};
+  fuchsia_hardware_display::ConfigStamp last_config_stamp = {
+      {.value = fuchsia_hardware_display::kInvalidConfigStampValue}};
 
   auto vsync_cb = [&](fuchsia_hardware_display_types::DisplayId display_id, zx::time timestamp,
-                      fuchsia_hardware_display_types::ConfigStamp stamp,
+                      fuchsia_hardware_display::ConfigStamp stamp,
                       fuchsia_hardware_display::VsyncAckCookie cookie) {
     last_display_id = display_id;
     last_timestamp = timestamp;
@@ -148,7 +148,7 @@ TEST_F(DisplayCoordinatorListenerTest, OnVsyncCallback) {
   const fuchsia_hardware_display_types::DisplayId kTestDisplayId = {{.value = 1}};
   const fuchsia_hardware_display_types::DisplayId kInvalidDisplayId = {{.value = 2}};
   const zx::time kTestTimestamp(111111);
-  const fuchsia_hardware_display_types::ConfigStamp kConfigStamp = {{.value = 2u}};
+  const fuchsia_hardware_display::ConfigStamp kConfigStamp = {{.value = 2u}};
 
   fit::result<fidl::OneWayStatus> result = mock_display_coordinator()->listener()->OnVsync({{
       .display_id = kTestDisplayId,
@@ -156,7 +156,7 @@ TEST_F(DisplayCoordinatorListenerTest, OnVsyncCallback) {
       .applied_config_stamp = kConfigStamp,
       .cookie = 0,
   }});
-  ASSERT_EQ(fuchsia_hardware_display_types::kInvalidConfigStampValue, last_config_stamp.value());
+  ASSERT_EQ(fuchsia_hardware_display::kInvalidConfigStampValue, last_config_stamp.value());
   RunLoopUntilIdle();
   EXPECT_EQ(kTestDisplayId, last_display_id);
   EXPECT_EQ(kTestTimestamp, last_timestamp);

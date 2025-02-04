@@ -278,7 +278,7 @@ bool update_display_layers(const fbl::Vector<std::unique_ptr<VirtualLayer>>& lay
   return true;
 }
 
-zx_status_t apply_config(fhdt::wire::ConfigStamp stamp) {
+zx_status_t apply_config(fhd::wire::ConfigStamp stamp) {
   auto check_result = dc->CheckConfig(false);
   if (!check_result.ok()) {
     printf("Failed to make check call: %s\n", check_result.FormatDescription().c_str());
@@ -307,7 +307,7 @@ zx_status_t apply_config(fhdt::wire::ConfigStamp stamp) {
 }
 
 zx_status_t wait_for_vsync(async::Loop& coordinator_listener_loop,
-                           fhdt::wire::ConfigStamp expected_stamp) {
+                           fhd::wire::ConfigStamp expected_stamp) {
   zx_status_t status = coordinator_listener_loop.Run(zx::time::infinite(), /*once=*/true);
   if (status != ZX_OK) {
     printf("wait_for_vsync(): Failed to run coordinator listener loop: %s",
@@ -1050,7 +1050,7 @@ int main(int argc, const char* argv[]) {
     printf("Capturing every frame. Verification is %s\n", verify_capture ? "enabled" : "disabled");
   }
 
-  fhdt::wire::ConfigStamp last_applied_stamp = {.value = fhdt::wire::kInvalidConfigStampValue};
+  fhd::wire::ConfigStamp last_applied_stamp = {.value = fhd::wire::kInvalidConfigStampValue};
   bool capture_result = true;
   for (int i = 0; !num_frames || i < num_frames; i++) {
     for (auto& layer : layers) {

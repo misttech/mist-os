@@ -728,7 +728,7 @@ void DisplayCompositor::DiscardConfig() {
       << "Failed to call FIDL CheckConfig method: " << check_config_result.error_value();
 }
 
-fuchsia_hardware_display_types::ConfigStamp DisplayCompositor::ApplyConfig() {
+fuchsia_hardware_display::ConfigStamp DisplayCompositor::ApplyConfig() {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   FX_DCHECK(display_coordinator_.is_valid());
 
@@ -891,7 +891,7 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
                                                 std::move(callback));
   }
 
-  const fuchsia_hardware_display_types::ConfigStamp config_stamp = ApplyConfig();
+  const fuchsia_hardware_display::ConfigStamp config_stamp = ApplyConfig();
   pending_apply_configs_.push_back({.config_stamp = config_stamp, .frame_number = frame_number});
 
   return fallback_to_gpu_composition ? RenderFrameResult::kGpuComposition
@@ -935,7 +935,7 @@ bool DisplayCompositor::TryDirectToDisplay(const std::vector<RenderData>& render
 }
 
 void DisplayCompositor::OnVsync(zx::time timestamp,
-                                fuchsia_hardware_display_types::ConfigStamp applied_config_stamp) {
+                                fuchsia_hardware_display::ConfigStamp applied_config_stamp) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   TRACE_DURATION("gfx", "Flatland::DisplayCompositor::OnVsync");
 
@@ -1016,8 +1016,8 @@ void DisplayCompositor::AddDisplay(scenic_impl::display::Display* display, const
   // Add vsync callback on display. Note that this will overwrite the existing callback on
   // |display| and other clients won't receive any, i.e. gfx.
   display->SetVsyncCallback(
-      [weak_ref = weak_from_this()](
-          zx::time timestamp, fuchsia_hardware_display_types::ConfigStamp applied_config_stamp) {
+      [weak_ref = weak_from_this()](zx::time timestamp,
+                                    fuchsia_hardware_display::ConfigStamp applied_config_stamp) {
         if (auto ref = weak_ref.lock())
           ref->OnVsync(timestamp, applied_config_stamp);
       });

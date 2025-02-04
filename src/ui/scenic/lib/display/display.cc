@@ -44,7 +44,7 @@ void Display::Unclaim() {
 }
 
 void Display::OnVsync(zx::time timestamp,
-                      fuchsia_hardware_display_types::ConfigStamp applied_config_stamp) {
+                      fuchsia_hardware_display::ConfigStamp applied_config_stamp) {
   zx::duration time_since_last_vsync = timestamp - vsync_timing_->last_vsync_time();
 
   if (vsync_timing_->last_vsync_time() != zx::time(0)) {

@@ -101,11 +101,11 @@ class DisplayTest : public gtest::RealLoopFixture {
 
   // Wait until a vsync is received with a stamp that is >= `target_stamp`.  Return ZX_ERR_TIMED_OUT
   // if no such vsync is received before `timeout` elapses.
-  zx::result<> WaitForVsync(fuchsia_hardware_display_types::ConfigStamp target_stamp,
+  zx::result<> WaitForVsync(fuchsia_hardware_display::ConfigStamp target_stamp,
                             zx::duration timeout) {
-    std::optional<fuchsia_hardware_display_types::ConfigStamp> received_stamp;
+    std::optional<fuchsia_hardware_display::ConfigStamp> received_stamp;
     display_manager_->default_display()->SetVsyncCallback(
-        [&](zx::time, fuchsia_hardware_display_types::ConfigStamp applied_config_stamp) {
+        [&](zx::time, fuchsia_hardware_display::ConfigStamp applied_config_stamp) {
           received_stamp = applied_config_stamp;
         });
 
@@ -369,7 +369,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   EXPECT_TRUE(check_config_result.is_ok())
       << "Failed to call FIDL CheckConfig: " << check_config_result.error_value();
 
-  const fuchsia_hardware_display_types::ConfigStamp kFirstConfigStamp(11);
+  const fuchsia_hardware_display::ConfigStamp kFirstConfigStamp(11);
   {
     fuchsia_hardware_display::CoordinatorApplyConfig3Request request;
     request.stamp(kFirstConfigStamp);
@@ -404,7 +404,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
       << "Failed to call FIDL CheckConfig: " << check_config_result2.error_value();
   EXPECT_EQ(check_config_result2.value().res(), fuchsia_hardware_display_types::ConfigResult::kOk);
 
-  const fuchsia_hardware_display_types::ConfigStamp kSecondConfigStamp(22);
+  const fuchsia_hardware_display::ConfigStamp kSecondConfigStamp(22);
   {
     fuchsia_hardware_display::CoordinatorApplyConfig3Request request;
     request.stamp(kSecondConfigStamp);

@@ -164,7 +164,7 @@ void DisplayManager::OnClientOwnershipChange(bool has_ownership) {
 
 void DisplayManager::OnVsync(fuchsia_hardware_display_types::DisplayId display_id,
                              zx::time timestamp,
-                             fuchsia_hardware_display_types::ConfigStamp applied_config_stamp,
+                             fuchsia_hardware_display::ConfigStamp applied_config_stamp,
                              fuchsia_hardware_display::VsyncAckCookie cookie) {
   if (cookie.value() != fuchsia_hardware_display_types::kInvalidDispId) {
     [[maybe_unused]] fit::result<fidl::OneWayStatus> acknowledge_vsync_result =

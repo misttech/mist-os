@@ -183,8 +183,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // Notifies the compositor that a vsync has occurred, in response to a display configuration
   // applied by the compositor.  It is the compositor's responsibility to signal any release fences
   // corresponding to the frame identified by |frame_number|.
-  void OnVsync(zx::time timestamp,
-               fuchsia_hardware_display_types::ConfigStamp applied_config_stamp);
+  void OnVsync(zx::time timestamp, fuchsia_hardware_display::ConfigStamp applied_config_stamp);
 
   std::vector<allocation::ImageMetadata> AllocateDisplayRenderTargets(
       bool use_protected_memory, uint32_t num_render_targets, const fuchsia::math::SizeU& size,
@@ -248,7 +247,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // Applies the config to the display coordinator and returns the ConfigStamp associated with this
   // config. ConfigStamp is provided by the display coordinator. This should only be called after
   // CheckConfig has verified that the config is okay, since ApplyConfig does not return any errors.
-  fuchsia_hardware_display_types::ConfigStamp ApplyConfig() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  fuchsia_hardware_display::ConfigStamp ApplyConfig() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   bool ImportBufferCollectionToDisplayCoordinator(
       allocation::GlobalBufferCollectionId identifier,
@@ -317,7 +316,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   // Stores information about the last ApplyConfig() call to display.
   struct ApplyConfigInfo {
-    fuchsia_hardware_display_types::ConfigStamp config_stamp;
+    fuchsia_hardware_display::ConfigStamp config_stamp;
     uint64_t frame_number;
   };
 
@@ -327,8 +326,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   // Stores the ConfigStamp information of the latest frame shown on the display. If no frame
   // has been presented, its value will be nullopt.
-  std::optional<fuchsia_hardware_display_types::ConfigStamp> last_presented_config_stamp_ =
-      std::nullopt;
+  std::optional<fuchsia_hardware_display::ConfigStamp> last_presented_config_stamp_ = std::nullopt;
 
   fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
 

@@ -79,7 +79,7 @@ TEST_F(DisplayManagerMockTest, DisplayVsyncCallback) {
 
   display_manager()->default_display()->SetVsyncCallback(
       [&num_vsync_display_received](zx::time timestamp,
-                                    fuchsia_hardware_display_types::ConfigStamp stamp) {
+                                    fuchsia_hardware_display::ConfigStamp stamp) {
         ++num_vsync_display_received;
       });
 

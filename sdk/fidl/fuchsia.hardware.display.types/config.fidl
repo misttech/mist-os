@@ -24,27 +24,3 @@ type ConfigResult = strict enum : uint32 {
     /// The client should try a different set of displays or display modes.
     UNSUPPORTED_DISPLAY_MODES = 4;
 };
-
-/// Identifies an accepted display config.
-///
-/// This is a type-safe wrapper for a
-/// [`fuchsia.hardware.display.types/ConfigStampValue`], which is a raw numeric
-/// value.
-///
-/// Each successful call to [`fuchsia.hardware.display/Coordinator.ApplyConfig`]
-/// generates a valid value. Values are reported in
-/// [`fuchsia.hardware.display/Coordinator.Vsync`] events.
-///
-/// Generated values are strictly increasing (unique, strictly monotonic) within
-/// the lifetime of a [`fuchsia.display/Coordinator`] connection.
-///
-/// [`fuchsia.hardware.display.types/INVALID_CONFIG_STAMP_VALUE`] represents an
-/// invalid value.
-type ConfigStamp = struct {
-    value ConfigStampValue;
-};
-
-/// See [`fuchsia.hardware.display.types/ConfigStamp`].
-alias ConfigStampValue = uint64;
-
-const INVALID_CONFIG_STAMP_VALUE ConfigStampValue = 0;
