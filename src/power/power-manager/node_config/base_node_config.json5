@@ -2,8 +2,5 @@
     {
         type: "SystemShutdownHandler",
         name: "sys_shutdown",
-        config: {
-            shutdown_timeout_s: 3600,
-        },
     },
 ]
