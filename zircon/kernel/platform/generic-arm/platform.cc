@@ -72,8 +72,8 @@
 
 #include <platform/ram_mappable_crashlog.h>
 
-// Defined in start.S.
-extern paddr_t kernel_entry_paddr;
+// Set in start.S.
+paddr_t kernel_entry_paddr;
 
 static ktl::atomic<int> panic_started;
 static ktl::atomic<int> halted;

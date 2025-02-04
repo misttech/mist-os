@@ -10,13 +10,15 @@
 
 #ifndef __ASSEMBLER__
 
-#include <assert.h>
 #include <stdbool.h>
 #include <sys/types.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
 #include <kernel/cpu.h>
+
+// Defined in platform.cc and set in start.S.
+extern vaddr_t kernel_entry_paddr;
 
 struct iframe_t;
 
@@ -112,7 +114,9 @@ void arm64_fpu_context_switch(Thread* oldthread, Thread* newthread);
 void arm64_fpu_save_state(Thread* t);
 void arm64_fpu_restore_state(Thread* t);
 
-uint64_t arm64_get_boot_el();
+// TODO(https://fxbug.dev/393619961): Identically 1 today, but should one day
+// be dynamic.
+constexpr uint64_t arm64_get_boot_el() { return 1; }
 
 // Called during clock selection (if it is called at all) before secondary CPUs
 // have started.

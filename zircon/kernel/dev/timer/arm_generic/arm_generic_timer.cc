@@ -58,9 +58,8 @@
 #define TIMER_REG_CNTV_TVAL "cntv_tval_el0"
 #define TIMER_REG_CNTVCT "cntvct_el0"
 
-extern "C" {
+arch::EarlyTicks kernel_entry_ticks;
 arch::EarlyTicks kernel_virtual_entry_ticks;
-}
 
 KCOUNTER(platform_timer_set_counter, "platform.timer.set")
 KCOUNTER(platform_timer_cancel_counter, "platform.timer.cancel")

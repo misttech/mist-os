@@ -9,14 +9,12 @@
 #include <string.h>
 #include <trace.h>
 
+#include <arch/arm64.h>
 #include <arch/arm64/smccc.h>
 #include <dev/psci.h>
 #include <pdev/power.h>
 
 #define LOCAL_TRACE 0
-
-// Defined in start.S.
-extern paddr_t kernel_entry_paddr;
 
 namespace {
 
@@ -77,7 +75,9 @@ zx_status_t psci_system_off() {
       do_psci_call(PSCI64_SYSTEM_OFF, shutdown_args[0], shutdown_args[1], shutdown_args[2]));
 }
 
-uint32_t psci_get_version() { return static_cast<uint32_t>(do_psci_call(PSCI64_PSCI_VERSION, 0, 0, 0)); }
+uint32_t psci_get_version() {
+  return static_cast<uint32_t>(do_psci_call(PSCI64_PSCI_VERSION, 0, 0, 0));
+}
 
 /* powers down the calling cpu - only returns if call fails */
 zx_status_t psci_cpu_off() {

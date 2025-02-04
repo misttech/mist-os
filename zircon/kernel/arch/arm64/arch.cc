@@ -131,10 +131,6 @@ static Thread _init_thread[SMP_MAX_CPUS - 1];
 // one for each secondary CPU, indexed by (cpu_num - 1).
 arm64_sp_info_t arm64_secondary_sp_list[SMP_MAX_CPUS - 1];
 
-extern uint64_t arch_boot_el;  // Defined in start.S.
-
-uint64_t arm64_get_boot_el() { return arch_boot_el >> 2; }
-
 zx_status_t arm64_create_secondary_stack(cpu_num_t cpu_num, uint64_t mpid) {
   // Allocate a stack, indexed by CPU num so that |arm64_secondary_entry| can find it.
   DEBUG_ASSERT_MSG(cpu_num > 0 && cpu_num < SMP_MAX_CPUS, "cpu_num: %u", cpu_num);

@@ -94,11 +94,6 @@ FUNCTION(_start)
     adr_global tmp2, kernel_entry_paddr
     str     tmp, [tmp2]
 
-    // arch_boot_el: EL at boot time.
-    mrs     tmp, CurrentEL
-    adr_global tmp2, arch_boot_el
-    str     tmp, [tmp2]
-
     // root_lower_page_table_phys: boot CPU TTBR0_EL1.BADDR.
     mrs     tmp, ttbr0_el1
     and     tmp, tmp, MMU_PTE_OUTPUT_ADDR_MASK
@@ -292,25 +287,10 @@ FUNCTION(_start)
     b       .Lunsupported_cpu_trap
 END_FUNCTION(_start)
 
-.ltorg
-
-// These are logically .bss (uninitialized data).  But they're set before
-// clearing the .bss, so put them in .data so they don't get zeroed.
-.data
-    .balign 64
-DATA(arch_boot_el)
-    .quad 0xdeadbeef00ff00ff
-END_DATA(arch_boot_el)
-DATA(kernel_entry_paddr)
-    .quad -1
-END_DATA(kernel_entry_paddr)
-DATA(kernel_entry_ticks)
-    .quad -1, -1
-END_DATA(kernel_entry_ticks)
-
-    .balign 8
+.bss
+.balign 8
 LOCAL_DATA(boot_cpu_fake_arch_thread)
-    .quad 0xdeadbeef1ee2d00d // stack_guard
+    .quad 0 // Location of stack guard
 #if __has_feature(safe_stack)
     .quad boot_cpu_unsafe_kstack_end
 #else
@@ -319,7 +299,6 @@ LOCAL_DATA(boot_cpu_fake_arch_thread)
 LOCAL_DATA(boot_cpu_fake_thread_pointer_location)
 END_DATA(boot_cpu_fake_arch_thread)
 
-.bss
 LOCAL_DATA(boot_cpu_kstack)
     .skip ARCH_DEFAULT_STACK_SIZE
     .balign 16
