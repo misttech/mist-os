@@ -4,8 +4,13 @@
 
 use std::borrow::Borrow;
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
 use std::ops::Range;
+
+#[cfg(not(feature = "use_cowmap"))]
+use std::collections::BTreeMap;
+
+#[cfg(feature = "use_cowmap")]
+use cowmap::CowMap;
 
 /// Keys for the map inside RangeMap.
 ///
@@ -74,8 +79,12 @@ impl<T: Ord> Ord for RangeStart<T> {
 /// Querying a point in the map returns not only the value stored at that point
 /// but also the range that value occupies in the map.
 #[derive(Debug)]
-pub struct RangeMap<K, V> {
+pub struct RangeMap<K: Ord + Clone, V: Clone + Eq> {
+    #[cfg(not(feature = "use_cowmap"))]
     map: BTreeMap<RangeStart<K>, V>,
+
+    #[cfg(feature = "use_cowmap")]
+    map: CowMap<RangeStart<K>, V, 8>,
 }
 
 impl<K, V> Default for RangeMap<K, V>
@@ -96,7 +105,7 @@ where
 {
     /// Returns an empty RangeMap.
     pub fn new() -> Self {
-        RangeMap { map: BTreeMap::new() }
+        RangeMap { map: Default::default() }
     }
 
     /// Returns the range (and associated value) that contains the given point,
