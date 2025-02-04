@@ -385,7 +385,7 @@ macro_rules! get_key_variant {
 }
 
 impl Key {
-    fn new(type_: Type, max_size: u32) -> TeeResult<Key> {
+    pub fn new(type_: Type, max_size: u32) -> TeeResult<Key> {
         match type_ {
             Type::Aes => AesKey::new(max_size).map(Self::Aes),
             Type::Des => DesKey::new(max_size).map(Self::Des),
@@ -431,7 +431,7 @@ impl Key {
         }
     }
 
-    fn get_type(&self) -> Type {
+    pub fn get_type(&self) -> Type {
         match self {
             Key::Aes(_) => Type::Aes,
             Key::Des(_) => Type::Des,
