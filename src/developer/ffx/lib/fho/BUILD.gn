@@ -16,7 +16,6 @@ rustc_library("lib") {
     "//src/developer/ffx/command/error:lib",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/core:lib",
-    "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/fho/metadata:lib",
     "//src/developer/ffx/lib/target:lib",
     "//src/developer/ffx/lib/writer:lib",

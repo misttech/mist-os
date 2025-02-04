@@ -20,6 +20,7 @@ rustc_library("lib") {
     "//src/developer/ffx/core:lib",
     "//src/developer/ffx/daemon/proxy:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
+    "//src/developer/ffx/lib/addr:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/rcs:lib",
@@ -34,7 +35,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:futures",
   ]
 
-  test_deps = []
+  test_deps = [ "//sdk/fidl/fuchsia.net:fuchsia.net_rust" ]
 
   sources = [
     "src/daemon_proxy.rs",
@@ -46,6 +47,7 @@ rustc_library("lib") {
     "src/from_toolbox.rs",
     "src/lib.rs",
     "src/remote_control_proxy.rs",
+    "src/target_info.rs",
     "src/target_proxy.rs",
     "src/with_moniker.rs",
   ]
