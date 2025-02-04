@@ -111,6 +111,7 @@ futures-io = "=0.3.30"
 futures-lite = "1.11.3"
 futures-test = "=0.3.30"
 futures-util = "=0.3.30"
+generic-array = "0.14"
 getrandom = { version = "0.2.10" }
 glob = "0.3.0"
 gpt = "3.0.0"

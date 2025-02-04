@@ -1390,6 +1390,7 @@ dependencies = [
  "futures-lite",
  "futures-test",
  "futures-util",
+ "generic-array",
  "getopts",
  "getrandom",
  "glob",

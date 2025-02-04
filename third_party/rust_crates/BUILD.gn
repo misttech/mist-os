@@ -335,6 +335,10 @@ group("futures-util") {
   public_deps = [ ":futures-util-v0_3_30" ]
 }
 
+group("generic-array") {
+  public_deps = [ ":generic-array-v0_14_5" ]
+}
+
 if (current_os == "fuchsia") {
   group("getopts") {
     public_deps = [ ":getopts-v0_2_18" ]
