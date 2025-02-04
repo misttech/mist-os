@@ -240,6 +240,7 @@
 //src/devices/tests/v2/compat/leaf:driver
 //src/devices/tests/v2/compat/root:driver
 //src/devices/tests/v2/ddk-init-test:driver
+//src/devices/tests/v2/devfs-export-service:root_driver
 //src/devices/tests/v2/devfs_exporter:root_driver
 //src/devices/tests/v2/dynamic_offers:leaf_driver
 //src/devices/tests/v2/dynamic_offers:root_driver

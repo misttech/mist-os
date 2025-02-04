@@ -18,6 +18,7 @@ clock
 critical-services
 ?debug-dash-launcher
 devfs
+devfs-driver
 device-name-provider
 display-coordinator
 driver-index
