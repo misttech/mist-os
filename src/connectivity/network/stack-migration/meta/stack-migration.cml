@@ -27,6 +27,7 @@
         {
             protocol: [ "fuchsia.power.internal.CollaborativeRebootScheduler" ],
         },
+        { protocol: "fuchsia.net.http.Loader" },
     ],
     expose: [
         {

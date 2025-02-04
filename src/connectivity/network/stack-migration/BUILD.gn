@@ -12,6 +12,7 @@ network_unified_binary("bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
+    "//sdk/fidl/fuchsia.net.http:fuchsia.net.http_rust",
     "//sdk/fidl/fuchsia.net.stackmigrationdeprecated:fuchsia.net.stackmigrationdeprecated_rust",
     "//sdk/fidl/fuchsia.power.internal:fuchsia.power.internal_rust",
     "//sdk/rust/zx",
@@ -22,6 +23,7 @@ network_unified_binary("bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/lib/replace-with",
     "//third_party/cobalt/src/lib/client/rust:cobalt-client",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
@@ -31,6 +33,7 @@ network_unified_binary("bin") {
 
   test_deps = [
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
+    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:test-case",
   ]
 
