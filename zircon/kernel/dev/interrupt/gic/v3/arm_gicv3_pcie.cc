@@ -7,8 +7,8 @@
 
 #include "arm_gicv3_pcie.h"
 
-#if WITH_KERNEL_PCIE
 #include <lib/lazy_init/lazy_init.h>
+#include <lib/pci/kpci.h>
 #include <lib/zbi-format/driver-config.h>
 #include <trace.h>
 #include <zircon/types.h>
@@ -26,6 +26,10 @@ lazy_init::LazyInit<NoMsiPciePlatformInterface, lazy_init::CheckType::None,
 }  // anonymous namespace
 
 void arm_gicv3_pcie_init() {
+  if (!Pci::KernelPciEnabled()) {
+    return;
+  }
+
   // When GICv3 MSI support is added, add a handler to register the deny
   // regions. Add all MMIO regions which contain GIC registers to the
   // system-wide deny list using root_resource_filter_add_deny_region.
@@ -41,9 +45,3 @@ void arm_gicv3_pcie_init() {
         res);
   }
 }
-
-#else
-
-void arm_gicv3_pcie_init() {}
-
-#endif  // if WITH_KERNEL_PCIE

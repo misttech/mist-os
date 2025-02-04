@@ -354,10 +354,6 @@ if (is_kernel) {
       "EXPERIMENTAL_THREAD_SAMPLER_ENABLED=$experimental_thread_sampler_enabled",
     ]
 
-    if (!disable_kernel_pci) {
-      defines += [ "WITH_KERNEL_PCIE" ]
-    }
-
     if (kernel_no_userabi) {
       defines += [ "KERNEL_NO_USERABI" ]
     }

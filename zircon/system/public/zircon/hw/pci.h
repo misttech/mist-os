@@ -17,12 +17,6 @@ typedef struct zx_pci_bdf {
   uint8_t function_id;
 } zx_pci_bdf_t;
 
-// TODO(cja): This header is used for the transition of these defines from
-// kernel to userspace, but due to zx_pci_bdf_t some of the kernel includes it.
-// Make sure defines here don't clash with those in pci_common.h by having this
-// guard, but remove it after the transition.
-#ifndef WITH_KERNEL_PCIE
-
 #define PCI_MAX_BUSES (256u)
 #define PCI_MAX_DEVICES_PER_BUS (32u)
 #define PCI_MAX_FUNCTIONS_PER_DEVICE (8u)
@@ -42,8 +36,6 @@ typedef struct zx_pci_bdf {
 #define PCIE_MAX_MSIX_IRQS (2048u)
 
 #define PCI_INVALID_VENDOR_ID (0xFFFF)
-
-#endif  // WITH_KERNEL_PCIE
 
 __END_CDECLS
 
