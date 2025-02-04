@@ -20,7 +20,7 @@ Fuchsia software packaging, or the [long term SWD goals](https://fuchsia.dev/fuc
 
 All subsystems listed below are written in Rust.
 
-Updated: February 2023
+Updated: January 2025
 
 | Subsystem                 | Purpose                                                                                            | Location                                     |
 |-----------------------    |----------------------------------------------------------------------------------------------------|----------------------------------------------|
@@ -51,12 +51,12 @@ For wider system tests, including end-to-end tests of system OTA updates, see `/
 
 *   [`fidlcat`](https://fuchsia.dev/fuchsia-src/development/tools/fidl_inspecting):
     it’s `strace`, but for every IPC on the system, not just syscalls.
-*   [`zxdb`](https://fuchsia.dev/fuchsia-src/development/debugger/debugger_usage):
+*   [`zxdb`](https://fuchsia.dev/fuchsia-src/development/debugger):
     Fuchsia’s debugger. Similar usage to `gdb`, and has Unicode support
     (emoji!). Doesn’t currently work well with golang, but works fine with Rust.
-*   [Inspect](https://fuchsia.dev/fuchsia-src/development/inspect): Opt-in APIs
-    for components to expose aspects of their state. Several portions of the SWD
-    stack implement this, and more to come.
+*   [Inspect](https://fuchsia.dev/fuchsia-src/development/diagnostics/inspect):
+    Opt-in APIs for components to expose aspects of their state. Several
+    portions of the SWD stack implement this, and more to come.
 
 ##### IDEs
 
@@ -87,11 +87,13 @@ working with tests, your build configuration is quite simple:
 
 ```sh
 
-Tab 1 > fx set core.x64 --with //bundles/tests && fx build && fx serve
+Tab 1 > fx set core.x64 --with //bundles/tests && fx build && fx serve -v
 
-Tab 2 > fx qemu -kN
+Tab 2 > sudo ip tuntap add dev qemu mode tap user $USER && sudo ip link set qemu up
 
-Tab 3 > fx test pkg-resolver-integration-tests # example of running the pkg-resolver integration tests
+Tab 2 > ffx emu start --net tap -H # starts Fuchsia in an emulator running in the background, headless
+
+Tab 2 > fx test pkg-resolver-integration-tests # example of running the pkg-resolver integration tests
 
 ```
 
@@ -133,7 +135,7 @@ fuchsia-pkg://fuchsia.com/<package_name>#meta/<component_name>.cm`
 #### How do I run a hosted package server?
 
 See the instructions on
-[running a package repository with pm](https://fuchsia.dev/fuchsia-src/development/idk/documentation/packages).
+[publishing a package with ffx](https://fuchsia.dev/fuchsia-src/development/idk/documentation/packages).
 
 ### More information:
 
