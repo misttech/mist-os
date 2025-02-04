@@ -323,10 +323,11 @@ impl FileOps for Ashmem {
                 if state.unpinned.is_empty() {
                     return Ok(ASHMEM_IS_PINNED.into());
                 }
-                for (range, is_purged) in state.unpinned.iter_mut() {
+                let unpinned: Vec<_> = state.unpinned.iter().map(|(k, _)| k.clone()).collect();
+                for range in unpinned.into_iter() {
                     let (lo, hi) = (range.start as u64, range.end as u64);
-                    *is_purged = true;
                     memory.op_range(zx::VmoOp::ZERO, lo, hi - lo).unwrap_or(());
+                    state.unpinned.insert(range, true);
                 }
                 return Ok(ASHMEM_IS_UNPINNED.into());
             }
