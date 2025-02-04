@@ -2,15 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::num::NonZeroU64;
+use std::num::{NonZeroU32, NonZeroU64};
 
 use derivative::Derivative;
+use futures::StreamExt;
 
 use {fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_ndp as fnet_ndp};
 
 /// Errors regarding the length of an NDP option body observed in an
 /// [`OptionWatchEntry`].
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum BodyLengthError {
     /// The maximum possible length of an NDP option body
     /// ([`fidl_fuchsia_net_ndp::MAX_OPTION_BODY_LENGTH`]) was exceeded.
@@ -69,7 +70,7 @@ pub type OptionBodyRef<'a> = OptionBody<&'a [u8]>;
 
 /// Errors observed while converting from FIDL types to this extension crate's
 /// domain types.
-#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum FidlConversionError {
     /// A required field was not set.
     #[error("required field not set: {0}")]
@@ -170,6 +171,70 @@ impl From<OptionWatchEntry> for fnet_ndp::OptionWatchEntry {
             __source_breaking: fidl::marker::SourceBreaking,
         }
     }
+}
+
+/// An item in a stream of NDP option-watching hanging-get results.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum OptionWatchStreamItem {
+    /// An entry observed in the stream.
+    Entry(OptionWatchEntry),
+    /// Options have been dropped from the stream due to the hanging-get
+    /// consumer falling behind.
+    Dropped(NonZeroU32),
+}
+
+impl OptionWatchStreamItem {
+    /// Tries to convert into an [`OptionWatchEntry`], yielding `self` otherwise.
+    pub fn try_into_entry(self) -> Result<OptionWatchEntry, Self> {
+        match self {
+            Self::Entry(entry) => Ok(entry),
+            Self::Dropped(_) => Err(self),
+        }
+    }
+}
+
+/// An error in a stream of NDP option-watching hanging-get results.
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum OptionWatchStreamError {
+    #[error(transparent)]
+    Fidl(#[from] fidl::Error),
+    #[error(transparent)]
+    Conversion(#[from] FidlConversionError),
+}
+
+/// Creates an option watcher and a stream of its hanging-get results.
+///
+/// Awaits a probe of the watcher returning (indicating that it has been
+/// registered with the netstack) before returning the stream.
+pub async fn create_watcher_stream(
+    provider: &fnet_ndp::RouterAdvertisementOptionWatcherProviderProxy,
+    params: &fnet_ndp::RouterAdvertisementOptionWatcherParams,
+) -> Result<
+    impl futures::Stream<Item = Result<OptionWatchStreamItem, OptionWatchStreamError>> + 'static,
+    fidl::Error,
+> {
+    let (proxy, server_end) = fidl::endpoints::create_proxy::<fnet_ndp::OptionWatcherMarker>();
+    provider.new_router_advertisement_option_watcher(server_end, &params)?;
+    proxy.probe().await?;
+
+    Ok(futures::stream::try_unfold(proxy, |proxy| async move {
+        Ok(Some((proxy.watch_options().await?, proxy)))
+    })
+    .flat_map(|result: Result<_, fidl::Error>| match result {
+        Err(e) => {
+            futures::stream::once(futures::future::ready(Err(OptionWatchStreamError::Fidl(e))))
+                .left_stream()
+        }
+        Ok((batch, dropped)) => futures::stream::iter(
+            NonZeroU32::new(dropped).map(|dropped| Ok(OptionWatchStreamItem::Dropped(dropped))),
+        )
+        .chain(futures::stream::iter(batch.into_iter().map(|entry| {
+            OptionWatchEntry::try_from(entry)
+                .map(OptionWatchStreamItem::Entry)
+                .map_err(OptionWatchStreamError::Conversion)
+        })))
+        .right_stream(),
+    }))
 }
 
 #[cfg(test)]

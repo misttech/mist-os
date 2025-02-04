@@ -85,9 +85,13 @@
             availability: "same_as_target",
         },
         {
-            protocol: "fuchsia.net.filter.Control",
+            protocol: [
+                "fuchsia.net.filter.Control",
+                "fuchsia.net.ndp.RouterAdvertisementOptionWatcherProvider",
+            ],
 
-            // NS2 will not implement fuchsia.net.filter, mark as optional.
+            // NS2 will not implement fuchsia.net.filter or fuchsia.net.ndp,
+            // mark as optional.
             from: "#netstack",
             to: "#netcfg",
             availability: "same_as_target",
