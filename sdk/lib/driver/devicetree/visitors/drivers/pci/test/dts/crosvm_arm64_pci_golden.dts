@@ -8,6 +8,16 @@
   #size-cells = <0x02>;
   compatible = "fuchsia,test-dt";
 
+  intc {
+    #address-cells = <0x02>;
+    #interrupt-cells = <0x03>;
+    #size-cells = <0x02>;
+    compatible = "arm,gic-v3";
+    interrupt-controller;
+    phandle = <0x01>;
+    reg = <0x00 0x3fff0000 0x00 0x10000 0x00 0x3ffd0000 0x00 0x20000>;
+  };
+
   pci {
     #address-cells = <0x03>;
     #interrupt-cells = <0x01>;

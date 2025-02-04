@@ -7,6 +7,7 @@
 
 #include <lib/devicetree/devicetree.h>
 #include <lib/driver/devicetree/visitors/driver-visitor.h>
+#include <lib/driver/devicetree/visitors/drivers/pci/interrupt.h>
 
 #include <hwreg/bitfields.h>
 
@@ -53,9 +54,16 @@ class PciVisitor : public fdf_devicetree::DriverVisitor {
   // Memory mapped ranges parsed from the 'ranges' field.
   const std::vector<PciRange>& ranges() const { return ranges_; }
 
+  // Interrupt specifications if this device is gicv3.
+  // TODO: Add support for other interrupt controllers as needed.
+  const std::vector<Gicv3InterruptMapElement>& gic_v3_interrupt_map_elements() const {
+    return gic_v3_interrupt_map_elements_;
+  }
+
  private:
   std::optional<devicetree::RegPropertyElement> reg_;
   std::vector<PciRange> ranges_;
+  std::vector<Gicv3InterruptMapElement> gic_v3_interrupt_map_elements_;
 };
 
 }  // namespace pci_dt
