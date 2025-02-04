@@ -6,6 +6,10 @@
 
 namespace dl {
 
+void RuntimeDynamicLinker::AddNewModules(ModuleList modules) {
+  modules_.splice(modules_.end(), modules);
+}
+
 RuntimeModule* RuntimeDynamicLinker::FindModule(Soname name) {
   if (auto it = std::find(modules_.begin(), modules_.end(), name); it != modules_.end()) {
     // TODO(https://fxbug.dev/328135195): increase reference count.
@@ -62,6 +66,7 @@ void RuntimeDynamicLinker::PopulateStartupModules(fbl::AllocChecker& func_ac,
   // Arm the function-level AllocChecker with the result of the function.
   auto set_result = [&func_ac](bool v) { func_ac.arm(sizeof(RuntimeModule), v); };
 
+  ModuleList startup_modules;
   for (const AbiModule& abi_module : ld::AbiLoadedModules(abi)) {
     fbl::AllocChecker ac;
     std::unique_ptr<RuntimeModule> module =
@@ -73,8 +78,10 @@ void RuntimeDynamicLinker::PopulateStartupModules(fbl::AllocChecker& func_ac,
     module->SetStartupModule(abi_module, abi);
     // TODO(https://fxbug.dev/379766260): Fill out the direct_deps of
     // startup modules.
-    modules_.push_back(std::move(module));
+    startup_modules.push_back(std::move(module));
   }
+
+  AddNewModules(std::move(startup_modules));
 
   set_result(true);
 }

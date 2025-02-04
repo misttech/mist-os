@@ -124,11 +124,9 @@ class RuntimeDynamicLinker {
     // back to the caller.
     RuntimeModule& root_module = pending_modules.front();
 
-    // TODO(https://fxbug.dev/333573264): this assumes that all pending modules
-    // are not already in modules_.
     // After successful loading and relocation, append the new permanent modules
     // created by the linking session to the dynamic linker's module list.
-    modules_.splice(modules_.end(), pending_modules);
+    AddNewModules(std::move(pending_modules));
 
     // If RTLD_GLOBAL was passed, make the module and all of its dependencies
     // global. This is done after modules from the linking session have been
@@ -144,6 +142,9 @@ class RuntimeDynamicLinker {
  private:
   // A The RuntimeDynamicLinker can only be created with RuntimeDynamicLinker::Create...).
   RuntimeDynamicLinker() = default;
+
+  // Append new modules to the end of the `modules_`.
+  void AddNewModules(ModuleList modules);
 
   // Attempt to find the loaded module with the given name, returning a nullptr
   // if the module was not found.
