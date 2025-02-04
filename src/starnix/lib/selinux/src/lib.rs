@@ -31,7 +31,7 @@ impl SecurityId {
 }
 
 /// A class that may appear in SELinux policy or an access vector cache query.
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum AbstractObjectClass {
     Unspecified,
     /// A well-known class used in the SELinux system, such as `process` or `file`.
