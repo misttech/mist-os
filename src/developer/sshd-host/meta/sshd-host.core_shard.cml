@@ -50,7 +50,6 @@
                 "base-bin",
                 "blob",
                 "boot",
-                "boot-bin",
                 "build-info",
                 "dev-topological",
                 "pkgfs",
@@ -60,6 +59,13 @@
             ],
             from: "parent",
             to: "#sshd-host",
+        },
+        {
+            directory: [ "boot-bin" ],
+            from: "parent",
+            to: "#sshd-host",
+            source_availability: "unknown",
+            availability: "optional",
         },
         {
             directory: "mnt",

@@ -39,6 +39,7 @@
             directory: "boot-bin",
             rights: [ "rx*" ],
             path: "/boot-bin",
+            availability: "optional",
         },
         {
             directory: "build-info",

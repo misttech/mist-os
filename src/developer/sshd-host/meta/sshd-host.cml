@@ -51,7 +51,6 @@
                 "base-bin",
                 "blob",
                 "boot",
-                "boot-bin",
                 "build-info",
                 "config-data",
                 "data",
@@ -65,7 +64,10 @@
             to: "#shell",
         },
         {
-            directory: "mnt",
+            directory: [
+                "boot-bin",
+                "mnt",
+            ],
             from: "parent",
             to: "#shell",
             availability: "optional",
