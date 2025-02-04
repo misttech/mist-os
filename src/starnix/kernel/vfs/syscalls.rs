@@ -882,7 +882,7 @@ pub fn sys_fstat(
 
 type StatPtr = MultiArchUserRef<uapi::stat, uapi::arch32::stat64>;
 
-fn fstat64(
+pub fn sys_fstatat64(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
@@ -898,16 +898,7 @@ fn fstat64(
     Ok(())
 }
 
-pub fn sys_newfstatat(
-    locked: &mut Locked<'_, Unlocked>,
-    current_task: &CurrentTask,
-    dir_fd: FdNumber,
-    user_path: UserCString,
-    buffer: UserRef<uapi::stat>,
-    flags: u32,
-) -> Result<(), Errno> {
-    fstat64(locked, current_task, dir_fd, user_path, buffer.into(), flags)
-}
+pub use sys_fstatat64 as sys_newfstatat;
 
 pub fn sys_statx(
     locked: &mut Locked<'_, Unlocked>,
@@ -3176,8 +3167,8 @@ pub fn sys_io_uring_register(
 mod arch32 {
     use crate::mm::MemoryAccessorExt;
     use crate::vfs::syscalls::{
-        fstat64, lookup_at, sys_dup3, sys_faccessat, sys_lseek, sys_mkdirat, sys_openat,
-        sys_readlinkat, sys_unlinkat, LookupFlags, StatPtr,
+        lookup_at, sys_dup3, sys_faccessat, sys_lseek, sys_mkdirat, sys_openat, sys_readlinkat,
+        sys_unlinkat, LookupFlags,
     };
     use crate::vfs::{CurrentTask, FdNumber, FsNode};
     use linux_uapi::off_t;
@@ -3307,16 +3298,7 @@ mod arch32 {
         sys_unlinkat(locked, current_task, FdNumber::AT_FDCWD, user_path, 0)
     }
 
-    pub fn sys_arch32_fstatat64(
-        locked: &mut Locked<'_, Unlocked>,
-        current_task: &CurrentTask,
-        dir_fd: FdNumber,
-        user_path: UserCString,
-        buffer: UserRef<uapi::arch32::stat64>,
-        flags: u32,
-    ) -> Result<(), Errno> {
-        fstat64(locked, current_task, dir_fd, user_path, StatPtr::from_32(buffer), flags)
-    }
+    pub use super::sys_fstatat64 as sys_arch32_fstatat64;
 }
 
 #[cfg(feature = "arch32")]

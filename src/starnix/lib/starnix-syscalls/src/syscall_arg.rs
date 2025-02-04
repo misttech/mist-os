@@ -5,7 +5,9 @@
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::signals::UncheckedSignal;
-use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+use starnix_uapi::user_address::{
+    Into32, Into64, MultiArchUserRef, UserAddress, UserCString, UserRef,
+};
 use starnix_uapi::user_value::UserValue;
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
@@ -92,5 +94,17 @@ impl_from_syscall_arg! { for UncheckedSignal: arg => Self::new(arg.raw()) }
 impl<T> From<SyscallArg> for UserRef<T> {
     fn from(arg: SyscallArg) -> UserRef<T> {
         Self::new(arg.into())
+    }
+}
+
+impl<T64, T32> Into64<MultiArchUserRef<T64, T32>> for SyscallArg {
+    fn into_64(self) -> MultiArchUserRef<T64, T32> {
+        MultiArchUserRef::<T64, T32>::from(UserRef::<T64>::from(self))
+    }
+}
+
+impl<T64, T32> Into32<MultiArchUserRef<T64, T32>> for SyscallArg {
+    fn into_32(self) -> MultiArchUserRef<T64, T32> {
+        MultiArchUserRef::<T64, T32>::from_32(UserRef::<T32>::from(self))
     }
 }

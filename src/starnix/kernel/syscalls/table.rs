@@ -12,10 +12,12 @@ use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::decls::Syscall;
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::errors::Errno;
+#[allow(unused_imports)]
+use starnix_uapi::user_address::{Into32, Into64};
 
 macro_rules! syscall_match_generic {
     {
-        $path:path; $fn_prefix:ident; $locked:ident; $current_task:ident; $syscall_number:expr; $args:ident;
+        $path:path; $fn_prefix:ident; $into_fn:ident; $locked:ident; $current_task:ident; $syscall_number:expr; $args:ident;
         $($(#[$match:meta])? $call:ident [$num_args:tt],)*
     } => {
         paste! {
@@ -24,7 +26,7 @@ macro_rules! syscall_match_generic {
                     $(#[$match])?
                     $path :: [<__NR_ $call>] => {
                         profile_duration!(stringify!($call));
-                        match syscall_match_generic!(@call $locked; $current_task; $args; [<$fn_prefix $call>][$num_args]) {
+                        match syscall_match_generic!(@call $into_fn; $locked; $current_task; $args; [<$fn_prefix $call>][$num_args]) {
                             Ok(x) => Ok(SyscallResult::from(x)),
                             Err(err) => Err(err),
                         }
@@ -35,13 +37,13 @@ macro_rules! syscall_match_generic {
         }
     };
 
-    (@call $locked:ident; $current_task:ident; $args:ident; $func:ident [0]) => ($func($locked, $current_task));
-    (@call $locked:ident; $current_task:ident; $args:ident; $func:ident [1]) => ($func($locked, $current_task, $args.0.into()));
-    (@call $locked:ident; $current_task:ident; $args:ident; $func:ident [2]) => ($func($locked, $current_task, $args.0.into(), $args.1.into()));
-    (@call $locked:ident; $current_task:ident; $args:ident; $func:ident [3]) => ($func($locked, $current_task, $args.0.into(), $args.1.into(), $args.2.into()));
-    (@call $locked:ident; $current_task:ident; $args:ident; $func:ident [4]) => ($func($locked, $current_task, $args.0.into(), $args.1.into(), $args.2.into(), $args.3.into()));
-    (@call $locked:ident; $current_task:ident; $args:ident; $func:ident [5]) => ($func($locked, $current_task, $args.0.into(), $args.1.into(), $args.2.into(), $args.3.into(), $args.4.into()));
-    (@call $locked:ident; $current_task:ident; $args:ident; $func:ident [6]) => ($func($locked, $current_task, $args.0.into(), $args.1.into(), $args.2.into(), $args.3.into(), $args.4.into(), $args.5.into()));
+    (@call $into_fn:ident; $locked:ident; $current_task:ident; $args:ident; $func:ident [0]) => ($func($locked, $current_task));
+    (@call $into_fn:ident; $locked:ident; $current_task:ident; $args:ident; $func:ident [1]) => ($func($locked, $current_task, $args.0.$into_fn()));
+    (@call $into_fn:ident; $locked:ident; $current_task:ident; $args:ident; $func:ident [2]) => ($func($locked, $current_task, $args.0.$into_fn(), $args.1.$into_fn()));
+    (@call $into_fn:ident; $locked:ident; $current_task:ident; $args:ident; $func:ident [3]) => ($func($locked, $current_task, $args.0.$into_fn(), $args.1.$into_fn(), $args.2.$into_fn()));
+    (@call $into_fn:ident; $locked:ident; $current_task:ident; $args:ident; $func:ident [4]) => ($func($locked, $current_task, $args.0.$into_fn(), $args.1.$into_fn(), $args.2.$into_fn(), $args.3.$into_fn()));
+    (@call $into_fn:ident; $locked:ident; $current_task:ident; $args:ident; $func:ident [5]) => ($func($locked, $current_task, $args.0.$into_fn(), $args.1.$into_fn(), $args.2.$into_fn(), $args.3.$into_fn(), $args.4.$into_fn()));
+    (@call $into_fn:ident; $locked:ident; $current_task:ident; $args:ident; $func:ident [6]) => ($func($locked, $current_task, $args.0.$into_fn(), $args.1.$into_fn(), $args.2.$into_fn(), $args.3.$into_fn(), $args.4.$into_fn(), $args.5.$into_fn()));
 }
 
 macro_rules! syscall_match {
@@ -49,7 +51,7 @@ macro_rules! syscall_match {
         $($token:tt)*
     } => {
         syscall_match_generic! {
-            starnix_uapi; sys_; $($token)*
+            starnix_uapi; sys_; into_64; $($token)*
         }
     }
 }
@@ -60,7 +62,7 @@ macro_rules! arch32_syscall_match {
         $($token:tt)*
     } => {
         syscall_match_generic! {
-            starnix_uapi::arch32; sys_arch32_; $($token)*
+            starnix_uapi::arch32; sys_arch32_; into_32; $($token)*
         }
     }
 }
