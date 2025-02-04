@@ -43,7 +43,7 @@ the //:default target
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:140
+From //BUILD.gn:138
 
 ### all_cpu_kernel_boot_tests
 
@@ -136,7 +136,7 @@ The result will be built and uploaded to CIPD by infra.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:132
+From //BUILD.gn:130
 
 ### assembly_generate_fvm_fastboot
 
@@ -167,7 +167,7 @@ The result will be built and uploaded to CIPD by infra.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:136
+From //BUILD.gn:134
 
 ### authorized_ssh_keys_label
 
@@ -235,7 +235,7 @@ From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:41
+From //BUILD.gn:39
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -243,7 +243,7 @@ From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:41
+From //BUILD.gn:39
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -251,7 +251,7 @@ From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:41
+From //BUILD.gn:39
 
 ### basic_env_names
 
@@ -731,7 +731,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8723955296016339265"`
+**Current value for `target_cpu = "arm64"`:** `"8723909991874344753"`
 
 From //out/not-default/args.gn:10
 
@@ -739,7 +739,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8723955296016339265"`
+**Current value for `target_cpu = "riscv64"`:** `"8723909991874344753"`
 
 From //out/not-default/args.gn:10
 
@@ -747,7 +747,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8723955296016339265"`
+**Current value for `target_cpu = "x64"`:** `"8723909991874344753"`
 
 From //out/not-default/args.gn:10
 
@@ -770,7 +770,7 @@ From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:148
+From //BUILD.gn:146
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -778,7 +778,7 @@ From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:148
+From //BUILD.gn:146
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -786,7 +786,7 @@ From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:148
+From //BUILD.gn:146
 
 ### build_should_trace_actions
 
@@ -848,7 +848,7 @@ From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:50
+From //BUILD.gn:48
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -856,7 +856,7 @@ From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:50
+From //BUILD.gn:48
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -864,7 +864,7 @@ From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:50
+From //BUILD.gn:48
 
 ### camera_debug
 
@@ -2334,7 +2334,7 @@ From //out/not-default/args.gn:27
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:111
+From //BUILD.gn:109
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -2342,7 +2342,7 @@ From //out/not-default/args.gn:27
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:111
+From //BUILD.gn:109
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -2350,7 +2350,7 @@ From //out/not-default/args.gn:27
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:111
+From //BUILD.gn:109
 
 ### disable_boot_tests
 
@@ -2406,7 +2406,7 @@ From //products/core.gni:29
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:71
+From //BUILD.gn:69
 
 **Current value for `target_cpu = "riscv64"`:** `["//src/developer/debug/debug_agent"]`
 
@@ -2414,7 +2414,7 @@ From //products/minimal.gni:36
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:71
+From //BUILD.gn:69
 
 **Current value for `target_cpu = "x64"`:** `["//bundles/tools"]`
 
@@ -2422,7 +2422,7 @@ From //products/core.gni:29
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:71
+From //BUILD.gn:69
 
 ### dont_profile_source_files
 
@@ -2452,7 +2452,7 @@ From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:100
+From //BUILD.gn:98
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -2460,7 +2460,7 @@ From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:100
+From //BUILD.gn:98
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -2468,7 +2468,7 @@ From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:100
+From //BUILD.gn:98
 
 ### emu_window_size_height
 
@@ -2554,7 +2554,7 @@ disabled.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:135
+From //zircon/kernel/params.gni:136
 
 ### enable_mdns_trace
 
@@ -2842,7 +2842,7 @@ Include a mechanism for the kernel to sample threads and write the results to a 
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:127
+From //zircon/kernel/params.gni:128
 
 ### exported_package_labels
 
@@ -2861,7 +2861,7 @@ packages instead of explicitly adding the labels of the
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:85
+From //BUILD.gn:83
 
 ### extra_bazel_assembly_targets
 
@@ -3169,7 +3169,7 @@ From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:92
+From //BUILD.gn:90
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -3177,7 +3177,7 @@ From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:92
+From //BUILD.gn:90
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3185,7 +3185,7 @@ From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:92
+From //BUILD.gn:90
 
 ### host_byteorder
 
@@ -3211,7 +3211,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:118
+From //BUILD.gn:116
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -3219,7 +3219,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:118
+From //BUILD.gn:116
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3227,7 +3227,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:118
+From //BUILD.gn:116
 
 ### host_os
 
@@ -3246,7 +3246,7 @@ From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:106
+From //BUILD.gn:104
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -3254,7 +3254,7 @@ From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:106
+From //BUILD.gn:104
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3262,7 +3262,7 @@ From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:106
+From //BUILD.gn:104
 
 ### host_tools_base_path_override
 
@@ -3576,6 +3576,12 @@ From //zircon/kernel/params.gni:120
 
 From //zircon/kernel/params.gni:121
 
+### jtrace_use_mono_timestamps
+
+**Current value (from the default):** `false`
+
+From //zircon/kernel/params.gni:122
+
 ### kernel_base
 
 TODO(https://fxbug.dev/42164859): stub, probably not needed post-physboot
@@ -3635,7 +3641,7 @@ Build a kernel with no user-space support, for development only.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:124
+From //zircon/kernel/params.gni:125
 
 ### kernel_version_string
 
@@ -3860,13 +3866,13 @@ From //build/config/BUILDCONFIG.gn:1687
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:42
+From //BUILD.gn:40
 
 ### legacy_cache_package_labels
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:51
+From //BUILD.gn:49
 
 ### link_rbe_check
 
@@ -4814,7 +4820,7 @@ From //build/board.gni:48
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/x64.gni:45
+From //boards/x64.gni:38
 
 **Overridden from the default:** `false`
 
@@ -5043,7 +5049,7 @@ Labels for product bundles to assemble in addition to the main product bundle.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:151
+From //BUILD.gn:149
 
 ### product_description
 
@@ -5060,18 +5066,6 @@ A list of binary host tool labels to also build.
 **Current value (from the default):** `[]`
 
 From //build/product.gni:11
-
-### product_provides_factory_store_provider_configs
-
-**Current value (from the default):** `false`
-
-From //src/factory/factory_store_providers/soft_transition.gni:6
-
-### product_provides_setui_configs
-
-**Current value (from the default):** `false`
-
-From //src/settings/config/soft_transition.gni:6
 
 ### product_skip_uefi_disk
 
@@ -5544,7 +5538,7 @@ extension mechanism for IDK bits outside of the main repository.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:128
+From //BUILD.gn:126
 
 ### sdk_cross_compile_host_tools
 
@@ -6137,7 +6131,7 @@ afterwards.
 
 **Current value (from the default):** `""`
 
-From //BUILD.gn:124
+From //BUILD.gn:122
 
 ### test_package_labels
 
@@ -6150,7 +6144,7 @@ From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:96
+From //BUILD.gn:94
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -6158,7 +6152,7 @@ From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:96
+From //BUILD.gn:94
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -6166,7 +6160,7 @@ From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:96
+From //BUILD.gn:94
 
 ### testonly_in_containers
 
@@ -6290,7 +6284,7 @@ From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:59
+From //BUILD.gn:57
 
 **Current value for `target_cpu = "riscv64"`:** `["//bundles/buildbot/minimal"]`
 
@@ -6298,7 +6292,7 @@ From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:59
+From //BUILD.gn:57
 
 **Current value for `target_cpu = "x64"`:** `["//bundles/kitchen_sink"]`
 
@@ -6306,7 +6300,7 @@ From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:59
+From //BUILD.gn:57
 
 ### update_goldens
 
