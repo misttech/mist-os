@@ -243,7 +243,7 @@ fn default_blobfs_layout() -> BlobfsLayout {
 #[derive(Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "product")]
 pub struct ProductArgs {
-    /// the configuration file that describes the product assembly to perform.
+    /// the product configuration directory.
     #[argh(option)]
     pub product: Utf8PathBuf,
 

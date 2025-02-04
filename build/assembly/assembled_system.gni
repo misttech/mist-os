@@ -511,11 +511,13 @@ template("assembled_system") {
     files = {
       forward_variables_from(_outer_files, "*")
 
-      product_assembly_config =
+      product_assembly_config_dir =
           get_label_info(invoker.product_assembly_config_label,
                          "target_out_dir") + "/" +
           get_label_info(invoker.product_assembly_config_label, "name") +
-          "/product_assembly_config/product_configuration.json"
+          "/product_assembly_config"
+      product_assembly_config =
+          product_assembly_config_dir + "/product_configuration.json"
 
       image_assembly_inputs =
           "$target_out_dir/${_namespace}.image_assembly_inputs"
@@ -665,7 +667,7 @@ template("assembled_system") {
         "assembly",
         "product",
         "--product",
-        rebase_path(files.product_assembly_config, root_build_dir),
+        rebase_path(files.product_assembly_config_dir, root_build_dir),
       ]
 
       args += [

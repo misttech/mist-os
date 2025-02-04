@@ -36,9 +36,6 @@ pub struct AssemblyConfig {
     #[walk_paths]
     #[serde(default)]
     pub product: ProductConfig,
-    // TOOD(https://fxbug.dev/390189313): Remove once all product configs stop using this field.
-    #[serde(default, skip_serializing)]
-    pub file_relative_paths: bool,
 }
 
 impl AssemblyConfig {

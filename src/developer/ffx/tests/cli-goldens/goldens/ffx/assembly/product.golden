@@ -20,7 +20,7 @@
       "optionality": "required",
       "long": "--product",
       "short": null,
-      "description": "the configuration file that describes the product assembly to perform.",
+      "description": "the product configuration directory.",
       "hidden": false
     },
     {

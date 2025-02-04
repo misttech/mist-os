@@ -53,10 +53,6 @@ struct HybridProductArgs {
     #[argh(option)]
     input: Utf8PathBuf,
 
-    /// an optional path to the config file inside the directory.
-    #[argh(option)]
-    config_path: Option<Utf8PathBuf>,
-
     /// a package to replace in the input.
     #[argh(option)]
     replace_package: Vec<Utf8PathBuf>,
@@ -87,10 +83,7 @@ fn generate_product(args: &ProductArgs) -> Result<()> {
 }
 
 fn generate_hybrid_product(args: &HybridProductArgs) -> Result<()> {
-    let config = match &args.config_path {
-        Some(config_path) => AssemblyConfig::from_dir_with_config_path(&args.input, &config_path),
-        None => AssemblyConfig::from_dir(&args.input),
-    }?;
+    let config = AssemblyConfig::from_dir(&args.input)?;
 
     // Normally this would not be necessary, because all generated configs come
     // from this tool, which adds the package names above, but we still need to

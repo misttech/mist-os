@@ -107,7 +107,8 @@ template("test_assembly_config") {
       board_information = "${target_name}.board_information"
     }
     fuchsia_files = {
-      assembly_config = "${target_out_dir}/${target_name}_product_config/product_assembly_config.json"
+      assembly_config = "${target_out_dir}/${target_name}_product_config/product_assembly_config"
+      assembly_config_file = assembly_config + "/product_configuration.json"
       board_information =
           "${target_out_dir}/${target_name}_board/board_information.json"
     }
@@ -197,7 +198,7 @@ template("test_assembly_config") {
               ] + additional_deps_param
       inputs = [
         files.ffx_tool,
-        fuchsia_files.assembly_config,
+        fuchsia_files.assembly_config_file,
         fuchsia_files.board_information,
       ]
       outputs = [

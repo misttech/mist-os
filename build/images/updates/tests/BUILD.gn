@@ -73,6 +73,7 @@ if (is_fuchsia) {
     bazel_product_image_target = "//build/images/updates/tests:fake_product"
     bazel_inputs_from_gn = [ ":fx_publish_test.gn_assembly.bazel_legacy_aib" ]
     image_use_vbmeta = false
+    image_has_fxfs_blob = false
   }
 
   # macos infra builders cannot build assembly without timing out, so use a stub package manifest

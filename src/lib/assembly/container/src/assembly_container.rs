@@ -50,27 +50,8 @@ pub trait AssemblyContainer {
     where
         Self: Sized + WalkPaths + DeserializeOwned,
     {
-        Self::from_dir_with_config_path(dir, Self::get_config_filename())
-    }
-
-    /// Parse an assembly container from a hermetic directory on disk, but with
-    /// a custom config path.
-    /// TODO(https://fxbug.dev/390189313): Remove this once all containers have
-    /// consistent config paths.
-    fn from_dir_with_config_path(
-        dir: impl AsRef<Utf8Path>,
-        config_path: impl AsRef<Utf8Path>,
-    ) -> Result<Self>
-    where
-        Self: Sized + WalkPaths + DeserializeOwned,
-    {
-        let file = std::fs::File::open(dir.as_ref().join(&config_path)).with_context(|| {
-            format!("Opening config ({}) from dir: {}", config_path.as_ref(), dir.as_ref())
-        })?;
-
-        let mut config: Self = serde_json::from_reader(&file).with_context(|| {
-            format!("Parsing config ({}) from dir: {}", config_path.as_ref(), dir.as_ref())
-        })?;
+        let config_path = dir.as_ref().join(Self::get_config_filename());
+        let mut config = Self::from_config_path(config_path)?;
 
         // We assume that the paths are relative, because we are loading from a
         // hermetic directory. They need to be made absolute.

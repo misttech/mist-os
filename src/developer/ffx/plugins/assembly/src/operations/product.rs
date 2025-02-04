@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::operations::product::assembly_builder::ImageAssemblyConfigBuilder;
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use assembly_config_schema::assembly_config::{
     CompiledComponentDefinition, CompiledPackageDefinition,
 };
@@ -51,19 +51,11 @@ Resulting product is not supported and may misbehave!
         );
     }
 
-    let product_path = product;
-    let product_config_dir = product_path
-        .parent()
-        .ok_or_else(|| anyhow!("Product config path does not have a parent: {}", &product_path))?;
-    let product_config_path = product_path.file_name().ok_or_else(|| {
-        anyhow!("Product config path does not have a filename: {}", &product_path)
-    })?;
-
+    let product_config_dir = product;
     let board_info_path = board_info;
 
     let product_config =
-        AssemblyConfig::from_dir_with_config_path(&product_config_dir, &product_config_path)
-            .context("Reading product configuration")?;
+        AssemblyConfig::from_dir(&product_config_dir).context("Reading product configuration")?;
 
     // If there are developer overrides, then those need to be parsed  and applied before other
     // actions can be taken, since they impact how the rest of the assembly process works.

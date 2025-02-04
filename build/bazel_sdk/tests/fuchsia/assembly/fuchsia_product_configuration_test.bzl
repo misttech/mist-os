@@ -19,9 +19,6 @@ def _fuchsia_product_configuration_test_impl(ctx):
         config_dir = product_config.directory
 
     relative_path = "product_configuration.json"
-    if product_config.config_path:
-        relative_path = product_config.config_path
-
     return [create_validation_script_provider(
         ctx,
         config_dir,
