@@ -1809,7 +1809,11 @@ exec "${{cmd[@]}}"
         quoted = cl_utils.command_quoted_str(command)
         self.vmsg(f"Launching: {quoted}")
         with cl_utils.timer_cm("subprocess (remote, rewrapper)"):
-            return cl_utils.subprocess_call(command, cwd=self.working_dir)
+            return cl_utils.subprocess_call(
+                command,
+                cwd=self.working_dir,
+                quiet=self.exec_strategy == "local",
+            )
 
     def _on_success(self) -> int:
         """Work to do after success (local or remote)."""
