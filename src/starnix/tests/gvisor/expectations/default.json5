@@ -1200,6 +1200,9 @@
                 // TODO(https://fxbug.dev/379165488): deflake
                 "StatTimesTest.DirCreateFile",
                 "StatTimesTest.DirList",
+
+                // TODO(https://fxbug.dev/394338846): Re-enable once roll succeeds.
+                "MountTest.MMapWithExecProtFailsOnNoExecFile",
             ],
         },
     ],
