@@ -8,7 +8,6 @@
 #![warn(missing_docs)]
 
 use ahash::AHashSet;
-use once_cell::sync::Lazy;
 use serde::de::{Deserializer, Visitor};
 use serde::ser::Serializer;
 use serde::{Deserialize, Serialize};
@@ -23,7 +22,8 @@ use std::sync::{Arc, Mutex};
 ///
 /// If a live `FlyStr` contains an `Arc<Box<str>>`, the `Arc<Box<str>>` must also be in this cache
 /// and it must have a refcount of >= 2.
-static CACHE: Lazy<Mutex<AHashSet<Storage>>> = Lazy::new(|| Mutex::new(AHashSet::new()));
+static CACHE: std::sync::LazyLock<Mutex<AHashSet<Storage>>> =
+    std::sync::LazyLock::new(|| Mutex::new(AHashSet::new()));
 
 /// Wrapper type for stored `Arc`s that lets us query the cache without an owned value. Implementing
 /// `Borrow<str> for Arc<Box<str>>` upstream *might* be possible with specialization but this is

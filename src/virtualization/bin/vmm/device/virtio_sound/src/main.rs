@@ -18,7 +18,6 @@ use fidl::endpoints::RequestStream;
 use fidl_fuchsia_virtualization_hardware::{VirtioSoundRequest, VirtioSoundRequestStream};
 
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
-use once_cell::sync::Lazy;
 use service::VirtSoundService;
 use std::rc::Rc;
 use virtio_device::chain::ReadableChain;
@@ -30,8 +29,10 @@ pub(crate) struct DeadlineProfileConfig {
 }
 
 // Currently requesting 0.5ms of CPU every 5ms.
-pub(crate) static DEADLINE_PROFILE: Lazy<DeadlineProfileConfig> =
-    Lazy::new(|| DeadlineProfileConfig { period: zx::MonotonicDuration::from_millis(5) });
+pub(crate) static DEADLINE_PROFILE: std::sync::LazyLock<DeadlineProfileConfig> =
+    std::sync::LazyLock::new(|| DeadlineProfileConfig {
+        period: zx::MonotonicDuration::from_millis(5),
+    });
 
 // There are no defined features. See: 5.14.3 Feature Bits
 // https://www.kraxel.org/virtio/virtio-v1.1-cs01-sound-v8.html#x1-4980003
@@ -106,18 +107,20 @@ fn builtin_streams(enable_input: bool) -> Vec<wire::VirtioSndPcmInfo> {
     out
 }
 
-static MONO: Lazy<[u8; wire::VIRTIO_SND_CHMAP_MAX_SIZE]> = Lazy::new(|| {
-    let mut out: [u8; wire::VIRTIO_SND_CHMAP_MAX_SIZE] = Default::default();
-    out[0] = wire::VIRTIO_SND_CHMAP_MONO;
-    out
-});
+static MONO: std::sync::LazyLock<[u8; wire::VIRTIO_SND_CHMAP_MAX_SIZE]> =
+    std::sync::LazyLock::new(|| {
+        let mut out: [u8; wire::VIRTIO_SND_CHMAP_MAX_SIZE] = Default::default();
+        out[0] = wire::VIRTIO_SND_CHMAP_MONO;
+        out
+    });
 
-static STEREO: Lazy<[u8; wire::VIRTIO_SND_CHMAP_MAX_SIZE]> = Lazy::new(|| {
-    let mut out: [u8; wire::VIRTIO_SND_CHMAP_MAX_SIZE] = Default::default();
-    out[0] = wire::VIRTIO_SND_CHMAP_FL;
-    out[1] = wire::VIRTIO_SND_CHMAP_FR;
-    out
-});
+static STEREO: std::sync::LazyLock<[u8; wire::VIRTIO_SND_CHMAP_MAX_SIZE]> =
+    std::sync::LazyLock::new(|| {
+        let mut out: [u8; wire::VIRTIO_SND_CHMAP_MAX_SIZE] = Default::default();
+        out[0] = wire::VIRTIO_SND_CHMAP_FL;
+        out[1] = wire::VIRTIO_SND_CHMAP_FR;
+        out
+    });
 
 fn builtin_chmaps() -> Vec<wire::VirtioSndChmapInfo> {
     vec![

@@ -4,7 +4,6 @@
 
 use anyhow::bail;
 use fuchsia_async as fasync;
-use once_cell::sync::Lazy;
 use std::env;
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -31,24 +30,25 @@ impl TestContext {
 }
 
 // Matches `gn` terminology (for host toolchain)
-static ROOT_OUT_DIR: Lazy<PathBuf> = Lazy::new(|| {
+static ROOT_OUT_DIR: std::sync::LazyLock<PathBuf> = std::sync::LazyLock::new(|| {
     let mut dir = std::env::current_exe().expect("get path").canonicalize().unwrap();
     assert!(dir.pop());
     dir
 });
 
 // Matches `gn` terminology
-static ROOT_BUILD_DIR: Lazy<PathBuf> = Lazy::new(|| {
+static ROOT_BUILD_DIR: std::sync::LazyLock<PathBuf> = std::sync::LazyLock::new(|| {
     let mut dir = ROOT_OUT_DIR.clone();
     assert!(dir.pop());
     dir
 });
 
 // Matches `out_dir` var in `BUILD.gn`
-static OUT_DIR: Lazy<PathBuf> = Lazy::new(|| ROOT_OUT_DIR.join("src/developer/ffx/testing"));
+static OUT_DIR: std::sync::LazyLock<PathBuf> =
+    std::sync::LazyLock::new(|| ROOT_OUT_DIR.join("src/developer/ffx/testing"));
 
-static TEMP_DIR: Lazy<TempDir> =
-    Lazy::new(|| TempDir::new().expect("could not create test harness temp dir"));
+static TEMP_DIR: std::sync::LazyLock<TempDir> =
+    std::sync::LazyLock::new(|| TempDir::new().expect("could not create test harness temp dir"));
 
 /// Fixture that handles launching and tearing down a test after execution.
 async fn fixture_inner<F, Fut>(case_name: &str, test_fn: F, emulator_allowed: bool)

@@ -169,7 +169,6 @@ impl ViewAssistant for ConsoleViewAssistant {
 mod tests {
     use super::*;
     use carnelian::make_message;
-    use once_cell::sync::Lazy;
 
     const TEST_MESSAGE: &str = "Test message";
     const SMALL_MULTILINE_TEST_MESSAGE: &str = "1\n2\n3\n4\n5";
@@ -183,8 +182,8 @@ mod tests {
     static FONT_DATA: &'static [u8] = include_bytes!(
         "../../../../../prebuilt/third_party/fonts/robotoslab/RobotoSlab-Regular.ttf"
     );
-    static FONT_FACE: Lazy<FontFace> =
-        Lazy::new(|| FontFace::new(&FONT_DATA).expect("Failed to create font"));
+    static FONT_FACE: std::sync::LazyLock<FontFace> =
+        std::sync::LazyLock::new(|| FontFace::new(&FONT_DATA).expect("Failed to create font"));
 
     #[test]
     fn test_add_text_message_modifies_lines() -> std::result::Result<(), anyhow::Error> {

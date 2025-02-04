@@ -597,15 +597,14 @@ mod tests {
     use carnelian::drawing::{DisplayRotation, FontFace};
     use carnelian::render::{generic, ContextInner};
     use euclid::size2;
-    use once_cell::sync::Lazy;
 
     // This font creation method isn't ideal. The correct method would be to ask the Fuchsia
     // font service for the font data.
     static FONT_DATA: &'static [u8] = include_bytes!(
         "../../../../../prebuilt/third_party/fonts/robotomono/RobotoMono-Regular.ttf"
     );
-    static FONT_FACE: Lazy<FontFace> =
-        Lazy::new(|| FontFace::new(&FONT_DATA).expect("Failed to create font"));
+    static FONT_FACE: std::sync::LazyLock<FontFace> =
+        std::sync::LazyLock::new(|| FontFace::new(&FONT_DATA).expect("Failed to create font"));
 
     #[test]
     fn check_cursor_paths() -> Result<(), Error> {

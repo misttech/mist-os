@@ -12,7 +12,6 @@ use fuchsia_async as fasync;
 use fxfs::log::*;
 use fxfs::range::RangeExt;
 use fxfs::round::{round_down, round_up};
-use once_cell::sync::Lazy;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
@@ -458,7 +457,8 @@ pub fn default_page_in<P: PagerBacked>(this: Arc<P>, pager_range: PageInRange<P>
     let ref_guard = pager.epochs.add_ref();
 
     const ZERO_VMO_SIZE: u64 = 1_048_576;
-    static ZERO_VMO: Lazy<zx::Vmo> = Lazy::new(|| zx::Vmo::create(ZERO_VMO_SIZE).unwrap());
+    static ZERO_VMO: std::sync::LazyLock<zx::Vmo> =
+        std::sync::LazyLock::new(|| zx::Vmo::create(ZERO_VMO_SIZE).unwrap());
 
     assert!(pager_range.end() < i64::MAX as u64);
 

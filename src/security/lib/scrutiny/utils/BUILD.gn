@@ -86,7 +86,6 @@ if (is_host) {
       "//third_party/rust_crates:hex",
       "//third_party/rust_crates:libc",
       "//third_party/rust_crates:log",
-      "//third_party/rust_crates:once_cell",
       "//third_party/rust_crates:pathdiff",
       "//third_party/rust_crates:serde",
       "//third_party/rust_crates:serde_json",
@@ -150,7 +149,6 @@ if (is_host) {
       ":testdata($host_toolchain)",
       ":utils($host_toolchain)",
       "//src/sys/pkg/lib/fuchsia-merkle",
-      "//third_party/rust_crates:once_cell",
     ]
 
     non_rust_deps = [

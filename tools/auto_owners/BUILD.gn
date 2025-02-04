@@ -40,7 +40,6 @@ if (is_host) {
 
     deps = crate_deps + [
              "//third_party/rust_crates:assert_matches",
-             "//third_party/rust_crates:once_cell",
              "//third_party/rust_crates:pretty_assertions",
              "//third_party/rust_crates:serial_test",
              "//third_party/rust_crates:tempfile",

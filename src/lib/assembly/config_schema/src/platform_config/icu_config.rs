@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use include_str_from_working_dir::include_str_from_working_dir_env;
-use once_cell::sync::Lazy;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -11,7 +10,7 @@ use serde::{Deserialize, Serialize};
 pub struct ICUMap(pub std::collections::HashMap<Revision, String>);
 
 // See `rustenv` in //src/lib/assembly/config_schema:config_schema.
-pub static ICU_CONFIG_INFO: Lazy<ICUMap> = Lazy::new(|| {
+pub static ICU_CONFIG_INFO: std::sync::LazyLock<ICUMap> = std::sync::LazyLock::new(|| {
     serde_json::from_value(
         serde_json::from_str(include_str_from_working_dir_env!("ICU_GIT_INFO_JSON_FILE")).unwrap(),
     )

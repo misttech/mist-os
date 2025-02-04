@@ -70,7 +70,6 @@ platform_deps = [
   "//third_party/rust_crates:lazy_static",
   "//third_party/rust_crates:linked-hash-map",
   "//third_party/rust_crates:log",
-  "//third_party/rust_crates:once_cell",
   "//third_party/rust_crates:rustc-hash",
   "//third_party/rust_crates:scopeguard",
   "//third_party/rust_crates:zstd",

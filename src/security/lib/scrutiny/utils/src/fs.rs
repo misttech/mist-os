@@ -4,14 +4,13 @@
 
 use anyhow::{anyhow, Context, Result};
 use log::warn;
-use once_cell::sync::Lazy;
 use std::fs::{create_dir_all, remove_dir_all};
 use std::path::{Path, PathBuf};
 use std::process::id;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tempfile::TempDir;
 
-static PID: Lazy<u32> = Lazy::new(|| id());
+static PID: std::sync::LazyLock<u32> = std::sync::LazyLock::new(|| id());
 static NEXT_DIR_ID: AtomicU32 = AtomicU32::new(0);
 
 /// A temporary directory that will be deleted when this object goes out of scope.

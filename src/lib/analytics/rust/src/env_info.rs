@@ -6,7 +6,6 @@ use anyhow::{bail, Error, Result};
 #[allow(unused_imports)]
 use home::home_dir;
 use nix::unistd;
-use once_cell::sync::Lazy;
 use regex::Regex;
 use std::env::VarError;
 #[allow(unused_imports)]
@@ -232,10 +231,10 @@ pub fn is_googler() -> bool {
 
 #[allow(dead_code)]
 pub fn is_googler_host_domain(domain: &str) -> bool {
-    static C_GOOGLERS_DOMAIN_RE: Lazy<Regex> =
-        Lazy::new(|| Regex::new(C_GOOGLERS_DOMAIN_NAME).unwrap());
-    static CORP_GOOGLERS_DOMAIN_RE: Lazy<Regex> =
-        Lazy::new(|| Regex::new(CORP_GOOGLERS_DOMAIN_NAME).unwrap());
+    static C_GOOGLERS_DOMAIN_RE: std::sync::LazyLock<Regex> =
+        std::sync::LazyLock::new(|| Regex::new(C_GOOGLERS_DOMAIN_NAME).unwrap());
+    static CORP_GOOGLERS_DOMAIN_RE: std::sync::LazyLock<Regex> =
+        std::sync::LazyLock::new(|| Regex::new(CORP_GOOGLERS_DOMAIN_NAME).unwrap());
     C_GOOGLERS_DOMAIN_RE.is_match(domain) || CORP_GOOGLERS_DOMAIN_RE.is_match(domain)
 }
 

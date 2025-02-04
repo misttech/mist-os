@@ -679,7 +679,6 @@ fn get_targets_in_directory(gn_graph: &gn_graph::Graph, path: &str) -> Vec<Strin
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use once_cell::sync::Lazy;
     use pretty_assertions::assert_eq;
     use serial_test::serial;
     use std::process::{Command, Stdio};
@@ -1115,7 +1114,7 @@ mod tests {
     ///
     /// The hermetic test paths are computed based on the parent directory of this
     /// binary.
-    static PATHS: Lazy<Paths> = Lazy::new(|| {
+    static PATHS: std::sync::LazyLock<Paths> = std::sync::LazyLock::new(|| {
         let cwd = Utf8PathBuf::from_path_buf(std::env::current_dir().unwrap()).unwrap();
 
         let first_arg = concat!(env!("ROOT_OUT_DIR"), "/auto_owners_test");

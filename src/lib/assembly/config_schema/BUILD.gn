@@ -45,7 +45,6 @@ rustc_library("config_schema") {
     "//src/ui/lib/input-device-constants:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
-    "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
