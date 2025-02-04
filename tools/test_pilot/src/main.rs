@@ -8,6 +8,7 @@ mod env;
 mod errors;
 mod opts;
 mod params;
+mod parsers;
 mod run_tests;
 mod schema;
 mod test_config;

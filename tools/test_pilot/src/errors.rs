@@ -37,4 +37,18 @@ pub enum UsageError {
 
     #[error("Schema not well-formed: {0}")]
     InvalidSchema(String),
+
+    #[error("Wrong type: expected type {expected}, got \"{got}\" for parameter {parameter}")]
+    TypeMismatch { expected: String, got: String, parameter: String },
+
+    #[error("Multiple values supplied for non-array parameter {parameter}: \"{got}\"")]
+    CommasNotAllowed { parameter: String, got: String },
+
+    #[error("Parameters of type object (such as {0}) are not allowed in command lines or environment variables")]
+    ObjectNotAllowed(String),
+
+    #[error(
+        "Parameters of type array must have simple items in command lines or environment variables"
+    )]
+    ArrayOfComplexTypeNotAllowed(String),
 }

@@ -39,6 +39,7 @@ if (is_host) {
       "src/main.rs",
       "src/opts.rs",
       "src/params.rs",
+      "src/parsers.rs",
       "src/run_tests.rs",
       "src/schema.rs",
       "src/test_config.rs",
