@@ -195,9 +195,119 @@
             "metric_id": 10,
             "metric_type": "Occurrence",
             "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/peer_cache/metrics/bredr:bond_failure_events"
-        }
-    ],
+        },
 
+        // Adapter event (ID 9)
+        {
+            "event_codes": [
+                0, // LE
+                1  // OutgoingConnectionRequest
+            ],
+            "metric_id": 9,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/metrics/le:outgoing_connection_requests"
+        },
+        {
+            "event_codes": [
+                0, // LE
+                2  // PairRequest
+            ],
+            "metric_id": 9,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/metrics/le:pair_requests"
+        },
+        {
+            "event_codes": [
+                0, // LE
+                7  // StartAdvertising
+            ],
+            "metric_id": 9,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/metrics/le:start_advertising_events"
+        },
+        {
+            "event_codes": [
+                0, // LE
+                8  // StopAdvertising
+            ],
+            "metric_id": 9,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/metrics/le:stop_advertising_events"
+        },
+        {
+            "event_codes": [
+                0, // LE
+                9  // StartDiscovery
+            ],
+            "metric_id": 9,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/metrics/le:start_discovery_events"
+        },
+        {
+            "event_codes": [
+                1, // BrEdr
+                0  // OpenL2capChannelRequest
+            ],
+            "metric_id": 9,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/metrics/bredr:open_l2cap_channel_requests"
+        },
+        {
+            "event_codes": [
+                1, // BrEdr
+                1  // OutgoingConnectionRequest
+            ],
+            "metric_id": 9,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/metrics/bredr:outgoing_connection_requests"
+        },
+        {
+            "event_codes": [
+                1, // BrEdr
+                2  // PairRequest
+            ],
+            "metric_id": 9,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/metrics/bredr:pair_requests"
+        },
+        {
+            "event_codes": [
+                1, // BrEdr
+                3  // RequestDiscoverable
+            ],
+            "metric_id": 9,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/metrics/bredr:request_discoverable_events"
+        },
+        {
+            "event_codes": [
+                1, // BrEdr
+                4  // RequestDiscovery
+            ],
+            "metric_id": 9,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/metrics/bredr:request_discovery_events"
+        },
+        {
+            "event_codes": [
+                1, // BrEdr
+                5  // SetConnectableTrue
+            ],
+            "metric_id": 9,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/metrics/bredr:set_connectable_true_events"
+        },
+        {
+            "event_codes": [
+                1, // BrEdr
+                6  // SetConnectableFalse
+            ],
+            "metric_id": 9,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/metrics/bredr:set_connectable_false_events"
+        }
+
+    ],
     "poll_rate_sec": 300,
     "project_id": 2322225253
 }
