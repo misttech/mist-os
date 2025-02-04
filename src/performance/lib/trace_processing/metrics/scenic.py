@@ -17,6 +17,22 @@ _SCENIC_RENDER_EVENT_NAME: str = "RenderFrame"
 _DISPLAY_VSYNC_READY_EVENT_NAME: str = "Display::Fence::OnReady"
 
 
+class _ScenicTracingEvent:
+    start_event: trace_model.Event
+    render_event: trace_model.DurationEvent
+    vsync_event: trace_model.Event
+
+    def __init__(
+        self,
+        start_event: trace_model.Event,
+        render_event: trace_model.DurationEvent,
+        vsync_event: trace_model.Event,
+    ):
+        self.start_event = start_event
+        self.render_event = render_event
+        self.vsync_event = vsync_event
+
+
 class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
     """Computes CPU and GPU time spent rendering frames in Scenic.
 
@@ -63,23 +79,26 @@ class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
                 type=trace_model.DurationEvent,
             )
         )
-        scenic_render_events: list[trace_model.Event] = []
+        tracing_events: list[_ScenicTracingEvent] = []
         for e in scenic_start_events:
-            following = trace_utils.get_nearest_following_event(
+            render_event = trace_utils.get_nearest_following_event(
                 e, _EVENT_CATEGORY, _SCENIC_RENDER_EVENT_NAME
             )
-            if following is not None:
-                scenic_render_events.append(following)
-
-        vsync_ready_events: list[trace_model.Event] = []
-        for e in scenic_start_events:
-            following = trace_utils.get_nearest_following_event(
-                e, _EVENT_CATEGORY, _DISPLAY_VSYNC_READY_EVENT_NAME
+            if render_event is None:
+                continue
+            assert isinstance(render_event, trace_model.DurationEvent)
+            if not render_event.duration:
+                continue
+            vsync_ready_event = trace_utils.get_nearest_following_event(
+                render_event, _EVENT_CATEGORY, _DISPLAY_VSYNC_READY_EVENT_NAME
             )
-            if following is not None:
-                vsync_ready_events.append(following)
+            if vsync_ready_event is None:
+                continue
+            tracing_events.append(
+                _ScenicTracingEvent(e, render_event, vsync_ready_event)
+            )
 
-        if len(scenic_render_events) < 1 or len(vsync_ready_events) < 1:
+        if len(tracing_events) < 1:
             _LOGGER.info(
                 "No render or vsync events are present. Perhaps the trace "
                 "duration is too short to provide scenic render information"
@@ -87,19 +106,14 @@ class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
             return []
 
         cpu_render_times: list[float] = []
-        for start_event, render_event in zip(
-            scenic_start_events, scenic_render_events
-        ):
-            if render_event is None:
-                continue
-            assert isinstance(render_event, trace_model.DurationEvent)
-            if not render_event.duration:
+        for tracing_event in tracing_events:
+            if tracing_event.render_event.duration is None:
                 continue
             cpu_render_times.append(
                 (
-                    render_event.start
-                    + render_event.duration
-                    - start_event.start
+                    tracing_event.render_event.start
+                    + tracing_event.render_event.duration
+                    - tracing_event.start_event.start
                 ).to_milliseconds_f()
             )
 
@@ -107,13 +121,16 @@ class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
         _LOGGER.info(f"Average CPU render time: {cpu_render_mean} ms")
 
         total_render_times: list[float] = []
-        for start_event, vsync_event in zip(
-            scenic_start_events, vsync_ready_events
-        ):
-            if vsync_event is None:
-                continue
+        for tracing_event in tracing_events:
+            (
+                tracing_event.vsync_event.start
+                - tracing_event.start_event.start
+            ).to_milliseconds_f()
             total_render_times.append(
-                (vsync_event.start - start_event.start).to_milliseconds_f()
+                (
+                    tracing_event.vsync_event.start
+                    - tracing_event.start_event.start
+                ).to_milliseconds_f()
             )
 
         total_render_mean: float = statistics.mean(total_render_times)
