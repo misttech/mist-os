@@ -39,6 +39,48 @@ def get_host_tag() -> str:
     return "%s-%s" % (get_host_platform(), get_host_arch())
 
 
+def find_fuchsia_dir(from_path: T.Optional[Path] = None) -> Path:
+    """Find the Fuchsia checkout from a specific path.
+
+    Args:
+        from_path: Optional starting path for search. Defaults to the current directory.
+    Returns:
+        Path to the Fuchsia checkout directory (absolute).
+    Raises:
+        ValueError if the path could not be found.
+    """
+    start_path = from_path.resolve() if from_path else Path(os.getcwd())
+    cur_path = start_path
+    while True:
+        if (cur_path / ".jiri_manifest").exists():
+            return cur_path
+        prev_path = cur_path
+        cur_path = cur_path.parent
+        if cur_path == prev_path:
+            raise ValueError(
+                f"Could not find Fuchsia checkout directory from: {start_path}"
+            )
+
+
+def find_fx_build_dir(fuchsia_dir: Path) -> T.Optional[Path]:
+    """Find the build directory set through 'fx set' or 'fx use'.
+
+    Args:
+       fuchsia_dir: Path to Fuchsia checkout directory.
+    Returns:
+       Path to build directory if found, of None if none
+       is available (e.g. fresh checkout or infra build).
+    """
+    fx_build_dir_file = fuchsia_dir / ".fx-build-dir"
+    if fx_build_dir_file.exists():
+        build_dir_relative = fx_build_dir_file.read_text().strip()
+        if build_dir_relative:
+            build_dir = fuchsia_dir / build_dir_relative
+            if build_dir.exists():
+                return build_dir
+    return None
+
+
 def get_bazel_relative_topdir(
     fuchsia_dir: str | Path, workspace_name: str
 ) -> T.Tuple[str, T.Set[Path]]:
@@ -61,6 +103,41 @@ def get_bazel_relative_topdir(
     assert os.path.exists(input_file), "Missing input file: " + input_file
     with open(input_file) as f:
         return f.read().strip(), {Path(input_file)}
+
+
+def find_bazel_launcher_path(
+    fuchsia_dir: Path, build_dir: Path
+) -> T.Optional[Path]:
+    """Find the path of the Bazel launcher script.
+
+    Args:
+        fuchsia_dir: Path to Fuchsia checkout directory.
+        build_dir: Path to Fuchsia build directory.
+
+    Returns:
+        Path to bazel launcher script, or empty Path() value if the file
+        does not exist.
+    """
+    bazel_topdir, _ = get_bazel_relative_topdir(fuchsia_dir, "main")
+    result = build_dir / bazel_topdir / "bazel"
+    return result if result.exists() else None
+
+
+def find_bazel_workspace_path(
+    fuchsia_dir: Path, build_dir: Path
+) -> T.Optional[Path]:
+    """Find the path of the Bazel workspace.
+
+    Args:
+        fuchsia_dir: Path to Fuchsia checkout directory.
+        build_dir: Path to Fuchsia build directory.
+
+    Returns:
+        Path to bazel workspace, or None if the directory does not exists.
+    """
+    bazel_topdir, _ = get_bazel_relative_topdir(fuchsia_dir, "main")
+    result = build_dir / bazel_topdir / "workspace"
+    return result if result.exists() else None
 
 
 def workspace_should_exclude_file(path: str) -> bool:

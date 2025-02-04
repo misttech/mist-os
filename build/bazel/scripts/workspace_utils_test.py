@@ -13,8 +13,175 @@ sys.path.insert(0, os.path.dirname(__file__))
 import workspace_utils
 
 
+class TestFindFuchsiaDir(unittest.TestCase):
+    def test_find_fuchsia_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            not_fuchsia_dir = Path(tmp_dir) / "this_is_not_fuchsia"
+            not_fuchsia_dir.mkdir()
+            fuchsia_dir = Path(tmp_dir) / "this_is_fuchsia"
+            fuchsia_dir.mkdir()
+            (fuchsia_dir / ".jiri_manifest").write_text("")
+            (fuchsia_dir / "src" / "foo").mkdir(parents=True)
+
+            # Check function when searching from the current path.
+            saved_cwd = os.getcwd()
+            try:
+                os.chdir(not_fuchsia_dir)
+                with self.assertRaises(ValueError):
+                    workspace_utils.find_fuchsia_dir()
+
+                for path in (
+                    fuchsia_dir,
+                    fuchsia_dir / "src",
+                    fuchsia_dir / "src" / "foo",
+                ):
+                    os.chdir(path)
+                    self.assertEqual(
+                        workspace_utils.find_fuchsia_dir(),
+                        fuchsia_dir,
+                        f"From {path}",
+                    )
+
+                # Ensure the result is absolute even if the starting path is relative.
+                os.chdir(fuchsia_dir)
+                for path in (Path("."), Path("src"), Path("src/foo")):
+                    self.assertEqual(
+                        workspace_utils.find_fuchsia_dir(path),
+                        fuchsia_dir,
+                        f"From {path}",
+                    )
+
+            finally:
+                os.chdir(saved_cwd)
+
+            # Check function when searching from a given path.
+            with self.assertRaises(ValueError):
+                workspace_utils.find_fuchsia_dir(not_fuchsia_dir)
+
+            for path in (
+                fuchsia_dir,
+                fuchsia_dir / "src",
+                fuchsia_dir / "src" / "foo",
+            ):
+                self.assertEqual(
+                    workspace_utils.find_fuchsia_dir(path),
+                    fuchsia_dir,
+                    f"From {path}",
+                )
+
+
+class TestFindFxBuildDir(unittest.TestCase):
+    def test_find_fx_build_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fuchsia_dir = Path(tmp_dir)
+
+            # No .fx-build-dir present -> Path()
+            self.assertEqual(
+                workspace_utils.find_fx_build_dir(fuchsia_dir), None
+            )
+
+            # Empty .fx-build-dir content -> Path()
+            fx_build_dir_path = fuchsia_dir / ".fx-build-dir"
+            fx_build_dir_path.write_text("")
+            self.assertEqual(
+                workspace_utils.find_fx_build_dir(fuchsia_dir), None
+            )
+
+            # Invalid .fx-build-dir content -> Path()
+            fx_build_dir_path.write_text("does/not/exist\n")
+            self.assertEqual(
+                workspace_utils.find_fx_build_dir(fuchsia_dir), None
+            )
+
+            # Valid build directory.
+            build_dir = fuchsia_dir / "some" / "build_dir"
+            build_dir.mkdir(parents=True)
+
+            fx_build_dir_path.write_text("some/build_dir\n")
+            self.assertEqual(
+                workspace_utils.find_fx_build_dir(fuchsia_dir), build_dir
+            )
+
+
+class TestFindBazelPaths(unittest.TestCase):
+    def setUp(self) -> None:
+        self._td = tempfile.TemporaryDirectory()
+        self.fuchsia_dir = Path(self._td.name)
+        config_dir = self.fuchsia_dir / "build" / "bazel" / "config"
+        config_dir.mkdir(parents=True)
+        (config_dir / "main_workspace_top_dir").write_text("some/top/dir\n")
+
+        self.build_dir = self.fuchsia_dir / "out" / "build_dir"
+        self.launcher_path = self.build_dir / "some/top/dir/bazel"
+        self.workspace_path = self.build_dir / "some/top/dir/workspace"
+
+    def tearDown(self) -> None:
+        self._td.cleanup()
+
+    def test_find_bazel_launcher_path(self) -> None:
+        self.assertEqual(
+            workspace_utils.find_bazel_launcher_path(
+                self.fuchsia_dir, self.build_dir
+            ),
+            None,
+        )
+
+        self.launcher_path.parent.mkdir(parents=True)
+        self.launcher_path.write_text("!")
+        self.assertEqual(
+            workspace_utils.find_bazel_launcher_path(
+                self.fuchsia_dir, self.build_dir
+            ),
+            self.launcher_path,
+        )
+
+    def test_find_bazel_workspace_path(self) -> None:
+        self.assertEqual(
+            workspace_utils.find_bazel_workspace_path(
+                self.fuchsia_dir, self.build_dir
+            ),
+            None,
+        )
+
+        self.workspace_path.mkdir(parents=True)
+        self.assertEqual(
+            workspace_utils.find_bazel_workspace_path(
+                self.fuchsia_dir, self.build_dir
+            ),
+            self.workspace_path,
+        )
+
+
+class TestFindBazelWorkspacePath(unittest.TestCase):
+    def test_find_bazel_workspace_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fuchsia_dir = Path(tmp_dir)
+            config_dir = fuchsia_dir / "build" / "bazel" / "config"
+            config_dir.mkdir(parents=True)
+            (config_dir / "main_workspace_top_dir").write_text("some/top/dir\n")
+
+            build_dir = fuchsia_dir / "out" / "build_dir"
+            launcher_path = build_dir / "some/top/dir/bazel"
+
+            self.assertEqual(
+                workspace_utils.find_bazel_launcher_path(
+                    fuchsia_dir, build_dir
+                ),
+                None,
+            )
+
+            launcher_path.parent.mkdir(parents=True)
+            launcher_path.write_text("!")
+            self.assertEqual(
+                workspace_utils.find_bazel_launcher_path(
+                    fuchsia_dir, build_dir
+                ),
+                launcher_path,
+            )
+
+
 class TestGetBazelRelativeTopDir(unittest.TestCase):
-    def test_get_bazel_relative_topdir(self):
+    def test_get_bazel_relative_topdir(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             fuchsia_dir = Path(tmp_dir)
             config_dir = fuchsia_dir / "build" / "bazel" / "config"
@@ -46,7 +213,7 @@ class TestGetBazelRelativeTopDir(unittest.TestCase):
 
 
 class TestWorkspaceShouldExcludeFile(unittest.TestCase):
-    def test_workspace_should_exclude_file(self):
+    def test_workspace_should_exclude_file(self) -> None:
         _EXPECTED_EXCLUDED_PATHS = [
             "out",
             ".jiri",
@@ -77,7 +244,7 @@ class TestWorkspaceShouldExcludeFile(unittest.TestCase):
 
 
 class TestForceSymlink(unittest.TestCase):
-    def test_force_symlink(self):
+    def test_force_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir).resolve()
 
@@ -100,15 +267,15 @@ class TestForceSymlink(unittest.TestCase):
 
 
 class TestGeneratedWorkspaceFiles(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self._td = tempfile.TemporaryDirectory()
         self.out = Path(self._td.name)
         (self.out / "elephant").write_text("trumpet!")
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self._td.cleanup()
 
-    def test_with_no_file_hasher(self):
+    def test_with_no_file_hasher(self) -> None:
         ws_files = workspace_utils.GeneratedWorkspaceFiles()
         ws_files.record_file_content("zoo/lion", "roar!")
         ws_files.record_symlink("zoo/elephant", self.out / "elephant")
@@ -142,7 +309,7 @@ class TestGeneratedWorkspaceFiles(unittest.TestCase):
             "../../elephant",
         )
 
-    def test_with_file_hasher(self):
+    def test_with_file_hasher(self) -> None:
         ws_files = workspace_utils.GeneratedWorkspaceFiles()
         ws_files.set_file_hasher(lambda path: f"SHA256[{path}]")
         ws_files.record_file_content("zoo/lion", "roar!")
@@ -188,11 +355,11 @@ class TestGeneratedWorkspaceFiles(unittest.TestCase):
 
 
 class RemoveDirTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self._td = tempfile.TemporaryDirectory()
         self._root = self._td.name
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self._td.cleanup()
 
     def _run_checks(
@@ -212,23 +379,23 @@ class RemoveDirTests(unittest.TestCase):
                 f"{test_name}: {p} still exists after remove_dir({top_dir})",
             )
 
-    def test_remove_empty_dir(self):
+    def test_remove_empty_dir(self) -> None:
         dir = tempfile.mkdtemp(dir=self._root)
         self._run_checks("empty_dir", dir, {dir})
 
-    def test_dir_with_file(self):
+    def test_dir_with_file(self) -> None:
         dir = tempfile.mkdtemp(dir=self._root)
         _, f = tempfile.mkstemp(dir=dir)
         self._run_checks("dir_with_file", dir, {dir, f})
 
-    def test_dir_with_symlink(self):
+    def test_dir_with_symlink(self) -> None:
         dir = str(tempfile.mkdtemp(dir=self._root))
         _, f = tempfile.mkstemp(dir=dir)
         l = f"{f}_link"
         os.symlink(f, l)
         self._run_checks("dir_with_symlink", dir, {dir, f, l})
 
-    def test_dir_with_subdir_symlink(self):
+    def test_dir_with_subdir_symlink(self) -> None:
         dir = tempfile.mkdtemp(dir=self._root)
         subdir = tempfile.mkdtemp(dir=dir)
         _, f = tempfile.mkstemp(dir=subdir)
