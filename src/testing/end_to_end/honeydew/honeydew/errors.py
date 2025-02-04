@@ -114,10 +114,6 @@ class HoneydewDataResourceError(HoneydewError):
     """Raised when Honeydew fails to fetch its data resources."""
 
 
-class HoneydewNetstackError(HoneydewError):
-    """Raised by netstack affordances."""
-
-
 class HoneydewLocationError(HoneydewError):
     """Raised by location affordance."""
 

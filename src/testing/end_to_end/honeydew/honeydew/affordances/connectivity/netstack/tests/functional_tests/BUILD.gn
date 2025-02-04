@@ -6,7 +6,7 @@ import("//build/python/python_mobly_test.gni")
 import("//build/testing/environments.gni")
 
 if (is_host) {
-  python_mobly_test("netstack_test_fc") {
+  python_mobly_test("netstack_test") {
     main_source = "test_netstack.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -24,5 +24,5 @@ if (is_host) {
 
 group("tests") {
   testonly = true
-  public_deps = [ ":netstack_test_fc($host_toolchain)" ]
+  public_deps = [ ":netstack_test($host_toolchain)" ]
 }

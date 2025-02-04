@@ -13,13 +13,16 @@ from fuchsia_controller_py import Channel, ZxStatus
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 
 from honeydew import errors
+from honeydew.affordances.connectivity.netstack import netstack
+from honeydew.affordances.connectivity.netstack.errors import (
+    HoneydewNetstackError,
+)
+from honeydew.affordances.connectivity.netstack.types import InterfaceProperties
 from honeydew.affordances.connectivity.wlan.utils.types import MacAddress
-from honeydew.interfaces.affordances import netstack
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.transports import ffx as ffx_transport
 from honeydew.interfaces.transports import fuchsia_controller as fc_transport
 from honeydew.typing.custom_types import FidlEndpoint
-from honeydew.typing.netstack import InterfaceProperties
 
 # List of required FIDLs for this affordance.
 _REQUIRED_CAPABILITIES = [
@@ -37,7 +40,7 @@ _INTERFACES_PROXY = FidlEndpoint(
 )
 
 
-class Netstack(AsyncAdapter, netstack.Netstack):
+class NetstackUsingFc(AsyncAdapter, netstack.Netstack):
     """WLAN affordance implemented with Fuchsia Controller."""
 
     def __init__(
@@ -123,7 +126,7 @@ class Netstack(AsyncAdapter, netstack.Netstack):
                 watcher=server.take(),
             )
         except ZxStatus as status:
-            raise errors.HoneydewNetstackError(
+            raise HoneydewNetstackError(
                 f"State.GetWatcher() error {status}"
             ) from status
 
@@ -133,7 +136,7 @@ class Netstack(AsyncAdapter, netstack.Netstack):
             try:
                 resp = await watcher.watch()
             except ZxStatus as status:
-                raise errors.HoneydewNetstackError(
+                raise HoneydewNetstackError(
                     f"Watcher.Watch() error {status}"
                 ) from status
 
@@ -159,7 +162,7 @@ class Netstack(AsyncAdapter, netstack.Netstack):
                         else None
                     )
                 except ZxStatus as status:
-                    raise errors.HoneydewNetstackError(
+                    raise HoneydewNetstackError(
                         f"Interfaces.GetMac() error {status}"
                     )
 
@@ -170,7 +173,7 @@ class Netstack(AsyncAdapter, netstack.Netstack):
                 # No more information readily available.
                 break
             else:
-                raise errors.HoneydewNetstackError(
+                raise HoneydewNetstackError(
                     "Received invalid Watcher event from netstack. "
                     f"Expected existing or idle events, got {event}"
                 )

@@ -5,7 +5,7 @@
 
 import abc
 
-from honeydew.typing.netstack import InterfaceProperties
+from honeydew.affordances.connectivity.netstack.types import InterfaceProperties
 
 
 class Netstack(abc.ABC):

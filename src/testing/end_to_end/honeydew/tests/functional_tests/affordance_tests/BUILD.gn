@@ -8,7 +8,6 @@ group("tests") {
   public_deps = [
     "test_inspect:tests",
     "test_location:tests",
-    "test_netstack:tests",
     "test_rtc:tests",
     "test_tracing:tests",
   ]

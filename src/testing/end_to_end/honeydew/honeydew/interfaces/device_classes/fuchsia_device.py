@@ -9,6 +9,7 @@ from collections.abc import Callable
 from honeydew.affordances.connectivity.bluetooth.avrcp import avrcp
 from honeydew.affordances.connectivity.bluetooth.gap import gap
 from honeydew.affordances.connectivity.bluetooth.le import le
+from honeydew.affordances.connectivity.netstack import netstack
 from honeydew.affordances.connectivity.wlan.wlan import wlan
 from honeydew.affordances.connectivity.wlan.wlan_policy import wlan_policy
 from honeydew.affordances.connectivity.wlan.wlan_policy_ap import wlan_policy_ap
@@ -18,13 +19,7 @@ from honeydew.affordances.power.system_power_state_controller import (
 from honeydew.affordances.session import session
 from honeydew.affordances.ui.screenshot import screenshot
 from honeydew.affordances.ui.user_input import user_input
-from honeydew.interfaces.affordances import (
-    inspect,
-    location,
-    netstack,
-    rtc,
-    tracing,
-)
+from honeydew.interfaces.affordances import inspect, location, rtc, tracing
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
 )
@@ -306,10 +301,10 @@ class FuchsiaDevice(abc.ABC):
     @properties.Affordance
     @abc.abstractmethod
     def netstack(self) -> netstack.Netstack:
-        """Returns a Wlan affordance object.
+        """Returns a netstack affordance object.
 
         Returns:
-            wlan.Wlan object
+            netstack.Netstack object
         """
 
     @properties.Affordance

@@ -31,6 +31,10 @@ from honeydew.affordances.connectivity.bluetooth.le import le, le_using_fc
 from honeydew.affordances.connectivity.bluetooth.utils import (
     types as bluetooth_types,
 )
+from honeydew.affordances.connectivity.netstack import (
+    netstack,
+    netstack_using_fc,
+)
 from honeydew.affordances.connectivity.wlan.utils import types as wlan_types
 from honeydew.affordances.connectivity.wlan.wlan import wlan, wlan_using_fc
 from honeydew.affordances.connectivity.wlan.wlan_policy import (
@@ -43,7 +47,6 @@ from honeydew.affordances.connectivity.wlan.wlan_policy_ap import (
 )
 from honeydew.affordances.ffx import inspect as inspect_ffx
 from honeydew.affordances.fuchsia_controller import location as location_fc
-from honeydew.affordances.fuchsia_controller import netstack as netstack_fc
 from honeydew.affordances.fuchsia_controller import rtc as rtc_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
 from honeydew.affordances.power.system_power_state_controller import (
@@ -555,13 +558,13 @@ class FuchsiaDevice(
         )
 
     @properties.Affordance
-    def netstack(self) -> netstack_fc.Netstack:
+    def netstack(self) -> netstack.Netstack:
         """Returns a netstack affordance object.
 
         Returns:
             netstack.Netstack object
         """
-        return netstack_fc.Netstack(
+        return netstack_using_fc.NetstackUsingFc(
             device_name=self.device_name,
             ffx=self.ffx,
             fuchsia_controller=self.fuchsia_controller,
