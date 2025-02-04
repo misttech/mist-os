@@ -5,6 +5,7 @@
 use arrayvec::ArrayVec;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
+use std::ops::{Bound, RangeBounds};
 use std::sync::Arc;
 
 /// A leaf node in the btree.
@@ -98,9 +99,39 @@ where
 
     /// Search this leaf node for the given key.
     fn get(&self, key: &K) -> Option<&V> {
+        self.get_key_value(key).map(|(_, v)| v)
+    }
+
+    /// Search this leaf for the given key and return both the key and the value found.
+    fn get_key_value(&self, key: &K) -> Option<(&K, &V)> {
         match self.keys.binary_search(key) {
-            Ok(i) => Some(&self.values[i]),
+            Ok(i) => Some((&self.keys[i], &self.values[i])),
             Err(_) => None,
+        }
+    }
+
+    /// The last key/value pair stored in this leaf.
+    fn last_key_value(&self) -> Option<(&K, &V)> {
+        let key = self.keys.last()?;
+        let value = self.values.last()?;
+        Some((key, value))
+    }
+
+    /// Find the given key in this leaf and record its position in the given stack.
+    fn find_key<'a>(
+        self: &'a Arc<Self>,
+        key: &K,
+        inclusive: bool,
+        stack: &mut Vec<Cursor<'a, K, V, N>>,
+    ) {
+        match self.keys.binary_search(key) {
+            Ok(i) => {
+                let i = if inclusive { i } else { i + 1 };
+                stack.push(Cursor { node: NodeRef::Leaf(self), index: i });
+            }
+            Err(i) => {
+                stack.push(Cursor { node: NodeRef::Leaf(self), index: i });
+            }
         }
     }
 
@@ -331,6 +362,45 @@ where
         }
     }
 
+    /// Search this subtree for the given key and return both the key and the value found.
+    fn get_key_value(&self, key: &K) -> Option<(&K, &V)> {
+        match &self.children {
+            ChildList::Leaf(children) => {
+                children.last().expect("child lists are always non-empty").get_key_value(key)
+            }
+            ChildList::Internal(children) => {
+                children.last().expect("child lists are always non-empty").get_key_value(key)
+            }
+        }
+    }
+
+    /// The last key/value pair stored in this subtree.
+    fn last_key_value(&self) -> Option<(&K, &V)> {
+        match &self.children {
+            ChildList::Leaf(children) => {
+                children.last().expect("child lists are always non-empty").last_key_value()
+            }
+            ChildList::Internal(children) => {
+                children.last().expect("child lists are always non-empty").last_key_value()
+            }
+        }
+    }
+
+    /// Find the given key in this subtree and record its position in the given stack.
+    fn find_key<'a>(
+        self: &'a Arc<Self>,
+        key: &K,
+        inclusive: bool,
+        stack: &mut Vec<Cursor<'a, K, V, N>>,
+    ) {
+        let i = self.get_child_index(&key);
+        stack.push(Cursor { node: NodeRef::Internal(self), index: i + 1 });
+        match &self.children {
+            ChildList::Leaf(children) => children[i].find_key(key, inclusive, stack),
+            ChildList::Internal(children) => children[i].find_key(key, inclusive, stack),
+        }
+    }
+
     /// Insert the given child node at index `i` in this node.
     ///
     /// `key` must be the smallest key that occurs in the `child` subtree.
@@ -536,6 +606,22 @@ where
         }
     }
 
+    /// Search this node for the given key and return both the key and the value found.
+    fn get_key_value(&self, key: &K) -> Option<(&K, &V)> {
+        match self {
+            Node::Leaf(node) => node.get_key_value(key),
+            Node::Internal(node) => node.get_key_value(key),
+        }
+    }
+
+    /// The last key/value pair stored in this node.
+    fn last_key_value(&self) -> Option<(&K, &V)> {
+        match self {
+            Node::Leaf(node) => node.last_key_value(),
+            Node::Internal(node) => node.last_key_value(),
+        }
+    }
+
     /// Converts a reference into a Node into a NodeRef.
     fn as_ref(&self) -> NodeRef<'_, K, V, N> {
         match self {
@@ -561,6 +647,14 @@ where
             Node::Leaf(node) => Arc::make_mut(node).remove(key),
         }
     }
+
+    /// Find the given key in this node and record its position in the given stack.
+    fn find_key<'a>(&'a self, key: &K, inclusive: bool, stack: &mut Vec<Cursor<'a, K, V, N>>) {
+        match self {
+            Node::Internal(node) => node.find_key(key, inclusive, stack),
+            Node::Leaf(node) => node.find_key(key, inclusive, stack),
+        }
+    }
 }
 
 /// A node in the btree.
@@ -573,12 +667,14 @@ enum NodeRef<'a, K: Ord + Clone, V: Clone, const N: usize> {
     Leaf(&'a Arc<NodeLeaf<K, V, N>>),
 }
 
+#[derive(Debug)]
 struct Cursor<'a, K: Ord + Clone, V: Clone, const N: usize> {
     node: NodeRef<'a, K, V, N>,
     index: usize,
 }
 
 /// An iterator over the key-value pairs stored in a CowMap.
+#[derive(Debug)]
 pub struct Iter<'a, K: Ord + Clone, V: Clone, const N: usize> {
     stack: Vec<Cursor<'a, K, V, N>>,
 }
@@ -615,6 +711,45 @@ where
             }
         }
         None
+    }
+}
+
+/// Iterator for a range of values in a CowMap.
+#[derive(Debug)]
+pub struct Range<'a, K: Ord + Clone, V: Clone, const N: usize> {
+    /// The underlying iterator for the map.
+    iter: Iter<'a, K, V, N>,
+
+    /// The bound at which to stop the iteration.
+    end_bound: Bound<K>,
+}
+
+impl<'a, K, V, const N: usize> Iterator for Range<'a, K, V, N>
+where
+    K: Ord + Clone,
+    V: Clone,
+{
+    type Item = (&'a K, &'a V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (key, value) = self.iter.next()?;
+        match &self.end_bound {
+            Bound::Unbounded => Some((key, value)),
+            Bound::Excluded(bound) => {
+                if key < bound {
+                    Some((key, value))
+                } else {
+                    None
+                }
+            }
+            Bound::Included(bound) => {
+                if key <= bound {
+                    Some((key, value))
+                } else {
+                    None
+                }
+            }
+        }
     }
 }
 
@@ -698,6 +833,9 @@ where
         }
     }
 
+    /// Remove the entry with the given key from the map.
+    ///
+    /// If the key was present in the map, returns the value previously stored at the given key.
     pub fn remove(&mut self, key: &K) -> Option<V> {
         match self.node.remove(key) {
             RemoveResult::NotFound => None,
@@ -719,8 +857,37 @@ where
         }
     }
 
+    /// Iterate through the keys and values stored in the map.
     pub fn iter(&self) -> Iter<'_, K, V, N> {
         Iter { stack: vec![Cursor { node: self.node.as_ref(), index: 0 }] }
+    }
+
+    /// Iterate through the keys and values stored in the given range in the map.
+    pub fn range(&self, bounds: impl RangeBounds<K>) -> Range<'_, K, V, N> {
+        let mut range =
+            Range { iter: Iter { stack: vec![] }, end_bound: bounds.end_bound().cloned() };
+        let (key, inclusive) = match bounds.start_bound() {
+            Bound::Included(key) => (key, true),
+            Bound::Excluded(key) => (key, false),
+            Bound::Unbounded => {
+                range.iter.stack.push(Cursor { node: self.node.as_ref(), index: 0 });
+                return range;
+            }
+        };
+        self.node.find_key(key, inclusive, &mut range.iter.stack);
+        range
+    }
+
+    /// The key and value stored in the map at the given key.
+    ///
+    /// Useful if not all key objects that are equal in the total ordering are actually identical.
+    pub fn get_key_value(&self, key: &K) -> Option<(&K, &V)> {
+        self.node.get_key_value(key)
+    }
+
+    /// The key and value for the largest key value stored in the map.
+    pub fn last_key_value(&self) -> Option<(&K, &V)> {
+        self.node.last_key_value()
     }
 }
 
@@ -1060,5 +1227,145 @@ mod test {
             collected2,
             vec![(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (6, 6), (7, 7), (8, 8), (9, 9)]
         );
+    }
+
+    #[test]
+    fn test_range_basic() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        for i in 0..10 {
+            map.insert(i, i as i64);
+        }
+
+        let range: Vec<_> = map.range(3..7).map(|(&k, &v)| (k, v)).collect();
+        assert_eq!(range, vec![(3, 3), (4, 4), (5, 5), (6, 6)]);
+
+        let range: Vec<_> = map.range(3..=7).map(|(&k, &v)| (k, v)).collect();
+        assert_eq!(range, vec![(3, 3), (4, 4), (5, 5), (6, 6), (7, 7)]);
+
+        let range = map.range(..).map(|(&k, &v)| (k, v)).collect::<Vec<_>>();
+        assert_eq!(range.len(), 10);
+        for i in 0..10 {
+            assert_eq!(range[i], (i as u32, i as i64));
+        }
+    }
+
+    #[test]
+    fn test_range_empty() {
+        let map = CowMap::<u32, i64, 4>::default();
+        let range: Vec<_> = map.range(3..7).map(|(&k, &v)| (k, v)).collect();
+        assert!(range.is_empty());
+    }
+
+    #[test]
+    fn test_range_out_of_bounds() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        for i in 0..10 {
+            map.insert(i, i as i64);
+        }
+
+        let range: Vec<_> = map.range(10..20).map(|(&k, &v)| (k, v)).collect();
+        assert!(range.is_empty());
+
+        let range: Vec<_> = map.range(..0).map(|(&k, &v)| (k, v)).collect();
+        assert!(range.is_empty());
+    }
+
+    #[test]
+    fn test_range_exclusive_start_inclusive_end() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        for i in 0..10 {
+            map.insert(i, i as i64);
+        }
+        let range: Vec<_> =
+            map.range((Bound::Excluded(2), Bound::Included(5))).map(|(&k, &v)| (k, v)).collect();
+        assert_eq!(range, vec![(3, 3), (4, 4), (5, 5)]);
+    }
+
+    #[test]
+    fn test_get_key_value_basic() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        map.insert(1, 1);
+        assert_eq!(map.get_key_value(&1), Some((&1, &1)));
+        assert_eq!(map.get_key_value(&2), None);
+
+        map.insert(2, 2);
+        map.insert(3, 3);
+
+        assert_eq!(map.get_key_value(&2), Some((&2, &2)));
+        assert_eq!(map.get_key_value(&3), Some((&3, &3)));
+    }
+
+    #[test]
+    fn test_get_key_value_empty() {
+        let map = CowMap::<u32, i64, 4>::default();
+        assert_eq!(map.get_key_value(&1), None);
+    }
+
+    #[test]
+    fn test_last_key_value_basic() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        assert_eq!(map.last_key_value(), None);
+
+        map.insert(1, 1);
+        assert_eq!(map.last_key_value(), Some((&1, &1)));
+
+        map.insert(2, 2);
+        assert_eq!(map.last_key_value(), Some((&2, &2)));
+        map.insert(3, 3);
+        map.insert(0, 0);
+
+        assert_eq!(map.last_key_value(), Some((&3, &3)));
+    }
+
+    #[test]
+    fn test_last_key_value_after_remove() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        map.insert(1, 1);
+        map.insert(2, 2);
+        map.insert(3, 3);
+
+        map.remove(&3);
+        assert_eq!(map.last_key_value(), Some((&2, &2)));
+
+        map.remove(&2);
+        assert_eq!(map.last_key_value(), Some((&1, &1)));
+
+        map.remove(&1);
+        assert_eq!(map.last_key_value(), None); // Should be empty after removing everything
+    }
+
+    #[test]
+    fn test_last_key_value_empty() {
+        let map = CowMap::<u32, i64, 4>::default();
+        assert_eq!(map.last_key_value(), None);
+    }
+
+    #[test]
+    fn test_range_complex_large() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+
+        let keys = (0..200).collect::<Vec<_>>();
+
+        for &key in &keys {
+            map.insert(key, key as i64 * 2);
+        }
+
+        // Choose tricky start and end bounds for the range
+        let start = 32;
+        let end = 164;
+
+        let expected: Vec<_> = keys
+            .iter()
+            .cloned()
+            .filter(|&k| k > start && k <= end)
+            .map(|k| (k, k as i64 * 2))
+            .collect();
+
+        let range: Vec<_> = map
+            .range((Bound::Excluded(start), Bound::Included(end)))
+            .map(|(&k, &v)| (k, v))
+            .collect();
+
+        assert_eq!(range, expected);
     }
 }
