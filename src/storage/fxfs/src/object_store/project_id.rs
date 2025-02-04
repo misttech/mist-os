@@ -71,18 +71,14 @@ impl ObjectStore {
         Ok(())
     }
 
-    /// Apply a `project_id` to a given node. Fails if node is not found or already has a project
-    /// applied to it.
+    /// Apply a `project_id` to a given node. Fails if node is not found or target project is zero.
     pub async fn set_project_for_node(&self, node_id: u64, project_id: u64) -> Result<(), Error> {
         ensure!(project_id != 0, FxfsError::OutOfRange);
         let root_id = self.root_directory_object_id();
         let mut transaction = self
             .filesystem()
             .new_transaction(
-                lock_keys![
-                    LockKey::ProjectId { store_object_id: self.store_object_id, project_id },
-                    LockKey::object(self.store_object_id, node_id),
-                ],
+                lock_keys![LockKey::object(self.store_object_id, node_id)],
                 Options::default(),
             )
             .await?;
@@ -93,10 +89,6 @@ impl ObjectStore {
                 ObjectValue::Object { kind, attributes } => (kind, attributes),
                 _ => return Err(FxfsError::Inconsistent.into()),
             };
-        // Prevent updating this if it is already set.
-        if attributes.project_id != 0 {
-            return Err(FxfsError::AlreadyExists.into());
-        }
         // Make sure the object kind makes sense.
         match kind {
             ObjectKind::File { .. } | ObjectKind::Directory { .. } => (),
@@ -105,7 +97,11 @@ impl ObjectStore {
             ObjectKind::Symlink { .. } => return Err(FxfsError::NotSupported.into()),
             ObjectKind::Graveyard => return Err(FxfsError::Inconsistent.into()),
         }
-        let storage_size = attributes.allocated_size;
+        let storage_size = attributes.allocated_size.try_into().map_err(|_| FxfsError::TooBig)?;
+        let old_project_id = attributes.project_id;
+        if old_project_id == project_id {
+            return Ok(());
+        }
         attributes.project_id = project_id;
 
         transaction.add(
@@ -119,12 +115,18 @@ impl ObjectStore {
             self.store_object_id,
             Mutation::merge_object(
                 ObjectKey::project_usage(root_id, project_id),
-                ObjectValue::BytesAndNodes {
-                    bytes: storage_size.try_into().map_err(|_| FxfsError::TooBig)?,
-                    nodes: 1,
-                },
+                ObjectValue::BytesAndNodes { bytes: storage_size, nodes: 1 },
             ),
         );
+        if old_project_id != 0 {
+            transaction.add(
+                self.store_object_id,
+                Mutation::merge_object(
+                    ObjectKey::project_usage(root_id, old_project_id),
+                    ObjectValue::BytesAndNodes { bytes: -storage_size, nodes: -1 },
+                ),
+            );
+        }
         transaction.commit().await?;
         Ok(())
     }

@@ -1416,6 +1416,7 @@ mod tests {
         const VOLUME_NAME: &str = "A";
         const FILE_NAME: &str = "B";
         const PROJECT_ID: u64 = 42;
+        const PROJECT_ID2: u64 = 343;
         let volume_store_id;
         let node_id;
         let mut device = DeviceHolder::new(FakeDevice::new(8192, 512));
@@ -1511,12 +1512,6 @@ mod tests {
                 .expect("Setting project on node");
 
             project_proxy
-                .set_for_node(node_id, PROJECT_ID)
-                .await
-                .unwrap()
-                .expect_err("Should not be able to reset project for node.");
-
-            project_proxy
                 .set_limit(PROJECT_ID, BYTES_LIMIT_2, NODES_LIMIT_2)
                 .await
                 .unwrap()
@@ -1575,12 +1570,15 @@ mod tests {
                     .expect("Unable to connect to project id service")
             };
 
-            {
-                let BytesAndNodes { bytes, nodes } =
-                    project_proxy.info(PROJECT_ID).await.unwrap().expect("Fetching project info").0;
-                assert_eq!(bytes, BYTES_LIMIT_2);
-                assert_eq!(nodes, NODES_LIMIT_2);
-            }
+            let usage_bytes_and_nodes = {
+                let (
+                    BytesAndNodes { bytes: limit_bytes, nodes: limit_nodes },
+                    usage_bytes_and_nodes,
+                ) = project_proxy.info(PROJECT_ID).await.unwrap().expect("Fetching project info");
+                assert_eq!(limit_bytes, BYTES_LIMIT_2);
+                assert_eq!(limit_nodes, NODES_LIMIT_2);
+                usage_bytes_and_nodes
+            };
 
             // Should be unable to clear the project limit, due to being in use.
             project_proxy.clear(PROJECT_ID).await.unwrap().expect("To clear limits");
@@ -1589,15 +1587,23 @@ mod tests {
                 project_proxy.get_for_node(node_id).await.unwrap().expect("Checking project"),
                 PROJECT_ID
             );
-            project_proxy.clear_for_node(node_id).await.unwrap().expect("Clearing project");
+            project_proxy
+                .set_for_node(node_id, PROJECT_ID2)
+                .await
+                .unwrap()
+                .expect("Changing project");
             assert_eq!(
                 project_proxy.get_for_node(node_id).await.unwrap().expect("Checking project"),
-                0
+                PROJECT_ID2
             );
 
             assert_eq!(
                 project_proxy.info(PROJECT_ID).await.unwrap().expect_err("Expect missing limits"),
                 Status::NOT_FOUND.into_raw()
+            );
+            assert_eq!(
+                project_proxy.info(PROJECT_ID2).await.unwrap().expect("Fetching project info").1,
+                usage_bytes_and_nodes
             );
 
             std::mem::drop(volume_proxy);
