@@ -6,36 +6,8 @@
 group("tests") {
   testonly = true
   public_deps = [
-    ":test_ffx_on_nelson",
-    ":test_ffx_on_vim3",
-    ":test_ffx_on_x64",
     "test_fastboot:tests",
-    "test_ffx:ffx_test_on_nelson($host_toolchain)",
-    "test_ffx:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
+    "test_ffx:tests",
     "test_serial:tests",
-  ]
-}
-
-group("test_ffx_on_nelson") {
-  testonly = true
-  public_deps = [
-    "test_ffx:ffx_test_on_nelson($host_toolchain)",
-    "//examples/hello_world/rust:hermetic_tests($target_toolchain)",
-  ]
-}
-
-group("test_ffx_on_vim3") {
-  testonly = true
-  public_deps = [
-    "test_ffx:ffx_test_on_vim3($host_toolchain)",
-    "//examples/hello_world/rust:hermetic_tests($target_toolchain)",
-  ]
-}
-
-group("test_ffx_on_x64") {
-  testonly = true
-  public_deps = [
-    "test_ffx:ffx_test_on_x64($host_toolchain)",
-    "//examples/hello_world/rust:hermetic_tests($target_toolchain)",
   ]
 }
