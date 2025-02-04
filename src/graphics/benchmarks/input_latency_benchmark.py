@@ -9,8 +9,8 @@ from pathlib import Path
 
 import test_data
 from fuchsia_base_test import fuchsia_base_test
+from honeydew.affordances.ui.user_input import types as ui_custom_types
 from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.typing import ui as ui_custom_types
 from mobly import test_runner
 from perf_publish import publish
 from trace_processing import trace_importing, trace_metrics, trace_model

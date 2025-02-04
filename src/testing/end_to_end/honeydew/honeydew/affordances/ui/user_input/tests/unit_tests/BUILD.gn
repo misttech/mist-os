@@ -5,13 +5,9 @@
 import("//build/python/python_host_test.gni")
 
 if (is_host) {
-  python_host_test("inspect_ffx_test") {
-    main_source = "inspect_test.py"
-    libraries = [
-      "//src/testing/end_to_end/honeydew",
-      "//third_party/parameterized",
-      "//src/lib/diagnostics/python/fuchsia_inspect",
-    ]
+  python_host_test("user_input_using_fc_test") {
+    main_source = "user_input_using_fc_test.py"
+    libraries = [ "//src/testing/end_to_end/honeydew" ]
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
   }
@@ -19,5 +15,5 @@ if (is_host) {
 
 group("tests") {
   testonly = true
-  public_deps = [ ":inspect_ffx_test($host_toolchain)" ]
+  public_deps = [ ":user_input_using_fc_test($host_toolchain)" ]
 }

@@ -30,16 +30,14 @@ from honeydew.affordances.connectivity.wlan.wlan import wlan_using_fc
 from honeydew.affordances.connectivity.wlan.wlan_policy import (
     wlan_policy_using_fc,
 )
-from honeydew.affordances.ffx.ui import screenshot as screenshot_ffx
 from honeydew.affordances.fuchsia_controller import rtc as rtc_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
-from honeydew.affordances.fuchsia_controller.ui import (
-    user_input as user_input_fc,
-)
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller_using_starnix,
 )
 from honeydew.affordances.session import session_using_ffx
+from honeydew.affordances.ui.screenshot import screenshot_using_ffx
+from honeydew.affordances.ui.user_input import user_input_using_fc
 from honeydew.fuchsia_device import fuchsia_device
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
@@ -347,7 +345,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         affordance implemented using FFX"""
         self.assertIsInstance(
             self.fd_fc_obj.screenshot,
-            screenshot_ffx.Screenshot,
+            screenshot_using_ffx.ScreenshotUsingFfx,
         )
 
     @mock.patch.object(
@@ -407,12 +405,12 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         user_input affordance."""
 
         mock_ffx_run.return_value = (
-            user_input_fc._INPUT_HELPER_COMPONENT  # pylint: disable=protected-access
+            user_input_using_fc._INPUT_HELPER_COMPONENT  # pylint: disable=protected-access
         )
 
         self.assertIsInstance(
             self.fd_fc_obj.user_input,
-            user_input_fc.UserInput,
+            user_input_using_fc.UserInputUsingFc,
         )
 
     def test_bluetooth_avrcp_fc_transport(self) -> None:

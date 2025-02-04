@@ -6,10 +6,10 @@
 import abc
 from typing import Any
 
-from honeydew.typing import ui as ui_custom_types
+from honeydew.affordances.ui.user_input import types
 
 DEFAULTS: dict[str, Any] = {
-    "TOUCH_SCREEN_SIZE": ui_custom_types.Size(width=1000, height=1000),
+    "TOUCH_SCREEN_SIZE": types.Size(width=1000, height=1000),
     "TAP_EVENT_COUNT": 1,
     "DURATION_MS": 300,
 }
@@ -21,7 +21,7 @@ class TouchDevice(abc.ABC):
     @abc.abstractmethod
     def tap(
         self,
-        location: ui_custom_types.Coordinate,
+        location: types.Coordinate,
         tap_event_count: int = DEFAULTS["TAP_EVENT_COUNT"],
         duration_ms: int = DEFAULTS["DURATION_MS"],
     ) -> None:
@@ -48,7 +48,7 @@ class UserInput(abc.ABC):
     @abc.abstractmethod
     def create_touch_device(
         self,
-        touch_screen_size: ui_custom_types.Size = DEFAULTS["TOUCH_SCREEN_SIZE"],
+        touch_screen_size: types.Size = DEFAULTS["TOUCH_SCREEN_SIZE"],
     ) -> TouchDevice:
         """Create a virtual touch device for testing touch input.
 

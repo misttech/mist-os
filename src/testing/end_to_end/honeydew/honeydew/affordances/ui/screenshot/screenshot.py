@@ -5,14 +5,14 @@
 
 import abc
 
-from honeydew.typing.screenshot_image import ScreenshotImage
+from honeydew.affordances.ui.screenshot import types
 
 
 class Screenshot(abc.ABC):
     """Abstract base class for Screenshot affordance."""
 
     @abc.abstractmethod
-    def take(self) -> ScreenshotImage:
+    def take(self) -> types.ScreenshotImage:
         """Take a screenshot.
 
         Return:

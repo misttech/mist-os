@@ -22,13 +22,6 @@ if (is_host) {
     extra_args = [ "-v" ]
   }
 
-  python_host_test("user_input_fc_test") {
-    main_source = "user_input_test.py"
-    libraries = [ "//src/testing/end_to_end/honeydew" ]
-    main_callable = "unittest.main"
-    extra_args = [ "-v" ]
-  }
-
   python_host_test("location_fc_test") {
     main_source = "location_test.py"
     libraries = [ "//src/testing/end_to_end/honeydew" ]
@@ -51,6 +44,5 @@ group("tests") {
     ":netstack_fc_test($host_toolchain)",
     ":rtc_fc_test($host_toolchain)",
     ":tracing_fc_test($host_toolchain)",
-    ":user_input_fc_test($host_toolchain)",
   ]
 }

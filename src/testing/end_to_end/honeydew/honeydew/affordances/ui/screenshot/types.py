@@ -3,15 +3,13 @@
 # found in the LICENSE file.
 """Abstract base class for Screenshot affordance."""
 
-# TODO(b/393656975): This file will be deleted after impacted tests have been pointed to honeydew.affordances.ui.screenshot.types.py
-
 import enum
 from dataclasses import dataclass
 from importlib import resources as impresources
 
 import png
 
-from honeydew.typing import ui as ui_types
+from honeydew.affordances.ui.user_input import types as ui_types
 
 _BYTES_PER_PIXEL: int = 4
 

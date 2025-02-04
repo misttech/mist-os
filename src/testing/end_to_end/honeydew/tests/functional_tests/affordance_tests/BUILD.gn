@@ -6,28 +6,10 @@
 group("tests") {
   testonly = true
   public_deps = [
-    ":test_screenshot_ffx",
-    ":test_user_input_fc",
     "test_inspect:tests",
     "test_location:tests",
     "test_netstack:tests",
     "test_rtc:tests",
     "test_tracing:tests",
-  ]
-}
-
-group("test_screenshot_ffx") {
-  testonly = true
-  public_deps = [
-    "test_ui:screenshot_test_ffx($host_toolchain)",
-    "//src/ui/examples:flatland-examples($target_toolchain)",
-  ]
-}
-
-group("test_user_input_fc") {
-  testonly = true
-  public_deps = [
-    "test_ui:user_input_test_fc($host_toolchain)",
-    "//src/ui/examples:flatland-examples($target_toolchain)",
   ]
 }

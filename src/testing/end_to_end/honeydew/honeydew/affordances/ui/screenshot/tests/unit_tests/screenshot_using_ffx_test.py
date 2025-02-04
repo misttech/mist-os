@@ -9,17 +9,19 @@ from unittest import mock
 
 import png
 
-from honeydew.affordances.ffx.ui import screenshot as ffx_screenshot
+from honeydew.affordances.ui.screenshot import screenshot_using_ffx
 from honeydew.transports import ffx as ffx_transport
 
 
-class ScreenshotFfxTests(unittest.TestCase):
+class ScreenshotUsingFfxTests(unittest.TestCase):
     """Unit tests for honeydew.affordances.ffx.ui.screenshot.py."""
 
     def setUp(self) -> None:
         super().setUp()
         self.mock_ffx = mock.MagicMock(spec=ffx_transport.FFX)
-        self.screenshot_obj = ffx_screenshot.Screenshot(ffx=self.mock_ffx)
+        self.screenshot_obj = screenshot_using_ffx.ScreenshotUsingFfx(
+            ffx=self.mock_ffx
+        )
 
     def test_take_screenshot(self) -> None:
         # An image with a single pixel:

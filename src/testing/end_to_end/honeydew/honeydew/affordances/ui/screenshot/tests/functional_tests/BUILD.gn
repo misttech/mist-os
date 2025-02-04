@@ -6,8 +6,8 @@ import("//build/python/python_mobly_test.gni")
 import("//build/testing/environments.gni")
 
 if (is_host) {
-  python_mobly_test("session_test") {
-    main_source = "test_session.py"
+  python_mobly_test("screenshot_test") {
+    main_source = "test_screenshot.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
@@ -22,10 +22,10 @@ if (is_host) {
   }
 }
 
-group("test_session") {
+group("test_screenshot") {
   testonly = true
   public_deps = [
-    ":session_test($host_toolchain)",
+    ":screenshot_test($host_toolchain)",
     "//src/ui/examples:flatland-examples($target_toolchain)",
   ]
 }
@@ -33,5 +33,5 @@ group("test_session") {
 # Group containing all of the session affordances functional test cases and its dependencies.
 group("tests") {
   testonly = true
-  public_deps = [ ":test_session" ]
+  public_deps = [ ":test_screenshot" ]
 }

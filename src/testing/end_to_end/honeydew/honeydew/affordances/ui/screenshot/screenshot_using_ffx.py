@@ -7,9 +7,8 @@ import logging
 import os
 import tempfile
 
-from honeydew.interfaces.affordances.ui import screenshot
+from honeydew.affordances.ui.screenshot import screenshot, types
 from honeydew.transports import ffx as ffx_transport
-from honeydew.typing import screenshot_image
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -22,7 +21,7 @@ _FFX_SCREENSHOT_CMD: list[str] = [
 ]
 
 
-class Screenshot(screenshot.Screenshot):
+class ScreenshotUsingFfx(screenshot.Screenshot):
     """Screenshot affordance implementation using FFX.
 
     Args:
@@ -32,7 +31,7 @@ class Screenshot(screenshot.Screenshot):
     def __init__(self, ffx: ffx_transport.FFX) -> None:
         self._ffx: ffx_transport.FFX = ffx
 
-    def take(self) -> screenshot_image.ScreenshotImage:
+    def take(self) -> types.ScreenshotImage:
         """Take a screenshot.
 
         Return:
@@ -43,6 +42,6 @@ class Screenshot(screenshot.Screenshot):
             # ffx screenshot always outputs a file named screenshot.png
             path = os.path.join(temp_dir, "screenshot.png")
             self._ffx.run(cmd=_FFX_SCREENSHOT_CMD + [temp_dir])
-            image = screenshot_image.ScreenshotImage.load_from_path(path)
+            image = types.ScreenshotImage.load_from_path(path)
             _LOGGER.debug("Screenshot taken")
             return image

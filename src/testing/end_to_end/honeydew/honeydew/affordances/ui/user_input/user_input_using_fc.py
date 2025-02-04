@@ -10,11 +10,12 @@ import fidl.fuchsia_ui_test_input as f_test_input
 import fuchsia_controller_py as fcp
 
 from honeydew import errors
-from honeydew.interfaces.affordances.ui import user_input
+from honeydew.affordances.ui.user_input import errors as user_input_errors
+from honeydew.affordances.ui.user_input import types as ui_custom_types
+from honeydew.affordances.ui.user_input import user_input
 from honeydew.transports import ffx
 from honeydew.transports import fuchsia_controller as fc_transport
 from honeydew.typing import custom_types
-from honeydew.typing import ui as ui_custom_types
 
 _INPUT_HELPER_COMPONENT: str = "core/ui/input-helper"
 
@@ -54,7 +55,7 @@ class TouchDevice(user_input.TouchDevice):
                 device=channel_server.take(),
             )
         except fcp.ZxStatus as status:
-            raise errors.UserInputError(
+            raise user_input_errors.UserInputError(
                 f"Failed to initialize touch device on {self._device_name}"
             ) from status
 
@@ -94,12 +95,12 @@ class TouchDevice(user_input.TouchDevice):
                 time.sleep(interval / 1000)  # Sleep in seconds
 
         except fcp.ZxStatus as status:
-            raise errors.UserInputError(
+            raise user_input_errors.UserInputError(
                 f"tap operation failed on {self._device_name}"
             ) from status
 
 
-class UserInput(user_input.UserInput):
+class UserInputUsingFc(user_input.UserInput):
     """UserInput affordance implementation using FuchsiaController.
 
     Args:

@@ -42,14 +42,10 @@ from honeydew.affordances.connectivity.wlan.wlan_policy_ap import (
     wlan_policy_ap_using_fc,
 )
 from honeydew.affordances.ffx import inspect as inspect_ffx
-from honeydew.affordances.ffx.ui import screenshot as screenshot_ffx
 from honeydew.affordances.fuchsia_controller import location as location_fc
 from honeydew.affordances.fuchsia_controller import netstack as netstack_fc
 from honeydew.affordances.fuchsia_controller import rtc as rtc_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
-from honeydew.affordances.fuchsia_controller.ui import (
-    user_input as user_input_fc,
-)
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller as system_power_state_controller_interface,
 )
@@ -57,9 +53,10 @@ from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller_using_starnix,
 )
 from honeydew.affordances.session import session, session_using_ffx
+from honeydew.affordances.ui.screenshot import screenshot, screenshot_using_ffx
+from honeydew.affordances.ui.user_input import user_input, user_input_using_fc
 from honeydew.interfaces.affordances import inspect as inspect_interface
 from honeydew.interfaces.affordances import rtc, tracing
-from honeydew.interfaces.affordances.ui import screenshot, user_input
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
 )
@@ -397,7 +394,7 @@ class FuchsiaDevice(
         Returns:
             screenshot.Screenshot object
         """
-        return screenshot_ffx.Screenshot(self.ffx)
+        return screenshot_using_ffx.ScreenshotUsingFfx(self.ffx)
 
     @properties.Affordance
     def system_power_state_controller(
@@ -450,7 +447,7 @@ class FuchsiaDevice(
         Returns:
             user_input.UserInput object
         """
-        return user_input_fc.UserInput(
+        return user_input_using_fc.UserInputUsingFc(
             device_name=self.device_name,
             fuchsia_controller=self.fuchsia_controller,
             ffx_transport=self.ffx,

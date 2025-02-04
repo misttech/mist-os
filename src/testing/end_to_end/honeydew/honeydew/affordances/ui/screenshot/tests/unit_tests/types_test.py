@@ -11,12 +11,14 @@ from array import array
 import png
 from parameterized import param, parameterized
 
+from honeydew.affordances.ui.screenshot.types import ScreenshotImage
+from honeydew.affordances.ui.user_input.types import Pixel, Size
+
 # Disabling pylint to reduce verbosity for widely used trivial types
-from honeydew.typing.screenshot_image import (  # pylint: disable=g-importing-member
-    ScreenshotImage,
-)
-from honeydew.typing.ui import Pixel  # pylint: disable=g-importing-member
-from honeydew.typing.ui import Size  # pylint: disable=g-importing-member
+# pylint: disable=g-importing-member
+
+
+# pylint: enable=g-importing-member
 
 RED = Pixel(255, 0, 0)
 GREEN = Pixel(0, 255, 0)

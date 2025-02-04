@@ -10,13 +10,11 @@ import fidl.fuchsia_math as f_math
 import fidl.fuchsia_ui_test_input as f_test_input
 
 from honeydew import errors
-from honeydew.affordances.fuchsia_controller.ui import (
-    user_input as fc_user_input,
-)
+from honeydew.affordances.ui.user_input import types as ui_custom_types
+from honeydew.affordances.ui.user_input import user_input_using_fc
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import fuchsia_controller as fc_transport
 from honeydew.typing import custom_types
-from honeydew.typing import ui as ui_custom_types
 
 
 # pylint: disable=protected-access
@@ -31,10 +29,11 @@ class UserInputFCTests(unittest.TestCase):
         self.ffx_transport_obj = mock.MagicMock(spec=ffx_transport.FFX)
 
     def test_no_virtual_device_support_raise_error(self) -> None:
-        """Test for fc_user_input.UserInput() method raise error without virtual device support."""
+        """Test for user_input_using_fc.UserInputUsingFc() method raise error without virtual device
+        support."""
 
         with self.assertRaises(errors.NotSupportedError):
-            fc_user_input.UserInput(
+            user_input_using_fc.UserInputUsingFc(
                 device_name="fuchsia-emulator",
                 fuchsia_controller=self.fc_transport_obj,
                 ffx_transport=self.ffx_transport_obj,
@@ -45,21 +44,22 @@ class UserInputFCTests(unittest.TestCase):
         )
 
     def test_user_input_no_raise(self) -> None:
-        """Test for fc_user_input.UserInput() method not raise error with virtual device support."""
+        """Test for user_input_using_fc.UserInputUsingFc() method not raise error with virtual
+        device support."""
         self.ffx_transport_obj.run.return_value = (
-            fc_user_input._INPUT_HELPER_COMPONENT
+            user_input_using_fc._INPUT_HELPER_COMPONENT
         )
-        fc_user_input.UserInput(
+        user_input_using_fc.UserInputUsingFc(
             device_name="fuchsia-emulator",
             fuchsia_controller=self.fc_transport_obj,
             ffx_transport=self.ffx_transport_obj,
         )
 
-    def user_input(self) -> fc_user_input.UserInput:
+    def user_input(self) -> user_input_using_fc.UserInputUsingFc:
         self.ffx_transport_obj.run.return_value = (
-            fc_user_input._INPUT_HELPER_COMPONENT
+            user_input_using_fc._INPUT_HELPER_COMPONENT
         )
-        return fc_user_input.UserInput(
+        return user_input_using_fc.UserInputUsingFc(
             device_name="fuchsia-emulator",
             fuchsia_controller=self.fc_transport_obj,
             ffx_transport=self.ffx_transport_obj,
