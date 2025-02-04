@@ -33,7 +33,7 @@ visibility = [ ":*" ]
 assert(current_toolchain == default_toolchain ||
            current_toolchain == host_toolchain ||
            (sdk_cross_compile_host_tools && is_host),
-       "Unexpected target toolchain")
+       "Unexpected target toolchain `${current_toolchain}`.")
 
 # Log a message if a non-default set of API levels or CPU architecture will be
 # built as this reduces the compatibility coverage of the build and should not
@@ -133,7 +133,11 @@ generated_file("plasa_manifest") {
 # Generates, validates, and archive the "final" IDK, including prebuilt binaries
 # for several target_cpu architectures and API levels.
 group("final_fuchsia_idk") {
-  visibility += [ "*" ]
+  visibility = []
+  visibility = [
+    "//:ninja_subbuilds",
+    "//:sdk_archives",
+  ]
   deps = [
     ":final_fuchsia_idk.archive",
     ":final_fuchsia_idk.exported",
@@ -144,16 +148,30 @@ group("final_fuchsia_idk") {
 
 idk_subbuilds("core_idk_subbuilds") {
   sdk_collection_label = ":core"
-  visibility += [ "//build/bazel/bazel_sdk:idk" ]
+  visibility = []
+  visibility = [
+    ":bazel_in_tree_idk",
+    ":final_fuchsia_idk.exported",
+  ]
 }
 
 # This targets generates a "final" IDK archive, including prebuilt binaries for
 # several target_cpu architectures.
 idk("final_fuchsia_idk.exported") {
-  visibility += [ "*" ]
+  visibility = []
+  visibility = [
+    ":final_fuchsia_idk",
+    ":final_fuchsia_idk.archive",
+    ":final_fuchsia_idk.archive.tarmaker",
+    ":final_fuchsia_idk_bazel_sdk_tests_arm64",
+    ":final_fuchsia_idk_bazel_sdk_tests_riscv64",
+    ":final_fuchsia_idk_bazel_sdk_tests_x64",
+    ":final_fuchsia_idk_manifest_golden",
+    ":final_fuchsia_sdk",
+  ]
   output_name = "fuchsia_idk"
-  sdk_collection_label = ":core"
-  idk_subbuilds_label = ":core_idk_subbuilds"
+  sdk_collection_label = "//sdk:core"
+  idk_subbuilds_label = "//sdk:core_idk_subbuilds"
   target_cpus = idk_target_cpus
   api_levels = platform_version.idk_buildable_api_levels
 
@@ -220,7 +238,7 @@ run_fuchsia_bazel_sdk_tests("final_fuchsia_sdk_tests") {
   # target, except //:root_targets. This ensures the target is always
   # defined in the GN graph, but can only be built explicitly.
   visibility = []
-  visibility = [ "*" ]
+  visibility = [ "//:root_targets" ]
 }
 
 sdk_final_manifest_golden("final_fuchsia_idk_manifest_golden") {
@@ -229,24 +247,40 @@ sdk_final_manifest_golden("final_fuchsia_idk_manifest_golden") {
   idk_exported_label = ":final_fuchsia_idk.exported"
 }
 
-# NOTHING TO SEE HERE FOLKS.
-#
-# This build rule is an implementation detail. It should probably get
-# consolidated with ":final_fuchsia_idk".
-sdk_collection("core") {
-  visibility += [ "*" ]
-
-  category = "partner"
-  id = sdk_id
-
-  deps = [
-    # NOTE: Don't add any other sdk_molecules here.  Instead, add atoms to the
-    # :fuchsia_idk_atoms sdk_molecule.
-    ":fuchsia_idk_atoms",
-  ]
-}
-
 if (!is_host) {
+  # NOTHING TO SEE HERE FOLKS.
+  #
+  # This build rule is an implementation detail. It should probably get
+  # consolidated with ":final_fuchsia_idk".
+  sdk_collection("core") {
+    visibility = []
+    visibility = [
+      ":*",  # Required for ":core_idk_subbuilds-*".
+      ":bazel_in_tree_idk",
+      ":exported_idk_for_ffx_tests",
+      ":final_fuchsia_idk.exported",
+      ":plasa_manifest",
+      ":sdk",
+      ":sdk_source_set_list",
+      "//:bazel_workspace",
+      "//:build_only",
+      "//build/bazel/licenses:all_bazel_inputs",
+
+      # TODO(https://fxbug.dev/392136182): Migrate vendor uses to
+      # ":exported_idk_for_ffx_tests".
+      "//vendor/*",
+    ]
+
+    category = "partner"
+    id = sdk_id
+
+    deps = [
+      # NOTE: Don't add any other sdk_molecules here.  Instead, add atoms to the
+      # :fuchsia_idk_atoms sdk_molecule.
+      ":fuchsia_idk_atoms",
+    ]
+  }
+
   # A "molecule" of SDK atoms exposing the APIs and ABI of the Fuchsia platform.
   # It is built for each API level supported in the IDK and at "PLATFORM",
   # though the dependencies are very different in each of those cases.
@@ -256,7 +290,15 @@ if (!is_host) {
   # Libraries and packages for use in tests absolutely belong in the IDK, but
   # the `testonly` attribute must be removed before they can be added.
   sdk_molecule("fuchsia_idk_atoms") {
-    visibility += [ "//vendor/*" ]
+    visibility = []
+    visibility += [
+      ":core_molecule.manifest",
+      "//vendor/*",
+
+      # Dependencies related to template sub-targets.
+      ":fuchsia_idk_atoms",
+      ":fuchsia_idk_atoms.validate",
+    ]
 
     category = "partner"
 
@@ -847,9 +889,14 @@ if (current_toolchain == default_toolchain) {
   # architecture, and the HEAD API level.
   #
   idk("bazel_in_tree_idk") {
-    visibility += [
-      "//build/bazel:*",
-      "//build/bazel/bazel_sdk:*",
+    visibility = []
+    visibility = [
+      ":bazel_in_tree_idk_tests_arm64",
+      ":bazel_in_tree_idk_tests_riscv64",
+      ":bazel_in_tree_idk_tests_x64",
+      "//build/bazel:fuchsia_in_tree_idk.hash",
+      "//build/bazel:generate_main_workspace",
+      "//build/bazel/bazel_sdk:bazel_in_tree_idk.bazel_input",
     ]
     output_name = "bazel_in_tree_idk"
     sdk_collection_label = "//sdk:core"
@@ -948,6 +995,9 @@ if (current_toolchain == default_toolchain) {
   # Content are bound to change a lot.
   # TODO(https://fxbug.dev/333907192): Remove this.
   sdk_collection("bazel_internal_only") {
+    visibility = []
+    visibility = [ ":bazel_internal_only_idk" ]
+
     category = "internal"
     id = sdk_id
 
@@ -958,10 +1008,19 @@ if (current_toolchain == default_toolchain) {
   # @internal_sdk repository of the platform build's Bazel workspace.
   # TODO(https://fxbug.dev/333907192): Remove this.
   idk("bazel_internal_only_idk") {
-    visibility += [ "//build/bazel/*" ]
+    visibility = []
+    visibility = [
+      "//build/bazel:fuchsia_internal_only_idk.hash",
+      "//build/bazel:generate_main_workspace",
+    ]
     output_name = "bazel_internal_only_idk"
-    sdk_collection_label = ":bazel_internal_only"
-    idk_subbuilds_label = ":internal_only_idk_subbuilds"
+    sdk_collection_label = "//sdk:bazel_internal_only"
+
+    # There is no such target. This is okay because the values below ensure
+    # there are no sub-builds that would use it.
+    # Specifying a label serves to ensure no sub-builds are added because they
+    # would require that this target exist.
+    idk_subbuilds_label = "//sdk:non_existent_internal_only_idk_subbuilds"
 
     # Only build this for the current target_cpu, and the HEAD
     # API level. This ensures no sub-builds will be launched.
