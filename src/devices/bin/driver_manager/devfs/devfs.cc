@@ -209,15 +209,9 @@ void DevfsDevice::unpublish() {
 }
 
 zx::result<std::string> Devfs::MakeInstanceName(std::string_view class_name) {
+  // Don't allow classes not listed in class_names.h
   if (!class_entries_.contains(std::string(class_name))) {
-    class_entries_[std::string(class_name)] = fbl::MakeRefCounted<PseudoDir>();
-    zx_status_t status = class_->AddEntry(class_name, class_entries_[std::string(class_name)]);
-    if (status != ZX_OK) {
-      LOGF(WARNING, "Failed to add class name '%.*s'  %s", static_cast<int>(class_name.size()),
-           class_name.data(), zx_status_get_string(status));
-      class_entries_.erase(std::string(class_name));
-      return zx::error(status);
-    }
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
   if (classes_that_assume_ordering.contains(std::string(class_name))) {
     // must give a sequential id:
@@ -270,8 +264,9 @@ Devfs::Devfs(std::optional<Devnode>& root) : root_(root.emplace(*this)) {
     MustAddEntry(*builtin, kZeroDevName, fbl::MakeRefCounted<BuiltinDevVnode>(false));
     MustAddEntry(pd, "builtin", std::move(builtin));
   }
-  for (std::string class_name : kEagerClassNames) {
-    EnsureClassExists(class_name);
+  for (const auto& class_name : kEagerClassNames) {
+    class_entries_[std::string(class_name)] = fbl::MakeRefCounted<PseudoDir>();
+    MustAddEntry(*class_, class_name, class_entries_[std::string(class_name)]);
   }
 }
 
@@ -286,14 +281,6 @@ zx_status_t Devnode::export_class(Devnode::Target target, std::string_view class
 
   child.publish();
   return ZX_OK;
-}
-
-void Devfs::EnsureClassExists(std::string_view name) {
-  if (class_entries_.contains(std::string(name))) {
-    return;
-  }
-  class_entries_[std::string(name)] = fbl::MakeRefCounted<PseudoDir>();
-  MustAddEntry(*class_, name, class_entries_[std::string(name)]);
 }
 
 zx_status_t Devnode::export_topological_path(Devnode::Target target,
