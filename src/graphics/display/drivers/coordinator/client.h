@@ -371,6 +371,7 @@ class ClientProxy {
   void ReapplySpecialConfigs();
 
   ClientId client_id() const { return handler_.id(); }
+  ClientPriority client_priority() const { return handler_.priority(); }
 
   inspect::Node& node() { return node_; }
 

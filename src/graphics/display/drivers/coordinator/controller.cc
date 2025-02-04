@@ -352,37 +352,26 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
     }
   }
 
-  // Determine whether the configuration (associated with Controller
-  // |config_stamp|) comes from primary client, virtcon client, or neither.
-  enum class ConfigStampSource { kPrimary, kVirtcon, kNeither };
-  ConfigStampSource config_stamp_source = ConfigStampSource::kNeither;
+  // The display configuration associated with the VSync event can come
+  // from one of the currently connected clients, or from a previously
+  // connected client that is now disconnected.
+  std::optional<ClientPriority> config_stamp_source = std::nullopt;
+  ClientProxy* const client_proxies[] = {primary_client_, virtcon_client_};
+  for (ClientProxy* client_proxy : client_proxies) {
+    if (client_proxy == nullptr) {
+      continue;
+    }
 
-  struct {
-    ClientProxy* client;
-    ConfigStampSource source;
-  } const kClientInfo[] = {
-      {
-          .client = primary_client_,
-          .source = ConfigStampSource::kPrimary,
-      },
-      {
-          .client = virtcon_client_,
-          .source = ConfigStampSource::kVirtcon,
-      },
-  };
-
-  for (const auto& [client, source] : kClientInfo) {
-    if (client) {
-      auto pending_stamps = client->pending_applied_config_stamps();
-      auto it = std::find_if(pending_stamps.begin(), pending_stamps.end(),
-                             [vsync_config_stamp](const auto& pending_stamp) {
-                               return pending_stamp.controller_stamp >= vsync_config_stamp;
-                             });
-      if (it != pending_stamps.end() && it->controller_stamp == vsync_config_stamp) {
-        config_stamp_source = source;
-        // Obsolete stamps will be removed in |Client::OnDisplayVsync|.
-        break;
-      }
+    const std::list<ClientProxy::ConfigStampPair>& pending_stamps =
+        client_proxy->pending_applied_config_stamps();
+    auto it = std::ranges::find_if(pending_stamps,
+                                   [&](const ClientProxy::ConfigStampPair& pending_stamp) {
+                                     return pending_stamp.controller_stamp >= vsync_config_stamp;
+                                   });
+    if (it != pending_stamps.end() && it->controller_stamp == vsync_config_stamp) {
+      config_stamp_source = std::make_optional(client_proxy->client_priority());
+      // Obsolete stamps will be removed in `Client::OnDisplayVsync()`.
+      break;
     }
   };
 
@@ -448,24 +437,19 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
     }
   }
 
-  switch (config_stamp_source) {
-    case ConfigStampSource::kPrimary:
+  if (!config_stamp_source.has_value()) {
+    // The config was applied by a client that is no longer connected.
+    FDF_LOG(DEBUG, "VSync event dropped; the config owner disconnected");
+    return;
+  }
+
+  switch (config_stamp_source.value()) {
+    case ClientPriority::kPrimary:
       primary_client_->OnDisplayVsync(display_id, banjo_timestamp, vsync_config_stamp);
       break;
-    case ConfigStampSource::kVirtcon:
+    case ClientPriority::kVirtcon:
       virtcon_client_->OnDisplayVsync(display_id, banjo_timestamp, vsync_config_stamp);
       break;
-    case ConfigStampSource::kNeither:
-      if (primary_client_) {
-        // A previous client applied a config and then disconnected before the vsync. Don't send
-        // garbage image IDs to the new primary client.
-        if (primary_client_->client_id() != applied_client_id_) {
-          FDF_LOG(DEBUG,
-                  "Dropping vsync. This was meant for client[%" PRIu64 "], but client[%" PRIu64
-                  "] is currently active.\n",
-                  applied_client_id_.value(), primary_client_->client_id().value());
-        }
-      }
   }
 }
 
