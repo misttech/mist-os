@@ -324,10 +324,10 @@ async fn get_handle_info(
 }
 
 pub async fn resolve_target_query_to_info(
-    query: TargetInfoQuery,
+    query: impl Into<TargetInfoQuery>,
     ctx: &EnvironmentContext,
 ) -> Result<Vec<ffx::TargetInfo>> {
-    let handles = resolve_target_query(query, ctx).await?;
+    let handles = resolve_target_query(query.into(), ctx).await?;
     let targets =
         join_all(handles.into_iter().map(|t| async { get_handle_info(t, ctx).await })).await;
     targets.into_iter().collect::<Result<Vec<ffx::TargetInfo>>>()

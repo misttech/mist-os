@@ -4,7 +4,6 @@
 
 use ffx_command_error::{FfxContext as _, Result};
 use ffx_config::EnvironmentContext;
-use ffx_target::TargetInfoQuery;
 use fho::DeviceLookup;
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 use futures::future::LocalBoxFuture;
@@ -23,7 +22,7 @@ impl DeviceLookup for DeviceLookupDefaultImpl {
 
     fn resolve_target_query_to_info(
         &self,
-        query: TargetInfoQuery,
+        query: Option<String>,
         ctx: EnvironmentContext,
     ) -> LocalBoxFuture<'_, Result<Vec<ffx_fidl::TargetInfo>>> {
         Box::pin(async move {

@@ -8,7 +8,6 @@ use ffx_command::FfxCommandLine;
 use ffx_command_error::{return_bug, Result};
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
-use ffx_target::TargetInfoQuery;
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 use futures::future::LocalBoxFuture;
 use std::fmt;
@@ -24,7 +23,7 @@ pub trait DeviceLookup {
 
     fn resolve_target_query_to_info(
         &self,
-        query: TargetInfoQuery,
+        query: Option<String>,
         env: EnvironmentContext,
     ) -> LocalBoxFuture<'_, Result<Vec<ffx_fidl::TargetInfo>>>;
 }
