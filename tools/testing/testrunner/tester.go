@@ -574,7 +574,10 @@ func NewFFXTester(ctx context.Context, ffx FFXInstance, localOutputDir string, e
 		if err != nil {
 			return nil, err
 		}
-		debuginfodServers = strings.Split(os.Getenv("DEBUGINFOD_URLS"), " ")
+		debuginfodURLs := strings.TrimSpace(os.Getenv("DEBUGINFOD_URLS"))
+		if debuginfodURLs != "" {
+			debuginfodServers = strings.Split(debuginfodURLs, " ")
+		}
 		debuginfodCache = filepath.Join(localOutputDir, "debuginfod-cache")
 	}
 	return &FFXTester{
