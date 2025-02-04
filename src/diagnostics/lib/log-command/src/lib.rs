@@ -61,9 +61,8 @@ pub struct SetSeverityCommand {
     /// Specify using the format <component-selector>#<log-level>, with level
     /// as one of FATAL|ERROR|WARN|INFO|DEBUG|TRACE.
     /// May be repeated.
-    /// Cannot be used in conjunction with --set-severity-persist.
-    #[argh(option, from_str_fn(log_interest_selector))]
-    pub component: Vec<OneOrMany<LogInterestSelector>>,
+    #[argh(positional, from_str_fn(log_interest_selector))]
+    pub interest_selector: Vec<OneOrMany<LogInterestSelector>>,
 }
 
 #[derive(ArgsInfo, FromArgs, Clone, PartialEq, Debug)]
@@ -539,7 +538,7 @@ impl LogCommand {
                 if &default_cmd != self {
                     ffx_bail!("Cannot combine set-severity with other options.");
                 }
-                (&options.component, options.force, !options.no_persist)
+                (&options.interest_selector, options.force, !options.no_persist)
             } else {
                 (&self.set_severity, self.force_set_severity, false)
             };
@@ -688,7 +687,7 @@ mod test {
 
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::SetSeverity(SetSeverityCommand {
-                component: vec![OneOrMany::One(
+                interest_selector: vec![OneOrMany::One(
                     parse_log_interest_selector("ambiguous_selector#INFO").unwrap(),
                 )],
                 force: false,
@@ -854,7 +853,7 @@ ffx log --force-set-severity.
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::SetSeverity(SetSeverityCommand {
                 no_persist: true,
-                component: vec![OneOrMany::One(
+                interest_selector: vec![OneOrMany::One(
                     parse_log_interest_selector("ambiguous_selector#INFO").unwrap(),
                 )],
                 force: true,
@@ -898,7 +897,7 @@ ffx log --force-set-severity.
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::SetSeverity(SetSeverityCommand {
                 no_persist: false,
-                component: vec![log_socket_stream::OneOrMany::One(
+                interest_selector: vec![log_socket_stream::OneOrMany::One(
                     parse_log_interest_selector("ambiguous_selector#INFO").unwrap(),
                 )],
                 force: true,
