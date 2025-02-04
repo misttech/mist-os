@@ -16,6 +16,7 @@
     },
     capabilities: [
         { service: 'fuchsia.hardware.spiimpl.Service' },
+        { service: "fuchsia.hardware.spi.businfo.SpiBusMetadata" },
     ],
     use: [
         {
@@ -29,6 +30,10 @@
         {
             service: 'fuchsia.hardware.spiimpl.Service',
             from: 'self',
+        },
+        {
+            service: "fuchsia.hardware.spi.businfo.SpiBusMetadata",
+            from: "self",
         },
     ],
 }

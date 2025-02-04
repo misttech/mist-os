@@ -36,7 +36,8 @@ type SpiChannel = table {
     9: clock_phase SpiClockPhase;
 };
 
-/// Passed to the spi driver in metadata as DEVICE_METADATA_SPI_CHANNELS.
+/// Passed to the spi driver in platform device metadata.
+@serializable
 type SpiBusMetadata = table {
     1: channels vector<SpiChannel>:MAX_SPI_CHANNEL;
     /// ID of the bus that these devices are on. Set as a bind property on the

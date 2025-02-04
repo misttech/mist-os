@@ -17,6 +17,7 @@
     capabilities: [
         { service: "fuchsia.hardware.acpi.Service" },
         { service: "fuchsia.hardware.i2c.businfo.I2CBusMetadata" },
+        { service: "fuchsia.hardware.spi.businfo.SpiBusMetadata" },
     ],
     use: [
         {
@@ -44,6 +45,10 @@
         },
         {
             service: "fuchsia.hardware.i2c.businfo.I2CBusMetadata",
+            from: "self",
+        },
+        {
+            service: "fuchsia.hardware.spi.businfo.SpiBusMetadata",
             from: "self",
         },
     ],

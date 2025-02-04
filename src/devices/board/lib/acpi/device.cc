@@ -640,6 +640,7 @@ zx::result<> Device::AddDevice(const char* name, cpp20::span<zx_device_str_prop_
 
   std::array offers = {
       ddk::MetadataServer<fuchsia_hardware_i2c_businfo::I2CBusMetadata>::kFidlServiceName,
+      ddk::MetadataServer<fuchsia_hardware_spi_businfo::SpiBusMetadata>::kFidlServiceName,
   };
   zx_status_t status = DdkAdd(
       ddk::DeviceAddArgs(name).set_flags(DEVICE_ADD_NON_BINDABLE).set_fidl_service_offers(offers));
@@ -660,6 +661,24 @@ zx::result<> Device::AddDevice(const char* name, cpp20::span<zx_device_str_prop_
               case BusType::kSpi: {
                 const auto& metadata =
                     std::get<fuchsia_hardware_spi_businfo::SpiBusMetadata>(dev->metadata_);
+
+                auto& bus_metadata_server = dev->bus_metadata_server_.emplace<
+                    ddk::MetadataServer<fuchsia_hardware_spi_businfo::SpiBusMetadata>>();
+                if (zx_status_t status = bus_metadata_server.SetMetadata(metadata);
+                    status != ZX_OK) {
+                  zxlogf(ERROR, "Failed to set metadata for bus metadata server: %s",
+                         zx_status_get_string(status));
+                  result = status;
+                  break;
+                }
+                if (zx_status_t status =
+                        bus_metadata_server.Serve(dev->outgoing_, dev->dispatcher_);
+                    status != ZX_OK) {
+                  zxlogf(ERROR, "Failed serve bus metadata: %s", zx_status_get_string(status));
+                  result = status;
+                  break;
+                }
+
                 fit::result encoded_metadata = fidl::Persist(metadata);
                 if (encoded_metadata.is_error()) {
                   zxlogf(ERROR, "Failed to encode spi bus metadata: %s",
@@ -667,6 +686,8 @@ zx::result<> Device::AddDevice(const char* name, cpp20::span<zx_device_str_prop_
                   result = encoded_metadata.error_value().status();
                   break;
                 }
+                // TODO(b/385164506): Don't serve DEVICE_METADATA_SOU_CHANNELS once no longer
+                // referenced.
                 result = device_add_metadata(dev->passthrough_dev_, DEVICE_METADATA_SPI_CHANNELS,
                                              encoded_metadata.value().data(),
                                              encoded_metadata.value().size());
