@@ -40,11 +40,11 @@
 
 #include "src/graphics/display/drivers/coordinator/preferred-scanout-image-type.h"
 #include "src/graphics/display/drivers/fake/image-info.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
@@ -428,7 +428,7 @@ void FakeDisplay::DisplayEngineApplyConfiguration(const display_config_t* displa
   // given config, the captured contents can only be contents applied no earlier
   // than that config (which can be that config itself, or a config applied
   // after that config).
-  const display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
+  const display::DriverConfigStamp config_stamp = display::ToDriverConfigStamp(*banjo_config_stamp);
   current_config_stamp_.store(config_stamp, std::memory_order_relaxed);
 }
 
@@ -820,10 +820,10 @@ void FakeDisplay::SendVsync() {
   if (engine_listener_client_.is_valid()) {
     // See the discussion in `DisplayEngineApplyConfiguration()` about
     // the reason we use relaxed memory order here.
-    const display::ConfigStamp current_config_stamp =
+    const display::DriverConfigStamp current_config_stamp =
         current_config_stamp_.load(std::memory_order_relaxed);
     const config_stamp_t banjo_current_config_stamp =
-        display::ToBanjoConfigStamp(current_config_stamp);
+        display::ToBanjoDriverConfigStamp(current_config_stamp);
     engine_listener_client_.OnDisplayVsync(ToBanjoDisplayId(kDisplayId), zx_clock_get_monotonic(),
                                            &banjo_current_config_stamp);
   }

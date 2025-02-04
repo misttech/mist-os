@@ -281,7 +281,7 @@ open protocol EngineListener {
     flexible OnDisplayVsync(struct {
         display_id uint64;
         timestamp zx.Time;
-        config_stamp fuchsia.hardware.display.types.ConfigStamp;
+        config_stamp ConfigStamp;
     });
 
     /// Called when a previous display capture triggered by
@@ -422,7 +422,7 @@ open protocol Engine {
 
         /// Identifies the configuration to be applied. Must be a valid value.
         /// Must be strictly increasing across calls.
-        config_stamp fuchsia.hardware.display.types.ConfigStamp;
+        config_stamp ConfigStamp;
     }) -> ();
 
     /// Set sysmem buffer collection contraints needed to ensure an image can be

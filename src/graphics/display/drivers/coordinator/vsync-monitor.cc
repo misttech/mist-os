@@ -12,7 +12,7 @@
 
 #include <atomic>
 
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 
 namespace display_coordinator {
 
@@ -30,7 +30,7 @@ VsyncMonitor::VsyncMonitor(inspect::Node inspect_root, async_dispatcher_t* dispa
       last_vsync_ns_property_(inspect_root_.CreateUint("last_vsync_timestamp_ns", 0)),
       last_vsync_interval_ns_property_(inspect_root_.CreateUint("last_vsync_interval_ns", 0)),
       last_vsync_config_stamp_property_(inspect_root_.CreateUint(
-          "last_vsync_config_stamp", display::kInvalidConfigStamp.value())),
+          "last_vsync_config_stamp", display::kInvalidDriverConfigStamp.value())),
       vsync_stalls_detected_(inspect_root_.CreateUint("vsync_stalls", 0)),
       dispatcher_(*dispatcher) {
   ZX_DEBUG_ASSERT(dispatcher != nullptr);
@@ -69,7 +69,8 @@ void VsyncMonitor::UpdateStatistics() {
   }
 }
 
-void VsyncMonitor::OnVsync(zx::time vsync_timestamp, display::ConfigStamp vsync_config_stamp) {
+void VsyncMonitor::OnVsync(zx::time vsync_timestamp,
+                           display::DriverConfigStamp vsync_config_stamp) {
   last_vsync_ns_property_.Set(vsync_timestamp.get());
 
   zx::duration vsync_interval =

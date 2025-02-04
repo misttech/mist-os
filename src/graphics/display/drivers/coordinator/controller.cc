@@ -316,9 +316,9 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
   const display::DisplayId display_id(banjo_display_id);
 
   zx::time vsync_timestamp = zx::time(banjo_timestamp);
-  display::ConfigStamp vsync_config_stamp = banjo_config_stamp_ptr
-                                                ? display::ToConfigStamp(*banjo_config_stamp_ptr)
-                                                : display::kInvalidConfigStamp;
+  display::DriverConfigStamp vsync_config_stamp =
+      banjo_config_stamp_ptr ? display::ToDriverConfigStamp(*banjo_config_stamp_ptr)
+                             : display::kInvalidDriverConfigStamp;
   vsync_monitor_.OnVsync(vsync_timestamp, vsync_config_stamp);
 
   fbl::AutoLock lock(mtx());
@@ -340,10 +340,10 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
   // If there's a pending layer change, don't process any present/retire actions
   // until the change is complete.
   if (info->pending_layer_change) {
-    bool done = vsync_config_stamp >= info->pending_layer_change_controller_config_stamp;
+    bool done = vsync_config_stamp >= info->pending_layer_change_driver_config_stamp;
     if (done) {
       info->pending_layer_change = false;
-      info->pending_layer_change_controller_config_stamp = display::kInvalidConfigStamp;
+      info->pending_layer_change_driver_config_stamp = display::kInvalidDriverConfigStamp;
       info->switching_client = false;
 
       if (active_client_ && info->delayed_apply) {
@@ -366,9 +366,9 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
         client_proxy->pending_applied_config_stamps();
     auto it = std::ranges::find_if(pending_stamps,
                                    [&](const ClientProxy::ConfigStampPair& pending_stamp) {
-                                     return pending_stamp.controller_stamp >= vsync_config_stamp;
+                                     return pending_stamp.driver_stamp >= vsync_config_stamp;
                                    });
-    if (it != pending_stamps.end() && it->controller_stamp == vsync_config_stamp) {
+    if (it != pending_stamps.end() && it->driver_stamp == vsync_config_stamp) {
       config_stamp_source = std::make_optional(client_proxy->client_priority());
       // Obsolete stamps will be removed in `Client::OnDisplayVsync()`.
       break;
@@ -387,7 +387,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
     //   `latest_controller_config_stamp` is greater than the incoming
     //   `controller_config_stamp`) and yet to be presented.
     for (auto it = info->images.begin(); it != info->images.end();) {
-      bool should_retire = it->latest_controller_config_stamp() < vsync_config_stamp;
+      bool should_retire = it->latest_driver_config_stamp() < vsync_config_stamp;
 
       // Retire any images which are older than whatever is currently in their
       // layer.
@@ -409,7 +409,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
   // OnVsync() DisplayController FIDL events. In the future we'll remove this
   // logic and only return config seqnos in OnVsync() events instead.
 
-  if (vsync_config_stamp != display::kInvalidConfigStamp) {
+  if (vsync_config_stamp != display::kInvalidDriverConfigStamp) {
     auto& config_image_queue = info->config_image_queue;
 
     // Evict retired configurations from the queue.
@@ -454,14 +454,14 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
 }
 
 void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
-                             display::ConfigStamp config_stamp, uint32_t layer_stamp,
+                             display::ConfigStamp client_config_stamp, uint32_t layer_stamp,
                              ClientId client_id) {
   zx_time_t timestamp = zx_clock_get_monotonic();
   last_valid_apply_config_timestamp_ns_property_.Set(timestamp);
   last_valid_apply_config_interval_ns_property_.Set(timestamp - last_valid_apply_config_timestamp_);
   last_valid_apply_config_timestamp_ = timestamp;
 
-  last_valid_apply_config_config_stamp_property_.Set(config_stamp.value());
+  last_valid_apply_config_config_stamp_property_.Set(client_config_stamp.value());
 
   // TODO(https://fxbug.dev/42080631): Replace VLA with fixed-size array once we have a
   // limit on the number of connected displays.
@@ -472,7 +472,7 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
   // The applied configuration's stamp.
   //
   // Populated from `controller_stamp_` while the mutex is held.
-  display::ConfigStamp applied_config_stamp = {};
+  display::DriverConfigStamp driver_config_stamp = {};
 
   {
     fbl::AutoLock lock(mtx());
@@ -512,8 +512,8 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
 
     // Now we can guarantee that this configuration will be applied to display
     // controller. Thus increment the controller ApplyConfiguration() counter.
-    ++controller_stamp_;
-    applied_config_stamp = controller_stamp_;
+    ++last_issued_driver_config_stamp_;
+    driver_config_stamp = last_issued_driver_config_stamp_;
 
     for (int i = 0; i < count; i++) {
       auto* config = configs[i];
@@ -523,12 +523,12 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
       }
 
       auto& config_image_queue = display->config_image_queue;
-      config_image_queue.push({.config_stamp = applied_config_stamp, .images = {}});
+      config_image_queue.push({.config_stamp = driver_config_stamp, .images = {}});
 
       display->switching_client = switching_client;
       display->pending_layer_change = config->apply_layer_change();
       if (display->pending_layer_change) {
-        display->pending_layer_change_controller_config_stamp = applied_config_stamp;
+        display->pending_layer_change_driver_config_stamp = driver_config_stamp;
       }
       display->layer_count = config->current_layer_count();
       display->delayed_apply = false;
@@ -550,7 +550,7 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
         // Set the image controller config stamp so vsync knows what config the
         // image was used at.
         AssertMtxAliasHeld(*image->mtx());
-        image->set_latest_controller_config_stamp(applied_config_stamp);
+        image->set_latest_driver_config_stamp(driver_config_stamp);
 
         // NOTE: If changing this flow name or ID, please also do so in the
         // corresponding FLOW_END.
@@ -584,14 +584,19 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
       }
 
       active_client_->UpdateConfigStampMapping({
-          .controller_stamp = controller_stamp_,
-          .client_stamp = config_stamp,
+          .driver_stamp = driver_config_stamp,
+          .client_stamp = client_config_stamp,
       });
     }
   }
 
-  const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(applied_config_stamp);
+  const config_stamp_t banjo_config_stamp = display::ToBanjoDriverConfigStamp(driver_config_stamp);
   engine_driver_client_->ApplyConfiguration(display_configs, display_count, &banjo_config_stamp);
+
+  {
+    fbl::AutoLock<fbl::Mutex> lock(mtx());
+    last_applied_driver_config_stamp_ = driver_config_stamp;
+  }
 }
 
 void Controller::ReleaseImage(display::DriverImageId driver_image_id) {
@@ -857,9 +862,9 @@ void Controller::OpenCoordinatorWithListenerForPrimary(
   }
 }
 
-display::ConfigStamp Controller::TEST_controller_stamp() const {
+display::DriverConfigStamp Controller::last_applied_driver_config_stamp() const {
   fbl::AutoLock lock(mtx());
-  return controller_stamp_;
+  return last_applied_driver_config_stamp_;
 }
 
 // static
@@ -919,8 +924,9 @@ void Controller::PrepareStop() {
 
     // Set an empty config so that the display driver releases resources.
     display_config_t empty_config;
-    ++controller_stamp_;
-    const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(controller_stamp_);
+    ++last_issued_driver_config_stamp_;
+    const config_stamp_t banjo_config_stamp =
+        display::ToBanjoDriverConfigStamp(last_issued_driver_config_stamp_);
     engine_driver_client_->ApplyConfiguration(&empty_config, 0, &banjo_config_stamp);
 
     // It's possible that the Vsync with the null configuration is never

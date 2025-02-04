@@ -20,6 +20,7 @@
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
@@ -78,11 +79,11 @@ class Image : public fbl::RefCounted<Image>,
   // The client that owns the image.
   ClientId client_id() const { return client_id_; }
 
-  void set_latest_controller_config_stamp(display::ConfigStamp stamp) {
-    latest_controller_config_stamp_ = stamp;
+  void set_latest_driver_config_stamp(display::DriverConfigStamp driver_config_stamp) {
+    latest_driver_config_stamp_ = driver_config_stamp;
   }
-  display::ConfigStamp latest_controller_config_stamp() const {
-    return latest_controller_config_stamp_;
+  display::DriverConfigStamp latest_driver_config_stamp() const {
+    return latest_driver_config_stamp_;
   }
 
   void set_latest_client_config_stamp(display::ConfigStamp stamp) {
@@ -133,8 +134,8 @@ class Image : public fbl::RefCounted<Image>,
   Controller& controller_;
   const ClientId client_id_;
 
-  // Stamp of the latest Controller display configuration that uses this image.
-  display::ConfigStamp latest_controller_config_stamp_ = display::kInvalidConfigStamp;
+  // Stamp of the latest applied display configuration that uses this image.
+  display::DriverConfigStamp latest_driver_config_stamp_ = display::kInvalidDriverConfigStamp;
 
   // Stamp of the latest display configuration in Client (the DisplayController
   // FIDL service) that uses this image.

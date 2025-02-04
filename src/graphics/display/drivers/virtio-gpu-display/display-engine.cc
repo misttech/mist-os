@@ -34,10 +34,10 @@
 #include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-interface.h"
 #include "src/graphics/display/lib/api-types/cpp/alpha-mode.h"
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/coordinate-transformation.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
@@ -211,7 +211,7 @@ display::ConfigCheckResult DisplayEngine::CheckConfiguration(
 void DisplayEngine::ApplyConfiguration(display::DisplayId display_id,
                                        display::ModeId display_mode_id,
                                        cpp20::span<const display::DriverLayer> layers,
-                                       display::ConfigStamp config_stamp) {
+                                       display::DriverConfigStamp config_stamp) {
   ZX_DEBUG_ASSERT(display_id == kDisplayId);
   ZX_DEBUG_ASSERT(display_mode_id == kDisplayModeId);
 

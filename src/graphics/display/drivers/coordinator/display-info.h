@@ -25,9 +25,9 @@
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/lib/edid/edid.h"
 
@@ -92,7 +92,7 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, display::Display
   // If a configuration applied by Controller has layer change to occur on the
   // display (i.e. |pending_layer_change| is true), this stores the Controller's
   // config stamp for that configuration; otherwise it stores an invalid stamp.
-  display::ConfigStamp pending_layer_change_controller_config_stamp;
+  display::DriverConfigStamp pending_layer_change_driver_config_stamp;
 
   // Flag indicating that a new configuration was delayed during a layer change
   // and should be reapplied after the layer change completes.
@@ -112,7 +112,7 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, display::Display
   //
   // TODO(https://fxbug.dev/42152065): Remove once we remove image IDs in OnVsync() events.
   struct ConfigImages {
-    const display::ConfigStamp config_stamp;
+    const display::DriverConfigStamp config_stamp;
 
     struct ImageMetadata {
       display::ImageId image_id;

@@ -1708,18 +1708,18 @@ zx_status_t ClientProxy::OnCaptureComplete() {
 }
 
 zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_time_t timestamp,
-                                        display::ConfigStamp controller_stamp) {
+                                        display::DriverConfigStamp driver_config_stamp) {
   AssertHeld(*controller_.mtx());
   fidl::Status event_sending_result = fidl::Status::Ok();
 
   display::ConfigStamp client_stamp = {};
   auto it =
       std::find_if(pending_applied_config_stamps_.begin(), pending_applied_config_stamps_.end(),
-                   [controller_stamp](const ConfigStampPair& stamp) {
-                     return stamp.controller_stamp >= controller_stamp;
+                   [driver_config_stamp](const ConfigStampPair& stamp) {
+                     return stamp.driver_stamp >= driver_config_stamp;
                    });
 
-  if (it == pending_applied_config_stamps_.end() || it->controller_stamp != controller_stamp) {
+  if (it == pending_applied_config_stamps_.end() || it->driver_stamp != driver_config_stamp) {
     client_stamp = display::kInvalidConfigStamp;
   } else {
     client_stamp = it->client_stamp;
@@ -1839,9 +1839,9 @@ void ClientProxy::OnClientDead() {
 
 void ClientProxy::UpdateConfigStampMapping(ConfigStampPair stamps) {
   ZX_DEBUG_ASSERT(pending_applied_config_stamps_.empty() ||
-                  pending_applied_config_stamps_.back().controller_stamp < stamps.controller_stamp);
+                  pending_applied_config_stamps_.back().driver_stamp < stamps.driver_stamp);
   pending_applied_config_stamps_.push_back({
-      .controller_stamp = stamps.controller_stamp,
+      .driver_stamp = stamps.driver_stamp,
       .client_stamp = stamps.client_stamp,
   });
 }

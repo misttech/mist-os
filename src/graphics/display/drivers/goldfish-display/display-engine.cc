@@ -31,10 +31,10 @@
 #include <fbl/auto_lock.h>
 
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 
 namespace goldfish {
@@ -550,7 +550,7 @@ void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* disp
   const display_config_t& display_config = *display_config_ptr;
 
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
-  display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
+  display::DriverConfigStamp config_stamp = display::ToDriverConfigStamp(*banjo_config_stamp);
   display::DriverImageId driver_image_id = display::kInvalidDriverImageId;
 
   if (display::ToDisplayId(display_config.display_id) == kPrimaryDisplayId) {
@@ -779,7 +779,7 @@ void DisplayEngine::FlushPrimaryDisplay(async_dispatcher_t* dispatcher) {
       zx::time now = async::Now(dispatcher);
       const uint64_t banjo_display_id = display::ToBanjoDisplayId(kPrimaryDisplayId);
       const config_stamp_t banjo_config_stamp =
-          display::ToBanjoConfigStamp(primary_display_device_.latest_config_stamp);
+          display::ToBanjoDriverConfigStamp(primary_display_device_.latest_config_stamp);
       engine_listener_.OnDisplayVsync(banjo_display_id, now.get(), &banjo_config_stamp);
     }
   }

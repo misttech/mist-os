@@ -13,11 +13,10 @@
 
 #include <cstdint>
 #include <memory>
-#include <optional>
 
 #include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
 #include "src/graphics/display/drivers/amlogic-display/rdma.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 
 namespace amlogic_display {
 
@@ -57,12 +56,12 @@ class VideoInputUnit {
   // config, the |config_stamp| should be the client-provided stamp; otherwise
   // it should use the invalid stamp value indicating that the OSD has been
   // invalidated.
-  void DisableLayer(display::ConfigStamp config_stamp = display::kInvalidConfigStamp);
+  void DisableLayer(display::DriverConfigStamp config_stamp = display::kInvalidDriverConfigStamp);
   void EnableLayer();
 
   // Schedules the given |config| to be applied by the RDMA engine when the next VSYNC interrupt
   // occurs.
-  void FlipOnVsync(const display_config_t& config, display::ConfigStamp config_stamp);
+  void FlipOnVsync(const display_config_t& config, display::DriverConfigStamp config_stamp);
 
   // Returns the image handle that was most recently processed by the RDMA engine. If RDMA is
   // determined to be in progress and incomplete, then the previously applied image is returned. If
@@ -70,7 +69,7 @@ class VideoInputUnit {
   // updated accordingly.
   //
   // This function is used by the vsync thread to determine the latest applied config.
-  display::ConfigStamp GetLastConfigStampApplied();
+  display::DriverConfigStamp GetLastConfigStampApplied();
 
   void Dump();
   void Release();

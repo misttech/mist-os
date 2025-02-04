@@ -11,8 +11,8 @@
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/lib/api-protocols/cpp/mock-banjo-display-engine-listener.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 #include "src/graphics/display/lib/api-types/cpp/mode.h"
@@ -111,7 +111,7 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayRemovedWithNoListener) {
 TEST_F(DisplayEngineEventsBanjoTest, OnDisplayVsync) {
   static constexpr display::DisplayId kDisplayId(42);
   static constexpr zx::time kTimestamp(zx_time_t{42'4242});
-  static constexpr display::ConfigStamp kConfigStamp(4242'4242);
+  static constexpr display::DriverConfigStamp kConfigStamp(4242'4242);
 
   mock_.ExpectOnDisplayVsync([&](uint64_t banjo_display_id, zx_time_t banjo_timestamp,
                                  const config_stamp_t* banjo_config_stamp) {
@@ -125,7 +125,7 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayVsync) {
 TEST_F(DisplayEngineEventsBanjoTest, OnDisplayVsyncWithNoListener) {
   static constexpr display::DisplayId kDisplayId(42);
   static constexpr zx::time kTimestamp(zx_time_t{42'4242});
-  static constexpr display::ConfigStamp kConfigStamp(4242'4242);
+  static constexpr display::DriverConfigStamp kConfigStamp(4242'4242);
 
   banjo_adapter_.SetListener(nullptr);
   interface_.OnDisplayVsync(kDisplayId, kTimestamp, kConfigStamp);

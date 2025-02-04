@@ -40,6 +40,7 @@
 #include "src/graphics/display/lib/api-types/cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/event-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
@@ -895,7 +896,7 @@ class IntegrationTest : public TestBase {
     EXPECT_OK(sync_completion_wait(client_ptr->handler_.fidl_unbound(), zx::sec(1).get()));
     // SetVsyncEventDelivery(false) has not completed here, because we are still
     // holding controller()->mtx()
-    client_ptr->OnDisplayVsync(display_id, 0, display::kInvalidConfigStamp);
+    client_ptr->OnDisplayVsync(display_id, 0, display::kInvalidDriverConfigStamp);
   }
 
   bool IsClientConnected(ClientPriority client_priority) {
@@ -907,7 +908,7 @@ class IntegrationTest : public TestBase {
   void SendVsyncFromCoordinatorClientProxy() {
     fbl::AutoLock<fbl::Mutex> controller_lock(CoordinatorController()->mtx());
     CoordinatorController()->active_client_->OnDisplayVsync(display::kInvalidDisplayId, 0,
-                                                            display::kInvalidConfigStamp);
+                                                            display::kInvalidDriverConfigStamp);
   }
 
   void SendVsyncFromDisplayEngine() { FakeDisplayEngine().SendVsync(); }
@@ -1081,9 +1082,10 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
   //
   // TODO(https://fxbug.dev/388885807): The call below assumes that engine
   // driver-side config stamps match client-managed config stamps.
-  display::ConfigStamp invalid_config_stamp =
-      CoordinatorController()->TEST_controller_stamp() - display::ConfigStamp{1};
-  const config_stamp_t invalid_banjo_config_stamp = ToBanjoConfigStamp(invalid_config_stamp);
+  display::DriverConfigStamp invalid_config_stamp =
+      CoordinatorController()->last_applied_driver_config_stamp() - display::DriverConfigStamp{1};
+  const config_stamp_t invalid_banjo_config_stamp =
+      display::ToBanjoDriverConfigStamp(invalid_config_stamp);
   CoordinatorController()->DisplayEngineListenerOnDisplayVsync(
       ToBanjoDisplayId(primary_client->state().display_id()), 0u, &invalid_banjo_config_stamp);
 
@@ -1687,10 +1689,10 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   // Signal the event. Display Fence callback will be signaled, and new
   // configuration with new config stamp (config_stamp_2) will be used.
   // On next Vsync, the |presented_config_stamp| will be updated.
-  auto old_controller_stamp = CoordinatorController()->TEST_controller_stamp();
+  auto old_controller_stamp = CoordinatorController()->last_applied_driver_config_stamp();
   image_ready_fence.event.signal(0u, ZX_EVENT_SIGNALED);
   ASSERT_TRUE(PollUntilOnLoop([controller = CoordinatorController(), old_controller_stamp]() {
-    return controller->TEST_controller_stamp() > old_controller_stamp;
+    return controller->last_applied_driver_config_stamp() > old_controller_stamp;
   }));
   // TODO(https://fxbug.dev/388885807): The check above is racy. Although the
   // Coordinator processed the new configuration, there is no guarantee that it
@@ -1901,10 +1903,13 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
 
   // Signal the second image's event. VSync events must report the second
   // image's configuration.
-  auto old_controller_stamp = CoordinatorController()->TEST_controller_stamp();
+  display::DriverConfigStamp previous_driver_config_stamp =
+      CoordinatorController()->last_applied_driver_config_stamp();
   image_ready_fence2.event.signal(0u, ZX_EVENT_SIGNALED);
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return CoordinatorController()->TEST_controller_stamp() > old_controller_stamp; }));
+  ASSERT_TRUE(PollUntilOnLoop([&]() {
+    return CoordinatorController()->last_applied_driver_config_stamp() >
+           previous_driver_config_stamp;
+  }));
 
   ASSERT_EQ(3u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
@@ -1916,7 +1921,7 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   // old event associated with the old image shouldn't trigger ReapplyConfig().
   // We should still see |apply_config_stamp_2| as the latest presented config
   // stamp in the client.
-  old_controller_stamp = CoordinatorController()->TEST_controller_stamp();
+  previous_driver_config_stamp = CoordinatorController()->last_applied_driver_config_stamp();
   image_ready_fence1.event.signal(0u, ZX_EVENT_SIGNALED);
   // TODO(https://fxbug.dev/388885807): This test is racy. There's no guarantee
   // that the fence's ready event was processed by the Display Coordinator.

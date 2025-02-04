@@ -23,9 +23,9 @@
 #include <unordered_map>
 
 #include "src/graphics/display/drivers/fake/image-info.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 
 namespace fake_display {
@@ -222,7 +222,8 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
       display::DriverCaptureImageId(1);
 
   // The most recently applied config stamp.
-  std::atomic<display::ConfigStamp> current_config_stamp_ = display::kInvalidConfigStamp;
+  std::atomic<display::DriverConfigStamp> current_config_stamp_ =
+      display::kInvalidDriverConfigStamp;
 
   // Capture complete is signaled at vsync time. This counter introduces a bit of delay
   // for signal capture complete

@@ -8,10 +8,14 @@
 #include <lib/stdcompat/span.h>
 #include <lib/zx/time.h>
 
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
 #include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
+
+// TODO(https://fxbug.dev/394148660): Remove config-stamp.h include after
+// drivers are migrated to DriverConfigStamp.
+#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 
 namespace display {
 
@@ -37,8 +41,16 @@ class DisplayEngineEventsInterface {
                               cpp20::span<const display::PixelFormat> pixel_formats) = 0;
   virtual void OnDisplayRemoved(display::DisplayId display_id) = 0;
   virtual void OnDisplayVsync(display::DisplayId display_id, zx::time timestamp,
-                              display::ConfigStamp config_stamp) = 0;
+                              display::DriverConfigStamp config_stamp) = 0;
   virtual void OnCaptureComplete() = 0;
+
+  // TODO(https://fxbug.dev/394148660): Remove overload after
+  // drivers are migrated to DriverConfigStamp.
+  void OnDisplayVsync(display::DisplayId display_id, zx::time timestamp,
+                      display::ConfigStamp config_stamp) {
+    display::DriverConfigStamp driver_config_stamp(config_stamp.value());
+    OnDisplayVsync(display_id, timestamp, driver_config_stamp);
+  }
 
  protected:
   // Destruction via base class pointer is not supported intentionally.

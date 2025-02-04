@@ -347,7 +347,7 @@ class ClientProxy {
 
   // Requires holding `controller_.mtx()` lock.
   zx_status_t OnDisplayVsync(display::DisplayId display_id, zx_time_t timestamp,
-                             display::ConfigStamp controller_stamp);
+                             display::DriverConfigStamp driver_config_stamp);
   void OnDisplaysChanged(std::span<const display::DisplayId> added_display_ids,
                          std::span<const display::DisplayId> removed_display_ids);
   void SetOwnership(bool is_owner);
@@ -376,7 +376,7 @@ class ClientProxy {
   inspect::Node& node() { return node_; }
 
   struct ConfigStampPair {
-    display::ConfigStamp controller_stamp;
+    display::DriverConfigStamp driver_stamp;
     display::ConfigStamp client_stamp;
   };
   std::list<ConfigStampPair>& pending_applied_config_stamps() {

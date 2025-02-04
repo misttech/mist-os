@@ -62,10 +62,10 @@
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
 #include "src/graphics/display/drivers/intel-display/tiling.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/driver-utils/poll-until.h"
 #include "src/lib/fxl/strings/string_printf.h"
@@ -203,7 +203,7 @@ void Controller::HandlePipeVsync(PipeId pipe_id, zx_time_t timestamp) {
 
   display::DisplayId pipe_attached_display_id = display::kInvalidDisplayId;
 
-  display::ConfigStamp vsync_config_stamp = display::kInvalidConfigStamp;
+  display::DriverConfigStamp vsync_config_stamp = display::kInvalidDriverConfigStamp;
 
   Pipe* pipe = (*pipe_manager_)[pipe_id];
   if (pipe && pipe->in_use()) {
@@ -232,7 +232,7 @@ void Controller::HandlePipeVsync(PipeId pipe_id, zx_time_t timestamp) {
 
   if (pipe_attached_display_id != display::kInvalidDisplayId) {
     const uint64_t banjo_display_id = display::ToBanjoDisplayId(pipe_attached_display_id);
-    const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(vsync_config_stamp);
+    const config_stamp_t banjo_config_stamp = display::ToBanjoDriverConfigStamp(vsync_config_stamp);
     engine_listener_.OnDisplayVsync(banjo_display_id, timestamp, &banjo_config_stamp);
   }
 }
@@ -1820,7 +1820,8 @@ void Controller::DisplayEngineApplyConfiguration(const display_config_t* banjo_d
         FindBanjoConfig(display->id(), banjo_display_configs_span);
 
     if (banjo_display_config != nullptr) {
-      const display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
+      const display::DriverConfigStamp config_stamp =
+          display::ToDriverConfigStamp(*banjo_config_stamp);
       display->ApplyConfiguration(banjo_display_config, config_stamp);
     } else {
       if (display->pipe()) {

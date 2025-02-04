@@ -32,7 +32,7 @@
 #include "src/graphics/display/drivers/amlogic-display/rdma-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpp-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 
 namespace amlogic_display {
 
@@ -139,7 +139,7 @@ void RdmaEngine::TryResolvePendingRdma() {
   }
 }
 
-display::ConfigStamp RdmaEngine::GetLastConfigStampApplied() {
+display::DriverConfigStamp RdmaEngine::GetLastConfigStampApplied() {
   fbl::AutoLock lock(&rdma_lock_);
   if (rdma_active_) {
     TryResolvePendingRdma();
@@ -160,7 +160,8 @@ void RdmaEngine::ProcessRdmaUsageTable() {
     if (val == rdma_usage_table_[i]) {
       // Found the last table that was written to
       last_table_index = i;
-      latest_applied_config_ = display::ConfigStamp(rdma_usage_table_[i]);  // save this for vsync
+      latest_applied_config_ =
+          display::DriverConfigStamp(rdma_usage_table_[i]);  // save this for vsync
     }
     rdma_usage_table_[i] = kRdmaTableUnavailable;  // mark as unavailable for now
   }
@@ -258,7 +259,7 @@ void RdmaEngine::FlushRdmaTable(uint32_t table_index) {
   }
 }
 
-void RdmaEngine::ExecRdmaTable(uint32_t next_table_idx, display::ConfigStamp config_stamp,
+void RdmaEngine::ExecRdmaTable(uint32_t next_table_idx, display::DriverConfigStamp config_stamp,
                                bool use_afbc) {
   fbl::AutoLock lock(&rdma_lock_);
   // Write the start and end address of the table. End address is the last address that the
@@ -450,7 +451,7 @@ void RdmaEngine::StopRdma() {
   }
 }
 
-void RdmaEngine::ResetConfigStamp(display::ConfigStamp config_stamp) {
+void RdmaEngine::ResetConfigStamp(display::DriverConfigStamp config_stamp) {
   fbl::AutoLock lock(&rdma_lock_);
   latest_applied_config_ = config_stamp;
 }

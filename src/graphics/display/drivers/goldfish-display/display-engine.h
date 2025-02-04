@@ -23,8 +23,8 @@
 #include <fbl/mutex.h>
 
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 
 namespace goldfish {
@@ -126,7 +126,7 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
 
     // The |config_stamp| value of the ApplyConfiguration() call to which this
     // DisplayConfig corresponds.
-    display::ConfigStamp config_stamp = display::kInvalidConfigStamp;
+    display::DriverConfigStamp config_stamp = display::kInvalidDriverConfigStamp;
   };
 
   // TODO(https://fxbug.dev/335324453): Define DisplayState as a class with
@@ -137,7 +137,7 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
     int32_t refresh_rate_hz = 60;
 
     zx::time expected_next_flush = zx::time::infinite_past();
-    display::ConfigStamp latest_config_stamp = display::kInvalidConfigStamp;
+    display::DriverConfigStamp latest_config_stamp = display::kInvalidDriverConfigStamp;
 
     // The next display config to be posted through renderControl protocol.
     std::optional<DisplayConfig> incoming_config = std::nullopt;

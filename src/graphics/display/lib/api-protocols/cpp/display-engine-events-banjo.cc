@@ -14,8 +14,8 @@
 #include <cstdint>
 #include <mutex>
 
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 #include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
@@ -81,17 +81,18 @@ void DisplayEngineEventsBanjo::OnDisplayRemoved(display::DisplayId display_id) {
 }
 
 void DisplayEngineEventsBanjo::OnDisplayVsync(display::DisplayId display_id, zx::time timestamp,
-                                              display::ConfigStamp config_stamp) {
+                                              display::DriverConfigStamp config_stamp) {
   const uint64_t banjo_display_id = display::ToBanjoDisplayId(display_id);
   const zx_time_t banjo_timestamp = timestamp.get();
-  const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(config_stamp);
+  const config_stamp_t banjo_driver_config_stamp = display::ToBanjoDriverConfigStamp(config_stamp);
 
   std::lock_guard event_lock(event_mutex_);
   if (!display_engine_listener_.is_valid()) {
     FDF_LOG(WARNING, "OnDisplayAdded() emitted with invalid event listener; event dropped");
     return;
   }
-  display_engine_listener_.OnDisplayVsync(banjo_display_id, banjo_timestamp, &banjo_config_stamp);
+  display_engine_listener_.OnDisplayVsync(banjo_display_id, banjo_timestamp,
+                                          &banjo_driver_config_stamp);
 }
 
 void DisplayEngineEventsBanjo::OnCaptureComplete() {

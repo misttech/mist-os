@@ -22,9 +22,9 @@
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-display/tiling.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/driver-utils/poll-until.h"
 
 namespace {
@@ -389,11 +389,11 @@ void Pipe::LoadActiveMode(display::DisplayTiming* mode) {
 }
 
 void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
-                              display::ConfigStamp config_stamp,
+                              display::DriverConfigStamp config_stamp,
                               const SetupGttImageFunc& get_gtt_region_fn,
                               const GetImagePixelFormatFunc& get_pixel_format) {
   ZX_ASSERT(banjo_display_config);
-  ZX_ASSERT(config_stamp != display::kInvalidConfigStamp);
+  ZX_ASSERT(config_stamp != display::kInvalidDriverConfigStamp);
 
   // The values of the config stamps in `pending_eviction_config_stamps_` must
   // be strictly increasing.
@@ -469,7 +469,7 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
     }
     config_stamp_with_color_layer_ = config_stamp;
   } else {
-    config_stamp_with_color_layer_ = display::kInvalidConfigStamp;
+    config_stamp_with_color_layer_ = display::kInvalidDriverConfigStamp;
   }
 
   regs.pipe_bottom_color = bottom_color.reg_value();
@@ -512,7 +512,7 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
 
 void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const layer_t* primary, bool enable_csc,
                                  bool* scaler_1_claimed, registers::pipe_arming_regs_t* regs,
-                                 display::ConfigStamp config_stamp,
+                                 display::DriverConfigStamp config_stamp,
                                  const SetupGttImageFunc& setup_gtt_image,
                                  const GetImagePixelFormatFunc& get_pixel_format) {
   registers::PipeRegs pipe_regs(pipe_id());
@@ -730,7 +730,7 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const layer_t* primary, boo
 }
 
 void Pipe::DisableCursorPlane(registers::pipe_arming_regs* regs,
-                              display::ConfigStamp config_stamp) {
+                              display::DriverConfigStamp config_stamp) {
   registers::PipeRegs pipe_regs(pipe_id());
 
   auto cursor_ctrl = pipe_regs.CursorCtrl().ReadFrom(mmio_space_);
@@ -738,10 +738,10 @@ void Pipe::DisableCursorPlane(registers::pipe_arming_regs* regs,
   regs->cur_base = regs->cur_pos = 0;
 }
 
-display::ConfigStamp Pipe::GetVsyncConfigStamp(const std::vector<uint64_t>& image_handles) {
-  display::ConfigStamp oldest_config_stamp = display::kInvalidConfigStamp;
+display::DriverConfigStamp Pipe::GetVsyncConfigStamp(const std::vector<uint64_t>& image_handles) {
+  display::DriverConfigStamp oldest_config_stamp = display::kInvalidDriverConfigStamp;
 
-  if (config_stamp_with_color_layer_ != display::kInvalidConfigStamp) {
+  if (config_stamp_with_color_layer_ != display::kInvalidDriverConfigStamp) {
     oldest_config_stamp = config_stamp_with_color_layer_;
   }
   for (const uint64_t handle : image_handles) {
@@ -750,32 +750,32 @@ display::ConfigStamp Pipe::GetVsyncConfigStamp(const std::vector<uint64_t>& imag
       continue;
     }
 
-    if (oldest_config_stamp != display::kInvalidConfigStamp) {
+    if (oldest_config_stamp != display::kInvalidDriverConfigStamp) {
       oldest_config_stamp = std::min(oldest_config_stamp, config_it->second);
     } else {
       oldest_config_stamp = config_it->second;
     }
   }
 
-  if (oldest_config_stamp == display::kInvalidConfigStamp) {
+  if (oldest_config_stamp == display::kInvalidDriverConfigStamp) {
     // Display device may carry garbage contents in the registers, for example
     // if the driver restarted. In that case none of the images stored in the
     // device register will be recognized by the driver, so we just return a
     // null config stamp to ignore it.
     FDF_LOG(DEBUG, "%s: NO valid images for the display.", __func__);
-    return display::kInvalidConfigStamp;
+    return display::kInvalidDriverConfigStamp;
   }
   if (pending_eviction_config_stamps_.empty()) {
     // Vsync signals could be sent to the driver before the first
     // ApplyConfiguration() is called. In that case the Vsync signal should be
     // just ignored by the driver, so we return a null config stamp.
     FDF_LOG(DEBUG, "%s: No config has been applied.", __func__);
-    return display::kInvalidConfigStamp;
+    return display::kInvalidDriverConfigStamp;
   }
   if (pending_eviction_config_stamps_.front() > oldest_config_stamp) {
     FDF_LOG(ERROR, "%s: Device returns a config (%lu) that is already evicted.", __func__,
             oldest_config_stamp.value());
-    return display::kInvalidConfigStamp;
+    return display::kInvalidDriverConfigStamp;
   }
 
   // Evict all pending config stamps older than the current one from Vsync.

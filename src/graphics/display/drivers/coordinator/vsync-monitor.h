@@ -12,7 +12,7 @@
 
 #include <atomic>
 
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 
 namespace display_coordinator {
 
@@ -36,7 +36,7 @@ class VsyncMonitor {
   void Deinitialize();
 
   // Called when a display engine driver sends a Vsync event.
-  void OnVsync(zx::time vsync_timestamp, display::ConfigStamp vsync_config_stamp);
+  void OnVsync(zx::time vsync_timestamp, display::DriverConfigStamp vsync_config_stamp);
 
  private:
   // Periodically reads `last_vsync_timestamp_` and increments

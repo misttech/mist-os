@@ -26,10 +26,10 @@
 #include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-interface.h"
 #include "src/graphics/display/lib/api-protocols/cpp/display-engine-interface.h"
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
@@ -80,7 +80,7 @@ class DisplayEngine final : public display::DisplayEngineInterface {
       cpp20::span<display::LayerCompositionOperations> layer_composition_operations) override;
   void ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
                           cpp20::span<const display::DriverLayer> layers,
-                          display::ConfigStamp config_stamp) override;
+                          display::DriverConfigStamp config_stamp) override;
   zx::result<> SetBufferCollectionConstraints(
       const display::ImageBufferUsage& image_buffer_usage,
       display::DriverBufferCollectionId buffer_collection_id) override;
@@ -116,8 +116,8 @@ class DisplayEngine final : public display::DisplayEngineInterface {
 
   uint32_t latest_framebuffer_resource_id_ = virtio_abi::kInvalidResourceId;
   uint32_t displayed_framebuffer_resource_id_ = virtio_abi::kInvalidResourceId;
-  display::ConfigStamp latest_config_stamp_ = display::kInvalidConfigStamp;
-  display::ConfigStamp displayed_config_stamp_ = display::kInvalidConfigStamp;
+  display::DriverConfigStamp latest_config_stamp_ = display::kInvalidDriverConfigStamp;
+  display::DriverConfigStamp displayed_config_stamp_ = display::kInvalidDriverConfigStamp;
 
   std::unique_ptr<VirtioGpuDevice> gpu_device_;
 };

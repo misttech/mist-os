@@ -18,9 +18,9 @@
 #include "src/graphics/display/drivers/intel-display/dpll.h"
 #include "src/graphics/display/drivers/intel-display/pipe.h"
 #include "src/graphics/display/drivers/intel-display/power.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 
 namespace intel_display {
 
@@ -45,7 +45,7 @@ class DisplayDevice {
   virtual ~DisplayDevice();
 
   void ApplyConfiguration(const display_config_t* banjo_display_config,
-                          display::ConfigStamp config_stamp);
+                          display::DriverConfigStamp config_stamp);
 
   // TODO(https://fxbug.dev/42167004): Initialization-related interactions between the Controller
   // class and DisplayDevice can currently take different paths, with Init() being called

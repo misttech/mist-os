@@ -13,10 +13,10 @@
 #include <mutex>
 
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
@@ -218,7 +218,7 @@ display::ConfigCheckResult MockDisplayEngine::CheckConfiguration(
 void MockDisplayEngine::ApplyConfiguration(display::DisplayId display_id,
                                            display::ModeId display_mode_id,
                                            cpp20::span<const display::DriverLayer> layers,
-                                           display::ConfigStamp config_stamp) {
+                                           display::DriverConfigStamp config_stamp) {
   std::lock_guard<std::mutex> lock(mutex_);
   ZX_ASSERT_MSG(call_index_ < expectations_.size(), "All expected calls were already received");
   Expectation& call_expectation = expectations_[call_index_];

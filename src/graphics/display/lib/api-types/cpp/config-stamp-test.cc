@@ -56,30 +56,6 @@ TEST(ConfigStamp, Compare) {
   EXPECT_GT(kTwoToTheSixtyThird, kTwo);
 }
 
-TEST(ConfigStamp, BanjoConversion) {
-  {
-    EXPECT_EQ(ToConfigStamp(config_stamp_t{.value = 1}), ConfigStamp(1));
-    const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(ConfigStamp(1));
-    EXPECT_EQ(banjo_config_stamp.value, uint64_t{1});
-  }
-
-  {
-    const uint64_t kLargeConfigStampValue = uint64_t{1} << 63;
-    EXPECT_EQ(ToConfigStamp(config_stamp_t{.value = kLargeConfigStampValue}),
-              ConfigStamp(kLargeConfigStampValue));
-    const config_stamp_t banjo_config_stamp =
-        ToBanjoConfigStamp(ConfigStamp(kLargeConfigStampValue));
-    EXPECT_EQ(banjo_config_stamp.value, kLargeConfigStampValue);
-  }
-
-  {
-    EXPECT_EQ(ToConfigStamp(config_stamp_t{.value = INVALID_CONFIG_STAMP_VALUE}),
-              kInvalidConfigStamp);
-    const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(kInvalidConfigStamp);
-    EXPECT_EQ(banjo_config_stamp.value, INVALID_CONFIG_STAMP_VALUE);
-  }
-}
-
 TEST(ConfigStamp, FidlConversion) {
   {
     EXPECT_EQ(ToConfigStamp(fuchsia_hardware_display_types::wire::ConfigStamp{.value = 1}),

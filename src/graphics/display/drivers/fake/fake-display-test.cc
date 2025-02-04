@@ -38,9 +38,9 @@
 
 #include "src/graphics/display/drivers/fake/fake-display-stack.h"
 #include "src/graphics/display/drivers/fake/fake-sysmem-device-hierarchy.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace fake_display {
@@ -697,8 +697,8 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
           layer_composition_operations.size(), &layer_composition_operations_count);
   EXPECT_EQ(config_check_result, CONFIG_CHECK_RESULT_OK);
 
-  const display::ConfigStamp config_stamp(1);
-  const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(config_stamp);
+  const display::DriverConfigStamp config_stamp(1);
+  const config_stamp_t banjo_config_stamp = display::ToBanjoDriverConfigStamp(config_stamp);
   fake_display_stack_->display_engine().DisplayEngineApplyConfiguration(
       kDisplayConfigs.data(), kDisplayConfigs.size(), &banjo_config_stamp);
 

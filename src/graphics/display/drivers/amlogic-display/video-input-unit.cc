@@ -174,14 +174,14 @@ OsdRegisters osd1_registers = {
 
 }  // namespace
 
-display::ConfigStamp VideoInputUnit::GetLastConfigStampApplied() {
+display::DriverConfigStamp VideoInputUnit::GetLastConfigStampApplied() {
   return rdma_->GetLastConfigStampApplied();
 }
 
 VideoInputUnit::VideoInputUnit(fdf::MmioBuffer vpu_mmio, std::unique_ptr<RdmaEngine> rdma)
     : vpu_mmio_(std::move(vpu_mmio)), rdma_(std::move(rdma)) {}
 
-void VideoInputUnit::DisableLayer(display::ConfigStamp config_stamp) {
+void VideoInputUnit::DisableLayer(display::DriverConfigStamp config_stamp) {
   rdma_->StopRdma();
   osd1_registers.ctrl_stat.ReadFrom(&vpu_mmio_).set_blk_en(0).WriteTo(&vpu_mmio_);
   rdma_->ResetConfigStamp(config_stamp);
@@ -275,7 +275,7 @@ void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_c
 }
 
 void VideoInputUnit::FlipOnVsync(const display_config_t& config,
-                                 display::ConfigStamp config_stamp) {
+                                 display::DriverConfigStamp config_stamp) {
   ZX_DEBUG_ASSERT_MSG(config.layer_list[0].image_source.width != 0,
                       "Solid color fill layers not supported");
   ZX_DEBUG_ASSERT_MSG(config.layer_list[0].image_source.height != 0,

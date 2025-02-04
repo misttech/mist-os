@@ -48,9 +48,9 @@
 #include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 #include "src/graphics/display/drivers/amlogic-display/vsync-receiver.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace amlogic_display {
@@ -542,7 +542,7 @@ void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* disp
   const display_config_t& display_config = *display_config_ptr;
 
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
-  const display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
+  const display::DriverConfigStamp config_stamp = display::ToDriverConfigStamp(*banjo_config_stamp);
 
   fbl::AutoLock lock(&display_mutex_);
 
@@ -1021,13 +1021,14 @@ void DisplayEngine::DisplayEngineApplyConfiguration(
 }
 
 void DisplayEngine::OnVsync(zx::time timestamp) {
-  display::ConfigStamp current_config_stamp = display::kInvalidConfigStamp;
+  display::DriverConfigStamp current_config_stamp = display::kInvalidDriverConfigStamp;
   if (fully_initialized()) {
     current_config_stamp = video_input_unit_->GetLastConfigStampApplied();
   }
   fbl::AutoLock lock(&display_mutex_);
   if (engine_listener_.is_valid() && display_attached_) {
-    const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(current_config_stamp);
+    const config_stamp_t banjo_config_stamp =
+        display::ToBanjoDriverConfigStamp(current_config_stamp);
     engine_listener_.OnDisplayVsync(display::ToBanjoDisplayId(display_id_), timestamp.get(),
                                     &banjo_config_stamp);
   }

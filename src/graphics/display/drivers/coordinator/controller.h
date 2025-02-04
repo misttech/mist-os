@@ -45,6 +45,7 @@
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 
 namespace display_coordinator {
 
@@ -113,8 +114,9 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   void SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virtcon_mode);
   void ShowActiveDisplay();
 
-  void ApplyConfig(DisplayConfig* configs[], int32_t count, display::ConfigStamp config_stamp,
-                   uint32_t layer_stamp, ClientId client_id) __TA_EXCLUDES(mtx());
+  void ApplyConfig(DisplayConfig* configs[], int32_t count,
+                   display::ConfigStamp client_config_stamp, uint32_t layer_stamp,
+                   ClientId client_id) __TA_EXCLUDES(mtx());
 
   void ReleaseImage(display::DriverImageId driver_image_id);
   void ReleaseCaptureImage(display::DriverCaptureImageId driver_capture_image_id);
@@ -159,7 +161,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   const inspect::Inspector& inspector() const { return inspector_; }
 
   size_t ImportedImagesCountForTesting() const;
-  display::ConfigStamp TEST_controller_stamp() const;
+  display::DriverConfigStamp last_applied_driver_config_stamp() const;
 
   // Typically called by OpenController/OpenVirtconController. However, this is made public
   // for use by testing services which provide a fake display controller.
@@ -238,7 +240,10 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   inspect::UintProperty last_valid_apply_config_interval_ns_property_;
   inspect::UintProperty last_valid_apply_config_config_stamp_property_;
 
-  display::ConfigStamp controller_stamp_ __TA_GUARDED(mtx()) = display::kInvalidConfigStamp;
+  display::DriverConfigStamp last_issued_driver_config_stamp_ __TA_GUARDED(mtx()) =
+      display::kInvalidDriverConfigStamp;
+  display::DriverConfigStamp last_applied_driver_config_stamp_ __TA_GUARDED(mtx()) =
+      display::kInvalidDriverConfigStamp;
 };
 
 template <typename Callback>

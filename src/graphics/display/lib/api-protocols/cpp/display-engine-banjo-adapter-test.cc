@@ -328,7 +328,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfiguration) {
            .bytes = std::initializer_list<uint8_t>{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}}),
       .image_source_transformation = display::CoordinateTransformation::kIdentity,
   });
-  static constexpr display::ConfigStamp kConfigStamp(4242);
+  static constexpr display::DriverConfigStamp kConfigStamp(4242);
 
   static constexpr layer_t kBanjoLayer0 = kLayer0.ToBanjo();
   static constexpr display_config_t kBanjoDisplayConfig = {
@@ -336,11 +336,12 @@ TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfiguration) {
       .layer_list = &kBanjoLayer0,
       .layer_count = 1,
   };
-  static constexpr config_stamp_t kBanjoConfigStamp = display::ToBanjoConfigStamp(kConfigStamp);
+  static constexpr config_stamp_t kBanjoConfigStamp =
+      display::ToBanjoDriverConfigStamp(kConfigStamp);
 
   mock_.ExpectApplyConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
                                      cpp20::span<const display::DriverLayer> layers,
-                                     display::ConfigStamp config_stamp) {
+                                     display::DriverConfigStamp config_stamp) {
     EXPECT_EQ(kDisplayId, display_id);
     EXPECT_EQ(display::ModeId(1), display_mode_id);
     EXPECT_THAT(layers, ::testing::ElementsAre(kLayer0));
