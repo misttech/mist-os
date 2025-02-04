@@ -161,25 +161,25 @@ Note: Duration events must **begin** and **end** as last in, first out.
 * {C }
 
   ```c
-  TRACE_DURATION_BEGIN("{{ '<var>trace_category</var>' }}", "{{ '<var>trace_name</var>' }}");
+  TRACE_DURATION_BEGIN("{{ '<var>trace_category</var>' }}", "example_duration");
   // Do some work
-  TRACE_DURATION_END("{{ '<var>trace_category</var>' }}", "{{ '<var>trace_name</var>' }}");
+  TRACE_DURATION_END("{{ '<var>trace_category</var>' }}", "example_duration");
   ```
 
 * {C++}
 
   ```c
-  TRACE_DURATION_BEGIN("{{ '<var>trace_category</var>' }}", "{{ '<var>trace_name</var>' }}");
+  TRACE_DURATION_BEGIN("{{ '<var>trace_category</var>' }}", "example_duration");
   // Do some work
-  TRACE_DURATION_END("{{ '<var>trace_category</var>' }}", "{{ '<var>trace_name</var>' }}");
+  TRACE_DURATION_END("{{ '<var>trace_category</var>' }}", "example_duration");
   ```
 
 * {Rust}
 
   ```rust
-  duration_begin!(c"{{ '<var>trace_category</var>' }}", c"{{ '<var>trace_name</var>' }}");
+  duration_begin!(c"{{ '<var>trace_category</var>' }}", c"example_duration");
   // Do some work
-  duration_end!(c"{{ '<var>trace_category</var>' }}", c"{{ '<var>trace_name</var>' }}");
+  duration_end!(c"{{ '<var>trace_category</var>' }}", c"example_duration");
   ```
 
 Alternatively, you can define a duration event and automatically close it when
@@ -189,9 +189,9 @@ it goes out of scope using RAII (Resource acquisition is initialization) as foll
 
   ```c
   {
-    TRACE_DURATION("{{ '<var>trace_category</var>' }}", "{{ '<var>trace_duration_raii</var>' }}");
+    TRACE_DURATION("{{ '<var>trace_category</var>' }}", "example_duration_raii");
     // Do some work
-    TRACE_DURATION(c"{{ '<var>trace_category</var>' }}", c"{{ '<var>nested_duration</var>' }}", "{{ '<var>argument_3</var>' }}", {{ '<var>argument_3_value</var>' }}, "{{ '<var>argument_4</var>' }}", {{ '<var>argument_4_string</var>' }});
+    TRACE_DURATION(c"{{ '<var>trace_category</var>' }}", "nested duration", "{{ '<var>argument_3</var>' }}", {{ '<var>argument_3_value</var>' }}, "{{ '<var>argument_4</var>' }}", {{ '<var>argument_4_string</var>' }});
     // nested_duration closes due to RAII
     // trace_duration_raii closes due to RAII
   }
@@ -201,9 +201,9 @@ it goes out of scope using RAII (Resource acquisition is initialization) as foll
 
   ```cpp
   {
-    TRACE_DURATION("{{ '<var>trace_category</var>' }}", "{{ '<var>trace_duration_raii</var>' }}");
+    TRACE_DURATION("{{ '<var>trace_category</var>' }}", "example_duration_raii");
     // Do some work
-    TRACE_DURATION(c"{{ '<var>trace_category</var>' }}", c"{{ '<var>nested_duration</var>' }}", "{{ '<var>argument_3</var>' }}", {{ '<var>argument_3_value</var>' }}, "{{ '<var>argument_4</var>' }}", {{ '<var>argument_4_string</var>' }});
+    TRACE_DURATION(c"{{ '<var>trace_category</var>' }}", "nested duration", "{{ '<var>argument_3</var>' }}", {{ '<var>argument_3_value</var>' }}, "{{ '<var>argument_4</var>' }}", {{ '<var>argument_4_string</var>' }});
     // nested_duration closes due to RAII
     // trace_duration_raii closes due to RAII
   }
@@ -213,9 +213,9 @@ it goes out of scope using RAII (Resource acquisition is initialization) as foll
 
   ```rust
   {
-    duration!(c"{{ '<var>trace_category</var>' }}", c"{{ '<var>trace_duration_raii</var>' }}");
+    duration!(c"{{ '<var>trace_category</var>' }}", c"example_duration_raii");
     // Do some work
-    duration!(c"{{ '<var>trace_category</var>' }}", c"{{ '<var>nested_duration</var>' }}", {{ '<var>argument_3</var>' }} => {{ '<var>argument_3_value</var>' }}, {{ '<var>argument_4</var>' }} => {{ '<var>argument_4_string</var>' }});
+    duration!(c"{{ '<var>trace_category</var>' }}", c"nested duration", {{ '<var>argument_3</var>' }} => {{ '<var>argument_3_value</var>' }}, {{ '<var>argument_4</var>' }} => {{ '<var>argument_4_string</var>' }});
     // nested_duration closes due to RAII
     // trace_duration_raii closes due to RAII
   }
