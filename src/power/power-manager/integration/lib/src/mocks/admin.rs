@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::ServerEnd;
-use fidl_fuchsia_hardware_power_statecontrol::{self as fpower, RebootReason};
+use fidl_fuchsia_hardware_power_statecontrol::{self as fpower, RebootOptions};
 use fidl_fuchsia_io::DirectoryMarker;
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
@@ -16,8 +16,8 @@ use std::sync::Arc;
 
 /// Mocks the fuchsia.hardware.power.statecontrol.Admin service to be used in integration tests.
 pub struct MockStateControlAdminService {
-    shutdown_received_sender: Mutex<mpsc::Sender<RebootReason>>,
-    shutdown_received_receiver: Mutex<mpsc::Receiver<RebootReason>>,
+    shutdown_received_sender: Mutex<mpsc::Sender<RebootOptions>>,
+    shutdown_received_receiver: Mutex<mpsc::Receiver<RebootOptions>>,
 }
 
 impl MockStateControlAdminService {
@@ -63,14 +63,14 @@ impl MockStateControlAdminService {
             let this = self.clone();
             fasync::Task::local(async move {
                 info!("MockStateControlAdminService: new connection Admin");
-                while let Some(fpower::AdminRequest::Reboot { responder: _, reason }) =
+                while let Some(fpower::AdminRequest::PerformReboot { responder: _, options }) =
                     stream.try_next().await.unwrap()
                 {
                     info!("MockStateControlAdminService: received Reboot request");
                     this.shutdown_received_sender
                         .lock()
                         .await
-                        .try_send(reason)
+                        .try_send(options)
                         .expect("Failed to notify shutdown");
                 }
             })
@@ -84,7 +84,7 @@ impl MockStateControlAdminService {
     }
 
     /// Waits for the mock to receive a fidl.fuchsia.SystemController/Shutdown request.
-    pub async fn wait_for_shutdown_request(&self) -> RebootReason {
+    pub async fn wait_for_shutdown_request(&self) -> RebootOptions {
         self.shutdown_received_receiver
             .lock()
             .await
@@ -111,9 +111,10 @@ mod tests {
             connect_to_protocol_at_dir_svc::<fpower::AdminMarker>(&dir).unwrap();
 
         // Call the server's `shutdown` method and verify the mock sees the request
-        let _task = fuchsia_async::Task::local(
-            controller_client.reboot(fpower::RebootReason::HighTemperature),
-        );
+        let _task = fuchsia_async::Task::local(controller_client.perform_reboot(&RebootOptions {
+            reasons: Some(vec![fpower::RebootReason2::HighTemperature]),
+            ..Default::default()
+        }));
         mock.wait_for_shutdown_request().await;
     }
 }

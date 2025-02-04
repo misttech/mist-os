@@ -109,9 +109,13 @@ impl SystemShutdownHandler {
 
         info!("System shutdown ({:?})", msg);
         self.inspect.log_shutdown_request(&msg);
-        // TODO: Use perform_reboot(RebootReasons::new(RebootReason2::HighTemperature,)))
-        let result =
-            self.shutdown_shim_proxy.reboot(fpowercontrol::RebootReason::HighTemperature).await;
+        let result = self
+            .shutdown_shim_proxy
+            .perform_reboot(&fpowercontrol::RebootOptions {
+                reasons: Some(vec![fpowercontrol::RebootReason2::HighTemperature]),
+                ..Default::default()
+            })
+            .await;
 
         // If the result is an error, either by underlying API failure or by timeout, then force a
         // shutdown using the configured force_shutdown_func
@@ -190,18 +194,18 @@ pub mod tests {
     use futures::TryStreamExt;
     use std::cell::Cell;
 
-    /// Create a fake Admin service proxy that responds to Shutdown requests by calling
+    /// Create a fake Admin service proxy that responds to PerformReboot requests by calling
     /// the provided closure.
     fn setup_fake_admin_service(
-        mut shutdown_function: impl FnMut() + 'static,
+        mut shutdown_function: impl FnMut(fpowercontrol::RebootOptions) + 'static,
     ) -> fpowercontrol::AdminProxy {
         let (proxy, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<fpowercontrol::AdminMarker>();
         fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {
                 match req {
-                    Some(fpowercontrol::AdminRequest::Reboot { reason: _, responder }) => {
-                        shutdown_function();
+                    Some(fpowercontrol::AdminRequest::PerformReboot { options, responder }) => {
+                        shutdown_function(options);
                         let _ = responder.send(Ok(()));
                     }
                     e => panic!("Unexpected request: {:?}", e),
@@ -223,8 +227,7 @@ pub mod tests {
             .build()
             .unwrap();
 
-        // Issue a shutdown call that will fail (because the Component Manager mock node will
-        // respond to Shutdown with an error), which causes a force shutdown to be issued.
+        // Issue a shutdown call that will fail which causes a force shutdown to be issued.
         // This gives us something interesting to verify in Inspect.
         let _ = node.handle_shutdown(&Message::HighTemperatureReboot).await;
 
@@ -239,31 +242,37 @@ pub mod tests {
         );
     }
 
-    /// Tests that the `shutdown` function correctly sets the corresponding termination state on the
-    /// Driver Manager and calls the Component Manager shutdown API.
+    /// Tests that the handle_shutdown function correctly sets the reboot reasons and calls
+    /// Admin shutdown API.
     #[fasync::run_singlethreaded(test)]
     async fn test_shutdown() {
-        // At the end of the test, verify the Component Manager's received shutdown count (expected
-        // to be equal to the number of entries in the system_power_states vector)
+        // At the end of the test, verify the Admin server's received shutdown request with correct
+        // reason.
         let shutdown_count = Rc::new(Cell::new(0));
         let shutdown_count_clone = shutdown_count.clone();
 
-        // Create the node with a special Component Manager proxy
+        let reboot_reason = Rc::new(Cell::new(vec![]));
+        let reboot_reason_clone = reboot_reason.clone();
+
+        // Create the node with a special Admin proxy
         let node = SystemShutdownHandlerBuilder::new()
-            .with_shutdown_shim_proxy(setup_fake_admin_service(move || {
+            .with_shutdown_shim_proxy(setup_fake_admin_service(move |options| {
                 shutdown_count_clone.set(shutdown_count_clone.get() + 1);
+                reboot_reason_clone.set(options.reasons.unwrap());
             }))
             .build()
             .unwrap();
 
-        // Call `suspend` for each power state.
+        // Call handle_shutdown which results in a fidl call.
         let _ = node.handle_shutdown(&Message::HighTemperatureReboot).await;
 
-        // Verify the Component Manager shutdown was called
+        // Verify the shutdown was called with correct reason.
         assert_eq!(shutdown_count.get(), 1);
+        let final_reasons = reboot_reason.take();
+        assert_eq!(final_reasons, vec![fpowercontrol::RebootReason2::HighTemperature]);
     }
 
-    /// Tests that if an orderly shutdown request fails, the forced shutdown method is called.
+    /// Tests that if high temperature reboot request fails, the forced shutdown method is called.
     #[fasync::run_singlethreaded(test)]
     async fn test_force_shutdown() {
         let force_shutdown = Rc::new(Cell::new(false));
@@ -277,9 +286,8 @@ pub mod tests {
             .build()
             .unwrap();
 
-        // Call the normal shutdown function. The orderly shutdown will fail because the
-        // Component manager mock node will respond to the Shutdown message with an
-        // error. When the orderly shutdown fails, the forced shutdown method will be called.
+        // Call the normal shutdown function. The call will fail because there is no routing to the
+        // server in this unit test, and then the forced shutdown method will be called.
         let _ = node.handle_shutdown(&Message::HighTemperatureReboot).await;
         assert_eq!(force_shutdown.get(), true);
     }

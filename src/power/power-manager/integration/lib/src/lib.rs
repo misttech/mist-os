@@ -510,7 +510,7 @@ pub async fn test_thermal_reboot(mut env: TestEnv, sensor_path: &str, temperatur
     // 2) verify the admin receives the reboot request for `HighTemperature`
     env.set_temperature(sensor_path, temperature).await;
     let result = env.mocks.admin_service.wait_for_shutdown_request().await;
-    assert_eq!(result, fpower::RebootReason::HighTemperature);
+    assert_eq!(result.reasons.unwrap(), vec![fpower::RebootReason2::HighTemperature]);
 
     env.destroy().await;
 }
