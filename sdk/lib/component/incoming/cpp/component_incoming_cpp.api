@@ -5,5 +5,6 @@
   "pkg/component_incoming_cpp/include/lib/component/incoming/cpp/internal.h": "10103a0208eae02a07f17ffe276e186d",
   "pkg/component_incoming_cpp/include/lib/component/incoming/cpp/protocol.h": "a65965e39e2b5a0fbbdf302f9ce9f966",
   "pkg/component_incoming_cpp/include/lib/component/incoming/cpp/service.h": "13ed9556c50ade813ff9cfd13838e659",
+  "pkg/component_incoming_cpp/include/lib/component/incoming/cpp/service_member_watcher.h": "5a3cbc5adf6233b41d9795c4bc8c623b",
   "pkg/component_incoming_cpp/include/lib/component/incoming/cpp/service_watcher.h": "a8d430a544b9cc05e2942c2896d9fd5c"
 }

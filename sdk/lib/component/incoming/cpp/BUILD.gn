@@ -19,6 +19,7 @@ sdk_source_set("cpp") {
     "protocol.cc",
     "protocol.h",
     "service.h",
+    "service_member_watcher.h",
     "service_watcher.cc",
     "service_watcher.h",
   ]

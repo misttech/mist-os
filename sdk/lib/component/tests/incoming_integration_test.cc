@@ -5,6 +5,7 @@
 #include <fidl/fidl.service.test/cpp/fidl.h>
 #include <fidl/fidl.service.test/cpp/wire_test_base.h>
 #include <lib/async/dispatcher.h>
+#include <lib/component/incoming/cpp/service_member_watcher.h>
 #include <lib/component/tests/echo_server.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fidl/cpp/string.h>
@@ -26,6 +27,8 @@ using namespace component_testing;
 
 class LocalEchoServer : public LocalCppComponent {
  public:
+  static constexpr const char kAlternateServiceInstance[] = "alternate";
+
   explicit LocalEchoServer(async_dispatcher_t* dispatcher, unsigned int* called)
       : dispatcher_(dispatcher), called_(called) {}
 
@@ -42,6 +45,18 @@ class LocalEchoServer : public LocalCppComponent {
               .foo = servers_.back().CreateHandler(),
               .bar = servers_.back().CreateHandler(),
           }));
+      ASSERT_EQ(result.status_value(), ZX_OK);
+    }
+    // Add another service instance.  This simulates how an aggregated service would present
+    // multiple service instances to a client.
+    {
+      servers_.emplace(kAlternateServiceInstance, dispatcher_, called_);
+      auto result = outgoing()->AddService<fidl_service_test::EchoService>(
+          fidl_service_test::EchoService::InstanceHandler({
+              .foo = servers_.back().CreateHandler(),
+              .bar = servers_.back().CreateHandler(),
+          }),
+          kAlternateServiceInstance);
       ASSERT_EQ(result.status_value(), ZX_OK);
     }
   }
@@ -102,6 +117,36 @@ TEST_F(IncomingTest, ConnectsToServiceInNamespace) {
   });
 
   RunLoopUntil([&called]() { return called > 0; });
+}
+
+TEST_F(IncomingTest, ConnectsToAggregatedServiceInNamespace) {
+  auto realm_builder = RealmBuilder::Create();
+
+  realm_builder.AddChild("echo_client", "#meta/echo_service_watcher_client.cm",
+                         ChildOptions{.startup_mode = StartupMode::EAGER});
+
+  unsigned int called = 0;
+  realm_builder.AddLocalChild("echo_server", [dispatcher = dispatcher(), called_ptr = &called]() {
+    return std::make_unique<LocalEchoServer>(dispatcher, called_ptr);
+  });
+  realm_builder.AddRoute(Route{
+      .capabilities = {Service{fidl_service_test::EchoService::Name}},
+      .source = ChildRef{"echo_server"},
+      .targets = {ChildRef{"echo_client"}},
+  });
+
+  auto realm = realm_builder.Build(dispatcher());
+  auto cleanup = fit::defer([&]() {
+    bool complete = false;
+    realm.Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
+  });
+  // Here we expect 2 calls to the servers:
+  // The client component runs a watcher:
+  //  sees instance "default" and calls EchoString (1)
+  //  sees instance "alternate" and calls EchoString (2)
+  // Then the client gets the idle callback and stops.
+  RunLoopUntil([&called]() { return called >= 2; });
 }
 
 }  // namespace
