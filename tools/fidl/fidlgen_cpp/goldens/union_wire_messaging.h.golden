@@ -295,9 +295,9 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> {
@@ -317,11 +317,11 @@ static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_union::Test
 #endif  // __Fuchsia__
 
 template <>
-struct IsFidlType<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> : public std::true_type {};
 template <>
-struct IsFidlType<::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> : public std::true_type{};
+struct IsFidlType<::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> {
@@ -355,9 +355,9 @@ static_assert(sizeof(::fidl::WireResponse<::test_union::TestProtocol::StrictUnio
 static_assert(offsetof(::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>, xu) == 0);
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>> {
@@ -377,11 +377,11 @@ static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_union::Test
 #endif  // __Fuchsia__
 
 template <>
-struct IsFidlType<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>> : public std::true_type {};
 template <>
-struct IsFidlType<::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>> : public std::true_type{};
+struct IsFidlType<::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>> {

@@ -88,9 +88,9 @@ class Parent final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_protocolrequest::Child> : public std::true_type{};
+struct IsProtocol<::test_protocolrequest::Child> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_protocolrequest::Parent> : public std::true_type{};
+struct IsProtocol<::test_protocolrequest::Parent> : public std::true_type {};
 
 }  // namespace fidl

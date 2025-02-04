@@ -61,9 +61,9 @@ class SecondProtocol final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_service::FirstProtocol> : public std::true_type{};
+struct IsProtocol<::test_service::FirstProtocol> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_service::SecondProtocol> : public std::true_type{};
+struct IsProtocol<::test_service::SecondProtocol> : public std::true_type {};
 
 }  // namespace fidl

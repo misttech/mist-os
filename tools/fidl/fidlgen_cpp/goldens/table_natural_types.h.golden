@@ -1003,7 +1003,7 @@ class SixtyFourOrdinalTable {
 
 inline EmptyTable::EmptyTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline EmptyTable::EmptyTable(const ::test_table::EmptyTable& other) noexcept : EmptyTable(other.CloneStorage_()) {}
-inline EmptyTable& ::test_table::EmptyTable::operator=(const EmptyTable & other) noexcept {
+inline EmptyTable& ::test_table::EmptyTable::operator=(const EmptyTable& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1012,7 +1012,7 @@ inline EmptyTable::EmptyTable(::fidl::internal::DefaultConstructPossiblyInvalidO
 
 inline SimpleTable::SimpleTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline SimpleTable::SimpleTable(const ::test_table::SimpleTable& other) noexcept : SimpleTable(other.CloneStorage_()) {}
-inline SimpleTable& ::test_table::SimpleTable::operator=(const SimpleTable & other) noexcept {
+inline SimpleTable& ::test_table::SimpleTable::operator=(const SimpleTable& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1029,7 +1029,7 @@ inline SimpleTable& SimpleTable::y(std::optional<int64_t> value) {
 
 inline OlderSimpleTable::OlderSimpleTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline OlderSimpleTable::OlderSimpleTable(const ::test_table::OlderSimpleTable& other) noexcept : OlderSimpleTable(other.CloneStorage_()) {}
-inline OlderSimpleTable& ::test_table::OlderSimpleTable::operator=(const OlderSimpleTable & other) noexcept {
+inline OlderSimpleTable& ::test_table::OlderSimpleTable::operator=(const OlderSimpleTable& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1042,7 +1042,7 @@ inline OlderSimpleTable& OlderSimpleTable::x(std::optional<int64_t> value) {
 
 inline NewerSimpleTable::NewerSimpleTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline NewerSimpleTable::NewerSimpleTable(const ::test_table::NewerSimpleTable& other) noexcept : NewerSimpleTable(other.CloneStorage_()) {}
-inline NewerSimpleTable& ::test_table::NewerSimpleTable::operator=(const NewerSimpleTable & other) noexcept {
+inline NewerSimpleTable& ::test_table::NewerSimpleTable::operator=(const NewerSimpleTable& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1063,7 +1063,7 @@ inline NewerSimpleTable& NewerSimpleTable::z(std::optional<int64_t> value) {
 
 inline ReverseOrdinalTable::ReverseOrdinalTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline ReverseOrdinalTable::ReverseOrdinalTable(const ::test_table::ReverseOrdinalTable& other) noexcept : ReverseOrdinalTable(other.CloneStorage_()) {}
-inline ReverseOrdinalTable& ::test_table::ReverseOrdinalTable::operator=(const ReverseOrdinalTable & other) noexcept {
+inline ReverseOrdinalTable& ::test_table::ReverseOrdinalTable::operator=(const ReverseOrdinalTable& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1084,7 +1084,7 @@ inline ReverseOrdinalTable& ReverseOrdinalTable::x(std::optional<int64_t> value)
 
 inline TableWithAttributes::TableWithAttributes(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline TableWithAttributes::TableWithAttributes(const ::test_table::TableWithAttributes& other) noexcept : TableWithAttributes(other.CloneStorage_()) {}
-inline TableWithAttributes& ::test_table::TableWithAttributes::operator=(const TableWithAttributes & other) noexcept {
+inline TableWithAttributes& ::test_table::TableWithAttributes::operator=(const TableWithAttributes& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1097,7 +1097,7 @@ inline TableWithAttributes& TableWithAttributes::x(std::optional<int64_t> value)
 
 inline ExtensionTable::ExtensionTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline ExtensionTable::ExtensionTable(const ::test_table::ExtensionTable& other) noexcept : ExtensionTable(other.CloneStorage_()) {}
-inline ExtensionTable& ::test_table::ExtensionTable::operator=(const ExtensionTable & other) noexcept {
+inline ExtensionTable& ::test_table::ExtensionTable::operator=(const ExtensionTable& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1106,7 +1106,7 @@ inline ExtensionTable::ExtensionTable(::fidl::internal::DefaultConstructPossibly
 
 inline SixtyFourOrdinalTable::SixtyFourOrdinalTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline SixtyFourOrdinalTable::SixtyFourOrdinalTable(const ::test_table::SixtyFourOrdinalTable& other) noexcept : SixtyFourOrdinalTable(other.CloneStorage_()) {}
-inline SixtyFourOrdinalTable& ::test_table::SixtyFourOrdinalTable::operator=(const SixtyFourOrdinalTable & other) noexcept {
+inline SixtyFourOrdinalTable& ::test_table::SixtyFourOrdinalTable::operator=(const SixtyFourOrdinalTable& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1373,7 +1373,7 @@ inline SixtyFourOrdinalTable& SixtyFourOrdinalTable::v64(std::optional<::test_ta
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_table::EmptyTable> : public std::true_type{};
+struct IsFidlType<::test_table::EmptyTable> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_table::EmptyTable> {
@@ -1385,13 +1385,13 @@ struct TypeTraits<::test_table::EmptyTable> {
 };
 
 template <>
-struct IsTable<::test_table::EmptyTable> : public std::true_type{};
+struct IsTable<::test_table::EmptyTable> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_table::EmptyTable, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_table::EmptyTable> {};
 
 template <>
-struct IsFidlType<::test_table::SimpleTable> : public std::true_type{};
+struct IsFidlType<::test_table::SimpleTable> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_table::SimpleTable> {
@@ -1403,13 +1403,13 @@ struct TypeTraits<::test_table::SimpleTable> {
 };
 
 template <>
-struct IsTable<::test_table::SimpleTable> : public std::true_type{};
+struct IsTable<::test_table::SimpleTable> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_table::SimpleTable, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_table::SimpleTable> {};
 
 template <>
-struct IsFidlType<::test_table::OlderSimpleTable> : public std::true_type{};
+struct IsFidlType<::test_table::OlderSimpleTable> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_table::OlderSimpleTable> {
@@ -1421,13 +1421,13 @@ struct TypeTraits<::test_table::OlderSimpleTable> {
 };
 
 template <>
-struct IsTable<::test_table::OlderSimpleTable> : public std::true_type{};
+struct IsTable<::test_table::OlderSimpleTable> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_table::OlderSimpleTable, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_table::OlderSimpleTable> {};
 
 template <>
-struct IsFidlType<::test_table::NewerSimpleTable> : public std::true_type{};
+struct IsFidlType<::test_table::NewerSimpleTable> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_table::NewerSimpleTable> {
@@ -1439,13 +1439,13 @@ struct TypeTraits<::test_table::NewerSimpleTable> {
 };
 
 template <>
-struct IsTable<::test_table::NewerSimpleTable> : public std::true_type{};
+struct IsTable<::test_table::NewerSimpleTable> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_table::NewerSimpleTable, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_table::NewerSimpleTable> {};
 
 template <>
-struct IsFidlType<::test_table::ReverseOrdinalTable> : public std::true_type{};
+struct IsFidlType<::test_table::ReverseOrdinalTable> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_table::ReverseOrdinalTable> {
@@ -1457,13 +1457,13 @@ struct TypeTraits<::test_table::ReverseOrdinalTable> {
 };
 
 template <>
-struct IsTable<::test_table::ReverseOrdinalTable> : public std::true_type{};
+struct IsTable<::test_table::ReverseOrdinalTable> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_table::ReverseOrdinalTable, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_table::ReverseOrdinalTable> {};
 
 template <>
-struct IsFidlType<::test_table::TableWithAttributes> : public std::true_type{};
+struct IsFidlType<::test_table::TableWithAttributes> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_table::TableWithAttributes> {
@@ -1475,13 +1475,13 @@ struct TypeTraits<::test_table::TableWithAttributes> {
 };
 
 template <>
-struct IsTable<::test_table::TableWithAttributes> : public std::true_type{};
+struct IsTable<::test_table::TableWithAttributes> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_table::TableWithAttributes, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_table::TableWithAttributes> {};
 
 template <>
-struct IsFidlType<::test_table::ExtensionTable> : public std::true_type{};
+struct IsFidlType<::test_table::ExtensionTable> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_table::ExtensionTable> {
@@ -1493,13 +1493,13 @@ struct TypeTraits<::test_table::ExtensionTable> {
 };
 
 template <>
-struct IsTable<::test_table::ExtensionTable> : public std::true_type{};
+struct IsTable<::test_table::ExtensionTable> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_table::ExtensionTable, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_table::ExtensionTable> {};
 
 template <>
-struct IsFidlType<::test_table::SixtyFourOrdinalTable> : public std::true_type{};
+struct IsFidlType<::test_table::SixtyFourOrdinalTable> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_table::SixtyFourOrdinalTable> {
@@ -1511,7 +1511,7 @@ struct TypeTraits<::test_table::SixtyFourOrdinalTable> {
 };
 
 template <>
-struct IsTable<::test_table::SixtyFourOrdinalTable> : public std::true_type{};
+struct IsTable<::test_table::SixtyFourOrdinalTable> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_table::SixtyFourOrdinalTable, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_table::SixtyFourOrdinalTable> {};

@@ -57,11 +57,11 @@ struct TypeTraits<::test_importedconstvalues::wire::MyStruct> {
 };
 
 template <>
-struct IsFidlType<::test_importedconstvalues::wire::MyStruct> : public std::true_type{};
+struct IsFidlType<::test_importedconstvalues::wire::MyStruct> : public std::true_type {};
 template <>
-struct IsWire<::test_importedconstvalues::wire::MyStruct> : public std::true_type{};
+struct IsWire<::test_importedconstvalues::wire::MyStruct> : public std::true_type {};
 template <>
-struct IsStruct<::test_importedconstvalues::wire::MyStruct> : public std::true_type{};
+struct IsStruct<::test_importedconstvalues::wire::MyStruct> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_importedconstvalues::wire::MyStruct>);
 static_assert(offsetof(::test_importedconstvalues::wire::MyStruct, __reserved) == 0);
 static_assert(sizeof(::test_importedconstvalues::wire::MyStruct) == TypeTraits<::test_importedconstvalues::wire::MyStruct>::kPrimarySize);

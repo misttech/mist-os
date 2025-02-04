@@ -247,6 +247,6 @@ class MainProtocol final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_protocolpayloads::MainProtocol> : public std::true_type{};
+struct IsProtocol<::test_protocolpayloads::MainProtocol> : public std::true_type {};
 
 }  // namespace fidl

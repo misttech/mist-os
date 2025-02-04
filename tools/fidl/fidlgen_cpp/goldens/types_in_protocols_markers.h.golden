@@ -527,6 +527,6 @@ class Protocol final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_typesinprotocols::Protocol> : public std::true_type{};
+struct IsProtocol<::test_typesinprotocols::Protocol> : public std::true_type {};
 
 }  // namespace fidl

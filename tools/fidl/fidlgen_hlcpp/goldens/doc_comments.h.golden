@@ -721,7 +721,7 @@ struct Equality<::test::doccomments::Struct> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::doccomments::StrictUnion> : public std::true_type{};
+struct IsFidlXUnion<::test::doccomments::StrictUnion> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::doccomments::StrictUnion>
@@ -776,7 +776,7 @@ struct Equality<::test::doccomments::StrictUnion> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::doccomments::FlexibleUnion> : public std::true_type{};
+struct IsFidlXUnion<::test::doccomments::FlexibleUnion> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::doccomments::FlexibleUnion>

@@ -47,7 +47,7 @@ struct CodingTraits<::test::vectors::ExampleUseOfVectors>
     : public EncodableCodingTraits<::test::vectors::ExampleUseOfVectors, 32> {};
 
 template <>
-struct HasPadding<::test::vectors::ExampleUseOfVectors> : public std::true_type{};
+struct HasPadding<::test::vectors::ExampleUseOfVectors> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::vectors::ExampleUseOfVectors> : public internal::BoolConstant<

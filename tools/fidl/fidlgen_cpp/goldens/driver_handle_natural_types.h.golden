@@ -307,9 +307,9 @@ namespace fidl {
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_driverhandle::ClientEndWrapper> : public std::true_type{};
+struct IsResource<::test_driverhandle::ClientEndWrapper> : public std::true_type {};
 template <>
-struct IsFidlType<::test_driverhandle::ClientEndWrapper> : public std::true_type{};
+struct IsFidlType<::test_driverhandle::ClientEndWrapper> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_driverhandle::ClientEndWrapper> {
@@ -321,7 +321,7 @@ struct TypeTraits<::test_driverhandle::ClientEndWrapper> {
 };
 
 template <>
-struct IsStruct<::test_driverhandle::ClientEndWrapper> : public std::true_type{};
+struct IsStruct<::test_driverhandle::ClientEndWrapper> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_driverhandle::ClientEndWrapper, ::fidl::internal::NaturalCodingConstraintEmpty> final
@@ -332,9 +332,9 @@ struct internal::NaturalCodingTraits<::test_driverhandle::ClientEndWrapper, ::fi
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_driverhandle::ServerEndWrapper> : public std::true_type{};
+struct IsResource<::test_driverhandle::ServerEndWrapper> : public std::true_type {};
 template <>
-struct IsFidlType<::test_driverhandle::ServerEndWrapper> : public std::true_type{};
+struct IsFidlType<::test_driverhandle::ServerEndWrapper> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_driverhandle::ServerEndWrapper> {
@@ -346,7 +346,7 @@ struct TypeTraits<::test_driverhandle::ServerEndWrapper> {
 };
 
 template <>
-struct IsStruct<::test_driverhandle::ServerEndWrapper> : public std::true_type{};
+struct IsStruct<::test_driverhandle::ServerEndWrapper> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_driverhandle::ServerEndWrapper, ::fidl::internal::NaturalCodingConstraintEmpty> final
@@ -357,9 +357,9 @@ struct internal::NaturalCodingTraits<::test_driverhandle::ServerEndWrapper, ::fi
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_driverhandle::HandlesInProtocolSendHandlesRequest> : public std::true_type{};
+struct IsResource<::test_driverhandle::HandlesInProtocolSendHandlesRequest> : public std::true_type {};
 template <>
-struct IsFidlType<::test_driverhandle::HandlesInProtocolSendHandlesRequest> : public std::true_type{};
+struct IsFidlType<::test_driverhandle::HandlesInProtocolSendHandlesRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_driverhandle::HandlesInProtocolSendHandlesRequest> {
@@ -371,7 +371,7 @@ struct TypeTraits<::test_driverhandle::HandlesInProtocolSendHandlesRequest> {
 };
 
 template <>
-struct IsStruct<::test_driverhandle::HandlesInProtocolSendHandlesRequest> : public std::true_type{};
+struct IsStruct<::test_driverhandle::HandlesInProtocolSendHandlesRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_driverhandle::HandlesInProtocolSendHandlesRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
@@ -382,9 +382,9 @@ struct internal::NaturalCodingTraits<::test_driverhandle::HandlesInProtocolSendH
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_driverhandle::T> : public std::true_type{};
+struct IsResource<::test_driverhandle::T> : public std::true_type {};
 template <>
-struct IsFidlType<::test_driverhandle::T> : public std::true_type{};
+struct IsFidlType<::test_driverhandle::T> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_driverhandle::T> {
@@ -396,7 +396,7 @@ struct TypeTraits<::test_driverhandle::T> {
 };
 
 template <>
-struct IsTable<::test_driverhandle::T> : public std::true_type{};
+struct IsTable<::test_driverhandle::T> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_driverhandle::T, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_driverhandle::T> {};

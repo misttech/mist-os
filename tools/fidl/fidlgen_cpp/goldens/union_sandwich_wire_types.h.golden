@@ -316,11 +316,11 @@ struct TypeTraits<::test_unionsandwich::wire::SandwichUnionSize8Alignment4> {
 };
 
 template <>
-struct IsFidlType<::test_unionsandwich::wire::SandwichUnionSize8Alignment4> : public std::true_type{};
+struct IsFidlType<::test_unionsandwich::wire::SandwichUnionSize8Alignment4> : public std::true_type {};
 template <>
-struct IsWire<::test_unionsandwich::wire::SandwichUnionSize8Alignment4> : public std::true_type{};
+struct IsWire<::test_unionsandwich::wire::SandwichUnionSize8Alignment4> : public std::true_type {};
 template <>
-struct IsStruct<::test_unionsandwich::wire::SandwichUnionSize8Alignment4> : public std::true_type{};
+struct IsStruct<::test_unionsandwich::wire::SandwichUnionSize8Alignment4> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unionsandwich::wire::SandwichUnionSize8Alignment4>);
 static_assert(offsetof(::test_unionsandwich::wire::SandwichUnionSize8Alignment4, before) == 0);
 static_assert(offsetof(::test_unionsandwich::wire::SandwichUnionSize8Alignment4, union_) == 8);
@@ -374,11 +374,11 @@ struct TypeTraits<::test_unionsandwich::wire::SandwichUnionSize12Alignment4> {
 };
 
 template <>
-struct IsFidlType<::test_unionsandwich::wire::SandwichUnionSize12Alignment4> : public std::true_type{};
+struct IsFidlType<::test_unionsandwich::wire::SandwichUnionSize12Alignment4> : public std::true_type {};
 template <>
-struct IsWire<::test_unionsandwich::wire::SandwichUnionSize12Alignment4> : public std::true_type{};
+struct IsWire<::test_unionsandwich::wire::SandwichUnionSize12Alignment4> : public std::true_type {};
 template <>
-struct IsStruct<::test_unionsandwich::wire::SandwichUnionSize12Alignment4> : public std::true_type{};
+struct IsStruct<::test_unionsandwich::wire::SandwichUnionSize12Alignment4> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unionsandwich::wire::SandwichUnionSize12Alignment4>);
 static_assert(offsetof(::test_unionsandwich::wire::SandwichUnionSize12Alignment4, before) == 0);
 static_assert(offsetof(::test_unionsandwich::wire::SandwichUnionSize12Alignment4, union_) == 8);
@@ -432,11 +432,11 @@ struct TypeTraits<::test_unionsandwich::wire::StructSize16Alignment8> {
 };
 
 template <>
-struct IsFidlType<::test_unionsandwich::wire::StructSize16Alignment8> : public std::true_type{};
+struct IsFidlType<::test_unionsandwich::wire::StructSize16Alignment8> : public std::true_type {};
 template <>
-struct IsWire<::test_unionsandwich::wire::StructSize16Alignment8> : public std::true_type{};
+struct IsWire<::test_unionsandwich::wire::StructSize16Alignment8> : public std::true_type {};
 template <>
-struct IsStruct<::test_unionsandwich::wire::StructSize16Alignment8> : public std::true_type{};
+struct IsStruct<::test_unionsandwich::wire::StructSize16Alignment8> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unionsandwich::wire::StructSize16Alignment8>);
 static_assert(offsetof(::test_unionsandwich::wire::StructSize16Alignment8, f1) == 0);
 static_assert(offsetof(::test_unionsandwich::wire::StructSize16Alignment8, f2) == 8);
@@ -482,11 +482,11 @@ struct TypeTraits<::test_unionsandwich::wire::SandwichUnionSize24Alignment8> {
 };
 
 template <>
-struct IsFidlType<::test_unionsandwich::wire::SandwichUnionSize24Alignment8> : public std::true_type{};
+struct IsFidlType<::test_unionsandwich::wire::SandwichUnionSize24Alignment8> : public std::true_type {};
 template <>
-struct IsWire<::test_unionsandwich::wire::SandwichUnionSize24Alignment8> : public std::true_type{};
+struct IsWire<::test_unionsandwich::wire::SandwichUnionSize24Alignment8> : public std::true_type {};
 template <>
-struct IsStruct<::test_unionsandwich::wire::SandwichUnionSize24Alignment8> : public std::true_type{};
+struct IsStruct<::test_unionsandwich::wire::SandwichUnionSize24Alignment8> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unionsandwich::wire::SandwichUnionSize24Alignment8>);
 static_assert(offsetof(::test_unionsandwich::wire::SandwichUnionSize24Alignment8, before) == 0);
 static_assert(offsetof(::test_unionsandwich::wire::SandwichUnionSize24Alignment8, union_) == 8);
@@ -540,11 +540,11 @@ struct TypeTraits<::test_unionsandwich::wire::SandwichUnionSize36Alignment4> {
 };
 
 template <>
-struct IsFidlType<::test_unionsandwich::wire::SandwichUnionSize36Alignment4> : public std::true_type{};
+struct IsFidlType<::test_unionsandwich::wire::SandwichUnionSize36Alignment4> : public std::true_type {};
 template <>
-struct IsWire<::test_unionsandwich::wire::SandwichUnionSize36Alignment4> : public std::true_type{};
+struct IsWire<::test_unionsandwich::wire::SandwichUnionSize36Alignment4> : public std::true_type {};
 template <>
-struct IsStruct<::test_unionsandwich::wire::SandwichUnionSize36Alignment4> : public std::true_type{};
+struct IsStruct<::test_unionsandwich::wire::SandwichUnionSize36Alignment4> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unionsandwich::wire::SandwichUnionSize36Alignment4>);
 static_assert(offsetof(::test_unionsandwich::wire::SandwichUnionSize36Alignment4, before) == 0);
 static_assert(offsetof(::test_unionsandwich::wire::SandwichUnionSize36Alignment4, union_) == 8);
@@ -598,11 +598,11 @@ struct TypeTraits<::test_unionsandwich::wire::UnionSize8Alignment4> {
 };
 
 template <>
-struct IsFidlType<::test_unionsandwich::wire::UnionSize8Alignment4> : public std::true_type{};
+struct IsFidlType<::test_unionsandwich::wire::UnionSize8Alignment4> : public std::true_type {};
 template <>
-struct IsWire<::test_unionsandwich::wire::UnionSize8Alignment4> : public std::true_type{};
+struct IsWire<::test_unionsandwich::wire::UnionSize8Alignment4> : public std::true_type {};
 template <>
-struct IsUnion<::test_unionsandwich::wire::UnionSize8Alignment4> : public std::true_type{};
+struct IsUnion<::test_unionsandwich::wire::UnionSize8Alignment4> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unionsandwich::wire::UnionSize8Alignment4>);
 
 template <typename Constraint, bool IsRecursive>
@@ -708,11 +708,11 @@ struct TypeTraits<::test_unionsandwich::wire::UnionSize12Alignment4> {
 };
 
 template <>
-struct IsFidlType<::test_unionsandwich::wire::UnionSize12Alignment4> : public std::true_type{};
+struct IsFidlType<::test_unionsandwich::wire::UnionSize12Alignment4> : public std::true_type {};
 template <>
-struct IsWire<::test_unionsandwich::wire::UnionSize12Alignment4> : public std::true_type{};
+struct IsWire<::test_unionsandwich::wire::UnionSize12Alignment4> : public std::true_type {};
 template <>
-struct IsUnion<::test_unionsandwich::wire::UnionSize12Alignment4> : public std::true_type{};
+struct IsUnion<::test_unionsandwich::wire::UnionSize12Alignment4> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unionsandwich::wire::UnionSize12Alignment4>);
 
 template <typename Constraint, bool IsRecursive>
@@ -818,11 +818,11 @@ struct TypeTraits<::test_unionsandwich::wire::UnionSize24Alignment8> {
 };
 
 template <>
-struct IsFidlType<::test_unionsandwich::wire::UnionSize24Alignment8> : public std::true_type{};
+struct IsFidlType<::test_unionsandwich::wire::UnionSize24Alignment8> : public std::true_type {};
 template <>
-struct IsWire<::test_unionsandwich::wire::UnionSize24Alignment8> : public std::true_type{};
+struct IsWire<::test_unionsandwich::wire::UnionSize24Alignment8> : public std::true_type {};
 template <>
-struct IsUnion<::test_unionsandwich::wire::UnionSize24Alignment8> : public std::true_type{};
+struct IsUnion<::test_unionsandwich::wire::UnionSize24Alignment8> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unionsandwich::wire::UnionSize24Alignment8>);
 
 template <typename Constraint, bool IsRecursive>
@@ -928,11 +928,11 @@ struct TypeTraits<::test_unionsandwich::wire::UnionSize36Alignment4> {
 };
 
 template <>
-struct IsFidlType<::test_unionsandwich::wire::UnionSize36Alignment4> : public std::true_type{};
+struct IsFidlType<::test_unionsandwich::wire::UnionSize36Alignment4> : public std::true_type {};
 template <>
-struct IsWire<::test_unionsandwich::wire::UnionSize36Alignment4> : public std::true_type{};
+struct IsWire<::test_unionsandwich::wire::UnionSize36Alignment4> : public std::true_type {};
 template <>
-struct IsUnion<::test_unionsandwich::wire::UnionSize36Alignment4> : public std::true_type{};
+struct IsUnion<::test_unionsandwich::wire::UnionSize36Alignment4> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unionsandwich::wire::UnionSize36Alignment4>);
 
 template <typename Constraint, bool IsRecursive>

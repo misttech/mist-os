@@ -410,30 +410,30 @@ constexpr inline void EmptyBits::operator-=(
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_bits::MyBits> : public std::true_type{};
+struct IsFidlType<::test_bits::MyBits> : public std::true_type {};
 template <>
-struct ContainsHandle<::test_bits::MyBits> : public std::false_type{};
+struct ContainsHandle<::test_bits::MyBits> : public std::false_type {};
 static_assert(std::is_standard_layout_v<::test_bits::MyBits>);
 static_assert(sizeof(::test_bits::MyBits) == sizeof(uint32_t));
 
 template <>
-struct IsFidlType<::test_bits::StrictBits> : public std::true_type{};
+struct IsFidlType<::test_bits::StrictBits> : public std::true_type {};
 template <>
-struct ContainsHandle<::test_bits::StrictBits> : public std::false_type{};
+struct ContainsHandle<::test_bits::StrictBits> : public std::false_type {};
 static_assert(std::is_standard_layout_v<::test_bits::StrictBits>);
 static_assert(sizeof(::test_bits::StrictBits) == sizeof(uint64_t));
 
 template <>
-struct IsFidlType<::test_bits::FlexibleBits> : public std::true_type{};
+struct IsFidlType<::test_bits::FlexibleBits> : public std::true_type {};
 template <>
-struct ContainsHandle<::test_bits::FlexibleBits> : public std::false_type{};
+struct ContainsHandle<::test_bits::FlexibleBits> : public std::false_type {};
 static_assert(std::is_standard_layout_v<::test_bits::FlexibleBits>);
 static_assert(sizeof(::test_bits::FlexibleBits) == sizeof(uint64_t));
 
 template <>
-struct IsFidlType<::test_bits::EmptyBits> : public std::true_type{};
+struct IsFidlType<::test_bits::EmptyBits> : public std::true_type {};
 template <>
-struct ContainsHandle<::test_bits::EmptyBits> : public std::false_type{};
+struct ContainsHandle<::test_bits::EmptyBits> : public std::false_type {};
 static_assert(std::is_standard_layout_v<::test_bits::EmptyBits>);
 static_assert(sizeof(::test_bits::EmptyBits) == sizeof(uint32_t));
 

@@ -327,28 +327,28 @@ constexpr inline auto ToUnderlying(::test_doccomments::MyFlexibleEnum value) -> 
 }
 
 template <>
-struct IsFidlType<::test_doccomments::MyStrictBits> : public std::true_type{};
+struct IsFidlType<::test_doccomments::MyStrictBits> : public std::true_type {};
 template <>
-struct ContainsHandle<::test_doccomments::MyStrictBits> : public std::false_type{};
+struct ContainsHandle<::test_doccomments::MyStrictBits> : public std::false_type {};
 static_assert(std::is_standard_layout_v<::test_doccomments::MyStrictBits>);
 static_assert(sizeof(::test_doccomments::MyStrictBits) == sizeof(uint32_t));
 
 template <>
-struct IsFidlType<::test_doccomments::MyFlexibleBits> : public std::true_type{};
+struct IsFidlType<::test_doccomments::MyFlexibleBits> : public std::true_type {};
 template <>
-struct ContainsHandle<::test_doccomments::MyFlexibleBits> : public std::false_type{};
+struct ContainsHandle<::test_doccomments::MyFlexibleBits> : public std::false_type {};
 static_assert(std::is_standard_layout_v<::test_doccomments::MyFlexibleBits>);
 static_assert(sizeof(::test_doccomments::MyFlexibleBits) == sizeof(uint32_t));
 
 template <>
-struct IsFidlType<::test_doccomments::MyStrictEnum> : public std::true_type{};
+struct IsFidlType<::test_doccomments::MyStrictEnum> : public std::true_type {};
 template <>
-struct ContainsHandle<::test_doccomments::MyStrictEnum> : public std::false_type{};
+struct ContainsHandle<::test_doccomments::MyStrictEnum> : public std::false_type {};
 
 template <>
-struct IsFidlType<::test_doccomments::MyFlexibleEnum> : public std::true_type{};
+struct IsFidlType<::test_doccomments::MyFlexibleEnum> : public std::true_type {};
 template <>
-struct ContainsHandle<::test_doccomments::MyFlexibleEnum> : public std::false_type{};
+struct ContainsHandle<::test_doccomments::MyFlexibleEnum> : public std::false_type {};
 
 #pragma clang diagnostic pop
 

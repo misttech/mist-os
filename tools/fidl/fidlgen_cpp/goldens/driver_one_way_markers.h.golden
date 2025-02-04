@@ -37,6 +37,6 @@ class OneWay final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_driveroneway::OneWay> : public std::true_type{};
+struct IsProtocol<::test_driveroneway::OneWay> : public std::true_type {};
 
 }  // namespace fidl

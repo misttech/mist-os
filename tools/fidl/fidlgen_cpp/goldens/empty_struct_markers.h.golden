@@ -65,6 +65,6 @@ class EmptyProtocol final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_emptystruct::EmptyProtocol> : public std::true_type{};
+struct IsProtocol<::test_emptystruct::EmptyProtocol> : public std::true_type {};
 
 }  // namespace fidl

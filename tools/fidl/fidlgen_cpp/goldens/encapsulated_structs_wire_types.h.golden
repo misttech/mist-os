@@ -107,11 +107,11 @@ struct TypeTraits<::test_encapsulatedstructs::wire::Int8Int32> {
 };
 
 template <>
-struct IsFidlType<::test_encapsulatedstructs::wire::Int8Int32> : public std::true_type{};
+struct IsFidlType<::test_encapsulatedstructs::wire::Int8Int32> : public std::true_type {};
 template <>
-struct IsWire<::test_encapsulatedstructs::wire::Int8Int32> : public std::true_type{};
+struct IsWire<::test_encapsulatedstructs::wire::Int8Int32> : public std::true_type {};
 template <>
-struct IsStruct<::test_encapsulatedstructs::wire::Int8Int32> : public std::true_type{};
+struct IsStruct<::test_encapsulatedstructs::wire::Int8Int32> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_encapsulatedstructs::wire::Int8Int32>);
 static_assert(offsetof(::test_encapsulatedstructs::wire::Int8Int32, a) == 0);
 static_assert(offsetof(::test_encapsulatedstructs::wire::Int8Int32, b) == 4);
@@ -159,11 +159,11 @@ struct TypeTraits<::test_encapsulatedstructs::wire::Int16Int8> {
 };
 
 template <>
-struct IsFidlType<::test_encapsulatedstructs::wire::Int16Int8> : public std::true_type{};
+struct IsFidlType<::test_encapsulatedstructs::wire::Int16Int8> : public std::true_type {};
 template <>
-struct IsWire<::test_encapsulatedstructs::wire::Int16Int8> : public std::true_type{};
+struct IsWire<::test_encapsulatedstructs::wire::Int16Int8> : public std::true_type {};
 template <>
-struct IsStruct<::test_encapsulatedstructs::wire::Int16Int8> : public std::true_type{};
+struct IsStruct<::test_encapsulatedstructs::wire::Int16Int8> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_encapsulatedstructs::wire::Int16Int8>);
 static_assert(offsetof(::test_encapsulatedstructs::wire::Int16Int8, a) == 0);
 static_assert(offsetof(::test_encapsulatedstructs::wire::Int16Int8, b) == 2);
@@ -211,11 +211,11 @@ struct TypeTraits<::test_encapsulatedstructs::wire::ArrayInt16Int8> {
 };
 
 template <>
-struct IsFidlType<::test_encapsulatedstructs::wire::ArrayInt16Int8> : public std::true_type{};
+struct IsFidlType<::test_encapsulatedstructs::wire::ArrayInt16Int8> : public std::true_type {};
 template <>
-struct IsWire<::test_encapsulatedstructs::wire::ArrayInt16Int8> : public std::true_type{};
+struct IsWire<::test_encapsulatedstructs::wire::ArrayInt16Int8> : public std::true_type {};
 template <>
-struct IsStruct<::test_encapsulatedstructs::wire::ArrayInt16Int8> : public std::true_type{};
+struct IsStruct<::test_encapsulatedstructs::wire::ArrayInt16Int8> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_encapsulatedstructs::wire::ArrayInt16Int8>);
 static_assert(offsetof(::test_encapsulatedstructs::wire::ArrayInt16Int8, arr) == 0);
 static_assert(sizeof(::test_encapsulatedstructs::wire::ArrayInt16Int8) == TypeTraits<::test_encapsulatedstructs::wire::ArrayInt16Int8>::kPrimarySize);
@@ -257,11 +257,11 @@ struct TypeTraits<::test_encapsulatedstructs::wire::StructPaddingTestStruct> {
 };
 
 template <>
-struct IsFidlType<::test_encapsulatedstructs::wire::StructPaddingTestStruct> : public std::true_type{};
+struct IsFidlType<::test_encapsulatedstructs::wire::StructPaddingTestStruct> : public std::true_type {};
 template <>
-struct IsWire<::test_encapsulatedstructs::wire::StructPaddingTestStruct> : public std::true_type{};
+struct IsWire<::test_encapsulatedstructs::wire::StructPaddingTestStruct> : public std::true_type {};
 template <>
-struct IsStruct<::test_encapsulatedstructs::wire::StructPaddingTestStruct> : public std::true_type{};
+struct IsStruct<::test_encapsulatedstructs::wire::StructPaddingTestStruct> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_encapsulatedstructs::wire::StructPaddingTestStruct>);
 static_assert(offsetof(::test_encapsulatedstructs::wire::StructPaddingTestStruct, trailing) == 0);
 static_assert(offsetof(::test_encapsulatedstructs::wire::StructPaddingTestStruct, inner) == 4);
@@ -301,7 +301,7 @@ struct ::fidl::internal::WireCodingTraits<::test_encapsulatedstructs::wire::Stru
 
 #ifdef __Fuchsia__
 template <>
-struct IsResource<::test_encapsulatedstructs::wire::NonInlineStructTestStruct> : public std::true_type{};
+struct IsResource<::test_encapsulatedstructs::wire::NonInlineStructTestStruct> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_encapsulatedstructs::wire::NonInlineStructTestStruct> {
@@ -315,11 +315,11 @@ struct TypeTraits<::test_encapsulatedstructs::wire::NonInlineStructTestStruct> {
 };
 
 template <>
-struct IsFidlType<::test_encapsulatedstructs::wire::NonInlineStructTestStruct> : public std::true_type{};
+struct IsFidlType<::test_encapsulatedstructs::wire::NonInlineStructTestStruct> : public std::true_type {};
 template <>
-struct IsWire<::test_encapsulatedstructs::wire::NonInlineStructTestStruct> : public std::true_type{};
+struct IsWire<::test_encapsulatedstructs::wire::NonInlineStructTestStruct> : public std::true_type {};
 template <>
-struct IsStruct<::test_encapsulatedstructs::wire::NonInlineStructTestStruct> : public std::true_type{};
+struct IsStruct<::test_encapsulatedstructs::wire::NonInlineStructTestStruct> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_encapsulatedstructs::wire::NonInlineStructTestStruct>);
 static_assert(offsetof(::test_encapsulatedstructs::wire::NonInlineStructTestStruct, element) == 0);
 static_assert(offsetof(::test_encapsulatedstructs::wire::NonInlineStructTestStruct, h) == 8);
@@ -359,7 +359,7 @@ struct ::fidl::internal::WireCodingTraits<::test_encapsulatedstructs::wire::NonI
 
 #ifdef __Fuchsia__
 template <>
-struct IsResource<::test_encapsulatedstructs::wire::TopLevelStruct> : public std::true_type{};
+struct IsResource<::test_encapsulatedstructs::wire::TopLevelStruct> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_encapsulatedstructs::wire::TopLevelStruct> {
@@ -373,11 +373,11 @@ struct TypeTraits<::test_encapsulatedstructs::wire::TopLevelStruct> {
 };
 
 template <>
-struct IsFidlType<::test_encapsulatedstructs::wire::TopLevelStruct> : public std::true_type{};
+struct IsFidlType<::test_encapsulatedstructs::wire::TopLevelStruct> : public std::true_type {};
 template <>
-struct IsWire<::test_encapsulatedstructs::wire::TopLevelStruct> : public std::true_type{};
+struct IsWire<::test_encapsulatedstructs::wire::TopLevelStruct> : public std::true_type {};
 template <>
-struct IsStruct<::test_encapsulatedstructs::wire::TopLevelStruct> : public std::true_type{};
+struct IsStruct<::test_encapsulatedstructs::wire::TopLevelStruct> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_encapsulatedstructs::wire::TopLevelStruct>);
 static_assert(offsetof(::test_encapsulatedstructs::wire::TopLevelStruct, a) == 0);
 static_assert(offsetof(::test_encapsulatedstructs::wire::TopLevelStruct, b) == 24);

@@ -397,7 +397,7 @@ struct CodingTraits<::test::nullable::StructWithNullableString>
     : public EncodableCodingTraits<::test::nullable::StructWithNullableString, 16> {};
 
 template <>
-struct HasPadding<::test::nullable::StructWithNullableString> : public std::true_type{};
+struct HasPadding<::test::nullable::StructWithNullableString> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::nullable::StructWithNullableString> : public internal::BoolConstant<
@@ -422,7 +422,7 @@ struct CodingTraits<::test::nullable::StructWithNullableVector>
     : public EncodableCodingTraits<::test::nullable::StructWithNullableVector, 16> {};
 
 template <>
-struct HasPadding<::test::nullable::StructWithNullableVector> : public std::true_type{};
+struct HasPadding<::test::nullable::StructWithNullableVector> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::nullable::StructWithNullableVector> : public internal::BoolConstant<
@@ -597,7 +597,7 @@ struct CodingTraits<::test::nullable::StructWithNullableStruct>
     : public EncodableCodingTraits<::test::nullable::StructWithNullableStruct, 8> {};
 
 template <>
-struct HasPadding<::test::nullable::StructWithNullableStruct> : public std::true_type{};
+struct HasPadding<::test::nullable::StructWithNullableStruct> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::nullable::StructWithNullableStruct> : public internal::BoolConstant<
@@ -618,7 +618,7 @@ struct Equality<::test::nullable::StructWithNullableStruct> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::nullable::SimpleUnion> : public std::true_type{};
+struct IsFidlXUnion<::test::nullable::SimpleUnion> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::nullable::SimpleUnion>

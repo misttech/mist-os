@@ -244,7 +244,7 @@ struct CodingTraits<::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFail
     : public EncodableCodingTraits<::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest, 16> {};
 
 template <>
-struct HasPadding<::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest> : public std::true_type{};
+struct HasPadding<::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest> : public internal::BoolConstant<
@@ -287,7 +287,7 @@ struct Equality<::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Re
   }
 };
 template <>
-struct IsFidlXUnion<::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result> : public std::true_type{};
+struct IsFidlXUnion<::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result>

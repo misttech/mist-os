@@ -433,7 +433,7 @@ inline StructSmallArray::StructSmallArray(Storage_ storage) noexcept : storage_(
 inline StructSmallArray::StructSmallArray(::std::array<uint32_t, 2> a) noexcept
     : storage_({.a = std::move(a)}) {}
 inline StructSmallArray::StructSmallArray(const ::test_arrays::StructSmallArray& other) noexcept : ::test_arrays::StructSmallArray(other.CloneStorage_()) {}
-inline StructSmallArray& ::test_arrays::StructSmallArray::operator=(const ::test_arrays::StructSmallArray & other) noexcept {
+inline StructSmallArray& ::test_arrays::StructSmallArray::operator=(const ::test_arrays::StructSmallArray& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -450,7 +450,7 @@ inline StructLargeArray::StructLargeArray(Storage_ storage) noexcept : storage_(
 inline StructLargeArray::StructLargeArray(::std::array<uint32_t, 100> a) noexcept
     : storage_({.a = std::move(a)}) {}
 inline StructLargeArray::StructLargeArray(const ::test_arrays::StructLargeArray& other) noexcept : ::test_arrays::StructLargeArray(other.CloneStorage_()) {}
-inline StructLargeArray& ::test_arrays::StructLargeArray::operator=(const ::test_arrays::StructLargeArray & other) noexcept {
+inline StructLargeArray& ::test_arrays::StructLargeArray::operator=(const ::test_arrays::StructLargeArray& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -465,7 +465,7 @@ inline StructLargeArray& StructLargeArray::a(::std::array<uint32_t, 100> value) 
 
 inline TableSmallArray::TableSmallArray(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline TableSmallArray::TableSmallArray(const ::test_arrays::TableSmallArray& other) noexcept : TableSmallArray(other.CloneStorage_()) {}
-inline TableSmallArray& ::test_arrays::TableSmallArray::operator=(const TableSmallArray & other) noexcept {
+inline TableSmallArray& ::test_arrays::TableSmallArray::operator=(const TableSmallArray& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -478,7 +478,7 @@ inline TableSmallArray& TableSmallArray::a(std::optional<::std::array<uint32_t, 
 
 inline TableLargeArray::TableLargeArray(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline TableLargeArray::TableLargeArray(const ::test_arrays::TableLargeArray& other) noexcept : TableLargeArray(other.CloneStorage_()) {}
-inline TableLargeArray& ::test_arrays::TableLargeArray::operator=(const TableLargeArray & other) noexcept {
+inline TableLargeArray& ::test_arrays::TableLargeArray::operator=(const TableLargeArray& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -493,7 +493,7 @@ inline TableLargeArray& TableLargeArray::a(std::optional<::std::array<uint32_t, 
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_arrays::StructSmallArray> : public std::true_type{};
+struct IsFidlType<::test_arrays::StructSmallArray> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_arrays::StructSmallArray> {
@@ -505,14 +505,14 @@ struct TypeTraits<::test_arrays::StructSmallArray> {
 };
 
 template <>
-struct IsStruct<::test_arrays::StructSmallArray> : public std::true_type{};
+struct IsStruct<::test_arrays::StructSmallArray> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_arrays::StructSmallArray, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_arrays::StructSmallArray, 8> {};
 
 template <>
-struct IsFidlType<::test_arrays::StructLargeArray> : public std::true_type{};
+struct IsFidlType<::test_arrays::StructLargeArray> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_arrays::StructLargeArray> {
@@ -524,14 +524,14 @@ struct TypeTraits<::test_arrays::StructLargeArray> {
 };
 
 template <>
-struct IsStruct<::test_arrays::StructLargeArray> : public std::true_type{};
+struct IsStruct<::test_arrays::StructLargeArray> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_arrays::StructLargeArray, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_arrays::StructLargeArray, 400> {};
 
 template <>
-struct IsFidlType<::test_arrays::TableSmallArray> : public std::true_type{};
+struct IsFidlType<::test_arrays::TableSmallArray> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_arrays::TableSmallArray> {
@@ -543,13 +543,13 @@ struct TypeTraits<::test_arrays::TableSmallArray> {
 };
 
 template <>
-struct IsTable<::test_arrays::TableSmallArray> : public std::true_type{};
+struct IsTable<::test_arrays::TableSmallArray> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_arrays::TableSmallArray, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_arrays::TableSmallArray> {};
 
 template <>
-struct IsFidlType<::test_arrays::TableLargeArray> : public std::true_type{};
+struct IsFidlType<::test_arrays::TableLargeArray> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_arrays::TableLargeArray> {
@@ -561,13 +561,13 @@ struct TypeTraits<::test_arrays::TableLargeArray> {
 };
 
 template <>
-struct IsTable<::test_arrays::TableLargeArray> : public std::true_type{};
+struct IsTable<::test_arrays::TableLargeArray> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_arrays::TableLargeArray, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_arrays::TableLargeArray> {};
 
 template <>
-struct IsFidlType<::test_arrays::UnionSmallArray> : public std::true_type{};
+struct IsFidlType<::test_arrays::UnionSmallArray> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_arrays::UnionSmallArray> {
@@ -579,14 +579,14 @@ struct TypeTraits<::test_arrays::UnionSmallArray> {
 };
 
 template <>
-struct IsUnion<::test_arrays::UnionSmallArray> : public std::true_type{};
+struct IsUnion<::test_arrays::UnionSmallArray> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_arrays::UnionSmallArray, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_arrays::UnionSmallArray> {};
 
 template <>
-struct IsFidlType<::test_arrays::UnionLargeArray> : public std::true_type{};
+struct IsFidlType<::test_arrays::UnionLargeArray> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_arrays::UnionLargeArray> {
@@ -598,7 +598,7 @@ struct TypeTraits<::test_arrays::UnionLargeArray> {
 };
 
 template <>
-struct IsUnion<::test_arrays::UnionLargeArray> : public std::true_type{};
+struct IsUnion<::test_arrays::UnionLargeArray> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_arrays::UnionLargeArray, ::fidl::internal::NaturalCodingConstraintEmpty> final

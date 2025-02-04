@@ -180,7 +180,7 @@ struct CodingTraits<::test::encapsulatedstructs::Int8Int32>
     : public EncodableCodingTraits<::test::encapsulatedstructs::Int8Int32, 8> {};
 
 template <>
-struct HasPadding<::test::encapsulatedstructs::Int8Int32> : public std::true_type{};
+struct HasPadding<::test::encapsulatedstructs::Int8Int32> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::encapsulatedstructs::Int8Int32> : public internal::BoolConstant<
@@ -208,7 +208,7 @@ struct CodingTraits<::test::encapsulatedstructs::Int16Int8>
     : public EncodableCodingTraits<::test::encapsulatedstructs::Int16Int8, 4> {};
 
 template <>
-struct HasPadding<::test::encapsulatedstructs::Int16Int8> : public std::true_type{};
+struct HasPadding<::test::encapsulatedstructs::Int16Int8> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::encapsulatedstructs::Int16Int8> : public internal::BoolConstant<
@@ -236,7 +236,7 @@ struct CodingTraits<::test::encapsulatedstructs::ArrayInt16Int8>
     : public EncodableCodingTraits<::test::encapsulatedstructs::ArrayInt16Int8, 12> {};
 
 template <>
-struct HasPadding<::test::encapsulatedstructs::ArrayInt16Int8> : public std::true_type{};
+struct HasPadding<::test::encapsulatedstructs::ArrayInt16Int8> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::encapsulatedstructs::ArrayInt16Int8> : public internal::BoolConstant<
@@ -261,7 +261,7 @@ struct CodingTraits<::test::encapsulatedstructs::StructPaddingTestStruct>
     : public EncodableCodingTraits<::test::encapsulatedstructs::StructPaddingTestStruct, 24> {};
 
 template <>
-struct HasPadding<::test::encapsulatedstructs::StructPaddingTestStruct> : public std::true_type{};
+struct HasPadding<::test::encapsulatedstructs::StructPaddingTestStruct> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::encapsulatedstructs::StructPaddingTestStruct> : public internal::BoolConstant<
@@ -294,7 +294,7 @@ struct CodingTraits<::test::encapsulatedstructs::NonInlineStructTestStruct>
     : public EncodableCodingTraits<::test::encapsulatedstructs::NonInlineStructTestStruct, 16> {};
 
 template <>
-struct HasPadding<::test::encapsulatedstructs::NonInlineStructTestStruct> : public std::true_type{};
+struct HasPadding<::test::encapsulatedstructs::NonInlineStructTestStruct> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::encapsulatedstructs::NonInlineStructTestStruct> : public internal::BoolConstant<
@@ -327,7 +327,7 @@ struct CodingTraits<::test::encapsulatedstructs::TopLevelStruct>
     : public EncodableCodingTraits<::test::encapsulatedstructs::TopLevelStruct, 40> {};
 
 template <>
-struct HasPadding<::test::encapsulatedstructs::TopLevelStruct> : public std::true_type{};
+struct HasPadding<::test::encapsulatedstructs::TopLevelStruct> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::encapsulatedstructs::TopLevelStruct> : public internal::BoolConstant<

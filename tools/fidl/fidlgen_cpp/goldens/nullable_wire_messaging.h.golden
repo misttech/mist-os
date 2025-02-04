@@ -190,9 +190,9 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_nullable::SimpleProtocol::Add>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_nullable::SimpleProtocol::Add>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_nullable::SimpleProtocol::Add>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_nullable::SimpleProtocol::Add>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_nullable::SimpleProtocol::Add>> {
@@ -216,11 +216,11 @@ static_assert(offsetof(::test_nullable::wire::SimpleProtocolAddRequest, b) == 4)
 #endif  // __Fuchsia__
 
 template <>
-struct IsFidlType<::fidl::internal::TransactionalResponse<::test_nullable::SimpleProtocol::Add>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalResponse<::test_nullable::SimpleProtocol::Add>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_nullable::SimpleProtocol::Add>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_nullable::SimpleProtocol::Add>> : public std::true_type {};
 template <>
-struct IsFidlType<::fidl::WireResponse<::test_nullable::SimpleProtocol::Add>> : public std::true_type{};
+struct IsFidlType<::fidl::WireResponse<::test_nullable::SimpleProtocol::Add>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_nullable::SimpleProtocol::Add>> {

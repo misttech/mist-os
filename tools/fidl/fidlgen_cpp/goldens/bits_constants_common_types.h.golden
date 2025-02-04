@@ -119,9 +119,9 @@ constexpr inline void BitsType::operator-=(
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_bitsconstants::BitsType> : public std::true_type{};
+struct IsFidlType<::test_bitsconstants::BitsType> : public std::true_type {};
 template <>
-struct ContainsHandle<::test_bitsconstants::BitsType> : public std::false_type{};
+struct ContainsHandle<::test_bitsconstants::BitsType> : public std::false_type {};
 static_assert(std::is_standard_layout_v<::test_bitsconstants::BitsType>);
 static_assert(sizeof(::test_bitsconstants::BitsType) == sizeof(uint32_t));
 

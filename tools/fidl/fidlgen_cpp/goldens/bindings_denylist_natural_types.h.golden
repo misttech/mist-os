@@ -1450,7 +1450,7 @@ inline DenyEachBindingOnlyDenyDartRequest::DenyEachBindingOnlyDenyDartRequest(St
 inline DenyEachBindingOnlyDenyDartRequest::DenyEachBindingOnlyDenyDartRequest(bool a) noexcept
     : storage_({.a = std::move(a)}) {}
 inline DenyEachBindingOnlyDenyDartRequest::DenyEachBindingOnlyDenyDartRequest(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenyDartRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest & other) noexcept {
+inline DenyEachBindingOnlyDenyDartRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1467,7 +1467,7 @@ inline DenyEachBindingOnlyDenyDartResponse::DenyEachBindingOnlyDenyDartResponse(
 inline DenyEachBindingOnlyDenyDartResponse::DenyEachBindingOnlyDenyDartResponse(int32_t b) noexcept
     : storage_({.b = std::move(b)}) {}
 inline DenyEachBindingOnlyDenyDartResponse::DenyEachBindingOnlyDenyDartResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenyDartResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse & other) noexcept {
+inline DenyEachBindingOnlyDenyDartResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1484,7 +1484,7 @@ inline DenyEachBindingOnlyDenyGoRequest::DenyEachBindingOnlyDenyGoRequest(Storag
 inline DenyEachBindingOnlyDenyGoRequest::DenyEachBindingOnlyDenyGoRequest(bool a) noexcept
     : storage_({.a = std::move(a)}) {}
 inline DenyEachBindingOnlyDenyGoRequest::DenyEachBindingOnlyDenyGoRequest(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenyGoRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest & other) noexcept {
+inline DenyEachBindingOnlyDenyGoRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1501,7 +1501,7 @@ inline DenyEachBindingOnlyDenyGoResponse::DenyEachBindingOnlyDenyGoResponse(Stor
 inline DenyEachBindingOnlyDenyGoResponse::DenyEachBindingOnlyDenyGoResponse(int32_t b) noexcept
     : storage_({.b = std::move(b)}) {}
 inline DenyEachBindingOnlyDenyGoResponse::DenyEachBindingOnlyDenyGoResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenyGoResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse & other) noexcept {
+inline DenyEachBindingOnlyDenyGoResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1518,7 +1518,7 @@ inline DenyEachBindingOnlyDenyLibfuzzerRequest::DenyEachBindingOnlyDenyLibfuzzer
 inline DenyEachBindingOnlyDenyLibfuzzerRequest::DenyEachBindingOnlyDenyLibfuzzerRequest(bool a) noexcept
     : storage_({.a = std::move(a)}) {}
 inline DenyEachBindingOnlyDenyLibfuzzerRequest::DenyEachBindingOnlyDenyLibfuzzerRequest(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenyLibfuzzerRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest & other) noexcept {
+inline DenyEachBindingOnlyDenyLibfuzzerRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1535,7 +1535,7 @@ inline DenyEachBindingOnlyDenyLibfuzzerResponse::DenyEachBindingOnlyDenyLibfuzze
 inline DenyEachBindingOnlyDenyLibfuzzerResponse::DenyEachBindingOnlyDenyLibfuzzerResponse(int32_t b) noexcept
     : storage_({.b = std::move(b)}) {}
 inline DenyEachBindingOnlyDenyLibfuzzerResponse::DenyEachBindingOnlyDenyLibfuzzerResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenyLibfuzzerResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse & other) noexcept {
+inline DenyEachBindingOnlyDenyLibfuzzerResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1552,7 +1552,7 @@ inline DenyEachBindingOnlyDenyRustRequest::DenyEachBindingOnlyDenyRustRequest(St
 inline DenyEachBindingOnlyDenyRustRequest::DenyEachBindingOnlyDenyRustRequest(bool a) noexcept
     : storage_({.a = std::move(a)}) {}
 inline DenyEachBindingOnlyDenyRustRequest::DenyEachBindingOnlyDenyRustRequest(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenyRustRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest & other) noexcept {
+inline DenyEachBindingOnlyDenyRustRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1569,7 +1569,7 @@ inline DenyEachBindingOnlyDenyRustResponse::DenyEachBindingOnlyDenyRustResponse(
 inline DenyEachBindingOnlyDenyRustResponse::DenyEachBindingOnlyDenyRustResponse(int32_t b) noexcept
     : storage_({.b = std::move(b)}) {}
 inline DenyEachBindingOnlyDenyRustResponse::DenyEachBindingOnlyDenyRustResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenyRustResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse & other) noexcept {
+inline DenyEachBindingOnlyDenyRustResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1586,7 +1586,7 @@ inline DenyEachBindingOnlyDenySyzkallerRequest::DenyEachBindingOnlyDenySyzkaller
 inline DenyEachBindingOnlyDenySyzkallerRequest::DenyEachBindingOnlyDenySyzkallerRequest(bool a) noexcept
     : storage_({.a = std::move(a)}) {}
 inline DenyEachBindingOnlyDenySyzkallerRequest::DenyEachBindingOnlyDenySyzkallerRequest(const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenySyzkallerRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest & other) noexcept {
+inline DenyEachBindingOnlyDenySyzkallerRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1603,7 +1603,7 @@ inline DenyEachBindingOnlyDenySyzkallerResponse::DenyEachBindingOnlyDenySyzkalle
 inline DenyEachBindingOnlyDenySyzkallerResponse::DenyEachBindingOnlyDenySyzkallerResponse(int32_t b) noexcept
     : storage_({.b = std::move(b)}) {}
 inline DenyEachBindingOnlyDenySyzkallerResponse::DenyEachBindingOnlyDenySyzkallerResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenySyzkallerResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse & other) noexcept {
+inline DenyEachBindingOnlyDenySyzkallerResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1620,7 +1620,7 @@ inline MemberOnlyAppearsInImportingLibrary::MemberOnlyAppearsInImportingLibrary(
 inline MemberOnlyAppearsInImportingLibrary::MemberOnlyAppearsInImportingLibrary(bool a) noexcept
     : storage_({.a = std::move(a)}) {}
 inline MemberOnlyAppearsInImportingLibrary::MemberOnlyAppearsInImportingLibrary(const ::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary& other) noexcept : ::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary(other.CloneStorage_()) {}
-inline MemberOnlyAppearsInImportingLibrary& ::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary::operator=(const ::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary & other) noexcept {
+inline MemberOnlyAppearsInImportingLibrary& ::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary::operator=(const ::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1637,7 +1637,7 @@ inline OnlyAppearsInImportingLibrary::OnlyAppearsInImportingLibrary(Storage_ sto
 inline OnlyAppearsInImportingLibrary::OnlyAppearsInImportingLibrary(::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary member_only_appears_in_importing_library) noexcept
     : storage_({.member_only_appears_in_importing_library = std::move(member_only_appears_in_importing_library)}) {}
 inline OnlyAppearsInImportingLibrary::OnlyAppearsInImportingLibrary(const ::test_bindingsdenylist::OnlyAppearsInImportingLibrary& other) noexcept : ::test_bindingsdenylist::OnlyAppearsInImportingLibrary(other.CloneStorage_()) {}
-inline OnlyAppearsInImportingLibrary& ::test_bindingsdenylist::OnlyAppearsInImportingLibrary::operator=(const ::test_bindingsdenylist::OnlyAppearsInImportingLibrary & other) noexcept {
+inline OnlyAppearsInImportingLibrary& ::test_bindingsdenylist::OnlyAppearsInImportingLibrary::operator=(const ::test_bindingsdenylist::OnlyAppearsInImportingLibrary& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1654,7 +1654,7 @@ inline OnlyAppearsInImportingLibrary& OnlyAppearsInImportingLibrary::member_only
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest> : public std::true_type{};
+struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest> {
@@ -1666,14 +1666,14 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest> {
 };
 
 template <>
-struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest> : public std::true_type{};
+struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest, 1> {};
 
 template <>
-struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse> : public std::true_type{};
+struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse> {
@@ -1685,14 +1685,14 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse> 
 };
 
 template <>
-struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse> : public std::true_type{};
+struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse, 4> {};
 
 template <>
-struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest> : public std::true_type{};
+struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest> {
@@ -1704,14 +1704,14 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest> {
 };
 
 template <>
-struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest> : public std::true_type{};
+struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest, 1> {};
 
 template <>
-struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse> : public std::true_type{};
+struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse> {
@@ -1723,14 +1723,14 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse> {
 };
 
 template <>
-struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse> : public std::true_type{};
+struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse, 4> {};
 
 template <>
-struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest> : public std::true_type{};
+struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest> {
@@ -1742,14 +1742,14 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerReque
 };
 
 template <>
-struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest> : public std::true_type{};
+struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest, 1> {};
 
 template <>
-struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse> : public std::true_type{};
+struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse> {
@@ -1761,14 +1761,14 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRespo
 };
 
 template <>
-struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse> : public std::true_type{};
+struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse, 4> {};
 
 template <>
-struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest> : public std::true_type{};
+struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest> {
@@ -1780,14 +1780,14 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest> {
 };
 
 template <>
-struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest> : public std::true_type{};
+struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest, 1> {};
 
 template <>
-struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse> : public std::true_type{};
+struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse> {
@@ -1799,14 +1799,14 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse> 
 };
 
 template <>
-struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse> : public std::true_type{};
+struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse, 4> {};
 
 template <>
-struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest> : public std::true_type{};
+struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest> {
@@ -1818,14 +1818,14 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerReque
 };
 
 template <>
-struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest> : public std::true_type{};
+struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest, 1> {};
 
 template <>
-struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse> : public std::true_type{};
+struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse> {
@@ -1837,14 +1837,14 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRespo
 };
 
 template <>
-struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse> : public std::true_type{};
+struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse, 4> {};
 
 template <>
-struct IsFidlType<::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary> : public std::true_type{};
+struct IsFidlType<::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary> {
@@ -1856,14 +1856,14 @@ struct TypeTraits<::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary> 
 };
 
 template <>
-struct IsStruct<::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary> : public std::true_type{};
+struct IsStruct<::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary, 1> {};
 
 template <>
-struct IsFidlType<::test_bindingsdenylist::OnlyAppearsInImportingLibrary> : public std::true_type{};
+struct IsFidlType<::test_bindingsdenylist::OnlyAppearsInImportingLibrary> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_bindingsdenylist::OnlyAppearsInImportingLibrary> {
@@ -1875,14 +1875,14 @@ struct TypeTraits<::test_bindingsdenylist::OnlyAppearsInImportingLibrary> {
 };
 
 template <>
-struct IsStruct<::test_bindingsdenylist::OnlyAppearsInImportingLibrary> : public std::true_type{};
+struct IsStruct<::test_bindingsdenylist::OnlyAppearsInImportingLibrary> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::OnlyAppearsInImportingLibrary, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::OnlyAppearsInImportingLibrary, 1> {};
 
 template <>
-struct IsFidlType<::test_bindingsdenylist::OnlyLlcpp> : public std::true_type{};
+struct IsFidlType<::test_bindingsdenylist::OnlyLlcpp> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_bindingsdenylist::OnlyLlcpp> {
@@ -1894,14 +1894,14 @@ struct TypeTraits<::test_bindingsdenylist::OnlyLlcpp> {
 };
 
 template <>
-struct IsUnion<::test_bindingsdenylist::OnlyLlcpp> : public std::true_type{};
+struct IsUnion<::test_bindingsdenylist::OnlyLlcpp> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::OnlyLlcpp, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_bindingsdenylist::OnlyLlcpp> {};
 
 template <>
-struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult> : public std::true_type{};
+struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult> {
@@ -1913,14 +1913,14 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult> {
 };
 
 template <>
-struct IsUnion<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult> : public std::true_type{};
+struct IsUnion<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult> {};
 
 template <>
-struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult> : public std::true_type{};
+struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult> {
@@ -1932,14 +1932,14 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult> {
 };
 
 template <>
-struct IsUnion<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult> : public std::true_type{};
+struct IsUnion<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult> {};
 
 template <>
-struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult> : public std::true_type{};
+struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult> {
@@ -1951,14 +1951,14 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResul
 };
 
 template <>
-struct IsUnion<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult> : public std::true_type{};
+struct IsUnion<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult> {};
 
 template <>
-struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult> : public std::true_type{};
+struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult> {
@@ -1970,14 +1970,14 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult> {
 };
 
 template <>
-struct IsUnion<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult> : public std::true_type{};
+struct IsUnion<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult> {};
 
 template <>
-struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult> : public std::true_type{};
+struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult> {
@@ -1989,7 +1989,7 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResul
 };
 
 template <>
-struct IsUnion<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult> : public std::true_type{};
+struct IsUnion<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult, ::fidl::internal::NaturalCodingConstraintEmpty> final

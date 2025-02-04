@@ -51,6 +51,6 @@ class ExampleUseOfErrorSyntax final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_errorsyntax::ExampleUseOfErrorSyntax> : public std::true_type{};
+struct IsProtocol<::test_errorsyntax::ExampleUseOfErrorSyntax> : public std::true_type {};
 
 }  // namespace fidl

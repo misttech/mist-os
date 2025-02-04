@@ -37,6 +37,6 @@ class SomeProtocol final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_anonymous::SomeProtocol> : public std::true_type{};
+struct IsProtocol<::test_anonymous::SomeProtocol> : public std::true_type {};
 
 }  // namespace fidl

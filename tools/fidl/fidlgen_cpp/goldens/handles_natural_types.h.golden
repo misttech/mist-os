@@ -951,9 +951,9 @@ namespace fidl {
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_handles::Handles> : public std::true_type{};
+struct IsResource<::test_handles::Handles> : public std::true_type {};
 template <>
-struct IsFidlType<::test_handles::Handles> : public std::true_type{};
+struct IsFidlType<::test_handles::Handles> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_handles::Handles> {
@@ -965,7 +965,7 @@ struct TypeTraits<::test_handles::Handles> {
 };
 
 template <>
-struct IsStruct<::test_handles::Handles> : public std::true_type{};
+struct IsStruct<::test_handles::Handles> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_handles::Handles, ::fidl::internal::NaturalCodingConstraintEmpty> final
@@ -976,9 +976,9 @@ struct internal::NaturalCodingTraits<::test_handles::Handles, ::fidl::internal::
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_handles::FdfHandles> : public std::true_type{};
+struct IsResource<::test_handles::FdfHandles> : public std::true_type {};
 template <>
-struct IsFidlType<::test_handles::FdfHandles> : public std::true_type{};
+struct IsFidlType<::test_handles::FdfHandles> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_handles::FdfHandles> {
@@ -990,7 +990,7 @@ struct TypeTraits<::test_handles::FdfHandles> {
 };
 
 template <>
-struct IsStruct<::test_handles::FdfHandles> : public std::true_type{};
+struct IsStruct<::test_handles::FdfHandles> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_handles::FdfHandles, ::fidl::internal::NaturalCodingConstraintEmpty> final

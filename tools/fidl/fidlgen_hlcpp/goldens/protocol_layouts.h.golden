@@ -1396,7 +1396,7 @@ struct Equality<::test::protocollayouts::LocalTablePayload> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::protocollayouts::LocalUnionPayload> : public std::true_type{};
+struct IsFidlXUnion<::test::protocollayouts::LocalUnionPayload> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::protocollayouts::LocalUnionPayload>
@@ -1450,7 +1450,7 @@ struct Equality<::test::protocollayouts::LocalUnionPayload> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result> : public std::true_type{};
+struct IsFidlXUnion<::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result>
@@ -1507,7 +1507,7 @@ struct Equality<::test::protocollayouts::MainProtocol_TwoWayImportWithError_Resu
   }
 };
 template <>
-struct IsFidlXUnion<::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result> : public std::true_type{};
+struct IsFidlXUnion<::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result>
@@ -1588,7 +1588,7 @@ struct Equality<::test::protocollayouts::MainProtocolOneWayAnonRequest> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::protocollayouts::MainProtocolTwoWayAnonRequest> : public std::true_type{};
+struct IsFidlXUnion<::test::protocollayouts::MainProtocolTwoWayAnonRequest> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::protocollayouts::MainProtocolTwoWayAnonRequest>
@@ -1690,7 +1690,7 @@ struct Equality<::test::protocollayouts::MainProtocolTwoWayAnonWithErrorRequest>
   }
 };
 template <>
-struct IsFidlXUnion<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response> : public std::true_type{};
+struct IsFidlXUnion<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response>
@@ -1744,7 +1744,7 @@ struct Equality<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Respon
   }
 };
 template <>
-struct IsFidlXUnion<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result> : public std::true_type{};
+struct IsFidlXUnion<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result>
@@ -1801,7 +1801,7 @@ struct Equality<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result
   }
 };
 template <>
-struct IsFidlXUnion<::test::protocollayouts::MainProtocolOnAnonRequest> : public std::true_type{};
+struct IsFidlXUnion<::test::protocollayouts::MainProtocolOnAnonRequest> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::protocollayouts::MainProtocolOnAnonRequest>

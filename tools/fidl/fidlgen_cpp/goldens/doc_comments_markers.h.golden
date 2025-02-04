@@ -60,6 +60,6 @@ class Interface final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_doccomments::Interface> : public std::true_type{};
+struct IsProtocol<::test_doccomments::Interface> : public std::true_type {};
 
 }  // namespace fidl

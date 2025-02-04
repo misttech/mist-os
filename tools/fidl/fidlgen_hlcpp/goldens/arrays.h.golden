@@ -462,7 +462,7 @@ struct Equality<::test::arrays::TableLargeArray> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::arrays::UnionSmallArray> : public std::true_type{};
+struct IsFidlXUnion<::test::arrays::UnionSmallArray> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::arrays::UnionSmallArray>
@@ -517,7 +517,7 @@ struct Equality<::test::arrays::UnionSmallArray> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::arrays::UnionLargeArray> : public std::true_type{};
+struct IsFidlXUnion<::test::arrays::UnionLargeArray> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::arrays::UnionLargeArray>

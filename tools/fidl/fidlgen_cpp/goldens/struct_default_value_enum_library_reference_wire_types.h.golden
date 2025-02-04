@@ -53,11 +53,11 @@ struct TypeTraits<::test_structdefaultvalueenumlibraryreference::wire::Foo> {
 };
 
 template <>
-struct IsFidlType<::test_structdefaultvalueenumlibraryreference::wire::Foo> : public std::true_type{};
+struct IsFidlType<::test_structdefaultvalueenumlibraryreference::wire::Foo> : public std::true_type {};
 template <>
-struct IsWire<::test_structdefaultvalueenumlibraryreference::wire::Foo> : public std::true_type{};
+struct IsWire<::test_structdefaultvalueenumlibraryreference::wire::Foo> : public std::true_type {};
 template <>
-struct IsStruct<::test_structdefaultvalueenumlibraryreference::wire::Foo> : public std::true_type{};
+struct IsStruct<::test_structdefaultvalueenumlibraryreference::wire::Foo> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_structdefaultvalueenumlibraryreference::wire::Foo>);
 static_assert(offsetof(::test_structdefaultvalueenumlibraryreference::wire::Foo, field) == 0);
 static_assert(sizeof(::test_structdefaultvalueenumlibraryreference::wire::Foo) == TypeTraits<::test_structdefaultvalueenumlibraryreference::wire::Foo>::kPrimarySize);

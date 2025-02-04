@@ -125,11 +125,11 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First>> : public std::true_type {};
 template <>
-struct IsResource<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First>> : public std::true_type{};
+struct IsResource<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First>> {
@@ -470,11 +470,11 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First>> : public std::true_type {};
 template <>
-struct IsResource<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First>> : public std::true_type{};
+struct IsResource<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First>> {
@@ -498,11 +498,11 @@ static_assert(offsetof(::test_inheritancewithrecursivedecl::wire::ParentFirstReq
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>> : public std::true_type {};
 template <>
-struct IsResource<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>> : public std::true_type{};
+struct IsResource<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>> {

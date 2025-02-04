@@ -51,6 +51,6 @@ class Protocol final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_requestflexibleenvelope::Protocol> : public std::true_type{};
+struct IsProtocol<::test_requestflexibleenvelope::Protocol> : public std::true_type {};
 
 }  // namespace fidl

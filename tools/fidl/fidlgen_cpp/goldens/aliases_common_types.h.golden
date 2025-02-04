@@ -36,9 +36,9 @@ constexpr inline auto ToUnderlying(::test_aliases::ObjType value) -> uint32_t {
 }
 
 template <>
-struct IsFidlType<::test_aliases::ObjType> : public std::true_type{};
+struct IsFidlType<::test_aliases::ObjType> : public std::true_type {};
 template <>
-struct ContainsHandle<::test_aliases::ObjType> : public std::false_type{};
+struct ContainsHandle<::test_aliases::ObjType> : public std::false_type {};
 
 #pragma clang diagnostic pop
 

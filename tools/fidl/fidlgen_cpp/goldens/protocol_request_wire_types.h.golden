@@ -85,7 +85,7 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 template <>
-struct IsResource<::test_protocolrequest::wire::ParentGetChildResponse> : public std::true_type{};
+struct IsResource<::test_protocolrequest::wire::ParentGetChildResponse> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocolrequest::wire::ParentGetChildResponse> {
@@ -99,11 +99,11 @@ struct TypeTraits<::test_protocolrequest::wire::ParentGetChildResponse> {
 };
 
 template <>
-struct IsFidlType<::test_protocolrequest::wire::ParentGetChildResponse> : public std::true_type{};
+struct IsFidlType<::test_protocolrequest::wire::ParentGetChildResponse> : public std::true_type {};
 template <>
-struct IsWire<::test_protocolrequest::wire::ParentGetChildResponse> : public std::true_type{};
+struct IsWire<::test_protocolrequest::wire::ParentGetChildResponse> : public std::true_type {};
 template <>
-struct IsStruct<::test_protocolrequest::wire::ParentGetChildResponse> : public std::true_type{};
+struct IsStruct<::test_protocolrequest::wire::ParentGetChildResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocolrequest::wire::ParentGetChildResponse>);
 static_assert(offsetof(::test_protocolrequest::wire::ParentGetChildResponse, c) == 0);
 static_assert(sizeof(::test_protocolrequest::wire::ParentGetChildResponse) == TypeTraits<::test_protocolrequest::wire::ParentGetChildResponse>::kPrimarySize);
@@ -137,7 +137,7 @@ struct ::fidl::internal::WireCodingTraits<::test_protocolrequest::wire::ParentGe
 
 #ifdef __Fuchsia__
 template <>
-struct IsResource<::test_protocolrequest::wire::ParentGetChildRequestResponse> : public std::true_type{};
+struct IsResource<::test_protocolrequest::wire::ParentGetChildRequestResponse> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocolrequest::wire::ParentGetChildRequestResponse> {
@@ -151,11 +151,11 @@ struct TypeTraits<::test_protocolrequest::wire::ParentGetChildRequestResponse> {
 };
 
 template <>
-struct IsFidlType<::test_protocolrequest::wire::ParentGetChildRequestResponse> : public std::true_type{};
+struct IsFidlType<::test_protocolrequest::wire::ParentGetChildRequestResponse> : public std::true_type {};
 template <>
-struct IsWire<::test_protocolrequest::wire::ParentGetChildRequestResponse> : public std::true_type{};
+struct IsWire<::test_protocolrequest::wire::ParentGetChildRequestResponse> : public std::true_type {};
 template <>
-struct IsStruct<::test_protocolrequest::wire::ParentGetChildRequestResponse> : public std::true_type{};
+struct IsStruct<::test_protocolrequest::wire::ParentGetChildRequestResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocolrequest::wire::ParentGetChildRequestResponse>);
 static_assert(offsetof(::test_protocolrequest::wire::ParentGetChildRequestResponse, r) == 0);
 static_assert(sizeof(::test_protocolrequest::wire::ParentGetChildRequestResponse) == TypeTraits<::test_protocolrequest::wire::ParentGetChildRequestResponse>::kPrimarySize);
@@ -189,7 +189,7 @@ struct ::fidl::internal::WireCodingTraits<::test_protocolrequest::wire::ParentGe
 
 #ifdef __Fuchsia__
 template <>
-struct IsResource<::test_protocolrequest::wire::ParentTakeChildRequest> : public std::true_type{};
+struct IsResource<::test_protocolrequest::wire::ParentTakeChildRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocolrequest::wire::ParentTakeChildRequest> {
@@ -203,11 +203,11 @@ struct TypeTraits<::test_protocolrequest::wire::ParentTakeChildRequest> {
 };
 
 template <>
-struct IsFidlType<::test_protocolrequest::wire::ParentTakeChildRequest> : public std::true_type{};
+struct IsFidlType<::test_protocolrequest::wire::ParentTakeChildRequest> : public std::true_type {};
 template <>
-struct IsWire<::test_protocolrequest::wire::ParentTakeChildRequest> : public std::true_type{};
+struct IsWire<::test_protocolrequest::wire::ParentTakeChildRequest> : public std::true_type {};
 template <>
-struct IsStruct<::test_protocolrequest::wire::ParentTakeChildRequest> : public std::true_type{};
+struct IsStruct<::test_protocolrequest::wire::ParentTakeChildRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocolrequest::wire::ParentTakeChildRequest>);
 static_assert(offsetof(::test_protocolrequest::wire::ParentTakeChildRequest, c) == 0);
 static_assert(sizeof(::test_protocolrequest::wire::ParentTakeChildRequest) == TypeTraits<::test_protocolrequest::wire::ParentTakeChildRequest>::kPrimarySize);
@@ -241,7 +241,7 @@ struct ::fidl::internal::WireCodingTraits<::test_protocolrequest::wire::ParentTa
 
 #ifdef __Fuchsia__
 template <>
-struct IsResource<::test_protocolrequest::wire::ParentTakeChildRequestRequest> : public std::true_type{};
+struct IsResource<::test_protocolrequest::wire::ParentTakeChildRequestRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocolrequest::wire::ParentTakeChildRequestRequest> {
@@ -255,11 +255,11 @@ struct TypeTraits<::test_protocolrequest::wire::ParentTakeChildRequestRequest> {
 };
 
 template <>
-struct IsFidlType<::test_protocolrequest::wire::ParentTakeChildRequestRequest> : public std::true_type{};
+struct IsFidlType<::test_protocolrequest::wire::ParentTakeChildRequestRequest> : public std::true_type {};
 template <>
-struct IsWire<::test_protocolrequest::wire::ParentTakeChildRequestRequest> : public std::true_type{};
+struct IsWire<::test_protocolrequest::wire::ParentTakeChildRequestRequest> : public std::true_type {};
 template <>
-struct IsStruct<::test_protocolrequest::wire::ParentTakeChildRequestRequest> : public std::true_type{};
+struct IsStruct<::test_protocolrequest::wire::ParentTakeChildRequestRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocolrequest::wire::ParentTakeChildRequestRequest>);
 static_assert(offsetof(::test_protocolrequest::wire::ParentTakeChildRequestRequest, r) == 0);
 static_assert(sizeof(::test_protocolrequest::wire::ParentTakeChildRequestRequest) == TypeTraits<::test_protocolrequest::wire::ParentTakeChildRequestRequest>::kPrimarySize);

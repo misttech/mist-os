@@ -46,9 +46,9 @@ class HandlesInProtocol final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_driverhandle::DriverProtocol> : public std::true_type{};
+struct IsProtocol<::test_driverhandle::DriverProtocol> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_driverhandle::HandlesInProtocol> : public std::true_type{};
+struct IsProtocol<::test_driverhandle::HandlesInProtocol> : public std::true_type {};
 
 }  // namespace fidl

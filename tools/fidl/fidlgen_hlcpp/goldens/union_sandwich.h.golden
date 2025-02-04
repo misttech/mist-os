@@ -443,7 +443,7 @@ using SandwichUnionSize36Alignment4Ptr = ::std::unique_ptr<SandwichUnionSize36Al
 namespace fidl {
 
 template <>
-struct IsFidlXUnion<::test::unionsandwich::UnionSize8Alignment4> : public std::true_type{};
+struct IsFidlXUnion<::test::unionsandwich::UnionSize8Alignment4> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::unionsandwich::UnionSize8Alignment4>
@@ -502,7 +502,7 @@ struct CodingTraits<::test::unionsandwich::SandwichUnionSize8Alignment4>
     : public EncodableCodingTraits<::test::unionsandwich::SandwichUnionSize8Alignment4, 32> {};
 
 template <>
-struct HasPadding<::test::unionsandwich::SandwichUnionSize8Alignment4> : public std::true_type{};
+struct HasPadding<::test::unionsandwich::SandwichUnionSize8Alignment4> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::unionsandwich::SandwichUnionSize8Alignment4> : public internal::BoolConstant<
@@ -529,7 +529,7 @@ struct Equality<::test::unionsandwich::SandwichUnionSize8Alignment4> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::unionsandwich::UnionSize12Alignment4> : public std::true_type{};
+struct IsFidlXUnion<::test::unionsandwich::UnionSize12Alignment4> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::unionsandwich::UnionSize12Alignment4>
@@ -588,7 +588,7 @@ struct CodingTraits<::test::unionsandwich::SandwichUnionSize12Alignment4>
     : public EncodableCodingTraits<::test::unionsandwich::SandwichUnionSize12Alignment4, 32> {};
 
 template <>
-struct HasPadding<::test::unionsandwich::SandwichUnionSize12Alignment4> : public std::true_type{};
+struct HasPadding<::test::unionsandwich::SandwichUnionSize12Alignment4> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::unionsandwich::SandwichUnionSize12Alignment4> : public internal::BoolConstant<
@@ -640,7 +640,7 @@ struct Equality<::test::unionsandwich::StructSize16Alignment8> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::unionsandwich::UnionSize24Alignment8> : public std::true_type{};
+struct IsFidlXUnion<::test::unionsandwich::UnionSize24Alignment8> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::unionsandwich::UnionSize24Alignment8>
@@ -699,7 +699,7 @@ struct CodingTraits<::test::unionsandwich::SandwichUnionSize24Alignment8>
     : public EncodableCodingTraits<::test::unionsandwich::SandwichUnionSize24Alignment8, 32> {};
 
 template <>
-struct HasPadding<::test::unionsandwich::SandwichUnionSize24Alignment8> : public std::true_type{};
+struct HasPadding<::test::unionsandwich::SandwichUnionSize24Alignment8> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::unionsandwich::SandwichUnionSize24Alignment8> : public internal::BoolConstant<
@@ -726,7 +726,7 @@ struct Equality<::test::unionsandwich::SandwichUnionSize24Alignment8> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::unionsandwich::UnionSize36Alignment4> : public std::true_type{};
+struct IsFidlXUnion<::test::unionsandwich::UnionSize36Alignment4> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::unionsandwich::UnionSize36Alignment4>
@@ -785,7 +785,7 @@ struct CodingTraits<::test::unionsandwich::SandwichUnionSize36Alignment4>
     : public EncodableCodingTraits<::test::unionsandwich::SandwichUnionSize36Alignment4, 32> {};
 
 template <>
-struct HasPadding<::test::unionsandwich::SandwichUnionSize36Alignment4> : public std::true_type{};
+struct HasPadding<::test::unionsandwich::SandwichUnionSize36Alignment4> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::unionsandwich::SandwichUnionSize36Alignment4> : public internal::BoolConstant<

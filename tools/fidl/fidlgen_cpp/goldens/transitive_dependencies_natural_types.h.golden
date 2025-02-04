@@ -85,7 +85,7 @@ inline Baz::Baz(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline Baz::Baz(::test_middle::Bar g) noexcept
     : storage_({.g = std::move(g)}) {}
 inline Baz::Baz(const ::test_transitivedependencies::Baz& other) noexcept : ::test_transitivedependencies::Baz(other.CloneStorage_()) {}
-inline Baz& ::test_transitivedependencies::Baz::operator=(const ::test_transitivedependencies::Baz & other) noexcept {
+inline Baz& ::test_transitivedependencies::Baz::operator=(const ::test_transitivedependencies::Baz& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -102,7 +102,7 @@ inline Baz& Baz::g(::test_middle::Bar value) {
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_transitivedependencies::Baz> : public std::true_type{};
+struct IsFidlType<::test_transitivedependencies::Baz> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_transitivedependencies::Baz> {
@@ -114,7 +114,7 @@ struct TypeTraits<::test_transitivedependencies::Baz> {
 };
 
 template <>
-struct IsStruct<::test_transitivedependencies::Baz> : public std::true_type{};
+struct IsStruct<::test_transitivedependencies::Baz> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_transitivedependencies::Baz, ::fidl::internal::NaturalCodingConstraintEmpty> final

@@ -228,11 +228,11 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>> : public std::true_type {};
 template <>
-struct IsResource<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>> : public std::true_type{};
+struct IsResource<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>> {

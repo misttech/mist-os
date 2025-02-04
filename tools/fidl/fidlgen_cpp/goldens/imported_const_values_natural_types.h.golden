@@ -89,7 +89,7 @@ inline MyStruct::MyStruct(Storage_ storage) noexcept : storage_(std::move(storag
 inline MyStruct::MyStruct(uint8_t __reserved) noexcept
     : storage_({.__reserved = std::move(__reserved)}) {}
 inline MyStruct::MyStruct(const ::test_importedconstvalues::MyStruct& other) noexcept : ::test_importedconstvalues::MyStruct(other.CloneStorage_()) {}
-inline MyStruct& ::test_importedconstvalues::MyStruct::operator=(const ::test_importedconstvalues::MyStruct & other) noexcept {
+inline MyStruct& ::test_importedconstvalues::MyStruct::operator=(const ::test_importedconstvalues::MyStruct& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -106,7 +106,7 @@ inline MyStruct& MyStruct::__reserved(uint8_t value) {
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_importedconstvalues::MyStruct> : public std::true_type{};
+struct IsFidlType<::test_importedconstvalues::MyStruct> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_importedconstvalues::MyStruct> {
@@ -118,7 +118,7 @@ struct TypeTraits<::test_importedconstvalues::MyStruct> {
 };
 
 template <>
-struct IsStruct<::test_importedconstvalues::MyStruct> : public std::true_type{};
+struct IsStruct<::test_importedconstvalues::MyStruct> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_importedconstvalues::MyStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final

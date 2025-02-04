@@ -37,6 +37,6 @@ class Example final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_error::Example> : public std::true_type{};
+struct IsProtocol<::test_error::Example> : public std::true_type {};
 
 }  // namespace fidl

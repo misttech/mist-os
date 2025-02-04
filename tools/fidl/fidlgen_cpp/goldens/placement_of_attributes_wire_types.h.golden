@@ -370,11 +370,11 @@ struct TypeTraits<::test_placementofattributes::wire::ExampleProtocolMethodReque
 };
 
 template <>
-struct IsFidlType<::test_placementofattributes::wire::ExampleProtocolMethodRequest> : public std::true_type{};
+struct IsFidlType<::test_placementofattributes::wire::ExampleProtocolMethodRequest> : public std::true_type {};
 template <>
-struct IsWire<::test_placementofattributes::wire::ExampleProtocolMethodRequest> : public std::true_type{};
+struct IsWire<::test_placementofattributes::wire::ExampleProtocolMethodRequest> : public std::true_type {};
 template <>
-struct IsStruct<::test_placementofattributes::wire::ExampleProtocolMethodRequest> : public std::true_type{};
+struct IsStruct<::test_placementofattributes::wire::ExampleProtocolMethodRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_placementofattributes::wire::ExampleProtocolMethodRequest>);
 static_assert(offsetof(::test_placementofattributes::wire::ExampleProtocolMethodRequest, arg) == 0);
 static_assert(sizeof(::test_placementofattributes::wire::ExampleProtocolMethodRequest) == TypeTraits<::test_placementofattributes::wire::ExampleProtocolMethodRequest>::kPrimarySize);
@@ -416,11 +416,11 @@ struct TypeTraits<::test_placementofattributes::wire::ExampleStruct> {
 };
 
 template <>
-struct IsFidlType<::test_placementofattributes::wire::ExampleStruct> : public std::true_type{};
+struct IsFidlType<::test_placementofattributes::wire::ExampleStruct> : public std::true_type {};
 template <>
-struct IsWire<::test_placementofattributes::wire::ExampleStruct> : public std::true_type{};
+struct IsWire<::test_placementofattributes::wire::ExampleStruct> : public std::true_type {};
 template <>
-struct IsStruct<::test_placementofattributes::wire::ExampleStruct> : public std::true_type{};
+struct IsStruct<::test_placementofattributes::wire::ExampleStruct> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_placementofattributes::wire::ExampleStruct>);
 static_assert(offsetof(::test_placementofattributes::wire::ExampleStruct, member) == 0);
 static_assert(sizeof(::test_placementofattributes::wire::ExampleStruct) == TypeTraits<::test_placementofattributes::wire::ExampleStruct>::kPrimarySize);
@@ -462,11 +462,11 @@ struct TypeTraits<::test_placementofattributes::wire::ExampleTable> {
 };
 
 template <>
-struct IsFidlType<::test_placementofattributes::wire::ExampleTable> : public std::true_type{};
+struct IsFidlType<::test_placementofattributes::wire::ExampleTable> : public std::true_type {};
 template <>
-struct IsWire<::test_placementofattributes::wire::ExampleTable> : public std::true_type{};
+struct IsWire<::test_placementofattributes::wire::ExampleTable> : public std::true_type {};
 template <>
-struct IsTable<::test_placementofattributes::wire::ExampleTable> : public std::true_type{};
+struct IsTable<::test_placementofattributes::wire::ExampleTable> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_placementofattributes::wire::ExampleTable>);
 
 template <bool IsRecursive>
@@ -549,11 +549,11 @@ struct TypeTraits<::test_placementofattributes::wire::ExampleUnion> {
 };
 
 template <>
-struct IsFidlType<::test_placementofattributes::wire::ExampleUnion> : public std::true_type{};
+struct IsFidlType<::test_placementofattributes::wire::ExampleUnion> : public std::true_type {};
 template <>
-struct IsWire<::test_placementofattributes::wire::ExampleUnion> : public std::true_type{};
+struct IsWire<::test_placementofattributes::wire::ExampleUnion> : public std::true_type {};
 template <>
-struct IsUnion<::test_placementofattributes::wire::ExampleUnion> : public std::true_type{};
+struct IsUnion<::test_placementofattributes::wire::ExampleUnion> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_placementofattributes::wire::ExampleUnion>);
 
 template <typename Constraint, bool IsRecursive>

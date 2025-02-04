@@ -1313,11 +1313,11 @@ struct TypeTraits<::test_protocollayouts::wire::LocalTablePayload> {
 };
 
 template <>
-struct IsFidlType<::test_protocollayouts::wire::LocalTablePayload> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::wire::LocalTablePayload> : public std::true_type {};
 template <>
-struct IsWire<::test_protocollayouts::wire::LocalTablePayload> : public std::true_type{};
+struct IsWire<::test_protocollayouts::wire::LocalTablePayload> : public std::true_type {};
 template <>
-struct IsTable<::test_protocollayouts::wire::LocalTablePayload> : public std::true_type{};
+struct IsTable<::test_protocollayouts::wire::LocalTablePayload> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::LocalTablePayload>);
 
 template <bool IsRecursive>
@@ -1400,11 +1400,11 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest> {
 };
 
 template <>
-struct IsFidlType<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest> : public std::true_type {};
 template <>
-struct IsWire<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest> : public std::true_type{};
+struct IsWire<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest> : public std::true_type {};
 template <>
-struct IsTable<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest> : public std::true_type{};
+struct IsTable<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>);
 
 template <bool IsRecursive>
@@ -1487,11 +1487,11 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse> 
 };
 
 template <>
-struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse> : public std::true_type {};
 template <>
-struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse> : public std::true_type{};
+struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse> : public std::true_type {};
 template <>
-struct IsTable<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse> : public std::true_type{};
+struct IsTable<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>);
 
 template <bool IsRecursive>
@@ -1574,11 +1574,11 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorR
 };
 
 template <>
-struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type {};
 template <>
-struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type{};
+struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type {};
 template <>
-struct IsTable<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type{};
+struct IsTable<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>);
 
 template <bool IsRecursive>
@@ -1661,11 +1661,11 @@ struct TypeTraits<::test_protocollayouts::wire::LocalUnionPayload> {
 };
 
 template <>
-struct IsFidlType<::test_protocollayouts::wire::LocalUnionPayload> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::wire::LocalUnionPayload> : public std::true_type {};
 template <>
-struct IsWire<::test_protocollayouts::wire::LocalUnionPayload> : public std::true_type{};
+struct IsWire<::test_protocollayouts::wire::LocalUnionPayload> : public std::true_type {};
 template <>
-struct IsUnion<::test_protocollayouts::wire::LocalUnionPayload> : public std::true_type{};
+struct IsUnion<::test_protocollayouts::wire::LocalUnionPayload> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::LocalUnionPayload>);
 
 template <typename Constraint, bool IsRecursive>
@@ -1771,11 +1771,11 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErro
 };
 
 template <>
-struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult> : public std::true_type {};
 template <>
-struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult> : public std::true_type{};
+struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult> : public std::true_type {};
 template <>
-struct IsUnion<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult> : public std::true_type{};
+struct IsUnion<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult>);
 
 template <typename Constraint, bool IsRecursive>
@@ -1893,11 +1893,11 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithError
 };
 
 template <>
-struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type {};
 template <>
-struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type{};
+struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type {};
 template <>
-struct IsUnion<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type{};
+struct IsUnion<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult>);
 
 template <typename Constraint, bool IsRecursive>
@@ -2015,11 +2015,11 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest> {
 };
 
 template <>
-struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest> : public std::true_type {};
 template <>
-struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest> : public std::true_type{};
+struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest> : public std::true_type {};
 template <>
-struct IsUnion<::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest> : public std::true_type{};
+struct IsUnion<::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest>);
 
 template <typename Constraint, bool IsRecursive>
@@ -2125,11 +2125,11 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorR
 };
 
 template <>
-struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type {};
 template <>
-struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type{};
+struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type {};
 template <>
-struct IsUnion<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type{};
+struct IsUnion<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse>);
 
 template <typename Constraint, bool IsRecursive>
@@ -2235,11 +2235,11 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorR
 };
 
 template <>
-struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type {};
 template <>
-struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type{};
+struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type {};
 template <>
-struct IsUnion<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type{};
+struct IsUnion<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult>);
 
 template <typename Constraint, bool IsRecursive>
@@ -2357,11 +2357,11 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolOnAnonRequest> {
 };
 
 template <>
-struct IsFidlType<::test_protocollayouts::wire::MainProtocolOnAnonRequest> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::wire::MainProtocolOnAnonRequest> : public std::true_type {};
 template <>
-struct IsWire<::test_protocollayouts::wire::MainProtocolOnAnonRequest> : public std::true_type{};
+struct IsWire<::test_protocollayouts::wire::MainProtocolOnAnonRequest> : public std::true_type {};
 template <>
-struct IsUnion<::test_protocollayouts::wire::MainProtocolOnAnonRequest> : public std::true_type{};
+struct IsUnion<::test_protocollayouts::wire::MainProtocolOnAnonRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolOnAnonRequest>);
 
 template <typename Constraint, bool IsRecursive>

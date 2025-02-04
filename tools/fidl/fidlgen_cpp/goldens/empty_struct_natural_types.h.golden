@@ -322,7 +322,7 @@ inline Empty::Empty(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline Empty::Empty(uint8_t __reserved) noexcept
     : storage_({.__reserved = std::move(__reserved)}) {}
 inline Empty::Empty(const ::test_emptystruct::Empty& other) noexcept : ::test_emptystruct::Empty(other.CloneStorage_()) {}
-inline Empty& ::test_emptystruct::Empty::operator=(const ::test_emptystruct::Empty & other) noexcept {
+inline Empty& ::test_emptystruct::Empty::operator=(const ::test_emptystruct::Empty& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -339,7 +339,7 @@ inline EmptyProtocolSendRequest::EmptyProtocolSendRequest(Storage_ storage) noex
 inline EmptyProtocolSendRequest::EmptyProtocolSendRequest(::test_emptystruct::Empty e) noexcept
     : storage_({.e = std::move(e)}) {}
 inline EmptyProtocolSendRequest::EmptyProtocolSendRequest(const ::test_emptystruct::EmptyProtocolSendRequest& other) noexcept : ::test_emptystruct::EmptyProtocolSendRequest(other.CloneStorage_()) {}
-inline EmptyProtocolSendRequest& ::test_emptystruct::EmptyProtocolSendRequest::operator=(const ::test_emptystruct::EmptyProtocolSendRequest & other) noexcept {
+inline EmptyProtocolSendRequest& ::test_emptystruct::EmptyProtocolSendRequest::operator=(const ::test_emptystruct::EmptyProtocolSendRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -356,7 +356,7 @@ inline EmptyProtocolReceiveRequest::EmptyProtocolReceiveRequest(Storage_ storage
 inline EmptyProtocolReceiveRequest::EmptyProtocolReceiveRequest(::test_emptystruct::Empty e) noexcept
     : storage_({.e = std::move(e)}) {}
 inline EmptyProtocolReceiveRequest::EmptyProtocolReceiveRequest(const ::test_emptystruct::EmptyProtocolReceiveRequest& other) noexcept : ::test_emptystruct::EmptyProtocolReceiveRequest(other.CloneStorage_()) {}
-inline EmptyProtocolReceiveRequest& ::test_emptystruct::EmptyProtocolReceiveRequest::operator=(const ::test_emptystruct::EmptyProtocolReceiveRequest & other) noexcept {
+inline EmptyProtocolReceiveRequest& ::test_emptystruct::EmptyProtocolReceiveRequest::operator=(const ::test_emptystruct::EmptyProtocolReceiveRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -373,7 +373,7 @@ inline EmptyProtocolSendAndReceiveRequest::EmptyProtocolSendAndReceiveRequest(St
 inline EmptyProtocolSendAndReceiveRequest::EmptyProtocolSendAndReceiveRequest(::test_emptystruct::Empty e) noexcept
     : storage_({.e = std::move(e)}) {}
 inline EmptyProtocolSendAndReceiveRequest::EmptyProtocolSendAndReceiveRequest(const ::test_emptystruct::EmptyProtocolSendAndReceiveRequest& other) noexcept : ::test_emptystruct::EmptyProtocolSendAndReceiveRequest(other.CloneStorage_()) {}
-inline EmptyProtocolSendAndReceiveRequest& ::test_emptystruct::EmptyProtocolSendAndReceiveRequest::operator=(const ::test_emptystruct::EmptyProtocolSendAndReceiveRequest & other) noexcept {
+inline EmptyProtocolSendAndReceiveRequest& ::test_emptystruct::EmptyProtocolSendAndReceiveRequest::operator=(const ::test_emptystruct::EmptyProtocolSendAndReceiveRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -390,7 +390,7 @@ inline EmptyProtocolSendAndReceiveResponse::EmptyProtocolSendAndReceiveResponse(
 inline EmptyProtocolSendAndReceiveResponse::EmptyProtocolSendAndReceiveResponse(::test_emptystruct::Empty e) noexcept
     : storage_({.e = std::move(e)}) {}
 inline EmptyProtocolSendAndReceiveResponse::EmptyProtocolSendAndReceiveResponse(const ::test_emptystruct::EmptyProtocolSendAndReceiveResponse& other) noexcept : ::test_emptystruct::EmptyProtocolSendAndReceiveResponse(other.CloneStorage_()) {}
-inline EmptyProtocolSendAndReceiveResponse& ::test_emptystruct::EmptyProtocolSendAndReceiveResponse::operator=(const ::test_emptystruct::EmptyProtocolSendAndReceiveResponse & other) noexcept {
+inline EmptyProtocolSendAndReceiveResponse& ::test_emptystruct::EmptyProtocolSendAndReceiveResponse::operator=(const ::test_emptystruct::EmptyProtocolSendAndReceiveResponse& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -407,7 +407,7 @@ inline EmptyProtocolSendAndReceiveResponse& EmptyProtocolSendAndReceiveResponse:
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_emptystruct::Empty> : public std::true_type{};
+struct IsFidlType<::test_emptystruct::Empty> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_emptystruct::Empty> {
@@ -419,14 +419,14 @@ struct TypeTraits<::test_emptystruct::Empty> {
 };
 
 template <>
-struct IsStruct<::test_emptystruct::Empty> : public std::true_type{};
+struct IsStruct<::test_emptystruct::Empty> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_emptystruct::Empty, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_emptystruct::Empty> {};
 
 template <>
-struct IsFidlType<::test_emptystruct::EmptyProtocolSendRequest> : public std::true_type{};
+struct IsFidlType<::test_emptystruct::EmptyProtocolSendRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_emptystruct::EmptyProtocolSendRequest> {
@@ -438,14 +438,14 @@ struct TypeTraits<::test_emptystruct::EmptyProtocolSendRequest> {
 };
 
 template <>
-struct IsStruct<::test_emptystruct::EmptyProtocolSendRequest> : public std::true_type{};
+struct IsStruct<::test_emptystruct::EmptyProtocolSendRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_emptystruct::EmptyProtocolSendRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_emptystruct::EmptyProtocolSendRequest, 1> {};
 
 template <>
-struct IsFidlType<::test_emptystruct::EmptyProtocolReceiveRequest> : public std::true_type{};
+struct IsFidlType<::test_emptystruct::EmptyProtocolReceiveRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_emptystruct::EmptyProtocolReceiveRequest> {
@@ -457,14 +457,14 @@ struct TypeTraits<::test_emptystruct::EmptyProtocolReceiveRequest> {
 };
 
 template <>
-struct IsStruct<::test_emptystruct::EmptyProtocolReceiveRequest> : public std::true_type{};
+struct IsStruct<::test_emptystruct::EmptyProtocolReceiveRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_emptystruct::EmptyProtocolReceiveRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_emptystruct::EmptyProtocolReceiveRequest, 1> {};
 
 template <>
-struct IsFidlType<::test_emptystruct::EmptyProtocolSendAndReceiveRequest> : public std::true_type{};
+struct IsFidlType<::test_emptystruct::EmptyProtocolSendAndReceiveRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_emptystruct::EmptyProtocolSendAndReceiveRequest> {
@@ -476,14 +476,14 @@ struct TypeTraits<::test_emptystruct::EmptyProtocolSendAndReceiveRequest> {
 };
 
 template <>
-struct IsStruct<::test_emptystruct::EmptyProtocolSendAndReceiveRequest> : public std::true_type{};
+struct IsStruct<::test_emptystruct::EmptyProtocolSendAndReceiveRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_emptystruct::EmptyProtocolSendAndReceiveRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_emptystruct::EmptyProtocolSendAndReceiveRequest, 1> {};
 
 template <>
-struct IsFidlType<::test_emptystruct::EmptyProtocolSendAndReceiveResponse> : public std::true_type{};
+struct IsFidlType<::test_emptystruct::EmptyProtocolSendAndReceiveResponse> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_emptystruct::EmptyProtocolSendAndReceiveResponse> {
@@ -495,7 +495,7 @@ struct TypeTraits<::test_emptystruct::EmptyProtocolSendAndReceiveResponse> {
 };
 
 template <>
-struct IsStruct<::test_emptystruct::EmptyProtocolSendAndReceiveResponse> : public std::true_type{};
+struct IsStruct<::test_emptystruct::EmptyProtocolSendAndReceiveResponse> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_emptystruct::EmptyProtocolSendAndReceiveResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final

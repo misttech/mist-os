@@ -139,11 +139,11 @@ struct TypeTraits<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayF
 };
 
 template <>
-struct IsFidlType<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailRequest> : public std::true_type{};
+struct IsFidlType<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailRequest> : public std::true_type {};
 template <>
-struct IsWire<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailRequest> : public std::true_type{};
+struct IsWire<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailRequest> : public std::true_type {};
 template <>
-struct IsStruct<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailRequest> : public std::true_type{};
+struct IsStruct<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailRequest>);
 static_assert(offsetof(::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailRequest, s) == 0);
 static_assert(sizeof(::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailRequest) == TypeTraits<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailRequest>::kPrimarySize);
@@ -185,11 +185,11 @@ struct TypeTraits<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayF
 };
 
 template <>
-struct IsFidlType<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResponse> : public std::true_type{};
+struct IsFidlType<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResponse> : public std::true_type {};
 template <>
-struct IsWire<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResponse> : public std::true_type{};
+struct IsWire<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResponse> : public std::true_type {};
 template <>
-struct IsStruct<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResponse> : public std::true_type{};
+struct IsStruct<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResponse>);
 static_assert(offsetof(::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResponse, value) == 0);
 static_assert(sizeof(::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResponse) == TypeTraits<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResponse>::kPrimarySize);
@@ -231,11 +231,11 @@ struct TypeTraits<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayF
 };
 
 template <>
-struct IsFidlType<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult> : public std::true_type{};
+struct IsFidlType<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult> : public std::true_type {};
 template <>
-struct IsWire<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult> : public std::true_type{};
+struct IsWire<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult> : public std::true_type {};
 template <>
-struct IsUnion<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult> : public std::true_type{};
+struct IsUnion<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult>);
 
 template <typename Constraint, bool IsRecursive>

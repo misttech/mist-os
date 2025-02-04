@@ -37,6 +37,6 @@ class SimpleProtocol final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_nullable::SimpleProtocol> : public std::true_type{};
+struct IsProtocol<::test_nullable::SimpleProtocol> : public std::true_type {};
 
 }  // namespace fidl

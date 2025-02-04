@@ -2352,7 +2352,7 @@ struct CodingTraits<::test::union_::Pizza>
     : public EncodableCodingTraits<::test::union_::Pizza, 16> {};
 
 template <>
-struct HasPadding<::test::union_::Pizza> : public std::true_type{};
+struct HasPadding<::test::union_::Pizza> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::union_::Pizza> : public internal::BoolConstant<
@@ -2377,7 +2377,7 @@ struct CodingTraits<::test::union_::Pasta>
     : public EncodableCodingTraits<::test::union_::Pasta, 16> {};
 
 template <>
-struct HasPadding<::test::union_::Pasta> : public std::true_type{};
+struct HasPadding<::test::union_::Pasta> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::union_::Pasta> : public internal::BoolConstant<
@@ -2398,7 +2398,7 @@ struct Equality<::test::union_::Pasta> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::PizzaOrPasta> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::PizzaOrPasta> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::PizzaOrPasta>
@@ -2455,7 +2455,7 @@ struct Equality<::test::union_::PizzaOrPasta> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::ExplicitPizzaOrPasta> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::ExplicitPizzaOrPasta> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::ExplicitPizzaOrPasta>
@@ -2512,7 +2512,7 @@ struct Equality<::test::union_::ExplicitPizzaOrPasta> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::FlexiblePizzaOrPasta> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::FlexiblePizzaOrPasta> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::FlexiblePizzaOrPasta>
@@ -2568,7 +2568,7 @@ struct Equality<::test::union_::FlexiblePizzaOrPasta> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::StrictPizzaOrPasta> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::StrictPizzaOrPasta> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::StrictPizzaOrPasta>
@@ -2625,7 +2625,7 @@ struct Equality<::test::union_::StrictPizzaOrPasta> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::Union> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::Union> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::Union>
@@ -2684,7 +2684,7 @@ struct Equality<::test::union_::Union> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::FlexibleUnion> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::FlexibleUnion> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::FlexibleUnion>
@@ -2742,7 +2742,7 @@ struct Equality<::test::union_::FlexibleUnion> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::StrictUnion> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::StrictUnion> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::StrictUnion>
@@ -2801,7 +2801,7 @@ struct Equality<::test::union_::StrictUnion> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::FieldCollision> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::FieldCollision> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::FieldCollision>
@@ -2856,7 +2856,7 @@ struct Equality<::test::union_::FieldCollision> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::ExplicitUnion> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::ExplicitUnion> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::ExplicitUnion>
@@ -2913,7 +2913,7 @@ struct Equality<::test::union_::ExplicitUnion> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::ReverseOrdinalUnion> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::ReverseOrdinalUnion> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::ReverseOrdinalUnion>
@@ -2974,7 +2974,7 @@ struct CodingTraits<::test::union_::NullableUnionStruct>
     : public EncodableCodingTraits<::test::union_::NullableUnionStruct, 16> {};
 
 template <>
-struct HasPadding<::test::union_::NullableUnionStruct> : public std::true_type{};
+struct HasPadding<::test::union_::NullableUnionStruct> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::union_::NullableUnionStruct> : public internal::BoolConstant<
@@ -2995,7 +2995,7 @@ struct Equality<::test::union_::NullableUnionStruct> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::FlexibleFoo> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::FlexibleFoo> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::FlexibleFoo>
@@ -3051,7 +3051,7 @@ struct Equality<::test::union_::FlexibleFoo> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::StrictFoo> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::StrictFoo> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::StrictFoo>
@@ -3108,7 +3108,7 @@ struct Equality<::test::union_::StrictFoo> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::ExplicitFoo> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::ExplicitFoo> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::ExplicitFoo>
@@ -3164,7 +3164,7 @@ struct Equality<::test::union_::ExplicitFoo> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::ExplicitStrictFoo> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::ExplicitStrictFoo> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::ExplicitStrictFoo>
@@ -3221,7 +3221,7 @@ struct Equality<::test::union_::ExplicitStrictFoo> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::OlderSimpleUnion> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::OlderSimpleUnion> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::OlderSimpleUnion>
@@ -3277,7 +3277,7 @@ struct Equality<::test::union_::OlderSimpleUnion> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::NewerSimpleUnion> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::NewerSimpleUnion> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::NewerSimpleUnion>
@@ -3335,7 +3335,7 @@ struct Equality<::test::union_::NewerSimpleUnion> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::StrictSimpleUnion> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::StrictSimpleUnion> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::StrictSimpleUnion>
@@ -3416,7 +3416,7 @@ struct Equality<::test::union_::Empty> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::UnionContainingEmptyStruct> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::UnionContainingEmptyStruct> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::UnionContainingEmptyStruct>
@@ -3470,7 +3470,7 @@ struct Equality<::test::union_::UnionContainingEmptyStruct> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::StrictBoundedUnion> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::StrictBoundedUnion> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::StrictBoundedUnion>
@@ -3529,7 +3529,7 @@ struct CodingTraits<::test::union_::TestProtocolStrictUnionHenceResponseMayBeSta
     : public EncodableCodingTraits<::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, 16> {};
 
 template <>
-struct HasPadding<::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> : public std::true_type{};
+struct HasPadding<::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> : public internal::BoolConstant<
@@ -3594,7 +3594,7 @@ struct Equality<::test::union_::StructWithNullableUnion> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::ExplicitFlexibleUnion> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::ExplicitFlexibleUnion> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::ExplicitFlexibleUnion>
@@ -3654,7 +3654,7 @@ struct CodingTraits<::test::union_::UnionSandwich>
     : public EncodableCodingTraits<::test::union_::UnionSandwich, 32> {};
 
 template <>
-struct HasPadding<::test::union_::UnionSandwich> : public std::true_type{};
+struct HasPadding<::test::union_::UnionSandwich> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::union_::UnionSandwich> : public internal::BoolConstant<
@@ -3681,7 +3681,7 @@ struct Equality<::test::union_::UnionSandwich> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::UnionWithAttributes> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::UnionWithAttributes> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::UnionWithAttributes>
@@ -3735,7 +3735,7 @@ struct Equality<::test::union_::UnionWithAttributes> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::EmptyFlexibleUnion> : public std::true_type{};
+struct IsFidlXUnion<::test::union_::EmptyFlexibleUnion> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::union_::EmptyFlexibleUnion>

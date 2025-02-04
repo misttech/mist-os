@@ -37,6 +37,6 @@ class TwoWay final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_drivertwoway::TwoWay> : public std::true_type{};
+struct IsProtocol<::test_drivertwoway::TwoWay> : public std::true_type {};
 
 }  // namespace fidl

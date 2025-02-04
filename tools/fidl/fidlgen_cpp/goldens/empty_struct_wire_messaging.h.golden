@@ -301,9 +301,9 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send>> {
@@ -327,9 +327,9 @@ static_assert(offsetof(::test_emptystruct::wire::EmptyProtocolSendRequest, e) ==
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive>> {
@@ -351,9 +351,9 @@ static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_emptystruct::
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive>> {
@@ -376,11 +376,11 @@ static_assert(offsetof(::test_emptystruct::wire::EmptyProtocolSendAndReceiveRequ
 #endif  // __Fuchsia__
 
 template <>
-struct IsFidlType<::fidl::internal::TransactionalResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>> : public std::true_type {};
 template <>
-struct IsFidlType<::fidl::WireResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>> : public std::true_type{};
+struct IsFidlType<::fidl::WireResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>> {

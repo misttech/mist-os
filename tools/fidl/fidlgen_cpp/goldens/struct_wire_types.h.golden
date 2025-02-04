@@ -62,11 +62,11 @@ struct TypeTraits<::test_struct::wire::Simple> {
 };
 
 template <>
-struct IsFidlType<::test_struct::wire::Simple> : public std::true_type{};
+struct IsFidlType<::test_struct::wire::Simple> : public std::true_type {};
 template <>
-struct IsWire<::test_struct::wire::Simple> : public std::true_type{};
+struct IsWire<::test_struct::wire::Simple> : public std::true_type {};
 template <>
-struct IsStruct<::test_struct::wire::Simple> : public std::true_type{};
+struct IsStruct<::test_struct::wire::Simple> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_struct::wire::Simple>);
 static_assert(offsetof(::test_struct::wire::Simple, f1) == 0);
 static_assert(offsetof(::test_struct::wire::Simple, f2) == 1);
@@ -112,11 +112,11 @@ struct TypeTraits<::test_struct::wire::BasicStruct> {
 };
 
 template <>
-struct IsFidlType<::test_struct::wire::BasicStruct> : public std::true_type{};
+struct IsFidlType<::test_struct::wire::BasicStruct> : public std::true_type {};
 template <>
-struct IsWire<::test_struct::wire::BasicStruct> : public std::true_type{};
+struct IsWire<::test_struct::wire::BasicStruct> : public std::true_type {};
 template <>
-struct IsStruct<::test_struct::wire::BasicStruct> : public std::true_type{};
+struct IsStruct<::test_struct::wire::BasicStruct> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_struct::wire::BasicStruct>);
 static_assert(offsetof(::test_struct::wire::BasicStruct, x) == 0);
 static_assert(offsetof(::test_struct::wire::BasicStruct, y) == 8);

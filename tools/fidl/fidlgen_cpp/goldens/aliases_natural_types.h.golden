@@ -274,9 +274,9 @@ namespace fidl {
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_aliases::ExampleOfUseOfAliases> : public std::true_type{};
+struct IsResource<::test_aliases::ExampleOfUseOfAliases> : public std::true_type {};
 template <>
-struct IsFidlType<::test_aliases::ExampleOfUseOfAliases> : public std::true_type{};
+struct IsFidlType<::test_aliases::ExampleOfUseOfAliases> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_aliases::ExampleOfUseOfAliases> {
@@ -288,7 +288,7 @@ struct TypeTraits<::test_aliases::ExampleOfUseOfAliases> {
 };
 
 template <>
-struct IsStruct<::test_aliases::ExampleOfUseOfAliases> : public std::true_type{};
+struct IsStruct<::test_aliases::ExampleOfUseOfAliases> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_aliases::ExampleOfUseOfAliases, ::fidl::internal::NaturalCodingConstraintEmpty> final

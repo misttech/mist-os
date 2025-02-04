@@ -971,11 +971,11 @@ struct TypeTraits<::test_anonymous::wire::OverrideTest> {
 };
 
 template <>
-struct IsFidlType<::test_anonymous::wire::OverrideTest> : public std::true_type{};
+struct IsFidlType<::test_anonymous::wire::OverrideTest> : public std::true_type {};
 template <>
-struct IsWire<::test_anonymous::wire::OverrideTest> : public std::true_type{};
+struct IsWire<::test_anonymous::wire::OverrideTest> : public std::true_type {};
 template <>
-struct IsStruct<::test_anonymous::wire::OverrideTest> : public std::true_type{};
+struct IsStruct<::test_anonymous::wire::OverrideTest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_anonymous::wire::OverrideTest>);
 static_assert(offsetof(::test_anonymous::wire::OverrideTest, op) == 0);
 static_assert(offsetof(::test_anonymous::wire::OverrideTest, left) == 8);
@@ -1027,11 +1027,11 @@ struct TypeTraits<::test_anonymous::wire::TableData> {
 };
 
 template <>
-struct IsFidlType<::test_anonymous::wire::TableData> : public std::true_type{};
+struct IsFidlType<::test_anonymous::wire::TableData> : public std::true_type {};
 template <>
-struct IsWire<::test_anonymous::wire::TableData> : public std::true_type{};
+struct IsWire<::test_anonymous::wire::TableData> : public std::true_type {};
 template <>
-struct IsStruct<::test_anonymous::wire::TableData> : public std::true_type{};
+struct IsStruct<::test_anonymous::wire::TableData> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_anonymous::wire::TableData>);
 static_assert(offsetof(::test_anonymous::wire::TableData, data) == 0);
 static_assert(sizeof(::test_anonymous::wire::TableData) == TypeTraits<::test_anonymous::wire::TableData>::kPrimarySize);
@@ -1073,11 +1073,11 @@ struct TypeTraits<::test_anonymous::wire::SomeProtocolSomeMethodRequest> {
 };
 
 template <>
-struct IsFidlType<::test_anonymous::wire::SomeProtocolSomeMethodRequest> : public std::true_type{};
+struct IsFidlType<::test_anonymous::wire::SomeProtocolSomeMethodRequest> : public std::true_type {};
 template <>
-struct IsWire<::test_anonymous::wire::SomeProtocolSomeMethodRequest> : public std::true_type{};
+struct IsWire<::test_anonymous::wire::SomeProtocolSomeMethodRequest> : public std::true_type {};
 template <>
-struct IsStruct<::test_anonymous::wire::SomeProtocolSomeMethodRequest> : public std::true_type{};
+struct IsStruct<::test_anonymous::wire::SomeProtocolSomeMethodRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_anonymous::wire::SomeProtocolSomeMethodRequest>);
 static_assert(offsetof(::test_anonymous::wire::SomeProtocolSomeMethodRequest, union_member) == 0);
 static_assert(offsetof(::test_anonymous::wire::SomeProtocolSomeMethodRequest, table_member) == 16);
@@ -1123,11 +1123,11 @@ struct TypeTraits<::test_anonymous::wire::SomeProtocolSomeMethodResponse> {
 };
 
 template <>
-struct IsFidlType<::test_anonymous::wire::SomeProtocolSomeMethodResponse> : public std::true_type{};
+struct IsFidlType<::test_anonymous::wire::SomeProtocolSomeMethodResponse> : public std::true_type {};
 template <>
-struct IsWire<::test_anonymous::wire::SomeProtocolSomeMethodResponse> : public std::true_type{};
+struct IsWire<::test_anonymous::wire::SomeProtocolSomeMethodResponse> : public std::true_type {};
 template <>
-struct IsStruct<::test_anonymous::wire::SomeProtocolSomeMethodResponse> : public std::true_type{};
+struct IsStruct<::test_anonymous::wire::SomeProtocolSomeMethodResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_anonymous::wire::SomeProtocolSomeMethodResponse>);
 static_assert(offsetof(::test_anonymous::wire::SomeProtocolSomeMethodResponse, bits_member) == 0);
 static_assert(sizeof(::test_anonymous::wire::SomeProtocolSomeMethodResponse) == TypeTraits<::test_anonymous::wire::SomeProtocolSomeMethodResponse>::kPrimarySize);
@@ -1169,11 +1169,11 @@ struct TypeTraits<::test_anonymous::wire::FunctionApplication> {
 };
 
 template <>
-struct IsFidlType<::test_anonymous::wire::FunctionApplication> : public std::true_type{};
+struct IsFidlType<::test_anonymous::wire::FunctionApplication> : public std::true_type {};
 template <>
-struct IsWire<::test_anonymous::wire::FunctionApplication> : public std::true_type{};
+struct IsWire<::test_anonymous::wire::FunctionApplication> : public std::true_type {};
 template <>
-struct IsTable<::test_anonymous::wire::FunctionApplication> : public std::true_type{};
+struct IsTable<::test_anonymous::wire::FunctionApplication> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_anonymous::wire::FunctionApplication>);
 
 template <bool IsRecursive>
@@ -1280,11 +1280,11 @@ struct TypeTraits<::test_anonymous::wire::TableMember> {
 };
 
 template <>
-struct IsFidlType<::test_anonymous::wire::TableMember> : public std::true_type{};
+struct IsFidlType<::test_anonymous::wire::TableMember> : public std::true_type {};
 template <>
-struct IsWire<::test_anonymous::wire::TableMember> : public std::true_type{};
+struct IsWire<::test_anonymous::wire::TableMember> : public std::true_type {};
 template <>
-struct IsTable<::test_anonymous::wire::TableMember> : public std::true_type{};
+struct IsTable<::test_anonymous::wire::TableMember> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_anonymous::wire::TableMember>);
 
 template <bool IsRecursive>
@@ -1367,11 +1367,11 @@ struct TypeTraits<::test_anonymous::wire::Expression> {
 };
 
 template <>
-struct IsFidlType<::test_anonymous::wire::Expression> : public std::true_type{};
+struct IsFidlType<::test_anonymous::wire::Expression> : public std::true_type {};
 template <>
-struct IsWire<::test_anonymous::wire::Expression> : public std::true_type{};
+struct IsWire<::test_anonymous::wire::Expression> : public std::true_type {};
 template <>
-struct IsUnion<::test_anonymous::wire::Expression> : public std::true_type{};
+struct IsUnion<::test_anonymous::wire::Expression> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_anonymous::wire::Expression>);
 
 template <typename Constraint, bool IsRecursive>
@@ -1501,11 +1501,11 @@ struct TypeTraits<::test_anonymous::wire::UnionMember> {
 };
 
 template <>
-struct IsFidlType<::test_anonymous::wire::UnionMember> : public std::true_type{};
+struct IsFidlType<::test_anonymous::wire::UnionMember> : public std::true_type {};
 template <>
-struct IsWire<::test_anonymous::wire::UnionMember> : public std::true_type{};
+struct IsWire<::test_anonymous::wire::UnionMember> : public std::true_type {};
 template <>
-struct IsUnion<::test_anonymous::wire::UnionMember> : public std::true_type{};
+struct IsUnion<::test_anonymous::wire::UnionMember> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_anonymous::wire::UnionMember>);
 
 template <typename Constraint, bool IsRecursive>
@@ -1611,11 +1611,11 @@ struct TypeTraits<::test_anonymous::wire::SomeProtocolSomeMethodResult> {
 };
 
 template <>
-struct IsFidlType<::test_anonymous::wire::SomeProtocolSomeMethodResult> : public std::true_type{};
+struct IsFidlType<::test_anonymous::wire::SomeProtocolSomeMethodResult> : public std::true_type {};
 template <>
-struct IsWire<::test_anonymous::wire::SomeProtocolSomeMethodResult> : public std::true_type{};
+struct IsWire<::test_anonymous::wire::SomeProtocolSomeMethodResult> : public std::true_type {};
 template <>
-struct IsUnion<::test_anonymous::wire::SomeProtocolSomeMethodResult> : public std::true_type{};
+struct IsUnion<::test_anonymous::wire::SomeProtocolSomeMethodResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_anonymous::wire::SomeProtocolSomeMethodResult>);
 
 template <typename Constraint, bool IsRecursive>

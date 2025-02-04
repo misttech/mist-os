@@ -178,7 +178,7 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 template <>
-struct IsResource<::test_handles::wire::Handles> : public std::true_type{};
+struct IsResource<::test_handles::wire::Handles> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_handles::wire::Handles> {
@@ -192,11 +192,11 @@ struct TypeTraits<::test_handles::wire::Handles> {
 };
 
 template <>
-struct IsFidlType<::test_handles::wire::Handles> : public std::true_type{};
+struct IsFidlType<::test_handles::wire::Handles> : public std::true_type {};
 template <>
-struct IsWire<::test_handles::wire::Handles> : public std::true_type{};
+struct IsWire<::test_handles::wire::Handles> : public std::true_type {};
 template <>
-struct IsStruct<::test_handles::wire::Handles> : public std::true_type{};
+struct IsStruct<::test_handles::wire::Handles> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_handles::wire::Handles>);
 static_assert(offsetof(::test_handles::wire::Handles, plain_handle) == 0);
 static_assert(offsetof(::test_handles::wire::Handles, bti_handle) == 4);
@@ -362,7 +362,7 @@ struct ::fidl::internal::WireCodingTraits<::test_handles::wire::Handles, ::fidl:
 
 #ifdef __Fuchsia__
 template <>
-struct IsResource<::test_handles::wire::FdfHandles> : public std::true_type{};
+struct IsResource<::test_handles::wire::FdfHandles> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_handles::wire::FdfHandles> {
@@ -376,11 +376,11 @@ struct TypeTraits<::test_handles::wire::FdfHandles> {
 };
 
 template <>
-struct IsFidlType<::test_handles::wire::FdfHandles> : public std::true_type{};
+struct IsFidlType<::test_handles::wire::FdfHandles> : public std::true_type {};
 template <>
-struct IsWire<::test_handles::wire::FdfHandles> : public std::true_type{};
+struct IsWire<::test_handles::wire::FdfHandles> : public std::true_type {};
 template <>
-struct IsStruct<::test_handles::wire::FdfHandles> : public std::true_type{};
+struct IsStruct<::test_handles::wire::FdfHandles> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_handles::wire::FdfHandles>);
 static_assert(offsetof(::test_handles::wire::FdfHandles, fdf_channel_handle) == 0);
 static_assert(offsetof(::test_handles::wire::FdfHandles, client_end_driver) == 4);

@@ -61,7 +61,7 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 template <>
-struct IsResource<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest> : public std::true_type{};
+struct IsResource<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest> {
@@ -75,11 +75,11 @@ struct TypeTraits<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest>
 };
 
 template <>
-struct IsFidlType<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest> : public std::true_type{};
+struct IsFidlType<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest> : public std::true_type {};
 template <>
-struct IsWire<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest> : public std::true_type{};
+struct IsWire<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest> : public std::true_type {};
 template <>
-struct IsStruct<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest> : public std::true_type{};
+struct IsStruct<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest>);
 static_assert(offsetof(::test_inheritancewithrecursivedecl::wire::ParentFirstRequest, request) == 0);
 static_assert(sizeof(::test_inheritancewithrecursivedecl::wire::ParentFirstRequest) == TypeTraits<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest>::kPrimarySize);
@@ -113,7 +113,7 @@ struct ::fidl::internal::WireCodingTraits<::test_inheritancewithrecursivedecl::w
 
 #ifdef __Fuchsia__
 template <>
-struct IsResource<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest> : public std::true_type{};
+struct IsResource<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest> {
@@ -127,11 +127,11 @@ struct TypeTraits<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest>
 };
 
 template <>
-struct IsFidlType<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest> : public std::true_type{};
+struct IsFidlType<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest> : public std::true_type {};
 template <>
-struct IsWire<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest> : public std::true_type{};
+struct IsWire<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest> : public std::true_type {};
 template <>
-struct IsStruct<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest> : public std::true_type{};
+struct IsStruct<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest>);
 static_assert(offsetof(::test_inheritancewithrecursivedecl::wire::ChildSecondRequest, request) == 0);
 static_assert(sizeof(::test_inheritancewithrecursivedecl::wire::ChildSecondRequest) == TypeTraits<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest>::kPrimarySize);

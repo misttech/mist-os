@@ -269,7 +269,7 @@ inline ExampleUseOfErrorSyntaxCallWhichMayFailRequest::ExampleUseOfErrorSyntaxCa
 inline ExampleUseOfErrorSyntaxCallWhichMayFailRequest::ExampleUseOfErrorSyntaxCallWhichMayFailRequest(::std::string s) noexcept
     : storage_({.s = std::move(s)}) {}
 inline ExampleUseOfErrorSyntaxCallWhichMayFailRequest::ExampleUseOfErrorSyntaxCallWhichMayFailRequest(const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest& other) noexcept : ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest(other.CloneStorage_()) {}
-inline ExampleUseOfErrorSyntaxCallWhichMayFailRequest& ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest::operator=(const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest & other) noexcept {
+inline ExampleUseOfErrorSyntaxCallWhichMayFailRequest& ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest::operator=(const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -286,7 +286,7 @@ inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse::ExampleUseOfErrorSyntaxC
 inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse::ExampleUseOfErrorSyntaxCallWhichMayFailResponse(int64_t value) noexcept
     : storage_({.value = std::move(value)}) {}
 inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse::ExampleUseOfErrorSyntaxCallWhichMayFailResponse(const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse& other) noexcept : ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse(other.CloneStorage_()) {}
-inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse& ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse::operator=(const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse & other) noexcept {
+inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse& ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse::operator=(const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -303,7 +303,7 @@ inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse& ExampleUseOfErrorSyntaxC
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest> : public std::true_type{};
+struct IsFidlType<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest> {
@@ -315,14 +315,14 @@ struct TypeTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailReq
 };
 
 template <>
-struct IsStruct<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest> : public std::true_type{};
+struct IsStruct<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest, 16> {};
 
 template <>
-struct IsFidlType<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse> : public std::true_type{};
+struct IsFidlType<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse> {
@@ -334,14 +334,14 @@ struct TypeTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRes
 };
 
 template <>
-struct IsStruct<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse> : public std::true_type{};
+struct IsStruct<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse, 8> {};
 
 template <>
-struct IsFidlType<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult> : public std::true_type{};
+struct IsFidlType<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult> {
@@ -353,7 +353,7 @@ struct TypeTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRes
 };
 
 template <>
-struct IsUnion<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult> : public std::true_type{};
+struct IsUnion<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult, ::fidl::internal::NaturalCodingConstraintEmpty> final

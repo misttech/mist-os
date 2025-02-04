@@ -250,9 +250,9 @@ namespace fidl {
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_versions::Struct> : public std::true_type{};
+struct IsResource<::test_versions::Struct> : public std::true_type {};
 template <>
-struct IsFidlType<::test_versions::Struct> : public std::true_type{};
+struct IsFidlType<::test_versions::Struct> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_versions::Struct> {
@@ -264,7 +264,7 @@ struct TypeTraits<::test_versions::Struct> {
 };
 
 template <>
-struct IsStruct<::test_versions::Struct> : public std::true_type{};
+struct IsStruct<::test_versions::Struct> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_versions::Struct, ::fidl::internal::NaturalCodingConstraintEmpty> final
@@ -275,9 +275,9 @@ struct internal::NaturalCodingTraits<::test_versions::Struct, ::fidl::internal::
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_versions::Table> : public std::true_type{};
+struct IsResource<::test_versions::Table> : public std::true_type {};
 template <>
-struct IsFidlType<::test_versions::Table> : public std::true_type{};
+struct IsFidlType<::test_versions::Table> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_versions::Table> {
@@ -289,7 +289,7 @@ struct TypeTraits<::test_versions::Table> {
 };
 
 template <>
-struct IsTable<::test_versions::Table> : public std::true_type{};
+struct IsTable<::test_versions::Table> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_versions::Table, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_versions::Table> {};
@@ -299,9 +299,9 @@ struct internal::NaturalCodingTraits<::test_versions::Table, ::fidl::internal::N
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_versions::Union> : public std::true_type{};
+struct IsResource<::test_versions::Union> : public std::true_type {};
 template <>
-struct IsFidlType<::test_versions::Union> : public std::true_type{};
+struct IsFidlType<::test_versions::Union> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_versions::Union> {
@@ -313,7 +313,7 @@ struct TypeTraits<::test_versions::Union> {
 };
 
 template <>
-struct IsUnion<::test_versions::Union> : public std::true_type{};
+struct IsUnion<::test_versions::Union> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_versions::Union, ::fidl::internal::NaturalCodingConstraintEmpty> final

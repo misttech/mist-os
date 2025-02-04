@@ -369,9 +369,9 @@ class MainProtocol final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_protocollayoutssamelibrary::ComposedProtocol> : public std::true_type{};
+struct IsProtocol<::test_protocollayoutssamelibrary::ComposedProtocol> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_protocollayoutssamelibrary::MainProtocol> : public std::true_type{};
+struct IsProtocol<::test_protocollayoutssamelibrary::MainProtocol> : public std::true_type {};
 
 }  // namespace fidl

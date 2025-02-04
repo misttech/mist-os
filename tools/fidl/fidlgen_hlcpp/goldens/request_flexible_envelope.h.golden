@@ -360,7 +360,7 @@ class Protocol_ResponseEncoder {
 namespace fidl {
 
 template <>
-struct IsFidlXUnion<::test::requestflexibleenvelope::FlexibleFoo> : public std::true_type{};
+struct IsFidlXUnion<::test::requestflexibleenvelope::FlexibleFoo> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::requestflexibleenvelope::FlexibleFoo>
@@ -416,7 +416,7 @@ struct Equality<::test::requestflexibleenvelope::FlexibleFoo> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::requestflexibleenvelope::StrictFoo> : public std::true_type{};
+struct IsFidlXUnion<::test::requestflexibleenvelope::StrictFoo> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::requestflexibleenvelope::StrictFoo>
@@ -477,7 +477,7 @@ struct CodingTraits<::test::requestflexibleenvelope::ProtocolRequestStrictRespon
     : public EncodableCodingTraits<::test::requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest, 16> {};
 
 template <>
-struct HasPadding<::test::requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest> : public std::true_type{};
+struct HasPadding<::test::requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest> : public internal::BoolConstant<
@@ -502,7 +502,7 @@ struct CodingTraits<::test::requestflexibleenvelope::ProtocolRequestStrictRespon
     : public EncodableCodingTraits<::test::requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse, 16> {};
 
 template <>
-struct HasPadding<::test::requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse> : public std::true_type{};
+struct HasPadding<::test::requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse> : public internal::BoolConstant<
@@ -527,7 +527,7 @@ struct CodingTraits<::test::requestflexibleenvelope::ProtocolRequestFlexibleResp
     : public EncodableCodingTraits<::test::requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest, 16> {};
 
 template <>
-struct HasPadding<::test::requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest> : public std::true_type{};
+struct HasPadding<::test::requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest> : public internal::BoolConstant<
@@ -552,7 +552,7 @@ struct CodingTraits<::test::requestflexibleenvelope::ProtocolRequestFlexibleResp
     : public EncodableCodingTraits<::test::requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse, 16> {};
 
 template <>
-struct HasPadding<::test::requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse> : public std::true_type{};
+struct HasPadding<::test::requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse> : public internal::BoolConstant<

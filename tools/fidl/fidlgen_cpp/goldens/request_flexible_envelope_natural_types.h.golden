@@ -512,7 +512,7 @@ inline ProtocolRequestStrictResponseFlexibleRequest::ProtocolRequestStrictRespon
 inline ProtocolRequestStrictResponseFlexibleRequest::ProtocolRequestStrictResponseFlexibleRequest(::test_requestflexibleenvelope::StrictFoo s) noexcept
     : storage_({.s = std::move(s)}) {}
 inline ProtocolRequestStrictResponseFlexibleRequest::ProtocolRequestStrictResponseFlexibleRequest(const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest& other) noexcept : ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest(other.CloneStorage_()) {}
-inline ProtocolRequestStrictResponseFlexibleRequest& ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest::operator=(const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest & other) noexcept {
+inline ProtocolRequestStrictResponseFlexibleRequest& ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest::operator=(const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -529,7 +529,7 @@ inline ProtocolRequestStrictResponseFlexibleResponse::ProtocolRequestStrictRespo
 inline ProtocolRequestStrictResponseFlexibleResponse::ProtocolRequestStrictResponseFlexibleResponse(::test_requestflexibleenvelope::FlexibleFoo f) noexcept
     : storage_({.f = std::move(f)}) {}
 inline ProtocolRequestStrictResponseFlexibleResponse::ProtocolRequestStrictResponseFlexibleResponse(const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse& other) noexcept : ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse(other.CloneStorage_()) {}
-inline ProtocolRequestStrictResponseFlexibleResponse& ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse::operator=(const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse & other) noexcept {
+inline ProtocolRequestStrictResponseFlexibleResponse& ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse::operator=(const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -546,7 +546,7 @@ inline ProtocolRequestFlexibleResponseStrictRequest::ProtocolRequestFlexibleResp
 inline ProtocolRequestFlexibleResponseStrictRequest::ProtocolRequestFlexibleResponseStrictRequest(::test_requestflexibleenvelope::FlexibleFoo s) noexcept
     : storage_({.s = std::move(s)}) {}
 inline ProtocolRequestFlexibleResponseStrictRequest::ProtocolRequestFlexibleResponseStrictRequest(const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest& other) noexcept : ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest(other.CloneStorage_()) {}
-inline ProtocolRequestFlexibleResponseStrictRequest& ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest::operator=(const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest & other) noexcept {
+inline ProtocolRequestFlexibleResponseStrictRequest& ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest::operator=(const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -563,7 +563,7 @@ inline ProtocolRequestFlexibleResponseStrictResponse::ProtocolRequestFlexibleRes
 inline ProtocolRequestFlexibleResponseStrictResponse::ProtocolRequestFlexibleResponseStrictResponse(::test_requestflexibleenvelope::StrictFoo f) noexcept
     : storage_({.f = std::move(f)}) {}
 inline ProtocolRequestFlexibleResponseStrictResponse::ProtocolRequestFlexibleResponseStrictResponse(const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse& other) noexcept : ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse(other.CloneStorage_()) {}
-inline ProtocolRequestFlexibleResponseStrictResponse& ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse::operator=(const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse & other) noexcept {
+inline ProtocolRequestFlexibleResponseStrictResponse& ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse::operator=(const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -580,7 +580,7 @@ inline ProtocolRequestFlexibleResponseStrictResponse& ProtocolRequestFlexibleRes
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest> : public std::true_type{};
+struct IsFidlType<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest> {
@@ -592,14 +592,14 @@ struct TypeTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseF
 };
 
 template <>
-struct IsStruct<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest> : public std::true_type{};
+struct IsStruct<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest, 16> {};
 
 template <>
-struct IsFidlType<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse> : public std::true_type{};
+struct IsFidlType<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse> {
@@ -611,14 +611,14 @@ struct TypeTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseF
 };
 
 template <>
-struct IsStruct<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse> : public std::true_type{};
+struct IsStruct<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse, 16> {};
 
 template <>
-struct IsFidlType<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest> : public std::true_type{};
+struct IsFidlType<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest> {
@@ -630,14 +630,14 @@ struct TypeTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleRespons
 };
 
 template <>
-struct IsStruct<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest> : public std::true_type{};
+struct IsStruct<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest, 16> {};
 
 template <>
-struct IsFidlType<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse> : public std::true_type{};
+struct IsFidlType<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse> {
@@ -649,14 +649,14 @@ struct TypeTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleRespons
 };
 
 template <>
-struct IsStruct<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse> : public std::true_type{};
+struct IsStruct<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse, 16> {};
 
 template <>
-struct IsFidlType<::test_requestflexibleenvelope::FlexibleFoo> : public std::true_type{};
+struct IsFidlType<::test_requestflexibleenvelope::FlexibleFoo> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_requestflexibleenvelope::FlexibleFoo> {
@@ -668,14 +668,14 @@ struct TypeTraits<::test_requestflexibleenvelope::FlexibleFoo> {
 };
 
 template <>
-struct IsUnion<::test_requestflexibleenvelope::FlexibleFoo> : public std::true_type{};
+struct IsUnion<::test_requestflexibleenvelope::FlexibleFoo> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_requestflexibleenvelope::FlexibleFoo, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_requestflexibleenvelope::FlexibleFoo> {};
 
 template <>
-struct IsFidlType<::test_requestflexibleenvelope::StrictFoo> : public std::true_type{};
+struct IsFidlType<::test_requestflexibleenvelope::StrictFoo> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_requestflexibleenvelope::StrictFoo> {
@@ -687,7 +687,7 @@ struct TypeTraits<::test_requestflexibleenvelope::StrictFoo> {
 };
 
 template <>
-struct IsUnion<::test_requestflexibleenvelope::StrictFoo> : public std::true_type{};
+struct IsUnion<::test_requestflexibleenvelope::StrictFoo> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_requestflexibleenvelope::StrictFoo, ::fidl::internal::NaturalCodingConstraintEmpty> final

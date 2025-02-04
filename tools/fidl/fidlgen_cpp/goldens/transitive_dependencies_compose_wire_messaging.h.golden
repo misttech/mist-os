@@ -182,9 +182,9 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_transitivedependenciescompose::Top::GetFoo>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_transitivedependenciescompose::Top::GetFoo>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_transitivedependenciescompose::Top::GetFoo>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_transitivedependenciescompose::Top::GetFoo>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_transitivedependenciescompose::Top::GetFoo>> {
@@ -204,11 +204,11 @@ static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_transitived
 #endif  // __Fuchsia__
 
 template <>
-struct IsFidlType<::fidl::internal::TransactionalResponse<::test_transitivedependenciescompose::Top::GetFoo>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalResponse<::test_transitivedependenciescompose::Top::GetFoo>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_transitivedependenciescompose::Top::GetFoo>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_transitivedependenciescompose::Top::GetFoo>> : public std::true_type {};
 template <>
-struct IsFidlType<::fidl::WireResponse<::test_transitivedependenciescompose::Top::GetFoo>> : public std::true_type{};
+struct IsFidlType<::fidl::WireResponse<::test_transitivedependenciescompose::Top::GetFoo>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_transitivedependenciescompose::Top::GetFoo>> {

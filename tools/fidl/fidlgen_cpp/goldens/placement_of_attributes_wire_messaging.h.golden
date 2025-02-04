@@ -121,9 +121,9 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method>> {

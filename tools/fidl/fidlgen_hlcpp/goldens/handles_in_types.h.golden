@@ -467,7 +467,7 @@ struct Equality<::test::handlesintypes::TableWithHandle> {
 #ifdef __Fuchsia__
 
 template <>
-struct IsFidlXUnion<::test::handlesintypes::UnionWithHandle> : public std::true_type{};
+struct IsFidlXUnion<::test::handlesintypes::UnionWithHandle> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::handlesintypes::UnionWithHandle>
@@ -530,7 +530,7 @@ struct CodingTraits<::test::handlesintypes::HandlesInTypes>
     : public EncodableCodingTraits<::test::handlesintypes::HandlesInTypes, 96> {};
 
 template <>
-struct HasPadding<::test::handlesintypes::HandlesInTypes> : public std::true_type{};
+struct HasPadding<::test::handlesintypes::HandlesInTypes> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::handlesintypes::HandlesInTypes> : public internal::BoolConstant<
@@ -617,7 +617,7 @@ struct Equality<::test::handlesintypes::EmptyResourceTable> {
 #ifdef __Fuchsia__
 
 template <>
-struct IsFidlXUnion<::test::handlesintypes::EmptyResourceUnion> : public std::true_type{};
+struct IsFidlXUnion<::test::handlesintypes::EmptyResourceUnion> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::handlesintypes::EmptyResourceUnion>

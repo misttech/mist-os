@@ -359,7 +359,7 @@ struct internal::WireCodingTraits<::test_versions::wire::Enum, ::fidl::internal:
 
 #ifdef __Fuchsia__
 template <>
-struct IsResource<::test_versions::wire::Struct> : public std::true_type{};
+struct IsResource<::test_versions::wire::Struct> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_versions::wire::Struct> {
@@ -373,11 +373,11 @@ struct TypeTraits<::test_versions::wire::Struct> {
 };
 
 template <>
-struct IsFidlType<::test_versions::wire::Struct> : public std::true_type{};
+struct IsFidlType<::test_versions::wire::Struct> : public std::true_type {};
 template <>
-struct IsWire<::test_versions::wire::Struct> : public std::true_type{};
+struct IsWire<::test_versions::wire::Struct> : public std::true_type {};
 template <>
-struct IsStruct<::test_versions::wire::Struct> : public std::true_type{};
+struct IsStruct<::test_versions::wire::Struct> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_versions::wire::Struct>);
 static_assert(offsetof(::test_versions::wire::Struct, x) == 0);
 static_assert(sizeof(::test_versions::wire::Struct) == TypeTraits<::test_versions::wire::Struct>::kPrimarySize);
@@ -411,7 +411,7 @@ struct ::fidl::internal::WireCodingTraits<::test_versions::wire::Struct, ::fidl:
 
 #ifdef __Fuchsia__
 template <>
-struct IsResource<::test_versions::wire::Table> : public std::true_type{};
+struct IsResource<::test_versions::wire::Table> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_versions::wire::Table> {
@@ -425,11 +425,11 @@ struct TypeTraits<::test_versions::wire::Table> {
 };
 
 template <>
-struct IsFidlType<::test_versions::wire::Table> : public std::true_type{};
+struct IsFidlType<::test_versions::wire::Table> : public std::true_type {};
 template <>
-struct IsWire<::test_versions::wire::Table> : public std::true_type{};
+struct IsWire<::test_versions::wire::Table> : public std::true_type {};
 template <>
-struct IsTable<::test_versions::wire::Table> : public std::true_type{};
+struct IsTable<::test_versions::wire::Table> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_versions::wire::Table>);
 
 template <bool IsRecursive>
@@ -504,7 +504,7 @@ struct ::fidl::internal::WireCodingTraits<::test_versions::wire::Table, ::fidl::
 
 #ifdef __Fuchsia__
 template <>
-struct IsResource<::test_versions::wire::Union> : public std::true_type{};
+struct IsResource<::test_versions::wire::Union> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_versions::wire::Union> {
@@ -518,11 +518,11 @@ struct TypeTraits<::test_versions::wire::Union> {
 };
 
 template <>
-struct IsFidlType<::test_versions::wire::Union> : public std::true_type{};
+struct IsFidlType<::test_versions::wire::Union> : public std::true_type {};
 template <>
-struct IsWire<::test_versions::wire::Union> : public std::true_type{};
+struct IsWire<::test_versions::wire::Union> : public std::true_type {};
 template <>
-struct IsUnion<::test_versions::wire::Union> : public std::true_type{};
+struct IsUnion<::test_versions::wire::Union> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_versions::wire::Union>);
 
 template <typename Constraint, bool IsRecursive>

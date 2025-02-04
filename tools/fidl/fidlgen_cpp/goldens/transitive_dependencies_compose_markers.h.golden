@@ -37,6 +37,6 @@ class Top final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_transitivedependenciescompose::Top> : public std::true_type{};
+struct IsProtocol<::test_transitivedependenciescompose::Top> : public std::true_type {};
 
 }  // namespace fidl

@@ -103,7 +103,7 @@ inline DocCommentWithQuotes::DocCommentWithQuotes(Storage_ storage) noexcept : s
 inline DocCommentWithQuotes::DocCommentWithQuotes(uint8_t __reserved) noexcept
     : storage_({.__reserved = std::move(__reserved)}) {}
 inline DocCommentWithQuotes::DocCommentWithQuotes(const ::test_escaping::DocCommentWithQuotes& other) noexcept : ::test_escaping::DocCommentWithQuotes(other.CloneStorage_()) {}
-inline DocCommentWithQuotes& ::test_escaping::DocCommentWithQuotes::operator=(const ::test_escaping::DocCommentWithQuotes & other) noexcept {
+inline DocCommentWithQuotes& ::test_escaping::DocCommentWithQuotes::operator=(const ::test_escaping::DocCommentWithQuotes& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -120,7 +120,7 @@ inline DocCommentWithQuotes& DocCommentWithQuotes::__reserved(uint8_t value) {
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_escaping::DocCommentWithQuotes> : public std::true_type{};
+struct IsFidlType<::test_escaping::DocCommentWithQuotes> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_escaping::DocCommentWithQuotes> {
@@ -132,7 +132,7 @@ struct TypeTraits<::test_escaping::DocCommentWithQuotes> {
 };
 
 template <>
-struct IsStruct<::test_escaping::DocCommentWithQuotes> : public std::true_type{};
+struct IsStruct<::test_escaping::DocCommentWithQuotes> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_escaping::DocCommentWithQuotes, ::fidl::internal::NaturalCodingConstraintEmpty> final
