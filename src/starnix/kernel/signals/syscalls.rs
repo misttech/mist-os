@@ -145,7 +145,8 @@ pub fn sys_rt_sigprocmask(
 
 type SigAltStackPtr = MultiArchUserRef<uapi::sigaltstack, uapi::arch32::sigaltstack>;
 
-fn sigaltstack(
+pub fn sys_sigaltstack(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     user_ss: SigAltStackPtr,
     user_old_ss: SigAltStackPtr,
@@ -188,15 +189,6 @@ fn sigaltstack(
     }
 
     Ok(())
-}
-
-pub fn sys_sigaltstack(
-    _locked: &mut Locked<'_, Unlocked>,
-    current_task: &CurrentTask,
-    user_ss: UserRef<sigaltstack>,
-    user_old_ss: UserRef<sigaltstack>,
-) -> Result<(), Errno> {
-    sigaltstack(current_task, user_ss.into(), user_old_ss.into())
 }
 
 pub fn sys_rt_sigsuspend(
@@ -879,25 +871,7 @@ fn negate_pid(pid: pid_t) -> Result<pid_t, Errno> {
 // Syscalls for arch32 usage
 #[cfg(feature = "arch32")]
 mod arch32 {
-    use crate::signals::syscalls::{sigaltstack, SigAltStackPtr};
-    use crate::task::CurrentTask;
-    use starnix_sync::{Locked, Unlocked};
-    use starnix_uapi::errors::Errno;
-    use starnix_uapi::uapi;
-    use starnix_uapi::user_address::UserRef;
-
-    pub fn sys_arch32_sigaltstack(
-        _locked: &mut Locked<'_, Unlocked>,
-        current_task: &CurrentTask,
-        user_ss: UserRef<uapi::arch32::sigaltstack>,
-        user_old_ss: UserRef<uapi::arch32::sigaltstack>,
-    ) -> Result<(), Errno> {
-        sigaltstack(
-            current_task,
-            SigAltStackPtr::from_32(user_ss),
-            SigAltStackPtr::from_32(user_old_ss),
-        )
-    }
+    pub use super::sys_sigaltstack as sys_arch32_sigaltstack;
 }
 
 #[cfg(feature = "arch32")]
@@ -931,7 +905,7 @@ mod tests {
         let nullptr = UserRef::<sigaltstack>::default();
 
         // Check that the initial state is disabled.
-        sys_sigaltstack(&mut locked, &current_task, nullptr, user_ss)
+        sys_sigaltstack(&mut locked, &current_task, nullptr.into(), user_ss.into())
             .expect("failed to call sigaltstack");
         let mut ss = current_task.read_object(user_ss).expect("failed to read struct");
         assert!(ss.ss_flags & (SS_DISABLE as i32) != 0);
@@ -941,12 +915,12 @@ mod tests {
         ss.ss_size = 0x1000;
         ss.ss_flags = SS_AUTODISARM as i32;
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
-        sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr)
+        sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into())
             .expect("failed to call sigaltstack");
         current_task
             .write_memory(addr, &[0u8; std::mem::size_of::<sigaltstack>()])
             .expect("failed to clear struct");
-        sys_sigaltstack(&mut locked, &current_task, nullptr, user_ss)
+        sys_sigaltstack(&mut locked, &current_task, nullptr.into(), user_ss.into())
             .expect("failed to call sigaltstack");
         let another_ss = current_task.read_object(user_ss).expect("failed to read struct");
         assert_eq!(ss.as_bytes(), another_ss.as_bytes());
@@ -954,12 +928,12 @@ mod tests {
         // Disable the sigaltstack and read it back out.
         let ss = sigaltstack { ss_flags: SS_DISABLE as i32, ..sigaltstack::default() };
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
-        sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr)
+        sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into())
             .expect("failed to call sigaltstack");
         current_task
             .write_memory(addr, &[0u8; std::mem::size_of::<sigaltstack>()])
             .expect("failed to clear struct");
-        sys_sigaltstack(&mut locked, &current_task, nullptr, user_ss)
+        sys_sigaltstack(&mut locked, &current_task, nullptr.into(), user_ss.into())
             .expect("failed to call sigaltstack");
         let ss = current_task.read_object(user_ss).expect("failed to read struct");
         assert!(ss.ss_flags & (SS_DISABLE as i32) != 0);
@@ -974,7 +948,7 @@ mod tests {
         let nullptr = UserRef::<sigaltstack>::default();
 
         // Check that the initial state is disabled.
-        sys_sigaltstack(&mut locked, &current_task, nullptr, user_ss)
+        sys_sigaltstack(&mut locked, &current_task, nullptr.into(), user_ss.into())
             .expect("failed to call sigaltstack");
         let mut ss = current_task.read_object(user_ss).expect("failed to read struct");
         assert!(ss.ss_flags & (SS_DISABLE as i32) != 0);
@@ -992,7 +966,10 @@ mod tests {
         ss.ss_flags = 0;
         ss.ss_size = MINSIGSTKSZ as u64 - 1;
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
-        assert_eq!(sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr), error!(ENOMEM));
+        assert_eq!(
+            sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into()),
+            error!(ENOMEM)
+        );
     }
 
     #[cfg(target_arch = "x86_64")]
@@ -1005,7 +982,7 @@ mod tests {
         let nullptr = UserRef::<sigaltstack>::default();
 
         // Check that the initial state is disabled.
-        sys_sigaltstack(&mut locked, &current_task, nullptr, user_ss)
+        sys_sigaltstack(&mut locked, &current_task, nullptr.into(), user_ss.into())
             .expect("failed to call sigaltstack");
         let mut ss = current_task.read_object(user_ss).expect("failed to read struct");
         assert!(ss.ss_flags & (SS_DISABLE as i32) != 0);
@@ -1023,7 +1000,7 @@ mod tests {
         ss.ss_flags = 0;
         ss.ss_size = sigaltstack_addr_size as u64;
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
-        sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr)
+        sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into())
             .expect("failed to call sigaltstack");
 
         // Changing the sigaltstack while we are there should be an error.
@@ -1031,7 +1008,10 @@ mod tests {
             (sigaltstack_addr + sigaltstack_addr_size).ptr() as u64;
         ss.ss_flags = SS_DISABLE as i32;
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
-        assert_eq!(sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr), error!(EPERM));
+        assert_eq!(
+            sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into()),
+            error!(EPERM)
+        );
 
         // However, setting the rsp to a different value outside the alt stack should allow us to
         // disable it.
@@ -1039,7 +1019,7 @@ mod tests {
             (sigaltstack_addr + sigaltstack_addr_size + 0x1000usize).ptr() as u64;
         let ss = sigaltstack { ss_flags: SS_DISABLE as i32, ..sigaltstack::default() };
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
-        sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr)
+        sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into())
             .expect("failed to call sigaltstack");
     }
 
@@ -1053,7 +1033,7 @@ mod tests {
         let nullptr = UserRef::<sigaltstack>::default();
 
         // Check that the initial state is disabled.
-        sys_sigaltstack(&mut locked, &current_task, nullptr, user_ss)
+        sys_sigaltstack(&mut locked, &current_task, nullptr.into(), user_ss.into())
             .expect("failed to call sigaltstack");
         let mut ss = current_task.read_object(user_ss).expect("failed to read struct");
         assert!(ss.ss_flags & (SS_DISABLE as i32) != 0);
@@ -1071,7 +1051,7 @@ mod tests {
         ss.ss_flags = 0;
         ss.ss_size = u64::MAX;
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
-        sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr)
+        sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into())
             .expect("failed to call sigaltstack");
 
         // Changing the sigaltstack while we are there should be an error.
@@ -1079,13 +1059,16 @@ mod tests {
             (sigaltstack_addr + sigaltstack_addr_size).ptr() as u64;
         ss.ss_flags = SS_DISABLE as i32;
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
-        assert_eq!(sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr), error!(EPERM));
+        assert_eq!(
+            sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into()),
+            error!(EPERM)
+        );
 
         // However, setting the rsp to a low value should work (it doesn't wrap-around).
         current_task.thread_state.registers.rsp = 0u64;
         let ss = sigaltstack { ss_flags: SS_DISABLE as i32, ..sigaltstack::default() };
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
-        sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr)
+        sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into())
             .expect("failed to call sigaltstack");
     }
 
