@@ -29,11 +29,6 @@ fpromise::result<fidl::WireSharedClient<Protocol>, zx_status_t> ConnectWithResul
 
 // Opens the given `path` in `ns`, and returns a fpromise::result containing a
 // fidl::WireSharedClient on success.
-// TODO(https://fxbug.dev/324080864): Remove this when we no longer support io1.
-fpromise::result<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> OpenWithResultDeprecated(
-    const fdf::Namespace& ns, async_dispatcher_t* dispatcher, const char* path,
-    fuchsia_io::OpenFlags flags);
-
 fpromise::result<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> OpenWithResult(
     const fdf::Namespace& ns, async_dispatcher_t* dispatcher, const char* path,
     fuchsia_io::Flags flags);
@@ -48,17 +43,6 @@ fpromise::promise<fidl::WireSharedClient<Protocol>, zx_status_t> Connect(
     const char* protocol_name = fidl::DiscoverableProtocolName<Protocol>) {
   return fpromise::make_result_promise(
       internal::ConnectWithResult<Protocol>(ns, dispatcher, protocol_name));
-}
-
-// Opens the given `path` in `ns`, and returns a fpromise::promise containing a
-// fidl::WireSharedClient on success. Uses deprecated fuchsia.io/Directory.Open1.
-// TODO(https://fxbug.dev/324080864): Mark this as removed when we update all out-of-tree usages.
-inline fpromise::promise<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> Open(
-    const fdf::Namespace& ns, async_dispatcher_t* dispatcher, const char* path,
-    fuchsia_io::OpenFlags flags)
-    ZX_DEPRECATED_SINCE(1, 24, "Use new signature that takes fuchsia.io/Flags instead.") {
-  return fpromise::make_result_promise(
-      internal::OpenWithResultDeprecated(ns, dispatcher, path, flags));
 }
 
 // Opens the given `path` in `ns`, and returns a fpromise::promise containing a

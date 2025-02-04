@@ -150,24 +150,6 @@ class Namespace final {
     return zx::ok(std::move(client_end));
   }
 
-  // Protocol must compose fuchsia.io/Node. Uses deprecated fuchsia.io/Directory.Open1.
-  // DriverTransport is not supported. Protocols using DriverTransport must be service members.
-  // TODO(https://fxbug.dev/324080864): Remove this when we no longer support io1.
-  template <typename Protocol>
-  zx::result<fidl::ClientEnd<Protocol>> Open(const char* path, fuchsia_io::OpenFlags flags) const
-      ZX_DEPRECATED_SINCE(
-          1, 24, "Use new signature that takes fuchsia.io/Flags instead of fuchsia.io/OpenFlags.") {
-    static_assert(!fidl::IsServiceMemberV<Protocol>, "Protocol must not be a ServiceMember.");
-    static_assert((std::is_same_v<typename Protocol::Transport, fidl::internal::ChannelTransport>),
-                  "Protocol must use ChannelTransport. Use a ServiceMember for DriverTransport.");
-    auto [client_end, server_end] = fidl::Endpoints<Protocol>::Create();
-    zx::result result = OpenDeprecated(path, flags, server_end.TakeChannel());
-    if (result.is_error()) {
-      return result.take_error();
-    }
-    return zx::ok(std::move(client_end));
-  }
-
   // Connects to the |ServiceMember| protocol.
   //
   // |instance| refers to the name of the instance of the service.
@@ -258,12 +240,7 @@ class Namespace final {
   Namespace(const Namespace& other) = delete;
   Namespace& operator=(const Namespace& other) = delete;
 
-  // Opens the |path| in the driver's namespace with Open1. DriverTransport is not supported.
-  // TODO(https://fxbug.dev/324080864): Remove this when we no longer support io1.
-  zx::result<> OpenDeprecated(const char* path, fuchsia_io::OpenFlags flags,
-                              zx::channel server_end) const;
-
-  // Opens the |path| in the driver's namespace with Open3. DriverTransport is not supported.
+  // Opens |path| in the driver's namespace. DriverTransport is not supported.
   zx::result<> Open(const char* path, fuchsia_io::Flags flags, zx::channel server_end) const;
 
   fdio_ns_t* incoming_ = nullptr;

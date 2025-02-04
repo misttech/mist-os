@@ -87,13 +87,6 @@ Namespace& Namespace::operator=(Namespace&& other) noexcept {
   return *this;
 }
 
-zx::result<> Namespace::OpenDeprecated(const char* path, fuchsia_io::OpenFlags flags,
-                                       zx::channel server_end) const {
-  zx_status_t status =
-      fdio_ns_open(incoming_, path, static_cast<uint32_t>(flags), server_end.release());
-  return zx::make_result(status);
-}
-
 zx::result<> Namespace::Open(const char* path, fuchsia_io::Flags flags,
                              zx::channel server_end) const {
   zx_status_t status =
