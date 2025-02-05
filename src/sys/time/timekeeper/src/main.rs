@@ -152,6 +152,10 @@ impl Config {
         self.source_config.has_real_time_clock
     }
 
+    fn has_always_on_counter(&self) -> bool {
+        self.source_config.has_always_on_counter
+    }
+
     fn serve_fuchsia_time_alarms(&self) -> bool {
         self.source_config.serve_fuchsia_time_alarms
     }
@@ -250,22 +254,6 @@ async fn main() -> Result<()> {
         CobaltDiagnostics::new(cobalt_experiment, &primary_track, &monitor_track),
     ));
 
-    info!("connecting to RTC");
-    let optional_rtc = match RtcImpl::only_device(config.has_rtc()).await {
-        Ok(rtc) => {
-            debug!("RTC found.");
-            Some(rtc)
-        }
-        Err(err) => {
-            match err {
-                RtcCreationError::NoDevices => info!("no RTC devices found."),
-                _ => warn!("failed to connect to RTC: {}", err),
-            };
-            diagnostics.record(Event::InitializeRtc { outcome: err.into(), time: None });
-            None
-        }
-    };
-
     let persistence_node = inspector_root.create_child("persistence");
     let persistence_health = Rc::new(RefCell::new(health::Node::new(&persistence_node)));
     persistence_health.borrow_mut().set_ok();
@@ -286,20 +274,55 @@ async fn main() -> Result<()> {
     let serve_test_protocols = config.serve_test_protocols();
     let serve_fuchsia_time_alarms = config.serve_fuchsia_time_alarms();
     let ps = persistent_state.clone();
-    fasync::Task::local(async move {
-        maintain_utc(
-            primary_track,
-            monitor_track,
-            optional_rtc,
-            diagnostics,
-            config,
-            cmd_send_clone,
-            cmd_rcv,
-            ps,
-        )
-        .await;
-    })
-    .detach();
+
+    if config.has_always_on_counter() {
+        // A read only RTC implementation using an always-on counter.
+        let read_only_rtc = rtc::new_read_only_rtc(persistent_state.clone());
+        fasync::Task::local(async move {
+            maintain_utc(
+                primary_track,
+                monitor_track,
+                Some(read_only_rtc),
+                diagnostics,
+                config,
+                cmd_send_clone,
+                cmd_rcv,
+                ps,
+            )
+            .await;
+        })
+        .detach();
+    } else {
+        // A conventional (PC-like) RTC implementation.
+        let optional_rtc: Option<RtcImpl> = match RtcImpl::only_device(config.has_rtc()).await {
+            Ok(rtc) => {
+                debug!("RTC found.");
+                Some(rtc)
+            }
+            Err(err) => {
+                match err {
+                    RtcCreationError::NoDevices => info!("no RTC devices found."),
+                    _ => warn!("failed to connect to RTC: {}", err),
+                };
+                diagnostics.record(Event::InitializeRtc { outcome: err.into(), time: None });
+                None
+            }
+        };
+        fasync::Task::local(async move {
+            maintain_utc(
+                primary_track,
+                monitor_track,
+                optional_rtc,
+                diagnostics,
+                config,
+                cmd_send_clone,
+                cmd_rcv,
+                ps,
+            )
+            .await;
+        })
+        .detach();
+    }
 
     let loop_inspect = inspector_root.create_child("wake_alarms");
 
@@ -496,7 +519,7 @@ async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
 /// The top-level control loop for time synchronization.
 ///
 /// Maintains the utc clock using updates received over the `fuchsia.time.external` protocols.
-async fn maintain_utc<R: 'static, D: 'static>(
+async fn maintain_utc<R: Rtc, D: 'static>(
     primary: PrimaryTrack,
     optional_monitor: Option<MonitorTrack>,
     optional_rtc: Option<R>,
@@ -506,7 +529,6 @@ async fn maintain_utc<R: 'static, D: 'static>(
     cmd_recv: mpsc::Receiver<Command>,
     persistent_state: Rc<RefCell<time_persistence::State>>,
 ) where
-    R: Rtc,
     D: Diagnostics,
 {
     info!("record the state at initialization.");

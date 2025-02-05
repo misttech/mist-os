@@ -106,8 +106,7 @@ rustc_binary("bin") {
     "//src/lib/test_util",
     "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:assert_matches",
-
-    #"//third_party/rust_crates:tempfile",
+    "//third_party/rust_crates:tempfile",
     "//third_party/rust_crates:test-case",
   ]
 }
