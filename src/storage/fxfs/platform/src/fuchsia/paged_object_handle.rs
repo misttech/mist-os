@@ -326,7 +326,7 @@ impl PagedObjectHandle {
         }
         let new_inner = Inner {
             dirty_page_count: inner.dirty_page_count + pages_added,
-            spare: SPARE_SIZE,
+            spare: if pages_added == 0 { inner.spare } else { SPARE_SIZE },
             ..*inner
         };
         let previous_reservation = inner.reservation();
@@ -1182,7 +1182,7 @@ mod tests {
     use crate::fuchsia::node::FxNode;
     use crate::fuchsia::pager::{default_page_in, PageInRange, PagerPacketReceiverRegistration};
     use crate::fuchsia::testing::{
-        close_dir_checked, close_file_checked, open_file_checked, TestFixture,
+        close_dir_checked, close_file_checked, open_file_checked, TestFixture, TestFixtureOptions,
     };
     use crate::fuchsia::volume::FxVolumeAndRoot;
     use anyhow::bail;
@@ -2629,6 +2629,118 @@ mod tests {
         // the overwrite transactions committed above as part of the fallocate range above will
         // consume journal space and this space may lead to a compaction that frees the prefix of
         // the journal, creating up to around 128kb of available space.
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_file_allocate_write_disk_full_multi_file() {
+        let page_size = zx::system_get_page_size() as u64;
+        let write_data = (0..20).cycle().take(page_size as usize).collect::<Vec<_>>();
+
+        let device = {
+            let fixture = TestFixture::new_unencrypted().await;
+            let root = fixture.root();
+
+            {
+                let file = open_file_checked(
+                    &root,
+                    fio::OpenFlags::CREATE
+                        | fio::OpenFlags::RIGHT_READABLE
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::NOT_DIRECTORY,
+                    FILE_NAME,
+                )
+                .await;
+                file.allocate(0, page_size * 4, fio::AllocateMode::empty())
+                    .await
+                    .unwrap()
+                    .map_err(zx::Status::from_raw)
+                    .unwrap();
+                file.close().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+            }
+
+            fixture.close().await
+        };
+
+        let fixture = TestFixture::open(
+            device,
+            TestFixtureOptions {
+                encrypted: false,
+                as_blob: false,
+                format: false,
+                serve_volume: false,
+            },
+        )
+        .await;
+        let root = fixture.root();
+
+        let filler_file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            "filler",
+        )
+        .await;
+        loop {
+            match filler_file.write(&write_data).await.unwrap().map_err(zx::Status::from_raw) {
+                Ok(len) => assert_eq!(len, page_size),
+                Err(status) => {
+                    assert_eq!(status, zx::Status::NO_SPACE);
+                    break;
+                }
+            }
+        }
+
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        // Writing outside the allocated range fails.
+        assert_eq!(
+            file.write_at(&write_data, page_size * 4).await.unwrap().map_err(zx::Status::from_raw),
+            Err(zx::Status::NO_SPACE)
+        );
+
+        for _ in 0..100 {
+            // Writing inside the allocated range succeeds indefinitely.
+            assert_eq!(
+                file.write_at(&write_data, 0).await.unwrap().map_err(zx::Status::from_raw).unwrap(),
+                page_size
+            );
+            assert_eq!(
+                file.write_at(&write_data, page_size)
+                    .await
+                    .unwrap()
+                    .map_err(zx::Status::from_raw)
+                    .unwrap(),
+                page_size
+            );
+            assert_eq!(
+                file.write_at(&write_data, page_size * 2)
+                    .await
+                    .unwrap()
+                    .map_err(zx::Status::from_raw)
+                    .unwrap(),
+                page_size
+            );
+            assert_eq!(
+                file.write_at(&write_data, page_size * 3)
+                    .await
+                    .unwrap()
+                    .map_err(zx::Status::from_raw)
+                    .unwrap(),
+                page_size
+            );
+            file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        }
 
         fixture.close().await;
     }
