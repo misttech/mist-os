@@ -23,10 +23,6 @@
 #include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 
-// TODO(https://fxbug.dev/394148660): Remove config-stamp.h include after
-// drivers are migrated to DriverConfigStamp.
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
-
 namespace display {
 
 // The methods in the [`fuchsia.hardware.display.engine/Engine`] FIDL interface.
@@ -68,20 +64,9 @@ class DisplayEngineInterface {
       cpp20::span<const display::DriverLayer> layers,
       cpp20::span<display::LayerCompositionOperations> layer_composition_operations) = 0;
 
-  // TODO(https://fxbug.dev/394148660): Remove implementation and switch back to
-  // pure virtual method after drivers are migrated to DriverConfigStamp.
   virtual void ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
                                   cpp20::span<const display::DriverLayer> layers,
-                                  display::DriverConfigStamp driver_config_stamp) {
-    display::ConfigStamp config_stamp(driver_config_stamp.value());
-    ApplyConfiguration(display_id, display_mode_id, layers, config_stamp);
-  }
-
-  // TODO(https://fxbug.dev/394148660): Remove overload after drivers are
-  // migrated to DriverConfigStamp.
-  virtual void ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
-                                  cpp20::span<const display::DriverLayer> layers,
-                                  display::ConfigStamp driver_config_stamp) {}
+                                  display::DriverConfigStamp driver_config_stamp) = 0;
 
   virtual zx::result<> SetBufferCollectionConstraints(
       const display::ImageBufferUsage& image_buffer_usage,
