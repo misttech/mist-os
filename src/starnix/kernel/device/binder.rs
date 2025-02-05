@@ -3530,7 +3530,7 @@ impl BinderDriver {
             release_after!(guard, &mut actions, {
                 let target_proc = target_proc.ok_or(TransactionError::Dead)?;
                 let weak_task = current_task.get_task(target_proc.pid);
-                let target_task = weak_task.upgrade().ok_or_else(|| TransactionError::Dead)?;
+                let target_task = weak_task.upgrade().ok_or(TransactionError::Dead)?;
                 let security_context: Option<FsString> =
                     if object.flags.contains(BinderObjectFlags::TXN_SECURITY_CTX) {
                         let mut security_context = FsString::from(
@@ -3688,7 +3688,7 @@ impl BinderDriver {
             binder_thread.lock().pop_transaction_caller(current_task)?;
         if let Err(e) = release_after!(policy, current_task, || -> Result<(), TransactionError> {
             let weak_task = current_task.get_task(target_proc.pid);
-            let target_task = weak_task.upgrade().ok_or_else(|| TransactionError::Dead)?;
+            let target_task = weak_task.upgrade().ok_or(TransactionError::Dead)?;
 
             // Copy the transaction data to the target process.
             let (buffers, transaction_state) = self.copy_transaction_buffers(

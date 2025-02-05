@@ -297,7 +297,7 @@ impl Calls {
         let active_calls: Vec<_> = self
             .current_calls
             .calls()
-            .filter_map(|(i, call)| (i != index && call.is_active()).then(|| i))
+            .filter_map(|(i, call)| (i != index && call.is_active()).then_some(i))
             .collect();
 
         let mut txn = pending::Transaction::default();

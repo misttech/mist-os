@@ -69,7 +69,7 @@ impl<T> MaskedVec<T> {
             .iter()
             .enumerate()
             .skip(self.skipped.get())
-            .filter_map(|(i, cell)| cell.mask.get().then(|| (Index(i), &cell.val)))
+            .filter_map(|(i, cell)| cell.mask.get().then_some((Index(i), &cell.val)))
     }
 
     pub fn clear(&mut self) {
@@ -202,7 +202,7 @@ impl LayerWorkbench {
         }
 
         (!acc_cover.is_empty(context.props.get(id).fill_rule))
-            .then(|| CoverCarry { cover: acc_cover, layer_id: id })
+            .then_some(CoverCarry { cover: acc_cover, layer_id: id })
     }
 
     fn optimization_passes<'c, P: LayerProps>(

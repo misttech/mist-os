@@ -234,7 +234,7 @@ impl Metadata {
             .skip(1) // The first partition is unused.
             .filter_map(|(index, e)| {
                 let partition = PartitionEntry::read_from_bytes(e).unwrap();
-                partition.is_allocated().then(|| (index as u16, partition))
+                partition.is_allocated().then_some((index as u16, partition))
             })
             .collect();
         let allocations: Vec<_> = if allocation_size < std::mem::size_of::<SliceEntry>() {

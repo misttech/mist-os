@@ -615,7 +615,7 @@ where
     let now = bindings_ctx.now();
 
     let target = query.group_addr();
-    let target = QueryTarget::new(target).ok_or_else(|| NotAMemberErr(target))?;
+    let target = QueryTarget::new(target).ok_or(NotAMemberErr(target))?;
     let iter = match target {
         QueryTarget::Unspecified => either::Either::Left(
             groups

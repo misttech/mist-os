@@ -219,7 +219,7 @@ impl<S: SshProvider> Registrar for RealRegistrar<S> {
             .await
             .manager
             .get(&repo_target_info.repo_name)
-            .ok_or_else(|| ffx::RepositoryError::NoMatchingRepository)?;
+            .ok_or(ffx::RepositoryError::NoMatchingRepository)?;
 
         let repo_server_listen_addr = match inner.read().await.server.listen_addr() {
             Some(repo_server_listen_addr) => repo_server_listen_addr,
@@ -303,7 +303,7 @@ impl<S: SshProvider> Registrar for RealRegistrar<S> {
             .await
             .manager
             .get(repo_name)
-            .ok_or_else(|| ffx::RepositoryError::NoMatchingRepository)?;
+            .ok_or(ffx::RepositoryError::NoMatchingRepository)?;
 
         // Make sure the repository is up to date.
         update_repository(repo_name, &repo).await?;
@@ -558,7 +558,7 @@ impl<T: EventHandlerProvider<R>, R: Registrar> Repo<T, R> {
                 );
                 ffx::RepositoryError::InternalError
             })?
-            .ok_or_else(|| ffx::RepositoryError::NoMatchingRegistration)?;
+            .ok_or(ffx::RepositoryError::NoMatchingRegistration)?;
 
         // Finally, remove the registration config from the ffx config.
         pkg::config::remove_registration(&repo_name, &target_nodename).await.map_err(|err| {

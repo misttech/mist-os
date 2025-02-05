@@ -284,8 +284,8 @@ impl TryFrom<fcrunner::ComponentNamespaceEntry> for Entry {
 
     fn try_from(entry: fcrunner::ComponentNamespaceEntry) -> Result<Self, Self::Error> {
         Ok(Self {
-            path: entry.path.ok_or_else(|| EntryError::MissingPath)?.parse()?,
-            directory: entry.directory.ok_or_else(|| EntryError::MissingDirectory)?,
+            path: entry.path.ok_or(EntryError::MissingPath)?.parse()?,
+            directory: entry.directory.ok_or(EntryError::MissingDirectory)?,
         })
     }
 }
@@ -295,8 +295,8 @@ impl TryFrom<fcomponent::NamespaceEntry> for Entry {
 
     fn try_from(entry: fcomponent::NamespaceEntry) -> Result<Self, Self::Error> {
         Ok(Self {
-            path: entry.path.ok_or_else(|| EntryError::MissingPath)?.parse()?,
-            directory: entry.directory.ok_or_else(|| EntryError::MissingDirectory)?,
+            path: entry.path.ok_or(EntryError::MissingPath)?.parse()?,
+            directory: entry.directory.ok_or(EntryError::MissingDirectory)?,
         })
     }
 }

@@ -963,7 +963,7 @@ impl<A: IpAddress> TcpSegmentBuilder<A> {
 
     /// Returns the ACK number, if present.
     pub fn ack_num(&self) -> Option<u32> {
-        self.data_offset_reserved_flags.ack().then(|| self.ack_num)
+        self.data_offset_reserved_flags.ack().then_some(self.ack_num)
     }
 
     /// Returns the unscaled window size

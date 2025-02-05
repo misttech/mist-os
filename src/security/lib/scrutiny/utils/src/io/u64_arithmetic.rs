@@ -138,11 +138,11 @@ impl<'lhs, 'rhs, LHS: U64Eval, RHS: U64Eval> U64Eval for U64Expression<'lhs, 'rh
         match self.op {
             U64Operation::Add => lhs
                 .checked_add(rhs)
-                .ok_or_else(|| U64ArithmeticError { lhs, op: U64Operation::Add, rhs })
+                .ok_or(U64ArithmeticError { lhs, op: U64Operation::Add, rhs })
                 .with_context(|| self.context()),
             U64Operation::Subtract => lhs
                 .checked_sub(rhs)
-                .ok_or_else(|| U64ArithmeticError { lhs, op: U64Operation::Subtract, rhs })
+                .ok_or(U64ArithmeticError { lhs, op: U64Operation::Subtract, rhs })
                 .with_context(|| self.context()),
         }
     }

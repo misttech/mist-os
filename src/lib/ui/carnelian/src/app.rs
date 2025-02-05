@@ -691,7 +691,7 @@ impl App {
         self.view_controllers
             .iter()
             .filter_map(|(view_key, view_controller)| {
-                view_controller.is_hosted_on_display(display_id).then(|| *view_key)
+                view_controller.is_hosted_on_display(display_id).then_some(*view_key)
             })
             .collect()
     }

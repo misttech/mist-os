@@ -201,7 +201,7 @@ impl TryFrom<ipt_replace> for ReplaceInfo {
     fn try_from(replace: ipt_replace) -> Result<Self, Self::Error> {
         let name = ascii_to_string(&replace.name).map_err(IpTableParseError::AsciiConversion)?;
         let valid_hooks = NfIpHooks::from_bits(replace.valid_hooks)
-            .ok_or_else(|| IpTableParseError::InvalidHookBits { hooks: replace.valid_hooks })?;
+            .ok_or(IpTableParseError::InvalidHookBits { hooks: replace.valid_hooks })?;
         Ok(Self {
             name,
             num_entries: usize::try_from(replace.num_entries).expect("u32 fits in usize"),
@@ -220,7 +220,7 @@ impl TryFrom<ip6t_replace> for ReplaceInfo {
     fn try_from(replace: ip6t_replace) -> Result<Self, Self::Error> {
         let name = ascii_to_string(&replace.name).map_err(IpTableParseError::AsciiConversion)?;
         let valid_hooks = NfIpHooks::from_bits(replace.valid_hooks)
-            .ok_or_else(|| IpTableParseError::InvalidHookBits { hooks: replace.valid_hooks })?;
+            .ok_or(IpTableParseError::InvalidHookBits { hooks: replace.valid_hooks })?;
         Ok(Self {
             name,
             num_entries: usize::try_from(replace.num_entries).expect("u32 fits in usize"),
@@ -329,9 +329,9 @@ impl TryFrom<ipt_ip> for IpInfo {
         };
 
         let flags_v4 = IptIpFlagsV4::from_bits(flags.into())
-            .ok_or_else(|| IpTableParseError::InvalidIpFlags { flags })?;
+            .ok_or(IpTableParseError::InvalidIpFlags { flags })?;
         let inverse_flags = IptIpInverseFlags::from_bits(invflags.into())
-            .ok_or_else(|| IpTableParseError::InvalidIpInverseFlags { flags: invflags })?;
+            .ok_or(IpTableParseError::InvalidIpInverseFlags { flags: invflags })?;
 
         Ok(Self {
             src_subnet,
@@ -383,9 +383,9 @@ impl TryFrom<ip6t_ip6> for IpInfo {
         };
 
         let flags_v6 = IptIpFlagsV6::from_bits(flags.into())
-            .ok_or_else(|| IpTableParseError::InvalidIpFlags { flags })?;
+            .ok_or(IpTableParseError::InvalidIpFlags { flags })?;
         let inverse_flags = IptIpInverseFlags::from_bits(invflags.into())
-            .ok_or_else(|| IpTableParseError::InvalidIpInverseFlags { flags: invflags })?;
+            .ok_or(IpTableParseError::InvalidIpInverseFlags { flags: invflags })?;
 
         Ok(Self {
             src_subnet,
@@ -821,7 +821,7 @@ impl IptReplaceParser {
                 );
                 let bytes = self
                     .get_next_bytes(remaining_size)
-                    .ok_or_else(|| IpTableParseError::TargetSizeMismatch {
+                    .ok_or(IpTableParseError::TargetSizeMismatch {
                         size: remaining_size,
                         target_name: "unknown",
                     })?
@@ -854,7 +854,7 @@ impl IptReplaceParser {
                     });
                 }
                 let range = redirect_target.range[0];
-                let flags = NfNatRangeFlags::from_bits(range.flags).ok_or_else(|| {
+                let flags = NfNatRangeFlags::from_bits(range.flags).ok_or({
                     IpTableParseError::InvalidRedirectTargetFlags { flags: range.flags }
                 })?;
 
@@ -875,7 +875,7 @@ impl IptReplaceParser {
                     });
                 }
                 let range = self.view_next_bytes_as::<nf_nat_range>()?;
-                let flags = NfNatRangeFlags::from_bits(range.flags).ok_or_else(|| {
+                let flags = NfNatRangeFlags::from_bits(range.flags).ok_or({
                     IpTableParseError::InvalidRedirectTargetFlags { flags: range.flags }
                 })?;
 
@@ -1074,7 +1074,7 @@ impl IpTable {
     }
 
     fn check_and_remove_last_entry(entries: &mut Vec<Entry>) -> Result<(), IpTableParseError> {
-        let last_entry = entries.last().ok_or_else(|| IpTableParseError::NoTrailingErrorTarget)?;
+        let last_entry = entries.last().ok_or(IpTableParseError::NoTrailingErrorTarget)?;
         if !last_entry.matchers.is_empty() {
             return Err(IpTableParseError::ErrorEntryHasMatchers);
         }
@@ -1566,9 +1566,7 @@ impl Entry {
                     };
 
                     let inverse_flags = XtTcpInverseFlags::from_bits((*invflags).into())
-                        .ok_or_else(|| IpTableParseError::InvalidXtTcpInverseFlags {
-                            flags: *invflags,
-                        })?;
+                        .ok_or(IpTableParseError::InvalidXtTcpInverseFlags { flags: *invflags })?;
 
                     if src_port.is_some() || dst_port.is_some() {
                         return Err(IpTableParseError::MatchExtensionOverwrite);
@@ -1601,9 +1599,7 @@ impl Entry {
                     };
 
                     let inverse_flags = XtUdpInverseFlags::from_bits((*invflags).into())
-                        .ok_or_else(|| IpTableParseError::InvalidXtUdpInverseFlags {
-                            flags: *invflags,
-                        })?;
+                        .ok_or(IpTableParseError::InvalidXtUdpInverseFlags { flags: *invflags })?;
 
                     if src_port.is_some() || dst_port.is_some() {
                         return Err(IpTableParseError::MatchExtensionOverwrite);

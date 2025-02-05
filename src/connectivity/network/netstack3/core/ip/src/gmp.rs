@@ -1019,13 +1019,13 @@ mod witness {
         /// Creates a new `GmpEnabledGroup` if `addr` should have GMP performed
         /// on it.
         pub fn new(addr: MulticastAddr<A>) -> Option<Self> {
-            <A::Version as IpExt>::should_perform_gmp(addr).then(|| Self(addr))
+            <A::Version as IpExt>::should_perform_gmp(addr).then_some(Self(addr))
         }
 
         /// Like [`GmpEnabledGroup::new`] but returns a `Result` with `addr` on
         /// `Err`.
         pub fn try_new(addr: MulticastAddr<A>) -> Result<Self, MulticastAddr<A>> {
-            Self::new(addr).ok_or_else(|| addr)
+            Self::new(addr).ok_or(addr)
         }
 
         /// Returns a copy of the multicast address witness.

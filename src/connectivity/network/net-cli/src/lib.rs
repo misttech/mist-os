@@ -234,8 +234,7 @@ fn write_tabulated_interfaces_info<
         } in addresses.all_addresses()
         {
             let valid_until = valid_until.map(|v| {
-                let v = std::time::Duration::from_nanos(v.try_into().unwrap_or_else(|_| 0))
-                    .as_secs_f32();
+                let v = std::time::Duration::from_nanos(v.try_into().unwrap_or(0)).as_secs_f32();
                 std::borrow::Cow::Owned(format!("valid until [{v}s]"))
             });
             let assignment_state: Option<std::borrow::Cow<'_, _>> = match assignment_state {

@@ -267,7 +267,7 @@ async fn run_device_control(
                 Err(e) => Err(e)
             },
             ready_task = tasks.next() => {
-                let () = ready_task.unwrap_or_else(|| ());
+                let () = ready_task.unwrap_or(());
                 continue;
             }
         };

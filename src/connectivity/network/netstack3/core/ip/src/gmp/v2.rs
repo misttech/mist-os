@@ -371,7 +371,7 @@ pub(super) fn handle_query_message<
         }
 
         let target = query.group_address();
-        let target = QueryTarget::new(target).ok_or_else(|| QueryError::NotAMember(target))?;
+        let target = QueryTarget::new(target).ok_or(QueryError::NotAMember(target))?;
 
         // Common early bailout.
         let target = match target {

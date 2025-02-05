@@ -489,38 +489,38 @@ impl TryFrom<fidl_security::Authentication> for SecurityAuthenticator {
                 _ => Err(SecurityError::Incompatible),
             },
             fidl_security::Protocol::Wep => credentials
-                .ok_or_else(|| SecurityError::Incompatible)? // No credentials.
+                .ok_or(SecurityError::Incompatible)? // No credentials.
                 .into_wep()
                 .map(wep::WepAuthenticator::try_from)
                 .transpose()? // Conversion failure.
                 .map(From::from)
-                .ok_or_else(|| SecurityError::Incompatible), // Non-WEP credentials.
+                .ok_or(SecurityError::Incompatible), // Non-WEP credentials.
             fidl_security::Protocol::Wpa1 => credentials
-                .ok_or_else(|| SecurityError::Incompatible)? // No credentials.
+                .ok_or(SecurityError::Incompatible)? // No credentials.
                 .into_wpa()
                 .map(wpa::Wpa1Credentials::try_from)
                 .transpose()? // Conversion failure.
                 .map(|credentials| wpa::WpaAuthenticator::Wpa1 { credentials })
                 .map(From::from)
-                .ok_or_else(|| SecurityError::Incompatible), // Non-WPA credentials.
+                .ok_or(SecurityError::Incompatible), // Non-WPA credentials.
             fidl_security::Protocol::Wpa2Personal => credentials
-                .ok_or_else(|| SecurityError::Incompatible)? // No credentials.
+                .ok_or(SecurityError::Incompatible)? // No credentials.
                 .into_wpa()
                 .map(wpa::Wpa2PersonalCredentials::try_from)
                 .transpose()? // Conversion failure.
                 .map(From::from)
                 .map(|authentication| wpa::WpaAuthenticator::Wpa2 { cipher: None, authentication })
                 .map(From::from)
-                .ok_or_else(|| SecurityError::Incompatible), // Non-WPA credentials.
+                .ok_or(SecurityError::Incompatible), // Non-WPA credentials.
             fidl_security::Protocol::Wpa3Personal => credentials
-                .ok_or_else(|| SecurityError::Incompatible)? // No credentials.
+                .ok_or(SecurityError::Incompatible)? // No credentials.
                 .into_wpa()
                 .map(wpa::Wpa3PersonalCredentials::try_from)
                 .transpose()? // Conversion failure.
                 .map(From::from)
                 .map(|authentication| wpa::WpaAuthenticator::Wpa3 { cipher: None, authentication })
                 .map(From::from)
-                .ok_or_else(|| SecurityError::Incompatible), // Non-WPA credentials.
+                .ok_or(SecurityError::Incompatible), // Non-WPA credentials.
             // TODO(https://fxbug.dev/42174395): This returns an error when encountering WPA Enterprise
             //                        protocols. Some conversions of composing types panic, but
             //                        this top-level conversion insulates client code from this and

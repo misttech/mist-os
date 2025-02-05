@@ -385,7 +385,7 @@ impl MagmaFile {
     }
 
     fn get_semaphore(&self, semaphore: magma_semaphore_t) -> Result<Arc<MagmaSemaphore>, i32> {
-        Ok(self.semaphores.lock().get(&semaphore).ok_or_else(|| MAGMA_STATUS_INVALID_ARGS)?.clone())
+        Ok(self.semaphores.lock().get(&semaphore).ok_or(MAGMA_STATUS_INVALID_ARGS)?.clone())
     }
 
     fn import_semaphore2(

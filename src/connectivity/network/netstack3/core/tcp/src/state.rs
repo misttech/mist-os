@@ -1249,7 +1249,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             let (seg, discarded) = Segment::with_data(
                 next_seg,
                 Some(rcv_nxt),
-                has_fin.then(|| Control::FIN),
+                has_fin.then_some(Control::FIN),
                 rcv_wnd,
                 readable.slice(0..bytes_to_send),
             );

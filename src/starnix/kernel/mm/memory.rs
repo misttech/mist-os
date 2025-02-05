@@ -231,7 +231,7 @@ impl MemoryObject {
                 let vmo_size = vmo.get_size().map_err(impossible_error).unwrap();
                 let data_size = vmo_size - (2 * *PAGE_SIZE);
                 let memory_size = vmo_size + data_size;
-                if memory_offset.checked_add(len as u64).ok_or_else(|| zx::Status::OUT_OF_RANGE)?
+                if memory_offset.checked_add(len as u64).ok_or(zx::Status::OUT_OF_RANGE)?
                     > memory_size
                 {
                     return Err(zx::Status::OUT_OF_RANGE);

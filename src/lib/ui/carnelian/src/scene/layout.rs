@@ -145,7 +145,7 @@ impl StackMemberData {
     }
 
     fn from_if_positioned(data: &Option<GroupMemberData>) -> Option<Self> {
-        Self::from(data).and_then(|data| data.is_positioned().then(|| data))
+        Self::from(data).and_then(|data| data.is_positioned().then_some(data))
     }
 
     fn is_positioned(&self) -> bool {
@@ -182,7 +182,7 @@ impl StackMemberData {
             let left_right_width = self
                 .left
                 .and_then(|left| self.right.and_then(|right| Some(available.width - right - left)));
-            left_right_width.unwrap_or_else(|| calculated.width)
+            left_right_width.unwrap_or(calculated.width)
         };
 
         let height = if let Some(height) = self.height() {
@@ -191,7 +191,7 @@ impl StackMemberData {
             let top_bottom_height = self.top.and_then(|top| {
                 self.bottom.and_then(|bottom| Some(available.height - bottom - top))
             });
-            top_bottom_height.unwrap_or_else(|| calculated.height)
+            top_bottom_height.unwrap_or(calculated.height)
         };
 
         size2(width, height)

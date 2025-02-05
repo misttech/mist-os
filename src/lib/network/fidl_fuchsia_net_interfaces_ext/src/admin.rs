@@ -134,7 +134,7 @@ where
         + Unpin,
 {
     stream
-        .try_filter_map(|state| futures::future::ok((state == want).then(|| ())))
+        .try_filter_map(|state| futures::future::ok((state == want).then_some(())))
         .try_next()
         .await
         .and_then(|opt| opt.ok_or_else(|| AddressStateProviderError::ChannelClosed))

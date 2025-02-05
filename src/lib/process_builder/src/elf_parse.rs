@@ -649,7 +649,7 @@ impl Validate for [Elf32ProgramHeader] {
                             "Overlap in virtual addresses",
                         ));
                     }
-                    vaddr_high = hdr.vaddr.checked_add(hdr.memsz).ok_or_else(|| {
+                    vaddr_high = hdr.vaddr.checked_add(hdr.memsz).ok_or({
                         ElfParseError::InvalidProgramHeader(
                             "load segment overflow the 32-bit memory space",
                         )

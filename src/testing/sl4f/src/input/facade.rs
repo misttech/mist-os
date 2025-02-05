@@ -141,7 +141,7 @@ impl InputFacade {
         let width = req.width.unwrap_or(DEFAULT_DIMENSION);
         let height = req.height.unwrap_or(DEFAULT_DIMENSION);
         let duration = req.duration.map_or(DEFAULT_DURATION, Duration::from_millis);
-        let tap_event_count = req.tap_event_count.unwrap_or_else(|| {
+        let tap_event_count = req.tap_event_count.unwrap_or({
             // 17 msec per move event, to emulate a ~60Hz sensor.
             duration.as_millis() as usize / 17
         });
@@ -205,7 +205,7 @@ impl InputFacade {
         let width = req.width.unwrap_or(DEFAULT_DIMENSION);
         let height = req.height.unwrap_or(DEFAULT_DIMENSION);
         let duration = req.duration.map_or(DEFAULT_DURATION, Duration::from_millis);
-        let move_event_count = req.move_event_count.unwrap_or_else(|| {
+        let move_event_count = req.move_event_count.unwrap_or({
             // 17 msec per move event, to emulate a ~60Hz sensor.
             duration.as_millis() as usize / 17
         });

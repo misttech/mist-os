@@ -560,13 +560,14 @@ impl<I: IpExt, BT: FragmentBindingsTypes> IpPacketFragmentCache<I, BT> {
 
                 return (
                     FragmentProcessingState::InvalidFragment,
-                    (!timer_not_yet_scheduled).then(|| CacheTimerAction::CancelExistingTimer(key)),
+                    (!timer_not_yet_scheduled)
+                        .then_some(CacheTimerAction::CancelExistingTimer(key)),
                 );
             }
             Some(f) => f,
         };
 
-        let timer_id = timer_not_yet_scheduled.then(|| CacheTimerAction::CreateNewTimer(key));
+        let timer_id = timer_not_yet_scheduled.then_some(CacheTimerAction::CreateNewTimer(key));
 
         // Remove `found_gap` since the gap as it exists will no longer be
         // valid.

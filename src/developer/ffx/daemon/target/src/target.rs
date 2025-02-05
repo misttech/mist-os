@@ -1040,7 +1040,7 @@ impl Target {
         self.addrs
             .borrow()
             .iter()
-            .filter_map(|entry| entry.is_manual().then(|| entry.addr))
+            .filter_map(|entry| entry.is_manual().then_some(entry.addr))
             .collect()
     }
 

@@ -132,7 +132,7 @@ impl Stash {
         let () = self.proxy.get_prefix(&self.prefix, server)?;
         futures::stream::try_unfold(iter, |iter| async move {
             let kvs = iter.get_next().await?;
-            let yielded = (!kvs.is_empty()).then(|| (kvs, iter));
+            let yielded = (!kvs.is_empty()).then_some((kvs, iter));
             Result::<_, StashError>::Ok(yielded)
         })
         .map_ok(|kvs| futures::stream::iter(kvs.into_iter().map(Ok)))

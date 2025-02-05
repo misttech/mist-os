@@ -2179,7 +2179,7 @@ fn parse_options<T: Extend<DhcpOption>>(
     mut options: T,
 ) -> Result<T, ProtocolError> {
     loop {
-        let (raw_opt_code, rest) = buf.split_first().ok_or_else(|| {
+        let (raw_opt_code, rest) = buf.split_first().ok_or({
             // From RFC 2131 Section 4.1:
             //   The last option must always be the 'end' option.
             ProtocolError::MissingOption(OptionCode::End)
@@ -2192,12 +2192,11 @@ fn parse_options<T: Extend<DhcpOption>>(
             }
             Ok(OptionCode::Pad) => {}
             code => {
-                let (&opt_len, rest) =
-                    buf.split_first().ok_or_else(|| ProtocolError::MalformedOption {
-                        code: *raw_opt_code,
-                        remaining: buf.len(),
-                        want: 1,
-                    })?;
+                let (&opt_len, rest) = buf.split_first().ok_or(ProtocolError::MalformedOption {
+                    code: *raw_opt_code,
+                    remaining: buf.len(),
+                    want: 1,
+                })?;
                 buf = rest;
                 let opt_len = usize::from(opt_len);
 

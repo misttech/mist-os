@@ -130,7 +130,7 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ActionErro
 
 fn ok_or_first_error(results: Vec<Result<(), ActionError>>) -> Result<(), ActionError> {
     #[allow(clippy::manual_try_fold, reason = "mass allow for https://fxbug.dev/381896734")]
-    results.into_iter().fold(Ok(()), |acc, r| acc.and_then(|_| r))
+    results.into_iter().fold(Ok(()), |acc, r| acc.and(r))
 }
 
 #[cfg(test)]

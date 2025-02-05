@@ -22,7 +22,7 @@ fn as_buffer_view_mut<'a, B: packet::BufferViewMut<&'a mut [u8]>>(
 }
 
 fn find_null_termination<B: zerocopy::SplitByteSlice>(b: &B) -> Option<usize> {
-    b.as_ref().iter().enumerate().find_map(|(index, c)| (*c == 0).then(|| index))
+    b.as_ref().iter().enumerate().find_map(|(index, c)| (*c == 0).then_some(index))
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Error)]

@@ -71,7 +71,7 @@ pub fn extract_system_image_hash_string(
 ) -> Result<String, SystemImageError> {
     let pkgfs_cmd = additional_boot_args
         .get(PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY)
-        .ok_or_else(|| SystemImageError::MissingPkgfsCmdEntry)?;
+        .ok_or(SystemImageError::MissingPkgfsCmdEntry)?;
 
     if pkgfs_cmd.len() != 2 {
         return Err(SystemImageError::UnexpectedPkgfsCmdLen {

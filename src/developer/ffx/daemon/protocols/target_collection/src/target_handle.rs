@@ -94,7 +94,7 @@ impl TargetHandleInner {
                 let result = self
                     .target
                     .set_preferred_ssh_address(ip.into())
-                    .then(|| ())
+                    .then_some(())
                     .ok_or(ffx::TargetError::AddressNotFound);
 
                 if result.is_ok() {

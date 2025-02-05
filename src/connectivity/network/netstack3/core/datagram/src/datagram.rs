@@ -710,9 +710,9 @@ impl<A: Eq + Hash, D: WeakDeviceIdentifier> MulticastMemberships<A, D> {
 
         let Self(map) = self;
         if want_membership {
-            map.insert((address, device)).then(|| MulticastMembershipChange::Join)
+            map.insert((address, device)).then_some(MulticastMembershipChange::Join)
         } else {
-            map.remove(&(address, device)).then(|| MulticastMembershipChange::Leave)
+            map.remove(&(address, device)).then_some(MulticastMembershipChange::Leave)
         }
     }
 }

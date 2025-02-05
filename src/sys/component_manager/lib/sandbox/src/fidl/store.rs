@@ -25,8 +25,7 @@ pub async fn serve_capability_store(
         match request {
             fsandbox::CapabilityStoreRequest::Duplicate { id, dest_id, responder } => {
                 let result = (|| {
-                    let cap =
-                        store.get(&id).ok_or_else(|| fsandbox::CapabilityStoreError::IdNotFound)?;
+                    let cap = store.get(&id).ok_or(fsandbox::CapabilityStoreError::IdNotFound)?;
                     let cap = cap
                         .try_clone()
                         .map_err(|_| fsandbox::CapabilityStoreError::NotDuplicatable)?;
@@ -35,17 +34,14 @@ pub async fn serve_capability_store(
                 responder.send(result)?;
             }
             fsandbox::CapabilityStoreRequest::Drop { id, responder } => {
-                let result = store
-                    .remove(&id)
-                    .map(|_| ())
-                    .ok_or_else(|| fsandbox::CapabilityStoreError::IdNotFound);
+                let result =
+                    store.remove(&id).map(|_| ()).ok_or(fsandbox::CapabilityStoreError::IdNotFound);
                 responder.send(result)?;
             }
             fsandbox::CapabilityStoreRequest::Export { id, responder } => {
                 let result = (|| {
-                    let cap = store
-                        .remove(&id)
-                        .ok_or_else(|| fsandbox::CapabilityStoreError::IdNotFound)?;
+                    let cap =
+                        store.remove(&id).ok_or(fsandbox::CapabilityStoreError::IdNotFound)?;
                     Ok(cap.into())
                 })();
                 responder.send(result)?;
@@ -112,9 +108,8 @@ pub async fn serve_capability_store(
                 responder,
             } => {
                 let result = (|| {
-                    let cap = store
-                        .remove(&id)
-                        .ok_or_else(|| fsandbox::CapabilityStoreError::IdNotFound)?;
+                    let cap =
+                        store.remove(&id).ok_or(fsandbox::CapabilityStoreError::IdNotFound)?;
                     let Capability::Dictionary(_) = &cap else {
                         return Err(fsandbox::CapabilityStoreError::WrongType);
                     };
@@ -136,7 +131,7 @@ pub async fn serve_capability_store(
                         item.key.parse().map_err(|_| fsandbox::CapabilityStoreError::InvalidKey)?;
                     let value = store
                         .remove(&item.value)
-                        .ok_or_else(|| fsandbox::CapabilityStoreError::IdNotFound)?;
+                        .ok_or(fsandbox::CapabilityStoreError::IdNotFound)?;
                     this.insert(key, value)
                 })();
                 responder.send(result)?;
@@ -420,7 +415,7 @@ fn get_connector(
     store: &HashMap<u64, Capability>,
     id: u64,
 ) -> Result<&Connector, fsandbox::CapabilityStoreError> {
-    let conn = store.get(&id).ok_or_else(|| fsandbox::CapabilityStoreError::IdNotFound)?;
+    let conn = store.get(&id).ok_or(fsandbox::CapabilityStoreError::IdNotFound)?;
     if let Capability::Connector(conn) = conn {
         Ok(conn)
     } else {
@@ -432,7 +427,7 @@ fn get_dir_connector(
     store: &HashMap<u64, Capability>,
     id: u64,
 ) -> Result<&DirConnector, fsandbox::CapabilityStoreError> {
-    let conn = store.get(&id).ok_or_else(|| fsandbox::CapabilityStoreError::IdNotFound)?;
+    let conn = store.get(&id).ok_or(fsandbox::CapabilityStoreError::IdNotFound)?;
     if let Capability::DirConnector(conn) = conn {
         Ok(conn)
     } else {
@@ -444,7 +439,7 @@ fn get_dictionary(
     store: &HashMap<u64, Capability>,
     id: u64,
 ) -> Result<&Dict, fsandbox::CapabilityStoreError> {
-    let dict = store.get(&id).ok_or_else(|| fsandbox::CapabilityStoreError::IdNotFound)?;
+    let dict = store.get(&id).ok_or(fsandbox::CapabilityStoreError::IdNotFound)?;
     if let Capability::Dictionary(dict) = dict {
         Ok(dict)
     } else {

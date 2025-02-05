@@ -385,7 +385,7 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<
             };
 
             let address_types_to_add = (!seen_stable)
-                .then(|| {
+                .then_some({
                     // As per RFC 4862 Section 5.5.3.d,
                     //
                     //
@@ -399,7 +399,7 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<
                     SlaacType::Stable
                 })
                 .into_iter()
-                .chain((!seen_temporary).then(|| {
+                .chain((!seen_temporary).then_some({
                     // As per RFC 8981 Section 3.4.3,
                     //
                     //   If the host has not configured any temporary

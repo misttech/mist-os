@@ -471,7 +471,7 @@ impl Primitives {
                         .checked_sub(1)
                         .and_then(|i| {
                             let partial_curvature = self.partial_curvatures[i];
-                            (partial_curvature.0 == spline_i).then(|| partial_curvature.1)
+                            (partial_curvature.0 == spline_i).then_some(partial_curvature.1)
                         })
                         .unwrap_or_default();
                     let ratio =
@@ -659,7 +659,7 @@ impl Path {
                 )
                 .map(|(&x, (&y, start_new_contour))| {
                     let point = transform.transform(Point::new(x, y));
-                    (point.x, point.y, (!start_new_contour).then(|| id))
+                    (point.x, point.y, (!start_new_contour).then_some(id))
                 });
 
             ExtendTuple3::new((x, y, ids)).par_extend(iter);
@@ -675,7 +675,7 @@ impl Path {
                         .with_min_len(MIN_LEN)
                         .zip(lines.start_new_contour.par_iter().with_min_len(MIN_LEN)),
                 )
-                .map(|(&x, (&y, start_new_contour))| (x, y, (!start_new_contour).then(|| id)));
+                .map(|(&x, (&y, start_new_contour))| (x, y, (!start_new_contour).then_some(id)));
 
             ExtendTuple3::new((x, y, ids)).par_extend(iter);
         }

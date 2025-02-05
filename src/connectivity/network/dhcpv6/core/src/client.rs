@@ -2071,7 +2071,7 @@ impl<I: Instant> ServerDiscovery<I> {
                     })
                     .collect::<HashSet<_>>();
 
-                (!ia_addrs.is_empty()).then(|| (iaid, ia_addrs))
+                (!ia_addrs.is_empty()).then_some((iaid, ia_addrs))
             })
             .collect::<HashMap<_, _>>();
         let delegated_prefixes = delegated_prefixes
@@ -2122,7 +2122,7 @@ impl<I: Instant> ServerDiscovery<I> {
                     })
                     .collect::<HashSet<_>>();
 
-                (!ia_prefixes.is_empty()).then(|| (iaid, ia_prefixes))
+                (!ia_prefixes.is_empty()).then_some((iaid, ia_prefixes))
             })
             .collect::<HashMap<_, _>>();
         let advertise = AdvertiseMessage {
@@ -3180,8 +3180,8 @@ fn process_reply_with_leases<B: SplitByteSlice, I: Instant>(
     }
     .into_iter()
     .flatten()
-    .chain((!ia_na_updates.is_empty()).then(|| Action::IaNaUpdates(ia_na_updates)))
-    .chain((!ia_pd_updates.is_empty()).then(|| Action::IaPdUpdates(ia_pd_updates)))
+    .chain((!ia_na_updates.is_empty()).then_some(Action::IaNaUpdates(ia_na_updates)))
+    .chain((!ia_pd_updates.is_empty()).then_some(Action::IaPdUpdates(ia_pd_updates)))
     .chain(all_ias_invalidates_at.into_iter().map(|all_ias_invalidates_at| {
         match all_ias_invalidates_at {
             AllIasInvalidatesAt::At(instant) => {
@@ -3561,11 +3561,11 @@ impl<I: Instant> Requesting<I> {
                                 );
 
                                 let initial_actions = (!ia_na_updates.is_empty())
-                                    .then(|| Action::IaNaUpdates(ia_na_updates))
+                                    .then_some(Action::IaNaUpdates(ia_na_updates))
                                     .into_iter()
                                     .chain(
                                         (!ia_pd_updates.is_empty())
-                                            .then(|| Action::IaPdUpdates(ia_pd_updates)),
+                                            .then_some(Action::IaPdUpdates(ia_pd_updates)),
                                     );
 
                                 warn!(
@@ -3992,11 +3992,11 @@ fn restart_server_discovery<R: Rng, I: Instant>(
         .chain((!dns_servers.is_empty()).then(|| Action::UpdateDnsServers(Vec::new())))
         .chain(
             (!non_temporary_address_updates.is_empty())
-                .then(|| Action::IaNaUpdates(non_temporary_address_updates)),
+                .then_some(Action::IaNaUpdates(non_temporary_address_updates)),
         )
         .chain(
             (!delegated_prefix_updates.is_empty())
-                .then(|| Action::IaPdUpdates(delegated_prefix_updates)),
+                .then_some(Action::IaPdUpdates(delegated_prefix_updates)),
         ),
     )
 }

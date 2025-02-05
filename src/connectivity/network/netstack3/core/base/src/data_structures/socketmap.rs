@@ -369,7 +369,7 @@ impl<T: Eq, const INLINE_SIZE: usize> DescendantCounts<T, INLINE_SIZE> {
     /// Increments the count for the given tag.
     fn increment(&mut self, tag: T) {
         let Self { counts } = self;
-        match counts.iter_mut().find_map(|(t, count)| (t == &tag).then(|| count)) {
+        match counts.iter_mut().find_map(|(t, count)| (t == &tag).then_some(count)) {
             Some(count) => *count = NonZeroUsize::new(count.get() + 1).unwrap(),
             None => counts.push((tag, Self::ONE)),
         }
@@ -385,7 +385,7 @@ impl<T: Eq, const INLINE_SIZE: usize> DescendantCounts<T, INLINE_SIZE> {
         let (index, count) = counts
             .iter_mut()
             .enumerate()
-            .find_map(|(i, (t, count))| (t == &tag).then(|| (i, count)))
+            .find_map(|(i, (t, count))| (t == &tag).then_some((i, count)))
             .unwrap();
         if let Some(new_count) = NonZeroUsize::new(count.get() - 1) {
             *count = new_count

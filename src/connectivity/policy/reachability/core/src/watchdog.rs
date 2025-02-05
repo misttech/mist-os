@@ -399,10 +399,10 @@ where
         if let Some(reason) = [(rx, ActionReason::DeviceRxStall), (tx, ActionReason::DeviceTxStall)]
             .iter()
             .find_map(|(TimestampedCounter { value: _, at }, reason)| {
-                (now - *at >= DEVICE_COUNTERS_UNHEALTHY_TIME).then(|| *reason)
+                (now - *at >= DEVICE_COUNTERS_UNHEALTHY_TIME).then_some(*reason)
             })
         {
-            let action = health.set_unhealthy_and_check_for_debug_info_cooldown(now).then(|| {
+            let action = health.set_unhealthy_and_check_for_debug_info_cooldown(now).then_some({
                 Action { trigger_stack_diagnosis: true, trigger_device_diagnosis: true, reason }
             });
 

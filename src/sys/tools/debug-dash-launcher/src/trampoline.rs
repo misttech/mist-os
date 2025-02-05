@@ -186,7 +186,7 @@ async fn create_trampolines(pkg_dirs: &Vec<PkgDir>) -> Result<Trampolines, Launc
             Some(res) => {
                 let contents = format!("#!resolve {}#{}\n", &pkg_dir.url, res);
                 let binary_name =
-                    res.split('/').next_back().ok_or_else(|| LauncherError::BadUrl)?.to_string();
+                    res.split('/').next_back().ok_or(LauncherError::BadUrl)?.to_string();
                 let set = BTreeSet::from([Trampoline { contents, binary_name }]);
                 trampolines.insert(pkg_dir.url.clone(), set)?;
             }

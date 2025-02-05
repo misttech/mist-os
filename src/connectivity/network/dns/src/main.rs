@@ -404,7 +404,7 @@ struct LookupIpErrorsFromSource {
 impl LookupIpErrorsFromSource {
     fn any_error(&self) -> Option<&ResolveError> {
         let Self { ipv4, ipv6, canonical_name } = self;
-        ipv4.as_ref().or_else(|| ipv6.as_ref()).or_else(|| canonical_name.as_ref())
+        ipv4.as_ref().or(ipv6.as_ref()).or(canonical_name.as_ref())
     }
 
     fn accumulate(&mut self, src: LookupIpErrorSource, error: ResolveError) {

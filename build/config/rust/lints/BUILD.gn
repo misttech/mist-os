@@ -32,7 +32,7 @@ config("clippy_warn_production") {
     "-Wclippy::perf",
     "-Wclippy::redundant_clone",
     "-Wclippy::set_contains_or_insert",
-    "-Wclippy::unnecessary_lazy_evaluation",
+    "-Wclippy::unnecessary_lazy_evaluations",
 
     # go/keep-sorted end
   ]

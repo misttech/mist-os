@@ -106,7 +106,7 @@ impl ViewStrategyParams {
     pub fn view_key(&self) -> Option<ViewKey> {
         match self {
             ViewStrategyParams::DisplayDirect(params) => {
-                params.view_key.or_else(|| Some(ViewKey(params.info.id.value)))
+                params.view_key.or(Some(ViewKey(params.info.id.value)))
             }
             _ => None,
         }

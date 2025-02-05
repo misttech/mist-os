@@ -196,7 +196,7 @@ impl Map {
         if flags != 0 {
             return Err(MapError::InvalidParam);
         }
-        self.entries.lock().as_ringbuf().ok_or_else(|| MapError::InvalidParam)?.reserve(size)
+        self.entries.lock().as_ringbuf().ok_or(MapError::InvalidParam)?.reserve(size)
     }
 
     /// Submit the data.
@@ -448,11 +448,7 @@ impl MapStore {
 }
 
 pub fn compute_map_storage_size(schema: &MapSchema) -> Result<usize, MapError> {
-    schema
-        .value_size
-        .checked_mul(schema.max_entries)
-        .map(|v| v as usize)
-        .ok_or_else(|| MapError::NoMemory)
+    schema.value_size.checked_mul(schema.max_entries).map(|v| v as usize).ok_or(MapError::NoMemory)
 }
 
 #[derive(Debug)]
@@ -488,7 +484,7 @@ impl HashStorage {
             }
             _ => self.index_map.iter().next(),
         };
-        let key = next_entry.ok_or_else(|| MapError::InvalidKey)?.0;
+        let key = next_entry.ok_or(MapError::InvalidKey)?.0;
         Ok(MapKey::from_slice(&key[..]))
     }
 
@@ -668,11 +664,9 @@ impl RingBufferStorage {
         let producer_position = self.producer_position.load(Ordering::Acquire);
         let max_size = self.mask + 1;
         // Available size on the ringbuffer.
-        let consumed_size = producer_position
-            .checked_sub(consumer_position)
-            .ok_or_else(|| MapError::InvalidParam)?;
-        let available_size =
-            max_size.checked_sub(consumed_size).ok_or_else(|| MapError::InvalidParam)?;
+        let consumed_size =
+            producer_position.checked_sub(consumer_position).ok_or(MapError::InvalidParam)?;
+        let available_size = max_size.checked_sub(consumed_size).ok_or(MapError::InvalidParam)?;
 
         const HEADER_ALIGNMENT: u32 = std::mem::size_of::<u64>() as u32;
 

@@ -890,7 +890,7 @@ impl ComponentInstance {
             }
         }
         #[allow(clippy::manual_try_fold, reason = "mass allow for https://fxbug.dev/381896734")]
-        join_all(futures).await.into_iter().fold(Ok(()), |acc, r| acc.and_then(|_| r))
+        join_all(futures).await.into_iter().fold(Ok(()), |acc, r| acc.and(r))
     }
 
     pub async fn destroy_child(
@@ -1104,7 +1104,7 @@ impl ComponentInstance {
                 clippy::manual_try_fold,
                 reason = "mass allow for https://fxbug.dev/381896734"
             )]
-            join_all(futures).await.into_iter().fold(Ok(()), |acc, r| acc.and_then(|_| r))?;
+            join_all(futures).await.into_iter().fold(Ok(()), |acc, r| acc.and(r))?;
             Ok(())
         };
         Box::pin(f)

@@ -47,7 +47,7 @@ impl<Rule: RuleType> ArgumentsParser<Rule> {
         let parsed_delimited_argument_delimiter_option = match delimited_argument_delimiter_option {
             Some(delimiter) => {
                 let string = parse_string(delimiter)?;
-                (!string.is_empty()).then(|| string)
+                (!string.is_empty()).then_some(string)
             }
             None => None,
         };
@@ -63,7 +63,7 @@ impl<Rule: RuleType> ArgumentsParser<Rule> {
         {
             Some(terminator) => {
                 let string = parse_string(terminator)?;
-                (!string.is_empty()).then(|| string)
+                (!string.is_empty()).then_some(string)
             }
             None => None,
         };

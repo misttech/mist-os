@@ -764,7 +764,7 @@ impl INode {
             // the same size as an ExtentTreeNode.
             &self.e2di_blocks,
         )
-        .ok_or_else(|| ParsingError::InvalidExtentHeader)?;
+        .ok_or(ParsingError::InvalidExtentHeader)?;
         eh.header.check_magic()?;
         Ok(eh)
     }

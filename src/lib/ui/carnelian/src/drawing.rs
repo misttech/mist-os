@@ -584,8 +584,7 @@ impl Glyph {
         id: ttf_parser::GlyphId,
     ) -> Self {
         let mut builder = GlyphBuilder::new(scale, offset, context);
-        let glyph_bounding_box =
-            &face.face.outline_glyph(id, &mut builder).unwrap_or_else(|| ZERO_RECT);
+        let glyph_bounding_box = &face.face.outline_glyph(id, &mut builder).unwrap_or(ZERO_RECT);
         let min_x = glyph_bounding_box.x_min as f32 * scale.x + offset.x;
         let max_y = -glyph_bounding_box.y_min as f32 * scale.y + offset.y;
         let max_x = glyph_bounding_box.x_max as f32 * scale.x + offset.x;

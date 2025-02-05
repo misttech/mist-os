@@ -402,13 +402,11 @@ impl InterfaceEventProducer {
 impl Drop for InterfaceEventProducer {
     fn drop(&mut self) {
         let Self { id, channel } = self;
-        channel.unbounded_send(InterfaceEvent::Removed(*id)).unwrap_or_else(
-            |_: mpsc::TrySendError<_>| {
-                // If the worker was closed before its producers we can assume
-                // it's no longer interested in events, so we simply drop these
-                // errors.
-            },
-        )
+        channel.unbounded_send(InterfaceEvent::Removed(*id)).unwrap_or({
+            // If the worker was closed before its producers we can assume
+            // it's no longer interested in events, so we simply drop these
+            // errors.
+        })
     }
 }
 
@@ -692,9 +690,7 @@ impl Worker {
                     addresses,
                     has_default_ipv4_route,
                     has_default_ipv6_route,
-                } = state
-                    .get_mut(&id)
-                    .ok_or_else(|| WorkerError::UpdateNonexistentInterface(id))?;
+                } = state.get_mut(&id).ok_or(WorkerError::UpdateNonexistentInterface(id))?;
                 match event {
                     InterfaceUpdate::AddressAdded {
                         addr,
@@ -732,7 +728,7 @@ impl Worker {
                     }
                     InterfaceUpdate::AddressAssignmentStateChanged { addr, new_state } => {
                         let AddressProperties { prefix_len: _, state } =
-                            addresses.get_mut(&addr).ok_or_else(|| {
+                            addresses.get_mut(&addr).ok_or({
                                 WorkerError::UpdateStateOnNonexistentAddr {
                                     interface: id,
                                     addr,

@@ -504,9 +504,9 @@ impl Flags {
             return Err(MalformedFlags { syn: self.syn, fin: self.fin, rst: self.rst });
         }
 
-        let syn = self.syn.then(|| Control::SYN);
-        let fin = self.fin.then(|| Control::FIN);
-        let rst = self.rst.then(|| Control::RST);
+        let syn = self.syn.then_some(Control::SYN);
+        let fin = self.fin.then_some(Control::FIN);
+        let rst = self.rst.then_some(Control::RST);
 
         Ok(syn.or(fin).or(rst))
     }

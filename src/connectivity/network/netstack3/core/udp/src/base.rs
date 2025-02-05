@@ -818,7 +818,7 @@ impl<I: Debug + Eq> SocketMapAddrStateSpec for AddrState<I> {
         self.to_sharing_options()
             .is_shareable_with_new_state(*new_sharing_state)
             .then_some(())
-            .ok_or_else(|| IncompatibleError)
+            .ok_or(IncompatibleError)
     }
 
     fn remove_by_id(&mut self, id: I) -> RemoveResult {

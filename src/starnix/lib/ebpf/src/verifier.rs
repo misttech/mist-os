@@ -171,7 +171,7 @@ impl StructDescriptor {
             }
         };
 
-        is_valid_load.then(|| field_desc)
+        is_valid_load.then_some(field_desc)
     }
 }
 

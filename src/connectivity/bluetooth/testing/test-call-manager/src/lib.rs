@@ -329,9 +329,8 @@ impl TestCallManager {
     }
 
     pub async fn set_request_stream(&self, stream: CallManagerRequestStream) {
-        let task = fasync::Task::spawn(
-            self.clone().watch_for_peers(stream).map(|f| f.unwrap_or_else(|_| {})),
-        );
+        let task =
+            fasync::Task::spawn(self.clone().watch_for_peers(stream).map(|f| f.unwrap_or({})));
         self.inner.lock().await.manager.peer_watcher = Some(task);
     }
 
@@ -361,9 +360,8 @@ impl TestCallManager {
                 fidl::endpoints::create_request_stream::<CallManagerMarker>();
             hfp_service_proxy.register(client_end)?;
 
-            let task = fasync::Task::spawn(
-                self.clone().watch_for_peers(stream).map(|f| f.unwrap_or_else(|_| {})),
-            );
+            let task =
+                fasync::Task::spawn(self.clone().watch_for_peers(stream).map(|f| f.unwrap_or({})));
 
             inner.manager.peer_watcher = Some(task);
         }
