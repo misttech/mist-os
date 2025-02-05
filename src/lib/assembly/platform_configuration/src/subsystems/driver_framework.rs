@@ -170,6 +170,11 @@ impl DefineSubsystemConfiguration<(&DriverFrameworkConfig, &StorageConfig)>
         // Include bus-pci driver through a platform AIB.
         if context.board_info.provides_feature("fuchsia::bus_pci") {
             builder.platform_bundle("bus_pci_driver");
+            // In engineering builds, include the lspci tool whenever the pci
+            // bus feature is enabled.
+            if context.build_type == &BuildType::Eng {
+                builder.platform_bundle("lspci");
+            }
         }
 
         Ok(())

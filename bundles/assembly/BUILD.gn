@@ -613,7 +613,6 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/devices/thermal/bin/temperature-cli:bootfs",
     "//src/devices/thermal/bin/thermal-cli:bootfs",
     "//src/devices/usb/bin/lsusb:bootfs",
-    "//src/devices/pci/bin:bootfs",
     "//src/media/audio/tools/audio-driver-ctl:bootfs",
     "//src/security/bin/syscall-check:bootfs",
     "//src/sys/tools/package:bootfs",
@@ -635,6 +634,12 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/ui/light/bin/lights-cli:bootfs",
     "//src/zircon/testing/mutex_pi_exerciser:bootfs",
   ]
+}
+
+# lspci shell utility. Used in products that use PCI and have shell commands enabled.
+#
+assembly_input_bundle("lspci") {
+  bootfs_files_labels = [ "//src/devices/pci/bin:bootfs" ]
 }
 
 # The kernel_debug_broker AIB is included by all eng and userdebug products.

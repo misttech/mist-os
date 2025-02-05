@@ -146,6 +146,9 @@ bootstrap_eng_platform_aib_names = [
 
   # Testing Support
   "testing_support_bootstrap",
+
+  # PCI utilities
+  "lspci",
 ]
 
 # The names of all of the platform's 'testonly=false' Assembly Input Bundles
