@@ -15,7 +15,6 @@ ffx_plugin("ffx_net") {
 
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.net.debug:fuchsia.net.debug_rust",
     "//sdk/fidl/fuchsia.net.dhcp:fuchsia.net.dhcp_rust",
     "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",

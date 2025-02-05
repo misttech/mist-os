@@ -7,9 +7,9 @@ use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
 use std::ops::Deref as _;
 use target_holders::RemoteControlProxyHolder;
 use {
-    fidl_fuchsia_developer_remotecontrol as fremotecontrol, fidl_fuchsia_io as fio,
-    fidl_fuchsia_net_debug as fdebug, fidl_fuchsia_net_dhcp as fdhcp,
-    fidl_fuchsia_net_filter as ffilter, fidl_fuchsia_net_filter_deprecated as ffilter_deprecated,
+    fidl_fuchsia_developer_remotecontrol as fremotecontrol, fidl_fuchsia_net_debug as fdebug,
+    fidl_fuchsia_net_dhcp as fdhcp, fidl_fuchsia_net_filter as ffilter,
+    fidl_fuchsia_net_filter_deprecated as ffilter_deprecated,
     fidl_fuchsia_net_interfaces as finterfaces,
     fidl_fuchsia_net_interfaces_admin as finterfaces_admin, fidl_fuchsia_net_name as fname,
     fidl_fuchsia_net_neighbor as fneighbor, fidl_fuchsia_net_root as froot,
@@ -43,12 +43,11 @@ impl FfxConnector<'_> {
         }
         let (proxy, server_end) = fidl::endpoints::create_proxy::<S>();
         remote_control
-            .deprecated_open_capability(
+            .connect_capability(
                 &moniker,
                 fsys::OpenDirType::ExposedDir,
                 S::PROTOCOL_NAME,
                 server_end.into_channel(),
-                fio::OpenFlags::empty(),
             )
             .await?
             .map_err(|e| {
