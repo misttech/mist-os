@@ -303,6 +303,13 @@ pub struct FlowControlledData {
     pub credits: Option<u8>,
 }
 
+impl FlowControlledData {
+    #[cfg(test)]
+    pub fn new_no_credits(data: Vec<u8>) -> Self {
+        Self { user_data: UserData { information: data }, credits: None }
+    }
+}
+
 /// The processing task associated with an established SessionChannel.
 struct SessionChannelTask {
     /// The processing task.

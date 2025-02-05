@@ -217,7 +217,7 @@ impl SessionMultiplexer {
 
     /// Sets the flow control mode of the RFCOMM channel associated with the `dlci` to use
     /// the provided `flow_control`.
-    /// Returns an Error if the DLCI is not registered, or if the SessionChannel has already
+    /// Returns an Error if the DLCI is not registered or if the SessionChannel has already
     /// been established.
     pub fn set_flow_control(
         &mut self,
@@ -259,36 +259,92 @@ impl SessionMultiplexer {
         Ok(remote)
     }
 
-    /// Closes the SessionChannel for the provided `dlci`. Returns true if the SessionChannel
+    /// Closes the `SessionChannel` for the provided `dlci`. Returns true if the `SessionChannel`
     /// was closed.
     pub fn close_session_channel(&mut self, dlci: &DLCI) -> bool {
         self.channels.remove(dlci).is_some()
     }
 
-    /// Sends `user_data` received from the peer to the SessionChannel associated with the `dlci`.
+    /// Forwards `user_data` received from the peer to the `SessionChannel` associated with the
+    /// `dlci`.
+    /// Returns Error if there is no such channel or if it is closed.
     pub async fn receive_user_data(
         &mut self,
         dlci: DLCI,
         user_data: FlowControlledData,
     ) -> Result<(), Error> {
-        if let Some(session_channel) = self.channels.get_mut(&dlci) {
-            return session_channel.receive_user_data(user_data).await;
-        }
-        Err(RfcommError::InvalidDLCI(dlci).into())
+        let Some(session_channel) = self.channels.get_mut(&dlci) else {
+            return Err(RfcommError::InvalidDLCI(dlci).into());
+        };
+        session_channel.receive_user_data(user_data).await
     }
 }
 
-// TODO(https://fxbug.dev/42140263): IWBN to have focused tests for the `SessionMultiplexer`. Currently, it's
-// transitively tested by the tests for `SessionInner`.
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use diagnostics_assertions::assert_data_tree;
+    use futures::StreamExt;
 
     use crate::rfcomm::inspect::CREDIT_FLOW_CONTROL;
 
     #[test]
-    fn test_multiplexer_inspect() {
+    fn negotiate_session_parameters() {
+        const DEFAULT_MAX_TX: u16 = 900;
+        let mut multiplexer = SessionMultiplexer::create(DEFAULT_MAX_TX);
+        assert!(!multiplexer.parameters_negotiated());
+
+        let new_parameters = SessionParameters { credit_based_flow: true, max_frame_size: 1000 };
+        let negotiated = multiplexer.negotiate_parameters(new_parameters);
+        let expected = SessionParameters { credit_based_flow: true, max_frame_size: 900 };
+        // Expect the negotiated to contain the smaller frame size
+        assert_eq!(negotiated, expected);
+        assert!(multiplexer.parameters_negotiated());
+    }
+
+    #[test]
+    fn start_multiplexer_multiple_times_is_error() {
+        const DEFAULT_MAX_TX: u16 = 900;
+        let mut multiplexer = SessionMultiplexer::create(DEFAULT_MAX_TX);
+        multiplexer.start(Role::Initiator).expect("can start the multiplexer");
+        assert!(multiplexer.started());
+        let err_result = multiplexer.start(Role::Responder);
+        assert_matches!(err_result, Err(Error::MultiplexerAlreadyStarted));
+    }
+
+    #[fuchsia::test]
+    async fn start_multiplexer_and_establish_dlci() {
+        const DEFAULT_MAX_TX: u16 = 900;
+        let mut multiplexer = SessionMultiplexer::create(DEFAULT_MAX_TX);
+        multiplexer.start(Role::Initiator).expect("can start the multiplexer");
+        assert!(multiplexer.started());
+        assert!(!multiplexer.dlc_established());
+
+        let dlci = DLCI::try_from(9).unwrap();
+        let (sender, _receiver) = mpsc::channel(0);
+        let mut user_rfcomm_channel =
+            multiplexer.establish_session_channel(dlci, sender).expect("can register");
+        assert!(multiplexer.dlc_established());
+        assert!(multiplexer.dlci_established(&dlci));
+
+        // Can't set the flow control for a DLCI that has already been established.
+        let result = multiplexer.set_flow_control(dlci, FlowControlMode::None);
+        assert_matches!(result, Err(Error::ChannelAlreadyEstablished(_)));
+
+        // Data received from the peer should be forwarded to the `user_rfcomm_channel`.
+        let data = FlowControlledData::new_no_credits(vec![4, 5, 6]);
+        let result = multiplexer.receive_user_data(dlci, data).await;
+        assert_matches!(result, Ok(_));
+        let user_data_received = user_rfcomm_channel.next().await.expect("data received");
+        assert_eq!(user_data_received, Ok(vec![4, 5, 6]));
+
+        assert!(multiplexer.close_session_channel(&dlci));
+        assert!(!multiplexer.dlci_established(&dlci));
+    }
+
+    #[test]
+    fn multiplexer_inspect_hierarchy() {
         let mut exec = fuchsia_async::TestExecutor::new();
         let inspect = inspect::Inspector::default();
 
