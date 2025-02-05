@@ -4,6 +4,7 @@
 
 //! Type-safe bindings for Zircon vmar objects.
 
+use crate::iob::Iob;
 use crate::{
     object_get_info, object_get_info_single, object_get_info_vec, ok, sys, AsHandleRef, Handle,
     HandleBased, HandleRef, Koid, Name, ObjectQuery, Status, Topic, Vmo,
@@ -344,6 +345,34 @@ impl Vmar {
     /// syscall for the ZX_INFO_VMAR_MAPS topic.
     pub fn info_maps_vec(&self) -> Result<Vec<MapInfo>, Status> {
         object_get_info_vec::<VmarMapsInfo>(self.as_handle_ref())
+    }
+
+    /// Wraps the [zx_vmar_map_iob](https://fuchsia.dev/fuchsia-src/reference/syscalls/zx_vmar_map_iob.md)
+    /// syscall.
+    pub fn map_iob(
+        &self,
+        options: VmarFlags,
+        vmar_offset: usize,
+        iob: &Iob,
+        region_index: u32,
+        region_offset: u64,
+        region_len: usize,
+    ) -> Result<usize, Status> {
+        let mut addr = 0;
+        let status = unsafe {
+            sys::zx_vmar_map_iob(
+                self.raw_handle(),
+                options.bits(),
+                vmar_offset,
+                iob.raw_handle(),
+                region_index,
+                region_offset,
+                region_len,
+                &mut addr,
+            )
+        };
+        ok(status)?;
+        Ok(addr)
     }
 }
 

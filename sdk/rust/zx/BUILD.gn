@@ -26,6 +26,7 @@ _common_sources = [
   "src/handle.rs",
   "src/info.rs",
   "src/interrupt.rs",
+  "src/iob.rs",
   "src/iommu.rs",
   "src/job.rs",
   "src/lib.rs",

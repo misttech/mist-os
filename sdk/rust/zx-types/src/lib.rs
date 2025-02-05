@@ -33,7 +33,10 @@ pub type zx_instant_boot_t = i64;
 pub type zx_instant_boot_ticks_t = i64;
 pub type zx_instant_mono_t = i64;
 pub type zx_instant_mono_ticks_t = i64;
+pub type zx_iob_access_t = u32;
 pub type zx_iob_allocate_id_options_t = u32;
+pub type zx_iob_discipline_type_t = u64;
+pub type zx_iob_region_type_t = u32;
 pub type zx_off_t = u64;
 pub type zx_paddr_t = usize;
 pub type zx_rights_t = u32;
@@ -370,6 +373,9 @@ multiconst!(zx_signals_t, [
     ZX_FIFO_READABLE            = ZX_OBJECT_READABLE;
     ZX_FIFO_WRITABLE            = ZX_OBJECT_WRITABLE;
     ZX_FIFO_PEER_CLOSED         = ZX_OBJECT_PEER_CLOSED;
+
+    // Iob
+    ZX_IOB_PEER_CLOSED           = ZX_OBJECT_PEER_CLOSED;
 
     // Job
     ZX_JOB_TERMINATED           = ZX_OBJECT_SIGNAL_3;
@@ -2490,6 +2496,54 @@ multiconst!(u32, [
     ZX_INTERRUPT_BIND = 0;
     ZX_INTERRUPT_UNBIND = 1;
 ]);
+
+#[repr(C)]
+pub struct zx_iob_region_t {
+    pub r#type: zx_iob_region_type_t,
+    pub access: zx_iob_access_t,
+    pub size: u64,
+    pub discipline: zx_iob_discipline_t,
+    pub extension: zx_iob_region_extension_t,
+}
+
+multiconst!(zx_iob_region_type_t, [
+    ZX_IOB_REGION_TYPE_PRIVATE = 0;
+]);
+
+multiconst!(zx_iob_access_t, [
+    ZX_IOB_ACCESS_EP0_CAN_MAP_READ = 1 << 0;
+    ZX_IOB_ACCESS_EP0_CAN_MAP_WRITE = 1 << 1;
+    ZX_IOB_ACCESS_EP0_CAN_MEDIATED_READ = 1 << 2;
+    ZX_IOB_ACCESS_EP0_CAN_MEDIATED_WRITE = 1 << 3;
+    ZX_IOB_ACCESS_EP1_CAN_MAP_READ = 1 << 4;
+    ZX_IOB_ACCESS_EP1_CAN_MAP_WRITE = 1 << 5;
+    ZX_IOB_ACCESS_EP1_CAN_MEDIATED_READ = 1 << 6;
+    ZX_IOB_ACCESS_EP1_CAN_MEDIATED_WRITE = 1 << 7;
+]);
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, Default)]
+pub struct zx_iob_discipline_t {
+    pub r#type: zx_iob_discipline_type_t,
+    pub reserved: [u32; 16],
+}
+
+multiconst!(zx_iob_discipline_type_t, [
+    ZX_IOB_DISCIPLINE_TYPE_NONE = 0;
+]);
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct zx_iob_region_private_t {
+    options: u32,
+    padding: [PadByte; 28],
+}
+
+#[repr(C)]
+pub union zx_iob_region_extension_t {
+    pub private_region: zx_iob_region_private_t,
+    pub max_extension: [u8; 32],
+}
 
 #[cfg(test)]
 mod test {
