@@ -171,7 +171,7 @@ class Devfs {
   zx::result<std::string> MakeInstanceName(std::string_view class_name);
 
   fbl::RefPtr<PseudoDir> get_class_entry(std::string_view class_name) {
-    EnsureClassExists(class_name);
+    ZX_ASSERT(class_entries_.contains(std::string(class_name)));
     return class_entries_[std::string(class_name)];
   }
 
@@ -180,8 +180,6 @@ class Devfs {
 
   static std::optional<std::reference_wrapper<fs::Vnode>> Lookup(PseudoDir& parent,
                                                                  std::string_view name);
-  void EnsureClassExists(std::string_view name);
-
   Devnode& root_;
   std::default_random_engine device_number_generator_;
 
