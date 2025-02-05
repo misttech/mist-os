@@ -18,6 +18,7 @@ driver_bind_rules("virtio_input_bind") {
 }
 
 fuchsia_cc_driver("virtio_input-driver") {
+  legacy = true
   output_name = "virtio_input"
   configs += [
     "//build/config:all_source",

@@ -21,6 +21,7 @@ group("tests") {
 }
 
 fuchsia_cc_driver("ums-function-driver") {
+  legacy = true
   output_name = "ums-function"
   configs += [
     "//build/config:all_source",

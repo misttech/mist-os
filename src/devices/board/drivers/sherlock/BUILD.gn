@@ -21,6 +21,7 @@ driver_bind_rules("sherlock-bind") {
 
 template("sherlock_driver") {
   fuchsia_cc_driver(target_name + "-driver") {
+    legacy = true
     output_name = invoker.target_name
     forward_variables_from(invoker, "*")
 

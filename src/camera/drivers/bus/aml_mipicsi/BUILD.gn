@@ -47,6 +47,7 @@ source_set("aml_mipi_driver_source") {
 }
 
 fuchsia_cc_driver("aml_mipicsi_driver-driver") {
+  legacy = true
   output_name = "aml_mipicsi"
   deps = [
     ":aml_mipi_bind",

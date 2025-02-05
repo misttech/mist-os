@@ -20,6 +20,7 @@ group("tests") {
 }
 
 fuchsia_cc_driver("machina-driver") {
+  legacy = true
   output_name = "machina"
   configs += [
     "//build/config:all_source",

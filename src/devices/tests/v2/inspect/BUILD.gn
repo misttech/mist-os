@@ -30,6 +30,7 @@ driver_bind_rules("bind") {
 }
 
 fuchsia_cc_driver("root-driver") {
+  legacy = true
   testonly = true
   output_name = "inspect-root"
   sources = [ "root-driver.cc" ]

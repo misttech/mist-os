@@ -17,6 +17,7 @@ driver_bind_rules("realtek_rtl8111_bind") {
 
 if (current_cpu == "x64") {
   fuchsia_cc_driver("realtek-8111-driver") {
+    legacy = true
     output_name = "realtek-8111"
     configs += [
       "//build/config:all_source",

@@ -20,6 +20,7 @@ driver_bind_rules("aml-cpu-legacy-bind") {
 }
 
 fuchsia_cc_driver("aml-cpu-legacy-driver") {
+  legacy = true
   output_name = "aml-cpu-legacy"
   defines = [ "_ALL_SOURCE" ]
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]

@@ -85,6 +85,7 @@ driver_bind_rules("v1_test_bind") {
 }
 
 fuchsia_cc_driver("v1_test") {
+  legacy = true
   sources = [
     "v1_test.cc",
     "v1_test.h",
@@ -107,6 +108,7 @@ fidl("fuchsia.test.echo") {
 }
 
 fuchsia_cc_driver("v1_create_test") {
+  legacy = true
   sources = [
     "v1_create_test.cc",
     "v1_test.h",
@@ -125,6 +127,7 @@ fuchsia_driver_component("compat_v1_create_test") {
 }
 
 fuchsia_cc_driver("v1_missing_test") {
+  legacy = true
   sources = [ "v1_missing_test.cc" ]
   deps = [
     ":v1_test_bind",
@@ -140,6 +143,7 @@ fuchsia_driver_component("compat_v1_missing_test") {
 }
 
 fuchsia_cc_driver("v1_device_add_null_test") {
+  legacy = true
   sources = [
     "v1_device_add_null.cc",
     "v1_test.h",

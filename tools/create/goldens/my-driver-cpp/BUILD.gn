@@ -32,6 +32,7 @@ driver_bind_rules("bind") {
 }
 
 fuchsia_cc_driver("driver") {
+  legacy = true
   output_name = "my-driver-cpp"
   sources = [ "my_driver_cpp.cc" ]
   deps = [

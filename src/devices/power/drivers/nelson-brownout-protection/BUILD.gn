@@ -37,6 +37,7 @@ group("common") {
 }
 
 fuchsia_cc_driver("nelson-brownout-protection-driver") {
+  legacy = true
   output_name = "nelson-brownout-protection"
   configs += [ "//build/config:all_source" ]
   sources = [ "nelson-brownout-protection.cc" ]

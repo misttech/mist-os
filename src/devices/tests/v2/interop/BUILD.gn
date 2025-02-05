@@ -60,6 +60,7 @@ driver_bind_rules("interop_v1_bind") {
 }
 
 fuchsia_cc_driver("v1_driver") {
+  legacy = true
   testonly = true
   output_name = "interop_v1"
   sources = [ "v1_driver.cc" ]

@@ -128,6 +128,7 @@ bind_test("block-verity-bind-test") {
 }
 
 fuchsia_cc_driver("block-verity-driver") {
+  legacy = true
   output_name = "block-verity"
 
   sources = [

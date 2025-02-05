@@ -15,6 +15,7 @@ driver_bind_rules("aml_rtc_bind") {
 }
 
 fuchsia_cc_driver("aml-rtc-driver") {
+  legacy = true
   output_name = "aml-rtc"
   configs += [
     "//build/config:all_source",

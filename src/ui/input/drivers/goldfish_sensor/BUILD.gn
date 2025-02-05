@@ -38,6 +38,7 @@ common_deps = [
 ]
 
 fuchsia_cc_driver("sensor_fuchsia_driver") {
+  legacy = true
   output_name = "goldfish_sensor"
 
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]

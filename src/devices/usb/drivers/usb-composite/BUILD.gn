@@ -24,6 +24,7 @@ group("tests") {
 }
 
 fuchsia_cc_driver("usb-composite-driver") {
+  legacy = true
   output_name = "usb-composite"
   configs += [
     "//build/config:all_source",

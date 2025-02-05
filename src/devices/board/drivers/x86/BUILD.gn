@@ -40,6 +40,7 @@ driver_bind_rules("x64-bind") {
 }
 
 fuchsia_cc_driver("platform-bus-x86-driver") {
+  legacy = true
   output_name = "platform-bus-x86"
   configs += [
     "//build/config:all_source",

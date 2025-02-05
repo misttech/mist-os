@@ -21,6 +21,7 @@ driver_bind_rules("ftl_bind") {
 }
 
 fuchsia_cc_driver("ftl-driver") {
+  legacy = true
   output_name = "ftl"
   configs += [
     "//build/config:all_source",

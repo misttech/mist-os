@@ -21,6 +21,7 @@ group("tests") {
 }
 
 fuchsia_cc_driver("qemu-riscv64-driver") {
+  legacy = true
   output_name = "qemu-riscv64"
   configs += [
     "//build/config:all_source",

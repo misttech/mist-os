@@ -80,6 +80,7 @@ source_set("shared") {
 }
 
 fuchsia_cc_driver("usb-audio-driver") {
+  legacy = true
   output_name = "usb-audio"
   deps = [ ":shared" ]
 }

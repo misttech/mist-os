@@ -23,6 +23,7 @@ driver_bind_rules("gpt_bind") {
 }
 
 fuchsia_cc_driver("gpt-driver") {
+  legacy = true
   output_name = "gpt"
   configs += [
     "//build/config:all_source",

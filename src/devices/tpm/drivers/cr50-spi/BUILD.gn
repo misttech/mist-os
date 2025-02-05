@@ -31,6 +31,7 @@ common_deps = [
 ]
 
 fuchsia_cc_driver("fuchsia_driver") {
+  legacy = true
   output_name = "cr50-spi-driver"
   sources = [ "cr50-spi.cc" ]
   deps = common_deps

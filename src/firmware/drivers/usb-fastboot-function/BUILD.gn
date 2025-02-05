@@ -59,6 +59,7 @@ source_set("usb-fastboot-function-common") {
 }
 
 fuchsia_cc_driver("driver") {
+  legacy = true
   output_name = "usb-fastboot-function"
   deps = [ ":usb-fastboot-function-common" ]
 }

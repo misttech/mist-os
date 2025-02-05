@@ -18,6 +18,7 @@ driver_bind_rules("cdc_acm_bind") {
 }
 
 fuchsia_cc_driver("usb-cdc-acm-driver") {
+  legacy = true
   output_name = "usb-cdc-acm"
   configs += [
     "//build/config:all_source",
@@ -69,6 +70,7 @@ driver_bind_rules("usb_cdc_acm_function_bind") {
 }
 
 fuchsia_cc_driver("fake-usb-cdc-acm-driver") {
+  legacy = true
   output_name = "fake-usb-cdc-acm"
   configs += [
     "//build/config:all_source",

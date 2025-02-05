@@ -27,6 +27,7 @@ driver_bind_rules("bind") {
 }
 
 fuchsia_cc_driver("driver") {
+  legacy = true
   output_name = "test-autobind"
   sources = [ "autobind.cc" ]
   deps = [

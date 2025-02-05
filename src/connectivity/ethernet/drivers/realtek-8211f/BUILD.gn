@@ -12,6 +12,7 @@ driver_bind_rules("rtl8211f_bind") {
 }
 
 fuchsia_cc_driver("realtek-8211f-driver") {
+  legacy = true
   output_name = "realtek-8211f"
   configs += [
     "//build/config:all_source",

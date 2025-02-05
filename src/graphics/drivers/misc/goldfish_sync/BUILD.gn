@@ -38,6 +38,7 @@ source_set("common_deps") {
 }
 
 fuchsia_cc_driver("goldfish_sync_driver-driver") {
+  legacy = true
   output_name = "goldfish_sync"
 
   sources = [

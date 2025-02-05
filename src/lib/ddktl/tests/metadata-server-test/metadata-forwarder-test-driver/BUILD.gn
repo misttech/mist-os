@@ -14,6 +14,7 @@ driver_bind_rules("bind") {
 }
 
 fuchsia_cc_driver("driver") {
+  legacy = true
   testonly = true
   output_name = "metadata_forwarder_test_driver"
   sources = [

@@ -9,6 +9,7 @@ import("//build/test.gni")
 import("//src/storage/testing/driver_test_realm.gni")
 
 fuchsia_cc_driver("core-driver") {
+  legacy = true
   output_name = "block.core"
   configs += [
     "//build/config:all_source",

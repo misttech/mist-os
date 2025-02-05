@@ -49,6 +49,7 @@ source_set("common") {
 }
 
 fuchsia_cc_driver("vim3-pwm-backlight-driver") {
+  legacy = true
   output_name = "vim3-pwm-backlight"
   deps = [ ":common" ]
 }

@@ -38,6 +38,7 @@ driver_bind_rules("test-board-bind") {
 }
 
 fuchsia_cc_driver("test-board-driver") {
+  legacy = true
   testonly = true
   output_name = "test-board"
   configs += [ "//build/config:all_source" ]
@@ -88,6 +89,7 @@ driver_bind_rules("test-gpio-bind") {
 }
 
 fuchsia_cc_driver("test-gpio-driver") {
+  legacy = true
   testonly = true
   output_name = "test-gpio"
   configs += [ "//build/config:all_source" ]
@@ -124,6 +126,7 @@ driver_bind_rules("test-power-bind") {
 }
 
 fuchsia_cc_driver("test-power-driver") {
+  legacy = true
   testonly = true
   output_name = "test-power"
   configs += [ "//build/config:all_source" ]
@@ -159,6 +162,7 @@ driver_bind_rules("test-spi-bind") {
 }
 
 fuchsia_cc_driver("test-spi-driver") {
+  legacy = true
   testonly = true
   output_name = "test-spi"
   configs += [ "//build/config:all_source" ]
@@ -196,6 +200,7 @@ driver_bind_rules("test-composite-node-spec-bind") {
 }
 
 fuchsia_cc_driver("test-composite-node-spec-driver") {
+  legacy = true
   testonly = true
   output_name = "test-composite-node-spec"
   configs += [ "//build/config:all_source" ]
@@ -287,6 +292,7 @@ driver_bind_rules("test-bti-board-bind") {
 }
 
 fuchsia_cc_driver("test-bti-board-driver") {
+  legacy = true
   testonly = true
   output_name = "test-bti-board"
   configs += [ "//build/config:all_source" ]
@@ -323,6 +329,7 @@ driver_bind_rules("test-bti-bind") {
 }
 
 fuchsia_cc_driver("test-bti-driver") {
+  legacy = true
   testonly = true
   output_name = "test-bti"
   configs += [ "//build/config:all_source" ]

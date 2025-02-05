@@ -18,6 +18,7 @@ driver_bind_rules("aml-thermal-bind") {
 }
 
 fuchsia_cc_driver("aml-thermal-driver") {
+  legacy = true
   output_name = "aml-thermal"
   configs += [
     "//build/config:all_source",

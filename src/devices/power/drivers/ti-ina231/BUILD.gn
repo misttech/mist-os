@@ -39,6 +39,7 @@ driver_bind_rules("bind") {
 }
 
 fuchsia_cc_driver("ti-ina231-driver") {
+  legacy = true
   output_name = "ti-ina231"
   configs += [
     "//build/config:all_source",

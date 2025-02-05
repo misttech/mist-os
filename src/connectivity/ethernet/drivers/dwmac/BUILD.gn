@@ -18,6 +18,7 @@ driver_bind_rules("dwmac_bind") {
 }
 
 fuchsia_cc_driver("dwmac-driver") {
+  legacy = true
   output_name = "dwmac"
   configs += [
     "//build/config:all_source",

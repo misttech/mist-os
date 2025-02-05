@@ -21,6 +21,7 @@ group("tests") {
 }
 
 fuchsia_cc_driver("qemu-arm64-driver") {
+  legacy = true
   output_name = "qemu-arm64"
   configs += [
     "//build/config:all_source",

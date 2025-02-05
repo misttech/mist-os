@@ -62,6 +62,7 @@ source_set("common-dfv1") {
 }
 
 fuchsia_cc_driver("driver") {
+  legacy = true
   output_name = "da7219"
   sources = []
   deps = [ ":common-dfv1" ]

@@ -42,6 +42,7 @@ common_deps = [
 ]
 
 fuchsia_cc_driver("control_driver-driver") {
+  legacy = true
   output_name = "goldfish_control"
 
   sources = [

@@ -21,6 +21,7 @@ driver_bind_rules("test-bus-bind") {
 }
 
 fuchsia_cc_driver("integration-test-driver") {
+  legacy = true
   testonly = true
   output_name = "integration-test"
   configs += [ "//build/config:all_source" ]

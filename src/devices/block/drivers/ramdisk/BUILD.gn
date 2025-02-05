@@ -13,6 +13,7 @@ driver_bind_rules("ramdisk_bind") {
 }
 
 fuchsia_cc_driver("ramdisk-driver") {
+  legacy = true
   output_name = "ramdisk"
   configs += [
     "//build/config:all_source",

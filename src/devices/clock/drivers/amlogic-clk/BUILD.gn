@@ -76,6 +76,7 @@ source_set("amlogic-clk-driver-source") {
 }
 
 fuchsia_cc_driver("amlogic-clk-driver") {
+  legacy = true
   output_name = "amlogic-clk"
   deps = [
     ":aml-clk-bind",

@@ -40,6 +40,7 @@ driver_bind_rules("nelson-bind") {
 }
 
 fuchsia_cc_driver("nelson-module-driver") {
+  legacy = true
   output_name = "nelson-module"
   configs += [
     "//build/config:all_source",

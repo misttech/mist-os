@@ -16,6 +16,7 @@ group("realtek") {
 }
 
 fuchsia_cc_driver("realtek-audio-codec-driver") {
+  legacy = true
   output_name = "realtek-audio-codec"
   configs += [
     "//build/config:all_source",

@@ -8,6 +8,7 @@ import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
 # The gpu device
 fuchsia_cc_driver("msd_intel-driver") {
+  legacy = true
   output_name = "libmsd_intel"
 
   deps = [
@@ -28,6 +29,7 @@ fuchsia_driver_component("msd_intel") {
 
 # The gpu device; runs gtests at startup
 fuchsia_cc_driver("msd_intel_test-driver") {
+  legacy = true
   testonly = true
 
   output_name = "libmsd_intel_test"

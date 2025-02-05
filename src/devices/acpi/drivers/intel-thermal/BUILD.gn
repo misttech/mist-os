@@ -34,6 +34,7 @@ common_deps = [
 ]
 
 fuchsia_cc_driver("driver") {
+  legacy = true
   output_name = "intel-thermal"
   sources = [ "intel_thermal.cc" ]
   deps = common_deps + [ "//src/devices/lib/driver" ]

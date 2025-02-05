@@ -21,6 +21,7 @@ group("tests") {
   deps = [ ":virtio_console_bind_test" ]
 }
 fuchsia_cc_driver("virtio_console-driver") {
+  legacy = true
   output_name = "virtio_console"
   configs += [
     "//build/config:all_source",

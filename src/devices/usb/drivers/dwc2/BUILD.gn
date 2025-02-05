@@ -63,6 +63,7 @@ source_set("common") {
 }
 
 fuchsia_cc_driver("dwc2-driver") {
+  legacy = true
   output_name = "dwc2"
   deps = [ ":common" ]
 }

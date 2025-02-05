@@ -33,6 +33,7 @@ driver_bind_rules("root_test-bind") {
 }
 
 fuchsia_cc_driver("audio-test-root-driver") {
+  legacy = true
   sources = [ "test-root.cc" ]
   deps = [
     ":fuchsia.test.audio_cpp",
@@ -50,6 +51,7 @@ fuchsia_driver_component("audio-test-root") {
 }
 
 fuchsia_cc_driver("codec-test-driver") {
+  legacy = true
   output_name = "codec-test-driver"
   sources = [ "test-codec.cc" ]
   deps = [
@@ -64,6 +66,7 @@ fuchsia_cc_driver("codec-test-driver") {
   ]
 }
 fuchsia_cc_driver("codec-test-driver2") {
+  legacy = true
   output_name = "codec-test-driver2"
   sources = [ "test-codec2.cc" ]
   deps = [
@@ -78,6 +81,7 @@ fuchsia_cc_driver("codec-test-driver2") {
   ]
 }
 fuchsia_cc_driver("dai-test-driver") {
+  legacy = true
   output_name = "dai-test-driver"
   sources = [ "test-dai.cc" ]
   deps = [

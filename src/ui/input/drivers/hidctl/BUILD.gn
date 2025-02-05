@@ -18,6 +18,7 @@ driver_bind_rules("hidctl_bind") {
 }
 
 fuchsia_cc_driver("hidctl-driver") {
+  legacy = true
   output_name = "hidctl"
   configs += [
     "//build/config:all_source",

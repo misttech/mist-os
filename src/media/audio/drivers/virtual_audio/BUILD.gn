@@ -22,6 +22,7 @@ group("tests") {
 }
 
 fuchsia_cc_driver("virtual_audio_driver-driver") {
+  legacy = true
   output_name = "virtual_audio_driver"
 
   sources = [

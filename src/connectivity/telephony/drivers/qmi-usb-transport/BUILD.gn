@@ -25,6 +25,7 @@ group("tests") {
 }
 
 fuchsia_cc_driver("qmi_driver-driver") {
+  legacy = true
   output_name = "qmi-transport"
 
   deps = [ ":qmi_driver_src" ]

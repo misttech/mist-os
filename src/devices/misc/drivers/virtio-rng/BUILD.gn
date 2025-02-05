@@ -22,6 +22,7 @@ group("tests") {
 }
 
 fuchsia_cc_driver("virtio_rng-driver") {
+  legacy = true
   output_name = "virtio_rng"
   configs += [
     "//build/config:all_source",

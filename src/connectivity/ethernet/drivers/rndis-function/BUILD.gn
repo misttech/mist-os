@@ -44,6 +44,8 @@ source_set("rndis-function-lib") {
 }
 
 fuchsia_cc_driver("rndis-function-driver") {
+  legacy = true
+
   # visibility = [ ":*" ]
   output_name = "rndis-function"
 

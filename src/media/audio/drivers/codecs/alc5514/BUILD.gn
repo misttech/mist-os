@@ -15,6 +15,7 @@ driver_bind_rules("alc5514_bind") {
 }
 
 fuchsia_cc_driver("alc5514-driver") {
+  legacy = true
   output_name = "alc5514"
   configs += [
     "//build/config:all_source",

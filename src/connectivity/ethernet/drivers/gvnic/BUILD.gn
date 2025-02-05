@@ -30,6 +30,7 @@ driver_bind_rules("gvnic_bind") {
 }
 
 fuchsia_cc_driver("gvnic-driver") {
+  legacy = true
   output_name = "gvnic"
   sources = [
     "abi.h",

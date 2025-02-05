@@ -13,6 +13,7 @@ driver_bind_rules("bind") {
 }
 
 fuchsia_cc_driver("driver") {
+  legacy = true
   output_name = "simple_dfv1"
   sources = [ "simple_driver.cc" ]
   deps = [

@@ -68,6 +68,7 @@ test("pci-driver") {
 # These drivers are not 'test' drivers because at the moment having other
 # drivers in test/ breaks ddkltl integration tests.
 fuchsia_cc_driver("pci_fake-driver") {
+  legacy = true
   output_name = "pci_fake"
   configs += [
     "//build/config:all_source",
@@ -98,6 +99,7 @@ fuchsia_driver_component("pci_fake") {
 }
 
 fuchsia_cc_driver("pci_protocol_test_driver-driver") {
+  legacy = true
   output_name = "pci_protocol_test_driver"
   configs += [
     "//build/config:all_source",

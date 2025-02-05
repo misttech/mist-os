@@ -14,6 +14,7 @@ driver_bind_rules("bind") {
 }
 
 fuchsia_cc_driver("driver") {
+  legacy = true
   output_name = "driver-test-realm-fake-driver"
   sources = [ "fake_driver.cc" ]
   deps = [

@@ -16,6 +16,7 @@ driver_bind_rules("pci-sdhci-bind") {
 }
 
 fuchsia_cc_driver("pci-sdhci-driver") {
+  legacy = true
   output_name = "pci-sdhci"
   configs += [
     "//build/config:all_source",

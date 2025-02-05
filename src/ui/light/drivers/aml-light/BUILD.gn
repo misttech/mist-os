@@ -45,6 +45,7 @@ source_set("aml-light-driver-source") {
 }
 
 fuchsia_cc_driver("aml-light-driver") {
+  legacy = true
   output_name = "aml-light"
   deps = [
     ":aml-light-driver-source",

@@ -18,6 +18,7 @@ group("tests") {
 }
 
 fuchsia_cc_driver("qmi_function-driver") {
+  legacy = true
   output_name = "qmi-function"
   testonly = true
 

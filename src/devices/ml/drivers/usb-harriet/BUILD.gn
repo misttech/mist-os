@@ -18,6 +18,7 @@ group("tests") {
 }
 
 fuchsia_cc_driver("usb-harriet-driver") {
+  legacy = true
   output_name = "usb-harriet"
   configs += [
     "//build/config:all_source",

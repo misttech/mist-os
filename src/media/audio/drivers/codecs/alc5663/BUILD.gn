@@ -32,6 +32,7 @@ source_set("shared") {
 }
 
 fuchsia_cc_driver("alc5663-driver") {
+  legacy = true
   output_name = "alc5663"
   configs += [
     "//build/config:all_source",

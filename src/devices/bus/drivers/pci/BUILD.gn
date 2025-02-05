@@ -85,6 +85,7 @@ driver_bind_rules("pci_bind") {
 
 if (platform_enable_user_pci) {
   fuchsia_cc_driver("bus-pci-driver") {
+    legacy = true
     output_name = "bus-pci"
     configs += [
       "//build/config:all_source",
@@ -115,6 +116,7 @@ if (platform_enable_user_pci) {
   }
 } else {  # Kernel PCI
   fuchsia_cc_driver("bus-pci-driver") {
+    legacy = true
     output_name = "bus-pci"
     configs += [
       "//build/config:all_source",

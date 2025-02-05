@@ -18,6 +18,7 @@ driver_bind_rules("aml_ram_bind") {
 }
 
 fuchsia_cc_driver("aml-ram-driver") {
+  legacy = true
   output_name = "aml-ram"
   configs += [
     "//build/config:all_source",

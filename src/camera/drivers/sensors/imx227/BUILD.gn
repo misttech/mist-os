@@ -61,6 +61,7 @@ source_set("lib") {
 }
 
 fuchsia_cc_driver("fuchsia_driver") {
+  legacy = true
   output_name = "imx227"
 
   sources = [ "imx227_hardware_test.cc" ]

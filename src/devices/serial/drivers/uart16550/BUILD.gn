@@ -80,6 +80,7 @@ driver_bind_rules("uart16550_bind") {
 }
 
 fuchsia_cc_driver("uart16550-driver") {
+  legacy = true
   output_name = "uart16550"
   deps = [
     ":uart16550_bind",
