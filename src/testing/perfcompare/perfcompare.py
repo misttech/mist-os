@@ -376,19 +376,24 @@ def CompareIntervals(stats_before, stats_after):
 
 
 def CheckSampleSize(expected_sample_size, results_maps):
-    # Check that the sample size for each metric matches the
-    # "--expected_sample_size" argument (if given).
+    # Check that the sample size for each metric does not exceed the
+    # value from the "--expected_sample_size" argument (if given).
+    #
+    # We allow smaller sample sizes so that if a metric is flaky (in
+    # the sense of not being consistently produced by a test), we
+    # don't break perfcompare builds or sample builds that produce
+    # that metric (see b/391497045).
     if expected_sample_size is None:
         return
     mismatches = []
     for results_map in results_maps:
         for label, stats in sorted(results_map.items()):
-            if stats.sample_size != expected_sample_size:
+            if stats.sample_size > expected_sample_size:
                 mismatches.append("  %s (got %d)" % (label, stats.sample_size))
     if len(mismatches) != 0:
         raise AssertionError(
             "The following metrics had an unexpected sample size"
-            " (expected %d):\n%s"
+            " (expected <=%d):\n%s"
             % (expected_sample_size, "\n".join(mismatches))
         )
 
@@ -634,7 +639,7 @@ def Main(argv, out_fh, run_cmd=subprocess.check_call):
         type=int,
         help="Expected sample size (number of boots) for each metric in each"
         " set of results. The subcommand will raise an error if the actual"
-        " sample size does not match this value. This may be passed by the"
+        " sample size is larger than this value. This may be passed by the"
         " infra recipe to provide a consistency check to make sure that tests"
         " are not accidentally run more times than intended, such as on a mix"
         " of inconsistent device types.",

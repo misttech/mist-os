@@ -409,31 +409,38 @@ class StatisticsTest(TempDirTestCase):
         output = ComparePerf([dir_path, dir_path], expected_sample_size=2)
         GOLDEN.AssertCaseEq("comparison_no_change_zero_width_ci", output)
 
-    def test_sample_size_check(self):
-        dir1_path = self.DirOfData([[[10]], [[20]]])
-        dir2_path = self.DirOfData([[[10]], [[20]], [[30]]])
+    def test_sample_size_check_larger(self):
+        dir1_path = self.DirOfData([[[10]]] * 4)
+        dir2_path = self.DirOfData([[[10]]] * 5)
         # Check that we get a descriptive error if the actual sample
         # sizes do not match the "--expected_sample_size" argument.
         error = (
             "^The following metrics had an unexpected sample size"
-            " \(expected 99\):\n"
-            "  example_suite: ExampleTest \(got 2\)\n"
-            "  example_suite: ExampleTest \(got 3\)$"
+            " \(expected <=3\):\n"
+            "  example_suite: ExampleTest \(got 4\)\n"
+            "  example_suite: ExampleTest \(got 5\)$"
         )
         with self.assertRaisesRegex(AssertionError, error):
-            ComparePerf([dir1_path, dir2_path], expected_sample_size=99)
+            ComparePerf([dir1_path, dir2_path], expected_sample_size=3)
         # We should get a similar error if we pass only one directory.
         error = (
             "^The following metrics had an unexpected sample size"
-            " \(expected 99\):\n"
-            "  example_suite: ExampleTest \(got 2\)$"
+            " \(expected <=3\):\n"
+            "  example_suite: ExampleTest \(got 4\)$"
         )
         with self.assertRaisesRegex(AssertionError, error):
-            ComparePerf([dir1_path], expected_sample_size=99)
+            ComparePerf([dir1_path], expected_sample_size=3)
         # There should be no check for the sample sizes if the
         # "--expected_sample_size" argument is not given.
         stdout = io.StringIO()
         perfcompare.Main(["compare_perf", dir1_path, dir2_path], stdout)
+
+    def test_sample_size_check_smaller(self):
+        # We shouldn't get an error if the actual sample sizes are
+        # smaller than expected.
+        dir1_path = self.DirOfData([[[10]]] * 3)
+        dir2_path = self.DirOfData([[[10]]] * 4)
+        ComparePerf([dir1_path, dir2_path], expected_sample_size=5)
 
 
 class PerfCompareTest(TempDirTestCase):
