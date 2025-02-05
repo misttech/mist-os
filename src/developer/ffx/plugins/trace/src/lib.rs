@@ -28,7 +28,8 @@ use std::time::Duration;
 use target_holders::{daemon_protocol, moniker};
 use term_grid::Grid;
 #[cfg_attr(test, allow(unused))]
-use termion::{color, terminal_size};
+use termion::terminal_size;
+use termion::{color, style};
 
 // This is to make the schema make sense as this plugin can output one of these based on the
 // subcommand. An alternative is to break this one plugin into multiple plugins each with their own
@@ -108,43 +109,47 @@ fn more_than_init_record(
     }
 }
 
-fn stats_to_print(trace_stat: ProviderStats, verbose: bool) -> Vec<String> {
+// Scan through the resulting stats of a trace session and build up the output to inform or warn
+// the user.
+fn stats_to_output(provider_stats: Vec<ProviderStats>, verbose: bool) -> Vec<String> {
     let mut stats_output = Vec::new();
-    let (
-        Some(provider_name),
-        Some(pid),
-        Some(buffering_mode),
-        Some(wrapped_count),
-        Some(records_dropped),
-        Some(durable_buffer_used),
-        Some(non_durable_bytes_written),
-    ) = (
-        trace_stat.name,
-        trace_stat.pid,
-        trace_stat.buffering_mode,
-        trace_stat.buffer_wrapped_count,
-        trace_stat.records_dropped,
-        trace_stat.percentage_durable_buffer_used,
-        trace_stat.non_durable_bytes_written,
-    )
-    else {
-        if verbose {
-            stats_output.push(String::from("A provider returned stats with missing values"));
-        }
-        return stats_output;
-    };
-    if (verbose
-        && more_than_init_record(non_durable_bytes_written, durable_buffer_used, buffering_mode))
-        || (records_dropped != 0)
-    {
+    let mut dropped_records_warnings = Vec::new();
+    let mut providers_with_missing_stats = 0;
+    for provider in provider_stats {
+        let (
+            Some(provider_name),
+            Some(pid),
+            Some(buffering_mode),
+            Some(wrapped_count),
+            Some(records_dropped),
+            Some(durable_buffer_used),
+            Some(non_durable_bytes_written),
+        ) = (
+            provider.name,
+            provider.pid,
+            provider.buffering_mode,
+            provider.buffer_wrapped_count,
+            provider.records_dropped,
+            provider.percentage_durable_buffer_used,
+            provider.non_durable_bytes_written,
+        )
+        else {
+            providers_with_missing_stats += 1;
+            continue;
+        };
+
+        // If we dropped records, we always want to warn the user, regardless of verbosity.
         if records_dropped != 0 {
-            stats_output.push(format!(
+            dropped_records_warnings.push(format!(
                 "{}WARNING: {provider_name:?} dropped {records_dropped:?} records!{}",
                 color::Fg(color::Yellow),
                 color::Fg(color::Reset)
             ));
         }
-        if verbose {
+
+        let provider_has_data =
+            more_than_init_record(non_durable_bytes_written, durable_buffer_used, buffering_mode);
+        if verbose && provider_has_data {
             stats_output.extend([
                 format!("{provider_name:?} (pid: {pid:?}) trace stats"),
                 format!("Buffer wrapped count: {wrapped_count:?}"),
@@ -154,6 +159,22 @@ fn stats_to_print(trace_stat: ProviderStats, verbose: bool) -> Vec<String> {
             ]);
         }
     }
+
+    if !dropped_records_warnings.is_empty() {
+        dropped_records_warnings
+            .push(format!("{}TIP: One or more providers dropped records. Consider increasing the buffer size with `--buffer-size <MB>`.{}", style::Bold, style::Reset));
+    }
+
+    if verbose && providers_with_missing_stats != 0 {
+        stats_output.push(format!(
+            "{}WARNING: {} producers were missing stats. Perhaps a producer is misconfigured?{}",
+            color::Fg(color::Yellow),
+            providers_with_missing_stats,
+            style::Reset
+        ));
+    }
+    stats_output.extend(dropped_records_warnings);
+
     return stats_output;
 }
 
@@ -554,20 +575,10 @@ pub async fn trace(
                     &trace_config,
                 )
                 .await?;
-            let Ok(target) = res else {
-                ffx_bail!("{}", handle_recording_error(&context, res.unwrap_err(), &output).await);
-            };
-            writer.print(format!(
-                "Tracing started successfully on \"{}\" for categories: [ {} ].\nWriting to {}",
-                target.nodename.or(target.serial_number).as_deref().unwrap_or("<UNKNOWN>"),
-                expanded_categories.join(","),
-                output
-            ))?;
-            if let Some(duration) = &opts.duration {
-                writer.line(format!(" for {} seconds.", duration))?;
-            } else {
-                writer.line("")?;
+            if let Err(e) = res {
+                ffx_bail!("{}", handle_recording_error(&context, e, &output).await);
             }
+            writer.line(format!("Tracing categories: [{}]...", expanded_categories.join(","),))?;
             if opts.background {
                 writer.line("To manually stop the trace, use `ffx trace stop`")?;
                 writer.line("Current tracing status:")?;
@@ -576,13 +587,11 @@ pub async fn trace(
 
             let waiter = &mut stdin();
             if let Some(duration) = &opts.duration {
-                writer.line(format!("Waiting for {} seconds.", duration))?;
                 fuchsia_async::Timer::new(Duration::from_secs_f64(*duration)).await;
             } else {
                 writer.line("Press <enter> to stop trace.")?;
                 waiter.wait().await;
             }
-            writer.line(format!("Shutting down recording and writing to file."))?;
             stop_tracing(
                 &context,
                 &proxy,
@@ -713,12 +722,11 @@ async fn stop_tracing(
     no_verify_trace: bool,
 ) -> Result<()> {
     let res = proxy.stop_recording(&output).await?;
-    let (target, output_file) = match res {
+    let (_target, output_file) = match res {
         Ok((target, output_file, categories, stop_result)) => {
-            for stat in stop_result.provider_stats.unwrap_or_default() {
-                for stat_output in stats_to_print(stat, verbose) {
-                    writer.line(stat_output)?;
-                }
+            let output = stats_to_output(stop_result.provider_stats.unwrap_or(vec![]), verbose);
+            for line in output {
+                writer.line(line)?;
             }
             if !no_verify_trace {
                 match std::fs::read(output_file.clone()) {
@@ -741,11 +749,7 @@ async fn stop_tracing(
         Err(e) => ffx_bail!("{}", handle_recording_error(context, e, &output).await),
     };
     // TODO(awdavies): Make a clickable link that auto-uploads the trace file if possible.
-    writer.line(format!(
-        "Tracing stopped successfully on \"{}\".\nResults written to {}",
-        target.nodename.or(target.serial_number).as_deref().unwrap_or("<UNKNOWN>"),
-        output_file
-    ))?;
+    writer.line(format!("Results written to {}", output_file))?;
     writer.line("Upload to https://ui.perfetto.dev/#!/ to view.")?;
     Ok(())
 }
@@ -1304,7 +1308,7 @@ mod tests {
         let output = test_buffers.into_stdout_str();
         // This doesn't find `/.../foo.txt` for the tracing status, since the faked
         // proxy has no state.
-        let regex_str = "Tracing started successfully on \"foo\" for categories: \\[ beaver,platypus \\].\nWriting to /([^/]+/)+?foo.txt
+        let regex_str = "Tracing categories: \\[beaver,platypus\\]...
 To manually stop the trace, use `ffx trace stop`
 Current tracing status:
 - foo:
@@ -1350,7 +1354,7 @@ Current tracing status:
         let output = test_buffers.into_stdout_str();
         // This doesn't find `/.../foo.txt` for the tracing status, since the faked
         // proxy has no state.
-        let regex_str = "Tracing started successfully on \"foo\" for categories: \\[ beaver,platypus \\].\nWriting to /([^/]+/)+?trace.fxt
+        let regex_str = "Tracing categories: \\[beaver,platypus\\]...
 To manually stop the trace, use `ffx trace stop`
 Current tracing status:
 - foo:
@@ -1415,7 +1419,8 @@ Current tracing status:
         )
         .await;
         let output = test_buffers.into_stdout_str();
-        let regex_str = "Tracing stopped successfully on \"foo\".\nResults written to /([^/]+/)+?foo.txt\nUpload to https://ui.perfetto.dev/#!/ to view.";
+        let regex_str =
+            "Results written to /([^/]+/)+?foo.txt\nUpload to https://ui.perfetto.dev/#!/ to view.";
         let want = Regex::new(regex_str).unwrap();
         assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
     }
@@ -1439,7 +1444,7 @@ Current tracing status:
         )
         .await;
         let output = test_buffers.into_stdout_str();
-        let regex_str = "Tracing stopped successfully on \"foo\".\nResults written to /([^/]+/)+?trace.fxt\nUpload to https://ui.perfetto.dev/#!/ to view.";
+        let regex_str = "Results written to /([^/]+/)+?trace.fxt\nUpload to https://ui.perfetto.dev/#!/ to view.";
         let want = Regex::new(regex_str).unwrap();
         assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
     }
@@ -1471,7 +1476,7 @@ Current tracing status:
         let output = test_buffers.into_stdout_str();
         // This doesn't find `/.../foo.txt` for the tracing status, since the faked
         // proxy has no state.
-        let regex_str = "Tracing started successfully on \"foo\" for categories: \\[ beaver,platypus \\].\nWriting to /([^/]+/)+?foo.txt
+        let regex_str = "Tracing categories: \\[beaver,platypus\\]...
 To manually stop the trace, use `ffx trace stop`
 Current tracing status:
 - foo:
@@ -1514,7 +1519,6 @@ Current tracing status:
             # records dropped: 0\n\
             Durable buffer used: 30.00%\n\
             Bytes written to non-durable buffer: 0x28\n\n\
-            Tracing stopped successfully on \"foo\".\n\
             Results written to /([^/]+/)+?foo.txt\n\
             Upload to https://ui.perfetto.dev/#!/ to view.";
         let want = Regex::new(regex_str).unwrap();
@@ -1546,8 +1550,7 @@ Current tracing status:
         )
         .await;
         let output = test_buffers.into_stdout_str();
-        let regex_str =
-            "Tracing started successfully on \"foo\" for categories: \\[  \\].\nWriting to /([^/]+/)+?foober.fxt for 5.2 seconds.";
+        let regex_str = "Tracing categories: \\[\\]...\n";
         let want = Regex::new(regex_str).unwrap();
         assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
     }
@@ -1577,11 +1580,8 @@ Current tracing status:
         )
         .await;
         let output = test_buffers.into_stdout_str();
-        let regex_str =
-            "Tracing started successfully on \"foo\" for categories: \\[  \\].\nWriting to /([^/]+/)+?foober.fxt for 0.8 seconds.\n\
-            Waiting for 0.8 seconds.\n\
-            Shutting down recording and writing to file.\n\
-            Tracing stopped successfully on \"foo\".\nResults written to /([^/]+/)+?foober.fxt\n\
+        let regex_str = "Tracing categories: \\[\\]...\n\
+            Results written to /([^/]+/)+?foober.fxt\n\
             Upload to https://ui.perfetto.dev/#!/ to view.";
         let want = Regex::new(regex_str).unwrap();
         assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
@@ -1612,11 +1612,9 @@ Current tracing status:
         )
         .await;
         let output = test_buffers.into_stdout_str();
-        let regex_str =
-            "Tracing started successfully on \"foo\" for categories: \\[  \\].\nWriting to /([^/]+/)+?foober.fxt\n\
+        let regex_str = "Tracing categories: \\[\\]...\n\
             Press <enter> to stop trace.\n\
-            Shutting down recording and writing to file.\n\
-            Tracing stopped successfully on \"foo\".\nResults written to /([^/]+/)+?foober.fxt\n\
+            Results written to /([^/]+/)+?foober.fxt\n\
             Upload to https://ui.perfetto.dev/#!/ to view.";
         let want = Regex::new(regex_str).unwrap();
         assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
@@ -1647,11 +1645,9 @@ Current tracing status:
         )
         .await;
         let output = test_buffers.into_stdout_str();
-        let regex_str =
-            "Tracing started successfully on \"foo\" for categories: \\[  \\].\nWriting to /([^/]+/)+?foober.fxt\n\
+        let regex_str = "Tracing categories: \\[\\]...\n\
             Press <enter> to stop trace.\n\
-            Shutting down recording and writing to file.\n\
-            Tracing stopped successfully on \"foo\".\nResults written to /([^/]+/)+?foober.fxt\n\
+            Results written to /([^/]+/)+?foober.fxt\n\
             Upload to https://ui.perfetto.dev/#!/ to view.";
         let want = Regex::new(regex_str).unwrap();
         assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
@@ -1850,37 +1846,43 @@ Current tracing status:
         stats.records_dropped = Some(10);
         stats.percentage_durable_buffer_used = Some(30.0);
         stats.non_durable_bytes_written = Some(40);
-        let _warn_str = format!(
+        let warn_str = format!(
             "{}WARNING: \"provider_foo\" dropped 10 records!{}",
             color::Fg(color::Yellow),
             color::Fg(color::Reset)
         );
-        let mut expected_output = vec![
-            &_warn_str,
-            "\"provider_foo\" (pid: 1234) trace stats",
-            "Buffer wrapped count: 10",
-            "# records dropped: 10",
-            "Durable buffer used: 30.00%",
-            "Bytes written to non-durable buffer: 0x28\n",
+        let tip_str = format!("{}TIP: One or more providers dropped records. Consider increasing the buffer size with `--buffer-size <MB>`.{}", style::Bold, style::Reset);
+        let mut expected_output: Vec<String> = vec![
+            "\"provider_foo\" (pid: 1234) trace stats".into(),
+            "Buffer wrapped count: 10".into(),
+            "# records dropped: 10".into(),
+            "Durable buffer used: 30.00%".into(),
+            "Bytes written to non-durable buffer: 0x28\n".into(),
+            warn_str.clone(),
+            tip_str.clone(),
         ];
 
-        let mut actual_output = stats_to_print(stats.clone(), true);
+        let mut actual_output = stats_to_output(vec![stats.clone()], true);
         assert_eq!(expected_output, actual_output);
 
         // Verify that dropped records warning is printed even if not verbose
-        expected_output = vec![&_warn_str];
-        actual_output = stats_to_print(stats.clone(), false);
+        expected_output = vec![warn_str, tip_str];
+        actual_output = stats_to_output(vec![stats.clone()], false);
         assert_eq!(expected_output, actual_output);
 
         // Verbose output with missing stats
         stats.buffer_wrapped_count = None;
-        expected_output = vec!["A provider returned stats with missing values"];
-        actual_output = stats_to_print(stats.clone(), true);
+        expected_output = vec![format!(
+            "{}WARNING: 1 producers were missing stats. Perhaps a producer is misconfigured?{}",
+            color::Fg(color::Yellow),
+            style::Reset
+        )];
+        actual_output = stats_to_output(vec![stats.clone()], true);
         assert_eq!(expected_output, actual_output);
 
         // No output on missing stats if not verbose
         expected_output = vec![];
-        actual_output = stats_to_print(stats.clone(), false);
+        actual_output = stats_to_output(vec![stats.clone()], false);
         assert_eq!(expected_output, actual_output);
     }
 
