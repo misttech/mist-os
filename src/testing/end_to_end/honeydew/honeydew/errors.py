@@ -106,10 +106,6 @@ class FfxTimeoutError(HoneydewTimeoutError):
     """Exception for timeout based errors raised by ffx commands running on host machine."""
 
 
-class HoneydewRtcError(HoneydewError):
-    """Raised by rtc.Rtc class."""
-
-
 class HoneydewDataResourceError(HoneydewError):
     """Raised when Honeydew fails to fetch its data resources."""
 

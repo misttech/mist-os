@@ -30,11 +30,11 @@ from honeydew.affordances.connectivity.wlan.wlan import wlan_using_fc
 from honeydew.affordances.connectivity.wlan.wlan_policy import (
     wlan_policy_using_fc,
 )
-from honeydew.affordances.fuchsia_controller import rtc as rtc_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller_using_starnix,
 )
+from honeydew.affordances.rtc import rtc_using_fc
 from honeydew.affordances.session import session_using_ffx
 from honeydew.affordances.ui.screenshot import screenshot_using_ffx
 from honeydew.affordances.ui.user_input import user_input_using_fc
@@ -366,7 +366,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         mock_run_starnix_console_shell_cmd.assert_called_once()
 
     @mock.patch.object(
-        rtc_fc.Rtc,
+        rtc_using_fc.RtcUisngFc,
         "__init__",
         autospec=True,
         return_value=None,
@@ -376,7 +376,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         implemented using fuchsia-controller"""
         self.assertIsInstance(
             self.fd_fc_obj.rtc,
-            rtc_fc.Rtc,
+            rtc_using_fc.RtcUisngFc,
         )
         mock_rtc_fc_init.assert_called_once_with(
             self.fd_fc_obj.rtc,

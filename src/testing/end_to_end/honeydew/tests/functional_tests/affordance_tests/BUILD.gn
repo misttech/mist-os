@@ -7,7 +7,6 @@ group("tests") {
   testonly = true
   public_deps = [
     "test_inspect:tests",
-    "test_rtc:tests",
     "test_tracing:tests",
   ]
 }

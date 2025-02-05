@@ -5,12 +5,9 @@
 import("//build/python/python_host_test.gni")
 
 if (is_host) {
-  python_host_test("tracing_fc_test") {
-    main_source = "tracing_test.py"
-    libraries = [
-      "//src/testing/end_to_end/honeydew",
-      "//third_party/parameterized",
-    ]
+  python_host_test("rtc_using_fc_test") {
+    main_source = "rtc_using_fc_test.py"
+    libraries = [ "//src/testing/end_to_end/honeydew" ]
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
   }
@@ -18,5 +15,5 @@ if (is_host) {
 
 group("tests") {
   testonly = true
-  public_deps = [ ":tracing_fc_test($host_toolchain)" ]
+  public_deps = [ ":rtc_using_fc_test($host_toolchain)" ]
 }

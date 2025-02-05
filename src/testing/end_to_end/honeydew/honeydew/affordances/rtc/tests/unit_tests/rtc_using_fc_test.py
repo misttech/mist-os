@@ -11,8 +11,8 @@ from unittest import mock
 import fidl.fuchsia_hardware_rtc as frtc
 import fuchsia_controller_py
 
-from honeydew import errors
-from honeydew.affordances.fuchsia_controller import rtc
+from honeydew.affordances.rtc import rtc_using_fc
+from honeydew.affordances.rtc.errors import HoneydewRtcError
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import fuchsia_controller
 
@@ -21,7 +21,7 @@ ZX_OK = fuchsia_controller_py.ZxStatus.ZX_OK
 ZX_ERR_INTERNAL = fuchsia_controller_py.ZxStatus.ZX_ERR_INTERNAL
 
 
-class RtcTest(unittest.TestCase):
+class RtcFcTests(unittest.TestCase):
     def setUp(self) -> None:
         self.m_run = self.enterContext(mock.patch.object(asyncio, "run"))
         self.m_proxy = self.enterContext(
@@ -35,7 +35,7 @@ class RtcTest(unittest.TestCase):
             affordances_capable.RebootCapableDevice
         )
 
-        self.rtc = rtc.Rtc(self.transport, self.reboot_af)
+        self.rtc = rtc_using_fc.RtcUisngFc(self.transport, self.reboot_af)
         self.transport.connect_device_proxy.assert_called_once()
         self.reboot_af.register_for_on_device_boot.assert_called_once()
 
@@ -48,18 +48,18 @@ class RtcTest(unittest.TestCase):
             ZX_OK,
         ]
 
-        _ = rtc.Rtc(self.transport, self.reboot_af)
+        _ = rtc_using_fc.RtcUisngFc(self.transport, self.reboot_af)
         self.assertEqual(self.transport.connect_device_proxy.call_count, 2)
         self.reboot_af.register_for_on_device_boot.assert_called_once()
 
         (ep1,), _ = self.transport.connect_device_proxy.call_args_list[0]
         (ep2,), _ = self.transport.connect_device_proxy.call_args_list[1]
 
-        self.assertEqual(rtc.Rtc.MONIKER_OLD, ep1.moniker)
-        self.assertEqual(rtc.CAPABILITY, ep1.protocol)
+        self.assertEqual(rtc_using_fc.RtcUisngFc.MONIKER_OLD, ep1.moniker)
+        self.assertEqual(rtc_using_fc.CAPABILITY, ep1.protocol)
 
-        self.assertEqual(rtc.Rtc.MONIKER_NEW, ep2.moniker)
-        self.assertEqual(rtc.CAPABILITY, ep2.protocol)
+        self.assertEqual(rtc_using_fc.RtcUisngFc.MONIKER_NEW, ep2.moniker)
+        self.assertEqual(rtc_using_fc.CAPABILITY, ep2.protocol)
 
     def test_rtc_get(self) -> None:
         chip_time = frtc.Time(23, 50, 15, 5, 2, 2022)
@@ -82,7 +82,7 @@ class RtcTest(unittest.TestCase):
         self.m_run.side_effect = fuchsia_controller_py.ZxStatus
 
         msg = r"Device\.Get\(\) error"
-        with self.assertRaisesRegex(errors.HoneydewRtcError, msg):
+        with self.assertRaisesRegex(HoneydewRtcError, msg):
             self.rtc.get()
 
         self.m_proxy.get.assert_called_once()
@@ -113,7 +113,7 @@ class RtcTest(unittest.TestCase):
         self.m_run.return_value.response.status = ZX_ERR_INTERNAL
 
         msg = r"Device\.Set\(\) error"
-        with self.assertRaisesRegex(errors.HoneydewRtcError, msg):
+        with self.assertRaisesRegex(HoneydewRtcError, msg):
             self.rtc.set(time)
 
         self.m_proxy.set.assert_called_once()
@@ -132,7 +132,7 @@ class RtcTest(unittest.TestCase):
         self.m_run.side_effect = fuchsia_controller_py.ZxStatus
 
         msg = r"Device\.Set\(\) error"
-        with self.assertRaisesRegex(errors.HoneydewRtcError, msg):
+        with self.assertRaisesRegex(HoneydewRtcError, msg):
             self.rtc.set(time)
 
         self.m_proxy.set.assert_called_once()

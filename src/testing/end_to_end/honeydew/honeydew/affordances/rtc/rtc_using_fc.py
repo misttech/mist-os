@@ -9,8 +9,8 @@ import datetime
 import fidl.fuchsia_hardware_rtc as frtc
 import fuchsia_controller_py
 
-from honeydew import errors
-from honeydew.interfaces.affordances import rtc
+from honeydew.affordances.rtc import rtc
+from honeydew.affordances.rtc.errors import HoneydewRtcError
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.transports import (
     fuchsia_controller as fuchsia_controller_lib,
@@ -20,7 +20,7 @@ from honeydew.typing import custom_types
 CAPABILITY = "fuchsia.hardware.rtc.Service/default/device"
 
 
-class Rtc(rtc.Rtc):
+class RtcUisngFc(rtc.Rtc):
     """Affordance for the fuchsia.hardware.rtc.Device protocol."""
 
     # TODO(b/316959472) Use toolbox once RTC service lands in the toolbox realm.
@@ -69,7 +69,7 @@ class Rtc(rtc.Rtc):
                     self._controller.connect_device_proxy(ep_new)
                 )
             except RuntimeError:
-                raise errors.HoneydewRtcError(
+                raise HoneydewRtcError(
                     "Failed to connect to either moniker."
                 ) from None
 
@@ -80,7 +80,7 @@ class Rtc(rtc.Rtc):
             time = asyncio.run(self._proxy.get())
         except fuchsia_controller_py.ZxStatus as status:
             msg = f"Device.Get() error {status}"
-            raise errors.HoneydewRtcError(msg) from status
+            raise HoneydewRtcError(msg) from status
 
         response = time.response.rtc
         return datetime.datetime(
@@ -102,8 +102,8 @@ class Rtc(rtc.Rtc):
             result = asyncio.run(self._proxy.set(rtc=ftime))
         except fuchsia_controller_py.ZxStatus as status:
             msg = f"Device.Set() error {status}"
-            raise errors.HoneydewRtcError(msg) from status
+            raise HoneydewRtcError(msg) from status
 
         if result.response.status != fuchsia_controller_py.ZxStatus.ZX_OK:
             msg = f"Device.Set() error {result.response.status}"
-            raise errors.HoneydewRtcError(msg)
+            raise HoneydewRtcError(msg)

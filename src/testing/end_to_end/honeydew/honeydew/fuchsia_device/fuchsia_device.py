@@ -46,7 +46,6 @@ from honeydew.affordances.connectivity.wlan.wlan_policy_ap import (
     wlan_policy_ap_using_fc,
 )
 from honeydew.affordances.ffx import inspect as inspect_ffx
-from honeydew.affordances.fuchsia_controller import rtc as rtc_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
 from honeydew.affordances.location import location, location_using_fc
 from honeydew.affordances.power.system_power_state_controller import (
@@ -55,11 +54,12 @@ from honeydew.affordances.power.system_power_state_controller import (
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller_using_starnix,
 )
+from honeydew.affordances.rtc import rtc, rtc_using_fc
 from honeydew.affordances.session import session, session_using_ffx
 from honeydew.affordances.ui.screenshot import screenshot, screenshot_using_ffx
 from honeydew.affordances.ui.user_input import user_input, user_input_using_fc
 from honeydew.interfaces.affordances import inspect as inspect_interface
-from honeydew.interfaces.affordances import rtc, tracing
+from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
 )
@@ -425,7 +425,7 @@ class FuchsiaDevice(
         Returns:
             rtc.Rtc object
         """
-        return rtc_fc.Rtc(
+        return rtc_using_fc.RtcUisngFc(
             fuchsia_controller=self.fuchsia_controller,
             reboot_affordance=self,
         )
