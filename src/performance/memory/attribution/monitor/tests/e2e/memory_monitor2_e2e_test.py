@@ -70,7 +70,7 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
         )
 
     def test_memory_monitor2_inspect2(self) -> None:
-        inspect_col = self.dut.inspect.get_data(
+        inspect_col = self.dut.get_inspect_data(
             monikers=["core/memory_monitor2"]
         )
         (only_entry,) = inspect_col.data
@@ -87,7 +87,7 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
         )
 
     def test_memory_monitor2_inspect_current(self) -> None:
-        inspect_col = self.dut.inspect.get_data(
+        inspect_col = self.dut.get_inspect_data(
             monikers=["core/memory_monitor2"]
         )
         (only_entry,) = inspect_col.data
