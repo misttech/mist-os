@@ -609,9 +609,9 @@ class VmCowPages final : public VmHierarchyBase,
   // See VmObject::ChangeHighPriorityCountLocked
   void ChangeHighPriorityCountLocked(int64_t delta) TA_REQ(lock());
 
-  zx_status_t LockRangeLocked(VmCowRange range, zx_vmo_lock_state_t* lock_state_out);
-  zx_status_t TryLockRangeLocked(VmCowRange range);
-  zx_status_t UnlockRangeLocked(VmCowRange range);
+  zx_status_t LockRangeLocked(VmCowRange range, zx_vmo_lock_state_t* lock_state_out) TA_REQ(lock());
+  zx_status_t TryLockRangeLocked(VmCowRange range) TA_REQ(lock());
+  zx_status_t UnlockRangeLocked(VmCowRange range) TA_REQ(lock());
 
   uint64_t DebugGetPageCountLocked() const TA_REQ(lock());
   bool DebugIsPage(uint64_t offset) const;
@@ -1124,7 +1124,7 @@ class VmCowPages final : public VmHierarchyBase,
   zx_status_t CloneCowPageLocked(uint64_t offset, list_node_t* alloc_list, VmCowPages* page_owner,
                                  vm_page_t* page, uint64_t owner_offset,
                                  AnonymousPageRequest* page_request, vm_page_t** out_page)
-      TA_REQ(lock());
+      TA_REQ(lock()) TA_REQ(page_owner->lock());
 
   // Helper function that 'forks' the page into |offset| of the current node, which must be a
   // visible node. This function is similar to |CloneCowPageLocked|, but instead handles the case
@@ -1150,7 +1150,7 @@ class VmCowPages final : public VmHierarchyBase,
   zx_status_t CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* freed_list,
                                        VmCowPages* page_owner, vm_page_t* page,
                                        uint64_t owner_offset, AnonymousPageRequest* page_request)
-      TA_REQ(lock());
+      TA_REQ(lock()) TA_REQ(page_owner->lock());
 
   // Helper struct which encapsulates a parent node along with a range and limit relative to it.
   struct ParentAndRange {
@@ -1184,7 +1184,8 @@ class VmCowPages final : public VmHierarchyBase,
   //
   // Returns the parent node along with the clones' range and limit relative to that parent.
   static ParentAndRange FindParentAndRangeForCloneLocked(VmCowPages* parent, uint64_t offset,
-                                                         uint64_t size, bool parent_must_be_hidden);
+                                                         uint64_t size, bool parent_must_be_hidden)
+      TA_REQ(parent->lock());
 
   // Helper function for |CloneBidirectionalLocked|.
   //
@@ -1192,7 +1193,7 @@ class VmCowPages final : public VmHierarchyBase,
   // specified by |location|. The |location.parent| field must be |this| object. Also, updates the
   // appropriate share counts for the pages that are now shared by the new child.
   void AddBidirectionallyClonedChildLocked(ParentAndRange location, VmCowPages* child)
-      TA_REQ(lock());
+      TA_REQ(lock()) TA_REQ(child->lock());
 
   // Helper function for |CreateCloneLocked|.
   //
@@ -1242,7 +1243,7 @@ class VmCowPages final : public VmHierarchyBase,
 
   // When cleaning up a hidden vmo, merges the hidden vmo's content (e.g. page list, view
   // of the parent) into the remaining child.
-  void MergeContentWithChildLocked(VmCowPages* removed) TA_REQ(lock());
+  void MergeContentWithChildLocked() TA_REQ(lock());
 
   // Moves an existing page to the wired queue as a consequence of the page being pinned.
   void MoveToPinnedLocked(vm_page_t* page, uint64_t offset) TA_REQ(lock());
@@ -1276,7 +1277,7 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Move all the pages from this VmCowPages object into another VmCowPages object.
   // The receiving VmCowPages must not have any pages yet.
-  void MovePagesIntoLocked(fbl::RefPtr<VmCowPages> other) TA_REQ(lock());
+  void MovePagesIntoLocked(VmCowPages& other) TA_REQ(lock()) TA_REQ(other.lock());
 
   // Replaces this node in its parent's child list with a hidden node and makes this node a child
   // of the newly created hidden node. Moves the pages that were stored at this node into the
@@ -1287,12 +1288,13 @@ class VmCowPages final : public VmHierarchyBase,
   // updates that need to happen as a result. This does not modify the |parent_| member of the
   // removed child and if this is not being called due to |removed| being destructed it is the
   // callers responsibility to correct parent_.
-  void RemoveChildLocked(VmCowPages* removed) TA_REQ(lock());
+  void RemoveChildLocked(VmCowPages* removed) TA_REQ(lock()) TA_REQ(removed->lock());
 
   // Inserts a newly created VmCowPages into this hierarchy as a child of this VmCowPages.
   // Initializes child members based on the passed in values that only have meaning when an object
   // is a child. This updates the parent_ field in child to hold a refptr to |this|.
-  void AddChildLocked(VmCowPages* child, uint64_t offset, uint64_t parent_limit) TA_REQ(lock());
+  void AddChildLocked(VmCowPages* child, uint64_t offset, uint64_t parent_limit) TA_REQ(lock())
+      TA_REQ(child->lock());
 
   // Helpers to give convenience locked access to the parent_. Only valid to be called if there is a
   // parent.

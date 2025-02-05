@@ -866,7 +866,6 @@ void VmCowPages::AddChildLocked(VmCowPages* child, uint64_t offset, uint64_t par
   canary_.Assert();
 
   // This function must succeed, as failure here requires the caller to roll back allocations.
-  AssertHeld(child->lock_ref());
 
   // The child should definitely stop seeing into the parent at the limit of its size.
   DEBUG_ASSERT(parent_limit <= child->size_);
@@ -898,7 +897,6 @@ void VmCowPages::AddChildLocked(VmCowPages* child, uint64_t offset, uint64_t par
 
 VmCowPages::ParentAndRange VmCowPages::FindParentAndRangeForCloneLocked(
     VmCowPages* parent, uint64_t offset, uint64_t size, bool parent_must_be_hidden) {
-  AssertHeld(parent->lock_ref());
   DEBUG_ASSERT(!parent->is_hidden());
 
   // The clone's parent limit starts out equal to its size, but it can't exceed the parent's size.
@@ -975,10 +973,9 @@ void VmCowPages::AddBidirectionallyClonedChildLocked(ParentAndRange location, Vm
   VMO_FRUGAL_VALIDATION_ASSERT(child->DebugValidateVmoPageBorrowingLocked());
 }
 
-void VmCowPages::MovePagesIntoLocked(fbl::RefPtr<VmCowPages> other) {
+void VmCowPages::MovePagesIntoLocked(VmCowPages& other) {
   canary_.Assert();
 
-  AssertHeld(other->lock_ref());
   // This function is invalid to call if any pages are pinned as the unpin after we change the
   // backlink will not work.
   DEBUG_ASSERT(pinned_page_count_ == 0);
@@ -990,7 +987,7 @@ void VmCowPages::MovePagesIntoLocked(fbl::RefPtr<VmCowPages> other) {
 
   VmCompression* compression = Pmm::Node().GetPageCompression();
 
-  __UNINITIALIZED BatchPQUpdateBacklink page_backlink_updater(other.get());
+  __UNINITIALIZED BatchPQUpdateBacklink page_backlink_updater(&other);
   page_list_.ForEveryPageMutable([&](VmPageOrMarkerRef p, uint64_t off) __ALWAYS_INLINE {
     if (p->IsReference()) {
       // A regular reference we can move, a temporary reference we need to turn back into its
@@ -1015,8 +1012,8 @@ void VmCowPages::MovePagesIntoLocked(fbl::RefPtr<VmCowPages> other) {
 
   page_backlink_updater.Flush();
 
-  DEBUG_ASSERT(other->page_list_.IsEmpty());
-  other->page_list_ = ktl::move(page_list_);
+  DEBUG_ASSERT(other.page_list_.IsEmpty());
+  other.page_list_ = ktl::move(page_list_);
   DEBUG_ASSERT(page_list_.IsEmpty());
 }
 
@@ -1068,7 +1065,7 @@ zx_status_t VmCowPages::ReplaceWithHiddenNodeLocked(fbl::RefPtr<VmCowPages>* rep
 
   // We need to move all our pages into the new parent before adding ourselves as its child
   // because we cannot be added as a child unless we have no pages.
-  MovePagesIntoLocked(hidden_parent);
+  MovePagesIntoLocked(*hidden_parent);
   DEBUG_ASSERT(page_list_.GetSkew() == 0);
 
   hidden_parent->AddChildLocked(this, 0, size_);
@@ -1228,7 +1225,6 @@ zx_status_t VmCowPages::CreateCloneLocked(SnapshotType type, bool require_unidir
 void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
   canary_.Assert();
 
-  AssertHeld(removed->lock_ref());
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
@@ -1244,7 +1240,7 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
   // cannot be here with 0 children, therefore we must have 2, including the one we are removing.
   DEBUG_ASSERT(children_list_len_ == 2);
   DropChildLocked(removed);
-  MergeContentWithChildLocked(removed);
+  MergeContentWithChildLocked();
 
   VmCowPages* child = &children_list_.front();
   DEBUG_ASSERT(child);
@@ -1292,7 +1288,7 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
   VMO_FRUGAL_VALIDATION_ASSERT(child->DebugValidateVmoPageBorrowingLocked());
 }
 
-void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed) {
+void VmCowPages::MergeContentWithChildLocked() {
   canary_.Assert();
 
   DEBUG_ASSERT(is_hidden());
@@ -1759,7 +1755,6 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
                                            uint64_t owner_offset,
                                            AnonymousPageRequest* page_request,
                                            vm_page_t** out_page) {
-  AssertHeld(page_owner->lock_ref());
   DEBUG_ASSERT(page != vm_get_zero_page());
   DEBUG_ASSERT(parent_);
   DEBUG_ASSERT(page_request);
@@ -1834,7 +1829,6 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
                                                  VmCowPages* page_owner, vm_page_t* page,
                                                  uint64_t owner_offset,
                                                  AnonymousPageRequest* page_request) {
-  AssertHeld(page_owner->lock_ref());
   DEBUG_ASSERT(page != vm_get_zero_page());
   DEBUG_ASSERT(parent_);
   DEBUG_ASSERT(!page_source_ || page_source_->DebugIsPageOk(page, offset));
@@ -1988,8 +1982,7 @@ void VmCowPages::FindPageContentLocked(uint64_t offset, uint64_t max_owner_lengt
 
 void VmCowPages::FindInitialPageContentLocked(uint64_t offset, PageLookup* out) {
   if (parent_ && offset < parent_limit_) {
-    AssertHeld(parent_->lock_ref());
-    parent_->FindPageContentLocked(offset + parent_offset_, PAGE_SIZE, out);
+    parent_locked().FindPageContentLocked(offset + parent_offset_, PAGE_SIZE, out);
   } else {
     *out = {VMPLCursor(), this, offset, offset + PAGE_SIZE};
   }
@@ -2745,7 +2738,7 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
                                             page_request->GetAnonymous());
     }
     zx_status_t result = target_->CloneCowPageLocked(
-        offset_, alloc_list_, owner_info_.owner_, owner_cursor_->Page(), owner_info_.owner_offset_,
+        offset_, alloc_list_, owner(), owner_cursor_->Page(), owner_info_.owner_offset_,
         page_request->GetAnonymous(), &res_page);
     if (result != ZX_OK) {
       return zx::error(result);
@@ -6548,7 +6541,6 @@ zx_status_t VmCowPages::LockRangeLocked(VmCowRange range, zx_vmo_lock_state_t* l
   canary_.Assert();
   ASSERT(discardable_tracker_);
 
-  AssertHeld(lock_ref());
   if (!IsLockRangeValidLocked(range)) {
     return ZX_ERR_OUT_OF_RANGE;
   }
@@ -6576,7 +6568,6 @@ zx_status_t VmCowPages::TryLockRangeLocked(VmCowRange range) {
   canary_.Assert();
   ASSERT(discardable_tracker_);
 
-  AssertHeld(lock_ref());
   if (!IsLockRangeValidLocked(range)) {
     return ZX_ERR_OUT_OF_RANGE;
   }
@@ -6590,7 +6581,6 @@ zx_status_t VmCowPages::UnlockRangeLocked(VmCowRange range) {
   canary_.Assert();
   ASSERT(discardable_tracker_);
 
-  AssertHeld(lock_ref());
   if (!IsLockRangeValidLocked(range)) {
     return ZX_ERR_OUT_OF_RANGE;
   }
