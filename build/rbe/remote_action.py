@@ -1229,14 +1229,15 @@ exec "${{cmd[@]}}"
         if self._local_only_command == self._remote_only_command:
             return  # no differences to show
 
-        print("local vs. remote command differences:")
+        self.vmsg("local vs. remote command differences:")
         diffs = difflib.unified_diff(
             [tok + "\n" for tok in self.local_only_command],
             [tok + "\n" for tok in self.remote_only_command],
             fromfile="local.command",
             tofile="remote.command",
         )
-        sys.stdout.writelines(diffs)
+        for l in diffs:
+            self.vmsg(l)
 
     @property
     def remote_debug_command(self) -> Sequence[str]:
