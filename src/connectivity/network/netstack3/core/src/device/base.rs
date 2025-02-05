@@ -748,24 +748,13 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
 {
     type LinkLayerAddr = Ipv6DeviceLinkLayerAddr;
 
-    fn get_link_layer_addr_bytes(
+    fn get_link_layer_addr(
         &mut self,
         device_id: &Self::DeviceId,
     ) -> Option<Ipv6DeviceLinkLayerAddr> {
         match device_id {
             DeviceId::Ethernet(id) => {
                 Some(Ipv6DeviceLinkLayerAddr::Mac(ethernet::get_mac(self, &id).get()))
-            }
-            DeviceId::Loopback(LoopbackDeviceId { .. })
-            | DeviceId::Blackhole(BlackholeDeviceId { .. })
-            | DeviceId::PureIp(PureIpDeviceId { .. }) => None,
-        }
-    }
-
-    fn get_eui64_iid(&mut self, device_id: &Self::DeviceId) -> Option<[u8; 8]> {
-        match device_id {
-            DeviceId::Ethernet(id) => {
-                Some(ethernet::get_mac(self, &id).to_eui64_with_magic(Mac::DEFAULT_EUI_MAGIC))
             }
             DeviceId::Loopback(LoopbackDeviceId { .. })
             | DeviceId::Blackhole(BlackholeDeviceId { .. })

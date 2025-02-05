@@ -622,11 +622,17 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
         BC,
     >
 {
+    type LinkLayerAddr = <Self as device::Ipv6DeviceContext<BC>>::LinkLayerAddr;
+
     type SlaacAddrs<'s> = SlaacAddrs<'s, BC>;
 
     fn with_slaac_addrs_mut_and_configs<
         O,
-        F: FnOnce(&mut Self::SlaacAddrs<'_>, SlaacConfigAndState<BC>, &mut SlaacState<BC>) -> O,
+        F: FnOnce(
+            &mut Self::SlaacAddrs<'_>,
+            SlaacConfigAndState<Self::LinkLayerAddr, BC>,
+            &mut SlaacState<BC>,
+        ) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,
@@ -643,8 +649,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
                 params.retrans_timer_or_default().get()
             },
         );
-        let interface_identifier = device::Ipv6DeviceContext::get_eui64_iid(core_ctx, device_id)
-            .unwrap_or_else(Default::default);
+        let link_layer_addr = device::Ipv6DeviceContext::get_link_layer_addr(core_ctx, device_id);
 
         let config = Borrow::borrow(config);
         let Ipv6DeviceConfiguration {
@@ -671,7 +676,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
                 config: slaac_config,
                 dad_transmits,
                 retrans_timer,
-                interface_identifier,
+                link_layer_addr,
                 temp_secret_key: *temp_secret_key,
                 _marker: PhantomData,
             },
@@ -848,12 +853,9 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
         cb(&mut state, Borrow::borrow(&*config).max_router_solicitations)
     }
 
-    fn get_link_layer_addr_bytes(
-        &mut self,
-        device_id: &Self::DeviceId,
-    ) -> Option<Self::LinkLayerAddr> {
+    fn get_link_layer_addr(&mut self, device_id: &Self::DeviceId) -> Option<Self::LinkLayerAddr> {
         let Self { config: _, core_ctx } = self;
-        device::Ipv6DeviceContext::get_link_layer_addr_bytes(core_ctx, device_id)
+        device::Ipv6DeviceContext::get_link_layer_addr(core_ctx, device_id)
     }
 
     fn send_rs_packet<
@@ -987,17 +989,9 @@ impl<'a, Config, BC: BindingsContext> device::Ipv6DeviceContext<BC>
         WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>,
     > as device::Ipv6DeviceContext<BC>>::LinkLayerAddr;
 
-    fn get_link_layer_addr_bytes(
-        &mut self,
-        device_id: &Self::DeviceId,
-    ) -> Option<Self::LinkLayerAddr> {
+    fn get_link_layer_addr(&mut self, device_id: &Self::DeviceId) -> Option<Self::LinkLayerAddr> {
         let Self { config: _, core_ctx } = self;
-        device::Ipv6DeviceContext::get_link_layer_addr_bytes(core_ctx, device_id)
-    }
-
-    fn get_eui64_iid(&mut self, device_id: &Self::DeviceId) -> Option<[u8; 8]> {
-        let Self { config: _, core_ctx } = self;
-        device::Ipv6DeviceContext::get_eui64_iid(core_ctx, device_id)
+        device::Ipv6DeviceContext::get_link_layer_addr(core_ctx, device_id)
     }
 
     fn set_link_mtu(&mut self, device_id: &Self::DeviceId, mtu: Mtu) {

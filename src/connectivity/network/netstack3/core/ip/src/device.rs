@@ -822,25 +822,25 @@ pub trait Ipv6DeviceConfigurationContext<BC: IpDeviceBindingsContext<Ipv6, Self:
     ) -> O;
 }
 
+/// A link-layer address that can be used to generate IPv6 addresses.
+pub trait Ipv6LinkLayerAddr {
+    /// Gets the address as a byte slice.
+    fn as_bytes(&self) -> &[u8];
+
+    /// Gets the device's EUI-64 based interface identifier.
+    fn eui64_iid(&self) -> [u8; 8];
+}
+
 /// The execution context for an IPv6 device.
 pub trait Ipv6DeviceContext<BC: IpDeviceBindingsContext<Ipv6, Self::DeviceId>>:
     IpDeviceStateContext<Ipv6, BC>
 {
     /// A link-layer address.
-    type LinkLayerAddr: AsRef<[u8]>;
+    type LinkLayerAddr: Ipv6LinkLayerAddr;
 
-    /// Gets the device's link-layer address bytes, if the device supports
-    /// link-layer addressing.
-    fn get_link_layer_addr_bytes(
-        &mut self,
-        device_id: &Self::DeviceId,
-    ) -> Option<Self::LinkLayerAddr>;
-
-    /// Gets the device's EUI-64 based interface identifier.
-    ///
-    /// A `None` value indicates the device does not have an EUI-64 based
-    /// interface identifier.
-    fn get_eui64_iid(&mut self, device_id: &Self::DeviceId) -> Option<[u8; 8]>;
+    /// Gets the device's link-layer address, if the device supports link-layer
+    /// addressing.
+    fn get_link_layer_addr(&mut self, device_id: &Self::DeviceId) -> Option<Self::LinkLayerAddr>;
 
     /// Sets the link MTU for the device.
     fn set_link_mtu(&mut self, device_id: &Self::DeviceId, mtu: Mtu);
@@ -917,14 +917,11 @@ pub fn receive_igmp_packet<CC, BC, B, H>(
 /// An implementation of an IPv6 device.
 pub trait Ipv6DeviceHandler<BC>: IpDeviceHandler<Ipv6, BC> {
     /// A link-layer address.
-    type LinkLayerAddr: AsRef<[u8]>;
+    type LinkLayerAddr: Ipv6LinkLayerAddr;
 
-    /// Gets the device's link-layer address bytes, if the device supports
-    /// link-layer addressing.
-    fn get_link_layer_addr_bytes(
-        &mut self,
-        device_id: &Self::DeviceId,
-    ) -> Option<Self::LinkLayerAddr>;
+    /// Gets the device's link-layer address, if the device supports link-layer
+    /// addressing.
+    fn get_link_layer_addr(&mut self, device_id: &Self::DeviceId) -> Option<Self::LinkLayerAddr>;
 
     /// Sets the discovered retransmit timer for the device.
     fn set_discovered_retrans_timer(
@@ -1006,11 +1003,8 @@ impl<
 {
     type LinkLayerAddr = CC::LinkLayerAddr;
 
-    fn get_link_layer_addr_bytes(
-        &mut self,
-        device_id: &Self::DeviceId,
-    ) -> Option<CC::LinkLayerAddr> {
-        Ipv6DeviceContext::get_link_layer_addr_bytes(self, device_id)
+    fn get_link_layer_addr(&mut self, device_id: &Self::DeviceId) -> Option<CC::LinkLayerAddr> {
+        Ipv6DeviceContext::get_link_layer_addr(self, device_id)
     }
 
     fn set_discovered_retrans_timer(
@@ -1256,7 +1250,7 @@ fn enable_ipv6_device_with_config<
 
     // Only generate a link-local address if the device supports link-layer
     // addressing.
-    if core_ctx.get_link_layer_addr_bytes(device_id).is_some() {
+    if core_ctx.get_link_layer_addr(device_id).is_some() {
         SlaacHandler::generate_link_local_address(core_ctx, bindings_ctx, device_id);
     }
 

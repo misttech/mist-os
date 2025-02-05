@@ -15,7 +15,7 @@ use core::ops::ControlFlow;
 use core::time::Duration;
 
 use assert_matches::assert_matches;
-use log::{debug, error, trace};
+use log::{debug, error, trace, warn};
 use net_types::ip::{AddrSubnet, Ip as _, IpAddress, Ipv6, Ipv6Addr, Subnet};
 use net_types::Witness as _;
 use netstack3_base::{
@@ -34,7 +34,9 @@ use crate::internal::device::opaque_iid::{IidSecret, OpaqueIid, OpaqueIidNonce};
 use crate::internal::device::state::{
     Lifetime, PreferredLifetime, SlaacConfig, TemporarySlaacConfig,
 };
-use crate::internal::device::{AddressRemovedReason, IpDeviceEvent, Ipv6DeviceAddr};
+use crate::internal::device::{
+    AddressRemovedReason, IpDeviceEvent, Ipv6DeviceAddr, Ipv6LinkLayerAddr,
+};
 
 /// Minimum Valid Lifetime value to actually update an address's valid lifetime.
 ///
@@ -160,15 +162,17 @@ pub trait SlaacAddresses<BT: SlaacBindingsTypes> {
 /// Supports [`SlaacContext::with_slaac_addrs_mut_and_configs`].
 ///
 /// Contains the fields necessary for the SLAAC state machine.
-pub struct SlaacConfigAndState<BT: SlaacBindingsTypes> {
+pub struct SlaacConfigAndState<A: Ipv6LinkLayerAddr, BT: SlaacBindingsTypes> {
     /// The current config for the device.
     pub config: SlaacConfiguration,
     /// The configured number of DAD transmits.
     pub dad_transmits: Option<NonZeroU16>,
     /// THhe configured retransmission timer (can be learned from the network).
     pub retrans_timer: Duration,
-    /// The device's interface identifier.
-    pub interface_identifier: [u8; 8],
+    /// The link-layer address of the interface, if it has one.
+    ///
+    /// Used to generate IIDs for stable addresses.
+    pub link_layer_addr: Option<A>,
     /// Secret key for generating temporary addresses.
     pub temp_secret_key: IidSecret,
     #[allow(missing_docs)]
@@ -179,6 +183,9 @@ pub struct SlaacConfigAndState<BT: SlaacBindingsTypes> {
 pub trait SlaacContext<BC: SlaacBindingsContext<Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
+    /// A link-layer address.
+    type LinkLayerAddr: Ipv6LinkLayerAddr;
+
     /// The inner [`SlaacAddresses`] impl.
     type SlaacAddrs<'a>: SlaacAddresses<BC> + CounterContext<SlaacCounters> + 'a;
 
@@ -186,7 +193,11 @@ pub trait SlaacContext<BC: SlaacBindingsContext<Self::DeviceId>>:
     /// `device_id`.
     fn with_slaac_addrs_mut_and_configs<
         O,
-        F: FnOnce(&mut Self::SlaacAddrs<'_>, SlaacConfigAndState<BC>, &mut SlaacState<BC>) -> O,
+        F: FnOnce(
+            &mut Self::SlaacAddrs<'_>,
+            SlaacConfigAndState<Self::LinkLayerAddr, BC>,
+            &mut SlaacState<BC>,
+        ) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,
@@ -500,7 +511,7 @@ fn on_address_removed_inner<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacCon
     addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
     device_id: &CC::DeviceId,
     slaac_addrs: &mut CC::SlaacAddrs<'_>,
-    config: SlaacConfigAndState<BC>,
+    config: SlaacConfigAndState<CC::LinkLayerAddr, BC>,
     slaac_state: &mut SlaacState<BC>,
     state: SlaacConfig<BC::Instant>,
     reason: AddressRemovedReason,
@@ -1221,7 +1232,7 @@ fn desync_factor<R: Rng>(
 fn regenerate_temporary_slaac_addr<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>>(
     bindings_ctx: &mut BC,
     slaac_addrs: &mut CC::SlaacAddrs<'_>,
-    config_and_state: SlaacConfigAndState<BC>,
+    config_and_state: SlaacConfigAndState<CC::LinkLayerAddr, BC>,
     slaac_state: &mut SlaacState<BC>,
     device_id: &CC::DeviceId,
     addr_subnet: &AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
@@ -1477,7 +1488,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
     slaac_addrs: &mut CC::SlaacAddrs<'_>,
-    config: &SlaacConfigAndState<BC>,
+    config: &SlaacConfigAndState<CC::LinkLayerAddr, BC>,
     slaac_state: &mut SlaacState<BC>,
     now: BC::Instant,
     slaac_config: SlaacInitConfig,
@@ -1503,10 +1514,18 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
         config,
         dad_transmits,
         retrans_timer,
-        interface_identifier: iid,
+        link_layer_addr,
         temp_secret_key,
         _marker,
     } = config;
+
+    let Some(link_layer_addr) = link_layer_addr else {
+        warn!(
+            "add_slaac_addr_sub: cannot derive IIDs for device {device_id:?} that does not support \
+            link-layer addressing"
+        );
+        return;
+    };
 
     let SlaacConfiguration { enable_stable_addresses, temporary_address_configuration } = config;
     let SlaacState { timers } = slaac_state;
@@ -1526,7 +1545,10 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
                 // Generate the global address as defined by RFC 4862 section 5.5.3.d.
                 //
                 // TODO(https://fxbug.dev/42148800): Support regenerating address.
-                either::Either::Left(core::iter::once(generate_stable_address(&subnet, &iid[..]))),
+                either::Either::Left(core::iter::once(generate_stable_address(
+                    &subnet,
+                    &link_layer_addr.eui64_iid(),
+                ))),
             )
         }
         SlaacInitConfig::Temporary { dad_count } => {
@@ -1575,7 +1597,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
                         loop {
                             let address = generate_global_temporary_address(
                                 &subnet,
-                                &iid,
+                                &link_layer_addr.eui64_iid(),
                                 seed,
                                 &temp_secret_key,
                             );
@@ -1831,7 +1853,6 @@ mod tests {
         config: SlaacConfiguration,
         dad_transmits: Option<NonZeroU16>,
         retrans_timer: Duration,
-        iid: [u8; 8],
         slaac_addrs: FakeSlaacAddrs,
         slaac_state: SlaacState<FakeBindingsCtxImpl>,
     }
@@ -1843,6 +1864,20 @@ mod tests {
         (),
         (),
     >;
+
+    struct FakeLinkLayerAddr;
+
+    const IID: [u8; 8] = [0, 1, 2, 3, 4, 5, 6, 7];
+
+    impl Ipv6LinkLayerAddr for FakeLinkLayerAddr {
+        fn as_bytes(&self) -> &[u8] {
+            &IID
+        }
+
+        fn eui64_iid(&self) -> [u8; 8] {
+            IID
+        }
+    }
 
     #[derive(Default)]
     struct FakeSlaacAddrs {
@@ -1924,6 +1959,8 @@ mod tests {
     }
 
     impl SlaacContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
+        type LinkLayerAddr = FakeLinkLayerAddr;
+
         type SlaacAddrs<'a>
             = &'a mut FakeSlaacAddrs
         where
@@ -1933,7 +1970,7 @@ mod tests {
             O,
             F: FnOnce(
                 &mut Self::SlaacAddrs<'_>,
-                SlaacConfigAndState<FakeBindingsCtxImpl>,
+                SlaacConfigAndState<FakeLinkLayerAddr, FakeBindingsCtxImpl>,
                 &mut SlaacState<FakeBindingsCtxImpl>,
             ) -> O,
         >(
@@ -1945,7 +1982,6 @@ mod tests {
                 config,
                 dad_transmits,
                 retrans_timer,
-                iid,
                 slaac_addrs,
                 slaac_state,
                 ..
@@ -1957,7 +1993,7 @@ mod tests {
                     config: *config,
                     dad_transmits: *dad_transmits,
                     retrans_timer: *retrans_timer,
-                    interface_identifier: *iid,
+                    link_layer_addr: Some(FakeLinkLayerAddr),
                     temp_secret_key: SECRET_KEY,
                     _marker: PhantomData,
                 },
@@ -1987,7 +2023,6 @@ mod tests {
                 config,
                 dad_transmits,
                 retrans_timer,
-                iid: IID,
                 slaac_addrs,
                 slaac_state: SlaacState::new::<_, IntoCoreTimerCtx>(
                     bindings_ctx,
@@ -2023,7 +2058,6 @@ mod tests {
         assert_eq!(has_iana_allowed_iid(addr), expect_allowed);
     }
 
-    const IID: [u8; 8] = [0, 1, 2, 3, 4, 5, 6, 7];
     const DEFAULT_RETRANS_TIMER: Duration = Duration::from_secs(1);
     const SUBNET: Subnet<Ipv6Addr> = net_declare::net_subnet_v6!("200a::/64");
 

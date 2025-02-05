@@ -53,7 +53,9 @@ use crate::internal::base::{
 };
 use crate::internal::device::nud::{ConfirmationFlags, NudIpHandler};
 use crate::internal::device::route_discovery::Ipv6DiscoveredRoute;
-use crate::internal::device::{IpAddressState, IpDeviceHandler, Ipv6DeviceHandler};
+use crate::internal::device::{
+    IpAddressState, IpDeviceHandler, Ipv6DeviceHandler, Ipv6LinkLayerAddr,
+};
 use crate::internal::local_delivery::{IpHeaderInfo, LocalDeliveryPacketInfo, ReceiveIpPacketMeta};
 use crate::internal::path_mtu::PmtuHandler;
 use crate::internal::socket::{
@@ -1121,7 +1123,7 @@ fn send_neighbor_advertisement<
     // carry that information, but it is not necessary. So it is perfectly valid
     // that trying to send this advertisement will end up triggering a neighbor
     // solicitation to be sent.
-    let src_ll = core_ctx.get_link_layer_addr_bytes(&device_id);
+    let src_ll = core_ctx.get_link_layer_addr(&device_id);
 
     // Nothing reasonable to do with the error.
     let advertisement = NeighborAdvertisement::new(
@@ -1137,7 +1139,11 @@ fn send_neighbor_advertisement<
         Some(device_addr.into_specified()),
         dst_ip,
         OptionSequenceBuilder::new(
-            src_ll.as_ref().map(AsRef::as_ref).map(NdpOptionBuilder::TargetLinkLayerAddress).iter(),
+            src_ll
+                .as_ref()
+                .map(Ipv6LinkLayerAddr::as_bytes)
+                .map(NdpOptionBuilder::TargetLinkLayerAddress)
+                .iter(),
         )
         .into_serializer(),
         IcmpZeroCode,
@@ -2873,7 +2879,7 @@ mod tests {
         set_logger_for_test, FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeInstant,
         FakeTxMetadata, FakeWeakDeviceId, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
     };
-    use netstack3_base::CtxPair;
+    use netstack3_base::{CtxPair, Uninstantiable};
     use packet::Buf;
     use packet_formats::icmp::mld::MldPacket;
     use packet_formats::ip::IpProto;
@@ -3384,9 +3390,9 @@ mod tests {
     }
 
     impl Ipv6DeviceHandler<FakeIcmpBindingsCtx<Ipv6>> for FakeIcmpCoreCtx<Ipv6> {
-        type LinkLayerAddr = [u8; 0];
+        type LinkLayerAddr = Uninstantiable;
 
-        fn get_link_layer_addr_bytes(&mut self, _device_id: &Self::DeviceId) -> Option<[u8; 0]> {
+        fn get_link_layer_addr(&mut self, _device_id: &Self::DeviceId) -> Option<Uninstantiable> {
             unimplemented!()
         }
 

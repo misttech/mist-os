@@ -7,11 +7,12 @@ use net_types::SpecifiedAddr;
 use netstack3_base::socket::SocketIpAddr;
 use netstack3_base::{
     AnyDevice, DeviceIdContext, EitherDeviceId, IpDeviceAddr, IpExt, Mms, TxMetadataBindingsTypes,
-    UninstantiableWrapper,
+    Uninstantiable, UninstantiableWrapper,
 };
 use netstack3_filter::Tuple;
 
 use crate::internal::base::{BaseTransportIpContext, HopLimits, IpLayerIpExt};
+use crate::internal::device::Ipv6LinkLayerAddr;
 use crate::internal::socket::{
     DeviceIpSocketHandler, IpSock, IpSockCreationError, IpSockSendError, IpSocketHandler, MmsError,
     RouteResolutionOptions,
@@ -81,6 +82,16 @@ impl<I: IpLayerIpExt, C, P: DeviceIpSocketHandler<I, C>> DeviceIpSocketHandler<I
         _ip_sock: &IpSock<I, Self::WeakDeviceId>,
         _options: &O,
     ) -> Result<Mms, MmsError> {
+        self.uninstantiable_unreachable()
+    }
+}
+
+impl Ipv6LinkLayerAddr for Uninstantiable {
+    fn as_bytes(&self) -> &[u8] {
+        self.uninstantiable_unreachable()
+    }
+
+    fn eui64_iid(&self) -> [u8; 8] {
         self.uninstantiable_unreachable()
     }
 }

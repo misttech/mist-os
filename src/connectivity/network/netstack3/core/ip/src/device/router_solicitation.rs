@@ -24,6 +24,7 @@ use packet_formats::icmp::ndp::{OptionSequenceBuilder, RouterSolicitation};
 use rand::Rng as _;
 
 use crate::internal::base::IpSendFrameError;
+use crate::internal::device::Ipv6LinkLayerAddr;
 
 /// Amount of time to wait after sending `MAX_RTR_SOLICITATIONS` Router
 /// Solicitation messages before determining that there are no routers on the
@@ -78,7 +79,7 @@ pub trait RsContext<BC: RsBindingsTypes>:
     DeviceIdContext<AnyDevice> + CoreTimerContext<RsTimerId<Self::WeakDeviceId>, BC>
 {
     /// A link-layer address.
-    type LinkLayerAddr: AsRef<[u8]>;
+    type LinkLayerAddr: Ipv6LinkLayerAddr;
 
     /// Calls the callback with a mutable reference to the router solicitation
     /// state and the maximum number of router solications to send.
@@ -98,12 +99,9 @@ pub trait RsContext<BC: RsBindingsTypes>:
         self.with_rs_state_mut_and_max(device_id, |state, _max| cb(state))
     }
 
-    /// Gets the device's link-layer address bytes, if the device supports
-    /// link-layer addressing.
-    fn get_link_layer_addr_bytes(
-        &mut self,
-        device_id: &Self::DeviceId,
-    ) -> Option<Self::LinkLayerAddr>;
+    /// Gets the device's link-layer address, if the device supports link-layer
+    /// addressing.
+    fn get_link_layer_addr(&mut self, device_id: &Self::DeviceId) -> Option<Self::LinkLayerAddr>;
 
     /// Sends an NDP Router Solicitation to the local-link.
     ///
@@ -232,7 +230,7 @@ fn do_router_solicitation<BC: RsBindingsContext, CC: RsContext<BC>>(
         return;
     }
 
-    let src_ll = core_ctx.get_link_layer_addr_bytes(device_id);
+    let src_ll = core_ctx.get_link_layer_addr(device_id);
 
     // TODO(https://fxbug.dev/42165912): Either panic or guarantee that this error
     // can't happen statically.
@@ -252,7 +250,7 @@ fn do_router_solicitation<BC: RsBindingsContext, CC: RsContext<BC>>(
                     OptionSequenceBuilder::new(
                         src_ll
                             .as_ref()
-                            .map(AsRef::as_ref)
+                            .map(Ipv6LinkLayerAddr::as_bytes)
                             .into_iter()
                             .map(NdpOptionBuilder::SourceLinkLayerAddress),
                     )
@@ -304,6 +302,16 @@ mod tests {
         }
     }
 
+    impl Ipv6LinkLayerAddr for Vec<u8> {
+        fn as_bytes(&self) -> &[u8] {
+            &self
+        }
+
+        fn eui64_iid(&self) -> [u8; 8] {
+            unimplemented!()
+        }
+    }
+
     impl RsContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         type LinkLayerAddr = Vec<u8>;
 
@@ -319,7 +327,7 @@ mod tests {
             cb(rs_state, *max_router_solicitations)
         }
 
-        fn get_link_layer_addr_bytes(&mut self, &FakeDeviceId: &FakeDeviceId) -> Option<Vec<u8>> {
+        fn get_link_layer_addr(&mut self, &FakeDeviceId: &FakeDeviceId) -> Option<Vec<u8>> {
             let FakeRsContext { link_layer_bytes, .. } = &self.state;
             link_layer_bytes.clone()
         }

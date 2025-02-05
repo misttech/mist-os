@@ -82,8 +82,8 @@ pub mod device {
         IpAddressIdSpecContext, IpAddressState, IpDeviceAddressContext, IpDeviceBindingsContext,
         IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt, IpDeviceSendContext,
         IpDeviceStateContext, IpDeviceTimerId, Ipv4DeviceTimerId, Ipv6DeviceConfigurationContext,
-        Ipv6DeviceContext, Ipv6DeviceHandler, Ipv6DeviceTimerId, WithIpDeviceConfigurationMutInner,
-        WithIpv6DeviceConfigurationMutInner,
+        Ipv6DeviceContext, Ipv6DeviceHandler, Ipv6DeviceTimerId, Ipv6LinkLayerAddr,
+        WithIpDeviceConfigurationMutInner, WithIpv6DeviceConfigurationMutInner,
     };
 
     /// IP device test utilities.

@@ -17,6 +17,7 @@ use netstack3_base::{
     ReferenceNotifiers, TimerBindingsTypes, TimerHandler, TxMetadataBindingsTypes,
 };
 use netstack3_filter::FilterBindingsTypes;
+use netstack3_ip::device::Ipv6LinkLayerAddr;
 use netstack3_ip::nud::{LinkResolutionContext, NudCounters};
 use packet::Buf;
 
@@ -73,10 +74,16 @@ pub enum Ipv6DeviceLinkLayerAddr {
     // Add other link-layer address types as needed.
 }
 
-impl AsRef<[u8]> for Ipv6DeviceLinkLayerAddr {
-    fn as_ref(&self) -> &[u8] {
+impl Ipv6LinkLayerAddr for Ipv6DeviceLinkLayerAddr {
+    fn as_bytes(&self) -> &[u8] {
         match self {
             Ipv6DeviceLinkLayerAddr::Mac(a) => a.as_ref(),
+        }
+    }
+
+    fn eui64_iid(&self) -> [u8; 8] {
+        match self {
+            Ipv6DeviceLinkLayerAddr::Mac(a) => a.to_eui64(),
         }
     }
 }
