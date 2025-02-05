@@ -647,17 +647,27 @@ impl Heap {
             let old_index = self.0[index].set_index(HeapIndex::NULL);
             debug_assert_eq!(old_index, index.into());
         }
-        let last = self.0.len() - 1;
 
+        // Swap the item at slot `index` to the end of the vector so we can truncate it away, and
+        // then swap the previously last item into the correct spot.
+        let last = self.0.len() - 1;
         if index < last {
-            self.0[index] = self.0[last];
-            // SAFETY: `inner` is locked.
+            let fix_up;
             unsafe {
+                // SAFETY: `inner` is locked.
+                fix_up = self.0[last].nanos() < self.0[index].nanos();
+                self.0[index] = self.0[last];
                 self.0[index].set_index(index.into());
+            };
+            self.0.truncate(last);
+            if fix_up {
+                self.fix_up(index);
+            } else {
+                self.fix_down(index);
             }
-        }
-        self.0.truncate(last);
-        self.fix_down(index);
+        } else {
+            self.0.truncate(last);
+        };
     }
 
     /// Returns the new index
@@ -890,12 +900,21 @@ mod test {
         timer_futures.clear();
         create_timers(&timers, &nanos, &mut timer_futures);
 
-        // Remove them in random order.
+        // Remove half of them in random order, and ensure the remaining timers are correctly
+        // ordered.
         timer_futures.shuffle(&mut rng);
-        for _timer_fut in timer_futures.drain(..) {}
-
+        timer_futures.truncate(500);
+        let mut last_time = None;
+        for _ in 0..500 {
+            let time = timers.wake_next_timer().unwrap();
+            if let Some(last_time) = last_time {
+                assert!(last_time <= time);
+            }
+            last_time = Some(time);
+        }
         assert_eq!(timers.wake_next_timer(), None);
 
+        timer_futures = vec![];
         create_timers(&timers, &nanos, &mut timer_futures);
 
         // Replace them all in random order.
