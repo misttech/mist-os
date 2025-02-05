@@ -110,14 +110,6 @@ class HoneydewDataResourceError(HoneydewError):
     """Raised when Honeydew fails to fetch its data resources."""
 
 
-class TracingError(HoneydewError):
-    """Raised by tracing affordance."""
-
-
-class TracingStateError(TracingError):
-    """Raised by tracing affordance when in an unexpected state."""
-
-
 class FuchsiaStateError(HoneydewError):
     """Exception for state errors."""
 

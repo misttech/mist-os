@@ -13,7 +13,7 @@ if (is_host) {
     deps = [ "//src/performance/trace2json:bin" ]
   }
 
-  python_mobly_test("tracing_test_fc") {
+  python_mobly_test("tracing_test") {
     main_source = "test_tracing.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -33,5 +33,5 @@ if (is_host) {
 # Group containing all of the tracing affordance functional test cases and its dependencies.
 group("tests") {
   testonly = true
-  public_deps = [ ":tracing_test_fc($host_toolchain)" ]
+  public_deps = [ ":tracing_test($host_toolchain)" ]
 }

@@ -4,8 +4,5 @@
 
 group("tests") {
   testonly = true
-  public_deps = [
-    "ffx:tests",
-    "fuchsia_controller:tests",
-  ]
+  public_deps = [ "ffx:tests" ]
 }

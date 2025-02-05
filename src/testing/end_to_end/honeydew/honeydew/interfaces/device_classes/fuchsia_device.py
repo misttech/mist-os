@@ -19,9 +19,10 @@ from honeydew.affordances.power.system_power_state_controller import (
 )
 from honeydew.affordances.rtc import rtc
 from honeydew.affordances.session import session
+from honeydew.affordances.tracing import tracing
 from honeydew.affordances.ui.screenshot import screenshot
 from honeydew.affordances.ui.user_input import user_input
-from honeydew.interfaces.affordances import inspect, tracing
+from honeydew.interfaces.affordances import inspect
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
 )

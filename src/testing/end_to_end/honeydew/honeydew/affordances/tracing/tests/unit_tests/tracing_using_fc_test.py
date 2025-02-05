@@ -14,8 +14,8 @@ import fidl.fuchsia_tracing_controller as f_tracingcontroller
 import fuchsia_controller_py as fc
 from parameterized import param, parameterized
 
-from honeydew import errors
-from honeydew.affordances.fuchsia_controller import tracing as fc_tracing
+from honeydew.affordances.tracing import tracing_using_fc
+from honeydew.affordances.tracing.errors import TracingError, TracingStateError
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import fuchsia_controller as fc_transport
 
@@ -44,7 +44,7 @@ class TracingFCTests(unittest.TestCase):
             spec=fc_transport.FuchsiaController
         )
 
-        self.tracing_obj = fc_tracing.Tracing(
+        self.tracing_obj = tracing_using_fc.TracingUsingFc(
             device_name="fuchsia-emulator",
             fuchsia_controller=self.fc_transport_obj,
             reboot_affordance=self.reboot_affordance_obj,
@@ -87,10 +87,10 @@ class TracingFCTests(unittest.TestCase):
         if parameterized_dict.get("session_initialized"):
             self.tracing_obj.initialize()
 
-        # Check whether an `errors.TracingStateError` exception is raised when
+        # Check whether an `TracingStateError` exception is raised when
         # calling `initialize()` on a session that is already initialized.
         if parameterized_dict.get("session_initialized"):
-            with self.assertRaises(errors.TracingStateError):
+            with self.assertRaises(TracingStateError):
                 self.tracing_obj.initialize()
         else:
             self.tracing_obj.initialize(
@@ -111,7 +111,7 @@ class TracingFCTests(unittest.TestCase):
         mock_tracingcontroller_initialize.side_effect = fc.ZxStatus(
             fc.ZxStatus.ZX_ERR_INVALID_ARGS
         )
-        with self.assertRaises(errors.TracingError):
+        with self.assertRaises(TracingError):
             self.tracing_obj.initialize()
 
     @parameterized.expand(
@@ -162,12 +162,12 @@ class TracingFCTests(unittest.TestCase):
         if parameterized_dict.get("tracing_active"):
             self.tracing_obj.start()
 
-        # Check whether an `errors.TracingStateError` exception is raised when
+        # Check whether an `TracingStateError` exception is raised when
         # state is not valid.
         if not parameterized_dict.get(
             "session_initialized"
         ) or parameterized_dict.get("tracing_active"):
-            with self.assertRaises(errors.TracingStateError):
+            with self.assertRaises(TracingStateError):
                 self.tracing_obj.start()
         else:
             self.tracing_obj.start()
@@ -192,7 +192,7 @@ class TracingFCTests(unittest.TestCase):
         mock_tracingcontroller_start.side_effect = fc.ZxStatus(
             fc.ZxStatus.ZX_ERR_INVALID_ARGS
         )
-        with self.assertRaises(errors.TracingError):
+        with self.assertRaises(TracingError):
             self.tracing_obj.start()
 
     @parameterized.expand(
@@ -248,12 +248,12 @@ class TracingFCTests(unittest.TestCase):
         if parameterized_dict.get("tracing_active"):
             self.tracing_obj.start()
 
-        # Check whether an `errors.TracingStateError` exception is raised when
+        # Check whether an `TracingStateError` exception is raised when
         # state is not valid.
         if not parameterized_dict.get(
             "session_initialized"
         ) or not parameterized_dict.get("tracing_active"):
-            with self.assertRaises(errors.TracingStateError):
+            with self.assertRaises(TracingStateError):
                 self.tracing_obj.stop()
         else:
             self.tracing_obj.stop()
@@ -284,7 +284,7 @@ class TracingFCTests(unittest.TestCase):
         mock_tracingcontroller_stop.side_effect = fc.ZxStatus(
             fc.ZxStatus.ZX_ERR_INVALID_ARGS
         )
-        with self.assertRaises(errors.TracingError):
+        with self.assertRaises(TracingError):
             self.tracing_obj.stop()
 
     @parameterized.expand(
@@ -318,7 +318,7 @@ class TracingFCTests(unittest.TestCase):
         if parameterized_dict.get("session_initialized"):
             self.tracing_obj.initialize()
 
-        # Check whether an `errors.TracingStateError` exception is raised when
+        # Check whether an `TracingStateError` exception is raised when
         # state is not valid.
         self.tracing_obj.terminate()
         self.assertFalse(self.tracing_obj.is_active())
@@ -452,7 +452,7 @@ class TracingFCTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             if not parameterized_dict.get("session_initialized"):
-                with self.assertRaises(errors.TracingStateError):
+                with self.assertRaises(TracingStateError):
                     self.tracing_obj.terminate_and_download(directory=tmpdir)
                 return
 

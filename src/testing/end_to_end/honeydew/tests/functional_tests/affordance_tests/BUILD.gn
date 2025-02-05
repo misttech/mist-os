@@ -5,8 +5,5 @@
 # Group containing all of the Honeydew affordances functional test cases and its dependencies.
 group("tests") {
   testonly = true
-  public_deps = [
-    "test_inspect:tests",
-    "test_tracing:tests",
-  ]
+  public_deps = [ "test_inspect:tests" ]
 }

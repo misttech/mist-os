@@ -30,12 +30,12 @@ from honeydew.affordances.connectivity.wlan.wlan import wlan_using_fc
 from honeydew.affordances.connectivity.wlan.wlan_policy import (
     wlan_policy_using_fc,
 )
-from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller_using_starnix,
 )
 from honeydew.affordances.rtc import rtc_using_fc
 from honeydew.affordances.session import session_using_ffx
+from honeydew.affordances.tracing import tracing_using_fc
 from honeydew.affordances.ui.screenshot import screenshot_using_ffx
 from honeydew.affordances.ui.user_input import user_input_using_fc
 from honeydew.fuchsia_device import fuchsia_device
@@ -389,7 +389,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         implemented using fuchsia-controller"""
         self.assertIsInstance(
             self.fd_fc_obj.tracing,
-            tracing_fc.Tracing,
+            tracing_using_fc.TracingUsingFc,
         )
 
     @mock.patch.object(
