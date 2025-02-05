@@ -125,6 +125,7 @@ void Dwc3::EpEndTransfers(Endpoint& ep, zx_status_t reason) {
     ep.current_req->status = reason;
 
     pending_completions_.push(std::move(*ep.current_req));
+    ep.current_req.reset();
   }
   ep.got_not_ready = false;
 
