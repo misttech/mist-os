@@ -62,7 +62,7 @@ impl Program {
         program_type: ProgramType,
         struct_mappings: &[StructMapping],
         local_helpers: &[(u32, EbpfHelperImpl<C>)],
-    ) -> Result<LinkedProgram<C>, Errno> {
+    ) -> Result<EbpfProgram<C>, Errno> {
         if program_type != self.info.program_type {
             return error!(EINVAL);
         }
@@ -74,20 +74,8 @@ impl Program {
         let program = link_program(&self.program, struct_mappings, self.maps.clone(), helpers)
             .map_err(map_ebpf_error)?;
 
-        Ok(LinkedProgram { program, _maps: self.maps.clone() })
+        Ok(program)
     }
-}
-
-#[derive(Debug)]
-pub struct LinkedProgram<C: EbpfProgramContext> {
-    pub program: EbpfProgram<C>,
-
-    // Map references kept to ensure that the maps are not dropped before the
-    // program.
-    //
-    // TODO(https://fxbug.dev/378507648): `EbpfProgram` will keep these
-    // references after the implementation is moved to the `ebpf` crate.
-    _maps: Vec<PinnedMap>,
 }
 
 /// Links maps referenced by FD, replacing them with by-index references.

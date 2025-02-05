@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::bpf::fs::get_bpf_object;
-use crate::bpf::program::LinkedProgram;
 use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::buffers::{
@@ -18,8 +17,8 @@ use crate::vfs::{
     LookupContext, Message,
 };
 use ebpf::{
-    BpfProgramContext, BpfValue, CbpfConfig, DataWidth, FieldMapping, Packet, ProgramArgument,
-    StructMapping, Type,
+    BpfProgramContext, BpfValue, CbpfConfig, DataWidth, EbpfProgram, FieldMapping, Packet,
+    ProgramArgument, StructMapping, Type,
 };
 use ebpf_api::{
     get_socket_filter_helpers, PinnedMap, ProgramType, SocketFilterContext, SK_BUF_ID, SK_BUF_TYPE,
@@ -921,7 +920,7 @@ impl UnixSocketInner {
             // TODO(https://fxbug.dev/385015056): Fill in SkBuf.
             let mut sk_buf = SkBuf::default();
 
-            let s = bpf_program.program.run(&mut context, &mut sk_buf);
+            let s = bpf_program.run(&mut context, &mut sk_buf);
             if s == 0 {
                 None
             } else {
@@ -1040,7 +1039,7 @@ impl BpfProgramContext for UnixSocketEbpfContext {
     const CBPF_CONFIG: &'static CbpfConfig = &SOCKET_FILTER_CBPF_CONFIG;
 }
 
-type UnixSocketFilter = LinkedProgram<UnixSocketEbpfContext>;
+type UnixSocketFilter = EbpfProgram<UnixSocketEbpfContext>;
 
 #[cfg(test)]
 mod tests {
