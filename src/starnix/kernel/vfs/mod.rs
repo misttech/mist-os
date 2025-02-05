@@ -95,7 +95,7 @@ use std::sync::Arc;
 //     RELEASERS.with(|cell| {
 //         cell.borrow_mut()
 //             .as_mut()
-//             .expect("not finalized")
+//             .expect("...")
 //             .releasables
 //             .push(Box::new(Some(to_release)));
 //     });
@@ -223,7 +223,12 @@ impl DelayedReleaser {
     ) {
         loop {
             let releasers = RELEASERS.with(|cell| {
-                std::mem::take(cell.borrow_mut().as_mut().expect("not finalized").deref_mut())
+                std::mem::take(
+                    cell.borrow_mut()
+                        .as_mut()
+                        .expect("DelayedReleaser hasn't been finalized yet")
+                        .deref_mut(),
+                )
             });
             if releasers.is_empty() {
                 return;
@@ -239,7 +244,11 @@ impl DelayedReleaser {
     /// releasables for the last time.
     pub fn finalize() {
         RELEASERS.with(|cell| {
-            assert!(cell.borrow().as_ref().expect("not finalized").is_empty());
+            assert!(cell
+                .borrow()
+                .as_ref()
+                .expect("DelayedReleaser hasn't been finalized yet")
+                .is_empty());
             *cell.borrow_mut() = None;
         });
     }
