@@ -67,16 +67,11 @@ class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
  private:
   void CollectJsonStatsWithOptions(zx::socket socket);
 
-  void PublishBucketConfiguration();
-
   void CreateMetrics(
       fidl::SyncClient<fuchsia_metrics::MetricEventLoggerFactory> metric_event_logger_factory,
       const std::vector<memory::BucketMatch>& bucket_matches);
 
   void UpdateState();
-
-  void StartTracing();
-  void StopTracing();
 
   void SampleAndPost();
   void MeasureBandwidthAndPost();

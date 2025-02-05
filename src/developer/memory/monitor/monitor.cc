@@ -28,7 +28,6 @@
 #include <soc/aml-common/aml-ram.h>
 #include <trace-vthread/event_vthread.h>
 
-#include "lib/component/incoming/cpp/protocol.h"
 #include "lib/fpromise/result.h"
 #include "src/developer/memory/metrics/bucket_match.h"
 #include "src/developer/memory/metrics/capture.h"
@@ -46,7 +45,6 @@ using memory::Capture;
 using memory::CaptureLevel;
 using memory::Digest;
 using memory::Digester;
-using memory::JsonPrinter;
 using memory::SORTED;
 using memory::Summary;
 using memory::TextPrinter;
@@ -316,7 +314,7 @@ void Monitor::CollectJsonStatsWithOptions(zx::socket socket) {
   } else {
     FX_CHECK(files::ReadFileToString(kBucketConfigPath, &configuration_str));
   }
-  JsonPrinter printer(socket);
+  memory::JsonPrinter printer(socket);
   printer.PrintCaptureAndBucketConfig(capture, configuration_str);
 }
 
