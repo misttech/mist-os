@@ -270,8 +270,7 @@ zx_status_t CaptureMaker::GetCapture(Capture* capture, CaptureLevel level,
   return err;
 }
 
-fit::result<zx_status_t, std::unique_ptr<CaptureMaker>> CaptureMaker::Create(
-    std::unique_ptr<OS> os) {
+fit::result<zx_status_t, CaptureMaker> CaptureMaker::Create(std::unique_ptr<OS> os) {
   TRACE_DURATION("memory_metrics", "Capture::GetCaptureState");
   fidl::WireSyncClient<fuchsia_kernel::Stats> stats_client;
 
@@ -280,8 +279,7 @@ fit::result<zx_status_t, std::unique_ptr<CaptureMaker>> CaptureMaker::Create(
     return fit::error(err);
   }
 
-  return fit::ok(
-      std::unique_ptr<CaptureMaker>(new CaptureMaker{std::move(stats_client), std::move(os)}));
+  return fit::ok(CaptureMaker{std::move(stats_client), std::move(os)});
 }
 
 // Descendents of this vmo will have their allocated_bytes treated as an allocation of their

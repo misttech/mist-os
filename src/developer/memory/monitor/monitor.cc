@@ -128,12 +128,15 @@ std::vector<memory::BucketMatch> CreateBucketMatchesFromConfigData() {
 }  // namespace
 
 Monitor::Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispatcher,
-                 memory_monitor_config::Config config,
-                 std::unique_ptr<memory::CaptureMaker> capture_maker,
+                 memory_monitor_config::Config config, memory::CaptureMaker capture_maker,
                  std::optional<fidl::Client<fuchsia_memorypressure::Provider>> pressure_provider,
                  std::optional<zx_handle_t> root_job,
                  std::optional<fidl::SyncClient<fuchsia_metrics::MetricEventLoggerFactory>> factory)
     : capture_maker_(std::move(capture_maker)),
+      high_water_(
+          "/cache", kHighWaterPollFrequency, kHighWaterThreshold, dispatcher,
+          [this](Capture* c, CaptureLevel l) { return capture_maker_.GetCapture(c, l); },
+          [this](const Capture& c, Digest* d) { digester_->Digest(c, d); }),
       prealloc_size_(0),
       logging_(command_line.HasOption("log")),
       tracing_(false),
@@ -141,19 +144,14 @@ Monitor::Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispa
       dispatcher_(dispatcher),
       config_(config),
       inspector_(dispatcher_, {}),
-      level_(pressure_signaler::Level::kNumLevels),
-      pressure_provider_(std::move(pressure_provider)) {
+      logger_(
+          dispatcher_, &high_water_,
+          [this](Capture* c) { return capture_maker_.GetCapture(c, CaptureLevel::VMO); },
+          [this](const Capture& c, Digest* d) { GetDigest(c, d); }, &config_,
+          inspector_.root().CreateChild(kLoggerInspectKey)),
+      level_(pressure_signaler::Level::kNumLevels) {
   auto bucket_matches = CreateBucketMatchesFromConfigData();
   digester_ = std::make_unique<Digester>(bucket_matches);
-  high_water_ = std::make_unique<HighWater>(
-      "/cache", kHighWaterPollFrequency, kHighWaterThreshold, dispatcher_,
-      [this](Capture* c, CaptureLevel l) { return capture_maker_->GetCapture(c, l); },
-      [this](const Capture& c, Digest* d) { digester_->Digest(c, d); });
-  logger_ = std::make_unique<Logger>(
-      dispatcher_, high_water_.get(),
-      [this](Capture* c) { return capture_maker_->GetCapture(c, CaptureLevel::VMO); },
-      [this](const Capture& c, Digest* d) { GetDigest(c, d); }, &config_,
-      inspector_.root().CreateChild(kLoggerInspectKey));
   if (factory)
     CreateMetrics(std::move(factory.value()), bucket_matches);
 
@@ -210,7 +208,7 @@ Monitor::Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispa
   trace_observer_.Start(dispatcher_, [this] { UpdateState(); });
   if (logging_) {
     Capture capture;
-    auto s = capture_maker_->GetCapture(&capture, CaptureLevel::KMEM);
+    auto s = capture_maker_.GetCapture(&capture, CaptureLevel::KMEM);
     if (s != ZX_OK) {
       FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(s);
       exit(EXIT_FAILURE);
@@ -221,11 +219,11 @@ Monitor::Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispa
   }
 
   // Pressure monitoring
-  if (pressure_provider_.has_value()) {
+  if (pressure_provider) {
     auto watcher_endpoints = fidl::CreateEndpoints<fuchsia_memorypressure::Watcher>();
     auto watcher = fidl::BindServer(dispatcher_, std::move(watcher_endpoints->server), this);
 
-    auto result = pressure_provider_.value()->RegisterWatcher(std::move(watcher_endpoints->client));
+    auto result = (*pressure_provider)->RegisterWatcher(std::move(watcher_endpoints->client));
     if (!result.is_ok()) {
       FX_LOGS(ERROR) << "Error registering to memory pressure changes: " << result.error_value();
       exit(-1);
@@ -267,9 +265,9 @@ void Monitor::CreateMetrics(
     return;
   }
   fidl::SyncClient<fuchsia_metrics::MetricEventLogger> metric_event_logger{
-      std::move(endpoints.value().client)};
+      std::move(endpoints->client)};
   auto result = metric_event_logger_factory->CreateMetricEventLogger(
-      {{.project_spec = project_spec, .logger = std::move(endpoints.value().server)}});
+      {{.project_spec = project_spec, .logger = std::move(endpoints->server)}});
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Unable to get metrics.Logger from factory.";
     return;
@@ -277,7 +275,7 @@ void Monitor::CreateMetrics(
   metrics_.emplace(
       bucket_matches, kMetricsPollFrequency, dispatcher_, &inspector_,
       std::move(metric_event_logger),
-      [this](Capture* c) { return capture_maker_->GetCapture(c, CaptureLevel::VMO); },
+      [this](Capture* c) { return capture_maker_.GetCapture(c, CaptureLevel::VMO); },
       [this](const Capture& c, Digest* d) { GetDigest(c, d); });
 }
 
@@ -298,7 +296,7 @@ void Monitor::CollectJsonStatsWithOptions(zx::socket socket) {
   Capture capture;
 
   zx_status_t capture_status;
-  capture_status = capture_maker_->GetCapture(&capture, CaptureLevel::VMO);
+  capture_status = capture_maker_.GetCapture(&capture, CaptureLevel::VMO);
 
   if (capture_status != ZX_OK) {
     FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(capture_status);
@@ -330,22 +328,22 @@ inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& buck
   inspect::Inspector inspector(inspect::InspectSettings{.maximum_size = 1024ul * 1024});
   auto& root = inspector.GetRoot();
 
-  auto high_water_string = high_water_->GetHighWater();
+  auto high_water_string = high_water_.GetHighWater();
   if (!high_water_string.empty()) {
     root.RecordString("high_water", high_water_string);
   }
 
-  auto high_water_digest_string = high_water_->GetHighWaterDigest();
+  auto high_water_digest_string = high_water_.GetHighWaterDigest();
   if (!high_water_digest_string.empty()) {
     root.RecordString("high_water_digest", high_water_digest_string);
   }
 
-  auto previous_high_water_string = high_water_->GetPreviousHighWater();
+  auto previous_high_water_string = high_water_.GetPreviousHighWater();
   if (!previous_high_water_string.empty()) {
     root.RecordString("high_water_previous_boot", previous_high_water_string);
   }
 
-  auto previous_high_water_digest_string = high_water_->GetPreviousHighWaterDigest();
+  auto previous_high_water_digest_string = high_water_.GetPreviousHighWaterDigest();
   if (!previous_high_water_digest_string.empty()) {
     root.RecordString("high_water_digest_previous_boot", previous_high_water_digest_string);
   }
@@ -354,7 +352,7 @@ inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& buck
     inspect::Inspector inspector(inspect::InspectSettings{.maximum_size = 1024ul * 1024});
     auto& root = inspector.GetRoot();
     Capture capture;
-    zx_status_t rc = capture_maker_->GetCapture(&capture, CaptureLevel::VMO);
+    zx_status_t rc = capture_maker_.GetCapture(&capture, CaptureLevel::VMO);
     if (rc != ZX_OK) {
       FX_LOGS(ERROR) << "Failed to create capture with error: " << zx_status_get_string(rc);
       return fpromise::make_result_promise(fpromise::ok(inspector));
@@ -443,7 +441,7 @@ inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& buck
 void Monitor::SampleAndPost() {
   if (logging_ || tracing_) {
     Capture capture;
-    auto s = capture_maker_->GetCapture(&capture, CaptureLevel::KMEM);
+    auto s = capture_maker_.GetCapture(&capture, CaptureLevel::KMEM);
     if (s != ZX_OK) {
       FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(s);
       return;
@@ -571,7 +569,7 @@ void Monitor::UpdateState() {
       FX_LOGS(INFO) << "Tracing started";
       if (!tracing_) {
         Capture capture;
-        auto s = capture_maker_->GetCapture(&capture, CaptureLevel::KMEM);
+        auto s = capture_maker_.GetCapture(&capture, CaptureLevel::KMEM);
         if (s != ZX_OK) {
           FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(s);
           return;
@@ -624,7 +622,7 @@ void Monitor::OnLevelChanged(pressure_signaler::Level level) {
                 pressure_signaler::kLevelNames[level_], "to",
                 pressure_signaler::kLevelNames[level]);
   level_ = level;
-  logger_->SetPressureLevel(level_);
+  logger_.SetPressureLevel(level_);
 }
 
 void Monitor::OnLevelChanged(OnLevelChangedRequest& request,

@@ -36,7 +36,7 @@ class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
                 public fidl::Server<fuchsia_memorypressure::Watcher> {
  public:
   Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispatcher,
-          memory_monitor_config::Config config, std::unique_ptr<memory::CaptureMaker> capture_maker,
+          memory_monitor_config::Config config, memory::CaptureMaker capture_maker,
           std::optional<fidl::Client<fuchsia_memorypressure::Provider>> pressure_provider =
               std::nullopt,
           std::optional<zx_handle_t> root_job = std::nullopt,
@@ -83,8 +83,8 @@ class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
 
   void OnLevelChanged(pressure_signaler::Level level);
 
-  std::unique_ptr<memory::CaptureMaker> capture_maker_;
-  std::unique_ptr<HighWater> high_water_;
+  memory::CaptureMaker capture_maker_;
+  HighWater high_water_;
   uint64_t prealloc_size_;
   zx::vmo prealloc_vmo_;
   bool logging_;
@@ -95,14 +95,13 @@ class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
   trace::TraceObserver trace_observer_;
   memory_monitor_config::Config config_;
   inspect::ComponentInspector inspector_;
-  std::unique_ptr<Logger> logger_;
+  Logger logger_;
   std::optional<Metrics> metrics_;
   std::unique_ptr<memory::Digester> digester_;
   std::mutex digester_mutex_;
   fuchsia::hardware::ram::metrics::DevicePtr ram_device_;
   uint64_t pending_bandwidth_measurements_ = 0;
   pressure_signaler::Level level_;
-  std::optional<fidl::Client<fuchsia_memorypressure::Provider>> pressure_provider_;
 
   // Imminent OOM monitoring
   void WaitForImminentOom();

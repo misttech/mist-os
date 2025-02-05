@@ -23,7 +23,7 @@ using CaptureSystemTest = testing::Test;
 TEST_F(CaptureSystemTest, KMEM) {
   ASSERT_OK_AND_ASSIGN(capture_maker, memory::CaptureMaker::Create(CreateDefaultOS()));
   Capture c;
-  auto ret = capture_maker->GetCapture(&c, CaptureLevel::KMEM);
+  auto ret = capture_maker.GetCapture(&c, CaptureLevel::KMEM);
   ASSERT_EQ(ZX_OK, ret) << zx_status_get_string(ret);
   EXPECT_LT(0U, c.kmem().free_bytes);
   EXPECT_LT(0U, c.kmem().total_bytes);
@@ -33,7 +33,7 @@ TEST_F(CaptureSystemTest, KMEM) {
 TEST_F(CaptureSystemTest, VMO) {
   ASSERT_OK_AND_ASSIGN(capture_maker, memory::CaptureMaker::Create(CreateDefaultOS()));
   Capture c;
-  auto ret = capture_maker->GetCapture(&c, CaptureLevel::VMO);
+  auto ret = capture_maker.GetCapture(&c, CaptureLevel::VMO);
   ASSERT_EQ(ZX_OK, ret) << zx_status_get_string(ret);
   EXPECT_LT(0U, c.kmem().free_bytes);
   EXPECT_LT(0U, c.kmem().total_bytes);

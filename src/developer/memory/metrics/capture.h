@@ -253,7 +253,7 @@ class Capture {
 // Holds the necessary components required to create a |Capture|.
 class CaptureMaker {
  public:
-  static fit::result<zx_status_t, std::unique_ptr<CaptureMaker>> Create(std::unique_ptr<OS> os);
+  static fit::result<zx_status_t, CaptureMaker> Create(std::unique_ptr<OS> os);
 
   zx_status_t GetCapture(
       Capture* capture, CaptureLevel level,
