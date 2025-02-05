@@ -391,7 +391,7 @@ class WebEngineTest : public ui_testing::PortableUITest,
          .targets = {target}},
         {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_buildinfo::Provider>}},
          .source = ChildRef{kBuildInfoProvider},
-         .targets = {target}},
+         .targets = {ChildRef{kWebContextProvider}, target}},
         {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_intl::PropertyProvider>}},
          .source = ChildRef{kIntl},
          .targets = {target}},
@@ -464,7 +464,7 @@ class WebEngineTest : public ui_testing::PortableUITest,
 INSTANTIATE_TEST_SUITE_P(WebEngineTestParameterized, WebEngineTest,
                          testing::ValuesIn(AsTuples(ConfigsToTest())));
 
-TEST_P(WebEngineTest, DISABLED_ChromiumTap) {
+TEST_P(WebEngineTest, ChromiumTap) {
   InjectInput(TapLocation::kTopLeft);
 
   RunLoopUntil([&] { return response_state()->events_received().size() >= 1; });

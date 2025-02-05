@@ -283,7 +283,7 @@ class VirtualKeyboardTest : public ui_testing::PortableUITest {
          .targets = {ChildRef{kMemoryPressureSignaler}}},
         {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_buildinfo::Provider>}},
          .source = ChildRef{kBuildInfoProvider},
-         .targets = {target}},
+         .targets = {ChildRef{kWebContextProvider}, target}},
         {.capabilities =
              {
                  Directory{
@@ -333,7 +333,7 @@ class VirtualKeyboardTest : public ui_testing::PortableUITest {
   static constexpr auto kBuildInfoProviderUrl = "#meta/fake_build_info.cm";
 };
 
-TEST_F(VirtualKeyboardTest, DISABLED_ShowAndHideKeyboard) {
+TEST_F(VirtualKeyboardTest, ShowAndHideKeyboard) {
   LaunchWebEngineClient();
 
   std::optional<bool> is_keyboard_visible;

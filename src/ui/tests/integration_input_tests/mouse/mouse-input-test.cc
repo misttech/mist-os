@@ -377,7 +377,7 @@ class ChromiumInputTest : public MouseInputBase {
          .targets = {target}},
         {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_buildinfo::Provider>}},
          .source = ChildRef{kBuildInfoProvider},
-         .targets = {target}},
+         .targets = {ChildRef{kWebContextProvider}, target}},
         {.capabilities =
              {
                  Directory{
@@ -467,7 +467,7 @@ class ChromiumInputTest : public MouseInputBase {
   static const int kMaxRetry = 10;
 };
 
-TEST_F(ChromiumInputTest, DISABLED_ChromiumMouseMove) {
+TEST_F(ChromiumInputTest, ChromiumMouseMove) {
   auto initial_position = EnsureMouseIsReadyAndGetPosition();
 
   double initial_x = initial_position.x;
