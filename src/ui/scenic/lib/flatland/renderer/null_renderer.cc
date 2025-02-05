@@ -139,9 +139,9 @@ void NullRenderer::ReleaseBufferImage(allocation::GlobalImageId image_id) {
   image_map_.erase(image_id);
 }
 
-void NullRenderer::SetColorConversionValues(const std::array<float, 9>& coefficients,
-                                            const std::array<float, 3>& preoffsets,
-                                            const std::array<float, 3>& postoffsets) {}
+void NullRenderer::SetColorConversionValues(const fidl::Array<float, 9>& coefficients,
+                                            const fidl::Array<float, 3>& preoffsets,
+                                            const fidl::Array<float, 3>& postoffsets) {}
 
 // Check that the buffer collections for each of the images passed in have been validated.
 // DCHECK if they have not.

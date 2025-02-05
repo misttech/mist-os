@@ -6,7 +6,7 @@
 #define SRC_UI_SCENIC_LIB_FLATLAND_ENGINE_TESTS_MOCK_DISPLAY_COORDINATOR_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.display/cpp/test_base.h>
+#include <fidl/fuchsia.hardware.display/cpp/wire_test_base.h>
 #include <fidl/fuchsia.math/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/errors.h>
@@ -20,7 +20,7 @@
 namespace flatland {
 
 class MockDisplayCoordinator
-    : public fidl::testing::TestBase<fuchsia_hardware_display::Coordinator> {
+    : public fidl::testing::WireTestBase<fuchsia_hardware_display::Coordinator> {
  public:
   MockDisplayCoordinator() = default;
 
@@ -42,12 +42,19 @@ class MockDisplayCoordinator
   // TODO(https://fxbug.dev/324689624): Do not use gMock to generate mocking
   // methods.
 
-  MOCK_METHOD(void, ImportEvent, (ImportEventRequest&, ImportEventCompleter::Sync&), (override));
+  MOCK_METHOD(void, ImportEvent,
+              (fuchsia_hardware_display::wire::CoordinatorImportEventRequest*,
+               ImportEventCompleter::Sync&),
+              (override));
 
   MOCK_METHOD(void, SetLayerColorConfig,
-              (SetLayerColorConfigRequest&, SetLayerColorConfigCompleter::Sync&), (override));
+              (fuchsia_hardware_display::wire::CoordinatorSetLayerColorConfigRequest*,
+               SetLayerColorConfigCompleter::Sync&),
+              (override));
 
-  MOCK_METHOD(void, SetLayerImage2, (SetLayerImage2Request&, SetLayerImage2Completer::Sync&),
+  MOCK_METHOD(void, SetLayerImage2,
+              (fuchsia_hardware_display::wire::CoordinatorSetLayerImage2Request*,
+               SetLayerImage2Completer::Sync&),
               (override));
 
   MOCK_METHOD(void, ApplyConfig, (ApplyConfigCompleter::Sync&), (override));
@@ -55,43 +62,66 @@ class MockDisplayCoordinator
   MOCK_METHOD(void, GetLatestAppliedConfigStamp, (GetLatestAppliedConfigStampCompleter::Sync&),
               (override));
 
-  MOCK_METHOD(void, CheckConfig, (CheckConfigRequest&, CheckConfigCompleter::Sync&), (override));
+  MOCK_METHOD(void, CheckConfig,
+              (fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest*,
+               CheckConfigCompleter::Sync&),
+              (override));
 
   MOCK_METHOD(void, ImportBufferCollection,
-              (ImportBufferCollectionRequest&, ImportBufferCollectionCompleter::Sync&), (override));
+              (fuchsia_hardware_display::wire::CoordinatorImportBufferCollectionRequest*,
+               ImportBufferCollectionCompleter::Sync&),
+              (override));
 
   MOCK_METHOD(void, SetBufferCollectionConstraints,
-              (SetBufferCollectionConstraintsRequest&,
+              (fuchsia_hardware_display::wire::CoordinatorSetBufferCollectionConstraintsRequest*,
                SetBufferCollectionConstraintsCompleter::Sync&),
               (override));
 
   MOCK_METHOD(void, ReleaseBufferCollection,
-              (ReleaseBufferCollectionRequest&, ReleaseBufferCollectionCompleter::Sync&),
+              (fuchsia_hardware_display::wire::CoordinatorReleaseBufferCollectionRequest*,
+               ReleaseBufferCollectionCompleter::Sync&),
               (override));
 
-  MOCK_METHOD(void, ImportImage, (ImportImageRequest&, ImportImageCompleter::Sync&), (override));
+  MOCK_METHOD(void, ImportImage,
+              (fuchsia_hardware_display::wire::CoordinatorImportImageRequest*,
+               ImportImageCompleter::Sync&),
+              (override));
 
-  MOCK_METHOD(void, ReleaseImage, (ReleaseImageRequest&, ReleaseImageCompleter::Sync&), (override));
+  MOCK_METHOD(void, ReleaseImage,
+              (fuchsia_hardware_display::wire::CoordinatorReleaseImageRequest*,
+               ReleaseImageCompleter::Sync&),
+              (override));
 
   MOCK_METHOD(void, SetLayerPrimaryConfig,
-              (SetLayerPrimaryConfigRequest&, SetLayerPrimaryConfigCompleter::Sync&), (override));
+              (fuchsia_hardware_display::wire::CoordinatorSetLayerPrimaryConfigRequest*,
+               SetLayerPrimaryConfigCompleter::Sync&),
+              (override));
 
   MOCK_METHOD(void, SetLayerPrimaryPosition,
-              (SetLayerPrimaryPositionRequest&, SetLayerPrimaryPositionCompleter::Sync&),
+              (fuchsia_hardware_display::wire::CoordinatorSetLayerPrimaryPositionRequest*,
+               SetLayerPrimaryPositionCompleter::Sync&),
               (override));
 
   MOCK_METHOD(void, SetLayerPrimaryAlpha,
-              (SetLayerPrimaryAlphaRequest&, SetLayerPrimaryAlphaCompleter::Sync&), (override));
+              (fuchsia_hardware_display::wire::CoordinatorSetLayerPrimaryAlphaRequest*,
+               SetLayerPrimaryAlphaCompleter::Sync&),
+              (override));
 
   MOCK_METHOD(void, CreateLayer, (CreateLayerCompleter::Sync&), (override));
 
-  MOCK_METHOD(void, DestroyLayer, (DestroyLayerRequest&, DestroyLayerCompleter::Sync&), (override));
+  MOCK_METHOD(void, DestroyLayer,
+              (fuchsia_hardware_display::wire::CoordinatorDestroyLayerRequest*,
+               DestroyLayerCompleter::Sync&),
+              (override));
 
-  MOCK_METHOD(void, SetDisplayLayers, (SetDisplayLayersRequest&, SetDisplayLayersCompleter::Sync&),
+  MOCK_METHOD(void, SetDisplayLayers,
+              (fuchsia_hardware_display::wire::CoordinatorSetDisplayLayersRequest*,
+               SetDisplayLayersCompleter::Sync&),
               (override));
 
   MOCK_METHOD(void, SetDisplayColorConversion,
-              (SetDisplayColorConversionRequest&, SetDisplayColorConversionCompleter::Sync&),
+              (fuchsia_hardware_display::wire::CoordinatorSetDisplayColorConversionRequest*,
+               SetDisplayColorConversionCompleter::Sync&),
               (override));
 
  private:

@@ -52,9 +52,9 @@ class NullRenderer final : public Renderer {
               bool apply_color_conversion = false) override;
 
   // |Renderer|.
-  void SetColorConversionValues(const std::array<float, 9>& coefficients,
-                                const std::array<float, 3>& preoffsets,
-                                const std::array<float, 3>& postoffsets) override;
+  void SetColorConversionValues(const fidl::Array<float, 9>& coefficients,
+                                const fidl::Array<float, 3>& preoffsets,
+                                const fidl::Array<float, 3>& postoffsets) override;
 
   // |Renderer|.
   fuchsia_images2::PixelFormat ChoosePreferredRenderTargetFormat(

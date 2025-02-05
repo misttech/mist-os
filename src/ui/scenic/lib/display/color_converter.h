@@ -11,9 +11,9 @@
 
 namespace scenic_impl::display {
 
-using SetColorConversionFunc = fit::function<void(const std::array<float, 9>& coefficients,
-                                                  const std::array<float, 3>& preoffsets,
-                                                  const std::array<float, 3>& postoffsets)>;
+using SetColorConversionFunc = fit::function<void(const fidl::Array<float, 9>& coefficients,
+                                                  const fidl::Array<float, 3>& preoffsets,
+                                                  const fidl::Array<float, 3>& postoffsets)>;
 using SetMinimumRgbFunc = fit::function<bool(uint8_t minimum_rgb)>;
 
 // Backend for the ColorConverter FIDL interface.
@@ -39,4 +39,4 @@ class ColorConverter : public fuchsia::ui::display::color::Converter {
 
 }  // namespace scenic_impl::display
 
-#endif  //  SRC_UI_SCENIC_LIB_DISPLAY_COLOR_CONVERTER_H_
+#endif  // SRC_UI_SCENIC_LIB_DISPLAY_COLOR_CONVERTER_H_

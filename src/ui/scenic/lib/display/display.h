@@ -29,15 +29,16 @@ namespace display {
 // resolution, vsync interval, last vsync time, etc.
 class Display {
  public:
-  Display(fuchsia_hardware_display_types::DisplayId id, uint32_t width_in_px, uint32_t height_in_px,
-          uint32_t width_in_mm, uint32_t height_in_mm,
-          std::vector<fuchsia_images2::PixelFormat> pixel_formats, uint32_t refresh_rate);
-  Display(fuchsia_hardware_display_types::DisplayId id, uint32_t width_in_px,
+  Display(fuchsia_hardware_display_types::wire::DisplayId id, uint32_t width_in_px,
+          uint32_t height_in_px, uint32_t width_in_mm, uint32_t height_in_mm,
+          std::vector<fuchsia_images2::PixelFormat> pixel_formats,
+          uint32_t maximum_refresh_rate_in_millihertz);
+  Display(fuchsia_hardware_display_types::wire::DisplayId id, uint32_t width_in_px,
           uint32_t height_in_px);
   virtual ~Display() = default;
 
   using VsyncCallback = fit::function<void(
-      zx::time timestamp, fuchsia_hardware_display::ConfigStamp applied_config_stamp)>;
+      zx::time timestamp, fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp)>;
   void SetVsyncCallback(VsyncCallback callback) { vsync_callback_ = std::move(callback); }
 
   using DPRCallback = fit::function<void(const glm::vec2& dpr)>;
@@ -59,7 +60,7 @@ class Display {
   }
 
   // The display's ID in the context of the DisplayManager's DisplayController.
-  fuchsia_hardware_display_types::DisplayId display_id() const { return display_id_; }
+  fuchsia_hardware_display_types::wire::DisplayId display_id() const { return display_id_; }
   uint32_t width_in_px() const { return width_in_px_; }
   uint32_t height_in_px() const { return height_in_px_; }
   uint32_t width_in_mm() const { return width_in_mm_; }
@@ -78,7 +79,8 @@ class Display {
   const zx::event& ownership_event() const { return ownership_event_; }
 
   // Called by DisplayManager, other users of Display should probably not call this.  Except tests.
-  void OnVsync(zx::time timestamp, fuchsia_hardware_display::ConfigStamp applied_config_stamp);
+  void OnVsync(zx::time timestamp,
+               fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp);
 
  protected:
   std::shared_ptr<scheduling::VsyncTiming> vsync_timing_;
@@ -90,7 +92,7 @@ class Display {
   // The maximum vsync interval we would ever expect.
   static constexpr zx::duration kMaximumVsyncInterval = zx::msec(100);
 
-  const fuchsia_hardware_display_types::DisplayId display_id_;
+  const fuchsia_hardware_display_types::wire::DisplayId display_id_;
   const uint32_t width_in_px_;
   const uint32_t height_in_px_;
   const uint32_t width_in_mm_;

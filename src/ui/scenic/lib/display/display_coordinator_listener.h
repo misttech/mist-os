@@ -17,16 +17,16 @@ namespace scenic_impl::display {
 // Implements a [`fuchsia.hardware.display/CoordinatorListener`] server and
 // allows registration for display events callbacks.
 class DisplayCoordinatorListener final
-    : public fidl::Server<fuchsia_hardware_display::CoordinatorListener> {
+    : public fidl::WireServer<fuchsia_hardware_display::CoordinatorListener> {
  public:
-  using OnDisplaysChangedCallback =
-      std::function<void(std::vector<fuchsia_hardware_display::Info> added,
-                         std::vector<fuchsia_hardware_display_types::DisplayId> removed)>;
+  using OnDisplaysChangedCallback = std::function<void(
+      fidl::VectorView<fuchsia_hardware_display::wire::Info> added,
+      fidl::VectorView<fuchsia_hardware_display_types::wire::DisplayId> removed)>;
   using OnClientOwnershipChangeCallback = std::function<void(bool has_ownership)>;
-  using OnVsyncCallback =
-      std::function<void(fuchsia_hardware_display_types::DisplayId display_id, zx::time timestamp,
-                         fuchsia_hardware_display::ConfigStamp applied_config_stamp,
-                         fuchsia_hardware_display::VsyncAckCookie cookie)>;
+  using OnVsyncCallback = std::function<void(
+      fuchsia_hardware_display_types::wire::DisplayId display_id, zx::time timestamp,
+      fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp,
+      fuchsia_hardware_display::wire::VsyncAckCookie cookie)>;
 
   // `coordinator_listener_server` must be valid.
   explicit DisplayCoordinatorListener(
@@ -42,10 +42,10 @@ class DisplayCoordinatorListener final
   DisplayCoordinatorListener& operator=(DisplayCoordinatorListener&&) = delete;
 
   // fidl::Server<fuchsia_hardware_display::CoordinatorListener>:
-  void OnDisplaysChanged(OnDisplaysChangedRequest& request,
+  void OnDisplaysChanged(OnDisplaysChangedRequestView request,
                          OnDisplaysChangedCompleter::Sync& completer) override;
-  void OnVsync(OnVsyncRequest& request, OnVsyncCompleter::Sync& completer) override;
-  void OnClientOwnershipChange(OnClientOwnershipChangeRequest& request,
+  void OnVsync(OnVsyncRequestView request, OnVsyncCompleter::Sync& completer) override;
+  void OnClientOwnershipChange(OnClientOwnershipChangeRequestView request,
                                OnClientOwnershipChangeCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_display::CoordinatorListener> metadata,

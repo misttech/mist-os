@@ -14,7 +14,7 @@
 namespace scenic_impl {
 namespace display {
 
-Display::Display(fuchsia_hardware_display_types::DisplayId id, uint32_t width_in_px,
+Display::Display(fuchsia_hardware_display_types::wire::DisplayId id, uint32_t width_in_px,
                  uint32_t height_in_px, uint32_t width_in_mm, uint32_t height_in_mm,
                  std::vector<fuchsia_images2::PixelFormat> pixel_formats,
                  uint32_t maximum_refresh_rate_in_millihertz)
@@ -29,7 +29,7 @@ Display::Display(fuchsia_hardware_display_types::DisplayId id, uint32_t width_in
   zx::event::create(0, &ownership_event_);
   device_pixel_ratio_.store({1.f, 1.f});
 }
-Display::Display(fuchsia_hardware_display_types::DisplayId id, uint32_t width_in_px,
+Display::Display(fuchsia_hardware_display_types::wire::DisplayId id, uint32_t width_in_px,
                  uint32_t height_in_px)
     : Display(id, width_in_px, height_in_px, 0, 0, {fuchsia_images2::PixelFormat::kB8G8R8A8}, 0) {}
 
@@ -44,7 +44,7 @@ void Display::Unclaim() {
 }
 
 void Display::OnVsync(zx::time timestamp,
-                      fuchsia_hardware_display::ConfigStamp applied_config_stamp) {
+                      fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp) {
   zx::duration time_since_last_vsync = timestamp - vsync_timing_->last_vsync_time();
 
   if (vsync_timing_->last_vsync_time() != zx::time(0)) {

@@ -57,9 +57,9 @@ class Renderer : public allocation::BufferCollectionImporter {
                       bool apply_color_conversion = false) = 0;
 
   // Values needed to adjust the color of the framebuffer as a postprocessing effect.
-  virtual void SetColorConversionValues(const std::array<float, 9>& coefficients,
-                                        const std::array<float, 3>& preoffsets,
-                                        const std::array<float, 3>& postoffsets) = 0;
+  virtual void SetColorConversionValues(const fidl::Array<float, 9>& coefficients,
+                                        const fidl::Array<float, 3>& preoffsets,
+                                        const fidl::Array<float, 3>& postoffsets) = 0;
 
   // Returns the pixel format that the renderer prefers to use for render targets.
   // TODO(https://fxbug.dev/42065293): Rename this to reflect that it's for a render target.

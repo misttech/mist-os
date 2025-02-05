@@ -17,19 +17,19 @@ using fuchsia_ui_composition::ImageFlip;
 namespace flatland {
 
 DisplaySrcDstFrames DisplaySrcDstFrames::New(ImageRect rectangle, allocation::ImageMetadata image) {
-  fuchsia_math::RectU image_source = {{
+  fuchsia_math::wire::RectU image_source = {
       .x = static_cast<uint32_t>(rectangle.texel_uvs[0].x),
       .y = static_cast<uint32_t>(rectangle.texel_uvs[0].y),
       .width = static_cast<uint32_t>(rectangle.texel_uvs[2].x - rectangle.texel_uvs[0].x),
       .height = static_cast<uint32_t>(rectangle.texel_uvs[2].y - rectangle.texel_uvs[0].y),
-  }};
+  };
 
-  fuchsia_math::RectU display_destination = {{
+  fuchsia_math::wire::RectU display_destination = {
       .x = static_cast<uint32_t>(rectangle.origin.x),
       .y = static_cast<uint32_t>(rectangle.origin.y),
       .width = static_cast<uint32_t>(rectangle.extent.x),
       .height = static_cast<uint32_t>(rectangle.extent.y),
-  }};
+  };
   return {.src = image_source, .dst = display_destination};
 }
 

@@ -78,8 +78,8 @@ class DisplayCompositorSmokeTest : public DisplayCompositorTestBase {
           ASSERT_TRUE(client_channels.is_ok()) << "Failed to get display coordinator:"
                                                << zx_status_get_string(client_channels.error());
           auto [coordinator_client, listener_server] = std::move(client_channels.value());
-          display_manager_->BindDefaultDisplayCoordinator(std::move(coordinator_client),
-                                                          std::move(listener_server));
+          display_manager_->BindDefaultDisplayCoordinator(
+              dispatcher(), std::move(coordinator_client), std::move(listener_server));
         }));
 
     RunLoopUntil([this] { return display_manager_->default_display() != nullptr; });
@@ -232,7 +232,7 @@ VK_TEST_P(DisplayCompositorParameterizedSmokeTest, FullscreenRectangleTest) {
   display_compositor->RenderFrame(
       1, zx::time(1),
       GenerateDisplayListForTest(
-          {{display->display_id().value(), std::make_pair(display_info, root_handle)}}),
+          {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
       {}, [](const scheduling::Timestamps&) {});
 }
 

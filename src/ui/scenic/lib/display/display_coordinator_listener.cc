@@ -23,25 +23,25 @@ DisplayCoordinatorListener::DisplayCoordinatorListener(
 
 DisplayCoordinatorListener::~DisplayCoordinatorListener() {}
 
-void DisplayCoordinatorListener::OnDisplaysChanged(OnDisplaysChangedRequest& request,
+void DisplayCoordinatorListener::OnDisplaysChanged(OnDisplaysChangedRequestView request,
                                                    OnDisplaysChangedCompleter::Sync& completer) {
   if (on_displays_changed_) {
-    on_displays_changed_(std::move(request.added()), std::move(request.removed()));
+    on_displays_changed_(request->added, request->removed);
   }
 }
 
-void DisplayCoordinatorListener::OnVsync(OnVsyncRequest& request,
+void DisplayCoordinatorListener::OnVsync(OnVsyncRequestView request,
                                          OnVsyncCompleter::Sync& completer) {
   if (on_vsync_) {
-    on_vsync_(request.display_id(), zx::time(request.timestamp()), request.applied_config_stamp(),
-              request.cookie());
+    on_vsync_(request->display_id, zx::time(request->timestamp), request->applied_config_stamp,
+              request->cookie);
   }
 }
 
 void DisplayCoordinatorListener::OnClientOwnershipChange(
-    OnClientOwnershipChangeRequest& request, OnClientOwnershipChangeCompleter::Sync& completer) {
+    OnClientOwnershipChangeRequestView request, OnClientOwnershipChangeCompleter::Sync& completer) {
   if (on_client_ownership_change_) {
-    on_client_ownership_change_(request.has_ownership());
+    on_client_ownership_change_(request->has_ownership);
   }
 }
 

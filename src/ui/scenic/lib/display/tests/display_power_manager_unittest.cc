@@ -69,7 +69,7 @@ class DisplayPowerManagerMockTest : public gtest::RealLoopFixture {
 };
 
 TEST_F(DisplayPowerManagerMockTest, Ok) {
-  const fuchsia_hardware_display_types::DisplayId kDisplayId = {{.value = 1}};
+  const fuchsia_hardware_display_types::wire::DisplayId kDisplayId = {.value = 1};
   const uint32_t kDisplayWidth = 1024;
   const uint32_t kDisplayHeight = 768;
 
@@ -78,13 +78,14 @@ TEST_F(DisplayPowerManagerMockTest, Ok) {
   auto [listener_client, listener_server] =
       fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
 
-  display_manager()->BindDefaultDisplayCoordinator(std::move(coordinator_client),
+  display_manager()->BindDefaultDisplayCoordinator(dispatcher(), std::move(coordinator_client),
                                                    std::move(listener_server));
 
   display_manager()->SetDefaultDisplayForTests(
       std::make_shared<display::Display>(kDisplayId, kDisplayWidth, kDisplayHeight));
 
-  display::test::MockDisplayCoordinator mock_display_coordinator(fuchsia_hardware_display::Info{});
+  display::test::MockDisplayCoordinator mock_display_coordinator(
+      fuchsia_hardware_display::wire::Info{});
   mock_display_coordinator.Bind(std::move(coordinator_server), std::move(listener_client),
                                 dispatcher());
   mock_display_coordinator.set_set_display_power_result(ZX_OK);
@@ -137,12 +138,13 @@ TEST_F(DisplayPowerManagerMockTest, NoDisplay) {
   auto [listener_client, listener_server] =
       fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
 
-  display_manager()->BindDefaultDisplayCoordinator(std::move(coordinator_client),
+  display_manager()->BindDefaultDisplayCoordinator(dispatcher(), std::move(coordinator_client),
                                                    std::move(listener_server));
 
   display_manager()->SetDefaultDisplayForTests(nullptr);
 
-  display::test::MockDisplayCoordinator mock_display_coordinator(fuchsia_hardware_display::Info{});
+  display::test::MockDisplayCoordinator mock_display_coordinator(
+      fuchsia_hardware_display::wire::Info{});
   mock_display_coordinator.Bind(std::move(coordinator_server), std::move(listener_client),
                                 dispatcher());
 
@@ -165,7 +167,7 @@ TEST_F(DisplayPowerManagerMockTest, NoDisplay) {
 }
 
 TEST_F(DisplayPowerManagerMockTest, NotSupported) {
-  const fuchsia_hardware_display_types::DisplayId kDisplayId = {{.value = 1}};
+  const fuchsia_hardware_display_types::wire::DisplayId kDisplayId = {.value = 1};
   const uint32_t kDisplayWidth = 1024;
   const uint32_t kDisplayHeight = 768;
 
@@ -174,13 +176,14 @@ TEST_F(DisplayPowerManagerMockTest, NotSupported) {
   auto [listener_client, listener_server] =
       fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
 
-  display_manager()->BindDefaultDisplayCoordinator(std::move(coordinator_client),
+  display_manager()->BindDefaultDisplayCoordinator(dispatcher(), std::move(coordinator_client),
                                                    std::move(listener_server));
 
   display_manager()->SetDefaultDisplayForTests(
       std::make_shared<display::Display>(kDisplayId, kDisplayWidth, kDisplayHeight));
 
-  display::test::MockDisplayCoordinator mock_display_coordinator(fuchsia_hardware_display::Info{});
+  display::test::MockDisplayCoordinator mock_display_coordinator(
+      fuchsia_hardware_display::wire::Info{});
   mock_display_coordinator.Bind(std::move(coordinator_server), std::move(listener_client),
                                 dispatcher());
   mock_display_coordinator.set_set_display_power_result(ZX_ERR_NOT_SUPPORTED);

@@ -307,17 +307,17 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
           ASSERT_TRUE(client_channels.is_ok()) << "Failed to get display coordinator:"
                                                << zx_status_get_string(client_channels.error());
           auto [coordinator_client, listener_server] = std::move(client_channels.value());
-          display_manager_->BindDefaultDisplayCoordinator(std::move(coordinator_client),
-                                                          std::move(listener_server));
+          display_manager_->BindDefaultDisplayCoordinator(
+              dispatcher(), std::move(coordinator_client), std::move(listener_server));
         }));
 
     RunLoopUntil([this] { return display_manager_->default_display() != nullptr; });
 
     // Enable Vsync so that vsync events will be given to this client.
-    std::shared_ptr<fidl::SyncClient<fuchsia_hardware_display::Coordinator>> display_coordinator =
-        display_manager_->default_display_coordinator();
-    [[maybe_unused]] fit::result<fidl::OneWayStatus> enable_vsync_result =
-        (*display_coordinator)->SetVsyncEventDelivery(true);
+    std::shared_ptr<fidl::WireSharedClient<fuchsia_hardware_display::Coordinator>>
+        display_coordinator = display_manager_->default_display_coordinator();
+    [[maybe_unused]] fidl::OneWayStatus enable_vsync_result =
+        display_coordinator->sync()->SetVsyncEventDelivery(true);
   }
 
   void TearDown() override {
@@ -362,29 +362,28 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
   // these processes to have been completed.
   void WaitOnVSync() {
     auto display = display_manager_->default_display();
-    std::shared_ptr<fidl::SyncClient<fuchsia_hardware_display::Coordinator>> display_coordinator =
-        display_manager_->default_display_coordinator();
+    std::shared_ptr<fidl::WireSharedClient<fuchsia_hardware_display::Coordinator>>
+        display_coordinator = display_manager_->default_display_coordinator();
 
     ASSERT_TRUE(display_coordinator != nullptr);
 
     // Get the latest applied config stamp. This will be used to compare against the config
     // stamp in the OnSync callback function used by the display. If the two stamps match,
     // then we know that the vsync has completed and it is safe to do readbacks.
-    const fidl::Result config_stamp_result = (*display_coordinator)->GetLatestAppliedConfigStamp();
-    ASSERT_TRUE(config_stamp_result.is_ok())
+    const auto config_stamp_result = display_coordinator->sync()->GetLatestAppliedConfigStamp();
+    ASSERT_TRUE(config_stamp_result.ok())
         << "Failed to call FIDL GetLatestAppliedConfigStamp method: "
-        << config_stamp_result.error_value();
-    fuchsia_hardware_display::ConfigStamp pending_config_stamp =
-        config_stamp_result.value().stamp();
+        << config_stamp_result.status_string();
+    fuchsia_hardware_display::wire::ConfigStamp pending_config_stamp = config_stamp_result->stamp;
 
     // The callback will switch this bool to |true| if the two configs match. It is initialized
     // to |false| and blocks the main thread below.
     bool configs_are_equal = false;
     display->SetVsyncCallback(
         [&pending_config_stamp, &configs_are_equal](
-            zx::time timestamp, fuchsia_hardware_display::ConfigStamp applied_config_stamp) {
-          if (pending_config_stamp == applied_config_stamp &&
-              applied_config_stamp.value() != fuchsia_hardware_display::kInvalidConfigStampValue) {
+            zx::time timestamp, fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp) {
+          if (pending_config_stamp.value == applied_config_stamp.value &&
+              applied_config_stamp.value != fuchsia_hardware_display::kInvalidConfigStampValue) {
             configs_are_equal = true;
           }
         });
@@ -415,8 +414,8 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
       allocation::GlobalBufferCollectionId collection_id, fuchsia::images2::PixelFormat pixel_type,
       fuchsia::sysmem2::BufferCollectionInfo* collection_info, allocation::GlobalImageId image_id) {
     auto display = display_manager_->default_display();
-    std::shared_ptr<fidl::SyncClient<fuchsia_hardware_display::Coordinator>> display_coordinator =
-        display_manager_->default_display_coordinator();
+    std::shared_ptr<fidl::WireSharedClient<fuchsia_hardware_display::Coordinator>>
+        display_coordinator = display_manager_->default_display_coordinator();
     EXPECT_TRUE(display);
     EXPECT_TRUE(display_coordinator);
 
@@ -428,9 +427,9 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     }
 
     // Set up buffer collection and image for recording a snapshot.
-    fuchsia_hardware_display_types::ImageBufferUsage image_buffer_usage = {{
+    fuchsia_hardware_display_types::wire::ImageBufferUsage image_buffer_usage = {
         .tiling_type = fuchsia_hardware_display_types::kImageTilingTypeCapture,
-    }};
+    };
 
     auto tokens = SysmemTokens::Create(sysmem_allocator_.get());
     fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> dup_token(
@@ -499,11 +498,10 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     // TODO(https://fxbug.dev/332521780): Display clients will be required to
     // pass the captured display's mode information.
-    fuchsia_hardware_display_types::ImageMetadata image_metadata({
-        .dimensions = fuchsia_math::SizeU(
-            {.width = display->width_in_px(), .height = display->height_in_px()}),
+    fuchsia_hardware_display_types::wire::ImageMetadata image_metadata{
+        .dimensions = {.width = display->width_in_px(), .height = display->height_in_px()},
         .tiling_type = fuchsia_hardware_display_types::kImageTilingTypeCapture,
-    });
+    };
 
     zx_status_t import_status = scenic_impl::ImportImageForCapture(
         *display_coordinator, image_metadata, collection_id, 0, image_id);
@@ -548,17 +546,17 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
   }
 
   void ReleaseCaptureBufferCollection(allocation::GlobalBufferCollectionId collection_id) {
-    const fuchsia_hardware_display::BufferCollectionId display_collection_id =
+    const fuchsia_hardware_display::wire::BufferCollectionId display_collection_id =
         scenic_impl::ToDisplayFidlBufferCollectionId(collection_id);
     auto display = display_manager_->default_display();
-    std::shared_ptr<fidl::SyncClient<fuchsia_hardware_display::Coordinator>> display_coordinator =
-        display_manager_->default_display_coordinator();
+    std::shared_ptr<fidl::WireSharedClient<fuchsia_hardware_display::Coordinator>>
+        display_coordinator = display_manager_->default_display_coordinator();
     ASSERT_TRUE(display_coordinator != nullptr);
 
-    const fit::result<fidl::OneWayStatus> result =
-        (*display_coordinator)->ReleaseBufferCollection(display_collection_id);
-    ASSERT_TRUE(result.is_ok()) << "Failed to call FIDL ReleaseBufferCollection: "
-                                << result.error_value();
+    const fidl::OneWayStatus result =
+        display_coordinator->sync()->ReleaseBufferCollection(display_collection_id);
+    ASSERT_TRUE(result.ok()) << "Failed to call FIDL ReleaseBufferCollection: "
+                             << result.status_string();
   }
 
   static void ReleaseClientTextureBufferCollection(
@@ -576,12 +574,12 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     // This ID would only be zero if we were running in an environment without capture support.
     EXPECT_NE(capture_image_id, 0U);
-    const fuchsia_hardware_display::ImageId fidl_capture_image_id =
+    const fuchsia_hardware_display::wire::ImageId fidl_capture_image_id =
         scenic_impl::ToDisplayFidlImageId(capture_image_id);
 
     auto display = display_manager_->default_display();
-    std::shared_ptr<fidl::SyncClient<fuchsia_hardware_display::Coordinator>> display_coordinator =
-        display_manager_->default_display_coordinator();
+    std::shared_ptr<fidl::WireSharedClient<fuchsia_hardware_display::Coordinator>>
+        display_coordinator = display_manager_->default_display_coordinator();
 
     zx::event capture_signal_fence;
     auto status = zx::event::create(0, &capture_signal_fence);
@@ -589,13 +587,12 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     scenic_impl::DisplayEventId capture_signal_fence_id =
         scenic_impl::ImportEvent(*display_coordinator, capture_signal_fence);
-    const fidl::Result start_capture_result = (*display_coordinator)
-                                                  ->StartCapture({{
-                                                      .signal_event_id = capture_signal_fence_id,
-                                                      .image_id = fidl_capture_image_id,
-                                                  }});
-    ASSERT_TRUE(start_capture_result.is_ok())
-        << "Failed to call FIDL StartCapture: " << start_capture_result.error_value();
+    const auto start_capture_result =
+        display_coordinator->sync()->StartCapture(capture_signal_fence_id, fidl_capture_image_id);
+    ASSERT_TRUE(start_capture_result.ok())
+        << "Failed to call FIDL StartCapture: " << start_capture_result.status_string();
+    ASSERT_TRUE(start_capture_result->is_ok())
+        << "Failed StartCapture: " << zx_status_get_string(start_capture_result->error_value());
 
     // We must wait for the capture to finish before we can proceed. Time out after 3 seconds.
     status = capture_signal_fence.wait_one(ZX_EVENT_SIGNALED, zx::deadline_after(zx::msec(3000)),
@@ -611,11 +608,9 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     // Cleanup the capture.
     if (release_capture_image) {
-      const fit::result<fidl::OneWayStatus> result = (*display_coordinator)
-                                                         ->ReleaseImage({{
-                                                             .image_id = fidl_capture_image_id,
-                                                         }});
-      EXPECT_TRUE(result.is_ok()) << "Failed to call FIDL ReleaseImage: " << result.error_value();
+      const fidl::OneWayStatus result =
+          display_coordinator->sync()->ReleaseImage(fidl_capture_image_id);
+      EXPECT_TRUE(result.ok()) << "Failed to call FIDL ReleaseImage: " << result.status_string();
     }
   }
 
@@ -928,7 +923,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, DISABLED_FullscreenRectangleT
   display_compositor->RenderFrame(
       1, zx::time(1),
       GenerateDisplayListForTest(
-          {{display->display_id().value(), std::make_pair(display_info, root_handle)}}),
+          {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
       {}, [](const scheduling::Timestamps&) {});
 
   bool images_are_same = [&]() -> bool {
@@ -955,14 +950,12 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, DISABLED_FullscreenRectangleT
   EXPECT_TRUE(images_are_same);
 
   // Manually clean up the capture since we didn't in CaptureDisplayOutput.
-  const fuchsia_hardware_display::ImageId fidl_capture_image_id =
+  const fuchsia_hardware_display::wire::ImageId fidl_capture_image_id =
       scenic_impl::ToDisplayFidlImageId(capture_image_id);
-  const fit::result<fidl::OneWayStatus> release_result = (*display_coordinator)
-                                                             ->ReleaseImage({{
-                                                                 .image_id = fidl_capture_image_id,
-                                                             }});
-  EXPECT_TRUE(release_result.is_ok())
-      << "Failed to call FIDL ReleaseImage: " << release_result.error_value();
+  const fidl::OneWayStatus release_result =
+      display_coordinator->sync()->ReleaseImage(fidl_capture_image_id);
+  EXPECT_TRUE(release_result.ok())
+      << "Failed to call FIDL ReleaseImage: " << release_result.status_string();
 }
 
 // Test color conversion on the display hardware.
@@ -1060,7 +1053,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
     display_compositor->RenderFrame(
         1, zx::time(1),
         GenerateDisplayListForTest(
-            {{display->display_id().value(), std::make_pair(display_info, root_handle)}}),
+            {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
         {}, [](const scheduling::Timestamps&) {});
 
     // Grab the capture vmo data.
@@ -1161,7 +1154,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
   display_compositor->RenderFrame(
       1, zx::time(1),
       GenerateDisplayListForTest(
-          {{display->display_id().value(), std::make_pair(display_info, root_handle)}}),
+          {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
       {}, [](const scheduling::Timestamps&) {});
 
   // Grab the capture vmo data.
@@ -1280,7 +1273,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   display_compositor->RenderFrame(
       1, zx::time(1),
       GenerateDisplayListForTest(
-          {{display->display_id().value(), std::make_pair(display_info, root_handle)}}),
+          {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
       {}, [](const scheduling::Timestamps&) {});
 
   // Grab the capture vmo data.
@@ -1807,7 +1800,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
   auto render_frame_result = display_compositor->RenderFrame(
       1, zx::time(1),
       GenerateDisplayListForTest(
-          {{display->display_id().value(), std::make_pair(display_info, root_handle)}}),
+          {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
       {}, [](const scheduling::Timestamps&) {},
       // NOTE: this is somewhat redundant, since we also pass enable_display_composition=false into
       // the DisplayCompositor constructor.  But, no harm is done.
@@ -1848,13 +1841,11 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
         EXPECT_TRUE(images_are_same);
 
         // Manually clean up the capture since we didn't in CaptureDisplayOutput.
-        const fuchsia_hardware_display::ImageId fidl_capture_image_id =
+        const fuchsia_hardware_display::wire::ImageId fidl_capture_image_id =
             scenic_impl::ToDisplayFidlImageId(capture_image_id);
-        const fit::result<fidl::OneWayStatus> result = (*display_coordinator)
-                                                           ->ReleaseImage({{
-                                                               .image_id = fidl_capture_image_id,
-                                                           }});
-        EXPECT_TRUE(result.is_ok()) << "Failed to call FIDL ReleaseImage: " << result.error_value();
+        const fidl::OneWayStatus result =
+            display_coordinator->sync()->ReleaseImage(fidl_capture_image_id);
+        EXPECT_TRUE(result.ok()) << "Failed to call FIDL ReleaseImage: " << result.status_string();
 
         // |vmo_host| has BGRA sequence in pixel values.
         auto get_pixel = [&display, display_bytes_per_row](const uint8_t* vmo_host, uint32_t x,
@@ -2056,7 +2047,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
   display_compositor->RenderFrame(
       1, zx::time(1),
       GenerateDisplayListForTest(
-          {{display->display_id().value(), std::make_pair(display_info, root_handle)}}),
+          {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
       {}, [](const scheduling::Timestamps&) {});
   renderer->WaitIdle();
 
@@ -2138,8 +2129,8 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
   SKIP_TEST_IF_ESCHER_USES_DEVICE(VirtualGpu);
 
   auto display = display_manager_->default_display();
-  std::shared_ptr<fidl::SyncClient<fuchsia_hardware_display::Coordinator>> display_coordinator =
-      display_manager_->default_display_coordinator();
+  std::shared_ptr<fidl::WireSharedClient<fuchsia_hardware_display::Coordinator>>
+      display_coordinator = display_manager_->default_display_coordinator();
 
   ASSERT_TRUE(display_coordinator != nullptr);
 
@@ -2147,7 +2138,7 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
 
   auto [escher, renderer] = NewVkRenderer();
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
-      dispatcher(), display_manager_->default_display_coordinator(), renderer,
+      dispatcher(), display_coordinator, renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
       /*enable_display_composition=*/true, /*max_display_layers=*/1, /*visual_debugging_level=*/0);
 
@@ -2250,10 +2241,10 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
   };
   push_uberstruct_for_image_into_session(blue_image_metadata);
   auto blue_display_list = GenerateDisplayListForTest(
-      {{display->display_id().value(), std::make_pair(display_info, root_handle)}});
+      {{display->display_id().value, std::make_pair(display_info, root_handle)}});
   push_uberstruct_for_image_into_session(green_image_metadata);
   auto green_display_list = GenerateDisplayListForTest(
-      {{display->display_id().value(), std::make_pair(display_info, root_handle)}});
+      {{display->display_id().value, std::make_pair(display_info, root_handle)}});
 
   // FRAME 1, BLUE, GPU-COMPOSITED //////////////////////////////////////////////////////
 
@@ -2344,11 +2335,12 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
   EXPECT_TRUE(images_are_same);
 
   // Cleanup.
-  fuchsia_hardware_display::ImageId image_id = scenic_impl::ToDisplayFidlImageId(capture_image_id);
-  const fit::result<fidl::OneWayStatus> release_image_result =
-      (*display_coordinator)->ReleaseImage({{.image_id = image_id}});
-  EXPECT_TRUE(release_image_result.is_ok())
-      << "Failed to call FIDL ReleaseImage: " << release_image_result.error_value();
+  fuchsia_hardware_display::wire::ImageId image_id =
+      scenic_impl::ToDisplayFidlImageId(capture_image_id);
+  const fidl::OneWayStatus release_image_result =
+      display_coordinator->sync()->ReleaseImage(image_id);
+  EXPECT_TRUE(release_image_result.ok())
+      << "Failed to call FIDL ReleaseImage: " << release_image_result.status_string();
 }
 
 }  // namespace

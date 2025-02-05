@@ -35,7 +35,7 @@ struct RenderData {
   // TODO(https://fxbug.dev/42149711): should we remove this, and pass to RenderFrame() as a
   // std::map of RenderData keyed by display_id?  That would have the benefit of guaranteeing by
   // construction that each display_id could only appear once.
-  fuchsia_hardware_display_types::DisplayId display_id;
+  fuchsia_hardware_display_types::wire::DisplayId display_id;
 };
 
 // Struct to combine the source and destination rectangles used to set a layer's
@@ -43,8 +43,8 @@ struct RenderData {
 // of the image and the dst rectangle represents the position in screen space where
 // the layer will be placed.
 struct DisplaySrcDstFrames {
-  fuchsia_math::RectU src;
-  fuchsia_math::RectU dst;
+  fuchsia_math::wire::RectU src;
+  fuchsia_math::wire::RectU dst;
 
   // When setting an image on a layer in the display, you have to specify the "source"
   // and "destination", where the source represents the pixel offsets and dimensions to

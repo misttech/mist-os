@@ -52,13 +52,14 @@ static constexpr zx::duration kShutdownTimeout = zx::sec(1);
 // escher/profiling/timestamp_profiler.cc.
 static constexpr zx::duration kEscherCleanupRetryInterval{1'000'000};  // 1 millisecond
 
-std::optional<fuchsia_hardware_display_types::DisplayId> GetDisplayId(
+std::optional<fuchsia_hardware_display_types::wire::DisplayId> GetDisplayId(
     const scenic_structured_config::Config& values) {
   if (values.i_can_haz_display_id() < 0) {
     return std::nullopt;
   }
-  return std::make_optional<fuchsia_hardware_display_types::DisplayId>(
-      {{.value = static_cast<uint64_t>(values.i_can_haz_display_id())}});
+  return std::make_optional<fuchsia_hardware_display_types::wire::DisplayId>({
+      .value = static_cast<uint64_t>(values.i_can_haz_display_id()),
+  });
 }
 
 std::optional<uint64_t> GetDisplayMode(const scenic_structured_config::Config& values) {
@@ -140,9 +141,10 @@ scenic_structured_config::Config GetConfig() {
                 << " display_composition: " << values.display_composition()
                 << " i_can_haz_display_id: "
                 << GetDisplayId(values)
-                       .value_or(fuchsia_hardware_display_types::DisplayId{
-                           {.value = fuchsia_hardware_display_types::kInvalidDispId}})
-                       .value()
+                       .value_or(fuchsia_hardware_display_types::wire::DisplayId{
+                           .value = fuchsia_hardware_display_types::kInvalidDispId,
+                       })
+                       .value
                 << " i_can_haz_display_mode: " << GetDisplayMode(values).value_or(0)
                 << " display_rotation: " << GetDisplayRotation(values)
                 << " visual_debugging_level: " << static_cast<int>(values.visual_debugging_level());
@@ -209,11 +211,10 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
       color_converter_(
           app_context_.get(),
           /*set_color_conversion_values*/
-          display::SetColorConversionFunc([this](const auto& coefficients, const auto& preoffsets,
-                                                 const auto& postoffsets) {
+          [this](const auto& coefficients, const auto& preoffsets, const auto& postoffsets) {
             FX_DCHECK(flatland_compositor_);
             flatland_compositor_->SetColorConversionValues(coefficients, preoffsets, postoffsets);
-          }),
+          },
           /*set_minimum_rgb*/
           display::SetMinimumRgbFunc([this](const uint8_t minimum_rgb) {
             FX_DCHECK(flatland_compositor_);
@@ -287,7 +288,8 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
         FX_CHECK(client_channels.is_ok()) << "Failed to get display coordinator:"
                                           << zx_status_get_string(client_channels.error());
         auto [coordinator_client, listener_server] = std::move(client_channels.value());
-        display_manager_->BindDefaultDisplayCoordinator(std::move(coordinator_client),
+        display_manager_->BindDefaultDisplayCoordinator(async_get_default_dispatcher(),
+                                                        std::move(coordinator_client),
                                                         std::move(listener_server));
       }));
 

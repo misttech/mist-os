@@ -157,9 +157,9 @@ void CpuRenderer::ReleaseBufferImage(allocation::GlobalImageId image_id) {
   image_map_.erase(image_id);
 }
 
-void CpuRenderer::SetColorConversionValues(const std::array<float, 9>& coefficients,
-                                           const std::array<float, 3>& preoffsets,
-                                           const std::array<float, 3>& postoffsets) {}
+void CpuRenderer::SetColorConversionValues(const fidl::Array<float, 9>& coefficients,
+                                           const fidl::Array<float, 3>& preoffsets,
+                                           const fidl::Array<float, 3>& postoffsets) {}
 
 void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
                          const std::vector<ImageRect>& rectangles,

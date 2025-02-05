@@ -190,7 +190,7 @@ void FlatlandManager::CreateFlatlandDisplay(
 
   if (hw_display->is_claimed()) {
     // TODO(https://fxbug.dev/42156567): error reporting direct to client somehow?
-    FX_LOGS(ERROR) << "Display id=" << hw_display->display_id().value()
+    FX_LOGS(ERROR) << "Display id=" << hw_display->display_id().value
                    << " is already claimed, cannot instantiate FlatlandDisplay.";
     return;
   }

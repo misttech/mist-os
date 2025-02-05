@@ -5,7 +5,7 @@
 #ifndef SRC_UI_SCENIC_LIB_FLATLAND_ENGINE_ENGINE_H_
 #define SRC_UI_SCENIC_LIB_FLATLAND_ENGINE_ENGINE_H_
 
-#include <fuchsia/ui/display/color/cpp/fidl.h>
+#include <fidl/fuchsia.ui.display.color/cpp/fidl.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/zx/eventpair.h>
 

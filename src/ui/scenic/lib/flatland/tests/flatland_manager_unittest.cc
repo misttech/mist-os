@@ -115,7 +115,7 @@ class FlatlandManagerTest : public LoggingEventLoop, public ::testing::Test {
               });
             }));
 
-    const fuchsia_hardware_display_types::DisplayId kDisplayId = {{.value = 1}};
+    const fuchsia_hardware_display_types::wire::DisplayId kDisplayId = {.value = 1};
     constexpr uint32_t kDisplayWidth = 640;
     constexpr uint32_t kDisplayHeight = 480;
     std::vector<std::shared_ptr<allocation::BufferCollectionImporter>> importers;

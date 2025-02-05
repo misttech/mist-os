@@ -6,7 +6,7 @@
 #define SRC_UI_SCENIC_LIB_DISPLAY_TESTS_MOCK_DISPLAY_COORDINATOR_H_
 
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.display/cpp/test_base.h>
+#include <fidl/fuchsia.hardware.display/cpp/wire_test_base.h>
 #include <fidl/fuchsia.math/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/syslog/cpp/macros.h>
@@ -16,49 +16,56 @@ namespace scenic_impl::display::test {
 class MockDisplayCoordinator;
 
 class MockDisplayCoordinator
-    : public fidl::testing::TestBase<fuchsia_hardware_display::Coordinator> {
+    : public fidl::testing::WireTestBase<fuchsia_hardware_display::Coordinator> {
  public:
   using CheckConfigFn =
-      std::function<void(bool, fuchsia_hardware_display_types::ConfigResult*,
-                         std::vector<fuchsia_hardware_display::ClientCompositionOp>*)>;
+      std::function<void(bool, fuchsia_hardware_display_types::wire::ConfigResult*,
+                         std::vector<fuchsia_hardware_display::wire::ClientCompositionOp>*)>;
   using SetDisplayColorConversionFn =
-      std::function<void(fuchsia_hardware_display_types::DisplayId, std::array<float, 3>,
-                         std::array<float, 9>, std::array<float, 3>)>;
+      std::function<void(fuchsia_hardware_display_types::wire::DisplayId, fidl::Array<float, 3>,
+                         fidl::Array<float, 9>, fidl::Array<float, 3>)>;
   using SetMinimumRgbFn = std::function<void(uint8_t)>;
   using ImportEventFn =
-      std::function<void(zx::event event, fuchsia_hardware_display::EventId event_id)>;
+      std::function<void(zx::event event, fuchsia_hardware_display::wire::EventId event_id)>;
   using AcknowledgeVsyncFn = std::function<void(uint64_t cookie)>;
-  using SetDisplayLayersFn = std::function<void(fuchsia_hardware_display_types::DisplayId,
-                                                std::vector<fuchsia_hardware_display::LayerId>)>;
-  using SetLayerPrimaryPositionFn = std::function<void(
-      fuchsia_hardware_display::LayerId, fuchsia_hardware_display_types::CoordinateTransformation,
-      fuchsia_math::RectU, fuchsia_math::RectU)>;
+  using SetDisplayLayersFn =
+      std::function<void(fuchsia_hardware_display_types::wire::DisplayId,
+                         fidl::VectorView<fuchsia_hardware_display::wire::LayerId>)>;
+  using SetLayerPrimaryPositionFn =
+      std::function<void(fuchsia_hardware_display::wire::LayerId,
+                         fuchsia_hardware_display_types::wire::CoordinateTransformation,
+                         fuchsia_math::wire::RectU, fuchsia_math::wire::RectU)>;
 
   using SetDisplayModeFn = std::function<void(fuchsia_hardware_display_types::DisplayId,
                                               fuchsia_hardware_display_types::Mode)>;
 
-  explicit MockDisplayCoordinator(fuchsia_hardware_display::Info display_info);
+  explicit MockDisplayCoordinator(fuchsia_hardware_display::wire::Info display_info);
   ~MockDisplayCoordinator() override;
 
   // `fidl::testing::TestBase<fuchsia_hardware_display::Coordinator>`:
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) final {}
-  void ImportEvent(ImportEventRequest& request, ImportEventCompleter::Sync& completer) override;
-  void SetDisplayColorConversion(SetDisplayColorConversionRequest& request,
-                                 SetDisplayColorConversionCompleter::Sync& completer) override;
-  void SetMinimumRgb(SetMinimumRgbRequest& request,
+  void ImportEvent(fuchsia_hardware_display::wire::CoordinatorImportEventRequest* request,
+                   ImportEventCompleter::Sync& completer) override;
+  void SetDisplayColorConversion(
+      fuchsia_hardware_display::wire::CoordinatorSetDisplayColorConversionRequest* request,
+      SetDisplayColorConversionCompleter::Sync& completer) override;
+  void SetMinimumRgb(fuchsia_hardware_display::wire::CoordinatorSetMinimumRgbRequest* request,
                      SetMinimumRgbCompleter::Sync& completer) override;
   void CreateLayer(CreateLayerCompleter::Sync& completer) override;
-  void SetDisplayLayers(SetDisplayLayersRequest& request,
+  void SetDisplayLayers(fuchsia_hardware_display::wire::CoordinatorSetDisplayLayersRequest* request,
                         SetDisplayLayersCompleter::Sync& completer) override;
-  void ImportImage(ImportImageRequest& request, ImportImageCompleter::Sync& completer) override;
-  void SetLayerPrimaryPosition(SetLayerPrimaryPositionRequest& request,
-                               SetLayerPrimaryPositionCompleter::Sync& completer) override;
-  void CheckConfig(CheckConfigRequest& request, CheckConfigCompleter::Sync& completer) override;
-  void AcknowledgeVsync(AcknowledgeVsyncRequest& request,
+  void ImportImage(fuchsia_hardware_display::wire::CoordinatorImportImageRequest* request,
+                   ImportImageCompleter::Sync& completer) override;
+  void SetLayerPrimaryPosition(
+      fuchsia_hardware_display::wire::CoordinatorSetLayerPrimaryPositionRequest* request,
+      SetLayerPrimaryPositionCompleter::Sync& completer) override;
+  void CheckConfig(fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest* request,
+                   CheckConfigCompleter::Sync& completer) override;
+  void AcknowledgeVsync(fuchsia_hardware_display::wire::CoordinatorAcknowledgeVsyncRequest* request,
                         AcknowledgeVsyncCompleter::Sync& completer) override;
-  void SetDisplayPower(SetDisplayPowerRequest& request,
+  void SetDisplayPower(fuchsia_hardware_display::wire::CoordinatorSetDisplayPowerRequest* request,
                        SetDisplayPowerCompleter::Sync& completer) override;
-  void SetDisplayMode(SetDisplayModeRequest& request,
+  void SetDisplayMode(fuchsia_hardware_display::wire::CoordinatorSetDisplayModeRequest* request,
                       SetDisplayModeCompleter::Sync& completer) override;
 
   void Bind(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_server,
@@ -78,11 +85,13 @@ class MockDisplayCoordinator
     return *binding_;
   }
 
-  fidl::SyncClient<fuchsia_hardware_display::CoordinatorListener>& listener() { return listener_; }
+  fidl::WireSharedClient<fuchsia_hardware_display::CoordinatorListener>& listener() {
+    return listener_;
+  }
 
-  const fuchsia_hardware_display::Info& display_info() const { return display_info_; }
+  const fuchsia_hardware_display::wire::Info& display_info() const { return display_info_; }
 
-  void set_import_event_fn(ImportEventFn fn) { import_event_fn_ = fn; }
+  void set_import_event_fn(ImportEventFn fn) { import_event_fn_ = std::move(fn); }
   void set_display_color_conversion_fn(SetDisplayColorConversionFn fn) {
     set_display_color_conversion_fn_ = std::move(fn);
   }
@@ -131,10 +140,10 @@ class MockDisplayCoordinator
   zx_status_t set_display_power_result_ = ZX_OK;
   bool display_power_on_ = true;
 
-  const fuchsia_hardware_display::Info display_info_;
+  const fuchsia_hardware_display::wire::Info display_info_;
 
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator>> binding_;
-  fidl::SyncClient<fuchsia_hardware_display::CoordinatorListener> listener_;
+  fidl::WireSharedClient<fuchsia_hardware_display::CoordinatorListener> listener_;
 };
 
 }  // namespace scenic_impl::display::test

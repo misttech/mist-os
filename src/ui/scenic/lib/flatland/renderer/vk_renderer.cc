@@ -943,9 +943,9 @@ void VkRenderer::Render(const ImageMetadata& render_target,
   frame->EndFrame(semaphores, nullptr);
 }
 
-void VkRenderer::SetColorConversionValues(const std::array<float, 9>& coefficients,
-                                          const std::array<float, 3>& preoffsets,
-                                          const std::array<float, 3>& postoffsets) {
+void VkRenderer::SetColorConversionValues(const fidl::Array<float, 9>& coefficients,
+                                          const fidl::Array<float, 3>& preoffsets,
+                                          const fidl::Array<float, 3>& postoffsets) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
 
   // Coefficients are ordered like this:
