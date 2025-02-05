@@ -59,7 +59,6 @@ def fuchsia_cc_driver(
     user_link_flags = [
         # We need to run our own linker script to limit the symbols that are exported
         # and to make the driver framework symbols global.
-        "-Wl,--undefined-version",
         "-Wl,--version-script",
         "$(location %s)" % driver_ld_target,
     ]
