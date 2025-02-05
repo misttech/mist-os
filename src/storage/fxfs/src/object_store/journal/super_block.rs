@@ -536,20 +536,6 @@ impl SuperBlockHeader {
         }
     }
 
-    /// Shreds the super-block, rendering it unreadable.  This is used in mkfs to ensure that we
-    /// wipe out any stale super-blocks when rewriting Fxfs.
-    /// This isn't a secure shred in any way, it just ensures the super-block is not recognized as a
-    /// super-block.
-    pub async fn shred<S: HandleOwner>(handle: DataObjectHandle<S>) -> Result<(), Error> {
-        let mut buf = handle
-            .store()
-            .device()
-            .allocate_buffer(handle.store().device().block_size() as usize)
-            .await;
-        buf.as_mut_slice().fill(0u8);
-        handle.overwrite(0, buf.as_mut(), false).await
-    }
-
     /// Read the super-block header, and return it and a reader that produces the records that are
     /// to be replayed in to the root parent object store.
     async fn read_header(
@@ -987,24 +973,27 @@ mod tests {
         SuperBlockHeader::read_header(device.clone(), SuperBlockInstance::A)
             .await
             .expect("read failed");
-        SuperBlockHeader::read_header(device.clone(), SuperBlockInstance::B)
+        let header = SuperBlockHeader::read_header(device.clone(), SuperBlockInstance::B)
             .await
             .expect("read failed");
 
-        // Re-initialize the filesystem.  The A block should be reset and the B block should be
-        // wiped.
+        let old_guid = header.0.guid;
+
+        // Re-initialize the filesystem.  The A and B blocks should be for the new FS.
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
         fs.close().await.expect("Close failed");
         let device = fs.take_device().await;
         device.reopen(false);
 
-        SuperBlockHeader::read_header(device.clone(), SuperBlockInstance::A)
+        let a = SuperBlockHeader::read_header(device.clone(), SuperBlockInstance::A)
             .await
             .expect("read failed");
-        SuperBlockHeader::read_header(device.clone(), SuperBlockInstance::B)
+        let b = SuperBlockHeader::read_header(device.clone(), SuperBlockInstance::B)
             .await
-            .map(|_| ())
-            .expect_err("Super-block B was readable after a re-format");
+            .expect("read failed");
+
+        assert_eq!(a.0.guid, b.0.guid);
+        assert_ne!(old_guid, a.0.guid);
     }
 
     #[fuchsia::test]

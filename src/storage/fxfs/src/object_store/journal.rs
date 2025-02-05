@@ -380,6 +380,8 @@ struct Inner {
     // number and this number.  New super-blocks will be written every time about half of this
     // amount is written to the journal.
     reclaim_size: u64,
+
+    image_builder_mode: bool,
 }
 
 impl Inner {
@@ -487,7 +489,7 @@ impl<S: HandleOwner> JournalHandle for DataObjectHandle<S> {
 #[fxfs_trace::trace]
 impl Journal {
     pub fn new(objects: Arc<ObjectManager>, options: JournalOptions) -> Journal {
-        let starting_checksum = rand::thread_rng().gen();
+        let starting_checksum = rand::thread_rng().gen_range(1..u64::MAX);
         Journal {
             objects: objects,
             handle: OnceCell::new(),
@@ -509,6 +511,7 @@ impl Journal {
                 valid_to: 0,
                 discard_offset: None,
                 reclaim_size: options.reclaim_size,
+                image_builder_mode: false,
             }),
             writer_mutex: Mutex::new(()),
             sync_mutex: futures::lock::Mutex::new(()),
@@ -522,6 +525,14 @@ impl Journal {
         if trace != old_value {
             info!(trace; "J: trace");
         }
+    }
+
+    pub fn set_image_builder_mode(&self, enabled: bool) {
+        self.inner.lock().unwrap().image_builder_mode = enabled;
+    }
+
+    pub fn image_builder_mode(&self) -> bool {
+        self.inner.lock().unwrap().image_builder_mode
     }
 
     /// Used during replay to validate a mutation.  This should return false if the mutation is not
@@ -1310,8 +1321,15 @@ impl Journal {
 
         // Initialize the journal writer.
         let _ = self.handle.set(journal_handle);
-        self.write_super_block().await?;
-        SuperBlockHeader::shred(super_block_b_handle).await
+        Ok(())
+    }
+
+    pub async fn init_superblocks(&self) -> Result<(), Error> {
+        // Overwrite both superblocks.
+        for _ in 0..2 {
+            self.write_super_block().await?;
+        }
+        Ok(())
     }
 
     /// Takes a snapshot of all journaled transactions which affect |object_id| since its last
@@ -1633,6 +1651,9 @@ impl Journal {
                 {
                     break Ok(());
                 }
+                if inner.image_builder_mode {
+                    break Ok(());
+                }
                 if inner.disable_compactions {
                     break Err(
                         anyhow!(FxfsError::JournalFlushError).context("Compactions disabled")
@@ -1732,6 +1753,7 @@ impl Journal {
                 if compact_fut.is_none()
                     && !inner.terminate
                     && !inner.disable_compactions
+                    && !inner.image_builder_mode
                     && self.objects.last_end_offset()
                         - inner.super_block_header.journal_checkpoint.file_offset
                         > inner.reclaim_size / 2
@@ -1777,7 +1799,9 @@ impl Journal {
         let mut buf = handle.allocate_buffer(amount).await;
         let offset = self.inner.lock().unwrap().writer.take_flushable(buf.as_mut());
         let len = buf.len() as u64;
-        self.handle.get().unwrap().overwrite(offset, buf.as_mut(), false).await?;
+        if !self.inner.lock().unwrap().image_builder_mode {
+            self.handle.get().unwrap().overwrite(offset, buf.as_mut(), false).await?;
+        }
         let mut inner = self.inner.lock().unwrap();
         if let Some(waker) = inner.sync_waker.take() {
             waker.wake();

@@ -19,7 +19,7 @@ use fuchsia_hash::Hash;
 use fuchsia_merkle::{MerkleTree, MerkleTreeBuilder};
 use futures::{try_join, TryStreamExt as _};
 use fxfs::errors::FxfsError;
-use fxfs::object_handle::{ObjectHandle, WriteObjectHandle};
+use fxfs::object_handle::ObjectHandle;
 use fxfs::object_store::directory::{replace_child_with_object, ReplacedChild};
 use fxfs::object_store::transaction::{lock_keys, LockKey};
 use fxfs::object_store::{
@@ -310,7 +310,7 @@ impl DeliveryBlobWriter {
                 )
             });
         }
-        // Write metadata and ensure everything is flushed to disk.
+        // Write metadata to disk.
         let metadata =
             self.generate_metadata(merkle_tree).context("Failed to generate metadata for blob.")?;
         if let Some(metadata) = metadata {
@@ -321,7 +321,6 @@ impl DeliveryBlobWriter {
                 .await
                 .context("Failed to write metadata for blob.")?;
         }
-        self.handle.flush().await.context("Failed to flush blob.")?;
 
         let volume = self.handle.owner();
         let store = self.handle.store();

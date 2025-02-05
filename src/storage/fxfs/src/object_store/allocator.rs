@@ -2356,11 +2356,12 @@ mod tests {
 
         // Expected extents:
         let expected = vec![
-            0..4096,        // Superblock A
-            4096..139264,   // Superblock A extension
-            139264..204800, // Superblock B extension
-            204800..335872, // Initial Journal
-            524288..528384, // Superblock B extension
+            0..4096,        // Superblock A (4k)
+            4096..139264,   // root_store layer files, StoreInfo.. (33x4k blocks)
+            139264..204800, // Superblock A extension (64k)
+            204800..335872, // Initial Journal (128k)
+            335872..401408, // Superblock B extension (64k)
+            524288..528384, // Superblock B (4k)
         ];
         assert_eq!(device_ranges, expected);
         device_ranges.push(

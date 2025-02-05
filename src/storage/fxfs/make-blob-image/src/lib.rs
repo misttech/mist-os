@@ -8,7 +8,7 @@ use fuchsia_async as fasync;
 use fuchsia_merkle::{Hash, HASH_SIZE};
 use futures::{try_join, SinkExt as _, StreamExt as _, TryStreamExt as _};
 use fxfs::errors::FxfsError;
-use fxfs::filesystem::{FxFilesystem, FxFilesystemBuilder, SyncOptions};
+use fxfs::filesystem::{FxFilesystem, FxFilesystemBuilder};
 use fxfs::object_handle::WriteBytes;
 use fxfs::object_store::directory::Directory;
 use fxfs::object_store::journal::RESERVED_SPACE;
@@ -95,6 +95,7 @@ pub async fn make_blob_image(
     let filesystem = FxFilesystemBuilder::new()
         .format(true)
         .trim_config(None)
+        .image_builder_mode(true)
         .open(device)
         .await
         .context("Failed to format filesystem")?;
@@ -108,17 +109,12 @@ pub async fn make_blob_image(
             e
         }
     })?;
-    filesystem
-        .sync(SyncOptions { flush_device: true, ..Default::default() })
-        .await
-        .context("Failed to flush")?;
-    let actual_size = filesystem.allocator().maximum_offset();
-    filesystem.close().await?;
+    let (_device, actual_size) = filesystem.finalize().await?;
 
     if target_size == 0 {
         // Apply a default heuristic of 2x the actual image size.  This is necessary to use the
         // Fxfs image, since if it's completely full it can't be modified.
-        target_size = actual_size * 2 + RESERVED_SPACE;
+        target_size = (actual_size + RESERVED_SPACE) * 2;
     }
 
     if let Some(sparse_path) = sparse_output_image_path {

@@ -20,7 +20,7 @@ use crate::object_store::ObjectStore;
 use crate::range::RangeExt;
 use crate::serialized_types::Version;
 use crate::{debug_assert_not_too_long, metrics};
-use anyhow::{bail, Context, Error};
+use anyhow::{bail, ensure, Context, Error};
 use async_trait::async_trait;
 use event_listener::Event;
 use fuchsia_async as fasync;
@@ -91,6 +91,9 @@ pub struct Options {
     // is done.
     // Default values are (5 minutes, 24 hours).
     pub trim_config: Option<(std::time::Duration, std::time::Duration)>,
+
+    // If true, journal will not be used for writes.
+    pub image_builder_mode: bool,
 }
 
 impl Default for Options {
@@ -102,6 +105,7 @@ impl Default for Options {
             post_commit_hook: None,
             skip_initial_reap: false,
             trim_config: Some((TRIM_AFTER_BOOT_TIMER, TRIM_INTERVAL_TIMER)),
+            image_builder_mode: false,
         }
     }
 }
@@ -186,6 +190,21 @@ impl OpenFxFilesystem {
         std::mem::drop(self);
         debug_assert_not_too_long!(fut)
     }
+
+    /// Used to finalize a filesystem image when in image_builder_mode.
+    /// Returns the actual number of bytes used to store data, which may be useful in truncating
+    /// the image size down.
+    pub async fn finalize(self) -> Result<(DeviceHolder, u64), Error> {
+        ensure!(
+            self.journal().image_builder_mode(),
+            "finalize() only valid in image_builder_mode."
+        );
+        self.journal().set_image_builder_mode(false);
+        self.journal().compact().await?;
+        let actual_size = self.allocator().maximum_offset();
+        self.close().await?;
+        Ok((self.take_device().await, actual_size))
+    }
 }
 
 impl From<Arc<FxFilesystem>> for OpenFxFilesystem {
@@ -196,6 +215,9 @@ impl From<Arc<FxFilesystem>> for OpenFxFilesystem {
 
 impl Drop for OpenFxFilesystem {
     fn drop(&mut self) {
+        if self.options.image_builder_mode && self.journal().image_builder_mode() {
+            error!("OpenFxFilesystem in image_builder_mode dropped without calling finalize().");
+        }
         if !self.options.read_only && !self.closed.load(Ordering::SeqCst) {
             error!("OpenFxFilesystem dropped without first being closed. Data loss may occur.");
         }
@@ -249,6 +271,16 @@ impl FxFilesystemBuilder {
     /// Incompatible with `format`.
     pub fn read_only(mut self, read_only: bool) -> Self {
         self.options.read_only = read_only;
+        self
+    }
+
+    /// For image building and in-place migration.
+    ///
+    /// This mode avoids the initial write of super blocks and skips the journal for all
+    /// transactions. The user *must* call `finalize()` before closing the filesystem to trigger
+    /// a compaction of in-memory data structures, a minimal journal and a write to SuperBlock A.
+    pub fn image_builder_mode(mut self, enabled: bool) -> Self {
+        self.options.image_builder_mode = enabled;
         self
     }
 
@@ -332,6 +364,8 @@ impl FxFilesystemBuilder {
         let objects = Arc::new(ObjectManager::new(self.on_new_store));
         let journal = Arc::new(Journal::new(objects.clone(), self.journal_options));
 
+        let image_builder_mode = self.options.image_builder_mode;
+
         let block_size = std::cmp::max(device.block_size().into(), MIN_BLOCK_SIZE);
         assert_eq!(block_size % MIN_BLOCK_SIZE, 0);
         assert!(block_size <= MAX_BLOCK_SIZE, "Max supported block size is 64KiB");
@@ -371,9 +405,18 @@ impl FxFilesystemBuilder {
             transaction_limit_event: Event::new(),
         });
 
+        if image_builder_mode {
+            filesystem.journal().set_image_builder_mode(true);
+        }
+
         filesystem.journal.set_trace(self.trace);
         if self.format {
             filesystem.journal.init_empty(filesystem.clone()).await?;
+            if !image_builder_mode {
+                // The filesystem isn't valid until superblocks are written but we want to defer
+                // that until last when migrating filesystems or building system images.
+                filesystem.journal.init_superblocks().await?;
+            }
             // Start the graveyard's background reaping task.
             filesystem.graveyard.clone().reap_async();
 
@@ -426,7 +469,7 @@ impl FxFilesystemBuilder {
 
         filesystem.closed.store(false, Ordering::SeqCst);
 
-        if !read_only {
+        if !read_only && !image_builder_mode {
             // Start the background tasks.
             filesystem.graveyard.clone().reap_async();
 

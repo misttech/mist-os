@@ -96,6 +96,9 @@ struct Inner {
 
     // The maximum transaction size that has been encountered so far.
     max_transaction_size: (u64, UintProperty),
+
+    // Extra temporary space that might be tied up in the journal that hasn't yet been deallocated.
+    reserved_space: u64,
 }
 
 impl Inner {
@@ -115,9 +118,8 @@ impl Inner {
             .map(|min| reserved_space_from_journal_usage(self.last_end_offset - min))
             .unwrap_or(0)
 
-        // Add extra for temporary space that might be tied up in the journal that hasn't yet been
-        // deallocated.
-            + journal::RESERVED_SPACE
+        // Extra reserved space
+            + self.reserved_space
     }
 
     fn object(&self, object_id: u64) -> Option<Arc<dyn JournalingObject>> {
@@ -143,6 +145,7 @@ impl ObjectManager {
                 last_end_offset: 0,
                 borrowed_metadata_space: 0,
                 max_transaction_size: (0, metrics::detail().create_uint("max_transaction_size", 0)),
+                reserved_space: journal::RESERVED_SPACE,
             }),
             metadata_reservation: OnceCell::new(),
             volume_directory: OnceCell::new(),
@@ -654,6 +657,10 @@ impl ObjectManager {
 
     pub fn reservation(&self, object_id: u64) -> Option<u64> {
         self.inner.read().unwrap().reservations.get(&object_id).cloned()
+    }
+
+    pub fn set_reserved_space(&self, amount: u64) {
+        self.inner.write().unwrap().reserved_space = amount;
     }
 
     pub fn last_end_offset(&self) -> u64 {
