@@ -410,6 +410,11 @@ impl<I: IcmpIpExt, B: SplitByteSlice, M: IcmpMessage<I>> IcmpPacketRaw<I, B, M> 
 }
 
 impl<I: IcmpIpExt, B: SplitByteSliceMut, M: IcmpMessage<I>> IcmpPacketRaw<I, B, M> {
+    /// Get the mutable ICMP message.
+    pub fn message_mut(&mut self) -> &mut M {
+        &mut self.header.message
+    }
+
     /// Attempts to calculate and write a Checksum for this [`IcmpPacketRaw`].
     ///
     /// Returns whether the checksum was successfully calculated & written. In
