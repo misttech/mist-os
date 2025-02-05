@@ -30,6 +30,39 @@ _FC_PROXIES: dict[str, custom_types.FidlEndpoint] = {
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
+# Specified here: https://source.corp.google.com/h/fuchsia/fuchsia/+/main:src/developer/ffx/plugins/trace/data/config.json;l=3
+# LINT.IfChange
+DEFAULT_CATEGORIES: list[str] = [
+    "app",
+    "audio",
+    "benchmark",
+    "blobfs",
+    "fxfs",
+    "gfx",
+    "input",
+    "kernel:meta",
+    "kernel:sched",
+    "magma",
+    "memory:kernel",
+    "minfs",
+    "modular",
+    "net",
+    "storage",
+    "system_metrics",
+    "view",
+    "flutter",
+    "dart",
+    "dart:compiler",
+    "dart:dart",
+    "dart:debugger",
+    "dart:embedder",
+    "dart:gc",
+    "dart:isolate",
+    "dart:profiler",
+    "dart:vm",
+]
+# LINT.ThenChange(//src/developer/ffx/plugins/trace/data/config.json)
+
 
 class Tracing(tracing.Tracing):
     """Tracing affordance implementation using Fuchsia-Controller."""
@@ -82,7 +115,7 @@ class Tracing(tracing.Tracing):
     # List all the public methods
     def initialize(
         self,
-        categories: list[str] | None = None,
+        categories: list[str] | None = DEFAULT_CATEGORIES,
         buffer_size: int | None = None,
         start_timeout_milliseconds: int | None = None,
     ) -> None:
@@ -100,12 +133,27 @@ class Tracing(tracing.Tracing):
             errors.TracingStateError: When trace session is already initialized.
             errors.TracingError: On FIDL communication failure.
         """
+        # Developers may use a "#" in front of the default categories string because
+        # that is the expected behavior when using tracing with ffx so we process this
+        # parameter.
+        if categories is None:
+            categories = DEFAULT_CATEGORIES
+        else:
+            new_categories: set[str] = set()
+            for category in categories:
+                if category == "#default" or category == "default":
+                    new_categories.update(DEFAULT_CATEGORIES)
+                else:
+                    new_categories.add(category)
+            categories = list(new_categories)
+
         if self._session_initialized:
             raise errors.TracingStateError(
                 f"Trace session is already initialized on {self._name}. Can be "
                 "initialized only once"
             )
         _LOGGER.info("Initializing trace session on '%s'", self._name)
+        _LOGGER.info("Trace categories: '%s'", categories)
 
         assert self._trace_controller_proxy is None
         trace_provisioner_proxy = f_tracingcontroller.Provisioner.Client(

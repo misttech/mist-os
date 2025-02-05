@@ -100,7 +100,7 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             or self.tracing_on == TracingOn.TEARDOWN_CLASS_ON_FAIL
         ):
             for device in self.fuchsia_devices:
-                device.tracing.initialize()
+                device.tracing.initialize(categories=self.trace_categories)
                 device.tracing.start()
 
     def setup_test(self) -> None:
@@ -131,7 +131,7 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
                     self.tracing_on == TracingOn.TEARDOWN_TEST
                     or self.tracing_on == TracingOn.TEARDOWN_TEST_ON_FAIL
                 ):
-                    device.tracing.initialize()
+                    device.tracing.initialize(categories=self.trace_categories)
                     device.tracing.start()
 
     def teardown_test(self) -> None:
@@ -453,8 +453,21 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
     def _process_metric_user_params(self) -> None:
         """Reads, processes and stores the metric collection params used by this module.
 
-        At the moment we collect snapshots and traces.
+        At the moment we collect snapshots and traces. When providing trace categories
+        the format should be a list of strings without '#'.
 
+        Example:
+        ```
+        params = {
+          snapshot = "teardown_class"
+          tracing_on = "teardown_class_on_fail"
+          trace_categories = [
+            "default",
+            "starnix:atrace",
+            "system_metrics_logger",
+          ]
+        }
+        ```
         Raises:
             TestAbortClass: When user_params provided are invalid.
         """
@@ -468,6 +481,9 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         tracing_on: str = self.user_params.get(
             "tracing_on", SnapshotOn.NEVER.value
         ).lower()
+        self.trace_categories: list[str] = self.user_params.get(
+            "trace_categories", None
+        )
 
         try:
             self.snapshot_on: SnapshotOn = SnapshotOn(snapshot_on)
