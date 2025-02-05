@@ -18,6 +18,7 @@ Then follow one of the following two subsections.
 Given a tar file with the contents of the root filesystem:
 ```
 $ fx host-tool convert_tarball_to_starnix_container --input-format tarball \
+    --arch x64 \
     ~/rootfs.tar ~/example.far
 ```
 
