@@ -2,6 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::ops::Range;
+
+use inspect_stubs::track_stub;
+use tee_internal::binding::{
+    TEE_Result, TEE_ERROR_ACCESS_DENIED, TEE_MEMORY_ACCESS_ANY_OWNER, TEE_MEMORY_ACCESS_READ,
+    TEE_MEMORY_ACCESS_WRITE, TEE_SUCCESS,
+};
+
 pub fn malloc(size: usize, _hint: u32) -> *mut ::std::os::raw::c_void {
     // The 'hint' parameter allows requesting memory that is zeroed and that's
     // not shared with other TAs. We always zero allocations and don't share
@@ -81,6 +89,54 @@ pub fn mem_fill(buffer: *mut ::std::os::raw::c_void, x: u8, size: usize) {
     // This uses the Rust library routine instead so that it can be optimized directly if the
     // toolchain decides, calling libc::memmove() would require an external library call here.
     unsafe { std::ptr::write_bytes(buffer as *mut u8, x, size) }
+}
+
+fn vmar_flags_from_access_flags(access_flags: u32) -> zx::VmarFlagsExtended {
+    let mut flags = zx::VmarFlagsExtended::empty();
+    if access_flags & TEE_MEMORY_ACCESS_READ != 0 {
+        flags |= zx::VmarFlagsExtended::PERM_READ;
+    }
+    if access_flags & TEE_MEMORY_ACCESS_WRITE != 0 {
+        flags |= zx::VmarFlagsExtended::PERM_WRITE;
+    }
+    flags
+}
+
+fn range_contains(map_range: &Range<usize>, start: usize, end: usize) -> bool {
+    map_range.contains(&start) && (start == end || map_range.contains(&(end - 1)))
+}
+
+pub fn check_memory_access_rights(access_flags: u32, start: usize, size: usize) -> TEE_Result {
+    let end = match start.checked_add(size) {
+        Some(end) => end,
+        None => return TEE_ERROR_ACCESS_DENIED,
+    };
+    let required_mmu_flags = vmar_flags_from_access_flags(access_flags);
+
+    if access_flags & TEE_MEMORY_ACCESS_ANY_OWNER == 0 {
+        // Once we support mapping memory that is shared with less trusted
+        // components such as the REE then when this flag is not set we need to
+        // verify that the checked range is not within such a shared memory
+        // mapping such as one created for a MEMREF parameter.
+        track_stub!(
+            TODO("https://fxbug.dev/384584494"),
+            "TEE_MEMORY_ACCESS_ANY_OWNER not implemented in TEE_CheckMemoryAccessRights"
+        );
+    }
+    let maps = fuchsia_runtime::vmar_root_self().info_maps_vec().unwrap();
+    for map in maps {
+        if let Some(details) = map.details().as_mapping() {
+            let map_range = map.base..map.base + map.size;
+            if range_contains(&map_range, start, end)
+                && details.mmu_flags.contains(required_mmu_flags)
+            {
+                return TEE_SUCCESS;
+            }
+        }
+    }
+
+    // No mapping found covering the input range.
+    TEE_ERROR_ACCESS_DENIED
 }
 
 #[no_mangle]

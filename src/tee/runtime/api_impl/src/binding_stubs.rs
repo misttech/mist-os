@@ -711,7 +711,7 @@ extern "C" fn TEE_CheckMemoryAccessRights(
     buffer: *mut ::std::os::raw::c_void,
     size: usize,
 ) -> TEE_Result {
-    unimplemented!()
+    mem::check_memory_access_rights(accessFlags, buffer.addr(), size)
 }
 
 #[no_mangle]
