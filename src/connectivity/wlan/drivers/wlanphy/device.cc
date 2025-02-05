@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.wlan.device/cpp/wire.h>
 #include <fuchsia/wlan/common/cpp/fidl.h>
 #include <fuchsia/wlan/internal/cpp/fidl.h>
+#include <inttypes.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/driver.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -199,7 +200,7 @@ void Device::CreateIface(CreateIfaceRequestView request, CreateIfaceCompleter::S
         }
 
         if (!result->value()->has_iface_id()) {
-          lerror("iface_id does not exist");
+          lerror("CreateIface failed. Response missing iface_id");
           completer.ReplyError(ZX_ERR_INTERNAL);
           return;
         }
@@ -280,20 +281,20 @@ void Device::GetCountry(GetCountryCompleter::Sync& completer) {
         fuchsia_wlan_device::wire::CountryCode resp;
         zx_status_t status;
         if (!result.ok()) {
-          ldebug_device("GetCountry failed with FIDL error %s", result.status_string());
+          lerror("GetCountry failed with FIDL error %s", result.status_string());
           status = result.status();
           completer.ReplyError(status);
           return;
         }
         if (result->is_error()) {
-          ldebug_device("GetCountry failed with error %s",
-                        zx_status_get_string(result->error_value()));
+          lerror("GetCountry failed with error %s", zx_status_get_string(result->error_value()));
           status = result->error_value();
           completer.ReplyError(status);
           return;
         }
         if (!result->value()->is_alpha2()) {
-          lerror("only alpha2 format is supported");
+          lerror("GetCountry failed. Response union is not an alpha2: %" PRIu64,
+                 result->value()->Which());
           completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
           return;
         }
@@ -313,13 +314,12 @@ void Device::ClearCountry(ClearCountryCompleter::Sync& completer) {
       [completer = completer.ToAsync()](
           fdf::WireUnownedResult<fuchsia_wlan_phyimpl::WlanPhyImpl::ClearCountry>& result) mutable {
         if (!result.ok()) {
-          ldebug_device("ClearCountry failed with FIDL error %s", result.status_string());
+          lerror("ClearCountry failed with FIDL error %s", result.status_string());
           completer.Reply(result.status());
           return;
         }
         if (result->is_error()) {
-          ldebug_device("ClearCountry failed with error %s",
-                        zx_status_get_string(result->error_value()));
+          lerror("ClearCountry failed with error %s", zx_status_get_string(result->error_value()));
           completer.Reply(result->error_value());
           return;
         }
@@ -347,13 +347,13 @@ void Device::SetPowerSaveMode(SetPowerSaveModeRequestView request,
               fdf::WireUnownedResult<fuchsia_wlan_phyimpl::WlanPhyImpl::SetPowerSaveMode>&
                   result) mutable {
             if (!result.ok()) {
-              ldebug_device("SetPowerSaveMode failed with FIDL error %s", result.status_string());
+              lerror("SetPowerSaveMode failed with FIDL error %s", result.status_string());
               completer.Reply(result.status());
               return;
             }
             if (result->is_error()) {
-              ldebug_device("SetPowerSaveMode failed with error %s",
-                            zx_status_get_string(result->error_value()));
+              lerror("SetPowerSaveMode failed with error %s",
+                     zx_status_get_string(result->error_value()));
               completer.Reply(result->error_value());
               return;
             }
@@ -372,19 +372,19 @@ void Device::GetPowerSaveMode(GetPowerSaveModeCompleter::Sync& completer) {
           fdf::WireUnownedResult<fuchsia_wlan_phyimpl::WlanPhyImpl::GetPowerSaveMode>&
               result) mutable {
         if (!result.ok()) {
-          ldebug_device("GetPowerSaveMode failed with FIDL error %s", result.status_string());
+          lerror("GetPowerSaveMode failed with FIDL error %s", result.status_string());
           completer.ReplyError(result.status());
           return;
         }
         if (result->is_error()) {
-          ldebug_device("GetPowerSaveMode failed with error %s",
-                        zx_status_get_string(result->error_value()));
+          lerror("GetPowerSaveMode failed with error %s",
+                 zx_status_get_string(result->error_value()));
           completer.ReplyError(result->error_value());
           return;
         }
 
         if (!result->value()->has_ps_mode()) {
-          lerror("ps mode is not present in response");
+          lerror("GetPowerSaveMode failed. Response missing ps_mode.");
           completer.ReplyError(ZX_ERR_INTERNAL);
           return;
         }
