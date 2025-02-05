@@ -201,7 +201,7 @@ group("libc_test.deps") {
   testonly = true
   public_deps = [
     "include:headers",
-    "//zircon/system/ulib/zxtest",
+    "//zircon/system/ulib/zxtest:zxtest-streams",
   ]
 }
 
