@@ -1947,9 +1947,13 @@ test_loadable_module("static-tls-module") {
     "//src/lib/elfldltl",
   ]
 
+  # We need to allow undefined symbols, since __tls_get_addr will not be
+  # defined by this module or any link-time dependency, but will be supplied by libc.
+  remove_configs = [ "//build/config:symbol_no_undefined" ]
+
   # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
   # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
-  remove_configs = [ "//build/config/lto" ]
+  remove_configs += [ "//build/config/lto" ]
   configs += [ "//build/config/lto:no-lto" ]
 
   # workaround for b/349448459 to remote-link successfully

@@ -10,12 +10,6 @@
 #error "//build/config:{no-,}tlsdesc should define {HAVE,WANT}_TLSDESC"
 #elif HAVE_TLSDESC == WANT_TLSDESC
 
-extern "C" [[gnu::visibility("hidden")]] void* __tls_get_addr(
-    elfldltl::Elf<>::TlsGetAddrGot<>* got) {
-  // Nothing useful is returned, just return the pointer that's passed in.
-  return got;
-}
-
 int* get_static_tls_var() { return &gStaticTlsVar; }
 
 #endif
