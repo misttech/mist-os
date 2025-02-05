@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BUS_DRIVERS_PLATFORM_PLATFORM_DEVICE_H_
 #define SRC_DEVICES_BUS_DRIVERS_PLATFORM_PLATFORM_DEVICE_H_
 
+#include <fidl/fuchsia.boot.metadata/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
@@ -15,6 +16,7 @@
 #include <lib/zx/channel.h>
 
 #include <ddktl/device.h>
+#include <ddktl/metadata_server.h>
 #include <fbl/vector.h>
 
 #include "src/devices/bus/drivers/platform/platform-interrupt.h"
@@ -163,6 +165,10 @@ class PlatformDevice : public PlatformDeviceType,
   std::vector<unsigned int> interrupt_vectors_;
 
   inspect::Node inspect_node_;
+
+  ddk::MetadataServer<fuchsia_boot_metadata::SerialNumberMetadata> serial_number_metadata_server_;
+  ddk::MetadataServer<fuchsia_boot_metadata::PartitionMapMetadata> partition_map_metadata_server_;
+  ddk::MetadataServer<fuchsia_boot_metadata::MacAddressMetadata> mac_address_metadata_server_;
 };
 
 }  // namespace platform_bus
