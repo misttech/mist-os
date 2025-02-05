@@ -151,7 +151,7 @@ func NewDevice(ctx context.Context, config DeviceConfig, opts Options) (*Device,
 	}
 	var s io.ReadWriteCloser
 	if config.SerialMux != "" {
-		if config.FastbootSernum == "" {
+		if config.FastbootSernum == "" && config.InstallMode != fastbootMode {
 			s, err = serial.NewSocket(ctx, config.SerialMux)
 			if err != nil {
 				return nil, fmt.Errorf("unable to open: %s: %w", config.SerialMux, err)
