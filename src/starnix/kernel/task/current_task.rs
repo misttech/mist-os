@@ -714,6 +714,10 @@ impl CurrentTask {
             };
 
         let name = if flags.contains(OpenFlags::TMPFILE) {
+            // `O_TMPFILE` is incompatible with `O_CREAT`
+            if flags.contains(OpenFlags::CREAT) {
+                return error!(EINVAL);
+            }
             name.create_tmpfile(locked, self, mode.with_type(FileMode::IFREG), flags)?
         } else {
             let mode = name.entry.node.info().mode;

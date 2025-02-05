@@ -429,6 +429,12 @@ impl vfs::node::Node for FxFile {
         let props = self.handle.get_properties().await.map_err(map_to_status)?;
         let descriptor =
             self.handle.uncached_handle().get_descriptor().await.map_err(map_to_status)?;
+        // Unnamed temporary files live in the graveyard. Fxfs treats this is as a reference.
+        // However, the hard link count for an unnamed temporary file should be zero.
+        // TODO(https://fxbug.dev/391458506): we should also check the expected link_count for
+        // unlinked files.
+        let Flags { is_unnamed_temporary, .. } = self.state.get_flags();
+        let link_count = if is_unnamed_temporary { 0 } else { props.refs };
         Ok(attributes!(
             requested_attributes,
             Mutable {
@@ -455,7 +461,7 @@ impl vfs::node::Node for FxFile {
                     | fio::Operations::WRITE_BYTES,
                 content_size: props.data_attribute_size,
                 storage_size: props.allocated_size,
-                link_count: props.refs,
+                link_count: link_count,
                 id: self.handle.object_id(),
                 change_time: props.change_time.as_nanos(),
                 options: descriptor.clone().map(|a| a.0),

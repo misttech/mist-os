@@ -944,6 +944,73 @@ impl FsNodeOps for RemoteNode {
         self.zxio.attr_get(has).map_err(|status| from_status_like_fdio!(status))
     }
 
+    fn create_tmpfile(
+        &self,
+        node: &FsNode,
+        current_task: &CurrentTask,
+        mode: FileMode,
+        owner: FsCred,
+    ) -> Result<FsNodeHandle, Errno> {
+        let fs = node.fs();
+        let fs_ops = RemoteFs::from_fs(&fs);
+
+        let zxio;
+        let mut node_id;
+        if !mode.is_reg() {
+            return error!(EINVAL);
+        }
+        let mut attrs = zxio_node_attributes_t {
+            has: zxio_node_attr_has_t { id: true, ..Default::default() },
+            ..Default::default()
+        };
+        // `create_tmpfile` is used by O_TMPFILE. Note that
+        // <https://man7.org/linux/man-pages/man2/open.2.html> states that if O_EXCL is specified
+        // with O_TMPFILE, the temporary file created cannot be linked into the filesystem. Although
+        // there exist fuchsia flags `fio::FLAG_TEMPORARY_AS_NOT_LINKABLE`, the starnix vfs already
+        // handles this case and makes sure that the created file is not linkable. There is also no
+        // current way of passing the open flags to this function.
+        zxio = Arc::new(
+            self.zxio
+                .open(
+                    ".",
+                    fio::Flags::PROTOCOL_FILE
+                        | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
+                        | self.rights,
+                    ZxioOpenOptions::new(
+                        Some(&mut attrs),
+                        Some(zxio_node_attributes_t {
+                            mode: mode.bits(),
+                            uid: owner.uid,
+                            gid: owner.gid,
+                            has: zxio_node_attr_has_t {
+                                mode: true,
+                                uid: true,
+                                gid: true,
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        }),
+                    ),
+                )
+                .map_err(|status| from_status_like_fdio!(status))?,
+        );
+        node_id = attrs.id;
+
+        let ops = Box::new(RemoteNode { zxio, rights: self.rights }) as Box<dyn FsNodeOps>;
+
+        if !fs_ops.use_remote_ids {
+            node_id = fs.next_node_id();
+        }
+        let child = fs.create_node_with_id(
+            current_task,
+            ops,
+            node_id,
+            FsNodeInfo::new(node_id, mode, owner),
+        );
+
+        Ok(child)
+    }
+
     fn link(
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
