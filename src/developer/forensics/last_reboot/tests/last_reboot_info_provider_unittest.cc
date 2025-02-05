@@ -20,8 +20,10 @@ namespace {
 
 fuchsia::feedback::LastReboot GetLastReboot(
     const feedback::RebootReason reboot_reason,
-    const std::optional<zx::duration> uptime = std::nullopt) {
-  const feedback::RebootLog reboot_log(reboot_reason, "", uptime, std::nullopt);
+    const std::optional<zx::duration> uptime = std::nullopt,
+    const std::optional<zx::duration> runtime = std::nullopt) {
+  const feedback::RebootLog reboot_log(reboot_reason, "", uptime, runtime,
+                                       /*critical_process=*/std::nullopt);
 
   fuchsia::feedback::LastReboot out_last_reboot;
 
@@ -89,9 +91,27 @@ TEST(LastRebootInfoProviderTest, Succeed_HasUptime) {
 }
 
 TEST(LastRebootInfoProviderTest, Succeed_DoesNotHaveUptime) {
-  const auto last_reboot = GetLastReboot(feedback::RebootReason::kGenericGraceful, std::nullopt);
+  const auto last_reboot =
+      GetLastReboot(feedback::RebootReason::kGenericGraceful, /*uptime=*/std::nullopt);
 
   EXPECT_FALSE(last_reboot.has_uptime());
+}
+
+TEST(LastRebootInfoProviderTest, Succeed_HasRuntime) {
+  const zx::duration runtime = zx::msec(78);
+
+  const auto last_reboot =
+      GetLastReboot(feedback::RebootReason::kGenericGraceful, /*uptime=*/std::nullopt, runtime);
+
+  ASSERT_TRUE(last_reboot.has_runtime());
+  EXPECT_EQ(last_reboot.runtime(), runtime.to_nsecs());
+}
+
+TEST(LastRebootInfoProviderTest, Succeed_DoesNotHaveRuntime) {
+  const auto last_reboot = GetLastReboot(feedback::RebootReason::kGenericGraceful,
+                                         /*uptime=*/std::nullopt, /*runtime=*/std::nullopt);
+
+  EXPECT_FALSE(last_reboot.has_runtime());
 }
 
 TEST(LastRebootInfoProviderTest, Succeed_NotParseable) {

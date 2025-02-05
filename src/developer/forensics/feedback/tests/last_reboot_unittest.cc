@@ -57,13 +57,16 @@ class LastRebootTest : public UnitTestFixture {
 
 TEST_F(LastRebootTest, FirstInstance) {
   const zx::duration oom_crash_reporting_delay = zx::sec(90);
-  const RebootLog reboot_log(RebootReason::kOOM, "reboot log", zx::sec(1), std::nullopt);
+  const RebootLog reboot_log(RebootReason::kOOM, "reboot log", /*last_boot_uptime=*/zx::sec(1),
+                             /*last_boot_runtime=*/zx::msec(500),
+                             /*critical_process=*/std::nullopt);
 
   SetUpCrashReporterServer(
       std::make_unique<stubs::CrashReporter>(stubs::CrashReporter::Expectations{
           .crash_signature = ToCrashSignature(reboot_log.RebootReason()),
           .reboot_log = reboot_log.RebootLogStr(),
           .uptime = reboot_log.Uptime(),
+          .runtime = reboot_log.Runtime(),
           .is_fatal = IsFatal(reboot_log.RebootReason()),
       }));
 
@@ -85,7 +88,9 @@ TEST_F(LastRebootTest, FirstInstance) {
 
 TEST_F(LastRebootTest, IsNotFirstInstance) {
   const zx::duration oom_crash_reporting_delay = zx::sec(90);
-  const RebootLog reboot_log(RebootReason::kOOM, "reboot log", zx::sec(1), std::nullopt);
+  const RebootLog reboot_log(RebootReason::kOOM, "reboot log", /*last_boot_uptime=*/zx::sec(1),
+                             /*last_boot_runtime=*/zx::msec(500),
+                             /*critical_process=*/std::nullopt);
 
   SetUpCrashReporterServer(std::make_unique<stubs::CrashReporterNoFileExpected>());
 

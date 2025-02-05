@@ -24,6 +24,7 @@ class CrashReporter : public CrashReporterBase {
     std::string crash_signature;
     std::string reboot_log;
     std::optional<zx::duration> uptime;
+    std::optional<zx::duration> runtime;
     std::optional<bool> is_fatal;
   };
 
@@ -40,6 +41,7 @@ class CrashReporter : public CrashReporterBase {
   std::string crash_signature_;
   std::string reboot_log_;
   std::optional<zx::duration> uptime_;
+  std::optional<zx::duration> runtime_;
   std::optional<bool> is_fatal_;
 };
 

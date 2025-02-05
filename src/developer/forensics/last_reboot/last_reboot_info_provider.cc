@@ -16,6 +16,10 @@ LastRebootInfoProvider::LastRebootInfoProvider(const feedback::RebootLog& reboot
     last_reboot_.set_uptime(reboot_log.Uptime()->get());
   }
 
+  if (reboot_log.Runtime().has_value()) {
+    last_reboot_.set_runtime(reboot_log.Runtime()->get());
+  }
+
   if (const auto graceful = OptionallyGraceful(reboot_log.RebootReason()); graceful.has_value()) {
     last_reboot_.set_graceful(graceful.value());
   }

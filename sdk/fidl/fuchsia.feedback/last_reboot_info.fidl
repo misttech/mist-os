@@ -31,8 +31,14 @@ type LastReboot = table {
     /// Why a device last rebooted.
     2: reason RebootReason;
 
-    /// The uptime of the device before it rebooted.
+    /// The uptime of the device before it rebooted. This is the amount of time since boot,
+    /// including any time spent in suspend-to-idle.
     3: uptime zx.Duration;
+
+    /// The runtime of the device before it rebooted. This is the amount of time since boot
+    /// excluding any time spent in suspend-to-idle.
+    @available(added=NEXT)
+    5: runtime zx.Duration;
 
     /// Whether the last reboot was planned, i.e. the device rebooted in accordance to a schedule
     /// applied by the system.

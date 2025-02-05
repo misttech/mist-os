@@ -40,7 +40,9 @@ class MainServiceTest : public UnitTestFixture {
                           LastReboot::Options{
                               .is_first_instance = kIsFirstInstance,
                               .reboot_log = RebootLog(RebootReason::kUserRequest, "reboot log",
-                                                      zx::sec(100), std::nullopt),
+                                                      /*last_boot_uptime=*/zx::sec(100),
+                                                      /*last_boot_runtime=*/zx::sec(90),
+                                                      /*critical_process=*/std::nullopt),
                               .oom_crash_reporting_delay = zx::sec(1),
                           },
                           CrashReports::Options{

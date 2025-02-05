@@ -41,7 +41,7 @@ enum class ZirconRebootReason {
   kNotParseable,
 };
 
-zx::duration ExtractUptime(const std::string_view line) {
+zx::duration ExtractTime(const std::string_view line) {
   const std::string line_copy(line);
   return zx::msec(std::stoll(line_copy));
 }
@@ -72,6 +72,7 @@ ZirconRebootReason ExtractZirconRebootReason(const std::string_view line) {
 ZirconRebootReason ExtractZirconRebootInfo(const std::string& path,
                                            std::optional<std::string>* content,
                                            std::optional<zx::duration>* uptime,
+                                           std::optional<zx::duration>* runtime,
                                            std::optional<std::string>* crashed_process) {
   if (!files::IsFile(path)) {
     return ZirconRebootReason::kCold;
@@ -106,6 +107,8 @@ ZirconRebootReason ExtractZirconRebootInfo(const std::string& path,
   // <empty>
   // UPTIME (ms)
   // <SOME UPTIME>
+  // RUNTIME (ms)
+  // <SOME RUNTIME>
   const auto reason = ExtractZirconRebootReason(lines[0]);
 
   if (lines.size() < 3) {
@@ -113,7 +116,15 @@ ZirconRebootReason ExtractZirconRebootInfo(const std::string& path,
   } else if (lines[1] != "UPTIME (ms)") {
     FX_LOGS(ERROR) << "'UPTIME(ms)' not present, found '" << lines[1] << "'";
   } else {
-    *uptime = ExtractUptime(lines[2]);
+    *uptime = ExtractTime(lines[2]);
+  }
+
+  if (lines.size() < 5) {
+    FX_LOGS(ERROR) << "Zircon reboot log is missing runtime information";
+  } else if (lines[3] != "RUNTIME (ms)") {
+    FX_LOGS(ERROR) << "'RUNTIME(ms)' not present, found '" << lines[3] << "'";
+  } else {
+    *runtime = ExtractTime(lines[4]);
   }
 
   // We expect the critical process to look like:
@@ -275,9 +286,11 @@ RebootLog RebootLog::ParseRebootLog(const std::string& zircon_reboot_log_path,
                                     const bool not_a_fdr) {
   std::optional<std::string> zircon_reboot_log;
   std::optional<zx::duration> last_boot_uptime;
+  std::optional<zx::duration> last_boot_runtime;
   std::optional<std::string> critical_process;
-  const auto zircon_reason = ExtractZirconRebootInfo(zircon_reboot_log_path, &zircon_reboot_log,
-                                                     &last_boot_uptime, &critical_process);
+  const auto zircon_reason =
+      ExtractZirconRebootInfo(zircon_reboot_log_path, &zircon_reboot_log, &last_boot_uptime,
+                              &last_boot_runtime, &critical_process);
 
   const auto graceful_reasons = ExtractGracefulRebootInfo(graceful_reboot_log_path);
 
@@ -286,15 +299,18 @@ RebootLog RebootLog::ParseRebootLog(const std::string& zircon_reboot_log_path,
 
   FX_LOGS(INFO) << "Reboot info:\n" << reboot_log;
 
-  return RebootLog(reboot_reason, reboot_log, last_boot_uptime, critical_process);
+  return RebootLog(reboot_reason, reboot_log, last_boot_uptime, last_boot_runtime,
+                   critical_process);
 }
 
 RebootLog::RebootLog(enum RebootReason reboot_reason, std::string reboot_log_str,
                      std::optional<zx::duration> last_boot_uptime,
+                     std::optional<zx::duration> last_boot_runtime,
                      std::optional<std::string> critical_process)
     : reboot_reason_(reboot_reason),
       reboot_log_str_(reboot_log_str),
       last_boot_uptime_(last_boot_uptime),
+      last_boot_runtime_(last_boot_runtime),
       critical_process_(critical_process) {}
 
 }  // namespace feedback
