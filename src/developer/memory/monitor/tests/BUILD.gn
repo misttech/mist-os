@@ -20,6 +20,7 @@ cc_test_executable("memory_monitor_unittests") {
 
   sources = [
     "high_water_unittest.cc",
+    "logger_unittest.cc",
     "metrics_unittest.cc",
     "monitor_fidl_unittest.cc",
   ]

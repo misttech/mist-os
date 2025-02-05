@@ -11,6 +11,20 @@
 #include "src/developer/memory/metrics/bucket_match.h"
 
 namespace memory {
+
+namespace {
+constexpr char kUndigested[]{"Undigested"};
+constexpr char kOrphaned[]{"Orphaned"};
+constexpr char kKernel[]{"Kernel"};
+constexpr char kFree[]{"Free"};
+constexpr char kPagerTotal[]{"[Addl]PagerTotal"};
+constexpr char kPagerNewest[]{"[Addl]PagerNewest"};
+constexpr char kPagerOldest[]{"[Addl]PagerOldest"};
+constexpr char kDiscardableLocked[]{"[Addl]DiscardableLocked"};
+constexpr char kDiscardableUnlocked[]{"[Addl]DiscardableUnlocked"};
+constexpr char kZramCompressedBytes[]{"[Addl]ZramCompressedBytes"};
+}  // namespace
+
 Digest::Digest(const Capture& capture, Digester* digester) { digester->Digest(capture, this); }
 
 Digester::Digester(const std::vector<BucketMatch>& bucket_matches)
@@ -46,52 +60,33 @@ void Digester::Digest(const Capture& capture, class Digest* digest) {
     }
   }
 
-  std::ranges::sort(digest->buckets_,
-                    [](const Bucket& a, const Bucket& b) { return a.size() > b.size(); });
   FractionalBytes undigested_size{};
   for (auto v : digest->undigested_vmos_) {
     undigested_size += capture.vmo_for_koid(v).committed_bytes;
   }
-  if (undigested_size.integral > 0) {
-    digest->buckets_.emplace_back("Undigested", undigested_size.integral);
-  }
 
   const auto& kmem = capture.kmem();
-  if (kmem.total_bytes > 0) {
-    FractionalBytes vmo_size;
-    for (const auto& bucket : digest->buckets_) {
-      vmo_size += bucket.size_;
-    }
-    if (vmo_size.integral < kmem.vmo_bytes) {
-      digest->buckets_.emplace_back("Orphaned", kmem.vmo_bytes - vmo_size.integral);
-    }
-
-    digest->buckets_.emplace_back("Kernel", kmem.wired_bytes + kmem.total_heap_bytes +
-                                                kmem.mmu_overhead_bytes + kmem.ipc_bytes +
-                                                kmem.other_bytes);
-    digest->buckets_.emplace_back("Free", kmem.free_bytes);
-
-    if (capture.kmem_extended()) {
-      const auto& kmem_ext = capture.kmem_extended().value();
-      if (kmem_ext.vmo_pager_total_bytes > 0) {
-        digest->buckets_.emplace_back("[Addl]PagerTotal", kmem_ext.vmo_pager_total_bytes);
-        digest->buckets_.emplace_back("[Addl]PagerNewest", kmem_ext.vmo_pager_newest_bytes);
-        digest->buckets_.emplace_back("[Addl]PagerOldest", kmem_ext.vmo_pager_oldest_bytes);
-      }
-      if (kmem_ext.vmo_discardable_locked_bytes > 0 ||
-          kmem_ext.vmo_discardable_unlocked_bytes > 0) {
-        digest->buckets_.emplace_back("[Addl]DiscardableLocked",
-                                      kmem_ext.vmo_discardable_locked_bytes);
-        digest->buckets_.emplace_back("[Addl]DiscardableUnlocked",
-                                      kmem_ext.vmo_discardable_unlocked_bytes);
-      }
-    }
-
-    if (capture.kmem_compression()) {
-      digest->buckets_.emplace_back("[Addl]ZramCompressedBytes",
-                                    capture.kmem_compression()->compressed_storage_bytes);
-    }
+  FractionalBytes vmo_size{undigested_size};
+  for (const auto& bucket : digest->buckets_) {
+    vmo_size += bucket.size_;
   }
+  digest->buckets_.emplace_back(kUndigested, undigested_size.integral);
+  digest->buckets_.emplace_back(
+      kOrphaned, std::clamp(kmem.vmo_bytes - vmo_size.integral, 0ul, kmem.vmo_bytes));
+  digest->buckets_.emplace_back(kKernel, kmem.wired_bytes + kmem.total_heap_bytes +
+                                             kmem.mmu_overhead_bytes + kmem.ipc_bytes +
+                                             kmem.other_bytes);
+  digest->buckets_.emplace_back(kFree, kmem.free_bytes);
+  const auto& kmem_ext =
+      capture.kmem_extended() ? capture.kmem_extended().value() : zx_info_kmem_stats_extended_t{};
+  digest->buckets_.emplace_back(kPagerTotal, kmem_ext.vmo_pager_total_bytes);
+  digest->buckets_.emplace_back(kPagerNewest, kmem_ext.vmo_pager_newest_bytes);
+  digest->buckets_.emplace_back(kPagerOldest, kmem_ext.vmo_pager_oldest_bytes);
+  digest->buckets_.emplace_back(kDiscardableLocked, kmem_ext.vmo_discardable_locked_bytes);
+  digest->buckets_.emplace_back(kDiscardableUnlocked, kmem_ext.vmo_discardable_unlocked_bytes);
+  digest->buckets_.emplace_back(
+      kZramCompressedBytes,
+      capture.kmem_compression() ? capture.kmem_compression()->compressed_storage_bytes : 0);
 }
 
 }  // namespace memory

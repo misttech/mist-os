@@ -10,9 +10,6 @@
 
 #include <string>
 
-#include <src/lib/cobalt/cpp/metric_event_builder.h>
-
-#include "lib/fpromise/result.h"
 #include "src/developer/memory/metrics/digest.h"
 
 namespace monitor {
@@ -42,11 +39,11 @@ const std::map<zx_duration_t, TimeSinceBoot> UptimeLevelMap = {
 Metrics::Metrics(const std::vector<memory::BucketMatch>& bucket_matches,
                  zx::duration poll_frequency, async_dispatcher_t* dispatcher,
                  inspect::ComponentInspector* inspector,
-                 fuchsia::metrics::MetricEventLogger_Sync* logger, CaptureCb capture_cb,
+                 fidl::SyncClient<fuchsia_metrics::MetricEventLogger> logger, CaptureCb capture_cb,
                  DigestCb digest_cb)
     : poll_frequency_(poll_frequency),
       dispatcher_(dispatcher),
-      logger_(logger),
+      logger_(std::move(logger)),
       capture_cb_(std::move(capture_cb)),
       digest_cb_(std::move(digest_cb)),
       bucket_name_to_code_({
@@ -108,11 +105,11 @@ void Metrics::CollectMetrics() {
 
   WriteDigestToInspect(digest);
 
-  std::vector<fuchsia::metrics::MetricEvent> events;
+  std::vector<fuchsia_metrics::MetricEvent> events;
   const auto& kmem = capture.kmem();
   AddKmemEvents(kmem, &events);
   AddKmemEventsWithUptime(kmem, capture.time(), &events);
-  auto builder = cobalt::MetricEventBuilder(cobalt_registry::kMemoryMigratedMetricId);
+
   for (const auto& bucket : digest.buckets()) {
     if (bucket.size() == 0) {
       continue;
@@ -123,12 +120,15 @@ void Metrics::CollectMetrics() {
                                 << bucket.name();
       continue;
     }
-    events.push_back(builder.Clone().with_event_code(code_iter->second).as_integer(bucket.size()));
+    fuchsia_metrics::MetricEvent event{
+        cobalt_registry::kMemoryMigratedMetricId,
+        {code_iter->second},
+        fuchsia_metrics::MetricEventPayload::WithIntegerValue(static_cast<int64_t>(bucket.size()))};
+    events.push_back(event);
   }
-  fuchsia::metrics::MetricEventLogger_LogMetricEvents_Result response =
-      fpromise::error(fuchsia::metrics::Error::INTERNAL_ERROR);
-  logger_->LogMetricEvents(std::move(events), &response);
-  if (response.is_err() && response.err() == fuchsia::metrics::Error::INVALID_ARGUMENTS) {
+  auto response = logger_->LogMetricEvents({std::move(events)});
+  if (response.is_error() &&
+      response.error_value().domain_error() == fuchsia_metrics::Error::kInvalidArguments) {
     FX_LOGS(ERROR) << "LogMetricEvents() returned status INVALID_ARGUMENTS";
   }
   task_.PostDelayed(dispatcher_, poll_frequency_);
@@ -152,69 +152,51 @@ void Metrics::WriteDigestToInspect(const memory::Digest& digest) {
 }
 
 void Metrics::AddKmemEvents(const zx_info_kmem_stats_t& kmem,
-                            std::vector<fuchsia::metrics::MetricEvent>* events) {
+                            std::vector<fuchsia_metrics::MetricEvent>* events) {
   TRACE_DURATION("memory_monitor", "Metrics::AddKmemEvents");
-  auto builder =
-      cobalt::MetricEventBuilder(cobalt_registry::kMemoryGeneralBreakdownMigratedMetricId);
   using Breakdown = cobalt_registry::MemoryGeneralBreakdownMigratedMetricDimensionGeneralBreakdown;
-  events->push_back(
-      builder.Clone().with_event_code(Breakdown::TotalBytes).as_integer(kmem.total_bytes));
-  events->push_back(builder.Clone()
-                        .with_event_code(Breakdown::UsedBytes)
-                        .as_integer(kmem.total_bytes - kmem.free_bytes));
-  events->push_back(
-      builder.Clone().with_event_code(Breakdown::FreeBytes).as_integer(kmem.free_bytes));
-  events->push_back(
-      builder.Clone().with_event_code(Breakdown::VmoBytes).as_integer(kmem.vmo_bytes));
-  events->push_back(builder.Clone()
-                        .with_event_code(Breakdown::KernelFreeHeapBytes)
-                        .as_integer(kmem.free_heap_bytes));
-  events->push_back(
-      builder.Clone().with_event_code(Breakdown::MmuBytes).as_integer(kmem.mmu_overhead_bytes));
-  events->push_back(
-      builder.Clone().with_event_code(Breakdown::IpcBytes).as_integer(kmem.ipc_bytes));
-  events->push_back(builder.Clone()
-                        .with_event_code(Breakdown::KernelTotalHeapBytes)
-                        .as_integer(kmem.total_heap_bytes));
-  events->push_back(
-      builder.Clone().with_event_code(Breakdown::WiredBytes).as_integer(kmem.wired_bytes));
-  events->push_back(
-      builder.Clone().with_event_code(Breakdown::OtherBytes).as_integer(kmem.other_bytes));
+  constexpr auto make_event = [](Breakdown code, uint64_t value) {
+    return fuchsia_metrics::MetricEvent{
+        cobalt_registry::kMemoryGeneralBreakdownMigratedMetricId,
+        {code},
+        fuchsia_metrics::MetricEventPayload::WithIntegerValue(static_cast<int64_t>(value))};
+    ;
+  };
+  events->push_back(make_event(Breakdown::TotalBytes, kmem.total_bytes));
+  events->push_back(make_event(Breakdown::UsedBytes, kmem.total_bytes - kmem.free_bytes));
+  events->push_back(make_event(Breakdown::FreeBytes, kmem.free_bytes));
+  events->push_back(make_event(Breakdown::VmoBytes, kmem.vmo_bytes));
+  events->push_back(make_event(Breakdown::KernelFreeHeapBytes, kmem.free_heap_bytes));
+  events->push_back(make_event(Breakdown::MmuBytes, kmem.mmu_overhead_bytes));
+  events->push_back(make_event(Breakdown::IpcBytes, kmem.ipc_bytes));
+  events->push_back(make_event(Breakdown::KernelTotalHeapBytes, kmem.total_heap_bytes));
+  events->push_back(make_event(Breakdown::WiredBytes, kmem.wired_bytes));
+  events->push_back(make_event(Breakdown::OtherBytes, kmem.other_bytes));
 }
 
 // TODO(https://fxbug.dev/42113456): Refactor this when dedup enum is availble in generated
 // cobalt config source code.
 void Metrics::AddKmemEventsWithUptime(const zx_info_kmem_stats_t& kmem,
                                       const zx_time_t capture_time,
-                                      std::vector<fuchsia::metrics::MetricEvent>* events) {
+                                      std::vector<fuchsia_metrics::MetricEvent>* events) {
   TRACE_DURATION("memory_monitor", "Metrics::AddKmemEventsWithUptime");
-  auto builder = std::move(cobalt::MetricEventBuilder(cobalt_registry::kMemoryLeakMigratedMetricId)
-                               .with_event_code_at(1, GetUpTimeEventCode(capture_time)));
   using Breakdown = cobalt_registry::MemoryLeakMigratedMetricDimensionGeneralBreakdown;
-  events->push_back(
-      builder.Clone().with_event_code_at(0, Breakdown::TotalBytes).as_integer(kmem.total_bytes));
-  events->push_back(builder.Clone()
-                        .with_event_code_at(0, Breakdown::UsedBytes)
-                        .as_integer(kmem.total_bytes - kmem.free_bytes));
-  events->push_back(
-      builder.Clone().with_event_code_at(0, Breakdown::FreeBytes).as_integer(kmem.free_bytes));
-  events->push_back(
-      builder.Clone().with_event_code_at(0, Breakdown::VmoBytes).as_integer(kmem.vmo_bytes));
-  events->push_back(builder.Clone()
-                        .with_event_code_at(0, Breakdown::KernelFreeHeapBytes)
-                        .as_integer(kmem.free_heap_bytes));
-  events->push_back(builder.Clone()
-                        .with_event_code_at(0, Breakdown::MmuBytes)
-                        .as_integer(kmem.mmu_overhead_bytes));
-  events->push_back(
-      builder.Clone().with_event_code_at(0, Breakdown::IpcBytes).as_integer(kmem.ipc_bytes));
-  events->push_back(builder.Clone()
-                        .with_event_code_at(0, Breakdown::KernelTotalHeapBytes)
-                        .as_integer(kmem.total_heap_bytes));
-  events->push_back(
-      builder.Clone().with_event_code_at(0, Breakdown::WiredBytes).as_integer(kmem.wired_bytes));
-  events->push_back(
-      builder.Clone().with_event_code_at(0, Breakdown::OtherBytes).as_integer(kmem.other_bytes));
+  auto make_event = [capture_time](Breakdown code, uint64_t value) {
+    return fuchsia_metrics::MetricEvent{
+        cobalt_registry::kMemoryLeakMigratedMetricId,
+        {code, GetUpTimeEventCode(capture_time)},
+        fuchsia_metrics::MetricEventPayload::WithIntegerValue(static_cast<int64_t>(value))};
+  };
+  events->push_back(make_event(Breakdown::TotalBytes, kmem.total_bytes));
+  events->push_back(make_event(Breakdown::UsedBytes, kmem.total_bytes - kmem.free_bytes));
+  events->push_back(make_event(Breakdown::FreeBytes, kmem.free_bytes));
+  events->push_back(make_event(Breakdown::VmoBytes, kmem.vmo_bytes));
+  events->push_back(make_event(Breakdown::KernelFreeHeapBytes, kmem.free_heap_bytes));
+  events->push_back(make_event(Breakdown::MmuBytes, kmem.mmu_overhead_bytes));
+  events->push_back(make_event(Breakdown::IpcBytes, kmem.ipc_bytes));
+  events->push_back(make_event(Breakdown::KernelTotalHeapBytes, kmem.total_heap_bytes));
+  events->push_back(make_event(Breakdown::WiredBytes, kmem.wired_bytes));
+  events->push_back(make_event(Breakdown::OtherBytes, kmem.other_bytes));
 }
 
 TimeSinceBoot Metrics::GetUpTimeEventCode(const zx_time_t capture_time) {

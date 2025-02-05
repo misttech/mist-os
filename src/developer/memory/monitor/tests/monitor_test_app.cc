@@ -9,7 +9,6 @@
 #include <memory>
 
 #include "src/developer/memory/metrics/capture.h"
-#include "src/developer/memory/metrics/capture_strategy.h"
 #include "src/developer/memory/metrics/tests/test_utils.h"
 #include "src/developer/memory/monitor/memory_monitor_config.h"
 #include "src/developer/memory/monitor/monitor.h"
@@ -26,8 +25,12 @@ std::unique_ptr<memory::MockOS> CreateMockOS() {
       .name = "vmo_0",
       .size_bytes = 0,
   };
-  static const memory::GetInfoResponse vmo_0_info = {
-      handle_process_0, ZX_INFO_PROCESS_VMOS, &_vmo_0, sizeof(_vmo_0), 1, ZX_OK};
+  static const memory::GetInfoResponse vmo_0_info = {.handle = handle_process_0,
+                                                     .topic = ZX_INFO_PROCESS_VMOS,
+                                                     .values = &_vmo_0,
+                                                     .value_size = sizeof(_vmo_0),
+                                                     .value_count = 1,
+                                                     .ret = ZX_OK};
 
   const zx_koid_t koid_vmo_1 = 201;
 
@@ -105,9 +108,8 @@ int main(int argc, const char** argv) {
   auto os = CreateMockOS();
   auto capture_maker = memory::CaptureMaker::Create(CreateMockOS()).value();
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  monitor::Monitor app(sys::ComponentContext::CreateAndServeOutgoingDirectory(), fxl::CommandLine{},
-                       loop.dispatcher(), false, false, memory_monitor_config::Config{},
-                       std::move(capture_maker));
+  monitor::Monitor app{fxl::CommandLine{}, loop.dispatcher(), memory_monitor_config::Config{},
+                       std::move(capture_maker)};
   loop.Run();
   return 0;
 }

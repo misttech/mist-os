@@ -5,13 +5,12 @@
 #ifndef SRC_DEVELOPER_MEMORY_MONITOR_MONITOR_H_
 #define SRC_DEVELOPER_MEMORY_MONITOR_MONITOR_H_
 
+#include <fidl/fuchsia.memory.inspection/cpp/fidl.h>
 #include <fidl/fuchsia.memorypressure/cpp/fidl.h>
 #include <fuchsia/hardware/ram/metrics/cpp/fidl.h>
-#include <fuchsia/memory/inspection/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/inspect/component/cpp/component.h>
-#include <lib/sys/cpp/component_context.h>
 #include <lib/trace/observer.h>
 #include <lib/zx/socket.h>
 #include <lib/zx/vmo.h>
@@ -33,13 +32,16 @@ namespace test {
 class MemoryBandwidthInspectTest;
 }  // namespace test
 
-class Monitor : public fuchsia::memory::inspection::Collector,
+class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
                 public fidl::Server<fuchsia_memorypressure::Watcher> {
  public:
-  Monitor(std::unique_ptr<sys::ComponentContext> context, const fxl::CommandLine& command_line,
-          async_dispatcher_t* dispatcher, bool send_metrics, bool watch_memory_pressure,
-          memory_monitor_config::Config config,
-          std::unique_ptr<memory::CaptureMaker> capture_maker);
+  Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispatcher,
+          memory_monitor_config::Config config, std::unique_ptr<memory::CaptureMaker> capture_maker,
+          std::optional<fidl::Client<fuchsia_memorypressure::Provider>> pressure_provider =
+              std::nullopt,
+          std::optional<zx_handle_t> root_job = std::nullopt,
+          std::optional<fidl::SyncClient<fuchsia_metrics::MetricEventLoggerFactory>>
+              metric_event_logger_factory = std::nullopt);
   ~Monitor() override = default;
 
   // For memory bandwidth measurement, SetRamDevice should be called once
@@ -49,10 +51,11 @@ class Monitor : public fuchsia::memory::inspection::Collector,
   // in UTF-8.
   // See the fuchsia.memory.inspection FIDL library for a
   // description of the format of the JSON.
-  void CollectJsonStats(zx::socket socket) override;
+  void CollectJsonStats(CollectJsonStatsRequest& request,
+                        CollectJsonStatsCompleter::Sync& completer) override;
 
-  void CollectJsonStatsWithOptions(
-      fuchsia::memory::inspection::CollectorCollectJsonStatsWithOptionsRequest request) override;
+  void CollectJsonStatsWithOptions(CollectJsonStatsWithOptionsRequest& request,
+                                   CollectJsonStatsWithOptionsCompleter::Sync& completer) override;
 
   // fuchsia_memorypressure::Watcher implementation; this callback gets called
   // whenever a memory pressure change is signaled.
@@ -66,7 +69,9 @@ class Monitor : public fuchsia::memory::inspection::Collector,
 
   void PublishBucketConfiguration();
 
-  void CreateMetrics(const std::vector<memory::BucketMatch>& bucket_matches);
+  void CreateMetrics(
+      fidl::SyncClient<fuchsia_metrics::MetricEventLoggerFactory> metric_event_logger_factory,
+      const std::vector<memory::BucketMatch>& bucket_matches);
 
   void UpdateState();
 
@@ -92,20 +97,17 @@ class Monitor : public fuchsia::memory::inspection::Collector,
   zx::duration delay_;
   zx_handle_t root_;
   async_dispatcher_t* dispatcher_;
-  std::unique_ptr<sys::ComponentContext> component_context_;
-  fuchsia::metrics::MetricEventLoggerSyncPtr metric_event_logger_;
-  fidl::BindingSet<fuchsia::memory::inspection::Collector> bindings_;
   trace::TraceObserver trace_observer_;
   memory_monitor_config::Config config_;
   inspect::ComponentInspector inspector_;
   std::unique_ptr<Logger> logger_;
-  std::unique_ptr<Metrics> metrics_;
+  std::optional<Metrics> metrics_;
   std::unique_ptr<memory::Digester> digester_;
   std::mutex digester_mutex_;
   fuchsia::hardware::ram::metrics::DevicePtr ram_device_;
   uint64_t pending_bandwidth_measurements_ = 0;
   pressure_signaler::Level level_;
-  fidl::Client<fuchsia_memorypressure::Provider> pressure_provider_;
+  std::optional<fidl::Client<fuchsia_memorypressure::Provider>> pressure_provider_;
 
   // Imminent OOM monitoring
   void WaitForImminentOom();

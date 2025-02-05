@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 
+#include "gmock/gmock.h"
 #include "src/developer/memory/metrics/capture.h"
 #include "src/developer/memory/metrics/summary.h"
 #include "src/developer/memory/metrics/tests/test_utils.h"
@@ -15,30 +16,10 @@
 #include "third_party/rapidjson/include/rapidjson/ostreamwrapper.h"
 #include "third_party/rapidjson/include/rapidjson/prettywriter.h"
 
-namespace rapidjson {
-
-// Teach the testing framework to print json doc.
-void PrintTo(const rapidjson::Document& value, ::std::ostream* os) {
-  rapidjson::OStreamWrapper osw(*os);
-  rapidjson::PrettyWriter writer(osw);
-  value.Accept(writer);
-}
-}  // namespace rapidjson
-
-namespace memory::test {
-
-using PrinterUnitTest = testing::Test;
-
-void ConfirmLines(std::ostringstream& oss, std::vector<std::string> expected_lines) {
-  SCOPED_TRACE("");
+namespace {
+void ConfirmLines(std::ostringstream& oss, const std::vector<std::string>& expected_lines) {
   auto lines = fxl::SplitStringCopy(oss.str(), "\n", fxl::kKeepWhitespace, fxl::kSplitWantNonEmpty);
-  ASSERT_EQ(expected_lines.size(), lines.size());
-  for (size_t li = 0; li < expected_lines.size(); li++) {
-    SCOPED_TRACE(li);
-    std::string expected_line = expected_lines.at(li);
-    std::string_view line = lines.at(li);
-    EXPECT_STREQ(expected_line.c_str(), std::string(line).c_str());
-  }
+  EXPECT_THAT(expected_lines, testing::UnorderedElementsAreArray(lines));
 }
 
 std::string ExecuteWithSocket(fit::function<void(zx::socket)> generator) {
@@ -52,6 +33,21 @@ std::string ExecuteWithSocket(fit::function<void(zx::socket)> generator) {
 
   return output;
 }
+
+}  // namespace
+
+namespace rapidjson {
+// Teach the testing framework to print json doc.
+extern void PrintTo(const rapidjson::Document& value, ::std::ostream* os) {
+  rapidjson::OStreamWrapper osw(*os);
+  rapidjson::PrettyWriter writer(osw);
+  value.Accept(writer);
+}
+}  // namespace rapidjson
+
+namespace memory::test {
+
+using PrinterUnitTest = testing::Test;
 
 TEST_F(PrinterUnitTest, PrintCapture) {
   Capture c;
@@ -664,7 +660,9 @@ TEST_F(PrinterUnitTest, PrintDigest) {
   TextPrinter p(oss);
   p.PrintDigest(d);
   ConfirmLines(oss, {"B: 200B", "A: 100B", "Undigested: 300B", "Orphaned: 100B", "Kernel: 10B",
-                     "Free: 100B"});
+                     "Free: 100B", "[Addl]PagerTotal: 0B", "[Addl]PagerNewest: 0B",
+                     "[Addl]PagerOldest: 0B", "[Addl]DiscardableLocked: 0B",
+                     "[Addl]DiscardableUnlocked: 0B", "[Addl]ZramCompressedBytes: 0B"});
 }
 
 TEST_F(PrinterUnitTest, OutputDigest) {
@@ -720,7 +718,8 @@ TEST_F(PrinterUnitTest, OutputDigest) {
   ConfirmLines(oss, {"1234,B,200", "1234,A,100", "1234,Undigested,300", "1234,Orphaned,100",
                      "1234,Kernel,10", "1234,Free,100", "1234,[Addl]PagerTotal,300",
                      "1234,[Addl]PagerNewest,50", "1234,[Addl]PagerOldest,150",
-                     "1234,[Addl]DiscardableLocked,60", "1234,[Addl]DiscardableUnlocked,40"});
+                     "1234,[Addl]DiscardableLocked,60", "1234,[Addl]DiscardableUnlocked,40",
+                     "1234,[Addl]ZramCompressedBytes,0"});
 }
 
 TEST_F(PrinterUnitTest, FormatSize) {

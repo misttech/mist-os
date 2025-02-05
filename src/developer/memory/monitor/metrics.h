@@ -5,7 +5,7 @@
 #ifndef SRC_DEVELOPER_MEMORY_MONITOR_METRICS_H_
 #define SRC_DEVELOPER_MEMORY_MONITOR_METRICS_H_
 
-#include <fuchsia/metrics/cpp/fidl.h>
+#include <fidl/fuchsia.metrics/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/dispatcher.h>
 #include <lib/inspect/component/cpp/component.h>
@@ -27,7 +27,7 @@ class Metrics {
   using DigestCb = fit::function<void(const memory::Capture&, memory::Digest*)>;
   Metrics(const std::vector<memory::BucketMatch>& bucket_matches, zx::duration poll_frequency,
           async_dispatcher_t* dispatcher, inspect::ComponentInspector* inspector,
-          fuchsia::metrics::MetricEventLogger_Sync* logger, CaptureCb capture_cb,
+          fidl::SyncClient<fuchsia_metrics::MetricEventLogger> logger, CaptureCb capture_cb,
           DigestCb digest_cb);
 
   // Allow monitor to update the memory bandwidth readings
@@ -50,15 +50,15 @@ class Metrics {
   void CollectMetrics();
   void WriteDigestToInspect(const memory::Digest& digest);
   static void AddKmemEvents(const zx_info_kmem_stats_t& kmem,
-                            std::vector<fuchsia::metrics::MetricEvent>* events);
+                            std::vector<fuchsia_metrics::MetricEvent>* events);
   static void AddKmemEventsWithUptime(const zx_info_kmem_stats_t& kmem, zx_time_t capture_time,
-                                      std::vector<fuchsia::metrics::MetricEvent>* events);
+                                      std::vector<fuchsia_metrics::MetricEvent>* events);
   static cobalt_registry::MemoryLeakMigratedMetricDimensionTimeSinceBoot GetUpTimeEventCode(
       zx_time_t capture_time);
 
   zx::duration poll_frequency_;
   async_dispatcher_t* dispatcher_;
-  fuchsia::metrics::MetricEventLogger_Sync* logger_;
+  fidl::SyncClient<fuchsia_metrics::MetricEventLogger> logger_;
   CaptureCb capture_cb_;
   DigestCb digest_cb_;
   async::TaskClosureMethod<Metrics, &Metrics::CollectMetrics> task_{this};

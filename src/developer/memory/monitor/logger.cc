@@ -11,6 +11,43 @@
 
 namespace monitor {
 
+namespace {
+
+constexpr size_t kMeasurementsCapacity = 100;  // Max number of digest entries to store in inspect
+constexpr std::string_view kMeasurementsEntry{"bucket_sizes"};
+constexpr std::string_view kTimestamp{"@timestamp"};
+constexpr std::string_view kMeasurementsKey{"measurements"};
+constexpr std::string_view kBucketsKey{"buckets"};
+constexpr size_t kMaxBucketsCount = 100;
+
+std::once_flag bucket_names_flag;
+
+void PrintDigestToInspect(inspect::contrib::BoundedListNode& node, const memory::Digest& digest) {
+  node.CreateEntry([&digest](inspect::Node& n) {
+    n.RecordUint(kTimestamp, digest.time());
+    auto& buckets = digest.buckets();
+    auto ia = n.CreateUintArray(kMeasurementsEntry, buckets.size());
+    for (std::size_t i = 0; i < buckets.size(); i++) {
+      ia.Set(i, buckets[i].size());
+    }
+    n.Record(std::move(ia));
+  });
+}
+
+}  // namespace
+
+Logger::Logger(async_dispatcher_t* dispatcher, std::optional<monitor::HighWater*> high_water,
+               CaptureCb capture_cb, DigestCb digest_cb, memory_monitor_config::Config* config,
+               inspect::Node node)
+    : dispatcher_(dispatcher),
+      high_water_(high_water),
+      capture_cb_(std::move(capture_cb)),
+      digest_cb_(std::move(digest_cb)),
+      config_(config),
+      root_node_(std::move(node)),
+      inspect_bucket_digest_node_(root_node_.CreateChild(kMeasurementsKey), kMeasurementsCapacity),
+      bucket_names_(root_node_.CreateStringArray(kBucketsKey, kMaxBucketsCount)) {}
+
 void Logger::SetPressureLevel(pressure_signaler::Level l) {
   switch (l) {
     case pressure_signaler::kImminentOOM:
@@ -50,17 +87,27 @@ void Logger::Log() {
   }
   memory::Digest d;
   digest_cb_(c, &d);
-  std::ostringstream oss;
-  memory::TextPrinter p(oss);
+  // TODO(https://fxbug.dev/391360542): Remove the text output.
+  {
+    std::ostringstream oss;
+    memory::TextPrinter p(oss);
+    p.PrintDigest(d);
+    auto str = std::move(oss).str();
+    std::ranges::replace(str, '\n', ' ');
+    FX_LOGS(INFO) << str;
+  }
 
-  p.PrintDigest(d);
-  auto str = std::move(oss).str();
-  std::ranges::replace(str, '\n', ' ');
-  FX_LOGS(INFO) << str;
+  // Enshrine the order of buckets, once they have been populated.
+  std::call_once(bucket_names_flag, [this, &buckets = d.buckets()]() {
+    for (size_t i = 0; i < buckets.size() && i < kMaxBucketsCount; i++) {
+      bucket_names_.Set(i, buckets[i].name());
+    }
+  });
+  PrintDigestToInspect(inspect_bucket_digest_node_, d);
 
-  if (capture_high_water_) {
-    high_water_->RecordHighWater(c);
-    high_water_->RecordHighWaterDigest(d);
+  if (capture_high_water_ && high_water_) {
+    high_water_.value()->RecordHighWater(c);
+    high_water_.value()->RecordHighWaterDigest(d);
   }
 
   task_.PostDelayed(dispatcher_, duration_);

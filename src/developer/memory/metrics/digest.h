@@ -37,6 +37,10 @@ class Digest {
   Digest() = default;
   Digest(const Capture& capture, Digester* digester);
   zx_time_t time() const { return time_; }
+  // Access aggregated memory usage, grouped by buckets. Those get populated by
+  // calling |Digester::Digest| with a configured |Digester| instance. Buckets
+  // are always populated in the same order when produced by the same |Digester|
+  // configuration.
   const std::vector<Bucket>& buckets() const { return buckets_; }
   const std::unordered_set<zx_koid_t>& undigested_vmos() const { return undigested_vmos_; }
 

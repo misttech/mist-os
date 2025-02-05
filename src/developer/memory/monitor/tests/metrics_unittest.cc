@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 #include <src/cobalt/bin/testing/stub_metric_event_logger.h>
 
+#include "lib/fit/result.h"
 #include "src/developer/memory/metrics/capture.h"
 #include "src/developer/memory/metrics/tests/test_utils.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
@@ -69,7 +70,7 @@ class MetricsUnitTest : public gtest::RealLoopFixture {
     RunLoopUntilIdle();
     ASSERT_TRUE(done);
   }
-  std::vector<CaptureTemplate> Template() {
+  static std::vector<CaptureTemplate> Template() {
     return std::vector<CaptureTemplate>{{
         .time = zx_nsec_from_duration(zx_duration_from_hour(7)),
         .kmem =
@@ -200,20 +201,111 @@ class MetricsUnitTest : public gtest::RealLoopFixture {
             },
     }};
   }
+
+ private:
   async::Executor executor_;
-  sys::testing::ComponentContextProvider context_provider_;
+};
+
+// Wrapper around |cobalt::StubMetricEventLogger_Sync| for new style C++ bindings.
+class StubMetricEventLogger : public fidl::Server<fuchsia_metrics::MetricEventLogger> {
+ public:
+  fidl::SyncClient<fuchsia_metrics::MetricEventLogger> SpawnClient(async_dispatcher_t* dispatcher) {
+    auto endpoints = fidl::CreateEndpoints<fuchsia_metrics::MetricEventLogger>().value();
+    fidl::BindServer(dispatcher, std::move(endpoints.server), this);
+    return fidl::SyncClient{std::move(endpoints.client)};
+  }
+
+  void LogOccurrence(LogOccurrenceRequest& request,
+                     LogOccurrenceCompleter::Sync& completer) override {
+    fuchsia::metrics::MetricEventLogger_LogOccurrence_Result result;
+    logger_.LogOccurrence(request.metric_id(), request.count(), request.event_codes(), &result);
+    completer.Reply(fit::success{});
+  }
+
+  void LogInteger(LogIntegerRequest& request, LogIntegerCompleter::Sync& completer) override {
+    fuchsia::metrics::MetricEventLogger_LogInteger_Result result;
+    logger_.LogInteger(request.metric_id(), request.value(), request.event_codes(), &result);
+    completer.Reply(fit::success{});
+  }
+
+  void LogIntegerHistogram(LogIntegerHistogramRequest& request,
+                           LogIntegerHistogramCompleter::Sync& completer) override {
+    std::vector<fuchsia::metrics::HistogramBucket> histograms;
+    for (auto& b : request.histogram()) {
+      histograms.emplace_back(b.index(), b.count());
+    }
+    fuchsia::metrics::MetricEventLogger_LogIntegerHistogram_Result result;
+    logger_.LogIntegerHistogram(request.metric_id(), std::move(histograms), request.event_codes(),
+                                &result);
+    completer.Reply(fit::success{});
+  }
+
+  void LogString(LogStringRequest& request, LogStringCompleter::Sync& completer) override {
+    fuchsia::metrics::MetricEventLogger_LogString_Result result;
+    logger_.LogString(request.metric_id(), request.string_value(), request.event_codes(), &result);
+    completer.Reply(fit::success{});
+  }
+
+  void LogMetricEvents(LogMetricEventsRequest& request,
+                       LogMetricEventsCompleter::Sync& completer) override {
+    fuchsia::metrics::MetricEventLogger_LogMetricEvents_Result result;
+    std::vector<fuchsia::metrics::MetricEvent> events;
+    for (const auto& e : request.events()) {
+      std::optional<fuchsia::metrics::MetricEventPayload> payload;
+      switch (e.payload().Which()) {
+        case fuchsia_metrics::MetricEventPayload::Tag::kCount:
+          payload.emplace(fuchsia::metrics::MetricEventPayload::WithCount(
+              static_cast<uint64_t>(e.payload().count().value())));
+          break;
+        case fuchsia_metrics::MetricEventPayload::Tag::kHistogram: {
+          std::vector<fuchsia::metrics::HistogramBucket> histograms;
+          for (const auto& b : e.payload().histogram().value()) {
+            histograms.emplace_back(b.index(), b.count());
+          }
+          payload.emplace(
+              fuchsia::metrics::MetricEventPayload::WithHistogram(std::move(histograms)));
+        } break;
+        case fuchsia_metrics::MetricEventPayload::Tag::kIntegerValue:
+          payload.emplace(fuchsia::metrics::MetricEventPayload::WithIntegerValue(
+              static_cast<int64_t>(e.payload().integer_value().value())));
+          break;
+        case fuchsia_metrics::MetricEventPayload::Tag::kStringValue:
+          payload.emplace(fuchsia::metrics::MetricEventPayload::WithStringValue(
+              std::string(e.payload().string_value().value())));
+          break;
+        default:
+          FAIL() << "Unknown event type.";
+      }
+      ASSERT_TRUE(payload.has_value());
+      events.emplace_back(e.metric_id(), e.event_codes(), std::move(*payload));
+    }
+
+    logger_.LogMetricEvents(std::move(events), &result);
+    completer.Reply(fit::success{});
+  }
+
+  const std::vector<fuchsia::metrics::MetricEvent>& logged_events() {
+    return logger_.logged_events();
+  }
+
+  size_t event_count() { return logger_.event_count(); }
+
+ private:
+  cobalt::StubMetricEventLogger_Sync logger_;
 };
 
 TEST_F(MetricsUnitTest, Inspect) {
   CaptureSupplier cs(Template());
-  cobalt::StubMetricEventLogger_Sync logger;
   inspect::ComponentInspector inspector(dispatcher(), inspect::PublishOptions{});
+  async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
+  StubMetricEventLogger logger;
   Metrics m(
-      kBucketMatches, zx::min(5), dispatcher(), &inspector, &logger,
+      kBucketMatches, zx::min(5), dispatcher(), &inspector, logger.SpawnClient(loop.dispatcher()),
       [&cs](Capture* c) {
         return cs.GetCapture(c, CaptureLevel::VMO, true /*use_capture_supplier_time*/);
       },
       [](const Capture& c, Digest* d) { Digester(kBucketMatches).Digest(c, d); });
+  loop.StartThread();
   RunLoopUntil([&cs] { return cs.empty(); });
 
   // [START get_hierarchy]
@@ -239,14 +331,16 @@ TEST_F(MetricsUnitTest, Inspect) {
 
 TEST_F(MetricsUnitTest, All) {
   CaptureSupplier cs(Template());
-  cobalt::StubMetricEventLogger_Sync logger;
   inspect::ComponentInspector inspector(dispatcher(), inspect::PublishOptions{});
+  StubMetricEventLogger logger;
+  async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
   Metrics m(
-      kBucketMatches, zx::msec(10), dispatcher(), &inspector, &logger,
+      kBucketMatches, zx::msec(10), dispatcher(), &inspector, logger.SpawnClient(loop.dispatcher()),
       [&cs](Capture* c) {
         return cs.GetCapture(c, CaptureLevel::VMO, true /*use_capture_supplier_time*/);
       },
       [](const Capture& c, Digest* d) { Digester(kBucketMatches).Digest(c, d); });
+  loop.StartThread();
   RunLoopUntil([&cs] { return cs.empty(); });
   // memory metric: 20 buckets + 4 (Orphaned, Kernel, Undigested and Free buckets)  +
   // memory_general_breakdown metric: 10 +
@@ -383,6 +477,8 @@ TEST_F(MetricsUnitTest, All) {
             break;
         }
         break;
+      default:
+        FAIL() << "Unexpected metric id: " << metric_event.metric_id;
     }
   }
 }
@@ -413,12 +509,14 @@ TEST_F(MetricsUnitTest, One) {
               {.koid = 1, .name = "bin/bootsvc", .vmos = {1}},
           },
   }});
-  cobalt::StubMetricEventLogger_Sync logger;
+  StubMetricEventLogger logger;
+  async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
   inspect::ComponentInspector inspector(dispatcher(), inspect::PublishOptions{});
   Metrics m(
-      kBucketMatches, zx::msec(10), dispatcher(), &inspector, &logger,
+      kBucketMatches, zx::msec(10), dispatcher(), &inspector, logger.SpawnClient(loop.dispatcher()),
       [&cs](Capture* c) { return cs.GetCapture(c, CaptureLevel::VMO); },
       [](const Capture& c, Digest* d) { Digester(kBucketMatches).Digest(c, d); });
+  loop.StartThread();
   RunLoopUntil([&cs] { return cs.empty(); });
   EXPECT_EQ(21U, logger.event_count());  // 1 + 10 + 10
 }
@@ -454,12 +552,14 @@ TEST_F(MetricsUnitTest, Undigested) {
               {.koid = 2, .name = "test", .vmos = {2}},
           },
   }});
-  cobalt::StubMetricEventLogger_Sync logger;
+  StubMetricEventLogger logger;
+  async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
   inspect::ComponentInspector inspector(dispatcher(), inspect::PublishOptions{});
   Metrics m(
-      kBucketMatches, zx::msec(10), dispatcher(), &inspector, &logger,
+      kBucketMatches, zx::msec(10), dispatcher(), &inspector, logger.SpawnClient(loop.dispatcher()),
       [&cs](Capture* c) { return cs.GetCapture(c, CaptureLevel::VMO); },
       [](const Capture& c, Digest* d) { Digester(kBucketMatches).Digest(c, d); });
+  loop.StartThread();
   RunLoopUntil([&cs] { return cs.empty(); });
   EXPECT_EQ(22U, logger.event_count());  // 2 + 10 + 10
 }

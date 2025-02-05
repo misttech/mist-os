@@ -4,6 +4,7 @@
 
 #include "src/developer/memory/monitor/monitor.h"
 
+#include <fuchsia/hardware/ram/metrics/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/time.h>
 #include <lib/async/default.h>
@@ -29,7 +30,6 @@
 
 #include "lib/component/incoming/cpp/protocol.h"
 #include "lib/fpromise/result.h"
-#include "lib/zx/result.h"
 #include "src/developer/memory/metrics/bucket_match.h"
 #include "src/developer/memory/metrics/capture.h"
 #include "src/developer/memory/metrics/printer.h"
@@ -56,6 +56,7 @@ const char Monitor::kTraceName[] = "memory_monitor";
 namespace {
 // Path to the configuration file for buckets.
 const std::string kBucketConfigPath = "/config/data/buckets.json";
+constexpr std::string kLoggerInspectKey = "logger";
 const zx::duration kHighWaterPollFrequency = zx::sec(10);
 const uint64_t kHighWaterThreshold = 10ul * 1024 * 1024;
 const zx::duration kMetricsPollFrequency = zx::min(5);
@@ -128,21 +129,22 @@ std::vector<memory::BucketMatch> CreateBucketMatchesFromConfigData() {
 
 }  // namespace
 
-Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
-                 const fxl::CommandLine& command_line, async_dispatcher_t* dispatcher,
-                 bool send_metrics, bool watch_memory_pressure,
+Monitor::Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispatcher,
                  memory_monitor_config::Config config,
-                 std::unique_ptr<memory::CaptureMaker> capture_maker)
+                 std::unique_ptr<memory::CaptureMaker> capture_maker,
+                 std::optional<fidl::Client<fuchsia_memorypressure::Provider>> pressure_provider,
+                 std::optional<zx_handle_t> root_job,
+                 std::optional<fidl::SyncClient<fuchsia_metrics::MetricEventLoggerFactory>> factory)
     : capture_maker_(std::move(capture_maker)),
       prealloc_size_(0),
       logging_(command_line.HasOption("log")),
       tracing_(false),
       delay_(zx::sec(1)),
       dispatcher_(dispatcher),
-      component_context_(std::move(context)),
       config_(config),
       inspector_(dispatcher_, {}),
-      level_(pressure_signaler::Level::kNumLevels) {
+      level_(pressure_signaler::Level::kNumLevels),
+      pressure_provider_(std::move(pressure_provider)) {
   auto bucket_matches = CreateBucketMatchesFromConfigData();
   digester_ = std::make_unique<Digester>(bucket_matches);
   high_water_ = std::make_unique<HighWater>(
@@ -152,9 +154,10 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
   logger_ = std::make_unique<Logger>(
       dispatcher_, high_water_.get(),
       [this](Capture* c) { return capture_maker_->GetCapture(c, CaptureLevel::VMO); },
-      [this](const Capture& c, Digest* d) { GetDigest(c, d); }, &config_);
-  if (send_metrics)
-    CreateMetrics(bucket_matches);
+      [this](const Capture& c, Digest* d) { GetDigest(c, d); }, &config_,
+      inspector_.root().CreateChild(kLoggerInspectKey));
+  if (factory)
+    CreateMetrics(std::move(factory.value()), bucket_matches);
 
   // Expose lazy values under the root, populated from the Inspect method.
   inspector_.root().RecordLazyValues(
@@ -163,11 +166,6 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
       });
   inspect::Node config_node = inspector_.root().CreateChild("config");
   config_.RecordInspect(&config_node);
-
-  zx_status_t status =
-      component_context_->outgoing()->AddPublicService<fuchsia::memory::inspection::Collector>(
-          bindings_.GetHandler(this));
-  FX_CHECK(status == ZX_OK);
 
   if (command_line.HasOption("help")) {
     PrintHelp();
@@ -190,7 +188,7 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
       exit(-1);
     }
     prealloc_size_ *= 1024ul * 1024;
-    status = zx::vmo::create(prealloc_size_, 0, &prealloc_vmo_);
+    zx_status_t status = zx::vmo::create(prealloc_size_, 0, &prealloc_vmo_);
     if (status != ZX_OK) {
       FX_LOGS(ERROR) << "zx::vmo::create() returns " << zx_status_get_string(status);
       exit(-1);
@@ -224,52 +222,31 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
                   << " Total Heap: " << kmem.total_heap_bytes;
   }
 
-  if (watch_memory_pressure) {
-    {
-      // Pressure monitoring
-      zx::result client_end = component::Connect<fuchsia_memorypressure::Provider>();
-      if (!client_end.is_ok()) {
-        FX_LOGS(ERROR) << "Error connecting to FIDL fuchsia.memorypressure.Provider: "
-                       << client_end.status_string();
-        exit(-1);
-      }
-      pressure_provider_ = fidl::Client{std::move(*client_end), dispatcher_};
-      auto watcher_endpoints = fidl::CreateEndpoints<fuchsia_memorypressure::Watcher>();
-      auto watcher = fidl::BindServer(dispatcher_, std::move(watcher_endpoints->server), this);
+  // Pressure monitoring
+  if (pressure_provider_.has_value()) {
+    auto watcher_endpoints = fidl::CreateEndpoints<fuchsia_memorypressure::Watcher>();
+    auto watcher = fidl::BindServer(dispatcher_, std::move(watcher_endpoints->server), this);
 
-      auto result = pressure_provider_->RegisterWatcher(std::move(watcher_endpoints->client));
-      if (!result.is_ok()) {
-        FX_LOGS(ERROR) << "Error registering to memory pressure changes: " << result.error_value();
-        exit(-1);
-      }
+    auto result = pressure_provider_.value()->RegisterWatcher(std::move(watcher_endpoints->client));
+    if (!result.is_ok()) {
+      FX_LOGS(ERROR) << "Error registering to memory pressure changes: " << result.error_value();
+      exit(-1);
+    }
+  }
+
+  // Imminent OOM monitoring
+  if (root_job.has_value()) {
+    zx_status_t status = zx_system_get_event(
+        root_job.value(), ZX_SYSTEM_EVENT_IMMINENT_OUT_OF_MEMORY, &imminent_oom_event_handle_);
+    if (status != ZX_OK) {
+      FX_LOGS(ERROR) << "zx_system_get_event [IMMINENT-OOM] returned "
+                     << zx_status_get_string(status);
+      exit(-1);
     }
 
-    {
-      // Imminent OOM monitoring
-      auto client_end = component::Connect<fuchsia_kernel::RootJobForInspect>();
-      if (!client_end.is_ok()) {
-        FX_LOGS(ERROR) << "Error connecting to root job: " << client_end.error_value();
-        exit(-1);
-      }
-
-      auto result = fidl::WireCall(*client_end)->Get();
-      if (result.status() != ZX_OK) {
-        FX_LOGS(ERROR) << "Error getting root job: " << result.status();
-        exit(-1);
-      }
-
-      zx_status_t status = zx_system_get_event(
-          result->job.get(), ZX_SYSTEM_EVENT_IMMINENT_OUT_OF_MEMORY, &imminent_oom_event_handle_);
-      if (status != ZX_OK) {
-        FX_LOGS(ERROR) << "zx_system_get_event [IMMINENT-OOM] returned "
-                       << zx_status_get_string(status);
-        exit(-1);
-      }
-
-      // Start imminent oom monitoring on a new named thread.
-      imminent_oom_loop_.StartThread("imminent-oom-loop");
-      watch_task_.Post(imminent_oom_loop_.dispatcher());
-    }
+    // Start imminent oom monitoring on a new named thread.
+    imminent_oom_loop_.StartThread("imminent-oom-loop");
+    watch_task_.Post(imminent_oom_loop_.dispatcher());
   }
 
   SampleAndPost();
@@ -281,43 +258,41 @@ void Monitor::SetRamDevice(fuchsia::hardware::ram::metrics::DevicePtr ptr) {
     PeriodicMeasureBandwidth();
 }
 
-void Monitor::CreateMetrics(const std::vector<memory::BucketMatch>& bucket_matches) {
-  // Connect to the metrics fidl service provided by the environment.
-  fuchsia::metrics::MetricEventLoggerFactorySyncPtr factory;
-  component_context_->svc()->Connect(factory.NewRequest());
-  if (!factory) {
-    FX_LOGS(ERROR) << "Unable to get metrics.MetricEventLoggerFactory.";
+void Monitor::CreateMetrics(
+    fidl::SyncClient<fuchsia_metrics::MetricEventLoggerFactory> metric_event_logger_factory,
+    const std::vector<memory::BucketMatch>& bucket_matches) {
+  fuchsia_metrics::ProjectSpec project_spec{
+      {.customer_id = cobalt_registry::kCustomerId, .project_id = cobalt_registry::kProjectId}};
+  auto endpoints = fidl::CreateEndpoints<fuchsia_metrics::MetricEventLogger>();
+  if (endpoints.is_error()) {
+    FX_LOGS(ERROR) << "Unable to create fuchsia_metrics::MetricEventLogger channels.";
     return;
   }
-  // Create a Metric Event Logger. The ID name is the one we specified in the
-  // Cobalt metrics registry.
-  fuchsia::metrics::ProjectSpec project_spec;
-  project_spec.set_customer_id(cobalt_registry::kCustomerId);
-  project_spec.set_project_id(cobalt_registry::kProjectId);
-  fuchsia::metrics::MetricEventLoggerFactory_CreateMetricEventLogger_Result result =
-      fpromise::error(fuchsia::metrics::Error::INTERNAL_ERROR);
-  factory->CreateMetricEventLogger(std::move(project_spec), metric_event_logger_.NewRequest(),
-                                   &result);
-  if (result.is_err()) {
+  fidl::SyncClient<fuchsia_metrics::MetricEventLogger> metric_event_logger{
+      std::move(endpoints.value().client)};
+  auto result = metric_event_logger_factory->CreateMetricEventLogger(
+      {{.project_spec = project_spec, .logger = std::move(endpoints.value().server)}});
+  if (result.is_error()) {
     FX_LOGS(ERROR) << "Unable to get metrics.Logger from factory.";
     return;
   }
-
-  metrics_ = std::make_unique<Metrics>(
-      bucket_matches, kMetricsPollFrequency, dispatcher_, &inspector_, metric_event_logger_.get(),
+  metrics_.emplace(
+      bucket_matches, kMetricsPollFrequency, dispatcher_, &inspector_,
+      std::move(metric_event_logger),
       [this](Capture* c) { return capture_maker_->GetCapture(c, CaptureLevel::VMO); },
       [this](const Capture& c, Digest* d) { GetDigest(c, d); });
 }
 
-void Monitor::CollectJsonStats(zx::socket socket) {
+void Monitor::CollectJsonStats(CollectJsonStatsRequest& request,
+                               CollectJsonStatsCompleter::Sync& completer) {
   // We set |include_starnix_processes| to true to avoid any change of behavior to the current
   // clients.
-  CollectJsonStatsWithOptions(std::move(socket));
+  CollectJsonStatsWithOptions(std::move(request.socket()));
 }
 
-void Monitor::CollectJsonStatsWithOptions(
-    fuchsia::memory::inspection::CollectorCollectJsonStatsWithOptionsRequest request) {
-  CollectJsonStatsWithOptions(std::move(*request.mutable_socket()));
+void Monitor::CollectJsonStatsWithOptions(CollectJsonStatsWithOptionsRequest& request,
+                                          CollectJsonStatsWithOptionsCompleter::Sync& completer) {
+  CollectJsonStatsWithOptions(std::move(request.socket().value()));
 }
 
 void Monitor::CollectJsonStatsWithOptions(zx::socket socket) {
