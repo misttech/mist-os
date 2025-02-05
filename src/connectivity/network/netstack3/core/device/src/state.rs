@@ -22,8 +22,8 @@ use crate::internal::socket::HeldDeviceSockets;
 /// Provides the specifications for device state held by [`BaseDeviceId`] in
 /// [`BaseDeviceState`].
 pub trait DeviceStateSpec: Device + Sized + Send + Sync + 'static {
-    /// The link state.
-    type Link<BT: DeviceLayerTypes>: Send + Sync;
+    /// The device state.
+    type State<BT: DeviceLayerTypes>: Send + Sync;
     /// The external (bindings) state.
     type External<BT: DeviceLayerTypes>: Send + Sync;
     /// Properties given to device creation.
@@ -33,15 +33,15 @@ pub trait DeviceStateSpec: Device + Sized + Send + Sync + 'static {
     /// The timer identifier required by this device state.
     type TimerId<D: WeakDeviceIdentifier>;
 
-    /// Creates a new link state from the given properties.
-    fn new_link_state<
+    /// Creates a new device state from the given properties.
+    fn new_device_state<
         CC: CoreTimerContext<Self::TimerId<CC::WeakDeviceId>, BC> + DeviceIdContext<Self>,
         BC: DeviceLayerTypes + TimerContext,
     >(
         bindings_ctx: &mut BC,
         self_id: CC::WeakDeviceId,
         properties: Self::CreationProperties,
-    ) -> Self::Link<BC>;
+    ) -> Self::State<BC>;
 
     /// Marker for loopback devices.
     const IS_LOOPBACK: bool;
@@ -69,7 +69,7 @@ pub(crate) struct BaseDeviceState<T: DeviceStateSpec, BT: DeviceLayerTypes> {
 /// A convenience wrapper around `IpLinkDeviceStateInner` that uses
 /// `DeviceStateSpec` to extract the link state type and make type signatures
 /// shorter.
-pub type IpLinkDeviceState<T, BT> = IpLinkDeviceStateInner<<T as DeviceStateSpec>::Link<BT>, BT>;
+pub type IpLinkDeviceState<T, BT> = IpLinkDeviceStateInner<<T as DeviceStateSpec>::State<BT>, BT>;
 
 /// State for a link-device that is also an IP device.
 ///

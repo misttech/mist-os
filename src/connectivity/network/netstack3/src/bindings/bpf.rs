@@ -3,33 +3,31 @@
 // found in the LICENSE file.
 
 use ebpf::{
-    BpfValue, DataWidth, EbpfInstruction, EbpfProgram, EbpfRunContext, PacketAccessor, SKF_AD_OFF,
-    SKF_AD_PROTOCOL, SKF_LL_OFF, SKF_NET_OFF,
+    link_program, BpfProgramContext, BpfValue, CbpfConfig, DataWidth, EbpfInstruction, EbpfProgram,
+    Packet, ProgramArgument, Type, VerifiedEbpfProgram,
+};
+use ebpf_api::{
+    PinnedMap, __sk_buff, SKF_AD_OFF, SKF_AD_PROTOCOL, SKF_LL_OFF, SKF_NET_OFF, SK_BUF_TYPE,
+    SOCKET_FILTER_CBPF_CONFIG,
 };
 use fidl_fuchsia_posix_socket_packet as fppacket;
 use netstack3_core::device_socket::Frame;
+use std::collections::HashMap;
 use zerocopy::FromBytes;
 
+// Packet buffer representation used for BPF filters.
+#[repr(C)]
 struct IpPacketForBpf<'a> {
+    // This field must be first. eBPF programs will access it directly.
+    sk_buff: __sk_buff,
+
     kind: fppacket::Kind,
     frame: Frame<&'a [u8]>,
     raw: &'a [u8],
 }
 
-struct IpPacketAccessor {}
-
-impl<C: EbpfRunContext> PacketAccessor<C> for IpPacketAccessor {
-    fn load<'a>(
-        &self,
-        _context: &mut C::Context<'a>,
-        packet_ptr: BpfValue,
-        offset: i32,
-        width: DataWidth,
-    ) -> Option<BpfValue> {
-        // SAFETY: The verifier checks that the `packet_ptr` we get here is the value that was
-        // passed to the program as the first argument.
-        let packet: &IpPacketForBpf<'_> = unsafe { &*packet_ptr.as_ptr::<IpPacketForBpf<'_>>() };
-
+impl Packet for &'_ IpPacketForBpf<'_> {
+    fn load<'a>(&self, offset: i32, width: DataWidth) -> Option<BpfValue> {
         // cBPF Socket Filters use non-negative offset to access packet content.
         // Negative offsets are handler as follows as follows:
         //   SKF_AD_OFF (-0x1000) - Auxiliary info that may be outside of the packet.
@@ -39,14 +37,14 @@ impl<C: EbpfRunContext> PacketAccessor<C> for IpPacketAccessor {
         let (offset, slice) = if offset >= 0 {
             (
                 offset,
-                match packet.kind {
-                    fppacket::Kind::Network => packet.frame.into_body(),
-                    fppacket::Kind::Link => packet.raw,
+                match self.kind {
+                    fppacket::Kind::Network => self.frame.into_body(),
+                    fppacket::Kind::Link => self.raw,
                 },
             )
         } else if offset >= SKF_AD_OFF {
             if offset == SKF_AD_OFF + SKF_AD_PROTOCOL {
-                return Some(packet.frame.protocol().unwrap_or(0).into());
+                return Some(self.frame.protocol().unwrap_or(0).into());
             } else {
                 log::info!(
                     "cBPF program tried to access unimplemented SKF_AD_OFF offset: {}",
@@ -56,10 +54,10 @@ impl<C: EbpfRunContext> PacketAccessor<C> for IpPacketAccessor {
             }
         } else if offset >= SKF_NET_OFF {
             // Access network level packet.
-            (offset - SKF_NET_OFF, packet.frame.into_body())
+            (offset - SKF_NET_OFF, self.frame.into_body())
         } else if offset >= SKF_LL_OFF {
             // Access link-level packet.
-            (offset - SKF_LL_OFF, packet.raw)
+            (offset - SKF_LL_OFF, self.raw)
         } else {
             return None;
         };
@@ -87,20 +85,26 @@ impl<C: EbpfRunContext> PacketAccessor<C> for IpPacketAccessor {
                 .map(|(v, _)| v.get().into()),
         }
     }
+}
 
-    fn packet_len<'a>(&self, _context: &mut C::Context<'a>, packet_ptr: BpfValue) -> usize {
-        // SAFETY: Verifier checks that `packet_ptr` points at IpPacketForBpf.
-        let packet: &IpPacketForBpf<'_> = unsafe { &*packet_ptr.as_ptr::<IpPacketForBpf<'_>>() };
-        match packet.kind {
-            fppacket::Kind::Network => packet.frame.into_body().len(),
-            fppacket::Kind::Link => packet.raw.len(),
-        }
+impl ProgramArgument for &'_ IpPacketForBpf<'_> {
+    fn get_type() -> &'static Type {
+        &*SK_BUF_TYPE
     }
+}
+
+struct SocketFilterContext {}
+
+impl BpfProgramContext for SocketFilterContext {
+    type RunContext<'a> = ();
+    type Packet<'a> = &'a IpPacketForBpf<'a>;
+    type Map = PinnedMap;
+    const CBPF_CONFIG: &'static CbpfConfig = &SOCKET_FILTER_CBPF_CONFIG;
 }
 
 #[derive(Debug)]
 pub(crate) struct SocketFilterProgram {
-    program: EbpfProgram<()>,
+    program: EbpfProgram<SocketFilterContext>,
 }
 
 pub(crate) enum SocketFilterResult {
@@ -126,7 +130,10 @@ impl SocketFilterProgram {
         // This is safe because fuchsia.posix.socket.packet is routed only to Starnix,
         // but that may change in the future. We need a better mechanism for permissions & BPF
         // verification.
-        let program = EbpfProgram::<()>::from_verified_code(code);
+        let program =
+            VerifiedEbpfProgram::from_verified_code(code, SocketFilterContext::get_arg_types());
+        let program = link_program::<SocketFilterContext>(&program, &[], vec![], HashMap::new())
+            .expect("Failed to link SocketFilter program");
 
         Self { program }
     }
@@ -137,8 +144,19 @@ impl SocketFilterProgram {
         frame: Frame<&[u8]>,
         raw: &[u8],
     ) -> SocketFilterResult {
-        let mut packet = IpPacketForBpf { kind, frame, raw };
-        let result = self.program.run(&mut (), &IpPacketAccessor {}, &mut packet);
+        let packet_size = match kind {
+            fppacket::Kind::Network => frame.into_body().len(),
+            fppacket::Kind::Link => raw.len(),
+        };
+
+        let mut packet = IpPacketForBpf {
+            sk_buff: __sk_buff { len: packet_size.try_into().unwrap(), ..Default::default() },
+            kind,
+            frame,
+            raw,
+        };
+
+        let result = self.program.run(&mut (), &mut packet);
         match result {
             0 => SocketFilterResult::Reject,
             n => SocketFilterResult::Accept(n.try_into().unwrap()),
@@ -149,7 +167,8 @@ impl SocketFilterProgram {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ebpf::SKF_AD_MAX;
+    use ebpf::Packet;
+    use ebpf_api::SKF_AD_MAX;
     use netstack3_core::device_socket::SentFrame;
     use packet::ParsablePacket;
     use packet_formats::ethernet::EthernetFrameLengthCheck;
@@ -180,10 +199,7 @@ mod tests {
     }
 
     fn packet_load(packet: &IpPacketForBpf<'_>, offset: i32, width: DataWidth) -> Option<u64> {
-        let bpf_packet_ptr = BpfValue::from(packet as *const IpPacketForBpf<'_>);
-        let packet_accessor = IpPacketAccessor {};
-        PacketAccessor::<()>::load(&packet_accessor, &mut (), bpf_packet_ptr, offset, width)
-            .map(|v| v.as_u64())
+        packet.load(offset, width).map(|v| v.as_u64())
     }
 
     // Test loading Ethernet header at the specified base offset.
@@ -222,6 +238,7 @@ mod tests {
     #[test]
     fn network_level_packet() {
         let packet = IpPacketForBpf {
+            sk_buff: Default::default(),
             kind: fppacket::Kind::Network,
             frame: TestData::frame(),
             raw: TestData::BUFFER,
@@ -238,6 +255,7 @@ mod tests {
     #[test]
     fn link_level_packet() {
         let packet = IpPacketForBpf {
+            sk_buff: Default::default(),
             kind: fppacket::Kind::Link,
             frame: TestData::frame(),
             raw: TestData::BUFFER,
@@ -250,6 +268,7 @@ mod tests {
     #[test]
     fn negative_offsets() {
         let packet = IpPacketForBpf {
+            sk_buff: Default::default(),
             kind: fppacket::Kind::Link,
             frame: TestData::frame(),
             raw: TestData::BUFFER,

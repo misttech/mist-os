@@ -12,9 +12,9 @@ use fidl_fuchsia_bluetooth_bredr::{
 use fuchsia_bluetooth::types::{Channel, PeerId, Uuid};
 use futures::ready;
 use futures::stream::{FusedStream, Stream, StreamExt};
+use log::{info, trace, warn};
 use packet_encoding::Encodable;
 use profile_client::{ProfileClient, ProfileEvent};
-use tracing::{info, trace, warn};
 
 use crate::types::packets::MessageStreamPacket;
 use crate::types::Error;
@@ -45,7 +45,7 @@ impl MessageStream {
         let profile = match Self::advertise(&profile) {
             Ok(p) => p,
             Err(e) => {
-                warn!(?e, "Couldn't advertise the RFCOMM service");
+                warn!(e:?; "Couldn't advertise the RFCOMM service");
                 ProfileClient::new(profile)
             }
         };
@@ -98,19 +98,19 @@ impl MessageStream {
             .iter()
             .any(|descriptor| descriptor.protocol == Some(ProtocolIdentifier::Rfcomm))
         {
-            warn!(%id, "Received non-RFCOMM connection. Ignoring");
+            warn!(id:%; "Received non-RFCOMM connection. Ignoring");
             return None;
         }
 
         if self.rfcomm.is_some() {
-            trace!(%id, "RFCOMM connection already exists. Overwriting");
+            trace!(id:%; "RFCOMM connection already exists. Overwriting");
         }
         self.rfcomm.set(channel);
         Some(id)
     }
 
     fn handle_rfcomm_data(&mut self, data: Vec<u8>) {
-        info!(?data, "Received Message Stream request");
+        info!(data:?; "Received Message Stream request");
         // We don't support any Message Stream requests.
         // TODO(https://fxbug.dev/42062580): Parse and handle Message Stream requests.
     }
@@ -134,7 +134,7 @@ impl Stream for MessageStream {
                 }
             }
             Poll::Ready(Some(Err(e))) => {
-                warn!(?e, "Error in ProfileClient stream");
+                warn!(e:?; "Error in ProfileClient stream");
             }
             Poll::Ready(None) => {
                 info!("ProfileClient stream terminated");
@@ -149,7 +149,7 @@ impl Stream for MessageStream {
             match rfcomm_event {
                 Some(Ok(data)) => self.handle_rfcomm_data(data),
                 Some(Err(e)) => {
-                    warn!(?e, "Error in RFCOMM channel");
+                    warn!(e:?; "Error in RFCOMM channel");
                     let _ = MaybeStream::take(&mut self.rfcomm);
                 }
                 None => {

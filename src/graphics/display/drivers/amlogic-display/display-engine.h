@@ -92,11 +92,10 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
                                        uint64_t* out_image_handle);
   void DisplayEngineReleaseImage(uint64_t image_handle);
   config_check_result_t DisplayEngineCheckConfiguration(
-      const display_config_t* display_configs, size_t display_count,
+      const display_config_t* display_config_ptr,
       layer_composition_operations_t* out_layer_composition_operations_list,
       size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual);
-  void DisplayEngineApplyConfiguration(const display_config_t* display_configs,
-                                       size_t display_count,
+  void DisplayEngineApplyConfiguration(const display_config_t* display_config_ptr,
                                        const config_stamp_t* banjo_config_stamp);
   zx_status_t DisplayEngineSetBufferCollectionConstraints(
       const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
@@ -107,6 +106,16 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
                                                  uint32_t index, uint64_t* out_capture_handle);
   zx_status_t DisplayEngineStartCapture(uint64_t capture_handle);
   zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle);
+
+  // TODO(https://fxbug.dev/42080631): Remove these transitional overloads.
+  config_check_result_t DisplayEngineCheckConfiguration(
+      const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
+      layer_composition_operations_t* out_layer_composition_operations_list,
+      size_t out_layer_composition_operations_size,
+      size_t* out_layer_composition_operations_actual);
+  void DisplayEngineApplyConfiguration(const display_config_t* banjo_display_configs_array,
+                                       size_t banjo_display_configs_count,
+                                       const config_stamp_t* banjo_config_stamp);
 
   const display_engine_protocol_ops_t* display_engine_protocol_ops() const {
     return &display_engine_protocol_ops_;

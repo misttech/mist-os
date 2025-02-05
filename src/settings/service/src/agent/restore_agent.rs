@@ -52,7 +52,7 @@ impl RestoreAgent {
                         .next_of::<HandlerPayload>()
                         .await
                         .map_err(|e| {
-                            tracing::error!("Received error when getting payload: {:?}", e);
+                            log::error!("Received error when getting payload: {:?}", e);
                             AgentError::UnexpectedError
                         })?
                         .0;
@@ -67,19 +67,16 @@ impl RestoreAgent {
                                 continue;
                             }
                             Err(Error::UnhandledType(setting_type)) => {
-                                tracing::info!(
-                                    "setting not available for restore: {:?}",
-                                    setting_type
-                                );
+                                log::info!("setting not available for restore: {:?}", setting_type);
                                 continue;
                             }
                             e => {
-                                tracing::error!("error during restore for {component:?}: {e:?}");
+                                log::error!("error during restore for {component:?}: {e:?}");
                                 return Err(AgentError::UnexpectedError);
                             }
                         }
                     } else {
-                        tracing::error!("Error because of response: {:?}", response);
+                        log::error!("Error because of response: {:?}", response);
                         return Err(AgentError::UnexpectedError);
                     }
                 }

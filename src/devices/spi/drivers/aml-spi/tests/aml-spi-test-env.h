@@ -9,13 +9,15 @@
 #include <fidl/fuchsia.hardware.gpio/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire_test_base.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/fake-bti/cpp/fake-bti.h>
+#include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/testing/cpp/driver_test.h>
-#include <lib/fake-bti/bti.h>
+#include <lib/fpromise/promise.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/vmo.h>
 #include <zircon/errors.h>
 
-#include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>
 
 #include "src/devices/registers/testing/mock-registers/mock-registers.h"
@@ -38,7 +40,7 @@ class TestAmlSpiDriver : public AmlSpiDriver {
                                           fdf_internal::DriverServer<TestAmlSpiDriver>::destroy);
   }
 
-  ddk_fake::FakeMmioRegRegion& mmio() { return mmio_region_; }
+  fake_mmio::FakeMmioRegRegion& mmio() { return mmio_region_; }
 
   uint32_t conreg() const { return conreg_; }
   uint32_t enhance_cntl() const { return enhance_cntl_; }
@@ -63,7 +65,7 @@ class TestAmlSpiDriver : public AmlSpiDriver {
   }
 
  private:
-  ddk_fake::FakeMmioRegRegion mmio_region_;
+  fake_mmio::FakeMmioRegRegion mmio_region_;
   uint32_t conreg_{};
   uint32_t enhance_cntl_{};
   uint32_t testreg_{};
@@ -128,8 +130,22 @@ class BaseTestEnvironment : public fdf_testing::Environment,
       : fdf_testing::Environment(), registers_(fdf::Dispatcher::GetCurrent()->async_dispatcher()) {}
 
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    SetUpInterrupt();
-    SetUpBti();
+    std::map<uint32_t, zx::interrupt> irqs;
+    std::optional interrupt = CreateInterrupt();
+    if (interrupt.has_value()) {
+      irqs[0] = std::move(interrupt.value());
+    }
+
+    std::map<uint32_t, zx::bti> btis;
+    std::optional bti = CreateBti();
+    if (bti.has_value()) {
+      btis[0] = std::move(bti.value());
+    }
+
+    pdev_server_.SetConfig({
+        .irqs = std::move(irqs),
+        .btis = std::move(btis),
+    });
 
     auto result = to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
         pdev_server_.GetInstanceHandler(fdf::Dispatcher::GetCurrent()->async_dispatcher()), "pdev");
@@ -177,15 +193,15 @@ class BaseTestEnvironment : public fdf_testing::Environment,
     return zx::ok();
   }
 
-  virtual void SetUpInterrupt() {
-    ASSERT_OK(zx::interrupt::create({}, 0, ZX_INTERRUPT_VIRTUAL, &interrupt_));
+  virtual std::optional<zx::interrupt> CreateInterrupt() {
+    EXPECT_OK(zx::interrupt::create({}, 0, ZX_INTERRUPT_VIRTUAL, &interrupt_));
     zx::interrupt dut_interrupt;
-    ASSERT_OK(interrupt_.duplicate(ZX_RIGHT_SAME_RIGHTS, &dut_interrupt));
-    pdev_server_.set_interrupt(std::move(dut_interrupt));
+    EXPECT_OK(interrupt_.duplicate(ZX_RIGHT_SAME_RIGHTS, &dut_interrupt));
     interrupt_.trigger(0, zx::clock::get_boot());
+    return std::move(dut_interrupt);
   }
 
-  virtual void SetUpBti() {}
+  virtual std::optional<zx::bti> CreateBti() { return std::nullopt; }
 
   virtual bool SetupResetRegister() { return true; }
 
@@ -235,7 +251,8 @@ class BaseTestEnvironment : public fdf_testing::Environment,
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
-  FakePDev pdev_server_;
+ private:
+  fdf_fake::FakePDev pdev_server_;
   zx::interrupt interrupt_;
 
   mock_registers::MockRegisters registers_;

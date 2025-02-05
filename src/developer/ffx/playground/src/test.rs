@@ -190,6 +190,17 @@ impl<T: AsRef<str>> Test<T> {
         )
     }
 
+    /// Run this test, check the output with the given closure.
+    pub async fn check_fails(self, eval: impl Fn(crate::error::Error)) {
+        eval(
+            test_interpreter(self.with_fidl, self.with_dirs, self.with_test_cmds)
+                .await
+                .run(self.test.as_ref())
+                .await
+                .unwrap_err(),
+        )
+    }
+
     /// Run this test, check the output with the given closure, which may be a future.
     pub async fn check_async<F: std::future::Future<Output = ()>>(self, eval: impl Fn(Value) -> F) {
         eval(

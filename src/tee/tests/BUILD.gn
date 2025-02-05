@@ -45,6 +45,7 @@ fuchsia_package("ta-lifecycle-test-package") {
   deps = [
     ":ta-lifecycle-test",
     ":ta-lifecycle-test-root",
+    "//src/tee/manager:test-tee-system-properties",
   ]
 }
 
@@ -80,5 +81,8 @@ fuchsia_test_component("tee-internal-api-entry-points-component") {
 fuchsia_test_package("tee-internal-api-entry-points-test") {
   subpackages = [ "//src/tee/ta/entry_points:tee-internal-api-entry-points" ]
   test_components = [ ":tee-internal-api-entry-points-test-root" ]
-  deps = [ ":tee-internal-api-entry-points-component" ]
+  deps = [
+    ":tee-internal-api-entry-points-component",
+    "//src/tee/manager:test-tee-system-properties",
+  ]
 }

@@ -26,6 +26,8 @@ import log
 import main
 import test_list_file
 
+WARNING_LEVEL = event.MessageLevel.WARNING
+
 
 class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
     """Integration tests for the main entrypoint.
@@ -1262,4 +1264,47 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(
                     os.path.commonprefix([artifact_path, artifact_root]),
                     artifact_root,
+                )
+
+        with self.subTest(
+            "it is an error to output to an existing, non-empty directory"
+        ):
+            with tempfile.TemporaryDirectory() as td:
+                logpath = os.path.join("log.json.gz")
+                artifact_root = os.path.join(td, "artifacts")
+                os.mkdir(artifact_root)
+                with open(os.path.join(artifact_root, "some_file"), "w") as f:
+                    f.write("Demo data")
+                flags = args.parse_args(
+                    [
+                        "--simple",
+                        "--logpath",
+                        logpath,
+                        "--outdir",
+                        artifact_root,
+                        "--no-timestamp-artifacts",
+                    ]
+                )
+                ret = await main.async_main_wrapper(flags)
+                self.assertEqual(ret, 1)
+
+                env = environment.ExecutionEnvironment.initialize_from_args(
+                    flags, create_log_file=False
+                )
+
+                artifact_path = None
+                found_error = False
+                for log_entry in log.LogSource.from_env(env).read_log():
+                    if (event := log_entry.log_event) is not None:
+                        if (error_message := event.error) is not None:
+                            if (
+                                "Your output directory already exists"
+                                in error_message
+                            ):
+                                found_error = True
+                                break
+
+                self.assertTrue(
+                    found_error,
+                    "Expected to find an error about output directory existing",
                 )

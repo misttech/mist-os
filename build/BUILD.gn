@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/testing/python_build_time_tests.gni")
+
 group("build") {
   testonly = true
 
@@ -13,6 +15,7 @@ group("tests") {
   testonly = true
 
   deps = [
+    ":regenerator_tests",
     "bazel:tests",
     "fidl:tests",
     "go:tests",
@@ -24,6 +27,15 @@ group("tests") {
     "sdk:tests",
     "tools:tests",
     "tracer:tests",
+  ]
+}
+
+python_build_time_tests("regenerator_tests") {
+  tests = [ "//build/regenerator_test.py" ]
+  inputs = [
+    "//build/regenerator.py",
+    "//build/bazel/scripts/compute_content_hash.py",
+    "//build/bazel/scripts/get_git_head_commit.py",
   ]
 }
 
@@ -112,6 +124,17 @@ group("non_hermetic_deps") {
     "//zircon/system/*",
   ]
 
+  # //build/assembly/product_assembly_configuration.gni needs
+  # `hermetic_deps = false`, and that will not be resolved except by moving to
+  # Bazel.
+  visibility += [
+    "//build/assembly/*",
+    "//build/testing:*",
+    "//products/bringup:*",
+    "//products/core:*",
+    "//products/zedboot:*",
+  ]
+
   # TODO(https://fxbug.dev/42176361): Remove entry when action tracer can handle ld.lld invocations.
   visibility += [ "//src/graphics/lib/magma/src/libmagma:*" ]
 
@@ -159,6 +182,7 @@ group("non_hermetic_deps") {
     "//build/bazel/examples/*",
     "//build/bazel/tests/*",
     "//sdk/lib/driver/devicetree/*",
+    "//src:*",
     "//src/devices/block/drivers/aml-sdmmc:*",
     "//src/devices/board/drivers/vim3-devicetree:*",
     "//src/devices/clock/drivers/vim3-clk:*",
@@ -521,7 +545,6 @@ group("legacy_bundle_allowlist") {
   visibility += [
     "//build/testing/boot_tests:*",
     "//src/power/testing/system-integration/msd-arm-mali/custom-product:*",
-    "//src/power/testing/system-integration/storage/custom-product:*",
     "//src/security/lib/scrutiny/collector:*",
     "//src/security/lib/scrutiny/tests/structured_config:*",
     "//src/security/tests/pkg_test/tests:*",

@@ -141,7 +141,8 @@ where
 }
 
 /// A client handler for the Parent protocol.
-
+///
+/// See [`Parent`] for more details.
 pub trait ParentClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for Parent
@@ -172,7 +173,8 @@ impl<___T> ParentServerSender<___T> for ::fidl_next::bind::ServerSender<___T, Pa
 }
 
 /// A server handler for the Parent protocol.
-
+///
+/// See [`Parent`] for more details.
 pub trait ParentServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn first(
         &mut self,
@@ -393,7 +395,8 @@ where
 }
 
 /// A client handler for the Child protocol.
-
+///
+/// See [`Child`] for more details.
 pub trait ChildClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for Child
@@ -424,7 +427,8 @@ impl<___T> ChildServerSender<___T> for ::fidl_next::bind::ServerSender<___T, Chi
 }
 
 /// A server handler for the Child protocol.
-
+///
+/// See [`Child`] for more details.
 pub trait ChildServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn first(
         &mut self,

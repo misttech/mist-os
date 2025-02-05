@@ -44,6 +44,11 @@ pub struct JournalReader {
 
     // Indicates whether the next read is the first read.
     first_read: bool,
+
+    /// For the filesystem journal, we should never hit the end of the file but
+    /// when initially reading the superblock, we only know the first block.
+    /// In this case, we don't treat EOF in fill_buf as an error.
+    eof_ok: bool,
 }
 
 impl JournalReader {
@@ -59,6 +64,7 @@ impl JournalReader {
             bad_checksum: false,
             found_reset: false,
             first_read: true,
+            eof_ok: false,
         }
     }
 
@@ -82,6 +88,11 @@ impl JournalReader {
 
         // Reset bad_checksum in case this version change triggers a change in the block size.
         self.bad_checksum = false;
+    }
+
+    /// Used by superblock reader where we expect to hit EOF until we hit the first extent record.
+    pub fn set_eof_ok(&mut self) {
+        self.eof_ok = true;
     }
 
     /// To allow users to flush a block, they can store a record that indicates the rest of the
@@ -166,10 +177,13 @@ impl JournalReader {
             // Read the next block's worth, verify its checksum, and append it to |buf|.
             let mut buffer = self.handle.allocate_buffer(bs).await;
             assert!(self.read_offset % bs as u64 == 0);
-            if self.handle.read(self.read_offset, buffer.as_mut()).await? != bs {
-                // This shouldn't happen -- it shouldn't be possible to read to the end
-                // of the journal file.
-                bail!("unexpected end of journal file");
+            let bytes_read = self.handle.read(self.read_offset, buffer.as_mut()).await?;
+            if bytes_read != bs {
+                if self.eof_ok {
+                    return Ok(());
+                } else {
+                    bail!("unexpected end of journal file");
+                }
             }
             self.buf.as_mut_slice()[self.buf_range.end..].copy_from_slice(buffer.as_slice());
 

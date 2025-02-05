@@ -10,7 +10,6 @@
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>
-#include <lib/stdcompat/span.h>
 #include <lib/trace/event.h>
 #include <lib/zbi-format/graphics.h>
 #include <lib/zx/channel.h>
@@ -33,6 +32,7 @@
 #include <cstring>
 #include <memory>
 #include <optional>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -180,12 +180,12 @@ zx::result<> Controller::AddDisplay(const raw_display_info_t& banjo_display_info
           PopulateDisplayTimings(display_info);
         }
 
-        // TODO(b/317914671): Pass parsed display metadata to driver.
+        // TODO(https://fxbug.dev/317914671): Pass parsed display metadata to driver.
 
         fbl::AutoLock lock(mtx());
 
         const std::array<display::DisplayId, 1> added_id_candidates = {display_info->id};
-        cpp20::span<const display::DisplayId> added_ids(added_id_candidates);
+        std::span<const display::DisplayId> added_ids(added_id_candidates);
 
         // TODO(https://fxbug.dev/339311596): Do not trigger the client's
         // `OnDisplaysChanged` if an added display is ignored.
@@ -224,10 +224,8 @@ zx::result<> Controller::RemoveDisplay(display::DisplayId display_id) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
-  while (fbl::RefPtr<Image> image = removed_display->images.pop_front()) {
-    AssertMtxAliasHeld(*image->mtx());
-    image->StartRetire();
-    image->OnRetire();
+  // Release references to all images on the display.
+  while (removed_display->images.pop_front()) {
   }
 
   fbl::AllocChecker alloc_checker;
@@ -406,14 +404,11 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
       // layer.
       if (should_retire) {
         fbl::RefPtr<Image> image_to_retire = info->images.erase(it++);
-
-        AssertMtxAliasHeld(*image_to_retire->mtx());
-        image_to_retire->OnRetire();
         // Older images may not be presented. Ending their flows here
         // ensures the correctness of traces.
         //
         // NOTE: If changing this flow name or ID, please also do so in the
-        // corresponding FLOW_BEGIN in display_swapchain.cc.
+        // corresponding FLOW_BEGIN.
         TRACE_FLOW_END("gfx", "present_image", image_to_retire->id.value());
       } else {
         it++;
@@ -447,7 +442,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
         // End of the flow for the image going to be presented.
         //
         // NOTE: If changing this flow name or ID, please also do so in the
-        // corresponding FLOW_BEGIN in display_swapchain.cc.
+        // corresponding FLOW_BEGIN.
         TRACE_FLOW_END("gfx", "present_image", image.image_id.value());
       }
     }
@@ -572,7 +567,10 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
         // image was used at.
         AssertMtxAliasHeld(*image->mtx());
         image->set_latest_controller_config_stamp(applied_config_stamp);
-        image->StartPresent();
+
+        // NOTE: If changing this flow name or ID, please also do so in the
+        // corresponding FLOW_END.
+        TRACE_FLOW_BEGIN("gfx", "present_image", image->id.value());
 
         // It's possible that the image's layer was moved between displays. The logic around
         // pending_layer_change guarantees that the old display will be done with the image
@@ -581,6 +579,9 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
         // Even if we're on the same display, the entry needs to be moved to the end of the
         // list to ensure that the last config->current.layer_count elements in the queue
         // are the current images.
+        //
+        // TODO(https://fxbug.dev/317914671): investigate whether storing Images in doubly-linked
+        //                                    lists continues to be desirable.
         if (image->InDoublyLinkedList()) {
           image->RemoveFromDoublyLinkedList();
         }
@@ -678,7 +679,7 @@ void Controller::OnClientDead(ClientProxy* client) {
       [client](std::unique_ptr<ClientProxy>& list_client) { return list_client.get() == client; });
 }
 
-zx::result<cpp20::span<const display::DisplayTiming>> Controller::GetDisplayTimings(
+zx::result<std::span<const display::DisplayTiming>> Controller::GetDisplayTimings(
     display::DisplayId display_id) {
   if (unbinding_) {
     return zx::error(ZX_ERR_BAD_STATE);
@@ -686,11 +687,11 @@ zx::result<cpp20::span<const display::DisplayTiming>> Controller::GetDisplayTimi
   for (auto& display : displays_) {
     if (display.id == display_id) {
       if (display.edid.has_value()) {
-        return zx::ok(cpp20::span(display.edid->timings));
+        return zx::ok(std::span(display.edid->timings));
       }
 
       ZX_DEBUG_ASSERT(display.mode.has_value());
-      return zx::ok(cpp20::span(&*display.mode, 1));
+      return zx::ok(std::span(&*display.mode, 1));
     }
   }
   return zx::error(ZX_ERR_NOT_FOUND);
@@ -817,9 +818,9 @@ zx_status_t Controller::CreateClient(
               ++initialized_display_count;
             }
           }
-          cpp20::span<display::DisplayId> removed_display_ids = {};
+          std::span<display::DisplayId> removed_display_ids = {};
           client_proxy->OnDisplaysChanged(
-              cpp20::span<display::DisplayId>(current_displays, initialized_display_count),
+              std::span<display::DisplayId>(current_displays, initialized_display_count),
               removed_display_ids);
         }
 
@@ -942,10 +943,8 @@ void Controller::PrepareStop() {
     // triggered when drivers are shut down. We should proactively retire
     // all images on all displays.
     for (DisplayInfo& display : displays_) {
-      while (fbl::RefPtr<Image> image = display.images.pop_front()) {
-        AssertMtxAliasHeld(*image->mtx());
-        image->StartRetire();
-        image->OnRetire();
+      // Release all reffed images.
+      while (display.images.pop_front()) {
       }
     }
   }
@@ -983,10 +982,10 @@ Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
 
 Controller::~Controller() { FDF_LOG(INFO, "Controller::~Controller"); }
 
-size_t Controller::TEST_imported_images_count() const {
+size_t Controller::ImportedImagesCountForTesting() const {
   fbl::AutoLock lock(mtx());
-  size_t virtcon_images = virtcon_client_ ? virtcon_client_->TEST_imported_images_count() : 0;
-  size_t primary_images = primary_client_ ? primary_client_->TEST_imported_images_count() : 0;
+  size_t virtcon_images = virtcon_client_ ? virtcon_client_->ImportedImagesCountForTesting() : 0;
+  size_t primary_images = primary_client_ ? primary_client_->ImportedImagesCountForTesting() : 0;
   size_t display_images = 0;
   for (const auto& display : displays_) {
     display_images += display.images.size_slow();

@@ -9,10 +9,10 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
 use futures::channel::mpsc::unbounded;
 use futures::{FutureExt as _, StreamExt as _};
+use log::info;
 use reachability_core::{Monitor, NetworkCheckAction, NetworkCheckCookie};
 use reachability_handler::ReachabilityHandler;
 use std::pin::pin;
-use tracing::info;
 
 mod eventloop;
 

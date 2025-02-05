@@ -126,7 +126,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   // `display_id` is valid.
   //
   // `mtx()` must be held for as long as the return value is retained.
-  zx::result<cpp20::span<const display::DisplayTiming>> GetDisplayTimings(
+  zx::result<std::span<const display::DisplayTiming>> GetDisplayTimings(
       display::DisplayId display_id) __TA_REQUIRES(mtx());
 
   zx::result<fbl::Array<CoordinatorPixelFormat>> GetSupportedPixelFormats(
@@ -158,11 +158,10 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   fbl::Mutex* mtx() const { return &mtx_; }
   const inspect::Inspector& inspector() const { return inspector_; }
 
-  // Test helpers
-  size_t TEST_imported_images_count() const;
+  size_t ImportedImagesCountForTesting() const;
   display::ConfigStamp TEST_controller_stamp() const;
 
-  // Typically called by OpenController/OpenVirtconController.  However, this is made public
+  // Typically called by OpenController/OpenVirtconController. However, this is made public
   // for use by testing services which provide a fake display controller.
   zx_status_t CreateClient(
       ClientPriority client_priority,

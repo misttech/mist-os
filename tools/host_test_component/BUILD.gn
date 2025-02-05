@@ -15,13 +15,14 @@ binary_sources = [
   "params.py",
 ]
 
-binary_deps = []
+binary_deps = [ "//scripts/lib/async_utils" ]
 
 python_binary("host_test_component_runner") {
   testonly = true
   main_source = "main.py"
   sources = binary_sources + [ "main.py" ]
   deps = binary_deps
+  unbuffered_output = true
 }
 
 main_module_tests = [

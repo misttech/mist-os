@@ -45,7 +45,7 @@ async fn try_connect_tpm20(
     if is_supported_tpm20(vendor_id, device_id, revision_id) {
         Ok(Some(tpm_device_proxy))
     } else {
-        tracing::warn!(
+        log::warn!(
             "TPM device not supported: vendor_id: {:x}, device_id: {:x}, revision_id: {:x}",
             vendor_id,
             device_id,
@@ -74,7 +74,7 @@ pub async fn find_tpm20() -> Result<TpmDeviceProxy, Error> {
             Ok(Some(proxy)) => return Ok(proxy),
             Ok(None) => {}
             Err(e) => {
-                tracing::warn!(
+                log::warn!(
                     "Failed to determine if {}/{} is a tpm20: {:?}",
                     TPM_PATH,
                     device.name,

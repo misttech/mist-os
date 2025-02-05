@@ -16,9 +16,9 @@ use futures::future::LocalBoxFuture;
 use futures::lock::Mutex;
 use futures::stream::{FuturesUnordered, StreamExt};
 use futures::{select, FutureExt};
+use log::{debug, error, info, warn};
 use std::any::Any;
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
 use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal};
 
 pub mod default_monitor;

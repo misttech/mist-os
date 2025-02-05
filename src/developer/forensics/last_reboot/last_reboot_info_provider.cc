@@ -20,6 +20,10 @@ LastRebootInfoProvider::LastRebootInfoProvider(const feedback::RebootLog& reboot
     last_reboot_.set_graceful(graceful.value());
   }
 
+  if (const auto planned = OptionallyPlanned(reboot_log.RebootReason()); planned.has_value()) {
+    last_reboot_.set_planned(planned.value());
+  }
+
   if (const auto fidl_reboot_reason = ToFidlRebootReason(reboot_log.RebootReason());
       fidl_reboot_reason.has_value()) {
     last_reboot_.set_reason(fidl_reboot_reason.value());

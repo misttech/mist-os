@@ -25,17 +25,7 @@ group("headers") {
   } else {
     public_deps = [ "$zircon_cpu:headers" ]
   }
-  if (!is_host) {
-    public_deps += [
-      # These would be circular dependencies on the host, since that's where
-      # the generator programs are built and they need the library's headers.
-      # Since these headers are meant to be used by assembly code, they should
-      # not be needed by any host-compatible code.
-      ":gen-arm64-sysreg-asm",
-      ":gen-riscv64-system-asm",
-      ":gen-x86-msr-asm",
-    ]
-  }
+  public_deps += [ ":gen-asm" ]
 
   # This comes after the arch-specific one so arch-specific headers
   # take precedence (and can use `#include_next`).
@@ -88,26 +78,48 @@ group("tests") {
   deps = [ "test:tests" ]
 }
 
-hwreg_asm_header("gen-x86-msr-asm") {
-  visibility = [ ":*" ]
-  output_name = "lib/arch/x86/msr-asm.h"
-  defines = [ "LIB_ARCH_PRINTERS" ]
-  sources = [ "gen-x86-msr-asm.cc" ]
-  deps = [ ":arch" ]
+asm_headers = [
+  {
+    arch = "arm64"
+    name = "feature"
+  },
+  {
+    arch = "arm64"
+    name = "system"
+  },
+  {
+    arch = "riscv64"
+    name = "system"
+  },
+  {
+    arch = "x86"
+    name = "msr"
+  },
+  {
+    arch = "x86"
+    name = "cpuid"
+  },
+]
+gen_asm_deps = []
+foreach(header, asm_headers) {
+  gen_asm_deps += [ ":gen-${header.arch}-${header.name}-asm" ]
+  hwreg_asm_header("gen-${header.arch}-${header.name}-asm") {
+    visibility = [ ":*" ]
+    output_name = "lib/arch/${header.arch}/${header.name}-asm.h"
+    defines = [ "LIB_ARCH_PRINTERS" ]
+    sources = [ "$target_name.cc" ]
+    deps = [ ":arch" ]
+  }
 }
 
-hwreg_asm_header("gen-arm64-sysreg-asm") {
+group("gen-asm") {
   visibility = [ ":*" ]
-  output_name = "lib/arch/arm64/sysreg-asm.h"
-  defines = [ "LIB_ARCH_PRINTERS" ]
-  sources = [ "gen-arm64-sysreg-asm.cc" ]
-  deps = [ ":arch" ]
-}
 
-hwreg_asm_header("gen-riscv64-system-asm") {
-  visibility = [ ":*" ]
-  output_name = "lib/arch/riscv64/system-asm.h"
-  defines = [ "LIB_ARCH_PRINTERS" ]
-  sources = [ "gen-riscv64-system-asm.cc" ]
-  deps = [ ":arch" ]
+  # These would be circular dependencies on the host, since that's where
+  # the generator programs are built and they need the library's headers.
+  # Since these headers are meant to be used by assembly code, they should
+  # not be needed by any host-compatible code.
+  if (!is_host) {
+    public_deps = gen_asm_deps
+  }
 }

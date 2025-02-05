@@ -42,11 +42,8 @@ pub trait Length {
 impl<T: ArrayProperty + InspectTypeInternal> Length for T {
     fn len(&self) -> Option<usize> {
         if let Ok(state) = self.state()?.try_lock() {
-            if let Ok(size) = state.get_array_size(self.block_index()?) {
-                return Some(size);
-            }
+            return Some(state.get_array_size(self.block_index()?));
         }
-
         None
     }
 }
@@ -100,7 +97,7 @@ impl InnerType for InnerPropertyType {
     fn free(state: &State, _: &Self::Data, block_index: BlockIndex) -> Result<(), Error> {
         let mut state_lock = state.try_lock()?;
         state_lock
-            .free_property(block_index)
+            .free_string_or_bytes_buffer_property(block_index)
             .map_err(|err| Error::free("property", block_index, err))
     }
 }

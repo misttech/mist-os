@@ -7,8 +7,8 @@ use fidl_fuchsia_fakeclock_test::{ExampleRequest, ExampleRequestStream};
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use futures::{StreamExt, TryStreamExt};
+use log::warn;
 use named_timer::DeadlineId;
-use tracing::warn;
 
 const DEADLINE_NAME: DeadlineId<'static> = DeadlineId::new("fake-clock-example", "deadline");
 

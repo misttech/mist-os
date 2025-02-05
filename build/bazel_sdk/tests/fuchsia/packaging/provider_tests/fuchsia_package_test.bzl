@@ -345,7 +345,7 @@ def _test_api_levels():
 
     no_repo_default_api_level_failure_test(
         name = "failure_test_pkg_without_api_level_and_no_repo_default",
-        expected_failure_message = '`@fuchsia_sdk//fuchsia:fuchsia_api_level` has not been set to an API level. Has an API level been specified for this target? Valid API levels are ["',
+        expected_failure_message = "ERROR: An API level has not been specified for this target or the repository.",
         target_under_test = ":pkg_without_api_level",
         tags = ["manual"],
     )

@@ -31,7 +31,7 @@ enum class TestState : uint8_t {
 };
 
 void Reader(std::atomic<uint32_t>& num_readers_ready, std::atomic<TestState>& mapped,
-            zx_ticks_t* shared_value, zx_ticks_t* read_value) {
+            zx_instant_mono_ticks_t* shared_value, zx_instant_mono_ticks_t* read_value) {
   // Attempt to read from the shared value. This should succeed because the value has been mapped
   // at this point.
   *read_value = *shared_value;
@@ -49,7 +49,8 @@ void Reader(std::atomic<uint32_t>& num_readers_ready, std::atomic<TestState>& ma
 }
 
 zx_status_t RunRestricted(const zx::vmo& vmo, zx_vaddr_t cs_addr, zx_vaddr_t stack_addr,
-                          const zx_ticks_t* shared_value, zx_ticks_t* read_value,
+                          const zx_instant_mono_ticks_t* shared_value,
+                          zx_instant_mono_ticks_t* read_value,
                           const zx_excp_type_t expected_exception) {
   zx_restricted_state_t state{};
 #if defined(__x86_64__)
@@ -98,7 +99,8 @@ zx_status_t RunRestricted(const zx::vmo& vmo, zx_vaddr_t cs_addr, zx_vaddr_t sta
 
 void RestrictedReader(zx_vaddr_t cs_addr, zx_vaddr_t stack_addr, zx_status_t* status,
                       std::atomic<uint32_t>& num_readers_ready, std::atomic<TestState>& mapped,
-                      zx_ticks_t* shared_value, zx_ticks_t* read_value, zx_ticks_t expected_value) {
+                      zx_instant_mono_ticks_t* shared_value, zx_instant_mono_ticks_t* read_value,
+                      zx_instant_mono_ticks_t expected_value) {
   // Wait for the RestrictedWriter to map and write the shared value.
   while (mapped.load() == TestState::Unmapped) {
   }
@@ -134,8 +136,9 @@ void RestrictedReader(zx_vaddr_t cs_addr, zx_vaddr_t stack_addr, zx_status_t* st
   *read_value = *shared_value;
 }
 
-void RestrictedWriter(std::atomic<TestState>& mapped, zx_vaddr_t shared_addr, zx_ticks_t value) {
-  *reinterpret_cast<volatile zx_ticks_t*>(shared_addr) = value;
+void RestrictedWriter(std::atomic<TestState>& mapped, zx_vaddr_t shared_addr,
+                      zx_instant_mono_ticks_t value) {
+  *reinterpret_cast<volatile zx_instant_mono_ticks_t*>(shared_addr) = value;
   mapped.store(TestState::Mapped);
 }
 
@@ -174,7 +177,8 @@ void RunRestrictedTestIteration() {
   ASSERT_OK(zx::vmo::create(page_size, 0, &observed_values));
   ASSERT_OK(restricted_vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, observed_values, 0,
                                 page_size, &observed_values_addr));
-  zx_ticks_t* read_values = reinterpret_cast<zx_ticks_t*>(observed_values_addr);
+  zx_instant_mono_ticks_t* read_values =
+      reinterpret_cast<zx_instant_mono_ticks_t*>(observed_values_addr);
 
   // Map shared address.
   zx::vmo vmo;
@@ -187,7 +191,7 @@ void RunRestrictedTestIteration() {
   zx_status_t reader_statuses[kNumReaders]{};
   std::atomic<uint32_t> num_readers_ready{};
   std::atomic<TestState> mapped = TestState::Unmapped;
-  zx_ticks_t expected_value = zx::ticks::now().get();
+  zx_instant_mono_ticks_t expected_value = zx::ticks::now().get();
   std::vector<std::thread> threads;
   threads.reserve(kNumReaders);
 
@@ -199,7 +203,7 @@ void RunRestrictedTestIteration() {
     // Create the reader thread.
     threads.emplace_back(RestrictedReader, cs_addr, result.value(), &reader_statuses[i],
                          std::ref(num_readers_ready), std::ref(mapped),
-                         reinterpret_cast<zx_ticks_t*>(shared_addr), &read_values[i],
+                         reinterpret_cast<zx_instant_mono_ticks_t*>(shared_addr), &read_values[i],
                          expected_value);
   }
   // Spin up a writer thread to write expected_value to the shared_addr.
@@ -258,7 +262,7 @@ void RunSharedTestIteration() {
   zx::process procs[kNumReaders];
   zx::vmar vmars[kNumReaders];
   zx::channel exception_channels[kNumReaders];
-  zx_ticks_t read_values[kNumReaders]{};
+  zx_instant_mono_ticks_t read_values[kNumReaders]{};
   std::vector<std::thread> threads;
   threads.reserve(kNumReaders);
 
@@ -279,8 +283,8 @@ void RunSharedTestIteration() {
   ASSERT_EQ(shared_addr, (zx_vaddr_t)vmar_addr);
 
   // Write a random value (in this case the current ticks) to addr.
-  zx_ticks_t expected_value = zx::ticks::now().get();
-  *reinterpret_cast<volatile zx_ticks_t*>(shared_addr) = expected_value;
+  zx_instant_mono_ticks_t expected_value = zx::ticks::now().get();
+  *reinterpret_cast<volatile zx_instant_mono_ticks_t*>(shared_addr) = expected_value;
 
   std::atomic<TestState> mapped = TestState::Mapped;
   std::atomic<uint32_t> num_readers_ready = 0;
@@ -297,7 +301,7 @@ void RunSharedTestIteration() {
     // Create the reader thread.
     zx_handle_t orig_proc = thrd_set_zx_process(procs[i].get());
     threads.emplace_back(Reader, std::ref(num_readers_ready), std::ref(mapped),
-                         reinterpret_cast<zx_ticks_t*>(shared_addr), &read_values[i]);
+                         reinterpret_cast<zx_instant_mono_ticks_t*>(shared_addr), &read_values[i]);
     thrd_set_zx_process(orig_proc);
   }
 
@@ -328,7 +332,7 @@ void RunSharedTestIteration() {
   ASSERT_OK(sub_vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, page_size, &shared_addr));
   ASSERT_EQ(shared_addr, (zx_vaddr_t)vmar_addr);
   expected_value = zx::ticks::now().get();
-  *reinterpret_cast<volatile zx_ticks_t*>(shared_addr) = expected_value;
+  *reinterpret_cast<volatile zx_instant_mono_ticks_t*>(shared_addr) = expected_value;
 
   // Resume all of the readers.
   for (uint32_t i = 0; i < kNumReaders; i++) {

@@ -3,6 +3,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/config/clang/clang_toolchain_info.gni")
 import("//build/config/compilation_modes.gni")
 import("//build/config/python_interpreter.gni")
 import("//build/icu/build_config.gni")
@@ -135,8 +136,6 @@ if (!defined(toolchain_variant.name)) {
   toolchain_variant.prefix_configs = []
   toolchain_variant.remove_common_configs = []
   toolchain_variant.remove_shared_configs = []
-  toolchain_variant.deps = []
-  toolchain_variant.executable_deps = []
   toolchain_variant.is_pic_default = false
   toolchain_variant.with_shared = true
   toolchain_variant.instrumented = false
@@ -147,7 +146,11 @@ if (!defined(toolchain_variant.name)) {
   ]
 
   # LINT.IfChange
-  toolchain_variant.source_deps = [ "//zircon/public/sysroot:headers" ]
+  toolchain_variant.deps = [ "//build/config/fuchsia:terminal_link_deps" ]
+  toolchain_variant.executable_deps =
+      [ "//build/config/fuchsia:executable_deps" ]
+  toolchain_variant.link_deps = [ "//build/config/fuchsia:link_deps" ]
+  toolchain_variant.source_deps = [ "//build/config/fuchsia:source_deps" ]
 
   # LINT.ThenChange(//build/toolchain/fuchsia/BUILD.gn)
 }
@@ -311,9 +314,12 @@ in_default_toolchain =
     current_os == target_os && toolchain_variant.name == "" &&
     !toolchain_variant.is_pic_default
 
+# Base toolchain with its variant suffix.
+variant_base_toolchain = "${toolchain_variant.base}${toolchain_variant.suffix}"
+
 # References should use `"label($shlib_toolchain)"` rather than
 # `"label(${target_toolchain}-shared)"` or anything else.
-shlib_toolchain = "${toolchain_variant.base}${toolchain_variant.suffix}-shared"
+shlib_toolchain = "${variant_base_toolchain}-shared"
 
 # The build system now implements build variant toolchain redirection for
 # shared_library() targets that are defined in the default toolchain.
@@ -450,7 +456,7 @@ if (zircon_toolchain == false) {
     default_common_binary_configs += [ "//build/config:release" ]
   }
 
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     default_common_binary_configs += [
       "//build/config:auto_var_init",
       "//build/config:icf",
@@ -463,22 +469,6 @@ if (zircon_toolchain == false) {
       # TODO(mcgrathr): Perhaps restrict this to only affected code.
       # For now, safest to do it everywhere.
       "//build/config/fuchsia:zircon_asserts",
-    ]
-  }
-
-  if (is_mistos) {
-    default_common_binary_configs += [
-      "//build/config:auto_var_init",
-      "//build/config:icf",
-      "//build/config:thread_safety_annotations",
-      "//build/config/mistos:dynamic_rust_standard_library",
-      "//build/config/mistos:large_rust_stack",
-      "//build/config/rust:panic_abort",
-      "//build/config/rust:v0_symbol_mangling",
-
-      # TODO(mcgrathr): Perhaps restrict this to only affected code.
-      # For now, safest to do it everywhere.
-      "//build/config/mistos:zircon_asserts",
     ]
   }
 
@@ -515,18 +505,11 @@ if (zircon_toolchain == false) {
   # These configs are added here so that they can later be removed from default
   # configs for targets which do not need them. This cannot be done when the
   # configs are added transitively.
-  if (current_os == "fuchsia") {
+  if (current_os == "fuchsia" || current_os == "mistos") {
     default_executable_configs += [ "//build/config/fuchsia:fdio_config" ]
 
     default_executable_deps +=
         [ "//build/config/fuchsia:maybe_scudo_default_options" ]
-  }
-
-  if (current_os == "mistos") {
-    default_executable_configs += [ "//build/config/mistos:fdio_config" ]
-
-    default_executable_deps +=
-        [ "//build/config/mistos:maybe_scudo_default_options" ]
   }
 
   if (toolchain_variant.is_pic_default) {
@@ -599,7 +582,12 @@ e2e_test_libs = [
   "//third_party/mobly($host_toolchain)",
   "//src/testing/end_to_end/honeydew($host_toolchain)",
 ]
-if (is_linux) {
+
+# For libraries only supported on Linux hosts, we must use host_os to determine
+# whether to include them. The is_linux condition will not function as naively expected
+# because it applies to the current toolchain which may not be a host toolchain
+# when this file is loaded.
+if (host_os == "linux") {
   e2e_test_libs += [ "//tools/emulator($host_toolchain)" ]
 }
 
@@ -609,7 +597,7 @@ if (is_linux) {
 e2e_lib_unit_tests = [
   "//sdk/testing/sl4f/client:tests",
   "//tools/emulator:tests",
-  "//src/testing/end_to_end/honeydew/tests/unit_tests:tests",
+  "//src/testing/end_to_end/honeydew:unit_tests",
   "//src/testing/end_to_end/mobly_driver/tests/unit_tests:tests",
 ]
 
@@ -1636,8 +1624,6 @@ declare_args() {
   #
   # Normally this is not set as a build argument, but it serves to
   # document the available set of variants.
-  # See also [`universal_variants`](#universal_variants).
-  # Only set this to remove all the default variants here.
   # To add more, set [`extra_variants`](#extra_variants) instead.
   #
   # Each element of the list is one variant, which is a scope defining:
@@ -1660,7 +1646,7 @@ declare_args() {
   #       added.
   #
   #   `deps` (optional)
-  #       [list of labels] Added to the deps of every target linked in
+  #       [list of labels] Added to the deps of every terminal target linked in
   #       this variant (as well as the automatic `${label}_deps` for
   #       each label in configs).
   #
@@ -1668,6 +1654,12 @@ declare_args() {
   #       [list of labels] Added to the deps of every executable() target
   #       linked in this variant (as well as `deps`, above, and the automatic
   #       `${label}_deps` for each label in configs).
+  #
+  #   `link_deps`
+  #       [list of labels] Added to the deps of every linking target
+  #       (i.e. terminal targets, plus shared_library() targets) linked in this
+  #       variant (as well as `deps`, above, and the automatic `${label}_deps`
+  #       for each label in configs).
   #
   #   `source_deps`
   #       [list of labels] Added to the deps of every target that compiles
@@ -1742,6 +1734,16 @@ declare_args() {
     },
 
     {
+      configs = [ "//build/config/profile:coverage-cts" ]
+      tags = [
+        "coverage",
+        "debugdata",
+        "instrumented",
+        "llvm-profdata",
+      ]
+    },
+
+    {
       configs = [ "//build/config/profile" ]
       tags = [
         "debugdata",
@@ -1753,14 +1755,16 @@ declare_args() {
     },
 
     {
-      configs = [ "//build/config/profile:coverage-cts" ]
+      configs = [ "//build/config/profile:profile-rust" ]
       tags = [
-        "coverage",
         "debugdata",
         "instrumented",
         "llvm-profdata",
+        "needs-writable-globals",
+        "profile",
       ]
     },
+
     {
       configs = [ "//build/config/sanitizers:tsan" ]
       tags = [
@@ -1895,45 +1899,6 @@ declare_args() {
   # This is just added to [`known_variants`](#known_variants).
   extra_variants = []
 
-  # List of "universal" variants, in addition to
-  # [`known_variants`](#known_variants).  Normally this is not set as a
-  # build argument, but it serves to document the available set of
-  # variants.  These are treated just like
-  # [`known_variants`](#known_variants), but as well as being variants by
-  # themselves, these are also combined with each of
-  # [`known_variants`](#known_variants) to form additional variants,
-  # e.g. "asan-debug" or "ubsan-sancov-release".
-  universal_variants = []
-
-  # Only one of "debug" and "release" is really available as a universal
-  # variant in any given build (depending on the global setting of
-  # `is_debug`).  But this gets evaluated separately in every toolchain, so
-  # e.g. in the "release" toolchain the sense of `if (is_debug)` tests is
-  # inverted and this would list only "debug" as an available variant.  The
-  # selection logic in `variant_target()` can only work if the value of
-  # `universal_variants` it sees includes the current variant.
-  if (is_debug) {
-    universal_variants += [
-      {
-        name = "release"
-        configs = []
-        toolchain_args = {
-          is_debug = false
-        }
-      },
-    ]
-  } else {
-    universal_variants += [
-      {
-        name = "debug"
-        configs = []
-        toolchain_args = {
-          is_debug = true
-        }
-      },
-    ]
-  }
-
   # List of short names for commonly-used variant selectors.  Normally this
   # is not set as a build argument, but it serves to document the available
   # set of short-cut names for variant selectors.  Each element of this list
@@ -1993,6 +1958,18 @@ declare_args() {
         },
       ]
     },
+
+    {
+      name = "host_profile-rust"
+      select_variant = []
+      select_variant = [
+        {
+          variant = "profile-rust"
+          host = true
+        },
+      ]
+    },
+
     {
       name = "host_tsan"
       select_variant = []
@@ -2064,35 +2041,6 @@ foreach(variant, known_variants + extra_variants) {
       ]
     },
   ]
-  foreach(universal_variant, universal_variants) {
-    _select_variant_shortcuts += [
-      {
-        name = "${variant}-${universal_variant.name}"
-        select_variant = []
-        select_variant = [
-          {
-            variant = name
-            host = false
-          },
-        ]
-      },
-    ]
-  }
-}
-foreach(variant, universal_variants) {
-  variant = variant.name
-  _select_variant_shortcuts += [
-    {
-      name = variant
-      select_variant = []
-      select_variant = [
-        {
-          variant = name
-          host = false
-        },
-      ]
-    },
-  ]
 }
 
 declare_args() {
@@ -2108,8 +2056,7 @@ declare_args() {
   # A string selector can match a name in
   # [`select_variant_shortcuts`](#select_variant_shortcuts).  If it's not a
   # specific shortcut listed there, then it can be the name of any variant
-  # described in [`known_variants`](#known_variants) and
-  # [`universal_variants`](#universal_variants) (and combinations thereof).
+  # described in [`known_variants`](#known_variants).
   # A `selector` that's a simple variant name selects for every binary
   # built in the target toolchain: `{ host=false variant=selector }`.
   #
@@ -2124,8 +2071,7 @@ declare_args() {
   #         [string or `false`] The variant that applies if this selector
   #         matches.  This can be `false` to choose no variant, or a string
   #         that names the variant.  See
-  #         [`known_variants`](#known_variants) and
-  #         [`universal_variants`](#universal_variants).
+  #         [`known_variants`](#known_variants).
   #
   # The rest below are matching criteria.  All are optional.
   # The selector matches if and only if all of its criteria match.
@@ -2193,7 +2139,14 @@ is_rust_coverage =
     select_variant + [ "coverage-rust" ] - [ "coverage-rust" ] != select_variant
 is_cts_coverage =
     select_variant + [ "coverage-cts" ] - [ "coverage-cts" ] != select_variant
-is_profile = select_variant + [ "profile" ] - [ "profile" ] != select_variant
+is_profile = select_variant + [
+               "profile",
+               "profile-rust",
+             ] -
+             [
+               "profile",
+               "profile-rust",
+             ] != select_variant
 
 # Whether sanitizer instrumentation is enabled.
 is_asan = select_variant + [
@@ -2302,9 +2255,9 @@ if (in_default_toolchain) {
   }
 
   # Expand the list of all variants, based on the values of known_variants,
-  # extra_variants, and universal_variants. Note that the items in the list
-  # are not in their full canonical format because they don't have a 'base'
-  # key, and the 'host_only' and 'target_only' keys are not expanded yet.
+  # and extra_variants. Note that the items in the list are not in their full
+  # canonical format because they don't have a 'base' key, and the 'host_only'
+  # and 'target_only' keys are not expanded yet.
   # Full expansion will happen in variant_toolchain_suite().
   all_toolchain_variants = []
   foreach(variant, [ false ] + known_variants + extra_variants) {
@@ -2316,6 +2269,8 @@ if (in_default_toolchain) {
         remove_shared_configs = []
         deps = []
         executable_deps = []
+        link_deps = []
+        source_deps = []
         tags = []
         if (variant == false) {
           name = ""
@@ -2351,43 +2306,6 @@ if (in_default_toolchain) {
         }
       },
     ]
-  }
-
-  # Now elaborate the list with all the universal variant combinations.
-  # Each universal variant becomes its own standalone variant when
-  # combined with the null variant.
-  foreach(variant, all_toolchain_variants) {
-    foreach(universal_variant, universal_variants) {
-      all_toolchain_variants += [
-        {
-          forward_variables_from(variant, "*", [ "toolchain_args" ])
-          toolchain_args = {
-            if (defined(variant.toolchain_args)) {
-              forward_variables_from(variant.toolchain_args, "*")
-            }
-            if (defined(universal_variant.toolchain_args)) {
-              forward_variables_from(universal_variant.toolchain_args, "*")
-            }
-          }
-          if (name == "") {
-            name = universal_variant.name
-          } else {
-            name += "-${universal_variant.name}"
-          }
-          suffix += "-${universal_variant.name}"
-          configs += universal_variant.configs
-          if (defined(universal_variant.remove_common_configs)) {
-            remove_common_configs += universal_variant.remove_common_configs
-          }
-          if (defined(universal_variant.remove_shared_configs)) {
-            remove_shared_configs += universal_variant.remove_shared_configs
-          }
-          if (defined(universal_variant.deps)) {
-            deps += universal_variant.deps
-          }
-        },
-      ]
-    }
   }
 
   # Insert a 'variant_tags' field in each selector item that corresponds to
@@ -2480,34 +2398,22 @@ template("_fuchsia_binary") {
     # This is implicitly added to every kind of target that can have `sources`.
     deps += toolchain_variant.source_deps
 
+    # This is implicitly added to every kind of linking target.
+    deps += toolchain_variant.link_deps
+
+    foreach(
+        config,
+        toolchain_variant.configs + toolchain_variant.remove_common_configs -
+            toolchain_variant.remove_common_configs) {
+      # Expand the label so it always has a `:name` part.
+      config = get_label_info(config, "label_no_toolchain")
+      deps += [
+        "${config}_link_deps",
+        "${config}_source_deps",
+      ]
+    }
+
     if ((is_fuchsia || is_mistos) && zircon_toolchain == false) {
-      # Depend on runtime libraries provided by the sysroot and the toolchain.
-      # This ensures the libraries are packaged up with the output of this
-      # target.
-      # These dependencies need to be attached here rather than higher up in the
-      # dependency tree in order to correctly capture the active toolchain
-      # variant.
-
-      # NOTE: invoker.crate_root will be defined when building a Rust crate
-      # instead of a C++ binary.
-      if (defined(crate_root)) {
-        deps += [ "//zircon/public/sysroot:rust_binary_deps" ]
-      } else {
-        deps += [ "//zircon/public/sysroot:cpp_binary_deps" ]
-      }
-
-      # Add dependency to the C runtime startup object file for executables,
-      # except if the static-pie-config is used.
-      _static_pie_label = "//build/config/fuchsia:static-pie-config"
-      if (is_mistos) {
-        _static_pie_label = "//build/config/mistos:static-pie-config"
-      }
-
-      if ((target_type == "executable" || target_type == "test") &&
-          configs + [ _static_pie_label ] - [ _static_pie_label ] == configs) {
-        deps += [ "//zircon/public/sysroot:crt1_deps" ]
-      }
-
       if (target_type == "shared_library") {
         # Add zircon dependency for the profile variant. TODO(https://fxbug.dev/42139818): Remove this.
         if (toolchain_variant.tags + [
@@ -3048,6 +2954,174 @@ template("variant_target") {
   }
 }
 
+# _fuchsia_shared_library is an internal library used by the shared_library
+# wrapper in this file.
+#
+# This template takes the same arguments as the built-in shared_library, plus
+# the `install_name` argument.
+template("_fuchsia_shared_library") {
+  _fuchsia_binary(target_name) {
+    target_type = "shared_library"
+
+    # Explicitly forward applicable_licenses and visibility, implicitly
+    # forward everything else.
+    # Forwarding "*" doesn't recurse into nested scopes (to
+    # avoid copying all globals into each template invocation), so
+    # won't pick up file-scoped variables.  Normally this isn't too
+    # bad, but visibility is commonly defined at the file scope.
+    # Explicitly forwarding visibility and then excluding it from the
+    # "*" set works around this problem.  See http://crbug.com/594610
+    # for rationale on why this GN behavior is not considered a bug.
+    forward_variables_from(invoker,
+                           [
+                             "applicable_licenses",
+                             "visibility",
+                           ])
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "applicable_licenses",
+                             "metadata",
+                             "target_name",
+                             "visibility",
+                           ])
+
+    if (defined(visibility)) {
+      visibility += [ ":$target_name" ]
+    }
+
+    if (!defined(output_dir)) {
+      output_dir = root_out_dir
+    }
+    if (!defined(output_name)) {
+      output_name = target_name
+    }
+
+    # Remove any "lib" prefix - this matches GN's behavior.
+    _prefixless = string_replace("###$output_name", "###lib", "")
+    if (_prefixless != "###$output_name") {
+      output_name = _prefixless
+    }
+    if (!defined(output_extension)) {
+      if (current_os == "mac") {
+        output_extension = "dylib"
+      } else if (current_os == "win") {
+        output_extension = "dll"
+      } else if (current_os == "unknown" && current_cpu == "wasm32") {
+        output_extension = "wasm"
+      } else {
+        output_extension = "so"
+      }
+    }
+
+    output_file_name = "lib$output_name"
+    if (output_extension != "") {
+      output_file_name += ".$output_extension"
+    }
+    output_file = "$output_dir/$output_file_name"
+    rebased_output_file = rebase_path(output_file, root_build_dir)
+
+    install_name = output_file_name
+    if (defined(invoker.install_name)) {
+      install_name = invoker.install_name
+    }
+
+    # TODO(https://fxbug.dev/42131832): Zircon toolchains must use a .debug
+    # suffix for non-stripped shared libraries, instead of putting them into
+    # lib.unstripped. This can be changed after build unification completes.
+    if (zircon_toolchain != false) {
+      link_output_file = output_file + zircon_toolchain.link_output_suffix
+    } else {
+      link_output_file = "$output_dir/lib.unstripped/$output_file_name"
+    }
+    _link_output_path = rebase_path(link_output_file, root_build_dir)
+    _link_output_dir =
+        rebase_path(get_path_info(link_output_file, "dir"), root_build_dir)
+
+    # rustc doesn't support building dylibs with LTO enabled without the
+    # `-Zdylib-lto` flag. For now we just disable LTO on these targets.
+    if (defined(configs) && defined(crate_type)) {
+      configs += [
+        "//build/config/lto",
+        "//build/config/lto:thinlto",
+      ]
+      configs -= [
+        "//build/config/lto",
+        "//build/config/lto:thinlto",
+      ]
+    }
+
+    # Note: the manifest-related metadata is added to the builder target as
+    # some targets (e.g. drivers) depend on it directly in the builder
+    # toolchain.
+    metadata = {
+      binaries = []
+
+      # Used by link_output_rspfile(), see its documentation for details
+      link_output_path = [ _link_output_path ]
+      link_output_barrier = []
+
+      # Allow metadata to be specified to shared_library instances
+      # that come from a PIC-friendly toolchain too. This is required
+      # for the Zircon VDSO and C library.
+      if (defined(invoker.metadata)) {
+        forward_variables_from(invoker.metadata, "*")
+      }
+
+      # Used by the distribution_manifest template.
+      if (!defined(distribution_entries)) {
+        distribution_entries = [
+          {
+            source = rebased_output_file
+            destination = "lib/${toolchain_variant.libprefix}$install_name"
+            label = get_label_info(":$target_name", "label_with_toolchain")
+          },
+        ]
+      } else {
+        not_needed([ "install_name" ])
+      }
+
+      # Used by sdk_verify_runtime_deps().
+      if (!defined(sdk_runtime_deps)) {
+        sdk_runtime_deps = [
+          {
+            label = get_label_info(":$target_name", "label_with_toolchain")
+            source = rebased_output_file
+          },
+        ]
+      }
+
+      # Used by the //:binaries target.
+      binaries += [
+        {
+          type = "shared_library"
+          label = get_label_info(":$target_name", "label_with_toolchain")
+          cpu = current_cpu
+          os = current_os
+          debug = rebase_path(link_output_file, root_build_dir)
+          dist = rebased_output_file
+          if (current_os != "mac" && current_os != "win") {
+            elf_build_id = rebased_output_file + ".build-id.stamp"
+          }
+          if (output_breakpad_syms &&
+              (current_os == "fuchsia" || current_os == "mistos")) {
+            breakpad = rebased_output_file + ".sym"
+          }
+        },
+      ]
+
+      # Don't collect rlibs from transitive deps. This is used by the
+      # rust_auxiliary template when collecting rlib dependencies.
+      rust_barrier = []
+
+      if (defined(invoker.crate_type)) {
+        rlib = [ "--extern=$crate_name=$_link_output_path" ]
+        searchdir = [ "-Ldependency=$_link_output_dir" ]
+      }
+    }
+  }
+}
+
 # This wraps the GN built-in shared_library() target and adds a few more features:
 #
 # - Redirecting from the current toolchain to its shared-library-compatible
@@ -3085,7 +3159,9 @@ template("variant_target") {
 #     }
 #
 #   Note that not all toolchains need a companion toolchain though (e.g. those
-#   for non-ELF systems, or even some Zircon-specific ones).
+#   for non-ELF systems, or even some Zircon-specific ones). This also applies
+#   to Rust targets, because the Rust compiler only generates `-fPIC` code
+#   anyway.
 #
 # - If not specified by the caller, will use `root_out_dir` as the default output
 #   directory. So building '//some/dir:mylib(//toolchain:tc)' will build
@@ -3138,6 +3214,9 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
       #    //src:bar(default_toolchain): group() -->
       #      //src:bar(x64-ubsan-shared): shared_library()
       #
+      # Also note this does NOT happen for Rust targets, which only generates
+      # `-fPIC` code anyway.
+      #
       template("shared_library") {
         _target_name = target_name
         variant_target("shared_library") {
@@ -3156,7 +3235,12 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
                                    "visibility",
                                  ])
           target_name = _target_name
-          variant_shared_redirection = toolchain_variant.with_shared
+
+          # Avoid redirection for Rust shared libraries (dylibs and cdylibs).
+          # See https://fxbug.dev/387208039.
+          _is_rust_target = defined(invoker.crate_root)
+          variant_shared_redirection =
+              !_is_rust_target && toolchain_variant.with_shared
           metadata = {
             if (defined(invoker.metadata)) {
               forward_variables_from(invoker.metadata, "*")
@@ -3170,19 +3254,28 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
         }
       }
     } else {
-      # In a base toolchain that has an shlib_toolchain, shared_library just
-      # redirects to the same target in the -shared toolchain.
       template("shared_library") {
-        group(target_name) {
-          public_deps = [ ":$target_name(${current_toolchain}-shared)" ]
-          forward_variables_from(invoker,
-                                 [
-                                   "applicable_licenses",
-                                   "testonly",
-                                   "visibility",
-                                 ])
+        _is_rust_target = defined(invoker.crate_root)
+        if (_is_rust_target) {
+          # Avoid redirection for Rust shared libraries (dylibs and cdylibs).
+          # See https://fxbug.dev/387208039.
+          _fuchsia_shared_library(target_name) {
+            forward_variables_from(invoker, "*")
+          }
+        } else {
+          # In a base toolchain that has an shlib_toolchain, shared_library just
+          # redirects to the same target in the -shared toolchain.
+          group(target_name) {
+            public_deps = [ ":$target_name(${current_toolchain}-shared)" ]
+            forward_variables_from(invoker,
+                                   [
+                                     "applicable_licenses",
+                                     "testonly",
+                                     "visibility",
+                                   ])
+          }
+          not_needed(invoker, "*")
         }
-        not_needed(invoker, "*")
       }
     }
   } else {
@@ -3190,172 +3283,12 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
     # but if the invoker constrained the visibility, we must make sure
     # the dependency from the main toolchain is still allowed.
     template("shared_library") {
+      assert(
+          !defined(invoker.crate_type),
+          "Rust libraries should not be expanded in the -shared toolchain, see https://fxbug.dev/387208039")
       not_needed(invoker, [ "exclude_toolchain_tags" ])
-      _fuchsia_binary(target_name) {
-        target_type = "shared_library"
-
-        # Save the target name here as it could be overridden by the calls
-        # to forward_variables_from below.
-        original_target_name = target_name
-
-        # Explicitly forward applicable_licenses and visibility, implicitly
-        # forward everything else.
-        # Forwarding "*" doesn't recurse into nested scopes (to
-        # avoid copying all globals into each template invocation), so
-        # won't pick up file-scoped variables.  Normally this isn't too
-        # bad, but visibility is commonly defined at the file scope.
-        # Explicitly forwarding visibility and then excluding it from the
-        # "*" set works around this problem.  See http://crbug.com/594610
-        # for rationale on why this GN behavior is not considered a bug.
-        forward_variables_from(invoker,
-                               [
-                                 "applicable_licenses",
-                                 "visibility",
-                               ])
-        forward_variables_from(invoker,
-                               "*",
-                               [
-                                 "applicable_licenses",
-                                 "metadata",
-                                 "visibility",
-                               ])
-
-        # Restore the original target name.
-        target_name = original_target_name
-
-        if (defined(visibility)) {
-          visibility += [ ":$target_name" ]
-        }
-
-        if (!defined(output_dir)) {
-          output_dir = root_out_dir
-        }
-        if (!defined(output_name)) {
-          output_name = target_name
-        }
-
-        # Remove any "lib" prefix - this matches GN's behavior.
-        _prefixless = string_replace("###$output_name", "###lib", "")
-        if (_prefixless != "###$output_name") {
-          output_name = _prefixless
-        }
-        if (!defined(output_extension)) {
-          if (current_os == "mac") {
-            output_extension = "dylib"
-          } else if (current_os == "win") {
-            output_extension = "dll"
-          } else if (current_os == "unknown" && current_cpu == "wasm32") {
-            output_extension = "wasm"
-          } else {
-            output_extension = "so"
-          }
-        }
-
-        output_file_name = "lib$output_name"
-        if (output_extension != "") {
-          output_file_name += ".$output_extension"
-        }
-        output_file = "$output_dir/$output_file_name"
-        rebased_output_file = rebase_path(output_file, root_build_dir)
-
-        install_name = output_file_name
-        if (defined(invoker.install_name)) {
-          install_name = invoker.install_name
-        }
-
-        # TODO(https://fxbug.dev/42131832): Zircon toolchains must use a .debug suffix for non-stripped
-        # shared libraries, instead of putting them into exe.unstripped. This can be
-        # changed after build unification completes.
-        if (zircon_toolchain != false) {
-          link_output_file = output_file + zircon_toolchain.link_output_suffix
-        } else {
-          link_output_file = "$output_dir/lib.unstripped/$output_file_name"
-        }
-        _link_output_path = rebase_path(link_output_file, root_build_dir)
-        _link_output_dir =
-            rebase_path(get_path_info(link_output_file, "dir"), root_build_dir)
-
-        # rustc doesn't support building dylibs with LTO enabled without the
-        # `-Zdylib-lto` flag. For now we just disable LTO on these targets.
-        if (defined(configs) && defined(crate_type)) {
-          configs += [
-            "//build/config/lto",
-            "//build/config/lto:thinlto",
-          ]
-          configs -= [
-            "//build/config/lto",
-            "//build/config/lto:thinlto",
-          ]
-        }
-
-        # Note: the manifest-related metadata is added to the builder target as
-        # some targets (e.g. drivers) depend on it directly in the builder
-        # toolchain.
-        metadata = {
-          binaries = []
-
-          # Used by link_output_rspfile(), see its documentation for details
-          link_output_path = [ _link_output_path ]
-          link_output_barrier = []
-
-          # Allow metadata to be specified to shared_library instances
-          # that come from a PIC-friendly toolchain too. This is required
-          # for the Zircon VDSO and C library.
-          if (defined(invoker.metadata)) {
-            forward_variables_from(invoker.metadata, "*")
-          }
-
-          # Used by the distribution_manifest template.
-          if (!defined(distribution_entries)) {
-            distribution_entries = [
-              {
-                source = rebased_output_file
-                destination = "lib/${toolchain_variant.libprefix}$install_name"
-                label = get_label_info(":$target_name", "label_with_toolchain")
-              },
-            ]
-          } else {
-            not_needed([ "install_name" ])
-          }
-
-          # Used by sdk_verify_runtime_deps().
-          if (!defined(sdk_runtime_deps)) {
-            sdk_runtime_deps = [
-              {
-                label = get_label_info(":$target_name", "label_with_toolchain")
-                source = rebased_output_file
-              },
-            ]
-          }
-
-          # Used by the //:binaries target.
-          binaries += [
-            {
-              type = "shared_library"
-              label = get_label_info(":$target_name", "label_with_toolchain")
-              cpu = current_cpu
-              os = current_os
-              debug = rebase_path(link_output_file, root_build_dir)
-              dist = rebased_output_file
-              if (current_os != "mac" && current_os != "win") {
-                elf_build_id = rebased_output_file + ".build-id.stamp"
-              }
-              if (output_breakpad_syms &&
-                  (current_os == "fuchsia" || current_os == "mistos")) {
-                breakpad = rebased_output_file + ".sym"
-              }
-            },
-          ]
-
-          if (!defined(invoker.crate_type) || invoker.crate_type != "dylib") {
-            # Don't collect rlibs from transitive deps
-            rust_barrier = []
-          }
-          if (defined(invoker.crate_type)) {
-            rlib = [ "--extern=$crate_name=$_link_output_path" ]
-            searchdir = [ "-Ldependency=$_link_output_dir" ]
-          }
-        }
+      _fuchsia_shared_library(target_name) {
+        forward_variables_from(invoker, "*")
       }
     }
   }
@@ -3747,7 +3680,11 @@ template("loadable_module") {
   _module_name = target_name
 
   # NOTE: Allow PIC-friendly toolchains to use loadable_module().
-  variant_shared_redirection = toolchain_variant.with_shared
+  #
+  # Avoid redirection for Rust shared libraries (dylibs and cdylibs).
+  # See https://fxbug.dev/387208039.
+  _is_rust_target = defined(invoker.crate_root)
+  variant_shared_redirection = !_is_rust_target && toolchain_variant.with_shared
 
   variant_target("loadable_module") {
     target_name = _module_name
@@ -3904,6 +3841,14 @@ template("source_set") {
 
     # This is implicitly added to every kind of target that can have `sources`.
     deps += toolchain_variant.source_deps
+    foreach(
+        config,
+        toolchain_variant.configs + toolchain_variant.remove_common_configs -
+            toolchain_variant.remove_common_configs) {
+      # Expand the label so it always has a `:name` part.
+      config = get_label_info(config, "label_no_toolchain")
+      deps += [ "${config}_source_deps" ]
+    }
   }
 }
 _built_in_target_types_without_public_wrapper -= [ "source_set" ]
@@ -3949,6 +3894,14 @@ template("static_library") {
 
     # This is implicitly added to every kind of target that can have `sources`.
     deps += toolchain_variant.source_deps
+    foreach(
+        config,
+        toolchain_variant.configs + toolchain_variant.remove_common_configs -
+            toolchain_variant.remove_common_configs) {
+      # Expand the label so it always has a `:name` part.
+      config = get_label_info(config, "label_no_toolchain")
+      deps += [ "${config}_source_deps" ]
+    }
 
     if (defined(invoker.no_rust_aux_build_config_dep)) {
       _no_rust_aux_build_config_dep = invoker.no_rust_aux_build_config_dep

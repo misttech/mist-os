@@ -17,18 +17,27 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.inspect.InspectSink",
-            ],
+            protocol: "fuchsia.boot.WriteOnlyLog",
             from: "parent",
-            to: [ "#fs-collection" ],
+            to: "#fs-collection",
+        },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#fs-collection",
         },
         {
             protocol: "fuchsia.tracing.provider.Registry",
             from: "parent",
             to: "#fs-collection",
             availability: "same_as_target",
+        },
+        {
+            protocol: "fuchsia.scheduler.RoleManager",
+            from: "parent",
+            to: "#fs-collection",
+            availability: "same_as_target",
+            source_availability: "unknown",
         },
     ],
 }

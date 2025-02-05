@@ -17,8 +17,8 @@ use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::{Address, HostId, HostInfo};
 use futures::future::join;
 use futures::{FutureExt, StreamExt, TryStreamExt};
+use log::info;
 use std::collections::{HashMap, HashSet};
-use tracing::info;
 
 async fn handle_host_requests(id: HostId, mut stream: HostRequestStream) {
     let mut first_state_req = true;

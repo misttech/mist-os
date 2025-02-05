@@ -991,14 +991,14 @@ static zx_status_t brcmf_escan_prep(
       struct brcmf_ssid_le* ssid_le =
           reinterpret_cast<struct brcmf_ssid_le*>(reinterpret_cast<char*>(params_le) + offset);
       for (uint32_t i = 0; i < n_ssids; i++, ssid_le++) {
-        if (request->ssids().data()[i].len > fuchsia_wlan_ieee80211::kMaxSsidByteLen) {
+        if (request->ssids().data()[i].count() > fuchsia_wlan_ieee80211::kMaxSsidByteLen) {
           BRCMF_ERR("SSID in scan request SSID list too long(no longer than %hhu bytes)",
                     fuchsia_wlan_ieee80211::kMaxSsidByteLen);
           return ZX_ERR_INVALID_ARGS;
         }
-        ssid_le->SSID_len = request->ssids().data()[i].len;
-        memcpy(&ssid_le->SSID, request->ssids().data()[i].data.data(),
-               request->ssids().data()[i].len);
+        ssid_le->SSID_len = request->ssids().data()[i].count();
+        memcpy(&ssid_le->SSID, request->ssids().data()[i].data(),
+               request->ssids().data()[i].count());
         if (ssid_le->SSID_len == 0) {
           BRCMF_DBG(SCAN, "%d: Broadcast scan", i);
         } else {
@@ -3715,7 +3715,7 @@ static fuchsia_wlan_fullmac_wire::StartResult brcmf_cfg80211_start_ap(
 
   BRCMF_DBG(TRACE,
             "ssid: " FMT_SSID "  beacon period: %d  dtim_period: %d  channel: %d  rsne_len: %zd",
-            FMT_SSID_BYTES(req->ssid().data.data(), req->ssid().len), req->beacon_period(),
+            FMT_SSID_BYTES(req->ssid().data(), req->ssid().count()), req->beacon_period(),
             req->dtim_period(), req->channel(), req->has_rsne() ? req->rsne().count() : 0);
 
   uint16_t chanspec = 0;
@@ -3724,8 +3724,8 @@ static fuchsia_wlan_fullmac_wire::StartResult brcmf_cfg80211_start_ap(
 
   struct brcmf_ssid_le ssid_le;
   memset(&ssid_le, 0, sizeof(ssid_le));
-  memcpy(ssid_le.SSID, req->ssid().data.data(), req->ssid().len);
-  ssid_le.SSID_len = req->ssid().len;
+  memcpy(ssid_le.SSID, req->ssid().data(), req->ssid().count());
+  ssid_le.SSID_len = req->ssid().count();
 
   brcmf_enable_mpc(ifp, 0);
 
@@ -3838,7 +3838,8 @@ static fuchsia_wlan_fullmac_wire::StartResult brcmf_cfg80211_start_ap(
 
   cfg->ap_started = true;
   // Save the SSID for checking when SoftAP is stopped.
-  ifp->saved_softap_ssid = req->ssid();
+  ifp->saved_softap_ssid.resize(req->ssid().count());
+  memcpy(ifp->saved_softap_ssid.data(), req->ssid().data(), req->ssid().count());
   return fuchsia_wlan_fullmac_wire::StartResult::kSuccess;
 
 fail:
@@ -4355,7 +4356,7 @@ void brcmf_if_start_req(net_device* ndev,
   BRCMF_IFDBG(WLANIF, ndev, "Start AP request from SME. rsne_len: %zu, channel: %u",
               req->has_rsne() ? req->rsne().count() : 0, req->channel());
 #if !defined(NDEBUG)
-  BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid().data.data(), req->ssid().len));
+  BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid().data(), req->ssid().count()));
 #endif /* !defined(NDEBUG) */
 
   fuchsia_wlan_fullmac_wire::StartResult result_code = brcmf_cfg80211_start_ap(ndev, req);
@@ -4383,13 +4384,13 @@ void brcmf_if_stop_req(net_device* ndev,
     goto done;
   }
 #if !defined(NDEBUG)
-  BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid().data.data(), req->ssid().len));
+  BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid().data(), req->ssid().count()));
 #endif /* !defined(NDEBUG) */
-  if ((req->ssid().len != ifp->saved_softap_ssid.len) ||
-      (memcmp(req->ssid().data.data(), ifp->saved_softap_ssid.data.data(), req->ssid().len) != 0)) {
+  if ((req->ssid().count() != ifp->saved_softap_ssid.size()) ||
+      (memcmp(req->ssid().data(), ifp->saved_softap_ssid.data(), req->ssid().count()) != 0)) {
     BRCMF_ERR("SSID does not match running SoftAP, req SSID: " FMT_SSID, " current SSID: " FMT_SSID,
-              FMT_SSID_BYTES(req->ssid().data.data(), req->ssid().len),
-              FMT_SSID_BYTES(ifp->saved_softap_ssid.data.data(), ifp->saved_softap_ssid.len));
+              FMT_SSID_BYTES(req->ssid().data(), req->ssid().count()),
+              FMT_SSID_BYTES(ifp->saved_softap_ssid.data(), ifp->saved_softap_ssid.size()));
     result_code = fuchsia_wlan_fullmac_wire::StopResult::kInternalError;
     goto done;
   }
@@ -5056,15 +5057,14 @@ void brcmf_if_query_spectrum_management_support(
 
 namespace {
 
-zx_status_t brcmf_convert_antenna_id(
-    const histograms_report_t& histograms_report,
-    fuchsia_wlan_fullmac_wire::WlanFullmacAntennaId* out_antenna_id) {
+zx_status_t brcmf_convert_antenna_id(const histograms_report_t& histograms_report,
+                                     fuchsia_wlan_stats::wire::AntennaId* out_antenna_id) {
   switch (histograms_report.antennaid.freq) {
     case ANTENNA_2G:
-      out_antenna_id->freq = fuchsia_wlan_fullmac_wire::WlanFullmacAntennaFreq::kAntenna2G;
+      out_antenna_id->freq = fuchsia_wlan_stats::wire::AntennaFreq::kAntenna2G;
       break;
     case ANTENNA_5G:
-      out_antenna_id->freq = fuchsia_wlan_fullmac_wire::WlanFullmacAntennaFreq::kAntenna5G;
+      out_antenna_id->freq = fuchsia_wlan_stats::wire::AntennaFreq::kAntenna5G;
       break;
     default:
       return ZX_ERR_OUT_OF_RANGE;
@@ -5075,10 +5075,10 @@ zx_status_t brcmf_convert_antenna_id(
 
 void brcmf_get_noise_floor_samples(
     const histograms_report_t& histograms_report,
-    std::vector<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket>* out_noise_floor_samples,
+    std::vector<fuchsia_wlan_stats::wire::HistBucket>* out_noise_floor_samples,
     uint64_t* out_invalid_samples) {
-  for (size_t i = 0; i < fuchsia_wlan_fullmac_wire::kWlanFullmacMaxNoiseFloorSamples; ++i) {
-    fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket bucket;
+  for (size_t i = 0; i < fuchsia_wlan_stats::wire::kMaxNoiseFloorSamples; ++i) {
+    fuchsia_wlan_stats::wire::HistBucket bucket;
     bucket.bucket_index = i;
     bucket.num_samples = histograms_report.rxnoiseflr[i];
     out_noise_floor_samples->push_back(bucket);
@@ -5087,12 +5087,11 @@ void brcmf_get_noise_floor_samples(
   *out_invalid_samples = histograms_report.rxsnr[255];
 }
 
-void brcmf_get_rssi_samples(
-    const histograms_report_t& histograms_report,
-    std::vector<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket>* out_rssi_samples,
-    uint64_t* out_invalid_samples) {
-  for (size_t i = 0; i < fuchsia_wlan_fullmac_wire::kWlanFullmacMaxRssiSamples; ++i) {
-    fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket bucket;
+void brcmf_get_rssi_samples(const histograms_report_t& histograms_report,
+                            std::vector<fuchsia_wlan_stats::wire::HistBucket>* out_rssi_samples,
+                            uint64_t* out_invalid_samples) {
+  for (size_t i = 0; i < fuchsia_wlan_stats::wire::kMaxRssiSamples; ++i) {
+    fuchsia_wlan_stats::wire::HistBucket bucket;
     bucket.bucket_index = i;
     bucket.num_samples = histograms_report.rxrssi[i];
     out_rssi_samples->push_back(bucket);
@@ -5101,12 +5100,11 @@ void brcmf_get_rssi_samples(
   *out_invalid_samples = histograms_report.rxrssi[255];
 }
 
-void brcmf_get_snr_samples(
-    const histograms_report_t& histograms_report,
-    std::vector<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket>* out_snr_samples,
-    uint64_t* out_invalid_samples) {
-  for (size_t i = 0; i < fuchsia_wlan_fullmac_wire::kWlanFullmacMaxSnrSamples; ++i) {
-    fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket bucket;
+void brcmf_get_snr_samples(const histograms_report_t& histograms_report,
+                           std::vector<fuchsia_wlan_stats::wire::HistBucket>* out_snr_samples,
+                           uint64_t* out_invalid_samples) {
+  for (size_t i = 0; i < fuchsia_wlan_stats::wire::kMaxSnrSamples; ++i) {
+    fuchsia_wlan_stats::wire::HistBucket bucket;
     bucket.bucket_index = i;
     bucket.num_samples = histograms_report.rxsnr[i];
     out_snr_samples->push_back(bucket);
@@ -5117,15 +5115,15 @@ void brcmf_get_snr_samples(
 
 void brcmf_get_rx_rate_index_samples(
     const histograms_report_t& histograms_report,
-    std::vector<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket>* out_rx_rate_index_samples,
+    std::vector<fuchsia_wlan_stats::wire::HistBucket>* out_rx_rate_index_samples,
     uint64_t* out_invalid_samples) {
-  uint32_t rxrate[fuchsia_wlan_fullmac_wire::kWlanFullmacMaxRxRateIndexSamples];
+  uint32_t rxrate[fuchsia_wlan_stats::wire::kMaxRxRateIndexSamples];
   brcmu_set_rx_rate_index_hist_rx11ac(histograms_report.rx11ac, rxrate);
   brcmu_set_rx_rate_index_hist_rx11b(histograms_report.rx11b, rxrate);
   brcmu_set_rx_rate_index_hist_rx11g(histograms_report.rx11g, rxrate);
   brcmu_set_rx_rate_index_hist_rx11n(histograms_report.rx11n, rxrate);
-  for (uint8_t i = 0; i < fuchsia_wlan_fullmac_wire::kWlanFullmacMaxRxRateIndexSamples; ++i) {
-    fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket bucket;
+  for (uint8_t i = 0; i < fuchsia_wlan_stats::wire::kMaxRxRateIndexSamples; ++i) {
+    fuchsia_wlan_stats::wire::HistBucket bucket;
     bucket.bucket_index = i;
     bucket.num_samples = rxrate[i];
     out_rx_rate_index_samples->push_back(bucket);
@@ -5136,50 +5134,48 @@ void brcmf_get_rx_rate_index_samples(
 
 void brcmf_convert_histograms_report_noise_floor(
     const histograms_report_t& histograms_report,
-    const fuchsia_wlan_fullmac_wire::WlanFullmacAntennaId& antenna_id,
-    fuchsia_wlan_fullmac_wire::WlanFullmacNoiseFloorHistogram* out_hist, fidl::AnyArena& arena) {
-  out_hist->antenna_id = antenna_id;
-  out_hist->hist_scope = fuchsia_wlan_fullmac_wire::WlanFullmacHistScope::kPerAntenna;
-  std::vector<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket> samples;
+    const fuchsia_wlan_stats::wire::AntennaId& antenna_id,
+    fuchsia_wlan_stats::wire::NoiseFloorHistogram* out_hist, fidl::AnyArena& arena) {
+  out_hist->antenna_id = fidl::ObjectView<fuchsia_wlan_stats::wire::AntennaId>(arena, antenna_id);
+  out_hist->hist_scope = fuchsia_wlan_stats::wire::HistScope::kPerAntenna;
+  std::vector<fuchsia_wlan_stats::wire::HistBucket> samples;
   brcmf_get_noise_floor_samples(histograms_report, &samples, &out_hist->invalid_samples);
   out_hist->noise_floor_samples =
-      fidl::VectorView<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket>(arena, samples);
+      fidl::VectorView<fuchsia_wlan_stats::wire::HistBucket>(arena, samples);
 }
 
 void brcmf_convert_histograms_report_rx_rate_index(
     const histograms_report_t& histograms_report,
-    const fuchsia_wlan_fullmac_wire::WlanFullmacAntennaId& antenna_id,
-    fuchsia_wlan_fullmac_wire::WlanFullmacRxRateIndexHistogram* out_hist, fidl::AnyArena& arena) {
-  out_hist->antenna_id = antenna_id;
-  out_hist->hist_scope = fuchsia_wlan_fullmac_wire::WlanFullmacHistScope::kPerAntenna;
-  std::vector<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket> samples;
+    const fuchsia_wlan_stats::wire::AntennaId& antenna_id,
+    fuchsia_wlan_stats::wire::RxRateIndexHistogram* out_hist, fidl::AnyArena& arena) {
+  out_hist->antenna_id = fidl::ObjectView<fuchsia_wlan_stats::wire::AntennaId>(arena, antenna_id);
+  out_hist->hist_scope = fuchsia_wlan_stats::wire::HistScope::kPerAntenna;
+  std::vector<fuchsia_wlan_stats::wire::HistBucket> samples;
   brcmf_get_rx_rate_index_samples(histograms_report, &samples, &out_hist->invalid_samples);
   out_hist->rx_rate_index_samples =
-      fidl::VectorView<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket>(arena, samples);
+      fidl::VectorView<fuchsia_wlan_stats::wire::HistBucket>(arena, samples);
 }
 
-void brcmf_convert_histograms_report_rssi(
-    const histograms_report_t& histograms_report,
-    const fuchsia_wlan_fullmac_wire::WlanFullmacAntennaId& antenna_id,
-    fuchsia_wlan_fullmac_wire::WlanFullmacRssiHistogram* out_hist, fidl::AnyArena& arena) {
-  out_hist->antenna_id = antenna_id;
-  out_hist->hist_scope = fuchsia_wlan_fullmac_wire::WlanFullmacHistScope::kPerAntenna;
-  std::vector<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket> samples;
+void brcmf_convert_histograms_report_rssi(const histograms_report_t& histograms_report,
+                                          const fuchsia_wlan_stats::wire::AntennaId& antenna_id,
+                                          fuchsia_wlan_stats::wire::RssiHistogram* out_hist,
+                                          fidl::AnyArena& arena) {
+  out_hist->antenna_id = fidl::ObjectView<fuchsia_wlan_stats::wire::AntennaId>(arena, antenna_id);
+  out_hist->hist_scope = fuchsia_wlan_stats::wire::HistScope::kPerAntenna;
+  std::vector<fuchsia_wlan_stats::wire::HistBucket> samples;
   brcmf_get_rssi_samples(histograms_report, &samples, &out_hist->invalid_samples);
-  out_hist->rssi_samples =
-      fidl::VectorView<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket>(arena, samples);
+  out_hist->rssi_samples = fidl::VectorView<fuchsia_wlan_stats::wire::HistBucket>(arena, samples);
 }
 
-void brcmf_convert_histograms_report_snr(
-    const histograms_report_t& histograms_report,
-    const fuchsia_wlan_fullmac_wire::WlanFullmacAntennaId& antenna_id,
-    fuchsia_wlan_fullmac_wire::WlanFullmacSnrHistogram* out_hist, fidl::AnyArena& arena) {
-  out_hist->antenna_id = antenna_id;
-  out_hist->hist_scope = fuchsia_wlan_fullmac_wire::WlanFullmacHistScope::kPerAntenna;
-  std::vector<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket> samples;
+void brcmf_convert_histograms_report_snr(const histograms_report_t& histograms_report,
+                                         const fuchsia_wlan_stats::wire::AntennaId& antenna_id,
+                                         fuchsia_wlan_stats::wire::SnrHistogram* out_hist,
+                                         fidl::AnyArena& arena) {
+  out_hist->antenna_id = fidl::ObjectView<fuchsia_wlan_stats::wire::AntennaId>(arena, antenna_id);
+  out_hist->hist_scope = fuchsia_wlan_stats::wire::HistScope::kPerAntenna;
+  std::vector<fuchsia_wlan_stats::wire::HistBucket> samples;
   brcmf_get_snr_samples(histograms_report, &samples, &out_hist->invalid_samples);
-  out_hist->snr_samples =
-      fidl::VectorView<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket>(arena, samples);
+  out_hist->snr_samples = fidl::VectorView<fuchsia_wlan_stats::wire::HistBucket>(arena, samples);
 }
 
 zx_status_t brcmf_get_histograms_report(brcmf_if* ifp, histograms_report_t* out_report) {
@@ -5238,8 +5234,9 @@ zx_status_t brcmf_get_histograms_report(brcmf_if* ifp, histograms_report_t* out_
 
 }  // namespace
 
-zx_status_t brcmf_if_get_iface_counter_stats(
-    net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacIfaceCounterStats* out_stats) {
+zx_status_t brcmf_if_get_iface_counter_stats(net_device* ndev,
+                                             fuchsia_wlan_stats::wire::IfaceCounterStats* out_stats,
+                                             fidl::AnyArena& arena) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   if (!ndev->if_proto.is_valid()) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping get iface counter stats");
@@ -5270,17 +5267,18 @@ zx_status_t brcmf_if_get_iface_counter_stats(
   BRCMF_DBG(DATA, "Cntrs: rxgood:%d rxbad:%d txgood:%d txbad:%d rxocast:%d", pktcnt.rx_good_pkt,
             pktcnt.rx_bad_pkt, pktcnt.tx_good_pkt, pktcnt.tx_bad_pkt, pktcnt.rx_ocast_good_pkt);
 
-  out_stats->rx_unicast_total = pktcnt.rx_good_pkt + pktcnt.rx_bad_pkt + ndev->stats.rx_errors;
-  out_stats->rx_unicast_drop = pktcnt.rx_bad_pkt + ndev->stats.rx_errors;
-  out_stats->rx_multicast = pktcnt.rx_ocast_good_pkt;
-  out_stats->tx_total = pktcnt.tx_good_pkt + pktcnt.tx_bad_pkt + ndev->stats.tx_dropped;
-  out_stats->tx_drop = pktcnt.tx_bad_pkt + ndev->stats.tx_dropped;
-
+  *out_stats = fuchsia_wlan_stats::wire::IfaceCounterStats::Builder(arena)
+                   .rx_unicast_total(pktcnt.rx_good_pkt + pktcnt.rx_bad_pkt + ndev->stats.rx_errors)
+                   .rx_unicast_drop(pktcnt.rx_bad_pkt + ndev->stats.rx_errors)
+                   .rx_multicast(pktcnt.rx_ocast_good_pkt)
+                   .tx_total(pktcnt.tx_good_pkt + pktcnt.tx_bad_pkt + ndev->stats.tx_dropped)
+                   .tx_drop(pktcnt.tx_bad_pkt + ndev->stats.tx_dropped)
+                   .Build();
   return ZX_OK;
 }
 
 zx_status_t brcmf_if_get_iface_histogram_stats(
-    net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacIfaceHistogramStats* out_stats,
+    net_device* ndev, fuchsia_wlan_stats::wire::IfaceHistogramStats* out_stats,
     fidl::AnyArena& arena) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   if (!ndev->if_proto.is_valid()) {
@@ -5288,7 +5286,7 @@ zx_status_t brcmf_if_get_iface_histogram_stats(
     return ZX_ERR_INTERNAL;
   }
   struct brcmf_if* ifp = ndev_to_if(ndev);
-  auto stats_builder = fuchsia_wlan_fullmac_wire::WlanFullmacIfaceHistogramStats::Builder(arena);
+  auto stats_builder = fuchsia_wlan_stats::wire::IfaceHistogramStats::Builder(arena);
 
   ndev->stats.noise_floor_histograms = {};
   ndev->stats.rssi_histograms = {};
@@ -5314,7 +5312,7 @@ zx_status_t brcmf_if_get_iface_histogram_stats(
   if (hist_status != ZX_OK) {
     return hist_status;
   }
-  fuchsia_wlan_fullmac_wire::WlanFullmacAntennaId antenna_id;
+  fuchsia_wlan_stats::wire::AntennaId antenna_id;
   const auto antenna_id_status = brcmf_convert_antenna_id(histograms_report, &antenna_id);
   if (antenna_id_status != ZX_OK) {
     BRCMF_ERR("Invalid antenna ID, freq: %d idx: %d", histograms_report.antennaid.freq,
@@ -5336,16 +5334,15 @@ zx_status_t brcmf_if_get_iface_histogram_stats(
 
   // Conversion from banjo to FIDL table.
   stats_builder.noise_floor_histograms(
-      fidl::VectorView<fuchsia_wlan_fullmac_wire::WlanFullmacNoiseFloorHistogram>(
+      fidl::VectorView<fuchsia_wlan_stats::wire::NoiseFloorHistogram>(
           arena, ndev->stats.noise_floor_histograms));
-  stats_builder.rssi_histograms(
-      fidl::VectorView<fuchsia_wlan_fullmac_wire::WlanFullmacRssiHistogram>(
-          arena, ndev->stats.rssi_histograms));
+  stats_builder.rssi_histograms(fidl::VectorView<fuchsia_wlan_stats::wire::RssiHistogram>(
+      arena, ndev->stats.rssi_histograms));
   stats_builder.rx_rate_index_histograms(
-      fidl::VectorView<fuchsia_wlan_fullmac_wire::WlanFullmacRxRateIndexHistogram>(
+      fidl::VectorView<fuchsia_wlan_stats::wire::RxRateIndexHistogram>(
           arena, ndev->stats.rx_rate_index_histograms));
-  stats_builder.snr_histograms(fidl::VectorView<fuchsia_wlan_fullmac_wire::WlanFullmacSnrHistogram>(
-      arena, ndev->stats.snr_histograms));
+  stats_builder.snr_histograms(
+      fidl::VectorView<fuchsia_wlan_stats::wire::SnrHistogram>(arena, ndev->stats.snr_histograms));
 
   *out_stats = stats_builder.Build();
 
@@ -6422,12 +6419,19 @@ static zx_status_t brcmf_handle_assoc_ind(struct brcmf_if* ifp, const struct brc
   }
 
   // Extract the RSN information from the IEs
-  std::vector<uint8_t> rsne(fuchsia_wlan_ieee80211_wire::kWlanIeBodyMaxLen, 0);
+  std::vector<uint8_t> rsne{};
   if (rsn_ie != nullptr) {
     size_t rsn_len = rsn_ie->len + TLV_HDR_LEN;
     const uint8_t* rsn_ie_ptr = reinterpret_cast<const uint8_t*>(rsn_ie);
     cpp20::span<const uint8_t> rsne_span = {rsn_ie_ptr, rsn_len};
-    rsne.assign(rsne_span.begin(), rsne_span.end());
+    if (rsne_span.size() <= fuchsia_wlan_ieee80211_wire::kWlanIeBodyMaxLen) {
+      rsne.assign(rsne_span.begin(), rsne_span.end());
+    } else {
+      BRCMF_ERR("Received ASSOC_IND with invalid RSN IE length %zu", rsne_span.size());
+      brcmf_cfg80211_del_station(ndev, peer_sta_address.data(),
+                                 fuchsia_wlan_ieee80211::ReasonCode::kInvalidRsneCapabilities);
+      return ZX_OK;
+    }
   }
   auto assoc_ind_builder =
       fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcAssocIndRequest::Builder(arena)

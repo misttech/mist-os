@@ -276,7 +276,7 @@ mod tests {
         let Poll::Ready(Some(Ok(fio::DirectoryRequest::GetFlags { responder }))) = message else {
             panic!("Unexpected {message:?}");
         };
-        responder.send(zx::Status::OK.into_raw(), fio::OpenFlags::empty()).unwrap();
+        responder.send(Ok(fio::Flags::empty())).unwrap();
 
         // The stream hasn't stalled yet.
         TestExecutor::advance_to(initial + idle_duration * 2).await;
@@ -324,7 +324,7 @@ mod tests {
         }
 
         // Now we resolve the pending reply.
-        responder.send(zx::Status::OK.into_raw(), fio::OpenFlags::empty()).unwrap();
+        responder.send(Ok(fio::Flags::empty())).unwrap();
 
         // The connection should stall.
         assert_matches!(

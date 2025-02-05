@@ -33,24 +33,24 @@ struct SavedState {
 pub fn apply_state(resume_state: ResumedState, index: Rc<Indexer>) -> bool {
     match resume_state.notifier {
         Some(handle) => {
-            tracing::info!("loading driver notifier from escrow.");
+            log::info!("loading driver notifier from escrow.");
             index.set_notifier(handle.into());
         }
         None => {}
     };
 
-    tracing::info!("loading composite node specs from escrow.");
+    log::info!("loading composite node specs from escrow.");
     index.composite_node_spec_manager.replace(resume_state.composite_specs);
 
     let base_loaded = if let Some(base_repo) = resume_state.base_repo {
         index.base_repo.replace(base_repo);
-        tracing::info!("loading base drivers from escrow.");
+        log::info!("loading base drivers from escrow.");
         true
     } else {
         false
     };
 
-    tracing::info!("loading ephemeral drivers from escrow.");
+    log::info!("loading ephemeral drivers from escrow.");
     index.ephemeral_drivers.replace(resume_state.ephemeral_repo);
 
     base_loaded
@@ -105,7 +105,7 @@ pub async fn resume_state(
     let notifier = match notifier_result {
         Ok(notifier) => Some(notifier),
         Err(e) => {
-            tracing::warn!("Failed to get notifier {:?}", e);
+            log::warn!("Failed to get notifier {:?}", e);
             None
         }
     };
@@ -134,7 +134,7 @@ pub async fn resume_state(
         saved_state.ephemeral_repo.into_iter().map(|d| (d.component_url.clone(), d)),
     );
 
-    tracing::info!(
+    log::info!(
         "read and decompress duration {:?}, deserialize duration {:?}",
         read_and_decompress_time,
         deserialize_time
@@ -171,7 +171,7 @@ async fn save_state(
                     })?;
             }
             None => {
-                tracing::info!("No notifier to store.");
+                log::info!("No notifier to store.");
             }
         }
     }
@@ -199,7 +199,7 @@ async fn save_state(
         .await?;
     let compress_and_save_time = now.elapsed();
 
-    tracing::info!(
+    log::info!(
         "serialize duration {:?}, compress and save duration {:?}",
         serialize_time,
         compress_and_save_time
@@ -220,7 +220,7 @@ async fn save_to_dictionary_vmo(
     vmo.set_content_size(&size)
         .map_err(|e| anyhow!("Failed to set_content_size on vmo: {:?}", e))?;
 
-    tracing::info!("{} vmo size: {}", key, size);
+    log::info!("{} vmo size: {}", key, size);
 
     let id = id_gen.next();
     capability_store
@@ -243,7 +243,7 @@ async fn compress_and_save_to_dictionary_vmo(
     dict_id: u64,
     key: &str,
 ) -> Result<(), anyhow::Error> {
-    tracing::info!("{} uncompressed size: {}", key, data.len());
+    log::info!("{} uncompressed size: {}", key, data.len());
     write_size_to_dictionary(
         data.len(),
         capability_store,

@@ -5,6 +5,9 @@
 #ifndef SRC_MEDIA_AUDIO_AUDIO_CORE_SHARED_STREAM_USAGE_H_
 #define SRC_MEDIA_AUDIO_AUDIO_CORE_SHARED_STREAM_USAGE_H_
 
+#include <fidl/fuchsia.media/cpp/fidl.h>
+#include <fidl/fuchsia.media/cpp/hlcpp_conversion.h>
+#include <fidl/fuchsia.media/cpp/type_conversions.h>
 #include <fuchsia/media/cpp/fidl.h>
 #include <lib/fidl/cpp/enum.h>
 #include <lib/syslog/cpp/macros.h>
@@ -16,14 +19,45 @@
 
 namespace media::audio {
 
-static_assert(fuchsia::media::RENDER_USAGE_COUNT == 5);
-// These must be listed in the order of the fuchsia::media::AudioRenderUsage enum.
+// Indexing of the FIDL enums (primarily usages).
+//
+constexpr uint32_t ToIndex(const fuchsia::media::AudioRenderUsage& u) {
+  return static_cast<uint32_t>(u);
+}
+constexpr uint32_t ToIndex(const fuchsia_media::AudioRenderUsage& u) {
+  return static_cast<uint32_t>(u);
+}
+constexpr uint32_t ToIndex(const fuchsia::media::AudioRenderUsage2& u) {
+  return static_cast<uint32_t>(u);
+}
+constexpr uint32_t ToIndex(const fuchsia_media::AudioRenderUsage2& u) {
+  return static_cast<uint32_t>(u);
+}
+constexpr uint32_t ToIndex(const fuchsia::media::AudioCaptureUsage& u) {
+  return static_cast<uint32_t>(u);
+}
+constexpr uint32_t ToIndex(const fuchsia_media::AudioCaptureUsage& u) {
+  return static_cast<uint32_t>(u);
+}
+constexpr uint32_t ToIndex(const fuchsia::media::AudioCaptureUsage2& u) {
+  return static_cast<uint32_t>(u);
+}
+constexpr uint32_t ToIndex(const fuchsia_media::AudioCaptureUsage2& u) {
+  return static_cast<uint32_t>(u);
+}
+constexpr uint32_t ToIndex(const fuchsia::media::Behavior& b) { return static_cast<uint32_t>(b); }
+
+// Creation of our own usage enums, so we can include internal values like ULTRASOUND or LOOPBACK.
+//
+static_assert(fuchsia::media::RENDER_USAGE2_COUNT == 6);
+// These must be listed in the order of the fuchsia::media::AudioRenderUsage2 enum.
 #define EXPAND_EACH_FIDL_RENDER_USAGE \
   EXPAND_RENDER_USAGE(BACKGROUND)     \
   EXPAND_RENDER_USAGE(MEDIA)          \
   EXPAND_RENDER_USAGE(INTERRUPTION)   \
   EXPAND_RENDER_USAGE(SYSTEM_AGENT)   \
-  EXPAND_RENDER_USAGE(COMMUNICATION)
+  EXPAND_RENDER_USAGE(COMMUNICATION)  \
+  EXPAND_RENDER_USAGE(ACCESSIBILITY)
 
 static constexpr uint32_t kStreamInternalRenderUsageCount = 1;
 #define EXPAND_EACH_INTERNAL_RENDER_USAGE EXPAND_RENDER_USAGE(ULTRASOUND)
@@ -32,8 +66,8 @@ static constexpr uint32_t kStreamInternalRenderUsageCount = 1;
   EXPAND_EACH_FIDL_RENDER_USAGE  \
   EXPAND_EACH_INTERNAL_RENDER_USAGE
 
-// These must be listed in the order of the fuchsia::media::AudioCaptureUsage enum.
-static_assert(fuchsia::media::CAPTURE_USAGE_COUNT == 4);
+// These must be listed in the order of the fuchsia::media::AudioCaptureUsage2 enum.
+static_assert(fuchsia::media::CAPTURE_USAGE2_COUNT == 4);
 #define EXPAND_EACH_FIDL_CAPTURE_USAGE \
   EXPAND_CAPTURE_USAGE(BACKGROUND)     \
   EXPAND_CAPTURE_USAGE(FOREGROUND)     \
@@ -50,9 +84,9 @@ static constexpr uint32_t kStreamInternalCaptureUsageCount = 2;
   EXPAND_EACH_INTERNAL_CAPTURE_USAGE
 
 static constexpr uint32_t kStreamRenderUsageCount =
-    fuchsia::media::RENDER_USAGE_COUNT + kStreamInternalRenderUsageCount;
-enum class RenderUsage : std::underlying_type_t<fuchsia::media::AudioRenderUsage> {
-#define EXPAND_RENDER_USAGE(U) U = fidl::ToUnderlying(fuchsia::media::AudioRenderUsage::U),
+    fuchsia::media::RENDER_USAGE2_COUNT + kStreamInternalRenderUsageCount;
+enum class RenderUsage : uint32_t {
+#define EXPAND_RENDER_USAGE(U) U = ToIndex(fuchsia::media::AudioRenderUsage2::U),
   EXPAND_EACH_FIDL_RENDER_USAGE
 #undef EXPAND_RENDER_USAGE
 #define EXPAND_RENDER_USAGE(U) U,
@@ -60,7 +94,7 @@ enum class RenderUsage : std::underlying_type_t<fuchsia::media::AudioRenderUsage
 #undef EXPAND_RENDER_USAGE
 };
 
-constexpr std::array<RenderUsage, fuchsia::media::RENDER_USAGE_COUNT> kFidlRenderUsages = {{
+constexpr std::array<RenderUsage, fuchsia::media::RENDER_USAGE2_COUNT> kFidlRenderUsages = {{
 #define EXPAND_RENDER_USAGE(U) RenderUsage::U,
     EXPAND_EACH_FIDL_RENDER_USAGE
 #undef EXPAND_RENDER_USAGE
@@ -73,9 +107,9 @@ constexpr std::array<RenderUsage, kStreamRenderUsageCount> kRenderUsages = {{
 }};
 
 static constexpr uint32_t kStreamCaptureUsageCount =
-    fuchsia::media::CAPTURE_USAGE_COUNT + kStreamInternalCaptureUsageCount;
-enum class CaptureUsage : std::underlying_type_t<fuchsia::media::AudioCaptureUsage> {
-#define EXPAND_CAPTURE_USAGE(U) U = fidl::ToUnderlying(fuchsia::media::AudioCaptureUsage::U),
+    fuchsia::media::CAPTURE_USAGE2_COUNT + kStreamInternalCaptureUsageCount;
+enum class CaptureUsage : uint32_t {
+#define EXPAND_CAPTURE_USAGE(U) U = ToIndex(fuchsia::media::AudioCaptureUsage2::U),
   EXPAND_EACH_FIDL_CAPTURE_USAGE
 #undef EXPAND_CAPTURE_USAGE
 #define EXPAND_CAPTURE_USAGE(U) U,
@@ -83,7 +117,7 @@ enum class CaptureUsage : std::underlying_type_t<fuchsia::media::AudioCaptureUsa
 #undef EXPAND_CAPTURE_USAGE
 };
 
-constexpr std::array<CaptureUsage, fuchsia::media::CAPTURE_USAGE_COUNT> kFidlCaptureUsages = {{
+constexpr std::array<CaptureUsage, fuchsia::media::CAPTURE_USAGE2_COUNT> kFidlCaptureUsages = {{
 #define EXPAND_CAPTURE_USAGE(U) CaptureUsage::U,
     EXPAND_EACH_FIDL_CAPTURE_USAGE
 #undef EXPAND_CAPTURE_USAGE
@@ -97,31 +131,40 @@ constexpr std::array<CaptureUsage, kStreamCaptureUsageCount> kCaptureUsages = {{
 
 static constexpr uint32_t kStreamUsageCount = kStreamRenderUsageCount + kStreamCaptureUsageCount;
 
-// Since we define the RenderUsage enum to have the same numeric values for each fidl enum entry,
-// we can convert by casting the underlying numeric value.
-static RenderUsage RenderUsageFromFidlRenderUsage(fuchsia::media::AudioRenderUsage u) {
-  return static_cast<RenderUsage>(fidl::ToUnderlying(u));
-}
-static CaptureUsage CaptureUsageFromFidlCaptureUsage(fuchsia::media::AudioCaptureUsage u) {
-  return static_cast<CaptureUsage>(fidl::ToUnderlying(u));
-}
+// Conversions from FIDL usage types to RenderUsage or CaptureUsage.
+//
+// Since we define these enums with the same numeric values for each fidl enum entry, we can
+// convert by casting the underlying numeric value.
+//
 
-std::optional<fuchsia::media::AudioRenderUsage> FidlRenderUsageFromRenderUsage(RenderUsage u);
+// RenderUsage
+RenderUsage ToRenderUsage(fuchsia::media::AudioRenderUsage u);
+RenderUsage ToRenderUsage(fuchsia_media::AudioRenderUsage u);
+RenderUsage ToRenderUsage(fuchsia::media::AudioRenderUsage2 u);
+RenderUsage ToRenderUsage(fuchsia_media::AudioRenderUsage2 u);
+RenderUsage ToRenderUsage(fuchsia_media::AudioRenderUsage2 u);
 
-std::optional<fuchsia::media::AudioCaptureUsage> FidlCaptureUsageFromCaptureUsage(CaptureUsage u);
+// CaptureUsage
+CaptureUsage ToCaptureUsage(fuchsia::media::AudioCaptureUsage usage);
+CaptureUsage ToCaptureUsage(fuchsia_media::AudioCaptureUsage usage);
+CaptureUsage ToCaptureUsage(fuchsia::media::AudioCaptureUsage2 u);
+CaptureUsage ToCaptureUsage(fuchsia_media::AudioCaptureUsage2 u);
 
-const char* RenderUsageToString(const RenderUsage& usage);
-const char* CaptureUsageToString(const CaptureUsage& usage);
+const char* ToString(const RenderUsage& usage);
+const char* ToString(const CaptureUsage& usage);
+
+// Genericized container for either RenderUsage or CaptureUsage.
+//
 
 class StreamUsage {
  public:
   static constexpr StreamUsage WithRenderUsage(RenderUsage u) { return StreamUsage(u); }
   static constexpr StreamUsage WithCaptureUsage(CaptureUsage u) { return StreamUsage(u); }
-  static constexpr StreamUsage WithRenderUsage(fuchsia::media::AudioRenderUsage u) {
-    return StreamUsage(RenderUsageFromFidlRenderUsage(u));
+  static constexpr StreamUsage WithRenderUsage(fuchsia::media::AudioRenderUsage2 u) {
+    return StreamUsage(ToRenderUsage(u));
   }
-  static constexpr StreamUsage WithCaptureUsage(fuchsia::media::AudioCaptureUsage u) {
-    return StreamUsage(CaptureUsageFromFidlCaptureUsage(u));
+  static constexpr StreamUsage WithCaptureUsage(fuchsia::media::AudioCaptureUsage2 u) {
+    return StreamUsage(ToCaptureUsage(u));
   }
 
   constexpr StreamUsage() = default;
@@ -197,7 +240,7 @@ using RenderUsageSet = std::unordered_set<RenderUsage, internal::EnumHash>;
 using CaptureUsageSet = std::unordered_set<CaptureUsage, internal::EnumHash>;
 using StreamUsageSet = std::unordered_set<StreamUsage, internal::StreamUsageHash>;
 
-StreamUsage StreamUsageFromFidlUsage(const fuchsia::media::Usage& usage);
+StreamUsage StreamUsageFromFidlUsage(const fuchsia::media::Usage2& usage);
 
 template <typename Container>
 static StreamUsageSet StreamUsageSetFromRenderUsages(const Container& container) {
@@ -273,6 +316,54 @@ class StreamUsageMask final {
  private:
   uint32_t mask_ = 0;
 };
+
+//
+// Conversions
+//
+
+// StreamUsage
+StreamUsage ToStreamUsage(const fuchsia::media::Usage2& usage);
+
+// AudioRenderUsage
+std::optional<fuchsia::media::AudioRenderUsage> ToFidlRenderUsageTry(
+    const fuchsia::media::AudioRenderUsage2& usage2);
+
+// AudioRenderUsage2
+fuchsia::media::AudioRenderUsage2 ToFidlRenderUsage2(const fuchsia::media::AudioRenderUsage& usage);
+fuchsia::media::AudioRenderUsage2 ToFidlRenderUsage2(const fuchsia_media::AudioRenderUsage& usage);
+fuchsia::media::AudioRenderUsage2 ToFidlRenderUsage2(const fuchsia_media::AudioRenderUsage2& usage);
+fuchsia::media::AudioRenderUsage2 ToFidlRenderUsage2(RenderUsage usage);
+
+// AudioCaptureUsage
+std::optional<fuchsia::media::AudioCaptureUsage> ToFidlCaptureUsageTry(
+    const fuchsia::media::AudioCaptureUsage2& usage2);
+fuchsia::media::AudioCaptureUsage ToFidlCaptureUsage(const fuchsia_media::AudioCaptureUsage& usage);
+fuchsia::media::AudioCaptureUsage ToFidlCaptureUsage(CaptureUsage usage);
+
+// AudioCaptureUsage2
+fuchsia::media::AudioCaptureUsage2 ToFidlCaptureUsage2(
+    const fuchsia::media::AudioCaptureUsage& usage);
+fuchsia::media::AudioCaptureUsage2 ToFidlCaptureUsage2(
+    const fuchsia_media::AudioCaptureUsage& usage);
+fuchsia::media::AudioCaptureUsage2 ToFidlCaptureUsage2(
+    const fuchsia_media::AudioCaptureUsage2& usage);
+fuchsia::media::AudioCaptureUsage2 ToFidlCaptureUsage2(CaptureUsage usage);
+
+// Usage
+std::optional<fuchsia::media::Usage> ToFidlUsageTry(const fuchsia::media::Usage2& usage2);
+std::optional<fuchsia::media::Usage> ToFidlUsageTry(
+    const fuchsia::media::AudioRenderUsage2& usage2);
+
+// Usage2
+fuchsia::media::Usage2 ToFidlUsage2(const fuchsia::media::Usage& usage);
+fuchsia::media::Usage2 ToFidlUsage2(const fuchsia_media::Usage& usage);
+fuchsia::media::Usage2 ToFidlUsage2(RenderUsage u);
+fuchsia::media::Usage2 ToFidlUsage2(CaptureUsage u);
+
+// Logging for FIDL Usage and UsageState unions.
+std::ostream& operator<<(std::ostream& out, const fuchsia::media::Usage& usage);
+std::ostream& operator<<(std::ostream& out, const fuchsia::media::Usage2& usage);
+std::ostream& operator<<(std::ostream& out, const fuchsia::media::UsageState& state);
 
 }  // namespace media::audio
 

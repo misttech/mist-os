@@ -14,8 +14,8 @@ use fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream};
 use fuchsia_fatfs::{fatfs_error_to_status, FatDirectory, FatFs};
 use futures::lock::Mutex;
 use futures::TryStreamExt;
+use log::{error, info, warn};
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::execution_scope::ExecutionScope;
@@ -35,7 +35,7 @@ fn map_to_status(error: Error) -> zx::Status {
             Err(error) => {
                 // Print the internal error if we re-map it because we will lose any context after
                 // this.
-                warn!(?error, "Internal error");
+                warn!(error:?; "Internal error");
                 zx::Status::INTERNAL
             }
         },
@@ -135,7 +135,7 @@ impl Component {
             let me = self.clone();
             self.scope.spawn(async move {
                 if let Err(error) = me.handle_lifecycle_requests(channel).await {
-                    warn!(?error, "handle_lifecycle_requests");
+                    warn!(error:?; "handle_lifecycle_requests");
                 }
             });
         }
@@ -150,19 +150,19 @@ impl Component {
             match request {
                 StartupRequest::Start { responder, device, options } => {
                     responder.send(self.handle_start(device, options).await.map_err(|e| {
-                        error!(?e, "handle_start failed");
+                        error!(e:?; "handle_start failed");
                         map_to_raw_status(e)
                     }))?
                 }
                 StartupRequest::Format { responder, device, options } => {
                     responder.send(self.handle_format(device, options).await.map_err(|e| {
-                        error!(?e, "handle_format failed");
+                        error!(e:?; "handle_format failed");
                         map_to_raw_status(e)
                     }))?
                 }
                 StartupRequest::Check { responder, device, options } => {
                     responder.send(self.handle_check(device, options).await.map_err(|e| {
-                        error!(?e, "handle_check failed");
+                        error!(e:?; "handle_check failed");
                         map_to_raw_status(e)
                     }))?
                 }
@@ -176,7 +176,7 @@ impl Component {
         device: ClientEnd<BlockMarker>,
         options: StartOptions,
     ) -> Result<(), Error> {
-        info!(?options, "Received start request");
+        info!(options:?; "Received start request");
 
         let mut state = self.state.lock().await;
         state.stop(&self.outgoing_dir).await;

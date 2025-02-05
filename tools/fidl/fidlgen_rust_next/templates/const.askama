@@ -1,9 +1,7 @@
 {% let base_name = cnst.name.decl_name().screaming_snake() %}
 {% let name = filters::ident(base_name)? %}
 
-{% if let Some(doc) = cnst.attributes.doc_string() %}
-    #[doc = "{{ doc.escape_default() }}"]
-{% endif %}
+{{ self::doc_string(cnst.attributes) -}}
 {% match cnst.ty.kind %}
     {% when TypeKind::String { element_count, nullable } %}
         pub const {{ name }}: &str = "{{ cnst.value.value.escape_default() }}";

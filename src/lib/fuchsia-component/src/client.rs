@@ -18,7 +18,6 @@ use pin_project::pin_project;
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::pin::pin;
-use std::sync::Arc;
 use std::task::Poll;
 
 use crate::directory::{open_directory_async, AsRefDirectory};
@@ -238,7 +237,7 @@ impl MemberOpener for ServiceInstanceDirectory {
 struct ServiceInstance<S> {
     /// The name of the service instance within the service directory
     name: String,
-    service: Arc<Service<S>>,
+    service: Service<S>,
 }
 
 impl<S: ServiceMarker> MemberOpener for ServiceInstance<S> {
@@ -254,6 +253,12 @@ impl<S: ServiceMarker> MemberOpener for ServiceInstance<S> {
 pub struct Service<S> {
     dir: fio::DirectoryProxy,
     _marker: S,
+}
+
+impl<S: Clone> Clone for Service<S> {
+    fn clone(&self) -> Self {
+        Self { dir: Clone::clone(&self.dir), _marker: self._marker.clone() }
+    }
 }
 
 /// Returns a new [`Service`] that waits for instances to appear in
@@ -306,7 +311,15 @@ impl<S: ServiceMarker> Service<S> {
     /// after the instance name has been returned by the [`Self::watch`] stream, or if the
     /// instance is statically routed so component manager will lazily load it.
     pub fn connect_to_instance(&self, name: impl AsRef<str>) -> Result<S::Proxy, Error> {
-        connect_to_instance_in_service_dir::<S>(&self.dir, name.as_ref())
+        let directory_proxy = fuchsia_fs::directory::open_directory_async(
+            &self.dir,
+            name.as_ref(),
+            fio::Flags::empty(),
+        )?;
+        Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(
+            directory_proxy,
+            name.as_ref().to_string(),
+        ))))
     }
 
     /// Connects to the named instance member without waiting for it to appear. You should only use this
@@ -327,7 +340,7 @@ impl<S: ServiceMarker> Service<S> {
     pub async fn watch(self) -> Result<ServiceInstanceStream<S>, Error> {
         let watcher = Watcher::new(&self.dir).await?;
         let finished = false;
-        Ok(ServiceInstanceStream { service: Arc::new(self), watcher, finished })
+        Ok(ServiceInstanceStream { service: self, watcher, finished })
     }
 
     /// Asynchronously returns the first service instance available within this service directory.
@@ -338,6 +351,21 @@ impl<S: ServiceMarker> Service<S> {
             .await
             .context("No instances found before service directory was removed")?
     }
+
+    /// Returns an list of all instances that are currently available.
+    pub async fn enumerate(self) -> Result<Vec<S::Proxy>, Error> {
+        let instances: Vec<S::Proxy> = fuchsia_fs::directory::readdir(&self.dir)
+            .await?
+            .into_iter()
+            .map(|dirent| {
+                S::Proxy::from_member_opener(Box::new(ServiceInstance {
+                    service: self.clone(),
+                    name: dirent.name,
+                }))
+            })
+            .collect();
+        Ok(instances)
+    }
 }
 
 /// A stream iterator for a service directory that produces one item for every service instance
@@ -346,11 +374,12 @@ impl<S: ServiceMarker> Service<S> {
 /// Normally, this stream will only terminate if the service directory being watched is removed, so
 /// the client must decide when it has found all the instances it's looking for.
 #[pin_project]
-pub struct ServiceInstanceStream<S> {
-    service: Arc<Service<S>>,
+pub struct ServiceInstanceStream<S: Clone> {
+    service: Service<S>,
     watcher: Watcher,
     finished: bool,
 }
+
 impl<S: ServiceMarker> Stream for ServiceInstanceStream<S> {
     type Item = Result<S::Proxy, Error>;
 
@@ -411,36 +440,9 @@ impl<S: ServiceMarker> FusedStream for ServiceInstanceStream<S> {
 // inputs but Rust limits specifying explicit generic parameters when `impl-traits`
 // are present.
 pub fn connect_to_service_instance<S: ServiceMarker>(instance: &str) -> Result<S::Proxy, Error> {
-    connect_to_service_instance_at::<S>(SVC_DIR, instance)
-}
-
-/// Connect to an instance of a FIDL service using the provided path prefix.
-/// `path_prefix` should not contain any slashes.
-/// `instance` is a path of one or more components.
-// NOTE: We would like to use impl AsRef<T> to accept a wide variety of string-like
-// inputs but Rust limits specifying explicit generic parameters when `impl-traits`
-// are present.
-pub fn connect_to_service_instance_at<S: ServiceMarker>(
-    path_prefix: &str,
-    instance: &str,
-) -> Result<S::Proxy, Error> {
-    let service_path = format!("{}/{}/{}", path_prefix, S::SERVICE_NAME, instance);
+    let service_path = format!("{}/{}/{}", SVC_DIR, S::SERVICE_NAME, instance);
     let directory_proxy =
         fuchsia_fs::directory::open_in_namespace(&service_path, fio::Flags::empty())?;
-    Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(
-        directory_proxy,
-        instance.to_string(),
-    ))))
-}
-
-/// Connect to an instance of a FIDL service hosted on the directory protocol channel `directory`.
-/// `instance` is a path of one or more components.
-pub fn connect_to_instance_in_service_dir<S: ServiceMarker>(
-    directory: &fio::DirectoryProxy,
-    instance: &str,
-) -> Result<S::Proxy, Error> {
-    let directory_proxy =
-        fuchsia_fs::directory::open_directory_async(directory, instance, fio::Flags::empty())?;
     Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(
         directory_proxy,
         instance.to_string(),
@@ -487,15 +489,6 @@ pub fn open_service<S: ServiceMarker>() -> Result<fio::DirectoryProxy, Error> {
     let service_path = format!("{}/{}", SVC_DIR, S::SERVICE_NAME);
     fuchsia_fs::directory::open_in_namespace(&service_path, fio::Flags::empty())
         .context("namespace open failed")
-}
-
-/// Opens a FIDL service hosted in `directory` as a directory, which holds
-/// instances of the service.
-pub fn open_service_at_dir<S: ServiceMarker>(
-    directory: &fio::DirectoryProxy,
-) -> Result<fio::DirectoryProxy, Error> {
-    fuchsia_fs::directory::open_directory_async(directory, S::SERVICE_NAME, fio::Flags::empty())
-        .map_err(Into::into)
 }
 
 /// Opens the exposed directory from a child. Only works in CFv2, and only works if this component
@@ -554,6 +547,7 @@ pub mod test_util {
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
+    use std::sync::Arc;
 
     use super::*;
     use fidl::endpoints::ServiceMarker as _;

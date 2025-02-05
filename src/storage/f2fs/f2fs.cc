@@ -274,26 +274,28 @@ zx_status_t F2fs::SyncFs(bool bShutdown) {
     // Stop listening to memorypressure.
     memory_pressure_watcher_.reset();
     // Flush every dirty Pages.
-    size_t target_vnodes = 0;
-    uint32_t to_write = kDefaultBlocksPerSegment;
     do {
       // If CpFlag::kCpErrorFlag is set, it cannot be synchronized to disk. So we will drop all
       // dirty pages.
       if (superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag)) {
         return ZX_ERR_INTERNAL;
       }
-      target_vnodes = 0;
-      WritebackOperation op = {.to_write = to_write, .bReclaim = true};
-      op.if_vnode = [&target_vnodes](fbl::RefPtr<VnodeF2fs>& vnode) {
+      WritebackOperation op = {.to_write = kDefaultBlocksPerSegment, .bReclaim = true};
+      op.if_vnode = [](fbl::RefPtr<VnodeF2fs>& vnode) {
         if ((!vnode->IsDir() && vnode->GetDirtyPageCount()) || !vnode->IsValid()) {
-          ++target_vnodes;
           return ZX_OK;
         }
         return ZX_ERR_NEXT;
       };
-      AllocateFreeSections(to_write);
-      FlushDirtyDataPages(op);
-    } while (superblock_info_->GetPageCount(CountType::kDirtyData) && target_vnodes);
+
+      uint32_t to_write =
+          std::min(static_cast<uint32_t>(superblock_info_->GetPageCount(CountType::kDirtyData)),
+                   kDefaultBlocksPerSegment);
+      if (to_write) {
+        AllocateFreeSections(to_write);
+        FlushDirtyDataPages(op);
+      }
+    } while (superblock_info_->GetPageCount(CountType::kDirtyData));
   }
   return WriteCheckpointUnsafe(bShutdown);
 }

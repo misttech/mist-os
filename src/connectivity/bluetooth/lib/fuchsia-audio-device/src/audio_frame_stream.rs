@@ -8,9 +8,9 @@ use fuchsia_sync::Mutex;
 use futures::stream::FusedStream;
 use futures::task::{Context, Poll};
 use futures::{FutureExt, Stream};
+use log::info;
 use std::pin::Pin;
 use std::sync::Arc;
-use tracing::info;
 
 use crate::frame_vmo;
 use crate::stream_config::{SoftStreamConfig, StreamConfigOrTask};

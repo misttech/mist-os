@@ -114,6 +114,10 @@ if (toolchain_environment == "kernel.phys" ||
   }
   group("phys_config_executable_deps") {
   }
+  group("phys_config_link_deps") {
+  }
+  group("phys_config_source_deps") {
+  }
 
   source_set("trampoline-boot") {
     visibility = [
@@ -696,11 +700,7 @@ group("boot_tests") {
 }
 
 group("physboot") {
-  if (use_elf_kernel) {
-    public_deps = [ ":physboot-elf-kernel.package" ]
-  } else {
-    public_deps = [ ":physboot-zbi-kernel.package" ]
-  }
+  public_deps = [ ":physboot.package" ]
 }
 
 source_set("handoff") {
@@ -749,24 +749,11 @@ source_set("handoff") {
   public_configs = [ ":includes" ]
 }
 
-# The physboot-zbi-kernel target provides the distribution_entries metadata via
-# kernel_elf_binary() for "physboot".  This target reifies that to be directly
-# in the root of the STORAGE_KERNEL filesystem layout, whereas if another
-# kernel_package() took a dependency on the kernel_elf_binary() target, then it
-# would wind up under "package_name/physboot" instead.
-kernel_package("physboot-zbi-kernel.package") {
-  visibility = [ ":*" ]
-
-  # Just "physboot" at top level is the default for `kernel.phys.next`.
-  prefix = ""
-  deps = [ ":physboot-zbi-kernel(:kernel.phys_$current_cpu)" ]
-}
-
-kernel_package("physboot-elf-kernel.package") {
+kernel_package("physboot.package") {
   visibility = [ "./*" ]
 
   prefix = ""
-  deps = [ ":physboot-elf-kernel(:kernel.phys_$current_cpu)" ]
+  deps = [ ":physboot.module(:kernel.phys_$current_cpu)" ]
 }
 
 zbi_executable("physload") {
@@ -782,6 +769,7 @@ zbi_executable("physload") {
     ":physload.header",
     ":stdio",
     ":symbolize",
+    "$arch_phys:arch-physload",
     "//src/lib/elfldltl",
     "//src/lib/zbitl",
     "//zircon/kernel/lib/boot-options",
@@ -798,6 +786,7 @@ if (is_kernel) {
     visibility = [
       ":*",
       "$arch_phys:arch-on-physload-handoff",
+      "$arch_phys:arch-physload",
     ]
     public = [ "physload.h" ]
     public_deps = [
@@ -847,37 +836,6 @@ if (is_kernel) {
     }
   }
 
-  # TODO(https://fxbug.dev/42164859): Delete me!
-  kernel_elf_binary("physboot-zbi-kernel") {
-    target_type = "loadable_module"
-    has_patches = false
-
-    sources = [ "physboot-elf-main.cc" ]
-    deps = [
-      ":elf-image",
-      ":log",
-      ":physboot-main",
-      ":physload.module",
-      ":stdio",
-      ":symbolize",
-      "//zircon/kernel/lib/boot-options",
-      "//zircon/kernel/lib/ktl",
-      "//zircon/kernel/lib/libc",
-    ]
-
-    metadata = {
-      # This is what kernel.phys.next expects by default
-      distribution_entries = [
-        {
-          source = rebase_path("$target_out_dir/physboot-zbi-kernel.bin",
-                               root_build_dir)
-          destination = "physboot"
-          label = get_label_info(":$target_name", "label_with_toolchain")
-        },
-      ]
-    }
-  }
-
   source_set("physboot.h") {
     visibility = [ ":*" ]
     public = [ "physboot.h" ]
@@ -915,11 +873,12 @@ if (is_kernel) {
     configs += [ "//zircon/kernel:kernel_image_max_size" ]
   }
 
-  kernel_elf_binary("physboot-elf-kernel") {
+  kernel_elf_binary("physboot.module") {
     target_type = "loadable_module"
     has_patches = false
 
-    sources = [ "physboot-elf-kernel.cc" ]
+    output_name = "physboot"
+    sources = [ "physboot.cc" ]
     include_dirs = [ "//zircon/kernel/arch/$zircon_cpu/include" ]
     deps = [
       ":address-space",
@@ -940,20 +899,6 @@ if (is_kernel) {
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",
     ]
-
-    # TODO(https://fxbug.dev/42164859): This is what kernel.phys.next expects
-    # by default, and we should just rename this target to "physboot" when
-    # ":physboot-zbi-kernel" is removed.
-    metadata = {
-      distribution_entries = [
-        {
-          source = rebase_path("$target_out_dir/physboot-elf-kernel.bin",
-                               root_build_dir)
-          destination = "physboot"
-          label = get_label_info(":$target_name", "label_with_toolchain")
-        },
-      ]
-    }
 
     # Defines the maximum support kernel image size.
     configs += [ "//zircon/kernel:kernel_image_max_size" ]
@@ -979,5 +924,5 @@ if (is_kernel) {
 
 kernel_elf_interp("physboot.interp") {
   visibility = [ ":*" ]
-  deps = [ ":physboot-elf-kernel($phys_toolchain)" ]
+  deps = [ ":physboot($phys_toolchain)" ]
 }

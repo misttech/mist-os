@@ -5,16 +5,22 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_setui_do_not_disturb") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
   args_with_unit_tests = true
 
-  args_deps = [ "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust" ]
+  args_deps = [
+    "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust",
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
 
   deps = [
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/plugins/setui/utils:utils",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",

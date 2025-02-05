@@ -10,8 +10,8 @@ using fuchsia.mem;
 using zx;
 
 /// Allows clients to play fire-and-forget sounds.
-@discoverable
-closed protocol Player {
+@discoverable(server="platform")
+closed(removed=26) open(added=26) protocol Player {
     /// Adds a sound to the collection maintained for the client, reading the sound from a file.
     /// If `id` identifies an existing sound in the collection, the service will close the
     /// connection. Returns the duration of the sound or an error status returned from an I/O
@@ -56,9 +56,17 @@ closed protocol Player {
     /// `PlaySoundError.NO_SUCH_SOUND`. The most recent `PlaySound` call for a given valid id can
     /// be stopped using `StopPlayingSound`, in which case, this method returns
     /// `PlaySoundError.STOPPED`.
+    // TODO(https://fxbug.dev/384934089): deprecate and remove |AudioRenderUsage|
+    @available(deprecated=26, note="Use PlaySound2 and AudioRenderUsage2")
     strict PlaySound(struct {
         id uint32;
         usage fuchsia.media.AudioRenderUsage;
+    }) -> () error PlaySoundError;
+
+    @available(added=26)
+    flexible PlaySound2(struct {
+        id uint32;
+        usage fuchsia.media.AudioRenderUsage2;
     }) -> () error PlaySoundError;
 
     /// Stops playback of the sound identified by `id` invoked by the the most recent call to

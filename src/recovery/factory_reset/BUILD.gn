@@ -120,6 +120,7 @@ test("factory_reset_unittests") {
     "//src/storage/lib/block_client/cpp",
     "//src/storage/lib/fs_management",
     "//src/storage/lib/ramdevice_client/cpp",
+    "//third_party/googletest:gmock",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
   ]

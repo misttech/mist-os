@@ -5,7 +5,7 @@
 use fidl_fuchsia_wlan_policy as fidl_policy;
 use fidl_test_wlan_realm::WlanConfig;
 use ieee80211::{Bssid, Ssid};
-use tracing::info;
+use log::info;
 use wlan_common::bss::Protection;
 use wlan_hw_sim::*;
 

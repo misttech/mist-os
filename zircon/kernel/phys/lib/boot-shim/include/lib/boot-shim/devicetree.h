@@ -9,6 +9,7 @@
 
 #include <lib/boot-shim/devicetree-boot-shim.h>
 #include <lib/boot-shim/item-base.h>
+#include <lib/boot-shim/tty.h>
 #include <lib/boot-shim/watchdog.h>
 #include <lib/devicetree/devicetree.h>
 #include <lib/devicetree/matcher.h>
@@ -274,7 +275,27 @@ class DevicetreeChosenNodeMatcherBase
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
                                const devicetree::PropertyDecoder& decoder);
   devicetree::ScanState OnScan() {
-    return found_chosen_ ? devicetree::ScanState::kActive : devicetree::ScanState::kDone;
+    if (found_chosen_) {
+      // If we had to match a tty arg, but we didn't find a UART matching
+      // within a single scan, then it's over.
+      if (tty_) {
+        // Wait a full iteration before counting, so enumeration is determined
+        // by the node position in the tree, and not by the relative position
+        // from the chosen node.
+        if (!tty_index_) {
+          tty_index_ = 0;
+          return devicetree::ScanState::kActive;
+        }
+        // After we do a full clean scan, and the index do not match, then
+        // it means the argument is invalid, since we couldn't see enough ttys
+        // to satisfy the argument. (E.g. ttys0 with 10 uarts)
+        if (tty_index_ < tty_->index) {
+          return devicetree::ScanState::kDone;
+        }
+      }
+      return devicetree::ScanState::kActive;
+    }
+    return devicetree::ScanState::kDone;
   }
 
   // Accessors
@@ -297,6 +318,13 @@ class DevicetreeChosenNodeMatcherBase
   devicetree::ScanState HandleBootstrapStdout(const devicetree::NodePath& path,
                                               const devicetree::PropertyDecoder& decoder);
   devicetree::ScanState HandleUartInterruptParent(const devicetree::PropertyDecoder& decoder);
+  devicetree::ScanState HandleTtyNode(const devicetree::NodePath& path,
+                                      const devicetree::PropertyDecoder& decoder);
+
+  devicetree::ScanState SetUpUart(const devicetree::PropertyDecoder& decoder,
+                                  devicetree::RegProperty& reg,
+                                  const std::optional<devicetree::PropertyValue>& reg_offset,
+                                  const std::optional<devicetree::PropertyValue>& interrupts);
 
   // May only be called after |uart_irq_.ResolveIrqController| returns |fit::ok(true)|.
   void UpdateUart() {
@@ -312,6 +340,8 @@ class DevicetreeChosenNodeMatcherBase
   // Path to device node containing the stdout device (uart).
   bool found_chosen_ = false;
   std::string_view stdout_path_;
+  std::optional<Tty> tty_;
+  std::optional<size_t> tty_index_;
   std::optional<devicetree::ResolvedPath> resolved_stdout_;
   zbi_dcfg_simple_t uart_dcfg_ = {};
 
@@ -340,10 +370,11 @@ class DevicetreeChosenNodeMatcher : public DevicetreeChosenNodeMatcherBase {
 
   // We use std::nullopt over the null driver as a clearer indication that no
   // UART was matched.
-  constexpr std::optional<AllUartDrivers> uart() const {
-    return std::holds_alternative<uart::null::Driver>(uart_.uart())
-               ? std::nullopt
-               : std::make_optional(uart_.uart());
+  constexpr std::optional<AllUartDrivers> TakeUart() {
+    if (uart_.template holds_alternative<uart::null::Driver>()) {
+      return std::nullopt;
+    }
+    return std::move(uart_).TakeUart();
   }
 
  private:

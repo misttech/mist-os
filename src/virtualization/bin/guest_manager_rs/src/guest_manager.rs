@@ -53,7 +53,7 @@ fn get_default_num_cpus() -> u8 {
 macro_rules! send_checked {
     ($responder:ident $(, $res:expr)?) => {
         if let Err(err) = $responder.send($($res)?) {
-            tracing::warn!(%err, "Could not send reply")
+            log::warn!(err:%; "Could not send reply")
         };
     }
 }
@@ -182,7 +182,7 @@ impl GuestManager {
                 result = on_closed => {
                     result.map_err(|err| anyhow!(
                         "failed to wait on guest lifecycle proxy closed: {}", err))?;
-                    tracing::error!("VMM component has unexpectedly stopped");
+                    log::error!("VMM component has unexpectedly stopped");
                     self.status = GuestStatus::VmmUnexpectedTermination;
 
                     // The VMM component has terminated, create a new one by opening a new
@@ -220,7 +220,7 @@ impl GuestManager {
                         Some(result) => match result {
                             Ok(request) => request,
                             Err(err) => {
-                                tracing::error!(%err, "Connection stream ended with reason");
+                                log::error!(err:%; "Connection stream ended with reason");
                                 continue;
                             }
                         }
@@ -236,7 +236,7 @@ impl GuestManager {
                             // Merge guest config.
                             let config = self.get_merged_config(guest_config);
                             if let Err(err) = config {
-                                tracing::error!(%err, "Could not create guest config");
+                                log::error!(err:%; "Could not create guest config");
                                 send_checked!(responder, Err(GuestManagerError::BadConfig));
                                 continue;
                             }
@@ -251,7 +251,7 @@ impl GuestManager {
                                 });
 
                             if let Err(err) = create {
-                                tracing::error!(?err, "Could not create VMM");
+                                log::error!(err:?; "Could not create VMM");
                                 send_checked!(responder, Err(GuestManagerError::StartFailure));
                                 self.handle_guest_stopped(create);
                                 continue;
@@ -274,7 +274,7 @@ impl GuestManager {
 
                             self.status = GuestStatus::Stopping;
                             if let Err(err) = lifecycle.stop().await {
-                                tracing::error!(%err, "failed to send Stop FIDL call")
+                                log::error!(err:%; "failed to send Stop FIDL call")
                             }
                             // Respond to this request when the shutdown completes.
                             pending_shutdowns.push(responder);
@@ -292,7 +292,7 @@ impl GuestManager {
                             let network_state = GuestManager::host_network_state().await
                                 .map(|host_state| self.guest_network_state(host_state))
                                 .unwrap_or_else(|err| {
-                                    tracing::warn!(%err, "Unable to query host network interface.");
+                                    log::warn!(err:%; "Unable to query host network interface.");
                                     GuestNetworkState::FailedToQuery
                                 });
 
@@ -513,7 +513,7 @@ impl GuestManager {
     ) -> Result<(), GuestError> {
         let result = lifecycle.create(config).await;
         if let Err(err) = result {
-            tracing::error!(%err, "failed to send Create FIDL call");
+            log::error!(err:%; "failed to send Create FIDL call");
             Err(GuestError::InternalError)
         } else {
             result.unwrap()
@@ -523,7 +523,7 @@ impl GuestManager {
     async fn send_run_request(lifecycle: Rc<GuestLifecycleProxy>) -> Result<(), GuestError> {
         let result = lifecycle.run().await;
         if let Err(err) = result {
-            tracing::error!(%err, "failed to send Run FIDL call");
+            log::error!(err:%; "failed to send Run FIDL call");
             Err(GuestError::InternalError)
         } else {
             result.unwrap()
@@ -536,7 +536,7 @@ impl GuestManager {
     ) -> Result<(), GuestError> {
         let result = lifecycle.bind(controller);
         if let Err(err) = result {
-            tracing::error!(%err, "failed to send Bind FIDL call");
+            log::error!(err:%; "failed to send Bind FIDL call");
             Err(GuestError::InternalError)
         } else {
             Ok(())

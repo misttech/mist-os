@@ -26,10 +26,136 @@
 
 #include <ktl/enforce.h>
 
-namespace lockup_internal {
-
 #if defined(__aarch64__)
 
+bool CanDumpRegistersAndBacktrace() { return arm64_dap_is_enabled(); }
+
+zx_status_t DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
+  if (!CanDumpRegistersAndBacktrace()) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  arm64_dap_processor_state state;
+  // TODO(maniscalco): Update the DAP to make use of lockup_detector_diagnostic_query_timeout_ms.
+  zx_status_t result = arm64_dap_read_processor_state(cpu, &state);
+
+  if (result != ZX_OK) {
+    fprintf(output_target, "Failed to read DAP state (res %d)\n", result);
+    return result;
+  }
+
+  fprintf(output_target, "DAP state:\n");
+  state.Dump(output_target);
+  fprintf(output_target, "\n");
+
+  if constexpr (__has_feature(shadow_call_stack)) {
+    Backtrace bt;
+    zx_status_t status = lockup_internal::GetBacktraceFromDapState(state, bt);
+    switch (status) {
+      case ZX_ERR_BAD_STATE:
+        fprintf(output_target, "DAP backtrace: CPU-%u not in kernel mode.\n", cpu);
+        break;
+      case ZX_ERR_INVALID_ARGS:
+        fprintf(output_target, "DAP backtrace: invalid SCSP.\n");
+        break;
+      case ZX_ERR_OUT_OF_RANGE:
+        fprintf(output_target, "DAP backtrace: not a kernel address.\n");
+        break;
+      case ZX_ERR_NOT_FOUND:
+        fprintf(output_target, "DAP backtrace: not mapped.\n");
+        break;
+      default:
+        fprintf(output_target, "DAP backtrace: %d\n", status);
+    }
+    if (bt.size() > 0) {
+      bt.PrintWithoutVersion(output_target);
+    }
+    return status;
+  } else {
+    return ZX_OK;
+  }
+}
+
+#elif defined(__x86_64__)
+
+namespace {
+
+// A value <= 0 means the diagnostic query is disabled.
+zx_duration_t GetTimeout() {
+  return ZX_MSEC(gBootOptions->lockup_detector_diagnostic_query_timeout_ms);
+}
+
+}  // namespace
+
+bool CanDumpRegistersAndBacktrace() { return (GetTimeout() > 0); }
+
+zx_status_t DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
+  zx_duration_t timeout = GetTimeout();
+  if (timeout == 0) {
+    fprintf(output_target, "diagnostic query disabled (timeout is 0)\n");
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  // Make sure interrupts are disabled before calling |RequestContext|.
+  InterruptDisableGuard irqd;
+
+  // First, dump the context for the unresponsive CPU.  Then, dump the contexts of the other CPUs.
+  cpu_num_t target_cpu = cpu;
+  cpu_mask_t remaining_cpus = Scheduler::PeekActiveMask() & ~cpu_num_to_mask(target_cpu);
+  zx_status_t result = ZX_OK;
+  do {
+    CpuContext context;
+    zx_status_t status = g_cpu_context_exchange.RequestContext(target_cpu, timeout, context);
+    if (status != ZX_OK) {
+      fprintf(output_target, "failed to get context of CPU-%u: %d\n", target_cpu, status);
+      if (result == ZX_OK) {
+        result = status;
+      }
+    } else {
+      fprintf(output_target, "CPU-%u context follows\n", target_cpu);
+      context.backtrace.PrintWithoutVersion(output_target);
+      PrintFrame(output_target, context.frame);
+      fprintf(output_target, "end of CPU-%u context\n", target_cpu);
+    }
+  } while ((target_cpu = remove_cpu_from_mask(remaining_cpus)) != INVALID_CPU);
+
+  return result;
+}
+
+#elif defined(__riscv)
+
+bool CanDumpRegistersAndBacktrace() { return false; }
+
+zx_status_t DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
+#else
+#error "Unknown architecture!"
+#endif
+
+namespace lockup_internal {
+
+void DumpCommonDiagnostics(cpu_num_t cpu, FILE* output_target, FailureSeverity severity) {
+  DEBUG_ASSERT(arch_ints_disabled());
+
+  auto& percpu = percpu::Get(cpu);
+  fprintf(output_target, "timer_ints: %lu, interrupts: %lu\n", percpu.stats.timer_ints,
+          percpu.stats.interrupts);
+
+  percpu.scheduler.Dump(output_target);
+  percpu.scheduler.DumpActiveThread(output_target);
+
+  if (severity == FailureSeverity::Fatal) {
+    fprintf(output_target, "\n");
+    zx_status_t status = DumpRegistersAndBacktrace(cpu, output_target);
+    if (status != ZX_OK) {
+      fprintf(output_target, "failed to dump registers and backtrace: %d", status);
+    }
+  }
+}
+
+#if defined(__aarch64__)
 zx_status_t GetBacktraceFromDapState(const arm64_dap_processor_state& state, Backtrace& out_bt) {
   // Don't attempt to do any backtracing unless this looks like the thread is in the kernel right
   // now.  The PC might be completely bogus, but even if it is in a legit user mode process, I'm not
@@ -86,97 +212,6 @@ zx_status_t GetBacktraceFromDapState(const arm64_dap_processor_state& state, Bac
 
   return ZX_OK;
 }
-
-void DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
-  arm64_dap_processor_state state;
-  // TODO(maniscalco): Update the DAP to make use of lockup_detector_diagnostic_query_timeout_ms.
-  zx_status_t result = arm64_dap_read_processor_state(cpu, &state);
-
-  if (result != ZX_OK) {
-    fprintf(output_target, "Failed to read DAP state (res %d)\n", result);
-    return;
-  }
-
-  fprintf(output_target, "DAP state:\n");
-  state.Dump(output_target);
-  fprintf(output_target, "\n");
-
-  if constexpr (__has_feature(shadow_call_stack)) {
-    Backtrace bt;
-    zx_status_t status = GetBacktraceFromDapState(state, bt);
-    switch (status) {
-      case ZX_ERR_BAD_STATE:
-        fprintf(output_target, "DAP backtrace: CPU-%u not in kernel mode.\n", cpu);
-        break;
-      case ZX_ERR_INVALID_ARGS:
-        fprintf(output_target, "DAP backtrace: invalid SCSP.\n");
-        break;
-      case ZX_ERR_OUT_OF_RANGE:
-        fprintf(output_target, "DAP backtrace: not a kernel address.\n");
-        break;
-      case ZX_ERR_NOT_FOUND:
-        fprintf(output_target, "DAP backtrace: not mapped.\n");
-        break;
-      default:
-        fprintf(output_target, "DAP backtrace: %d\n", status);
-    }
-    if (bt.size() > 0) {
-      bt.PrintWithoutVersion(output_target);
-    }
-  }
-}
-
-#elif defined(__x86_64__)
-
-void DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
-  DEBUG_ASSERT(arch_ints_disabled());
-
-  zx_duration_t timeout = ZX_MSEC(gBootOptions->lockup_detector_diagnostic_query_timeout_ms);
-  if (timeout == 0) {
-    fprintf(output_target, "diagnostic query disabled (timeout is 0)\n");
-    return;
-  }
-
-  // First, dump the context for the unresponsive CPU.  Then, dump the contexts of the other CPUs.
-  cpu_num_t target_cpu = cpu;
-  cpu_mask_t remaining_cpus = Scheduler::PeekActiveMask() & ~cpu_num_to_mask(target_cpu);
-  do {
-    CpuContext context;
-    zx_status_t status = g_cpu_context_exchange.RequestContext(target_cpu, timeout, context);
-    if (status != ZX_OK) {
-      fprintf(output_target, "failed to get context of CPU-%u: %d\n", target_cpu, status);
-    } else {
-      fprintf(output_target, "CPU-%u context follows\n", target_cpu);
-      context.backtrace.PrintWithoutVersion(output_target);
-      PrintFrame(output_target, context.frame);
-      fprintf(output_target, "end of CPU-%u context\n", target_cpu);
-    }
-  } while ((target_cpu = remove_cpu_from_mask(remaining_cpus)) != INVALID_CPU);
-}
-
-#elif defined(__riscv)
-
-// TODO(eieio): implement me
-void DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) { PANIC_UNIMPLEMENTED; }
-
-#else
-#error "Unknown architecture! Neither __aarch64__ nor __x86_64__ are defined"
-#endif
-
-void DumpCommonDiagnostics(cpu_num_t cpu, FILE* output_target, FailureSeverity severity) {
-  DEBUG_ASSERT(arch_ints_disabled());
-
-  auto& percpu = percpu::Get(cpu);
-  fprintf(output_target, "timer_ints: %lu, interrupts: %lu\n", percpu.stats.timer_ints,
-          percpu.stats.interrupts);
-
-  percpu.scheduler.Dump(output_target);
-  percpu.scheduler.DumpActiveThread(output_target);
-
-  if (severity == FailureSeverity::Fatal) {
-    fprintf(output_target, "\n");
-    DumpRegistersAndBacktrace(cpu, output_target);
-  }
-}
+#endif  // __aarch64__
 
 }  // namespace lockup_internal

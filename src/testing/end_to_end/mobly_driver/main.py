@@ -70,6 +70,13 @@ parser.add_argument(
     default=False,
     help="run the mobly test with the --v flag.",
 )
+parser.add_argument(
+    "--test_cases",
+    nargs="*",
+    default=[],
+    type=str,
+    help="List of test cases to run.",
+)
 args = parser.parse_args()
 
 
@@ -95,6 +102,7 @@ def main() -> None:
         driver=driver,
         python_path=sys.executable,
         test_path=args.mobly_test_path,
+        test_cases=args.test_cases,
         timeout_sec=args.test_timeout_sec,
         verbose=args.v,
         hermetic=args.hermetic,

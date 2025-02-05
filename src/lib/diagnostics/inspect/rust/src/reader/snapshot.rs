@@ -11,8 +11,9 @@ use crate::reader::LinkValue;
 use crate::Inspector;
 use diagnostics_hierarchy::{ArrayContent, Property};
 use inspect_format::{
-    constants, utils, Block, BlockAccessorExt, BlockContainer, BlockIndex, BlockType, Container,
-    CopyBytes, Error as FormatError, PropertyFormat, ReadBytes,
+    constants, utils, Array, Block, BlockAccessorExt, BlockContainer, BlockIndex, BlockType, Bool,
+    Buffer, Container, CopyBytes, Double, Extent, Header, Int, Link, Name, PropertyFormat,
+    ReadBytes, StringRef, Uint, Unknown, ValueBlockKind,
 };
 use std::cmp;
 
@@ -26,7 +27,7 @@ pub struct Snapshot {
 }
 
 /// A scanned block.
-pub type ScannedBlock<'a> = Block<&'a BackingBuffer>;
+pub type ScannedBlock<'a, K> = Block<&'a BackingBuffer, K>;
 
 const SNAPSHOT_TRIES: u64 = 1024;
 
@@ -37,11 +38,11 @@ impl Snapshot {
     }
 
     /// Gets the block at the given |index|.
-    pub fn get_block(&self, index: BlockIndex) -> Option<ScannedBlock<'_>> {
+    pub fn get_block(&self, index: BlockIndex) -> Result<ScannedBlock<'_, Unknown>, ReaderError> {
         if index.offset() < self.buffer.len() {
-            Some(self.buffer.block_at(index))
+            Ok(self.buffer.block_at(index))
         } else {
-            None
+            Err(ReaderError::GetBlock(index))
         }
     }
 
@@ -62,12 +63,10 @@ impl Snapshot {
         // Read the generation count one time
         let mut header_bytes: [u8; 32] = [0; 32];
         source.copy_bytes(&mut header_bytes);
-        let header_block = header_bytes.block_at(BlockIndex::HEADER);
-        let generation = header_block.header_generation_count();
-
-        let Ok(gen) = generation else {
-            return Err(ReaderError::InconsistentSnapshot);
+        let Some(header_block) = header_bytes.maybe_block_at::<Header>(BlockIndex::HEADER) else {
+            return Err(ReaderError::InvalidVmo);
         };
+        let gen = header_block.generation_count();
         if gen == constants::VMO_FROZEN {
             if let Ok(buffer) = BackingBuffer::try_from(source) {
                 return Ok(Snapshot { buffer });
@@ -75,7 +74,7 @@ impl Snapshot {
         }
 
         // Read the buffer
-        let vmo_size = if let Some(vmo_size) = header_block.header_vmo_size()? {
+        let vmo_size = if let Some(vmo_size) = header_block.vmo_size()? {
             cmp::min(vmo_size as usize, constants::MAX_VMO_SIZE)
         } else {
             cmp::min(source.len(), constants::MAX_VMO_SIZE)
@@ -119,176 +118,172 @@ impl Snapshot {
     }
 
     pub(crate) fn get_name(&self, index: BlockIndex) -> Option<String> {
-        let block = self.get_block(index)?;
-
-        match block.block_type() {
-            BlockType::Name => self.load_name(block),
-            BlockType::StringReference => self.load_string_reference(block),
+        let block = self.get_block(index).ok()?;
+        match block.block_type()? {
+            BlockType::Name => self.load_name(block.cast::<Name>().unwrap()),
+            BlockType::StringReference => {
+                self.load_string_reference(block.cast::<StringRef>().unwrap()).ok()
+            }
             _ => None,
         }
     }
 
-    pub(crate) fn load_name(&self, block: ScannedBlock<'_>) -> Option<String> {
-        block.name_contents().ok().map(|s| s.to_string())
+    pub(crate) fn load_name(&self, block: ScannedBlock<'_, Name>) -> Option<String> {
+        block.contents().ok().map(|s| s.to_string())
     }
 
-    pub(crate) fn load_string_reference(&self, block: ScannedBlock<'_>) -> Option<String> {
-        let mut data = block.inline_string_reference().ok()?.to_vec();
-        let total_length = block.total_length().ok()?;
+    pub(crate) fn load_string_reference(
+        &self,
+        block: ScannedBlock<'_, StringRef>,
+    ) -> Result<String, ReaderError> {
+        let mut data = block.inline_data()?.to_vec();
+        let total_length = block.total_length();
         if data.len() == total_length {
-            return String::from_utf8(data).ok();
+            return Ok(String::from_utf8_lossy(&data).to_string());
         }
 
-        let extent_index = block.next_extent().ok()?;
+        let extent_index = block.next_extent();
         let still_to_read_length = total_length - data.len();
-        data.append(&mut self.read_extents(still_to_read_length, extent_index).ok()?);
+        data.append(&mut self.read_extents(still_to_read_length, extent_index)?);
 
-        String::from_utf8(data).ok()
+        Ok(String::from_utf8_lossy(&data).to_string())
     }
 
-    pub(crate) fn parse_numeric_property(
+    pub(crate) fn parse_primitive_property<'a, K>(
         &self,
-        block: &ScannedBlock<'_>,
-    ) -> Result<Property, ReaderError> {
-        let name_index = block.name_index()?;
+        block: ScannedBlock<'a, K>,
+    ) -> Result<Property, ReaderError>
+    where
+        ScannedBlock<'a, K>: MakePrimitiveProperty,
+        K: ValueBlockKind,
+    {
+        let name_index = block.name_index();
         let name = self.get_name(name_index).ok_or(ReaderError::ParseName(name_index))?;
-        match block.block_type() {
-            BlockType::IntValue => {
-                let value = block.int_value()?;
-                Ok(Property::Int(name, value))
-            }
-            BlockType::UintValue => {
-                let value = block.uint_value()?;
-                Ok(Property::Uint(name, value))
-            }
-            BlockType::DoubleValue => {
-                let value = block.double_value()?;
-                Ok(Property::Double(name, value))
-            }
-            _ => Err(ReaderError::VmoFormat(FormatError::UnexpectedBlockTypeRepr(
-                "Number".to_string(),
-                block.block_type(),
-            ))),
-        }
-    }
-
-    pub(crate) fn parse_bool_property(
-        &self,
-        block: &ScannedBlock<'_>,
-    ) -> Result<Property, ReaderError> {
-        let name_index = block.name_index()?;
-        let name = self.get_name(name_index).ok_or(ReaderError::ParseName(name_index))?;
-        if matches!(block.block_type(), BlockType::BoolValue) {
-            let value = block.bool_value()?;
-            Ok(Property::Bool(name, value))
-        } else {
-            Err(ReaderError::VmoFormat(FormatError::UnexpectedBlockType(
-                BlockType::BoolValue,
-                block.block_type(),
-            )))
-        }
+        Ok(block.make_property(name))
     }
 
     pub(crate) fn parse_array_property(
         &self,
-        block: &ScannedBlock<'_>,
+        block: ScannedBlock<'_, Array<Unknown>>,
     ) -> Result<Property, ReaderError> {
-        let name_index = block.name_index()?;
+        let name_index = block.name_index();
         let name = self.get_name(name_index).ok_or(ReaderError::ParseName(name_index))?;
-        let array_slots = block.array_slots()?;
+        let array_slots = block.slots();
         // Safety: So long as the array is valid, array_capacity will return a valid value.
-        if utils::array_capacity(block.order(), block.array_entry_type()?).unwrap() < array_slots {
+        let capacity = block.capacity().ok_or(ReaderError::InvalidVmo)?;
+        if capacity < array_slots {
             return Err(ReaderError::AttemptedToReadTooManyArraySlots(block.index()));
         }
         let value_indexes = 0..array_slots;
-        let parsed_property = match block.array_entry_type().map_err(ReaderError::VmoFormat)? {
-            BlockType::IntValue => {
+        let format = block.format().ok_or(ReaderError::InvalidVmo)?;
+        let parsed_property = match block.entry_type() {
+            Some(BlockType::IntValue) => {
+                let block = block.cast_array_unchecked::<Int>();
                 let values = value_indexes
                     // Safety: in release mode, this can only error for index-out-of-bounds.
                     // We check above that indexes are in-bounds.
-                    .map(|i| block.array_get_int_slot(i).unwrap())
+                    .map(|i| block.get(i).unwrap())
                     .collect::<Vec<i64>>();
                 Property::IntArray(
                     name,
                     // Safety: if the block is an array, it must have an array format.
                     // We have already verified it is an array.
-                    ArrayContent::new(values, block.array_format().unwrap())
-                        .map_err(ReaderError::Hierarchy)?,
+                    ArrayContent::new(values, format)?,
                 )
             }
-            BlockType::UintValue => {
+            Some(BlockType::UintValue) => {
+                let block = block.cast_array_unchecked::<Uint>();
                 let values = value_indexes
                     // Safety: in release mode, this can only error for index-out-of-bounds.
                     // We check above that indexes are in-bounds.
-                    .map(|i| block.array_get_uint_slot(i).unwrap())
+                    .map(|i| block.get(i).unwrap())
                     .collect::<Vec<u64>>();
                 Property::UintArray(
                     name,
                     // Safety: if the block is an array, it must have an array format.
                     // We have already verified it is an array.
-                    ArrayContent::new(values, block.array_format().unwrap())
-                        .map_err(ReaderError::Hierarchy)?,
+                    ArrayContent::new(values, format)?,
                 )
             }
-            BlockType::DoubleValue => {
+            Some(BlockType::DoubleValue) => {
+                let block = block.cast_array_unchecked::<Double>();
                 let values = value_indexes
                     // Safety: in release mode, this can only error for index-out-of-bounds.
                     // We check above that indexes are in-bounds.
-                    .map(|i| block.array_get_double_slot(i).unwrap())
+                    .map(|i| block.get(i).unwrap())
                     .collect::<Vec<f64>>();
                 Property::DoubleArray(
                     name,
                     // Safety: if the block is an array, it must have an array format.
                     // We have already verified it is an array.
-                    ArrayContent::new(values, block.array_format().unwrap())
-                        .map_err(ReaderError::Hierarchy)?,
+                    ArrayContent::new(values, format)?,
                 )
             }
-            BlockType::StringReference => {
+            Some(BlockType::StringReference) => {
+                let block = block.cast_array_unchecked::<StringRef>();
                 let values = value_indexes
-                    .map(|i| {
-                        // Safety: in release mode, this can only error for index-out-of-bounds.
-                        // We check above that indexes are in-bounds.
-                        let string_idx = block.array_get_string_index_slot(i).unwrap();
+                    .map(|value_index| {
+                        let string_idx = block
+                            .get_string_index_at(value_index)
+                            .ok_or(ReaderError::InvalidVmo)?;
                         // default initialize unset values -- 0 index is never a string, it is always
                         // the header block
                         if string_idx == BlockIndex::EMPTY {
-                            return String::new();
+                            return Ok(String::new());
                         }
 
-                        self.get_block(string_idx)
-                            .and_then(|b| self.load_string_reference(b))
-                            .unwrap_or_default()
+                        let ref_block = self
+                            .get_block(string_idx)?
+                            .cast::<StringRef>()
+                            .ok_or(ReaderError::InvalidVmo)?;
+                        self.load_string_reference(ref_block)
                     })
-                    .collect::<Vec<String>>();
+                    .collect::<Result<Vec<String>, _>>()?;
                 Property::StringList(name, values)
             }
-            t => return Err(ReaderError::UnexpectedArrayEntryFormat(t)),
+            _ => return Err(ReaderError::UnexpectedArrayEntryFormat(block.entry_type_raw())),
         };
         Ok(parsed_property)
     }
 
-    pub(crate) fn parse_property(&self, block: &ScannedBlock<'_>) -> Result<Property, ReaderError> {
-        let name_index = block.name_index()?;
+    pub(crate) fn parse_property(
+        &self,
+        block: ScannedBlock<'_, Buffer>,
+    ) -> Result<Property, ReaderError> {
+        let name_index = block.name_index();
         let name = self.get_name(name_index).ok_or(ReaderError::ParseName(name_index))?;
-        let total_length = block.total_length().map_err(ReaderError::VmoFormat)?;
-        let extent_index = block.property_extent_index()?;
-        let buffer = self.read_extents(total_length, extent_index)?;
-        match block.property_format().map_err(ReaderError::VmoFormat)? {
+        let data_index = block.extent_index();
+        match block.format().ok_or(ReaderError::InvalidVmo)? {
             PropertyFormat::String => {
+                let total_length = block.total_length();
+                let buffer = self.read_extents(total_length, data_index)?;
                 Ok(Property::String(name, String::from_utf8_lossy(&buffer).to_string()))
             }
-            PropertyFormat::Bytes => Ok(Property::Bytes(name, buffer)),
+            PropertyFormat::Bytes => {
+                let total_length = block.total_length();
+                let buffer = self.read_extents(total_length, data_index)?;
+                Ok(Property::Bytes(name, buffer))
+            }
+            PropertyFormat::StringReference => {
+                let data_head = self
+                    .get_block(data_index)?
+                    .cast::<StringRef>()
+                    .ok_or(ReaderError::InvalidVmo)?;
+                Ok(Property::String(name, self.load_string_reference(data_head)?))
+            }
         }
     }
 
-    pub(crate) fn parse_link(&self, block: &ScannedBlock<'_>) -> Result<LinkValue, ReaderError> {
-        let name_index = block.name_index()?;
+    pub(crate) fn parse_link(
+        &self,
+        block: ScannedBlock<'_, Link>,
+    ) -> Result<LinkValue, ReaderError> {
+        let name_index = block.name_index();
         let name = self.get_name(name_index).ok_or(ReaderError::ParseName(name_index))?;
-        let link_content_index = block.link_content_index()?;
+        let link_content_index = block.content_index();
         let content =
             self.get_name(link_content_index).ok_or(ReaderError::ParseName(link_content_index))?;
-        let disposition = block.link_node_disposition()?;
+        let disposition = block.link_node_disposition().ok_or(ReaderError::InvalidVmo)?;
         Ok(LinkValue { name, content, disposition })
     }
 
@@ -303,13 +298,14 @@ impl Snapshot {
         let mut offset = 0;
         let mut extent_index = first_extent;
         while extent_index != BlockIndex::EMPTY && offset < total_length {
-            let extent =
-                self.get_block(extent_index).ok_or(ReaderError::GetExtent(extent_index))?;
-            let content = extent.extent_contents()?;
+            let extent = self
+                .get_block(extent_index)
+                .and_then(|b| b.cast::<Extent>().ok_or(ReaderError::InvalidVmo))?;
+            let content = extent.contents()?;
             let extent_length = cmp::min(total_length - offset, content.len());
             buffer[offset..offset + extent_length].copy_from_slice(&content[..extent_length]);
             offset += extent_length;
-            extent_index = extent.next_extent()?;
+            extent_index = extent.next_extent();
         }
 
         Ok(buffer)
@@ -329,13 +325,12 @@ fn header_generation_count<T: ReadBytes>(bytes: &T) -> Option<u64> {
     if bytes.len() < 16 {
         return None;
     }
-    let block = Block::new(bytes, BlockIndex::HEADER);
-    if block.block_type_or().unwrap_or(BlockType::Reserved) == BlockType::Header
-        && block.header_magic().unwrap() == constants::HEADER_MAGIC_NUMBER
-        && block.header_version().unwrap() <= constants::HEADER_VERSION_NUMBER
-        && !block.header_is_locked().unwrap()
+    let block = bytes.maybe_block_at::<Header>(BlockIndex::HEADER)?;
+    if block.magic_number() == constants::HEADER_MAGIC_NUMBER
+        && block.version() <= constants::HEADER_VERSION_NUMBER
+        && !block.is_locked()
     {
-        return block.header_generation_count().ok();
+        return Some(block.generation_count());
     }
     None
 }
@@ -398,14 +393,14 @@ impl<'a> From<&'a BackingBuffer> for BlockIterator<'a> {
 }
 
 impl<'a> Iterator for BlockIterator<'a> {
-    type Item = ScannedBlock<'a>;
+    type Item = ScannedBlock<'a, Unknown>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.offset >= self.container.len() {
             return None;
         }
         let index = BlockIndex::from_offset(self.offset);
-        let block = Block::new(self.container, index);
+        let block = self.container.block_at(index);
         if self.container.len() - self.offset < utils::order_to_size(block.order()) {
             return None;
         }
@@ -424,7 +419,7 @@ pub enum BackingBuffer {
 impl TryFrom<&zx::Vmo> for BackingBuffer {
     type Error = ReaderError;
     fn try_from(source: &zx::Vmo) -> Result<Self, Self::Error> {
-        let container = Container::read_only(source).map_err(ReaderError::Vmo)?;
+        let container = Container::read_only(source)?;
         Ok(BackingBuffer::Container(container))
     }
 }
@@ -465,10 +460,39 @@ impl BlockContainer for BackingBuffer {
     }
 }
 
+pub(crate) trait MakePrimitiveProperty {
+    fn make_property(&self, name: String) -> Property;
+}
+
+impl MakePrimitiveProperty for ScannedBlock<'_, Int> {
+    fn make_property(&self, name: String) -> Property {
+        Property::Int(name, self.value())
+    }
+}
+
+impl MakePrimitiveProperty for ScannedBlock<'_, Uint> {
+    fn make_property(&self, name: String) -> Property {
+        Property::Uint(name, self.value())
+    }
+}
+
+impl MakePrimitiveProperty for ScannedBlock<'_, Double> {
+    fn make_property(&self, name: String) -> Property {
+        Property::Double(name, self.value())
+    }
+}
+
+impl MakePrimitiveProperty for ScannedBlock<'_, Bool> {
+    fn make_property(&self, name: String) -> Property {
+        Property::Bool(name, self.value())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use anyhow::Error;
+    use assert_matches::assert_matches;
     use inspect_format::{BlockAccessorMutExt, WriteBytes};
 
     #[cfg(target_os = "fuchsia")]
@@ -491,58 +515,59 @@ mod tests {
     fn scan() -> Result<(), Error> {
         let size = 4096;
         let (mut container, storage) = Container::read_and_write(size).unwrap();
-        {
-            let mut header = Block::new_free(
-                &mut container,
-                BlockIndex::HEADER,
-                constants::HEADER_ORDER,
-                BlockIndex::EMPTY,
-            )?;
-            header.become_reserved()?;
-            header.become_header(size)?;
-        }
-        {
-            let mut b = Block::new_free(&mut container, 2.into(), 2, BlockIndex::EMPTY)?;
-            b.become_reserved()?;
-            b.become_extent(6.into())?;
-        }
-        {
-            let mut b = Block::new_free(&mut container, 6.into(), 0, BlockIndex::EMPTY)?;
-            b.become_reserved()?;
-            b.become_int_value(1, 3.into(), 4.into())?;
-        }
+        let _ = Block::free(
+            &mut container,
+            BlockIndex::HEADER,
+            constants::HEADER_ORDER,
+            BlockIndex::EMPTY,
+        )?
+        .become_reserved()
+        .become_header(size)?;
+        let _ = Block::free(&mut container, 2.into(), 2, BlockIndex::EMPTY)?
+            .become_reserved()
+            .become_extent(6.into());
+        let _ = Block::free(&mut container, 6.into(), 0, BlockIndex::EMPTY)?
+            .become_reserved()
+            .become_int_value(1, 3.into(), 4.into());
 
         let snapshot = get_snapshot!(container, storage, || {})?;
 
         // Scan blocks
-        let blocks = snapshot.scan().collect::<Vec<ScannedBlock<'_>>>();
+        let mut blocks = snapshot.scan();
 
-        assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert_eq!(*blocks[0].index(), 0);
-        assert_eq!(blocks[0].order(), constants::HEADER_ORDER);
-        assert_eq!(blocks[0].header_magic().unwrap(), constants::HEADER_MAGIC_NUMBER);
-        assert_eq!(blocks[0].header_version().unwrap(), constants::HEADER_VERSION_NUMBER);
+        let block = blocks.next().unwrap().cast::<Header>().unwrap();
+        assert_eq!(block.block_type(), Some(BlockType::Header));
+        assert_eq!(*block.index(), 0);
+        assert_eq!(block.order(), constants::HEADER_ORDER);
+        assert_eq!(block.magic_number(), constants::HEADER_MAGIC_NUMBER);
+        assert_eq!(block.version(), constants::HEADER_VERSION_NUMBER);
 
-        assert_eq!(blocks[1].block_type(), BlockType::Extent);
-        assert_eq!(*blocks[1].index(), 2);
-        assert_eq!(blocks[1].order(), 2);
-        assert_eq!(*blocks[1].next_extent().unwrap(), 6);
+        let block = blocks.next().unwrap().cast::<Extent>().unwrap();
+        assert_eq!(block.block_type(), Some(BlockType::Extent));
+        assert_eq!(*block.index(), 2);
+        assert_eq!(block.order(), 2);
+        assert_eq!(*block.next_extent(), 6);
 
-        assert_eq!(blocks[2].block_type(), BlockType::IntValue);
-        assert_eq!(*blocks[2].index(), 6);
-        assert_eq!(blocks[2].order(), 0);
-        assert_eq!(*blocks[2].name_index().unwrap(), 3);
-        assert_eq!(*blocks[2].parent_index().unwrap(), 4);
-        assert_eq!(blocks[2].int_value().unwrap(), 1);
+        let block = blocks.next().unwrap().cast::<Int>().unwrap();
+        assert_eq!(block.block_type(), Some(BlockType::IntValue));
+        assert_eq!(*block.index(), 6);
+        assert_eq!(block.order(), 0);
+        assert_eq!(*block.name_index(), 3);
+        assert_eq!(*block.parent_index(), 4);
+        assert_eq!(block.value(), 1);
 
-        assert!(blocks[3..].iter().all(|b| b.block_type() == BlockType::Free));
+        assert!(blocks.all(|b| b.block_type() == Some(BlockType::Free)));
 
         // Verify get_block
-        assert_eq!(snapshot.get_block(0.into()).unwrap().block_type(), BlockType::Header);
-        assert_eq!(snapshot.get_block(2.into()).unwrap().block_type(), BlockType::Extent);
-        assert_eq!(snapshot.get_block(6.into()).unwrap().block_type(), BlockType::IntValue);
-        assert_eq!(snapshot.get_block(7.into()).unwrap().block_type(), BlockType::Free);
-        assert!(snapshot.get_block(4096.into()).is_none());
+        assert_eq!(snapshot.get_block(0.into()).unwrap().block_type(), Some(BlockType::Header));
+        assert_eq!(snapshot.get_block(2.into()).unwrap().block_type(), Some(BlockType::Extent));
+        assert_eq!(snapshot.get_block(6.into()).unwrap().block_type(), Some(BlockType::IntValue));
+        assert_eq!(snapshot.get_block(7.into()).unwrap().block_type(), Some(BlockType::Free));
+        let bad_index = BlockIndex::from(4096);
+        assert_matches!(
+            snapshot.get_block(bad_index),
+            Err(ReaderError::GetBlock(index)) if index == bad_index
+        );
 
         Ok(())
     }
@@ -582,15 +607,15 @@ mod tests {
     fn invalid_pending_write() -> Result<(), Error> {
         let size = 4096;
         let (mut container, storage) = Container::read_and_write(size).unwrap();
-        let mut header = Block::new_free(
+        let mut header = Block::free(
             &mut container,
             BlockIndex::HEADER,
             constants::HEADER_ORDER,
             BlockIndex::EMPTY,
-        )?;
-        header.become_reserved()?;
-        header.become_header(size)?;
-        header.lock_header()?;
+        )?
+        .become_reserved()
+        .become_header(size)?;
+        header.lock();
         assert!(get_snapshot!(container, storage, || {}).is_err());
         Ok(())
     }
@@ -599,15 +624,15 @@ mod tests {
     fn invalid_magic_number() -> Result<(), Error> {
         let size = 4096;
         let (mut container, storage) = Container::read_and_write(size).unwrap();
-        let mut header = Block::new_free(
+        let mut header = Block::free(
             &mut container,
             BlockIndex::HEADER,
             constants::HEADER_ORDER,
             BlockIndex::EMPTY,
-        )?;
-        header.become_reserved()?;
-        header.become_header(size)?;
-        header.set_header_magic(3)?;
+        )?
+        .become_reserved()
+        .become_header(size)?;
+        header.set_magic(3);
         assert!(get_snapshot!(container, storage, || {}).is_err());
         Ok(())
     }
@@ -616,18 +641,18 @@ mod tests {
     fn invalid_generation_count() -> Result<(), Error> {
         let size = 4096;
         let (mut container, storage) = Container::read_and_write(size).unwrap();
-        let mut header = Block::new_free(
+        let _ = Block::free(
             &mut container,
             BlockIndex::HEADER,
             constants::HEADER_ORDER,
             BlockIndex::EMPTY,
-        )?;
-        header.become_reserved()?;
-        header.become_header(size)?;
+        )?
+        .become_reserved()
+        .become_header(size)?;
         let result = get_snapshot!(container, storage, || {
-            let mut header = container.block_at_mut(BlockIndex::HEADER);
-            header.lock_header().unwrap();
-            header.unlock_header().unwrap();
+            let mut header = container.block_at_unchecked_mut::<Header>(BlockIndex::HEADER);
+            header.lock();
+            header.unlock();
         });
         #[cfg(target_os = "fuchsia")]
         assert!(result.is_err());
@@ -651,16 +676,14 @@ mod tests {
     fn snapshot_frozen_vmo() -> Result<(), Error> {
         let size = 4096;
         let (mut container, storage) = Container::read_and_write(size).unwrap();
-        {
-            let mut header = Block::new_free(
-                &mut container,
-                BlockIndex::HEADER,
-                constants::HEADER_ORDER,
-                BlockIndex::EMPTY,
-            )?;
-            header.become_reserved()?;
-            header.become_header(size)?;
-        }
+        let _ = Block::free(
+            &mut container,
+            BlockIndex::HEADER,
+            constants::HEADER_ORDER,
+            BlockIndex::EMPTY,
+        )?
+        .become_reserved()
+        .become_header(size)?;
         container.copy_from_slice_at(8, &[0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 
         let snapshot = get_snapshot!(container, storage, || {})?;
@@ -678,14 +701,14 @@ mod tests {
     fn snapshot_vmo_with_unused_space() -> Result<(), Error> {
         let size = 4 * constants::PAGE_SIZE_BYTES;
         let (mut container, storage) = Container::read_and_write(size).unwrap();
-        let mut header = Block::new_free(
+        let _ = Block::free(
             &mut container,
             BlockIndex::HEADER,
             constants::HEADER_ORDER,
             BlockIndex::EMPTY,
-        )?;
-        header.become_reserved()?;
-        header.become_header(constants::PAGE_SIZE_BYTES)?;
+        )?
+        .become_reserved()
+        .become_header(constants::PAGE_SIZE_BYTES)?;
 
         let snapshot = get_snapshot!(container, storage, || {})?;
         assert_eq!(snapshot.buffer.len(), constants::PAGE_SIZE_BYTES);
@@ -697,14 +720,14 @@ mod tests {
     fn snapshot_vmo_with_very_large_vmo() -> Result<(), Error> {
         let size = 2 * constants::MAX_VMO_SIZE;
         let (mut container, storage) = Container::read_and_write(size).unwrap();
-        let mut header = Block::new_free(
+        let _ = Block::free(
             &mut container,
             BlockIndex::HEADER,
             constants::HEADER_ORDER,
             BlockIndex::EMPTY,
-        )?;
-        header.become_reserved()?;
-        header.become_header(size)?;
+        )?
+        .become_reserved()
+        .become_header(size)?;
 
         let snapshot = get_snapshot!(container, storage, || {})?;
         assert_eq!(snapshot.buffer.len(), constants::MAX_VMO_SIZE);
@@ -716,9 +739,9 @@ mod tests {
     fn snapshot_vmo_with_header_without_size_info() -> Result<(), Error> {
         let size = 2 * constants::PAGE_SIZE_BYTES;
         let (mut container, storage) = Container::read_and_write(size).unwrap();
-        let mut header = Block::new_free(&mut container, BlockIndex::HEADER, 0, BlockIndex::EMPTY)?;
-        header.become_reserved()?;
-        header.become_header(constants::PAGE_SIZE_BYTES)?;
+        let mut header = Block::free(&mut container, BlockIndex::HEADER, 0, BlockIndex::EMPTY)?
+            .become_reserved()
+            .become_header(constants::PAGE_SIZE_BYTES)?;
         header.set_order(0)?;
 
         let snapshot = get_snapshot!(container, storage, || {})?;

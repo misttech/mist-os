@@ -73,6 +73,11 @@
 
                 // TODO(https://fxbug.dev/365763270)
                 "EpollTest.EpollIsPollable",
+
+                // TODO(https://fxbug.dev/293950309)
+                "OtmpfileTest.TmpFileLinkIntoAfter",
+                "OtmpfileTest.TmpFileWithOExclShouldFailLinkInto",
+                "OtmpfileTest.TmpFileWithOCreatShouldFail",
             ],
         },
         {
@@ -91,8 +96,9 @@
                 // TODO(https://fxbug.dev/379958264)
                 "CgroupTest.WriteToInterfaceFileAfterCgroupIsDeleted",
 
-                // TODO(https://fxbug.dev/377755814): Re-enable impl of cgroup.events is complete
-                "CgroupFreezerTest.CheckStateInEventsFile",
+                // TODO(https://fxbug.dev/384194637): deflake and re-enable
+                "CgroupFreezerTest.FreezeNestedCgroups",
+                "CgroupFreezerTest.MoveProcess",
             ],
         },
     ],

@@ -162,12 +162,12 @@ mod tests {
             let _double_property = node.create_double(String::from("double_property"), 1.0);
             let _int_property = node.create_int(String::from("int_property"), 1);
             let _uint_property = node.create_uint(String::from("uint_property"), 1);
-            node.get_block(|node_block| {
-                assert_eq!(node_block.child_count().unwrap(), 5);
+            node.get_block::<_, inspect_format::Node>(|node_block| {
+                assert_eq!(node_block.child_count(), 5);
             });
         }
-        node.get_block(|node_block| {
-            assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block::<_, inspect_format::Node>(|node_block| {
+            assert_eq!(node_block.child_count(), 0);
         });
     }
 }

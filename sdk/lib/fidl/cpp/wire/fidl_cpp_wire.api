@@ -46,7 +46,7 @@
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/transaction.h": "384a258e569f5bc022bd41a32a0782f9",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/unknown_interaction_handler.h": "898a0bccf419a2b6ac51434e95221dea",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/unknown_interactions.h": "84512500e07d5a1e29b4fbd4b2388c03",
-  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/vector_view.h": "c8653176dd59cd2bddd12cf8e8c482f9",
+  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/vector_view.h": "55adc7abbd9972e8c6500c851d46bfe5",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/wire_coding_common.h": "c2222b134eb065c14f7568695ab345a6",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/wire_coding_traits.h": "00c7bb677eb1d3b97a78f0e54b3fd6b1",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/wire_decoder.h": "df97148cc05ecad3e208ee754a45a837",

@@ -12,7 +12,6 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/sync/completion.h>
 
-#include <memory>
 #include <thread>
 
 #include <ddktl/device.h>
@@ -69,9 +68,9 @@ class UsbHidbus : public DeviceType,
   void DdkUnbind(ddk::UnbindTxn txn);
   void UsbHidRelease();
   void DdkRelease();
-  void FindDescriptors(usb::Interface interface, usb_hid_descriptor_t** hid_desc,
-                       const usb_endpoint_descriptor_t** endptin,
-                       const usb_endpoint_descriptor_t** endptout);
+  static void FindDescriptors(usb::Interface interface, const usb_hid_descriptor_t** hid_desc,
+                              const usb_endpoint_descriptor_t** endptin,
+                              const usb_endpoint_descriptor_t** endptout);
   zx_status_t Bind(ddk::UsbProtocolClient usbhid,
                    fidl::ClientEnd<fuchsia_hardware_usb::Usb>& client);
 
@@ -90,12 +89,12 @@ class UsbHidbus : public DeviceType,
   std::optional<usb::InterfaceList> usb_interface_list_;
 
   // These pointers are valid as long as usb_interface_list_ is valid.
-  usb_hid_descriptor_t* hid_desc_ = nullptr;
+  const usb_hid_descriptor_t* hid_desc_ = nullptr;
 
   fidl::Arena<> arena_;
   fuchsia_hardware_hidbus::wire::HidInfo info_;
 
-  ddk::UsbProtocolClient usb_ = {};
+  ddk::UsbProtocolClient usb_;
 
   uint8_t interface_ = 0;
   usb_desc_iter_t desc_iter_ = {};

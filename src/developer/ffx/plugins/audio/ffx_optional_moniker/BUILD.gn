@@ -10,11 +10,11 @@ rustc_library("ffx_optional_moniker") {
   edition = "2021"
 
   deps = [
-    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/developer/ffx/command/error:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/rcs:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:tracing",

@@ -4,6 +4,8 @@
 
 """Utility functions used by multiple bazel rules and macros."""
 
+load("@bazel_skylib//lib:paths.bzl", "paths")
+
 # A dictionary to be expanded inside a ctx.actions.run() or
 # ctx.actions.run_shell() call to specify that the corresponding
 # action should only run locally.
@@ -32,6 +34,22 @@ LOCAL_ONLY_ACTION_KWARGS = {
         "no-cache": "1",
     },
 }
+
+def select_root_dir(files):
+    """Finds the top-most directory in a set of files.
+
+    Args:
+      files: A list of files.
+
+    Returns:
+      The top-most directory.
+    """
+    shortest = paths.dirname(files[0].path)
+    for file in files:
+        directory = paths.dirname(file.path)
+        if len(directory) < len(shortest):
+            shortest = directory
+    return shortest
 
 def select_single_file(files, basename, error_footer = ""):
     """Finds a single file with a given basename. Multiple matches will fail.
@@ -157,7 +175,7 @@ def replace_labels_with_files(json_dict, target_to_string_map, relative = None):
             label = string_to_target_map.get(value)
             label_files = label.files.to_list()
             if relative:
-                dictionary[key] = label_files[0].path.removeprefix(relative + "/")
+                dictionary[key] = paths.relativize(label_files[0].path, relative)
             else:
                 dictionary[key] = label_files[0].path
 
@@ -229,6 +247,9 @@ rm -rf \"$2\" && cp -fR \"$1/\" \"$2\";
 """
     if subdirectories_to_overwrite:
         for src_subdir, dest_subdir in subdirectories_to_overwrite.items():
+            # Check that all subdirectories which are being overwritten exist
+            dest_dir = dst + "/" + dest_subdir
+            cmd += 'if [ ! -d "' + dest_dir + '" ]; then echo "ERROR: ' + dest_dir + ' does not exist." 1>&2; exit 1; fi;\n'
             cmd += 'rm -rf \"' + dst + "/" + dest_subdir + '\";\n'
             cmd += 'cp -fR \"' + src_subdir + "\" \"" + dst + "/" + dest_subdir + '\";\n'
     mnemonic = "CopyDirectory"

@@ -24,14 +24,14 @@
 //     // ...
 //   }
 //
-template <zx_duration_t Duration>
+template <zx_duration_mono_t Duration>
 class EventLimiter {
  public:
   bool Ready() {
-    zx_time_t now = current_time();
+    zx_instant_mono_t now = current_mono_time();
 
     // If we have recently taken action, we don't need to do it again.
-    zx_time_t last_event = last_event_.load(ktl::memory_order_relaxed);
+    zx_instant_mono_t last_event = last_event_.load(ktl::memory_order_relaxed);
     if (last_event != 0 && now < last_event + Duration) {
       return false;
     }
@@ -46,7 +46,7 @@ class EventLimiter {
   }
 
  private:
-  ktl::atomic<zx_time_t> last_event_ = 0;
+  ktl::atomic<zx_instant_mono_t> last_event_ = 0;
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_EVENT_LIMITER_H_

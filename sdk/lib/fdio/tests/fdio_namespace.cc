@@ -13,6 +13,10 @@
 #include <zircon/errors.h>
 #include <zircon/processargs.h>
 
+#include <cstddef>
+#include <latch>
+#include <thread>
+
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
@@ -28,6 +32,7 @@ TEST(NamespaceTest, CreateDestroy) {
 TEST(NamespaceTest, NullPaths) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto destroy = fit::defer([ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
 
   zx::channel ch0, ch1;
   ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
@@ -47,13 +52,12 @@ TEST(NamespaceTest, NullPaths) {
   EXPECT_STATUS(fdio_ns_open(ns, nullptr, 0, service0.release()), ZX_ERR_INVALID_ARGS);
   ASSERT_OK(zx::channel::create(0, &service0, &service1));
   EXPECT_STATUS(fdio_ns_open3(ns, nullptr, 0, service0.release()), ZX_ERR_INVALID_ARGS);
-
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 TEST(NamespaceTest, BindUnbindRoot) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto destroy = fit::defer([ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
 
   zx::channel ch0, ch1;
   ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
@@ -61,13 +65,12 @@ TEST(NamespaceTest, BindUnbindRoot) {
   ASSERT_OK(fdio_ns_bind(ns, "/", ch0.release()));
 
   ASSERT_OK(fdio_ns_unbind(ns, "/"));
-
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 TEST(NamespaceTest, BindUnbindCanonicalPaths) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto destroy = fit::defer([ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
 
   zx::channel ch0, ch1;
   ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
@@ -75,13 +78,12 @@ TEST(NamespaceTest, BindUnbindCanonicalPaths) {
   ASSERT_OK(fdio_ns_bind(ns, "/foo", ch0.release()));
 
   ASSERT_OK(fdio_ns_unbind(ns, "/foo"));
-
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 TEST(NamespaceTest, BindUnbindNonCanonical) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto destroy = fit::defer([ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
 
   zx::channel ch0, ch1;
   ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
@@ -90,13 +92,12 @@ TEST(NamespaceTest, BindUnbindNonCanonical) {
   ASSERT_OK(fdio_ns_bind(ns, "/////foo", ch0.release()));
 
   ASSERT_OK(fdio_ns_unbind(ns, "/foo/fake_subdir/../"));
-
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 TEST(NamespaceTest, BindOversizedPath) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto destroy = fit::defer([ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
 
   zx::channel ch0, ch1;
   ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
@@ -109,13 +110,12 @@ TEST(NamespaceTest, BindOversizedPath) {
   EXPECT_EQ(long_path.length(), PATH_MAX);
 
   EXPECT_STATUS(fdio_ns_bind(ns, long_path.c_str(), ch0.release()), ZX_ERR_BAD_PATH);
-
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 TEST(NamespaceTest, BindOversizedPathComponent) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto destroy = fit::defer([ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
 
   zx::channel ch0, ch1;
   ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
@@ -126,13 +126,12 @@ TEST(NamespaceTest, BindOversizedPathComponent) {
   long_path_component.append(NAME_MAX + 1, 'a');
 
   EXPECT_STATUS(fdio_ns_bind(ns, long_path_component.c_str(), ch0.release()), ZX_ERR_BAD_PATH);
-
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 TEST(NamespaceTest, ConnectRoot) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto destroy = fit::defer([ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
 
   zx::channel ch0, ch1;
   ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
@@ -147,13 +146,12 @@ TEST(NamespaceTest, ConnectRoot) {
 
   // Expect an incoming connect on ch1
   ASSERT_OK(ch1.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), nullptr));
-
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 TEST(NamespaceTest, ConnectRootOpen3) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto destroy = fit::defer([ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
 
   zx::channel ch0, ch1;
   ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
@@ -168,13 +166,12 @@ TEST(NamespaceTest, ConnectRootOpen3) {
 
   // Expect an incoming connect on ch1
   ASSERT_OK(ch1.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), nullptr));
-
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 TEST(NamespaceTest, ConnectCanonicalPath) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto destroy = fit::defer([ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
 
   zx::channel ch0, ch1;
   ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
@@ -189,13 +186,12 @@ TEST(NamespaceTest, ConnectCanonicalPath) {
 
   // Expect an incoming connect on ch1
   ASSERT_OK(ch1.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), nullptr));
-
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 TEST(NamespaceTest, ConnectCanonicalPathOpen3) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto destroy = fit::defer([ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
 
   zx::channel ch0, ch1;
   ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
@@ -210,8 +206,6 @@ TEST(NamespaceTest, ConnectCanonicalPathOpen3) {
 
   // Expect an incoming connect on ch1
   ASSERT_OK(ch1.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), nullptr));
-
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 TEST(NamespaceTest, ConnectNonCanonicalPath) {
@@ -238,6 +232,7 @@ TEST(NamespaceTest, ConnectNonCanonicalPath) {
 TEST(NamespaceTest, ConnectNonCanonicalPathOpen3) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto destroy = fit::defer([ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
 
   zx::channel ch0, ch1;
   ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
@@ -252,13 +247,12 @@ TEST(NamespaceTest, ConnectNonCanonicalPathOpen3) {
 
   // Expect an incoming connect on ch1
   ASSERT_OK(ch1.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), nullptr));
-
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 TEST(NamespaceTest, ConnectOversizedPath) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto destroy = fit::defer([ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
 
   zx::channel ch0, ch1;
   ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
@@ -273,13 +267,12 @@ TEST(NamespaceTest, ConnectOversizedPath) {
   EXPECT_STATUS(fdio_ns_open(ns, long_path.c_str(), 0u, ch0.release()), ZX_ERR_BAD_PATH);
   ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
   EXPECT_STATUS(fdio_ns_open3(ns, long_path.c_str(), 0u, ch0.release()), ZX_ERR_BAD_PATH);
-
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 TEST(NamespaceTest, ConnectOversizedPathComponent) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto destroy = fit::defer([ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
 
   zx::channel ch0, ch1;
   ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
@@ -292,8 +285,47 @@ TEST(NamespaceTest, ConnectOversizedPathComponent) {
   EXPECT_STATUS(fdio_ns_open(ns, long_path_component.c_str(), 0u, ch0.release()), ZX_ERR_BAD_PATH);
   ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
   EXPECT_STATUS(fdio_ns_open3(ns, long_path_component.c_str(), 0u, ch0.release()), ZX_ERR_BAD_PATH);
+}
 
-  ASSERT_OK(fdio_ns_destroy(ns));
+TEST(NamespaceTest, ExportBindUnbindRace) {
+  fdio_ns_t* ns;
+  ASSERT_OK(fdio_ns_create(&ns));
+  auto destroy = fit::defer([ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
+
+  constexpr int8_t num_threads = 5;
+  std::latch latch(static_cast<ptrdiff_t>(2) * num_threads);
+
+  std::vector<std::thread> threads;
+  for (int8_t i = 0; i < num_threads; ++i) {
+    threads.emplace_back(
+        [&](char c) {
+          std::ostringstream path;
+          path << "/" << c;
+          const std::string path_str = path.str();
+
+          zx::channel ch0, ch1;
+          ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
+
+          latch.arrive_and_wait();
+
+          ASSERT_OK(fdio_ns_bind(ns, path_str.c_str(), ch0.release()));
+          ASSERT_OK(fdio_ns_unbind(ns, path_str.c_str()));
+        },
+        'A' + i);
+
+    threads.emplace_back([&]() {
+      fdio_flat_namespace_t* flat;
+
+      latch.arrive_and_wait();
+
+      ASSERT_OK(fdio_ns_export(ns, &flat));
+      fdio_ns_free_flat_ns(flat);
+    });
+  }
+
+  for (auto& thread : threads) {
+    thread.join();
+  }
 }
 
 TEST(NamespaceTest, BindShadowingFails) {

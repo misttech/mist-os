@@ -105,7 +105,7 @@ impl ExpectationsComparer {
                 Err(err) => {
                     match &err {
                         ExpectationError::Mismatch { got, want } => {
-                            tracing::error!(
+                            log::error!(
                                 // TODO(https://fxbug.dev/42064421): Decide what error message to use
                                 // here.
                                 "Failing test case {}: got {:?}, expected {:?}",
@@ -115,7 +115,7 @@ impl ExpectationsComparer {
                             );
                         }
                         ExpectationError::NoExpectationFound => {
-                            tracing::error!("No expectation matches {}", name);
+                            log::error!("No expectation matches {}", name);
                         }
                     };
                     (fidl_fuchsia_test::Status::Failed, Some(err))
@@ -126,12 +126,12 @@ impl ExpectationsComparer {
             (original_status, status),
             (fidl_fuchsia_test::Status::Failed, fidl_fuchsia_test::Status::Passed)
         ) {
-            tracing::info!("{name} failure is expected, so it will be reported to the test runner as having passed.")
+            log::info!("{name} failure is expected, so it will be reported to the test runner as having passed.")
         } else if matches!(
             (original_status, status),
             (fidl_fuchsia_test::Status::Passed, fidl_fuchsia_test::Status::Passed)
         ) {
-            tracing::info!("{name} success is expected.")
+            log::info!("{name} success is expected.")
         }
 
         case_listener_proxy
@@ -159,7 +159,7 @@ impl ExpectationsComparer {
         for (invocation, _) in skipped {
             let (case_listener_proxy, case_listener_server_end) = fidl::endpoints::create_proxy();
             let name = invocation.name.as_ref().expect("fuchsia.test/Invocation had no name");
-            tracing::info!("{name} skip is expected.");
+            log::info!("{name} skip is expected.");
             listener_proxy
                 .on_test_case_started(
                     &invocation,
@@ -298,21 +298,18 @@ impl ExpectationsComparer {
             });
 
         if !missing.is_empty() {
-            tracing::error!("Observed {} test results with no matching expectation", missing.len());
+            log::error!("Observed {} test results with no matching expectation", missing.len());
             for invocation in missing {
                 let name = invocation.name.unwrap();
-                tracing::error!("{name} -- no expectation found");
+                log::error!("{name} -- no expectation found");
             }
         }
 
         if !mismatch.is_empty() {
-            tracing::error!(
-                "Observed {} test results that did not match expectations",
-                mismatch.len()
-            );
+            log::error!("Observed {} test results that did not match expectations", mismatch.len());
             for (invocation, got, want) in mismatch {
                 let name = invocation.name.unwrap();
-                tracing::error!("{name} -- got {got:?}, expected {want:?}");
+                log::error!("{name} -- got {got:?}, expected {want:?}");
             }
         }
         Ok(())
@@ -362,7 +359,7 @@ mod test {
 
     #[fuchsia::test]
     async fn a_passing_test_with_err_logs() {
-        tracing::error!("this is an error");
+        log::error!("this is an error");
         println!("this is a passing test");
     }
 
@@ -373,7 +370,7 @@ mod test {
 
     #[fuchsia::test]
     async fn a_failing_test_with_err_logs() {
-        tracing::error!("this is an error");
+        log::error!("this is an error");
         panic!("this is a failing test")
     }
 

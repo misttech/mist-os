@@ -30,12 +30,12 @@ std::shared_ptr<FakeAudioRenderer> FakeAudioRenderer::CreateWithDefaultFormatInf
   auto format_result = Format::Create(kDefaultStreamType);
   FX_CHECK(format_result.is_ok());
   return FakeAudioRenderer::Create(dispatcher, {format_result.value()},
-                                   fuchsia::media::AudioRenderUsage::MEDIA, link_matrix,
+                                   fuchsia::media::AudioRenderUsage2::MEDIA, link_matrix,
                                    std::move(clock_factory));
 }
 
 FakeAudioRenderer::FakeAudioRenderer(async_dispatcher_t* dispatcher, std::optional<Format> format,
-                                     fuchsia::media::AudioRenderUsage usage,
+                                     fuchsia::media::AudioRenderUsage2 usage,
                                      LinkMatrix* link_matrix,
                                      std::shared_ptr<AudioCoreClockFactory> clock_factory)
     : AudioObject(AudioObject::Type::AudioRenderer),

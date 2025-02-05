@@ -52,15 +52,16 @@ static const clock_id_t kClockIds[] = {
 };
 
 zx_status_t Sherlock::ClkInit() {
-  fuchsia_hardware_clockimpl::wire::InitMetadata metadata;
-  metadata.steps = fidl::VectorView<fuchsia_hardware_clockimpl::wire::InitStep>::FromExternal(
-      clock_init_steps_.data(), clock_init_steps_.size());
+  fuchsia_hardware_clockimpl::wire::InitMetadata clock_init_metadata;
+  clock_init_metadata.steps =
+      fidl::VectorView<fuchsia_hardware_clockimpl::wire::InitStep>::FromExternal(
+          clock_init_steps_.data(), clock_init_steps_.size());
 
-  const fit::result encoded_metadata = fidl::Persist(metadata);
-  if (!encoded_metadata.is_ok()) {
+  fit::result encoded_clock_init_metadata = fidl::Persist(clock_init_metadata);
+  if (!encoded_clock_init_metadata.is_ok()) {
     zxlogf(ERROR, "Failed to encode clock init metadata: %s",
-           encoded_metadata.error_value().FormatDescription().c_str());
-    return encoded_metadata.error_value().status();
+           encoded_clock_init_metadata.error_value().FormatDescription().c_str());
+    return encoded_clock_init_metadata.error_value().status();
   }
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
@@ -106,8 +107,8 @@ zx_status_t Sherlock::ClkInit() {
               reinterpret_cast<const uint8_t*>(&kClockIds) + sizeof(kClockIds)),
       }},
       {{
-          .id = std::to_string(DEVICE_METADATA_CLOCK_INIT),
-          .data = encoded_metadata.value(),
+          .id = fuchsia_hardware_clockimpl::wire::InitMetadata::kSerializableName,
+          .data = std::move(encoded_clock_init_metadata.value()),
       }},
   };
 

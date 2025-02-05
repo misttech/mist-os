@@ -40,9 +40,9 @@ class FakeAudioRenderer : public fuchsia::media::AudioRenderer {
 
   // FakeAudioRenderer records every method call using the following types.
   // SendPacket is tracked separately, by the Packet type.
-  enum class Method {
+  enum class Method : uint8_t {
     AddPayloadBuffer,
-    SetUsage,
+    SetUsage2,
     SetPcmStreamType,
     EnableMinLeadTimeEvents,
     Play,
@@ -88,11 +88,11 @@ class FakeAudioRenderer : public fuchsia::media::AudioRenderer {
     size_t size;
     ASSERT_EQ(payload_buffer.get_size(&size), ZX_OK);
     calls_.push_back({.method = Method::AddPayloadBuffer, .payload_buffer_size = size});
-    ASSERT_EQ(ZX_OK, payload_mapper_.Map(std::move(payload_buffer)));
+    ASSERT_EQ(ZX_OK, payload_mapper_.Map(payload_buffer));
   }
-  void SetUsage(fuchsia::media::AudioRenderUsage usage) override {
-    EXPECT_EQ(usage, fuchsia::media::AudioRenderUsage::MEDIA);
-    calls_.push_back({.method = Method::SetUsage});
+  void SetUsage2(fuchsia::media::AudioRenderUsage2 usage) override {
+    EXPECT_EQ(usage, fuchsia::media::AudioRenderUsage2::MEDIA);
+    calls_.push_back({.method = Method::SetUsage2});
   }
   void SetPcmStreamType(fuchsia::media::AudioStreamType type) override {
     calls_.push_back({.method = Method::SetPcmStreamType, .stream_type = type});
@@ -125,6 +125,7 @@ class FakeAudioRenderer : public fuchsia::media::AudioRenderer {
   }
 
   // Unexpected methods.
+  void SetUsage(fuchsia::media::AudioRenderUsage usage) override { UNEXPECTED_METHOD_CALL; }
   void RemovePayloadBuffer(uint32_t id) override { UNEXPECTED_METHOD_CALL; }
   void SendPacketNoReply(fuchsia::media::StreamPacket packet) override { UNEXPECTED_METHOD_CALL; }
   void EndOfStream() override { UNEXPECTED_METHOD_CALL; }
@@ -141,6 +142,11 @@ class FakeAudioRenderer : public fuchsia::media::AudioRenderer {
   void GetMinLeadTime(GetMinLeadTimeCallback callback) override { UNEXPECTED_METHOD_CALL; }
   void BindGainControl(
       fidl::InterfaceRequest<::fuchsia::media::audio::GainControl> gain_control_request) override {
+    UNEXPECTED_METHOD_CALL;
+  }
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
+    FX_LOGS(ERROR) << "FakeAudioRenderer: AudioRenderer::handle_unknown_method(ordinal " << ordinal
+                   << ", method_has_response " << method_has_response << ")";
     UNEXPECTED_METHOD_CALL;
   }
 
@@ -163,9 +169,9 @@ class FakeAudioCapturer : public fuchsia::media::AudioCapturer {
 
   // FakeAudioCapturer records every method call using the following types.
   // CaptureAt is tracked separately, by the Packet type.
-  enum class Method {
+  enum class Method : uint8_t {
     AddPayloadBuffer,
-    SetUsage,
+    SetUsage2,
     SetPcmStreamType,
     Disconnect,
   };
@@ -217,11 +223,11 @@ class FakeAudioCapturer : public fuchsia::media::AudioCapturer {
     size_t size;
     ASSERT_EQ(payload_buffer.get_size(&size), ZX_OK);
     calls_.push_back({.method = Method::AddPayloadBuffer, .payload_buffer_size = size});
-    ASSERT_EQ(ZX_OK, payload_mapper_.Map(std::move(payload_buffer)));
+    ASSERT_EQ(ZX_OK, payload_mapper_.Map(payload_buffer));
   }
-  void SetUsage(fuchsia::media::AudioCaptureUsage usage) override {
-    EXPECT_EQ(usage, fuchsia::media::AudioCaptureUsage::FOREGROUND);
-    calls_.push_back({.method = Method::SetUsage});
+  void SetUsage2(fuchsia::media::AudioCaptureUsage2 usage) override {
+    EXPECT_EQ(usage, fuchsia::media::AudioCaptureUsage2::FOREGROUND);
+    calls_.push_back({.method = Method::SetUsage2});
   }
   void SetPcmStreamType(fuchsia::media::AudioStreamType type) override {
     calls_.push_back({.method = Method::SetPcmStreamType, .stream_type = type});
@@ -236,6 +242,7 @@ class FakeAudioCapturer : public fuchsia::media::AudioCapturer {
     });
   }
 
+  void SetUsage(fuchsia::media::AudioCaptureUsage usage) override { UNEXPECTED_METHOD_CALL; }
   void RemovePayloadBuffer(uint32_t id) override { UNEXPECTED_METHOD_CALL; }
   void ReleasePacket(fuchsia::media::StreamPacket packet) override { UNEXPECTED_METHOD_CALL; }
   void DiscardAllPackets(DiscardAllPacketsCallback callback) override { UNEXPECTED_METHOD_CALL; }
@@ -250,6 +257,11 @@ class FakeAudioCapturer : public fuchsia::media::AudioCapturer {
   void GetReferenceClock(GetReferenceClockCallback callback) override { UNEXPECTED_METHOD_CALL; }
   void SetReferenceClock(::zx::clock ref_clock) override { UNEXPECTED_METHOD_CALL; }
   void GetStreamType(GetStreamTypeCallback callback) override { UNEXPECTED_METHOD_CALL; }
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) final {
+    FX_LOGS(ERROR) << "FakeAudioCapturer: AudioCapturer::handle_unknown_method(ordinal " << ordinal
+                   << ", method_has_response " << method_has_response << ")";
+    UNEXPECTED_METHOD_CALL;
+  }
 
  private:
   fidl::Binding<fuchsia::media::AudioCapturer> binding_;
@@ -292,26 +304,26 @@ class FakeAudio : public fuchsia::media::Audio, public component_testing::LocalC
 
 uint64_t bit(uint64_t n) { return 1ul << n; }
 
-enum QueueId {
+enum QueueId : uint8_t {
   CONTROLQ = 0,
   EVENTQ = 1,
   TXQ = 2,
   RXQ = 3,
 };
 
-static const uint32_t kNumJacks = 1;
-static const uint32_t kNumStreams = 2;
-static const uint32_t kNumChmaps = 3;
+constexpr uint32_t kNumJacks = 1;
+constexpr uint32_t kNumStreams = 2;
+constexpr uint32_t kNumChmaps = 3;
 
-static const uint32_t kOutputStreamId = 0;
-static const uint32_t kInputStreamId = 1;
+constexpr uint32_t kOutputStreamId = 0;
+constexpr uint32_t kInputStreamId = 1;
 
-static const auto kDeadlinePeriod = zx::msec(5);
+constexpr auto kDeadlinePeriod = zx::msec(5);
 
 // Each response struct contains a status. We initialize that response status
 // to this value when we want to verify that the response is not written before
 // a certain point in time.
-static constexpr uint32_t kInvalidStatus = 0xffff;
+constexpr uint32_t kInvalidStatus = 0xffff;
 static_assert(VIRTIO_SND_S_OK != kInvalidStatus);
 
 struct QueueConfig {
@@ -319,11 +331,11 @@ struct QueueConfig {
   size_t data_bytes;
 };
 
-static constexpr QueueConfig kQueueConfigs[4] = {
-    {16, 16 * 128},  // all req+resp messages are < 128 bytes
-    {16, 16 * 64},   // all messages are < 64 bytes
-    {16, PAGE_SIZE},
-    {16, PAGE_SIZE},
+constexpr QueueConfig kQueueConfigs[4] = {
+    {.descriptors = 16, .data_bytes = 16ul * 128},  // all req+resp messages are < 128 bytes
+    {.descriptors = 16, .data_bytes = 16ul * 64},   // all messages are < 64 bytes
+    {.descriptors = 16, .data_bytes = PAGE_SIZE},
+    {.descriptors = 16, .data_bytes = PAGE_SIZE},
 };
 
 constexpr auto kTimeout = zx::sec(20);
@@ -408,11 +420,12 @@ class VirtioSoundTestBase : public TestWithDevice {
     ASSERT_EQ(chmaps, kNumChmaps);
 
     // Configure device queues.
-    for (uint16_t k = 0; k < queues_.size(); k++) {
-      SCOPED_TRACE(fxl::StringPrintf("queue %u", k));
+    for (size_t k = 0; k < queues_.size(); k++) {
+      SCOPED_TRACE(fxl::StringPrintf("queue %zu", k));
       auto& q = *queues_[k];
       q.Configure(queue_data_addrs_[k], kQueueConfigs[k].data_bytes);
-      ASSERT_EQ(ZX_OK, sound_->ConfigureQueue(k, q.size(), q.desc(), q.avail(), q.used()));
+      ASSERT_EQ(ZX_OK, sound_->ConfigureQueue(static_cast<uint16_t>(k), q.size(), q.desc(),
+                                              q.avail(), q.used()));
     }
 
     // Finish negotiating features.
@@ -493,11 +506,11 @@ class VirtioSoundTestBase : public TestWithDevice {
       }
 
       auto call = server.calls().front();
-      if (!expected_methods.count(call.method)) {
+      if (!expected_methods.contains(call.method)) {
         ADD_FAILURE() << "Got unexpected method call " << static_cast<int>(call.method);
         return {};
       }
-      if (out.count(call.method)) {
+      if (out.contains(call.method)) {
         ADD_FAILURE() << "Got duplicate method call " << static_cast<int>(call.method);
         return {};
       }
@@ -533,7 +546,7 @@ class VirtioSoundTestBase : public TestWithDevice {
   // to wait for that request to complete.
   zx_status_t WaitForDescriptor(VirtioQueueFake& queue, uint32_t idx) {
     auto& used = used_descriptors_[&queue];
-    while (!used.count(idx)) {
+    while (!used.contains(idx)) {
       auto elem = queue.NextUsed();
       while (!elem) {
         if (auto status = WaitOnInterrupt(); status != ZX_OK) {
@@ -1092,7 +1105,7 @@ void VirtioSoundTestBase<EnableInput>::TestPcmOutputSetParamsAndPrepare(
   auto renderer = get_audio_renderer(0);
   ASSERT_TRUE(renderer) << "device did not call CreateAudioRenderer?";
   auto calls = WaitForCalls(*renderer, {
-                                           FakeAudioRenderer::Method::SetUsage,
+                                           FakeAudioRenderer::Method::SetUsage2,
                                            FakeAudioRenderer::Method::SetPcmStreamType,
                                            FakeAudioRenderer::Method::EnableMinLeadTimeEvents,
                                            FakeAudioRenderer::Method::AddPayloadBuffer,
@@ -1180,7 +1193,7 @@ void VirtioSoundTestBase<EnableInput>::TestPcmOutputStateTraversal(size_t render
   auto renderer = get_audio_renderer(renderer_id);
   ASSERT_TRUE(renderer) << "device did not call CreateAudioRenderer?";
   auto calls = WaitForCalls(*renderer, {
-                                           FakeAudioRenderer::Method::SetUsage,
+                                           FakeAudioRenderer::Method::SetUsage2,
                                            FakeAudioRenderer::Method::SetPcmStreamType,
                                            FakeAudioRenderer::Method::EnableMinLeadTimeEvents,
                                            FakeAudioRenderer::Method::AddPayloadBuffer,
@@ -1284,7 +1297,7 @@ TEST_F(VirtioSoundTest, PcmOutputTransitionPrepareRelease) {
   auto renderer = get_audio_renderer(0);
   ASSERT_TRUE(renderer) << "device did not call CreateAudioRenderer?";
   auto calls = WaitForCalls(*renderer, {
-                                           FakeAudioRenderer::Method::SetUsage,
+                                           FakeAudioRenderer::Method::SetUsage2,
                                            FakeAudioRenderer::Method::SetPcmStreamType,
                                            FakeAudioRenderer::Method::EnableMinLeadTimeEvents,
                                            FakeAudioRenderer::Method::AddPayloadBuffer,
@@ -1403,7 +1416,7 @@ TEST_F(VirtioSoundTest, PcmOutputXferOne) {
   virtio_snd_pcm_status_t* resp;
   ASSERT_EQ(ZX_OK, DescriptorChainBuilder(txq())
                        .AppendReadableDescriptor(&xfer, sizeof(xfer))
-                       .AppendReadableDescriptor(&kPacket[0], kPacketSize)
+                       .AppendReadableDescriptor(kPacket.data(), kPacketSize)
                        .AppendWritableDescriptor(&resp, sizeof(*resp))
                        .Build());
   ASSERT_EQ(ZX_OK, NotifyQueue(TXQ));
@@ -1439,7 +1452,7 @@ TEST_F(VirtioSoundTest, PcmOutputXferMultiple) {
     const uint32_t size = static_cast<uint32_t>(kPackets[k].size());
     ASSERT_EQ(ZX_OK, DescriptorChainBuilder(txq())
                          .AppendReadableDescriptor(&xfer, sizeof(xfer))
-                         .AppendReadableDescriptor(&kPackets[k][0], size)
+                         .AppendReadableDescriptor(kPackets[k].data(), size)
                          .AppendWritableDescriptor(&resp[k], sizeof(resp[k]))
                          .Build());
     ASSERT_EQ(ZX_OK, NotifyQueue(TXQ));
@@ -1490,7 +1503,7 @@ TEST_F(VirtioSoundTest, DISABLED_PcmOutputXferThenRelease) {
     SCOPED_TRACE(fxl::StringPrintf("packet %lu", k));
     ASSERT_EQ(ZX_OK, DescriptorChainBuilder(txq())
                          .AppendReadableDescriptor(&xfer, sizeof(xfer))
-                         .AppendReadableDescriptor(&kPacket[0], kPacketSize)
+                         .AppendReadableDescriptor(kPacket.data(), kPacketSize)
                          .AppendWritableDescriptor(&xfer_resp[k], sizeof(xfer_resp[k]))
                          .Build(&xfer_index[k]));
     ASSERT_EQ(ZX_OK, NotifyQueue(TXQ));
@@ -1527,7 +1540,7 @@ TEST_F(VirtioSoundTest, DISABLED_PcmOutputXferThenRelease) {
     SCOPED_TRACE(fxl::StringPrintf("packet %lu", k));
     ASSERT_EQ(ZX_OK, DescriptorChainBuilder(txq())
                          .AppendReadableDescriptor(&xfer, sizeof(xfer))
-                         .AppendReadableDescriptor(&kPacket[0], kPacketSize)
+                         .AppendReadableDescriptor(kPacket.data(), kPacketSize)
                          .AppendWritableDescriptor(&xfer_resp[k], sizeof(xfer_resp[k]))
                          .Build(&xfer_index[k]));
     ASSERT_EQ(ZX_OK, NotifyQueue(TXQ));
@@ -1563,7 +1576,7 @@ TEST_F(VirtioSoundTest, DISABLED_PcmOutputXferThenRelease) {
     SCOPED_TRACE(fxl::StringPrintf("packet %lu", k));
     ASSERT_EQ(ZX_OK, DescriptorChainBuilder(txq())
                          .AppendReadableDescriptor(&xfer, sizeof(xfer))
-                         .AppendReadableDescriptor(&kPacket[0], kPacketSize)
+                         .AppendReadableDescriptor(kPacket.data(), kPacketSize)
                          .AppendWritableDescriptor(&xfer_resp[k], sizeof(xfer_resp[k]))
                          .Build(&xfer_index[k]));
     xfer_resp[k]->status = kInvalidStatus;
@@ -1588,7 +1601,7 @@ TEST_F(VirtioSoundTest, BadPcmOutputXferBadStreamId) {
   virtio_snd_pcm_status_t* resp;
   ASSERT_EQ(ZX_OK, DescriptorChainBuilder(txq())
                        .AppendReadableDescriptor(&xfer, sizeof(xfer))
-                       .AppendReadableDescriptor(&kPacket[0], kPacketSize)
+                       .AppendReadableDescriptor(kPacket.data(), kPacketSize)
                        .AppendWritableDescriptor(&resp, sizeof(*resp))
                        .Build());
   ASSERT_EQ(ZX_OK, NotifyQueue(TXQ));
@@ -1614,7 +1627,7 @@ TEST_F(VirtioSoundTest, BadPcmOutputXferPacketTooBig) {
   virtio_snd_pcm_status_t* resp;
   ASSERT_EQ(ZX_OK, DescriptorChainBuilder(txq())
                        .AppendReadableDescriptor(&xfer, sizeof(xfer))
-                       .AppendReadableDescriptor(&kPacket[0], kPacketSize)
+                       .AppendReadableDescriptor(kPacket.data(), kPacketSize)
                        .AppendWritableDescriptor(&resp, sizeof(*resp))
                        .Build());
   ASSERT_EQ(ZX_OK, NotifyQueue(TXQ));
@@ -1641,7 +1654,7 @@ TEST_F(VirtioSoundTest, BadPcmOutputXferPacketNonintegralFrames) {
   virtio_snd_pcm_status_t* resp;
   ASSERT_EQ(ZX_OK, DescriptorChainBuilder(txq())
                        .AppendReadableDescriptor(&xfer, sizeof(xfer))
-                       .AppendReadableDescriptor(&kPacket[0], kPacketSize)
+                       .AppendReadableDescriptor(kPacket.data(), kPacketSize)
                        .AppendWritableDescriptor(&resp, sizeof(*resp))
                        .Build());
   ASSERT_EQ(ZX_OK, NotifyQueue(TXQ));
@@ -1694,7 +1707,7 @@ void VirtioSoundTestBase<true>::TestPcmInputSetParamsAndPrepare(
   auto capturer = get_audio_capturer(0);
   ASSERT_TRUE(capturer) << "device did not call CreateAudioCapturer?";
   auto calls = WaitForCalls(*capturer, {
-                                           FakeAudioCapturer::Method::SetUsage,
+                                           FakeAudioCapturer::Method::SetUsage2,
                                            FakeAudioCapturer::Method::SetPcmStreamType,
                                            FakeAudioCapturer::Method::AddPayloadBuffer,
                                        });
@@ -1776,7 +1789,7 @@ void VirtioSoundTestBase<true>::TestPcmInputStateTraversal(size_t capturer_id) {
   auto capturer = get_audio_capturer(capturer_id);
   ASSERT_TRUE(capturer) << "device did not call CreateAudioCapturer?";
   auto calls = WaitForCalls(*capturer, {
-                                           FakeAudioCapturer::Method::SetUsage,
+                                           FakeAudioCapturer::Method::SetUsage2,
                                            FakeAudioCapturer::Method::SetPcmStreamType,
                                            FakeAudioCapturer::Method::AddPayloadBuffer,
                                        });
@@ -1869,7 +1882,7 @@ TEST_F(VirtioSoundTest, PcmInputTransitionPrepareRelease) {
   auto capturer = get_audio_capturer(0);
   ASSERT_TRUE(capturer) << "device did not call CreateAudioCapturer?";
   auto calls = WaitForCalls(*capturer, {
-                                           FakeAudioCapturer::Method::SetUsage,
+                                           FakeAudioCapturer::Method::SetUsage2,
                                            FakeAudioCapturer::Method::SetPcmStreamType,
                                            FakeAudioCapturer::Method::AddPayloadBuffer,
                                        });

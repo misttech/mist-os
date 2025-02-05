@@ -199,6 +199,12 @@ declare_args() {
 #     Type: boolean
 #     Default: false
 #
+#   no_sdk: (optional)
+#     Set this to true to run a Bazel command with `--config=no_sdk`, which allows
+#     building artifacts that do not depend on the Fuchsia IDK or SDK.
+#     Type: boolean
+#     Default: false
+#
 #   deps:
 #   metadata:
 #   no_output_dir_leaks:
@@ -290,6 +296,8 @@ template("bazel_action") {
   _has_directory_outputs = false
   _has_package_outputs = false
   _has_final_symlink_outputs = false
+
+  _no_sdk = defined(invoker.no_sdk) && invoker.no_sdk
 
   _ninja_base_dir = target_out_dir
   if (defined(invoker.ninja_base_dir)) {
@@ -432,7 +440,7 @@ template("bazel_action") {
     }
     _manifest = ""
     if (defined(entry.manifest)) {
-      _manifest = "${_ninja_base_dir}/${entry.archive}"
+      _manifest = "${_ninja_base_dir}/${entry.manifest}"
     }
     _all_outputs += [
       {
@@ -610,7 +618,7 @@ template("bazel_action") {
     mnemonic = "BAZEL"
     script = "//build/bazel/scripts/bazel_action.py"
 
-    inputs = [ bazel_launcher ] + _bazel_build_files
+    inputs = _bazel_build_files
 
     inputs += [ _ninja_inputs_manifest ]
 
@@ -758,7 +766,9 @@ template("bazel_action") {
     # will inherit the 'default' platforms which may be set to
     # //build/bazel/platforms:common in the future, and does not target any
     # specific system intentionally.
-    if (is_host || is_fuchsia) {
+    if (_no_sdk) {
+      args += [ "--config=no_sdk" ]
+    } else if (is_host || is_fuchsia) {
       args +=
           [ "--platforms=//build/bazel/platforms:${current_os}_${current_cpu}" ]
     }
@@ -893,12 +903,17 @@ template("bazel_action") {
       ":${_gn_targets_repository_target}",
       ":${_ninja_inputs_target}",
       "//build/bazel:bazel_action_allowlist",
-      "//build/bazel:fuchsia_in_tree_idk.hash",
-      "//build/bazel:fuchsia_internal_only_idk.hash",
-      "//build/bazel:fuchsia_sdk.hash",
-      "//build/bazel:generate_main_workspace($default_toolchain)",
-      "//build/bazel:internal_sdk.hash",
     ]
+
+    if (!_no_sdk) {
+      deps += [
+        "//build/bazel:fuchsia_in_tree_idk.hash",
+        "//build/bazel:fuchsia_internal_only_idk.hash",
+        "//build/bazel:fuchsia_sdk.hash",
+        "//build/bazel:generate_main_workspace($default_toolchain)",
+        "//build/bazel:internal_sdk.hash",
+      ]
+    }
 
     # Using the console pool prevents concurrent bazel build actions to run
     # (otherwise the `bazel-bin` symlink target would become unpredictable

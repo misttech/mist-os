@@ -5,8 +5,9 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use ffx_debug_limbo_args::{LimboCommand, LimboSubCommand};
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_exception::ProcessLimboProxy;
+use target_holders::moniker;
 use zx_status::Status;
 use zx_types::{ZX_ERR_NOT_FOUND, ZX_ERR_UNAVAILABLE};
 

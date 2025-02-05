@@ -15,6 +15,7 @@ use fuchsia_cobalt_builders::MetricEventExt as _;
 use fuchsia_pkg::PackageDirectory;
 use fuchsia_url::{AbsolutePackageUrl, Hash, PinnedAbsolutePackageUrl, UnpinnedAbsolutePackageUrl};
 use futures::prelude::*;
+use log::{error, warn};
 use omaha_client::cup_ecdsa::{
     CupVerificationError, Cupv2Verifier, PublicKeys, StandardCupv2Handler,
 };
@@ -26,7 +27,6 @@ use std::collections::{BTreeMap, HashMap};
 use std::str::FromStr;
 use std::sync::Arc;
 use system_image::CachePackages;
-use tracing::{error, warn};
 use {cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio};
 
 const EAGER_PACKAGE_PERSISTENT_FIDL_NAME: &str = "eager_packages.pf";
@@ -594,7 +594,7 @@ pub async fn run_cup_service<T: Resolver>(
                     Some(manager) => {
                         EagerPackageManager::cup_write(manager, &url, cup).await.map_err(|e| {
                             let write_error = (&e).into();
-                            error!(url = %url.url, "cup_write failed: {:#}", anyhow!(e));
+                            error!(url:% = url.url; "cup_write failed: {:#}", anyhow!(e));
                             write_error
                         })
                     }
@@ -613,7 +613,7 @@ pub async fn run_cup_service<T: Resolver>(
                 let response = match manager.as_ref() {
                     Some(manager) => manager.read().await.cup_get_info(&url).await.map_err(|e| {
                         let get_info_error = (&e).into();
-                        error!(url = %url.url, "cup_get_info failed: {:#}", anyhow!(e));
+                        error!(url:% = url.url; "cup_get_info failed: {:#}", anyhow!(e));
                         get_info_error
                     }),
                     None => Err(GetInfoError::NotAvailable),

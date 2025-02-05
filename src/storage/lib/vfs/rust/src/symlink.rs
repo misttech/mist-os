@@ -91,19 +91,19 @@ impl<T: Symlink> Connection<T> {
     // Returns true if the connection should terminate.
     async fn handle_request(&mut self, req: fio::SymlinkRequest) -> Result<bool, fidl::Error> {
         match req {
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "26")]
             fio::SymlinkRequest::DeprecatedClone { flags, object, control_handle: _ } => {
                 self.handle_deprecated_clone(flags, object);
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "26"))]
             fio::SymlinkRequest::Clone { flags, object, control_handle: _ } => {
                 self.handle_deprecated_clone(flags, object);
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "26")]
             fio::SymlinkRequest::Clone { request, control_handle: _ } => {
                 self.handle_clone(ServerEnd::new(request.into_channel()));
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "26"))]
             fio::SymlinkRequest::Clone2 { request, control_handle: _ } => {
                 self.handle_clone(ServerEnd::new(request.into_channel()));
             }
@@ -177,9 +177,27 @@ impl<T: Symlink> Connection<T> {
                     return Ok(true);
                 }
             },
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::SymlinkRequest::GetFlags { responder } => {
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::SymlinkRequest::SetFlags { flags: _, responder } => {
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::SymlinkRequest::DeprecatedGetFlags { responder } => {
+                responder.send(Status::NOT_SUPPORTED.into_raw(), fio::OpenFlags::empty())?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::SymlinkRequest::DeprecatedSetFlags { responder, .. } => {
+                responder.send(Status::ACCESS_DENIED.into_raw())?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::SymlinkRequest::GetFlags { responder } => {
                 responder.send(Status::NOT_SUPPORTED.into_raw(), fio::OpenFlags::empty())?;
             }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::SymlinkRequest::SetFlags { responder, .. } => {
                 responder.send(Status::ACCESS_DENIED.into_raw())?;
             }
@@ -192,16 +210,8 @@ impl<T: Symlink> Connection<T> {
                     Ok(info) => responder.send(0, Some(&info))?,
                 }
             }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            fio::SymlinkRequest::GetFlags2 { responder } => {
-                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
-            }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            fio::SymlinkRequest::SetFlags2 { flags: _, responder } => {
-                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
-            }
             fio::SymlinkRequest::_UnknownMethod { ordinal, .. } => {
-                tracing::warn!(ordinal, "Received unknown method")
+                log::warn!(ordinal; "Received unknown method")
             }
         }
         Ok(false)
@@ -270,10 +280,10 @@ impl<T: Symlink> Connection<T> {
         let attributes = match self.symlink.list_extended_attributes().await {
             Ok(attributes) => attributes,
             Err(status) => {
-                tracing::error!(?status, "list extended attributes failed");
+                log::error!(status:?; "list extended attributes failed");
                 iterator
                     .close_with_epitaph(status)
-                    .unwrap_or_else(|error| tracing::error!(?error, "failed to send epitaph"));
+                    .unwrap_or_else(|error| log::error!(error:?; "failed to send epitaph"));
                 return;
             }
         };

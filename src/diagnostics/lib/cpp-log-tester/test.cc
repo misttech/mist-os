@@ -31,8 +31,9 @@ TEST(LogDecoder, DecodesRawMessageCorrectly) {
   auto ret = RetrieveLogsAsLogMessage(std::move(channel));
   ASSERT_EQ(ret[0].msg,
             "[src/diagnostics/lib/cpp-log-tester/test.cc(30)] Test log message custom-kvp=5");
-  ASSERT_EQ(ret[0].tags.size(), static_cast<size_t>(1));
-  ASSERT_EQ(ret[0].tags[0], "logging-test");
+  ASSERT_EQ(ret[0].tags.size(), static_cast<size_t>(2));
+  ASSERT_EQ(ret[0].tags[0], "test_moniker");
+  ASSERT_EQ(ret[0].tags[1], "logging-test");
 }
 
 }  // namespace

@@ -61,6 +61,7 @@ rustc_library_with_features("netstack3-core") {
   configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   check_cfgs = [
+    "test",
     "benchmark",
     "loom",
     "no_lock_order",
@@ -75,6 +76,7 @@ rustc_library_with_features("netstack3-core") {
     "src/context.rs",
     "src/counters.rs",
     "src/device/base.rs",
+    "src/device/blackhole.rs",
     "src/device/ethernet.rs",
     "src/device/loopback.rs",
     "src/device/pure_ip.rs",

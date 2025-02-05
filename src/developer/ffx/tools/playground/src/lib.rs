@@ -20,8 +20,9 @@ use std::fs::File;
 use std::io::{self, stdin, BufRead as _, BufReader};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use target_holders::RemoteControlProxyHolder;
 use vfs::directory::helper::DirectlyMutable;
-use {async_fs as afs, fidl_fuchsia_developer_remotecontrol as rc, fuchsia_async as fasync};
+use {async_fs as afs, fuchsia_async as fasync};
 
 mod analytics;
 mod cf_fs;
@@ -52,7 +53,7 @@ pub struct PlaygroundCommand {
 pub struct PlaygroundTool {
     #[command]
     cmd: PlaygroundCommand,
-    rcs_proxy: rc::RemoteControlProxy,
+    rcs_proxy: RemoteControlProxyHolder,
 }
 
 #[async_trait(?Send)]
@@ -65,7 +66,7 @@ impl FfxMain for PlaygroundTool {
 }
 
 pub async fn exec_playground(
-    remote_proxy: rc::RemoteControlProxy,
+    remote_proxy: RemoteControlProxyHolder,
     command: PlaygroundCommand,
 ) -> Result<()> {
     if !stdin().is_tty() {

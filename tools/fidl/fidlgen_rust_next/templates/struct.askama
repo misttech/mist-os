@@ -10,9 +10,7 @@
     {% let params = "<'buf>" %}
 {% endif %}
 
-{% if let Some(doc) = strct.attributes.doc_string() %}
-    #[doc = "{{ doc.escape_default() }}"]
-{% endif %}
+{{ self::doc_string(strct.attributes) -}}
 #[derive(
     {% if !strct.is_resource %}
         Clone,

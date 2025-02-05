@@ -208,6 +208,7 @@ mod tests {
         let _repo = test_utils::make_repo_dir(
             pb_path.join("repository").as_std_path(),
             &pb_path.join("blobs").as_std_path(),
+            None,
         )
         .await;
 

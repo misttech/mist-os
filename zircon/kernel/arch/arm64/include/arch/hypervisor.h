@@ -121,7 +121,7 @@ class Vcpu {
   zx::result<> WriteState(const zx_vcpu_state_t& state);
   zx::result<> WriteState(const zx_vcpu_io_t& io_state) { return zx::error(ZX_ERR_INVALID_ARGS); }
 
-  void GetInfo(zx_info_vcpu_t* info);
+  zx_info_vcpu_t GetInfo() const;
 
  private:
   Vcpu(Guest& guest, uint16_t vpid, Thread* thread);

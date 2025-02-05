@@ -26,14 +26,14 @@ class UartItem : public boot_shim::ItemBase {
   fit::result<DataZbi::Error> AppendItems(DataZbi& zbi) const {
     fit::result<UartItem::DataZbi::Error> result = fit::ok();
     uart::internal::Visit(
-        [&zbi, &result](const auto& driver) {
-          if constexpr (std::is_same_v<uart::null::Driver, std::decay_t<decltype(driver)>>) {
+        [&zbi, &result]<typename UartType>(const UartType& driver) {
+          if constexpr (std::is_same_v<uart::null::Driver, UartType>) {
             result = fit::ok();
           } else {
             if (auto append_result = zbi.Append({
-                    .type = driver.type(),
-                    .length = static_cast<uint32_t>(driver.size()),
-                    .extra = driver.extra(),
+                    .type = UartType::kType,
+                    .length = static_cast<uint32_t>(sizeof(typename UartType::config_type)),
+                    .extra = UartType::kExtra,
                 });
                 append_result.is_ok()) {
               auto& [header, payload] = *append_result.value();
@@ -51,7 +51,11 @@ class UartItem : public boot_shim::ItemBase {
  private:
   constexpr size_t zbi_dcfg_size() const {
     size_t size = 0;
-    uart::internal::Visit([&](const auto& driver) { size = driver.size(); }, driver_);
+    uart::internal::Visit(
+        [&]<typename UartType>(const UartType& driver) {
+          size = sizeof(typename UartType::config_type);
+        },
+        driver_);
     return size;
   }
 

@@ -230,7 +230,7 @@ bool SchedulerFlushesPendingControlRequests() {
 
   // Requesting the same power level as the current power level should be ignored.
   scheduler.RequestPowerLevelForTesting(kMaxPowerLevel);
-  EXPECT_EQ(controller->Wait(Deadline::after(zx_duration_from_sec(1))), ZX_ERR_TIMED_OUT);
+  EXPECT_EQ(controller->Wait(Deadline::after_mono(zx_duration_from_sec(1))), ZX_ERR_TIMED_OUT);
 
   END_TEST;
 }
@@ -313,7 +313,7 @@ bool SchedulerCanPendControlRequestsInIrqContext() {
   ASSERT_EQ(domain.get(), scheduler.GetPowerDomainForTesting().get());
   ASSERT_OK(scheduler.SetPowerLevel(kMaxPowerLevel).status_value());
 
-  auto timer_handler = +[](Timer* timer, zx_time_t now, void* arg) {
+  auto timer_handler = +[](Timer* timer, zx_instant_mono_t now, void* arg) {
     Scheduler* scheduler = static_cast<Scheduler*>(arg);
     scheduler->RequestPowerLevelForTesting(kHighPowerLevel);
   };

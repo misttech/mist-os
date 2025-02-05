@@ -26,7 +26,6 @@ pub struct SdkInfo {
 #[derive(FfxTool)]
 pub struct SdkTool {
     context: EnvironmentContext,
-    sdk_root: fho::Result<SdkRoot>,
     #[command]
     cmd: SdkCommand,
 }
@@ -38,10 +37,10 @@ impl FfxMain for SdkTool {
     type Writer = VerifiedMachineWriter<SdkInfo>;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+        let sdk: Sdk =
+            self.context.get_sdk().user_message("Could not load currently active SDK")?;
         match &self.cmd.sub {
-            SubCommand::Version(_) => {
-                exec_version(self.sdk_root?.get_sdk()?, writer).await.map_err(Into::into)
-            }
+            SubCommand::Version(_) => exec_version(sdk, writer).await.map_err(Into::into),
             SubCommand::Set(cmd) => {
                 if writer.is_machine() {
                     return_user_error!("This command does not support machine output");
@@ -52,13 +51,13 @@ impl FfxMain for SdkTool {
                 if writer.is_machine() {
                     return_user_error!("This command does not support machine output");
                 }
-                exec_run(self.sdk_root?.get_sdk()?, cmd).await
+                exec_run(sdk, cmd).await
             }
             SubCommand::PopulatePath(cmd) => {
                 if writer.is_machine() {
                     return_user_error!("This command does not support machine output");
                 }
-                exec_populate_path(writer, self.sdk_root?, &cmd.path)
+                exec_populate_path(writer, self.context.get_sdk_root()?, &cmd.path)
             }
         }
     }

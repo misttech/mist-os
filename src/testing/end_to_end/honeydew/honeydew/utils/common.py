@@ -3,8 +3,11 @@
 # found in the LICENSE file.
 """Common utils used across Honeydew."""
 import logging
+import signal
 import time
-from collections.abc import Callable
+import types
+from collections.abc import Callable, Generator
+from contextlib import contextmanager
 from typing import Any
 
 from honeydew import errors
@@ -170,3 +173,40 @@ def read_from_dict(
                 f"'{traversed_path}' does not exist in the config dict passed during init."
             ) from err
         return None
+
+
+@contextmanager
+def time_limit(
+    timeout: int,
+    exception_type: type[Exception] = errors.HoneydewTimeoutError,
+    exception_message: str = "",
+) -> Generator[None, None, None]:
+    """Context manager that can be used to time limit any function/method.
+
+    Args:
+        timeout: time limit allowed in seconds.
+        exception_type: type of exception to be raised on reaching the time limit. If not passed,
+            errors.HoneydewTimeoutError exception will be used.
+        exception_message: Error message to be used (if any) while raising the exception on reaching
+            the time limit.
+
+    Raises:
+        errors.HoneydewTimeoutError: If time limit is reached and exception_type is None.
+    """
+
+    def sigalarm_handler(signum: int, _: types.FrameType | None) -> None:
+        _LOGGER.debug(
+            "Received signal: %s (%s). Raising exception: %s('%s')",
+            signal.Signals(signum).name,
+            signum,
+            exception_type.__name__,
+            exception_message,
+        )
+        raise exception_type(exception_message)
+
+    signal.signal(signal.SIGALRM, sigalarm_handler)
+    signal.alarm(timeout)
+    try:
+        yield
+    finally:
+        signal.alarm(0)

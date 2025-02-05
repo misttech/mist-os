@@ -11,5 +11,3 @@ to interact with parent devices in a device-specific manner. The
 examples of these. Protocols are usually in-process interactions between
 devices in the same driver host, but in cases of driver isolation, they may take
 place through RPC to another driver host (through proxy).
-
-See [Banjo Tutorial](/docs/development/drivers/tutorials/banjo-tutorial.md) to learn how to use Banjo.

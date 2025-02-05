@@ -5,6 +5,7 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_scrutiny_verify") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
@@ -38,8 +39,10 @@ ffx_plugin("ffx_scrutiny_verify") {
   ]
 
   args_deps = [
+    "//src/developer/ffx/core:lib",
     "//src/security/lib/scrutiny/frontend",
     "//src/sys/lib/cm_rust",
+    "//third_party/rust_crates:argh",
   ]
 
   sources = [

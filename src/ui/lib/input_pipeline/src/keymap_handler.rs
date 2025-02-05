@@ -92,7 +92,7 @@ impl KeymapHandler {
         event_time: zx::MonotonicInstant,
     ) -> input_device::UnhandledInputEvent {
         let (key, event_type) = (event.get_key(), event.get_event_type());
-        tracing::debug!(
+        log::debug!(
             concat!(
                 "Keymap::process_keyboard_event: key:{:?}, ",
                 "modifier_state:{:?}, lock_state: {:?}, event_type: {:?}"

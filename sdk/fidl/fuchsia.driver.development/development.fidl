@@ -4,6 +4,7 @@
 
 library fuchsia.driver.development;
 
+using fuchsia.component.sandbox;
 using fuchsia.driver.framework;
 using fuchsia.url;
 using zx;
@@ -117,6 +118,22 @@ open protocol Manager {
     /// Waits for bootup to complete.
     @available(added=21)
     strict WaitForBootup() -> ();
+
+    /// Restarts the driver components bound to the nodes identified in |node_ids|,
+    /// providing them with the given dictionary. All child nodes are also restarted
+    /// and provided with this dictionary. This operation is temporary and
+    /// is reversed by releasing the |release_fence| that is returned.
+    @available(added=HEAD)
+    strict RestartWithDictionary(resource struct {
+        /// Moniker of the node to restart with the dictionary.
+        moniker string:NODE_MONIKER_MAX;
+        /// Dictionary to give to the drivers on and under the nodes.
+        dictionary fuchsia.component.sandbox.DictionaryRef;
+    }) -> (resource struct {
+        /// The caller should keep this handle alive while the modified drivers are needed.
+        /// Releasing this will reset the operation.
+        release_fence zx.Handle:EVENTPAIR;
+    }) error zx.Status;
 };
 
 /// Interface for watching when bootup is complete, in which there are no more bind and driver start

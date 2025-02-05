@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.audio/cpp/wire.h>
 #include <fidl/fuchsia.media/cpp/wire.h>
 #include <lib/fidl/cpp/wire/client.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/fit/function.h>
 #include <lib/zx/vmo.h>
 
@@ -85,6 +86,7 @@ class AudioRendererServer
   void SetReferenceClock(SetReferenceClockRequestView request,
                          SetReferenceClockCompleter::Sync& completer) final;
   void SetUsage(SetUsageRequestView request, SetUsageCompleter::Sync& completer) final;
+  void SetUsage2(SetUsage2RequestView request, SetUsage2Completer::Sync& completer) final;
 
   // Must be called exactly once, after the above and before the below.
   // For ULTRASOUND renderers, this cannot be called at all.
@@ -121,13 +123,23 @@ class AudioRendererServer
 
   void EnableMinLeadTimeEvents(EnableMinLeadTimeEventsRequestView request,
                                EnableMinLeadTimeEventsCompleter::Sync& completer) final;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_media::AudioRenderer> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) final {
+    FX_LOGS(ERROR) << "AudioRendererServer: AudioRenderer::handle_unknown_method(ordinal "
+                   << metadata.method_ordinal << ", "
+                   << (metadata.unknown_method_type == fidl::UnknownMethodType::kOneWay
+                           ? "OneWay)"
+                           : "TwoWay)");
+  }
 
  private:
-  static inline constexpr std::string_view kClassName = "AudioRendererServer";
+  static constexpr std::string_view kClassName = "AudioRendererServer";
   template <typename ServerT, template <typename T> typename FidlServerT, typename ProtocolT>
   friend class BaseFidlServer;
 
   AudioRendererServer(std::shared_ptr<const FidlThread> fidl_thread, Args args);
+
+  zx_status_t SetUsageCheck();
 
   void SendPacketInternal(fuchsia_media::StreamPacket packet,
                           std::optional<SendPacketCompleter::Async> completer);

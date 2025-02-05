@@ -4,6 +4,7 @@
 
 import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/components.gni")
+import("//build/packages/sdk_fuchsia_package.gni")
 import("//build/rust/rustc_binary.gni")
 
 group("manager") {
@@ -65,6 +66,19 @@ fuchsia_package("intl_property_manager") {
 
 export_fuchsia_package_to_bazel("intl_property_manager.bazel_input") {
   package = ":intl_property_manager"
+}
+
+if (current_toolchain == default_toolchain) {
+  sdk_fuchsia_package("intl_property_manager_sdk") {
+    distribution_name = "intl_property_manager"
+    package_label = ":intl_property_manager"
+    category = "partner"
+    expected_files_exact = [
+      "meta/intl_property_manager.cm",
+      "meta/intl_property_manager_without_flags.cm",
+    ]
+    api_level_added = 25
+  }
 }
 
 fuchsia_component("intl_property_manager_tests_component") {

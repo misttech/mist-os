@@ -19,11 +19,15 @@
             to: "#test_manager",
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#test_manager",
+        },
+        {
             protocol: [
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.boot.SvcStashProvider",
                 "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.inspect.InspectSink",
                 "fuchsia.kernel.HypervisorResource",
                 "fuchsia.kernel.MmioResource",
                 "fuchsia.kernel.Stats",
@@ -224,7 +228,6 @@
                 "fuchsia.kernel.DebuglogResource",
                 "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.EnergyInfoResource",
-                "fuchsia.kernel.FramebufferResource",
                 "fuchsia.kernel.InfoResource",
                 "fuchsia.kernel.IommuResource",
                 "fuchsia.kernel.IoportResource",

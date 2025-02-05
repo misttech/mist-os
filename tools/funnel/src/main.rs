@@ -177,7 +177,7 @@ async fn main() -> Result<()> {
     if let Err(record_res) =
         metrics_service.record_invocation(command_name, exit_code, error_message).await
     {
-        tracing::warn!("Error recording metrics: {}", record_res);
+        log::warn!("Error recording metrics: {}", record_res);
     }
 
     match res {
@@ -239,7 +239,7 @@ async fn list_targets_main(args: SubCommandListTargets) -> Result<(), FunnelErro
 }
 
 async fn funnel_main(args: SubCommandHost) -> Result<(), FunnelError> {
-    tracing::trace!("Discoving targets...");
+    log::trace!("Discoving targets...");
     let wait_duration = Duration::from_secs(args.wait_for_target_time);
 
     // Only want added events
@@ -261,8 +261,8 @@ async fn funnel_main(args: SubCommandHost) -> Result<(), FunnelError> {
     // Drop the locks we have on stdin and stdout
     drop(stdin);
 
-    tracing::debug!("Target to forward: {:?}", target);
-    tracing::info!("Additional port forwards: {:?}", args.additional_port_forwards);
+    log::debug!("Target to forward: {:?}", target);
+    log::info!("Additional port forwards: {:?}", args.additional_port_forwards);
     let host = args.host.clone();
     let repository_ports = if args.repository_ports.len() > 0 {
         args.repository_ports
@@ -282,7 +282,7 @@ async fn funnel_main(args: SubCommandHost) -> Result<(), FunnelError> {
             assert_eq!(signal, SIGINT);
             eprintln!("\nCaught interrupt. Shutting down the tunnel...");
             let res = ssh::close_existing_tunnel(host.clone());
-            tracing::debug!("Result from closing existing tunnel: {:?}", res);
+            log::debug!("Result from closing existing tunnel: {:?}", res);
             *thread_reqested.lock().unwrap() = true;
             return;
         }
@@ -290,7 +290,7 @@ async fn funnel_main(args: SubCommandHost) -> Result<(), FunnelError> {
 
     let do_ssh_res = do_ssh_fut.await;
     drop(stdout);
-    tracing::info!("result from do_ssh: {:?}", do_ssh_res);
+    log::info!("result from do_ssh: {:?}", do_ssh_res);
     match do_ssh_res {
         Ok(_) => {}
         e @ Err(ssh::TunnelError::PortForwardingFailed { remote_host: _ }) => {
@@ -381,7 +381,7 @@ where
                         TargetState::Fastboot(fb_state) => {
                             match fb_state.connection_state {
                                 FastbootConnectionState::Usb => {
-                                    tracing::warn!("Discovered Target {} in Fastboot USB mode. It cannot be used with `funnel`. Skipping", fb_state.serial_number);
+                                    log::warn!("Discovered Target {} in Fastboot USB mode. It cannot be used with `funnel`. Skipping", fb_state.serial_number);
                                     writeln!(w, "Discovered Target {} in Fastboot over USB mode, which funnel does not support.", fb_state.serial_number).context("writing to stdout")?;
                                 }
                                 FastbootConnectionState::Tcp(tcp_state) => {
@@ -392,19 +392,19 @@ where
                                     );
                                 }
                                 FastbootConnectionState::Udp(udp_state) => {
-                                    tracing::warn!("Discovered Target at address: {:?} in Fastboot Over UDP mode, which funnel does not support.", udp_state);
+                                    log::warn!("Discovered Target at address: {:?} in Fastboot Over UDP mode, which funnel does not support.", udp_state);
                                 }
                             }
                         }
                         TargetState::Zedboot => {
-                            tracing::warn!("Discovered Target in Zedboot mode. It cannot be used with `funnel`. Skipping.");
+                            log::warn!("Discovered Target in Zedboot mode. It cannot be used with `funnel`. Skipping.");
                             writeln!(
                                 w,
                                 "Discovered Target in Zedboot mode, which funnel does not support."
                             )?;
                         }
                         TargetState::Unknown => {
-                            tracing::warn!("Discovered a target in an unknown state. Skipping");
+                            log::warn!("Discovered a target in an unknown state. Skipping");
                             writeln!(w, "Discovered a Target in an unknown state.")?;
                         }
                     },
@@ -416,10 +416,10 @@ where
 
     match timeout(wait_time, task).await {
         Ok(_) => {
-            tracing::warn!("Got an okay result from the discover target loop.... this shouldnt happen we should always timeout.")
+            log::warn!("Got an okay result from the discover target loop.... this shouldnt happen we should always timeout.")
         }
         Err(_) => {
-            tracing::trace!("Timeout reached");
+            log::trace!("Timeout reached");
         }
     }
     let res = targets

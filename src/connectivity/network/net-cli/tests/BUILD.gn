@@ -25,6 +25,7 @@ rustc_test("net-cli-integration") {
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/network/fidl_fuchsia_net_filter_ext",
@@ -34,6 +35,7 @@ rustc_test("net-cli-integration") {
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:test-case",
   ]

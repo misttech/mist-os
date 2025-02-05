@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::cpu_manager::{CpuManager, SuspendResumeListener, SuspendStatsUpdater};
+use crate::cpu_manager::{
+    CpuManager, SuspendBlockManager, SuspendResumeListener, SuspendStatsUpdater,
+};
 use anyhow::Result;
 use async_trait::async_trait;
 use async_utils::hanging_get::server::{HangingGet, Publisher};
@@ -16,6 +18,7 @@ use fuchsia_inspect::{
 use fuchsia_inspect_contrib::nodes::NodeTimeExt;
 use futures::future::FutureExt;
 use futures::prelude::*;
+use futures::stream::StreamExt;
 use power_broker_client::{
     basic_update_fn_factory, run_power_element, LeaseHelper, PowerElementContext,
 };
@@ -164,6 +167,8 @@ struct LeaseManager {
     execution_state_assertive_dependency_token: fbroker::DependencyToken,
     /// Dependency token for Application Activity.
     application_activity_assertive_dependency_token: fbroker::DependencyToken,
+    /// Used to block suspension in CpuManager while a lease is in-flight but not yet satisfied.
+    suspend_block_manager: Rc<SuspendBlockManager>,
 }
 
 impl LeaseManager {
@@ -172,12 +177,14 @@ impl LeaseManager {
         topology: fbroker::TopologyProxy,
         execution_state_assertive_dependency_token: fbroker::DependencyToken,
         application_activity_assertive_dependency_token: fbroker::DependencyToken,
+        suspend_blocker: Rc<SuspendBlockManager>,
     ) -> Self {
         Self {
             inspect_node,
             topology,
             execution_state_assertive_dependency_token,
             application_activity_assertive_dependency_token,
+            suspend_block_manager: suspend_blocker,
         }
     }
 
@@ -199,7 +206,7 @@ impl LeaseManager {
         )
         .await?;
         log::debug!("Acquiring lease for '{}'", name);
-        let lease = lease_helper.lease().await?;
+        let lease = lease_helper.create_lease_and_wait_until_satisfied().await?;
 
         let token_info = server_token.basic_info()?;
         let inspect_lease_node =
@@ -226,6 +233,17 @@ impl LeaseManager {
     async fn create_wake_lease(&self, name: String) -> Result<fsystem::LeaseToken> {
         let (server_token, client_token) = fsystem::LeaseToken::create();
 
+        let suspend_blocker = match self.suspend_block_manager.try_get_blocker() {
+            None => {
+                log::info!(
+                    "Acquisition of wake lease {} temporarily blocked by suspend attempt",
+                    &name
+                );
+                self.suspend_block_manager.get_blocker().await
+            }
+            Some(blocker) => blocker,
+        };
+
         let lease_helper =
             LeaseHelper::new(
                 &self.topology,
@@ -242,7 +260,7 @@ impl LeaseManager {
             )
             .await?;
         log::debug!("Acquiring lease for '{}'", name);
-        let lease = lease_helper.lease().await?;
+        let lease = lease_helper.create_lease().await?;
 
         let token_info = server_token.basic_info()?;
         let inspect_lease_node =
@@ -252,13 +270,40 @@ impl LeaseManager {
         inspect_lease_node.record_string("name", name.clone());
         inspect_lease_node.record_string("type", "wake");
         inspect_lease_node.record_uint("client_token_koid", related_koid);
+        inspect_lease_node.record_string("status", "Awaiting satisfaction");
+
         NodeTimeExt::<zx::BootTimeline>::record_time(&inspect_lease_node, "created_at");
 
         fasync::Task::local(async move {
+            match lease.wait_until_satisfied().await {
+                Ok(_) => {
+                    inspect_lease_node.record_string("status", "Satisfied");
+                }
+                // If there is an error while waiting for lease satisfaction, `suspend_blocker`
+                // will still prevent suspension until the client drops its token.
+                Err(e) => {
+                    log::error!(
+                        "Waiting for satisfaction of wake lease with client_token_koid {} failed: \
+                        {:?}. SAG will block suspension internally for the lifetime of the client \
+                        token.",
+                        related_koid,
+                        e
+                    );
+                    inspect_lease_node
+                        .record_string("status", "Failed waiting for lease satisfaction.");
+                    inspect_lease_node.record_string("error", e.to_string());
+                }
+            }
+
             // Keep lease alive for as long as the client keeps it alive.
             let _ = fasync::OnSignals::new(server_token, zx::Signals::EVENTPAIR_PEER_CLOSED).await;
             log::debug!("Dropping lease for '{}'", name);
             drop(inspect_lease_node);
+
+            // Drop `suspend_blocker` before `lease` to avoid to avoid the possibility (however
+            // unlikely) that the lease drop leads to a suspend attempt before the suspend blocker
+            // is removed.
+            drop(suspend_blocker);
             drop(lease);
         })
         .detach();
@@ -295,8 +340,6 @@ pub struct SystemActivityGovernor {
     /// asynchronously. This signal prevents exposing uninitialized power
     /// element state to external clients.
     is_running_signal: async_lock::OnceCell<()>,
-    /// The flag which indicates a successful suspension.
-    suspend_succeeded: Cell<bool>,
     /// The flag used to synchronize the resume_control_lease.
     /// It's set to true when a resume_control_lease is created and to false
     /// when it needs to be dropped.
@@ -374,6 +417,7 @@ impl SystemActivityGovernor {
             topology.clone(),
             execution_state.assertive_dependency_token().expect("token not registered"),
             application_activity.assertive_dependency_token().expect("token not registered"),
+            cpu_manager.suspend_block_manager().await,
         );
 
         element_power_level_names.push(generate_element_power_level_names(
@@ -435,7 +479,6 @@ impl SystemActivityGovernor {
             cpu_manager,
             boot_control,
             element_power_level_names,
-            suspend_succeeded: Cell::new(false),
             waiting_for_es_activation_after_resume: Cell::new(false),
             resume_control_lease: RefCell::new(None),
             is_running_signal: async_lock::OnceCell::new(),
@@ -537,7 +580,7 @@ impl SystemActivityGovernor {
                             // State.
                             let this2 = this.clone();
                             fasync::Task::local(async move {
-                                this2.notify_suspend_ended().await;
+                                this2.notify_on_resume().await;
                             })
                             .detach();
                         }
@@ -805,9 +848,8 @@ impl SuspendResumeListener for SystemActivityGovernor {
         &self.suspend_stats
     }
 
-    async fn on_suspend_ended(&self, suspend_succeeded: bool) {
-        log::debug!(suspend_succeeded:?; "on_suspend_ended");
-        self.suspend_succeeded.set(suspend_succeeded);
+    async fn on_suspend_ended(&self) {
+        log::debug!("on_suspend_ended");
         self.waiting_for_es_activation_after_resume.set(true);
 
         let lease = self
@@ -831,43 +873,58 @@ impl SuspendResumeListener for SystemActivityGovernor {
     }
 
     async fn notify_on_suspend(&self) {
-        log::debug!("notify_on_suspend");
         // A client may call RegisterListener while handling on_suspend which may cause another
         // mutable borrow of listeners. Clone the listeners to prevent this.
         let listeners: Vec<_> = self.listeners.borrow_mut().clone();
-        for l in listeners {
-            // TODO(b/363055581): Remove the timeout when it is no longer needed.
-            let _ = l.on_suspend_started().await;
-        }
-    }
 
-    async fn notify_suspend_ended(&self) {
-        let suspend_succeeded = self.suspend_succeeded.get();
-        log::debug!(suspend_succeeded:?; "notify_suspend_ended");
-        if suspend_succeeded {
-            self.notify_on_resume().await;
-            self.suspend_succeeded.set(false);
-        } else {
-            self.notify_on_suspend_fail().await;
-        }
+        log::info!("Running on-suspend callbacks ({} listeners)", listeners.len());
+
+        // Run the callbacks concurrently.
+        // TODO(b/393212343): Include listeners' names in log messages once we have names for them.
+        futures::stream::iter(listeners)
+            .enumerate()
+            .for_each_concurrent(None, |(i, listener)| async move {
+                let _warn_task = fasync::Task::local(async move {
+                    loop {
+                        fasync::Timer::new(fasync::MonotonicDuration::from_seconds(10)).await;
+                        log::warn!(
+                            "No response from on_suspend_started from listener {} after 10 \
+                            seconds!",
+                            i
+                        );
+                    }
+                });
+                let _ = listener.on_suspend_started().await;
+            })
+            .await;
     }
 
     async fn notify_on_resume(&self) {
         // A client may call RegisterListener while handling on_resume which may cause another
         // mutable borrow of listeners. Clone the listeners to prevent this.
         let listeners: Vec<_> = self.listeners.borrow_mut().clone();
-        for l in listeners {
-            let _ = l.on_resume().await;
-        }
-    }
 
-    async fn notify_on_suspend_fail(&self) {
-        // A client may call RegisterListener while handling on_suspend_fail which may cause another
-        // mutable borrow of listeners. Clone the listeners to prevent this.
-        let listeners: Vec<_> = self.listeners.borrow_mut().clone();
-        for l in listeners {
-            let _ = l.on_suspend_fail().await;
-        }
+        log::info!("Running on-resume callbacks ({} listeners)", listeners.len());
+
+        // Run the callbacks concurrently.
+        // TODO(b/393212343): Include listeners' names in log messages once we have names for them.
+        futures::stream::iter(listeners)
+            .enumerate()
+            .for_each_concurrent(None, |(i, listener)| async move {
+                // Arguably, OnResume shouldn't yield a response at all, but given that it does,
+                // we'll log if a call takes a very long time to complete.
+                let _warn_task = fasync::Task::local(async move {
+                    loop {
+                        fasync::Timer::new(fasync::MonotonicDuration::from_seconds(10)).await;
+                        log::warn!(
+                            "No response from on_resume from listener {} after 10 seconds!",
+                            i,
+                        );
+                    }
+                });
+                let _ = listener.on_resume().await;
+            })
+            .await;
     }
 }
 

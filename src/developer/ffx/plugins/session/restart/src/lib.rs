@@ -5,9 +5,9 @@
 use anyhow::{format_err, Result};
 use async_trait::async_trait;
 use ffx_session_restart_args::SessionRestartCommand;
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_session::RestarterProxy;
-
+use target_holders::moniker;
 #[derive(FfxTool)]
 pub struct RestartTool {
     #[command]
@@ -40,10 +40,11 @@ pub async fn restart_impl<W: std::io::Write>(
 mod test {
     use super::*;
     use fidl_fuchsia_session::RestarterRequest;
+    use target_holders::fake_proxy;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_restart_session() {
-        let proxy = fho::testing::fake_proxy(|req| match req {
+        let proxy = fake_proxy(|req| match req {
             RestarterRequest::Restart { responder } => {
                 let _ = responder.send(Ok(()));
             }

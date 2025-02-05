@@ -637,7 +637,7 @@ mod tests {
                     duration,
                 )
                 .await;
-                tracing::error!("{}, {}", count, scaled_count.x);
+                log::error!("{}, {}", count, scaled_count.x);
             }
         }
 

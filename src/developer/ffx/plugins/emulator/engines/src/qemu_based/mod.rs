@@ -42,8 +42,7 @@ use vbmeta::{HashDescriptor, Key, Salt, VBMeta};
 pub(crate) async fn get_host_tool(name: &str) -> Result<PathBuf> {
     let sdk = ffx_config::global_env_context()
         .ok_or_else(|| bug!("loading global environment context"))?
-        .get_sdk()
-        .await?;
+        .get_sdk()?;
 
     // Attempts to get a host tool from the SDK manifest. If it fails, falls
     // back to attempting to derive the path to the host tool binary by simply checking
@@ -167,7 +166,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 } else {
                     None
                 };
-                Self::embed_boot_data(&zbi_image_path, &zbi_path, kernel_cmdline)
+                Self::embed_boot_data(&env, &zbi_image_path, &zbi_path, kernel_cmdline)
                     .await
                     .map_err(|e| bug!("cannot embed boot data: {e}"))?;
                 tracing::debug!(
@@ -377,11 +376,11 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
     ///   instead of the default configuration.
     /// - kernel commandline if present. This is currently needed for GPT images to pass kernel
     ///   parameters, as zedboot is not passing them through.
-    async fn embed_boot_data(src: &PathBuf, dest: &PathBuf, cmdline: Option<String>) -> Result<()> {
+    async fn embed_boot_data(ctx: &EnvironmentContext, src: &PathBuf, dest: &PathBuf, cmdline: Option<String>) -> Result<()> {
         let zbi_tool = get_host_tool(config::ZBI_HOST_TOOL)
             .await
             .map_err(|e| bug!("ZBI tool is missing: {e}"))?;
-        let ssh_keys = SshKeyFiles::load(None)
+        let ssh_keys = SshKeyFiles::load(Some(ctx))
             .await
             .map_err(|e| bug!("Error finding ssh authorized_keys file: {e}"))?;
         ssh_keys
@@ -1104,7 +1103,7 @@ mod tests {
             "id": "9999",
             "parts": [
                 {
-      "meta": "qemu_uefi_internal-meta.json",
+      "meta": "qemu_uefi_internal_x64-meta.json",
       "type": "companion_host_tool"
     }],  "root": "..",
   "schema_version": "1"}"#,
@@ -1640,7 +1639,7 @@ mod tests {
         let src = emu_config.guest.zbi_image.expect("zbi image path");
         let dest = root.join("dest.zbi");
 
-        <TestEngine as QemuBasedEngine>::embed_boot_data(&src, &dest, None).await?;
+        <TestEngine as QemuBasedEngine>::embed_boot_data(&env.context, &src, &dest, None).await?;
 
         Ok(())
     }
@@ -1658,6 +1657,7 @@ mod tests {
         let dest = root.join("dest.zbi");
 
         <TestEngine as QemuBasedEngine>::embed_boot_data(
+            &env.context,
             &src,
             &dest,
             Some("kernel.boot=yes".into()),

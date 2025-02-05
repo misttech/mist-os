@@ -8,7 +8,7 @@ use fidl_fuchsia_bluetooth_avrcp_test::*;
 use fuchsia_async as fasync;
 use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::TryStreamExt;
-use tracing::warn;
+use log::warn;
 
 use crate::packets::Scope;
 use crate::peer::Controller;

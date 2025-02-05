@@ -30,7 +30,7 @@
 // |current_ticks| is called.  For example:
 //
 //   // Make sure we spend no more than 30,000 nanoseconds in the loop, but
-//   // don't call current_ticks() more than once every 1,000 loop iterations.
+//   // don't call current_mono_ticks() more than once every 1,000 loop iterations.
 //   auto limiter = LoopLimiter<1000>::WithDuration(30000);
 //   while (!limiter.Exceeded()) {
 //     ...
@@ -46,8 +46,9 @@ class LoopLimiter {
   // Construct a limiter with a relative timeout.
   //
   // If |duration| is <= 0 |Exceeded| will always return false.
-  static LoopLimiter<ItersPerGetTicks> WithDuration(zx_duration_t duration) {
-    const zx_ticks_t relative_ticks = timer_get_ticks_to_time_ratio().Inverse().Scale(duration);
+  static LoopLimiter<ItersPerGetTicks> WithDuration(zx_duration_mono_t duration) {
+    const zx_duration_mono_ticks_t relative_ticks =
+        timer_get_ticks_to_time_ratio().Inverse().Scale(duration);
     return LoopLimiter<ItersPerGetTicks>(relative_ticks);
   }
 
@@ -56,29 +57,29 @@ class LoopLimiter {
   // Call once per loop iteration.
   bool Exceeded() {
     if constexpr (ItersPerGetTicks <= 1) {
-      const zx_ticks_t now = current_ticks();
+      const zx_instant_mono_ticks_t now = current_mono_ticks();
       return now >= deadline_ticks_;
     }
 
     ++iter_since_;
     if (iter_since_ >= ItersPerGetTicks) {
       iter_since_ = 0;
-      const zx_ticks_t now = current_ticks();
+      const zx_instant_mono_ticks_t now = current_mono_ticks();
       return now >= deadline_ticks_;
     }
     return false;
   }
 
  private:
-  explicit LoopLimiter(zx_ticks_t relative_ticks) {
+  explicit LoopLimiter(zx_duration_mono_ticks_t relative_ticks) {
     if (relative_ticks > 0) {
-      const zx_ticks_t now = current_ticks();
+      const zx_instant_mono_ticks_t now = current_mono_ticks();
       deadline_ticks_ = zx_ticks_add_ticks(now, relative_ticks);
     }
   }
 
   // Absolute deadline measured in monotonic clock ticks.
-  zx_ticks_t deadline_ticks_{};
+  zx_instant_mono_ticks_t deadline_ticks_{};
   // Number of iterations since the last call to |current_ticks|.
   uint64_t iter_since_{};
 };

@@ -110,7 +110,7 @@ test("nvme-queue-pair-tests-bin") {
     "//src/lib/testing/predicates",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
+    "//zircon/system/ulib/mmio-ptr",
     "//zircon/system/ulib/sync",
   ]
 }

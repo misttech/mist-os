@@ -66,7 +66,7 @@ void Halt() {
   }
 
   printf("root-job: taking %s action\n", action_name.data());
-  const zx_time_t dlog_deadline = current_time() + ZX_SEC(5);
+  const zx_instant_mono_t dlog_deadline = current_mono_time() + ZX_SEC(5);
   dlog_shutdown(dlog_deadline);
   // Does not return.
   platform_halt(action, ZirconCrashReason::UserspaceRootJobTermination);

@@ -483,7 +483,7 @@ def main() -> int:
 
     # extract fuchsia suspend hal's suspend/resume events
     fsh = find_dict_by_metadata(
-        metadata_name="aml-suspend",
+        metadata_name="generic-suspend",
         json=json_contents,
     )
     fsh_events = fsh["payload"]["root"]["suspend_events"]

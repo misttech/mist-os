@@ -32,6 +32,10 @@
             moniker: "/core/network/dhcpd",
         },
         {
+            instance_id: "ae676a92a954fa0ebd42e6af634e146faa0579f2cc8048d0e1705a8cd5249147",
+            moniker: "/core/network/netstack",
+        },
+        {
             instance_id: "7099557fdc645e1dd520a799c0788e92184463bbe0e6fdecfc22c550a2cdb814",
             moniker: "/core/network/netstack-migration",
         },

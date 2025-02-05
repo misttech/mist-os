@@ -4,9 +4,9 @@
 
 use anyhow::{format_err, Context, Error};
 use fidl::endpoints::ServerEnd;
+use log::*;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::*;
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::immutable::simple as simpledir;

@@ -42,37 +42,13 @@
             name: "sync-manager",
             url: "#meta/sync-manager.cm",
         },
-
-        // ================== fuchsia node ==================
         {
             name: "fuchsia-node",
             url: "#meta/fuchsia-node.cm",
         },
         {
-            name: "fuchsia-netstack",
-            url: "#meta/configurable-netstack.cm",
-        },
-
-        // =================== weave node ===================
-        {
             name: "weave-node",
             url: "#meta/weave-node.cm",
-        },
-        {
-            name: "weave-netstack",
-            url: "#meta/configurable-netstack.cm",
-        },
-
-        // =================== wlan node ====================
-        {
-            name: "wlan-netstack",
-            url: "#meta/configurable-netstack.cm",
-        },
-
-        // =================== wpan node ====================
-        {
-            name: "wpan-netstack",
-            url: "#meta/configurable-netstack.cm",
         },
     ],
     use: [
@@ -113,6 +89,19 @@
             ],
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: [
+                "#fuchsia-netstack",
+                "#fuchsia-node",
+                "#sync-manager",
+                "#weave-netstack",
+                "#weave-node",
+                "#wlan-netstack",
+                "#wpan-netstack",
+            ],
+        },
+        {
             protocol: [
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.root.Interfaces",
@@ -136,19 +125,6 @@
             protocol: "fuchsia.posix.socket.Provider",
             from: "#wpan-netstack",
             to: "#wpan-node",
-        },
-        {
-            protocol: "fuchsia.inspect.InspectSink",
-            from: "parent",
-            to: [
-                "#fuchsia-netstack",
-                "#fuchsia-node",
-                "#sync-manager",
-                "#weave-netstack",
-                "#weave-node",
-                "#wlan-netstack",
-                "#wpan-netstack",
-            ],
         },
     ],
 }

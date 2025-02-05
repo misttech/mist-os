@@ -19,6 +19,7 @@
 namespace device_watcher {
 
 namespace {
+
 zx::result<fidl::ClientEnd<fuchsia_io::DirectoryWatcher>> Watch(
     fidl::UnownedClientEnd<fuchsia_io::Directory> dir) {
   auto [client, server] = fidl::Endpoints<fuchsia_io::DirectoryWatcher>::Create();
@@ -33,6 +34,7 @@ zx::result<fidl::ClientEnd<fuchsia_io::DirectoryWatcher>> Watch(
   }
   return zx::ok(std::move(client));
 }
+
 }  // namespace
 
 __EXPORT
@@ -234,7 +236,7 @@ zx::result<zx::channel> RecursiveWaitForFile(const char* path, zx::duration time
   return RecursiveWaitForFile(dir_fd, rest, timeout);
 }
 
-zx::result<> WatchDirectoryForItems(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+zx::result<> WatchDirectoryForItems(fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
                                     ItemCallback callback) {
   auto [client, server] = fidl::Endpoints<fuchsia_io::DirectoryWatcher>::Create();
 

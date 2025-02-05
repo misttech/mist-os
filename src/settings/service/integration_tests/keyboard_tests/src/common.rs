@@ -12,7 +12,7 @@ pub struct KeyboardTest;
 
 impl KeyboardTest {
     pub async fn create_realm() -> Result<RealmInstance, Error> {
-        tracing::info!("Creating realm builder for keyboard test");
+        log::info!("Creating realm builder for keyboard test");
         let builder = RealmBuilder::new().await?;
         // Add setui_service as child of the realm builder.
         let setui_service =

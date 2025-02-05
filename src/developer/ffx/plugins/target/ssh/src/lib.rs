@@ -9,18 +9,19 @@ use ffx_config::environment::EnvironmentKind;
 use ffx_ssh::ssh::{build_ssh_command, build_ssh_command_with_config_file};
 use ffx_target_ssh_args::SshCommand;
 use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetIpPort, TargetProxy};
+use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetIpPort};
 use fidl_fuchsia_net::{IpAddress, Ipv4Address};
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::Duration;
+use target_holders::TargetProxyHolder;
 use timeout::timeout;
 
 #[derive(FfxTool)]
 pub struct SshTool {
     #[command]
     cmd: SshCommand,
-    target_proxy: TargetProxy,
+    target_proxy: TargetProxyHolder,
 }
 
 fho::embedded_plugin!(SshTool);

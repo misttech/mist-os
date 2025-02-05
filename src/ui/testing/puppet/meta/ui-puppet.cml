@@ -16,7 +16,6 @@
         {
             protocol: [
                 // From system
-                "fuchsia.logger.LogSink",
                 "fuchsia.tracing.provider.Registry",
             ],
         },

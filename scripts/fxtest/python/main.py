@@ -522,6 +522,17 @@ class AsyncMain:
                 asyncio.create_task(log.writer(recorder, output_file))
             )
 
+        # Validate output directory
+        if (
+            flags.artifact_output_directory
+            and os.path.exists(flags.artifact_output_directory)
+            and len(os.listdir(flags.artifact_output_directory)) > 0
+        ):
+            recorder.emit_end(
+                f"Your output directory already exists and is not empty.\nUse --timestamp-artifacts to create new subdirectories for each run, and use `fx test --prev artifact-path` to get the path from the previous run.",
+            )
+            return 1
+
         # Load the list of tests to execute.
         try:
             tests = await self._load_test_list()

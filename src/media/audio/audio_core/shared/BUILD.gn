@@ -123,6 +123,7 @@ source_set("shared") {
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/cpp:hlcpp_conversion",
     "//sdk/lib/fit",
     "//sdk/lib/media/audio/cpp",
     "//sdk/lib/sys/cpp",

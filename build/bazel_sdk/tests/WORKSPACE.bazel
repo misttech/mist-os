@@ -133,13 +133,13 @@ fuchsia_sdk_repository(
     ],
 )
 
-# The @fuchsia_idk repository is ignored, except when running the
+# The @fuchsia_in_tree_idk repository is ignored, except when running the
 # test suite for the Fuchsia platform build. In this case it will
 # be overridden explicitly on the command-line with
-# `--override-repository=fuchsia_idk=<realpath>`, but a
+# `--override-repository=fuchsia_in_tree_idk=<realpath>`, but a
 # declaration must appear in this file for it.
 new_local_repository(
-    name = "fuchsia_idk",
+    name = "fuchsia_in_tree_idk",
     build_file_content = "",
     path = "scripts",
     repo_mapping = {},

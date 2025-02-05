@@ -50,10 +50,23 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.process.Launcher",
+            dictionary: "diagnostics",
+            from: "parent",
+            to: [
+                "#elf_test_ambient_exec_runner",
+                "#elf_test_create_raw_processes_ambient_exec_runner",
+                "#elf_test_create_raw_processes_runner",
+                "#elf_test_runner",
+                "#go_test_runner",
+                "#gtest_runner",
+                "#gunit_runner",
+                "#rust_test_create_raw_processes_runner",
+                "#rust_test_next_vdso_runner",
+                "#rust_test_runner",
             ],
+        },
+        {
+            protocol: [ "fuchsia.process.Launcher" ],
             from: "parent",
             to: [
                 "#elf_test_ambient_exec_runner",

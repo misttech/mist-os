@@ -21,21 +21,21 @@
 
 int clock_tests(int, const cmd_args*, uint32_t) {
   uint64_t c;
-  zx_time_t t2;
+  zx_instant_mono_t t2;
 
   Thread::Current::SleepRelative(ZX_MSEC(100));
   c = arch::Cycles();
-  current_time();
+  current_mono_time();
   c = arch::Cycles() - c;
-  printf("%" PRIu64 " cycles per current_time()\n", c);
+  printf("%" PRIu64 " cycles per current_mono_time()\n", c);
 
   printf("making sure time never goes backwards\n");
   {
-    printf("testing current_time()\n");
-    zx_time_t start = current_time();
-    zx_time_t last = start;
+    printf("testing current_mono_time()\n");
+    zx_instant_mono_t start = current_mono_time();
+    zx_instant_mono_t last = start;
     for (;;) {
-      t2 = current_time();
+      t2 = current_mono_time();
       // printf("%llu %llu\n", last, t2);
       if (t2 < last) {
         printf("WARNING: time ran backwards: %" PRIi64 " < %" PRIi64 "\n", t2, last);
@@ -60,14 +60,14 @@ int clock_tests(int, const cmd_args*, uint32_t) {
     if (!mp_is_cpu_online(cpu))
       continue;
 
-    printf("measuring cpu clock against current_time() on cpu %u\n", cpu);
+    printf("measuring cpu clock against current_mono_time() on cpu %u\n", cpu);
 
     Thread::Current::Get()->SetCpuAffinity(cpu_num_to_mask(cpu));
 
     for (int i = 0; i < 3; i++) {
       uint64_t cycles = arch::Cycles();
-      zx_time_t start = current_time();
-      while ((current_time() - start) < ZX_SEC(1))
+      zx_instant_mono_t start = current_mono_time();
+      while ((current_mono_time() - start) < ZX_SEC(1))
         ;
       cycles = arch::Cycles() - cycles;
       printf("cpu %u: %" PRIu64 " cycles per second\n", cpu, cycles);

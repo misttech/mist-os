@@ -44,7 +44,7 @@ impl TryFrom<IntlRequest> for Job {
                 Ok(watch::Work::new_job(SettingType::Intl, responder))
             }
             _ => {
-                tracing::warn!("Received a call to an unsupported API: {:?}", item);
+                log::warn!("Received a call to an unsupported API: {:?}", item);
                 Err(JobError::Unsupported)
             }
         }

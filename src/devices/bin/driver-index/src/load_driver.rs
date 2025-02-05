@@ -10,7 +10,7 @@ use std::collections::HashSet;
 use std::rc::Rc;
 
 fn log_error(err: anyhow::Error) -> anyhow::Error {
-    tracing::error!("{:#?}", err);
+    log::error!("{:#?}", err);
     err
 }
 
@@ -70,7 +70,7 @@ pub async fn load_drivers(
         let url = match cm_types::Url::new(driver_url) {
             Ok(u) => u,
             Err(e) => {
-                tracing::error!("Found bad driver url: {}: error: {}", driver_url, e);
+                log::error!("Found bad driver url: {}: error: {}", driver_url, e);
                 continue;
             }
         };
@@ -81,10 +81,10 @@ pub async fn load_drivers(
 
         let mut resolved_driver = resolve.unwrap();
         if disabled_drivers.contains(&resolved_driver.component_url) {
-            tracing::info!("Skipping driver: {}", resolved_driver.component_url.to_string());
+            log::info!("Skipping driver: {}", resolved_driver.component_url.to_string());
             continue;
         }
-        tracing::info!("Found driver: {}", resolved_driver.component_url.to_string());
+        log::info!("Found driver: {}", resolved_driver.component_url.to_string());
         if eager_drivers.contains(&resolved_driver.component_url) {
             resolved_driver.fallback = false;
         }

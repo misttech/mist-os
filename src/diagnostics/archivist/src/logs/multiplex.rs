@@ -10,13 +10,13 @@ use fidl_fuchsia_diagnostics::{Selector, StreamMode};
 use fuchsia_trace as ftrace;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::{Stream, StreamExt};
+use log::trace;
 use selectors::SelectorExt;
 use std::cmp::Ordering;
 use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use tracing::trace;
 
 pub type PinStream<I> = Pin<Box<dyn Stream<Item = I> + Send + 'static>>;
 
@@ -268,7 +268,7 @@ impl<I> SubStream<I> {
 
 impl<I> Drop for SubStream<I> {
     fn drop(&mut self) {
-        trace!(identity = %self.identity, "substream terminated");
+        trace!(identity:% = self.identity; "substream terminated");
     }
 }
 

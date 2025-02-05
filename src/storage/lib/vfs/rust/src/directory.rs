@@ -60,6 +60,13 @@ impl DirectoryOptions {
     }
 }
 
+impl From<&DirectoryOptions> for fio::Flags {
+    fn from(options: &DirectoryOptions) -> Self {
+        // There is 1:1 mapping between `fio::Operations` and `fio::Flags`.
+        fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::from_bits_truncate(options.rights.bits())
+    }
+}
+
 impl Default for DirectoryOptions {
     fn default() -> Self {
         DirectoryOptions { rights: fio::R_STAR_DIR }

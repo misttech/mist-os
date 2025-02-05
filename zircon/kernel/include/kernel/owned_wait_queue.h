@@ -516,16 +516,17 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
       Thread* new_owner, const Thread* blocking_thread = nullptr,
       bool propagate_new_owner_cycle_error = false) TA_REQ(chainlock_transaction_token, get_lock());
 
-  ktl::optional<Thread::UnblockList> LockAndMakeWaiterListLocked(zx_time_t now, uint32_t max_count,
+  ktl::optional<Thread::UnblockList> LockAndMakeWaiterListLocked(zx_instant_mono_t now,
+                                                                 uint32_t max_count,
                                                                  IWakeRequeueHook& hooks)
       TA_REQ(chainlock_transaction_token, get_lock());
 
   ktl::optional<WakeRequeueThreadDetails> LockAndMakeWakeRequeueThreadListsLocked(
-      zx_time_t now, uint32_t max_wake_count, IWakeRequeueHook& wake_hooks,
+      zx_instant_mono_t now, uint32_t max_wake_count, IWakeRequeueHook& wake_hooks,
       uint32_t max_requeue_count, IWakeRequeueHook& requeue_hooks)
       TA_REQ(chainlock_transaction_token, get_lock());
 
-  ktl::optional<Thread::UnblockList> TryLockAndMakeWaiterListLocked(zx_time_t now,
+  ktl::optional<Thread::UnblockList> TryLockAndMakeWaiterListLocked(zx_instant_mono_t now,
                                                                     uint32_t max_count,
                                                                     IWakeRequeueHook& hooks)
       TA_REQ(chainlock_transaction_token, get_lock());

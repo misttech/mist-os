@@ -65,25 +65,20 @@ namespace PciFidl = fuchsia_hardware_pci;
 
 class BusInspect {
  public:
-  inline static const inspect::StringReference kBus = inspect::StringReference("Bus");
-  inline static const inspect::StringReference kDevices = inspect::StringReference("Devices");
-  inline static const inspect::StringReference kAcpiDevices =
-      inspect::StringReference("acpi devices");
-  inline static const inspect::StringReference kName = inspect::StringReference("name");
-  inline static const inspect::StringReference kBusStart = inspect::StringReference("bus start");
-  inline static const inspect::StringReference kBusEnd = inspect::StringReference("bus end");
-  inline static const inspect::StringReference kSegmentGroup =
-      inspect::StringReference("segment group");
-  inline static const inspect::StringReference kEcam = inspect::StringReference("ecam");
-  inline static const inspect::StringReference kVectors = inspect::StringReference("vectors");
-  inline static const inspect::StringReference kIrqRoutingEntries =
-      inspect::StringReference("irq routing entries");
-  inline static const inspect::StringReference kPortDeviceId =
-      inspect::StringReference("port device id");
-  inline static const inspect::StringReference kPortFunctionId =
-      inspect::StringReference("port function id");
-  inline static const inspect::StringReference kDeviceId = inspect::StringReference("device id");
-  inline static const inspect::StringReference kPins = inspect::StringReference("pins");
+  static constexpr std::string_view kBus = "Bus";
+  static constexpr std::string_view kDevices = "Devices";
+  static constexpr std::string_view kAcpiDevices = "acpi devices";
+  static constexpr std::string_view kName = "name";
+  static constexpr std::string_view kBusStart = "bus start";
+  static constexpr std::string_view kBusEnd = "bus end";
+  static constexpr std::string_view kSegmentGroup = "segment group";
+  static constexpr std::string_view kEcam = "ecam";
+  static constexpr std::string_view kVectors = "vectors";
+  static constexpr std::string_view kIrqRoutingEntries = "irq routing entries";
+  static constexpr std::string_view kPortDeviceId = "port device id";
+  static constexpr std::string_view kPortFunctionId = "port function id";
+  static constexpr std::string_view kDeviceId = "device id";
+  static constexpr std::string_view kPins = "pins";
 };
 
 // A tree of all pci Device objects in the bus topology.

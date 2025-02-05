@@ -31,6 +31,14 @@
             from: "parent",
             to: "all",
         },
+        {
+            directory: "pkg",
+            from: "framework",
+            as: "props",
+            to: "#tee-internal-api-entry-points",
+            rights: [ "r*" ],
+            subdir: "data/properties",
+        },
     ],
     expose: [
         {

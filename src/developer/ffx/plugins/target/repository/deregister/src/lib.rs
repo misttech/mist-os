@@ -7,8 +7,8 @@ use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
 use ffx_target_repository_deregister_args::DeregisterCommand;
 use fho::{
-    bug, daemon_protocol, moniker, return_bug, return_user_error, user_error, FfxContext, FfxMain,
-    FfxTool, Result, SimpleWriter,
+    bug, return_bug, return_user_error, user_error, FfxContext, FfxMain, FfxTool, Result,
+    SimpleWriter,
 };
 use fidl_fuchsia_developer_ffx::{
     RepositoryConfig, RepositoryIteratorMarker, RepositoryRegistryProxy,
@@ -18,6 +18,7 @@ use fidl_fuchsia_pkg::RepositoryManagerProxy;
 use fidl_fuchsia_pkg_rewrite::EngineProxy;
 use fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule};
 use pkg::{PkgServerInstanceInfo as _, PkgServerInstances, ServerMode};
+use target_holders::{daemon_protocol, moniker};
 use zx_status::Status;
 
 const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";
@@ -235,6 +236,7 @@ mod test {
     use std::collections::BTreeSet;
     use std::net::Ipv4Addr;
     use std::process;
+    use target_holders::fake_proxy;
 
     const REPO_NAME: &str = "some-name";
     const TARGET_NAME: &str = "some-target";
@@ -286,7 +288,7 @@ mod test {
     async fn setup_fake_server() -> (RepositoryRegistryProxy, Receiver<(String, Option<String>)>) {
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::DeregisterTarget {
                 repository_name,
                 target_identifier,
@@ -306,7 +308,7 @@ mod test {
     async fn setup_fake_repo_manager_server(
     ) -> (RepositoryManagerProxy, Receiver<(String, Option<String>)>) {
         let (_sender, receiver) = channel();
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             fidl_fuchsia_pkg::RepositoryManagerRequest::Remove { responder, .. } => {
                 responder.send(Ok(())).unwrap();
             }
@@ -394,7 +396,7 @@ mod test {
     }
 
     fn setup_fake_engine_server() -> EngineProxy {
-        let engine = fho::testing::fake_proxy(move |req| match req {
+        let engine = fake_proxy(move |req| match req {
             EngineRequest::StartEditTransaction { transaction, control_handle: _ } => {
                 handle_edit_transaction(transaction);
             }
@@ -425,7 +427,7 @@ mod test {
             .await
             .expect("Setting default target");
 
-        let repos = fho::testing::fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
+        let repos = fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
         let (repo_mgr, _) = setup_fake_repo_manager_server().await;
 
         make_server_instance(ServerMode::Foreground, default_repo_name.to_string(), &env.context)
@@ -491,7 +493,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_deregister_returns_error() {
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::DeregisterTarget {
                 repository_name: _,
                 target_identifier: _,
@@ -523,8 +525,8 @@ mod test {
             .await
             .expect("Setting default target");
 
-        let repos = fho::testing::fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
-        let repo_mgr = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
+        let repo_mgr = fake_proxy(move |req| match req {
             fidl_fuchsia_pkg::RepositoryManagerRequest::Remove { responder, .. } => {
                 responder.send(Err(Status::NOT_FOUND.into_raw())).unwrap();
             }

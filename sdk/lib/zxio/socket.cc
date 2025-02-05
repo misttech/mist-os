@@ -9,6 +9,7 @@
 #include <lib/fidl/cpp/wire/string_view.h>
 #include <lib/fit/result.h>
 #include <lib/zx/socket.h>
+#include <lib/zxio/bsdsocket.h>
 #include <lib/zxio/cpp/transitional.h>
 #include <lib/zxio/cpp/udp_socket_private.h>
 #include <lib/zxio/fault_catcher.h>
@@ -26,6 +27,7 @@
 #include <cstring>
 #include <type_traits>
 
+#include <fbl/unaligned.h>
 #include <safemath/safe_conversions.h>
 
 #include "sdk/lib/zxio/dgram_cache.h"
@@ -160,6 +162,12 @@ struct SockOptResult {
   const zx_status_t status;
   const int16_t err;
 
+  // An implicit constructor to simplify error handling. This should represent an errno.
+  SockOptResult(fit::error<int16_t> error)
+      : SockOptResult(ZX_OK, fit::result<int16_t>(error).error_value()) {}
+
+  SockOptResult(zx_status_t status, int16_t err) : status(status), err(err) {}
+
   bool ok() const { return status == ZX_OK && err == 0; }
 
   static inline SockOptResult Ok() { return SockOptResult{ZX_OK, 0}; }
@@ -181,9 +189,52 @@ struct SockOptResult {
   }
 };
 
-class GetSockOptProcessor {
+// A helper class that forbids direct access to `optval` and `optlen`.
+template <typename OptVal, typename OptLen>
+class OptValAndLen {
+  static_assert(std::is_pointer_v<OptVal>);
+  static_assert(std::is_same_v<std::remove_pointer_t<OptLen>, socklen_t>);
+  static_assert(std::is_same_v<std::remove_const_t<std::remove_pointer_t<OptVal>>, void>);
+
+ protected:
+  OptValAndLen(OptVal optval, OptLen optlen) : optval_(optval), optlen_(optlen) {}
+  fit::result<int16_t, const OptVal> checked_optval() const {
+    if (!optval_) {
+      return fit::as_error<int16_t>(EFAULT);
+    }
+    return fit::success(optval_);
+  }
+
+  // The only exception that allows direct access is when `optlen_` is not a pointer.
+  template <typename T = OptLen, typename = std::enable_if_t<!std::is_pointer_v<T>>>
+  OptLen optlen() const {
+    return optlen_;
+  }
+
+  template <typename T = OptLen, typename = std::enable_if_t<std::is_pointer_v<T>>>
+  fit::result<int16_t, const OptLen> checked_optlen() const {
+    if (!optlen_) {
+      return fit::as_error<int16_t>(EFAULT);
+    }
+    return fit::success(optlen_);
+  }
+
+  template <typename T = OptLen, typename = std::enable_if_t<std::is_pointer_v<T>>>
+  fit::result<int16_t, std::pair<const OptVal, const OptLen>> checked_optval_and_optlen() const {
+    if (!optlen_ || !optval_) {
+      return fit::as_error<int16_t>(EFAULT);
+    }
+    return fit::success(std::pair(optval_, optlen_));
+  }
+
+ private:
+  const OptVal optval_;
+  const OptLen optlen_;
+};
+
+class GetSockOptProcessor : OptValAndLen<void*, socklen_t*> {
  public:
-  GetSockOptProcessor(void* optval, socklen_t* optlen) : optval_(optval), optlen_(optlen) {}
+  GetSockOptProcessor(void* optval, socklen_t* optlen) : OptValAndLen(optval, optlen) {}
 
   template <typename T, typename F>
   SockOptResult Process(T&& response, F getter) {
@@ -204,16 +255,18 @@ class GetSockOptProcessor {
 
  private:
   SockOptResult StoreRaw(const void* data, socklen_t data_len) {
-    if (data_len > *optlen_) {
+    auto optval_len = checked_optval_and_optlen();
+    if (optval_len.is_error()) {
+      return optval_len.take_error();
+    }
+    auto [optval, optlen] = *optval_len;
+    if (data_len > *optlen) {
       return SockOptResult::Errno(EINVAL);
     }
-    memcpy(optval_, data, data_len);
-    *optlen_ = data_len;
+    memcpy(optval, data, data_len);
+    *optlen = data_len;
     return SockOptResult::Ok();
   }
-
-  void* const optval_;
-  socklen_t* const optlen_;
 };
 
 template <>
@@ -257,12 +310,17 @@ SockOptResult GetSockOptProcessor::StoreOption(const struct linger& value) {
 
 template <>
 SockOptResult GetSockOptProcessor::StoreOption(const fidl::StringView& value) {
+  auto optval_len = checked_optval_and_optlen();
+  if (optval_len.is_error()) {
+    return optval_len.take_error();
+  }
+  auto [optval, optlen] = *optval_len;
   if (value.empty()) {
-    *optlen_ = 0;
-  } else if (*optlen_ > value.size()) {
-    char* p = std::copy(value.begin(), value.end(), static_cast<char*>(optval_));
+    *optlen = 0;
+  } else if (*optlen > value.size()) {
+    char* p = std::copy(value.begin(), value.end(), static_cast<char*>(optval));
     *p = 0;
-    *optlen_ = static_cast<socklen_t>(value.size()) + 1;
+    *optlen = static_cast<socklen_t>(value.size()) + 1;
   } else {
     return SockOptResult::Errno(EINVAL);
   }
@@ -278,9 +336,14 @@ struct TruncatingStringView {
 
 template <>
 SockOptResult GetSockOptProcessor::StoreOption(const TruncatingStringView& value) {
-  *optlen_ = std::min(*optlen_, static_cast<socklen_t>(value.string.size()));
-  if (*optlen_ > 0) {
-    char* p = std::copy_n(value.string.begin(), *optlen_ - 1, static_cast<char*>(optval_));
+  auto optval_len = checked_optval_and_optlen();
+  if (optval_len.is_error()) {
+    return optval_len.take_error();
+  }
+  auto [optval, optlen] = *optval_len;
+  *optlen = std::min(*optlen, static_cast<socklen_t>(value.string.size()));
+  if (*optlen > 0) {
+    char* p = std::copy_n(value.string.begin(), *optlen - 1, static_cast<char*>(optval));
     *p = 0;
   }
   return SockOptResult::Ok();
@@ -315,9 +378,14 @@ SockOptResult GetSockOptProcessor::StoreOption(const fnet::wire::Ipv4Address& va
 
 template <>
 SockOptResult GetSockOptProcessor::StoreOption(const frawsocket::wire::Icmpv6Filter& value) {
+  auto optval_len = checked_optval_and_optlen();
+  if (optval_len.is_error()) {
+    return optval_len.take_error();
+  }
+  auto [optval, optlen] = *optval_len;
   static_assert(sizeof(icmp6_filter) == sizeof(value.blocked_types));
-  *optlen_ = std::min(static_cast<socklen_t>(sizeof(icmp6_filter)), *optlen_);
-  memcpy(optval_, value.blocked_types.data(), *optlen_);
+  *optlen = std::min(static_cast<socklen_t>(sizeof(icmp6_filter)), *optlen);
+  memcpy(optval, value.blocked_types.data(), *optlen);
   return SockOptResult::Ok();
 }
 
@@ -331,6 +399,11 @@ SockOptResult GetSockOptProcessor::StoreOption(const fsocket::wire::TcpInfo& val
   // Note that "unsupported" includes fields not defined in FIDL *and* fields not populated by
   // the server.
   memset(&info, 0xff, sizeof(info));
+
+  auto optlen = checked_optlen();
+  if (optlen.is_error()) {
+    return optlen.take_error();
+  }
 
   if (value.has_state()) {
     info.tcpi_state = [](fsocket::wire::TcpState state) -> uint8_t {
@@ -396,14 +469,67 @@ SockOptResult GetSockOptProcessor::StoreOption(const fsocket::wire::TcpInfo& val
   }
 
   static_assert(sizeof(info) <= std::numeric_limits<socklen_t>::max());
-  return StoreRaw(&info, std::min(*optlen_, static_cast<socklen_t>(sizeof(info))));
+  return StoreRaw(&info, std::min(**optlen, static_cast<socklen_t>(sizeof(info))));
 }
 
 template <>
 SockOptResult GetSockOptProcessor::StoreOption(const fuchsia_net::wire::SocketAddress& value) {
-  *optlen_ = fidl_to_sockaddr(value, optval_, *optlen_);
+  auto optval_len = checked_optval_and_optlen();
+  if (optval_len.is_error()) {
+    return optval_len.take_error();
+  }
+  auto [optval, optlen] = *optval_len;
+  *optlen = fidl_to_sockaddr(value, optval, *optlen);
   return SockOptResult::Ok();
 }
+
+// TODO(https://fxbug.dev/384115233): Update after the API is stabilized.
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+struct FidlSocketMarkWithDomain {
+  FidlSocketMarkWithDomain() = default;
+  explicit FidlSocketMarkWithDomain(fsocket::wire::OptionalUint32 mark,
+                                    fsocket::wire::MarkDomain domain)
+      : mark(mark), domain(domain) {}
+
+  fsocket::wire::OptionalUint32 mark;
+  fsocket::wire::MarkDomain domain;
+};
+
+zxio_socket_mark_domain_t from_fidl_mark_domain(fsocket::wire::MarkDomain domain) {
+  switch (domain) {
+    case fsocket::wire::MarkDomain::kMark1:
+      return ZXIO_SOCKET_MARK_DOMAIN_1;
+    case fsocket::wire::MarkDomain::kMark2:
+      return ZXIO_SOCKET_MARK_DOMAIN_2;
+  }
+}
+
+fit::result<int16_t, fsocket::wire::MarkDomain> into_fidl_mark_domain(
+    zxio_socket_mark_domain_t domain) {
+  switch (domain) {
+    case ZXIO_SOCKET_MARK_DOMAIN_1:
+      return fit::success(fsocket::wire::MarkDomain::kMark1);
+    case ZXIO_SOCKET_MARK_DOMAIN_2:
+      return fit::success(fsocket::wire::MarkDomain::kMark2);
+    default:
+      return fit::as_error<int16_t>(EINVAL);
+  }
+}
+
+template <>
+SockOptResult GetSockOptProcessor::StoreOption(const FidlSocketMarkWithDomain& mark_and_domain) {
+  const auto& [mark, domain] = mark_and_domain;
+  // Fuchsia socket marks are optional. It's different between having a mark with 0
+  // and not having a mark at all. So if `is_present` is false, then `value` has
+  // no meaning.
+  zxio_socket_mark_t socket_mark{
+      .value = mark.is_value() ? mark.value() : 0,
+      .domain = from_fidl_mark_domain(domain),
+      .is_present = mark.is_value(),
+  };
+  return StoreRaw(&socket_mark, sizeof(socket_mark));
+}
+#endif
 
 // Used for various options that allow the caller to supply larger buffers than needed.
 struct PartialCopy {
@@ -414,83 +540,92 @@ struct PartialCopy {
 
 template <>
 SockOptResult GetSockOptProcessor::StoreOption(const PartialCopy& value) {
+  auto optval_len = checked_optval_and_optlen();
+  if (optval_len.is_error()) {
+    return optval_len.take_error();
+  }
+  auto [optval, optlen] = *optval_len;
   socklen_t want_size =
-      *optlen_ < sizeof(int32_t) && value.allow_char ? sizeof(uint8_t) : sizeof(value.value);
-  *optlen_ = std::min(want_size, *optlen_);
-  memcpy(optval_, &value.value, *optlen_);
+      *optlen < sizeof(int32_t) && value.allow_char ? sizeof(uint8_t) : sizeof(value.value);
+  *optlen = std::min(want_size, *optlen);
+  memcpy(optval, &value.value, *optlen);
   return SockOptResult::Ok();
 }
 
-class SetSockOptProcessor {
+class SetSockOptProcessor : OptValAndLen<const void*, socklen_t> {
  public:
-  SetSockOptProcessor(const void* optval, socklen_t optlen) : optval_(optval), optlen_(optlen) {}
+  SetSockOptProcessor(const void* optval, socklen_t optlen) : OptValAndLen(optval, optlen) {}
 
   template <typename T>
-  int16_t Get(T& out) {
-    if (optlen_ < sizeof(T)) {
-      return EINVAL;
+  using GetResult = fit::result<int16_t, T>;
+
+  template <typename T>
+  GetResult<T> Get() {
+    if (optlen() < sizeof(T)) {
+      return fit::as_error<int16_t>(EINVAL);
     }
-    memcpy(&out, optval_, sizeof(T));
-    return 0;
+    auto optval = checked_optval();
+    if (optval.is_error()) {
+      return optval.take_error();
+    }
+    return fit::success(fbl::UnalignedLoad<T>(*optval));
   }
 
   template <typename T, typename F>
   SockOptResult Process(F f) {
-    T v;
-    int16_t result = Get(v);
-    if (result) {
-      return SockOptResult::Errno(result);
+    auto result = Get<T>();
+    if (result.is_error()) {
+      return SockOptResult::Errno(result.error_value());
     }
-    return SockOptResult::FromFidlResponse(f(std::move(v)));
+    return SockOptResult::FromFidlResponse(f(result.value()));
   }
-
- private:
-  const void* const optval_;
-  socklen_t const optlen_;
 };
 
 template <>
-int16_t SetSockOptProcessor::Get(fidl::StringView& out) {
-  const char* optval = static_cast<const char*>(optval_);
-  out = fidl::StringView::FromExternal(optval, strnlen(optval, optlen_));
-  return 0;
+SetSockOptProcessor::GetResult<fidl::StringView> SetSockOptProcessor::Get() {
+  auto optval = checked_optval();
+  if (optval.is_error()) {
+    return optval.take_error();
+  }
+  const char* str = static_cast<const char*>(*optval);
+  return fit::success(fidl::StringView::FromExternal(str, strnlen(str, optlen())));
 }
 
 template <>
-int16_t SetSockOptProcessor::Get(bool& out) {
-  int32_t i;
-  int16_t r = Get(i);
-  out = i != 0;
-  return r;
+SetSockOptProcessor::GetResult<bool> SetSockOptProcessor::Get() {
+  auto r = Get<int32_t>();
+  if (r.is_error())
+    return r;
+  return fit::success(r.value() != 0);
 }
 
 template <>
-int16_t SetSockOptProcessor::Get(uint32_t& out) {
-  int32_t& alt = *reinterpret_cast<int32_t*>(&out);
-  if (int16_t r = Get(alt); r) {
+SetSockOptProcessor::GetResult<uint32_t> SetSockOptProcessor::Get() {
+  auto r = Get<int32_t>();
+  if (r.is_error()) {
     return r;
   }
-  if (alt < 0) {
-    return EINVAL;
+  if (r.value() < 0) {
+    return fit::as_error<int16_t>(EINVAL);
   }
-  return 0;
+  return fit::success<uint32_t>(r.value());
 }
 
 template <>
-int16_t SetSockOptProcessor::Get(fsocket::wire::OptionalUint8& out) {
-  int32_t i;
-  if (int16_t r = Get(i); r) {
-    return r;
+SetSockOptProcessor::GetResult<fsocket::wire::OptionalUint8> SetSockOptProcessor::Get() {
+  auto r = Get<int32_t>();
+  if (r.is_error()) {
+    return r.take_error();
   }
+  auto i = r.value();
   if (i < -1 || i > std::numeric_limits<uint8_t>::max()) {
-    return EINVAL;
+    return fit::as_error<int16_t>(EINVAL);
   }
   if (i == -1) {
-    out = fsocket::wire::OptionalUint8::WithUnset({});
+    return fit::success(fsocket::wire::OptionalUint8::WithUnset({}));
   } else {
-    out = fsocket::wire::OptionalUint8::WithValue(static_cast<uint8_t>(i));
+    return fit::success(fsocket::wire::OptionalUint8::WithValue(static_cast<uint8_t>(i)));
   }
-  return 0;
 }
 
 // Like OptionalUint8, but permits truncation to a single byte.
@@ -499,80 +634,85 @@ struct OptionalUint8CharAllowed {
 };
 
 template <>
-int16_t SetSockOptProcessor::Get(OptionalUint8CharAllowed& out) {
-  if (optlen_ == sizeof(uint8_t)) {
-    out.inner = fsocket::wire::OptionalUint8::WithValue(*static_cast<const uint8_t*>(optval_));
-    return 0;
+SetSockOptProcessor::GetResult<OptionalUint8CharAllowed> SetSockOptProcessor::Get() {
+  if (optlen() == sizeof(uint8_t)) {
+    auto optval = checked_optval();
+    if (optval.is_error()) {
+      return optval.take_error();
+    }
+    return fit::success(
+        fsocket::wire::OptionalUint8::WithValue(*static_cast<const uint8_t*>(*optval)));
   }
-  return Get(out.inner);
+  return Get<fsocket::wire::OptionalUint8>();
 }
 
 template <>
-int16_t SetSockOptProcessor::Get(fsocket::wire::IpMulticastMembership& out) {
-  union {
-    struct ip_mreqn reqn;
-    struct ip_mreq req;
-  } r;
-  struct in_addr* local;
-  struct in_addr* mcast;
-  if (optlen_ < sizeof(struct ip_mreqn)) {
-    if (Get(r.req) != 0) {
-      return EINVAL;
+SetSockOptProcessor::GetResult<fsocket::wire::IpMulticastMembership> SetSockOptProcessor::Get() {
+  struct in_addr local;
+  struct in_addr mcast;
+  fsocket::wire::IpMulticastMembership out;
+  if (optlen() < sizeof(struct ip_mreqn)) {
+    auto req = Get<struct ip_mreq>();
+    if (req.is_error()) {
+      return fit::as_error<int16_t>(EINVAL);
     }
     out.iface = 0;
-    local = &r.req.imr_interface;
-    mcast = &r.req.imr_multiaddr;
+    local = req->imr_interface;
+    mcast = req->imr_multiaddr;
   } else {
-    if (Get(r.reqn) != 0) {
-      return EINVAL;
+    auto reqn = Get<struct ip_mreqn>();
+    if (reqn.is_error()) {
+      return fit::as_error<int16_t>(EINVAL);
     }
-    out.iface = r.reqn.imr_ifindex;
-    local = &r.reqn.imr_address;
-    mcast = &r.reqn.imr_multiaddr;
+    out.iface = reqn->imr_ifindex;
+    local = reqn->imr_address;
+    mcast = reqn->imr_multiaddr;
   }
-  static_assert(sizeof(out.local_addr.addr) == sizeof(*local));
-  memcpy(out.local_addr.addr.data(), local, sizeof(*local));
-  static_assert(sizeof(out.mcast_addr.addr) == sizeof(*mcast));
-  memcpy(out.mcast_addr.addr.data(), mcast, sizeof(*mcast));
-  return 0;
+  static_assert(sizeof(out.local_addr.addr) == sizeof(local));
+  memcpy(out.local_addr.addr.data(), &local, sizeof(local));
+  static_assert(sizeof(out.mcast_addr.addr) == sizeof(mcast));
+  memcpy(out.mcast_addr.addr.data(), &mcast, sizeof(mcast));
+  return fit::success(out);
 }
 
 template <>
-int16_t SetSockOptProcessor::Get(fsocket::wire::Ipv6MulticastMembership& out) {
-  struct ipv6_mreq req;
-  if (Get(req) != 0) {
-    return EINVAL;
+SetSockOptProcessor::GetResult<fsocket::wire::Ipv6MulticastMembership> SetSockOptProcessor::Get() {
+  auto req = Get<struct ipv6_mreq>();
+  if (req.is_error()) {
+    return fit::as_error<int16_t>(EINVAL);
   }
-  out.iface = req.ipv6mr_interface;
-  static_assert(std::size(req.ipv6mr_multiaddr.s6_addr) == decltype(out.mcast_addr.addr)::size());
-  std::copy(std::begin(req.ipv6mr_multiaddr.s6_addr), std::end(req.ipv6mr_multiaddr.s6_addr),
+  fsocket::wire::Ipv6MulticastMembership out;
+  out.iface = req->ipv6mr_interface;
+  static_assert(sizeof(req->ipv6mr_multiaddr.s6_addr) == decltype(out.mcast_addr.addr)::size());
+  std::copy(std::begin(req->ipv6mr_multiaddr.s6_addr), std::end(req->ipv6mr_multiaddr.s6_addr),
             out.mcast_addr.addr.begin());
-  return 0;
+  return fit::success(out);
 }
 
 template <>
-int16_t SetSockOptProcessor::Get(frawsocket::wire::Icmpv6Filter& out) {
-  struct icmp6_filter filter;
-  if (Get(filter) != 0) {
-    return EINVAL;
+SetSockOptProcessor::GetResult<frawsocket::wire::Icmpv6Filter> SetSockOptProcessor::Get() {
+  auto filter = Get<struct icmp6_filter>();
+  if (filter.is_error()) {
+    return fit::as_error<int16_t>(EINVAL);
   }
 
-  static_assert(sizeof(filter) == sizeof(out.blocked_types));
-  memcpy(out.blocked_types.data(), &filter, sizeof(filter));
-  return 0;
+  static_assert(sizeof(filter.value()) == sizeof(frawsocket::wire::Icmpv6Filter::blocked_types));
+  return fit::success(fbl::UnalignedLoad<frawsocket::wire::Icmpv6Filter>(&filter.value()));
 }
 
 template <>
-int16_t SetSockOptProcessor::Get(fsocket::wire::TcpCongestionControl& out) {
-  if (strncmp(static_cast<const char*>(optval_), kCcCubic, optlen_) == 0) {
-    out = fsocket::wire::TcpCongestionControl::kCubic;
-    return 0;
+SetSockOptProcessor::GetResult<fsocket::wire::TcpCongestionControl> SetSockOptProcessor::Get() {
+  auto optval = checked_optval();
+  if (optval.is_error()) {
+    return optval.take_error();
   }
-  if (strncmp(static_cast<const char*>(optval_), kCcReno, optlen_) == 0) {
-    out = fsocket::wire::TcpCongestionControl::kReno;
-    return 0;
+  if (strncmp(static_cast<const char*>(*optval), kCcCubic, optlen()) == 0) {
+    return fit::success(fsocket::wire::TcpCongestionControl::kCubic);
   }
-  return ENOENT;
+  if (strncmp(static_cast<const char*>(*optval), kCcReno, optlen()) == 0) {
+    return fit::success(fsocket::wire::TcpCongestionControl::kReno);
+  }
+  return fit::as_error<int16_t>(ENOENT);
 }
 
 struct IntOrChar {
@@ -580,16 +720,39 @@ struct IntOrChar {
 };
 
 template <>
-int16_t SetSockOptProcessor::Get(IntOrChar& out) {
-  if (Get(out.value) == 0) {
-    return 0;
+SetSockOptProcessor::GetResult<IntOrChar> SetSockOptProcessor::Get() {
+  auto value = Get<int32_t>();
+  if (value.is_ok()) {
+    return value.take_value();
   }
-  if (optlen_ == 0) {
-    return EINVAL;
+  if (optlen() == 0) {
+    return fit::as_error<int16_t>(EINVAL);
   }
-  out.value = *static_cast<const uint8_t*>(optval_);
-  return 0;
+  auto optval = checked_optval();
+  if (optval.is_error()) {
+    return optval.take_error();
+  }
+  return fit::success(*static_cast<const uint8_t*>(*optval));
 }
+
+// TODO(https://fxbug.dev/384115233): Update after the API is stabilized.
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+template <>
+SetSockOptProcessor::GetResult<FidlSocketMarkWithDomain> SetSockOptProcessor::Get() {
+  auto socket_mark = Get<zxio_socket_mark_t>();
+  if (socket_mark.is_error()) {
+    return fit::as_error<int16_t>(EINVAL);
+  }
+  auto fidl_domain_result = into_fidl_mark_domain(socket_mark->domain);
+  if (fidl_domain_result.is_error()) {
+    return fidl_domain_result.take_error();
+  }
+  return fit::success(FidlSocketMarkWithDomain(
+      socket_mark->is_present ? fsocket::wire::OptionalUint32::WithValue(socket_mark->value)
+                              : fsocket::wire::OptionalUint32::WithUnset(fsocket::wire::Empty{}),
+      fidl_domain_result.value()));
+}
+#endif
 
 template <typename Client,
           typename = std::enable_if_t<
@@ -625,7 +788,7 @@ class base_socket {
 
   zx_status_t CloneSocket(zx_handle_t* out_handle) {
     auto [client, server] = fidl::Endpoints<fuchsia_unknown::Cloneable>::Create();
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
     zx_status_t status = client_->Clone(std::move(server)).status();
 #else
     zx_status_t status = client_->Clone2(std::move(server)).status();
@@ -789,6 +952,22 @@ class base_socket {
               .allow_char = false,
           };
         });
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+      case SO_FUCHSIA_MARK: {
+        if (*optlen < sizeof(zxio_socket_mark_t)) {
+          return SockOptResult::Errno(EINVAL);
+        }
+        zxio_socket_mark_domain_t domain = fbl::UnalignedLoad<zxio_socket_mark_t>(optval).domain;
+        auto fidl_domain_result = into_fidl_mark_domain(domain);
+        if (fidl_domain_result.is_error()) {
+          return SockOptResult::Errno(fidl_domain_result.error_value());
+        }
+        auto fidl_domain = fidl_domain_result.value();
+        return proc.Process(client()->GetMark(fidl_domain), [fidl_domain](const auto& response) {
+          return FidlSocketMarkWithDomain(response.mark, fidl_domain);
+        });
+      }
+#endif
       case SO_SNDTIMEO:
       case SO_RCVTIMEO:
       case SO_PEERCRED:
@@ -853,6 +1032,14 @@ class base_socket {
             [this](bool value) { return client()->SetOutOfBandInline(value); });
       case SO_NO_CHECK:
         return proc.Process<bool>([this](bool value) { return client()->SetNoCheck(value); });
+// TODO(https://fxbug.dev/384115233): Update after the API is stabilized.
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+      case SO_FUCHSIA_MARK:
+        return proc.Process<FidlSocketMarkWithDomain>([this](auto mark_and_domain) {
+          auto [mark, domain] = mark_and_domain;
+          return client()->SetMark(domain, mark);
+        });
+#endif
       case SO_SNDTIMEO:
       case SO_RCVTIMEO:
         return SockOptResult::Errno(ENOTSUP);
@@ -973,10 +1160,6 @@ struct network_socket : public base_socket<T> {
   }
 
   SockOptResult getsockopt_fidl(int level, int optname, void* optval, socklen_t* optlen) {
-    if (optval == nullptr || optlen == nullptr) {
-      return SockOptResult::Errno(EFAULT);
-    }
-
     GetSockOptProcessor proc(optval, optlen);
     switch (level) {
       case SOL_SOCKET:

@@ -269,8 +269,13 @@ fn translate_use(
     let mut out_uses = vec![];
     for use_ in use_in {
         if let Some(n) = use_.service() {
-            let (source, source_dictionary) =
-                extract_use_source(options, use_, all_capability_names, all_children)?;
+            let (source, source_dictionary) = extract_use_source(
+                options,
+                use_,
+                all_capability_names,
+                all_children,
+                Some(all_collections),
+            )?;
             let target_paths =
                 all_target_use_paths(use_, use_).ok_or_else(|| Error::internal("no capability"))?;
             let source_names = n.into_iter();
@@ -292,7 +297,7 @@ fn translate_use(
             }
         } else if let Some(n) = use_.protocol() {
             let (source, source_dictionary) =
-                extract_use_source(options, use_, all_capability_names, all_children)?;
+                extract_use_source(options, use_, all_capability_names, all_children, None)?;
             let target_paths =
                 all_target_use_paths(use_, use_).ok_or_else(|| Error::internal("no capability"))?;
             let source_names = n.into_iter();
@@ -314,7 +319,7 @@ fn translate_use(
             }
         } else if let Some(n) = &use_.directory {
             let (source, source_dictionary) =
-                extract_use_source(options, use_, all_capability_names, all_children)?;
+                extract_use_source(options, use_, all_capability_names, all_children, None)?;
             let target_path = one_target_use_path(use_, use_)?;
             let rights = extract_required_rights(use_, "use")?;
             let subdir = extract_use_subdir(use_);
@@ -356,7 +361,7 @@ fn translate_use(
                 };
                 let internal_error = format!("Internal error in all_target_use_paths when translating an EventStream. Please file a bug.");
                 let (source, _source_dictionary) =
-                    extract_use_source(options, use_, all_capability_names, all_children)?;
+                    extract_use_source(options, use_, all_capability_names, all_children, None)?;
                 out_uses.push(fdecl::Use::EventStream(fdecl::UseEventStream {
                     source_name: Some(name),
                     scope: match scopes {
@@ -398,7 +403,7 @@ fn translate_use(
             }
         } else if let Some(n) = &use_.runner {
             let (source, source_dictionary) =
-                extract_use_source(&options, use_, all_capability_names, all_children)?;
+                extract_use_source(&options, use_, all_capability_names, all_children, None)?;
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             out_uses.push(fdecl::Use::Runner(fdecl::UseRunner {
                 source: Some(source),
@@ -408,7 +413,7 @@ fn translate_use(
             }));
         } else if let Some(n) = &use_.config {
             let (source, source_dictionary) =
-                extract_use_source(&options, use_, all_capability_names, all_children)?;
+                extract_use_source(&options, use_, all_capability_names, all_children, None)?;
             let target = match &use_.key {
                 None => return Err(Error::validate("\"use config\" must have \"key\" field set.")),
                 Some(t) => t.clone(),
@@ -1471,6 +1476,7 @@ fn extract_use_source(
     in_obj: &Use,
     all_capability_names: &BTreeSet<&Name>,
     all_children_names: &BTreeSet<&Name>,
+    all_collection_names: Option<&BTreeSet<&Name>>,
 ) -> Result<(fdecl::Ref, Option<String>), Error> {
     let ref_ = match in_obj.from.as_ref() {
         Some(UseFromRef::Parent) => fdecl::Ref::Parent(fdecl::ParentRef {}),
@@ -1482,6 +1488,10 @@ fn extract_use_source(
                 fdecl::Ref::Capability(fdecl::CapabilityRef { name: name.clone().into() })
             } else if all_children_names.contains(&name) {
                 fdecl::Ref::Child(fdecl::ChildRef { name: name.clone().into(), collection: None })
+            } else if all_collection_names.is_some()
+                && all_collection_names.unwrap().contains(&name)
+            {
+                fdecl::Ref::Collection(fdecl::CollectionRef { name: name.clone().into() })
             } else {
                 return Err(Error::internal(format!(
                     "use source \"{:?}\" not supported for \"use from\"",

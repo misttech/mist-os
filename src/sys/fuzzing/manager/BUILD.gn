@@ -26,7 +26,7 @@ rustc_binary("bin") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:url",
   ]
   sources = [
@@ -43,7 +43,11 @@ rustc_binary("bin") {
 
 fuchsia_component("manager") {
   component_name = "fuzz-manager"
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/sys/fuzzing:*",
+    "//src/sys/test_runners/fuzz/tests:*",
+  ]
   testonly = true
   manifest = "meta/fuzz-manager.cml"
   deps = [ ":bin" ]

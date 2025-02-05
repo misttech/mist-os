@@ -31,6 +31,7 @@ use futures::channel::{mpsc, oneshot};
 use futures::future::LocalBoxFuture;
 use futures::{select, Future, FutureExt, StreamExt};
 use ieee80211::OuiFmt;
+use log::{error, info, warn};
 use num_traits::SaturatingAdd;
 use static_assertions::const_assert_eq;
 use std::cmp::{max, min, Reverse};
@@ -38,7 +39,6 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Add;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_sme as fidl_sme, wlan_metrics_registry as metrics,
@@ -756,17 +756,24 @@ fn inspect_record_external_data(
                                 let mut histograms = HistogramsNode::new(
                                     inspector.root().create_child("histograms"),
                                 );
-                                histograms
-                                    .log_per_antenna_snr_histograms(&stats.snr_histograms[..]);
-                                histograms.log_per_antenna_rx_rate_histograms(
-                                    &stats.rx_rate_index_histograms[..],
-                                );
-                                histograms.log_per_antenna_noise_floor_histograms(
-                                    &stats.noise_floor_histograms[..],
-                                );
-                                histograms.log_per_antenna_rssi_histograms(
-                                    &stats.rssi_histograms[..],
-                                );
+                                if let Some(snr_histograms) = &stats.snr_histograms {
+                                    histograms.log_per_antenna_snr_histograms(&snr_histograms[..]);
+                                }
+                                if let Some(rx_rate_histograms) = &stats.rx_rate_index_histograms {
+                                    histograms.log_per_antenna_rx_rate_histograms(
+                                        &rx_rate_histograms[..],
+                                    );
+                                }
+                                if let Some(noise_floor_histograms) = &stats.noise_floor_histograms {
+                                    histograms.log_per_antenna_noise_floor_histograms(
+                                        &noise_floor_histograms[..],
+                                    );
+                                }
+                                if let Some(rssi_histograms) = &stats.rssi_histograms {
+                                    histograms.log_per_antenna_rssi_histograms(
+                                        &rssi_histograms[..],
+                                    );
+                                }
 
                                 inspector.root().record(histograms);
                             }
@@ -1067,6 +1074,7 @@ impl Telemetry {
                             *state.num_consecutive_get_counter_stats_failures.get_mut() += 1;
                             // Safe to unwrap: If we've exceeded 63 bits of consecutive failures,
                             // we have other things to worry about.
+                            #[expect(clippy::unwrap_used)]
                             self.stats_logger
                                 .log_consecutive_counter_stats_failures(
                                     (*state.num_consecutive_get_counter_stats_failures)
@@ -1755,37 +1763,75 @@ async fn diff_and_log_counters(
     current: &fidl_fuchsia_wlan_stats::IfaceCounterStats,
     duration: zx::MonotonicDuration,
 ) {
-    let tx_total = current.tx_total - prev.tx_total;
-    let tx_drop = current.tx_drop - prev.tx_drop;
-    let rx_total = current.rx_unicast_total - prev.rx_unicast_total;
-    let rx_drop = current.rx_unicast_drop - prev.rx_unicast_drop;
+    diff_and_log_rx_counters(stats_logger, prev, current, duration).await;
+    diff_and_log_tx_counters(stats_logger, prev, current, duration).await;
+}
 
-    let tx_drop_rate = if tx_total > 0 { tx_drop as f64 / tx_total as f64 } else { 0f64 };
+async fn diff_and_log_rx_counters(
+    stats_logger: &mut StatsLogger,
+    prev: &fidl_fuchsia_wlan_stats::IfaceCounterStats,
+    current: &fidl_fuchsia_wlan_stats::IfaceCounterStats,
+    duration: zx::MonotonicDuration,
+) {
+    let (current_rx_unicast_total, prev_rx_unicast_total) =
+        match (current.rx_unicast_total, prev.rx_unicast_total) {
+            (Some(current), Some(prev)) => (current, prev),
+            _ => return,
+        };
+    let (current_rx_unicast_drop, prev_rx_unicast_drop) =
+        match (current.rx_unicast_drop, prev.rx_unicast_drop) {
+            (Some(current), Some(prev)) => (current, prev),
+            _ => return,
+        };
+
+    let rx_total = current_rx_unicast_total - prev_rx_unicast_total;
+    let rx_drop = current_rx_unicast_drop - prev_rx_unicast_drop;
     let rx_drop_rate = if rx_total > 0 { rx_drop as f64 / rx_total as f64 } else { 0f64 };
 
     stats_logger
-        .log_stat(StatOp::AddRxTxPacketCounters {
+        .log_stat(StatOp::AddRxPacketCounters {
             rx_unicast_total: rx_total,
             rx_unicast_drop: rx_drop,
-            tx_total,
-            tx_drop,
         })
         .await;
 
-    if tx_drop_rate > HIGH_PACKET_DROP_RATE_THRESHOLD {
-        stats_logger.log_stat(StatOp::AddTxHighPacketDropDuration(duration)).await;
-    }
     if rx_drop_rate > HIGH_PACKET_DROP_RATE_THRESHOLD {
         stats_logger.log_stat(StatOp::AddRxHighPacketDropDuration(duration)).await;
-    }
-    if tx_drop_rate > VERY_HIGH_PACKET_DROP_RATE_THRESHOLD {
-        stats_logger.log_stat(StatOp::AddTxVeryHighPacketDropDuration(duration)).await;
     }
     if rx_drop_rate > VERY_HIGH_PACKET_DROP_RATE_THRESHOLD {
         stats_logger.log_stat(StatOp::AddRxVeryHighPacketDropDuration(duration)).await;
     }
     if rx_total == 0 {
         stats_logger.log_stat(StatOp::AddNoRxDuration(duration)).await;
+    }
+}
+
+async fn diff_and_log_tx_counters(
+    stats_logger: &mut StatsLogger,
+    prev: &fidl_fuchsia_wlan_stats::IfaceCounterStats,
+    current: &fidl_fuchsia_wlan_stats::IfaceCounterStats,
+    duration: zx::MonotonicDuration,
+) {
+    let (current_tx_total, prev_tx_total) = match (current.tx_total, prev.tx_total) {
+        (Some(current), Some(prev)) => (current, prev),
+        _ => return,
+    };
+    let (current_tx_drop, prev_tx_drop) = match (current.tx_drop, prev.tx_drop) {
+        (Some(current), Some(prev)) => (current, prev),
+        _ => return,
+    };
+
+    let tx_total = current_tx_total - prev_tx_total;
+    let tx_drop = current_tx_drop - prev_tx_drop;
+    let tx_drop_rate = if tx_total > 0 { tx_drop as f64 / tx_total as f64 } else { 0f64 };
+
+    stats_logger.log_stat(StatOp::AddTxPacketCounters { tx_total, tx_drop }).await;
+
+    if tx_drop_rate > HIGH_PACKET_DROP_RATE_THRESHOLD {
+        stats_logger.log_stat(StatOp::AddTxHighPacketDropDuration(duration)).await;
+    }
+    if tx_drop_rate > VERY_HIGH_PACKET_DROP_RATE_THRESHOLD {
+        stats_logger.log_stat(StatOp::AddTxVeryHighPacketDropDuration(duration)).await;
     }
 }
 
@@ -1894,12 +1940,7 @@ impl StatsLogger {
             StatOp::AddDisconnectCount(..) => {
                 self.time_series_stats.lock().disconnect_count.log_value(&1u32);
             }
-            StatOp::AddRxTxPacketCounters {
-                rx_unicast_total,
-                rx_unicast_drop,
-                tx_total,
-                tx_drop,
-            } => {
+            StatOp::AddRxPacketCounters { rx_unicast_total, rx_unicast_drop } => {
                 self.time_series_stats
                     .lock()
                     .rx_unicast_total_count
@@ -1908,6 +1949,8 @@ impl StatsLogger {
                     .lock()
                     .rx_unicast_drop_count
                     .log_value(&(*rx_unicast_drop as u32));
+            }
+            StatOp::AddTxPacketCounters { tx_total, tx_drop } => {
                 self.time_series_stats.lock().tx_total_count.log_value(&(*tx_total as u32));
                 self.time_series_stats.lock().tx_drop_count.log_value(&(*tx_drop as u32));
             }
@@ -1968,7 +2011,8 @@ impl StatsLogger {
                 StatCounters { rx_very_high_packet_drop_duration: duration, ..zero }
             }
             StatOp::AddNoRxDuration(duration) => StatCounters { no_rx_duration: duration, ..zero },
-            StatOp::AddRxTxPacketCounters { .. } => StatCounters { ..zero },
+            StatOp::AddRxPacketCounters { .. } => StatCounters { ..zero },
+            StatOp::AddTxPacketCounters { .. } => StatCounters { ..zero },
         };
 
         if addition != zero {
@@ -3863,16 +3907,22 @@ impl StatsLogger {
                     payload: MetricEventPayload::IntegerValue(score as i64),
                 });
 
-                // Record runner-up candidate's score, iff there were multiple candidates and the
-                // selected candidate is the top scoring candidate (or tied in score)
+                // Record runner-up candidate's score, iff:
+                // 1. there were multiple candidates and
+                // 2. selected candidate is the top scoring candidate (or tied in score)
                 scored_candidates.sort_by_key(|(_, score)| Reverse(*score));
-                if scored_candidates.len() > 1 && score == scored_candidates[0].1 {
-                    let delta = score - scored_candidates[1].1;
-                    metric_events.push(MetricEvent {
-                        metric_id: metrics::RUNNER_UP_CANDIDATE_SCORE_DELTA_METRIC_ID,
-                        event_codes: vec![],
-                        payload: MetricEventPayload::IntegerValue(delta as i64),
-                    });
+                #[expect(clippy::get_first)]
+                if let (Some(first_candidate), Some(second_candidate)) =
+                    (scored_candidates.get(0), scored_candidates.get(1))
+                {
+                    if score == first_candidate.1 {
+                        let delta = first_candidate.1 - second_candidate.1;
+                        metric_events.push(MetricEvent {
+                            metric_id: metrics::RUNNER_UP_CANDIDATE_SCORE_DELTA_METRIC_ID,
+                            event_codes: vec![],
+                            payload: MetricEventPayload::IntegerValue(delta as i64),
+                        });
+                    }
                 }
             }
 
@@ -3910,17 +3960,17 @@ impl StatsLogger {
         duration_dim: u32,
         signals: Vec<client::types::TimestampedSignal>,
     ) {
-        if signals.is_empty() {
+        let Some(first_signal) = signals.first() else {
             warn!("Connection signals list is unexpectedly empty.");
             return;
-        }
+        };
         let mut sum_scores = 0;
         let mut ewma_signal = EwmaSignalData::new(
-            signals[0].signal.rssi_dbm,
-            signals[0].signal.snr_db,
+            first_signal.signal.rssi_dbm,
+            first_signal.signal.snr_db,
             EWMA_SMOOTHING_FACTOR_FOR_METRICS,
         );
-        let mut velocity = RssiVelocity::new(signals[0].signal.rssi_dbm);
+        let mut velocity = RssiVelocity::new(first_signal.signal.rssi_dbm);
         for timed_signal in &signals {
             ewma_signal.update_with_new_measurement(
                 timed_signal.signal.rssi_dbm,
@@ -4242,12 +4292,8 @@ enum StatOp {
     AddTxVeryHighPacketDropDuration(zx::MonotonicDuration),
     AddRxVeryHighPacketDropDuration(zx::MonotonicDuration),
     AddNoRxDuration(zx::MonotonicDuration),
-    AddRxTxPacketCounters {
-        rx_unicast_total: u64,
-        rx_unicast_drop: u64,
-        tx_total: u64,
-        tx_drop: u64,
-    },
+    AddRxPacketCounters { rx_unicast_total: u64, rx_unicast_drop: u64 },
+    AddTxPacketCounters { tx_total: u64, tx_drop: u64 },
 }
 
 #[derive(Clone, Default, PartialEq)]
@@ -5572,8 +5618,8 @@ mod tests {
         test_helper.set_counter_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                tx_total: 10 * seed,
-                tx_drop: 3 * seed,
+                tx_total: Some(10 * seed),
+                tx_drop: Some(3 * seed),
                 ..fake_iface_counter_stats(seed)
             })
         }));
@@ -5611,8 +5657,8 @@ mod tests {
         test_helper.set_counter_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                rx_unicast_total: 10 * seed,
-                rx_unicast_drop: 3 * seed,
+                rx_unicast_total: Some(10 * seed),
+                rx_unicast_drop: Some(3 * seed),
                 ..fake_iface_counter_stats(seed)
             })
         }));
@@ -5651,10 +5697,10 @@ mod tests {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
                 // 3% drop rate would be high, but not very high
-                rx_unicast_total: 100 * seed,
-                rx_unicast_drop: 3 * seed,
-                tx_total: 100 * seed,
-                tx_drop: 3 * seed,
+                rx_unicast_total: Some(100 * seed),
+                rx_unicast_drop: Some(3 * seed),
+                tx_total: Some(100 * seed),
+                tx_drop: Some(3 * seed),
                 ..fake_iface_counter_stats(seed)
             })
         }));
@@ -5695,10 +5741,10 @@ mod tests {
                 - fasync::MonotonicInstant::from_nanos(0i64))
             .into_seconds() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                rx_unicast_total: 100 * seed,
-                rx_unicast_drop: 3 * seed,
-                tx_total: 10 * seed,
-                tx_drop: 2 * seed,
+                rx_unicast_total: Some(100 * seed),
+                rx_unicast_drop: Some(3 * seed),
+                tx_total: Some(10 * seed),
+                tx_drop: Some(2 * seed),
                 ..fake_iface_counter_stats(seed)
             })
         }));
@@ -5735,7 +5781,7 @@ mod tests {
         test_helper.set_counter_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                rx_unicast_total: 10,
+                rx_unicast_total: Some(10),
                 ..fake_iface_counter_stats(seed)
             })
         }));
@@ -5773,7 +5819,7 @@ mod tests {
         test_helper.set_counter_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                rx_unicast_total: 10,
+                rx_unicast_total: Some(10),
                 ..fake_iface_counter_stats(seed)
             })
         }));
@@ -6046,23 +6092,28 @@ mod tests {
         test_helper.set_counter_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64 / 1_000_000_000;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                tx_total: 10 * seed,
+                tx_total: Some(10 * seed),
                 // TX drop rate stops increasing at 1 hour + TELEMETRY_QUERY_INTERVAL mark.
                 // Because the first TELEMETRY_QUERY_INTERVAL doesn't count when
                 // computing counters, this leads to 3 hour of high TX drop rate.
-                tx_drop: 3 * min(
-                    seed,
-                    (zx::MonotonicDuration::from_hours(3) + TELEMETRY_QUERY_INTERVAL).into_seconds()
-                        as u64,
+                tx_drop: Some(
+                    3 * min(
+                        seed,
+                        (zx::MonotonicDuration::from_hours(3) + TELEMETRY_QUERY_INTERVAL)
+                            .into_seconds() as u64,
+                    ),
                 ),
                 // RX total stops increasing at 23 hour mark
-                rx_unicast_total: 10
-                    * min(seed, zx::MonotonicDuration::from_hours(23).into_seconds() as u64),
+                rx_unicast_total: Some(
+                    10 * min(seed, zx::MonotonicDuration::from_hours(23).into_seconds() as u64),
+                ),
                 // RX drop rate stops increasing at 4 hour + TELEMETRY_QUERY_INTERVAL mark.
-                rx_unicast_drop: 3 * min(
-                    seed,
-                    (zx::MonotonicDuration::from_hours(4) + TELEMETRY_QUERY_INTERVAL).into_seconds()
-                        as u64,
+                rx_unicast_drop: Some(
+                    3 * min(
+                        seed,
+                        (zx::MonotonicDuration::from_hours(4) + TELEMETRY_QUERY_INTERVAL)
+                            .into_seconds() as u64,
+                    ),
                 ),
                 ..fake_iface_counter_stats(seed)
             })
@@ -6246,23 +6297,28 @@ mod tests {
         test_helper.set_counter_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64 / 1_000_000_000;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                tx_total: 10 * seed,
+                tx_total: Some(10 * seed),
                 // TX drop rate stops increasing at 10 min + TELEMETRY_QUERY_INTERVAL mark.
                 // Because the first TELEMETRY_QUERY_INTERVAL doesn't count when
                 // computing counters, this leads to 10 min of high TX drop rate.
-                tx_drop: 3 * min(
-                    seed,
-                    (zx::MonotonicDuration::from_minutes(10) + TELEMETRY_QUERY_INTERVAL)
-                        .into_seconds() as u64,
+                tx_drop: Some(
+                    3 * min(
+                        seed,
+                        (zx::MonotonicDuration::from_minutes(10) + TELEMETRY_QUERY_INTERVAL)
+                            .into_seconds() as u64,
+                    ),
                 ),
                 // RX total stops increasing at 45 min mark
-                rx_unicast_total: 10
-                    * min(seed, zx::MonotonicDuration::from_minutes(45).into_seconds() as u64),
+                rx_unicast_total: Some(
+                    10 * min(seed, zx::MonotonicDuration::from_minutes(45).into_seconds() as u64),
+                ),
                 // RX drop rate stops increasing at 20 min + TELEMETRY_QUERY_INTERVAL mark.
-                rx_unicast_drop: 3 * min(
-                    seed,
-                    (zx::MonotonicDuration::from_minutes(20) + TELEMETRY_QUERY_INTERVAL)
-                        .into_seconds() as u64,
+                rx_unicast_drop: Some(
+                    3 * min(
+                        seed,
+                        (zx::MonotonicDuration::from_minutes(20) + TELEMETRY_QUERY_INTERVAL)
+                            .into_seconds() as u64,
+                    ),
                 ),
                 ..fake_iface_counter_stats(seed)
             })
@@ -10164,20 +10220,22 @@ mod tests {
 
     fn fake_iface_counter_stats(nth_req: u64) -> fidl_fuchsia_wlan_stats::IfaceCounterStats {
         fidl_fuchsia_wlan_stats::IfaceCounterStats {
-            rx_unicast_total: nth_req,
-            rx_unicast_drop: 0,
-            rx_multicast: 2 * nth_req,
-            tx_total: nth_req,
-            tx_drop: 0,
+            rx_unicast_total: Some(nth_req),
+            rx_unicast_drop: Some(0),
+            rx_multicast: Some(2 * nth_req),
+            tx_total: Some(nth_req),
+            tx_drop: Some(0),
+            ..Default::default()
         }
     }
 
     fn fake_iface_histogram_stats() -> fidl_fuchsia_wlan_stats::IfaceHistogramStats {
         fidl_fuchsia_wlan_stats::IfaceHistogramStats {
-            noise_floor_histograms: fake_noise_floor_histograms(),
-            rssi_histograms: fake_rssi_histograms(),
-            rx_rate_index_histograms: fake_rx_rate_index_histograms(),
-            snr_histograms: fake_snr_histograms(),
+            noise_floor_histograms: Some(fake_noise_floor_histograms()),
+            rssi_histograms: Some(fake_rssi_histograms()),
+            rx_rate_index_histograms: Some(fake_rx_rate_index_histograms()),
+            snr_histograms: Some(fake_snr_histograms()),
+            ..Default::default()
         }
     }
 

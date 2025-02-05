@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-env.h"
+#include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-frame.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-sta-ifc.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-fake-ap/sim-fake-ap.h"
 
@@ -15,13 +16,12 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 
 }  // namespace
 
-namespace wlan_ieee80211 = wlan_ieee80211;
-
 constexpr simulation::WlanTxInfo kDefaultTxInfo = {
     .channel = {.primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
 constexpr simulation::WlanTxInfo kWrongChannelTxInfo = {
     .channel = {.primary = 10, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
-constexpr wlan_ieee80211::CSsid kApSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
+const fuchsia_wlan_ieee80211::Ssid kApSsid = {'F', 'u', 'c', 'h', 's', 'i', 'a', ' ',
+                                              'F', 'a', 'k', 'e', ' ', 'A', 'P'};
 const common::MacAddr kApBssid({0x11, 0x11, 0x11, 0x11, 0x11, 0x11});
 static const common::MacAddr kWrongBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbd});
 const common::MacAddr kClientMacAddr({0x22, 0x22, 0x22, 0x22, 0x22, 0x22});

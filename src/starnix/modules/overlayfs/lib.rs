@@ -8,6 +8,7 @@ use once_cell::sync::OnceCell;
 use rand::Rng;
 use starnix_core::fs::tmpfs::{TmpFs, TmpfsDirectory};
 use starnix_core::mm::memory::MemoryObject;
+use starnix_core::security;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::fs_args::MountParams;
 use starnix_core::vfs::rw_queue::RwQueueReadGuard;
@@ -339,6 +340,8 @@ impl OverlayNode {
                 info.clone()
             };
             let cred = info.cred();
+
+            let _scoped_fs_create = security::fs_node_copy_up(current_task, &lower.entry.node);
 
             let res = if info.mode.is_lnk() {
                 let link_target = lower.entry().node.readlink(locked, current_task)?;
@@ -886,6 +889,63 @@ impl FsNodeOps for OverlayNodeOps {
             offset,
             length,
         )
+    }
+
+    fn get_xattr(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        max_size: usize,
+    ) -> Result<ValueOrSize<FsString>, Errno> {
+        let entry = self
+            .node
+            .upper
+            .get()
+            .or(self.node.lower.as_ref())
+            .expect("expect either lower or upper node");
+        entry.entry().node.get_xattr(locked, current_task, &entry.mount, name, max_size)
+    }
+
+    fn set_xattr(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        value: &FsStr,
+        op: XattrOp,
+    ) -> Result<(), Errno> {
+        let upper = self.node.ensure_upper(locked, current_task)?;
+        upper.entry().node.set_xattr(locked, current_task, &upper.mount, name, value, op)
+    }
+
+    fn remove_xattr(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<(), Errno> {
+        let upper = self.node.ensure_upper(locked, current_task)?;
+        upper.entry().node.remove_xattr(locked, current_task, &upper.mount, name)
+    }
+
+    fn list_xattrs(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+        max_size: usize,
+    ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
+        let entry = self
+            .node
+            .upper
+            .get()
+            .or(self.node.lower.as_ref())
+            .expect("expect either lower or upper node");
+        entry.entry().node.list_xattrs(locked, current_task, max_size)
     }
 }
 struct OverlayDirectory {

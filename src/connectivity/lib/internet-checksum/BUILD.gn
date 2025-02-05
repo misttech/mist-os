@@ -10,7 +10,10 @@ rustc_library("internet-checksum") {
   version = "0.2.0"
   edition = "2021"
   with_unit_tests = true
-  check_cfgs = [ "feature, values(\"benchmark\")" ]
+  check_cfgs = [
+    "test",
+    "feature, values(\"benchmark\")",
+  ]
 
   test_deps = [
     "//third_party/rust_crates:rand",

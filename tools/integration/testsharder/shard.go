@@ -354,9 +354,6 @@ func makeShardNamesUnique(shards []*Shard) {
 		for k, v := range s.Env.Dimensions {
 			dims[k] = v
 		}
-		for k, v := range s.Env.EmuDimensions {
-			dims[k] = v
-		}
 		sameNameShards[s.Name] = append(sameNameShards[s.Name], shardDims{s, dims})
 	}
 

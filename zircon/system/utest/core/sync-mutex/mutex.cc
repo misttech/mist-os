@@ -19,7 +19,7 @@
 static sync_mutex_t g_mutex;
 
 static void xlog(const char* str) {
-  zx_time_t now = zx_clock_get_monotonic();
+  zx_instant_mono_t now = zx_clock_get_monotonic();
   printf("[%08" PRIu64 ".%08" PRIu64 "]: %s", now / 1000000000, now % 1000000000, str);
 }
 
@@ -163,7 +163,7 @@ static int test_timeout_helper(void* ctx) TA_NO_THREAD_SAFETY_ANALYSIS {
 }
 
 TEST(SyncMutex, TimeoutElapsed) {
-  const zx_duration_t kRelativeDeadline = ZX_MSEC(100);
+  const zx_duration_mono_t kRelativeDeadline = ZX_MSEC(100);
 
   timeout_args args;
   ASSERT_EQ(zx_event_create(0, &args.start_event), ZX_OK, "could not create event");
@@ -176,10 +176,10 @@ TEST(SyncMutex, TimeoutElapsed) {
             ZX_OK, "failed to wait");
 
   for (int i = 0; i < 5; ++i) {
-    zx_time_t now = zx_clock_get_monotonic();
+    zx_instant_mono_t now = zx_clock_get_monotonic();
     zx_status_t status = sync_mutex_timedlock(&args.mutex, now + kRelativeDeadline);
     ASSERT_EQ(status, ZX_ERR_TIMED_OUT, "wait should time out");
-    zx_duration_t elapsed = zx_time_sub_time(zx_clock_get_monotonic(), now);
+    zx_duration_mono_t elapsed = zx_time_sub_time(zx_clock_get_monotonic(), now);
     EXPECT_GE(elapsed, kRelativeDeadline, "wait returned early");
   }
 

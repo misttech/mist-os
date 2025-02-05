@@ -25,7 +25,7 @@ def ffx_task_rule(*, implementation, toolchains = [], attrs = {}, **kwargs):
 
     return shell_task_rule(
         implementation = _fuchsia_task_ffx_impl,
-        toolchains = FUCHSIA_TOOLCHAIN_DEFINITION + toolchains,
+        toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION] + toolchains,
         attrs = {
             "_run_ffx": attr.label(
                 doc = "The task runner used to run ffx tasks.",

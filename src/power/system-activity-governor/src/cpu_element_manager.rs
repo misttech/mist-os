@@ -85,7 +85,7 @@ where
             inspect_root.create_child("suspend_events"),
         ));
 
-        cpu_manager.run(&inspect_root, &power_elements_node2);
+        cpu_manager.run(&power_elements_node2);
 
         log::info!("Leasing CPU power element");
         let cpu_lease = LeaseHelper::new(
@@ -99,7 +99,7 @@ where
         )
         .await
         .expect("failed to create lease helper CPU element during startup")
-        .lease()
+        .create_lease_and_wait_until_satisfied()
         .await
         .expect("failed to lease CPU element during startup");
         log::info!("Leased CPU power element at 'Active'.");

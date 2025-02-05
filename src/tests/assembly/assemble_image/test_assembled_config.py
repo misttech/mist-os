@@ -61,11 +61,25 @@ def main() -> int:
         required=False,
         help="Package config arguments.",
     )
+    parser.add_argument(
+        "--suppress-overrides-warning",
+        action="store_true",
+        required=False,
+        help="Whether to display the developer overrides warning banner.",
+    )
+    parser.add_argument(
+        "--developer-overrides",
+        type=pathlib.Path,
+        required=False,
+        help="Developer overrides to add.",
+    )
     args = parser.parse_args()
 
     kwargs = {}
     if args.config:
         kwargs["extra_config"] = args.config
+    if args.developer_overrides:
+        kwargs["developer_overrides"] = args.developer_overrides
 
     output = run_product_assembly(
         ffx_bin=args.ffx_bin,
@@ -74,6 +88,7 @@ def main() -> int:
         input_bundles=args.input_bundles_dir,
         legacy_bundle=args.legacy_bundle,
         outdir=args.outdir,
+        suppress_overrides_warning=args.suppress_overrides_warning,
         **kwargs,
     )
     if output.returncode != 0:

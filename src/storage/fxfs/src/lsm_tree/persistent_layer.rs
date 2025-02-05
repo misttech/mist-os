@@ -298,9 +298,10 @@ impl<K: Key, V: LayerValue> KeyOnlyIterator<'_, K, V> {
             }
             debug!(
                 pos = self.pos,
-                buf = ?self.buffer,
+                buf:? = self.buffer,
                 object_size = self.layer.data_offset() + self.layer.data_size,
-                oid = self.layer.object_handle.object_id(),
+                oid = self.layer.object_handle.object_id();
+                ""
             );
             self.pos += self.layer.block_size;
             self.item_index = 0;
@@ -884,7 +885,7 @@ impl<W: WriteBytes, K: Key, V: LayerValue> PersistentLayerWriter<W, K, V> {
             cursor.write_u16::<LittleEndian>(offset)?;
         }
         self.writer.write_bytes(cursor.get_ref()).await?;
-        debug!(item_count = self.buf_item_count, byte_count = len, "wrote items");
+        debug!(item_count = self.buf_item_count, byte_count = len; "wrote items");
         self.buf_item_count = 0;
         self.block_offsets.clear();
         Ok(())

@@ -284,11 +284,11 @@ class LinkingSession<Loader>::SessionModule
                                                              RuntimeModule& runtime_module) {
     std::unique_ptr<SessionModule> session_module{new (ac) SessionModule(runtime_module)};
     if (session_module) [[likely]] {
-      session_module->set_name(runtime_module.name());
       // Have the underlying DecodedModule (see <lib/ld/decoded-module.h>) point to
       // the ABIModule embedded in the Module, so that its information will
       // be filled out during decoding operations.
       session_module->decoded().set_module(runtime_module.module());
+      session_module->set_name(runtime_module.name());
     }
     return session_module;
   }

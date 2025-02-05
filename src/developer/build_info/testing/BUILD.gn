@@ -4,6 +4,7 @@
 
 import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/components.gni")
+import("//build/packages/sdk_fuchsia_package.gni")
 import("//build/testing/cc_test_executable.gni")
 
 group("testing") {
@@ -30,15 +31,23 @@ executable("bin") {
 }
 
 fuchsia_component("fake-build-info-component") {
-  testonly = true
   component_name = "fake_build_info"
   manifest = "meta/build_info.cml"
   deps = [ ":bin" ]
 }
 
 fuchsia_package("fake-build-info") {
-  testonly = true
   deps = [ ":fake-build-info-component" ]
+}
+
+if (current_toolchain == default_toolchain) {
+  sdk_fuchsia_package("fake-build-info-sdk") {
+    distribution_name = "fake-build-info"
+    package_label = ":fake-build-info"
+    category = "partner"
+    expected_files_exact = [ "meta/fake_build_info.cm" ]
+    api_level_added = 25
+  }
 }
 
 export_fuchsia_package_to_bazel("fake-build-info.bazel_input") {

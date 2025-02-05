@@ -59,7 +59,7 @@ zx_status_t vmm_page_fault_handler(vaddr_t addr, uint flags) {
   flags |= VMM_PF_FLAG_HW_FAULT;
 
   Thread* current_thread = Thread::Current::Get();
-  zx_ticks_t start_time = current_ticks();
+  zx_instant_mono_ticks_t start_time = current_mono_ticks();
   PageFaultTimer timer(current_thread, start_time);
 
   if (TRACE_PAGE_FAULT || LOCAL_TRACE) {

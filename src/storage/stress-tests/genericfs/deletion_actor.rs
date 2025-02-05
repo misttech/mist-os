@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
+use log::{debug, info};
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::Rng;
 use storage_stress_test_utils::io::Directory;
 use stress_test::actor::{Actor, ActorError};
-use tracing::{debug, info};
 use zx::Status;
 
 // An actor responsible for deleting files randomly

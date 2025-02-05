@@ -50,6 +50,7 @@ pub enum ZbiType {
     CpuTopology = 0x544f_504f,          // 'TOPO'
     AcpiRsdp = 0x5044_5352,             // 'RSDP'
     Smbios = 0x4942_4d53,               // 'SMBI'
+    Framebuffer = 0x4246_5753,          // 'SWFB'
 
     // DriverMetadata is a special case, where only the LSB of the u32 needs to match this
     // value. See the IsZbiTypeDriverMetadata function for details.
@@ -74,6 +75,7 @@ impl ZbiType {
             x if x == ZbiType::CpuTopology.into_raw() => ZbiType::CpuTopology,
             x if x == ZbiType::AcpiRsdp.into_raw() => ZbiType::AcpiRsdp,
             x if x == ZbiType::Smbios.into_raw() => ZbiType::Smbios,
+            x if x == ZbiType::Framebuffer.into_raw() => ZbiType::Framebuffer,
             x if is_zbi_type_driver_metadata(x) => ZbiType::DriverMetadata,
             _ => ZbiType::Unknown,
         }

@@ -30,8 +30,7 @@ class PlatformPciDevice {
     return false;
   }
 
-  virtual std::unique_ptr<PlatformMmio> CpuMapPciMmio(unsigned int pci_bar,
-                                                      PlatformMmio::CachePolicy cache_policy) {
+  virtual std::unique_ptr<PlatformMmio> CpuMapPciMmio(unsigned int pci_bar) {
     MAGMA_DLOG("CpuMapPciMmio unimplemented");
     return nullptr;
   }

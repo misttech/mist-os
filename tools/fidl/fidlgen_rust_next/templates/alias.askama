@@ -4,9 +4,7 @@
 {% let natural_ty = context.natural_type(alias.ty) %}
 {% let wire_ty = context.wire_type(alias.ty) %}
 
-{% if let Some(doc) = alias.attributes.doc_string() %}
-    #[doc = "{{ doc.escape_default() }}"]
-{% endif %}
+{{ self::doc_string(alias.attributes) -}}
 pub type {{ name }} = {{ natural_ty }};
 
 /// The wire type corresponding to [`{{ name }}`].

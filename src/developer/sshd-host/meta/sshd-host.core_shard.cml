@@ -129,7 +129,6 @@
         {
             protocol: [
                 "fuchsia.hardware.pty.Device",
-                "fuchsia.tpm.cr50.Cr50",
                 "fuchsia.virtualconsole.SessionManager",
             ],
             from: "parent",
@@ -563,6 +562,11 @@
         },
         {
             service: "fuchsia.hardware.spmi.DebugService",
+            from: "parent",
+            to: "#sshd-host",
+        },
+        {
+            service: "fuchsia.hardware.nfc.Service",
             from: "parent",
             to: "#sshd-host",
         },

@@ -16,9 +16,9 @@ use fuchsia_component::client;
 use fuchsia_runtime::UtcInstant;
 use futures::stream::Stream;
 use futures::{FutureExt, TryFutureExt};
+use log::debug;
 use std::fmt::Debug;
 use std::sync::Arc;
-use tracing::debug;
 
 const TIMESOURCE_COLLECTION_NAME: &str = "timesource";
 

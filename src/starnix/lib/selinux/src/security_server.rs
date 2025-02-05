@@ -5,6 +5,7 @@
 use crate::access_vector_cache::{
     CacheStats, HasCacheStats, Manager as AvcManager, Query, QueryMut, Reset,
 };
+use crate::exceptions_config::ExceptionsConfig;
 use crate::permission_check::PermissionCheck;
 use crate::policy::metadata::HandleUnknown;
 use crate::policy::parser::ByValue;
@@ -36,6 +37,9 @@ struct ActivePolicy {
 
     /// Allocates and maintains the mapping between `SecurityId`s (SIDs) and Security Contexts.
     sid_table: SidTable,
+
+    /// Describes access checks that should be granted, with associated bug Ids.
+    exceptions: ExceptionsConfig,
 }
 
 #[derive(Default)]
@@ -121,10 +125,17 @@ pub struct SecurityServer {
 
     /// The mutable state of the security server.
     state: Mutex<SecurityServerState>,
+
+    /// Optional configuration to apply to the `TodoDenyList`.
+    exceptions_config: String,
 }
 
 impl SecurityServer {
     pub fn new() -> Arc<Self> {
+        Self::new_with_exceptions(String::new())
+    }
+
+    pub fn new_with_exceptions(exceptions_config: String) -> Arc<Self> {
         let avc_manager = AvcManager::new();
         let state = Mutex::new(SecurityServerState {
             active_policy: None,
@@ -134,7 +145,7 @@ impl SecurityServer {
             policy_change_count: 0,
         });
 
-        let security_server = Arc::new(Self { avc_manager, state });
+        let security_server = Arc::new(Self { avc_manager, state, exceptions_config });
 
         // TODO(http://b/304776236): Consider constructing shared owner of `AvcManager` and
         // `SecurityServer` to eliminate weak reference.
@@ -186,6 +197,8 @@ impl SecurityServer {
         let (parsed, binary) = parse_policy_by_value(binary_policy)?;
         let parsed = Arc::new(parsed.validate()?);
 
+        let exceptions = ExceptionsConfig::new(&parsed, &self.exceptions_config)?;
+
         // Replace any existing policy and push update to `state.status_publisher`.
         self.with_state_and_update_status(|state| {
             let sid_table = if let Some(previous_active_policy) = &state.active_policy {
@@ -205,7 +218,7 @@ impl SecurityServer {
                     .collect(),
             );
 
-            state.active_policy = Some(ActivePolicy { parsed, binary, sid_table });
+            state.active_policy = Some(ActivePolicy { parsed, binary, sid_table, exceptions });
             state.policy_change_count += 1;
         });
 
@@ -350,7 +363,7 @@ impl SecurityServer {
                     fs_use_type: use_type,
                     def_sid: def_sid_from_mount_option
                         .unwrap_or_else(|| SecurityId::initial(InitialSid::File)),
-                    root_sid: root_sid_from_mount_option.unwrap_or(fs_sid),
+                    root_sid: root_sid_from_mount_option,
                 },
             }
         } else if let Some(context) =
@@ -372,8 +385,7 @@ impl SecurityServer {
                 scheme: FileSystemLabelingScheme::FsUse {
                     fs_use_type: unrecognized_filesystem_type_fs_use_type,
                     def_sid: def_sid_from_mount_option.unwrap_or(unrecognized_filesystem_type_sid),
-                    root_sid: root_sid_from_mount_option
-                        .unwrap_or(unrecognized_filesystem_type_sid),
+                    root_sid: root_sid_from_mount_option,
                 },
             }
         }
@@ -396,73 +408,6 @@ impl SecurityServer {
             class_id,
         )?;
         Some(active_policy.sid_table.security_context_to_sid(&security_context).unwrap())
-    }
-
-    /// Computes the precise access vector for `source_sid` targeting `target_sid` as class
-    /// `target_class`.
-    fn compute_access_vector(
-        &self,
-        source_sid: SecurityId,
-        target_sid: SecurityId,
-        target_class: AbstractObjectClass,
-    ) -> AccessDecision {
-        let locked_state = self.state.lock();
-
-        let active_policy = match &locked_state.active_policy {
-            Some(active_policy) => active_policy,
-            // All permissions are allowed when no policy is loaded, regardless of enforcing state.
-            None => return AccessDecision::allow(AccessVector::ALL),
-        };
-
-        let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
-        let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
-
-        // Access decisions are currently based solely on explicit "allow" rules.
-        // TODO: https://fxbug.dev/372400976 - Include permissions from matched "constraints"
-        // rules in the policy.
-        // TODO: https://fxbug.dev/372400419 - Validate that "neverallow" rules are respected.
-        match target_class {
-            AbstractObjectClass::System(target_class) => {
-                active_policy.parsed.compute_explicitly_allowed(
-                    source_context.type_(),
-                    target_context.type_(),
-                    target_class,
-                )
-            }
-            AbstractObjectClass::Custom(target_class) => {
-                active_policy.parsed.compute_explicitly_allowed_custom(
-                    source_context.type_(),
-                    target_context.type_(),
-                    &target_class,
-                )
-            }
-            // No meaningful policy can be determined without target class.
-            _ => AccessDecision::allow(AccessVector::NONE),
-        }
-    }
-
-    pub fn compute_new_sid(
-        &self,
-        source_sid: SecurityId,
-        target_sid: SecurityId,
-        target_class: ObjectClass,
-    ) -> Result<SecurityId, anyhow::Error> {
-        let mut locked_state = self.state.lock();
-        let active_policy = locked_state.expect_active_policy_mut();
-
-        // Policy is loaded, so `sid_to_security_context()` will not panic.
-        let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
-        let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
-
-        active_policy
-            .sid_table
-            .security_context_to_sid(&active_policy.parsed.new_security_context(
-                source_context,
-                target_context,
-                &target_class,
-            ))
-            .map_err(anyhow::Error::from)
-            .context("computing new security context from policy")
     }
 
     /// Returns true if the `bounded_sid` is bounded by the `parent_sid`.
@@ -491,14 +436,20 @@ impl SecurityServer {
     }
 
     /// Returns a reference to the shared access vector cache that delebates cache misses to `self`.
-    pub fn get_shared_avc(&self) -> &impl Query {
+    // TODO: Remove this in favour of a higher-level security-lookup interface/impl getter, replacing
+    // `as_permission_check()`.
+    #[allow(dead_code)]
+    pub(super) fn get_shared_avc(&self) -> &impl Query {
         self.avc_manager.get_shared_cache()
     }
 
     /// Returns a newly constructed thread-local access vector cache that delegates cache misses to
     /// any shared caches owned by `self.avc_manager`, which ultimately delegate to `self`. The
     /// returned cache will be reset when this security server's policy is reset.
-    pub fn new_thread_local_avc(&self) -> impl QueryMut {
+    // TODO: Remove this in favour of a higher-level security-lookup interface/impl getter, replacing
+    // `as_permission_check()`.
+    #[allow(dead_code)]
+    pub(super) fn new_thread_local_avc(&self) -> impl QueryMut {
         self.avc_manager.new_thread_local_cache()
     }
 
@@ -516,6 +467,34 @@ impl SecurityServer {
             status_publisher.set_status(new_value);
         }
     }
+
+    /// Returns the security identifier (SID) with which to label a new object of `target_class`,
+    /// based on the specified source & target security SIDs.
+    /// For file-like classes the `compute_new_file_sid*()` APIs should be used instead.
+    // TODO: Move this API to sit alongside the other `compute_*()` APIs.
+    pub fn compute_new_sid(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: ObjectClass,
+    ) -> Result<SecurityId, anyhow::Error> {
+        let mut locked_state = self.state.lock();
+        let active_policy = locked_state.expect_active_policy_mut();
+
+        // Policy is loaded, so `sid_to_security_context()` will not panic.
+        let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
+        let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
+
+        active_policy
+            .sid_table
+            .security_context_to_sid(&active_policy.parsed.new_security_context(
+                source_context,
+                target_context,
+                &target_class,
+            ))
+            .map_err(anyhow::Error::from)
+            .context("computing new security context from policy")
+    }
 }
 
 impl Query for SecurityServer {
@@ -525,7 +504,45 @@ impl Query for SecurityServer {
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
     ) -> AccessDecision {
-        self.compute_access_vector(source_sid, target_sid, target_class)
+        let locked_state = self.state.lock();
+
+        let active_policy = match &locked_state.active_policy {
+            Some(active_policy) => active_policy,
+            // All permissions are allowed when no policy is loaded, regardless of enforcing state.
+            None => return AccessDecision::allow(AccessVector::ALL),
+        };
+
+        let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
+        let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
+
+        // Access decisions are currently based solely on explicit "allow" rules.
+        // TODO: https://fxbug.dev/372400976 - Include permissions from matched "constraints"
+        // rules in the policy.
+        // TODO: https://fxbug.dev/372400419 - Validate that "neverallow" rules are respected.
+        match target_class {
+            AbstractObjectClass::System(target_class) => {
+                let mut decision = active_policy.parsed.compute_explicitly_allowed(
+                    source_context.type_(),
+                    target_context.type_(),
+                    target_class,
+                );
+                decision.todo_bug = active_policy.exceptions.lookup(
+                    source_context.type_(),
+                    target_context.type_(),
+                    target_class,
+                );
+                decision
+            }
+            AbstractObjectClass::Custom(target_class) => {
+                active_policy.parsed.compute_explicitly_allowed_custom(
+                    source_context.type_(),
+                    target_context.type_(),
+                    &target_class,
+                )
+            }
+            // No meaningful policy can be determined without target class.
+            _ => AccessDecision::allow(AccessVector::NONE),
+        }
     }
 
     fn compute_new_file_sid(
@@ -535,12 +552,9 @@ impl Query for SecurityServer {
         file_class: FileClass,
     ) -> Result<SecurityId, anyhow::Error> {
         let mut locked_state = self.state.lock();
-        let active_policy = match &mut locked_state.active_policy {
-            Some(active_policy) => active_policy,
-            None => {
-                return Err(anyhow::anyhow!("no policy loaded")).context("computing new file sid")
-            }
-        };
+
+        // This interface will not be reached without a policy having been loaded.
+        let active_policy = locked_state.active_policy.as_mut().expect("Policy loaded");
 
         let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
         let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
@@ -557,6 +571,31 @@ impl Query for SecurityServer {
             .security_context_to_sid(&new_file_context)
             .map_err(anyhow::Error::from)
             .context("computing new file security context from policy")
+    }
+
+    fn compute_new_file_sid_with_name(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+        file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId> {
+        let mut locked_state = self.state.lock();
+
+        // This interface will not be reached without a policy having been loaded.
+        let active_policy = locked_state.active_policy.as_mut().expect("Policy loaded");
+
+        let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
+        let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
+
+        let new_file_context = active_policy.parsed.new_file_security_context_by_name(
+            source_context,
+            target_context,
+            &file_class,
+            file_name,
+        )?;
+
+        active_policy.sid_table.security_context_to_sid(&new_file_context).ok()
     }
 }
 
@@ -595,9 +634,9 @@ fn sid_from_mount_option(
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use crate::permission_check::PermissionCheckResult;
-    use crate::{CommonFilePermission, ProcessPermission};
+    use crate::{CommonFilePermission, FilePermission, ProcessPermission};
+    use std::num::NonZeroU64;
 
     const TESTSUITE_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/selinux_testsuite");
     const TESTS_BINARY_POLICY: &[u8] =
@@ -621,7 +660,7 @@ mod tests {
         let sid1 = SecurityId::initial(InitialSid::Kernel);
         let sid2 = SecurityId::initial(InitialSid::Unlabeled);
         assert_eq!(
-            security_server.compute_access_vector(sid1, sid2, ObjectClass::Process.into()).allow,
+            security_server.query(sid1, sid2, ObjectClass::Process.into()).allow,
             AccessVector::ALL
         );
     }
@@ -708,20 +747,6 @@ mod tests {
     }
 
     #[test]
-    fn compute_new_file_sid_no_policy() {
-        let security_server = SecurityServer::new();
-
-        // Only initial SIDs can exist, until a policy has been loaded.
-        let source_sid = SecurityId::initial(InitialSid::Kernel);
-        let target_sid = SecurityId::initial(InitialSid::Unlabeled);
-        let error = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
-            .expect_err("expected error");
-        let error_string = format!("{:?}", error);
-        assert!(error_string.contains("no policy"));
-    }
-
-    #[test]
     fn compute_new_file_sid_no_defaults() {
         let security_server = SecurityServer::new();
         let policy_bytes =
@@ -736,7 +761,8 @@ mod tests {
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -762,7 +788,8 @@ mod tests {
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -788,7 +815,8 @@ mod tests {
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -813,7 +841,8 @@ mod tests {
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -839,7 +868,8 @@ mod tests {
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -864,7 +894,8 @@ mod tests {
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -889,7 +920,8 @@ mod tests {
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -915,7 +947,8 @@ mod tests {
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -940,7 +973,8 @@ mod tests {
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -948,6 +982,64 @@ mod tests {
 
         // User copied from source, high security level from target, role and type as default.
         assert_eq!(computed_context, b"user_u:object_r:file_t:s1:c0");
+    }
+
+    #[test]
+    fn compute_new_file_sid_with_name() {
+        let security_server = SecurityServer::new();
+        let policy_bytes =
+            include_bytes!("../testdata/composite_policies/compiled/type_transition_policy.pp")
+                .to_vec();
+        security_server.load_policy(policy_bytes).expect("binary policy loads");
+
+        let source_sid = security_server
+            .security_context_to_sid(b"source_u:source_r:source_t:s0".into())
+            .expect("creating SID from security context should succeed");
+        let target_sid = security_server
+            .security_context_to_sid(b"target_u:object_r:target_t:s0".into())
+            .expect("creating SID from security context should succeed");
+
+        const SPECIAL_FILE_NAME: &[u8] = b"special_file";
+        let computed_sid = security_server
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, SPECIAL_FILE_NAME.into())
+            .expect("new sid computed");
+        let computed_context = security_server
+            .sid_to_security_context(computed_sid)
+            .expect("computed sid associated with context");
+
+        // New domain should be derived from the filename-specific rule.
+        assert_eq!(computed_context, b"source_u:object_r:special_transition_t:s0");
+
+        let computed_sid = security_server
+            .as_permission_check()
+            .compute_new_file_sid(
+                source_sid,
+                target_sid,
+                FileClass::Character,
+                SPECIAL_FILE_NAME.into(),
+            )
+            .expect("new sid computed");
+        let computed_context = security_server
+            .sid_to_security_context(computed_sid)
+            .expect("computed sid associated with context");
+
+        // New domain should be copied from the target, because the class does not match either the
+        // filename-specific nor generic type transition rules.
+        assert_eq!(computed_context, b"source_u:object_r:target_t:s0");
+
+        const OTHER_FILE_NAME: &[u8] = b"other_file";
+        let computed_sid = security_server
+            .as_permission_check()
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File, OTHER_FILE_NAME.into())
+            .expect("new sid computed");
+        let computed_context = security_server
+            .sid_to_security_context(computed_sid)
+            .expect("computed sid associated with context");
+
+        // New domain should be derived from the non-filename-specific rule, because the filename
+        // does not match.
+        assert_eq!(computed_context, b"source_u:object_r:transition_t:s0");
     }
 
     #[test]
@@ -1119,7 +1211,7 @@ mod tests {
         // Since the permission is granted by policy, the check will not be audit logged.
         assert_eq!(
             permission_check.has_permission(sid, sid, ProcessPermission::Fork),
-            PermissionCheckResult { permit: true, audit: false }
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None }
         );
 
         // Test policy does not grant "type0" the process-getrlimit permission to itself, but
@@ -1127,7 +1219,7 @@ mod tests {
         // granted by the policy, the check will be audit logged.
         assert_eq!(
             permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit),
-            PermissionCheckResult { permit: true, audit: true }
+            PermissionCheckResult { permit: true, audit: true, todo_bug: None }
         );
 
         // Test policy is built with "deny unknown" behaviour, and has no "blk_file" class defined.
@@ -1139,7 +1231,7 @@ mod tests {
                 sid,
                 CommonFilePermission::GetAttr.for_class(FileClass::Block)
             ),
-            PermissionCheckResult { permit: true, audit: true }
+            PermissionCheckResult { permit: true, audit: true, todo_bug: None }
         );
     }
 
@@ -1156,14 +1248,14 @@ mod tests {
         // Test policy grants "type0" the process-fork permission to itself.
         assert_eq!(
             permission_check.has_permission(sid, sid, ProcessPermission::Fork),
-            PermissionCheckResult { permit: true, audit: false }
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None }
         );
 
         // Test policy does not grant "type0" the process-getrlimit permission to itself.
         // Permission denials are audit logged in enforcing mode.
         assert_eq!(
             permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit),
-            PermissionCheckResult { permit: false, audit: true }
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
         );
 
         // Test policy is built with "deny unknown" behaviour, and has no "blk_file" class defined.
@@ -1174,7 +1266,7 @@ mod tests {
                 sid,
                 CommonFilePermission::GetAttr.for_class(FileClass::Block)
             ),
-            PermissionCheckResult { permit: false, audit: true }
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
         );
     }
 
@@ -1200,7 +1292,7 @@ mod tests {
                 permissive_sid,
                 ProcessPermission::GetSched
             ),
-            PermissionCheckResult { permit: true, audit: false }
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None }
         );
         assert_eq!(
             permission_check.has_permission(
@@ -1208,7 +1300,7 @@ mod tests {
                 non_permissive_sid,
                 ProcessPermission::GetSched
             ),
-            PermissionCheckResult { permit: true, audit: false }
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None }
         );
 
         // Test policy does not grant process-getsched permission to the test domains on one another.
@@ -1219,7 +1311,7 @@ mod tests {
                 non_permissive_sid,
                 ProcessPermission::GetSched
             ),
-            PermissionCheckResult { permit: true, audit: true }
+            PermissionCheckResult { permit: true, audit: true, todo_bug: None }
         );
         assert_eq!(
             permission_check.has_permission(
@@ -1227,7 +1319,7 @@ mod tests {
                 permissive_sid,
                 ProcessPermission::GetSched
             ),
-            PermissionCheckResult { permit: false, audit: true }
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
         );
 
         // Test policy has "deny unknown" behaviour and does not define the "blk_file" class, so
@@ -1240,7 +1332,7 @@ mod tests {
                 non_permissive_sid,
                 CommonFilePermission::GetAttr.for_class(FileClass::Block)
             ),
-            PermissionCheckResult { permit: true, audit: true }
+            PermissionCheckResult { permit: true, audit: true, todo_bug: None }
         );
         assert_eq!(
             permission_check.has_permission(
@@ -1248,7 +1340,7 @@ mod tests {
                 non_permissive_sid,
                 CommonFilePermission::GetAttr.for_class(FileClass::Block)
             ),
-            PermissionCheckResult { permit: false, audit: true }
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
         );
     }
 
@@ -1267,25 +1359,128 @@ mod tests {
         // Test policy grants the domain self-fork permission, and marks it audit-allow.
         assert_eq!(
             permission_check.has_permission(audit_sid, audit_sid, ProcessPermission::Fork),
-            PermissionCheckResult { permit: true, audit: true }
+            PermissionCheckResult { permit: true, audit: true, todo_bug: None }
         );
 
         // Self-setsched permission is granted, and marked dont-audit, which takes no effect.
         assert_eq!(
             permission_check.has_permission(audit_sid, audit_sid, ProcessPermission::SetSched),
-            PermissionCheckResult { permit: true, audit: false }
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None }
         );
 
         // Self-getsched permission is denied, but marked dont-audit.
         assert_eq!(
             permission_check.has_permission(audit_sid, audit_sid, ProcessPermission::GetSched),
-            PermissionCheckResult { permit: false, audit: false }
+            PermissionCheckResult { permit: false, audit: false, todo_bug: None }
         );
 
         // Self-getpgid permission is denied, with neither audit-allow nor dont-audit.
         assert_eq!(
             permission_check.has_permission(audit_sid, audit_sid, ProcessPermission::GetPgid),
-            PermissionCheckResult { permit: false, audit: true }
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
+        );
+    }
+
+    #[test]
+    fn access_checks_with_exceptions_config() {
+        const EXCEPTIONS_CONFIG: &str = "
+            // These statement should all be resolved.
+            todo_deny b/001 test_exception_source_t test_exception_target_t file
+            todo_deny b/002 test_exception_other_t test_exception_target_t chr_file
+            todo_deny b/003 test_exception_source_t test_exception_other_t anon_inode
+            todo_deny b/004 test_exception_permissive_t test_exception_target_t file
+
+            // These statements should not be resolved.
+            todo_deny b/101 test_undefined_source_t test_exception_target_t file
+            todo_deny b/102 test_exception_source_t test_undefined_target_t file
+        ";
+        let security_server = SecurityServer::new_with_exceptions(EXCEPTIONS_CONFIG.into());
+        security_server.set_enforcing(true);
+
+        const EXCEPTIONS_POLICY: &[u8] =
+            include_bytes!("../testdata/composite_policies/compiled/exceptions_config_policy.pp");
+        assert!(security_server.load_policy(EXCEPTIONS_POLICY.into()).is_ok());
+
+        let source_sid = security_server
+            .security_context_to_sid("test_exception_u:object_r:test_exception_source_t:s0".into())
+            .unwrap();
+        let target_sid = security_server
+            .security_context_to_sid("test_exception_u:object_r:test_exception_target_t:s0".into())
+            .unwrap();
+        let other_sid = security_server
+            .security_context_to_sid("test_exception_u:object_r:test_exception_other_t:s0".into())
+            .unwrap();
+        let permissive_sid = security_server
+            .security_context_to_sid(
+                "test_exception_u:object_r:test_exception_permissive_t:s0".into(),
+            )
+            .unwrap();
+        let unmatched_sid = security_server
+            .security_context_to_sid(
+                "test_exception_u:object_r:test_exception_unmatched_t:s0".into(),
+            )
+            .unwrap();
+
+        let permission_check = security_server.as_permission_check();
+
+        // Source SID has no "process" permissions to target SID, and no exceptions.
+        assert_eq!(
+            permission_check.has_permission(source_sid, target_sid, ProcessPermission::GetPgid),
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
+        );
+
+        // Source SID has no "file:entrypoint" permission to target SID, but there is an exception defined.
+        assert_eq!(
+            permission_check.has_permission(source_sid, target_sid, FilePermission::Entrypoint),
+            PermissionCheckResult {
+                permit: true,
+                audit: true,
+                todo_bug: Some(NonZeroU64::new(1).unwrap())
+            }
+        );
+
+        // Source SID has "file:execute_no_trans" permission to target SID.
+        assert_eq!(
+            permission_check.has_permission(source_sid, target_sid, FilePermission::ExecuteNoTrans),
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None }
+        );
+
+        // Other SID has no "file:entrypoint" permissions to target SID, and the exception does not match "file" class.
+        assert_eq!(
+            permission_check.has_permission(other_sid, target_sid, FilePermission::Entrypoint),
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
+        );
+
+        // Other SID has no "chr_file" permissions to target SID, but there is an exception defined.
+        assert_eq!(
+            permission_check.has_permission(
+                other_sid,
+                target_sid,
+                CommonFilePermission::Read.for_class(FileClass::Character)
+            ),
+            PermissionCheckResult {
+                permit: true,
+                audit: true,
+                todo_bug: Some(NonZeroU64::new(2).unwrap())
+            }
+        );
+
+        // Source SID has no "file:entrypoint" permissions to unmatched SID, and no exception is defined.
+        assert_eq!(
+            permission_check.has_permission(source_sid, unmatched_sid, FilePermission::Entrypoint),
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
+        );
+
+        // Unmatched SID has no "file:entrypoint" permissions to target SID, and no exception is defined.
+        assert_eq!(
+            permission_check.has_permission(unmatched_sid, target_sid, FilePermission::Entrypoint),
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
+        );
+
+        // Permissive SID is granted all permissions, so matching exception should be ignored.
+        assert_eq!(
+            permission_check.has_permission(permissive_sid, target_sid, FilePermission::Entrypoint),
+            PermissionCheckResult { permit: true, audit: true, todo_bug: None }
         );
     }
 }

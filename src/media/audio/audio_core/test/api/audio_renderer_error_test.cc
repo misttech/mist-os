@@ -6,15 +6,16 @@
 #include <cmath>
 #include <cstdint>
 
+#include "src/media/audio/audio_core/shared/stream_usage.h"
 #include "src/media/audio/audio_core/test/api/audio_renderer_test_shared.h"
 #include "src/media/audio/lib/clock/clone_mono.h"
 
 namespace media::audio::test {
 
-using AudioRenderUsage = fuchsia::media::AudioRenderUsage;
+using fuchsia::media::AudioRenderUsage2;
 
 // TODO(https://fxbug.dev/326083019): unittest AudioCore methods more directly (SetRenderUsageGain,
-// SetCaptureUsageGaqin, ResetInteractions, LoadDefaults).
+// SetRenderUsageGain2, SetCaptureUsageGain2, ResetInteractions, LoadDefaults).
 
 class AudioRendererBufferErrorTest : public AudioRendererBufferTest {};
 
@@ -107,7 +108,7 @@ TEST_F(AudioRendererPacketErrorTest, SendPacketInvalidPayloadBufferIdShouldDisco
   // We never added a payload buffer with this ID, so this should cause a disconnect
   auto packet = kTestPacket;
   packet.payload_buffer_id = 1234;
-  audio_renderer()->SendPacket(std::move(packet), []() {});
+  audio_renderer()->SendPacket(packet, []() {});
 
   ExpectDisconnect(audio_renderer());
 }
@@ -116,14 +117,14 @@ TEST_F(AudioRendererPacketErrorTest, SendPacketInvalidPayloadBufferIdShouldDisco
 TEST_F(AudioRendererPacketErrorTest, SendPacketInvalidPayloadBufferSizeShouldDisconnect) {
   // kTestStreamType frames are 8 bytes (float32 x Stereo).
   // As an invalid packet size, we specify a value (9) that is NOT a perfect multiple of 8.
-  constexpr uint64_t kInvalidPayloadSize = sizeof(float) * kTestStreamType.channels + 1;
+  constexpr uint64_t kInvalidPayloadSize = (sizeof(float) * kTestStreamType.channels) + 1;
 
   audio_renderer()->SetPcmStreamType(kTestStreamType);
   CreateAndAddPayloadBuffer(0);
 
   auto packet = kTestPacket;
   packet.payload_size = kInvalidPayloadSize;
-  audio_renderer()->SendPacket(std::move(packet), []() {});
+  audio_renderer()->SendPacket(packet, []() {});
 
   ExpectDisconnect(audio_renderer());
 }
@@ -135,7 +136,7 @@ TEST_F(AudioRendererPacketErrorTest, SendPacketBufferOutOfBoundsShouldDisconnect
 
   auto packet = kTestPacket;
   packet.payload_offset = DefaultPayloadBufferSize();
-  audio_renderer()->SendPacket(std::move(packet), []() {});
+  audio_renderer()->SendPacket(packet, []() {});
 
   ExpectDisconnect(audio_renderer());
 }
@@ -148,7 +149,7 @@ TEST_F(AudioRendererPacketErrorTest, SendPacketBufferOverrunShouldDisconnect) {
   auto packet = kTestPacket;
   packet.payload_size = kDefaultPacketSize * 2;
   packet.payload_offset = DefaultPayloadBufferSize() - kDefaultPacketSize;
-  audio_renderer()->SendPacket(std::move(packet), []() {});
+  audio_renderer()->SendPacket(packet, []() {});
 
   ExpectDisconnect(audio_renderer());
 }
@@ -229,7 +230,7 @@ TEST_F(AudioRendererPtsErrorTest, SetPtsContThresholdInfinityCausesDisconnect) {
 
 class AudioRendererClockErrorTest : public AudioRendererClockTest {};
 
-// Inadequate ZX_RIGHTS (no DUPLICATE) should cause GetReferenceClock to fail.
+// Inadequate ZX_RIGHTS (no DUPLICATE) should cause SetReferenceClock to fail.
 TEST_F(AudioRendererClockErrorTest, SetRefClockWithoutDuplicateShouldDisconnect) {
   zx::clock dupe_clock, orig_clock = clock::CloneOfMonotonic();
   ASSERT_EQ(orig_clock.duplicate(kClockRights & ~ZX_RIGHT_DUPLICATE, &dupe_clock), ZX_OK);
@@ -238,7 +239,7 @@ TEST_F(AudioRendererClockErrorTest, SetRefClockWithoutDuplicateShouldDisconnect)
   ExpectDisconnect(audio_renderer());
 }
 
-// inadequate ZX_RIGHTS (no READ) should cause GetReferenceClock to fail.
+// inadequate ZX_RIGHTS (no READ) should cause SetReferenceClock to fail.
 TEST_F(AudioRendererClockErrorTest, SetRefClockWithoutReadShouldDisconnect) {
   zx::clock dupe_clock, orig_clock = clock::CloneOfMonotonic();
   ASSERT_EQ(orig_clock.duplicate(kClockRights & ~ZX_RIGHT_READ, &dupe_clock), ZX_OK);
@@ -314,7 +315,7 @@ class AudioRendererFormatUsageErrorTest : public AudioRendererFormatUsageTest {}
 // Once the format has been set, SetUsage may no longer be called any time thereafter.
 TEST_F(AudioRendererFormatUsageErrorTest, SetUsageAfterFormatShouldDisconnect) {
   audio_renderer()->SetPcmStreamType(kTestStreamType);
-  audio_renderer()->SetUsage(AudioRenderUsage::COMMUNICATION);
+  audio_renderer()->SetUsage(*ToFidlRenderUsageTry(AudioRenderUsage2::COMMUNICATION));
 
   ExpectDisconnect(audio_renderer());
 }
@@ -331,7 +332,32 @@ TEST_F(AudioRendererFormatUsageErrorTest, SetUsageAfterOperatingShouldDisconnect
   audio_renderer()->Pause(AddCallback("Pause"));
   ExpectCallbacks();
 
-  audio_renderer()->SetUsage(AudioRenderUsage::BACKGROUND);
+  audio_renderer()->SetUsage(*ToFidlRenderUsageTry(AudioRenderUsage2::BACKGROUND));
+
+  ExpectDisconnect(audio_renderer());
+}
+
+// Once the format has been set, SetUsage2 may no longer be called any time thereafter.
+TEST_F(AudioRendererFormatUsageErrorTest, SetUsage2AfterFormatShouldDisconnect) {
+  audio_renderer()->SetPcmStreamType(kTestStreamType);
+  audio_renderer()->SetUsage2(AudioRenderUsage2::COMMUNICATION);
+
+  ExpectDisconnect(audio_renderer());
+}
+
+// ... this restriction is not lifted even after all packets have been returned.
+TEST_F(AudioRendererFormatUsageErrorTest, SetUsage2AfterOperatingShouldDisconnect) {
+  audio_renderer()->SetPcmStreamType(kTestStreamType);
+  CreateAndAddPayloadBuffer(0);
+  audio_renderer()->PlayNoReply(fuchsia::media::NO_TIMESTAMP, 0);
+
+  audio_renderer()->SendPacket(kTestPacket, AddCallback("SendPacket"));
+  ExpectCallbacks();  // Send a packet and allow it to drain out.
+
+  audio_renderer()->Pause(AddCallback("Pause"));
+  ExpectCallbacks();
+
+  audio_renderer()->SetUsage2(AudioRenderUsage2::BACKGROUND);
 
   ExpectDisconnect(audio_renderer());
 }
@@ -400,7 +426,7 @@ TEST_F(AudioRendererTransportErrorTest, PlayWithLargeMediaTimeShouldDisconnect) 
 
   audio_renderer()->SendPacket(kTestPacket, AddCallback("SendPacket"));
 
-  constexpr int64_t kLargeTimestamp = std::numeric_limits<int64_t>::max() / 2 + 1;
+  constexpr int64_t kLargeTimestamp = (std::numeric_limits<int64_t>::max() / 2) + 1;
   audio_renderer()->Play(fuchsia::media::NO_TIMESTAMP, kLargeTimestamp,
                          AddUnexpectedCallback("Play"));
 

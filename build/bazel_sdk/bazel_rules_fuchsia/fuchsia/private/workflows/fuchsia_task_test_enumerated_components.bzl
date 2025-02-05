@@ -56,7 +56,7 @@ def _fuchsia_task_test_enumerated_components_impl(ctx, make_fuchsia_task):
     fuchsia_task_test_enumerated_components,
 ) = fuchsia_task_rule(
     implementation = _fuchsia_task_test_enumerated_components_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "component_name_filter": attr.string(
             doc = "A regex filter allowlist applied to component names; used to filter components for testing.",

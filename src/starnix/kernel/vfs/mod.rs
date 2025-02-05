@@ -22,12 +22,14 @@ mod splice;
 mod static_directory;
 mod stubs;
 mod symlink_node;
+mod userfault_file;
 mod vec_directory;
 mod wd_number;
 mod xattr;
 
 pub mod aio;
 pub mod buffers;
+pub mod crypt_service;
 pub mod directory_file;
 pub mod eventfd;
 pub mod file_server;
@@ -67,6 +69,7 @@ pub use simple_file::*;
 pub use static_directory::*;
 pub use stubs::*;
 pub use symlink_node::*;
+pub use userfault_file::*;
 pub use vec_directory::*;
 pub use wd_number::*;
 pub use xattr::*;
@@ -103,7 +106,7 @@ macro_rules! register {
         RELEASERS.with(|cell| {
             cell.borrow_mut()
                 .as_mut()
-                .expect("not finalized")
+                .expect("DelayedReleaser hasn't been finalized yet")
                 .releasables
                 .push(Box::new(Some($arg)));
         });

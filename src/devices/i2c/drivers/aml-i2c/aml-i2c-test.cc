@@ -6,14 +6,15 @@
 
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <fidl/fuchsia.hardware.i2cimpl/cpp/driver/wire.h>
-#include <fidl/fuchsia.hardware.platform.device/cpp/wire_test_base.h>
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
+#include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/clock.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -44,8 +45,7 @@ class TestAmlI2c : public AmlI2c {
   static void set_mmio(fdf::MmioBuffer mmio) { mmio_.emplace(std::move(mmio)); }
 
  protected:
-  zx::result<fdf::MmioBuffer> MapMmio(
-      const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev) override {
+  zx::result<fdf::MmioBuffer> MapMmio(fdf::PDev& pdev) override {
     if (mmio_) {
       return zx::ok(*std::move(mmio_));
     }
@@ -57,40 +57,6 @@ class TestAmlI2c : public AmlI2c {
 };
 
 std::optional<fdf::MmioBuffer> TestAmlI2c::mmio_;
-
-class FakePDev : public fidl::testing::WireTestBase<fuchsia_hardware_platform_device::Device> {
- public:
-  fuchsia_hardware_platform_device::Service::InstanceHandler GetInstanceHandler(
-      async_dispatcher_t* dispatcher) {
-    return fuchsia_hardware_platform_device::Service::InstanceHandler({
-        .device = binding_group_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
-    });
-  }
-
-  void set_interrupt(zx::interrupt interrupt) { interrupt_ = std::move(interrupt); }
-
- private:
-  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {}
-
-  void GetInterruptById(
-      fuchsia_hardware_platform_device::wire::DeviceGetInterruptByIdRequest* request,
-      GetInterruptByIdCompleter::Sync& completer) override {
-    if (request->index != 0) {
-      return completer.ReplyError(ZX_ERR_NOT_FOUND);
-    }
-
-    zx::interrupt out_interrupt;
-    zx_status_t status = interrupt_.duplicate(ZX_RIGHT_SAME_RIGHTS, &out_interrupt);
-    if (status == ZX_OK) {
-      completer.ReplySuccess(std::move(out_interrupt));
-    } else {
-      completer.ReplyError(status);
-    }
-  }
-
-  zx::interrupt interrupt_;
-  fidl::ServerBindingGroup<fuchsia_hardware_platform_device::Device> binding_group_;
-};
 
 class FakeAmlI2cController {
  public:
@@ -226,7 +192,17 @@ class Environment {
  public:
   fdf_testing::TestNode::CreateStartArgsResult Init(zx::interrupt interrupt,
                                                     std::optional<aml_i2c_delay_values> metadata) {
-    pdev_server_.set_interrupt(std::move(interrupt));
+    async_dispatcher_t* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+
+    std::map<uint32_t, zx::interrupt> irqs;
+    irqs[0] = std::move(interrupt);
+    pdev_server_.SetConfig({.irqs = std::move(irqs)});
+    pdev_server_.AddFidlMetadata(fuchsia_hardware_i2c_businfo::I2CBusMetadata::kSerializableName,
+                                 fuchsia_hardware_i2c_businfo::I2CBusMetadata{});
+    zx::result add_service_result = test_environment_.incoming_directory()
+                                        .AddService<fuchsia_hardware_platform_device::Service>(
+                                            pdev_server_.GetInstanceHandler(dispatcher), "pdev");
+    ZX_ASSERT(add_service_result.is_ok());
 
     zx::result start_args_result = test_node_.CreateStartArgsAndServe();
     ZX_ASSERT(start_args_result.is_ok());
@@ -234,15 +210,6 @@ class Environment {
     zx::result init_result =
         test_environment_.Initialize(std::move(start_args_result->incoming_directory_server));
     ZX_ASSERT(init_result.is_ok());
-
-    async_dispatcher_t* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
-    std::string instance_name = "pdev";
-
-    zx::result add_service_result =
-        test_environment_.incoming_directory()
-            .AddService<fuchsia_hardware_platform_device::Service>(
-                pdev_server_.GetInstanceHandler(dispatcher), instance_name);
-    ZX_ASSERT(add_service_result.is_ok());
 
     compat_server_.Initialize("default");
     if (metadata.has_value()) {
@@ -257,7 +224,7 @@ class Environment {
 
  private:
   fdf_testing::TestNode test_node_{"root"};
-  FakePDev pdev_server_;
+  fdf_fake::FakePDev pdev_server_;
   fdf_testing::internal::TestEnvironment test_environment_;
   compat::DeviceServer compat_server_;
 };

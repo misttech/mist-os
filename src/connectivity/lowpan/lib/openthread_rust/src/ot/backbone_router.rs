@@ -28,14 +28,6 @@ pub trait BackboneRouter {
     fn set_backbone_router_enabled(&self, enable: bool);
 
     /// Functional equivalent of
-    /// [`otsys::otBackboneRouterMulticastListenerAdd`](crate::otsys::otBackboneRouterMulticastListenerAdd).
-    fn multicast_listener_add(&self, addr: &Ip6Address, timeout: u32) -> Result;
-
-    /// Functional equivalent of
-    /// [`otsys::otBackboneRouterMulticastListenerClear`](crate::otsys::otBackboneRouterMulticastListenerClear).
-    fn multicast_listener_clear(&self);
-
-    /// Functional equivalent of
     /// [`otsys::otBackboneRouterMulticastListenerGetNext`](crate::otsys::otBackboneRouterMulticastListenerGetNext).
     // TODO: Determine if the underlying implementation of
     //       this method has undefined behavior when network data
@@ -53,10 +45,6 @@ pub trait BackboneRouter {
     where
         F: FnMut(BackboneRouterMulticastListenerEvent, &Ip6Address) + 'a;
 
-    /// Functional equivalent of
-    /// [`otsys::otBackboneRouterConfigNextMulticastListenerRegistrationResponse`](crate::otsys::otBackboneRouterConfigNextMulticastListenerRegistrationResponse).
-    fn config_next_multicast_listener_registration_response(&self, status: u8);
-
     /// Returns an iterator for iterating over multicast listeners.
     fn iter_multicaster_listeners(&self) -> MulticastListenerIterator<'_, Self> {
         MulticastListenerIterator {
@@ -73,23 +61,11 @@ impl<T: BackboneRouter + Boxable> BackboneRouter for ot::Box<T> {
         self.as_ref().set_backbone_router_enabled(enable)
     }
 
-    fn multicast_listener_add(&self, addr: &Ip6Address, timeout: u32) -> Result {
-        self.as_ref().multicast_listener_add(addr, timeout)
-    }
-
-    fn multicast_listener_clear(&self) {
-        self.as_ref().multicast_listener_clear()
-    }
-
     fn multicast_listener_get_next(
         &self,
         listener_iter: &mut otBackboneRouterMulticastListenerIterator,
     ) -> Option<BackboneRouterMulticastListenerInfo> {
         self.as_ref().multicast_listener_get_next(listener_iter)
-    }
-
-    fn config_next_multicast_listener_registration_response(&self, status: u8) {
-        self.as_ref().config_next_multicast_listener_registration_response(status)
     }
 
     fn set_multicast_listener_callback<'a, F>(&'a self, f: Option<F>)
@@ -103,17 +79,6 @@ impl<T: BackboneRouter + Boxable> BackboneRouter for ot::Box<T> {
 impl BackboneRouter for Instance {
     fn set_backbone_router_enabled(&self, enable: bool) {
         unsafe { otBackboneRouterSetEnabled(self.as_ot_ptr(), enable) }
-    }
-
-    fn multicast_listener_add(&self, addr: &Ip6Address, timeout: u32) -> Result {
-        Error::from(unsafe {
-            otBackboneRouterMulticastListenerAdd(self.as_ot_ptr(), addr.as_ot_ptr(), timeout)
-        })
-        .into()
-    }
-
-    fn multicast_listener_clear(&self) {
-        unsafe { otBackboneRouterMulticastListenerClear(self.as_ot_ptr()) }
     }
 
     fn multicast_listener_get_next(
@@ -133,15 +98,6 @@ impl BackboneRouter for Instance {
                     "Unexpected error from otBackboneRouterMulticastListenerIterator: {err:?}"
                 ),
             }
-        }
-    }
-
-    fn config_next_multicast_listener_registration_response(&self, status: u8) {
-        unsafe {
-            otBackboneRouterConfigNextMulticastListenerRegistrationResponse(
-                self.as_ot_ptr(),
-                status,
-            )
         }
     }
 

@@ -22,14 +22,14 @@ name = "fuchsia-third-party"
 version = "0.1.0"
 
 [dependencies]
-# Keep this sorted alphabetically, please.
+# keep-sorted start
 aead = { version = "0.4.2", features = ["std"] }
 aes = "0.8.4"
 aes-gcm = "0.10.1"
 aes-gcm-siv = { version = "0.11.1", features = ["std"] }
 ahash = "0.8.11"
 ansi_term = "0.12.0"
-anyhow = "1.0.86"
+anyhow = "1.0.95"
 arbitrary = { version = "1.0.3", features = ["derive"] }
 argh = "0.1.12"
 arrayref = "0.3.5"
@@ -44,16 +44,18 @@ async-trait = "0.1.71"
 atty = "0.2.11"
 base64 = "0.22.1"
 bincode = "1.3"
-bitfield = "0.14.0"
-bitflags = { version = "2.4.1", features = ["serde"] }
 bit-set = "0.5.3"
 bit-vec = { version = "0.6.3", features = [ "serde" ] }
+bitfield = "0.14.0"
+bitflags = { version = "2.7.0", features = ["serde"] }
 blocking = "1.0.2"
 bstr = { version = "1.5.0", default-features = false, features = [ "std" ] }
 bumpalo = { version = "3.2.1", features = [ "collections" ] }
 byteorder = { version = "1.4.3", features = ["i128"] }
 bytes = "1.6.0"
 camino = { version = "1.1.1", features = ["proptest1", "serde1"] }
+cfg-if = "1.0.0"
+chacha20 = "0.9.0"
 # NB: morally we'd like to default-features = false here, but we have
 # transitive dependencies on this crate that *do* enable default features.
 # Cargo does something called "feature unification"
@@ -77,9 +79,8 @@ clap = "2.34"
 crc = "1.8.1"
 criterion = { version = "0.2", default-features = false }
 crossbeam = "0.8.0"
+crossbeam-channel = "0.5.1"
 crossbeam-utils = "0.8.14"
-cfg-if = "1.0.0"
-chacha20 = "0.9.0"
 csv = "1.2.1"
 darling = "0.20.10"
 data-encoding = "2.1.2"
@@ -91,8 +92,8 @@ digest = "0.10.7"
 downcast-rs = "1.2.0"
 dyn-clone = "1.0.5"
 ecdsa = { version = "0.14.3", features = ["pkcs8"] }
+either = "1.13.0"
 elliptic-curve = { version = "0.12.3", features = [ "ecdh" ] }
-either = "1.5.0"
 eui48 = { version = "1.1.0", default-features = false, features = ["serde", "disp_hexstring"] }
 event-listener = "5.3.1"
 # TODO(https://fxbug.dev/112722): We're importing this explicitly for now, but eventually
@@ -117,11 +118,11 @@ half = "1.6.0"
 handlebars = "4.3.5"
 heck = "0.3.1"
 hex = { version = "0.4.3", features = ["serde"] }
-hmac = "0.12.1"
 hkdf = "0.12.3"
+hmac = "0.12.1"
 hound = "3.5.0"
-humansize = "1.1.1"
 http = "0.2.4"
+humansize = "1.1.1"
 # TODO(https://fxbug.dev/100964): We intentionally did not enable http2, since we're
 # currently not using it on Fuchsia. Please see this ticket if you want to
 # enable it.
@@ -132,14 +133,14 @@ itertools = "0.10"
 itoa = "0.4"
 json5format = "0.2.6"
 lazy_static = "1.4"
-libc = "0.2.158"
+libc = { version = "0.2.169", features = ["extra_traits"] }
 libm = "0.2.1"
 linked-hash-map = "0.5.3"
 lock_api = "0.4.11"
 log = { version = "0.4.22", features = ["kv", "std"] }
 lru-cache = "0.1.2"
-maplit = "1.0"
 macro_rules_attribute = "0.1.3"
+maplit = "1.0"
 maybe-owned = "0.3.2"
 md-5 = "0.10.5"
 memchr = "2.7.1"
@@ -148,19 +149,18 @@ miniz_oxide = "0.3.6"
 mock-omaha-server = { version = "0.3.3", default-features = false }
 mockall = "0.9"
 munge = "0.4.1"
-nix = "0.26.2"
+nix = { version = "0.29.0", features = ["feature", "fs", "hostname", "net", "process", "signal", "user"] }
 nom = { version = "7.1.3", default-features = false, features = ["std"] }
 nom_locate = "4.2.0"
+nu-ansi-term = "0.46.0"
 num = { version = "0.4.0", features = ["rand"] }
 num-derive = "0.4.2"
 num-traits = "0.2.18"
 omaha_client = "0.2"
 once_cell = "1.20.2"
-nu-ansi-term = "0.46.0"
 overload = "0.1.1"
 p256 = { version = "0.11.1", features = ["pem", "serde"] }
-pkcs8 = "0.9.0"
-paste = "1.0"
+paste = "1.0.15"
 pathdiff = { version = "0.2.1", features = ["camino"] }
 pem = "0.8.3"
 percent-encoding = "2.1"
@@ -168,32 +168,30 @@ pest = "2.7.8"
 pest_derive = "2.7.8"
 pin-project = "1.0.11"
 pin-project-lite = "0.2.13"
+pkcs8 = "0.9.0"
 png = "0.14" # saved for future use
 pretty = "0.5.2"
 pretty_assertions = "1.2.1"
 prettytable-rs = "0.8.0"
 proptest = "1.5.0"
-proptest-derive = "0.3.0"
+proptest-derive = "0.4.0"
 prost = "0.11.0"
 prost-build = "0.11.1"
 prost-types = "0.11.1"
 rand = { version = "0.8", features = ["small_rng"] }
 rand_xorshift = "0.3"
 rayon = "1.10.0"
-ref-cast = "1.0.9"
+ref-cast = "1.0.23"
 regex = "1.7.3"
 regex-syntax = "0.8.3"
 rend = { version = "0.5.2", features = ["zerocopy-0_8"] }
-ring = "0.16.20"
+ring = "0.17.8"
 rustc-hash = "1.0.1"
-rustls = { version = "=0.21.7", features = ["dangerous_configuration"] }
+rustls = { version = "0.21.12", features = ["dangerous_configuration"] }
 rustls-pemfile = "1.0.4"
 rustls-webpki = "0.101.6"
-rustyline = "2.1.0"
+rustyline = { version = "15.0.0", default-features = false }
 rutabaga_gfx = { version = "0.1.3", features = ["gfxstream"] }
-# TODO(https://fxbug.dev/385403698): add a visibility allowlist to prevent unintended usage when
-# targetting fuchsia.
-simplelog = "0.10.2"
 schemars = { version = "0.8", features = ["chrono", "preserve_order"] }
 scopeguard = "1.1.0"
 scrypt = "0.10.0"
@@ -206,8 +204,11 @@ serde_repr = "0.1.7"
 sha1 = "0.10.5"
 sha2 = "0.10.2"
 signature =  "1.4.0"
+# TODO(https://fxbug.dev/385403698): add a visibility allowlist to prevent unintended usage when
+# targetting fuchsia.
+simplelog = "0.10.2"
 siphasher = "0.3.10"
-slab = "0.4.7"
+slab = "0.4.9"
 smallvec = {version= "1.13.1", features = ["const_generics", "const_new", "union"]}
 socket2 = { version = "0.5.5", features = ["all"] }
 splines = "2.2.0"
@@ -217,38 +218,39 @@ structopt = "0.2.14"
 strum = "0.25.0"
 strum_macros = "0.25.3"
 tempfile = "3.2"
-termtree = "0.4.1"
-tuf = { version = "=0.3.0-beta12", default-features = false, features = ["hyper"] }
 termion = "1.5.3"
+termtree = "0.4.1"
 test-case = "3.2.1"
 textwrap = "0.11.0"
-thiserror = "1.0.57"
+thiserror = "2.0.11"
 tokio-rustls = "0.24.1"
 toml = "0.5"
 toml_edit = "0.2.1"
-tracing = { version = "0.1.40", default-features = false, features = ["std", "attributes"] }
+tracing = { version = "0.1.40", default-features = false, features = ["std", "attributes", "log"] }
 tracing-core = "0.1.32"
 tracing-log = "0.2.0"
 tracing-mutex = { version = "0.3.0", features = ["lockapi", "parkinglot"] }
+tuf = { version = "=0.3.0-beta13", default-features = false, features = ["hyper"] }
 typed-builder = "0.10.0"
-unicase = "2.7.0"
-untrusted = "0.7.1"
-url = "2.3"
-uuid = { version = "1.1.2", features = ["serde", "v4"] } # move ?
-valico = "2.4.2"
-vte = "0.3"
-xml-rs = "0.8"
 unic-char-range = "0.9"
 unic-ucd-block = "0.9"
+unicase = "2.7.0"
 unicode-segmentation = "1.10"
-unicode-width = "0.1.3"
+unicode-width = "0.2.0"
 unicode-xid = "0.2.0"
-utf8parse = "0.1"
+untrusted = "0.7.1"
+url = "2.3"
+utf8parse = "0.2.2"
+uuid = { version = "1.1.2", features = ["serde", "v4"] } # move ?
+valico = "2.4.2"
 vm-device = "0.1.0"
+vte = "0.3"
 walkdir = "2.2.7"
 which = "4.0.2"
-zerocopy = { version = "0.8.1", features = ["derive", "simd"] }
+xml-rs = "0.8"
+zerocopy = { version = "0.8.14", features = ["derive", "simd"] }
 zstd = "0.11.2"
+# keep-sorted end
 
 [dependencies.tracing-subscriber]
 version = "0.3.18"
@@ -257,6 +259,7 @@ features = ["ansi", "env-filter", "fmt", "registry", "std", "tracing-log"]
 
 # Target-side only dependencies
 [target.'cfg(target_os = "fuchsia")'.dependencies]
+# keep-sorted start
 # do not add back without verifying certificate transparency is ready to use - see https://fxbug.dev/25100
 # ct-logs = "0.6"
 euclid = { version = "0.22.1", features = [ "serde" ] }
@@ -274,15 +277,17 @@ rust_icu_uenum = { version = "5.0.0", default-features = false, features = ["ren
 rust_icu_uloc = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
 rust_icu_unorm2 = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
 rust_icu_ustring = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env"] }
-tokio = { version = "=1.32.1", default-features = false }
+tokio = { version = "=1.38.1", default-features = false }
 trust-dns-proto = { version = "0.22.0", default-features = false, features = ["testing"] }
 trust-dns-resolver = { version = "0.22.0", default-features = false, features = ["testing"] }
 ttf-parser = "0.10.1"
 unicode-normalization = "0.1"
 vk-sys = "0.7.0"
+# keep-sorted end
 
 # Host-side only dependencies
 [target.'cfg(not(target_os = "fuchsia"))'.dependencies]
+# keep-sorted start
 askama = { version = "0.12.1", default-features = false, features = ["config"] }
 async-executor = "1.5.0"
 async-fs = "1.6.0"
@@ -315,7 +320,7 @@ serde_yaml = "0.9.14" # To use on Fuchsia, serde_yaml and unsafe-libyaml will ne
 serial_test = "0.5.1" # Not for use on Fuchsia, only for a single process.
 shared_child = "1.0.0"
 signal-hook = "0.3.17"
-syn = { version = "2.0.69", features = ["full", "visit", "visit-mut", "extra-traits"] }
+syn = { version = "2.0.87", features = ["full", "visit", "visit-mut", "extra-traits"] }
 synstructure = "0.12.1"
 tar = "0.4.25"
 term_grid = "0.2.0"
@@ -323,19 +328,23 @@ termios = "0.3.2"
 tinyjson = "2.5.0"
 # TODO(https://fxbug.dev/106164) Enable the "rt" and "net" features here once gnaw
 # supports target-specific feature resolution
-tokio = { version = "=1.32.1", default-features = false }
+tokio = { version = "=1.38.1", default-features = false }
 tokio-stream = "0.1.14"
+wait-timeout = "0.2.0"
 zip = { version = "0.5.5", default-features = false, features = ["deflate"] }
+# keep-sorted end
 
 # For crates we don't want to vendor, follow instructions at
 # //docs/development/languages/rust/external_crates.md.
 [patch.crates-io]
-# Keep each section sorted alphabetically, please.
 
 ### In-tree Crates: crates which are on crates.io but which we build from our in-tree copy
+# keep-sorted start
 fuchsia-cprng = { path = "intree/fuchsia-cprng" }
+# keep-sorted end
 
 ### Ask to Patch: crates which require a policy exception to contribute to.
+# keep-sorted start
 aho-corasick = { path = "ask2patch/aho-corasick" }
 byteorder = { path = "ask2patch/byteorder" }
 csv = { path = "ask2patch/csv" }
@@ -345,12 +354,16 @@ regex-automata = { path = "ask2patch/regex-automata" }
 same-file = { path = "ask2patch/same-file" }
 termcolor = { path = "ask2patch/termcolor" }
 walkdir = { path = "ask2patch/walkdir" }
+# keep-sorted end
 
 ### Empty Forks: empty forks kept only for satisfying cargo's resolution
+# keep-sorted start
 android-tzdata = { path = "empty/android-tzdata" }
 android_system_properties = { path = "empty/android_system_properties" }
 backtrace = { path = "empty/backtrace" }
 cc = { path = "empty/cc" }
+cfg_aliases = { path = "empty/cfg_aliases"}
+clipboard-win = { path = "empty/clipboard-win" }
 crossterm_winapi = { path = "empty/crossterm_winapi" }
 ctor = { path = "empty/ctor" }
 hermit-abi = { path = "empty/hermit-abi" }
@@ -364,39 +377,42 @@ redox_syscall = { path = "empty/redox_syscall" }
 rustversion = { path = "empty/rustversion" }
 wasi-0_11_0_preview1 = { path = "empty/wasi-0.11.0-wasi-snapshot-preview1", package = "wasi" }
 wasm-bindgen = { path = "empty/wasm-bindgen" }
-web-sys = { path = "empty/web-sys" }
-wepoll-ffi = { path = "empty/wepoll-ffi" }
 winapi = { path = "empty/winapi" }
 winapi-util = { path = "empty/winapi-util" }
 windows = { path = "empty/windows" }
 windows-core = { path = "empty/windows-core" }
-windows-sys-0_42_0 = { package = "windows-sys", path = "empty/windows-sys-0.42.0" }
 windows-sys-0_45_0 = { package = "windows-sys", path = "empty/windows-sys-0.45.0" }
 windows-sys-0_48_0 = { package = "windows-sys", path = "empty/windows-sys-0.48.0" }
 windows-sys-0_52_0 = { package = "windows-sys", path = "empty/windows-sys-0.52.0" }
+windows-sys-0_59_0 = { package = "windows-sys", path = "empty/windows-sys-0.59.0" }
 windows-targets-0_48_5 = { package = "windows-targets", path = "empty/windows-targets-0.48.5" }
-windows-targets-0_52_0 = { package = "windows-targets", path = "empty/windows-targets-0.52.0" }
+windows-targets-0_52_6 = { package = "windows-targets", path = "empty/windows-targets-0.52.6" }
+# keep-sorted end
 
 ### Forks: vendored crates whose code doesn't match the upstream version
+# keep-sorted start
 askama_derive = { path = "forks/askama_derive" }
 fatfs = { path = "forks/fatfs" }
 fuse3 = { path = "forks/fuse3" }
 hound = { path = "forks/hound" }
-libc = { features = ["extra_traits"], path = "forks/libc-0.2.158" }
 libm = { path = "forks/libm" }
+nix_0_29_0 = { package = "nix", path = "forks/nix-0.29.0" }
 nom = { path = "forks/nom" }
 notify = { path = "forks/notify" }
 # FIXME(118248): We can unfork once undefined behavior is resolved.
 prettytable-rs = { path = "forks/prettytable-rs" }
 #pulldown-cmark = { path = "forks/pulldown-cmark" }
-rustyline = { path = "forks/rustyline" }
+ring = { path = "forks/ring-0.17.8" }
 security-framework = { path = "forks/security-framework" }
 tracing-core = { path = "forks/tracing-core" }
 zeroize = { path = "forks/zeroize" }
 zstd-sys = { path = "forks/zstd-sys" }
+# keep-sorted end
 
 ### Mirrors: forked crates managed as separate git repos
+# keep-sorted start
 serde_json5 = { path = "mirrors/serde_json5" } # TODO(https://fxbug.dev/75491) remove
+# keep-sorted end
 
 #################################################################################
 ###                            Cargo GNaw Configs                             ###
@@ -451,15 +467,23 @@ require_feature_reviews = [
   "tokio",
 ]
 
+[gn.package.aead."0.5.2"]
+license_files = ["LICENSE-APACHE"]
+
 [gn.package.aes."0.8.4"]
 rustflags = [ "--cfg=aes_armv8" ]
+license_files = ["LICENSE-APACHE"]
 
 [gn.package.ahash."0.8.11".platform."cfg(any(target_arch = \"x86_64\", target_arch = \"aarch64\", target_arch = \"mips64\", target_arch = \"powerpc64\", target_arch = \"riscv64gc\", target_arch = \"s390x\"))"]
 rustflags = [ "--cfg=feature=\\\"folded_multiply\\\"" ]
 
-[gn.package.anyhow."1.0.86"]
+[gn.package.anyhow."1.0.95"]
 # TODO(https://github.com/rust-lang/rust/pull/99301): uncomment when generic member access is stable
 #rustflags = ["--cfg=backtrace"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.arbitrary."1.0.3"]
+license_files = ["LICENSE-APACHE"]
 
 [gn.package.ash."0.37.0+1.3.209"]
 rustflags = []
@@ -486,7 +510,7 @@ env_vars = [
 visibility = [":*", "//third_party/alacritty/alacritty_terminal:*" ]
 reviewed_features = ["default"]
 
-[gn.package.bitflags."2.4.1"]
+[gn.package.bitflags."2.7.0"]
 reviewed_features = ["serde"]
 
 # The unicode feature is excluded so we don't need to spend time auditing it.
@@ -511,6 +535,9 @@ rustflags = ["--cfg=crc32fast_stdarchx86"]
 
 [gn.package.crossbeam-utils."0.8.14"]
 rustflags = []
+
+[gn.package.euclid."0.22.1"]
+license_files = ["LICENSE-APACHE"]
 
 [gn.package.fancy-regex."0.8.0"]
 # TODO(https://fxbug.dev/112722): We're importing this explicitly for now, but eventually
@@ -569,6 +596,9 @@ rustflags = [ "--cfg=relaxed_coherence" ]
 env_vars = [ "CARGO_PKG_NAME=getrandom", "CARGO_PKG_VERSION=0.2.10", "CARGO_MANIFEST_DIR=${gn_source_root}/third_party/rust_crates/vendor/getrandom-0.2.10" ]
 rustflags = []
 
+[gn.package.group."0.12.1"]
+license_files = ["LICENSE-APACHE"]
+
 [gn.package.handlebars."4.3.5"]
 # pest relies on this being set to find the grammar file
 env_vars = [ "CARGO_MANIFEST_DIR=${gn_source_root}/third_party/rust_crates/vendor/handlebars-4.3.5" ]
@@ -585,7 +615,7 @@ rustflags = ["--cfg=has_std"]
 [gn.package.lazy_static."1.4.0"]
 group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "lazy_static_visibility" }
 
-[gn.package.libc."0.2.158"]
+[gn.package.libc."0.2.169"]
 rustflags = [
   "--cfg=libc_priv_mod_use",
   "--cfg=libc_union",
@@ -602,7 +632,7 @@ rustflags = [
   "--cfg=libc_const_extern_fn",
  ]
 
-[gn.package.libc."0.2.158".platform."cfg(target_os = \"freebsd\")"]
+[gn.package.libc."0.2.169".platform."cfg(target_os = \"freebsd\")"]
 rustflags = ["--cfg=freebsd11"]
 
 [gn.package.libm."0.2.1"]
@@ -650,9 +680,29 @@ deps = [
 [gn.package.mockall."0.9.0"]
 deps = ["//build/validate:non_production_tag"]
 
-[gn.package.nix."0.26.2"]
+[gn.package.nix."0.29.0"]
 group_visibility = { import = "//src/lib/fuchsia_nix/nix_visibility.gni", variable = "nix_visibility" }
-visibility = [":*", "//third_party/rust_crates/compat/rustyline:*"]
+visibility = [":*"]
+
+[gn.package.nix."0.29.0".platform."cfg(target_os = \"linux\")"]
+rustflags = [
+  "--cfg=linux",
+  "--cfg=linux_android",
+]
+
+[gn.package.nix."0.29.0".platform."cfg(target_os = \"freebsd\")"]
+rustflags = [
+  "--cfg=bsd",
+  "--cfg=freebsd",
+  "--cfg=freebsdlike",
+]
+
+[gn.package.nix."0.29.0".platform."cfg(target_os = \"macos\")"]
+rustflags = [
+  "--cfg=apple_targets",
+  "--cfg=bsd",
+  "--cfg=macos",
+]
 
 [gn.package.num-bigint."0.4.3"]
 rustflags = [
@@ -696,12 +746,14 @@ rustflags = [
 
 [gn.package.once_cell."1.20.2"]
 group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "once_cell_visibility" }
-
 [gn.package.parking_lot."0.12.0"]
 # Funnel usage of parking_lot through fuchsia_sync.
 visibility = ["//src/lib/fuchsia-sync", "//third_party/rust_crates:*"]
 
 [gn.package.parking_lot_core."0.9.9"]
+rustflags = []
+
+[gn.package.paste."1.0.15"]
 rustflags = []
 
 # "--cfg=use_fallback" is required in order to avoid using the unstable
@@ -726,64 +778,74 @@ rustflags = ["--cfg=span_locations", "--cfg=wrap_proc_macro"]
 
 [gn.package.rand."0.6.5"]
 rustflags = ["--cfg=rustc_1_25","--cfg=rustc_1_26",  "--cfg=rustc_1_27",]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_chacha."0.3.1"]
+license_files = ["LICENSE-APACHE"]
 
 [gn.package.rand_chacha."0.1.1"]
 rustflags = ["--cfg=rustc_1_26"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_core."0.3.1"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_core."0.4.2"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_core."0.6.3"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_hc."0.1.0"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_hc."0.3.1"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_isaac."0.1.1"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_jitter."0.1.3"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_os."0.1.2"]
+license_files = ["LICENSE-APACHE"]
 
 [gn.package.rand_pcg."0.1.1"]
 rustflags = ["--cfg=rust_1_26"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_xorshift."0.1.1"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_xorshift."0.3.0"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_xoshiro."0.1.0"]
+license_files = ["LICENSE-APACHE"]
 
 [gn.package.rayon-core."1.12.1"]
 # Has build script but no config needed.
 
-[gn.package.ref-cast."1.0.9"]
+[gn.package.ref-cast."1.0.23"]
 rustflags = []
 
-[gn.package.ring."0.16.20"]
+[gn.package.ring."0.17.8"]
 # See https://fxbug.dev/104855 if you want to change this: Please talk to Security team.
 # Thank you!
 visibility = [
   ":ring",
-  ":rustls-v0_21_7",
-  ":rustls-webpki-v0_101_6",
-  ":sct-v0_7_0",
-  ":trust-dns-proto-v0_21_2",
-  ":tuf-v0_3_0-beta12",
-  ":webpki-v0_21_0",
-
-  ":ring.clippy",
-  ":rustls-v0_21_7.clippy",
-  ":rustls-webpki-v0_101_6.clippy",
-  ":sct-v0_6_0.clippy",
-  ":trust-dns-proto-v0_21_2.clippy",
-  ":tuf-v0_3_0-beta12.clippy",
-  ":webpki-v0_21_0.clippy",
-
-  ":ring.rustdoc",
-  ":rustls-v0_21_7.rustdoc",
-  ":rustls-webpki-v0_101_6.rustdoc",
-  ":sct-v0_7_0.rustdoc",
-  ":trust-dns-proto-v0_21_2.rustdoc",
-  ":tuf-v0_3_0-beta12.rustdoc",
-  ":webpki-v0_21_0.rustdoc",
-
-  ":ring.aux.deps",
-  ":rustls-v0_21_7.aux.deps",
-  ":rustls-webpki-v0_101_6.aux.deps",
-  ":sct-v0_7_0.aux.deps",
-  ":trust-dns-proto-v0_21_2.aux.deps",
-  ":tuf-v0_3_0-beta12.aux.deps",
-  ":webpki-v0_21_0.aux.deps",
-
-  ":ring.aux.transdeps",
-  ":rustls-v0_21_7.aux.transdeps",
-  ":rustls-webpki-v0_101_6.aux.transdeps",
-  ":sct-v0_7_0.aux.transdeps",
-  ":trust-dns-proto-v0_21_2.aux.transdeps",
-  ":tuf-v0_3_0-beta12.aux.transdeps",
-  ":webpki-v0_21_0.aux.transdeps",
+  ":rustls-v0_21_12",
+  ":rustls-webpki-v0_101_7",
+  ":sct-v0_7_1",
+  ":tuf-v0_3_0-beta13",
+  ":tuf-v0_3_0-beta13.aux.deps",
+  ":tuf-v0_3_0-beta13.aux.transdeps",
+  ":tuf-v0_3_0-beta13.clippy",
+  ":tuf-v0_3_0-beta13.rustdoc",
 ]
-deps = [ "//third_party/rust_crates/compat/ring:ring-core" ]
+deps = [ "//third_party/rust_crates/compat/ring-0.17.8:ring-core" ]
+env_vars = [ "RING_CORE_PREFIX=ring_core_0_17_8_" ]
 
 # Please keep the rust_icu_* crates together in this list.
 # Refer to //build/icu/README.md for the details of the approach.
@@ -818,7 +880,7 @@ target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "ic
 configs = [ "//src/lib/icu:version" ]
 target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
 
-[gn.package.rustls."0.21.7"]
+[gn.package.rustls."0.21.12"]
 rustflags = []
 
 [gn.package.rutabaga_gfx."0.1.3"]
@@ -868,8 +930,15 @@ group_visibility = { import = "//third_party/rust_crates/visibility.gni", variab
 [gn.package.signal-hook."0.3.17"]
 rustflags = []
 
-[gn.package.slab."0.4.7"]
+[gn.package.slab."0.4.9"]
 rustflags = []
+
+[gn.package.syn."0.15.26"]
+rustflags = [
+  "--cfg=feature=\\\"extra-traits\\\"",
+  "--cfg=feature=\\\"full\\\"",
+  "--cfg=feature=\\\"visit\\\"",
+]
 
 [gn.package.syn."1.0.98"]
 # Has build script but no config needed.
@@ -918,6 +987,9 @@ visibility = [
   "//tools/lib/reference_doc/macro:*",
 ]
 
+[gn.package.thiserror."2.0.11"]
+# Has build script but no config needed.
+
 [gn.package.thiserror."1.0.57"]
 # Has build script but no config needed.
 
@@ -928,7 +1000,7 @@ group_visibility = { import = "//third_party/rust_crates/private_visibility.gni"
 # TODO(https://fxbug.dev/106164) This manual configuration enables the "rt", "net"
 # "fs" and "sync" features on non-Fuchsia targets. It should be removed
 # once gnaw supports target-specific features.
-[gn.package.tokio."1.32.1"]
+[gn.package.tokio."1.38.1"]
 reviewed_features = [
   "bytes",
   "default",
@@ -947,10 +1019,10 @@ reviewed_features = [
   "time",
 ]
 
-[gn.package.tokio."1.32.1".platform."cfg(not(target_os = \"fuchsia\"))"]
+[gn.package.tokio."1.38.1".platform."cfg(not(target_os = \"fuchsia\"))"]
 deps = [
   ":bytes-v1_6_0",
-  ":libc-v0_2_158",
+  ":libc-v0_2_169",
   ":memchr-v2_7_1",
   ":mio-v0_8_9",
   ":num_cpus-v1_16_0",
@@ -976,15 +1048,11 @@ rustflags = [
   "--cfg=tokio_unstable",
 ]
 
-# TODO(https://fxbug.dev/106164) This manual configuration enables the "log" so that
-# tracing macros also emit log events and binaries with setting up a
-# log::Logger receive tracing events as logs. On Fuchsia we don't need that
-# since all binaries set up a tracing Subscriber.
-[gn.package.tracing."0.1.40".platform."cfg(not(target_os = \"fuchsia\"))"]
-deps = [ ":log-v0_4_22" ]
-rustflags = [
-  "--cfg=feature=\\\"log\\\"",
-]
+[gn.package.tracing."0.1.40"]
+group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "tracing_visibility" }
+
+[gn.package.tracing-subscriber."0.3.18"]
+group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "tracing_subscriber_visibility" }
 
 # No build script but relies on cargo to populate environment variables.
 [gn.package.trust-dns-resolver."0.22.0"]
@@ -1015,9 +1083,39 @@ rustflags = [
   "--cfg=__unicase__core_and_alloc",
 ]
 
+[gn.package.unicode-bidi."0.3.4"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.unicode-normalization."0.1.19"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.unicode-segmentation."1.10.1"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.unicode-width."0.1.14"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.unicode-width."0.2.0"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.unicode-xid."0.1.0"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.unicode-xid."0.2.0"]
+license_files = ["LICENSE-APACHE"]
+
 [gn.package.url."1.7.2"]
 # FIXME(91750): Blocked on updating valico to 3.x.
 visibility = [":*", "//build/sdk/meta:*"]
+
+[gn.package.uuid."0.7.2"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.uuid."0.8.2"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.uuid."1.1.2"]
+license_files = ["LICENSE-APACHE"]
 
 [gn.package.valico."2.4.2"]
 env_vars = ["OUT_DIR=../../../../compat/valico"]
@@ -1025,24 +1123,28 @@ env_vars = ["OUT_DIR=../../../../compat/valico"]
 [gn.package.valuable."0.1.0"]
 rustflags = []
 
-[gn.package.zerocopy."0.8.1"]
+[gn.package.zerocopy."0.8.14"]
 rustflags = [
-  "--cfg=zerocopy_core_error",
-  "--cfg=zerocopy_diagnostic_on_unimplemented",
-  "--cfg=zerocopy_generic_bounds_in_const_fn",
-  "--cfg=zerocopy_target_has_atomics",
-  "--cfg=zerocopy_aarch64_simd",
-  "--cfg=zerocopy_panic_in_const_and_vec_try_reserve"
+  "--cfg=zerocopy_core_error_1_81_0",
+  "--cfg=zerocopy_diagnostic_on_unimplemented_1_78_0",
+  "--cfg=zerocopy_generic_bounds_in_const_fn_1_61_0",
+  "--cfg=zerocopy_target_has_atomics_1_60_0",
+  "--cfg=zerocopy_aarch64_simd_1_59_0",
+  "--cfg=zerocopy_panic_in_const_and_vec_try_reserve_1_57_0"
 ]
 
-[gn.package.zerocopy-derive."0.8.1"]
+[gn.package.zerocopy-derive."0.8.14"]
 # See https://github.com/google/zerocopy/issues/1792
 rustflags = [ "--cfg=zerocopy_derive_union_into_bytes" ]
 
 [gn.package.zstd-safe."5.0.2+zstd.1.5.2"]
 rustflags = []
 
-[gn.package.zstd-sys."2.0.1+zstd.1.5.2"]
+# Note that the zstd version we use on Fuchsia doesn't match the current zstd/zstd-safe crate,
+# however we do not rely on any new or experimental features outside of the existing APIs these
+# crates provide. When we do update the zstd/zstd-safe crates, we should ensure that we update the
+# zstd version pinned in the integration repo via the fuchsia/third_party/flower file accordingly.
+[gn.package.zstd-sys."2.0.1+zstd.1.5.6"]
 rustflags = []
 # It is a fork:
 uses_fuchsia_license = true

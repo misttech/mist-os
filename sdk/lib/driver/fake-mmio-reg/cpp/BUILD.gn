@@ -7,9 +7,8 @@ import("//build/cpp/sdk_source_set.gni")
 import("//build/test.gni")
 
 sdk_source_set("cpp") {
-  # TODO(https://fxbug.dev/383339999): Promote category to "partner".
-  category = "internal"
-  stable = false
+  category = "partner"
+  stable = true
   sdk_name = "fake_mmio_reg_cpp"
   include_base = "//sdk"
 
@@ -18,7 +17,7 @@ sdk_source_set("cpp") {
     "fake-mmio-reg.h",
   ]
 
-  deps = [ "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake" ]
+  deps = [ "//zircon/system/ulib/mmio-ptr" ]
 
   public_deps = [
     "//sdk/lib/fit",

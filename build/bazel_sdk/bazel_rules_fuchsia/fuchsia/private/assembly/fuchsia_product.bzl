@@ -78,9 +78,18 @@ def _fuchsia_product_assembly_impl(ctx):
     board_config_file_path = board_config.config
 
     # Invoke Product Assembly
-    product_config_file_path = ctx.attr.product_config[FuchsiaProductConfigInfo].config
-    build_type = ctx.attr.product_config[FuchsiaProductConfigInfo].build_type
-    build_id_dirs = ctx.attr.product_config[FuchsiaProductConfigInfo].build_id_dirs
+    # TODO(https://fxbug.dev/391674348): Assembly should take the product config as a directory.
+    product_config = ctx.attr.product_config[FuchsiaProductConfigInfo]
+    product_config_file_path = product_config.directory
+    if product_config.config_path:
+        product_config_file_path += "/" + product_config.config_path
+    else:
+        product_config_file_path += "/product_configuration.json"
+
+    build_type = product_config.build_type
+    build_id_dirs = []
+    build_id_dirs += product_config.build_id_dirs
+    build_id_dirs += ctx.attr.board_config[FuchsiaBoardConfigInfo].build_id_dirs
 
     ffx_inputs = get_ffx_assembly_inputs(fuchsia_toolchain)
     ffx_inputs += ctx.files.product_config
@@ -179,7 +188,7 @@ def _fuchsia_product_assembly_impl(ctx):
 _fuchsia_product_assembly = rule(
     doc = """Declares a target to product a fully-configured list of artifacts that make up a product.""",
     implementation = _fuchsia_product_assembly_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     provides = [FuchsiaProductAssemblyInfo],
     attrs = {
         "product_config": attr.label(
@@ -278,7 +287,7 @@ def _fuchsia_product_create_system_impl(ctx):
 _fuchsia_product_create_system = rule(
     doc = """Declares a target to generate the images for a Fuchsia product.""",
     implementation = _fuchsia_product_create_system_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     provides = [FuchsiaProductImageInfo],
     attrs = {
         "product_assembly": attr.label(

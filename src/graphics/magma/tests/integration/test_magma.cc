@@ -112,7 +112,7 @@ class FakeLogSink : public fidl::WireServer<fuchsia_logger::LogSink> {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
-#if FUCHSIA_API_LEVEL_LESS_THAN(NEXT) || FUCHSIA_API_LEVEL_AT_LEAST(PLATFORM)
+#if FUCHSIA_API_LEVEL_LESS_THAN(26) || FUCHSIA_API_LEVEL_AT_LEAST(PLATFORM)
   void Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) override {
     fprintf(stderr, "Unexpected Connect\n");
     completer.Close(ZX_ERR_NOT_SUPPORTED);
@@ -123,6 +123,14 @@ class FakeLogSink : public fidl::WireServer<fuchsia_logger::LogSink> {
                          ConnectStructuredCompleter::Sync& _completer) override {
     loop_.Quit();
   }
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_logger::LogSink> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {
+    fprintf(stderr, "Unexpected method\n");
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+#endif
 
  private:
   async::Loop& loop_;

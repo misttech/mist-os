@@ -41,6 +41,11 @@ pub struct ListSubCommand {
     /// toggle whether components in each package will be fetched and shown in the output table
     #[argh(option, default = "true")]
     pub include_components: bool,
+
+    /// toggle whether the sum of the uncompressed size of all blobs in each package will be
+    /// calculated and shown in the output table
+    #[argh(option, default = "false")]
+    pub include_size: bool,
 }
 
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]

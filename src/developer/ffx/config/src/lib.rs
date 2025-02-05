@@ -10,6 +10,9 @@ use analytics::{set_new_opt_in_status, show_status_message};
 use anyhow::{anyhow, Context, Result};
 use api::value::TryConvert;
 use core::fmt;
+use ffx_command_error::bug;
+use futures::future::LocalBoxFuture;
+use std::fmt::Debug;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -46,6 +49,31 @@ lazy_static::lazy_static! {
 #[doc(hidden)]
 pub mod macro_deps {
     pub use {anyhow, serde_json};
+}
+
+pub trait TryFromEnvContext: Sized + Debug {
+    fn try_from_env_context<'a>(
+        env: &'a EnvironmentContext,
+    ) -> LocalBoxFuture<'a, ffx_command_error::Result<Self>>;
+}
+
+// This is an implementation for the "target_spec", which is just an `Option<String>` (it should
+// really just be a newtype, but that requires a lot of existing code to change).
+impl TryFromEnvContext for Option<String> {
+    fn try_from_env_context<'a>(
+        env: &'a EnvironmentContext,
+    ) -> LocalBoxFuture<'a, ffx_command_error::Result<Self>> {
+        Box::pin(async {
+            // TODO(XXX): Create a TargetSpecifier type vs. Option<String>.
+            // ffx_target::get_target_specifier(env).await.bug().map_err(Into::into) })
+            let target_spec = env.get_optional(keys::TARGET_DEFAULT_KEY).map_err(|e| bug!(e))?;
+            match target_spec {
+                Some(ref target) => tracing::info!("Target specifier: ['{target:?}']"),
+                None => tracing::debug!("No target specified"),
+            }
+            Ok(target_spec)
+        })
+    }
 }
 
 /// The levels of configuration possible
@@ -204,6 +232,7 @@ pub const SDK_OVERRIDE_KEY_PREFIX: &str = "sdk.overrides";
 /// Returns the path to the tool with the given name by first
 /// checking for configured override with the key of `sdk.override.{name}`,
 /// and no override is found, sdk.get_host_tool() is called.
+#[allow(clippy::unused_async)] // TODO(https://fxbug.dev/386387845)
 pub async fn get_host_tool(sdk: &Sdk, name: &str) -> Result<PathBuf> {
     // Check for configured override for the host tool.
     let override_key = format!("{SDK_OVERRIDE_KEY_PREFIX}.{name}");
@@ -222,12 +251,14 @@ pub async fn get_host_tool(sdk: &Sdk, name: &str) -> Result<PathBuf> {
     sdk.get_host_tool(name)
 }
 
+#[allow(clippy::unused_async)] // TODO(https://fxbug.dev/386387845)
 pub async fn print_config<W: Write>(ctx: &EnvironmentContext, mut writer: W) -> Result<()> {
     let config = ctx.load()?.config_from_cache()?;
     let read_guard = config.read().map_err(|_| anyhow!("config read guard"))?;
     writeln!(writer, "{}", *read_guard).context("displaying config")
 }
 
+#[allow(clippy::unused_async)] // TODO(https://fxbug.dev/386387845)
 pub async fn get_log_dirs() -> Result<Vec<String>> {
     match query("log.dir").get() {
         Ok(log_dirs) => Ok(log_dirs),
@@ -447,7 +478,7 @@ mod test {
         put_file!(sdk_root, "../test_data/sdk", "meta/manifest.json");
         put_file!(sdk_root, "../test_data/sdk", "tools/x64/a_host_tool-meta.json");
 
-        let sdk = env.context.get_sdk().await.expect("test sdk");
+        let sdk = env.context.get_sdk().expect("test sdk");
 
         let result = get_host_tool(&sdk, "a_host_tool").await.expect("a_host_tool");
         assert_eq!(result, sdk_root.join("tools/x64/a-host-tool"));
@@ -476,7 +507,7 @@ mod test {
             .await
             .expect("setting override");
 
-        let sdk = env.context.get_sdk().await.expect("test sdk");
+        let sdk = env.context.get_sdk().expect("test sdk");
 
         let result = get_host_tool(&sdk, "a_host_tool").await.expect("a_host_tool");
         assert_eq!(result, override_path);
@@ -508,7 +539,7 @@ mod test {
             .await
             .expect("setting override");
 
-        let sdk = env.context.get_sdk().await.expect("test sdk");
+        let sdk = env.context.get_sdk().expect("test sdk");
 
         let result = get_host_tool(&sdk, "a_host_tool").await;
         assert_eq!(

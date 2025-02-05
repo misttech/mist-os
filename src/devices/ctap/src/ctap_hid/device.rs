@@ -16,11 +16,11 @@ use fuchsia_async::{MonotonicInstant, TimeoutExt};
 use futures::lock::Mutex;
 use futures::TryFutureExt;
 use lazy_static::lazy_static;
+use log::{info, warn};
 use rand::rngs::OsRng;
 use rand::Rng;
 use std::io::Read;
 use std::path::PathBuf;
-use tracing::{info, warn};
 
 /// The broadcast channel to use for the initial init request, as defined in the CTAP HID spec.
 const INIT_CHANNEL: u32 = 0xffffffff;

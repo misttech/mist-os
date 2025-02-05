@@ -80,6 +80,14 @@ inferior("async_rust") {
   ]
 }
 
+inferior("async_rust_multithreaded") {
+  type = "rustc_binary"
+  edition = "2021"
+  sources = [ "async_rust_multithreaded.rs" ]
+  source_root = "async_rust_multithreaded.rs"
+  deps = [ "//src/lib/fuchsia-async" ]
+}
+
 inferior("simplified_templates") {
   sources = [ "simplified_templates.cc" ]
   deps = [ "//src/lib/debug" ]
@@ -178,6 +186,7 @@ fuchsia_package("zxdb_e2e_inferiors") {
   testonly = true
   deps = [
     ":async_rust",
+    ":async_rust_multithreaded",
     ":bitfield",
     ":cpp_functions",
     ":inlined_crasher",

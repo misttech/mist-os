@@ -9,5 +9,8 @@
 // ordering no longer causes overflows.
 #![recursion_limit = "256"]
 
+extern crate alloc;
+
 mod bindtodevice;
 mod loopback;
+mod sndbuf;

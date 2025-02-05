@@ -19,7 +19,7 @@ use fidl_fuchsia_tracing_provider::RegistryMarker;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use futures::{StreamExt, TryStream, TryStreamExt};
-use tracing::info;
+use log::info;
 use {
     fidl_fuchsia_bluetooth_avdtp_test as fidl_avdtp, fidl_fuchsia_bluetooth_avrcp as fidl_avrcp,
     fuchsia_async as fasync,

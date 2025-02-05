@@ -153,7 +153,7 @@ class FidlRequest {
     }
     return *this;
   }
-  FidlRequest& reset_buffers(get_mapped_func_t GetMapped) {
+  FidlRequest& reset_buffers(const get_mapped_func_t& GetMapped) {
     for (auto& d : *request_.data()) {
       d.offset(0);
       switch (d.buffer()->Which()) {
@@ -175,7 +175,7 @@ class FidlRequest {
   // CopyTo: tries to copy `size` bytes from `buffer` to contiguous `request` buffers from
   // `offset`. Returns the number of bytes copied for each buffer.
   std::vector<size_t> CopyTo(size_t offset, const void* buffer, size_t size,
-                             get_mapped_func_t GetMapped) {
+                             const get_mapped_func_t& GetMapped) {
     const uint8_t* start = static_cast<const uint8_t*>(buffer);
     size_t todo = size;
     size_t cur_offset = offset;
@@ -226,7 +226,7 @@ class FidlRequest {
   // CopyFrom: tries to copy `size` bytes from `request` (starting from `offset`) to `buffer`.
   // Returns the number of bytes copied for each buffer.
   std::vector<size_t> CopyFrom(size_t offset, void* buffer, size_t size,
-                               get_mapped_func_t GetMapped) {
+                               const get_mapped_func_t& GetMapped) {
     uint8_t* start = static_cast<uint8_t*>(buffer);
     size_t todo = size;
     size_t cur_offset = offset;
@@ -302,7 +302,7 @@ class FidlRequest {
 
   // CacheHelper flushes and invaldiates cache for specified buffer region.
   zx_status_t CacheHelper(const fuchsia_hardware_usb_request::BufferRegion& buffer,
-                          uint32_t options, get_mapped_func_t GetMapped) {
+                          uint32_t options, const get_mapped_func_t& GetMapped) {
     auto mapped = GetMapped(*buffer.buffer());
     if (mapped.is_error()) {
       return mapped.error_value();
@@ -474,13 +474,15 @@ class FidlRequestPool {
 
   // Add: called when adding a new request to the pool.
   void Add(RequestType&& request) {
+    std::lock_guard<std::mutex> _(mutex_);
     size_++;
-    Put(std::move(request));
+    PutLocked(std::move(request));
   }
 
   // Remove: called when removing a request from the pool.
   std::optional<RequestType> Remove() {
-    auto req = Get();
+    std::lock_guard<std::mutex> _(mutex_);
+    auto req = GetLocked();
     if (req.has_value()) {
       size_--;
     }
@@ -489,6 +491,27 @@ class FidlRequestPool {
 
   std::optional<RequestType> Get() {
     std::lock_guard<std::mutex> _(mutex_);
+    return GetLocked();
+  }
+
+  // Put: called when a request (originally obtained from `get`) is returned to the pool.
+  void Put(RequestType&& request) {
+    std::lock_guard<std::mutex> _(mutex_);
+    PutLocked(std::move(request));
+  }
+
+  bool Full() {
+    std::lock_guard<std::mutex> _(mutex_);
+    return free_reqs_.size() == size_;
+  }
+
+  bool Empty() {
+    std::lock_guard<std::mutex> _(mutex_);
+    return free_reqs_.empty();
+  }
+
+ private:
+  std::optional<RequestType> GetLocked() __TA_REQUIRES(mutex_) {
     if (free_reqs_.empty()) {
       return std::nullopt;
     }
@@ -498,27 +521,14 @@ class FidlRequestPool {
     return std::move(req);
   }
 
-  // Put: called when a request (originally obtained from `get`) is returned to the pool.
-  void Put(RequestType&& request) {
-    std::lock_guard<std::mutex> _(mutex_);
+  void PutLocked(RequestType&& request) __TA_REQUIRES(mutex_) {
     free_reqs_.emplace(std::move(request));
     ZX_DEBUG_ASSERT(free_reqs_.size() <= size_);
   }
 
-  bool Full() {
-    std::lock_guard<std::mutex> _(mutex_);
-    return free_reqs_.size() == size_;
-  }
-  bool Empty() {
-    std::lock_guard<std::mutex> _(mutex_);
-    return free_reqs_.empty();
-  }
-
- private:
   std::mutex mutex_;
   std::queue<RequestType> free_reqs_ __TA_GUARDED(mutex_);
-
-  std::atomic_uint32_t size_ = 0;
+  uint32_t size_ __TA_GUARDED(mutex_) = 0;
 };
 
 }  // namespace usb::internal

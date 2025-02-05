@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use tracing_subscriber::fmt::layer;
-use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
-
 use fidl_fuchsia_kernel::{
     CpuStats, MemoryStats, MemoryStatsCompression, MemoryStatsExtended, StatsProxyInterface,
 };
 use std::future::{self, Ready};
 use std::pin::pin;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Once};
 use tokio::sync::watch::{self};
 use traces::watcher::Watcher;
 struct FakeStatsProxy {
@@ -104,10 +100,13 @@ async fn actual_main(watcher: Watcher) {
     traces::kernel::serve_forever(watcher, kernel_stats).await;
 }
 
+static LOGGER_ONCE: Once = Once::new();
+
 #[no_mangle]
 pub extern "C" fn rs_init_logs() {
-    // Write logs to stderr.
-    tracing_subscriber::registry().with(layer().with_writer(std::io::stderr)).init();
+    LOGGER_ONCE.call_once(|| {
+        diagnostics_log::initialize_sync(diagnostics_log::PublishOptions::default());
+    });
 }
 
 #[no_mangle]

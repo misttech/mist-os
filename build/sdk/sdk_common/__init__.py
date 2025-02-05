@@ -95,8 +95,6 @@ def detect_collisions(atoms: Sequence[Atom]) -> Iterator[str]:
 
 
 CATEGORIES = [
-    # "excluded" is deprecated.
-    # "experimental" is deprecated.
     "internal",
     "cts",
     "partner_internal",
@@ -138,7 +136,6 @@ def area_names_from_file(parsed_areas: Any) -> list[str]:
     return [area["name"] for area in parsed_areas] + ["Unknown"]
 
 
-_AREA_REQUIRED_CATEGORIES = ["public", "partner", "partner_internal"]
 _AREA_OPTIONAL_TYPES = [
     "cc_prebuilt_library",
     "cc_source_library",
@@ -151,6 +148,7 @@ _AREA_OPTIONAL_TYPES = [
     "host_tool",
     "loadable_module",
     "package",
+    "rust_3p_library",
     "sysroot",
     "version_history",
 ]
@@ -186,11 +184,7 @@ class Validator:
     def detect_area_violations(self, atoms: Sequence[Atom]) -> Iterator[str]:
         """Yields strings describing any invalid API areas in `atoms`."""
         for atom in atoms:
-            if (
-                atom.area is None
-                and atom.category in _AREA_REQUIRED_CATEGORIES
-                and atom.type not in _AREA_OPTIONAL_TYPES
-            ):
+            if atom.area is None and atom.type not in _AREA_OPTIONAL_TYPES:
                 yield (
                     "%s must specify an API area. Valid areas: %s"
                     % (

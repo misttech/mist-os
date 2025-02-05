@@ -11,11 +11,11 @@ use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use fuchsia_runtime::{HandleInfo, HandleType};
 use futures::StreamExt;
 use lazy_static::lazy_static;
+use log::warn;
 use namespace::Namespace;
 use once_cell::unsync::OnceCell;
 use socket_parsing::{NewlineChunker, NewlineChunkerError};
 use std::sync::Arc;
-use tracing::{info, warn, Subscriber};
 use zx::HandleBased;
 use {fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fproc, fuchsia_async as fasync};
 
@@ -91,7 +91,7 @@ fn forward_socket_to_syslog(
     let mut writer = SyslogWriter::new(logger, level);
     let task = fasync::Task::spawn(async move {
         if let Err(error) = drain_lines(socket, &mut writer).await {
-            warn!(%error, "Draining output stream failed");
+            warn!(error:%; "Draining output stream failed");
         }
     });
 
@@ -134,17 +134,27 @@ trait LogWriter: Send {
 }
 
 struct SyslogWriter {
-    logger: Arc<dyn Subscriber + Send + Sync>,
+    logger: Arc<dyn log::Log + Send + Sync>,
     level: OutputLevel,
 }
 
+#[derive(Copy, Clone)]
 enum OutputLevel {
     Info,
     Warn,
 }
 
+impl From<OutputLevel> for log::Level {
+    fn from(level: OutputLevel) -> log::Level {
+        match level {
+            OutputLevel::Info => log::Level::Info,
+            OutputLevel::Warn => log::Level::Warn,
+        }
+    }
+}
+
 impl SyslogWriter {
-    fn new(logger: Arc<dyn Subscriber + Send + Sync>, level: OutputLevel) -> Self {
+    fn new(logger: Arc<dyn log::Log + Send + Sync>, level: OutputLevel) -> Self {
         Self { logger, level }
     }
 }
@@ -153,10 +163,9 @@ impl SyslogWriter {
 impl LogWriter for SyslogWriter {
     async fn write(&mut self, bytes: &[u8]) {
         let msg = String::from_utf8_lossy(&bytes);
-        tracing::subscriber::with_default(self.logger.clone(), || match self.level {
-            OutputLevel::Info => info!("{}", msg),
-            OutputLevel::Warn => warn!("{}", msg),
-        });
+        self.logger.log(
+            &log::Record::builder().level(self.level.into()).args(format_args!("{msg}")).build(),
+        );
     }
 }
 
@@ -382,6 +391,9 @@ mod tests {
                         }
                         LogSinkRequest::WaitForInterestChange { .. } => {
                             // we expect this request to come but asserting on it is flakey
+                        }
+                        LogSinkRequest::_UnknownMethod { .. } => {
+                            panic!("Unexpected unknown method")
                         }
                     }
                 }

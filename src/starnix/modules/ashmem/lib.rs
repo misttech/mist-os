@@ -224,7 +224,8 @@ impl FileOps for Ashmem {
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         match request {
-            ASHMEM_SET_SIZE => {
+            #[allow(unreachable_patterns)]
+            ASHMEM_SET_SIZE | starnix_uapi::arch32::ASHMEM_SET_SIZE => {
                 let mut state = self.state.lock();
 
                 if self.is_mapped() {
@@ -254,7 +255,8 @@ impl FileOps for Ashmem {
                 current_task.write_memory(arg.into(), name)?;
                 Ok(SUCCESS)
             }
-            ASHMEM_SET_PROT_MASK => {
+            #[allow(unreachable_patterns)]
+            ASHMEM_SET_PROT_MASK | starnix_uapi::arch32::ASHMEM_SET_PROT_MASK => {
                 let mut state = self.state.lock();
                 let prot_flags =
                     ProtectionFlags::from_access_bits(arg.into()).ok_or_else(|| errno!(EINVAL))?;
@@ -292,7 +294,7 @@ impl FileOps for Ashmem {
 
                 match request {
                     ASHMEM_PIN => {
-                        for is_purged in state.unpinned.remove(&(lo..hi)).iter() {
+                        for is_purged in state.unpinned.remove(lo..hi).iter() {
                             if *is_purged {
                                 return Ok(ASHMEM_WAS_PURGED.into());
                             }

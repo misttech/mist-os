@@ -101,7 +101,7 @@ impl TokenStore {
         if !access_token.is_empty() {
             // Passing the access token over a non-secure path is forbidden.
             if builder.uri_ref().and_then(|x| x.scheme()).map(|x| x.as_str()) == Some("https") {
-                tracing::debug!("maybe_authorize: adding Bearer Authorization");
+                log::debug!("maybe_authorize: adding Bearer Authorization");
                 return Ok(builder.header("Authorization", format!("Bearer {}", access_token)));
             }
         }
@@ -117,7 +117,7 @@ impl TokenStore {
         bucket: &str,
         object: &str,
     ) -> Result<Response<Body>> {
-        tracing::debug!("download {:?}, {:?}", bucket, object);
+        log::debug!("download {:?}, {:?}", bucket, object);
         // If the bucket and object are from a gs:// URL, the object may have a
         // undesirable leading slash. Trim it if present.
         let object = if object.starts_with('/') { &object[1..] } else { object };
@@ -134,7 +134,7 @@ impl TokenStore {
     /// Callers are expected to handle errors and call send_request() again as
     /// desired (e.g. follow redirects).
     async fn send_request(&self, https_client: &HttpsClient, url: Url) -> Result<Response<Body>> {
-        tracing::debug!("https_client.request {:?}", url);
+        log::debug!("https_client.request {:?}", url);
         let req = Request::builder().method(Method::GET).uri::<String>(url.into());
         let req = self.maybe_authorize(req).await.context("authorizing in send_request")?;
         let req = req.body(Body::empty()).context("creating request body")?;
@@ -146,12 +146,12 @@ impl TokenStore {
             // If an access token was already used, there's no need in getting
             // a new one, the server is saying NO to this request.
             StatusCode::FORBIDDEN if !auth_used => {
-                tracing::debug!("send_request status {} (FORBIDDEN)", res.status());
+                log::debug!("send_request status {} (FORBIDDEN)", res.status());
                 bail!(GcsError::NeedNewAccessToken);
             }
             // Status 401 (UNAUTHORIZED) means the access token didn't work.
             StatusCode::UNAUTHORIZED => {
-                tracing::debug!("send_request status {} (UNAUTHORIZED)", res.status());
+                log::debug!("send_request status {} (UNAUTHORIZED)", res.status());
                 bail!(GcsError::NeedNewAccessToken);
             }
             _ => (),
@@ -196,7 +196,7 @@ impl TokenStore {
         bucket: &str,
         prefix: &str,
     ) -> Result<bool> {
-        tracing::debug!("testing existence of gs://{}/{}", bucket, prefix);
+        log::debug!("testing existence of gs://{}/{}", bucket, prefix);
         // Note: gs 'stat' will not match a directory.  So, gs 'list' is used to
         // determine existence. The number of items in a directory may be
         // enormous, so the results are limited to one item.
@@ -222,7 +222,7 @@ impl TokenStore {
         prefix: &str,
         limit: Option<u32>,
     ) -> Result<Vec<String>> {
-        tracing::debug!("list objects at gs://{}/{}", bucket, prefix);
+        log::debug!("list objects at gs://{}/{}", bucket, prefix);
         self.attempt_list(https_client, bucket, prefix, limit).await
     }
 
@@ -237,7 +237,7 @@ impl TokenStore {
         prefix: &str,
         limit: Option<u32>,
     ) -> Result<Vec<String>> {
-        tracing::debug!("attempt_list of gs://{}/{}", bucket, prefix);
+        log::debug!("attempt_list of gs://{}/{}", bucket, prefix);
         // If the bucket and prefix are from a gs:// URL, the prefix may have a
         // undesirable leading slash. Trim it if present.
         let prefix = if prefix.starts_with('/') { &prefix[1..] } else { prefix };

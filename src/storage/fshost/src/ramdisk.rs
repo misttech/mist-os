@@ -91,7 +91,7 @@ async fn create_ramdisk(zbi_vmo: zx::Vmo, storage_host: bool) -> Result<Box<dyn 
             .map_err(zx::Status::from_raw)
             .context("get_topological_path returned an error")?;
 
-        tracing::info!(%topological_path, "launched ramdisk filesystem");
+        log::info!(topological_path:%; "launched ramdisk filesystem");
 
         // Ensure the boot image remains attached for the system lifetime.
         ramdisk.forget().context("detaching/forgetting ramdisk client")?;

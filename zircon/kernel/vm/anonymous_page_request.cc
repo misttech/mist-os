@@ -24,12 +24,12 @@ zx_status_t AnonymousPageRequest::Wait() {
   // This should only ever end up waiting momentarily until reclamation catches up. As such if we
   // end up waiting for a long time then this is probably a sign of a bug in reclamation somewhere,
   // so we want to make some noise here.
-  constexpr zx_duration_t kReportWaitTime = ZX_SEC(5);
+  constexpr zx_duration_mono_t kReportWaitTime = ZX_SEC(5);
 
   zx_status_t status = ZX_OK;
   uint32_t waited = 0;
-  while ((status = pmm_wait_till_should_retry_single_alloc(Deadline::after(kReportWaitTime))) ==
-         ZX_ERR_TIMED_OUT) {
+  while ((status = pmm_wait_till_should_retry_single_alloc(
+              Deadline::after_mono(kReportWaitTime))) == ZX_ERR_TIMED_OUT) {
     waited++;
     printf("WARNING: Waited %" PRIi64 " seconds to retry PMM allocations\n",
            (kReportWaitTime * waited) / ZX_SEC(1));

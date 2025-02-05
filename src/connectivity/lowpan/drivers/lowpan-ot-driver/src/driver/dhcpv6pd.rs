@@ -133,7 +133,9 @@ fn dhcp_v6_pd_prefix_unassigned<T: ot::BorderRouter>(instance: &T, prefix: ot::I
 impl DhcpV6PdInner {
     fn abandon_current_prefix(&mut self, instance: &ot::Instance) {
         if let Some(prefix) = self.prefix {
-            info!(tag = "dhcp_v6_pd"; "Abandoning current prefix `{}`", prefix);
+            let prefix_len = prefix.prefix_len();
+            let prefix_addr: &std::net::Ipv6Addr = prefix.addr();
+            info!(tag = "dhcp_v6_pd"; "Abandoning current prefix {} with length {}", prefix_addr, prefix_len);
 
             dhcp_v6_pd_prefix_unassigned(instance, prefix);
 

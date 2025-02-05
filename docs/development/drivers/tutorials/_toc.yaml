@@ -6,7 +6,5 @@
 # before making changes to this file, and add a member of the fuchsia.dev
 # team as reviewer.
 toc:
-- title: "Banjo tutorial"
-  path: /docs/development/drivers/tutorials/banjo-tutorial.md
 - title: "Using the C++ DDK template library"
   path: /docs/development/drivers/concepts/driver_development/using-ddktl.md

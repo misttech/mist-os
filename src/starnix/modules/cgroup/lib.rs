@@ -5,7 +5,10 @@
 #![recursion_limit = "512"]
 
 mod cgroup;
-mod freezer;
+mod directory;
+mod events;
+mod freeze;
 mod fs;
+mod procs;
 
 pub use fs::*;

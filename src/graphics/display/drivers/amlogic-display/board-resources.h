@@ -91,9 +91,10 @@ constexpr std::string_view kInterruptNameRdmaDone = "rdma-done";
 // Display capture done on VDIN1.
 constexpr std::string_view kInterruptNameVdin1WriteDone = "vdin1-write-done";
 
-// Typesafe wrapper for [`fuchsia.hardware.platform.device/Device.GetInterruptByName`].
+// Typesafe wrappers for [`fuchsia.hardware.platform.device/Device.GetInterruptByName`].
 //
-// `platform_device` must be valid.
+// `platform_device` must be valid. Note that interrupts retrieved via this function will
+// be created using the ZX_INTERRUPT_MODE_EDGE_HIGH and ZX_INTERRUPT_TIMESTAMP_MONO flags.
 //
 // If the result is successful, the zx::interrupt is guaranteed to be valid.
 zx::result<zx::interrupt> GetInterrupt(

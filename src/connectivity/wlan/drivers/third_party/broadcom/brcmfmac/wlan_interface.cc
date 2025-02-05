@@ -466,14 +466,20 @@ void WlanInterface::EapolTx(EapolTxRequestView request, EapolTxCompleter::Sync& 
   completer.Reply();
 }
 
+// Max size of IfaceHistogramStats.
+constexpr size_t kIfaceCounterStatsBufferSize =
+    fidl::MaxSizeInChannel<fuchsia_wlan_stats::wire::IfaceCounterStats,
+                           fidl::MessageDirection::kSending>();
+
 void WlanInterface::GetIfaceCounterStats(GetIfaceCounterStatsCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
-  fuchsia_wlan_fullmac::wire::WlanFullmacIfaceCounterStats out_stats;
+  fidl::Arena<kIfaceCounterStatsBufferSize> table_arena;
+  fuchsia_wlan_stats::wire::IfaceCounterStats out_stats;
   if (wdev_ == nullptr) {
     completer.ReplyError(ZX_ERR_BAD_STATE);
     return;
   }
-  zx_status_t status = brcmf_if_get_iface_counter_stats(wdev_->netdev, &out_stats);
+  zx_status_t status = brcmf_if_get_iface_counter_stats(wdev_->netdev, &out_stats, table_arena);
   if (status != ZX_OK) {
     completer.ReplyError(status);
   } else {
@@ -481,15 +487,15 @@ void WlanInterface::GetIfaceCounterStats(GetIfaceCounterStatsCompleter::Sync& co
   }
 }
 
-// Max size of WlanFullmacIfaceHistogramStats.
-constexpr size_t kWlanFullmacIfaceHistogramStatsBufferSize =
-    fidl::MaxSizeInChannel<fuchsia_wlan_fullmac::wire::WlanFullmacIfaceHistogramStats,
+// Max size of IfaceHistogramStats.
+constexpr size_t kIfaceHistogramStatsBufferSize =
+    fidl::MaxSizeInChannel<fuchsia_wlan_stats::wire::IfaceHistogramStats,
                            fidl::MessageDirection::kSending>();
 
 void WlanInterface::GetIfaceHistogramStats(GetIfaceHistogramStatsCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
-  fidl::Arena<kWlanFullmacIfaceHistogramStatsBufferSize> table_arena;
-  fuchsia_wlan_fullmac::wire::WlanFullmacIfaceHistogramStats out_stats;
+  fidl::Arena<kIfaceHistogramStatsBufferSize> table_arena;
+  fuchsia_wlan_stats::wire::IfaceHistogramStats out_stats;
   if (wdev_ == nullptr) {
     completer.ReplyError(ZX_ERR_BAD_STATE);
     return;

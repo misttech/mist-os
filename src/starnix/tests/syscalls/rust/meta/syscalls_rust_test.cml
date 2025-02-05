@@ -4,20 +4,12 @@
 {
     include: [
         "//src/power/system-activity-governor/meta/no-suspender-for-test-sag.shard.cml",
-        "//src/starnix/containers/debian/meta/debian_container_for_test.shard.cml",
+        "//src/starnix/containers/debian/meta/debian_container_with_user_volume_for_test.shard.cml",
         "//src/starnix/tests/starnix_test.shard.cml",
     ],
     program: {
         binary: "data/tests/syscalls_rust_test_bin",
         uid: "0",
-        environ: [ "MUTABLE_STORAGE={component_path}/data" ],
+        environ: [ "MUTABLE_STORAGE=/data" ],
     },
-    use: [
-        {
-            directory: "data",
-            from: "#test-fxfs",
-            rights: [ "rw*" ],
-            path: "/data",
-        },
-    ],
 }

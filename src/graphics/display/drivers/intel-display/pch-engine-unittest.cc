@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-display/pch-engine.h"
 
-#include <lib/driver/mock-mmio-range/cpp/mock-mmio-range.h>
+#include <lib/driver/mock-mmio/cpp/mock-mmio-range.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio/mmio-buffer.h>
 

@@ -65,12 +65,12 @@ async fn get_zbi_serial_number() -> Result<String, Error> {
         return match String::from_utf8(vec) {
             Ok(v) => Ok(v),
             Err(err) => {
-                tracing::warn!("Could not read Serial from VMO from Boot");
+                log::warn!("Could not read Serial from VMO from Boot");
                 Err(err.into())
             }
         };
     } else {
-        tracing::warn!("Invalid VMO from Boot");
+        log::warn!("Invalid VMO from Boot");
         return Err(anyhow::anyhow!("Invalid VMO from Boot"));
     }
 }
@@ -91,7 +91,7 @@ impl DeviceInfo {
         device_info.serial_number = match read_factory_file(SERIAL_TXT, proxy_handle).await {
             Ok(content) => Some(content),
             Err(err) => {
-                tracing::warn!("Failed to read factory file {}: {}", SERIAL_TXT, err);
+                log::warn!("Failed to read factory file {}: {}", SERIAL_TXT, err);
                 None
             }
         };
@@ -101,7 +101,7 @@ impl DeviceInfo {
             device_info.serial_number = match get_zbi_serial_number().await {
                 Ok(content) => Some(content),
                 Err(err) => {
-                    tracing::warn!("Failed to read serial number from boot {}", err);
+                    log::warn!("Failed to read serial number from boot {}", err);
                     None
                 }
             };
@@ -163,9 +163,9 @@ impl BoardInfo {
 
     pub fn load() -> Self {
         let mut board_info = BoardInfo::read_config(BOARD_CONFIG_JSON_FILE).unwrap_or_else(|err| {
-            tracing::error!("Failed to read board_config.json due to {}", err);
+            log::error!("Failed to read board_config.json due to {}", err);
             BoardInfo::read_config(DEFAULT_BOARD_CONFIG_JSON_FILE).unwrap_or_else(|err| {
-                tracing::error!("Failed to read default_board_config.json due to {}", err);
+                log::error!("Failed to read default_board_config.json due to {}", err);
                 BoardInfo { name: None, revision: None, cpu_architecture: None }
             })
         });
@@ -301,10 +301,10 @@ impl ProductInfo {
                     self.audio_amplifier = Some(value.to_owned());
                 }
                 _ => {
-                    tracing::warn!("hw.txt dictionary values {} - {}", key, value.to_owned());
+                    log::warn!("hw.txt dictionary values {} - {}", key, value.to_owned());
                 }
             }
-            tracing::warn!("hw.txt line: {}={}", key, filtered_value);
+            log::warn!("hw.txt line: {}={}", key, filtered_value);
         }
         Ok(())
     }
@@ -326,10 +326,10 @@ impl ProductInfo {
         let mut product_info = ProductInfo::new();
         product_info.load_from_structured_config();
         if let Err(err) = product_info.load_from_hw_file(HW_TXT, proxy_handle).await {
-            tracing::warn!("Failed to load hw.txt due to {}", err);
+            log::warn!("Failed to load hw.txt due to {}", err);
         }
         if let Err(err) = product_info.load_from_locale_list(LOCALE_LIST_FILE, proxy_handle).await {
-            tracing::warn!("Failed to load locale_list.txt due to {}", err);
+            log::warn!("Failed to load locale_list.txt due to {}", err);
         }
         product_info
     }

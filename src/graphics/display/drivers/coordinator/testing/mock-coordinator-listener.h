@@ -5,8 +5,11 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_TESTING_MOCK_COORDINATOR_LISTENER_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_TESTING_MOCK_COORDINATOR_LISTENER_H_
 
-#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <lib/fit/function.h>
+#include <lib/zx/time.h>
+
+#include <span>
 
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
@@ -18,8 +21,8 @@ class MockCoordinatorListener
     : public fidl::WireServer<fuchsia_hardware_display::CoordinatorListener> {
  public:
   using OnDisplaysChangedCallback =
-      fit::function<void(std::vector<fuchsia_hardware_display::wire::Info> added_displays,
-                         std::vector<display::DisplayId> removed_display_ids)>;
+      fit::function<void(std::span<const fuchsia_hardware_display::wire::Info> added_displays,
+                         std::span<const display::DisplayId> removed_display_ids)>;
   using OnClientOwnershipChangeCallback = fit::function<void(bool has_ownership)>;
   using OnVsyncCallback = fit::function<void(display::DisplayId display_id, zx::time timestamp,
                                              display::ConfigStamp applied_config_stamp,
@@ -36,11 +39,6 @@ class MockCoordinatorListener
   MockCoordinatorListener& operator=(const MockCoordinatorListener&) = delete;
   MockCoordinatorListener& operator=(MockCoordinatorListener&&) = delete;
 
-  // Must be only called once for each `MockCoordinatorListener` instance.
-  // `server_end` must be valid.
-  void Bind(fidl::ServerEnd<fuchsia_hardware_display::CoordinatorListener> server_end,
-            async_dispatcher_t& dispatcher);
-
   // [`fuchsia.hardware.display/CoordinatorListener`]:
   void OnDisplaysChanged(OnDisplaysChangedRequestView request,
                          OnDisplaysChangedCompleter::Sync& completer) override;
@@ -51,17 +49,10 @@ class MockCoordinatorListener
       fidl::UnknownMethodMetadata<fuchsia_hardware_display::CoordinatorListener> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  std::optional<fidl::ServerBindingRef<fuchsia_hardware_display::CoordinatorListener>>& binding() {
-    return binding_;
-  }
-
  private:
   const OnDisplaysChangedCallback on_displays_changed_callback_;
   const OnVsyncCallback on_vsync_callback_;
   const OnClientOwnershipChangeCallback on_client_ownership_change_callback_;
-
-  async_dispatcher_t* binding_dispatcher_ = nullptr;
-  std::optional<fidl::ServerBindingRef<fuchsia_hardware_display::CoordinatorListener>> binding_;
 };
 
 }  // namespace display_coordinator

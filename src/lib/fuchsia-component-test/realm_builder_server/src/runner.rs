@@ -7,9 +7,9 @@ use fidl::endpoints::ServerEnd;
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use futures::TryStreamExt;
+use log::*;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::*;
 use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
@@ -106,7 +106,7 @@ impl Runner {
         let self_ref = self.clone();
         fasync::Task::local(async move {
             if let Err(err) = self_ref.handle_runner_request_stream(stream).await {
-                warn!(%err, "`ComponentRunner` server unexpectedly failed.");
+                warn!(err:%; "`ComponentRunner` server unexpectedly failed.");
             }
         })
         .detach();
@@ -142,7 +142,7 @@ impl Runner {
                 }
                 #[cfg(fuchsia_api_level_at_least = "24")]
                 fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
-                    warn!(%ordinal, "Unknown ComponentRunner request");
+                    warn!(ordinal:%; "Unknown ComponentRunner request");
                 }
             }
         }

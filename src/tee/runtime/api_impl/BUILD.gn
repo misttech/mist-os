@@ -38,6 +38,8 @@ rustc_library("api_impl") {
   edition = "2021"
   sources = [
     "src/binding_stubs.rs",
+    "src/context.rs",
+    "src/crypto.rs",
     "src/lib.rs",
     "src/mem.rs",
     "src/props.rs",
@@ -50,7 +52,6 @@ rustc_library("api_impl") {
     "//sdk/rust/zx",
     "//src/lib/diagnostics/inspect/contrib/stubs:inspect_stubs",
     "//src/lib/fuchsia-runtime",
-    "//src/lib/fuchsia-sync",
     "//src/tee/lib/tee_properties",
     "//src/tee/tee_internal_api:tee_internal",
     "//third_party/rust_crates:libc",

@@ -29,14 +29,14 @@ use net_types::{MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _};
 use netstack3_base::sync::{DynDebugReferences, Mutex};
 use netstack3_base::testutil::{
     FakeAtomicInstant, FakeCryptoRng, FakeFrameCtx, FakeInstant, FakeNetwork, FakeNetworkLinks,
-    FakeNetworkSpec, FakeTimerCtx, FakeTimerCtxExt, FakeTimerId, MonotonicIdentifier, TestAddrs,
-    WithFakeFrameContext, WithFakeTimerContext,
+    FakeNetworkSpec, FakeSocketWritableListener, FakeTimerCtx, FakeTimerCtxExt, FakeTimerId,
+    MonotonicIdentifier, TestAddrs, WithFakeFrameContext, WithFakeTimerContext,
 };
 use netstack3_base::{
     AddressResolutionFailed, CtxPair, DeferredResourceRemovalContext, EventContext,
     FrameDestination, InstantBindingsTypes, InstantContext, IpDeviceAddr, LinkDevice,
     NotFoundError, ReferenceNotifiers, RemoveResourceResult, RngContext, TimerBindingsTypes,
-    TimerContext, TimerHandler, TracingContext, WorkQueueReport,
+    TimerContext, TimerHandler, TracingContext, TxMetadataBindingsTypes, WorkQueueReport,
 };
 use netstack3_device::ethernet::{
     EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
@@ -62,7 +62,7 @@ use netstack3_ip::raw::{RawIpSocketId, RawIpSocketsBindingsContext, RawIpSockets
 use netstack3_ip::{
     self as ip, AddRouteError, AddableEntryEither, AddableMetric, DeviceIpLayerMetadata,
     IpLayerEvent, IpLayerTimerId, Marks, RawMetric, ResolveRouteError, ResolvedRoute,
-    RoutableIpAddr,
+    RoutableIpAddr, RouterAdvertisementEvent,
 };
 use netstack3_tcp::testutil::{ClientBuffers, ProvidedBuffers, RingBuffer, TestSendBuffer};
 use netstack3_tcp::{BufferSizes, TcpBindingsTypes};
@@ -75,7 +75,7 @@ use crate::context::prelude::*;
 use crate::context::UnlockedCoreCtx;
 use crate::state::{StackState, StackStateBuilder};
 use crate::time::{TimerId, TimerIdInner};
-use crate::{BindingsContext, BindingsTypes, IpExt};
+use crate::{BindingsContext, BindingsTypes, IpExt, TxMetadata};
 
 /// The default interface routing metric for test interfaces.
 pub const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
@@ -819,6 +819,10 @@ impl TimerContext for FakeBindingsCtx {
     }
 }
 
+impl TxMetadataBindingsTypes for FakeBindingsCtx {
+    type TxMetadata = TxMetadata<Self>;
+}
+
 impl RngContext for FakeBindingsCtx {
     type Rng<'a> = FakeCryptoRng;
 
@@ -1287,6 +1291,7 @@ impl<I: IpExt> UdpReceiveBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx 
 
 impl UdpBindingsTypes for FakeBindingsCtx {
     type ExternalData<I: Ip> = ();
+    type SocketWritableListener = FakeSocketWritableListener;
 }
 
 impl<I: IpExt> IcmpEchoBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
@@ -1315,6 +1320,7 @@ impl<I: IpExt> IcmpEchoBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
 
 impl IcmpEchoBindingsTypes for FakeBindingsCtx {
     type ExternalData<I: Ip> = ();
+    type SocketWritableListener = FakeSocketWritableListener;
 }
 
 impl DeviceSocketTypes for FakeBindingsCtx {
@@ -1351,6 +1357,7 @@ impl<I: IpExt> RawIpSocketsBindingsContext<I, DeviceId<Self>> for FakeBindingsCt
 impl DeviceLayerStateTypes for FakeBindingsCtx {
     type LoopbackDeviceState = ();
     type EthernetDeviceState = ();
+    type BlackholeDeviceState = ();
     type PureIpDeviceState = ();
     type DeviceIdentifier = MonotonicIdentifier;
 }
@@ -1408,6 +1415,7 @@ pub enum DispatchedEvent {
     IpLayerIpv6(IpLayerEvent<WeakDeviceId<FakeBindingsCtx>, Ipv6>),
     NeighborIpv4(nud::Event<Mac, EthernetWeakDeviceId<FakeBindingsCtx>, Ipv4, FakeInstant>),
     NeighborIpv6(nud::Event<Mac, EthernetWeakDeviceId<FakeBindingsCtx>, Ipv6, FakeInstant>),
+    RouterAdvertisement(RouterAdvertisementEvent<WeakDeviceId<FakeBindingsCtx>>),
 }
 
 /// A tuple of device ID and IP version.
@@ -1449,6 +1457,13 @@ impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeBindingsCtx>, I, FakeInsta
     ) -> DispatchedEvent {
         let e = e.map_device(|d| d.downgrade());
         I::map_ip(e, |e| DispatchedEvent::NeighborIpv4(e), |e| DispatchedEvent::NeighborIpv6(e))
+    }
+}
+
+impl From<RouterAdvertisementEvent<DeviceId<FakeBindingsCtx>>> for DispatchedEvent {
+    fn from(e: RouterAdvertisementEvent<DeviceId<FakeBindingsCtx>>) -> DispatchedEvent {
+        let e = e.map_device(|d| d.downgrade());
+        DispatchedEvent::RouterAdvertisement(e)
     }
 }
 

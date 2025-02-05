@@ -73,7 +73,7 @@ class UndocumentedClass {
   int SomeFunction();
 };
 
-// This class should not have a generated declaration becaose of the $nodecl annotation.
+// This class should not have a generated declaration because of the $nodecl annotation.
 class NoDeclarationClass {
  public:
   int SomeFunction();

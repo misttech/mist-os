@@ -6,8 +6,8 @@ use crate::FIDL_TIMEOUT_ID;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use futures::TryFutureExt;
+use log::warn;
 use named_timer::NamedTimeoutExt;
-use tracing::warn;
 use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_name as fnet_name};
 
 const DNS_FIDL_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(90);

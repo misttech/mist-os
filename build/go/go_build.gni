@@ -9,7 +9,6 @@ import("//build/host.gni")
 import("//build/sdk/sdk_host_tool.gni")
 import("//build/toolchain/breakpad.gni")
 import("//build/toolchain/concurrent_jobs.gni")
-import("//zircon/public/sysroot/go.gni")
 
 declare_args() {
   #   gocache_dir
@@ -266,12 +265,6 @@ template("go_build") {
     }
 
     if (sysroot != "") {
-      if (is_fuchsia || is_mistos) {
-        # For Fuchsia binaries, use a Go-specific sysroot instead of the
-        # standard one which only contains empty linker stubs (see
-        # comments in //zircon/public/sysroot/BUILD.gn for details).
-        sysroot = go_sysroot_dir
-      }
       args += [
         "--sysroot",
         rebase_path(sysroot, root_build_dir),
@@ -303,7 +296,9 @@ template("go_build") {
         _fdio_label_with_toolchain = "//sdk/lib/fdio($_fdio_toolchain)"
 
         deps += [
-          "//zircon/public/sysroot:go_binary_deps",
+          "//build/config/fuchsia:executable_deps",
+          "//build/config/fuchsia:link_deps",
+          "//build/config/fuchsia:source_deps",
           _fdio_label_with_toolchain,
         ]
 

@@ -9,6 +9,6 @@ extern "C" {
 
 bool jent_have_clock(void) { return true; }
 
-void jent_get_nstime(uint64_t* out) { *out = current_ticks(); }
+void jent_get_nstime(uint64_t* out) { *out = current_mono_ticks(); }
 
 }  // extern C

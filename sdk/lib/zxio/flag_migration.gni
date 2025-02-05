@@ -1,0 +1,9 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+# TODO(https://fxbug.dev/376509077): Remove this when the rename is completed.
+declare_args() {
+  # Temporary variable used to soft migrate callers of zxio_deprecated_flags_get/zxio_deprecated_flags_set.
+  # We want to rename zxio_flags* to zxio_deprecated_flags*, and zxio_flags2* to zxio_flags*.
+  use_updated_zxio_flags_name = true
+}

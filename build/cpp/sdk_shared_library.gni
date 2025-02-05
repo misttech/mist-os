@@ -32,9 +32,13 @@ import("//build/sdk/sdk_atom_alias.gni")
 #     Not allowed when `no_headers` is true.
 #
 #   symbols_api (required)
-#     Path to the ifs file containing the public symbols of this library.
+#     Path to the ifs file containing the public symbols of this library for
+#     the PLATFORM build.
 #     This file is used to ensure modifications to the library's ABI are
 #     explicitly acknowledged.
+#     This path is not used for API-level specific checks.
+#     TODO(https://fxbug.dev/310006516): Remove when the `arch/` directory is
+#     removed from the IDK if not sooner.
 #
 #   no_headers (optional)
 #     Specifies that the library's headers are NOT included in the SDK.
@@ -145,9 +149,6 @@ template("sdk_shared_library") {
 
   # Only categories that are included in an IDK makes sense.
   valid_categories = [
-    # "excluded" is deprecated.
-    # "experimental" is deprecated.
-    # "internal" does not apply to shared libraries.
     # "cts" is only for ABI compatibility and thus not applicable.
     # "partner_internal" is only for ABI compatibility and thus not applicable.
     "partner",
@@ -160,7 +161,7 @@ template("sdk_shared_library") {
 
   assert(
       defined(invoker.symbols_api),
-      "Must define path to an ifs file. See comment in //build/cpp/verify_public_symbols.gni")
+      "Must define path to the golden ifs file for the PLATFORM build. See comment in //build/cpp/verify_public_symbols.gni")
 
   output_name = target_name
   if (defined(invoker.output_name)) {
@@ -217,7 +218,7 @@ template("sdk_shared_library") {
       configs = []
     }
     if (libcxx_linkage == "static") {
-      configs += [ "//build/config/mistos:static_cpp_standard_library" ]
+      configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
     } else {
       # Adding this linker flag keeps us honest about not committing to a
       # specific C++ ABI. If this flag is causing your library to not
@@ -226,7 +227,7 @@ template("sdk_shared_library") {
       # precompiled. If you do require precompilation, you probably need to
       # find a way not to depend on dynamically linking C++ symbols because C++
       # does not have a sufficiently stable ABI for the purposes of our SDK.
-      configs += [ "//build/config/mistos:no_cpp_standard_library" ]
+      configs += [ "//build/config/fuchsia:no_cpp_standard_library" ]
     }
 
     metadata = {
@@ -349,23 +350,65 @@ template("sdk_shared_library") {
       ":${main_target_name}(${shlib_toolchain_no_default_variant_redirect})"
   shared_out_dir = get_label_info(shared_lib_target, "root_out_dir")
   lib_name = "lib${output_name}.so"
-  link_lib = "${sdk_prebuilt_base_for_target_api_level}/lib/${lib_name}"
+  ifs_file_name = "lib${output_name}.ifs"
+  generated_ifs_file = "${shared_out_dir}/${ifs_file_name}"
+  link_lib_dir = "${sdk_prebuilt_base_for_target_api_level}/lib"
+  packaged_ifs_file = "${link_lib_dir}/${ifs_file_name}"
+  _goldens_dir = "//sdk/history"
+  ifs_goldens_dir = "${_goldens_dir}/${current_build_target_api_level}"
+  ifs_golden_file = "${ifs_goldens_dir}/${ifs_file_name}"
+
+  # TODO(https://fxbug.dev/310006516): Remove this block when the `arch/`
+  # directory is removed from the IDK.
+  if (current_build_target_api_level == "PLATFORM") {
+    # For legacy reasons, the file name in the IDK is different.
+    ifs_file_name = "${output_name}.ifs"
+
+    # Unlike other target API levels, the golden file is not in `_goldens_dir`.
+    # It is in the same directory as the BUILD.gn file except when the `api`
+    # parameter is specified, in which case it is next to that file.
+    if (defined(invoker.api)) {
+      ifs_golden_file = get_path_info(invoker.api, "dir") + "/${ifs_file_name}"
+    } else {
+      ifs_golden_file = get_path_info(ifs_file_name, "abspath")
+    }
+
+    # Verify that the path generated above is equivalent to that specified by
+    # the `symbols_api` parameter.
+    # TODO(https://fxbug.dev/342032854): Remove the `symbols_api` parameter
+    # since the path can be generated and it is only used for this target API
+    # level, for which it will be unnecessary in the future.
+    assert(rebase_path(invoker.symbols_api, "//") ==
+           rebase_path(ifs_golden_file, "//"))
+
+    packaged_ifs_file = "${file_base}/${ifs_file_name}"
+  }
+
+  link_lib = "${link_lib_dir}/${lib_name}"
   dist_lib = "${sdk_prebuilt_base_for_target_api_level}/dist/${lib_name}"
-  sdk_files =
-      sdk_header_files + [
-        {
-          source = "${shared_out_dir}/link_stub/${lib_name}"
-          dest = link_lib
-        },
-        {
-          source = "${shared_out_dir}/${lib_name}"
-          dest = dist_lib
-        },
-        {
-          source = get_path_info(invoker.symbols_api, "abspath")
-          dest = "${file_base}/" + get_path_info(invoker.symbols_api, "file")
-        },
-      ]
+  sdk_files = sdk_header_files + [
+                {
+                  source = "${shared_out_dir}/link_stub/${lib_name}"
+                  dest = link_lib
+                },
+                {
+                  source = "${shared_out_dir}/${lib_name}"
+                  dest = dist_lib
+                },
+                {
+                  # `generated_ifs_file` contains text, including undefined
+                  # symbols, that should not be exposed. In addition, the Target
+                  # and other such text can vary by architecture and would cause
+                  # errors when assemblying the IDK. `verify_public_symbols()`
+                  # removes such text, so we must use its output for the IDK.
+                  # `verify_public_symbols_target_name` verifies the golden file
+                  # against a stripped version of `generated_ifs_file`, so we
+                  # can use the golden file here. (Ideally, we would use the
+                  # stripped file - see https://fxbug.dev/383416850.)
+                  source = ifs_golden_file
+                  dest = packaged_ifs_file
+                },
+              ]
 
   if (generate_plasa_artifacts) {
     _plasa_artifacts_target_name = "${main_target_name}_plasa"
@@ -432,7 +475,7 @@ template("sdk_shared_library") {
     ]
     args += [ "--deps" ] + rebase_path(sdk_metas, root_build_dir)
     args += [ "--headers" ] + sdk_metadata_headers
-    args += [ "--ifs" ] + [ get_path_info(invoker.symbols_api, "file") ]
+    args += [ "--ifs" ] + [ ifs_file_name ]
     if (current_build_target_api_level != "PLATFORM") {
       args += [
         "--api-level",
@@ -450,8 +493,8 @@ template("sdk_shared_library") {
   main_target_dir = get_label_info(":${main_target_name}", "dir")
   verify_public_symbols_target_name = "${target_name}_sdk_verify_public_symbols"
   verify_public_symbols(verify_public_symbols_target_name) {
-    current = "${shared_out_dir}/lib${output_name}.ifs"
-    reference = invoker.symbols_api
+    current = generated_ifs_file
+    reference = ifs_golden_file
     library_name = main_target_dir
 
     deps = [ shared_lib_target ]

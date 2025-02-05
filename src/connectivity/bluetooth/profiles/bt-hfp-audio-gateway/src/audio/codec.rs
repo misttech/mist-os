@@ -8,8 +8,8 @@ use fuchsia_bluetooth::types::{peer_audio_stream_id, PeerId};
 use fuchsia_sync::Mutex;
 use futures::stream::BoxStream;
 use futures::{SinkExt, StreamExt};
+use log::{info, warn};
 use std::sync::Arc;
-use tracing::{info, warn};
 use {
     fidl_fuchsia_audio_device as audio_device, fidl_fuchsia_hardware_audio as audio,
     fuchsia_async as fasync,

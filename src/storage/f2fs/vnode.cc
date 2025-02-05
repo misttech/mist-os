@@ -535,13 +535,16 @@ zx_status_t VnodeF2fs::TruncateBlocks(uint64_t from) {
   return ZX_OK;
 }
 
-zx_status_t VnodeF2fs::TruncateHole(pgoff_t pg_start, pgoff_t pg_end, bool zero) {
+zx_status_t VnodeF2fs::TruncateHole(pgoff_t pg_start, pgoff_t pg_end, bool evict) {
   fs::SharedLock lock(f2fs::GetGlobalLock());
-  return TruncateHoleUnsafe(pg_start, pg_end, zero);
+  return TruncateHoleUnsafe(pg_start, pg_end, evict);
 }
 
-zx_status_t VnodeF2fs::TruncateHoleUnsafe(pgoff_t pg_start, pgoff_t pg_end, bool zero) {
-  InvalidatePages(pg_start, pg_end, zero);
+zx_status_t VnodeF2fs::TruncateHoleUnsafe(pgoff_t pg_start, pgoff_t pg_end, bool evict) {
+  std::vector<LockedPage> pages;
+  if (evict) {
+    pages = InvalidatePages(pg_start, pg_end);
+  }
   for (pgoff_t index = pg_start; index < pg_end; ++index) {
     auto path_or = GetNodePath(index);
     if (path_or.is_error()) {

@@ -29,7 +29,6 @@ pub enum FfxError {
     Error(#[source] anyhow::Error, i32 /* Error status code */),
     #[error("Test Error")]
     TestingError, // this is here to be used in tests for verifying errors are translated properly.
-
     #[cfg(not(target_os = "fuchsia"))]
     #[error("{}", .err)]
     DaemonError { err: Box<dyn SourceError + Send + Sync>, target: Option<String> },

@@ -2,57 +2,54 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import subprocess
-import threading
-from typing import IO, Callable, List
+import asyncio
+import logging
+import sys
+from typing import Callable, List
+
+import async_utils
+import async_utils.command
 
 Handler = Callable[[bytes], None]
 
+logger = logging.getLogger(__name__)
 
-def handle_stream(stream: IO[bytes], output_handler: Handler) -> None:
-    """Calls `output_handler` with the output bytes. Makes it easy to unit test `CommandRunner`.
 
-    Args:
-        stream (IO[bytes]): Stream of output strings
-        output_handler (Handler): Output Handler
-    """
-    for line in stream:
-        output_handler(line)
-    stream.close()
+class CommandError(Exception):
+    pass
 
 
 def run_command(
     cmd: List[str],
-    output_handler: Handler,
-    error_handler: Handler,
 ) -> int:
     """Execute command and collect output
 
     Args:
         cmd (List[str]): Command to execute
-        output_handler (Handler): Handler for stdout
-        error_handler (Handler): Handler for stderr
 
     Returns:
         int: Exit code of the process
     """
-    process = subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
-    stdout_thread = threading.Thread(
-        target=handle_stream, args=(process.stdout, output_handler)
-    )
-    stderr_thread = threading.Thread(
-        target=handle_stream, args=(process.stderr, error_handler)
-    )
 
-    stdout_thread.start()
-    stderr_thread.start()
+    async def inner_async_command() -> int:
+        logger.info(f"Running command: {cmd}")
+        process = await async_utils.command.AsyncCommand.create(*cmd)
 
-    process.wait()
+        async for event in process:
+            if isinstance(event, async_utils.command.StdoutEvent):
+                sys.stdout.write(event.text.decode())
+                sys.stdout.flush()
+            elif isinstance(event, async_utils.command.StderrEvent):
+                sys.stderr.write(event.text.decode())
+                sys.stderr.flush()
+            elif isinstance(event, async_utils.command.TerminationEvent):
+                logger.info(
+                    f"Command ended after {event.runtime} seconds, return code {event.return_code}"
+                )
+                return event.return_code
+        return -1
 
-    # Wait for the threads to finish
-    stdout_thread.join()
-    stderr_thread.join()
-
-    return process.returncode
+    try:
+        return asyncio.run(inner_async_command())
+    except async_utils.command.AsyncCommandError as e:
+        raise CommandError(e)

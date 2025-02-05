@@ -127,7 +127,6 @@ fuchsia_package_resource(
 
 fuchsia_cc_test(
     name = "vim3-devicetree-test-bin",
-    size = "small",
     srcs = [
         "vim3-devicetree-test.cc",
     ],

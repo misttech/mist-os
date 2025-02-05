@@ -4,7 +4,7 @@
 
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
-use tracing::warn;
+use log::warn;
 use {
     fidl_fuchsia_memory_heapdump_client as fheapdump_client,
     fidl_fuchsia_memory_heapdump_process as fheapdump_process,
@@ -40,12 +40,12 @@ async fn main() -> Result<(), anyhow::Error> {
             match stream {
                 Service::Client(stream) => {
                     if let Err(error) = registry.serve_client_stream(stream).await {
-                        warn!(%error, "Error while serving client");
+                        warn!(error:%; "Error while serving client");
                     }
                 }
                 Service::Process(stream) => {
                     if let Err(error) = registry.serve_process_stream(stream).await {
-                        warn!(%error, "Error while serving process");
+                        warn!(error:%; "Error while serving process");
                     }
                 }
             }

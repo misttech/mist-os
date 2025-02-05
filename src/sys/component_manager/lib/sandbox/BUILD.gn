@@ -78,8 +78,8 @@ rustc_library("sandbox") {
       "//src/lib/fuchsia-async",
       "//src/storage/lib/vfs/rust:vfs",
       "//third_party/rust_crates:lazy_static",
+      "//third_party/rust_crates:log",
       "//third_party/rust_crates:scopeguard",
-      "//third_party/rust_crates:tracing",
     ]
     sources += [ "src/fidl/registry.rs" ]
   }

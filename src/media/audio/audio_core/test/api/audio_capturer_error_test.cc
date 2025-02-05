@@ -147,7 +147,7 @@ TEST_F(AudioCapturerErrorTestOldAPI, AddPayloadBufferBeforeSetFormatShouldDiscon
   ExpectDisconnect(audio_capturer());
 }
 
-// inadequate ZX_RIGHTS -- no DUPLICATE should cause GetReferenceClock to fail.
+// inadequate ZX_RIGHTS -- no DUPLICATE should cause SetReferenceClock to fail.
 TEST_F(AudioCapturerClockTestOldAPI, SetRefClockNoDuplicateShouldDisconnect) {
   zx::clock dupe_clock, orig_clock = clock::CloneOfMonotonic();
   ASSERT_EQ(orig_clock.duplicate(kClockRights & ~ZX_RIGHT_DUPLICATE, &dupe_clock), ZX_OK);
@@ -157,7 +157,7 @@ TEST_F(AudioCapturerClockTestOldAPI, SetRefClockNoDuplicateShouldDisconnect) {
   ExpectDisconnect(audio_capturer());
 }
 
-// inadequate ZX_RIGHTS -- no READ should cause GetReferenceClock to fail.
+// inadequate ZX_RIGHTS -- no READ should cause SetReferenceClock to fail.
 TEST_F(AudioCapturerClockTestOldAPI, SetRefClockNoReadShouldDisconnect) {
   zx::clock dupe_clock, orig_clock = clock::CloneOfMonotonic();
   ASSERT_EQ(orig_clock.duplicate(kClockRights & ~ZX_RIGHT_READ, &dupe_clock), ZX_OK);

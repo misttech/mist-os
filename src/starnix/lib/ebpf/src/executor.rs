@@ -4,25 +4,25 @@
 
 use crate::visitor::{BpfVisitor, ProgramCounter, Register, Source};
 use crate::{
-    BpfValue, DataWidth, EbpfProgram, EbpfRunContext, PacketAccessor, BPF_STACK_SIZE,
-    GENERAL_REGISTER_COUNT,
+    BpfValue, DataWidth, EbpfHelperImpl, EbpfInstruction, EbpfProgramContext, FromBpfValue, Packet,
+    BPF_STACK_SIZE, GENERAL_REGISTER_COUNT,
 };
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
+use std::collections::HashMap;
 use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use zerocopy::IntoBytes;
 
-pub fn execute<C: EbpfRunContext>(
-    program: &EbpfProgram<C>,
-    run_context: &mut C::Context<'_>,
-    packet_accessor: &dyn PacketAccessor<C>,
+pub fn execute<C: EbpfProgramContext>(
+    code: &[EbpfInstruction],
+    helpers: &HashMap<u32, EbpfHelperImpl<C>>,
+    run_context: &mut C::RunContext<'_>,
     arguments: &[BpfValue],
 ) -> u64 {
     assert!(arguments.len() < 5);
     let mut context = ComputationContext {
-        program,
-        packet_accessor,
+        helpers,
         registers: Default::default(),
         stack: vec![MaybeUninit::uninit(); BPF_STACK_SIZE / std::mem::size_of::<BpfValue>()]
             .into_boxed_slice()
@@ -39,7 +39,7 @@ pub fn execute<C: EbpfRunContext>(
             return result;
         }
         context
-            .visit(run_context, &program.code[context.pc..])
+            .visit(run_context, &code[context.pc..])
             .expect("verifier should have found an issue");
     }
 }
@@ -51,12 +51,9 @@ impl BpfValue {
 }
 
 /// The state of the computation as known by the interpreter at a given point in time.
-#[derive(Debug)]
-struct ComputationContext<'a, C: EbpfRunContext> {
+struct ComputationContext<'a, C: EbpfProgramContext> {
     /// The program to execute.
-    program: &'a EbpfProgram<C>,
-    /// The packet accessor.
-    packet_accessor: &'a dyn PacketAccessor<C>,
+    helpers: &'a HashMap<u32, EbpfHelperImpl<C>>,
     /// Register 0 to 9.
     registers: [BpfValue; GENERAL_REGISTER_COUNT as usize],
     /// The state of the stack.
@@ -67,7 +64,7 @@ struct ComputationContext<'a, C: EbpfRunContext> {
     result: Option<u64>,
 }
 
-impl<C: EbpfRunContext> ComputationContext<'_, C> {
+impl<C: EbpfProgramContext> ComputationContext<'_, C> {
     fn reg(&mut self, index: Register) -> BpfValue {
         if index < GENERAL_REGISTER_COUNT {
             self.registers[index as usize]
@@ -243,8 +240,8 @@ impl<C: EbpfRunContext> ComputationContext<'_, C> {
     }
 }
 
-impl<C: EbpfRunContext> BpfVisitor for ComputationContext<'_, C> {
-    type Context<'a> = C::Context<'a>;
+impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
+    type Context<'a> = C::RunContext<'a>;
 
     fn add<'a>(
         &mut self,
@@ -479,7 +476,7 @@ impl<C: EbpfRunContext> BpfVisitor for ComputationContext<'_, C> {
         context: &mut Self::Context<'a>,
         index: u32,
     ) -> Result<(), String> {
-        let helper = &self.program.helpers[&index];
+        let helper = &self.helpers[&index];
         let result =
             helper.0(context, self.reg(1), self.reg(2), self.reg(3), self.reg(4), self.reg(5));
         self.next();
@@ -896,7 +893,9 @@ impl<C: EbpfRunContext> BpfVisitor for ComputationContext<'_, C> {
             return Ok(());
         };
         let src_reg = self.reg(src_reg);
-        if let Some(value) = self.packet_accessor.load(context, src_reg, offset, width) {
+        // SAFETY: The verifier checks that the `src_reg` points at packet.
+        let packet = unsafe { C::Packet::from_bpf_value(context, src_reg) };
+        if let Some(value) = packet.load(offset, width) {
             self.next();
             self.set_reg(dst_reg, value.into());
         } else {

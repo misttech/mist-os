@@ -18,21 +18,23 @@ rustc_library("framework") {
     "src/testing.rs",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/performance/lib/fuchsiaperf",
     "//src/storage/lib/trace",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:libc",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:prettytable-rs",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:rand_xorshift",
     "//third_party/rust_crates:regex",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tempfile",
-    "//third_party/rust_crates:tracing",
   ]
+  if (is_fuchsia) {
+    deps += [ "//src/storage/lib/fs_management/rust:fs_management" ]
+  }
   test_deps = [
     "//src/lib/fuchsia",
     "//src/sys/test_runners:tmp_storage",

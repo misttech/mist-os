@@ -12,8 +12,8 @@ use anyhow::anyhow;
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_sync::Mutex;
+use log::{error, info};
 use std::sync::Arc;
-use tracing::{error, info};
 
 mod fidl;
 mod install_manager;

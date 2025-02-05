@@ -6,6 +6,7 @@ import("//build/host.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/sdk/sdk_atom.gni")
 import("//build/testing/host_test_data.gni")
+import("//sdk/categories/compatibility.gni")
 import("//src/developer/ffx/build/ffx_action.gni")
 import("//src/developer/ffx/config.gni")
 import("//src/developer/ffx/lib/version/build/ffx_apply_version.gni")
@@ -100,6 +101,12 @@ template("ffx_tool") {
                              "sdk_area",
                              "sdk_deps",
                            ])
+
+    # As these are large libraries that are slow to compile on RBE workers, switch
+    # them to the larger RBE workers.
+    _concurrent_jobs = concurrent_jobs.rust_highmem
+    configs += _concurrent_jobs.configs
+    forward_variables_from(_concurrent_jobs.vars, "*")
   }
 
   # Replace the special linker sections containing the version information with the real values
@@ -279,18 +286,14 @@ template("ffx_tool") {
       # Also, there are exceptions - see https://fxbug.dev/42081073 and
       # https://fxbug.dev/326090508.
       # TODO(b/314822328): improve this logic to cascade properly
-      if (invoker.sdk_category != "internal") {
-        if (!defined(assert_no_deps)) {
-          assert_no_deps = []
-        }
-        assert_no_deps += [
-          "//sdk:marker-cts",
-          "//sdk:marker-excluded",
-          "//sdk:marker-experimental",
-          "//sdk:marker-internal",
-          "//sdk:marker-unknown",
-        ]
+      if (!defined(assert_no_deps)) {
+        assert_no_deps = []
       }
+
+      assert(invoker.sdk_category == "partner",
+             "Unexpected SDK category '${invoker.sdk_category}'.")
+
+      assert_no_deps += markers_partner_idk_prebuilts_must_not_depend_on
     }
   }
 }

@@ -46,6 +46,7 @@ labels = {
   _qemu_deps = qemu_boot_shim.deps
   assert(_qemu_deps == [ _qemu_deps[0] ])
   qemu_kernel = _qemu_deps[0]
+  main_pb = main_pb_label
 }
 
 supports_flashing_fxfs =

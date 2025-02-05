@@ -85,7 +85,7 @@ class DpcQueue {
   //
   // If |Shutdown| fails, this DpcQueue is left in an undefined state and
   // |TransitionOffCpu| must not be called.
-  zx_status_t Shutdown(zx_time_t deadline);
+  zx_status_t Shutdown(zx_instant_mono_t deadline);
 
   // Moves queued Dpcs from |source| to this DpcQueue.
   //

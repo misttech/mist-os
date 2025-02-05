@@ -107,6 +107,7 @@ template("network_unified_binary") {
   }
 
   gub_target_name = target_name + "_gub"
+  bin_target_name = target_name
   renamed_binary(gub_target_name) {
     forward_variables_from(invoker,
                            [
@@ -115,16 +116,25 @@ template("network_unified_binary") {
                            ])
     source_deps =
         [ "//src/connectivity/network/unified_binary:network_unified_binary" ]
-    deps = [ ":$library_target_name" ]
 
-    # Force a barrier on the library target, which prevents includes from all
+    # Force a barrier on the binary target, which prevents includes from all
     # the dependencies of the unified binary from causing check_includes to
-    # bubble up to dependent components.
+    # bubble up to dependent components. The standalone binary is also added as
+    # a data_dep for GN metadata walk, so the check includes logic work
+    # correctly.
+    #
+    # NOTE: It is necessary to go through the binary target instead of the
+    # library target to properly trigger variant selection logic.
+    data_deps = [ ":${bin_target_name}" ]
     metadata = {
-      expect_includes_barrier = [ ":$library_target_name" ]
+      expect_includes_barrier = data_deps
+
+      # The unified binary is the actual binary that goes into packages, so
+      # walk this dep when generating distribution manifest.
+      distribution_entries_barrier = source_deps
     }
     source = "$root_out_dir/network_unified_binary"
-    dest = "bin/$output_name"
+    dest = "bin/${output_name}"
   }
 }
 

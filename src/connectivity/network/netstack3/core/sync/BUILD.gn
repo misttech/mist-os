@@ -10,7 +10,10 @@ rustc_library_with_features("netstack3-sync") {
   version = "0.0.1"
   edition = "2021"
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
-  check_cfgs = [ "loom" ]
+  check_cfgs = [
+    "loom",
+    "test",
+  ]
   sources = [
     "src/lib.rs",
     "src/rc.rs",

@@ -13,7 +13,7 @@
             to: [ "#container" ],
         },
         {
-            protocol: "fuchsia.fxfs.CryptManagement",
+            protocol: "fuchsia.fshost.StarnixVolumeProvider",
             from: "#test-fxfs",
             to: [ "#container" ],
         },

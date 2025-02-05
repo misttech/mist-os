@@ -4,11 +4,9 @@
 # found in the LICENSE file.
 
 #### CATEGORY=Other
-### Flash Fuchsia onto a Kola board that has an unmodified bootloader. Install the user's public SSH
-### key onto the device via serial console (using default path /dev/ttyUSB0 if unspecified).
+### Flash Fuchsia onto a Kola board that has an unmodified bootloader.
 
-## usage: fx flash-kola [serial_console_path]
-##  e.g.: fx flash-kola /tmp/pontis/serial-10c4-ea60
+## usage: fx flash-kola
 
 # Bash strict mode.
 set -eo pipefail
@@ -37,31 +35,6 @@ if [[ ${DEVICE_COUNT} -ne 1 ]]; then
   exit 1
 fi
 
-# Get serial console path to device.
-readonly SERIAL_PATH=${1:-'/dev/ttyUSB0'}
-
-if [[ ! -e "${SERIAL_PATH}" ]]; then
-  echo "Serial device ${SERIAL_PATH} not detected, skipping SSH key deployment."
-  read -r -p "Press enter to continue..."
-else
-  if [[ $# -eq 0 ]]; then
-    echo "The user's public SSH key will be installed onto the device using the serial console at" \
-        "${SERIAL_PATH}."
-    echo "Alternatively, you can supply the serial console path to be used, e.g.:"
-    echo "  fx flash-kola /tmp/pontis/serial-10c4-ea60"
-    read -r -p "Press enter to continue..."
-  fi
-
-  if [[ "${SERIAL_PATH}" =~ (pontis)|(/dev/pts/) ]]; then
-    echo "If the serial console is over pontis, it must be an unused connection."
-    echo "Else, disconnect and reconnect it at http://pontis/ on your laptop."
-    read -r -p "Press enter to continue..."
-  fi
-
-  stty -F "${SERIAL_PATH}" 115200 raw -echo
-fi
-
-
 ${FASTBOOT} flash boot_a "$ZBI_PATH"
 ${FASTBOOT} flash boot_b "$ZBI_PATH"
 ${FASTBOOT} flash dtbo_a "$DTBO_PATH"
@@ -69,16 +42,5 @@ ${FASTBOOT} flash dtbo_b "$DTBO_PATH"
 ${FASTBOOT} flash super "$FVM_PATH"
 
 ${FASTBOOT} reboot
-
-
-if [[ -e "${SERIAL_PATH}" ]]; then
-  # Wait until device has completed bootup.
-  sleep 60
-
-  # Install user's public SSH key (the first one in $AUTHKEYS_PATH).
-  AUTHKEYS_PATH="$(get-ssh-authkeys)"
-  readonly AUTHKEYS_PATH
-  echo "echo \"$(head -n 1 "${AUTHKEYS_PATH}")\" > /data/ssh/authorized_keys" > "${SERIAL_PATH}"
-fi
 
 echo "Done flashing Kola device."

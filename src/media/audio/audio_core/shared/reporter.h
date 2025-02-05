@@ -250,7 +250,7 @@ class Reporter {
 
   // Audio policy logging of usage activity and behavior (none|duck|mute).
   void SetAudioPolicyBehaviorGain(AudioAdmin::BehaviorGain behavior_gain);
-  void UpdateActiveUsagePolicy(const std::vector<fuchsia::media::Usage>& active_usages,
+  void UpdateActiveUsagePolicy(const std::vector<fuchsia::media::Usage2>& active_usages,
                                const AudioAdmin::RendererPolicies& renderer_policies,
                                const AudioAdmin::CapturerPolicies& capturer_policies);
 

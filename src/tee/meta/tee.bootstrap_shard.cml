@@ -16,6 +16,11 @@
             to: "#tee",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: "#tee",
+        },
+        {
             protocol: [ "fuchsia.vsock.Connector" ],
             from: "#vsock",
             to: "#tee",

@@ -4,13 +4,18 @@
 
 use crate::policy::AccessDecision;
 use crate::sync::Mutex;
-use crate::{AbstractObjectClass, FileClass, ObjectClass, SecurityId};
+use crate::{AbstractObjectClass, FileClass, NullessByteStr, ObjectClass, SecurityId};
+use indexmap::IndexMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 
-/// An interface for computing the rights permitted to a source accessing a target of a particular
-/// SELinux object type. This interface requires implementers to update state via interior mutability.
-pub trait Query {
+/// Interface used internally by the `SecurityServer` implementation to implement policy queries
+/// such as looking up the set of permissions to grant, or the Security Context to apply to new
+/// files, etc.
+///
+/// This trait allows layering of caching, delegation, and thread-safety between the policy-backed
+/// calculations, and the caller-facing permission-check interface.
+pub(super) trait Query {
     /// Computes the [`AccessVector`] permitted to `source_sid` for accessing `target_sid`, an
     /// object of of type `target_class`.
     fn query(
@@ -20,14 +25,28 @@ pub trait Query {
         target_class: AbstractObjectClass,
     ) -> AccessDecision;
 
-    /// Computes the appropriate security identifier (SID) for the security context of a file-like
-    /// object of class `file_class` created by `source_sid` targeting `target_sid`.
+    /// Returns the security identifier (SID) with which to label a new `file_class` instance
+    /// created by `source_sid` in a parent directory labeled `target_sid` should be labeled,
+    /// if no more specific SID was specified by `compute_new_file_sid_with_name()`, based on
+    /// the file's name.
     fn compute_new_file_sid(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
         file_class: FileClass,
     ) -> Result<SecurityId, anyhow::Error>;
+
+    /// Returns the security identifier (SID) with which to label a new `file_class` instance of
+    /// name `file_name`, created by `source_sid` in a parent directory labeled `target_sid`.
+    /// If no filename-transition rules exist for the specified `file_name` then `None` is
+    /// returned.
+    fn compute_new_file_sid_with_name(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+        file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId>;
 }
 
 /// An interface through which statistics may be obtained from each cache.
@@ -48,14 +67,28 @@ pub trait QueryMut {
         target_class: AbstractObjectClass,
     ) -> AccessDecision;
 
-    /// Computes the appropriate security identifier (SID) for the security context of a file-like
-    /// object of class `file_class` created by `source_sid` targeting `target_sid`.
+    /// Returns the security identifier (SID) with which to label a new `file_class` instance
+    /// created by `source_sid` in a parent directory labeled `target_sid` should be labeled,
+    /// if no more specific SID was specified by `compute_new_file_sid_with_name()`, based on
+    /// the file's name.
     fn compute_new_file_sid(
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
         file_class: FileClass,
     ) -> Result<SecurityId, anyhow::Error>;
+
+    /// Returns the security identifier (SID) with which to label a new `file_class` instance of
+    /// name `file_name`, created by `source_sid` in a parent directory labeled `target_sid`.
+    /// If no filename-transition rules exist for the specified `file_name` then `None` is
+    /// returned.
+    fn compute_new_file_sid_with_name(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+        file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId>;
 }
 
 impl<Q: Query> QueryMut for Q {
@@ -75,6 +108,17 @@ impl<Q: Query> QueryMut for Q {
         file_class: FileClass,
     ) -> Result<SecurityId, anyhow::Error> {
         (self as &dyn Query).compute_new_file_sid(source_sid, target_sid, file_class)
+    }
+
+    fn compute_new_file_sid_with_name(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+        file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId> {
+        (self as &dyn Query)
+            .compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
     }
 }
 
@@ -125,6 +169,16 @@ impl Query for DenyAll {
     ) -> Result<SecurityId, anyhow::Error> {
         unreachable!()
     }
+
+    fn compute_new_file_sid_with_name(
+        &self,
+        _source_sid: SecurityId,
+        _target_sid: SecurityId,
+        _file_class: FileClass,
+        _file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId> {
+        unreachable!()
+    }
 }
 
 impl Reset for DenyAll {
@@ -135,11 +189,15 @@ impl Reset for DenyAll {
     }
 }
 
-#[derive(Clone)]
-struct QueryAndResult {
+#[derive(Clone, Hash, PartialEq, Eq)]
+struct QueryArgs {
     source_sid: SecurityId,
     target_sid: SecurityId,
     target_class: AbstractObjectClass,
+}
+
+#[derive(Clone)]
+struct QueryResult {
     access_decision: AccessDecision,
     new_file_sid: Option<SecurityId>,
 }
@@ -178,6 +236,16 @@ impl<D: QueryMut> QueryMut for Empty<D> {
     ) -> Result<SecurityId, anyhow::Error> {
         unreachable!()
     }
+
+    fn compute_new_file_sid_with_name(
+        &mut self,
+        _source_sid: SecurityId,
+        _target_sid: SecurityId,
+        _file_class: FileClass,
+        _file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId> {
+        unreachable!()
+    }
 }
 
 impl<D: ResetMut> ResetMut for Empty<D> {
@@ -186,45 +254,34 @@ impl<D: ResetMut> ResetMut for Empty<D> {
     }
 }
 
-/// Default size of a fixed-sized (pre-allocated) access vector cache.
-pub(super) const DEFAULT_FIXED_SIZE: usize = 10;
-
-/// An access vector cache of fixed size and memory allocation. The underlying caching strategy is
-/// FIFO. Entries are evicted one at a time when entries are added to a full cache.
+/// Associative FIFO cache with capacity defined at creation.
+///
+/// Lookups in the cache are O(1), as are evictions.
 ///
 /// This implementation is thread-hostile; it expects all operations to be executed on the same
 /// thread.
-pub(super) struct Fixed<D = DenyAll, const SIZE: usize = DEFAULT_FIXED_SIZE> {
-    cache: [Option<QueryAndResult>; SIZE],
-    next_index: usize,
-    is_full: bool,
+pub(super) struct FifoCache<D = DenyAll> {
+    cache: IndexMap<QueryArgs, QueryResult>,
+    oldest_index: usize,
     delegate: D,
     stats: CacheStats,
 }
 
-impl<D, const SIZE: usize> Fixed<D, SIZE> {
+impl<D> FifoCache<D> {
     /// Constructs a fixed-size access vector cache that delegates to `delegate`.
     ///
     /// # Panics
     ///
-    /// This will panic when `SIZE` is 0; i.e., for any `Fixed<D, 0>`.
-    pub fn new(delegate: D) -> Self {
-        if SIZE == 0 {
-            panic!("cannot instantiate fixed access vector cache of size 0");
-        }
+    /// This will panic if called with a `capacity` of zero.
+    pub fn new(delegate: D, capacity: usize) -> Self {
+        assert!(capacity > 0, "cannot instantiate fixed access vector cache of size 0");
+
         Self {
-            cache: std::array::from_fn(|_| None),
-            next_index: 0,
-            is_full: false,
+            cache: IndexMap::with_capacity(capacity + 1),
+            oldest_index: 0,
             delegate,
             stats: CacheStats::default(),
         }
-    }
-
-    /// Returns a boolean indicating whether the local cache is empty.
-    #[inline]
-    fn is_empty(&self) -> bool {
-        self.next_index == 0 && !self.is_full
     }
 
     /// Searches the cache and returns the index of a [`QueryAndResult`] matching
@@ -237,27 +294,11 @@ impl<D, const SIZE: usize> Fixed<D, SIZE> {
     ) -> Option<usize> {
         self.stats.lookups += 1;
 
-        if !self.is_empty() {
-            let mut index = if self.next_index == 0 { SIZE - 1 } else { self.next_index - 1 };
-            loop {
-                // This loop will only visit entries that have been set, so
-                // each visited cache entry must already be `Some()`.
-                let query_and_result = self.cache[index].as_ref().unwrap();
-
-                if &source_sid == &query_and_result.source_sid
-                    && &target_sid == &query_and_result.target_sid
-                    && &target_class == &query_and_result.target_class
-                {
-                    self.stats.hits += 1;
-                    return Some(index);
-                }
-
-                if index == self.next_index || (index == 0 && !self.is_full) {
-                    break;
-                }
-
-                index = if index == 0 { SIZE - 1 } else { index - 1 };
-            }
+        if let Some(result) =
+            self.cache.get_index_of(&QueryArgs { source_sid, target_sid, target_class })
+        {
+            self.stats.hits += 1;
+            return Some(result);
         }
 
         self.stats.misses += 1;
@@ -265,29 +306,44 @@ impl<D, const SIZE: usize> Fixed<D, SIZE> {
         None
     }
 
-    /// Inserts `query_and_result` into the cache and returns the
-    /// index at which it was inserted.
+    /// Returns true if the cache has reached capacity.
+    #[cfg(test)]
     #[inline]
-    fn insert(&mut self, query_and_result: QueryAndResult) -> usize {
-        let index = self.next_index;
-        let entry = &mut self.cache[index];
+    fn is_full(&self) -> bool {
+        self.cache.len() == self.cache.capacity() - 1
+    }
 
+    /// Inserts the specified `query` and `result` into the cache, evicting the oldest existing
+    /// entry if capacity has been reached.
+    #[inline]
+    fn insert(&mut self, query: QueryArgs, result: QueryResult) -> usize {
         self.stats.allocs += 1;
-        if entry.is_some() {
-            self.stats.reclaims += 1;
-        }
 
-        *entry = Some(query_and_result);
-        self.next_index = (self.next_index + 1) % SIZE;
-        if self.next_index == 0 {
-            self.is_full = true;
+        // Insert the entry, at the end of the `IndexMap` queue.
+        let (mut index, _) = self.cache.insert_full(query, result);
+
+        // If the `cache` is now full then remove the oldest element, which is the entry at the
+        // `oldest_index`, and increment it to point to the new oldest element.
+        if self.cache.len() == self.cache.capacity() {
+            // The final element in the ordered container is the newly-added entry, so we can simply
+            // swap it with the oldest element, and then remove the final element, to achieve FIFO
+            // eviction.
+            self.cache.swap_remove_index(self.oldest_index);
+            self.stats.reclaims += 1;
+
+            index = self.oldest_index;
+
+            self.oldest_index += 1;
+            if self.oldest_index == self.cache.capacity() - 1 {
+                self.oldest_index = 0;
+            }
         }
 
         index
     }
 }
 
-impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
+impl<D: QueryMut> QueryMut for FifoCache<D> {
     fn query(
         &mut self,
         source_sid: SecurityId,
@@ -295,18 +351,17 @@ impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
         target_class: AbstractObjectClass,
     ) -> AccessDecision {
         if let Some(hit_index) = self.search(source_sid, target_sid, target_class.clone()) {
-            return self.cache[hit_index].as_ref().unwrap().access_decision.clone();
+            let entry = self.cache.get_index(hit_index);
+            let (_, result) = entry.as_ref().unwrap();
+            return result.access_decision.clone();
         }
 
         let access_decision = self.delegate.query(source_sid, target_sid, target_class.clone());
 
-        self.insert(QueryAndResult {
-            source_sid,
-            target_sid,
-            target_class,
-            access_decision: access_decision.clone(),
-            new_file_sid: None,
-        });
+        self.insert(
+            QueryArgs { source_sid, target_sid, target_class },
+            QueryResult { access_decision: access_decision.clone(), new_file_sid: None },
+        );
 
         access_decision
     }
@@ -323,45 +378,52 @@ impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
             index
         } else {
             let access_decision = self.delegate.query(source_sid, target_sid, target_class.clone());
-            self.insert(QueryAndResult {
-                source_sid,
-                target_sid,
-                target_class,
-                access_decision,
-                new_file_sid: None,
-            })
+            self.insert(
+                QueryArgs { source_sid, target_sid, target_class },
+                QueryResult { access_decision, new_file_sid: None },
+            )
         };
 
-        let query_and_result = &mut self.cache[index].as_mut().unwrap();
-        if let Some(new_file_sid) = query_and_result.new_file_sid {
+        let (_, query_result) = &mut self.cache.get_index_mut(index).unwrap();
+        if let Some(new_file_sid) = query_result.new_file_sid {
             Ok(new_file_sid)
         } else {
             let new_file_sid =
                 self.delegate.compute_new_file_sid(source_sid, target_sid, file_class);
             if let Ok(new_file_sid) = new_file_sid {
-                query_and_result.new_file_sid = Some(new_file_sid);
+                query_result.new_file_sid = Some(new_file_sid);
             }
             new_file_sid
         }
     }
+
+    fn compute_new_file_sid_with_name(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+        file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId> {
+        self.delegate.compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
+    }
 }
 
-impl<D, const SIZE: usize> HasCacheStats for Fixed<D, SIZE> {
+impl<D> HasCacheStats for FifoCache<D> {
     fn cache_stats(&self) -> CacheStats {
         self.stats.clone()
     }
 }
 
-impl<D, const SIZE: usize> ResetMut for Fixed<D, SIZE> {
+impl<D> ResetMut for FifoCache<D> {
     fn reset(&mut self) -> bool {
-        self.next_index = 0;
-        self.is_full = false;
+        self.oldest_index = 0;
+        self.cache.clear();
         self.stats = CacheStats::default();
         true
     }
 }
 
-impl<D, const SIZE: usize> ProxyMut<D> for Fixed<D, SIZE> {
+impl<D> ProxyMut<D> for FifoCache<D> {
     fn set_delegate(&mut self, mut delegate: D) -> D {
         std::mem::swap(&mut self.delegate, &mut delegate);
         delegate
@@ -403,6 +465,18 @@ impl<D: QueryMut> Query for Locked<D> {
         file_class: FileClass,
     ) -> Result<SecurityId, anyhow::Error> {
         self.delegate.lock().compute_new_file_sid(source_sid, target_sid, file_class)
+    }
+
+    fn compute_new_file_sid_with_name(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+        file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId> {
+        self.delegate
+            .lock()
+            .compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
     }
 }
 
@@ -469,6 +543,16 @@ impl<Q: Query> Query for Arc<Q> {
     ) -> Result<SecurityId, anyhow::Error> {
         self.as_ref().compute_new_file_sid(source_sid, target_sid, file_class)
     }
+
+    fn compute_new_file_sid_with_name(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+        file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId> {
+        self.as_ref().compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
+    }
 }
 
 impl<R: Reset> Reset for Arc<R> {
@@ -496,6 +580,17 @@ impl<Q: Query> Query for Weak<Q> {
         self.upgrade()
             .map(|q| q.compute_new_file_sid(source_sid, target_sid, file_class))
             .unwrap_or(Err(anyhow::anyhow!("weak reference failed to resolve")))
+    }
+
+    fn compute_new_file_sid_with_name(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+        file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId> {
+        let delegate = self.upgrade()?;
+        delegate.compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
     }
 }
 
@@ -558,31 +653,39 @@ impl<D: QueryMut + ResetMut> QueryMut for ThreadLocalQuery<D> {
         // Allow `self.delegate` to implement caching strategy and prepare response.
         self.delegate.compute_new_file_sid(source_sid, target_sid, file_class)
     }
+
+    fn compute_new_file_sid_with_name(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+        file_name: NullessByteStr<'_>,
+    ) -> Option<SecurityId> {
+        // Allow `self.delegate` to implement caching strategy and prepare response.
+        self.delegate.compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
+    }
 }
 
 /// Default size of an access vector cache shared by all threads in the system.
-pub(super) const DEFAULT_SHARED_SIZE: usize = 1000;
+const DEFAULT_SHARED_SIZE: usize = 1000;
+
+/// Default size of a thread-local access vector cache.
+const DEFAULT_THREAD_LOCAL_SIZE: usize = 10;
 
 /// Composite access vector cache manager that delegates queries to security server type, `SS`, and
-/// owns a shared cache of size `SHARED_SIZE`, and can produce thread-local caches of size
-/// `THREAD_LOCAL_SIZE`.
-pub(super) struct Manager<
-    SS,
-    const SHARED_SIZE: usize = DEFAULT_SHARED_SIZE,
-    const THREAD_LOCAL_SIZE: usize = DEFAULT_FIXED_SIZE,
-> {
-    shared_cache: Locked<Fixed<Weak<SS>, SHARED_SIZE>>,
+/// owns a shared cache of size `DEFAULT_SHARED_SIZE`, and can produce thread-local caches of size
+/// `DEFAULT_THREAD_LOCAL_SIZE`.
+pub(super) struct Manager<SS> {
+    shared_cache: Locked<FifoCache<Weak<SS>>>,
     thread_local_version: Arc<AtomicVersion>,
 }
 
-impl<SS, const SHARED_SIZE: usize, const THREAD_LOCAL_SIZE: usize>
-    Manager<SS, SHARED_SIZE, THREAD_LOCAL_SIZE>
-{
+impl<SS> Manager<SS> {
     /// Constructs a [`Manager`] that initially has no security server delegate (i.e., will default
     /// to deny all requests).
     pub fn new() -> Self {
         Self {
-            shared_cache: Locked::new(Fixed::new(Weak::<SS>::new())),
+            shared_cache: Locked::new(FifoCache::new(Weak::<SS>::new(), DEFAULT_SHARED_SIZE)),
             thread_local_version: Arc::new(AtomicVersion::default()),
         }
     }
@@ -594,7 +697,7 @@ impl<SS, const SHARED_SIZE: usize, const THREAD_LOCAL_SIZE: usize>
 
     /// Returns a shared reference to the shared cache managed by this manager. This operation does
     /// not copy the cache, but it does perform an atomic operation to update a reference count.
-    pub fn get_shared_cache(&self) -> &Locked<Fixed<Weak<SS>, SHARED_SIZE>> {
+    pub fn get_shared_cache(&self) -> &Locked<FifoCache<Weak<SS>>> {
         &self.shared_cache
     }
 
@@ -602,17 +705,15 @@ impl<SS, const SHARED_SIZE: usize, const THREAD_LOCAL_SIZE: usize>
     /// manager (which, in turn, delegates to its security server).
     pub fn new_thread_local_cache(
         &self,
-    ) -> ThreadLocalQuery<Fixed<Locked<Fixed<Weak<SS>, SHARED_SIZE>>, THREAD_LOCAL_SIZE>> {
+    ) -> ThreadLocalQuery<FifoCache<Locked<FifoCache<Weak<SS>>>>> {
         ThreadLocalQuery::new(
             self.thread_local_version.clone(),
-            Fixed::new(self.shared_cache.clone()),
+            FifoCache::new(self.shared_cache.clone(), DEFAULT_THREAD_LOCAL_SIZE),
         )
     }
 }
 
-impl<SS, const SHARED_SIZE: usize, const THREAD_LOCAL_SIZE: usize> Reset
-    for Manager<SS, SHARED_SIZE, THREAD_LOCAL_SIZE>
-{
+impl<SS> Reset for Manager<SS> {
     /// Resets caches owned by this manager. If owned caches delegate to a security server that is
     /// reloading its policy, the security server must reload its policy (and start serving the new
     /// policy) *before* invoking `Manager::reset()` on any managers that delegate to that security
@@ -720,6 +821,16 @@ mod tests {
         ) -> Result<SecurityId, anyhow::Error> {
             unreachable!()
         }
+
+        fn compute_new_file_sid_with_name(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _file_class: FileClass,
+            _file_name: NullessByteStr<'_>,
+        ) -> Option<SecurityId> {
+            unreachable!()
+        }
     }
 
     impl<D: Reset> Reset for Counter<D> {
@@ -741,7 +852,7 @@ mod tests {
 
     #[test]
     fn fixed_access_vector_cache_add_entry() {
-        let mut avc = Fixed::<_, CACHE_ENTRIES>::new(Counter::<DenyAll>::default());
+        let mut avc = FifoCache::<_>::new(Counter::<DenyAll>::default(), CACHE_ENTRIES);
         assert_eq!(0, avc.delegate.query_count());
         assert_eq!(
             AccessVector::NONE,
@@ -753,17 +864,17 @@ mod tests {
             avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into()).allow
         );
         assert_eq!(1, avc.delegate.query_count());
-        assert_eq!(1, avc.next_index);
-        assert_eq!(false, avc.is_full);
+        assert_eq!(0, avc.oldest_index);
+        assert_eq!(false, avc.is_full());
     }
 
     #[test]
     fn fixed_access_vector_cache_reset() {
-        let mut avc = Fixed::<_, CACHE_ENTRIES>::new(Counter::<DenyAll>::default());
+        let mut avc = FifoCache::<_>::new(Counter::<DenyAll>::default(), CACHE_ENTRIES);
 
         avc.reset();
-        assert_eq!(0, avc.next_index);
-        assert_eq!(false, avc.is_full);
+        assert_eq!(0, avc.oldest_index);
+        assert_eq!(false, avc.is_full());
 
         assert_eq!(0, avc.delegate.query_count());
         assert_eq!(
@@ -771,54 +882,54 @@ mod tests {
             avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into()).allow
         );
         assert_eq!(1, avc.delegate.query_count());
-        assert_eq!(1, avc.next_index);
-        assert_eq!(false, avc.is_full);
+        assert_eq!(0, avc.oldest_index);
+        assert_eq!(false, avc.is_full());
 
         avc.reset();
-        assert_eq!(0, avc.next_index);
-        assert_eq!(false, avc.is_full);
+        assert_eq!(0, avc.oldest_index);
+        assert_eq!(false, avc.is_full());
     }
 
     #[test]
     fn fixed_access_vector_cache_fill() {
-        let mut avc = Fixed::<_, CACHE_ENTRIES>::new(Counter::<DenyAll>::default());
+        let mut avc = FifoCache::<_>::new(Counter::<DenyAll>::default(), CACHE_ENTRIES);
 
         for sid in unique_sids(CACHE_ENTRIES) {
             avc.query(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
         }
-        assert_eq!(0, avc.next_index);
-        assert_eq!(true, avc.is_full);
+        assert_eq!(0, avc.oldest_index);
+        assert_eq!(true, avc.is_full());
 
         avc.reset();
-        assert_eq!(0, avc.next_index);
-        assert_eq!(false, avc.is_full);
+        assert_eq!(0, avc.oldest_index);
+        assert_eq!(false, avc.is_full());
 
         for sid in unique_sids(CACHE_ENTRIES) {
             avc.query(A_TEST_SID.clone(), sid, ObjectClass::Process.into());
         }
-        assert_eq!(0, avc.next_index);
-        assert_eq!(true, avc.is_full);
+        assert_eq!(0, avc.oldest_index);
+        assert_eq!(true, avc.is_full());
 
         avc.reset();
-        assert_eq!(0, avc.next_index);
-        assert_eq!(false, avc.is_full);
+        assert_eq!(0, avc.oldest_index);
+        assert_eq!(false, avc.is_full());
     }
 
     #[test]
     fn fixed_access_vector_cache_full_miss() {
-        let mut avc = Fixed::<_, CACHE_ENTRIES>::new(Counter::<DenyAll>::default());
+        let mut avc = FifoCache::<_>::new(Counter::<DenyAll>::default(), CACHE_ENTRIES);
 
         // Make the test query, which will trivially miss.
         let delegate_query_count = avc.delegate.query_count();
         avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into());
         assert_eq!(delegate_query_count + 1, avc.delegate.query_count());
-        assert!(!avc.is_full);
+        assert!(!avc.is_full());
 
         // Fill the cache with new queries, which should evict the test query.
         for sid in unique_sids(CACHE_ENTRIES) {
             avc.query(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
         }
-        assert!(avc.is_full);
+        assert!(avc.is_full());
 
         // Making the test query should result in another miss.
         let delegate_query_count = avc.delegate.query_count();
@@ -915,6 +1026,16 @@ mod starnix_tests {
         ) -> Result<SecurityId, anyhow::Error> {
             unreachable!()
         }
+
+        fn compute_new_file_sid_with_name(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _file_class: FileClass,
+            _file_name: NullessByteStr<'_>,
+        ) -> Option<SecurityId> {
+            unreachable!()
+        }
     }
 
     impl Reset for PolicyServer {
@@ -937,7 +1058,7 @@ mod starnix_tests {
             Arc::new(PolicyServer { policy: active_policy.clone() });
         let cache_version = Arc::new(AtomicVersion::default());
 
-        let fixed_avc = Fixed::<_, CACHE_ENTRIES>::new(policy_server.clone());
+        let fixed_avc = FifoCache::<_>::new(policy_server.clone(), CACHE_ENTRIES);
         let cache_version_for_avc = cache_version.clone();
         let mut query_avc = ThreadLocalQuery::new(cache_version_for_avc, fixed_avc);
 
@@ -1005,7 +1126,7 @@ mod starnix_tests {
 
         let active_policy: Arc<AtomicU32> = Arc::new(Default::default());
         let policy_server = Arc::new(PolicyServer { policy: active_policy.clone() });
-        let fixed_avc = Fixed::<_, CACHE_ENTRIES>::new(policy_server.clone());
+        let fixed_avc = FifoCache::<_>::new(policy_server.clone(), CACHE_ENTRIES);
         let avc = Locked::new(fixed_avc);
         let sids = unique_sids(30);
 
@@ -1068,8 +1189,8 @@ mod starnix_tests {
             // consistent with the final policy: `(_, _, ) => WRITE`.
             //
 
-            for item in avc_for_query_1.delegate.lock().cache.iter() {
-                assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_decision);
+            for (_, result) in avc_for_query_1.delegate.lock().cache.iter() {
+                assert_eq!(ACCESS_VECTOR_WRITE, result.access_decision);
             }
         });
 
@@ -1113,8 +1234,8 @@ mod starnix_tests {
             // consistent with the final policy: `(_, _, ) => NONE`.
             //
 
-            for item in avc_for_query_2.delegate.lock().cache.iter() {
-                assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_decision);
+            for (_, result) in avc_for_query_2.delegate.lock().cache.iter() {
+                assert_eq!(ACCESS_VECTOR_WRITE, result.access_decision);
             }
         });
 
@@ -1232,6 +1353,16 @@ mod starnix_tests {
         ) -> Result<SecurityId, anyhow::Error> {
             unreachable!()
         }
+
+        fn compute_new_file_sid_with_name(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _file_class: FileClass,
+            _file_name: NullessByteStr<'_>,
+        ) -> Option<SecurityId> {
+            unreachable!()
+        }
     }
 
     impl Reset for SecurityServer {
@@ -1341,8 +1472,8 @@ mod starnix_tests {
             // consistent with the final policy: `(_, _, ) => WRITE`.
             //
 
-            for item in avc_for_query_1.delegate.cache.iter() {
-                assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_decision);
+            for (_, result) in avc_for_query_1.delegate.cache.iter() {
+                assert_eq!(ACCESS_VECTOR_WRITE, result.access_decision);
             }
         });
 
@@ -1386,8 +1517,8 @@ mod starnix_tests {
             // consistent with the final policy: `(_, _, ) => WRITE`.
             //
 
-            for item in avc_for_query_2.delegate.cache.iter() {
-                assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_decision);
+            for (_, result) in avc_for_query_2.delegate.cache.iter() {
+                assert_eq!(ACCESS_VECTOR_WRITE, result.access_decision);
             }
         });
 
@@ -1471,17 +1602,8 @@ mod starnix_tests {
         }
 
         let shared_cache = security_server.manager().shared_cache.delegate.lock();
-        if shared_cache.is_full {
-            for item in shared_cache.cache.iter() {
-                assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_decision);
-            }
-        } else {
-            for i in 0..shared_cache.next_index {
-                assert_eq!(
-                    ACCESS_VECTOR_WRITE,
-                    shared_cache.cache[i].as_ref().unwrap().access_decision
-                );
-            }
+        for (_, result) in shared_cache.cache.iter() {
+            assert_eq!(ACCESS_VECTOR_WRITE, result.access_decision);
         }
     }
 }

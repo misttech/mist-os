@@ -4,23 +4,23 @@
 
 use anyhow::Error;
 use fidl_fuchsia_hardware_power_statecontrol::{
-    AdminProxy, AdminRebootResult, AdminRequest, AdminRequestStream,
+    AdminPerformRebootResult, AdminProxy, AdminRequest, AdminRequestStream, RebootOptions,
 };
 use fuchsia_async as fasync;
 use futures::{TryFutureExt, TryStreamExt};
 use std::sync::Arc;
 
-pub use fidl_fuchsia_hardware_power_statecontrol::RebootReason;
-
 pub struct MockRebootService {
-    call_hook: Box<dyn Fn(RebootReason) -> AdminRebootResult + Send + Sync>,
+    call_hook: Box<dyn Fn(RebootOptions) -> AdminPerformRebootResult + Send + Sync>,
 }
 
 impl MockRebootService {
     /// Creates a new MockRebootService with a given callback to run per call to the service.
     /// `call_hook` must return a `Result` for each call, which will be sent to
     /// the caller as the result of the reboot call.
-    pub fn new(call_hook: Box<dyn Fn(RebootReason) -> AdminRebootResult + Send + Sync>) -> Self {
+    pub fn new(
+        call_hook: Box<dyn Fn(RebootOptions) -> AdminPerformRebootResult + Send + Sync>,
+    ) -> Self {
         Self { call_hook }
     }
 
@@ -32,8 +32,8 @@ impl MockRebootService {
     ) -> Result<(), Error> {
         while let Some(event) = stream.try_next().await.expect("received request") {
             match event {
-                AdminRequest::Reboot { reason, responder } => {
-                    let result = (self.call_hook)(reason);
+                AdminRequest::PerformReboot { options, responder } => {
+                    let result = (self.call_hook)(options);
                     responder.send(result)?;
                 }
                 _ => {
@@ -64,6 +64,7 @@ impl MockRebootService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fidl_fuchsia_hardware_power_statecontrol::RebootReason2;
     use fuchsia_async as fasync;
     use std::sync::atomic::{AtomicU32, Ordering};
 
@@ -75,7 +76,10 @@ mod tests {
         let proxy = reboot_service_clone.spawn_reboot_service();
 
         proxy
-            .reboot(RebootReason::SystemUpdate)
+            .perform_reboot(&RebootOptions {
+                reasons: Some(vec![RebootReason2::SystemUpdate]),
+                ..Default::default()
+            })
             .await
             .expect("made reboot call")
             .expect("reboot call succeeded");
@@ -89,16 +93,27 @@ mod tests {
         let reboot_service_clone = Arc::clone(&reboot_service);
         let proxy = reboot_service_clone.spawn_reboot_service();
 
-        let reboot_result =
-            proxy.reboot(RebootReason::SystemUpdate).await.expect("made reboot call");
+        let reboot_result = proxy
+            .perform_reboot(&RebootOptions {
+                reasons: Some(vec![RebootReason2::SystemUpdate]),
+                ..Default::default()
+            })
+            .await
+            .expect("made reboot call");
         assert_eq!(reboot_result, Err(zx::Status::INTERNAL.into_raw()));
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_mock_reboot_call_hook() {
-        let reboot_service = Arc::new(MockRebootService::new(Box::new(|reason| match reason {
-            RebootReason::UserRequest => Ok(()),
-            _ => Err(zx::Status::NOT_SUPPORTED.into_raw()),
+        let reboot_service = Arc::new(MockRebootService::new(Box::new(|options| {
+            if let Some(reasons) = options.reasons {
+                match &reasons[..] {
+                    [RebootReason2::UserRequest] => Ok(()),
+                    _ => Err(zx::Status::NOT_SUPPORTED.into_raw()),
+                }
+            } else {
+                Err(zx::Status::NOT_SUPPORTED.into_raw())
+            }
         })));
 
         let reboot_service_clone = Arc::clone(&reboot_service);
@@ -106,14 +121,22 @@ mod tests {
 
         // Succeed when given expected reboot reason.
         let () = proxy
-            .reboot(RebootReason::UserRequest)
+            .perform_reboot(&RebootOptions {
+                reasons: Some(vec![RebootReason2::UserRequest]),
+                ..Default::default()
+            })
             .await
             .expect("made reboot call")
             .expect("reboot call succeeded");
 
         // Error when given unexpected reboot reason.
-        let error_reboot_result =
-            proxy.reboot(RebootReason::SystemUpdate).await.expect("made reboot call");
+        let error_reboot_result = proxy
+            .perform_reboot(&RebootOptions {
+                reasons: Some(vec![RebootReason2::SystemUpdate]),
+                ..Default::default()
+            })
+            .await
+            .expect("made reboot call");
         assert_eq!(error_reboot_result, Err(zx::Status::NOT_SUPPORTED.into_raw()));
     }
 
@@ -130,7 +153,10 @@ mod tests {
         let proxy = reboot_service_clone.spawn_reboot_service();
 
         proxy
-            .reboot(RebootReason::SystemUpdate)
+            .perform_reboot(&RebootOptions {
+                reasons: Some(vec![RebootReason2::SystemUpdate]),
+                ..Default::default()
+            })
             .await
             .expect("made reboot call")
             .expect("reboot call succeeded");

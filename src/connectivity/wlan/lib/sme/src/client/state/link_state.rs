@@ -11,7 +11,7 @@ use crate::{MlmeRequest, MlmeSink};
 use fuchsia_inspect_contrib::inspect_log;
 use fuchsia_inspect_contrib::log::InspectBytes;
 use ieee80211::{Bssid, MacAddr, MacAddrBytes, WILDCARD_BSSID};
-use tracing::{error, warn};
+use log::{error, warn};
 use wlan_common::bss::BssDescription;
 use wlan_common::timer::EventId;
 use wlan_rsn::key::exchange::Key;
@@ -179,7 +179,7 @@ impl LinkState {
                 });
                 let (transition, state) = state.release_data();
                 match process_rsna_updates(context, None, update_sink, None) {
-                    RsnaStatus::Unchanged { .. } => Ok(transition.to(state).into()),
+                    RsnaStatus::Unchanged => Ok(transition.to(state).into()),
                     // RSNA progress during start() should only be trivial.
                     RsnaStatus::Progressed {
                         ap_responsive: None,
@@ -214,6 +214,9 @@ impl LinkState {
                 let connected_duration = now() - state.since;
                 (state.protection, Some(connected_duration))
             }
+            // We always transition to EstablishingRsna or LinkUp on initialization
+            // and never transition back
+            #[expect(clippy::unreachable)]
             _ => unreachable!(),
         }
     }
@@ -289,6 +292,9 @@ impl LinkState {
                 }
                 Ok(transition.to(state).into())
             }
+            // We always transition to EstablishingRsna or LinkUp on initialization
+            // and never transition back
+            #[expect(clippy::unreachable)]
             _ => unreachable!(),
         }
     }
@@ -404,6 +410,9 @@ impl LinkState {
                 _ => Ok(state.into()),
             },
             Self::LinkUp(state) => Ok(state.into()),
+            // We always transition to EstablishingRsna or LinkUp on initialization
+            // and never transition back
+            #[expect(clippy::unreachable)]
             _ => unreachable!(),
         }
     }

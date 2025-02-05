@@ -28,7 +28,7 @@ pub async fn create_realm(
     MetricEventLoggerQuerierProxy,
     Option<FakeClockController>,
 )> {
-    tracing::debug!("create_realm: options: {:?}, fake_utc_clock={:?}", options, fake_utc_clock);
+    log::debug!("create_realm: options: {:?}, fake_utc_clock={:?}", options, fake_utc_clock);
     let (nested_timekeeper, push_source_puppet, rtc_updates, metric_proxy, fake_clock_controller) =
         NestedTimekeeper::new(
             Arc::new(fake_utc_clock),

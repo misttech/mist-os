@@ -41,10 +41,9 @@ void UsbHidbus::HandleInterrupt(fendpoint::Completion completion) {
   ZX_ASSERT(completion.status().has_value());
   ZX_ASSERT(completion.transfer_size().has_value());
 
-  // TODO use usb request copyfrom instead of mmap
   usb::FidlRequest req(std::move(completion.request().value()));
   std::vector<uint8_t> buffer(*completion.transfer_size());
-  auto actual = req.CopyFrom(0, buffer.data(), *completion.transfer_size(), ep_in_.GetMapped);
+  auto actual = req.CopyFrom(0, buffer.data(), *completion.transfer_size(), ep_in_.GetMapped());
   ZX_ASSERT(actual.size() == 1);
   ZX_ASSERT(actual[0] == *completion.transfer_size());
   zxlogf(TRACE, "usb-hid: callback request status %d", *completion.status());
@@ -81,8 +80,8 @@ void UsbHidbus::HandleInterrupt(fendpoint::Completion completion) {
   }
 
   if (requeue) {
-    req.reset_buffers(ep_in_.GetMapped);
-    req.CacheFlushInvalidate(ep_in_.GetMapped);
+    req.reset_buffers(ep_in_.GetMapped());
+    req.CacheFlushInvalidate(ep_in_.GetMapped());
     std::vector<fuchsia_hardware_usb_request::Request> requests;
     requests.push_back(req.take_request());
     auto result = ep_in_->QueueRequests(std::move(requests));
@@ -106,8 +105,8 @@ void UsbHidbus::Start(StartCompleter::Sync& completer) {
   started_ = true;
   auto req = ep_in_.GetRequest();
   if (req.has_value()) {
-    req->reset_buffers(ep_in_.GetMapped);
-    req->CacheFlushInvalidate(ep_in_.GetMapped);
+    req->reset_buffers(ep_in_.GetMapped());
+    req->CacheFlushInvalidate(ep_in_.GetMapped());
     std::vector<fuchsia_hardware_usb_request::Request> requests;
     requests.push_back(req->take_request());
     auto result = ep_in_->QueueRequests(std::move(requests));
@@ -230,14 +229,14 @@ void UsbHidbus::SetReport(fhidbus::wire::HidbusSetReportRequest* request,
       completer.ReplyError(ZX_ERR_SHOULD_WAIT);
       return;
     }
-    auto actual = req->CopyTo(0, request->data.data(), request->data.count(), ep_out_->GetMapped);
+    auto actual = req->CopyTo(0, request->data.data(), request->data.count(), ep_out_->GetMapped());
     ZX_ASSERT(actual.size() == 1);
     if (request->data.count() != actual[0]) {
       completer.ReplyError(ZX_ERR_BUFFER_TOO_SMALL);
       return;
     }
     (*req)->data()->at(0).size(actual[0]);
-    auto status = req->CacheFlush(ep_out_->GetMappedLocked);
+    auto status = req->CacheFlush(ep_out_->GetMappedLocked());
     if (status != ZX_OK) {
       zxlogf(ERROR, "Cache flush failed %d", status);
     }
@@ -336,19 +335,25 @@ void UsbHidbus::DdkRelease() {
   delete this;
 }
 
-void UsbHidbus::FindDescriptors(usb::Interface interface, usb_hid_descriptor_t** hid_desc,
+void UsbHidbus::FindDescriptors(usb::Interface interface, const usb_hid_descriptor_t** hid_desc,
                                 const usb_endpoint_descriptor_t** endptin,
                                 const usb_endpoint_descriptor_t** endptout) {
-  for (auto& descriptor : interface.GetDescriptorList()) {
+  for (const auto& descriptor : interface.GetDescriptorList()) {
     if (descriptor.b_descriptor_type == USB_DT_HID) {
-      *hid_desc = (usb_hid_descriptor_t*)&descriptor;
+      *hid_desc = reinterpret_cast<const usb_hid_descriptor_t*>(&descriptor);
     } else if (descriptor.b_descriptor_type == USB_DT_ENDPOINT) {
-      if (usb_ep_direction((usb_endpoint_descriptor_t*)&descriptor) == USB_ENDPOINT_IN &&
-          usb_ep_type((usb_endpoint_descriptor_t*)&descriptor) == USB_ENDPOINT_INTERRUPT) {
-        *endptin = (usb_endpoint_descriptor_t*)&descriptor;
-      } else if (usb_ep_direction((usb_endpoint_descriptor_t*)&descriptor) == USB_ENDPOINT_OUT &&
-                 usb_ep_type((usb_endpoint_descriptor_t*)&descriptor) == USB_ENDPOINT_INTERRUPT) {
-        *endptout = (usb_endpoint_descriptor_t*)&descriptor;
+      auto endpt_desc = reinterpret_cast<const usb_endpoint_descriptor_t*>(&descriptor);
+      if (usb_ep_type(endpt_desc) == USB_ENDPOINT_INTERRUPT) {
+        switch (usb_ep_direction(endpt_desc)) {
+          case USB_ENDPOINT_IN:
+            *endptin = endpt_desc;
+            break;
+          case USB_ENDPOINT_OUT:
+            *endptout = endpt_desc;
+            break;
+          default:
+            break;
+        }
       }
     }
   }
@@ -374,7 +379,7 @@ zx_status_t UsbHidbus::Bind(ddk::UsbProtocolClient usbhid,
     return status;
   }
 
-  usb_hid_descriptor_t* hid_desc = NULL;
+  const usb_hid_descriptor_t* hid_desc = NULL;
   const usb_endpoint_descriptor_t* endptin = NULL;
   const usb_endpoint_descriptor_t* endptout = NULL;
   auto interface = *usb_interface_list_->begin();

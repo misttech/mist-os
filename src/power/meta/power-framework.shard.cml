@@ -23,6 +23,14 @@
             availability: "optional",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: [
+                "#power-broker",
+                "#power_manager",
+            ],
+        },
+        {
             directory: "boot",
             from: "parent",
             as: "config",
@@ -55,6 +63,11 @@
             to: "#power_manager",
         },
         {
+            protocol: [ "fuchsia.hardware.power.statecontrol.Admin" ],
+            from: "#shutdown_shim",
+            to: "#power_manager",
+        },
+        {
             protocol: [
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.kernel.Stats",
@@ -69,22 +82,10 @@
             to: "#power_manager",
             availability: "optional",
         },
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: [
-                "#power-broker",
-                "#power_manager",
-            ],
-        },
     ],
     expose: [
         {
             protocol: [
-                "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
                 "fuchsia.power.clientlevel.Connector",
                 "fuchsia.power.profile.Watcher",
                 "fuchsia.power.systemmode.ClientConfigurator",

@@ -19,5 +19,5 @@ mod internal {
 pub use internal::socket::{
     BoundSockets, IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpEchoBoundStateContext,
     IcmpEchoContextMarker, IcmpEchoIpTransportContext, IcmpEchoSocketApi, IcmpEchoStateContext,
-    IcmpSocketId, IcmpSocketSet, IcmpSocketState, IcmpSockets,
+    IcmpSocketId, IcmpSocketSet, IcmpSocketState, IcmpSocketTxMetadata, IcmpSockets,
 };

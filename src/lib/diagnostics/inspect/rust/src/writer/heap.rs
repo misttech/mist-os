@@ -8,8 +8,8 @@
 
 use crate::writer::Error;
 use inspect_format::{
-    constants, utils, Block, BlockAccessorExt, BlockAccessorMutExt, BlockIndex, BlockType,
-    ReadBytes, WriteBytes,
+    constants, utils, Block, BlockAccessorExt, BlockAccessorMutExt, BlockIndex, BlockType, Free,
+    ReadBytes, Reserved, WriteBytes,
 };
 use std::cmp::min;
 
@@ -52,8 +52,10 @@ impl<T: ReadBytes + WriteBytes> Heap<T> {
     fn init_header(&mut self) -> Result<(), Error> {
         let header_index =
             self.allocate_block(inspect_format::utils::order_to_size(constants::HEADER_ORDER))?;
-        let heap_current_size = self.current_size();
-        self.container.block_at_mut(header_index).become_header(heap_current_size)?;
+        let heap_current_size = self.current_size_bytes;
+        self.container
+            .block_at_unchecked_mut::<Reserved>(header_index)
+            .become_header(heap_current_size)?;
         self.has_header = true;
         Ok(())
     }
@@ -92,7 +94,7 @@ impl<T: ReadBytes + WriteBytes> Heap<T> {
         let min_fit_order = min_fit_order as u8;
         // Find free block with order >= min_fit_order
         let order_found = (min_fit_order..constants::NUM_ORDERS)
-            .find(|&i| self.is_free_block(self.free_head_per_order[i as usize], i));
+            .find(|&i| self.is_free_block(self.free_head_per_order[i as usize], i).is_some());
         let next_order = match order_found {
             Some(order) => order,
             None => {
@@ -104,11 +106,8 @@ impl<T: ReadBytes + WriteBytes> Heap<T> {
         while self.container.block_at(block_index).order() > min_fit_order {
             self.split_block(block_index)?;
         }
-        self.remove_free(block_index)?;
-        self.container
-            .block_at_mut(block_index)
-            .become_reserved()
-            .expect("Failed to reserve make block reserved");
+        self.remove_free(block_index);
+        let _ = self.container.block_at_unchecked_mut::<Free>(block_index).become_reserved();
         self.allocated_blocks += 1;
         Ok(block_index)
     }
@@ -116,13 +115,13 @@ impl<T: ReadBytes + WriteBytes> Heap<T> {
     /// Marks the memory region pointed by the given `block` as free.
     pub fn free_block(&mut self, mut block_index: BlockIndex) -> Result<(), Error> {
         let block = self.container.block_at(block_index);
-        if block.block_type() == BlockType::Free {
+        if block.block_type() == Some(BlockType::Free) {
             return Err(Error::BlockAlreadyFree(block_index));
         }
         let mut buddy_index = buddy(block_index, block.order());
 
         while self.possible_to_merge(buddy_index, block_index) {
-            self.remove_free(buddy_index)?;
+            self.remove_free(buddy_index);
             if buddy_index < block_index {
                 std::mem::swap(&mut buddy_index, &mut block_index);
             }
@@ -131,9 +130,9 @@ impl<T: ReadBytes + WriteBytes> Heap<T> {
             block.set_order(order + 1)?;
             buddy_index = buddy(block_index, order + 1);
         }
-        let mut block = self.container.block_at_mut(block_index);
+        let block = self.container.block_at_unchecked_mut::<Reserved>(block_index);
         let order = block.order();
-        block.become_free(self.free_head_per_order[order as usize]);
+        let _ = block.become_free(self.free_head_per_order[order as usize]);
         self.free_head_per_order[order as usize] = block_index;
         self.deallocated_blocks += 1;
         Ok(())
@@ -141,11 +140,13 @@ impl<T: ReadBytes + WriteBytes> Heap<T> {
 
     #[inline]
     fn possible_to_merge(&self, buddy_index: BlockIndex, block_index: BlockIndex) -> bool {
-        let buddy_block = self.container.block_at(buddy_index);
-        let block = self.container.block_at(block_index);
-        buddy_block.block_type() == BlockType::Free
-            && block.order() < constants::NUM_ORDERS - 1
-            && block.order() == buddy_block.order()
+        self.container
+            .maybe_block_at::<Free>(buddy_index)
+            .map(|buddy_block| {
+                let block = self.container.block_at(block_index);
+                block.order() < constants::NUM_ORDERS - 1 && block.order() == buddy_block.order()
+            })
+            .unwrap_or(false)
     }
 
     /// Returns a copy of the bytes stored in this Heap.
@@ -167,7 +168,7 @@ impl<T: ReadBytes + WriteBytes> Heap<T> {
             BlockIndex::from_offset(new_size - new_size % constants::PAGE_SIZE_BYTES);
         loop {
             curr_index -= BlockIndex::from_offset(constants::MAX_ORDER_SIZE);
-            Block::new_free(&mut self.container, curr_index, constants::NUM_ORDERS - 1, last_index)
+            Block::free(&mut self.container, curr_index, constants::NUM_ORDERS - 1, last_index)
                 .expect("Failed to create free block");
             last_index = curr_index;
             if curr_index <= min_index {
@@ -178,45 +179,48 @@ impl<T: ReadBytes + WriteBytes> Heap<T> {
         self.current_size_bytes = new_size;
         if self.has_header {
             self.container
-                .block_at_mut(BlockIndex::HEADER)
+                .block_at_unchecked_mut(BlockIndex::HEADER)
                 // Safety: the current size can't be larger than a max u32 value
-                .set_header_vmo_size(self.current_size_bytes as u32)?;
+                .set_vmo_size(self.current_size_bytes as u32)?;
         }
         Ok(())
     }
 
     #[inline]
-    fn is_free_block(&self, index: BlockIndex, expected_order: u8) -> bool {
+    fn is_free_block(
+        &mut self,
+        index: BlockIndex,
+        expected_order: u8,
+    ) -> Option<Block<&mut T, Free>> {
         // Safety: promoting from u32 to usize
         if (*index as usize) >= self.current_size_bytes / constants::MIN_ORDER_SIZE {
-            return false;
+            return None;
         }
-        let block = self.container.block_at(index);
-        block.block_type() == BlockType::Free && block.order() == expected_order
+        self.container
+            .maybe_block_at_mut::<Free>(index)
+            .filter(|block| block.order() == expected_order)
     }
 
     #[inline]
-    fn remove_free(&mut self, block_index: BlockIndex) -> Result<bool, Error> {
-        let block = self.container.block_at(block_index);
-        let free_next_index = block.free_next_index()?;
+    fn remove_free(&mut self, block_index: BlockIndex) {
+        let block = self.container.block_at_unchecked::<Free>(block_index);
+        let free_next_index = block.free_next_index();
         let order = block.order();
         if order >= constants::NUM_ORDERS {
-            return Ok(false);
+            return;
         }
         let mut next_index = self.free_head_per_order[order as usize];
         if next_index == block_index {
             self.free_head_per_order[order as usize] = free_next_index;
-            return Ok(true);
+            return;
         }
-        while self.is_free_block(next_index, order) {
-            let mut curr_block = self.container.block_at_mut(next_index);
-            next_index = curr_block.free_next_index()?;
+        while let Some(mut curr_block) = self.is_free_block(next_index, order) {
+            next_index = curr_block.free_next_index();
             if next_index == block_index {
-                curr_block.set_free_next_index(free_next_index)?;
-                return Ok(true);
+                curr_block.set_free_next_index(free_next_index);
+                return;
             }
         }
-        Ok(false)
     }
 
     #[inline]
@@ -225,7 +229,7 @@ impl<T: ReadBytes + WriteBytes> Heap<T> {
         if block_order >= constants::NUM_ORDERS {
             return Err(Error::InvalidBlockOrderAtIndex(block_order, block_index));
         }
-        self.remove_free(block_index)?;
+        self.remove_free(block_index);
         let buddy_index = buddy(block_index, block_order - 1);
         let mut block = self.container.block_at_mut(block_index);
         block.set_order(block_order - 1)?;
@@ -248,7 +252,7 @@ fn buddy(index: BlockIndex, order: u8) -> BlockIndex {
 mod tests {
     use super::*;
     use crate::reader::snapshot::{BackingBuffer, BlockIterator};
-    use inspect_format::{block_testing, Container};
+    use inspect_format::{block_testing, BlockType, Container, Header};
 
     #[derive(Debug)]
     struct BlockDebug {
@@ -263,7 +267,7 @@ mod tests {
             .map(|block| BlockDebug {
                 order: block.order(),
                 index: block.index(),
-                block_type: block.block_type(),
+                block_type: block.block_type().unwrap(),
             })
             .collect();
         assert_eq!(expected.len(), actual.len());
@@ -287,8 +291,8 @@ mod tests {
         ];
         validate(&expected, &heap);
         assert_eq!(*heap.free_head_per_order[7], 0);
-        assert_eq!(*heap.container.block_at(0.into()).free_next_index().unwrap(), 128);
-        assert_eq!(*heap.container.block_at(128.into()).free_next_index().unwrap(), 0);
+        assert_eq!(*heap.container.block_at_unchecked::<Free>(0.into()).free_next_index(), 128);
+        assert_eq!(*heap.container.block_at_unchecked::<Free>(128.into()).free_next_index(), 0);
         assert_eq!(heap.failed_allocations, 0);
     }
 
@@ -322,7 +326,7 @@ mod tests {
             BlockDebug { index: 128.into(), order: 7, block_type: BlockType::Free },
         ];
         validate(&expected, &heap);
-        assert_eq!(*heap.container.block_at(128.into()).free_next_index().unwrap(), 0);
+        assert_eq!(*heap.container.block_at_unchecked::<Free>(128.into()).free_next_index(), 0);
         assert_eq!(heap.failed_allocations, 0);
     }
 
@@ -371,7 +375,11 @@ mod tests {
         validate(&expected, &heap);
         assert!(heap.free_head_per_order.iter().enumerate().skip(2).all(|(i, &j)| (1 << i) == *j));
         let buffer = BackingBuffer::from(heap.bytes());
-        assert!(BlockIterator::from(&buffer).skip(2).all(|b| *b.free_next_index().unwrap() == 0));
+        assert!(BlockIterator::from(&buffer).skip(2).all(|b| *b
+            .cast::<Free>()
+            .unwrap()
+            .free_next_index()
+            == 0));
 
         // Ensure a large block takes the first free large one.
         assert!(heap.free_block(BlockIndex::from(0)).is_ok());
@@ -412,7 +420,7 @@ mod tests {
         ];
         validate(&expected, &heap);
         assert_eq!(*heap.free_head_per_order[7], 0);
-        assert_eq!(*heap.container.block_at(0.into()).free_next_index().unwrap(), 0);
+        assert_eq!(*heap.container.block_at_unchecked::<Free>(0.into()).free_next_index(), 0);
 
         assert!(heap.free_block(BlockIndex::from(128)).is_ok());
         let expected = [
@@ -421,8 +429,8 @@ mod tests {
         ];
         validate(&expected, &heap);
         assert_eq!(*heap.free_head_per_order[7], 128);
-        assert_eq!(*heap.container.block_at(0.into()).free_next_index().unwrap(), 0);
-        assert_eq!(*heap.container.block_at(128.into()).free_next_index().unwrap(), 0);
+        assert_eq!(*heap.container.block_at_unchecked::<Free>(0.into()).free_next_index(), 0);
+        assert_eq!(*heap.container.block_at_unchecked::<Free>(128.into()).free_next_index(), 0);
         assert_eq!(heap.failed_allocations, 0);
     }
 
@@ -481,11 +489,15 @@ mod tests {
         validate(&expected, &heap);
         assert!(heap.free_head_per_order.iter().enumerate().skip(3).all(|(i, &j)| (1 << i) == *j));
         let buffer = BackingBuffer::from(heap.bytes());
-        assert!(BlockIterator::from(&buffer).skip(3).all(|b| *b.free_next_index().unwrap() == 0));
+        assert!(BlockIterator::from(&buffer).skip(3).all(|b| *b
+            .cast::<Free>()
+            .unwrap()
+            .free_next_index()
+            == 0));
         assert_eq!(*heap.free_head_per_order[1], 0);
         assert_eq!(*heap.free_head_per_order[0], 2);
-        assert_eq!(*heap.container.block_at(0.into()).free_next_index().unwrap(), 0);
-        assert_eq!(*heap.container.block_at(2.into()).free_next_index().unwrap(), 0);
+        assert_eq!(*heap.container.block_at_unchecked::<Free>(0.into()).free_next_index(), 0);
+        assert_eq!(*heap.container.block_at_unchecked::<Free>(2.into()).free_next_index(), 0);
 
         assert!(heap.free_block(BlockIndex::from(3)).is_ok());
         let expected = [
@@ -494,8 +506,8 @@ mod tests {
         ];
         validate(&expected, &heap);
         assert_eq!(*heap.free_head_per_order[1], 0);
-        assert_eq!(*heap.container.block_at(0.into()).free_next_index().unwrap(), 128);
-        assert_eq!(*heap.container.block_at(128.into()).free_next_index().unwrap(), 0);
+        assert_eq!(*heap.container.block_at_unchecked::<Free>(0.into()).free_next_index(), 128);
+        assert_eq!(*heap.container.block_at_unchecked::<Free>(128.into()).free_next_index(), 0);
     }
 
     #[fuchsia::test]
@@ -518,7 +530,7 @@ mod tests {
         ];
         validate(&expected, &heap);
         assert_eq!(*heap.free_head_per_order[7], 384);
-        assert_eq!(*heap.container.block_at(384.into()).free_next_index().unwrap(), 0);
+        assert_eq!(*heap.container.block_at_unchecked::<Free>(384.into()).free_next_index(), 0);
 
         let b = heap.allocate_block(2048).unwrap();
         assert_eq!(*b, 384);
@@ -542,12 +554,12 @@ mod tests {
         validate(&expected, &heap);
         assert_eq!(heap.current_size_bytes, 2048 * 4 + 4096);
         assert_eq!(*heap.free_head_per_order[7], 512);
-        assert_eq!(*heap.container.block_at(512.into()).free_next_index().unwrap(), 384);
-        assert_eq!(*heap.container.block_at(384.into()).free_next_index().unwrap(), 256);
-        assert_eq!(*heap.container.block_at(256.into()).free_next_index().unwrap(), 128);
-        assert_eq!(*heap.container.block_at(128.into()).free_next_index().unwrap(), 0);
-        assert_eq!(*heap.container.block_at(0.into()).free_next_index().unwrap(), 640);
-        assert_eq!(*heap.container.block_at(640.into()).free_next_index().unwrap(), 0);
+        assert_eq!(*heap.container.block_at_unchecked::<Free>(512.into()).free_next_index(), 384);
+        assert_eq!(*heap.container.block_at_unchecked::<Free>(384.into()).free_next_index(), 256);
+        assert_eq!(*heap.container.block_at_unchecked::<Free>(256.into()).free_next_index(), 128);
+        assert_eq!(*heap.container.block_at_unchecked::<Free>(128.into()).free_next_index(), 0);
+        assert_eq!(*heap.container.block_at_unchecked::<Free>(0.into()).free_next_index(), 640);
+        assert_eq!(*heap.container.block_at_unchecked::<Free>(640.into()).free_next_index(), 0);
         assert_eq!(heap.failed_allocations, 0);
     }
 
@@ -625,7 +637,7 @@ mod tests {
 
         // Write garbage to the second half of the order 1 block in index 2.
         {
-            let mut block = Block::new(&mut heap.container, 3.into());
+            let mut block = heap.container.block_at_mut(3.into());
             block_testing::override_header(&mut block, 0xffffffff);
             block_testing::override_payload(&mut block, 0xffffffff);
         }
@@ -661,29 +673,41 @@ mod tests {
         let (container, _storage) = Container::read_and_write(3 * 4096).unwrap();
         let mut heap = Heap::new(container).unwrap();
         assert_eq!(
-            heap.container.block_at(BlockIndex::HEADER).header_vmo_size().unwrap().unwrap()
-                as usize,
+            heap.container
+                .block_at_unchecked::<Header>(BlockIndex::HEADER)
+                .vmo_size()
+                .unwrap()
+                .unwrap() as usize,
             heap.current_size()
         );
         let b = heap.allocate_block(2048).unwrap();
         assert_eq!(*b, 128);
         assert_eq!(
-            heap.container.block_at(BlockIndex::HEADER).header_vmo_size().unwrap().unwrap()
-                as usize,
+            heap.container
+                .block_at_unchecked::<Header>(BlockIndex::HEADER)
+                .vmo_size()
+                .unwrap()
+                .unwrap() as usize,
             heap.current_size()
         );
         let b = heap.allocate_block(2048).unwrap();
         assert_eq!(*b, 256);
         assert_eq!(
-            heap.container.block_at(BlockIndex::HEADER).header_vmo_size().unwrap().unwrap()
-                as usize,
+            heap.container
+                .block_at_unchecked::<Header>(BlockIndex::HEADER)
+                .vmo_size()
+                .unwrap()
+                .unwrap() as usize,
             heap.current_size()
         );
         let b = heap.allocate_block(2048).unwrap();
         assert_eq!(*b, 384);
         assert_eq!(
-            heap.container.block_at(BlockIndex::HEADER).header_vmo_size().unwrap().unwrap()
-                as usize,
+            heap.container
+                .block_at_unchecked::<Header>(BlockIndex::HEADER)
+                .vmo_size()
+                .unwrap()
+                .unwrap() as usize,
             heap.current_size()
         );
 
@@ -704,22 +728,31 @@ mod tests {
         let b = heap.allocate_block(2048).unwrap();
         assert_eq!(*b, 512);
         assert_eq!(
-            heap.container.block_at(BlockIndex::HEADER).header_vmo_size().unwrap().unwrap()
-                as usize,
+            heap.container
+                .block_at_unchecked::<Header>(BlockIndex::HEADER)
+                .vmo_size()
+                .unwrap()
+                .unwrap() as usize,
             heap.current_size()
         );
         let b = heap.allocate_block(2048).unwrap();
         assert_eq!(*b, 640);
         assert_eq!(
-            heap.container.block_at(BlockIndex::HEADER).header_vmo_size().unwrap().unwrap()
-                as usize,
+            heap.container
+                .block_at_unchecked::<Header>(BlockIndex::HEADER)
+                .vmo_size()
+                .unwrap()
+                .unwrap() as usize,
             heap.current_size()
         );
         assert_eq!(heap.failed_allocations, 0);
         assert!(heap.allocate_block(2048).is_err());
         assert_eq!(
-            heap.container.block_at(BlockIndex::HEADER).header_vmo_size().unwrap().unwrap()
-                as usize,
+            heap.container
+                .block_at_unchecked::<Header>(BlockIndex::HEADER)
+                .vmo_size()
+                .unwrap()
+                .unwrap() as usize,
             heap.current_size()
         );
         assert_eq!(heap.failed_allocations, 1);
@@ -730,8 +763,11 @@ mod tests {
         assert!(heap.free_block(BlockIndex::from(512)).is_ok());
         assert!(heap.free_block(BlockIndex::from(640)).is_ok());
         assert_eq!(
-            heap.container.block_at(BlockIndex::HEADER).header_vmo_size().unwrap().unwrap()
-                as usize,
+            heap.container
+                .block_at_unchecked::<Header>(BlockIndex::HEADER)
+                .vmo_size()
+                .unwrap()
+                .unwrap() as usize,
             heap.current_size()
         );
 

@@ -9,9 +9,9 @@ use futures::StreamExt;
 use heapdump_vmo::allocations_table_v1::AllocationsTableReader;
 use heapdump_vmo::resources_table_v1::ResourcesTableReader;
 use heapdump_vmo::stack_trace_compression;
+use log::{info, warn};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use tracing::{info, warn};
 use zx::{self as zx, AsHandleRef, Koid};
 use {
     fidl_fuchsia_memory_heapdump_client as fheapdump_client,
@@ -108,7 +108,7 @@ impl Process for ProcessV1 {
                             snapshot_id,
                             snapshot_name = snapshot_name.as_str(),
                             process_koid = self.koid.raw_koid(),
-                            process_name = self.name.as_str(),
+                            process_name = self.name.as_str();
                             "Stored snapshot"
                         );
                     }
@@ -116,7 +116,7 @@ impl Process for ProcessV1 {
                         warn!(
                             koid = self.koid.raw_koid(),
                             name = self.name.as_str(),
-                            ?status,
+                            status:?;
                             "Failed to process snapshot"
                         );
                     }
@@ -145,9 +145,9 @@ impl Process for ProcessV1 {
                         // are unavoidable because we do not freeze the process while reading, and
                         // it can unmap its memory in the meantime.
                         warn!(
-                            ?error,
+                            error:?,
                             address = format!("{:#x}", block.address).as_str(),
-                            size = block.size,
+                            size = block.size;
                             "Error while reading process memory"
                         );
                     }

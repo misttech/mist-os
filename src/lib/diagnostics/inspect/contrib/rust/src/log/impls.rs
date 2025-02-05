@@ -23,6 +23,9 @@ macro_rules! write_inspect_value {
     (Str, $node_writer:expr, $key:expr, $expr:expr) => {
         $node_writer.record_string($key, $expr);
     };
+    (StrRef, $node_writer:expr, $key:expr, $expr:expr) => {
+        $node_writer.record_string($key, $expr);
+    };
     (Uint, $node_writer:expr, $key:expr, $expr:expr) => {
         $node_writer.record_uint($key, $expr);
     };
@@ -39,7 +42,8 @@ macro_rules! write_inspect_value {
 
 // --- Implementations for basic types ---
 
-impl_write_inspect!(Str, self => &self, &str, String);
+impl_write_inspect!(Str, self => self, String);
+impl_write_inspect!(StrRef, self => *self, &str);
 impl_write_inspect!(Uint, self => (*self).into(), u8, u16, u32);
 impl_write_inspect!(Uint, self => *self, u64);
 impl_write_inspect!(Int, self => (*self).into(), i8, i16, i32);

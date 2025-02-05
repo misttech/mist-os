@@ -16,10 +16,7 @@
         {
             // Hermetic protocols offered to all tests. See
             // https://fuchsia.dev/fuchsia-src/development/testing/components/test_runner_framework#hermetic_capabilities_for_tests.
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.process.Launcher",
-            ],
+            protocol: [ "fuchsia.process.Launcher" ],
             from: "parent",
             to: [ "#chromium-system-tests" ],
         },
@@ -131,6 +128,11 @@
             from: "parent",
             to: "#chromium-system-tests",
             rights: [ "r*" ],
+        },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#chromium-system-tests",
         },
         {
             directory: "root-ssl-certificates",

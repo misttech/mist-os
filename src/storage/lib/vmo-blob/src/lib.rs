@@ -4,8 +4,8 @@
 
 use anyhow::{anyhow, Error};
 use fidl_fuchsia_io as fio;
+use log::error;
 use std::sync::{Arc, OnceLock};
-use tracing::error;
 use vfs::directory::entry::{EntryInfo, GetEntryInfo};
 use vfs::file::{File, FileOptions, GetVmo, SyncMode};
 use vfs::immutable_attributes;

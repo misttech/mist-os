@@ -270,14 +270,18 @@ async fn run_legacy_subcommand(
     context: EnvironmentContext,
     subcommand: FfxBuiltIn,
 ) -> Result<()> {
-    let env = FhoEnvironment::new(&context, &ffx).await?;
+    let env = FhoEnvironment::new(&context, &ffx);
     ffx_lib_suite::ffx_plugin_impl(&env, subcommand).await
 }
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() {
     let result = ffx_command::run::<FfxSuite>(ExecutableKind::MainFfx).await;
-    ffx_command::exit(result).await
+    let should_format = match FfxCommandLine::from_env() {
+        Ok(cli) => cli.global.machine.is_some(),
+        Err(_e) => true,
+    };
+    ffx_command::exit(result, should_format).await
 }
 
 #[cfg(test)]

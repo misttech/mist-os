@@ -2,13 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("tests") {
-  testonly = true
-  if (target_cpu == "arm64") {
-    deps = [ ":vim3-clk-test-package" ]
-  }
-}
-
 if (target_cpu == "arm64") {
   import("//build/bazel/drivers/bazel_driver_package.gni")
   import("//build/bazel/wrappers.gni")

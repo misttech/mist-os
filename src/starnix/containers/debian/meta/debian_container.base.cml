@@ -6,16 +6,6 @@
     program: {
         runner: "starnix",
         init: [],
-        mounts: [
-            "/:remote_bundle:data/system:nosuid,nodev,relatime",
-            "/dev:devtmpfs::nosuid,relatime",
-            "/dev/pts:devpts::nosuid,noexec,relatime",
-            "/dev/shm:tmpfs::nosuid,nodev",
-            "/proc:proc::nosuid,nodev,noexec,relatime",
-            "/sys:sysfs::nosuid,nodev,noexec,relatime",
-            "/sys/fs/bpf:bpf::nosuid,nodev,noexec,relatime",
-            "/tmp:tmpfs",
-        ],
         features: [
             // keep-sorted start
             "ashmem",
@@ -24,7 +14,7 @@
             "enable_suid",
             "framebuffer",
             "io_uring",
-            "magma",
+            "magma_supported_vendors:0x13B5,0x8086",
             "test_data",
 
             // keep-sorted end
@@ -43,12 +33,13 @@
     ],
     use: [
         {
-            protocol: [
-                "fuchsia.element.GraphicalPresenter",
-                "fuchsia.fxfs.CryptManagement",
-            ],
+            protocol: [ "fuchsia.element.GraphicalPresenter" ],
             from: "parent",
             availability: "optional",
+        },
+        {
+            storage: "data",
+            path: "/data",
         },
     ],
     expose: [

@@ -25,6 +25,8 @@ rustc_test("test_driver") {
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-sync",
+    "//src/sys/lib/cm_rust",
+    "//src/sys/lib/component-events",
     "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
     "//src/sys/pkg/testing/mock-paver",
     "//src/sys/pkg/testing/mock-reboot",
@@ -34,6 +36,7 @@ rustc_test("test_driver") {
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tempfile",
+    "//third_party/rust_crates:test-case",
   ]
 
   sources = [ "src/lib.rs" ]

@@ -46,19 +46,16 @@ go_library("repo") {
 go_library("targets") {
   source_dir = "targets"
   sources = [
-    "aemu.go",
-    "aemu_test.go",
     "auxiliary.go",
     "auxiliary_test.go",
-    "crosvm.go",
     "device.go",
     "device_test.go",
     "emulator.go",
+    "emulator_test.go",
     "errors.go",
     "gce.go",
     "gce_test.go",
     "ip.go",
-    "qemu.go",
     "target.go",
     "target_test.go",
   ]

@@ -4,7 +4,7 @@
 
 use fuchsia_component::client;
 use futures::stream::TryStreamExt as _;
-use tracing::*;
+use log::*;
 use {fidl_fidl_test_components as ftest, fidl_fuchsia_process_lifecycle as flifecycle};
 
 #[fuchsia::main(logging_tags = ["reboot-on-terminate-success"])]

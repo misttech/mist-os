@@ -7,11 +7,11 @@ use aes::cipher::{BlockDecrypt as _, BlockEncrypt as _, KeyInit as _};
 use aes::Aes128;
 use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_inspect_derive::{AttachError, Inspect};
+use log::{debug, warn};
 use lru_cache::LruCache;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::{fs, io, path};
-use tracing::{debug, warn};
 
 use crate::advertisement::bloom_filter;
 

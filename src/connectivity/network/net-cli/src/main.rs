@@ -11,7 +11,8 @@ use std::io::Write;
 use {
     fidl_fuchsia_net_debug as fdebug, fidl_fuchsia_net_dhcp as fdhcp,
     fidl_fuchsia_net_filter as ffilter, fidl_fuchsia_net_filter_deprecated as ffilter_deprecated,
-    fidl_fuchsia_net_interfaces as finterfaces, fidl_fuchsia_net_name as fname,
+    fidl_fuchsia_net_interfaces as finterfaces,
+    fidl_fuchsia_net_interfaces_admin as finterfaces_admin, fidl_fuchsia_net_name as fname,
     fidl_fuchsia_net_neighbor as fneighbor, fidl_fuchsia_net_root as froot,
     fidl_fuchsia_net_routes as froutes, fidl_fuchsia_net_stack as fstack,
     fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration, fidl_fuchsia_sys2 as fsys,
@@ -132,6 +133,16 @@ impl net_cli::ServiceConnector<ffilter::StateMarker> for Connector {
 impl net_cli::ServiceConnector<finterfaces::StateMarker> for Connector {
     async fn connect(&self) -> Result<<finterfaces::StateMarker as ProtocolMarker>::Proxy, Error> {
         self.connect_to_exposed_protocol::<finterfaces::StateMarker>(NETSTACK_MONIKER).await
+    }
+}
+
+#[async_trait::async_trait]
+impl net_cli::ServiceConnector<finterfaces_admin::InstallerMarker> for Connector {
+    async fn connect(
+        &self,
+    ) -> Result<<finterfaces_admin::InstallerMarker as ProtocolMarker>::Proxy, Error> {
+        self.connect_to_exposed_protocol::<finterfaces_admin::InstallerMarker>(NETSTACK_MONIKER)
+            .await
     }
 }
 

@@ -10,7 +10,7 @@ load("//common:toolchains/clang/clang_utils.bzl", "process_clang_builtins_output
 load("//common:toolchains/clang/providers.bzl", "ClangInfo")
 load("//common:toolchains/clang/toolchain_utils.bzl", "define_clang_runtime_filegroups")
 
-def prepare_clang_repository(repo_ctx, clang_install_dir):
+def prepare_clang_repository(repo_ctx, clang_install_dir, needs_symlinks = True):
     """Prepare a repository directory for a clang toolchain creation.
 
     This function must be called from a repository rule, and creates a number
@@ -40,6 +40,7 @@ def prepare_clang_repository(repo_ctx, clang_install_dir):
       repo_ctx: A repository_ctx value.
       clang_install_dir: Path to the clang prebuilt toolchain installation,
           relative to the main project workspace.
+      needs_symlinks: Whether we need to symlink the content to an outside directory
     """
     workspace_dir = str(repo_ctx.workspace_root)
 
@@ -50,8 +51,11 @@ def prepare_clang_repository(repo_ctx, clang_install_dir):
     # Note that this is possible because our C++ toolchain configuration redefine
     # the "dependency_file" feature to use relative file paths.
     clang_install_path = repo_ctx.path(clang_install_dir) if paths.is_absolute(clang_install_dir) else repo_ctx.path(workspace_dir + "/" + clang_install_dir)
-    for f in clang_install_path.readdir():
-        repo_ctx.symlink(f, f.basename)
+
+    # We only need to symlink when the contents exist outside of the repository.
+    if needs_symlinks:
+        for f in clang_install_path.readdir():
+            repo_ctx.symlink(f, f.basename)
 
     # Extract the builtin include paths by running the executable once.
     # Only care about C++ include paths. The list for compiling C is actually
@@ -182,10 +186,6 @@ def setup_clang_repository(constants):
     # The following filegroups are referenced from toolchain definitions
     # created by the generate_clang_cc_toolchain() function from
     # toolchain_utils.bzl.
-    native.filegroup(
-        name = "clang_empty",
-        srcs = [],
-    )
 
     native.filegroup(
         name = "clang_all",
@@ -196,32 +196,62 @@ def setup_clang_repository(constants):
     )
 
     native.filegroup(
-        name = "clang_compiler_binaries",
+        name = "cc-compiler-prebuilts",
         srcs = [
-            "bin/clang",
-            "bin/clang++",
-            "bin/llvm-nm",
+            "//:bin/clang",
+            "//:bin/clang++",
+            "//:bin/llvm-nm",
+            "//:bin/llvm-strip",
         ],
     )
 
     native.filegroup(
-        name = "clang_linker_binaries",
-        srcs = native.glob(["bin/*"]),  # TODO(digit): Restrict this
+        name = "cc-linker-prebuilts",
+        srcs = [
+            "//:bin/clang",
+            "//:bin/clang++",
+            "//:bin/ld.lld",
+            "//:bin/ld64.lld",
+            "//:bin/lld",
+            "//:bin/lld-link",
+        ],
     )
 
     native.filegroup(
-        name = "clang_ar_binaries",
-        srcs = ["bin/llvm-ar"],
+        name = "ar",
+        srcs = ["//:bin/llvm-ar"],
     )
 
     native.filegroup(
-        name = "clang_objcopy_binaries",
-        srcs = ["bin/llvm-objcopy"],
+        name = "objcopy",
+        srcs = ["//:bin/llvm-objcopy"],
     )
 
     native.filegroup(
-        name = "clang_strip_binaries",
-        srcs = ["bin/llvm-strip"],
+        name = "objdump",
+        srcs = ["//:bin/llvm-objdump"],
+    )
+
+    native.filegroup(
+        name = "strip",
+        srcs = ["//:bin/llvm-strip"],
+    )
+
+    native.filegroup(
+        name = "nm",
+        srcs = ["//:bin/llvm-nm"],
+    )
+
+    native.filegroup(
+        name = "libunwind-headers",
+        srcs = [
+            "include/libunwind.h",
+            "include/libunwind.modulemap",
+            "include/mach-o/compact_unwind_encoding.h",
+            "include/unwind.h",
+            "include/unwind_arm_ehabi.h",
+            "include/unwind_itanium.h",
+        ],
     )
 
 def _empty_host_cpp_toolchain_repository_impl(repo_ctx):

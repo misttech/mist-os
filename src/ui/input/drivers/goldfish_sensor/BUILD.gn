@@ -94,7 +94,7 @@ test("goldfish-sensor-unittest") {
            "//src/devices/testing/mock-ddk",
            "//src/lib/fxl/test:gtest_main",
            "//third_party/googletest:gtest",
-           "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
+           "//zircon/system/ulib/mmio-ptr",
            "//zircon/system/ulib/sync",
            "//zircon/system/ulib/zircon-internal",
            "//zircon/system/ulib/zx",

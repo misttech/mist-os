@@ -17,47 +17,47 @@
 
 namespace media_audio {
 
-const inspect::StringReference kDetectionConnectionErrors(
-    "Device detection connection failures (count)");
-const inspect::StringReference kDetectionOtherErrors(
-    "Device detection unclassified errors (count)");
-const inspect::StringReference kDetectionUnsupportedDevices(
-    "Device detection unsupported devices (count)");
+static constexpr std::string_view kDetectionConnectionErrors =
+    "Device detection connection failures (count)";
+static constexpr std::string_view kDetectionOtherErrors =
+    "Device detection unclassified errors (count)";
+static constexpr std::string_view kDetectionUnsupportedDevices =
+    "Device detection unsupported devices (count)";
 
-const inspect::StringReference kDevices("Devices");
-const inspect::StringReference kAddedAt("added at");
-const inspect::StringReference kFailedAt("failed at");
-const inspect::StringReference kRemovedAt("removed at");
+static constexpr std::string_view kDevices = "Devices";
+static constexpr std::string_view kAddedAt = "added at";
+static constexpr std::string_view kFailedAt = "failed at";
+static constexpr std::string_view kRemovedAt = "removed at";
 
-const inspect::StringReference kDeviceType("type");
-const inspect::StringReference kTokenId("token id");
-const inspect::StringReference kHealthy("healthy");
-const inspect::StringReference kIsInput("is_input");
-const inspect::StringReference kManufacturer("manufacturer");
-const inspect::StringReference kProduct("product");
-const inspect::StringReference kUniqueId("unique id");
-const inspect::StringReference kClockDomain("clock domain");
+static constexpr std::string_view kDeviceType = "type";
+static constexpr std::string_view kTokenId = "token id";
+static constexpr std::string_view kHealthy = "healthy";
+static constexpr std::string_view kIsInput = "is_input";
+static constexpr std::string_view kManufacturer = "manufacturer";
+static constexpr std::string_view kProduct = "product";
+static constexpr std::string_view kUniqueId = "unique id";
+static constexpr std::string_view kClockDomain = "clock domain";
 
-const inspect::StringReference kRingBufferElements("ring buffer elements");
-const inspect::StringReference kElementId("element id");
-const inspect::StringReference kRunningIntervals("Running intervals");
-const inspect::StringReference kStartedAt("started at");
-const inspect::StringReference kStoppedAt("stopped at");
-const inspect::StringReference kSetActiveChannelsCalls("SetActiveChannels calls");
-const inspect::StringReference kCalledAt("called at");
-const inspect::StringReference kCompletedAt("completed at");
-const inspect::StringReference kChannelBitmask("channel bitmask");
+static constexpr std::string_view kRingBufferElements = "ring buffer elements";
+static constexpr std::string_view kElementId = "element id";
+static constexpr std::string_view kRunningIntervals = "Running intervals";
+static constexpr std::string_view kStartedAt = "started at";
+static constexpr std::string_view kStoppedAt = "stopped at";
+static constexpr std::string_view kSetActiveChannelsCalls = "SetActiveChannels calls";
+static constexpr std::string_view kCalledAt = "called at";
+static constexpr std::string_view kCompletedAt = "completed at";
+static constexpr std::string_view kChannelBitmask = "channel bitmask";
 
-const inspect::StringReference kFidlServers("FIDL servers");
-const inspect::StringReference kRegistryServerInstances("RegistryServer instances");
-const inspect::StringReference kObserverServerInstances("ObserverServer instances");
-const inspect::StringReference kControlCreatorServerInstances("ControlCreatorServer instances");
-const inspect::StringReference kControlServerInstances("ControlServer instances");
-const inspect::StringReference kRingBufferServerInstances("RingBufferServer instances");
-const inspect::StringReference kProviderServerInstances("ProviderServer instances");
-const inspect::StringReference kCreatedAt("created at");
-const inspect::StringReference kDestroyedAt("destroyed at");
-const inspect::StringReference kAddedDevices("Added devices");
+static constexpr std::string_view kFidlServers = "FIDL servers";
+static constexpr std::string_view kRegistryServerInstances = "RegistryServer instances";
+static constexpr std::string_view kObserverServerInstances = "ObserverServer instances";
+static constexpr std::string_view kControlCreatorServerInstances = "ControlCreatorServer instances";
+static constexpr std::string_view kControlServerInstances = "ControlServer instances";
+static constexpr std::string_view kRingBufferServerInstances = "RingBufferServer instances";
+static constexpr std::string_view kProviderServerInstances = "ProviderServer instances";
+static constexpr std::string_view kCreatedAt = "created at";
+static constexpr std::string_view kDestroyedAt = "destroyed at";
+static constexpr std::string_view kAddedDevices = "Added devices";
 
 //
 // These classes encapsulate the creation and update of the fuchsia Inspect data store. The parent

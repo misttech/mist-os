@@ -25,11 +25,11 @@ if (is_host) {
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:argh",
       "//third_party/rust_crates:futures",
+      "//third_party/rust_crates:log",
       "//third_party/rust_crates:serde",
       "//third_party/rust_crates:serde_json",
       "//third_party/rust_crates:serde_json5",
       "//third_party/rust_crates:thiserror",
-      "//third_party/rust_crates:tracing",
       "//tools/lib/cm_fidl_analyzer",
       "//tools/lib/config_value_file",
     ]

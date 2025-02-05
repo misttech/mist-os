@@ -12,11 +12,11 @@ use fuchsia_bluetooth::expectation::asynchronous::{
 };
 use fuchsia_bluetooth::types::{Peer, PeerId};
 use futures::future::{self, BoxFuture, FutureExt};
+use log::warn;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use test_harness::{SharedState, TestHarness, SHARED_STATE_TEST_COMPONENT_INDEX};
-use tracing::warn;
 
 use crate::core_realm::{CoreRealm, SHARED_STATE_INDEX};
 
@@ -96,7 +96,7 @@ async fn update_peer_state(harness: &AccessHarness) -> Result<(), Error> {
     for id in removed.into_iter() {
         let id = id.into();
         if harness.write_state().peers.remove(&id).is_none() {
-            warn!(%id, "Unknown peer removed from peer state");
+            warn!(id:%; "Unknown peer removed from peer state");
         }
     }
     harness.notify_state_changed();

@@ -15,8 +15,8 @@ use fuchsia_inspect_derive::{AttachError, Inspect};
 use futures::channel::oneshot;
 use futures::future::{BoxFuture, Fuse, Future, Shared};
 use futures::{select, FutureExt, StreamExt, TryFutureExt};
+use log::{debug, info, trace, warn};
 use thiserror::Error;
-use tracing::{debug, info, trace, warn};
 use {
     fidl_fuchsia_media as media, fidl_fuchsia_media_sessions2 as sessions2,
     fuchsia_async as fasync, fuchsia_trace as trace,
@@ -166,7 +166,7 @@ impl ConfiguredSinkTask {
 
                 match builder.publisher.publish(player_client, &registration).await {
                     Ok(session_id) => {
-                        info!(%peer_id, %session_id, "Published session");
+                        info!(peer_id:%, session_id:%; "Published session");
                         // If the receiver has hung up, this task will be dropped.
                         let _ = sender.send(session_id);
                         let mut avrcp = AvrcpRelay::default();
@@ -176,7 +176,7 @@ impl ConfiguredSinkTask {
                             relay_task.await;
                         }
                     }
-                    Err(e) => warn!(%peer_id, ?e, "Couldn't publish session"),
+                    Err(e) => warn!(peer_id:%, e:?; "Couldn't publish session"),
                 };
             };
             self._session_task = Some(fasync::Task::local(session_fut));
@@ -350,7 +350,7 @@ async fn media_stream_task(
                 trace::flow_end!(c"bluetooth", c"ProfilePacket", packet_count.into());
 
                 if player.is_none() {
-                    info!(%peer_id, "starting audio player");
+                    info!(peer_id:%; "starting audio player");
                     let mut new_player = match player_gen() {
                         Ok(player) => player,
                         Err(e) => break StreamingError::PlayerFailedSetup(e),
@@ -364,7 +364,7 @@ async fn media_stream_task(
 
                 inspect.record_transferred(pkt.len(), fasync::MonotonicInstant::now());
                 if let Err(e) = player.as_mut().unwrap().push_payload(&pkt.as_slice()).await {
-                    warn!(%peer_id, ?e, "can't play audio packet");
+                    warn!(peer_id:%, e:?; "can't play audio packet");
                 }
             },
             player_event = player_event_fut => {

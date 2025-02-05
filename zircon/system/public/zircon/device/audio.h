@@ -297,26 +297,11 @@ typedef struct audio_stream_unique_id {
   uint8_t data[16];
 } audio_stream_unique_id_t;
 
-#define AUDIO_STREAM_UNIQUE_ID_BUILTIN_SPEAKERS \
-  {                                             \
-    .data = { 0x01, 0x00 }                      \
-  }
-#define AUDIO_STREAM_UNIQUE_ID_BUILTIN_HEADPHONE_JACK \
-  {                                                   \
-    .data = { 0x02, 0x00 }                            \
-  }
-#define AUDIO_STREAM_UNIQUE_ID_BUILTIN_MICROPHONE \
-  {                                               \
-    .data = { 0x03, 0x00 }                        \
-  }
-#define AUDIO_STREAM_UNIQUE_ID_BUILTIN_HEADSET_JACK \
-  {                                                 \
-    .data = { 0x04, 0x00 }                          \
-  }
-#define AUDIO_STREAM_UNIQUE_ID_BUILTIN_BT \
-  {                                       \
-    .data = { 0x05, 0x00 }                \
-  }
+#define AUDIO_STREAM_UNIQUE_ID_BUILTIN_SPEAKERS {.data = {0x01, 0x00}}
+#define AUDIO_STREAM_UNIQUE_ID_BUILTIN_HEADPHONE_JACK {.data = {0x02, 0x00}}
+#define AUDIO_STREAM_UNIQUE_ID_BUILTIN_MICROPHONE {.data = {0x03, 0x00}}
+#define AUDIO_STREAM_UNIQUE_ID_BUILTIN_HEADSET_JACK {.data = {0x04, 0x00}}
+#define AUDIO_STREAM_UNIQUE_ID_BUILTIN_BT {.data = {0x05, 0x00}}
 
 typedef struct audio_stream_cmd_get_unique_id_resp {
   audio_cmd_hdr_t hdr;
@@ -453,7 +438,7 @@ typedef struct audio_rb_position_notify {
 
   // The time, per system monotonic clock, of the below byte position.
   // external_delay impact should not be incorporated into this value.
-  zx_time_t monotonic_time;
+  zx_instant_mono_t monotonic_time;
 
   // The current position (in bytes) of the driver/hardware's read (output) or
   // write (input) pointer in the ring buffer.

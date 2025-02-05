@@ -13,7 +13,7 @@
 //! Caution: Some data handled here are security access keys (tokens) and must
 //!          not be logged (or traced) or otherwise put someplace where the
 //!          secrecy could be compromised. I.e. watch out when adding/reviewing
-//!          log::*, tracing::*, or `impl` of Display or Debug.
+//!          log::*, log::*, or `impl` of Display or Debug.
 
 pub mod device;
 pub mod info;
@@ -91,7 +91,7 @@ struct RefreshTokenRequest<'a> {
 /// in storing an access token to disk for later use, though it may be used many
 /// times before needing to get a new access_token.
 pub async fn new_access_token(credentials: &GcsCredentials) -> Result<String, GcsError> {
-    tracing::debug!("new_access_token");
+    log::debug!("new_access_token");
     let req_body = RefreshTokenRequest {
         client_id: &credentials.client_id,
         client_secret: &credentials.client_secret,

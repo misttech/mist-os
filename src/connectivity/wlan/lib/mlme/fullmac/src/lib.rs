@@ -2,6 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// Turn on additional lints that could lead to unexpected crashes in production code
+#![warn(clippy::indexing_slicing)]
+#![cfg_attr(test, allow(clippy::indexing_slicing))]
+#![warn(clippy::unwrap_used)]
+#![cfg_attr(test, allow(clippy::unwrap_used))]
+#![warn(clippy::expect_used)]
+#![cfg_attr(test, allow(clippy::expect_used))]
+#![warn(clippy::unreachable)]
+#![cfg_attr(test, allow(clippy::unreachable))]
+#![warn(clippy::unimplemented)]
+#![cfg_attr(test, allow(clippy::unimplemented))]
+
 mod convert;
 pub mod device;
 mod logger;
@@ -16,7 +28,7 @@ use fuchsia_inspect::Inspector;
 use futures::channel::{mpsc, oneshot};
 use futures::future::BoxFuture;
 use futures::StreamExt;
-use tracing::{error, info, warn};
+use log::{error, info, warn};
 use wlan_common::sink::UnboundedSink;
 use wlan_ffi_transport::completers::Completer;
 use wlan_sme::serve::create_sme;
@@ -225,11 +237,16 @@ async fn start_and_serve<D: DeviceOps + Send + 'static>(
     let StartedDriver { mlme_main_loop_fut, sme_fut } =
         match start(device, driver_event_stream, driver_event_sender, inspector).await {
             Ok(initialized_mlme) => {
-                startup_sender.send(Ok(())).unwrap();
+                if let Err(e) = startup_sender.send(Ok(())) {
+                    error!("Failed to send startup response: {:?}", e);
+                    return Err(zx::Status::INTERNAL);
+                }
                 initialized_mlme
             }
             Err(e) => {
-                startup_sender.send(Err(e)).unwrap();
+                if let Err(e) = startup_sender.send(Err(e)) {
+                    error!("Failed to send startup response: {:?}", e);
+                }
                 return Err(zx::Status::INTERNAL);
             }
         };

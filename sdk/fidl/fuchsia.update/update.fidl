@@ -8,7 +8,7 @@ library fuchsia.update;
 ///
 /// The Manager provides a mechanism for checking for updates via the
 /// [`Manager.CheckNow`] message.
-@discoverable
+@discoverable(server="platform")
 closed protocol Manager {
     /// Immediately check for an update, and optionally track the state and
     /// progress of that update check.
@@ -50,6 +50,10 @@ closed protocol Manager {
     ///
     /// - response `rebooting` true if the system is rebooting, false if no
     ///                        update was pending reboot.
+    ///
+    /// Deprecated: Replaced by
+    /// `fuchsia.power/CollaborativeRebootInitiator.PerformPendingReboot`.
+    @available(deprecated=NEXT)
     strict PerformPendingReboot() -> (struct {
         rebooting bool;
     });

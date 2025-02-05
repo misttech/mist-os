@@ -9,7 +9,10 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fit/defer.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/zx/result.h>
+
+#include <functional>
 
 #include <fbl/auto_lock.h>
 #include <fbl/intrusive_single_list.h>
@@ -34,11 +37,16 @@ class LayerTest : public TestBase {
   void SetUp() override {
     TestBase::SetUp();
     fences_ = std::make_unique<FenceCollection>(dispatcher(), [](FenceReference*) {});
+    layer_waiting_image_allocator_ = std::make_unique<LayerWaitingImageAllocator>(/*max_slabs*/ 1);
+  }
+
+  LayerWaitingImageAllocator& layer_waiting_image_allocator() const {
+    return *layer_waiting_image_allocator_;
   }
 
   fbl::RefPtr<Image> CreateReadyImage() {
     zx::result<display::DriverImageId> import_result =
-        display()->ImportVmoImageForTesting(zx::vmo(0), 0);
+        FakeDisplayEngine().ImportVmoImageForTesting(zx::vmo(0), 0);
     EXPECT_OK(import_result);
     EXPECT_NE(import_result.value(), display::kInvalidDriverImageId);
 
@@ -47,10 +55,9 @@ class LayerTest : public TestBase {
         .height = kDisplayHeight,
         .tiling_type = display::ImageTilingType::kLinear,
     });
-    fbl::RefPtr<Image> image = fbl::AdoptRef(
-        new Image(controller(), image_metadata, import_result.value(), nullptr, ClientId(1)));
+    fbl::RefPtr<Image> image = fbl::AdoptRef(new Image(
+        CoordinatorController(), image_metadata, import_result.value(), nullptr, ClientId(1)));
     image->id = next_image_id_++;
-    image->Acquire();
     return image;
   }
 
@@ -58,249 +65,315 @@ class LayerTest : public TestBase {
     current_layers.push_front(&layer.current_node_);
   }
 
+  // Helper method that returns a unique_ptr with a custom deleter which destroys the layer on the
+  // controller loop, as required by the Layer destructor.
+  //
+  // Must not be called on the controller's client loop, otherwise deadlock is guaranteed.
+  std::unique_ptr<Layer, std::function<void(Layer*)>> CreateLayerForTest(
+      display::DriverLayerId layer_id) {
+    auto deleter = [this](Layer* layer) {
+      libsync::Completion completion;
+      async::PostTask(CoordinatorController()->client_dispatcher()->async_dispatcher(),
+                      [&completion, layer]() {
+                        delete layer;
+                        completion.Signal();
+                      });
+      completion.Wait();
+    };
+    return std::unique_ptr<Layer, decltype(deleter)>(
+        new Layer(CoordinatorController(), layer_id, &layer_waiting_image_allocator()),
+        std::move(deleter));
+  }
+
+  // Helper struct for `RunOnControllerLoop()`.  `std::optional<void>` is illegal, so we need our
+  // own structs, one for each of the void and non-void cases.
+  //
+  // Note: T must be default-constructable.  This is for simplicity, and meets current use cases.
+  template <typename T>
+  struct RunOnControllerLoopResultHolder {
+    T value;
+  };
+
+  // Specialization for void return type.
+  template <>
+  struct RunOnControllerLoopResultHolder<void> {};
+
+  template <typename ReturnType>
+  ReturnType RunOnControllerLoop(std::function<ReturnType()> func) {
+    RunOnControllerLoopResultHolder<ReturnType> result;
+    libsync::Completion completion;
+
+    async::PostTask(CoordinatorController()->client_dispatcher()->async_dispatcher(), [&]() {
+      if constexpr (std::is_same_v<ReturnType, void>) {
+        func();
+      } else {
+        result.value = func();
+      }
+      completion.Signal();
+    });
+
+    completion.Wait();
+    if constexpr (!std::is_same_v<ReturnType, void>) {
+      return std::move(result).value;
+    }
+  }
+
  protected:
   static constexpr uint32_t kDisplayWidth = 1024;
   static constexpr uint32_t kDisplayHeight = 600;
 
   std::unique_ptr<FenceCollection> fences_;
+  std::unique_ptr<LayerWaitingImageAllocator> layer_waiting_image_allocator_;
+
   display::ImageId next_image_id_ = display::ImageId(1);
 };
 
 TEST_F(LayerTest, PrimaryBasic) {
-  Layer layer(display::DriverLayerId(1));
+  std::unique_ptr layer = CreateLayerForTest(display::DriverLayerId(1));
+
   fhdt::wire::ImageMetadata image_metadata = {
       .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
       .tiling_type = fhdt::wire::kImageTilingTypeLinear};
   fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
-  layer.SetPrimaryConfig(image_metadata);
-  layer.SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
-                           display_area);
-  layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  layer->SetPrimaryConfig(image_metadata);
+  layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+                            display_area);
+  layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
   auto image = CreateReadyImage();
-  layer.SetImage(image, display::kInvalidEventId);
-  layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
+  layer->SetImage(image, display::kInvalidEventId);
+  layer->ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
 }
 
 TEST_F(LayerTest, CleanUpImage) {
-  Layer layer(display::DriverLayerId(1));
+  std::unique_ptr layer = CreateLayerForTest(display::DriverLayerId(1));
+
   fhdt::wire::ImageMetadata image_metadata = {
       .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
       .tiling_type = fhdt::wire::kImageTilingTypeLinear};
   fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
-  layer.SetPrimaryConfig(image_metadata);
-  layer.SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
-                           display_area);
-  layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  layer->SetPrimaryConfig(image_metadata);
+  layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+                            display_area);
+  layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
   auto displayed_image = CreateReadyImage();
-  layer.SetImage(displayed_image, display::kInvalidEventId);
-  layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-  ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(1)));
+  layer->SetImage(displayed_image, display::kInvalidEventId);
+  layer->ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
+
+  ASSERT_TRUE(RunOnControllerLoop<bool>(
+      [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(1)); }));
 
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
   constexpr display::EventId kWaitFenceId(1);
-  fences_->ImportEvent(std::move(event), kWaitFenceId);
-  auto fence_release = fit::defer([this, kWaitFenceId] { fences_->ReleaseEvent(kWaitFenceId); });
+  RunOnControllerLoop<void>([&]() { fences_->ImportEvent(std::move(event), kWaitFenceId); });
+  auto fence_release = fit::defer([this, kWaitFenceId] {
+    RunOnControllerLoop<void>([&]() { fences_->ReleaseEvent(kWaitFenceId); });
+  });
 
   auto waiting_image = CreateReadyImage();
-  layer.SetImage(waiting_image, kWaitFenceId);
-  ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(2)));
+  layer->SetImage(waiting_image, kWaitFenceId);
+  ASSERT_TRUE(RunOnControllerLoop<bool>(
+      [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(2)); }));
 
   auto pending_image = CreateReadyImage();
-  layer.SetImage(pending_image, display::kInvalidEventId);
+  layer->SetImage(pending_image, display::kInvalidEventId);
 
-  ASSERT_TRUE(layer.ActivateLatestReadyImage());
+  ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
-  EXPECT_TRUE(layer.current_image());
-  // pending / waiting images are still busy.
-  EXPECT_FALSE(pending_image->Acquire());
-  EXPECT_FALSE(waiting_image->Acquire());
+  EXPECT_TRUE(layer->current_image());
 
   // Nothing should happen if image doesn't match.
   auto not_matching_image = CreateReadyImage();
-  EXPECT_FALSE(layer.CleanUpImage(*not_matching_image));
-  EXPECT_TRUE(layer.current_image());
-  EXPECT_FALSE(pending_image->Acquire());
-  EXPECT_FALSE(waiting_image->Acquire());
+  EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+    fbl::AutoLock lock(CoordinatorController()->mtx());
+    CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
+    return layer->CleanUpImage(*not_matching_image);
+  }));
+  EXPECT_TRUE(layer->current_image());
 
   // Test cleaning up a waiting image.
-  EXPECT_FALSE(layer.CleanUpImage(*waiting_image));
-  EXPECT_TRUE(layer.current_image());
-  EXPECT_FALSE(pending_image->Acquire());
-  // waiting_image should be released.
-  EXPECT_TRUE(waiting_image->Acquire());
+  EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+    fbl::AutoLock lock(CoordinatorController()->mtx());
+    CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
+    return layer->CleanUpImage(*waiting_image);
+  }));
+  EXPECT_TRUE(layer->current_image());
 
   // Test cleaning up a pending image.
-  EXPECT_FALSE(layer.CleanUpImage(*pending_image));
-  EXPECT_TRUE(layer.current_image());
-  // pending_image should be released.
-  EXPECT_TRUE(pending_image->Acquire());
+  EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+    fbl::AutoLock lock(CoordinatorController()->mtx());
+    CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
+    return layer->CleanUpImage(*pending_image);
+  }));
+  EXPECT_TRUE(layer->current_image());
 
   // Test cleaning up the displayed image.
   // layer is not labeled current, so it doesn't change the current config.
-  EXPECT_FALSE(layer.CleanUpImage(*displayed_image));
-  EXPECT_FALSE(layer.current_image());
-
-  // Teardown. Images must be unused (retired) when destroyed.
-  displayed_image->EarlyRetire();
-  not_matching_image->EarlyRetire();
-  waiting_image->EarlyRetire();
-  pending_image->EarlyRetire();
-
-  // Stop the wait before tearing down the loop.
-  auto fence_reference = fences_->GetFence(kWaitFenceId);
-  ASSERT_TRUE(fence_reference);
-  fence_reference->ResetReadyWait();
+  EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+    fbl::AutoLock lock(CoordinatorController()->mtx());
+    CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
+    return layer->CleanUpImage(*displayed_image);
+  }));
+  EXPECT_FALSE(layer->current_image());
 }
 
 TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
   fbl::DoublyLinkedList<LayerNode*> current_layers;
 
-  Layer layer(display::DriverLayerId(1));
+  std::unique_ptr layer = CreateLayerForTest(display::DriverLayerId(1));
+
   fhdt::wire::ImageMetadata image_metadata = {
       .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
       .tiling_type = fhdt::wire::kImageTilingTypeLinear};
   fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
-  layer.SetPrimaryConfig(image_metadata);
-  layer.SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
-                           display_area);
-  layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  layer->SetPrimaryConfig(image_metadata);
+  layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+                            display_area);
+  layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
   // Clean up images, which doesn't change the current config.
   {
     auto image = CreateReadyImage();
-    layer.SetImage(image, display::kInvalidEventId);
-    layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-    ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(1)));
-    ASSERT_TRUE(layer.ActivateLatestReadyImage());
+    layer->SetImage(image, display::kInvalidEventId);
+    layer->ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
+    ASSERT_TRUE(RunOnControllerLoop<bool>(
+        [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(1)); }));
+    ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
-    EXPECT_TRUE(layer.current_image());
+    EXPECT_TRUE(layer->current_image());
     // layer is not labeled current, so image cleanup doesn't change the current
     // config.
-    EXPECT_FALSE(layer.CleanUpImage(*image));
-    EXPECT_FALSE(layer.current_image());
-
-    image->EarlyRetire();
+    EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+      fbl::AutoLock lock(CoordinatorController()->mtx());
+      CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
+      return layer->CleanUpImage(*image);
+    }));
+    EXPECT_FALSE(layer->current_image());
   }
 
   // Clean up images, which changes the current config.
   {
-    MakeLayerCurrent(layer, current_layers);
+    MakeLayerCurrent(*layer, current_layers);
 
     auto image = CreateReadyImage();
-    layer.SetImage(image, display::kInvalidEventId);
-    layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-    ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(2)));
-    ASSERT_TRUE(layer.ActivateLatestReadyImage());
+    layer->SetImage(image, display::kInvalidEventId);
+    layer->ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
+    ASSERT_TRUE(RunOnControllerLoop<bool>(
+        [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(2)); }));
+    ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
-    EXPECT_TRUE(layer.current_image());
+    EXPECT_TRUE(layer->current_image());
     // layer is labeled current, so image cleanup will change the current config.
-    EXPECT_TRUE(layer.CleanUpImage(*image));
-    EXPECT_FALSE(layer.current_image());
-
-    image->EarlyRetire();
+    EXPECT_TRUE(RunOnControllerLoop<bool>([&]() {
+      fbl::AutoLock lock(CoordinatorController()->mtx());
+      CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
+      return layer->CleanUpImage(*image);
+    }));
+    EXPECT_FALSE(layer->current_image());
 
     current_layers.clear();
   }
 }
 
 TEST_F(LayerTest, CleanUpAllImages) {
-  Layer layer(display::DriverLayerId(1));
+  std::unique_ptr layer = CreateLayerForTest(display::DriverLayerId(1));
+
   fhdt::wire::ImageMetadata image_metadata = {
       .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
       .tiling_type = fhdt::wire::kImageTilingTypeLinear};
   fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
-  layer.SetPrimaryConfig(image_metadata);
-  layer.SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
-                           display_area);
-  layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  layer->SetPrimaryConfig(image_metadata);
+  layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+                            display_area);
+  layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
   auto displayed_image = CreateReadyImage();
-  layer.SetImage(displayed_image, display::kInvalidEventId);
-  layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-  ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(1)));
+  layer->SetImage(displayed_image, display::kInvalidEventId);
+  layer->ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
+  ASSERT_TRUE(RunOnControllerLoop<bool>(
+      [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(1)); }));
 
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
   constexpr display::EventId kWaitFenceId(1);
-  fences_->ImportEvent(std::move(event), kWaitFenceId);
-  auto fence_release = fit::defer([this, kWaitFenceId] { fences_->ReleaseEvent(kWaitFenceId); });
+  RunOnControllerLoop<void>([&]() { fences_->ImportEvent(std::move(event), kWaitFenceId); });
+  auto fence_release = fit::defer([this, kWaitFenceId] {
+    RunOnControllerLoop<void>([&]() { fences_->ReleaseEvent(kWaitFenceId); });
+  });
 
   auto waiting_image = CreateReadyImage();
-  layer.SetImage(waiting_image, kWaitFenceId);
-  ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(2)));
+  layer->SetImage(waiting_image, kWaitFenceId);
+  ASSERT_TRUE(RunOnControllerLoop<bool>(
+      [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(2)); }));
 
   auto pending_image = CreateReadyImage();
-  layer.SetImage(pending_image, display::kInvalidEventId);
+  layer->SetImage(pending_image, display::kInvalidEventId);
 
-  ASSERT_TRUE(layer.ActivateLatestReadyImage());
+  ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
   // layer is not labeled current, so it doesn't change the current config.
-  EXPECT_FALSE(layer.CleanUpAllImages());
-  EXPECT_FALSE(layer.current_image());
-  // pending_image should be released.
-  EXPECT_TRUE(pending_image->Acquire());
-  // waiting_image should be released.
-  EXPECT_TRUE(waiting_image->Acquire());
-
-  // Teardown. Images must be unused (retired) when destroyed.
-  displayed_image->EarlyRetire();
-  waiting_image->EarlyRetire();
-  pending_image->EarlyRetire();
-
-  // Stop the wait before tearing down the loop.
-  auto fence_reference = fences_->GetFence(kWaitFenceId);
-  ASSERT_TRUE(fence_reference);
-  fence_reference->ResetReadyWait();
+  EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+    fbl::AutoLock lock(CoordinatorController()->mtx());
+    CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
+    return layer->CleanUpAllImages();
+  }));
+  EXPECT_FALSE(layer->current_image());
 }
 
 TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
   fbl::DoublyLinkedList<LayerNode*> current_layers;
 
-  Layer layer(display::DriverLayerId(1));
+  std::unique_ptr layer = CreateLayerForTest(display::DriverLayerId(1));
+
   fhdt::wire::ImageMetadata image_config = {
       .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
       .tiling_type = fhdt::wire::kImageTilingTypeLinear};
   fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
-  layer.SetPrimaryConfig(image_config);
-  layer.SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
-                           display_area);
-  layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
+  layer->SetPrimaryConfig(image_config);
+  layer->SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+                            display_area);
+  layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
   // Clean up all images, which doesn't change the current config.
   {
     auto image = CreateReadyImage();
-    layer.SetImage(image, display::kInvalidEventId);
-    layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-    ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(1)));
-    ASSERT_TRUE(layer.ActivateLatestReadyImage());
+    layer->SetImage(image, display::kInvalidEventId);
+    layer->ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
+    ASSERT_TRUE(RunOnControllerLoop<bool>(
+        [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(1)); }));
+    ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
-    EXPECT_TRUE(layer.current_image());
+    EXPECT_TRUE(layer->current_image());
     // layer is not labeled current, so image cleanup doesn't change the current
     // config.
-    EXPECT_FALSE(layer.CleanUpAllImages());
-    EXPECT_FALSE(layer.current_image());
-
-    image->EarlyRetire();
+    EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
+      fbl::AutoLock lock(CoordinatorController()->mtx());
+      CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
+      return layer->CleanUpAllImages();
+    }));
+    EXPECT_FALSE(layer->current_image());
   }
 
   // Clean up all images, which changes the current config.
   {
-    MakeLayerCurrent(layer, current_layers);
+    MakeLayerCurrent(*layer, current_layers);
 
     auto image = CreateReadyImage();
-    layer.SetImage(image, display::kInvalidEventId);
-    layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-    ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(2)));
-    ASSERT_TRUE(layer.ActivateLatestReadyImage());
+    layer->SetImage(image, display::kInvalidEventId);
+    layer->ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
+    ASSERT_TRUE(RunOnControllerLoop<bool>(
+        [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(2)); }));
+    ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
-    EXPECT_TRUE(layer.current_image());
+    EXPECT_TRUE(layer->current_image());
     // layer is labeled current, so image cleanup will change the current config.
-    EXPECT_TRUE(layer.CleanUpAllImages());
-    EXPECT_FALSE(layer.current_image());
-
-    image->EarlyRetire();
+    EXPECT_TRUE(RunOnControllerLoop<bool>([&]() {
+      fbl::AutoLock lock(CoordinatorController()->mtx());
+      CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
+      return layer->CleanUpAllImages();
+    }));
+    EXPECT_FALSE(layer->current_image());
 
     current_layers.clear();
   }

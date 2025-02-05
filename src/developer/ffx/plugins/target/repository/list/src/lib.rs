@@ -4,9 +4,7 @@
 
 use async_trait::async_trait;
 use ffx_target_repository_list_args::ListCommand;
-use fho::{
-    bug, daemon_protocol, moniker, Error, FfxMain, FfxTool, Result, ToolIO, VerifiedMachineWriter,
-};
+use fho::{bug, Error, FfxMain, FfxTool, Result, ToolIO, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
 use fidl_fuchsia_pkg::RepositoryKeyConfig::Ed25519Key;
 use fidl_fuchsia_pkg::{RepositoryConfig, RepositoryManagerProxy};
@@ -18,6 +16,7 @@ use prettytable::{cell, row, Table};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use target_holders::{daemon_protocol, moniker};
 
 #[derive(FfxTool)]
 pub struct ListTool {
@@ -271,9 +270,10 @@ mod test {
     use fidl_fuchsia_pkg_rewrite::{EditTransactionRequest, EngineRequest, RuleIteratorRequest};
     use fuchsia_async as fasync;
     use futures::{StreamExt, TryStreamExt};
+    use target_holders::fake_proxy;
 
     async fn empty_repo_proxy() -> RepositoryRegistryProxy {
-        fho::testing::fake_proxy(move |req| {
+        fake_proxy(move |req| {
             fasync::Task::spawn(async move {
                 match req {
                     RepositoryRegistryRequest::ListRegisteredTargets { iterator, .. } => {
@@ -294,7 +294,7 @@ mod test {
     }
 
     async fn repo_proxy() -> RepositoryRegistryProxy {
-        fho::testing::fake_proxy(move |req| {
+        fake_proxy(move |req| {
             fasync::Task::spawn(async move {
                 let mut sent = false;
                 match req {
@@ -346,7 +346,7 @@ mod test {
     }
 
     async fn setup_fake_repo_proxy() -> RepositoryManagerProxy {
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             RepositoryManagerRequest::Add { repo: _, responder } => {
                 responder.send(Ok(())).unwrap();
             }
@@ -366,7 +366,7 @@ mod test {
     }
 
     async fn setup_fake_engine_proxy() -> EngineProxy {
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             EngineRequest::StartEditTransaction { transaction, control_handle: _ } => {
                 fuchsia_async::Task::local(async move {
                     let mut tx_stream = transaction.into_stream();

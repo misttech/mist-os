@@ -43,7 +43,7 @@ zx::result<> Vim3Clock::Start() {
   }
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  // Serve metadata.
+  // Serve clock IDs metadata.
   {
     zx::result clock_ids = pdev.GetFidlMetadata<fuchsia_hardware_clockimpl::ClockIdsMetadata>(
         fuchsia_hardware_clockimpl::ClockIdsMetadata::kSerializableName);
@@ -65,6 +65,30 @@ zx::result<> Vim3Clock::Start() {
   }
 #endif
 
+  // Serve clock init metadata.
+  {
+    zx::result init_metadata = pdev.GetFidlMetadata<fuchsia_hardware_clockimpl::InitMetadata>(
+        fuchsia_hardware_clockimpl::InitMetadata::kSerializableName);
+    if (init_metadata.is_ok()) {
+      if (zx::result result = clock_init_metadata_server_.SetMetadata(init_metadata.value());
+          result.is_error()) {
+        FDF_LOG(ERROR, "Failed to set metadata for clock init metadata server: %s",
+                result.status_string());
+        return result.take_error();
+      }
+      if (zx::result result = clock_init_metadata_server_.Serve(*outgoing(), dispatcher());
+          result.is_error()) {
+        FDF_LOG(ERROR, "Failed to serve clock init metadata: %s", result.status_string());
+        return result.take_error();
+      }
+    } else if (init_metadata.status_value() == ZX_ERR_NOT_FOUND) {
+      FDF_LOG(DEBUG, "Not serving clock init metadata: Does not exist");
+    } else {
+      FDF_LOG(ERROR, "Failed to retrieve clock init metadata: %s", init_metadata.status_string());
+      return init_metadata.take_error();
+    }
+  }
+
   zx::result hiu_mmio = pdev.MapMmio(kHiuMmioIndex);
   if (hiu_mmio.is_error()) {
     FDF_LOG(ERROR, "Failed to map HIU mmio, st = %s", zx_status_get_string(hiu_mmio.error_value()));
@@ -85,9 +109,9 @@ zx::result<> Vim3Clock::Start() {
   {
     // TODO(b/373903133): Don't forward clock ID's using the legacy method once it is no longer
     // used.
-    zx::result<> result = compat_server_.Initialize(
-        incoming(), outgoing(), node_name(), child_name,
-        compat::ForwardMetadata::Some({DEVICE_METADATA_CLOCK_IDS, DEVICE_METADATA_CLOCK_INIT}));
+    zx::result<> result =
+        compat_server_.Initialize(incoming(), outgoing(), node_name(), child_name,
+                                  compat::ForwardMetadata::Some({DEVICE_METADATA_CLOCK_IDS}));
     if (result.is_error()) {
       return result.take_error();
     }
@@ -107,6 +131,7 @@ zx::result<> Vim3Clock::Start() {
   auto offers = compat_server_.CreateOffers2();
   offers.push_back(fdf::MakeOffer2<fuchsia_hardware_clockimpl::Service>());
   offers.push_back(clock_ids_metadata_server_.MakeOffer());
+  offers.push_back(clock_init_metadata_server_.MakeOffer());
 
   std::vector<fuchsia_driver_framework::NodeProperty2> properties = {};
   auto add_child_result = AddChild(child_name, properties, offers);

@@ -5,6 +5,7 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_wlan_deprecated") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   args_sources = [ "src/args.rs" ]
@@ -13,8 +14,13 @@ ffx_plugin("ffx_wlan_deprecated") {
     "//sdk/fidl/fuchsia.wlan.product.deprecatedconfiguration:fuchsia.wlan.product.deprecatedconfiguration_rust",
     "//src/connectivity/wlan/wlancfg/tool/policy:donut-lib",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
   ]
-  args_deps = [ "//third_party/rust_crates:eui48" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:eui48",
+  ]
 }

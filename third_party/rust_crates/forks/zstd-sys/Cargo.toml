@@ -4,7 +4,7 @@
 
 [package]
 name = "zstd-sys"
-version = "2.0.1+zstd.1.5.2"
+version = "2.0.1+zstd.1.5.6"
 authors = ["The Fuchsia Authors"]
 
 [dependencies]

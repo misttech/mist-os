@@ -111,30 +111,7 @@ pub const MAX_URL_LENGTH: usize = 4096;
 /// This asks for the maximum possible rights that the parent connection will allow; this will
 /// include the writable and executable rights if the parent connection has them, but won't fail if
 /// it doesn't.
-// TODO(https://fxbug.dev/324111518): Remove this once we migrate to using Open3.
-pub const OPEN_FLAGS_MAX_POSSIBLE_RIGHTS: fio::OpenFlags = fio::OpenFlags::RIGHT_READABLE
-    .union(fio::OpenFlags::POSIX_WRITABLE)
-    .union(fio::OpenFlags::POSIX_EXECUTABLE);
-
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
-/// This asks for the maximum possible rights that the parent connection will allow; this will
-/// include the writable and executable rights if the parent connection has them, but won't fail if
-/// it doesn't.
 pub const FLAGS_MAX_POSSIBLE_RIGHTS: fio::Flags = fio::PERM_READABLE
-    .union(fio::Flags::PERM_INHERIT_WRITE)
-    .union(fio::Flags::PERM_INHERIT_EXECUTE);
-
-#[cfg(fuchsia_api_level_less_than = "HEAD")]
-/// This asks for the maximum possible rights that the parent connection will allow; this will
-/// include the writable and executable rights if the parent connection has them, but won't fail if
-/// it doesn't.
-// Note that when opening a node as readable, we expect the connection to have the following set of
-// permissions: `PERM_CONNECT | PERM_ENUMERATE | PERM_TRAVERSE | PERM_READ | PERM_GET_ATTRIBUTES`.
-pub const FLAGS_MAX_POSSIBLE_RIGHTS: fio::Flags = fio::Flags::PERM_READ
-    .union(fio::Flags::PERM_CONNECT)
-    .union(fio::Flags::PERM_ENUMERATE)
-    .union(fio::Flags::PERM_TRAVERSE)
-    .union(fio::Flags::PERM_GET_ATTRIBUTES)
     .union(fio::Flags::PERM_INHERIT_WRITE)
     .union(fio::Flags::PERM_INHERIT_EXECUTE);
 

@@ -5,11 +5,13 @@
 #ifndef SRC_DEVICES_I2C_DRIVERS_AML_I2C_AML_I2C_H_
 #define SRC_DEVICES_I2C_DRIVERS_AML_I2C_AML_I2C_H_
 
+#include <fidl/fuchsia.hardware.i2c.businfo/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.i2cimpl/cpp/driver/wire.h>
-#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/async/cpp/irq.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/event.h>
 #include <lib/zx/interrupt.h>
@@ -38,8 +40,7 @@ class AmlI2c : public fdf::DriverBase, public fdf::WireServer<fuchsia_hardware_i
 
  protected:
   // Visible for testing
-  virtual zx::result<fdf::MmioBuffer> MapMmio(
-      const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev);
+  virtual zx::result<fdf::MmioBuffer> MapMmio(fdf::PDev& pdev);
 
  private:
   zx_status_t ServeI2cImpl();
@@ -70,6 +71,7 @@ class AmlI2c : public fdf::DriverBase, public fdf::WireServer<fuchsia_hardware_i
   std::optional<fdf::Dispatcher> irq_dispatcher_;
   std::optional<fdf::PrepareStopCompleter> completer_;
   async::IrqMethod<AmlI2c, &AmlI2c::HandleIrq> irq_handler_{this};
+  fdf_metadata::MetadataServer<fuchsia_hardware_i2c_businfo::I2CBusMetadata> metadata_server_;
 };
 
 }  // namespace aml_i2c

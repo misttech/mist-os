@@ -136,7 +136,7 @@ fn string_ref(
     if ref_mask == 0 {
         return Ok((Cow::Borrowed(""), buf));
     }
-    if (ref_mask & 1 << 15) == 0 {
+    if (ref_mask & (1 << 15)) == 0 {
         return Err(ParseError::Unsupported);
     }
     // zero out the top bit

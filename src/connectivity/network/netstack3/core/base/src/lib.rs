@@ -11,7 +11,6 @@
 #![warn(missing_docs, unreachable_patterns, clippy::useless_conversion, clippy::redundant_clone)]
 
 extern crate fakealloc as alloc;
-extern crate fakestd as std;
 
 mod context;
 mod convert;
@@ -24,6 +23,7 @@ mod frame;
 mod inspect;
 mod ip;
 mod matchers;
+mod num;
 mod port_alloc;
 mod resource_references;
 mod rng;
@@ -52,8 +52,9 @@ pub use error::{
 };
 pub use event::{CoreEventContext, EventContext};
 pub use frame::{
-    FrameDestination, ReceivableFrameMeta, RecvFrameContext, RecvIpFrameMeta, SendFrameContext,
-    SendFrameError, SendFrameErrorReason, SendableFrameMeta,
+    CoreTxMetadataContext, FrameDestination, ReceivableFrameMeta, RecvFrameContext,
+    RecvIpFrameMeta, SendFrameContext, SendFrameError, SendFrameErrorReason, SendableFrameMeta,
+    TxMetadataBindingsTypes,
 };
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
 pub use ip::{
@@ -61,6 +62,7 @@ pub use ip::{
     IpTypesIpExt, Mms, WrapBroadcastMarker,
 };
 pub use matchers::{DeviceNameMatcher, Matcher, SubnetMatcher};
+pub use num::PositiveIsize;
 pub use port_alloc::{simple_randomized_port_alloc, EphemeralPort, PortAllocImpl};
 pub use resource_references::{
     DeferredResourceRemovalContext, ReferenceNotifiers, ReferenceNotifiersExt,
@@ -91,6 +93,7 @@ pub mod ref_counted_hash_map {
 pub mod socket {
     mod address;
     mod base;
+    pub(crate) mod sndbuf;
 
     pub use address::{
         AddrIsMappedError, AddrVecIter, ConnAddr, ConnInfoAddr, ConnIpAddr, DualStackConnIpAddr,
@@ -105,6 +108,9 @@ pub mod socket {
         SocketIpAddrExt, SocketIpExt, SocketMapAddrSpec, SocketMapAddrStateSpec,
         SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy, SocketMapStateSpec,
         SocketMapUpdateSharingPolicy, SocketStateEntry, SocketZonedAddrExt, UpdateSharingError,
+    };
+    pub use sndbuf::{
+        SendBufferFullError, SendBufferSpace, SendBufferTracking, SocketWritableListener,
     };
 }
 
@@ -147,8 +153,9 @@ pub mod testutil {
         MultipleDevicesId,
     };
     pub use crate::event::testutil::FakeEventCtx;
-    pub use crate::frame::testutil::{FakeFrameCtx, WithFakeFrameContext};
+    pub use crate::frame::testutil::{FakeFrameCtx, FakeTxMetadata, WithFakeFrameContext};
     pub use crate::rng::testutil::{new_rng, run_with_many_seeds, FakeCryptoRng};
+    pub use crate::socket::sndbuf::testutil::FakeSocketWritableListener;
     pub use crate::time::testutil::{
         FakeAtomicInstant, FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, FakeTimerId,
         InstantAndData, WithFakeTimerContext,

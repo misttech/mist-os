@@ -38,12 +38,13 @@ async fn command(proxy: AccessibilityProxy, options: SetArgs) -> WatchOrSetResul
 mod test {
     use super::*;
     use fidl_fuchsia_settings::{AccessibilityRequest, ColorBlindnessType};
+    use target_holders::fake_proxy;
     use test_case::test_case;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_set() {
         const TRUE: bool = true;
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             AccessibilityRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -86,7 +87,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_accessibility_set(expected_set: SetArgs) -> Result<()> {
         let set_clone = expected_set.clone();
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             AccessibilityRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }

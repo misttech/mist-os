@@ -7,6 +7,7 @@ use crate::io::{ReadSeek, TryClone, WrappedReaderSeeker};
 use crate::zstd;
 use anyhow::{anyhow, Context, Error, Result};
 use byteorder::{LittleEndian, ReadBytesExt};
+use log::warn;
 use serde::Serialize;
 use std::cmp;
 use std::collections::HashMap;
@@ -15,7 +16,6 @@ use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::warn;
 
 /// Taken from //src/storage/blobfs/include/blobfs/format.h
 const BLOBFS_MAGIC_0: u64 = 0xac2153479e694d21;
@@ -474,13 +474,13 @@ impl<TCRS: TryClone + Read + Seek + Send + Sync> BlobFsReaderBuilder<TCRS> {
 
                 if inode.extent_count > 1 {
                     warn!(
-                        ?merkle,
+                        merkle:?;
                         "Skipping blobfs blob. Extended containers are not currently supported",
                     );
                     continue;
                 }
                 if prelude.is_compressed() && !prelude.is_chunk_compressed() {
-                    warn!(?merkle, "Skipping blobfs blob. Unsupported compression type");
+                    warn!(merkle:?; "Skipping blobfs blob. Unsupported compression type");
                     continue;
                 }
 

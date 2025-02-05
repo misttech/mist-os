@@ -29,27 +29,19 @@ async fn add_event(action: &'static str, label: Option<String>) {
         .await;
 }
 
-// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
-pub async fn server_mode_event(mode: &str) {
-    add_event("server.mode", Some(mode.into())).await
-}
-
-// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
-pub async fn server_started_event() {
+pub(crate) async fn server_started_event() {
     add_event("server.state", Some("started".into())).await
 }
 
-// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
-pub async fn server_failed_to_start_event(msg: &str) {
+pub(crate) async fn server_failed_to_start_event(msg: &str) {
     add_event("server.state", Some(msg.into())).await
 }
 
-// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
-pub async fn server_disabled_event() {
+pub(crate) async fn server_disabled_event() {
     add_event("server.state", Some("disabled".into())).await
 }
 
-// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
+// TODO(https://fxbug.dev/391921340) Refactor / trim when the repo daemon protocol is retired
 pub async fn add_repository_event(repo_spec: &RepositorySpec) {
     let repo_type = match repo_spec {
         RepositorySpec::FileSystem { .. } => "filesystem",
@@ -61,17 +53,17 @@ pub async fn add_repository_event(repo_spec: &RepositorySpec) {
     add_event("protocol.add-repository", Some(repo_type.into())).await
 }
 
-// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
+// TODO(https://fxbug.dev/391921340) Refactor / trim when the repo daemon protocol is retired
 pub async fn remove_repository_event() {
     add_event("protocol.remove-repository", None).await
 }
 
-// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
+// TODO(https://fxbug.dev/391921340) Refactor / trim when the repo daemon protocol is retired
 pub async fn register_repository_event() {
     add_event("protocol.register-repository-to-target", None).await
 }
 
-// TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
+// TODO(https://fxbug.dev/391921340) Refactor / trim when the repo daemon protocol is retired
 pub async fn deregister_repository_event() {
     add_event("protocol.deregister-repository-from-target", None).await
 }

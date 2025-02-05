@@ -105,7 +105,11 @@ async fn get_ssh_key_paths() -> Result<Vec<String>> {
 async fn apply_auth_sock(cmd: &mut Command) {
     const SSH_AUTH_SOCK: &str = "ssh.auth-sock";
     if let Ok(path) = ffx_config::get::<String, _>(SSH_AUTH_SOCK) {
-        cmd.env("SSH_AUTH_SOCK", path);
+        tracing::debug!("SSH_AUTH_SOCK retrieved via config: {}", path);
+        cmd.env("SSH_AUTH_SOCK", path.as_str());
+        if !std::fs::exists(path.as_str()).unwrap() {
+            tracing::warn!("SSH_AUTH_SOCK file does not exist at: {}", path);
+        }
     }
 }
 

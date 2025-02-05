@@ -11,6 +11,8 @@
 #include <algorithm>
 #include <vector>
 
+#include "linear_lookup_table.h"
+
 namespace thermal {
 
 static constexpr uint32_t kMaxProfileLen = 200;
@@ -33,20 +35,24 @@ struct NtcInfo {
   NtcTable profile[kMaxProfileLen];  // profile table should be sorted in decreasing resistance
 };
 
-class Ntc {
+class Ntc : public linear_lookup_table::LinearLookupTable<float, uint32_t> {
  public:
   Ntc(NtcInfo ntc_info, uint32_t pullup_ohms)
-      : profile_(ntc_info.profile, ntc_info.profile + kMaxProfileLen), pullup_ohms_(pullup_ohms) {
-    // Since all entries in profile table may not have been used (passed as metadata) check to make
-    // sure resistance isn't out of range of the table.
-    std::erase_if(profile_,
-                  [](NtcTable const& table) { return table.resistance_ohm == kInvalidResistance; });
-    // Sort profile table descending by resistance to ensure proper lookup
-    auto sort_compare = [](NtcTable const& x, NtcTable const& y) -> bool {
-      return x.resistance_ohm > y.resistance_ohm;
-    };
-    std::sort(profile_.begin(), profile_.end(), sort_compare);
-  }
+      : linear_lookup_table::LinearLookupTable<float, uint32_t>([&ntc_info]() {
+          std::vector profile(ntc_info.profile, ntc_info.profile + kMaxProfileLen);
+          // Since all entries in profile table may not have been used (passed as metadata) check to
+          // make sure resistance isn't out of range of the table.
+          std::erase_if(profile, [](NtcTable const& table) {
+            return table.resistance_ohm == kInvalidResistance;
+          });
+
+          std::vector<linear_lookup_table::LookupTableEntry<float, uint32_t>> table;
+          std::for_each(profile.begin(), profile.end(), [&table](NtcTable entry) {
+            return table.push_back({entry.temperature_c, entry.resistance_ohm});
+          });
+          return table;
+        }()),
+        pullup_ohms_(pullup_ohms) {}
   // we use a normalized sample [0-1] to prevent having to worry about adc resolution
   //  in this library. This assumes the call site will normalize the value appropriately
   // Since the thermistor is in series with a pullup resistor, we must convert our sample
@@ -59,83 +65,26 @@ class Ntc {
     }
     float ratio = -(norm_sample) / (norm_sample - 1);
     float resistance_f = ratio * static_cast<float>(pullup_ohms_);
-    return LookupCelsius(resistance_f, out);
+    zx::result temperature = LookupX(resistance_f);
+    if (temperature.is_error()) {
+      return temperature.error_value();
+    }
+    *out = *temperature;
+    return ZX_OK;
   }
 
   // Returns the normalized sample. Convert from resistance.
   zx_status_t GetNormalizedSample(float temperature_c, float* out) const {
-    float resistance;
-    zx_status_t status = LookupResistance(temperature_c, &resistance);
-    if (status != ZX_OK) {
-      return status;
+    zx::result resistance = LookupY(temperature_c);
+    if (resistance.is_error()) {
+      return resistance.error_value();
     }
-    *out = resistance / (resistance + static_cast<float>(pullup_ohms_));
+    *out = *resistance / (*resistance + static_cast<float>(pullup_ohms_));
     return ZX_OK;
   }
 
  private:
-  zx_status_t LookupCelsius(float resistance, float* out) const {
-    if (profile_.empty()) {
-      return ZX_ERR_NO_RESOURCES;
-    }
-
-    if (resistance >= static_cast<float>(profile_[0].resistance_ohm)) {
-      *out = profile_[0].temperature_c;
-      return ZX_OK;
-    }
-    if (resistance <= static_cast<float>(profile_[profile_.size() - 1].resistance_ohm)) {
-      *out = profile_[profile_.size() - 1].temperature_c;
-      return ZX_OK;
-    }
-
-    auto lb_compare = [](NtcTable const& lhs, float val) -> bool {
-      return static_cast<float>(lhs.resistance_ohm) > val;
-    };
-    auto low = std::lower_bound(profile_.begin(), profile_.end(), resistance, lb_compare);
-    size_t idx = (low - profile_.begin());
-
-    *out = LinearInterpolate(static_cast<float>(profile_.at(idx).resistance_ohm),
-                             profile_.at(idx).temperature_c,
-                             static_cast<float>(profile_.at(idx - 1).resistance_ohm),
-                             profile_.at(idx - 1).temperature_c, resistance);
-    return ZX_OK;
-  }
-
-  zx_status_t LookupResistance(float temperature_c, float* out) const {
-    if (profile_.empty()) {
-      return ZX_ERR_NO_RESOURCES;
-    }
-
-    if (temperature_c <= profile_[0].temperature_c) {
-      *out = static_cast<float>(profile_[0].resistance_ohm);
-      return ZX_OK;
-    }
-    if (temperature_c >= profile_[profile_.size() - 1].temperature_c) {
-      *out = static_cast<float>(profile_[profile_.size() - 1].resistance_ohm);
-      return ZX_OK;
-    }
-
-    auto lb_compare = [](NtcTable const& lhs, float val) -> bool {
-      return lhs.temperature_c < val;
-    };
-    auto lower = std::lower_bound(profile_.begin(), profile_.end(), temperature_c, lb_compare);
-    size_t idx = (lower - profile_.begin());
-
-    *out = LinearInterpolate(
-        profile_.at(idx).temperature_c, static_cast<float>(profile_.at(idx).resistance_ohm),
-        profile_.at(idx - 1).temperature_c, static_cast<float>(profile_.at(idx - 1).resistance_ohm),
-        temperature_c);
-    return ZX_OK;
-  }
-
-  // Find y for (x, y) on the line of (x1, y1) (x2, y2)
-  static constexpr float LinearInterpolate(float x1, float y1, float x2, float y2, float x) {
-    float scale = (x - x1) / (x2 - x1);
-    return scale * (y2 - y1) + y1;
-  }
-
   static constexpr uint32_t kInvalidResistance = 0;
-  std::vector<NtcTable> profile_;
   uint32_t pullup_ohms_ = 0;
 };
 }  // namespace thermal

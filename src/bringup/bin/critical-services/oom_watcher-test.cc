@@ -21,13 +21,22 @@ class FakePowerManager : public fidl::WireServer<fuchsia_hardware_power_statecon
   }
 
   void Reboot(RebootRequestView view, RebootCompleter::Sync& completer) override {
-    if (view->reason == fuchsia_hardware_power_statecontrol::RebootReason::kOutOfMemory) {
+    unexpected_calls_ = true;
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void PerformReboot(PerformRebootRequestView view,
+                     PerformRebootCompleter::Sync& completer) override {
+    if (!view->options.has_reasons() || view->options.reasons().count() != 1 ||
+        view->options.reasons().at(0) !=
+            fuchsia_hardware_power_statecontrol::RebootReason2::kOutOfMemory) {
+      unexpected_calls_ = true;
+      completer.Close(ZX_ERR_NOT_SUPPORTED);
+
+    } else {
       reboot_signaled_ = true;
       completer.ReplySuccess();
       loop_->Quit();
-    } else {
-      unexpected_calls_ = true;
-      completer.Close(ZX_ERR_NOT_SUPPORTED);
     }
   }
 

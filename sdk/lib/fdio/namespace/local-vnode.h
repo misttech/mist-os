@@ -54,7 +54,7 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
 
   // Invoke |func| on the (path, channel) pairs for all remote nodes found in the
   // node hierarchy rooted at `this`.
-  zx_status_t EnumerateRemotes(const EnumerateCallback& func) const;
+  zx_status_t EnumerateRemotes(const EnumerateCallback& func);
 
   struct IdTreeTag {};
   struct NameTreeTag {};
@@ -161,10 +161,10 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
     explicit Remote(zxio_storage_t remote_storage) : remote_storage_(remote_storage) {}
     ~Remote();
 
-    zxio_t* Connection() const { return const_cast<zxio_t*>(&remote_storage_.io); }
+    zxio_t* Connection() { return &remote_storage_.io; }
 
    private:
-    const zxio_storage_t remote_storage_;
+    zxio_storage_t remote_storage_;
   };
 
   std::variant<Local, Intermediate, Remote>& NodeType() { return node_type_; }
@@ -174,7 +174,7 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
   friend class fbl::RefPtr<LocalVnode>;
 
   zx_status_t EnumerateInternal(PathBuffer* path, std::string_view name,
-                                const EnumerateCallback& func) const;
+                                const EnumerateCallback& func);
 
   // The parent must outlive the child.
   template <class T, class... Args>

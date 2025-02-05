@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use alloc::boxed::Box;
 use alloc::collections::HashMap;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
@@ -34,7 +35,7 @@ use netstack3_base::{
     HandleableTimer, Inspectable, Inspector, InstantContext, IpAddressId, IpDeviceAddr,
     IpDeviceAddressIdContext, IpExt, Matcher as _, NestedIntoCoreTimerCtx, NotFoundError,
     RngContext, SendFrameErrorReason, StrongDeviceIdentifier, TimerBindingsTypes, TimerContext,
-    TimerHandler, TracingContext, WeakIpAddressId, WrapBroadcastMarker,
+    TimerHandler, TracingContext, TxMetadataBindingsTypes, WeakIpAddressId, WrapBroadcastMarker,
 };
 use netstack3_filter::{
     self as filter, ConnectionDirection, ConntrackConnection, FilterBindingsContext,
@@ -159,9 +160,18 @@ impl TransportReceiveError {
 /// as part of multicast forwarding).
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub struct IpLayerPacketMetadata<I: packet_formats::ip::IpExt, A, BT: FilterBindingsTypes> {
+pub struct IpLayerPacketMetadata<
+    I: packet_formats::ip::IpExt,
+    A,
+    BT: FilterBindingsTypes + TxMetadataBindingsTypes,
+> {
     conntrack_connection_and_direction:
         Option<(ConntrackConnection<I, A, BT>, ConnectionDirection)>,
+    /// Tx metadata associated with this packet.
+    ///
+    /// This may be non-default even in the rx path for looped back packets that
+    /// are still forcing tx frame ownership for sockets.
+    tx_metadata: BT::TxMetadata,
     #[cfg(debug_assertions)]
     drop_check: IpLayerPacketMetadataDropCheck,
 }
@@ -180,8 +190,9 @@ struct IpLayerPacketMetadataDropCheck {
 
 /// Metadata that is produced and consumed by the IP layer for each packet, but
 /// which also traverses the device layer.
-#[derive(Debug, Default, Clone)]
-pub struct DeviceIpLayerMetadata {
+#[derive(Derivative)]
+#[derivative(Debug(bound = ""), Default(bound = ""))]
+pub struct DeviceIpLayerMetadata<BT: TxMetadataBindingsTypes> {
     /// Weak reference to this packet's connection tracking entry, if the packet is
     /// tracked.
     ///
@@ -190,43 +201,73 @@ pub struct DeviceIpLayerMetadata {
     /// have been performed on them, causing them to no longer match the original or
     /// reply tuples of the connection.
     conntrack_entry: Option<(WeakConntrackConnection, ConnectionDirection)>,
+    /// Tx metadata associated with this packet.
+    ///
+    /// This may be non-default even in the rx path for looped back packets that
+    /// are still forcing tx frame ownership for sockets.
+    tx_metadata: BT::TxMetadata,
 }
 
-impl<I: IpLayerIpExt, A: WeakIpAddressId<I::Addr>, BT: FilterBindingsTypes>
-    IpLayerPacketMetadata<I, A, BT>
+impl<BT: TxMetadataBindingsTypes> DeviceIpLayerMetadata<BT> {
+    /// Discards the remaining IP layer information and returns only the tx
+    /// metadata used for buffer ownership.
+    pub fn into_tx_metadata(self) -> BT::TxMetadata {
+        self.tx_metadata
+    }
+}
+
+impl<
+        I: IpLayerIpExt,
+        A: WeakIpAddressId<I::Addr>,
+        BT: FilterBindingsTypes + TxMetadataBindingsTypes,
+    > IpLayerPacketMetadata<I, A, BT>
 {
     fn from_device_ip_layer_metadata<CC>(
         core_ctx: &mut CC,
-        DeviceIpLayerMetadata { conntrack_entry }: DeviceIpLayerMetadata,
+        DeviceIpLayerMetadata { conntrack_entry, tx_metadata }: DeviceIpLayerMetadata<BT>,
     ) -> Self
     where
         CC: CounterContext<IpCounters<I>>,
     {
-        match conntrack_entry
+        let conntrack_connection_and_direction = match conntrack_entry
             .map(|(conn, dir)| conn.into_inner().map(|conn| (conn, dir)))
             .transpose()
         {
             // Either the packet was tracked and we've preserved its conntrack entry across
             // loopback, or it was untracked and we just stash the `None`.
-            Ok(conn_and_dir) => IpLayerPacketMetadata {
-                conntrack_connection_and_direction: conn_and_dir,
-                ..Default::default()
-            },
+            Ok(conn_and_dir) => conn_and_dir,
             // Conntrack entry was removed from table after packet was enqueued in loopback.
-            Err(WeakConnectionError::EntryRemoved) => IpLayerPacketMetadata::default(),
+            Err(WeakConnectionError::EntryRemoved) => None,
             // Conntrack entry no longer matches the packet (for example, it could be that
             // this is an IPv6 packet that was modified at the device layer and therefore it
             // no longer matches its IPv4 conntrack entry).
             Err(WeakConnectionError::InvalidEntry) => {
                 core_ctx
                     .increment(|counters: &IpCounters<I>| &counters.invalid_cached_conntrack_entry);
-                IpLayerPacketMetadata::default()
+                None
             }
+        };
+        Self {
+            conntrack_connection_and_direction,
+            tx_metadata,
+            #[cfg(debug_assertions)]
+            drop_check: Default::default(),
         }
     }
 }
 
-impl<I: IpExt, A, BT: FilterBindingsTypes> IpLayerPacketMetadata<I, A, BT> {
+impl<I: IpExt, A, BT: FilterBindingsTypes + TxMetadataBindingsTypes>
+    IpLayerPacketMetadata<I, A, BT>
+{
+    pub(crate) fn from_tx_metadata(tx_metadata: BT::TxMetadata) -> Self {
+        Self {
+            conntrack_connection_and_direction: None,
+            tx_metadata,
+            #[cfg(debug_assertions)]
+            drop_check: Default::default(),
+        }
+    }
+
     /// Acknowledge that it's okay to drop this packet metadata.
     ///
     /// When compiled with debug assertions, dropping [`IplayerPacketMetadata`]
@@ -250,8 +291,8 @@ impl Drop for IpLayerPacketMetadataDropCheck {
     }
 }
 
-impl<I: packet_formats::ip::IpExt, A, BT: FilterBindingsTypes> FilterIpMetadata<I, A, BT>
-    for IpLayerPacketMetadata<I, A, BT>
+impl<I: packet_formats::ip::IpExt, A, BT: FilterBindingsTypes + TxMetadataBindingsTypes>
+    FilterIpMetadata<I, A, BT> for IpLayerPacketMetadata<I, A, BT>
 {
     fn take_connection_and_direction(
         &mut self,
@@ -390,7 +431,7 @@ pub trait BaseTransportIpContext<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
 
 /// A marker trait for the traits required by the transport layer from the IP
 /// layer.
-pub trait TransportIpContext<I: IpExt, BC>:
+pub trait TransportIpContext<I: IpExt, BC: TxMetadataBindingsTypes>:
     BaseTransportIpContext<I, BC> + IpSocketHandler<I, BC>
 {
 }
@@ -399,6 +440,7 @@ impl<I, CC, BC> TransportIpContext<I, BC> for CC
 where
     I: IpExt,
     CC: BaseTransportIpContext<I, BC> + IpSocketHandler<I, BC>,
+    BC: TxMetadataBindingsTypes,
 {
 }
 
@@ -473,7 +515,7 @@ where
 
 impl<
         I: IpLayerIpExt,
-        BC: FilterBindingsContext,
+        BC: FilterBindingsContext + TxMetadataBindingsTypes,
         CC: IpDeviceContext<I>
             + IpSocketHandler<I, BC>
             + IpStateContext<I>
@@ -958,9 +1000,42 @@ impl<DeviceId, I: IpLayerIpExt> IpLayerEvent<DeviceId, I> {
     }
 }
 
+/// An event signifying a router advertisement has been received.
+#[derive(Derivative, PartialEq, Eq, Clone, Hash)]
+#[derivative(Debug)]
+pub struct RouterAdvertisementEvent<D> {
+    /// The raw bytes of the router advertisement message's options.
+    // NB: avoid deriving Debug for this since it could contain PII.
+    #[derivative(Debug = "ignore")]
+    pub options_bytes: Box<[u8]>,
+    /// The source address of the RA message.
+    pub source: net_types::ip::Ipv6Addr,
+    /// The device on which the message was received.
+    pub device: D,
+}
+
+impl<D> RouterAdvertisementEvent<D> {
+    /// Maps the contained device ID type.
+    pub fn map_device<N, F: Fn(D) -> N>(self, map: F) -> RouterAdvertisementEvent<N> {
+        let Self { options_bytes, source, device } = self;
+        RouterAdvertisementEvent { options_bytes, source, device: map(device) }
+    }
+}
+
+/// Ipv6-specific bindings execution context for the IP layer.
+pub trait NdpBindingsContext<DeviceId>: EventContext<RouterAdvertisementEvent<DeviceId>> {}
+impl<DeviceId, BC: EventContext<RouterAdvertisementEvent<DeviceId>>> NdpBindingsContext<DeviceId>
+    for BC
+{
+}
+
 /// The bindings execution context for the IP layer.
 pub trait IpLayerBindingsContext<I: IpLayerIpExt, DeviceId>:
-    InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + TracingContext + FilterBindingsContext
+    InstantContext
+    + EventContext<IpLayerEvent<DeviceId, I>>
+    + TracingContext
+    + FilterBindingsContext
+    + TxMetadataBindingsTypes
 {
 }
 impl<
@@ -969,7 +1044,8 @@ impl<
         BC: InstantContext
             + EventContext<IpLayerEvent<DeviceId, I>>
             + TracingContext
-            + FilterBindingsContext,
+            + FilterBindingsContext
+            + TxMetadataBindingsTypes,
     > IpLayerBindingsContext<I, DeviceId> for BC
 {
 }
@@ -1581,14 +1657,14 @@ pub trait IpLayerEgressContext<I, BC>:
     + CounterContext<IpCounters<I>>
 where
     I: IpLayerIpExt,
-    BC: FilterBindingsContext,
+    BC: FilterBindingsContext + TxMetadataBindingsTypes,
 {
 }
 
 impl<I, BC, CC> IpLayerEgressContext<I, BC> for CC
 where
     I: IpLayerIpExt,
-    BC: FilterBindingsContext,
+    BC: FilterBindingsContext + TxMetadataBindingsTypes,
     CC: IpDeviceSendContext<I, BC, DeviceId: filter::InterfaceProperties<BC::DeviceClass>>
         + FilterHandlerProvider<I, BC>
         + CounterContext<IpCounters<I>>,
@@ -1642,12 +1718,24 @@ impl Ipv4StateBuilder {
 }
 
 /// A builder for IPv6 state.
+///
+/// By default, opaque IIDs will not be used to generate stable SLAAC addresses.
 #[derive(Copy, Clone, Default)]
 pub struct Ipv6StateBuilder {
     icmp: Icmpv6StateBuilder,
+    slaac_stable_secret_key: Option<IidSecret>,
 }
 
 impl Ipv6StateBuilder {
+    /// Sets the secret key used to generate stable SLAAC addresses.
+    ///
+    /// If `slaac_stable_secret_key` is left unset, opaque IIDs will not be used to
+    /// generate stable SLAAC addresses.
+    pub fn slaac_stable_secret_key(&mut self, secret_key: IidSecret) -> &mut Self {
+        self.slaac_stable_secret_key = Some(secret_key);
+        self
+    }
+
     /// Builds the [`Ipv6State`].
     pub fn build<
         CC: CoreTimerContext<IpLayerTimerId, BC>,
@@ -1657,13 +1745,13 @@ impl Ipv6StateBuilder {
         self,
         bindings_ctx: &mut BC,
     ) -> Ipv6State<StrongDeviceId, BC> {
-        let Ipv6StateBuilder { icmp } = self;
-
+        let Ipv6StateBuilder { icmp, slaac_stable_secret_key } = self;
         Ipv6State {
             inner: IpStateInner::new::<CC>(bindings_ctx),
             icmp: icmp.build(),
             slaac_counters: Default::default(),
             slaac_temp_secret_key: IidSecret::new_random(&mut bindings_ctx.rng()),
+            slaac_stable_secret_key,
         }
     }
 }
@@ -1705,6 +1793,11 @@ pub struct Ipv6State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindings
     pub slaac_counters: SlaacCounters,
     /// Secret key used for generating SLAAC temporary addresses.
     pub slaac_temp_secret_key: IidSecret,
+    /// Secret key used for generating SLAAC stable addresses.
+    ///
+    /// If `None`, opaque IIDs will not be used to generate stable SLAAC
+    /// addresses.
+    pub slaac_stable_secret_key: Option<IidSecret>,
 }
 
 impl<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
@@ -2427,7 +2520,13 @@ fn dispatch_receive_ipv6_packet<
 /// determination of how to forward. This is advantageous because forwarding
 /// requires the underlying packet buffer, which cannot be "moved" in certain
 /// contexts.
-pub(crate) struct IpPacketForwarder<'a, I: IpLayerIpExt, D, A, BT: FilterBindingsTypes> {
+pub(crate) struct IpPacketForwarder<
+    'a,
+    I: IpLayerIpExt,
+    D,
+    A,
+    BT: FilterBindingsTypes + TxMetadataBindingsTypes,
+> {
     inbound_device: &'a D,
     outbound_device: &'a D,
     packet_meta: IpLayerPacketMetadata<I, A, BT>,
@@ -2524,7 +2623,13 @@ where
 }
 
 /// The action to take for a packet that was a candidate for forwarding.
-pub(crate) enum ForwardingAction<'a, I: IpLayerIpExt, D, A, BT: FilterBindingsTypes> {
+pub(crate) enum ForwardingAction<
+    'a,
+    I: IpLayerIpExt,
+    D,
+    A,
+    BT: FilterBindingsTypes + TxMetadataBindingsTypes,
+> {
     /// Drop the packet without forwarding it or generating an ICMP error.
     SilentlyDrop,
     /// Forward the packet, as specified by the [`IpPacketForwarder`].
@@ -2725,7 +2830,7 @@ pub(crate) fn send_ip_frame<I, CC, BC, S>(
 ) -> Result<(), IpSendFrameError<S>>
 where
     I: IpLayerIpExt,
-    BC: FilterBindingsContext,
+    BC: FilterBindingsContext + TxMetadataBindingsTypes,
     CC: IpLayerEgressContext<I, BC> + IpDeviceMtuContext<I> + IpDeviceAddressIdContext<I>,
     S: FragmentableIpSerializer<I, Buffer: BufferMut> + IpPacket<I>,
 {
@@ -2754,7 +2859,8 @@ where
     } else {
         None
     };
-    let device_ip_layer_metadata = DeviceIpLayerMetadata { conntrack_entry };
+    let tx_metadata = core::mem::take(&mut packet_metadata.tx_metadata);
+    let device_ip_layer_metadata = DeviceIpLayerMetadata { conntrack_entry, tx_metadata };
     packet_metadata.acknowledge_drop();
 
     // The filtering layer may have changed our address. Perform a last moment
@@ -2797,18 +2903,38 @@ where
     // Body doesn't fit MTU, we must fragment this serializer in order to send
     // it out.
     core_ctx.increment(|c: &IpCounters<I>| &c.fragmentation.fragmentation_required);
+
+    // Taken on the last frame.
+    let mut device_ip_layer_metadata = Some(device_ip_layer_metadata);
     let body = body.into_inner();
     let result = match IpFragmenter::new(bindings_ctx, &body, mtu) {
         Ok(mut fragmenter) => loop {
-            let fragment = match fragmenter.next() {
+            let (fragment, has_more) = match fragmenter.next() {
                 None => break Ok(()),
                 Some(f) => f,
             };
+
+            // TODO(https://fxbug.dev/391953082): We should penalize sockets
+            // via the tx metadata when we incur IP fragmentation instead of
+            // just attaching the ownership to the last fragment. For now, we
+            // attach the tx metadata to the last frame only.
+            let device_ip_layer_metadata = if has_more {
+                // Unwrap here because only the last frame can take it.
+                let device_ip_layer_metadata = device_ip_layer_metadata.as_ref().unwrap();
+                DeviceIpLayerMetadata {
+                    conntrack_entry: device_ip_layer_metadata.conntrack_entry.clone(),
+                    tx_metadata: Default::default(),
+                }
+            } else {
+                // Unwrap here because the last frame can only happen once.
+                device_ip_layer_metadata.take().unwrap()
+            };
+
             match core_ctx.send_ip_frame(
                 bindings_ctx,
                 device,
                 destination.clone(),
-                device_ip_layer_metadata.clone(),
+                device_ip_layer_metadata,
                 fragment,
                 proof.clone_for_fragmentation(),
             ) {
@@ -3017,7 +3143,7 @@ pub fn receive_ipv4_packet<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: Option<FrameDestination>,
-    device_ip_layer_metadata: DeviceIpLayerMetadata,
+    device_ip_layer_metadata: DeviceIpLayerMetadata<BC>,
     buffer: B,
 ) {
     if !core_ctx.is_ip_device_enabled(&device) {
@@ -3346,7 +3472,7 @@ pub fn receive_ipv6_packet<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: Option<FrameDestination>,
-    device_ip_layer_metadata: DeviceIpLayerMetadata,
+    device_ip_layer_metadata: DeviceIpLayerMetadata<BC>,
     buffer: B,
 ) {
     if !core_ctx.is_ip_device_enabled(&device) {
@@ -4387,7 +4513,7 @@ pub(crate) fn send_ip_packet_from_device<I, BC, CC, S>(
 ) -> Result<(), IpSendFrameError<S>>
 where
     I: IpLayerIpExt,
-    BC: FilterBindingsContext,
+    BC: FilterBindingsContext + TxMetadataBindingsTypes,
     CC: IpLayerEgressContext<I, BC> + IpDeviceEgressStateContext<I> + IpDeviceMtuContext<I>,
     S: TransportPacketSerializer<I>,
     S::Buffer: BufferMut,

@@ -44,7 +44,7 @@ func TestParse2Summary(t *testing.T) {
 		}
 		testResults, skipped := SummaryToResultSink(summary, []*resultpb.StringPair{}, name)
 		expectRequests += (len(testResults)-1)/chunkSize + 1
-		requests = append(requests, CreateTestResultsRequests(testResults, chunkSize)...)
+		requests = append(requests, createTestResultsRequests(testResults, chunkSize)...)
 		for _, testResult := range testResults {
 			if len(testResult.TestId) == 0 {
 				t.Errorf("Empty testId is not allowed.")

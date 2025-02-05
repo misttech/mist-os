@@ -56,6 +56,11 @@ const (
 	// Whether we should place the device in Zedboot if idling in fastboot.
 	// TODO(https://fxbug.dev/42075766): Remove once release branches no longer need this.
 	mustLoadThroughZedboot = false
+
+	// One of the possible InstallMode mode types.
+	// Indicates that the target device is idling in fastboot mode.
+	// TOD0(betramlalusha): Remove once NUC11 migration to flashing is complete.
+	fastbootMode = "fastboot"
 )
 
 // DeviceConfig contains the static properties of a target device.
@@ -87,6 +92,13 @@ type DeviceConfig struct {
 	// Other failure modes should be resolved by fixing the source of the
 	// failure, not papering over it with retries.
 	MaxFlashAttempts int `json:"max_flash_attempts,omitempty"`
+
+	// InstallMode is an optional string that tells botanist what
+	// method to use to install fuchsia. This will be used to help
+	// botanist distinguish between NUC11s that should be paved and
+	// those that will be flashed (if the install_mode is fastboot).
+	// TOD0(betramlalusha): Remove once NUC11 migration to flashing is complete.
+	InstallMode string `json:"install_mode,omitempty"`
 }
 
 // NetworkProperties are the static network properties of a target.
@@ -219,7 +231,7 @@ func (t *Device) SSHClient() (*sshutil.Client, error) {
 }
 
 func (t *Device) mustLoadThroughZedboot() bool {
-	return mustLoadThroughZedboot || t.config.FastbootSernum == ""
+	return mustLoadThroughZedboot || (t.config.FastbootSernum == "" && t.config.InstallMode != fastbootMode)
 }
 
 // Start starts the device target.
@@ -280,7 +292,7 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 	useFastbootFlashing := t.config.FastbootSernum != "" && (deviceType == "Kola" || deviceType == "Sorrel")
 
 	// Boot Fuchsia.
-	if t.config.FastbootSernum != "" {
+	if t.config.FastbootSernum != "" || t.config.InstallMode == fastbootMode {
 		// Copy images locally, as fastboot does not support flashing
 		// from a remote location.
 		// TODO(rudymathu): Transport these images via isolate for improved caching performance.
@@ -319,15 +331,26 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 				maxAllowedAttempts = t.config.MaxFlashAttempts
 			}
 			var err error
+			tcpFlash := false
+			target := t.config.FastbootSernum
+			if target == "" {
+				ipv6, err := t.genericFuchsiaTarget.IPv6()
+				if err != nil {
+					return err
+				}
+
+				target = ipv6.String()
+				tcpFlash = true
+			}
 			for attempt := 1; attempt <= maxAllowedAttempts; attempt++ {
 				logger.Debugf(ctx, "Starting flash attempt %d/%d", attempt, maxAllowedAttempts)
 				if t.opts.Netboot {
-					if err = t.ffx.BootloaderBoot(ctx, t.config.FastbootSernum, pbPath); err == nil {
+					if err = t.ffx.BootloaderBoot(ctx, target, pbPath); err == nil {
 						// If successful, early exit.
 						break
 					}
 				} else {
-					if err = t.flash(ctx, pbPath); err == nil {
+					if err = t.flash(ctx, pbPath, target, tcpFlash); err == nil {
 						// If successful, early exit.
 						break
 					}
@@ -568,7 +591,7 @@ func (t *Device) fastbootFlash(ctx context.Context, pbPath string, images []boot
 	return nil
 }
 
-func (t *Device) flash(ctx context.Context, productBundle string) error {
+func (t *Device) flash(ctx context.Context, productBundle, target string, tcpFlash bool) error {
 	// Print logs to avoid hitting the I/O timeout.
 	ticker := time.NewTicker(2 * time.Minute)
 	defer ticker.Stop()
@@ -579,7 +602,7 @@ func (t *Device) flash(ctx context.Context, productBundle string) error {
 	}()
 
 	// TODO(https://fxbug.dev/42168777): Need support for ffx target flash for cuckoo tests.
-	return t.ffx.Flash(ctx, t.config.FastbootSernum, "", productBundle)
+	return t.ffx.Flash(ctx, target, "", productBundle, tcpFlash)
 }
 
 // Nasty hack to try to deal with the fact that some devices have real bad USB

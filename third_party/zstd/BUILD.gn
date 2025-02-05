@@ -6,6 +6,75 @@
 import("//build/host.gni")
 import("//build/zircon/migrated_targets.gni")
 
+# *NOTE*: This check is used to ensure that the Rust zstd bindings we use in
+# //third_party/rust_crates/forks/zstd-sys stays in sync with the pinned version of zstd.
+# To update our pinned version of zstd:
+#
+#   1. Determine if there are any incompatible API or ABI changes in the new version that
+#      are incompatible with the Rust crate in //third_party/rust_crates/forks/zstd-sys.
+#      If so, update the crate accordingly.
+#   2. Disable the check below, adding a TODO comment referencing a bug tracking the zstd
+#      update, and indicate that the check will be re-enabled once the crate is updated.
+#   3. Update the pinned version of zstd in //integration/third_party/flower
+#   4. Run third_party/rust_crates/forks/zstd-sys/bindgen.sh to update the Rust bindings
+#      and re-enable the check below.
+verify_rust_zstd_sys_crate_binding_version = true
+
+if (verify_rust_zstd_sys_crate_binding_version) {
+  # zstd.h Header Version Information
+  # Format: `#define ZSTD_VERSION_MAJOR 1`
+  zstd_version_line_no = 106
+  zstd_version_index = 2
+  zstd_header_path = "src/lib/zstd.h"
+
+  # zstd-sys Crate Binding Version Information
+  # Format: `pub const ZSTD_VERSION_MAJOR: u32 = 1;`
+  zstd_sys_version_line_no = 6
+  zstd_sys_version_idx = 5
+  zstd_sys_path = "../rust_crates/forks/zstd-sys/src/bindings_zstd_std.rs"
+
+  # Read the zstd header and create a version string of the form (maj.min.rel).
+  lines = read_file(zstd_header_path, "list lines")
+  lib_version_maj = string_split(lines[zstd_version_line_no])
+  assert(lib_version_maj[1] == "ZSTD_VERSION_MAJOR",
+         "location of version constant was moved, update zstd_version_line_no")
+  lib_version_min = string_split(lines[zstd_version_line_no + 1])
+  lib_version_rel = string_split(lines[zstd_version_line_no + 2])
+  lib_version = string_join(".",
+                            [
+                              lib_version_maj[zstd_version_index],
+                              lib_version_min[zstd_version_index],
+                              lib_version_rel[zstd_version_index],
+                            ])
+
+  # Do the same for our fork of the zstd-sys crate.
+  lines = []
+  lines = read_file(zstd_sys_path, "list lines")
+  rust_version_maj = string_split(lines[zstd_sys_version_line_no])
+  assert(
+      rust_version_maj[2] == "ZSTD_VERSION_MAJOR:",
+      "location of version constant was moved, update zstd_sys_version_line_no")
+  rust_version_min = string_split(lines[zstd_sys_version_line_no + 1])
+  rust_version_rel = string_split(lines[zstd_sys_version_line_no + 2])
+  crate_version = string_join(
+          ".",
+          [
+            string_replace(rust_version_maj[zstd_sys_version_idx], ";", ""),
+            string_replace(rust_version_min[zstd_sys_version_idx], ";", ""),
+            string_replace(rust_version_rel[zstd_sys_version_idx], ";", ""),
+          ])
+
+  # Make sure the versions match, and if not, provide details on how to update them.
+  assert(
+      lib_version == crate_version,
+      string_join(
+          " ",
+          [
+            "library version ($lib_version) does not match Rust bindings ($crate_version).",
+            "See the top of this build file for information on updating the Rust bindings.",
+          ]))
+}
+
 zstd_common_sources = [
   "src/lib/common/bitstream.h",
   "src/lib/common/compiler.h",
@@ -138,10 +207,13 @@ config("internal.config") {
       "PLATFORM_POSIX_VERSION=200112L",
       "ZSTD_SETPRIORITY_SUPPORT=0",
     ]
+  } else if (!is_kernel) {
+    defines += [ "ZSTD_MULTITHREAD" ]
   }
 
-  if (!(is_fuchsia || is_mistos) && !is_kernel) {
-    defines += [ "ZSTD_MULTITHREAD" ]
+  if (is_kernel) {
+    # This avoids references to malloc and free.
+    defines += [ "XXH_NO_STDLIB" ]
   }
 
   # Suppress warnings the zstd code doesn't comply with.
@@ -242,6 +314,8 @@ if (!is_kernel) {
       "src/programs/fileio.h",
       "src/programs/fileio_asyncio.c",
       "src/programs/fileio_asyncio.h",
+      "src/programs/lorem.c",
+      "src/programs/lorem.h",
       "src/programs/platform.h",
       "src/programs/timefn.c",
       "src/programs/timefn.h",

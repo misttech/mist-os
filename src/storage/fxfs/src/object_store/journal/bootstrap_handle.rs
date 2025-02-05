@@ -80,7 +80,7 @@ impl ObjectHandle for BootstrapObjectHandle {
     fn set_trace(&self, trace: bool) {
         let old_value = self.trace.swap(trace, Ordering::Relaxed);
         if trace != old_value {
-            info!(oid = self.object_id, trace, "JH: trace");
+            info!(oid = self.object_id, trace; "JH: trace");
         }
     }
 }
@@ -91,7 +91,7 @@ impl ReadObjectHandle for BootstrapObjectHandle {
         assert!(offset >= self.start_offset);
         let trace = self.trace.load(Ordering::Relaxed);
         if trace {
-            info!(len = buf.len(), offset, "JH: read");
+            info!(len = buf.len(), offset; "JH: read");
         }
         let len = buf.len();
         let mut buf_offset = 0;
@@ -101,7 +101,7 @@ impl ReadObjectHandle for BootstrapObjectHandle {
             let extent_len = device_range.end - device_range.start;
             if offset < file_offset + extent_len {
                 if trace {
-                    info!(?device_range, "JH: matching extent");
+                    info!(device_range:?; "JH: matching extent");
                 }
                 let device_offset = device_range.start + offset - file_offset;
                 let to_read =
@@ -154,7 +154,7 @@ impl JournalHandle for BootstrapObjectHandle {
         for extent in discarded {
             self.end_offset -= extent.device_range.length().unwrap();
             if trace {
-                info!(discard_offset, ?extent, "JH: Discarded extent");
+                info!(discard_offset, extent:?; "JH: Discarded extent");
             }
         }
     }

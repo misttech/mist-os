@@ -11,11 +11,11 @@ use fidl_fuchsia_metrics::{
 use fuchsia_cobalt_builders::MetricEventExt;
 use fuchsia_component::client::connect_to_protocol;
 use futures::prelude::*;
+use log::{info, warn};
 use mos_metrics_registry as mos_registry;
 use omaha_client::metrics::{ClockType, Metrics, MetricsReporter};
 use omaha_client::protocol::request::{EventResult, EventType, InstallSource};
 use std::time::Duration;
-use tracing::{info, warn};
 
 pub struct CobaltConnectedService(pub u32);
 impl ConnectedProtocol for CobaltConnectedService {

@@ -6,8 +6,8 @@ use fidl_fuchsia_bluetooth_power::{Information, ReporterRequest, ReporterRequest
 use fuchsia_bluetooth::types::PeerId;
 
 use futures::{Future, TryStreamExt};
+use log::debug;
 use std::sync::Arc;
-use tracing::debug;
 
 use crate::error::Error;
 use crate::peripheral_state::{peer_id_from_identifier, BatteryInfo, PeripheralState};

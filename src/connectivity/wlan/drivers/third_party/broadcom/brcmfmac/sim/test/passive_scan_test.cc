@@ -28,7 +28,7 @@ class PassiveScanTest;
 
 struct ApInfo {
   explicit ApInfo(simulation::Environment* env, const common::MacAddr& bssid,
-                  const wlan_ieee80211::CSsid& ssid, const wlan_common::WlanChannel& channel)
+                  const fuchsia_wlan_ieee80211::Ssid& ssid, const wlan_common::WlanChannel& channel)
       : ap_(env, bssid, ssid, channel) {}
 
   simulation::FakeAp ap_;
@@ -70,14 +70,14 @@ class PassiveScanTest : public SimTest {
   void SetUp() override;
 
   // Create a new AP with the specified parameters, and tell it to start beaconing.
-  void StartFakeAp(const common::MacAddr& bssid, const wlan_ieee80211::CSsid& ssid,
+  void StartFakeAp(const common::MacAddr& bssid, const fuchsia_wlan_ieee80211::Ssid& ssid,
                    const wlan_common::WlanChannel& channel,
                    zx::duration beacon_interval = kBeaconInterval);
 
   // Start a fake AP with a beacon mutator that will be applied to each beacon before it is sent.
   // The fake AP will begin beaconing immediately.
   void StartFakeApWithErrInjBeacon(
-      const common::MacAddr& bssid, const wlan_ieee80211::CSsid& ssid,
+      const common::MacAddr& bssid, const fuchsia_wlan_ieee80211::Ssid& ssid,
       const wlan_common::WlanChannel& channel,
       std::function<SimBeaconFrame(const SimBeaconFrame&)> beacon_mutator,
       zx::duration beacon_interval = kBeaconInterval);
@@ -97,7 +97,8 @@ void PassiveScanTest::SetUp() {
   client_ifc_.ClearVerifierFunction();
 }
 
-void PassiveScanTest::StartFakeAp(const common::MacAddr& bssid, const wlan_ieee80211::CSsid& ssid,
+void PassiveScanTest::StartFakeAp(const common::MacAddr& bssid,
+                                  const fuchsia_wlan_ieee80211::Ssid& ssid,
                                   const wlan_common::WlanChannel& channel,
                                   zx::duration beacon_interval) {
   auto ap_info = std::make_unique<ApInfo>(env_.get(), bssid, ssid, channel);
@@ -106,7 +107,7 @@ void PassiveScanTest::StartFakeAp(const common::MacAddr& bssid, const wlan_ieee8
 }
 
 void PassiveScanTest::StartFakeApWithErrInjBeacon(
-    const common::MacAddr& bssid, const wlan_ieee80211::CSsid& ssid,
+    const common::MacAddr& bssid, const fuchsia_wlan_ieee80211::Ssid& ssid,
     const wlan_common::WlanChannel& channel,
     std::function<SimBeaconFrame(const SimBeaconFrame&)> beacon_mutator,
     zx::duration beacon_interval) {
@@ -140,7 +141,6 @@ void PassiveScanTestInterface::OnScanResult(OnScanResultRequestView request,
 
 constexpr wlan_common::WlanChannel kDefaultChannel = {
     .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw40, .secondary80 = 0};
-constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 
 TEST_F(PassiveScanTest, BasicFunctionality) {
@@ -171,9 +171,7 @@ TEST_F(PassiveScanTest, BasicFunctionality) {
 
         // Verify SSID.
         auto ssid = brcmf_find_ssid_in_ies(result->bss().ies.data(), result->bss().ies.count());
-        EXPECT_EQ(ssid.size(), kDefaultSsid.len);
-        ASSERT_LE(kDefaultSsid.len, kDefaultSsid.data.size());
-        EXPECT_EQ(std::memcmp(ssid.data(), kDefaultSsid.data.data(), kDefaultSsid.len), 0);
+        EXPECT_EQ(ssid, kDefaultSsid);
 
         // Verify channel
         EXPECT_EQ(result->bss().channel.primary, kDefaultChannel.primary);
@@ -250,7 +248,6 @@ TEST_F(PassiveScanTest, ScanWithMalformedBeaconMissingSsidInformationElement) {
         // Verify that SSID is empty, since there was no SSID IE.
         auto ssid = brcmf_find_ssid_in_ies(result->bss().ies.data(), result->bss().ies.count());
         EXPECT_EQ(ssid.size(), 0u);
-        ASSERT_LE(kDefaultSsid.len, kDefaultSsid.data.size());
 
         // Verify channel
         EXPECT_EQ(result->bss().channel.primary, kDefaultChannel.primary);

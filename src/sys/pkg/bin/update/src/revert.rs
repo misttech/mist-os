@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Error};
-use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminProxy, RebootReason};
+use fidl_fuchsia_hardware_power_statecontrol::{
+    AdminMarker, AdminProxy, RebootOptions, RebootReason2,
+};
 use fidl_fuchsia_paver::{BootManagerMarker, BootManagerProxy, PaverMarker};
 use fuchsia_component::client::connect_to_protocol;
 use zx::Status;
@@ -44,7 +46,10 @@ async fn handle_revert_impl(
         .context("flush responded with")?;
 
     admin
-        .reboot(RebootReason::UserRequest)
+        .perform_reboot(&RebootOptions {
+            reasons: Some(vec![RebootReason2::UserRequest]),
+            ..Default::default()
+        })
         .await
         .context("while performing reboot call")?
         .map_err(Status::from_raw)

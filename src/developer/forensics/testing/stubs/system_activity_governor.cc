@@ -4,34 +4,37 @@
 
 #include "src/developer/forensics/testing/stubs/system_activity_governor.h"
 
+#include <lib/async/cpp/wait.h>
 #include <lib/zx/event.h>
 
 #include <utility>
 
-#include "src/lib/testing/predicates/status.h"
-
 namespace forensics::stubs {
 
-void SystemActivityGovernor::GetPowerElements(GetPowerElementsCompleter::Sync& completer) {
-  zx::event event;
-  ASSERT_OK(zx::event::create(0, &event));
+namespace {
 
-  fuchsia_power_system::ExecutionState execution_state;
-  execution_state.opportunistic_dependency_token(std::move(event));
+using fuchsia_power_system::LeaseToken;
 
-  fuchsia_power_system::PowerElements elements;
-  elements.execution_state(std::move(execution_state));
+}  // namespace
 
-  completer.Reply(fidl::Response<fuchsia_power_system::ActivityGovernor::GetPowerElements>(
-      std::move(elements)));
-}
+void SystemActivityGovernor::AcquireWakeLease(AcquireWakeLeaseRequest& request,
+                                              AcquireWakeLeaseCompleter::Sync& completer) {
+  LeaseToken client_token, server_token;
+  LeaseToken::create(/*options=*/0u, &client_token, &server_token);
 
-void SystemActivityGovernorNoTokens::GetPowerElements(GetPowerElementsCompleter::Sync& completer) {
-  fuchsia_power_system::PowerElements elements;
-  elements.execution_state(fuchsia_power_system::ExecutionState());
+  // Start an async task to wait for EVENTPAIR_PEER_CLOSED signal on server_token.
+  zx_handle_t token_handle = server_token.get();
+  active_wake_leases_[token_handle] = std::move(server_token);
+  auto wait = std::make_unique<async::WaitOnce>(token_handle, ZX_EVENTPAIR_PEER_CLOSED);
+  wait->Begin(dispatcher_, [this, token_handle, wait = std::move(wait)](
+                               async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
+                               const zx_packet_signal_t*) {
+    FX_CHECK(status == ZX_OK);
+    FX_CHECK(active_wake_leases_.contains(token_handle));
+    active_wake_leases_.erase(token_handle);
+  });
 
-  completer.Reply(fidl::Response<fuchsia_power_system::ActivityGovernor::GetPowerElements>(
-      std::move(elements)));
+  completer.Reply(fit::ok(std::move(client_token)));
 }
 
 }  // namespace forensics::stubs

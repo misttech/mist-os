@@ -70,7 +70,7 @@ An override with documentation. Note that the BaseClass1Function() is not overri
 
 [Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/classes.h#77)
 
-This class should not have a generated declaration becaose of the  annotation.
+This class should not have a generated declaration because of the  annotation.
 
 ### NoDeclarationClass::SomeFunction() {:#NoDeclarationClass::SomeFunction}
 

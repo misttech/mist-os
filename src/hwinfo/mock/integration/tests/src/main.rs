@@ -12,8 +12,8 @@ use fidl_fuchsia_hwinfo_mock::{SetterMarker, SetterProxy};
 use fidl_fuchsia_intl::RegulatoryDomain;
 use fidl_test_mock as ftest;
 use fuchsia_component::client::connect_to_protocol;
+use log::info;
 use realm_proxy_client::RealmProxyClient;
-use tracing::info;
 
 async fn create_realm(options: ftest::RealmOptions) -> Result<RealmProxyClient> {
     let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;

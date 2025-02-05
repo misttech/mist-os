@@ -80,7 +80,7 @@ TEST_F(MagmaImageTest, CreateInvalidFormat) {
       .flags = 0,
   };
   magma_buffer_t image;
-  size_t size;
+  uint64_t size;
   magma_buffer_id_t buffer_id;
 
   EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_virt_connection_create_image(
@@ -99,7 +99,7 @@ TEST_F(MagmaImageTest, CreateInvalidModifier) {
     create_info.drm_format_modifiers[i] = i;
   }
   magma_buffer_t image;
-  size_t size;
+  uint64_t size;
   magma_buffer_id_t buffer_id;
 
   EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_virt_connection_create_image(
@@ -115,7 +115,7 @@ TEST_F(MagmaImageTest, CreateInvalidWidth) {
       .flags = 0,
   };
   magma_buffer_t image;
-  size_t size;
+  uint64_t size;
   magma_buffer_id_t buffer_id;
 
   EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_virt_connection_create_image(
@@ -131,7 +131,7 @@ TEST_F(MagmaImageTest, CreateInvalidHeight) {
       .flags = 0,
   };
   magma_buffer_t image;
-  size_t size;
+  uint64_t size;
   magma_buffer_id_t buffer_id;
 
   EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_virt_connection_create_image(
@@ -147,7 +147,7 @@ TEST_F(MagmaImageTest, CreateInvalidFlags) {
       .flags = std::numeric_limits<uint32_t>::max(),
   };
   magma_buffer_t image;
-  size_t size;
+  uint64_t size;
   magma_buffer_id_t buffer_id;
 
   EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_virt_connection_create_image(
@@ -202,7 +202,7 @@ class MagmaImageTestFormats : public MagmaImageTest, public testing::WithParamIn
           .flags = flags,
       };
       magma_buffer_t image;
-      size_t size;
+      uint64_t size;
       magma_buffer_id_t buffer_id;
 
       ASSERT_EQ(MAGMA_STATUS_OK, magma_virt_connection_create_image(connection_, &create_info,
@@ -243,7 +243,7 @@ class MagmaImageTestFormats : public MagmaImageTest, public testing::WithParamIn
     {
       magma_buffer_t image;
       magma_handle_t handle = fd;
-      size_t size;
+      uint64_t size;
       magma_buffer_id_t buffer_id;
       ASSERT_EQ(MAGMA_STATUS_OK,
                 magma_connection_import_buffer(connection_, handle, &size, &image, &buffer_id));

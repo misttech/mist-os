@@ -16,7 +16,8 @@ using ::testing::IsNull;
 using ::testing::NotNull;
 using ::testing::SizeIs;
 
-const wlan_ieee80211::CSsid kDefaultSsid{.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
+const fuchsia_wlan_ieee80211::Ssid kDefaultSsid = {'F', 'u', 'c', 'h', 's', 'i', 'a', ' ',
+                                                   'F', 'a', 'k', 'e', ' ', 'A', 'P'};
 const common::MacAddr kDefaultBssid{0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc};
 const common::MacAddr kDefaultDest{0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa};
 constexpr wlan_common::WlanChannel kDefaultChannel = {
@@ -131,9 +132,7 @@ TEST_F(FrameIeTest, SsidIeAddRemove) {
   ASSERT_THAT(ssid_untyped_ie, NotNull());
   ASSERT_EQ(ssid_untyped_ie->IeType(), InformationElement::IE_TYPE_SSID);
   auto ssid_ie = std::static_pointer_cast<simulation::SsidInformationElement>(ssid_untyped_ie);
-  EXPECT_EQ(ssid_ie->ssid_.len, kDefaultSsid.len);
-  EXPECT_EQ(0,
-            memcmp(ssid_ie->ssid_.data.data(), kDefaultSsid.data.data(), kDefaultSsid.data.size()));
+  EXPECT_EQ(ssid_ie->ssid_, kDefaultSsid);
 
   // Add IE with same type again, add will fail.
   beacon_created_without_ssid.AddSsidIe(kDefaultSsid);
@@ -149,9 +148,7 @@ TEST_F(FrameIeTest, SsidIeAddRemove) {
   ASSERT_THAT(ssid_untyped_ie, NotNull());
   ASSERT_EQ(ssid_untyped_ie->IeType(), InformationElement::IE_TYPE_SSID);
   ssid_ie = std::static_pointer_cast<simulation::SsidInformationElement>(ssid_untyped_ie);
-  EXPECT_EQ(ssid_ie->ssid_.len, kDefaultSsid.len);
-  EXPECT_EQ(0,
-            memcmp(ssid_ie->ssid_.data.data(), kDefaultSsid.data.data(), kDefaultSsid.data.size()));
+  EXPECT_EQ(ssid_ie->ssid_, kDefaultSsid);
 
   // Add IE with same type again, add will fail.
   beacon_created_with_ssid.AddSsidIe(kDefaultSsid);
@@ -168,11 +165,10 @@ TEST_F(FrameIeTest, SsidIeToRawIe) {
   // 2 bytes of overhead, and then 15 bytes of SSID.
   const uint8_t expected_size = 17;
   ASSERT_THAT(raw_ie, SizeIs(expected_size));
-  std::vector<uint8_t> expected_bytes({InformationElement::IE_TYPE_SSID, kDefaultSsid.len});
-  for (int i = 0; i < kDefaultSsid.len; ++i) {
-    expected_bytes.push_back(kDefaultSsid.data.data()[i]);
-  }
-  EXPECT_THAT(raw_ie, ElementsAreArray(expected_bytes));
+  std::vector<uint8_t> expected_bytes(
+      {InformationElement::IE_TYPE_SSID, static_cast<uint8_t>(kDefaultSsid.size())});
+  expected_bytes.insert(expected_bytes.end(), kDefaultSsid.begin(), kDefaultSsid.end());
+  EXPECT_EQ(raw_ie, expected_bytes);
 }
 
 TEST_F(FrameIeTest, CsaIeAddRemove) {
@@ -247,19 +243,7 @@ TEST_F(FrameIeTest, DeepCopyBeaconFrame) {
   auto copied_ssid_ie =
       std::static_pointer_cast<simulation::SsidInformationElement>(copied_ssid_untyped_ie);
 
-  ASSERT_EQ(origin_ssid_ie->ssid_.len, copied_ssid_ie->ssid_.len);
-  // SSID IE arrays may contain undefined values at indices beyond the specified length. There's no
-  // great gmock matcher for comparing arrays like this, so let's turn them into vectors and then
-  // use a simple matcher.
-  std::vector<uint8_t> origin_ssid(origin_ssid_ie->ssid_.len);
-  for (int i = 0; i < origin_ssid_ie->ssid_.len; ++i) {
-    origin_ssid.push_back(origin_ssid_ie->ssid_.data.data()[i]);
-  }
-  std::vector<uint8_t> copied_ssid(copied_ssid_ie->ssid_.len);
-  for (int i = 0; i < copied_ssid_ie->ssid_.len; ++i) {
-    copied_ssid.push_back(copied_ssid_ie->ssid_.data.data()[i]);
-  }
-  EXPECT_THAT(origin_ssid, ElementsAreArray(copied_ssid));
+  ASSERT_EQ(origin_ssid_ie->ssid_, copied_ssid_ie->ssid_);
 
   // Make sure two pointers are pointing to different places.
   EXPECT_NE(origin_ssid_ie.get(), copied_ssid_ie.get());

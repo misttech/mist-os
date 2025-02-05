@@ -66,8 +66,7 @@ class UsbAdbDevice : public UsbAdb,
 
   // UsbFunctionInterface methods.
   size_t UsbFunctionInterfaceGetDescriptorsSize();
-  void UsbFunctionInterfaceGetDescriptors(uint8_t* out_descriptors_buffer, size_t descriptors_size,
-                                          size_t* out_descriptors_actual);
+  void UsbFunctionInterfaceGetDescriptors(uint8_t* buffer, size_t buffer_size, size_t* out_actual);
   zx_status_t UsbFunctionInterfaceControl(const usb_setup_t* setup, const uint8_t* write_buffer,
                                           size_t write_size, uint8_t* out_read_buffer,
                                           size_t read_size, size_t* out_read_actual);
@@ -108,9 +107,9 @@ class UsbAdbDevice : public UsbAdb,
                                usb::EndpointClient<UsbAdbDevice>& ep);
 
   // Helper method to get free request buffer and queue the request for transmitting.
-  zx::result<> SendLocked() __TA_REQUIRES(bulk_in_ep_.mutex_);
+  zx::result<> SendLocked() __TA_REQUIRES(bulk_in_ep_.mutex());
   // Helper method to get free request buffer and queue the request for receiving.
-  void ReceiveLocked() __TA_REQUIRES(bulk_out_ep_.mutex_);
+  void ReceiveLocked() __TA_REQUIRES(bulk_out_ep_.mutex());
 
   // USB request completion callback methods.
   void TxComplete(fendpoint::Completion completion);
@@ -150,8 +149,8 @@ class UsbAdbDevice : public UsbAdb,
   std::atomic_bool stop_completed_ __TA_GUARDED(lock_) = false;
 
   // This driver uses 4 locks to avoid race conditions in different sub-parts of the driver. The
-  // OUT/IN endpoints each contain one mutex, where bulk_in_ep_.mutex_ is used to avoid race
-  // conditions w.r.t transmit buffers. bulk_out_ep_.mutex_ is used to avoid race conditions w.r.t
+  // OUT/IN endpoints each contain one mutex, where bulk_in_ep_.mutex() is used to avoid race
+  // conditions w.r.t transmit buffers. bulk_out_ep_.mutex() is used to avoid race conditions w.r.t
   // receive buffers. lock_ is used for all driver internal states. Alternatively a single lock
   // (lock_) could have been used for TX, RX and driver states, but that will serialize TX methods
   // w.r.t RX. Hence the separation of locks.
@@ -165,8 +164,8 @@ class UsbAdbDevice : public UsbAdb,
 
   // Lock for guarding driver states. This should be held for only a short duration and is the inner
   // most lock in all cases.
-  mutable std::mutex lock_ __TA_ACQUIRED_AFTER(bulk_in_ep_.mutex_)
-      __TA_ACQUIRED_AFTER(bulk_out_ep_.mutex_);
+  mutable std::mutex lock_ __TA_ACQUIRED_AFTER(bulk_in_ep_.mutex())
+      __TA_ACQUIRED_AFTER(bulk_out_ep_.mutex());
 
   // USB ADB interface descriptor.
   struct {
@@ -214,16 +213,16 @@ class UsbAdbDevice : public UsbAdb,
   usb::EndpointClient<UsbAdbDevice> bulk_out_ep_{usb::EndpointType::BULK, this,
                                                  std::mem_fn(&UsbAdbDevice::RxComplete)};
   // Queue of pending Receive requests from client.
-  std::queue<ReceiveCompleter::Async> rx_requests_ __TA_GUARDED(bulk_out_ep_.mutex_);
+  std::queue<ReceiveCompleter::Async> rx_requests_ __TA_GUARDED(bulk_out_ep_.mutex());
   // pending_replies_ only used for bulk_out_ep_
-  std::queue<fendpoint::Completion> pending_replies_ __TA_GUARDED(bulk_out_ep_.mutex_);
+  std::queue<fendpoint::Completion> pending_replies_ __TA_GUARDED(bulk_out_ep_.mutex());
 
   // Bulk IN/TX endpoint
   usb::EndpointClient<UsbAdbDevice> bulk_in_ep_{usb::EndpointType::BULK, this,
                                                 std::mem_fn(&UsbAdbDevice::TxComplete)};
   // Queue of pending transfer requests that need to be transmitted once the BULK IN request buffers
   // become available.
-  std::queue<txn_req_t> tx_pending_reqs_ __TA_GUARDED(bulk_in_ep_.mutex_);
+  std::queue<txn_req_t> tx_pending_reqs_ __TA_GUARDED(bulk_in_ep_.mutex());
 };
 
 }  // namespace usb_adb_function

@@ -164,6 +164,23 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.io/Directory.DeprecatedGetFlags",
+        "strictness": "strict",
+        "ordinal": "6595803110182632097",
+        "direction": "two_way",
+        "response": "fuchsia.io/NodeDeprecatedGetFlagsResponse"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.io/Directory.DeprecatedSetFlags",
+        "strictness": "strict",
+        "ordinal": "5950864159036794675",
+        "direction": "two_way",
+        "request": "fuchsia.io/NodeDeprecatedSetFlagsRequest",
+        "response": "fuchsia.io/NodeDeprecatedSetFlagsResponse"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.io/Directory.GetAttr",
         "strictness": "strict",
         "ordinal": "8689798978500614909",
@@ -201,10 +218,11 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.io/Directory.GetFlags",
-        "strictness": "strict",
-        "ordinal": "6595803110182632097",
+        "strictness": "flexible",
+        "ordinal": "105530239381466147",
         "direction": "two_way",
-        "response": "fuchsia.io/NodeGetFlagsResponse"
+        "response": "fuchsia.io/Node_GetFlags_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
@@ -338,11 +356,12 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.io/Directory.SetFlags",
-        "strictness": "strict",
-        "ordinal": "5950864159036794675",
+        "strictness": "flexible",
+        "ordinal": "6172186066099445416",
         "direction": "two_way",
         "request": "fuchsia.io/NodeSetFlagsRequest",
-        "response": "fuchsia.io/NodeSetFlagsResponse"
+        "response": "fuchsia.io/Node_SetFlags_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
@@ -775,6 +794,23 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.io/File.DeprecatedGetFlags",
+        "strictness": "strict",
+        "ordinal": "6595803110182632097",
+        "direction": "two_way",
+        "response": "fuchsia.io/NodeDeprecatedGetFlagsResponse"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.io/File.DeprecatedSetFlags",
+        "strictness": "strict",
+        "ordinal": "5950864159036794675",
+        "direction": "two_way",
+        "request": "fuchsia.io/NodeDeprecatedSetFlagsRequest",
+        "response": "fuchsia.io/NodeDeprecatedSetFlagsResponse"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.io/File.Describe",
         "strictness": "strict",
         "ordinal": "7545125870053689020",
@@ -830,10 +866,11 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.io/File.GetFlags",
-        "strictness": "strict",
-        "ordinal": "6595803110182632097",
+        "strictness": "flexible",
+        "ordinal": "105530239381466147",
         "direction": "two_way",
-        "response": "fuchsia.io/NodeGetFlagsResponse"
+        "response": "fuchsia.io/Node_GetFlags_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
@@ -957,11 +994,12 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.io/File.SetFlags",
-        "strictness": "strict",
-        "ordinal": "5950864159036794675",
+        "strictness": "flexible",
+        "ordinal": "6172186066099445416",
         "direction": "two_way",
         "request": "fuchsia.io/NodeSetFlagsRequest",
-        "response": "fuchsia.io/NodeSetFlagsResponse"
+        "response": "fuchsia.io/Node_SetFlags_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
@@ -1649,6 +1687,23 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.io/Node.DeprecatedGetFlags",
+        "strictness": "strict",
+        "ordinal": "6595803110182632097",
+        "direction": "two_way",
+        "response": "fuchsia.io/NodeDeprecatedGetFlagsResponse"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.io/Node.DeprecatedSetFlags",
+        "strictness": "strict",
+        "ordinal": "5950864159036794675",
+        "direction": "two_way",
+        "request": "fuchsia.io/NodeDeprecatedSetFlagsRequest",
+        "response": "fuchsia.io/NodeDeprecatedSetFlagsResponse"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.io/Node.GetAttr",
         "strictness": "strict",
         "ordinal": "8689798978500614909",
@@ -1686,10 +1741,11 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.io/Node.GetFlags",
-        "strictness": "strict",
-        "ordinal": "6595803110182632097",
+        "strictness": "flexible",
+        "ordinal": "105530239381466147",
         "direction": "two_way",
-        "response": "fuchsia.io/NodeGetFlagsResponse"
+        "response": "fuchsia.io/Node_GetFlags_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
@@ -1763,11 +1819,12 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.io/Node.SetFlags",
-        "strictness": "strict",
-        "ordinal": "5950864159036794675",
+        "strictness": "flexible",
+        "ordinal": "6172186066099445416",
         "direction": "two_way",
         "request": "fuchsia.io/NodeSetFlagsRequest",
-        "response": "fuchsia.io/NodeSetFlagsResponse"
+        "response": "fuchsia.io/Node_SetFlags_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
@@ -1967,6 +2024,42 @@
     },
     {
         "kind": "struct/member",
+        "name": "fuchsia.io/NodeDeprecatedGetFlagsResponse.flags",
+        "ordinal": "2",
+        "type": "fuchsia.io/OpenFlags"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.io/NodeDeprecatedGetFlagsResponse.s",
+        "ordinal": "1",
+        "type": "int32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.io/NodeDeprecatedGetFlagsResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.io/NodeDeprecatedSetFlagsRequest.flags",
+        "ordinal": "1",
+        "type": "fuchsia.io/OpenFlags"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.io/NodeDeprecatedSetFlagsRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.io/NodeDeprecatedSetFlagsResponse.s",
+        "ordinal": "1",
+        "type": "int32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.io/NodeDeprecatedSetFlagsResponse"
+    },
+    {
+        "kind": "struct/member",
         "name": "fuchsia.io/NodeGetAttrResponse.attributes",
         "ordinal": "2",
         "type": "fuchsia.io/NodeAttributes"
@@ -2000,22 +2093,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.io/NodeGetExtendedAttributeRequest"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/NodeGetFlagsResponse.flags",
-        "ordinal": "2",
-        "type": "fuchsia.io/OpenFlags"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/NodeGetFlagsResponse.s",
-        "ordinal": "1",
-        "type": "int32"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.io/NodeGetFlagsResponse"
     },
     {
         "kind": "union/member",
@@ -2175,7 +2252,7 @@
         "kind": "struct/member",
         "name": "fuchsia.io/NodeSetFlagsRequest.flags",
         "ordinal": "1",
-        "type": "fuchsia.io/OpenFlags"
+        "type": "fuchsia.io/Flags"
     },
     {
         "kind": "struct",
@@ -2183,13 +2260,13 @@
     },
     {
         "kind": "struct/member",
-        "name": "fuchsia.io/NodeSetFlagsResponse.s",
+        "name": "fuchsia.io/Node_GetFlags_Response.flags",
         "ordinal": "1",
-        "type": "int32"
+        "type": "fuchsia.io/Flags"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.io/NodeSetFlagsResponse"
+        "name": "fuchsia.io/Node_GetFlags_Response"
     },
     {
         "kind": "const",
@@ -2532,6 +2609,23 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.io/Symlink.DeprecatedGetFlags",
+        "strictness": "strict",
+        "ordinal": "6595803110182632097",
+        "direction": "two_way",
+        "response": "fuchsia.io/NodeDeprecatedGetFlagsResponse"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.io/Symlink.DeprecatedSetFlags",
+        "strictness": "strict",
+        "ordinal": "5950864159036794675",
+        "direction": "two_way",
+        "request": "fuchsia.io/NodeDeprecatedSetFlagsRequest",
+        "response": "fuchsia.io/NodeDeprecatedSetFlagsResponse"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.io/Symlink.Describe",
         "strictness": "flexible",
         "ordinal": "8371117097481679347",
@@ -2577,10 +2671,11 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.io/Symlink.GetFlags",
-        "strictness": "strict",
-        "ordinal": "6595803110182632097",
+        "strictness": "flexible",
+        "ordinal": "105530239381466147",
         "direction": "two_way",
-        "response": "fuchsia.io/NodeGetFlagsResponse"
+        "response": "fuchsia.io/Node_GetFlags_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
@@ -2664,11 +2759,12 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.io/Symlink.SetFlags",
-        "strictness": "strict",
-        "ordinal": "5950864159036794675",
+        "strictness": "flexible",
+        "ordinal": "6172186066099445416",
         "direction": "two_way",
         "request": "fuchsia.io/NodeSetFlagsRequest",
-        "response": "fuchsia.io/NodeSetFlagsResponse"
+        "response": "fuchsia.io/Node_SetFlags_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",

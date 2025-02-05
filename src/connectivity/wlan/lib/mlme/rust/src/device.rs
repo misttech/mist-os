@@ -9,11 +9,11 @@ use fdf::ArenaStaticBox;
 use futures::channel::mpsc;
 use futures::Future;
 use ieee80211::MacAddr;
+use log::error;
 use std::fmt::Display;
 use std::mem;
 use std::sync::Arc;
 use trace::Id as TraceId;
-use tracing::error;
 use wlan_common::mac::FrameControl;
 use wlan_common::{tx_vector, TimeUnit};
 use wlan_ffi_transport::{EthernetRx, EthernetTx, FfiEthernetTx, FfiWlanRx, WlanRx, WlanTx};
@@ -1636,7 +1636,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn enable_disable_beaconing() {
         let (mut fake_device, fake_device_state) = FakeDevice::new().await;
-        let arena = Arena::new().expect("unable to create arena");
+        let arena = Arena::new();
         let mut buffer = arena.insert_default_slice::<u8>(4);
         buffer.copy_from_slice(&[1, 2, 3, 4][..]);
         let mac_frame = buffer.to_vec();

@@ -15,6 +15,10 @@ class RootJob final : public fidl::WireServer<fuchsia_kernel::RootJob> {
     bindings_.AddBinding(dispatcher, std::move(server_end), this, fidl::kIgnoreBindingClosure);
   }
 
+  fidl::ProtocolHandler<fuchsia_kernel::RootJob> CreateHandler(async_dispatcher_t* dispatcher) {
+    return bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure);
+  }
+
   void Get(GetCompleter::Sync& completer) override;
 
  private:

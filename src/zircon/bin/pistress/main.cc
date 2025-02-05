@@ -24,7 +24,7 @@ namespace {
 const std::array kThreadBehaviors{
     TestThreadBehavior{},
     TestThreadBehavior{},
-    TestThreadBehavior{ .inheritable = false },
+    TestThreadBehavior{.inheritable = false},
     TestThreadBehavior{
         .profile_type = ProfileType::Fair,
         .priority = ZX_PRIORITY_HIGH,
@@ -160,7 +160,8 @@ int main(int argc, char** argv) {
   bool quit_now = false;
 
   // Choose a thread and meddle with its profile at a rate of [20, 100] Hz
-  std::uniform_int_distribution<zx_duration_t> change_profile_delay_dist{ZX_MSEC(10), ZX_MSEC(50)};
+  std::uniform_int_distribution<zx_duration_mono_t> change_profile_delay_dist{ZX_MSEC(10),
+                                                                              ZX_MSEC(50)};
   zx::time status_deadline = zx::clock::get_monotonic();
   zx::time change_profile_deadline =
       zx::deadline_after(zx::nsec(Random::Get(change_profile_delay_dist)));

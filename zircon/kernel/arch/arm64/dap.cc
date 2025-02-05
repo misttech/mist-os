@@ -293,16 +293,16 @@ class RegBlock {
   }
 
   zx_status_t WaitFor(T reg_offset, uint32_t mask, uint32_t val,
-                      zx_duration_t timeout = ZX_MSEC(250)) {
-    zx_time_t t;
+                      zx_duration_mono_t timeout = ZX_MSEC(250)) {
+    zx_instant_mono_t t;
     if (timeout != ZX_TIME_INFINITE) {
-      t = current_time();
+      t = current_mono_time();
     }
 
     uint32_t temp;
     do {
       temp = Read(reg_offset);
-      if (timeout != ZX_TIME_INFINITE && (zx_time_sub_time(current_time(), t) >= timeout)) {
+      if (timeout != ZX_TIME_INFINITE && (zx_time_sub_time(current_mono_time(), t) >= timeout)) {
         TRACEF("timed out, val %#x\n", temp);
         return ZX_ERR_TIMED_OUT;
       }

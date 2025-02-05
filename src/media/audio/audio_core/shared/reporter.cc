@@ -572,7 +572,8 @@ std::string UsageBehaviorToString(fuchsia::media::Behavior behavior) {
     case fuchsia::media::Behavior::MUTE:
       return "MUTE";
     default:
-      FX_CHECK(false) << "Invalid fuchsia::media::Behavior: " << static_cast<int>(behavior);
+      FX_DCHECK(false) << "Invalid fuchsia::media::Behavior: " << static_cast<int>(behavior);
+      return "unknown";
   }
 }
 }  // namespace
@@ -580,7 +581,7 @@ std::string UsageBehaviorToString(fuchsia::media::Behavior behavior) {
 class Reporter::ActiveUsagePolicy {
  public:
   ActiveUsagePolicy(inspect::Node& parent, std::string name,
-                    const std::vector<fuchsia::media::Usage>& active_usages,
+                    const std::vector<fuchsia::media::Usage2>& active_usages,
                     const AudioAdmin::RendererPolicies& render_usage_behaviors,
                     const AudioAdmin::CapturerPolicies& capture_usage_behaviors)
       : node_(parent.CreateChild(name)), active_(node_.CreateBool("active", true)) {
@@ -618,7 +619,7 @@ class Reporter::ActiveUsagePolicyTracker {
         mute_gain_(node_.CreateDouble("mute gain db", 0.0)),
         last_policy_(active_usage_policies_.New(new ActiveUsagePolicy(
             node_, std::to_string(++next_active_usage_policy_id_),
-            std::vector<fuchsia::media::Usage>(), AudioAdmin::RendererPolicies(),
+            std::vector<fuchsia::media::Usage2>(), AudioAdmin::RendererPolicies(),
             AudioAdmin::CapturerPolicies()))) {}
 
   void SetAudioPolicyBehaviorGain(AudioAdmin::BehaviorGain behavior_gain) {
@@ -627,7 +628,7 @@ class Reporter::ActiveUsagePolicyTracker {
     mute_gain_.Set(behavior_gain.mute_gain_db);
   }
 
-  void UpdateActiveUsagePolicy(const std::vector<fuchsia::media::Usage>& active_usages,
+  void UpdateActiveUsagePolicy(const std::vector<fuchsia::media::Usage2>& active_usages,
                                const AudioAdmin::RendererPolicies& renderer_policies,
                                const AudioAdmin::CapturerPolicies& capturer_policies) {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -1025,7 +1026,7 @@ class Reporter::RendererImpl : public Reporter::Renderer {
     timestamp_underflows_->StopSession(stop_time);
   }
 
-  void SetUsage(RenderUsage usage) override { usage_.Set(RenderUsageToString(usage)); }
+  void SetUsage(RenderUsage usage) override { usage_.Set(ToString(usage)); }
   void SetFormat(const Format& format) override { client_port_.SetFormat(format); }
 
   void SetGain(float gain_db) override { client_port_.SetGain(gain_db); }
@@ -1134,7 +1135,7 @@ class Reporter::CapturerImpl : public Reporter::Capturer {
   void StartSession(zx::time start_time) override { overflows_->StartSession(start_time); }
   void StopSession(zx::time stop_time) override { overflows_->StopSession(stop_time); }
 
-  void SetUsage(CaptureUsage usage) override { usage_.Set(CaptureUsageToString(usage)); }
+  void SetUsage(CaptureUsage usage) override { usage_.Set(ToString(usage)); }
   void SetFormat(const Format& format) override { client_port_.SetFormat(format); }
 
   void SetGain(float gain_db) override { client_port_.SetGain(gain_db); }
@@ -1354,7 +1355,7 @@ void Reporter::SetAudioPolicyBehaviorGain(AudioAdmin::BehaviorGain behavior_gain
   impl_->active_usage_policy_tracker->SetAudioPolicyBehaviorGain(behavior_gain);
 }
 
-void Reporter::UpdateActiveUsagePolicy(const std::vector<fuchsia::media::Usage>& active_usages,
+void Reporter::UpdateActiveUsagePolicy(const std::vector<fuchsia::media::Usage2>& active_usages,
                                        const AudioAdmin::RendererPolicies& renderer_policies,
                                        const AudioAdmin::CapturerPolicies& capturer_policies) {
   std::lock_guard<std::mutex> lock(mutex_);

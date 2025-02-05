@@ -15,12 +15,12 @@ use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_inspect::reader::snapshot::{Snapshot, SnapshotTree};
 use futures::channel::oneshot;
 use futures::{FutureExt, Stream};
+use log::warn;
 use selectors::SelectorExt;
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
-use tracing::warn;
 use zx::{self as zx, AsHandleRef};
 use {
     fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_inspect as finspect,
@@ -507,7 +507,7 @@ impl UnpopulatedInspectDataContainer {
             state
                 .iterate(start_time)
                 .on_timeout((timeout - elapsed_time).after_now(), move || {
-                    warn!(identity = ?unpopulated_for_timeout.identity.moniker, "{TIMEOUT_MESSAGE}");
+                    warn!(identity:? = unpopulated_for_timeout.identity.moniker; "{TIMEOUT_MESSAGE}");
                     global_stats.add_timeout();
                     let result = PopulatedInspectDataContainer {
                         identity: Arc::clone(&unpopulated_for_timeout.identity),

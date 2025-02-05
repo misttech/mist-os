@@ -1,13 +1,14 @@
 {
-  "platform": {
-    "foo": "fuchsia/assembly/test_data/foo.txt"
-  },
-  "product": {
-    "bar": "fuchsia/assembly/test_data/bar.txt",
-    "base_drivers": [],
-    "packages": {
-      "base": [],
-      "cache": []
+    "platform": {
+        "ui": {
+            "sensor_config": "platform/ui/sensor_config/foo.txt"
+        }
+    },
+    "product": {
+        "component_policy": {
+            "product_policies": [
+                "product/component_policy/product_policies/0/bar.txt"
+            ]
+        }
     }
-  }
 }

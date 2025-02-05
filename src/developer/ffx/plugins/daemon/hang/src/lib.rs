@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 use ffx_hang_args::HangCommand;
-use fho::{daemon_protocol, FfxMain, FfxTool, Result, SimpleWriter};
+use fho::{FfxMain, FfxTool, Result, SimpleWriter};
 use fidl_fuchsia_developer_ffx::TestingProxy;
+use target_holders::daemon_protocol;
 
 #[derive(FfxTool)]
 pub struct DaemonHangTool {
@@ -30,11 +31,12 @@ mod test {
     use super::*;
     use fidl_fuchsia_developer_ffx::TestingRequest;
     use std::sync::atomic::{AtomicBool, Ordering};
+    use target_holders::fake_proxy;
 
     #[fuchsia::test]
     async fn test_hang_with_no_text() {
         static HUNG: AtomicBool = AtomicBool::new(false);
-        let proxy = fho::testing::fake_proxy(|req| match req {
+        let proxy = fake_proxy(|req| match req {
             TestingRequest::Hang { .. } => {
                 HUNG.store(true, Ordering::SeqCst);
             }

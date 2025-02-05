@@ -5,7 +5,7 @@
 use fidl_fidl_test_components as test_protocol;
 use fuchsia_component::server::ServiceFs;
 use futures_util::StreamExt;
-use tracing::info;
+use log::info;
 
 enum Protocols {
     Trigger(test_protocol::TriggerRequestStream),

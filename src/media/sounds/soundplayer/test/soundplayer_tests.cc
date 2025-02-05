@@ -9,8 +9,7 @@
 #include "src/media/sounds/soundplayer/sound_player_impl.h"
 #include "src/media/sounds/soundplayer/test/fake_audio_renderer.h"
 
-namespace soundplayer {
-namespace test {
+namespace soundplayer::test {
 
 constexpr uint64_t kPayloadSize = 1024;
 constexpr uint32_t kFrameSize = 2;
@@ -26,7 +25,9 @@ constexpr int64_t kOggOpusFileDuration = 2763500000;
 constexpr uint32_t kOggOpusFileChannels = 2;
 constexpr uint32_t kOggOpusFramesPerSecond = 48000;
 
-constexpr fuchsia::media::AudioRenderUsage kUsage = fuchsia::media::AudioRenderUsage::MEDIA;
+constexpr fuchsia::media::AudioRenderUsage2 kUsage = fuchsia::media::AudioRenderUsage2::MEDIA;
+
+namespace {
 
 zx_koid_t GetKoid(const zx::vmo& vmo) {
   zx_info_handle_basic_t info;
@@ -35,6 +36,8 @@ zx_koid_t GetKoid(const zx::vmo& vmo) {
   FX_CHECK(status == ZX_OK);
   return info.koid;
 }
+
+}  // namespace
 
 class FakeAudio : public fuchsia::media::Audio {
  public:
@@ -99,8 +102,7 @@ class FakeAudio : public fuchsia::media::Audio {
 
 class SoundPlayerTests : public gtest::RealLoopFixture {
  public:
-  SoundPlayerTests()
-      : ptr_to_under_test_(), under_test_(fake_audio_.NewPtr(), ptr_to_under_test_.NewRequest()) {}
+  SoundPlayerTests() : under_test_(fake_audio_.NewPtr(), ptr_to_under_test_.NewRequest()) {}
 
  protected:
   // Prevents warmup from completing until |ChangeMinLeadTime| is called with a non-zero
@@ -122,8 +124,8 @@ class SoundPlayerTests : public gtest::RealLoopFixture {
 
   bool renderers_completed() const { return fake_audio_.renderers_completed(); }
 
-  std::tuple<fuchsia::mem::Buffer, zx_koid_t, fuchsia::media::AudioStreamType> CreateTestSound(
-      uint64_t size) {
+  static std::tuple<fuchsia::mem::Buffer, zx_koid_t, fuchsia::media::AudioStreamType>
+  CreateTestSound(uint64_t size) {
     FX_CHECK(size % sizeof(int16_t) == 0);
     zx::vmo vmo;
     zx_status_t status = zx::vmo::create(size, 0, &vmo);
@@ -142,7 +144,7 @@ class SoundPlayerTests : public gtest::RealLoopFixture {
             }};
   }
 
-  fidl::InterfaceHandle<fuchsia::io::File> ResourceFile(const std::string& file_name) {
+  static fidl::InterfaceHandle<fuchsia::io::File> ResourceFile(const std::string& file_name) {
     auto fd = fbl::unique_fd(open(("/pkg/data/" + file_name).c_str(), O_RDONLY));
     EXPECT_TRUE(fd.is_valid());
     return fidl::InterfaceHandle<fuchsia::io::File>(
@@ -173,10 +175,10 @@ TEST_F(SoundPlayerTests, Buffer) {
       .block_completion_ = false,
   }});
 
-  under_test().AddSoundBuffer(0, std::move(buffer), std::move(stream_type));
+  under_test().AddSoundBuffer(0, std::move(buffer), stream_type);
   bool play_sound_completed = false;
-  under_test().PlaySound(
-      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound_Result result) {
+  under_test().PlaySound2(
+      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound2_Result result) {
         EXPECT_TRUE(result.is_response());
         play_sound_completed = true;
       });
@@ -205,10 +207,10 @@ TEST_F(SoundPlayerTests, MaxSinglePacketBuffer) {
       .block_completion_ = false,
   }});
 
-  under_test().AddSoundBuffer(0, std::move(buffer), std::move(stream_type));
+  under_test().AddSoundBuffer(0, std::move(buffer), stream_type);
   bool play_sound_completed = false;
-  under_test().PlaySound(
-      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound_Result result) {
+  under_test().PlaySound2(
+      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound2_Result result) {
         EXPECT_TRUE(result.is_response());
         play_sound_completed = true;
       });
@@ -244,10 +246,10 @@ TEST_F(SoundPlayerTests, TwoPacketBuffer) {
       .block_completion_ = false,
   }});
 
-  under_test().AddSoundBuffer(0, std::move(buffer), std::move(stream_type));
+  under_test().AddSoundBuffer(0, std::move(buffer), stream_type);
   bool play_sound_completed = false;
-  under_test().PlaySound(
-      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound_Result result) {
+  under_test().PlaySound2(
+      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound2_Result result) {
         EXPECT_TRUE(result.is_response());
         play_sound_completed = true;
       });
@@ -284,8 +286,8 @@ TEST_F(SoundPlayerTests, WavFile) {
                                   EXPECT_EQ(kWavFileDuration, result.response().duration);
                                 });
   bool play_sound_completed = false;
-  under_test().PlaySound(
-      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound_Result result) {
+  under_test().PlaySound2(
+      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound2_Result result) {
         EXPECT_TRUE(result.is_response());
         play_sound_completed = true;
       });
@@ -342,8 +344,8 @@ TEST_F(SoundPlayerTests, WavFileTwice) {
                                   EXPECT_EQ(kWavFileDuration, result.response().duration);
                                 });
   bool play_sound_completed = false;
-  under_test().PlaySound(
-      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound_Result result) {
+  under_test().PlaySound2(
+      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound2_Result result) {
         EXPECT_TRUE(result.is_response());
         play_sound_completed = true;
       });
@@ -351,8 +353,8 @@ TEST_F(SoundPlayerTests, WavFileTwice) {
   RunLoopUntil([this]() { return renderers_completed(); });
 
   play_sound_completed = false;
-  under_test().PlaySound(
-      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound_Result result) {
+  under_test().PlaySound2(
+      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound2_Result result) {
         EXPECT_TRUE(result.is_response());
         play_sound_completed = true;
       });
@@ -390,8 +392,8 @@ TEST_F(SoundPlayerTests, WavFileStop) {
                                   EXPECT_EQ(kWavFileDuration, result.response().duration);
                                 });
   bool play_sound_completed = false;
-  under_test().PlaySound(
-      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound_Result result) {
+  under_test().PlaySound2(
+      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound2_Result result) {
         EXPECT_TRUE(result.is_err());
         EXPECT_EQ(fuchsia::media::sounds::PlaySoundError::STOPPED, result.err());
         play_sound_completed = true;
@@ -452,16 +454,16 @@ TEST_F(SoundPlayerTests, WavFileTwiceStopSecond) {
                                   EXPECT_TRUE(result.is_response());
                                   EXPECT_EQ(kWavFileDuration, result.response().duration);
                                 });
-  under_test().PlaySound(0, kUsage, [](fuchsia::media::sounds::Player_PlaySound_Result result) {
+  under_test().PlaySound2(0, kUsage, [](fuchsia::media::sounds::Player_PlaySound2_Result result) {
     // Never completes.
     EXPECT_TRUE(false);
   });
   RunLoopUntilIdle();
 
   bool second_play_sound_completed = false;
-  under_test().PlaySound(
+  under_test().PlaySound2(
       0, kUsage,
-      [&second_play_sound_completed](fuchsia::media::sounds::Player_PlaySound_Result result) {
+      [&second_play_sound_completed](fuchsia::media::sounds::Player_PlaySound2_Result result) {
         EXPECT_TRUE(result.is_err());
         EXPECT_EQ(fuchsia::media::sounds::PlaySoundError::STOPPED, result.err());
         second_play_sound_completed = true;
@@ -511,8 +513,8 @@ TEST_F(SoundPlayerTests, WavFileBogusStops) {
 
   // Play the sound.
   bool play_sound_completed = false;
-  under_test().PlaySound(
-      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound_Result result) {
+  under_test().PlaySound2(
+      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound2_Result result) {
         EXPECT_TRUE(result.is_response());
         play_sound_completed = true;
       });
@@ -560,8 +562,8 @@ TEST_F(SoundPlayerTests, FileOggOpus) {
                                   EXPECT_EQ(kOggOpusFileDuration, result.response().duration);
                                 });
   bool play_sound_completed = false;
-  under_test().PlaySound(
-      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound_Result result) {
+  under_test().PlaySound2(
+      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound2_Result result) {
         EXPECT_TRUE(result.is_response());
         play_sound_completed = true;
       });
@@ -592,10 +594,10 @@ TEST_F(SoundPlayerTests, WhenReady) {
 
   // We use |under_test_ptr()| here, because invocation of methods is deferred by deferring
   // the channel bind. If we call the implementation directly, we bypass the warmup.
-  under_test_ptr()->AddSoundBuffer(0, std::move(buffer), std::move(stream_type));
+  under_test_ptr()->AddSoundBuffer(0, std::move(buffer), stream_type);
   bool play_sound_completed = false;
-  under_test_ptr()->PlaySound(
-      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound_Result result) {
+  under_test_ptr()->PlaySound2(
+      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound2_Result result) {
         EXPECT_TRUE(result.is_response());
         play_sound_completed = true;
       });
@@ -636,8 +638,8 @@ TEST_F(SoundPlayerTests, WavFileCloseConnection) {
                                   EXPECT_EQ(kWavFileDuration, result.response().duration);
                                 });
   bool play_sound_completed = false;
-  under_test().PlaySound(
-      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound_Result result) {
+  under_test().PlaySound2(
+      0, kUsage, [&play_sound_completed](fuchsia::media::sounds::Player_PlaySound2_Result result) {
         EXPECT_TRUE(result.is_err());
         EXPECT_EQ(fuchsia::media::sounds::PlaySoundError::RENDERER_FAILED, result.err());
         play_sound_completed = true;
@@ -648,5 +650,4 @@ TEST_F(SoundPlayerTests, WavFileCloseConnection) {
   RunLoopUntilIdle();
 }
 
-}  // namespace test
-}  // namespace soundplayer
+}  // namespace soundplayer::test

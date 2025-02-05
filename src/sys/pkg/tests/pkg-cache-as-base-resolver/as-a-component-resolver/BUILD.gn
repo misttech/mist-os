@@ -61,7 +61,7 @@ fake_dependencies_deps = [
   "//src/sys/pkg/testing/blobfs-ramdisk",
   "//src/sys/pkg/testing/mock-metrics",
   "//third_party/rust_crates:futures",
-  "//third_party/rust_crates:tracing",
+  "//third_party/rust_crates:log",
 ]
 
 rustc_binary("fake_dependencies_fxblob_bin") {

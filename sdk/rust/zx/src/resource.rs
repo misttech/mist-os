@@ -26,6 +26,7 @@ sys::zx_info_kmem_stats_extended_t!(MemStatsExtended);
 sys::zx_info_kmem_stats_compression_t!(MemStatsCompression);
 sys::zx_info_cpu_stats_t!(PerCpuStats);
 sys::zx_info_resource_t!(ResourceInfo);
+sys::zx_info_memory_stall_t!(MemoryStall);
 
 impl From<sys::zx_info_kmem_stats_t> for MemStats {
     fn from(info: sys::zx_info_kmem_stats_t) -> MemStats {
@@ -198,6 +199,13 @@ impl From<sys::zx_info_resource_t> for ResourceInfo {
     }
 }
 
+impl From<sys::zx_info_memory_stall_t> for MemoryStall {
+    fn from(info: sys::zx_info_memory_stall_t) -> MemoryStall {
+        let sys::zx_info_memory_stall_t { stall_time_some, stall_time_full } = info;
+        MemoryStall { stall_time_some, stall_time_full }
+    }
+}
+
 unsafe impl ObjectQuery for MemStats {
     const TOPIC: Topic = Topic::KMEM_STATS;
     type InfoTy = MemStats;
@@ -221,6 +229,11 @@ unsafe impl ObjectQuery for PerCpuStats {
 unsafe impl ObjectQuery for ResourceInfo {
     const TOPIC: Topic = Topic::RESOURCE;
     type InfoTy = ResourceInfo;
+}
+
+unsafe impl ObjectQuery for MemoryStall {
+    const TOPIC: Topic = Topic::MEMORY_STALL;
+    type InfoTy = MemoryStall;
 }
 
 bitflags! {
@@ -315,6 +328,13 @@ impl Resource {
     /// syscall for the ZX_INFO_KMEM_STATS_COMPRESSION topic.
     pub fn mem_stats_compression(&self) -> Result<MemStatsCompression, Status> {
         object_get_info_single::<MemStatsCompression>(self.as_handle_ref())
+    }
+
+    /// Wraps the
+    /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
+    /// syscall for the ZX_INFO_MEMORY_STALL topic.
+    pub fn memory_stall(&self) -> Result<MemoryStall, Status> {
+        object_get_info_single::<MemoryStall>(self.as_handle_ref())
     }
 }
 

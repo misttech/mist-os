@@ -119,7 +119,7 @@ MATCHER_P(UsageVolumeRenderUsageEq, want_usage, "") {
     *result_listener << "got capture usage, expected render usage";
     return false;
   }
-  if (arg->GetStreamUsage().render_usage() != FidlRenderUsageFromRenderUsage(want_usage)) {
+  if (arg->GetStreamUsage().render_usage() != media::audio::ToFidlRenderUsage2(want_usage)) {
     *result_listener << "got render usage "
                      << static_cast<int>(arg->GetStreamUsage().render_usage()) << ", expected "
                      << static_cast<int>(want_usage);
@@ -133,7 +133,7 @@ MATCHER_P(UsageVolumeCaptureUsageEq, want_usage, "") {
     *result_listener << "got render usage, expected capture usage";
     return false;
   }
-  if (arg->GetStreamUsage().capture_usage() != FidlCaptureUsageFromCaptureUsage(want_usage)) {
+  if (arg->GetStreamUsage().capture_usage() != media::audio::ToFidlCaptureUsage(want_usage)) {
     *result_listener << "got capture usage "
                      << static_cast<int>(arg->GetStreamUsage().capture_usage()) << ", expected "
                      << static_cast<int>(want_usage);

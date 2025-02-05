@@ -17,7 +17,6 @@ if (is_host) {
     "fastboot_file_discovery",
     "fho",
     "fidl-fuchsia-developer-ffx-ext",
-    "fuchsia-controller",
     "isolate",
     "manual_targets",
     "mdns_discovery",
@@ -34,6 +33,8 @@ if (is_host) {
     "symbol-index",
     "symbolize",
     "target",
+    "target/connector",
+    "target/holders",
     "tasks",
     "testing",
     "timeout",
@@ -43,6 +44,13 @@ if (is_host) {
 
     # keep-sorted end
   ]
+
+  # The fuchsia-controller library supports end-to-end testing from
+  # Linux hosts, and we don't intend to explicitly support end-to-end
+  # testing from other operating systems at this time.
+  if (is_linux) {
+    libs += [ "fuchsia-controller" ]
+  }
 
   group("tests") {
     testonly = true

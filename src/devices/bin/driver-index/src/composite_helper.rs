@@ -60,9 +60,12 @@ pub fn convert_fidl_to_bind_rules(
     let mut bind_rules = BTreeMap::new();
     for fidl_rule in fidl_bind_rules {
         let key = match &fidl_rule.key {
-            fdf::NodePropertyKey::IntValue(i) => PropertyKey::NumberKey(i.clone().into()),
-            fdf::NodePropertyKey::StringValue(s) => PropertyKey::StringKey(s.clone()),
-        };
+            fdf::NodePropertyKey::IntValue(i) => {
+                log::warn!("Found unsupported integer-based key {} in composite node spec", i);
+                Err(Status::NOT_SUPPORTED.into_raw())
+            }
+            fdf::NodePropertyKey::StringValue(s) => Ok(PropertyKey::StringKey(s.clone())),
+        }?;
 
         // Check if the properties contain duplicate keys.
         if bind_rules.contains_key(&key) {
@@ -147,7 +150,7 @@ pub fn match_node(bind_rules: &BindRules, device_properties: &DeviceProperties) 
             }
             fdf::Condition::Reject => !dev_prop_contains_value,
             fdf::Condition::Unknown => {
-                tracing::error!("Invalid condition type in bind rules.");
+                log::error!("Invalid condition type in bind rules.");
                 return false;
             }
         };

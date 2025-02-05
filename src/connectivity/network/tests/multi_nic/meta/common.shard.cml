@@ -87,7 +87,15 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.inspect.InspectSink" ],
+            protocol: "fuchsia.netemul.sync.SyncManager",
+            from: "#sync-manager",
+            to: [
+                "#client",
+                "#server",
+            ],
+        },
+        {
+            dictionary: "diagnostics",
             from: "parent",
             to: [
                 "#client",
@@ -95,14 +103,6 @@
                 "#server",
                 "#server-netstack",
                 "#sync-manager",
-            ],
-        },
-        {
-            protocol: "fuchsia.netemul.sync.SyncManager",
-            from: "#sync-manager",
-            to: [
-                "#client",
-                "#server",
             ],
         },
         {

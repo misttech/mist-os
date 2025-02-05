@@ -22,10 +22,11 @@ const (
 // EmuTools represent tools used by `ffx emu`. If using tools not included in the SDK,
 // their paths should be provided in this struct to EmuStart().
 type EmuTools struct {
-	Emulator string
-	FVM      string
-	ZBI      string
-	UEFI     string
+	Emulator   string
+	FVM        string
+	ZBI        string
+	UEFI_arm64 string
+	UEFI_x64   string
 }
 
 // SDKManifest contains the atoms that are part of the "SDK" which ffx looks up to find
@@ -80,8 +81,11 @@ func (f *FFXInstance) EmuStartConsole(ctx context.Context, sdkRoot, name string,
 	if tools.ZBI != "" {
 		toolsToOverride["zbi"] = tools.ZBI
 	}
-	if tools.UEFI != "" {
-		toolsToOverride["uefi_internal"] = tools.UEFI
+	if tools.UEFI_arm64 != "" {
+		toolsToOverride["uefi_internal_arm64"] = tools.UEFI_arm64
+	}
+	if tools.UEFI_x64 != "" {
+		toolsToOverride["uefi_internal_x64"] = tools.UEFI_x64
 	}
 	for toolName, toolPath := range toolsToOverride {
 		var err error

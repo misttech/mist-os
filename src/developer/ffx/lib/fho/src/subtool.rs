@@ -32,7 +32,9 @@ pub trait FfxTool: FfxMain + Sized {
     /// Executes the tool. This is intended to be invoked by the user in main.
     async fn execute_tool() {
         let result = ffx_command::run::<FhoSuite<Self>>(ExecutableKind::Subtool).await;
-        ffx_command::exit(result).await;
+        let cli = FfxCommandLine::from_env().unwrap();
+        let should_format = cli.global.machine.is_some();
+        ffx_command::exit(result, should_format).await;
     }
 }
 
@@ -60,7 +62,7 @@ pub trait FfxMain: Sized {
 
 #[derive(FromArgs)]
 #[argh(subcommand)]
-pub(crate) enum FhoHandler<M: FfxTool> {
+pub enum FhoHandler<M: FfxTool> {
     //FhoVersion1(M),
     /// Run the tool as if under ffx
     Standalone(M::Command),
@@ -70,16 +72,16 @@ pub(crate) enum FhoHandler<M: FfxTool> {
 
 #[derive(FromArgs)]
 #[argh(subcommand, name = "metadata", description = "Print out this subtool's FHO metadata json")]
-pub(crate) struct MetadataCmd {
+pub struct MetadataCmd {
     #[argh(positional)]
     output_path: Option<PathBuf>,
 }
 
 #[derive(FromArgs)]
 /// Fuchsia Host Objects Runner
-pub(crate) struct ToolCommand<M: FfxTool> {
+pub struct ToolCommand<M: FfxTool> {
     #[argh(subcommand)]
-    pub(crate) subcommand: FhoHandler<M>,
+    pub subcommand: FhoHandler<M>,
 }
 
 pub struct FhoSuite<M> {
@@ -131,7 +133,7 @@ impl<T: FfxTool> ToolRunner for FhoTool<T> {
             metrics.print_notice(&mut std::io::stderr()).await?;
         }
         let writer = TryFromEnv::try_from_env(&self.env).await?;
-        let res: Result<ExitStatus> = if self.env.ffx.global.schema {
+        let res: Result<ExitStatus> = if self.env.ffx_command().global.schema {
             if self.main.has_schema() {
                 self.main
                     .try_print_schema(writer)
@@ -158,7 +160,7 @@ impl<T: FfxTool> FhoTool<T> {
         check_strict_constraints(&ffx.global, T::requires_target())?;
 
         let is_machine_output = ffx.global.machine.is_some();
-        let env = FhoEnvironment::new(context, &ffx).await?;
+        let env = FhoEnvironment::new(context, &ffx);
         let redacted_args = match send_enhanced_analytics().await {
             false => ffx.redact_subcmd(&tool),
             true => ffx.unredacted_args_for_analytics(),
@@ -236,22 +238,22 @@ impl<M: FfxTool> ToolSuite for FhoSuite<M> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::tests::SimpleCheck;
     // This keeps the macros from having compiler errors.
-    use crate as fho;
-    use crate::testing::*;
-    use crate::SimpleWriter;
+    use crate::adapters::tests::{FakeCommand, FakeTool, SIMPLE_CHECK_COUNTER};
+    use crate::{self as fho, SimpleWriter};
     use async_trait::async_trait;
     use fho_macro::FfxTool;
     use fho_metadata::{FhoDetails, Only};
 
     // The main testing part will happen in the `main()` function of the tool.
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_run_fake_tool() {
         let config_env = ffx_config::test_init().await.unwrap();
-        let tool_env = fho::testing::ToolEnv::new()
-            .set_ffx_cmd(FfxCommandLine::new(None, &["ffx", "fake", "stuff"]).unwrap());
+        let ffx = FfxCommandLine::new(None, &["ffx", "fake", "stuff"]).expect("test ffx cmd");
+        let fho_env = FhoEnvironment::new(&config_env.context, &ffx);
         let writer = SimpleWriter::new_buffers(Vec::new(), Vec::new());
-        let fake_tool = tool_env.build_tool::<FakeTool>(config_env.context.clone()).await.unwrap();
+        let fake_tool: FakeTool = build_tool(fho_env).await.expect("build fake tool");
         assert_eq!(
             SIMPLE_CHECK_COUNTER.with(|counter| *counter.borrow()),
             1,
@@ -260,7 +262,7 @@ mod tests {
         fake_tool.main(writer).await.unwrap();
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn negative_precheck_fails() {
         #[derive(Debug, FfxTool)]
         #[check(SimpleCheck(false))]
@@ -277,10 +279,10 @@ mod tests {
         }
 
         let config_env = ffx_config::test_init().await.unwrap();
-        let tool_env = fho::testing::ToolEnv::new()
-            .set_ffx_cmd(FfxCommandLine::new(None, &["ffx", "fake", "stuff"]).unwrap());
-        tool_env
-            .build_tool::<FakeToolWillFail>(config_env.context.clone())
+        let ffx = FfxCommandLine::new(None, &["ffx", "fake", "stuff"]).expect("test ffx cmd");
+        let fho_env = FhoEnvironment::new(&config_env.context, &ffx);
+
+        build_tool::<FakeToolWillFail>(fho_env)
             .await
             .expect_err("Should not have been able to create tool with a negative pre-check");
         assert_eq!(
@@ -314,5 +316,17 @@ mod tests {
                 fho_details: FhoDetails::FhoVersion0 { version: Only },
             }
         );
+    }
+
+    pub async fn build_tool<T: FfxTool>(env: FhoEnvironment) -> Result<T> {
+        let tool_cmd = ToolCommand::<T>::from_args(
+            &Vec::from_iter(env.ffx_command().cmd_iter()),
+            &Vec::from_iter(env.ffx_command().subcmd_iter()),
+        )
+        .unwrap();
+        let fho::subtool::FhoHandler::Standalone(cmd) = tool_cmd.subcommand else {
+            panic!("Not testing metadata generation");
+        };
+        T::from_env(env, cmd).await
     }
 }

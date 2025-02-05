@@ -14,7 +14,12 @@ use crate::vfs::{
 };
 use bstr::ByteSlice;
 #[cfg(not(feature = "starnix_lite"))]
-use ebpf::{bpf_addressing_mode, bpf_class, DirectPacketAccessor, EbpfProgram, EbpfRunContext};
+use ebpf::{
+    bpf_addressing_mode, bpf_class, convert_and_link_cbpf, BpfProgramContext, CbpfConfig,
+    EbpfProgram, MemoryId, NoMap, ProgramArgument, Type,
+};
+#[cfg(not(feature = "starnix_lite"))]
+use ebpf_api::SECCOMP_CBPF_CONFIG;
 use starnix_lifecycle::AtomicU64Counter;
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_logging::{log_warn, track_stub};
@@ -33,7 +38,8 @@ use starnix_uapi::{
     __NR_exit, __NR_read, __NR_write, errno, errno_from_code, error, seccomp_data, seccomp_notif,
     seccomp_notif_resp, sock_filter, BPF_ABS, BPF_LD, BPF_ST, SECCOMP_IOCTL_NOTIF_ADDFD,
     SECCOMP_IOCTL_NOTIF_ID_VALID, SECCOMP_IOCTL_NOTIF_RECV, SECCOMP_IOCTL_NOTIF_SEND,
-    SECCOMP_RET_ACTION_FULL, SECCOMP_RET_DATA, SECCOMP_USER_NOTIF_FLAG_CONTINUE, SYS_SECCOMP,
+    SECCOMP_MODE_DISABLED, SECCOMP_MODE_FILTER, SECCOMP_MODE_STRICT, SECCOMP_RET_ACTION_FULL,
+    SECCOMP_RET_DATA, SECCOMP_USER_NOTIF_FLAG_CONTINUE, SYS_SECCOMP,
 };
 #[cfg(feature = "starnix_lite")]
 use starnix_uapi::{
@@ -44,7 +50,8 @@ use starnix_uapi::{
 };
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU8, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 #[cfg(target_arch = "aarch64")]
 use starnix_uapi::__NR_clock_getres;
@@ -72,7 +79,7 @@ use starnix_uapi::AUDIT_ARCH_RISCV64;
 pub struct SeccompFilter {
     /// The BPF program associated with this filter.
     #[cfg(not(feature = "starnix_lite"))]
-    program: EbpfProgram<()>,
+    program: EbpfProgram<SeccompFilter>,
 
     /// The unique-to-this-process id of thi1s filter.  SECCOMP_FILTER_FLAG_TSYNC only works if all
     /// threads in this process have filters that are a prefix of the filters of the thread
@@ -120,43 +127,43 @@ impl SeccompFilter {
             }
         }
 
-        #[cfg(not(feature = "starnix_lite"))]
-        match EbpfProgram::<()>::from_cbpf(code) {
-            Ok(program) => Ok(SeccompFilter {
-                program,
-                unique_id: maybe_unique_id,
-                cookie: AtomicU64Counter::new(0),
-                log: should_log,
-            }),
-            Err(errmsg) => {
-                log_warn!("{}", errmsg);
-                error!(EINVAL)
-            }
-        }
+        let program = convert_and_link_cbpf::<SeccompFilter>(code).map_err(|errmsg| {
+            log_warn!("{}", errmsg);
+            errno!(EINVAL)
+        })?;
 
-        #[cfg(feature = "starnix_lite")]
-        error!(EINVAL)
+        Ok(SeccompFilter {
+            program,
+            unique_id: maybe_unique_id,
+            cookie: AtomicU64Counter::new(0),
+            log: should_log,
+        })
     }
 
-    #[cfg(not(feature = "starnix_lite"))]
-    pub fn run(&self, data: &mut seccomp_data) -> u32 {
-        self.program.run(&mut (), &DirectPacketAccessor::<seccomp_data>::default(), data) as u32
-    }
-
-    #[cfg(feature = "starnix_lite")]
-    pub fn run(&self, _data: &mut seccomp_data) -> u32 {
-        0u32
+    pub fn run(&self, data: &seccomp_data) -> u32 {
+        self.program.run(&mut (), &SeccompData(*data)) as u32
     }
 }
 
-#[cfg(not(feature = "starnix_lite"))]
-impl EbpfRunContext for SeccompFilter {
-    type Context<'a> = seccomp_data;
+// Wrapper for `seccomp_data`. Required in order to implement the `ProgramArgument` trait below.
+#[repr(C)]
+#[derive(Debug, Default, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct SeccompData(seccomp_data);
+
+impl BpfProgramContext for SeccompFilter {
+    type RunContext<'a> = ();
+    type Packet<'a> = &'a SeccompData;
+    type Map = NoMap;
+    const CBPF_CONFIG: &'static CbpfConfig = &SECCOMP_CBPF_CONFIG;
 }
 
-#[cfg(not(feature = "starnix_lite"))]
-impl EbpfRunContext for SeccompFilter {
-    type Context<'a> = seccomp_data;
+static SECCOMP_DATA_TYPE: LazyLock<Type> =
+    LazyLock::new(|| Type::PtrToMemory { id: MemoryId::new(), offset: 0, buffer_size: 0 });
+
+impl ProgramArgument for &'_ SeccompData {
+    fn get_type() -> &'static Type {
+        &*SECCOMP_DATA_TYPE
+    }
 }
 
 const SECCOMP_MAX_INSNS_PER_PATH: u16 = 32768;
@@ -278,14 +285,14 @@ impl SeccompFilterContainer {
             return r;
         }
 
+        let data = make_seccomp_data(
+            syscall,
+            current_task.thread_state.registers.instruction_pointer_register(),
+        );
+
         // Filters are executed in reverse order of addition
         for filter in self.filters.iter().rev() {
-            let mut data = make_seccomp_data(
-                syscall,
-                current_task.thread_state.registers.instruction_pointer_register(),
-            );
-
-            let new_result = filter.run(&mut data);
+            let new_result = filter.run(&data);
 
             let action = SeccompAction::from_u32(new_result).unwrap_or(SeccompAction::KillProcess);
 
@@ -329,9 +336,9 @@ impl SeccompFilterContainer {
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum SeccompStateValue {
-    None = 0,
-    UserDefined = 1,
-    Strict = 2,
+    None = SECCOMP_MODE_DISABLED as u8,
+    Strict = SECCOMP_MODE_STRICT as u8,
+    UserDefined = SECCOMP_MODE_FILTER as u8,
 }
 
 /// Per-process state that cannot be stored in the container (e.g., whether there is a container).
@@ -348,9 +355,9 @@ impl SeccompState {
 
     fn from_u8(value: u8) -> SeccompStateValue {
         match value {
-            0 => SeccompStateValue::None,
-            1 => SeccompStateValue::UserDefined,
-            2 => SeccompStateValue::Strict,
+            v if v == SECCOMP_MODE_DISABLED as u8 => SeccompStateValue::None,
+            v if v == SECCOMP_MODE_STRICT as u8 => SeccompStateValue::Strict,
+            v if v == SECCOMP_MODE_FILTER as u8 => SeccompStateValue::UserDefined,
             _ => unreachable!(),
         }
     }

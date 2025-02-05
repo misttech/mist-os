@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assembly_container::WalkPaths;
 use assembly_file_relative_path::SupportsFileRelativePaths;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -13,6 +14,7 @@ pub mod development_support_config;
 pub mod diagnostics_config;
 pub mod driver_framework_config;
 pub mod example_config;
+pub mod factory_store_providers_config;
 pub mod fonts_config;
 pub mod forensics_config;
 pub mod graphics_config;
@@ -31,6 +33,7 @@ pub mod starnix_config;
 pub mod storage_config;
 pub mod swd_config;
 pub mod sysmem_config;
+pub mod system_sounds_config;
 pub mod timekeeper_config;
 pub mod ui_config;
 pub mod usb_config;
@@ -38,7 +41,9 @@ pub mod virtualization_config;
 
 /// Platform configuration options.  These are the options that pertain to the
 /// platform itself, not anything provided by the product.
-#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths)]
+#[derive(
+    Debug, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths, WalkPaths,
+)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformConfig {
     /// The minimum service-level that the platform will provide, or the main
@@ -76,23 +81,35 @@ pub struct PlatformConfig {
     /// Platform configuration options for the connectivity area.
     #[serde(default)]
     #[file_relative_paths]
+    #[walk_paths]
     pub connectivity: connectivity_config::PlatformConnectivityConfig,
 
     /// Platform configuration options for enabling developer support.
     #[serde(default)]
     #[file_relative_paths]
+    #[walk_paths]
     pub development_support: development_support_config::DevelopmentSupportConfig,
 
     /// Platform configuration options for the diagnostics area.
     #[serde(default)]
+    #[file_relative_paths]
+    #[walk_paths]
     pub diagnostics: diagnostics_config::DiagnosticsConfig,
 
     /// Platform configuration options for the driver framework area.
     #[serde(default)]
     pub driver_framework: driver_framework_config::DriverFrameworkConfig,
 
+    /// Platform configuration for the factory store providers
+    #[serde(default)]
+    #[file_relative_paths]
+    #[walk_paths]
+    pub factory_store_providers: factory_store_providers_config::FactoryStoreProvidersConfig,
+
     /// Platform configuration options for the forensics area.
     #[serde(default)]
+    #[file_relative_paths]
+    #[walk_paths]
     pub forensics: forensics_config::ForensicsConfig,
 
     /// Platform configuration options for graphics
@@ -114,6 +131,7 @@ pub struct PlatformConfig {
     /// Platform configuration options for recovery.
     #[serde(default)]
     #[file_relative_paths]
+    #[walk_paths]
     pub recovery: recovery_config::RecoveryConfig,
 
     /// Platform configuration options for the session.
@@ -123,6 +141,7 @@ pub struct PlatformConfig {
     /// Platform configuration options for the SWD subsystem.
     #[serde(default)]
     #[file_relative_paths]
+    #[walk_paths]
     pub software_delivery: swd_config::SwdConfig,
 
     /// Platform configuration options for the starnix area.
@@ -132,6 +151,7 @@ pub struct PlatformConfig {
     /// Platform configuration options for storage support.
     #[serde(default)]
     #[file_relative_paths]
+    #[walk_paths]
     pub storage: storage_config::StorageConfig,
 
     /// Platform configuration options for sysmem (contiguous/protected memory
@@ -141,10 +161,13 @@ pub struct PlatformConfig {
     /// board.
     #[serde(default)]
     #[file_relative_paths]
+    #[walk_paths]
     pub sysmem: sysmem_config::PlatformSysmemConfig,
 
     /// Platform configuration options for the UI area.
     #[serde(default)]
+    #[file_relative_paths]
+    #[walk_paths]
     pub ui: ui_config::PlatformUiConfig,
 
     /// Platform configuration options for the virtualization area.
@@ -168,7 +191,17 @@ pub struct PlatformConfig {
     ///
     /// SetUI is added to the platform config on all Standard systems.
     #[serde(default)]
+    #[file_relative_paths]
+    #[walk_paths]
     pub setui: setui_config::SetUiConfig,
+
+    /// System sounds configuration
+    ///
+    /// sounds to play on various system events.
+    #[serde(default)]
+    #[file_relative_paths]
+    #[walk_paths]
+    pub system_sounds: system_sounds_config::SystemSoundsConfig,
 
     /// Assembly option triggering the inclusion of test AIBs
     ///
@@ -181,6 +214,8 @@ pub struct PlatformConfig {
 
     /// Platform configuration options for the power area.
     #[serde(default)]
+    #[file_relative_paths]
+    #[walk_paths]
     pub power: power_config::PowerConfig,
 
     /// Platform configuration options for time maintenance and timekeeping.

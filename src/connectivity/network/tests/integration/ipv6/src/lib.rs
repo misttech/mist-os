@@ -11,9 +11,11 @@ use std::pin::pin;
 use assert_matches::assert_matches;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use {
-    fidl_fuchsia_net as net, fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_posix_socket as fposix_socket,
 };
 
@@ -30,8 +32,8 @@ use netemul::InterfaceConfig;
 use netstack_testing_common::constants::{eth as eth_consts, ipv6 as ipv6_consts};
 use netstack_testing_common::ndp::{
     self, assert_dad_failed, assert_dad_success, expect_dad_neighbor_solicitation,
-    fail_dad_with_na, fail_dad_with_ns, send_ra, send_ra_with_router_lifetime,
-    wait_for_router_solicitation, DadState,
+    fail_dad_with_na, fail_dad_with_ns, send_ra_with_router_lifetime, wait_for_router_solicitation,
+    DadState,
 };
 use netstack_testing_common::realms::{
     constants, KnownServiceProvider, Netstack, NetstackVersion, TestSandboxExt as _,
@@ -47,9 +49,7 @@ use packet_formats::icmp::mld::{MldPacket, Mldv2MulticastRecordType};
 use packet_formats::icmp::ndp::options::{
     NdpOption, NdpOptionBuilder, PrefixInformation, RouteInformation,
 };
-use packet_formats::icmp::ndp::{
-    NeighborSolicitation, RoutePreference, RouterAdvertisement, RouterSolicitation,
-};
+use packet_formats::icmp::ndp::{NeighborSolicitation, RoutePreference, RouterSolicitation};
 use packet_formats::icmp::{IcmpParseArgs, Icmpv6Packet};
 use packet_formats::ip::Ipv6Proto;
 use packet_formats::testutil::{parse_icmp_packet_in_ip_packet_in_ethernet_frame, parse_ip_packet};
@@ -82,7 +82,7 @@ async fn install_and_get_ipv6_addrs_for_endpoint<N: Netstack>(
     realm: &netemul::TestRealm<'_>,
     endpoint: &netemul::TestEndpoint<'_>,
     name: &str,
-) -> Vec<net::Subnet> {
+) -> Vec<fnet::Subnet> {
     let (id, control, _device_control) = endpoint
         .add_to_stack(
             realm,
@@ -94,14 +94,13 @@ async fn install_and_get_ipv6_addrs_for_endpoint<N: Netstack>(
     assert!(did_enable);
 
     let interface_state = realm
-        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
+        .connect_to_protocol::<fnet_interfaces::StateMarker>()
         .expect("failed to connect to fuchsia.net.interfaces/State service");
-    let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(id.into());
-    let ipv6_addresses = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
-            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
-        >(
-            &interface_state, fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned
+    let mut state = fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(id.into());
+    let ipv6_addresses = fnet_interfaces_ext::wait_interface_with_id(
+        fnet_interfaces_ext::event_stream_from_state::<fnet_interfaces_ext::DefaultInterest>(
+            &interface_state,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )
         .expect("creating interface event stream"),
         &mut state,
@@ -111,7 +110,7 @@ async fn install_and_get_ipv6_addrs_for_endpoint<N: Netstack>(
                 .addresses
                 .iter()
                 .filter_map(
-                    |fidl_fuchsia_net_interfaces_ext::Address {
+                    |fnet_interfaces_ext::Address {
                          addr,
                          valid_until: _,
                          preferred_lifetime_info: _,
@@ -119,11 +118,11 @@ async fn install_and_get_ipv6_addrs_for_endpoint<N: Netstack>(
                      }| {
                         assert_eq!(
                             *assignment_state,
-                            fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned
+                            fnet_interfaces::AddressAssignmentState::Assigned
                         );
                         match addr.addr {
-                            net::IpAddress::Ipv6(net::Ipv6Address { .. }) => Some(addr),
-                            net::IpAddress::Ipv4(net::Ipv4Address { .. }) => None,
+                            fnet::IpAddress::Ipv6(fnet::Ipv6Address { .. }) => Some(addr),
+                            fnet::IpAddress::Ipv4(fnet::Ipv4Address { .. }) => None,
                         }
                     },
                 )
@@ -371,28 +370,28 @@ async fn slaac_with_privacy_extensions<N: Netstack>(
     // We expect two addresses for the SLAAC prefixes to be assigned to the NIC as the
     // netstack should generate both a stable and temporary SLAAC address.
     let expected_addrs = 2;
-    fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
+    fnet_interfaces_ext::wait_interface_with_id(
         realm.get_interface_event_stream().expect("error getting interface state event stream"),
-        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id()),
+        &mut fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id()),
         |iface| {
             (iface
                 .properties
                 .addresses
                 .iter()
                 .filter_map(
-                    |&fidl_fuchsia_net_interfaces_ext::Address {
-                         addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
+                    |&fnet_interfaces_ext::Address {
+                         addr: fnet::Subnet { addr, prefix_len: _ },
                          valid_until: _,
                          preferred_lifetime_info: _,
                          assignment_state,
                      }| {
                         assert_eq!(
                             assignment_state,
-                            fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned
+                            fnet_interfaces::AddressAssignmentState::Assigned
                         );
                         match addr {
-                            net::IpAddress::Ipv4(net::Ipv4Address { .. }) => None,
-                            net::IpAddress::Ipv6(net::Ipv6Address { addr }) => {
+                            fnet::IpAddress::Ipv4(fnet::Ipv4Address { .. }) => None,
+                            fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => {
                                 ipv6_consts::GLOBAL_PREFIX
                                     .contains(&net_types_ip::Ipv6Addr::from_bytes(addr))
                                     .then_some(())
@@ -434,12 +433,10 @@ async fn add_address_for_dad<
     interface_up: bool,
     dad_fn: FN,
 ) -> impl futures::stream::Stream<Item = DadState> {
-    let (address_state_provider, server) = fidl::endpoints::create_proxy::<
-        fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
-    >();
+    let (address_state_provider, server) =
+        fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>();
     // Create the state stream before adding the address to observe all events.
-    let state_stream =
-        fidl_fuchsia_net_interfaces_ext::admin::assignment_state_stream(address_state_provider);
+    let state_stream = fnet_interfaces_ext::admin::assignment_state_stream(address_state_provider);
 
     // Note that DAD completes successfully after 1 second has elapsed if it
     // has not received a response to it's neighbor solicitation. This
@@ -449,13 +446,13 @@ async fn add_address_for_dad<
     let (get_addrs_fut, get_addrs_poll) = {
         let () = control
             .add_address(
-                &net::Subnet {
-                    addr: net::IpAddress::Ipv6(net::Ipv6Address {
+                &fnet::Subnet {
+                    addr: fnet::IpAddress::Ipv6(fnet::Ipv6Address {
                         addr: ipv6_consts::LINK_LOCAL_ADDR.ipv6_bytes(),
                     }),
                     prefix_len: ipv6_consts::LINK_LOCAL_SUBNET_PREFIX,
                 },
-                &fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+                &fnet_interfaces_admin::AddressParameters::default(),
                 server,
             )
             .expect("Control.AddAddress FIDL error");
@@ -479,24 +476,19 @@ async fn add_address_for_dad<
     // the address as added before DAD completes successfully or otherwise.
     assert_eq!(
         addrs.expect("failed to get addresses").into_iter().find(
-            |fidl_fuchsia_net_interfaces_ext::Address {
-                 addr: fidl_fuchsia_net::Subnet { addr, prefix_len },
+            |fnet_interfaces_ext::Address {
+                 addr: fnet::Subnet { addr, prefix_len },
                  valid_until: _,
                  preferred_lifetime_info: _,
                  assignment_state,
              }| {
-                assert_eq!(
-                    *assignment_state,
-                    fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned
-                );
+                assert_eq!(*assignment_state, fnet_interfaces::AddressAssignmentState::Assigned);
                 *prefix_len == ipv6_consts::LINK_LOCAL_SUBNET_PREFIX
                     && match addr {
-                        fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address {
-                            ..
-                        }) => false,
-                        fidl_fuchsia_net::IpAddress::Ipv6(fidl_fuchsia_net::Ipv6Address {
-                            addr,
-                        }) => *addr == ipv6_consts::LINK_LOCAL_ADDR.ipv6_bytes(),
+                        fnet::IpAddress::Ipv4(fnet::Ipv4Address { .. }) => false,
+                        fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => {
+                            *addr == ipv6_consts::LINK_LOCAL_ADDR.ipv6_bytes()
+                        }
                     }
             }
         ),
@@ -571,7 +563,7 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
 
         assert_matches::assert_matches!(
             state_stream.by_ref().next().await,
-            Some(Ok(fidl_fuchsia_net_interfaces::AddressAssignmentState::Unavailable))
+            Some(Ok(fnet_interfaces::AddressAssignmentState::Unavailable))
         );
 
         // Re-enable the interface, expect DAD to repeat and have it succeed.
@@ -580,8 +572,8 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
         assert_dad_success(&mut state_stream).await;
 
         let removed = control
-            .remove_address(&net::Subnet {
-                addr: net::IpAddress::Ipv6(net::Ipv6Address {
+            .remove_address(&fnet::Subnet {
+                addr: fnet::IpAddress::Ipv6(fnet::Ipv6Address {
                     addr: ipv6_consts::LINK_LOCAL_ADDR.ipv6_bytes(),
                 }),
                 prefix_len: ipv6_consts::LINK_LOCAL_SUBNET_PREFIX,
@@ -601,7 +593,7 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
 
     assert_matches::assert_matches!(
         state_stream.by_ref().next().await,
-        Some(Ok(fidl_fuchsia_net_interfaces::AddressAssignmentState::Unavailable))
+        Some(Ok(fnet_interfaces::AddressAssignmentState::Unavailable))
     );
 
     // Re-enable the interface, DAD should run.
@@ -616,19 +608,16 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
         iface.get_addrs(fnet_interfaces_ext::IncludedAddresses::OnlyAssigned).await.expect("addrs");
     assert!(
         addresses.iter().any(
-            |&fidl_fuchsia_net_interfaces_ext::Address {
-                 addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
+            |&fnet_interfaces_ext::Address {
+                 addr: fnet::Subnet { addr, prefix_len: _ },
                  valid_until: _,
                  preferred_lifetime_info: _,
                  assignment_state,
              }| {
-                assert_eq!(
-                    assignment_state,
-                    fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned
-                );
+                assert_eq!(assignment_state, fnet_interfaces::AddressAssignmentState::Assigned);
                 match addr {
-                    net::IpAddress::Ipv4(net::Ipv4Address { .. }) => false,
-                    net::IpAddress::Ipv6(net::Ipv6Address { addr }) => {
+                    fnet::IpAddress::Ipv4(fnet::Ipv4Address { .. }) => false,
+                    fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => {
                         addr == ipv6_consts::LINK_LOCAL_ADDR.ipv6_bytes()
                     }
                 }
@@ -788,7 +777,7 @@ async fn on_and_off_link_route_discovery<N: Netstack>(
         setup_network::<N>(&sandbox, name, Some(METRIC)).await.expect("failed to setup network");
 
     let main_route_table = realm
-        .connect_to_protocol::<fidl_fuchsia_net_routes_admin::RouteTableV6Marker>()
+        .connect_to_protocol::<fnet_routes_admin::RouteTableV6Marker>()
         .expect("failed to connect to protocol");
     let main_table_id = fnet_routes_ext::TableId::new(
         main_route_table.get_table_id().await.expect("failed to get table id"),
@@ -979,16 +968,15 @@ async fn slaac_regeneration_after_dad_failure<N: Netstack>(name: &str) {
     // netstack should generate both a stable and temporary SLAAC address.
     let expected_addrs = 2;
     let interface_state = realm
-        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
+        .connect_to_protocol::<fnet_interfaces::StateMarker>()
         .expect("failed to connect to fuchsia.net.interfaces/State");
-    let () = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
-            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
-        >(
-            &interface_state, fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned
+    let () = fnet_interfaces_ext::wait_interface_with_id(
+        fnet_interfaces_ext::event_stream_from_state::<fnet_interfaces_ext::DefaultInterest>(
+            &interface_state,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )
         .expect("error getting interfaces state event stream"),
-        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id()),
+        &mut fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id()),
         |iface| {
             // We have to make sure 2 things:
             // 1. We have `expected_addrs` addrs which have the advertised prefix for the
@@ -997,19 +985,16 @@ async fn slaac_regeneration_after_dad_failure<N: Netstack>(name: &str) {
             let (slaac_addrs, has_target_addr) = iface.properties.addresses.iter().fold(
                 (0, false),
                 |(mut slaac_addrs, mut has_target_addr),
-                 &fidl_fuchsia_net_interfaces_ext::Address {
-                     addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
+                 &fnet_interfaces_ext::Address {
+                     addr: fnet::Subnet { addr, prefix_len: _ },
                      valid_until: _,
                      preferred_lifetime_info: _,
                      assignment_state,
                  }| {
-                    assert_eq!(
-                        assignment_state,
-                        fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned
-                    );
+                    assert_eq!(assignment_state, fnet_interfaces::AddressAssignmentState::Assigned);
                     match addr {
-                        net::IpAddress::Ipv4(net::Ipv4Address { .. }) => {}
-                        net::IpAddress::Ipv6(net::Ipv6Address { addr }) => {
+                        fnet::IpAddress::Ipv4(fnet::Ipv4Address { .. }) => {}
+                        fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => {
                             let configured_addr = net_types_ip::Ipv6Addr::from_bytes(addr);
                             assert_ne!(
                                 configured_addr, tried_address,
@@ -1178,8 +1163,8 @@ async fn sends_mld_reports<N: Netstack>(
         );
     }
     let _address_state_provider = {
-        let subnet = net::Subnet {
-            addr: net::IpAddress::Ipv6(net::Ipv6Address {
+        let subnet = fnet::Subnet {
+            addr: fnet::IpAddress::Ipv6(fnet::Ipv6Address {
                 addr: ipv6_consts::LINK_LOCAL_ADDR.ipv6_bytes(),
             }),
             prefix_len: 64,
@@ -1188,7 +1173,7 @@ async fn sends_mld_reports<N: Netstack>(
         interfaces::add_address_wait_assigned(
             &iface.control(),
             subnet,
-            fidl_fuchsia_net_interfaces_admin::AddressParameters {
+            fnet_interfaces_admin::AddressParameters {
                 add_subnet_route: Some(true),
                 ..Default::default()
             },
@@ -1270,9 +1255,8 @@ async fn sending_ra_with_autoconf_flag_triggers_slaac<N: Netstack>(name: &str) {
     let (network, realm, iface, _fake_ep) =
         setup_network::<N>(&sandbox, name, None).await.expect("error setting up networking");
 
-    let interfaces_state = &realm
-        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
-        .expect("connect to protocol");
+    let interfaces_state =
+        &realm.connect_to_protocol::<fnet_interfaces::StateMarker>().expect("connect to protocol");
 
     // Wait for the netstack to be up before sending the RA.
     let iface_ip: net_types_ip::Ipv6Addr =
@@ -1303,45 +1287,36 @@ async fn sending_ra_with_autoconf_flag_triggers_slaac<N: Netstack>(name: &str) {
         0,                                    /* preferred_lifetime */
         ipv6_consts::GLOBAL_PREFIX.network(), /* prefix */
     ))];
-    let ra = RouterAdvertisement::new(
-        0,     /* current_hop_limit */
-        false, /* managed_flag */
-        false, /* other_config_flag */
-        1234,  /* router_lifetime */
-        0,     /* reachable_time */
-        0,     /* retransmit_timer */
-    );
-    send_ra(&fake_router, ra, &options, src_ip).await.expect("RA sent");
+    send_ra_with_router_lifetime(&fake_router, /* lifetime */ 1234, &options, src_ip)
+        .await
+        .expect("RA sent");
 
-    fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
-            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
-        >(
-            &interfaces_state, fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned
+    fnet_interfaces_ext::wait_interface_with_id(
+        fnet_interfaces_ext::event_stream_from_state::<fnet_interfaces_ext::DefaultInterest>(
+            &interfaces_state,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )
         .expect("creating interface event stream"),
-        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id()),
+        &mut fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id()),
         |iface| {
             iface.properties.addresses.iter().find_map(
-                |fidl_fuchsia_net_interfaces_ext::Address {
-                     addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
+                |fnet_interfaces_ext::Address {
+                     addr: fnet::Subnet { addr, prefix_len: _ },
                      valid_until: _,
                      preferred_lifetime_info: _,
                      assignment_state,
                  }| {
                     assert_eq!(
                         *assignment_state,
-                        fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned
+                        fnet_interfaces::AddressAssignmentState::Assigned
                     );
                     let addr = match addr {
-                        fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address {
-                            ..
-                        }) => {
+                        fnet::IpAddress::Ipv4(fnet::Ipv4Address { .. }) => {
                             return None;
                         }
-                        fidl_fuchsia_net::IpAddress::Ipv6(fidl_fuchsia_net::Ipv6Address {
-                            addr,
-                        }) => net_types_ip::Ipv6Addr::from_bytes(*addr),
+                        fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => {
+                            net_types_ip::Ipv6Addr::from_bytes(*addr)
+                        }
                     };
                     ipv6_consts::GLOBAL_PREFIX.contains(&addr).then(|| ())
                 },
@@ -1433,8 +1408,8 @@ async fn prefers_temporary<N: Netstack>(name: &str) {
         .await
         .expect("install interface");
 
-    const ADDR1: net::Subnet = net_declare::fidl_subnet!("2001:db8::1/64");
-    const ADDR2: net::Subnet = net_declare::fidl_subnet!("2001:db8::2/64");
+    const ADDR1: fnet::Subnet = net_declare::fidl_subnet!("2001:db8::1/64");
+    const ADDR2: fnet::Subnet = net_declare::fidl_subnet!("2001:db8::2/64");
     const ADDR3: std::net::SocketAddr = net_declare::std_socket_addr!("[2001:db8::3]:1234");
 
     // Do everything twice so we show we're not relying on some other property
@@ -1468,7 +1443,7 @@ async fn prefers_temporary<N: Netstack>(name: &str) {
             .expect("udp socket");
         sock.connect(&ADDR3.into()).expect("connect UDP");
         let addr = sock.local_addr().expect("get local addr").as_socket().expect("network socket");
-        let ip: net::IpAddress = fidl_fuchsia_net_ext::IpAddress(addr.ip()).into();
+        let ip: fnet::IpAddress = fnet_ext::IpAddress(addr.ip()).into();
         assert_eq!(ip, temp.addr);
 
         // Remove the addresses cleanly so we can add them again switching which
@@ -1587,7 +1562,7 @@ async fn slaac_addrs_report_lifetimes<N: Netstack>(name: &str) {
         }
     }
 
-    // Extract the initial addresses. We expect one static and one temporary
+    // Extract the initial addresses. We expect one stable and one temporary
     // address.
     const EXPECTED_ADDRS: usize = 2;
     let mut addrs = fnet_interfaces_ext::wait_interface_with_id(
@@ -1600,7 +1575,7 @@ async fn slaac_addrs_report_lifetimes<N: Netstack>(name: &str) {
                 .iter()
                 .filter_map(
                     |&fnet_interfaces_ext::Address {
-                         addr: net::Subnet { addr, prefix_len: _ },
+                         addr: fnet::Subnet { addr, prefix_len: _ },
                          valid_until,
                          preferred_lifetime_info,
                          assignment_state,
@@ -1613,8 +1588,8 @@ async fn slaac_addrs_report_lifetimes<N: Netstack>(name: &str) {
                         let preferred_lifetime_info = assert_matches!(preferred_lifetime_info,
                             fnet_interfaces_ext::PreferredLifetimeInfo::PreferredUntil(v) => v);
                         match addr {
-                            net::IpAddress::Ipv4(net::Ipv4Address { .. }) => None,
-                            v6 @ net::IpAddress::Ipv6(net::Ipv6Address { addr }) => {
+                            fnet::IpAddress::Ipv4(fnet::Ipv4Address { .. }) => None,
+                            v6 @ fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => {
                                 ipv6_consts::GLOBAL_PREFIX
                                     .contains(&net_types_ip::Ipv6Addr::from_bytes(addr))
                                     .then_some((

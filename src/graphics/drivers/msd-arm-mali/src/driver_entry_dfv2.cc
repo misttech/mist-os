@@ -20,11 +20,13 @@
 #include "parent_device_dfv2.h"
 
 #if MAGMA_TEST_DRIVER
+constexpr char kDriverName[] = "mali-test";
 using MagmaDriverBaseType = msd::MagmaTestDriverBase;
 
 zx_status_t magma_indriver_test(ParentDevice* device);
 
 #else
+constexpr char kDriverName[] = "mali";
 using MagmaDriverBaseType = msd::MagmaProductionDriverBase;
 #endif
 
@@ -32,7 +34,7 @@ class MaliDriver : public MagmaDriverBaseType,
                    public fidl::WireServer<fuchsia_hardware_gpu_mali::MaliUtils> {
  public:
   MaliDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : MagmaDriverBaseType("mali", std::move(start_args), std::move(driver_dispatcher)),
+      : MagmaDriverBaseType(kDriverName, std::move(start_args), std::move(driver_dispatcher)),
         mali_devfs_connector_(fit::bind_member<&MaliDriver::BindUtilsConnector>(this)) {}
 
   zx::result<> MagmaStart() override {

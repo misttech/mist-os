@@ -70,7 +70,7 @@ def _fuchsia_driver_bind_bytecode_impl(ctx):
 
 fuchsia_driver_bind_bytecode = rule(
     implementation = _fuchsia_driver_bind_bytecode_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "output": attr.output(
             mandatory = True,
@@ -106,7 +106,7 @@ def _fuchsia_driver_bind_bytecode_test_impl(ctx):
 fuchsia_driver_bind_bytecode_test = rule(
     implementation = _fuchsia_driver_bind_bytecode_test_impl,
     test = True,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "tests": attr.label(
             doc = "Path to the test_spec file",

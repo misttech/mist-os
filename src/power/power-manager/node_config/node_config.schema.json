@@ -130,21 +130,6 @@
             {
                 "properties": {
                     "type": {
-                        "pattern": "ShutdownWatcher"
-                    },
-                    "name": {
-                        "type": "string"
-                    }
-                },
-                "additionalProperties": false,
-                "required": [
-                    "type",
-                    "name"
-                ]
-            },
-            {
-                "properties": {
-                    "type": {
                         "pattern": "SystemProfileHandler"
                     },
                     "name": {
@@ -174,23 +159,13 @@
                                 "exclusiveMinimum": true
                             }
                         }
-                    },
-                    "dependencies": {
-                        "type": "object",
-                        "properties": {
-                            "shutdown_watcher_node": {
-                                "type": "string"
-                            }
-                        },
-                        "additionalProperties": false
                     }
                 },
                 "additionalProperties": false,
                 "required": [
                     "type",
                     "name",
-                    "config",
-                    "dependencies"
+                    "config"
                 ]
             },
             {

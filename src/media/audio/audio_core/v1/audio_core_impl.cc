@@ -15,7 +15,6 @@
 #include "src/media/audio/audio_core/v1/audio_capturer.h"
 #include "src/media/audio/audio_core/v1/audio_device_manager.h"
 #include "src/media/audio/audio_core/v1/audio_renderer.h"
-#include "src/media/audio/audio_core/v1/throttle_output.h"
 #include "src/media/audio/lib/format/format.h"
 
 namespace media::audio {
@@ -85,21 +84,40 @@ void AudioCoreImpl::CreateAudioCapturer(
 void AudioCoreImpl::SetRenderUsageGain(fuchsia::media::AudioRenderUsage render_usage,
                                        float gain_db) {
   TRACE_DURATION("audio", "AudioCoreImpl::SetRenderUsageGain");
+  SetRenderUsageGain2(ToFidlRenderUsage2(render_usage), gain_db);
+}
+
+void AudioCoreImpl::SetRenderUsageGain2(fuchsia::media::AudioRenderUsage2 render_usage,
+                                        float gain_db) {
+  TRACE_DURATION("audio", "AudioCoreImpl::SetRenderUsageGain2");
   context_.volume_manager().SetUsageGain(
-      fuchsia::media::Usage::WithRenderUsage(std::move(render_usage)), gain_db);
+      fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(render_usage)), gain_db);
 }
 
 void AudioCoreImpl::SetCaptureUsageGain(fuchsia::media::AudioCaptureUsage capture_usage,
                                         float gain_db) {
   TRACE_DURATION("audio", "AudioCoreImpl::SetCaptureUsageGain");
+  SetCaptureUsageGain2(ToFidlCaptureUsage2(capture_usage), gain_db);
+}
+
+void AudioCoreImpl::SetCaptureUsageGain2(fuchsia::media::AudioCaptureUsage2 capture_usage,
+                                         float gain_db) {
+  TRACE_DURATION("audio", "AudioCoreImpl::SetCaptureUsageGain2");
   context_.volume_manager().SetUsageGain(
-      fuchsia::media::Usage::WithCaptureUsage(std::move(capture_usage)), gain_db);
+      fuchsia::media::Usage2::WithCaptureUsage(fidl::Clone(capture_usage)), gain_db);
 }
 
 void AudioCoreImpl::BindUsageVolumeControl(
     fuchsia::media::Usage usage,
     fidl::InterfaceRequest<fuchsia::media::audio::VolumeControl> volume_control) {
   TRACE_DURATION("audio", "AudioCoreImpl::BindUsageVolumeControl");
+  BindUsageVolumeControl2(ToFidlUsage2(usage), std::move(volume_control));
+}
+
+void AudioCoreImpl::BindUsageVolumeControl2(
+    fuchsia::media::Usage2 usage,
+    fidl::InterfaceRequest<fuchsia::media::audio::VolumeControl> volume_control) {
+  TRACE_DURATION("audio", "AudioCoreImpl::BindUsageVolumeControl2");
   if (usage.is_render_usage()) {
     context_.volume_manager().BindUsageVolumeClient(std::move(usage), std::move(volume_control));
   } else {
@@ -109,33 +127,49 @@ void AudioCoreImpl::BindUsageVolumeControl(
 
 void AudioCoreImpl::GetDbFromVolume(fuchsia::media::Usage usage, float volume,
                                     GetDbFromVolumeCallback callback) {
-  float db = 0.0f;
-  auto loudness_transform =
-      context_.route_graph().LoudnessTransformForUsage(StreamUsageFromFidlUsage(usage));
-  if (loudness_transform) {
-    db = loudness_transform->Evaluate<1>({VolumeValue{volume}});
-  } else {
-    db = context_.process_config().default_volume_curve().VolumeToDb(volume);
-  }
-  callback(db);
+  callback(GetDbFromVolumeBase(ToFidlUsage2(usage), volume));
 }
 
-void AudioCoreImpl::GetVolumeFromDb(fuchsia::media::Usage usage, float db,
-                                    GetVolumeFromDbCallback callback) {
-  float volume = 1.0f;
-  auto loudness_transform =
-      context_.route_graph().LoudnessTransformForUsage(StreamUsageFromFidlUsage(usage));
+void AudioCoreImpl::GetDbFromVolume2(fuchsia::media::Usage2 usage, float volume,
+                                     GetDbFromVolume2Callback callback) {
+  callback(fpromise::ok(GetDbFromVolumeBase(usage, volume)));
+}
+
+float AudioCoreImpl::GetDbFromVolumeBase(const fuchsia::media::Usage2& usage, float volume) {
+  auto loudness_transform = context_.route_graph().LoudnessTransformForUsage(ToStreamUsage(usage));
   if (loudness_transform) {
-    volume = loudness_transform->Evaluate<1>({GainToVolumeValue{db}});
-  } else {
-    volume = context_.process_config().default_volume_curve().DbToVolume(db);
+    return loudness_transform->Evaluate<1>({VolumeValue{volume}});
   }
-  callback(volume);
+  return context_.process_config().default_volume_curve().VolumeToDb(volume);
+}
+
+void AudioCoreImpl::GetVolumeFromDb(fuchsia::media::Usage usage, float gain_db,
+                                    GetVolumeFromDbCallback callback) {
+  callback(GetVolumeFromDbBase(ToFidlUsage2(usage), gain_db));
+}
+
+void AudioCoreImpl::GetVolumeFromDb2(fuchsia::media::Usage2 usage, float gain_db,
+                                     GetVolumeFromDb2Callback callback) {
+  callback(fpromise::ok(GetVolumeFromDbBase(usage, gain_db)));
+}
+
+float AudioCoreImpl::GetVolumeFromDbBase(const fuchsia::media::Usage2& usage, float gain_db) {
+  auto loudness_transform = context_.route_graph().LoudnessTransformForUsage(ToStreamUsage(usage));
+  if (loudness_transform) {
+    return loudness_transform->Evaluate<1>({GainToVolumeValue{gain_db}});
+  }
+  return context_.process_config().default_volume_curve().DbToVolume(gain_db);
 }
 
 void AudioCoreImpl::SetInteraction(fuchsia::media::Usage active, fuchsia::media::Usage affected,
                                    fuchsia::media::Behavior behavior) {
   TRACE_DURATION("audio", "AudioCoreImpl::SetInteraction");
+  SetInteraction2(ToFidlUsage2(active), ToFidlUsage2(affected), behavior);
+}
+
+void AudioCoreImpl::SetInteraction2(fuchsia::media::Usage2 active, fuchsia::media::Usage2 affected,
+                                    fuchsia::media::Behavior behavior) {
+  TRACE_DURATION("audio", "AudioCoreImpl::SetInteraction2");
   context_.audio_admin().SetInteraction(std::move(active), std::move(affected), behavior);
 }
 

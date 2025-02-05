@@ -4,7 +4,7 @@
 
 use fidl_fuchsia_sys2 as fuchsia_sys2;
 use fuchsia_component::client as component_client;
-use tracing::error;
+use log::error;
 
 #[fuchsia::main(logging_tags = ["system_controller_consumer"])]
 async fn main() -> Result<(), anyhow::Error> {
@@ -13,7 +13,7 @@ async fn main() -> Result<(), anyhow::Error> {
     match shutdown.shutdown().await {
         Ok(()) => Ok(()),
         Err(err) => {
-            error!(?err, "Failure calling shutdown");
+            error!(err:?; "Failure calling shutdown");
             Err(err.into())
         }
     }

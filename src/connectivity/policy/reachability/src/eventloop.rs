@@ -17,6 +17,7 @@ use fuchsia_inspect::Inspector;
 use futures::channel::mpsc;
 use futures::prelude::*;
 use futures::select;
+use log::{debug, error, info, warn};
 use named_timer::NamedTimeoutExt;
 use reachability_core::dig::Dig;
 use reachability_core::fetch::Fetch;
@@ -30,7 +31,6 @@ use reachability_core::{
 use reachability_handler::ReachabilityHandler;
 use std::collections::{HashMap, HashSet};
 use std::pin::pin;
-use tracing::{debug, error, info, warn};
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net_debug as fnet_debug,
     fidl_fuchsia_net_interfaces as fnet_interfaces, fidl_fuchsia_net_neighbor as fnet_neighbor,
@@ -51,7 +51,7 @@ impl watchdog::SystemDispatcher for SystemDispatcher {
         let diagnostics =
             fuchsia_component::client::connect_to_protocol::<fnet_debug::DiagnosticsMarker>()
                 .map_err(|e| {
-                    error!(e = ?e, "failed to connect to protocol");
+                    error!(e:? = e; "failed to connect to protocol");
                     watchdog::Error::NotSupported
                 })?;
         diagnostics
@@ -68,7 +68,7 @@ impl watchdog::SystemDispatcher for SystemDispatcher {
         let interfaces_debug =
             fuchsia_component::client::connect_to_protocol::<fnet_debug::InterfacesMarker>()
                 .map_err(|e| {
-                    error!(e = ?e, "failed to connect to protocol");
+                    error!(e:? = e; "failed to connect to protocol");
                     watchdog::Error::NotSupported
                 })?;
         let (port, server_end) = fidl::endpoints::create_proxy();
@@ -101,7 +101,7 @@ impl watchdog::DeviceDiagnosticsProvider for DeviceDiagnosticsProvider {
                         futures::future::ok(watchdog::DeviceCounters { rx_frames, tx_frames })
                     }
                     (None, Some(_)) | (Some(_), None) | (None, None) => {
-                        error!(iface = self.interface, "missing information from port counters");
+                        error!(iface = self.interface; "missing information from port counters");
                         futures::future::err(watchdog::Error::NotSupported)
                     }
                 },
@@ -538,9 +538,9 @@ impl EventLoop {
         >,
     ) -> bool {
         return match port_class {
-            fnet_interfaces_ext::PortClass::Loopback | fnet_interfaces_ext::PortClass::Lowpan => {
-                false
-            }
+            fnet_interfaces_ext::PortClass::Loopback
+            | fnet_interfaces_ext::PortClass::Blackhole
+            | fnet_interfaces_ext::PortClass::Lowpan => false,
             fnet_interfaces_ext::PortClass::Virtual
             | fnet_interfaces_ext::PortClass::Ethernet
             | fnet_interfaces_ext::PortClass::WlanClient
@@ -668,7 +668,7 @@ impl EventLoop {
 //
 // TODO(https://fxbug.dev/42070352): add a test that works as intended.
 fn exit_with_anyhow_error(cause: anyhow::Error) -> ! {
-    error!(?cause, "exiting due to error");
+    error!(cause:%; "exiting due to error");
     std::process::exit(1);
 }
 

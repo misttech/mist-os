@@ -9,9 +9,9 @@ use futures::future::TryFutureExt as _;
 use futures::stream::{Stream, TryStreamExt as _};
 use hyper::body::HttpBody;
 use hyper::{Body, Request, StatusCode};
+use log::warn;
 use std::convert::TryInto as _;
 use std::str::FromStr;
-use tracing::warn;
 
 // On success, returns the Content-Length of the resource, as determined by the first GET,
 // and a Stream of the content.
@@ -71,7 +71,7 @@ pub(super) async fn resuming_get<'a>(
                         warn!(
                             resumptions = fetch_stats.resumptions(),
                             bytes_downloaded,
-                            expected_len,
+                            expected_len;
                             "Resuming failed blob GET after partial success: {:#}",
                             anyhow!(e),
                         );

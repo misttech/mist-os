@@ -95,6 +95,52 @@ inline zx::result<std::vector<std::string>> ProgramValueAsVector(
   return zx::error(ZX_ERR_NOT_FOUND);
 }
 
+inline zx::result<std::vector<fuchsia_data::wire::Dictionary>> ProgramValueAsObjVector(
+    const fuchsia_data::wire::Dictionary& program, std::string_view key) {
+  if (!program.has_entries()) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+  for (auto& entry : program.entries()) {
+    if (!std::equal(key.begin(), key.end(), entry.key.begin())) {
+      continue;
+    }
+    if (!entry.value.has_value() || !entry.value->is_obj_vec()) {
+      return zx::error(ZX_ERR_WRONG_TYPE);
+    }
+    auto& values = entry.value->obj_vec();
+    std::vector<fuchsia_data::wire::Dictionary> result;
+    result.reserve(values.count());
+    for (auto& value : values) {
+      result.emplace_back(value);
+    }
+    return zx::ok(result);
+  }
+  return zx::error(ZX_ERR_NOT_FOUND);
+}
+
+inline zx::result<std::vector<fuchsia_data::Dictionary>> ProgramValueAsObjVector(
+    const fuchsia_data::Dictionary& program, std::string_view key) {
+  auto program_entries = program.entries();
+  if (!program_entries.has_value()) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+  for (auto& entry : program_entries.value()) {
+    auto& entry_key = entry.key();
+    auto& entry_value = entry.value();
+
+    if (key != entry_key) {
+      continue;
+    }
+
+    if (entry_value->Which() != fuchsia_data::DictionaryValue::Tag::kObjVec) {
+      return zx::error(ZX_ERR_WRONG_TYPE);
+    }
+
+    return zx::ok(entry_value->obj_vec().value());
+  }
+  return zx::error(ZX_ERR_NOT_FOUND);
+}
+
 inline zx::result<fidl::UnownedClientEnd<fuchsia_io::Directory>> NsValue(
     const fidl::VectorView<fuchsia_component_runner::wire::ComponentNamespaceEntry>& entries,
     std::string_view path) {

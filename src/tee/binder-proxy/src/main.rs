@@ -18,7 +18,7 @@ extern "C" {
 
 #[fuchsia::main]
 fn main() -> Result<(), Error> {
-    tracing::info!("binder-proxy main");
+    log::info!("binder-proxy main");
     // Call register_dev_urandom_compat
     let register_status = zx::Status::from_raw(unsafe { register_dev_urandom_compat() });
     if register_status != zx::Status::OK {

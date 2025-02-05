@@ -168,7 +168,7 @@ void sampler::ThreadSamplerDispatcher::StopLocked() TA_REQ(get_lock()) {
 
   // Some timers may not have not been able to be canceled, so we need to wait for any samples that
   // have already started to finish.
-  zx_time_t deadline = zx_time_add_duration(current_time(), ZX_SEC(30));
+  zx_instant_mono_t deadline = zx_time_add_duration(current_mono_time(), ZX_SEC(30));
   for (const internal::PerCpuState& i : per_cpu_state_) {
     bool pending_timers;
     bool pending_writes;
@@ -178,7 +178,7 @@ void sampler::ThreadSamplerDispatcher::StopLocked() TA_REQ(get_lock()) {
       if (pending_timers || pending_writes) {
         Thread::Current::SleepRelative(ZX_MSEC(1));
       }
-    } while ((pending_writes || pending_timers) && (current_time() < deadline));
+    } while ((pending_writes || pending_timers) && (current_mono_time() < deadline));
     // We'll wait an unreasonable amount of time for the timer to finish. If the timer really
     // haven't finished by this point, something has gone terribly wrong.
     ZX_ASSERT(!pending_writes || !pending_timers);
@@ -327,9 +327,9 @@ zx::result<> sampler::ThreadSamplerDispatcher::SampleThreadImpl(zx_koid_t pid, z
 
   constexpr fxt::StringRef<fxt::RefType::kId> empty_string{0};
   const fxt::ThreadRef current_thread{pid, tid};
-  zx_status_t write_result =
-      fxt::WriteLargeBlobRecordWithMetadata(&cpu_state, current_ticks(), empty_string, empty_string,
-                                            current_thread, bt, sizeof(uint64_t) * frame_num);
+  zx_status_t write_result = fxt::WriteLargeBlobRecordWithMetadata(
+      &cpu_state, current_mono_ticks(), empty_string, empty_string, current_thread, bt,
+      sizeof(uint64_t) * frame_num);
 
   if (write_result != ZX_OK) {
     cpu_state.DisableWrites();

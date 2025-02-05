@@ -53,6 +53,7 @@
 #include <vm/physmap.h>
 #include <vm/vm.h>
 #include <vm/vm_aspace.h>
+
 #if WITH_PANIC_BACKTRACE
 #include <kernel/thread.h>
 #endif
@@ -66,6 +67,8 @@
 #include <zircon/types.h>
 
 #define LOCAL_TRACE 0
+
+#include <ktl/enforce.h>
 
 namespace {
 
@@ -258,7 +261,7 @@ static zx::result<fbl::Array<zbi_topology_node_t>> sbi_detect_topology(size_t ma
     // clang-format on
   }
 
-  return zx::ok(std::move(nodes));
+  return zx::ok(ktl::move(nodes));
 }
 
 static void init_topology(uint level) {
@@ -418,8 +421,6 @@ void platform_early_init() {
             nvram.length);
     allocate_persistent_ram(nvram.base, nvram.length);
   }
-
-  // Serial port should be active now
 
   // Initialize the PmmChecker now that the cmdline has been parsed.
   pmm_checker_init_from_cmdline();

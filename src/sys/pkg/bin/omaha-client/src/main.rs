@@ -9,13 +9,13 @@ use fuchsia_component::server::ServiceFs;
 use futures::lock::Mutex;
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;
+use log::{error, info};
 use omaha_client::cup_ecdsa::StandardCupv2Handler;
 use omaha_client::state_machine::StateMachineBuilder;
 use omaha_client::time::StandardTimeSource;
 use omaha_client_fuchsia::{app_set, http_request, installer, timer};
 use std::cell::RefCell;
 use std::rc::Rc;
-use tracing::{error, info};
 
 mod api_metrics;
 mod channel;

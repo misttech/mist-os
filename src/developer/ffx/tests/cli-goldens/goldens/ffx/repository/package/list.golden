@@ -54,6 +54,18 @@
       "short": null,
       "description": "toggle whether components in each package will be fetched and shown in the output table",
       "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "include-size"
+        }
+      },
+      "optionality": "optional",
+      "long": "--include-size",
+      "short": null,
+      "description": "toggle whether the sum of the uncompressed size of all blobs in each package will be calculated and shown in the output table",
+      "hidden": false
     }
   ],
   "notes": [],

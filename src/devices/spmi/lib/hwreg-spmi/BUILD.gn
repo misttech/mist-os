@@ -8,8 +8,3 @@ bazel_fuchsia_test_package("spmi-hwreg-test") {
   test_package_name = "spmi-hwreg-test"
   test_component_names = [ "spmi-hwreg-test-bin" ]
 }
-
-group("tests") {
-  testonly = true
-  deps = [ ":spmi-hwreg-test" ]
-}

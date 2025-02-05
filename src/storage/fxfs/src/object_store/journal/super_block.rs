@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! We currently store two of these super-blocks (A/B) located in two logical consecutive
-//! 512kiB extents at the start of the device.
+//! We currently store two of these super-blocks (A/B) starting at offset 0 and 512kB.
 //!
 //! Immediately following the serialized `SuperBlockHeader` structure below is a stream of
 //! serialized operations that are replayed into the root parent `ObjectStore`. Note that the root
@@ -29,7 +28,7 @@ use crate::log::*;
 use crate::lsm_tree::types::LayerIterator;
 use crate::lsm_tree::{LSMTree, LayerSet, Query};
 use crate::metrics;
-use crate::object_handle::ObjectHandle as _;
+use crate::object_handle::{ObjectHandle as _, ReadObjectHandle};
 use crate::object_store::allocator::Reservation;
 use crate::object_store::journal::bootstrap_handle::BootstrapObjectHandle;
 use crate::object_store::journal::reader::{JournalReader, ReadResult};
@@ -49,6 +48,7 @@ use crate::object_store::{
 use crate::range::RangeExt;
 use crate::serialized_types::{
     migrate_to_version, Migrate, Version, Versioned, VersionedLatest, EARLIEST_SUPPORTED_VERSION,
+    SMALL_SUPERBLOCK_VERSION,
 };
 use anyhow::{bail, ensure, Context, Error};
 use fprint::TypeFingerprint;
@@ -69,10 +69,12 @@ const SUPER_BLOCK_A_OBJECT_ID: u64 = 1;
 const SUPER_BLOCK_B_OBJECT_ID: u64 = 2;
 
 /// The superblock is extended in units of `SUPER_BLOCK_CHUNK_SIZE` as required.
-const SUPER_BLOCK_CHUNK_SIZE: u64 = 65536;
+pub const SUPER_BLOCK_CHUNK_SIZE: u64 = 65536;
 
-/// The first 2 * 512 KiB on the disk are reserved for two A/B super-blocks.
-const MIN_SUPER_BLOCK_SIZE: u64 = 524_288;
+/// Each superblock is one block but may contain records that extend its own length.
+const MIN_SUPER_BLOCK_SIZE: u64 = 4096;
+/// The first 2 * 512 KiB on the disk used to be reserved for two A/B super-blocks.
+const LEGACY_MIN_SUPER_BLOCK_SIZE: u64 = 524_288;
 
 /// All superblocks start with the magic bytes "FxfsSupr".
 const SUPER_BLOCK_MAGIC: &[u8; 8] = b"FxfsSupr";
@@ -108,7 +110,15 @@ impl SuperBlockInstance {
     pub fn first_extent(&self) -> Range<u64> {
         match self {
             SuperBlockInstance::A => 0..MIN_SUPER_BLOCK_SIZE,
-            SuperBlockInstance::B => MIN_SUPER_BLOCK_SIZE..2 * MIN_SUPER_BLOCK_SIZE,
+            SuperBlockInstance::B => 524288..524288 + MIN_SUPER_BLOCK_SIZE,
+        }
+    }
+
+    /// We used to allocate 512kB to superblocks but this was almost always more than needed.
+    pub fn legacy_first_extent(&self) -> Range<u64> {
+        match self {
+            SuperBlockInstance::A => 0..LEGACY_MIN_SUPER_BLOCK_SIZE,
+            SuperBlockInstance::B => LEGACY_MIN_SUPER_BLOCK_SIZE..2 * LEGACY_MIN_SUPER_BLOCK_SIZE,
         }
     }
 }
@@ -341,9 +351,10 @@ async fn write<S: HandleOwner>(
     handle: DataObjectHandle<S>,
 ) -> Result<(), Error> {
     let object_manager = handle.store().filesystem().object_manager().clone();
+    let extents = handle.device_extents().await?;
     // TODO(https://fxbug.dev/42177407): Don't use the same code here for Journal and SuperBlock. They
     // aren't the same things and it is already getting convoluted. e.g of diff stream content:
-    //   Superblock:  (Magic, Ver, Header(Ver), SuperBlockRecord(Ver)*, ...)
+    //   Superblock:  (Magic, Ver, Header(Ver), Extent(Ver)*, SuperBlockRecord(Ver)*, ...)
     //   Journal:     (Ver, JournalRecord(Ver)*, RESET, Ver2, JournalRecord(Ver2)*, ...)
     // We should abstract away the checksum code and implement these separately.
     let mut writer = SuperBlockWriter::new(handle, object_manager.metadata_reservation());
@@ -351,10 +362,18 @@ async fn write<S: HandleOwner>(
     writer.writer.write_all(SUPER_BLOCK_MAGIC)?;
     super_block_header.serialize_with_version(&mut writer.writer)?;
 
+    // Follow with a list of SuperBlockRecord::Extent(), skipping the first.
+    let mut pos = BLOCK_SIZE;
+    for (offset, device_extent) in &extents[1..] {
+        ensure!(*offset == pos, "Hole discovered in superblock allocation");
+        pos += device_extent.length().unwrap();
+        SuperBlockRecord::Extent(device_extent.clone()).serialize_into(&mut writer.writer)?;
+    }
+
     let mut merger = items.merger();
     let mut iter = LSMTree::major_iter(merger.query(Query::FullScan).await?).await?;
     while let Some(item) = iter.get() {
-        writer.maybe_extend().await?;
+        writer.maybe_extend().await.context("extend failed")?;
         SuperBlockRecord::ObjectItem(item.cloned()).serialize_into(&mut writer.writer)?;
         iter.advance().await?;
     }
@@ -363,7 +382,8 @@ async fn write<S: HandleOwner>(
     writer.writer.pad_to_block()?;
     writer.flush_buffer().await?;
     let len =
-        std::cmp::max(MIN_SUPER_BLOCK_SIZE, writer.writer.journal_file_checkpoint().file_offset);
+        std::cmp::max(MIN_SUPER_BLOCK_SIZE, writer.writer.journal_file_checkpoint().file_offset)
+            + SUPER_BLOCK_CHUNK_SIZE;
     writer
         .handle
         .truncate_with_options(
@@ -424,6 +444,11 @@ impl SuperBlockManager {
         device: Arc<dyn Device>,
         block_size: u64,
     ) -> Result<(SuperBlockHeader, ObjectStore), Error> {
+        // Superblocks consume a minimum of one block. We currently hard code the length of
+        // this first extent. It should work with larger block sizes, but has not been tested.
+        // TODO(https://fxbug.dev/42063349): Consider relaxing this.
+        debug_assert!(MIN_SUPER_BLOCK_SIZE == block_size);
+
         let (super_block, current_super_block, root_parent) = match futures::join!(
             read(device.clone(), block_size, SuperBlockInstance::A),
             read(device.clone(), block_size, SuperBlockInstance::B)
@@ -442,7 +467,7 @@ impl SuperBlockManager {
                 }
             }
         };
-        info!(?super_block, ?current_super_block, "loaded super-block");
+        info!(super_block:?, current_super_block:?; "loaded super-block");
         *self.next_instance.lock().unwrap() = current_super_block.next();
         Ok((super_block, root_parent))
     }
@@ -534,6 +559,7 @@ impl SuperBlockHeader {
         let mut handle = BootstrapObjectHandle::new(target_super_block.object_id(), device);
         handle.push_extent(0, target_super_block.first_extent());
         let mut reader = JournalReader::new(handle, &JournalCheckpoint::default());
+        reader.set_eof_ok();
 
         reader.fill_buf().await?;
 
@@ -579,6 +605,16 @@ impl SuperBlockHeader {
 
             cursor.position() as usize
         });
+
+        // We used to use 512kB for each extent. Now we use 4kB.
+        // If we find we're looking at an older version, bump the extent size to 512kb.
+        if super_block_version < SMALL_SUPERBLOCK_VERSION {
+            reader.handle().push_extent(
+                target_super_block.first_extent().length().unwrap(),
+                target_super_block.first_extent().end..target_super_block.legacy_first_extent().end,
+            );
+        }
+
         // If guid is zeroed (e.g. in a newly imaged system), assign one randomly.
         if super_block_header.guid.0.is_nil() {
             super_block_header.guid = UuidWrapper::new();
@@ -597,17 +633,18 @@ struct SuperBlockWriter<'a, S: HandleOwner> {
 
 impl<'a, S: HandleOwner> SuperBlockWriter<'a, S> {
     fn new(handle: DataObjectHandle<S>, reservation: &'a Reservation) -> Self {
+        let size = handle.get_size();
         Self {
             handle,
             writer: JournalWriter::new(BLOCK_SIZE as usize, 0),
-            next_extent_offset: MIN_SUPER_BLOCK_SIZE,
+            next_extent_offset: size,
             reservation,
         }
     }
 
     async fn maybe_extend(&mut self) -> Result<(), Error> {
-        if self.writer.journal_file_checkpoint().file_offset
-            < self.next_extent_offset - SUPER_BLOCK_CHUNK_SIZE
+        if self.writer.journal_file_checkpoint().file_offset + SUPER_BLOCK_CHUNK_SIZE
+            < self.next_extent_offset
         {
             return Ok(());
         }
@@ -622,7 +659,11 @@ impl<'a, S: HandleOwner> SuperBlockWriter<'a, S> {
             .await?;
         let mut file_range =
             self.next_extent_offset..self.next_extent_offset + SUPER_BLOCK_CHUNK_SIZE;
-        let allocated = self.handle.preallocate_range(&mut transaction, &mut file_range).await?;
+        let allocated = self
+            .handle
+            .preallocate_range(&mut transaction, &mut file_range)
+            .await
+            .context("preallocate superblock")?;
         if file_range.start < file_range.end {
             bail!("preallocate_range returned too little space");
         }
@@ -665,7 +706,7 @@ impl RecordReader {
 mod tests {
     use super::{
         compact_root_parent, write, SuperBlockHeader, SuperBlockInstance, UuidWrapper,
-        MIN_SUPER_BLOCK_SIZE,
+        MIN_SUPER_BLOCK_SIZE, SUPER_BLOCK_CHUNK_SIZE,
     };
     use crate::filesystem::{FxFilesystem, OpenFxFilesystem};
     use crate::object_handle::ReadObjectHandle;
@@ -718,7 +759,8 @@ mod tests {
         let (fs, _handle_a, _handle_b) = filesystem_and_super_block_handles().await;
         const JOURNAL_OBJECT_ID: u64 = 5;
 
-        // Confirm that the (first) super-block is minimum sized to start with.
+        // Confirm that the (first) super-block is expected size.
+        // It should be MIN_SUPER_BLOCK_SIZE + SUPER_BLOCK_CHUNK_SIZE.
         assert_eq!(
             ObjectStore::open_object(
                 &fs.root_store(),
@@ -729,13 +771,13 @@ mod tests {
             .await
             .expect("open_object failed")
             .get_size(),
-            MIN_SUPER_BLOCK_SIZE
+            MIN_SUPER_BLOCK_SIZE + SUPER_BLOCK_CHUNK_SIZE
         );
 
         // Create a large number of objects in the root parent store so that we test growing
         // of the super-block file, requiring us to add extents.
         let mut created_object_ids = vec![];
-        const NUM_ENTRIES: u64 = MIN_SUPER_BLOCK_SIZE / 32;
+        const NUM_ENTRIES: u64 = 16384;
         for _ in 0..NUM_ENTRIES {
             let mut transaction = fs
                 .clone()
@@ -770,7 +812,7 @@ mod tests {
             .await
             .expect("open_object failed")
             .get_size()
-                > MIN_SUPER_BLOCK_SIZE
+                > MIN_SUPER_BLOCK_SIZE + SUPER_BLOCK_CHUNK_SIZE
         );
 
         let written_super_block_a =
@@ -880,7 +922,7 @@ mod tests {
             .await
             .expect("open_object failed")
             .get_size(),
-            MIN_SUPER_BLOCK_SIZE
+            MIN_SUPER_BLOCK_SIZE + SUPER_BLOCK_CHUNK_SIZE
         );
     }
 

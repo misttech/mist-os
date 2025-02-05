@@ -1006,6 +1006,10 @@ impl<I: finterfaces_ext::FieldInterests> IntoFidlBackwardsCompatible<finterfaces
             finterfaces_ext::PortClass::Loopback => {
                 finterfaces::DeviceClass::Loopback(finterfaces::Empty)
             }
+            finterfaces_ext::PortClass::Blackhole => {
+                // `device_class` has no `Blackhole` variant, so report it as a virtual device.
+                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Virtual)
+            }
             finterfaces_ext::PortClass::Virtual => {
                 finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Virtual)
             }

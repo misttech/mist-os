@@ -4,6 +4,7 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <sys/mount.h>
 #include <unistd.h>
 
@@ -19,6 +20,9 @@
 constexpr char CONTROLLERS_FILE[] = "cgroup.controllers";
 constexpr char PROCS_FILE[] = "cgroup.procs";
 constexpr char FREEZE_FILE[] = "cgroup.freeze";
+constexpr char EVENTS_FILE[] = "cgroup.events";
+constexpr char EVENTS_POPULATED[] = "populated 1";
+constexpr char EVENTS_NOT_POPULATED[] = "populated 0";
 
 // Mounts cgroup2 in a temporary directory for each test case, and deletes all cgroups created by
 // `CreateCgroup` at the end of each test.
@@ -56,14 +60,17 @@ class CgroupTest : public ::testing::Test {
     std::string controllers_path = path + "/" + CONTROLLERS_FILE;
     std::string procs_path = path + "/" + PROCS_FILE;
     std::string freeze_path = path + "/" + FREEZE_FILE;
+    std::string events_path = path + "/" + EVENTS_FILE;
 
     struct stat buffer;
     ASSERT_THAT(stat(controllers_path.c_str(), &buffer), SyscallSucceeds());
     ASSERT_THAT(stat(procs_path.c_str(), &buffer), SyscallSucceeds());
     if (is_root) {
       ASSERT_THAT(stat(freeze_path.c_str(), &buffer), SyscallFailsWithErrno(ENOENT));
+      ASSERT_THAT(stat(events_path.c_str(), &buffer), SyscallFailsWithErrno(ENOENT));
     } else {
       ASSERT_THAT(stat(freeze_path.c_str(), &buffer), SyscallSucceeds());
+      ASSERT_THAT(stat(events_path.c_str(), &buffer), SyscallSucceeds());
     }
   }
 
@@ -84,7 +91,7 @@ class CgroupTest : public ::testing::Test {
 
     for (const ExpectedEntry& entry : expected) {
       auto found = entry_types.find(entry.name);
-      ASSERT_NE(found, entry_types.end());
+      ASSERT_NE(found, entry_types.end()) << entry.name << " not found in directory";
       EXPECT_EQ(found->second, entry.type);
     }
   }
@@ -150,23 +157,23 @@ TEST_F(CgroupTest, InodeNumbersAreConsistent) {
 
 TEST_F(CgroupTest, ReadDir) {
   CheckDirectoryIncludes(root_path(), {
-                                          {.name = "cgroup.procs", .type = DT_REG},
-                                          {.name = "cgroup.controllers", .type = DT_REG},
+                                          {.name = PROCS_FILE, .type = DT_REG},
+                                          {.name = CONTROLLERS_FILE, .type = DT_REG},
                                       });
 
   std::string child1 = "child1";
   CreateCgroup(root_path() + "/" + child1);
   CheckDirectoryIncludes(root_path(), {
-                                          {.name = "cgroup.procs", .type = DT_REG},
-                                          {.name = "cgroup.controllers", .type = DT_REG},
+                                          {.name = PROCS_FILE, .type = DT_REG},
+                                          {.name = CONTROLLERS_FILE, .type = DT_REG},
                                           {.name = child1, .type = DT_DIR},
                                       });
 
   std::string child2 = "child2";
   CreateCgroup(root_path() + "/" + child2);
   CheckDirectoryIncludes(root_path(), {
-                                          {.name = "cgroup.procs", .type = DT_REG},
-                                          {.name = "cgroup.controllers", .type = DT_REG},
+                                          {.name = PROCS_FILE, .type = DT_REG},
+                                          {.name = CONTROLLERS_FILE, .type = DT_REG},
                                           {.name = child1, .type = DT_DIR},
                                           {.name = child2, .type = DT_DIR},
                                       });
@@ -212,11 +219,14 @@ TEST_F(CgroupTest, MoveProcessToCgroup) {
   std::string root_procs_path = root_path() + "/" + PROCS_FILE;
   std::string child_path = root_path() + "/child";
   std::string child_procs_path = child_path + "/" + PROCS_FILE;
+  std::string child_events_path = child_path + "/" + EVENTS_FILE;
   std::string pid_string = std::to_string(getpid());
 
   CreateCgroup(child_path);
+  CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED);
 
   {
+    // Write pid to /child/cgroup.procs
     fbl::unique_fd child_procs_fd(open(child_procs_path.c_str(), O_WRONLY));
     ASSERT_TRUE(child_procs_fd.is_valid());
     EXPECT_THAT(write(child_procs_fd.get(), pid_string.c_str(), pid_string.length()),
@@ -225,8 +235,10 @@ TEST_F(CgroupTest, MoveProcessToCgroup) {
 
   CheckFileDoesNotHaveLine(root_procs_path, pid_string);
   CheckFileHasLine(child_procs_path, pid_string);
+  CheckFileHasLine(child_events_path, EVENTS_POPULATED);
 
   {
+    // Write pid to /cgroup.procs
     fbl::unique_fd procs_fd(open(root_procs_path.c_str(), O_WRONLY));
     ASSERT_TRUE(procs_fd.is_valid());
     EXPECT_THAT(write(procs_fd.get(), pid_string.c_str(), pid_string.length()), SyscallSucceeds());
@@ -234,6 +246,84 @@ TEST_F(CgroupTest, MoveProcessToCgroup) {
 
   CheckFileDoesNotHaveLine(child_procs_path, pid_string);
   CheckFileHasLine(root_procs_path, pid_string);
+  CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED);
+}
+
+TEST_F(CgroupTest, EventsWithPopulatedChild) {
+  std::string root_procs_path = root_path() + "/" + PROCS_FILE;
+  std::string child_path = root_path() + "/child";
+  std::string child_events_path = child_path + "/" + EVENTS_FILE;
+  std::string grandchild_path = child_path + "/grandchild";
+  std::string grandchild_procs_path = grandchild_path + "/" + PROCS_FILE;
+  std::string grandchild_events_path = grandchild_path + "/" + EVENTS_FILE;
+  std::string pid_string = std::to_string(getpid());
+
+  CreateCgroup(child_path);
+  CreateCgroup(grandchild_path);
+
+  CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED);
+  CheckFileHasLine(grandchild_events_path, EVENTS_NOT_POPULATED);
+
+  {
+    // Write pid to /child/grandchild/cgroup.procs
+    fbl::unique_fd child_procs_fd(open(grandchild_procs_path.c_str(), O_WRONLY));
+    ASSERT_TRUE(child_procs_fd.is_valid());
+    EXPECT_THAT(write(child_procs_fd.get(), pid_string.c_str(), pid_string.length()),
+                SyscallSucceeds());
+  }
+
+  CheckFileHasLine(child_events_path, EVENTS_POPULATED);
+  CheckFileHasLine(grandchild_events_path, EVENTS_POPULATED);
+
+  {
+    // Write pid to /cgroup.procs
+    fbl::unique_fd procs_fd(open(root_procs_path.c_str(), O_WRONLY));
+    ASSERT_TRUE(procs_fd.is_valid());
+    EXPECT_THAT(write(procs_fd.get(), pid_string.c_str(), pid_string.length()), SyscallSucceeds());
+  }
+
+  CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED);
+  CheckFileHasLine(grandchild_events_path, EVENTS_NOT_POPULATED);
+}
+
+TEST_F(CgroupTest, PollEvents) {
+  std::string child_path = root_path() + "/child";
+  std::string child_events_path = child_path + "/" + EVENTS_FILE;
+  std::string child_procs_path = child_path + "/" + PROCS_FILE;
+  std::string pid_string = std::to_string(getpid());
+
+  CreateCgroup(child_path);
+
+  fbl::unique_fd events_fd(open(child_events_path.c_str(), O_RDONLY));
+  ASSERT_TRUE(events_fd.is_valid());
+
+  // Initially, the cgroup should not be populated.
+  CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED);
+
+  struct pollfd pfd = {.fd = events_fd.get(), .events = POLLPRI};
+  fbl::unique_fd procs_fd(open(child_procs_path.c_str(), O_WRONLY));
+  ASSERT_TRUE(procs_fd.is_valid());
+  EXPECT_THAT(write(procs_fd.get(), pid_string.c_str(), pid_string.length()), SyscallSucceeds());
+
+  // After adding the process, poll should return with POLLPRI as populated changes to true.
+  EXPECT_THAT(poll(&pfd, 1, -1), SyscallSucceedsWithValue(1));
+  EXPECT_TRUE(pfd.revents & (POLLPRI | POLLERR));
+
+  // Verify the populated state has changed.
+  CheckFileHasLine(child_events_path, EVENTS_POPULATED);
+
+  // Now remove the process from the cgroup.
+  std::string root_procs_path = root_path() + "/" + PROCS_FILE;
+  procs_fd.reset(open(root_procs_path.c_str(), O_WRONLY));
+  ASSERT_TRUE(procs_fd.is_valid());
+  EXPECT_THAT(write(procs_fd.get(), pid_string.c_str(), pid_string.length()), SyscallSucceeds());
+
+  // Poll should return with POLLPRI as populated changes back to false.
+  EXPECT_THAT(poll(&pfd, 1, -1), SyscallSucceedsWithValue(1));
+  EXPECT_TRUE(pfd.revents & (POLLPRI | POLLERR));
+
+  // Verify the populated state has changed.
+  CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED);
 }
 
 TEST_F(CgroupTest, UnlinkCgroupWithProcess) {
@@ -268,4 +358,20 @@ TEST_F(CgroupTest, UnlinkCgroupWithChildren) {
   CreateCgroup(grandchild_path);
 
   ASSERT_THAT(rmdir(child_path.c_str()), SyscallFailsWithErrno(EBUSY));
+}
+
+TEST_F(CgroupTest, EventsFileSeekable) {
+  std::string child_path = root_path() + "/child";
+  std::string events_path = child_path + "/" + EVENTS_FILE;
+
+  CreateCgroup(child_path);
+  fbl::unique_fd events_fd(open(events_path.c_str(), O_RDONLY));
+  ASSERT_TRUE(events_fd.is_valid());
+  // Seek exactly 10 bytes over, skipping "populated ". The next byte read should be 1 or 0
+  // indicating whether the cgroup is populated or not, respectively.
+  EXPECT_THAT(lseek(events_fd.get(), 10, SEEK_SET), SyscallSucceeds());
+
+  char buffer;
+  EXPECT_THAT(read(events_fd.get(), &buffer, 1), SyscallSucceeds());
+  EXPECT_EQ(buffer, '0');
 }

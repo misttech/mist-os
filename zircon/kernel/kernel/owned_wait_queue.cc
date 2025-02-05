@@ -703,7 +703,7 @@ ktl::optional<Thread::UnblockList> OwnedWaitQueue::LockForWakeOperationLocked(
 
   // Lock as many threads as we can, moving them out of our wait collection
   // and onto a temporary unblock list as we go.
-  const zx_time_t now = current_time();
+  const zx_instant_mono_t now = current_mono_time();
   ktl::optional<Thread::UnblockList> maybe_unblock_list =
       LockAndMakeWaiterListLocked(now, max_wake, wake_hooks);
 
@@ -736,7 +736,7 @@ bool OwnedWaitQueue::LockForRequeueOperationOrBackoff(
   RequeueLockingDetails res;
   {
     ktl::optional<WakeRequeueThreadDetails> maybe_threads = LockAndMakeWakeRequeueThreadListsLocked(
-        current_time(), max_wake, wake_hooks, max_requeue, requeue_hooks);
+        current_mono_time(), max_wake, wake_hooks, max_requeue, requeue_hooks);
 
     if (!maybe_threads.has_value()) {
       get_lock().Release();
@@ -1236,7 +1236,7 @@ OwnedWaitQueue::LockForOwnerReplacement(Thread* _new_owner, const Thread* blocki
 }
 
 ktl::optional<Thread::UnblockList> OwnedWaitQueue::LockAndMakeWaiterListLocked(
-    zx_time_t now, uint32_t max_count, IWakeRequeueHook& hooks) {
+    zx_instant_mono_t now, uint32_t max_count, IWakeRequeueHook& hooks) {
   // Try to lock a set of threads to wake.  If we succeeded, make sure we place
   // them back into the collection before returning the list.
   ktl::optional<Thread::UnblockList> res = TryLockAndMakeWaiterListLocked(now, max_count, hooks);
@@ -1251,7 +1251,8 @@ ktl::optional<Thread::UnblockList> OwnedWaitQueue::LockAndMakeWaiterListLocked(
 }
 
 ktl::optional<OwnedWaitQueue::WakeRequeueThreadDetails>
-OwnedWaitQueue::LockAndMakeWakeRequeueThreadListsLocked(zx_time_t now, uint32_t max_wake_count,
+OwnedWaitQueue::LockAndMakeWakeRequeueThreadListsLocked(zx_instant_mono_t now,
+                                                        uint32_t max_wake_count,
                                                         IWakeRequeueHook& wake_hooks,
                                                         uint32_t max_requeue_count,
                                                         IWakeRequeueHook& requeue_hooks) {
@@ -1291,7 +1292,7 @@ OwnedWaitQueue::LockAndMakeWakeRequeueThreadListsLocked(zx_time_t now, uint32_t 
 }
 
 ktl::optional<Thread::UnblockList> OwnedWaitQueue::TryLockAndMakeWaiterListLocked(
-    zx_time_t now, uint32_t max_count, IWakeRequeueHook& hooks) {
+    zx_instant_mono_t now, uint32_t max_count, IWakeRequeueHook& hooks) {
   // Lock as many threads as we can, placing them on a temporary unblock list as
   // we go.  We remove the threads from the collection as we go, but we do not
   // remove the bookkeeping (see the note on optimization below).

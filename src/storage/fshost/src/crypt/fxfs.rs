@@ -35,7 +35,7 @@ async fn unwrap_or_create_keys(
             AES128_KEY_SIZE => WrappingKey::Aes128(key.try_into().unwrap()),
             AES256_KEY_SIZE => WrappingKey::Aes256(key.try_into().unwrap()),
             _ => {
-                tracing::warn!("key from {:?} source was an invalid size - skipping", source);
+                log::warn!("key from {:?} source was an invalid size - skipping", source);
                 last_err = anyhow!("invalid key size");
                 continue;
             }
@@ -236,10 +236,6 @@ impl CryptService {
             .unwrap()
             .into_zx_channel()
             .into()
-    }
-
-    pub fn exposed_dir(&self) -> &fio::DirectoryProxy {
-        &self.exposed_dir
     }
 }
 

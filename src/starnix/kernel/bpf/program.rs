@@ -6,17 +6,16 @@ use crate::bpf::fs::get_bpf_object;
 use crate::task::CurrentTask;
 use crate::vfs::{FdNumber, OutputBuffer};
 use ebpf::{
-    link_program, verify_program, BpfValue, EbpfError, EbpfHelperImpl, EbpfInstruction,
-    EbpfProgram, EbpfRunContext, EmptyPacketAccessor, MapDescriptor, StructMapping,
-    VerifiedEbpfProgram, VerifierLogger, BPF_LDDW, BPF_PSEUDO_BTF_ID, BPF_PSEUDO_FUNC,
-    BPF_PSEUDO_MAP_FD, BPF_PSEUDO_MAP_IDX, BPF_PSEUDO_MAP_IDX_VALUE, BPF_PSEUDO_MAP_VALUE,
+    link_program, verify_program, EbpfError, EbpfHelperImpl, EbpfInstruction, EbpfProgram,
+    EbpfProgramContext, StructMapping, VerifiedEbpfProgram, VerifierLogger, BPF_LDDW,
+    BPF_PSEUDO_BTF_ID, BPF_PSEUDO_FUNC, BPF_PSEUDO_MAP_FD, BPF_PSEUDO_MAP_IDX,
+    BPF_PSEUDO_MAP_IDX_VALUE, BPF_PSEUDO_MAP_VALUE,
 };
 use ebpf_api::{get_common_helpers, Map, PinnedMap, ProgramType};
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{bpf_attr__bindgen_ty_4, bpf_insn, errno, error};
 use std::collections::HashMap;
-use zerocopy::{FromBytes, Immutable, IntoBytes};
 
 #[derive(Clone, Debug)]
 pub struct ProgramInfo {
@@ -34,13 +33,7 @@ impl TryFrom<&bpf_attr__bindgen_ty_4> for ProgramInfo {
 #[derive(Debug)]
 pub struct Program {
     pub info: ProgramInfo,
-
     program: VerifiedEbpfProgram,
-
-    // Map references kept to ensure that the maps are not dropped before the program.
-    //
-    // TODO(https://fxbug.dev/378507648): `VerifiedEbpfProgram` should keep these references once
-    // we have maps implementation in the `ebpf` crate.
     maps: Vec<PinnedMap>,
 }
 
@@ -64,7 +57,7 @@ impl Program {
         Ok(Program { info, program, maps })
     }
 
-    pub fn link<C: EbpfRunContext>(
+    pub fn link<C: EbpfProgramContext<Map = PinnedMap>>(
         &self,
         program_type: ProgramType,
         struct_mappings: &[StructMapping],
@@ -74,17 +67,11 @@ impl Program {
             return error!(EINVAL);
         }
 
-        let maps = self
-            .maps
-            .iter()
-            .map(|m| MapDescriptor { schema: m.schema, ptr: BpfValue::from(&(**m) as *const Map) })
-            .collect::<Vec<MapDescriptor>>();
-
         let mut helpers = HashMap::new();
         helpers.extend(get_common_helpers::<C>().iter().cloned());
         helpers.extend(local_helpers.iter().cloned());
 
-        let program = link_program(&self.program, struct_mappings, &maps[..], helpers)
+        let program = link_program(&self.program, struct_mappings, self.maps.clone(), helpers)
             .map_err(map_ebpf_error)?;
 
         Ok(LinkedProgram { program, _maps: self.maps.clone() })
@@ -92,8 +79,8 @@ impl Program {
 }
 
 #[derive(Debug)]
-pub struct LinkedProgram<C: EbpfRunContext> {
-    program: EbpfProgram<C>,
+pub struct LinkedProgram<C: EbpfProgramContext> {
+    pub program: EbpfProgram<C>,
 
     // Map references kept to ensure that the maps are not dropped before the
     // program.
@@ -101,16 +88,6 @@ pub struct LinkedProgram<C: EbpfRunContext> {
     // TODO(https://fxbug.dev/378507648): `EbpfProgram` will keep these
     // references after the implementation is moved to the `ebpf` crate.
     _maps: Vec<PinnedMap>,
-}
-
-impl<C: EbpfRunContext> LinkedProgram<C> {
-    pub fn run<T>(&self, context: &mut C::Context<'_>, data: &mut T) -> u64
-    where
-        T: IntoBytes + FromBytes + Immutable,
-    {
-        // TODO(https://fxbug.dev/287120494) Use real PacketAccessor.
-        self.program.run(context, &EmptyPacketAccessor {}, data)
-    }
 }
 
 /// Links maps referenced by FD, replacing them with by-index references.

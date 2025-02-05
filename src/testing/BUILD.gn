@@ -33,10 +33,6 @@ group("e2e_tests") {
 
   if (!is_asan) {
     # Do not run host-driven tests on Fuchsia's `asan` build variant.
-    deps += [
-      "end_to_end:core_x64_stable_sl4f_tests",
-      "end_to_end:core_x64_stable_tests",
-      "end_to_end/mobly_driver/tests/functional_tests:tests",
-    ]
+    deps += [ "end_to_end/mobly_driver/tests/functional_tests:tests" ]
   }
 }

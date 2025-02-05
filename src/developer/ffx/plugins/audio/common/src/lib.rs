@@ -191,7 +191,7 @@ pub mod tests {
             _ => unimplemented!(),
         };
 
-        fho::testing::fake_proxy(callback)
+        target_holders::fake_proxy(callback)
     }
 
     pub fn fake_audio_recorder() -> fac::RecorderProxy {
@@ -238,6 +238,6 @@ pub mod tests {
             }
             _ => unimplemented!(),
         };
-        fho::testing::fake_proxy(callback)
+        target_holders::fake_proxy(callback)
     }
 }

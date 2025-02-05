@@ -5,8 +5,8 @@ use anyhow::{format_err, Context as _, Error};
 use fuchsia_inspect::Node as InspectNode;
 use futures::channel::mpsc;
 use futures::{future, select, Future, StreamExt, TryFutureExt};
+use log::error;
 use std::boxed::Box;
-use tracing::error;
 use windowed_stats::experimental::serve::serve_time_matrix_inspection;
 use wlan_common::bss::BssDescription;
 use {

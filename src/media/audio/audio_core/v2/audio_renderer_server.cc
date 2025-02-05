@@ -6,8 +6,11 @@
 
 #include <fidl/fuchsia.audio/cpp/fidl.h>
 #include <fidl/fuchsia.media/cpp/fidl.h>
+#include <fidl/fuchsia.media/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.media2/cpp/wire_types.h>
 #include <lib/async/cpp/wait.h>
+#include <lib/fidl/cpp/hlcpp_conversion.h>
+#include <lib/fidl/cpp/wire_natural_conversions.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 
@@ -233,24 +236,37 @@ void AudioRendererServer::SetReferenceClock(SetReferenceClockRequestView request
   reference_clock_ = std::move(clock);
 }
 
-void AudioRendererServer::SetUsage(SetUsageRequestView request,
-                                   SetUsageCompleter::Sync& completer) {
-  TRACE_DURATION("audio", "AudioRendererServer::SetUsage");
-
+zx_status_t AudioRendererServer::SetUsageCheck() {
   if (usage_ == RenderUsage::ULTRASOUND) {
     FX_LOGS(WARNING) << "Unsupported method SetUsage on ultrasound renderer";
     Shutdown(ZX_ERR_NOT_SUPPORTED);
-    return;
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
   if (IsConfigured()) {
     FX_LOGS(WARNING) << "Usage cannot be set once configured.";
     Shutdown(ZX_ERR_BAD_STATE);
-    return;
+    return ZX_ERR_BAD_STATE;
   }
+  return ZX_OK;
+}
 
-  usage_ = media::audio::RenderUsageFromFidlRenderUsage(
-      static_cast<fuchsia::media::AudioRenderUsage>(request->usage));
+void AudioRendererServer::SetUsage(SetUsageRequestView request,
+                                   SetUsageCompleter::Sync& completer) {
+  TRACE_DURATION("audio", "AudioRendererServer::SetUsage");
+
+  if (SetUsageCheck() == ZX_OK) {
+    usage_ = media::audio::ToRenderUsage(request->usage);
+  }
+}
+
+void AudioRendererServer::SetUsage2(SetUsage2RequestView request,
+                                    SetUsage2Completer::Sync& completer) {
+  TRACE_DURATION("audio", "AudioRendererServer::SetUsage2");
+
+  if (SetUsageCheck() == ZX_OK) {
+    usage_ = media::audio::ToRenderUsage(request->usage2);
+  }
 }
 
 void AudioRendererServer::SetPcmStreamType(SetPcmStreamTypeRequestView request,
@@ -398,8 +414,8 @@ void AudioRendererServer::RemovePayloadBuffer(RemovePayloadBufferRequestView req
   // reporter_->RemovePayloadBuffer(id);
 }
 
-// TODO(https://fxbug.dev/42181009): implement: need to create a fuchsia.media.audio.GainControl server that
-// forwards to stream_gain_control_client_
+// TODO(https://fxbug.dev/42181009): implement: need to create a fuchsia.media.audio.GainControl
+// server that forwards to stream_gain_control_client_
 void AudioRendererServer::BindGainControl(BindGainControlRequestView request,
                                           BindGainControlCompleter::Sync& completer) {
   FX_LOGS(ERROR) << "BindGainControl not implemented";
@@ -760,7 +776,8 @@ void AudioRendererServer::MaybeConfigure() {
     media_ticks_per_second_ = TimelineRate(1'000'000'000, 1);
   }
 
-  // TODO(https://fxbug.dev/42181009): add media_ticks_continuity_threshold_seconds_ to mixer service
+  // TODO(https://fxbug.dev/42181009): add media_ticks_continuity_threshold_seconds_ to mixer
+  // service
 
   state_ = State::kConfigured;
 
@@ -903,8 +920,8 @@ void AudioRendererServer::MaybeSetFullyCreated() {
     on_fully_created_(shared_from_this());
   }
 
-  // TODO(https://fxbug.dev/42181009): after implementing RouteGraph, this is where we should add this renderer
-  // to the RouteGroup.
+  // TODO(https://fxbug.dev/42181009): after implementing RouteGraph, this is where we should add
+  // this renderer to the RouteGroup.
 
   // Flush all queued tasks.
   for (auto& fn : queued_tasks_) {

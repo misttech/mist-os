@@ -9,7 +9,7 @@ use fidl_fuchsia_update::{
 use fidl_fuchsia_update_ext::State;
 use futures::channel::mpsc;
 use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
-use tracing::warn;
+use log::warn;
 
 pub(crate) struct CompletionResponder {
     state: CompletionResponderState,
@@ -42,7 +42,7 @@ impl CompletionResponderFidlServer {
             match request {
                 ListenerRequest::WaitForFirstUpdateCheckToComplete { responder, .. } => {
                     if let Err(e) = self.0.send(Message::NewWaiter(responder)).await {
-                        warn!(?e, "Internal bug; this send should always succeed");
+                        warn!(e:?; "Internal bug; this send should always succeed");
                     }
                 }
                 ListenerRequest::_UnknownMethod { .. } => {}
@@ -63,7 +63,7 @@ impl CompletionResponderStateReactor {
             | State::InstallationDeferredByPolicy(_) => {
                 // Internal stream - discard theoretical errors
                 if let Err(e) = self.0.send(Message::Completed).await {
-                    warn!(?e, "Internal bug; this send should always succeed");
+                    warn!(e:?; "Internal bug; this send should always succeed");
                 }
             }
             State::InstallingUpdate(_)

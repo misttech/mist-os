@@ -49,6 +49,7 @@ use instance::{
     InstanceState, ResolvedInstanceState, ShutdownInstanceState, StartedInstanceState,
     UnresolvedInstanceState,
 };
+use log::{debug, error, warn};
 use manager::ComponentManagerInstance;
 use moniker::{ChildName, Moniker};
 use router_error::{Explain, RouterError};
@@ -62,7 +63,6 @@ use std::fmt;
 use std::ops::DerefMut;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
-use tracing::{debug, error, warn};
 use version_history::AbiRevision;
 use vfs::directory::entry::{
     DirectoryEntry, DirectoryEntryAsync, EntryInfo, GetEntryInfo, OpenRequest,
@@ -551,7 +551,7 @@ impl ComponentInstance {
                 )
                 .await
                 .map_err(|err| {
-                    debug!(%err, moniker=%child.moniker, "failed to start component instance");
+                    debug!(err:%, moniker:% = child.moniker; "failed to start component instance");
                     AddDynamicChildError::ActionError { err }
                 })?;
         }
@@ -822,8 +822,8 @@ impl ComponentInstance {
                     {
                         let moniker = self_clone.moniker.child(child_moniker);
                         warn!(
-                            %moniker,
-                            %error,
+                            moniker:%,
+                            error:%;
                             "single-run component could not be destroyed",
                         );
                     }
@@ -856,7 +856,7 @@ impl ComponentInstance {
                     // be worse to not continue with destroying this instance. Log the error,
                     // and proceed.
                     warn!(
-                        component=%self.moniker, %error,
+                        component:% = self.moniker, error:%;
                         "failed to delete storage during instance destruction, proceeding with destruction anyway",
                     );
                 }
@@ -1118,19 +1118,24 @@ impl ComponentInstance {
         self.context.component_id_index().id_for_moniker(&self.moniker)
     }
 
-    /// Runs the provided closure with this component's logger (if any) set as the default
-    /// tracing subscriber for the duration of the closure.
-    ///
-    /// If the component is not running or does not have a logger, the tracing subscriber
-    /// is unchanged, so logs will be attributed to component_manager.
-    pub async fn with_logger_as_default<T>(&self, op: impl FnOnce() -> T) -> T {
+    pub async fn log(
+        &self,
+        level: log::Level,
+        message: impl fmt::Display,
+        key_values: &[&(dyn log::kv::Source + Send + Sync)],
+    ) {
         let state = self.lock_state().await;
+        let mut builder = log::Record::builder();
+        builder.level(level);
+        for key_value in key_values {
+            builder.key_values(key_value);
+        }
         match state.get_started_state() {
             Some(StartedInstanceState { logger: Some(ref logger), .. }) => {
-                let logger = logger.clone() as Arc<dyn tracing::Subscriber + Send + Sync>;
-                tracing::subscriber::with_default(logger, op)
+                let logger = logger.clone() as Arc<dyn log::Log + Send + Sync>;
+                logger.log(&builder.args(format_args!("{}", message)).build());
             }
-            _ => op(),
+            _ => log::logger().log(&builder.args(format_args!("{}", message)).build()),
         }
     }
 
@@ -1367,7 +1372,7 @@ probably not intended: {}",
         let (component_url, some_context) = component_address.to_url_and_context();
         let component = if component_address.is_relative_path() {
             let context = some_context.ok_or_else(|| {
-                error!(url=%component_url, "calling resolve_with_context() with absolute");
+                error!(url:% = component_url; "calling resolve_with_context() with absolute");
                 ResolverError::RelativeUrlMissingContext(component_url.to_string())
             })?;
             resolver_proxy
@@ -1518,7 +1523,6 @@ pub mod tests {
     use routing_test_helpers::component_id_index::make_index_file;
     use std::panic;
     use std::task::Poll;
-    use tracing::info;
     use vfs::path::Path as VfsPath;
     use vfs::service::host;
     use vfs::ToObjectRequest;
@@ -2499,6 +2503,7 @@ pub mod tests {
                             // It's expected that the log publisher calls this, but it's not
                             // necessary to implement it.
                         }
+                        flogger::LogSinkRequest::_UnknownMethod { .. } => unimplemented!(),
                     }
                 }
             }
@@ -2522,7 +2527,7 @@ pub mod tests {
         assert!(child.is_started().await);
 
         // Log a message using the child's scoped logger.
-        child.with_logger_as_default(|| info!("hello world")).await;
+        child.log(log::Level::Info, "hello world", &[]).await;
 
         // Wait for the logger to connect to LogSink.
         connect_rx.next().await.unwrap();

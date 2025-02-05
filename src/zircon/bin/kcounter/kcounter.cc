@@ -148,7 +148,7 @@ int main(int argc, char** argv) {
   };
 
   size_t times = 1;
-  zx_time_t deadline = zx_clock_get_monotonic();
+  zx_instant_mono_t deadline = zx_clock_get_monotonic();
   bool match_failed = false;
 
   if (cmdline.cpuid != kNoCpuIdChosen) {
@@ -188,7 +188,7 @@ int main(int argc, char** argv) {
 
   // Set last sample time to zero so that the system and period averages match
   // on the first iteration.
-  zx_time_t last_sample_time = 0;
+  zx_instant_mono_t last_sample_time = 0;
 
   // The printf modifier * expects an int for the field size. A negative value
   // specifies left justification.
@@ -205,7 +205,7 @@ int main(int argc, char** argv) {
              "Period Avg");
     }
 
-    const zx_time_t sample_time = zx_clock_get_monotonic();
+    const zx_instant_mono_t sample_time = zx_clock_get_monotonic();
     size_t match_index = 0;
     for (size_t i = 0; i < desc->num_counters(); ++i) {
       const auto& entry = desc->descriptor_table[i];
@@ -284,7 +284,7 @@ int main(int argc, char** argv) {
 
         match_index++;
       }  // if (matches(entry.name))
-    }    // for (size_t i = 0; i < desc->num_counters(); ++i)
+    }  // for (size_t i = 0; i < desc->num_counters(); ++i)
     last_sample_time = sample_time;
 
     // Check that each prefix was actually used.
@@ -302,11 +302,11 @@ int main(int argc, char** argv) {
       break;
     }
 
-    zx_time_t now = zx_clock_get_monotonic();
-    zx_duration_t timeout = zx_time_sub_time(deadline, now);
+    zx_instant_mono_t now = zx_clock_get_monotonic();
+    zx_duration_mono_t timeout = zx_time_sub_time(deadline, now);
     if (timeout > 0) {
       struct pollfd pfd = {.fd = STDIN_FILENO, .events = POLLIN, .revents = 0};
-      int msec_timeout = static_cast<int>(std::min<zx_duration_t>(
+      int msec_timeout = static_cast<int>(std::min<zx_duration_mono_t>(
           (timeout + ZX_MSEC(1) - 1) / ZX_MSEC(1), std::numeric_limits<int>::max()));
 
       int poll_result = poll(&pfd, 1, msec_timeout);

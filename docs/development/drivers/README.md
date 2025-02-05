@@ -88,7 +88,6 @@ section.
 - [Platform Bus][platform-bus]
 - Tutorials
 
-  - [Banjo tutorial][banjo-tutorial]
   - [Using the C++ DDK Template Library][using-cpp-ddk-template-lib]
 
 - Testing
@@ -178,7 +177,6 @@ section.
 [driver-logging]: diagnostics/logging.md
 [add-tracing]: diagnostics/tracing.md
 [driver-utilities]: diagnostics/driver-utils.md
-[banjo-tutorial]: tutorials/banjo-tutorial.md
 [bind-rules-tutorial]: tutorials/bind-rules-tutorial.md
 [fidl-tutorial]: tutorials/fidl-tutorial.md
 [bind-library-code-generation-tutorial]: tutorials/bind-libraries-codegen.md

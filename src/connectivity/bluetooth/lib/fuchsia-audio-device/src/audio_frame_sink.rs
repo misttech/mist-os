@@ -7,9 +7,9 @@ use fuchsia_inspect_derive::{AttachError, Inspect};
 use fuchsia_sync::Mutex;
 use futures::task::{Context, Poll};
 use futures::{io, FutureExt};
+use log::warn;
 use std::pin::Pin;
 use std::sync::Arc;
-use tracing::warn;
 
 use crate::frame_vmo;
 use crate::stream_config::{SoftStreamConfig, StreamConfigOrTask};

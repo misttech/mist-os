@@ -49,21 +49,19 @@ void ZbiInitMemory(void* zbi, ktl::span<zbi_mem_range_t> mem_config,
 
   Allocation::Init(zbi_ranges, special_ranges);
 
-  // Set up our own address space.
-  if (aspace) {
-    ArchSetUpAddressSpace(*aspace);
-  }
-
-  // If there is a boot option to restrict the amount of available physical RAM,
-  // apply it after we have the identity mapping in place for all actually
-  // present RAM. Even if the pool forgets about certain regions, we might still
-  // deliberately touch them (e.g., the ZBI or the pool's own bookkeeping).
+  // Now that memory is accounted for, truncate the address range before any
+  // further allocations.
   memalloc::Pool& pool = Allocation::GetPool();
   if (gBootOptions->memory_limit_mb > 0) {
     constexpr uint64_t kBytesPerMib = 0x100'000;
     uint64_t limit_mb = ktl::min(ktl::numeric_limits<uint64_t>::max() / kBytesPerMib,
                                  gBootOptions->memory_limit_mb);
     ZX_ASSERT(pool.TruncateTotalRam(kBytesPerMib * limit_mb).is_ok());
+  }
+
+  // Set up our own address space.
+  if (aspace) {
+    ArchSetUpAddressSpace(*aspace);
   }
 
   if (gBootOptions->phys_verbose) {

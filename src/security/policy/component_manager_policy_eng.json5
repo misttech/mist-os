@@ -38,6 +38,7 @@
                 "/core/testing/rust_test_create_raw_processes_runner",
                 "/core/test_manager/fuzz_starnix_test_runner",
                 "/core/testing/component-framework-tests:**",
+                "/core/testing/storage-tests:**",
             ],
         },
         capability_policy: [
@@ -196,6 +197,7 @@
                     "/core/sshd-host/shell:**",
                     "/core/testing/vfs-compliance-tests:**",
                     "/core/testing/component-framework-tests:**",
+                    "/core/testing/storage-tests:**",
 
                     // We allow tests to access ambient executability in the same
                     // way that we're permissive with use of the components v1
@@ -336,6 +338,15 @@
                 capability: "protocol",
                 target_monikers: [
                     "/bootstrap/test_manager",
+                ],
+            },
+            {
+                source_moniker: "/bootstrap/devfs-with-pkg",
+                source: "component",
+                source_name: "dev-topological",
+                capability: "directory",
+                target_monikers: [
+                    "/core/testing/storage-tests:**",
                 ],
             },
         ],

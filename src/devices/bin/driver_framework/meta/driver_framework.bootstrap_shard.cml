@@ -11,9 +11,7 @@
         {
             name: "driver_index",
             url: "fuchsia-boot:///driver-index#meta/driver-index.cm",
-
-            // TODO(https://fxbug.dev/352624082): Use on_terminate: "reboot_on_error".
-            // on_terminate: "reboot",
+            on_terminate: "reboot",
         },
         {
             // Exists to augment capability graph with information about when #boot-drivers should
@@ -68,10 +66,24 @@
             availability: "optional",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: [
+                "#boot-drivers",
+                "#devfs",
+                "#devfs-with-pkg",
+                "#driver-hosts",
+                "#driver_index",
+                "#driver_manager",
+            ],
+        },
+        {
             config: [
                 "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
                 "fuchsia.driver.manager.EnableTestShutdownDelays",
                 "fuchsia.driver.manager.RootDriver",
+                "fuchsia.power.StoragePowerManagementEnabled",
+                "fuchsia.power.SuspendEnabled",
             ],
             from: "parent",
             to: "#driver_manager",
@@ -79,6 +91,7 @@
         {
             config: [
                 "fuchsia.driver.UseHardwareIommu",
+                "fuchsia.power.StoragePowerManagementEnabled",
                 "fuchsia.power.SuspendEnabled",
                 "fuchsia.usb.PeripheralConfig.Functions",
             ],
@@ -197,7 +210,6 @@
             protocol: [
                 "fuchsia.boot.Items",
                 "fuchsia.kernel.CpuResource",
-                "fuchsia.kernel.FramebufferResource",
                 "fuchsia.kernel.IommuResource",
                 "fuchsia.kernel.IoportResource",
                 "fuchsia.kernel.IrqResource",
@@ -335,6 +347,9 @@
             ],
             source_availability: "unknown",
         },
+
+        // TODO(https://fxbug.dev/345827642): remove once OOT drivers are using these protocols from
+        // the diagnostics dictionary themselves.
         {
             protocol: [
                 "fuchsia.inspect.InspectSink",
@@ -343,28 +358,41 @@
             from: "#archivist",
             to: [
                 "#boot-drivers",
-                "#devfs",
-                "#devfs-with-pkg",
                 "#driver-hosts",
-                "#driver_index",
-                "#driver_manager",
             ],
         },
+
+        // TODO(https://fxbug.dev/369189827): Placeholders to keep sag and broker alive.
         {
-            protocol: [
-                "fuchsia.power.system.ActivityGovernor",
-                "fuchsia.power.system.CpuElementManager",
-            ],
+            service: "sag.placeholder",
             from: "#system-activity-governor",
             to: "#boot-drivers",
             source_availability: "unknown",
         },
         {
-            protocol: [ "fuchsia.power.broker.Topology" ],
+            service: "powerbroker.placeholder",
             from: "#power-broker",
             to: "#boot-drivers",
             source_availability: "unknown",
         },
+
+        // TODO(https://fxbug.dev/369189827): Route these statically again when the dictionary
+        // can override them.
+        // {
+        //     protocol: [
+        //         "fuchsia.power.system.ActivityGovernor",
+        //         "fuchsia.power.system.CpuElementManager",
+        //     ],
+        //     from: "#system-activity-governor",
+        //     to: "#boot-drivers",
+        //     source_availability: "unknown",
+        // },
+        // {
+        //     protocol: [ "fuchsia.power.broker.Topology" ],
+        //     from: "#power-broker",
+        //     to: "#boot-drivers",
+        //     source_availability: "unknown",
+        // },
         {
             protocol: "fuchsia.driver.test.DriverLists",
             from: "void",
@@ -385,6 +413,8 @@
             service: [
                 "fuchsia.gpu.magma.Service",
                 "fuchsia.hardware.cpu.ctrl.Service",
+                "fuchsia.hardware.gnss.Service",
+                "fuchsia.hardware.nfc.Service",
                 "fuchsia.hardware.rtc.Service",
                 "fuchsia.hardware.sockettunnel.Service",
                 "fuchsia.hardware.spmi.DebugService",

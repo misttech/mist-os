@@ -56,6 +56,9 @@ pub trait ProtocolsExt: ToFileOptions + ToNodeOptions + Sync + 'static {
 
     /// True if the protocol should be a limited node connection.
     fn is_node(&self) -> bool;
+
+    /// True if creating as an unnamed temporary object.
+    fn create_unnamed_temporary_in_directory_path(&self) -> bool;
 }
 
 impl ProtocolsExt for fio::OpenFlags {
@@ -217,6 +220,10 @@ impl ProtocolsExt for fio::OpenFlags {
     fn is_node(&self) -> bool {
         self.contains(fio::OpenFlags::NODE_REFERENCE)
     }
+
+    fn create_unnamed_temporary_in_directory_path(&self) -> bool {
+        false
+    }
 }
 
 impl ProtocolsExt for fio::Flags {
@@ -238,6 +245,15 @@ impl ProtocolsExt for fio::Flags {
     }
 
     fn creation_mode(&self) -> CreationMode {
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+        {
+            if self.contains(fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY) {
+                if self.contains(fio::Flags::FLAG_MUST_CREATE) {
+                    return CreationMode::UnlinkableUnnamedTemporary;
+                }
+                return CreationMode::UnnamedTemporary;
+            }
+        }
         if self.contains(fio::Flags::FLAG_MUST_CREATE) {
             CreationMode::Always
         } else if self.contains(fio::Flags::FLAG_MAYBE_CREATE) {
@@ -266,7 +282,8 @@ impl ProtocolsExt for fio::Flags {
         // connection later.
         let mut updated_flags = *self;
         if updated_flags.contains(fio::Flags::PERM_INHERIT_WRITE) {
-            updated_flags |= fio::INHERITED_WRITE_PERMISSIONS.to_flags();
+            updated_flags |=
+                fio::Flags::from_bits_truncate(fio::INHERITED_WRITE_PERMISSIONS.bits());
         }
         if updated_flags.contains(fio::Flags::PERM_INHERIT_EXECUTE) {
             updated_flags |= fio::Flags::PERM_EXECUTE;
@@ -326,6 +343,11 @@ impl ProtocolsExt for fio::Flags {
 
     fn is_node(&self) -> bool {
         self.contains(fio::Flags::PROTOCOL_NODE)
+    }
+
+    fn create_unnamed_temporary_in_directory_path(&self) -> bool {
+        self.creation_mode() == CreationMode::UnnamedTemporary
+            || self.creation_mode() == CreationMode::UnlinkableUnnamedTemporary
     }
 }
 
@@ -500,15 +522,4 @@ impl ToNodeOptions for NodeOptions {
 
 fn flags_to_rights(flags: &fio::Flags) -> fio::Rights {
     fio::Rights::from_bits_truncate(flags.bits())
-}
-
-pub trait ToFlags {
-    fn to_flags(&self) -> fio::Flags;
-}
-
-impl ToFlags for fio::Operations {
-    fn to_flags(&self) -> fio::Flags {
-        // The constants in `fio::Operations` are aligned with those in `fio::Flags`.
-        fio::Flags::from_bits_truncate(self.bits())
-    }
 }

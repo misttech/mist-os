@@ -19,6 +19,8 @@ type Network = table {
             1: mark uint32;
             2: handle uint64;
         };
+        /// Information about Fuchsia registered networks.
+        2: fuchsia @generated_name("FuchsiaNetworkInfo") table {};
     };
     /// The DNS servers associated with this network.
     3: dns_servers @generated_name("NetworkDnsServers") table {
@@ -83,4 +85,13 @@ closed protocol NetworkRegistry {
         /// The specified network is currently marked as the default network.
         CANNOT_REMOVE_DEFAULT_NETWORK = 2;
     };
+
+    /// No-op method that allows checking for presence.
+    ///
+    /// TODO(https://fxbug.dev/296283299): It's not currently possible for a
+    /// client with an optionally-provided protocol to check whether there's
+    /// someone on the other end without making a FIDL call . This method
+    /// provides a workaround by giving a client a method that it can call to
+    /// check for liveness.
+    strict CheckPresence() -> ();
 };

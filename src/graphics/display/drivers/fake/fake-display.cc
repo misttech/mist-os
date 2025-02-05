@@ -31,11 +31,11 @@
 #include <cstring>
 #include <iterator>
 #include <limits>
+#include <mutex>
 #include <string>
 #include <utility>
 
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/coordinator/preferred-scanout-image-type.h"
@@ -52,6 +52,7 @@
 namespace fake_display {
 
 namespace {
+
 // List of supported pixel formats
 constexpr fuchsia_images2_pixel_format_enum_value_t kSupportedPixelFormats[] = {
     static_cast<fuchsia_images2_pixel_format_enum_value_t>(
@@ -105,7 +106,6 @@ raw_display_info_t CreateRawDisplayInfo(const display_mode_t* banjo_display_mode
       .preferred_modes_count = 1,
       .edid_bytes_list = nullptr,
       .edid_bytes_count = 0,
-      .eddc_client = {.ops = nullptr, .ctx = nullptr},
       .pixel_formats_list = kSupportedPixelFormats,
       .pixel_formats_count = std::size(kSupportedPixelFormats),
   };
@@ -125,7 +125,7 @@ FakeDisplay::FakeDisplay(FakeDisplayDeviceConfig device_config,
 FakeDisplay::~FakeDisplay() { Deinitialize(); }
 
 zx_status_t FakeDisplay::DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) {
-  fbl::AutoLock lock(&capture_mutex_);
+  std::lock_guard capture_lock(capture_mutex_);
 
   clamp_rgb_value_ = minimum_rgb;
   return ZX_OK;
@@ -147,7 +147,7 @@ zx_status_t FakeDisplay::InitSysmemAllocatorClient() {
 
 void FakeDisplay::DisplayEngineSetListener(
     const display_engine_listener_protocol_t* engine_listener) {
-  fbl::AutoLock engine_listener_lock(&engine_listener_mutex_);
+  std::lock_guard engine_listener_lock(engine_listener_mutex_);
   engine_listener_client_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
 
   const display_mode_t banjo_display_mode = CreateBanjoDisplayMode();
@@ -156,14 +156,13 @@ void FakeDisplay::DisplayEngineSetListener(
 }
 
 void FakeDisplay::DisplayEngineUnsetListener() {
-  fbl::AutoLock engine_listener_lock(&engine_listener_mutex_);
+  std::lock_guard engine_listener_lock(engine_listener_mutex_);
   engine_listener_client_ = ddk::DisplayEngineListenerProtocolClient();
 }
 
 zx::result<display::DriverImageId> FakeDisplay::ImportVmoImageForTesting(zx::vmo vmo,
                                                                          size_t offset) {
-  fbl::AllocChecker alloc_checker;
-  fbl::AutoLock lock(&image_mutex_);
+  std::lock_guard image_lock(image_mutex_);
 
   display::DriverImageId driver_image_id = next_imported_display_driver_image_id_++;
   // Image metadata for testing only and may not reflect the actual image
@@ -173,6 +172,7 @@ zx::result<display::DriverImageId> FakeDisplay::ImportVmoImageForTesting(zx::vmo
       .coherency_domain = fuchsia_sysmem2::CoherencyDomain::kCpu,
   };
 
+  fbl::AllocChecker alloc_checker;
   auto import_info = fbl::make_unique_checked<DisplayImageInfo>(
       &alloc_checker, driver_image_id, display_image_metadata, std::move(vmo));
   if (!alloc_checker.check()) {
@@ -246,8 +246,6 @@ zx_status_t FakeDisplay::DisplayEngineImportImage(const image_metadata_t* image_
     return ZX_ERR_NOT_FOUND;
   }
   const fidl::SyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
-
-  fbl::AutoLock lock(&image_mutex_);
   if (!IsAcceptableImageTilingType(image_metadata->tiling_type)) {
     FDF_LOG(INFO, "ImportImage() will fail due to invalid Image tiling type %" PRIu32,
             image_metadata->tiling_type);
@@ -283,9 +281,18 @@ zx_status_t FakeDisplay::DisplayEngineImportImage(const image_metadata_t* image_
   auto& wait_response = wait_result.value();
   auto& collection_info = wait_response.buffer_collection_info();
 
+  fbl::AllocChecker alloc_checker;
   fbl::Vector<zx::vmo> vmos;
+  vmos.reserve(collection_info->buffers()->size(), &alloc_checker);
+  if (!alloc_checker.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
   for (auto& buffer : *collection_info->buffers()) {
-    vmos.push_back(std::move(buffer.vmo().value()));
+    ZX_DEBUG_ASSERT_MSG(vmos.size() < collection_info->buffers()->size(),
+                        "Incorrect capacity passed to earlier reserve()");
+    vmos.push_back(std::move(buffer.vmo().value()), &alloc_checker);
+    ZX_DEBUG_ASSERT_MSG(alloc_checker.check(), "Incorrect capacity passed to earlier reserve()");
   }
 
   if (!collection_info->settings()->image_format_constraints().has_value() ||
@@ -297,6 +304,7 @@ zx_status_t FakeDisplay::DisplayEngineImportImage(const image_metadata_t* image_
   // (IsCaptureSupported() is true), we should perform a check to ensure that
   // the display images should not be of "inaccessible" coherency domain.
 
+  std::lock_guard image_lock(image_mutex_);
   display::DriverImageId driver_image_id = next_imported_display_driver_image_id_++;
   ImageMetadata display_image_metadata = {
       .pixel_format =
@@ -305,7 +313,6 @@ zx_status_t FakeDisplay::DisplayEngineImportImage(const image_metadata_t* image_
           collection_info->settings()->buffer_settings()->coherency_domain().value(),
   };
 
-  fbl::AllocChecker alloc_checker;
   auto import_info = fbl::make_unique_checked<DisplayImageInfo>(
       &alloc_checker, driver_image_id, std::move(display_image_metadata), std::move(vmos[index]));
   if (!alloc_checker.check()) {
@@ -318,8 +325,9 @@ zx_status_t FakeDisplay::DisplayEngineImportImage(const image_metadata_t* image_
 }
 
 void FakeDisplay::DisplayEngineReleaseImage(uint64_t image_handle) {
-  fbl::AutoLock lock(&image_mutex_);
   display::DriverImageId driver_image_id = display::ToDriverImageId(image_handle);
+
+  std::lock_guard image_lock(image_mutex_);
   if (imported_images_.erase(driver_image_id) == nullptr) {
     FDF_LOG(ERROR, "Failed to release display Image (handle %" PRIu64 ")", driver_image_id.value());
   }
@@ -393,7 +401,7 @@ void FakeDisplay::DisplayEngineApplyConfiguration(const display_config_t* displa
   ZX_DEBUG_ASSERT(display_configs);
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
   {
-    fbl::AutoLock lock(&image_mutex_);
+    std::lock_guard image_lock(image_mutex_);
     if (display_count == 1 && display_configs[0].layer_count) {
       // Only support one display.
       current_image_to_capture_id_ =
@@ -569,8 +577,6 @@ zx_status_t FakeDisplay::DisplayEngineImportImageForCapture(
   }
   const fidl::SyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
 
-  fbl::AutoLock lock(&capture_mutex_);
-
   auto check_result = collection->CheckAllBuffersAllocated();
   // TODO(https://fxbug.dev/42072690): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
@@ -608,6 +614,8 @@ zx_status_t FakeDisplay::DisplayEngineImportImageForCapture(
     return ZX_ERR_OUT_OF_RANGE;
   }
 
+  std::lock_guard capture_lock(capture_mutex_);
+
   // TODO(https://fxbug.dev/42079320): Capture target images should not be of
   // "inaccessible" coherency domain. We should add a check here.
   display::DriverCaptureImageId driver_capture_image_id = next_imported_driver_capture_image_id_++;
@@ -637,7 +645,7 @@ zx_status_t FakeDisplay::DisplayEngineStartCapture(uint64_t capture_handle) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  fbl::AutoLock lock(&capture_mutex_);
+  std::lock_guard capture_lock(capture_mutex_);
   if (current_capture_target_image_id_ != display::kInvalidDriverCaptureImageId) {
     return ZX_ERR_SHOULD_WAIT;
   }
@@ -660,7 +668,7 @@ zx_status_t FakeDisplay::DisplayEngineReleaseCapture(uint64_t capture_handle) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  fbl::AutoLock lock(&capture_mutex_);
+  std::lock_guard capture_lock(capture_mutex_);
   display::DriverCaptureImageId driver_capture_image_id =
       display::ToDriverCaptureImageId(capture_handle);
   if (current_capture_target_image_id_ == driver_capture_image_id) {
@@ -676,12 +684,12 @@ zx_status_t FakeDisplay::DisplayEngineReleaseCapture(uint64_t capture_handle) {
 
 zx_status_t FakeDisplay::InitializeCapture() {
   {
-    fbl::AutoLock image_lock(&image_mutex_);
+    std::lock_guard image_lock(image_mutex_);
     current_image_to_capture_id_ = display::kInvalidDriverImageId;
   }
 
   if (IsCaptureSupported()) {
-    fbl::AutoLock capture_lock(&capture_mutex_);
+    std::lock_guard capture_lock(capture_mutex_);
     current_capture_target_image_id_ = display::kInvalidDriverCaptureImageId;
   }
   return ZX_OK;
@@ -697,11 +705,12 @@ int FakeDisplay::CaptureThread() {
       break;
     }
     {
-      fbl::AutoLock engine_listene(&engine_listener_mutex_);
+      std::lock_guard engine_listener_lock(engine_listener_mutex_);
       // `current_capture_target_image_` is a pointer to DisplayImageInfo stored in
       // `imported_captures_` (guarded by `capture_mutex_`). So `capture_mutex_`
       // must be locked while the capture image is being used.
-      fbl::AutoLock capture_lock(&capture_mutex_);
+
+      std::lock_guard capture_lock(capture_mutex_);
       if (engine_listener_client_.is_valid() &&
           (current_capture_target_image_id_ != display::kInvalidDriverCaptureImageId) &&
           ++capture_complete_signal_count_ >= kNumOfVsyncsForCapture) {
@@ -719,7 +728,7 @@ int FakeDisplay::CaptureThread() {
           // `current_image_to_capture_id_` is a key to DisplayImageInfo stored
           // in `imported_images_` (guarded by `image_mutex_`). So `image_mutex_`
           // must be locked while the source image is being used.
-          fbl::AutoLock image_lock(&image_mutex_);
+          std::lock_guard image_lock(image_mutex_);
           if (current_image_to_capture_id_ != display::kInvalidDriverImageId) {
             // We have a valid image being displayed. Let's capture it.
             auto src = imported_images_.find(current_image_to_capture_id_);
@@ -807,7 +816,7 @@ int FakeDisplay::VSyncThread() {
 }
 
 void FakeDisplay::SendVsync() {
-  fbl::AutoLock engine_listener_lock(&engine_listener_mutex_);
+  std::lock_guard engine_listener_lock(engine_listener_mutex_);
   if (engine_listener_client_.is_valid()) {
     // See the discussion in `DisplayEngineApplyConfiguration()` about
     // the reason we use relaxed memory order here.
@@ -827,7 +836,7 @@ void FakeDisplay::RecordDisplayConfigToInspectRootNode() {
     config_node.RecordInt("width_px", kWidth);
     config_node.RecordInt("height_px", kHeight);
     config_node.RecordDouble("refresh_rate_hz", kRefreshRateFps);
-    config_node.RecordBool("manual_vsync_trigger", device_config_.manual_vsync_trigger);
+    config_node.RecordBool("periodic_vsync", device_config_.periodic_vsync);
     config_node.RecordBool("no_buffer_access", device_config_.no_buffer_access);
   });
 }
@@ -848,7 +857,7 @@ zx_status_t FakeDisplay::Initialize() {
     return status;
   }
 
-  if (!device_config_.manual_vsync_trigger) {
+  if (device_config_.periodic_vsync) {
     status = thrd_status_to_zx_status(thrd_create(
         &vsync_thread_,
         [](void* context) { return static_cast<FakeDisplay*>(context)->VSyncThread(); }, this));

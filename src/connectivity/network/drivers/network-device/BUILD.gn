@@ -37,16 +37,19 @@ source_set("src") {
 fuchsia_cc_driver("network-device-driver") {
   output_name = "network-device"
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
-  if (is_mistos) {
-    configs -= [ "//build/config/fuchsia:enable_zircon_asserts" ]
-    configs += [ "//build/config/mistos:enable_zircon_asserts" ]
-  }
 
   deps = [ ":src" ]
 }
 
 fuchsia_driver_component("network-device") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/connectivity/ethernet/drivers/asix-88179:*",
+    "//src/connectivity/ethernet/drivers/usb-cdc-ecm:*",
+    "//src/connectivity/network:drivers",
+    "//src/connectivity/network/drivers:drivers",
+    "//src/connectivity/wlan/tests/helpers/realm-factory:*",
+  ]
   component_name = "network-device"
   deps = [ ":network-device-driver" ]
   info = "meta/network-device-info.json"

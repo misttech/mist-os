@@ -180,37 +180,37 @@ impl FsckWarning {
     fn log(&self) {
         match self {
             FsckWarning::ExtentForMissingAttribute(store_id, oid, attr_id) => {
-                warn!(store_id, oid, attr_id, "Found an extent for a missing attribute");
+                warn!(store_id, oid, attr_id; "Found an extent for a missing attribute");
             }
             FsckWarning::ExtentForNonexistentObject(store_id, oid) => {
-                warn!(store_id, oid, "Extent for missing object");
+                warn!(store_id, oid; "Extent for missing object");
             }
             FsckWarning::GraveyardRecordForAbsentObject(store_id, oid) => {
-                warn!(store_id, oid, "Graveyard entry for missing object");
+                warn!(store_id, oid; "Graveyard entry for missing object");
             }
             FsckWarning::InvalidObjectIdInStore(store_id, key, value) => {
-                warn!(store_id, ?key, ?value, "Invalid object ID");
+                warn!(store_id, key:?, value:?; "Invalid object ID");
             }
             FsckWarning::LimitForNonExistentStore(store_id, limit) => {
-                warn!(store_id, limit, "Found limit for non-existent owner store.");
+                warn!(store_id, limit; "Found limit for non-existent owner store.");
             }
             FsckWarning::OrphanedAttribute(store_id, oid, attribute_id) => {
-                warn!(store_id, oid, attribute_id, "Attribute for missing object");
+                warn!(store_id, oid, attribute_id; "Attribute for missing object");
             }
             FsckWarning::OrphanedObject(store_id, oid) => {
-                warn!(oid, store_id, "Orphaned object");
+                warn!(oid, store_id; "Orphaned object");
             }
             FsckWarning::OrphanedKeys(store_id, oid) => {
-                warn!(oid, store_id, "Orphaned keys");
+                warn!(oid, store_id; "Orphaned keys");
             }
             FsckWarning::OrphanedExtendedAttribute(store_id, oid, attribute_id) => {
-                warn!(oid, store_id, attribute_id, "Orphaned extended attribute");
+                warn!(oid, store_id, attribute_id; "Orphaned extended attribute");
             }
             FsckWarning::OrphanedExtendedAttributeRecord(store_id, oid) => {
-                warn!(oid, store_id, "Orphaned extended attribute record");
+                warn!(oid, store_id; "Orphaned extended attribute record");
             }
             FsckWarning::ProjectUsageInconsistent(store_id, project_id, stored, used) => {
-                warn!(project_id, store_id, ?stored, ?used, "Project Inconsistent");
+                warn!(project_id, store_id, stored:?, used:?; "Project Inconsistent");
             }
         }
     }
@@ -534,129 +534,129 @@ impl FsckError {
     fn log(&self) {
         match self {
             FsckError::AllocatedBytesMismatch(observed, stored) => {
-                error!(?observed, ?stored, "Unexpected allocated bytes");
+                error!(observed:?, stored:?; "Unexpected allocated bytes");
             }
             FsckError::AllocatedSizeMismatch(store_id, oid, observed, stored) => {
-                error!(observed, oid, store_id, stored, "Unexpected allocated size");
+                error!(observed, oid, store_id, stored; "Unexpected allocated size");
             }
             FsckError::AllocationForNonexistentOwner(alloc) => {
-                error!(?alloc, "Allocation for non-existent owner")
+                error!(alloc:?; "Allocation for non-existent owner")
             }
             FsckError::AllocationMismatch(observed, stored) => {
-                error!(?observed, ?stored, "Unexpected allocation");
+                error!(observed:?, stored:?; "Unexpected allocation");
             }
             FsckError::CasefoldInconsistency(store_id, parent_id, child_id) => {
-                error!(?store_id, ?parent_id, ?child_id, "CasefoldChild inconsistent");
+                error!(store_id:?, parent_id:?, child_id:?; "CasefoldChild inconsistent");
             }
             FsckError::ConflictingTypeForLink(store_id, oid, expected, actual) => {
-                error!(store_id, oid, ?expected, ?actual, "Bad link");
+                error!(store_id, oid, expected:?, actual:?; "Bad link");
             }
             FsckError::ExtentExceedsLength(store_id, oid, attr_id, size, extent) => {
-                error!(store_id, oid, attr_id, size, ?extent, "Extent exceeds length");
+                error!(store_id, oid, attr_id, size, extent:?; "Extent exceeds length");
             }
             FsckError::ExtraAllocations(allocations) => {
-                error!(?allocations, "Unexpected allocations");
+                error!(allocations:?; "Unexpected allocations");
             }
             FsckError::ObjectHasChildren(store_id, oid) => {
-                error!(store_id, oid, "Object has unexpected children");
+                error!(store_id, oid; "Object has unexpected children");
             }
             FsckError::UnexpectedJournalFileOffset(object_id) => {
                 error!(
-                    oid = object_id,
+                    oid = object_id;
                     "SuperBlock journal_file_offsets contains unexpected object-id"
                 );
             }
             FsckError::LinkCycle(store_id, oid) => {
-                error!(store_id, oid, "Link cycle");
+                error!(store_id, oid; "Link cycle");
             }
             FsckError::MalformedAllocation(allocations) => {
-                error!(?allocations, "Malformed allocations");
+                error!(allocations:?; "Malformed allocations");
             }
             FsckError::MalformedExtent(store_id, oid, extent, device_offset) => {
-                error!(store_id, oid, ?extent, device_offset, "Malformed extent");
+                error!(store_id, oid, extent:?, device_offset; "Malformed extent");
             }
             FsckError::MalformedObjectRecord(store_id, key, value) => {
-                error!(store_id, ?key, ?value, "Mismatched key and value");
+                error!(store_id, key:?, value:?; "Mismatched key and value");
             }
             FsckError::MisalignedAllocation(allocations) => {
-                error!(?allocations, "Misaligned allocation");
+                error!(allocations:?; "Misaligned allocation");
             }
             FsckError::MisalignedExtent(store_id, oid, extent, device_offset) => {
-                error!(store_id, oid, ?extent, device_offset, "Misaligned extent");
+                error!(store_id, oid, extent:?, device_offset; "Misaligned extent");
             }
             FsckError::MissingAllocation(allocation) => {
-                error!(?allocation, "Missing allocation");
+                error!(allocation:?; "Missing allocation");
             }
             FsckError::MissingAttributeForExtendedAttribute(store_id, oid, attribute_id) => {
-                error!(store_id, oid, attribute_id, "Missing attribute for extended attribute");
+                error!(store_id, oid, attribute_id; "Missing attribute for extended attribute");
             }
             FsckError::MissingDataAttribute(store_id, oid) => {
-                error!(store_id, oid, "Missing default attribute");
+                error!(store_id, oid; "Missing default attribute");
             }
             FsckError::MissingObjectInfo(store_id, oid) => {
-                error!(store_id, oid, "Missing object record");
+                error!(store_id, oid; "Missing object record");
             }
             FsckError::MultipleLinksToDirectory(store_id, oid) => {
-                error!(store_id, oid, "Directory with multiple links");
+                error!(store_id, oid; "Directory with multiple links");
             }
             FsckError::NonRootProjectIdMetadata(store_id, object_id, project_id) => {
                 error!(
                     store_id,
-                    object_id, project_id, "Non root object in volume with project id metadata"
+                    object_id, project_id; "Non root object in volume with project id metadata"
                 );
             }
             FsckError::ObjectCountMismatch(store_id, observed, stored) => {
-                error!(store_id, observed, stored, "Object count mismatch");
+                error!(store_id, observed, stored; "Object count mismatch");
             }
             FsckError::ProjectOnGraveyard(store_id, project_id, object_id) => {
-                error!(store_id, project_id, object_id, "Project was set on graveyard object");
+                error!(store_id, project_id, object_id; "Project was set on graveyard object");
             }
             FsckError::ProjectUsedWithNoUsageTracking(store_id, project_id, node_id) => {
-                error!(store_id, project_id, node_id, "Project used without tracking metadata");
+                error!(store_id, project_id, node_id; "Project used without tracking metadata");
             }
             FsckError::RefCountMismatch(oid, observed, stored) => {
-                error!(oid, observed, stored, "Reference count mismatch");
+                error!(oid, observed, stored; "Reference count mismatch");
             }
             FsckError::RootObjectHasParent(store_id, oid, apparent_parent_id) => {
-                error!(store_id, oid, apparent_parent_id, "Root object is a child");
+                error!(store_id, oid, apparent_parent_id; "Root object is a child");
             }
             FsckError::SubDirCountMismatch(store_id, oid, observed, stored) => {
-                error!(store_id, oid, observed, stored, "Sub-dir count mismatch");
+                error!(store_id, oid, observed, stored; "Sub-dir count mismatch");
             }
             FsckError::TombstonedObjectHasRecords(store_id, oid) => {
-                error!(store_id, oid, "Tombstoned object with references");
+                error!(store_id, oid; "Tombstoned object with references");
             }
             FsckError::UnexpectedObjectInGraveyard(oid) => {
-                error!(oid, "Unexpected object in graveyard");
+                error!(oid; "Unexpected object in graveyard");
             }
             FsckError::UnexpectedRecordInObjectStore(store_id, key, value) => {
-                error!(store_id, ?key, ?value, "Unexpected record");
+                error!(store_id, key:?, value:?; "Unexpected record");
             }
             FsckError::VolumeInChildStore(store_id, oid) => {
-                error!(store_id, oid, "Volume in child store");
+                error!(store_id, oid; "Volume in child store");
             }
             FsckError::BadGraveyardValue(store_id, oid) => {
-                error!(store_id, oid, "Bad graveyard value");
+                error!(store_id, oid; "Bad graveyard value");
             }
             FsckError::MissingEncryptionKeys(store_id, oid) => {
-                error!(store_id, oid, "Missing encryption keys");
+                error!(store_id, oid; "Missing encryption keys");
             }
             FsckError::MissingKey(store_id, oid, key_id) => {
-                error!(store_id, oid, key_id, "Missing encryption key");
+                error!(store_id, oid, key_id; "Missing encryption key");
             }
             FsckError::EncryptedChildDirectoryNoWrappingKey(store_id, oid) => {
-                error!(store_id, oid, "Encrypted directory does not have a wrapping key id");
+                error!(store_id, oid; "Encrypted directory does not have a wrapping key id");
             }
             FsckError::EncryptedDirectoryHasUnencryptedChild(store_id, parent_oid, child_oid) => {
                 error!(
                     store_id,
-                    parent_oid, child_oid, "Encrypted directory has unencrypted child"
+                    parent_oid, child_oid; "Encrypted directory has unencrypted child"
                 );
             }
             FsckError::UnencryptedDirectoryHasEncryptedChild(store_id, parent_oid, child_oid) => {
                 error!(
                     store_id,
-                    parent_oid, child_oid, "Unencrypted directory has encrypted child"
+                    parent_oid, child_oid; "Unencrypted directory has encrypted child"
                 );
             }
             FsckError::ChildEncryptedWithDifferentWrappingKeyThanParent(
@@ -671,48 +671,48 @@ impl FsckError {
                     parent_id,
                     child_id,
                     parent_wrapping_key_id,
-                    child_wrapping_key_id,
+                    child_wrapping_key_id;
                     "Child directory encrypted with different wrapping key than parent"
                 );
             }
             FsckError::DuplicateKey(store_id, oid, key_id) => {
-                error!(store_id, oid, key_id, "Duplicate key")
+                error!(store_id, oid, key_id; "Duplicate key")
             }
             FsckError::ZombieFile(store_id, oid, parent_oids) => {
-                error!(store_id, oid, ?parent_oids, "Links exist to file in graveyard")
+                error!(store_id, oid, parent_oids:?; "Links exist to file in graveyard")
             }
             FsckError::ZombieDir(store_id, oid, parent_oid) => {
-                error!(store_id, oid, parent_oid, "A link exists to directory in graveyard")
+                error!(store_id, oid, parent_oid; "A link exists to directory in graveyard")
             }
             FsckError::ZombieSymlink(store_id, oid, parent_oids) => {
-                error!(store_id, oid, ?parent_oids, "Links exists to symlink in graveyard")
+                error!(store_id, oid, parent_oids:?; "Links exists to symlink in graveyard")
             }
             FsckError::VerifiedFileDoesNotHaveAMerkleAttribute(store_id, oid) => {
-                error!(store_id, oid, "Verified file does not have a merkle attribute")
+                error!(store_id, oid; "Verified file does not have a merkle attribute")
             }
             FsckError::NonFileMarkedAsVerified(store_id, oid) => {
-                error!(store_id, oid, "Non-file marked as verified")
+                error!(store_id, oid; "Non-file marked as verified")
             }
             FsckError::IncorrectMerkleTreeSize(store_id, oid, expected_size, actual_size) => {
                 error!(
                     store_id,
-                    oid, expected_size, actual_size, "Verified file has incorrect merkle tree size"
+                    oid, expected_size, actual_size; "Verified file has incorrect merkle tree size"
                 )
             }
             FsckError::TombstonedAttributeDoesNotExist(store_id, oid, attribute_id) => {
-                error!(store_id, oid, attribute_id, "Tombstoned attribute does not exist")
+                error!(store_id, oid, attribute_id; "Tombstoned attribute does not exist")
             }
             FsckError::TrimValueForGraveyardAttributeEntry(store_id, oid, attribute_id) => {
                 error!(
                     store_id,
-                    oid, attribute_id, "Invalid Trim value for a graveyard attribute entry",
+                    oid, attribute_id; "Invalid Trim value for a graveyard attribute entry",
                 )
             }
             FsckError::MissingOverwriteExtents(store_id, oid, attribute_id) => {
                 error!(
                     store_id,
                     oid,
-                    attribute_id,
+                    attribute_id;
                     "Overwrite extents indicated, but no overwrite extents were found",
                 )
             }
@@ -720,7 +720,7 @@ impl FsckError {
                 error!(
                     store_id,
                     oid,
-                    attribute_id,
+                    attribute_id;
                     "Overwrite extents were found, but metadata flag was not set",
                 )
             }
@@ -774,25 +774,25 @@ impl FsckFatal {
                 error!("Graveyard is malformed; root store is inconsistent");
             }
             FsckFatal::MalformedLayerFile(store_id, layer_file_id) => {
-                error!(store_id, layer_file_id, "Layer file malformed");
+                error!(store_id, layer_file_id; "Layer file malformed");
             }
             FsckFatal::MalformedStore(id) => {
-                error!(id, "Malformed store; root store is inconsistent");
+                error!(id; "Malformed store; root store is inconsistent");
             }
             FsckFatal::MisOrderedLayerFile(store_id, layer_file_id) => {
                 // This can be for stores or the allocator.
-                error!(oid = store_id, layer_file_id, "Layer file contains out-of-oder records");
+                error!(oid = store_id, layer_file_id; "Layer file contains out-of-oder records");
             }
             FsckFatal::MisOrderedObjectStore(store_id) => {
                 // This can be for stores or the allocator.
                 error!(
-                    oid = store_id,
+                    oid = store_id;
                     "Store/allocator contains out-of-order or duplicate records"
                 );
             }
             FsckFatal::OverlappingKeysInLayerFile(store_id, layer_file_id, key1, key2) => {
                 // This can be for stores or the allocator.
-                error!(oid = store_id, layer_file_id, ?key1, ?key2, "Overlapping keys");
+                error!(oid = store_id, layer_file_id, key1:?, key2:?; "Overlapping keys");
             }
         }
     }

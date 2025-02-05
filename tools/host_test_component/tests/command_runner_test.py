@@ -2,12 +2,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import contextlib
 import os
 import unittest
 from dataclasses import dataclass
-from unittest.mock import MagicMock
+from io import StringIO
 
-from command_runner import run_command
+from command_runner import CommandError, run_command
 
 
 @dataclass
@@ -27,49 +28,50 @@ class TestCommandRunner(unittest.TestCase):
 
     def test_run_command_success(self) -> None:
         cmd = ["echo", "Hello, World"]
-        output_handler = OutputHandler()
-        error_handler = MagicMock()
 
-        exit_code = run_command(cmd, output_handler, error_handler)
+        with contextlib.redirect_stdout(StringIO()) as out:
+            with contextlib.redirect_stderr(StringIO()) as err:
+                exit_code = run_command(cmd)
 
-        self.assertEqual(exit_code, 0)
-        error_handler.assert_not_called()
-        self.assertEqual(output_handler.output, b"Hello, World\n")
+                self.assertEqual(exit_code, 0)
+                self.assertEqual(err.getvalue(), "")
+                self.assertEqual(out.getvalue(), "Hello, World\n")
 
     def test_run_command_no_binary_found(self) -> None:
         cmd = ["nonexistent_command"]
-        output_handler = MagicMock()
-        error_handler = MagicMock()
         got_error = False
-        try:
-            run_command(cmd, output_handler, error_handler)
-        except FileNotFoundError:
-            got_error = True
+
+        with contextlib.redirect_stdout(StringIO()) as out:
+            with contextlib.redirect_stderr(StringIO()) as err:
+                try:
+                    run_command(cmd)
+                except CommandError:
+                    got_error = True
         self.assertTrue(got_error)
-        output_handler.assert_not_called()
-        error_handler.assert_not_called()
+        self.assertEqual(out.getvalue(), "")
+        self.assertEqual(err.getvalue(), "")
 
     def test_run_command_exit_code(self) -> None:
         cmd = [os.path.join(self.test_data_path, "exit"), "123"]
-        output_handler = MagicMock()
-        error_handler = MagicMock()
-        exit_code = run_command(cmd, output_handler, error_handler)
+        with contextlib.redirect_stdout(StringIO()) as out:
+            with contextlib.redirect_stderr(StringIO()) as err:
+                exit_code = run_command(cmd)
         self.assertEqual(exit_code, 123)
-        output_handler.assert_not_called()
-        error_handler.assert_not_called()
+        self.assertEqual(out.getvalue(), "")
+        self.assertEqual(err.getvalue(), "")
 
     def test_run_command_test_output(self) -> None:
         cmd = [os.path.join(self.test_data_path, "output_mock")]
-        output_handler = OutputHandler()
-        error_handler = OutputHandler()
-        exit_code = run_command(cmd, output_handler, error_handler)
+        with contextlib.redirect_stdout(StringIO()) as out:
+            with contextlib.redirect_stderr(StringIO()) as err:
+                exit_code = run_command(cmd)
         self.assertEqual(exit_code, 0)
         self.assertEqual(
-            output_handler.output, b"Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n"
+            out.getvalue(), "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n"
         )
         self.assertEqual(
-            error_handler.output,
-            b"Error Line 1\nError Line 2\nError Line 3\nError Line 4\nError Line 5\n",
+            err.getvalue(),
+            "Error Line 1\nError Line 2\nError Line 3\nError Line 4\nError Line 5\n",
         )
 
 

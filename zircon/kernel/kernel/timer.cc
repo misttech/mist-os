@@ -86,13 +86,13 @@ void timer_set_ticks_to_time_ratio(const affine::Ratio& ticks_to_time) {
 
 const affine::Ratio& timer_get_ticks_to_time_ratio(void) { return gTicksToTime; }
 
-zx_time_t current_time(void) { return gTicksToTime.Scale(current_ticks()); }
+zx_instant_mono_t current_mono_time(void) { return gTicksToTime.Scale(current_mono_ticks()); }
 
 zx_instant_boot_t current_boot_time(void) { return gTicksToTime.Scale(current_boot_ticks()); }
 
 zx_ticks_t ticks_per_second(void) { return gTicksPerSecond; }
 
-ktl::optional<zx_ticks_t> TimerQueue::ConvertMonotonicTimeToRawTicks(zx_time_t mono) {
+ktl::optional<zx_ticks_t> TimerQueue::ConvertMonotonicTimeToRawTicks(zx_instant_mono_t mono) {
   // Do not attempt to convert the sentinel value of ZX_TIME_INFINITE.
   if (mono == ZX_TIME_INFINITE) {
     return ZX_TIME_INFINITE;
@@ -123,7 +123,7 @@ void TimerQueue::UpdatePlatformTimerLocked() {
 
   // The monotonic deadline should be the minimum of the preemption timer and the front of the
   // monotonic timer list.
-  zx_time_t mono_time_deadline = preempt_timer_deadline_;
+  zx_instant_mono_t mono_time_deadline = preempt_timer_deadline_;
   if (!monotonic_timer_list_.is_empty()) {
     mono_time_deadline =
         ktl::min(mono_time_deadline, monotonic_timer_list_.front().scheduled_time_);
@@ -166,7 +166,7 @@ void TimerQueue::UpdatePlatformTimerBoot(zx_instant_boot_t new_deadline) {
   }
 }
 
-void TimerQueue::UpdatePlatformTimerMono(zx_time_t new_deadline) {
+void TimerQueue::UpdatePlatformTimerMono(zx_instant_mono_t new_deadline) {
   DEBUG_ASSERT(arch_ints_disabled());
 
   // Do not set the platform timer if we were passed an infinite deadline.
@@ -366,7 +366,7 @@ void Timer::Set(const Deadline& deadline, Callback callback, void* arg) {
   kcounter_add(timer_created_counter, 1);
 }
 
-void TimerQueue::PreemptReset(zx_time_t deadline) {
+void TimerQueue::PreemptReset(zx_instant_mono_t deadline) {
   DEBUG_ASSERT(arch_ints_disabled());
   LTRACEF("preempt timer cpu %u deadline %" PRIi64 "\n", arch_curr_cpu_num(), deadline);
   preempt_timer_deadline_ = deadline;
@@ -462,7 +462,7 @@ void timer_tick() {
 }
 
 void TimerQueue::Tick(cpu_num_t cpu) {
-  zx_time_t now = current_time();
+  zx_instant_mono_t now = current_mono_time();
   zx_instant_boot_t boot_now = current_boot_time();
   LTRACEF("cpu %u now %" PRIi64 ", sp %p\n", cpu, now, __GET_FRAME());
 
@@ -642,7 +642,7 @@ void TimerQueue::PrintTimerQueues(char* buf, size_t len) {
   for (cpu_num_t i = 0; i < percpu::processor_count(); i++) {
     if (mp_is_cpu_online(i)) {
       fprintf(&buffer, "cpu %u:\n", i);
-      PrintTimerList(current_time(), percpu::Get(i).timer_queue.monotonic_timer_list_, buffer);
+      PrintTimerList(current_mono_time(), percpu::Get(i).timer_queue.monotonic_timer_list_, buffer);
       fprintf(&buffer, "boot timers:\n");
       PrintTimerList(current_boot_time(), percpu::Get(i).timer_queue.boot_timer_list_, buffer);
     }

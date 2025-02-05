@@ -7,9 +7,10 @@ use async_trait::async_trait;
 use component_debug::config::RawConfigEntry;
 use errors::ffx_error;
 use ffx_session_launch_args::SessionLaunchCommand;
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_session::{LaunchConfiguration, LauncherProxy};
 use moniker::Moniker;
+use target_holders::{moniker, RemoteControlProxyHolder};
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_developer_remotecontrol as rc};
 
 const SESSION_MANAGER_MONIKER: &str = "/core/session-manager";
@@ -18,7 +19,7 @@ const SESSION_MANAGER_MONIKER: &str = "/core/session-manager";
 pub struct LaunchTool {
     #[command]
     cmd: SessionLaunchCommand,
-    rcs: rc::RemoteControlProxy,
+    rcs: RemoteControlProxyHolder,
     #[with(moniker(SESSION_MANAGER_MONIKER))]
     launcher_proxy: LauncherProxy,
 }
@@ -36,7 +37,7 @@ impl FfxMain for LaunchTool {
 
 pub async fn launch_impl<W: std::io::Write>(
     launcher_proxy: LauncherProxy,
-    rcs: rc::RemoteControlProxy,
+    rcs: RemoteControlProxyHolder,
     cmd: SessionLaunchCommand,
     writer: &mut W,
 ) -> Result<()> {
@@ -83,12 +84,13 @@ async fn resolve_config_capabilities(
 mod test {
     use super::*;
     use fidl_fuchsia_session::LauncherRequest;
+    use target_holders::fake_proxy;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_launch_session() {
         const SESSION_URL: &str = "Session URL";
 
-        let proxy = fho::testing::fake_proxy(|req| match req {
+        let proxy = fake_proxy(|req| match req {
             LauncherRequest::Launch { configuration, responder } => {
                 assert!(configuration.session_url.is_some());
                 let session_url = configuration.session_url.unwrap();
@@ -96,7 +98,7 @@ mod test {
                 let _ = responder.send(Ok(()));
             }
         });
-        let rcs = fho::testing::fake_proxy(|_req| unimplemented!());
+        let rcs = fake_proxy::<rc::RemoteControlProxy>(|_req| unimplemented!()).into();
 
         let launch_cmd = SessionLaunchCommand { url: SESSION_URL.to_string(), config: vec![] };
         let result = launch_impl(proxy, rcs, launch_cmd, &mut std::io::stdout()).await;

@@ -118,15 +118,15 @@ impl Inspector {
     /// Very unsafe. Propagates unrelated errors by panicking.
     #[cfg(test)]
     pub fn is_frozen(&self) -> Result<(), u64> {
-        use inspect_format::Block;
+        use inspect_format::{BlockAccessorExt, Header};
         let vmo = self.storage.as_ref().unwrap();
         let mut buffer: [u8; 16] = [0; 16];
         vmo.read(&mut buffer, 0).unwrap();
-        let block = Block::new(&buffer, inspect_format::BlockIndex::EMPTY);
-        if block.header_generation_count().unwrap() == constants::VMO_FROZEN {
+        let block = buffer.block_at_unchecked::<Header>(inspect_format::BlockIndex::EMPTY);
+        if block.generation_count() == constants::VMO_FROZEN {
             Ok(())
         } else {
-            Err(block.header_generation_count().unwrap())
+            Err(block.generation_count())
         }
     }
 }
@@ -474,10 +474,8 @@ mod fuchsia_tests {
     #[fuchsia::test]
     fn freeze_vmo_works() {
         let inspector = Inspector::default();
-        let initial = inspector
-            .state()
-            .unwrap()
-            .with_current_header(|header| header.header_generation_count().unwrap());
+        let initial =
+            inspector.state().unwrap().with_current_header(|header| header.generation_count());
         let vmo = inspector.frozen_vmo_copy();
 
         let is_frozen_result = inspector.is_frozen();

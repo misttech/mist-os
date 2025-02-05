@@ -4,7 +4,7 @@
 
 use fidl::endpoints;
 use fuchsia_component::client;
-use tracing::*;
+use log::*;
 use {
     fidl_fidl_test_components as ftest, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,

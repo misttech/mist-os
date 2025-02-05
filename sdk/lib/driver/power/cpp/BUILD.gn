@@ -63,6 +63,8 @@ test("power-test") {
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/fidl",
+    "//sdk/lib/fit-promise",
+    "//sdk/lib/inspect/testing/cpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/sys/service/cpp",
     "//src/lib/fxl/test:gtest_main",

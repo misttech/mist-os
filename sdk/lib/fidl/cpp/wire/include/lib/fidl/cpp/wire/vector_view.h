@@ -43,6 +43,7 @@ class VectorView {
 
  public:
   using elem_type = T;
+  using value_type = T;
 
   VectorView() = default;
 

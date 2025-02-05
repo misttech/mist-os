@@ -14,8 +14,8 @@ use argh::FromArgs;
 use config::Config;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component::inspector;
+use log::{debug, error, info, warn};
 use std::path::PathBuf;
-use tracing::{debug, error, info, warn};
 use {fuchsia_trace as trace, fuchsia_trace_provider as trace_provider};
 
 const FONT_MANIFEST_PATH: &str = "/config/data/all.font_manifest.json";

@@ -12,14 +12,14 @@ use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
 use futures::{select, FutureExt, TryStreamExt};
 use ieee80211::Bssid;
+use log::{error, info, warn};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
-use tracing::{info, warn};
 use wlan_common::bss::BssDescription;
-use wlan_common::scan::Compatibility;
+use wlan_common::scan::{Compatibility, CompatibilityExt as _};
 use {
     fidl_fuchsia_power_broker as fidl_power_broker, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_device_service as fidl_device_service,
@@ -34,6 +34,7 @@ pub(crate) trait IfaceManager: Send + Sync {
     async fn list_phys(&self) -> Result<Vec<u16>, Error>;
     fn list_ifaces(&self) -> Vec<u16>;
     async fn get_country(&self, phy_id: u16) -> Result<[u8; 2], Error>;
+    async fn set_country(&self, phy_id: u16, country: [u8; 2]) -> Result<(), Error>;
     async fn query_iface(
         &self,
         iface_id: u16,
@@ -87,6 +88,18 @@ impl IfaceManager for DeviceMonitorIfaceManager {
                 Err(e) => Err(e.into()),
                 Ok(()) => Err(format_err!("get_country returned error with ok status")),
             },
+        }
+    }
+
+    async fn set_country(&self, phy_id: u16, country: [u8; 2]) -> Result<(), Error> {
+        let result = self
+            .monitor_svc
+            .set_country(&fidl_device_service::SetCountryRequest { phy_id, alpha2: country })
+            .await
+            .map_err(Into::<Error>::into)?;
+        match zx::Status::ok(result) {
+            Ok(()) => Ok(()),
+            Err(e) => Err(e.into()),
         }
     }
 
@@ -251,6 +264,7 @@ pub(crate) trait ClientIface: Sync + Send {
     fn on_signal_report(&self, ind: fidl_internal::SignalReportIndication);
     async fn set_power_save_mode(&self, enabled: bool) -> Result<(), Error>;
     async fn set_suspend_mode(&self, enabled: bool) -> Result<(), Error>;
+    async fn set_country(&self, code: [u8; 2]) -> Result<(), Error>;
 }
 
 #[derive(Debug)]
@@ -393,13 +407,21 @@ impl ClientIface for SmeClientIface {
             .iter()
             .filter_map(|r| {
                 let bss_description = BssDescription::try_from(r.bss_description.clone());
-                let compatibility =
-                    r.compatibility.clone().map(|c| Compatibility::try_from(*c)).transpose();
+                let compatibility = Compatibility::try_from_fidl(r.compatibility.clone());
                 match (bss_description, compatibility) {
                     (Ok(bss_description), Ok(compatibility)) if bss_description.ssid == *ssid => {
-                        match bssid {
-                            Some(bssid) if bss_description.bssid != bssid => None,
-                            _ => Some((bss_description, compatibility)),
+                        match compatibility {
+                            Ok(compatible) => match bssid {
+                                Some(bssid) if bss_description.bssid != bssid => None,
+                                _ => Some((bss_description, compatible)),
+                            },
+                            Err(incompatible) => {
+                                error!(
+                                    "BSS ({:?}) is incompatible: {}",
+                                    bss_description.bssid, incompatible,
+                                );
+                                None
+                            }
                         }
                     }
                     _ => None,
@@ -408,14 +430,14 @@ impl ClientIface for SmeClientIface {
             .collect::<Vec<_>>();
         scan_results.sort_by_key(|(bss_description, _)| self.bss_scorer.score_bss(bss_description));
 
-        let (bss_description, compatibility) = match scan_results.pop() {
+        let (bss_description, compatible) = match scan_results.pop() {
             Some(scan_result) => scan_result,
             None => bail!("Requested network not found"),
         };
 
         let credential = passphrase.map(Credential::Password).unwrap_or(Credential::None);
         let authenticator =
-            match get_authenticator(bss_description.bssid, compatibility, &credential) {
+            match get_authenticator(bss_description.bssid, compatible, &credential) {
                 Some(authenticator) => authenticator,
                 None => bail!("Failed to create authenticator for requested network. Unsupported security type, channel, or data rate."),
             };
@@ -531,6 +553,21 @@ impl ClientIface for SmeClientIface {
         drop(power_state);
         self.update_power_level(new_level).await
     }
+
+    async fn set_country(&self, code: [u8; 2]) -> Result<(), Error> {
+        let result = self
+            .monitor_svc
+            .set_country(&fidl_device_service::SetCountryRequest {
+                phy_id: self.phy_id,
+                alpha2: code,
+            })
+            .await
+            .map_err(Into::<Error>::into)?;
+        match zx::Status::ok(result) {
+            Ok(()) => Ok(()),
+            Err(e) => Err(e.into()),
+        }
+    }
 }
 
 /// Wait until stream returns an OnConnectResult event or None. Ignore other event types.
@@ -591,7 +628,10 @@ pub mod test_utils {
 
     pub fn fake_scan_result() -> fidl_sme::ScanResult {
         fidl_sme::ScanResult {
-            compatibility: None,
+            compatibility: fidl_sme::Compatibility::Incompatible(fidl_sme::Incompatible {
+                description: String::from("unknown"),
+                disjoint_security_protocols: None,
+            }),
             timestamp_nanos: 1000,
             bss_description: fidl_common::BssDescription {
                 bssid: [1, 2, 3, 4, 5, 6],
@@ -622,6 +662,7 @@ pub mod test_utils {
         OnSignalReport { ind: fidl_internal::SignalReportIndication },
         SetPowerSaveMode(bool),
         SetSuspendMode(bool),
+        SetCountry([u8; 2]),
     }
 
     pub struct TestClientIface {
@@ -721,6 +762,11 @@ pub mod test_utils {
             self.calls.lock().push(ClientIfaceCall::SetSuspendMode(enabled));
             Ok(())
         }
+
+        async fn set_country(&self, code: [u8; 2]) -> Result<(), Error> {
+            self.calls.lock().push(ClientIfaceCall::SetCountry(code));
+            Ok(())
+        }
     }
 
     // Iface IDs are not currently read out of this struct anywhere, but keep them for future tests.
@@ -729,6 +775,8 @@ pub mod test_utils {
     pub enum IfaceManagerCall {
         ListPhys,
         ListIfaces,
+        GetCountry,
+        SetCountry { phy_id: u16, country: [u8; 2] },
         QueryIface(u16),
         CreateClientIface(u16),
         GetClientIface(u16),
@@ -738,17 +786,23 @@ pub mod test_utils {
     pub struct TestIfaceManager {
         pub client_iface: Mutex<Option<Arc<TestClientIface>>>,
         pub calls: Arc<Mutex<Vec<IfaceManagerCall>>>,
+        country: Arc<Mutex<[u8; 2]>>,
     }
 
     impl TestIfaceManager {
         pub fn new() -> Self {
-            Self { client_iface: Mutex::new(None), calls: Arc::new(Mutex::new(vec![])) }
+            Self {
+                client_iface: Mutex::new(None),
+                calls: Arc::new(Mutex::new(vec![])),
+                country: Arc::new(Mutex::new(*b"WW")),
+            }
         }
 
         pub fn new_with_client() -> Self {
             Self {
                 client_iface: Mutex::new(Some(Arc::new(TestClientIface::new()))),
                 calls: Arc::new(Mutex::new(vec![])),
+                country: Arc::new(Mutex::new(*b"WW")),
             }
         }
 
@@ -762,6 +816,7 @@ pub mod test_utils {
                         ..TestClientIface::new()
                     }))),
                     calls: Arc::new(Mutex::new(vec![])),
+                    country: Arc::new(Mutex::new(*b"WW")),
                 },
                 sender,
             )
@@ -797,7 +852,14 @@ pub mod test_utils {
         }
 
         async fn get_country(&self, _phy_id: u16) -> Result<[u8; 2], Error> {
-            Ok([b'W', b'W'])
+            self.calls.lock().push(IfaceManagerCall::GetCountry);
+            Ok(*self.country.lock())
+        }
+
+        async fn set_country(&self, phy_id: u16, country: [u8; 2]) -> Result<(), Error> {
+            self.calls.lock().push(IfaceManagerCall::SetCountry { phy_id, country });
+            *self.country.lock() = country;
+            Ok(())
         }
 
         async fn query_iface(
@@ -1180,6 +1242,37 @@ mod tests {
     }
 
     #[test]
+    fn test_set_country() {
+        let (mut exec, mut monitor_stream, _sme_stream, manager, _iface) =
+            setup_test_manager_with_iface();
+        let mut set_country_fut = manager.set_country(123, *b"WW");
+        assert_variant!(exec.run_until_stalled(&mut set_country_fut), Poll::Pending);
+        let (req, responder) = assert_variant!(
+            exec.run_until_stalled(&mut monitor_stream.next()),
+            Poll::Ready(Some(Ok(fidl_device_service::DeviceMonitorRequest::SetCountry { req, responder }))) => (req, responder));
+        assert_eq!(req, fidl_device_service::SetCountryRequest { phy_id: 123, alpha2: *b"WW" });
+        responder.send(0).expect("Failed to send result");
+        assert_variant!(exec.run_until_stalled(&mut set_country_fut), Poll::Ready(Ok(())));
+    }
+
+    #[test]
+    fn test_set_country_on_iface() {
+        let (mut exec, mut monitor_stream, _sme_stream, _manager, iface) =
+            setup_test_manager_with_iface();
+        let mut set_country_fut = iface.set_country(*b"WW");
+        assert_variant!(exec.run_until_stalled(&mut set_country_fut), Poll::Pending);
+        let (req, responder) = assert_variant!(
+            exec.run_until_stalled(&mut monitor_stream.next()),
+            Poll::Ready(Some(Ok(fidl_device_service::DeviceMonitorRequest::SetCountry { req, responder }))) => (req, responder));
+        assert_eq!(
+            req,
+            fidl_device_service::SetCountryRequest { phy_id: iface.phy_id, alpha2: *b"WW" }
+        );
+        responder.send(0).expect("Failed to send result");
+        assert_variant!(exec.run_until_stalled(&mut set_country_fut), Poll::Ready(Ok(())));
+    }
+
+    #[test]
     fn test_trigger_scan() {
         let (mut exec, _monitor_stream, mut sme_stream, _manager, iface) =
             setup_test_manager_with_iface();
@@ -1264,7 +1357,9 @@ mod tests {
         );
         *iface.last_scan_results.lock() = vec![fidl_sme::ScanResult {
             bss_description: bss_description.clone(),
-            compatibility: Some(Box::new(fidl_sme::Compatibility { mutual_security_protocols })),
+            compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
+                mutual_security_protocols,
+            }),
             timestamp_nanos: 1,
         }];
 
@@ -1342,9 +1437,9 @@ mod tests {
             );
             *iface.last_scan_results.lock() = vec![fidl_sme::ScanResult {
                 bss_description: bss_description.clone(),
-                compatibility: Some(Box::new(fidl_sme::Compatibility {
+                compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
                     mutual_security_protocols,
-                })),
+                }),
                 timestamp_nanos: 1,
             }];
         }
@@ -1364,9 +1459,9 @@ mod tests {
         );
         *iface.last_scan_results.lock() = vec![fidl_sme::ScanResult {
             bss_description: bss_description.clone(),
-            compatibility: Some(Box::new(fidl_sme::Compatibility {
+            compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
                 mutual_security_protocols: vec![fidl_security::Protocol::Open],
-            })),
+            }),
             timestamp_nanos: 1,
         }];
 
@@ -1438,9 +1533,9 @@ mod tests {
         );
         *iface.last_scan_results.lock() = vec![fidl_sme::ScanResult {
             bss_description: bss_description.clone(),
-            compatibility: Some(Box::new(fidl_sme::Compatibility {
+            compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
                 mutual_security_protocols: vec![fidl_security::Protocol::Open],
-            })),
+            }),
             timestamp_nanos: 1,
         }];
 
@@ -1533,9 +1628,9 @@ mod tests {
             // for the BSS described by `bss_description`
             *iface.last_scan_results.lock() = vec![fidl_sme::ScanResult {
                 bss_description,
-                compatibility: Some(Box::new(fidl_sme::Compatibility {
+                compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
                     mutual_security_protocols: vec![fidl_security::Protocol::Open],
-                })),
+                }),
                 timestamp_nanos: 1,
             }];
 
@@ -1553,9 +1648,9 @@ mod tests {
             .into_iter()
             .map(|bss_description| fidl_sme::ScanResult {
                 bss_description,
-                compatibility: Some(Box::new(fidl_sme::Compatibility {
+                compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
                     mutual_security_protocols: vec![fidl_security::Protocol::Open],
-                })),
+                }),
                 timestamp_nanos: 1,
             })
             .collect::<Vec<_>>();

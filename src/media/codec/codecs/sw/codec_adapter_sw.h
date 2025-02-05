@@ -21,7 +21,7 @@
 #include "buffer_pool.h"
 #include "src/lib/fxl/macros.h"
 #include "src/lib/fxl/synchronization/thread_annotations.h"
-#include "src/media/lib/mpsc_queue/mpsc_queue.h"
+#include "src/media/lib/blocking_mpsc_queue/blocking_mpsc_queue.h"
 
 static constexpr uint32_t kMinOutputPacketCountForClient = 1;
 static constexpr uint32_t kMaxOutputPacketCountForClient = 10;

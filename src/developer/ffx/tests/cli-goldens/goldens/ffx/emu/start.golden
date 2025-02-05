@@ -74,7 +74,7 @@
       "optionality": "optional",
       "long": "--device",
       "short": null,
-      "description": "the virtual device specification used to configure the emulator. This can be the name of a device listed in the product bundle, or the path to a custom virtual device file. A default for this flag can be set by running `ffx config set emu.device <type>`. If --device is not specified and no default is set, then `ffx emu` will attempt to use the first device listed in the PBM(v1), or the product bundle's recommended device(v2).",
+      "description": "the virtual device specification used to configure the emulator. This can be the name of a device listed in the product bundle, or the path to a custom virtual device file. A default for this flag can be set by running `ffx config set emu.device <type>`. If --device is not specified and no default is set, then `ffx emu` will attempt to use the product bundle's recommended device.",
       "hidden": false
     },
     {
@@ -110,7 +110,7 @@
       "optionality": "optional",
       "long": "--engine",
       "short": null,
-      "description": "emulation engine to use for this instance. Allowed values are \"femu\" which is based on Android Emulator, and \"qemu\" which uses the version of Qemu packaged with Fuchsia. Default is \"femu\". This can be overridden by running `ffx config set emu.engine <type>`.",
+      "description": "emulation engine to use for this instance. Allowed values are \"femu\" which is based on Android Emulator, and \"qemu\" which uses the version of Qemu packaged with Fuchsia. Default is \"femu\", which can be overridden by running `ffx config set emu.engine <type>`. Engine defaults are overridden to \"qemu\" in cases of incompatibility (cross cpu or uefi emulation).",
       "hidden": false
     },
     {

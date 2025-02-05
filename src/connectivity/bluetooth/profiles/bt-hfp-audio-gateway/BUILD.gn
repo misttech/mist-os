@@ -49,9 +49,9 @@ rustc_binary("bin") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:num-traits",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [
@@ -209,7 +209,7 @@ rustc_test("bt_hfp_a2dp_controller_bin") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/a2dp.rs" ]

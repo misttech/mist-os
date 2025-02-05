@@ -62,8 +62,8 @@ impl Manager {
             }
             let topological_path = device.topological_path().to_string();
             if ignored_paths.remove(&topological_path) {
-                tracing::info!(
-                    topological_path = topological_path.as_str(),
+                log::info!(
+                    topological_path = topological_path.as_str();
                     "Skipping explicitly ignored device."
                 );
                 continue;
@@ -73,13 +73,13 @@ impl Manager {
             let label = device.partition_label().await.ok().map(|s| s.to_string());
             let type_guid =
                 device.partition_type().await.ok().map(|guid| uuid::Uuid::from_bytes(guid.clone()));
-            tracing::info!(
+            log::info!(
                 topological_path=topological_path.as_str(),
-                path = %device.path(),
-                ?content_format,
-                ?label,
-                ?type_guid,
-                is_ramdisk = device.is_fshost_ramdisk(),
+                path:% = device.path(),
+                content_format:?,
+                label:?,
+                type_guid:?,
+                is_ramdisk = device.is_fshost_ramdisk();
                 "Matching device"
             );
 
@@ -88,11 +88,11 @@ impl Manager {
                 Ok(true) => {}
                 // TODO(https://fxbug.dev/42069366): //src/tests/installer and //src/tests/femu look for
                 // "/dev/class/block/008 ignored"
-                Ok(false) => tracing::info!(path = %device_path, "ignored"),
+                Ok(false) => log::info!(path:% = device_path; "ignored"),
                 Err(error) => {
-                    tracing::error!(
-                        path = %device_path,
-                        ?error,
+                    log::error!(
+                        path:% = device_path,
+                        error:?;
                         "Failed to match device",
                     );
                 }

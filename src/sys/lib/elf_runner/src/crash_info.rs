@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use futures::lock::Mutex;
+use log::*;
 use moniker::Moniker;
 use std::sync::Arc;
-use tracing::*;
 use {fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync};
 
 /// Any stored data is removed after this amount of time

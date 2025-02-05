@@ -38,6 +38,15 @@
   related_guides: [""]
   area: ["UI", "HCI"]
 
+- term: "API element"
+  short_description: "An API element is an individual piece that makes up an API."
+  full_description: "An API element is an individual piece that makes up an API.
+  Examples include types, members, and functions. For FIDL, elements include
+  protocols, methods, tables, and members."
+  see_also: [""]
+  related_guides: [""]
+  area: ["General", "System"]
+
 - term: "Assembly Config"
   short_description: ""
   full_description: "<p>The JSON file that the product owner writes in order to specify (1)

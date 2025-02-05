@@ -60,8 +60,8 @@ shadow_call_sp .req x18
   // continue to use .cfi_adjust_cfa_offset for pushes and pops.
   .cfi_adjust_cfa_offset 16 + \frame_extra_size
   mov x29, sp
-  .cfi_offset x29, 0 - (16 + \frame_extra_size)
-  .cfi_offset x30, 8 - (16 + \frame_extra_size)
+  .cfi_rel_offset x29, 0
+  .cfi_rel_offset x30, 8
 .endm
 
 // Epilogue sequence to match .prologue.fp with the same argument.

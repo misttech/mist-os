@@ -180,7 +180,7 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
                                  const arch_exception_context_t& context) TA_EXCL(get_lock());
 
   // Fetch the state of the thread for userspace tools.
-  zx_status_t GetInfoForUserspace(zx_info_thread_t* info);
+  zx_info_thread_t GetInfoForUserspace() const;
 
   // Fetch per thread stats for userspace.
   zx_status_t GetStatsForUserspace(zx_info_thread_stats_t* info) TA_EXCL(get_lock());
@@ -247,10 +247,10 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
   void UpdateRuntimeStats(thread_state new_state);
 
   // Update time spent handling page faults. This is called by the VM during page fault handling.
-  void AddPageFaultTicks(zx_ticks_t ticks);
+  void AddPageFaultTicks(zx_duration_mono_ticks_t ticks);
 
   // Update time spent contended on locks. This is called by lock implementations.
-  void AddLockContentionTicks(zx_ticks_t ticks);
+  void AddLockContentionTicks(zx_duration_mono_ticks_t ticks);
 
   class CoreThreadObservation {
    public:

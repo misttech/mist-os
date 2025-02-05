@@ -449,7 +449,7 @@ void Dir::DeleteEntry(const DentryInfo &info, fbl::RefPtr<Page> &page, VnodeF2fs
   page_lock.reset();
 
   if (bit_pos == kNrDentryInBlock) {
-    TruncateHoleUnsafe(page->GetIndex(), page->GetIndex() + 1, true);
+    TruncateHoleUnsafe(page->GetIndex(), page->GetIndex() + 1);
   }
 }
 
@@ -709,6 +709,15 @@ zx::result<std::vector<LockedPage>> Dir::GetLockedDataPages(const pgoff_t start,
     return status.take_error();
   }
   return zx::ok(std::move(pages));
+}
+
+zx::result<LockedPage> Dir::FindGcPage(pgoff_t index) {
+  zx::result page_or = FindDataPage(index);
+  if (page_or.is_error()) {
+    return page_or.take_error();
+  }
+  page_or->WaitOnWriteback();
+  return page_or;
 }
 
 }  // namespace f2fs

@@ -35,7 +35,7 @@ rustc_library("component") {
   configs += [ "//build/config/rust:bootfs" ]
 
   if (is_mistos) {
-    configs += [ "//build/config/mistos:mistos_config" ]
+    configs += [ "//build/config/fuchsia:mistos_config" ]
   }
 
   sources = [

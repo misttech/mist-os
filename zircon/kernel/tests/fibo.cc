@@ -58,7 +58,7 @@ int fibo(int argc, const cmd_args* argv, uint32_t) {
     return -1;
   }
 
-  zx_time_t tim = current_time();
+  zx_instant_mono_t tim = current_mono_time();
 
   Thread* t = Thread::Create("fibo", &fibo_thread, (void*)(uintptr_t)argv[1].u, DEFAULT_PRIORITY);
   t->Resume();
@@ -66,7 +66,7 @@ int fibo(int argc, const cmd_args* argv, uint32_t) {
   int retcode;
   t->Join(&retcode, ZX_TIME_INFINITE);
 
-  zx_duration_t msec_duration = (current_time() - tim) / ZX_MSEC(1);
+  zx_duration_mono_t msec_duration = (current_mono_time() - tim) / ZX_MSEC(1);
 
   printf("fibo %d\n", retcode);
   printf("took %" PRIi64 " msecs to calculate\n", msec_duration);

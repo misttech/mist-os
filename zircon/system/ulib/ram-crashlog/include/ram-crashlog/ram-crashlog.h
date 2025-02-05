@@ -42,35 +42,66 @@ __BEGIN_CDECLS
 
 #define RAM_CRASHLOG_MAGIC_0 ((uint64_t)(0x6f8962d66b28504f))
 #define RAM_CRASHLOG_MAGIC_1 (~RAM_CRASHLOG_MAGIC_0)
+#define RAM_CRASHLOG_MAGIC_2 ((uint64_t)(0x4915dfded4f3336c))
+#define RAM_CRASHLOG_MAGIC_3 (~RAM_CRASHLOG_MAGIC_2)
 
 typedef struct {
-  zx_duration_t uptime;          // Best estimate of system uptime.
+  zx_instant_boot_t uptime;      // Best estimate of system uptime.
   zircon_crash_reason_t reason;  // The system's best guess as to the reason for crash/reboot
   uint32_t payload_len;
   uint32_t payload_crc32;  // A CRC32 of just the payload section of the crashlog.
   uint32_t header_crc32;   // A CRC32 of just this header, excluding |header_crc32|.
-} ram_crashlog_header_t;
+} ram_crashlog_header_v0_t;
 
 typedef struct {
-  // Magic number sanity check.  Also indicates which of the following two
+  // Uptime: The amount of time elapsed since the system first booted including any time spent
+  // suspended. In other words, this is the last known valid boot time.
+  zx_instant_boot_t uptime;
+  // Runtime: The amount of time elapsed since the system first booted _not_ including any time
+  // spent suspended. In other words, this is the last known valid monotonic time.
+  zx_instant_mono_t runtime;
+  zircon_crash_reason_t reason;  // The system's best guess as to the reason for crash/reboot
+  uint32_t payload_len;
+  uint32_t payload_crc32;  // A CRC32 of just the payload section of the crashlog.
+  uint32_t header_crc32;   // A CRC32 of just this header, excluding |header_crc32|.
+} ram_crashlog_header_v1_t;
+
+typedef struct {
+  // Magic number validity check.  Also indicates which of the following two
   // headers is considered active.  A value of MAGIC_0 indicates that hdr[0] is
   // active, while MAGIC_1 indicates that hdr[1] is active.
   uint64_t magic;
 
   // The two copies of the headers.  Check |magic| to see which (if any) is valid.
-  ram_crashlog_header_t hdr[2];
+  ram_crashlog_header_v0_t hdr[2];
 
   // Payload comes immediately after the top level header structure.
-} ram_crashlog_t;
+} ram_crashlog_v0_t;
+
+typedef struct {
+  // Magic number validity check. This also functions as a version number for the
+  // headers. If magic is equal to:
+  // * MAGIC_0 - MAGIC_1: We are using V0 headers, so code should use ram_crashlog_v0_t.
+  // * MAGIC_2 - MAGIC_3: We are using V1 headers and either hdr[0] or hdr[1] are valid
+  //   respectively.
+  uint64_t magic;
+
+  // The two copies of the v1 headers. Check |magic| to see which (if any) is valid.
+  ram_crashlog_header_v1_t hdr[2];
+
+  // Payload comes immediately after the top level header structure.
+} ram_crashlog_v1_t;
 
 // A structure used to provide details about a recovered crashlog.  When a
 // crashlog is recovered successfully, this structure will convey:
-// 1) The crash reason
-// 2) The uptime estimate
-// 3) An indication of the payload's integrity.
-// 4) A length of the memory mapped payload.
+// 1) The crash reason.
+// 2) The uptime estimate.
+// 3) The runtime estimate.
+// 4) An indication of the payload's integrity.
+// 5) A length of the memory mapped payload.
 typedef struct {
-  zx_duration_t uptime;
+  zx_instant_boot_t uptime;
+  zx_instant_mono_t runtime;
   zircon_crash_reason_t reason;
   bool payload_valid;
   const void* payload;
@@ -101,8 +132,9 @@ typedef struct {
 // |buf_len|     : The max number of bytes which may be stored at |buf|
 // |payload|     : The optional pointer to the payload to be stored.  May be NULL.
 // |payload_len| : The length of the payload buffer.  Must be 0 if |payload| is NULL
-// |sw_resaon|   : The reason that the system crashed, according to software.
-// |uptime|      : Our best guess as to the uptime of the system before reboot/crash.
+// |sw_reason|   : The reason that the system crashed, according to software.
+// |uptime|      : Our best guess as to the uptime (boot) of the system before reboot/crash.
+// |runtime|     : Our best guess as the the runtime (monotonic) of the system before reboot/crash.
 //
 // Return Values:
 // ZX_INVALID_ARGS     : Something is wrong with either buf, payload, payload_len, or sw_reason
@@ -111,7 +143,8 @@ typedef struct {
 // ZX_OK               : Log was successfully stowed.
 //
 zx_status_t ram_crashlog_stow(void* buf, size_t buf_len, const void* payload, uint32_t payload_len,
-                              zircon_crash_reason_t sw_reason, zx_time_t uptime);
+                              zircon_crash_reason_t sw_reason, zx_instant_boot_t uptime,
+                              zx_instant_mono_t runtime);
 
 // Attempt to recover the crashlog located at |buf|, returning details about the
 // recovered log in the user-supplied log_out structure.  Provided that valid
@@ -132,7 +165,7 @@ zx_status_t ram_crashlog_stow(void* buf, size_t buf_len, const void* payload, ui
 // ZX_INVALID_ARGS      : Something is wrong with either buf, log_out.
 // ZX_BUFFER_TOO_SMALL  : buf_len is too small to hold a crashlog, even if the payload is 0 bytes
 //                        long.
-// ZX_IO_DATA_INTEGRITY : The log failed fundamental sanity checks and cannot be recovered.
+// ZX_IO_DATA_INTEGRITY : The log failed fundamental validity checks and cannot be recovered.
 // ZX_OK                : Log was successfully recovered.
 //
 zx_status_t ram_crashlog_recover(const void* buf, size_t buf_len,

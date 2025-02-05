@@ -71,7 +71,8 @@ inline void timer_set_initial_ticks_offset(uint64_t offset) {
 
 // Converts a ticks value on the monotonic timeline to a raw hardware ticks value.
 // Returns the raw ticks value if the monotonic clock is not paused, and nullopt if it is.
-inline ktl::optional<zx_ticks_t> timer_convert_mono_to_raw_ticks(zx_ticks_t mono_ticks) {
+inline ktl::optional<zx_ticks_t> timer_convert_mono_to_raw_ticks(
+    zx_instant_mono_ticks_t mono_ticks) {
   const zx_ticks_t modifier = internal::mono_ticks_modifier.load(ktl::memory_order_relaxed);
   if (modifier > 0) {
     return ktl::nullopt;
@@ -112,7 +113,7 @@ void timer_tick();
 bool platform_usermode_can_access_tick_registers();
 
 // Current monotonic time in nanoseconds.
-zx_time_t current_time();
+zx_instant_mono_t current_mono_time();
 
 // Current boot time in nanoseconds.
 zx_instant_boot_t current_boot_time();
@@ -193,7 +194,7 @@ inline zx_ticks_t platform_current_raw_ticks() {
 }
 
 template <GetTicksSyncFlag Flags>
-inline zx_ticks_t timer_current_mono_ticks_synchronized() {
+inline zx_instant_mono_ticks_t timer_current_mono_ticks_synchronized() {
   while (true) {
     const zx_ticks_t obs1 = internal::mono_ticks_modifier.load(ktl::memory_order_relaxed);
     const zx_ticks_t raw_ticks = platform_current_raw_ticks_synchronized<Flags>();
@@ -209,13 +210,13 @@ inline zx_ticks_t timer_current_mono_ticks_synchronized() {
     }
   }
 }
-inline zx_ticks_t timer_current_mono_ticks() {
+inline zx_instant_mono_ticks_t timer_current_mono_ticks() {
   return timer_current_mono_ticks_synchronized<GetTicksSyncFlag::kAfterPreviousLoads |
                                                GetTicksSyncFlag::kBeforeSubsequentLoads>();
 }
 
 template <GetTicksSyncFlag Flags>
-inline zx_ticks_t timer_current_boot_ticks_synchronized() {
+inline zx_instant_boot_ticks_t timer_current_boot_ticks_synchronized() {
   while (true) {
     const zx_ticks_t off1 = internal::boot_ticks_offset.load(ktl::memory_order_relaxed);
     const zx_ticks_t raw_ticks = platform_current_raw_ticks_synchronized<Flags>();
@@ -225,15 +226,15 @@ inline zx_ticks_t timer_current_boot_ticks_synchronized() {
     }
   }
 }
-inline zx_ticks_t timer_current_boot_ticks() {
+inline zx_instant_boot_ticks_t timer_current_boot_ticks() {
   return timer_current_boot_ticks_synchronized<GetTicksSyncFlag::kNone>();
 }
 
 // The current monotonic time in ticks.
-inline zx_ticks_t current_ticks() { return timer_current_mono_ticks(); }
+inline zx_instant_mono_ticks_t current_mono_ticks() { return timer_current_mono_ticks(); }
 
 // The current boot time in ticks.
-inline zx_ticks_t current_boot_ticks() { return timer_current_boot_ticks(); }
+inline zx_instant_boot_ticks_t current_boot_ticks() { return timer_current_boot_ticks(); }
 
 // Pause/unpause the monotonic clock.
 //
@@ -243,14 +244,15 @@ inline zx_ticks_t current_boot_ticks() { return timer_current_boot_ticks(); }
 //
 // It is NOT safe to call timer_pause_monotonic and timer_unpause_monotonic concurrently.
 inline void timer_pause_monotonic() {
-  const zx_ticks_t paused_ticks = current_ticks();
+  const zx_instant_mono_ticks_t paused_ticks = current_mono_ticks();
   DEBUG_ASSERT(paused_ticks > 0);
   internal::mono_ticks_modifier.store(paused_ticks, ktl::memory_order_relaxed);
 }
 inline void timer_unpause_monotonic() {
   // First, load the existing modifier and assert that it is actually a paused value by checking
   // that it is positive.
-  const zx_ticks_t paused_value = internal::mono_ticks_modifier.load(ktl::memory_order_relaxed);
+  const zx_instant_mono_ticks_t paused_value =
+      internal::mono_ticks_modifier.load(ktl::memory_order_relaxed);
   DEBUG_ASSERT(paused_value > 0);
 
   // Then, compute the new offset by subtracting the current raw ticks counter value from the

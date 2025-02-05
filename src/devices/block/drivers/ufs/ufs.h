@@ -6,6 +6,7 @@
 #define SRC_DEVICES_BLOCK_DRIVERS_UFS_UFS_H_
 
 #include <fidl/fuchsia.hardware.pci/cpp/wire.h>
+#include <fidl/fuchsia.hardware.ufs/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -148,7 +149,9 @@ struct InspectProperties {
 
 using HostControllerCallback = fit::function<zx::result<>(NotifyEvent, uint64_t data)>;
 
-class Ufs : public fdf::DriverBase, public scsi::Controller {
+class Ufs : public fdf::DriverBase,
+            public scsi::Controller,
+            public fidl::WireServer<fuchsia_hardware_ufs::Ufs> {
  public:
   static constexpr char kDriverName[] = "ufs";
   static constexpr char kHardwarePowerElementName[] = "ufs-hardware";
@@ -313,6 +316,25 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
   // WatchHardwareRequiredLevel().)
   void WatchWakeOnRequestRequiredLevel();
 
+  void Serve(fidl::ServerEnd<fuchsia_hardware_ufs::Ufs> server);
+
+  // fidl::WireServer<fuchsia_hardware_ufs::Ufs>
+  void ReadDescriptor(ReadDescriptorRequestView request,
+                      ReadDescriptorCompleter::Sync &completer) override;
+  void WriteDescriptor(WriteDescriptorRequestView request,
+                       WriteDescriptorCompleter::Sync &completer) override;
+  void ReadFlag(ReadFlagRequestView request, ReadFlagCompleter::Sync &completer) override;
+  void SetFlag(SetFlagRequestView request, SetFlagCompleter::Sync &completer) override;
+  void ClearFlag(ClearFlagRequestView request, ClearFlagCompleter::Sync &completer) override;
+  void ToggleFlag(ToggleFlagRequestView request, ToggleFlagCompleter::Sync &completer) override;
+  void ReadAttribute(ReadAttributeRequestView request,
+                     ReadAttributeCompleter::Sync &completer) override;
+  void WriteAttribute(WriteAttributeRequestView request,
+                      WriteAttributeCompleter::Sync &completer) override;
+  void SendUicCommand(SendUicCommandRequestView request,
+                      SendUicCommandCompleter::Sync &completer) override;
+  void Request(RequestRequestView request, RequestCompleter::Sync &completer) override;
+
   fidl::WireSyncClient<fuchsia_hardware_pci::Device> pci_;
   zx::vmo mmio_buffer_vmo_;
   uint64_t mmio_buffer_size_ = 0;
@@ -396,6 +418,8 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
   fidl::WireClient<fuchsia_power_broker::RequiredLevel> wake_on_request_required_level_client_;
 
   fidl::ClientEnd<fuchsia_power_broker::LeaseControl> hardware_power_lease_control_client_end_;
+
+  fidl::ServerBindingGroup<fuchsia_hardware_ufs::Ufs> bindings_;
 };
 
 }  // namespace ufs

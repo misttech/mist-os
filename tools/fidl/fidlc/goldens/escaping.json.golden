@@ -25,7 +25,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "string",
         "kind_v2": "string",
         "nullable": false,
         "type_shape_v2": {
@@ -59,7 +58,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "string",
         "kind_v2": "string",
         "nullable": false,
         "type_shape_v2": {
@@ -93,7 +91,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "string",
         "kind_v2": "string",
         "nullable": false,
         "type_shape_v2": {
@@ -127,7 +124,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "string",
         "kind_v2": "string",
         "nullable": false,
         "type_shape_v2": {
@@ -161,7 +157,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "string",
         "kind_v2": "string",
         "nullable": false,
         "type_shape_v2": {
@@ -195,7 +190,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "string",
         "kind_v2": "string",
         "nullable": false,
         "type_shape_v2": {
@@ -229,7 +223,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "string",
         "kind_v2": "string",
         "nullable": false,
         "type_shape_v2": {
@@ -263,7 +256,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "string",
         "kind_v2": "string",
         "nullable": false,
         "type_shape_v2": {
@@ -297,7 +289,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "string",
         "kind_v2": "string",
         "nullable": false,
         "type_shape_v2": {

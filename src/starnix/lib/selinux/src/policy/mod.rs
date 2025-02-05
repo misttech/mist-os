@@ -9,6 +9,7 @@ pub mod metadata;
 pub mod parsed_policy;
 pub mod parser;
 
+mod constraints;
 mod extensible_bitmap;
 mod security_context;
 mod symbols;
@@ -26,7 +27,7 @@ use parsed_policy::ParsedPolicy;
 use parser::{ByRef, ByValue, ParseStrategy};
 use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::num::NonZeroU32;
+use std::num::{NonZeroU32, NonZeroU64};
 use std::ops::Deref;
 use symbols::{find_class_by_name, find_common_symbol_by_name_bytes};
 use zerocopy::{
@@ -75,6 +76,10 @@ pub struct AccessDecision {
     pub auditallow: AccessVector,
     pub auditdeny: AccessVector,
     pub flags: u32,
+
+    /// If this field is set then denials should be audit-logged with "todo_deny" as the reason, with
+    /// the `bug` number included in the audit message.
+    pub todo_bug: Option<NonZeroU64>,
 }
 
 impl Default for AccessDecision {
@@ -87,7 +92,13 @@ impl AccessDecision {
     /// Returns an [`AccessDecision`] with the specified permissions to `allow`, and default audit
     /// behaviour.
     pub(super) const fn allow(allow: AccessVector) -> Self {
-        Self { allow, auditallow: AccessVector::NONE, auditdeny: AccessVector::ALL, flags: 0 }
+        Self {
+            allow,
+            auditallow: AccessVector::NONE,
+            auditdeny: AccessVector::ALL,
+            flags: 0,
+            todo_bug: None,
+        }
     }
 }
 
@@ -226,6 +237,11 @@ impl<PS: ParseStrategy> Policy<PS> {
             .collect()
     }
 
+    /// Returns the parsed `Type` corresponding to the specified `name` (including aliases).
+    pub(super) fn type_id_by_name(&self, name: &str) -> Option<TypeId> {
+        self.0.parsed_policy().type_by_name(name).map(|x| x.id())
+    }
+
     /// Returns the set of permissions for the given class, including both the explicitly owned permissions
     /// and the inherited ones from common symbols. Each permission is a tuple of the permission identifier
     /// and it's name.
@@ -309,8 +325,8 @@ impl<PS: ParseStrategy> Policy<PS> {
 
     /// Returns the security context that should be applied to a newly created file-like SELinux
     /// object according to `source` and `target` security contexts, as well as the new object's
-    /// `class`. Returns an error if the security context for such an object is not well-defined
-    /// by this [`Policy`].
+    /// `class`. This context should be used only if no filename-transition match is found, via
+    /// [`new_file_security_context_by_name()`].
     pub fn new_file_security_context(
         &self,
         source: &SecurityContext,
@@ -318,6 +334,21 @@ impl<PS: ParseStrategy> Policy<PS> {
         class: &FileClass,
     ) -> SecurityContext {
         self.0.new_file_security_context(source, target, class)
+    }
+
+    /// Returns the security context that should be applied to a newly created file-like SELinux
+    /// object according to `source` and `target` security contexts, as well as the new object's
+    /// `class` and `name`. If no filename-transition rule matches the supplied arguments then
+    /// `None` is returned, and the caller should fall-back to filename-independent labeling
+    /// via [`new_file_security_context()`]
+    pub fn new_file_security_context_by_name(
+        &self,
+        source: &SecurityContext,
+        target: &SecurityContext,
+        class: &FileClass,
+        name: NullessByteStr<'_>,
+    ) -> Option<SecurityContext> {
+        self.0.new_file_security_context_by_name(source, target, class, name)
     }
 
     /// Returns the security context that should be applied to a newly created SELinux

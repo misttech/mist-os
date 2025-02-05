@@ -59,8 +59,8 @@ TEST_F(RedactorFromConfigTest, FilePresent) {
   std::string text(kUnredacted);
   EXPECT_EQ(redactor->Redact(text), kRedacted);
   EXPECT_THAT(InspectTree(), NodeMatches(AllOf(PropertyList(ElementsAreArray({
-                                 BoolIs("redaction_enabled", true),
                                  UintIs("num_redaction_ids", 1u),
+                                 BoolIs("redaction_enabled", true),
                              })))));
 
   redactor = RedactorFromConfig(nullptr, config, [] { return 10; });

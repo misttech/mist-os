@@ -17,6 +17,10 @@ rustc_library("lib") {
     # TODO(b/386792198) Move ToolSuite to internal crate.
     "//src/developer/ffx/lib/fho:*",
 
+    # TODO(b/287862487) TestEnv should be refactored
+    # to be more like FhoEnv
+    "//src/developer/ffx/lib/fho/testing:*",
+
     # E2E tests that parse the JSON ArgsInfo
     "//src/developer/ffx/tests/cli-goldens:*",
     "//src/developer/ffx/tests/help-json:*",
@@ -45,6 +49,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:regex",
+    "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:thiserror",

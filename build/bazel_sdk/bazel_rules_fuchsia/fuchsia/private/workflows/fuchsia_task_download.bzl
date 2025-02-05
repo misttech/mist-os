@@ -43,7 +43,7 @@ def _fuchsia_task_download_impl(ctx, make_shell_task):
 _fuchsia_task_download, _fuchsia_task_download_for_test, fuchsia_task_download = shell_task_rule(
     doc = """Downloads a product bundle.""",
     implementation = _fuchsia_task_download_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "product_bundle": attr.label(
             doc = "The product bundle to download",

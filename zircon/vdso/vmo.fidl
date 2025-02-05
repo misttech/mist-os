@@ -555,6 +555,8 @@ closed protocol Vmo {
     ///
     /// `ZX_ERR_NO_MEMORY`  Failure due to lack of system memory.
     ///
+    /// `ZX_ERR_NOT_SUPPORTED` VMO is physical or contiguous.
+    ///
     /// ## See also
     ///
     ///  - [`zx_vmo_create()`]

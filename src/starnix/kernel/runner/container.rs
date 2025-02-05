@@ -19,7 +19,6 @@ use bstr::BString;
 #[cfg(not(feature = "starnix_lite"))]
 use fasync::OnSignals;
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
-use fidl::AsyncChannel;
 use fidl_fuchsia_component_runner::{TaskProviderRequest, TaskProviderRequestStream};
 use fidl_fuchsia_feedback::CrashReporterMarker;
 use fidl_fuchsia_scheduler::RoleManagerMarker;
@@ -29,6 +28,7 @@ use fuchsia_component::server::ServiceFs;
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec};
+use starnix_core::container_namespace::ContainerNamespace;
 use starnix_core::execution::execute_task_with_prerun_result;
 use starnix_core::fs::fuchsia::create_remotefs_filesystem;
 use starnix_core::fs::tmpfs::TmpFs;
@@ -36,9 +36,12 @@ use starnix_core::security;
 use starnix_core::task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task};
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_core::time::utc::update_utc_clock;
-use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, Namespace, WhatToMount};
+use starnix_core::vfs::{
+    FileSystemOptions, FsContext, LookupContext, Namespace, StaticDirectoryBuilder, WhatToMount,
+};
 use starnix_logging::{
-    log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
+    log_debug, log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX,
+    NAME_CREATE_CONTAINER,
 };
 use starnix_modules::{init_common_devices, register_common_file_systems};
 use starnix_modules_layeredfs::LayeredFs;
@@ -49,7 +52,7 @@ use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::errors::{SourceContext, ENOENT};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
-use starnix_uapi::{errno, rlimit};
+use starnix_uapi::{errno, pid_t, rlimit};
 use std::collections::BTreeMap;
 use std::ffi::CString;
 use std::ops::DerefMut;
@@ -178,19 +181,14 @@ pub struct Config {
     /// The remote block devices to use for the container.
     remote_block_devices: Vec<String>,
 
-    /// The `/pkg` directory of the container.
-    pkg_dir: Option<zx::Channel>,
-
     /// The outgoing directory of the container, used to serve protocols on behalf of the container.
     /// For example, the starnix_kernel serves a component runner in the containers' outgoing
     /// directory.
     outgoing_dir: Option<zx::Channel>,
 
-    /// The svc directory of the container, used to access protocols from the container.
-    svc_dir: Option<zx::Channel>,
-
-    /// The data directory of the container, used to persist data.
-    data_dir: Option<zx::Channel>,
+    /// Mapping of top-level namespace entries to an associated channel.
+    /// For example, "/svc" to the respective channel.
+    container_namespace: ContainerNamespace,
 
     /// The runtime directory of the container, used to provide CF introspection.
     runtime_dir: Option<ServerEnd<fio::DirectoryMarker>>,
@@ -213,18 +211,6 @@ pub struct Config {
     /// Component moniker token for the container component. This token is used in various protocols
     /// to uniquely identify a component.
     component_instance: Option<zx::Event>,
-}
-
-fn get_ns_entry(
-    ns: &mut Option<Vec<frunner::ComponentNamespaceEntry>>,
-    entry_name: &str,
-) -> Option<zx::Channel> {
-    ns.as_mut().and_then(|ns| {
-        ns.iter_mut()
-            .find(|entry| entry.path == Some(entry_name.to_string()))
-            .and_then(|entry| entry.directory.take())
-            .map(|dir| dir.into_channel())
-    })
 }
 
 fn get_config_from_component_start_info(mut start_info: frunner::ComponentStartInfo) -> Config {
@@ -252,11 +238,9 @@ fn get_config_from_component_start_info(mut start_info: frunner::ComponentStartI
     let remote_block_devices = get_strvec("remote_block_devices");
     let rlimits = get_strvec("rlimits");
     let startup_file_path = get_string("startup_file_path");
+    let ns = start_info.ns.take().expect("Unable to access container namespace!");
+    let container_namespace = ContainerNamespace::from(ns);
 
-    let mut ns = start_info.ns.take();
-    let pkg_dir = get_ns_entry(&mut ns, "/pkg");
-    let svc_dir = get_ns_entry(&mut ns, "/svc");
-    let data_dir = get_ns_entry(&mut ns, "/data");
     let outgoing_dir = start_info.outgoing_dir.take().map(|dir| dir.into_channel());
     let component_instance = start_info.component_instance;
 
@@ -273,10 +257,8 @@ fn get_config_from_component_start_info(mut start_info: frunner::ComponentStartI
         startup_file_path,
         #[cfg(not(feature = "starnix_lite"))]
         remote_block_devices,
-        pkg_dir,
         outgoing_dir,
-        svc_dir,
-        data_dir,
+        container_namespace,
         component_instance,
         runtime_dir: start_info.runtime_dir,
     }
@@ -370,7 +352,11 @@ impl Container {
     pub async fn serve(&self, service_config: ContainerServiceConfig) -> Result<(), Error> {
         let (r, _) = futures::join!(
             self.serve_outgoing_directory(service_config.config.outgoing_dir),
-            server_component_controller(service_config.request_stream, service_config.receiver)
+            server_component_controller(
+                self.kernel.clone(),
+                service_config.request_stream,
+                service_config.receiver
+            )
         );
         r
     }
@@ -394,10 +380,11 @@ enum ExposedServices {
 type TaskResult = Result<ExitStatus, Error>;
 
 async fn server_component_controller(
+    kernel: Arc<Kernel>,
     request_stream: frunner::ComponentControllerRequestStream,
     task_complete: oneshot::Receiver<TaskResult>,
 ) {
-    let request_stream_control = request_stream.control_handle();
+    *kernel.container_control_handle.lock() = Some(request_stream.control_handle());
 
     enum Event<T, U> {
         Controller(T),
@@ -411,24 +398,36 @@ async fn server_component_controller(
 
     if let Some(event) = stream.next().await {
         match event {
-            Event::Controller(_) => {
-                // If we get a `Stop` request, we would ideally like to ask userspace to shut
-                // down gracefully.
+            Event::Controller(Ok(frunner::ComponentControllerRequest::Stop { .. })) => {
+                log_info!("Stopping the container.");
+            }
+            Event::Controller(Ok(frunner::ComponentControllerRequest::Kill { control_handle })) => {
+                log_info!("Killing the container's job.");
+                control_handle.shutdown_with_epitaph(zx::Status::from_raw(
+                    fcomponent::Error::InstanceDied.into_primitive() as i32,
+                ));
+                fruntime::job_default().kill().expect("Failed to kill job");
+            }
+            Event::Controller(Ok(frunner::ComponentControllerRequest::_UnknownMethod {
+                ordinal,
+                method_type,
+                ..
+            })) => {
+                log_error!(ordinal, method_type:?; "Unknown component controller request received.");
+            }
+            Event::Controller(Err(e)) => {
+                log_warn!(e:?; "Container component controller channel encountered an error.");
             }
             Event::Completion(result) => {
-                match result {
-                    Ok(Ok(ExitStatus::Exit(0))) => {
-                        request_stream_control.shutdown_with_epitaph(zx::Status::OK)
-                    }
-                    _ => request_stream_control.shutdown_with_epitaph(zx::Status::from_raw(
-                        fcomponent::Error::InstanceDied.into_primitive() as i32,
-                    )),
-                };
+                log_info!(result:?; "init process exited.");
             }
         }
     }
-    // Kill the starnix_kernel job, as the kernel is expected to reboot when init exits.
-    fruntime::job_default().kill().expect("Failed to kill job");
+
+    log_debug!("done listening for container-terminating events");
+    if !kernel.is_shutting_down() {
+        kernel.shut_down();
+    }
 }
 
 pub async fn create_component_from_stream(
@@ -479,20 +478,8 @@ async fn create_container(
     trace_duration!(CATEGORY_STARNIX, NAME_CREATE_CONTAINER);
     const DEFAULT_INIT: &str = "/container/init";
 
-    // Install container svc into the kernel namespace
-    let svc_dir = if let Some(svc_dir) = config.svc_dir.take() {
-        Some(fio::DirectoryProxy::new(AsyncChannel::from_channel(svc_dir)))
-    } else {
-        None
-    };
-
-    let data_dir = if let Some(data_dir) = config.data_dir.take() {
-        Some(fio::DirectorySynchronousProxy::new(data_dir))
-    } else {
-        None
-    };
-
-    let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(config.pkg_dir.take().unwrap());
+    let pkg_channel = config.container_namespace.get_namespace_channel("/pkg").unwrap();
+    let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(pkg_channel);
 
     let features = parse_features(&config, structured_config)?;
 
@@ -512,10 +499,17 @@ async fn create_container(
         }
     }
     #[cfg(not(feature = "starnix_lite"))]
-    if features.magma {
+    if let Some(supported_vendors) = &features.magma_supported_vendors {
         kernel_cmdline.extend(b" ");
-        let params = get_magma_params();
+        let params = get_magma_params(supported_vendors);
         kernel_cmdline.extend(&*params);
+    }
+
+    // Collect a vector of functions to be invoked while constructing /proc/device-tree
+    let mut procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>, &CurrentTask)> =
+        Vec::new();
+    if features.nanohub {
+        procfs_device_tree_setup.push(starnix_modules_nanohub::nanohub_procfs_builder);
     }
 
     // Check whether we actually have access to a role manager by trying to set our own
@@ -535,20 +529,44 @@ async fn create_container(
 
     let node = inspect::component::inspector().root().create_child("container");
     let kernel_node = node.create_child("kernel");
+    kernel_node.record_int("created_at", zx::MonotonicInstant::get().into_nanos());
     features.record_inspect(&kernel_node);
 
-    let security_state = security::kernel_init_security(features.selinux);
+    // The SELinux `exceptions_path` may provide a path to an exceptions file to read, or the
+    // special "#strict" value, to run with no exceptions applied.
+    // If no `exceptions_path` is specified then a default set of exceptions are used.
+    let selinux_exceptions_config =
+        match features.selinux.exceptions_path.as_ref().map(|x| x.as_str()) {
+            Some("#strict") => String::new(),
+            Some(file_path) => {
+                let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
+
+                let flags = fio::Flags::PERM_READ | fio::Flags::PROTOCOL_FILE;
+
+                pkg_dir_proxy
+                    .open3(&file_path, flags, &fio::Options::default(), server_end.into_channel())
+                    .expect("failed to open security exception file");
+
+                let contents =
+                    fuchsia_fs::file::read(&file).await.expect("reading security exception file");
+                String::from_utf8(contents).expect("parsing security exception file")
+            }
+            None => security::DEFAULT_EXCEPTIONS_CONFIG.into(),
+        };
+    let security_state =
+        security::kernel_init_security(features.selinux.enabled, selinux_exceptions_config);
+
     let kernel = Kernel::new(
         kernel_cmdline,
         features.kernel.clone(),
-        svc_dir,
-        data_dir,
+        config.container_namespace.try_clone()?,
         role_manager,
         Some(crash_reporter),
         kernel_node,
         #[cfg(not(feature = "starnix_lite"))]
         features.aspect_ratio.as_ref(),
         security_state,
+        procfs_device_tree_setup,
     )
     .with_source_context(|| format!("creating Kernel: {}", &config.name))?;
     let fs_context = create_fs_context(
@@ -578,7 +596,10 @@ async fn create_container(
 
     kernel.syslog.init(&system_task).source_context("initializing syslog")?;
 
-    kernel.hrtimer_manager.init(system_task).source_context("initializing HrTimer manager")?;
+    kernel
+        .hrtimer_manager
+        .init(system_task, None)
+        .source_context("initializing HrTimer manager")?;
 
     if let Err(e) = kernel.suspend_resume_manager.init(&system_task) {
         log_warn!("Suspend/Resume manager initialization failed: ({e:?})");
@@ -665,7 +686,7 @@ async fn create_container(
     )?;
 
     if !config.startup_file_path.is_empty() {
-        wait_for_init_file(&config.startup_file_path, &system_task).await?;
+        wait_for_init_file(&config.startup_file_path, &system_task, init_pid).await?;
     };
 
     let memory_attribution_manager = ContainerMemoryAttributionManager::new(
@@ -858,6 +879,7 @@ fn create_remote_block_device_from_spec<'a>(
 async fn wait_for_init_file(
     startup_file_path: &str,
     current_task: &CurrentTask,
+    init_pid: pid_t,
 ) -> Result<(), Error> {
     // TODO(https://fxbug.dev/42178400): Use inotify machinery to wait for the file.
     loop {
@@ -871,8 +893,12 @@ async fn wait_for_init_file(
             startup_file_path.into(),
         ) {
             Ok(_) => break,
-            Err(error) if error == ENOENT => continue,
+            Err(error) if error == ENOENT => {}
             Err(error) => return Err(anyhow::Error::from(error)),
+        }
+
+        if current_task.get_task(init_pid).upgrade().is_none() {
+            return Err(anyhow!("Init task terminated before startup_file_path was ready"));
         }
     }
     Ok(())
@@ -946,7 +972,9 @@ mod test {
             .expect("Failed to create file");
 
         fasync::Task::local(async move {
-            wait_for_init_file(path, &current_task).await.expect("failed to wait for file");
+            wait_for_init_file(path, &current_task, current_task.get_pid())
+                .await
+                .expect("failed to wait for file");
             sender.send(()).await.expect("failed to send message");
         })
         .detach();
@@ -964,9 +992,12 @@ mod test {
             current_task.clone_task_for_test(&mut locked, CLONE_FS as u64, Some(SIGCHLD));
         let path = "/path";
 
+        let test_init_pid = current_task.get_pid();
         fasync::Task::local(async move {
             sender.send(()).await.expect("failed to send message");
-            wait_for_init_file(path, &init_task).await.expect("failed to wait for file");
+            wait_for_init_file(path, &init_task, test_init_pid)
+                .await
+                .expect("failed to wait for file");
             sender.send(()).await.expect("failed to send message");
         })
         .detach();
@@ -988,6 +1019,35 @@ mod test {
             .expect("Failed to create file");
 
         // Wait for the file creation to be detected.
+        assert!(receiver.next().await.is_some());
+    }
+
+    #[fuchsia::test]
+    async fn test_init_exits_before_file_exists() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (mut sender, mut receiver) = futures::channel::mpsc::unbounded();
+
+        let init_task =
+            current_task.clone_task_for_test(&mut locked, CLONE_FS as u64, Some(SIGCHLD));
+        const STARTUP_FILE_PATH: &str = "/path";
+
+        let test_init_pid = init_task.get_pid();
+        fasync::Task::local(async move {
+            sender.send(()).await.expect("failed to send message");
+            wait_for_init_file(STARTUP_FILE_PATH, &current_task, test_init_pid)
+                .await
+                .expect_err("Did not detect init exit");
+            sender.send(()).await.expect("failed to send message");
+        })
+        .detach();
+
+        // Wait for message that file check has started.
+        assert!(receiver.next().await.is_some());
+
+        // Drop the `init_task`.
+        std::mem::drop(init_task);
+
+        // Wait for the init failure to be detected.
         assert!(receiver.next().await.is_some());
     }
 }

@@ -24,8 +24,8 @@
 #include "src/storage/lib/paver/moonflower.h"
 #include "src/storage/lib/paver/nelson.h"
 #include "src/storage/lib/paver/sherlock.h"
+#include "src/storage/lib/paver/uefi.h"
 #include "src/storage/lib/paver/vim3.h"
-#include "src/storage/lib/paver/x64.h"
 #elif defined(astro)
 #include "src/storage/lib/paver/astro.h"
 #elif defined(moonflower)
@@ -38,8 +38,8 @@
 #include "src/storage/lib/paver/sherlock.h"
 #elif defined(vim3)
 #include "src/storage/lib/paver/vim3.h"
-#elif defined(x64)
-#include "src/storage/lib/paver/x64.h"
+#elif defined(uefi)
+#include "src/storage/lib/paver/uefi.h"
 #elif defined(android)
 #include "src/storage/lib/paver/android.h"
 #endif
@@ -93,8 +93,8 @@ int main(int argc, char** argv) {
       std::make_unique<paver::MoonflowerPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::UefiPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::AndroidPartitionerFactory>());
-  paver::DevicePartitionerFactory::Register(std::make_unique<paver::X64PartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::DefaultPartitionerFactory>());
 #elif defined(astro)
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::AstroPartitionerFactory>());
@@ -109,8 +109,8 @@ int main(int argc, char** argv) {
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
 #elif defined(vim3)
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
-#elif defined(x64)
-  paver::DevicePartitionerFactory::Register(std::make_unique<paver::X64PartitionerFactory>());
+#elif defined(uefi)
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::UefiPartitionerFactory>());
 #elif defined(android)
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::AndroidPartitionerFactory>());
 #else

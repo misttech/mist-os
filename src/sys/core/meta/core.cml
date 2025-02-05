@@ -123,6 +123,14 @@
             from: "parent",
             to: [ "#font_provider" ],
         },
+
+        // TODO(b/345827642): Remove once fonts have been
+        // migrated to use dictionaries.
+        {
+            protocol: [ "fuchsia.logger.LogSink" ],
+            from: "parent/diagnostics",
+            to: [ "#font_provider" ],
+        },
         {
             config: "fuchsia.power.SuspendEnabled",
             from: "parent",
@@ -246,6 +254,11 @@
             to: "#network",
         },
         {
+            protocol: [ "fuchsia.power.internal.CollaborativeRebootScheduler" ],
+            from: "parent",
+            to: "#network",
+        },
+        {
             protocol: [ "fuchsia.pkg.PackageCache" ],
             from: "parent",
             to: "#pkg-resolver",
@@ -270,8 +283,12 @@
         },
         {
             protocol: [
-                "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.paver.Paver",
+
+                // TODO(https://fxbug.dev/389134835): Remove the initiator
+                // capability.
+                "fuchsia.power.CollaborativeRebootInitiator",
+                "fuchsia.power.internal.CollaborativeRebootScheduler",
                 "fuchsia.update.verify.BlobfsVerifier",
             ],
             from: "parent",

@@ -79,7 +79,7 @@ impl TryFrom<DoNotDisturbRequest> for Job {
                 Ok(watch::Work::new_job(SettingType::DoNotDisturb, responder))
             }
             _ => {
-                tracing::warn!("Received a call to an unsupported API: {:?}", req);
+                log::warn!("Received a call to an unsupported API: {:?}", req);
                 Err(JobError::Unsupported)
             }
         }

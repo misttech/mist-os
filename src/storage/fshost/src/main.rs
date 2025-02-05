@@ -59,7 +59,7 @@ async fn main() -> Result<(), Error> {
     apply_boot_args_to_config(&mut config, &boot_args);
     let config = Arc::new(config);
     // NB There are tests that look for "fshost started".
-    tracing::info!(?config, "fshost started");
+    log::info!(config:?; "fshost started");
 
     let directory_request =
         take_startup_handle(HandleType::DirectoryRequest.into()).ok_or_else(|| {
@@ -88,9 +88,9 @@ async fn main() -> Result<(), Error> {
     // Potentially launch the boot items ramdisk. It's not fatal, so if it fails we print an error
     // and continue.
     let ramdisk_device = if config.ramdisk_image {
-        tracing::info!("setting up ramdisk image from boot items");
+        log::info!("setting up ramdisk image from boot items");
         ramdisk::set_up_ramdisk(config.storage_host).await.unwrap_or_else(|error| {
-            tracing::error!(?error, "failed to set up ramdisk filesystems");
+            log::error!(error:?; "failed to set up ramdisk filesystems");
             None
         })
     } else {
@@ -112,7 +112,6 @@ async fn main() -> Result<(), Error> {
         .await;
     let blob_exposed_dir = env.blobfs_exposed_dir()?;
     let data_exposed_dir = env.data_exposed_dir()?;
-    let crypt_service_exposed_dir = env.crypt_service_exposed_dir()?;
     let export = vfs::pseudo_directory! {
         "fs" => vfs::pseudo_directory! {
             "blob" => remote_dir(blob_exposed_dir),
@@ -140,6 +139,15 @@ async fn main() -> Result<(), Error> {
             ),
     };
     if config.fxfs_blob {
+        export
+            .add_entry(
+                "user_volumes",
+                vfs::pseudo_directory! {
+                    "starnix" =>
+                        service::fshost_volume_provider(env.clone(), config.clone()),
+                },
+            )
+            .unwrap();
         svc_dir
             .add_entry(
                 fidl_fuchsia_update_verify::BlobfsVerifierMarker::PROTOCOL_NAME,
@@ -152,24 +160,6 @@ async fn main() -> Result<(), Error> {
                 fxblob::ota_health_check_service(),
             )
             .unwrap();
-    }
-    if config.data_filesystem_format == "fxfs" {
-        if let Some(dir) = crypt_service_exposed_dir {
-            svc_dir
-                .add_entry(
-                    fidl_fuchsia_fxfs::CryptManagementMarker::PROTOCOL_NAME,
-                    vfs::service::endpoint(move |_scope, server_end| {
-                        dir.open3(
-                            fidl_fuchsia_fxfs::CryptManagementMarker::PROTOCOL_NAME,
-                            fio::Flags::PROTOCOL_SERVICE,
-                            &fio::Options::default(),
-                            server_end.into(),
-                        )
-                        .unwrap();
-                    }),
-                )
-                .unwrap();
-        }
     }
     export.add_entry("svc", svc_dir).unwrap();
 
@@ -194,7 +184,7 @@ async fn main() -> Result<(), Error> {
 
     // TODO(https://fxbug.dev/42069366): //src/tests/oom looks for "fshost: lifecycle handler ready" to
     // indicate the watcher is about to start.
-    tracing::info!("fshost: lifecycle handler ready");
+    log::info!("fshost: lifecycle handler ready");
 
     // Run the main loop of fshost, handling devices as they appear according to our filesystem
     // policy.
@@ -212,7 +202,7 @@ async fn main() -> Result<(), Error> {
             .await?
     };
 
-    tracing::info!("shutdown signal received");
+    log::info!("shutdown signal received");
     // TODO(https://fxbug.dev/42069366): //src/tests/oom looks for "received shutdown command over lifecycle
     // interface" to indicate fshost shutdown is starting. Shutdown logs have to go straight to
     // serial because of timing issues (https://fxbug.dev/42179880).

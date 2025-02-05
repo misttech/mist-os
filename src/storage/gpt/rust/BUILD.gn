@@ -17,8 +17,8 @@ rustc_library("gpt") {
     "//src/storage/lib/block_client/rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:crc",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:uuid",
     "//third_party/rust_crates:zerocopy",
   ]

@@ -35,8 +35,7 @@ struct start_params {
 // in and of itself at this point (unlike in dynlink.c).  But they might also
 // use ShadowCallStack, which is not set up yet.  So make sure references here
 // only use the libc-internal symbols, which don't have any setup requirements.
-__asan_weak_ref("memcpy")
-__asan_weak_ref("memset")
+__asan_weak_ref("memcpy") __asan_weak_ref("memset")
 
 #if defined(__aarch64__)
 #define SHADOW_CALL_STACK_DWARF_REGNO 18
@@ -48,10 +47,10 @@ __asan_weak_ref("memset")
   "sd %[ra], -8(gp)\n"
 #endif
 
-// This gets called via inline assembly below, after switching onto
-// the newly-allocated (safe) stack.
-static _Noreturn void start_main(const struct start_params*) __asm__("start_main")
-    __attribute__((used));
+    // This gets called via inline assembly below, after switching onto
+    // the newly-allocated (safe) stack.
+    static _Noreturn void start_main(const struct start_params*) __asm__("start_main")
+        __attribute__((used));
 
 // Do not instrument this function with checks for function-type-mismatches.
 // UBSan will report errors on the entry to main via p->main if the application
@@ -187,9 +186,18 @@ static void start_main(const struct start_params* p) {
   exit(call_main(argc, argv, __environ, p->main));
 }
 
-__EXPORT NO_ASAN LIBC_NO_SAFESTACK _Noreturn void __libc_start_main(zx_handle_t bootstrap,
-                                                                    int (*main)(int, char**,
-                                                                                char**)) {
+__EXPORT NO_ASAN LIBC_NO_SAFESTACK _Noreturn void __libc_start_main(
+    zx_handle_t bootstrap, const void* vdso, zx_handle_t svc_server_end,
+    int (*main)(int, char**, char**)) {
+  // The first three argument registers are passed unchanged by _start.  The
+  // dynamic linker's handoff code (dl-entry.S) always zeroes the second two.
+  if (vdso) {
+    CRASH_WITH_UNIQUE_BACKTRACE();
+  }
+  if (svc_server_end != ZX_HANDLE_INVALID) {
+    CRASH_WITH_UNIQUE_BACKTRACE();
+  }
+
   // Initialize stack-protector canary value first thing.  Do the setjmp
   // manglers in the same call to avoid the overhead of two system calls.
   // That means we need a temporary buffer on the stack, which we then

@@ -27,7 +27,7 @@ use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::time::{duration_from_timeval, timeval_from_duration};
 use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::as_any::AsAny;
-use starnix_uapi::auth::CAP_NET_RAW;
+use starnix_uapi::auth::{CAP_NET_ADMIN, CAP_NET_RAW};
 use starnix_uapi::errors::{Errno, ErrnoCode};
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
@@ -36,8 +36,9 @@ use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     c_char, errno, error, ifreq, in_addr, sockaddr, sockaddr_in, ucred, AF_INET, SIOCGIFADDR,
-    SIOCGIFFLAGS, SIOCGIFHWADDR, SIOCGIFINDEX, SIOCGIFMTU, SIOCSIFADDR, SIOCSIFFLAGS, SOL_SOCKET,
-    SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO, SO_SNDTIMEO, SO_TYPE,
+    SIOCGIFFLAGS, SIOCGIFHWADDR, SIOCGIFINDEX, SIOCGIFMTU, SIOCGIFNETMASK, SIOCSIFADDR,
+    SIOCSIFFLAGS, SIOCSIFNETMASK, SOL_SOCKET, SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO,
+    SO_SNDTIMEO, SO_TYPE,
 };
 use static_assertions::const_assert;
 use std::collections::VecDeque;
@@ -523,7 +524,60 @@ impl Socket {
                 current_task.write_object(UserRef::new(user_addr), &out_ifreq)?;
                 Ok(SUCCESS)
             }
+            SIOCGIFNETMASK => {
+                let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
+                let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
+                let (_socket, address_msgs, _if_index) =
+                    get_netlink_ipv4_addresses(locked, current_task, &in_ifreq, &mut read_buf)?;
+
+                let mut maybe_errno = None;
+                let ifru_netmask = {
+                    let mut addr = sockaddr::default();
+                    let s_addr = address_msgs
+                        .into_iter()
+                        .next()
+                        .and_then(|msg| {
+                            let prefix_len = msg.header.prefix_len;
+                            if prefix_len > 32 {
+                                maybe_errno = Some(error!(EINVAL, "invalid prefix length"));
+                                return None;
+                            }
+                            // Convert prefix length to netmask.
+                            let all_ones_address = net_types::ip::Ipv4Addr::new([u8::MAX; 4]);
+                            let netmask = all_ones_address.mask(prefix_len);
+
+                            // The bytes of the netmask are already in network byte order.
+                            Some(NativeEndian::read_u32(netmask.bytes()))
+                        })
+                        .unwrap_or(0);
+
+                    if let Some(errno) = maybe_errno {
+                        return errno;
+                    }
+
+                    let _ = sockaddr_in {
+                        sin_family: AF_INET,
+                        sin_port: 0,
+                        sin_addr: in_addr { s_addr },
+                        __pad: Default::default(),
+                    }
+                    .write_to_prefix(addr.as_mut_bytes());
+                    addr
+                };
+
+                let out_ifreq: [u8; std::mem::size_of::<ifreq>()] = struct_with_union_into_bytes!(
+                ifreq {
+                    ifr_ifrn.ifrn_name: unsafe { in_ifreq.ifr_ifrn.ifrn_name },
+                    ifr_ifru.ifru_netmask: ifru_netmask,
+                });
+                current_task.write_object(UserRef::new(user_addr), &out_ifreq)?;
+                Ok(SUCCESS)
+            }
             SIOCSIFADDR => {
+                if !current_task.creds().has_capability(CAP_NET_ADMIN) {
+                    return error!(EPERM, "tried to SIOCSIFADDR without CAP_NET_ADMIN");
+                }
+
                 let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
                 let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
                 let (socket, address_msgs, if_index) =
@@ -559,8 +613,8 @@ impl Socket {
                     }
                 };
 
-                // First remove all IPv4 addresses for the requested interface.
-                for addr in address_msgs.into_iter() {
+                // Remove the first IPv4 address for the requested interface, if there is one.
+                for addr in address_msgs.into_iter().take(1) {
                     let resp = send_netlink_msg_and_wait_response(
                         locked,
                         current_task,
@@ -594,7 +648,10 @@ impl Socket {
                                 let mut msg = AddressMessage::default();
                                 msg.header.family = AddressFamily::Inet;
                                 msg.header.index = if_index;
-                                let addr = addr.to_be_bytes();
+
+                                // The SIOCSIFADDR ioctl already provides the address to set in
+                                // network byte order.
+                                let addr = addr.to_ne_bytes();
                                 // The request does not include the prefix
                                 // length so we use the default prefix for the
                                 // address's class.
@@ -612,6 +669,106 @@ impl Socket {
                     expect_ack(resp);
                 }
 
+                Ok(SUCCESS)
+            }
+            SIOCSIFNETMASK => {
+                if !current_task.creds().has_capability(CAP_NET_ADMIN) {
+                    return error!(EPERM, "tried to SIOCSIFNETMASK without CAP_NET_ADMIN");
+                }
+
+                let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
+                const_assert!(size_of::<sockaddr_in>() <= size_of::<sockaddr>());
+                let addr = sockaddr_in::read_from_prefix(
+                    unsafe { in_ifreq.ifr_ifru.ifru_netmask }.as_bytes(),
+                )
+                .expect("sockaddr_in is smaller than sockaddr")
+                .0
+                .sin_addr
+                .s_addr;
+                let prefix_len = addr.count_ones() as u8;
+                // Check that the subnet is valid. The netmask is already in network byte order.
+                match net_types::ip::Subnet::new(
+                    net_types::ip::Ipv4Addr::new(addr.to_ne_bytes()),
+                    prefix_len,
+                ) {
+                    Ok(_) => (),
+                    Err(_) => {
+                        return error!(EINVAL, "invalid netmask: {addr:?}");
+                    }
+                }
+
+                let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
+                let (socket, address_msgs, _if_index) =
+                    get_netlink_ipv4_addresses(locked, current_task, &in_ifreq, &mut read_buf)?;
+
+                let request_header = {
+                    let mut header = NetlinkHeader::default();
+                    // Always request the ACK response so that we know the
+                    // request has been handled before we return from this
+                    // operation.
+                    header.flags =
+                        netlink_packet_core::NLM_F_REQUEST | netlink_packet_core::NLM_F_ACK;
+                    header
+                };
+
+                // Helper to verify the response of a Netlink request
+                let expect_ack = |msg: NetlinkMessage<RouteNetlinkMessage>| {
+                    match msg.payload {
+                        NetlinkPayload::Error(ErrorMessage {
+                            code: Some(code), header: _, ..
+                        }) => {
+                            // Don't propagate the error up because its not the fault of the
+                            // caller - the stack state can change underneath the caller.
+                            log_warn!(
+                            "got NACK netlink route response when handling ioctl(_, {:#x}, _): {}",
+                            request,
+                            code
+                        );
+                        }
+                        // `ErrorMessage` with no code represents an ACK.
+                        NetlinkPayload::Error(ErrorMessage { code: None, header: _, .. }) => {}
+                        payload => panic!("unexpected message = {:?}", payload),
+                    }
+                };
+
+                // Remove the first IPv4 address on the requested interface.
+                let Some(addr) = address_msgs.into_iter().next() else {
+                    // There's nothing to do if there are no addresses on the interface.
+                    // TODO(https://fxbug.dev/387998791): We should actually return an error here,
+                    // but a workaround for us not supporting blackhole devices means that we need
+                    // to allow this to succeed as a no-op instead. Once the workaround is removed
+                    // this should be an EADDRNOTAVAIL.
+                    return Ok(SUCCESS);
+                };
+
+                let resp = send_netlink_msg_and_wait_response(
+                    locked,
+                    current_task,
+                    &socket,
+                    NetlinkMessage::new(
+                        request_header,
+                        NetlinkPayload::InnerMessage(RouteNetlinkMessage::DelAddress(addr.clone())),
+                    ),
+                    &mut read_buf,
+                )?;
+                expect_ack(resp);
+
+                // Then, re-add it with the new netmask.
+                let resp = send_netlink_msg_and_wait_response(
+                    locked,
+                    current_task,
+                    &socket,
+                    NetlinkMessage::new(
+                        request_header,
+                        NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewAddress({
+                            let mut msg = addr;
+                            msg.header.prefix_len = prefix_len;
+                            msg
+                        })),
+                    ),
+                    &mut read_buf,
+                )?;
+                expect_ack(resp);
                 Ok(SUCCESS)
             }
             SIOCGIFHWADDR => {

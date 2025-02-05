@@ -11,8 +11,8 @@ use fuchsia_component_test::{
 };
 use futures::channel::mpsc;
 use futures::{SinkExt, StreamExt};
+use log::info;
 use realmbuilder_mock_helpers::add_fidl_service_handler;
-use tracing::info;
 
 /// RFCOMM component URL.
 const RFCOMM_URL: &str = "fuchsia-pkg://fuchsia.com/bt-rfcomm-smoke-test#meta/bt-rfcomm.cm";

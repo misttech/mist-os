@@ -7,9 +7,9 @@ use fidl_fuchsia_metrics::MetricEvent;
 use fuchsia_cobalt_builders::MetricEventExt;
 use futures::lock::Mutex;
 use futures::{StreamExt, TryStreamExt};
+use log::info;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::info;
 
 /// MAX_QUERY_LENGTH is used as a usize in this component
 const MAX_QUERY_LENGTH: usize = fidl_fuchsia_metrics_test::MAX_QUERY_LENGTH as usize;

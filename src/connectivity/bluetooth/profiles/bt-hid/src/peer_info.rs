@@ -5,9 +5,9 @@
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_bluetooth::profile::{Attribute, DataElementConversionError};
 use fuchsia_bluetooth::types::PeerId;
+use log::{debug, info, warn};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
-use tracing::{debug, info, warn};
 
 use crate::descriptor::{DescriptorList, DescriptorReadError};
 use crate::sdp_data;

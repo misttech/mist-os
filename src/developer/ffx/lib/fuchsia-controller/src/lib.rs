@@ -480,7 +480,7 @@ pub unsafe extern "C" fn ffx_config_get_string(
     }
 }
 
-// LINT.ThenChange(../cpp/abi/fuchsia_controller.h)
+// LINT.ThenChange(../cpp/fuchsia_controller_internal/fuchsia_controller.h)
 
 #[cfg(test)]
 mod test {

@@ -13,7 +13,7 @@ use net_types::{SpecifiedAddr, UnicastAddr, Witness as _};
 use netstack3_base::{
     CoreTimerContext, Counter, CounterContext, DeviceIdContext, EventContext, FrameDestination,
     InstantBindingsTypes, LinkDevice, SendFrameContext, SendFrameError, TimerContext,
-    TracingContext, WeakDeviceIdentifier,
+    TracingContext, TxMetadataBindingsTypes, WeakDeviceIdentifier,
 };
 use netstack3_ip::nud::{
     self, ConfirmationFlags, DynamicNeighborUpdateSource, LinkResolutionContext, NudBindingsTypes,
@@ -78,6 +78,7 @@ pub trait ArpSenderContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceI
         bindings_ctx: &mut BC,
         dst_link_address: D::Address,
         body: S,
+        meta: BC::TxMetadata,
     ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
@@ -109,6 +110,7 @@ pub trait ArpBindingsContext<D: ArpDevice, DeviceId>:
     + TracingContext
     + LinkResolutionContext<D>
     + EventContext<nud::Event<D::Address, DeviceId, Ipv4, <Self as InstantBindingsTypes>::Instant>>
+    + TxMetadataBindingsTypes
 {
 }
 
@@ -120,7 +122,7 @@ impl<
             + LinkResolutionContext<D>
             + EventContext<
                 nud::Event<D::Address, DeviceId, Ipv4, <Self as InstantBindingsTypes>::Instant>,
-            >,
+            > + TxMetadataBindingsTypes,
     > ArpBindingsContext<D, DeviceId> for BC
 {
 }
@@ -151,11 +153,15 @@ pub trait ArpContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceId>>:
     ///
     /// If `device_id` does not have any addresses associated with it, return
     /// `None`.
-    fn get_protocol_addr(
-        &mut self,
-        bindings_ctx: &mut BC,
-        device_id: &Self::DeviceId,
-    ) -> Option<Ipv4Addr>;
+    ///
+    /// NOTE: If the interface has multiple addresses, an arbitrary one will be
+    /// returned.
+    fn get_protocol_addr(&mut self, device_id: &Self::DeviceId) -> Option<Ipv4Addr>;
+
+    /// Check if `addr` is assigned to this interface.
+    ///
+    /// If `device_id` does not have any addresses, return `false`.
+    fn addr_on_interface(&mut self, device_id: &Self::DeviceId, addr: Ipv4Addr) -> bool;
 
     /// Get the hardware address of this interface.
     fn get_hardware_addr(
@@ -287,13 +293,14 @@ impl<D: ArpDevice, BC: ArpBindingsContext<D, CC::DeviceId>, CC: ArpSenderContext
         bindings_ctx: &mut BC,
         dst_mac: D::Address,
         body: S,
+        meta: BC::TxMetadata,
     ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
         S::Buffer: BufferMut,
     {
         let Self(core_ctx) = self;
-        core_ctx.send_ip_packet_to_neighbor_link_addr(bindings_ctx, dst_mac, body)
+        core_ctx.send_ip_packet_to_neighbor_link_addr(bindings_ctx, dst_mac, body, meta)
     }
 }
 
@@ -428,10 +435,10 @@ fn handle_packet<
 
     let sender_addr = packet.sender_protocol_address();
     let target_addr = packet.target_protocol_address();
-    let (source, kind) = match (
-        sender_addr == target_addr,
-        Some(target_addr) == core_ctx.get_protocol_addr(bindings_ctx, &device_id),
-    ) {
+
+    let garp = sender_addr == target_addr;
+    let targets_interface = core_ctx.addr_on_interface(&device_id, target_addr);
+    let (source, kind) = match (garp, targets_interface) {
         (true, false) => {
             // Treat all GARP messages as neighbor probes as GARPs are not
             // responses for previously sent requests, even if the packet
@@ -567,7 +574,7 @@ fn send_arp_request<
     lookup_addr: Ipv4Addr,
     remote_link_addr: Option<D::Address>,
 ) {
-    if let Some(sender_protocol_addr) = core_ctx.get_protocol_addr(bindings_ctx, device_id) {
+    if let Some(sender_protocol_addr) = core_ctx.get_protocol_addr(device_id) {
         let self_hw_addr = core_ctx.get_hardware_addr(bindings_ctx, device_id);
         let dst_addr = remote_link_addr.unwrap_or(D::Address::BROADCAST);
         core_ctx.increment(|counters| &counters.tx_requests);
@@ -635,7 +642,7 @@ mod tests {
     use netstack3_base::socket::SocketIpAddr;
     use netstack3_base::testutil::{
         assert_empty, FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeInstant, FakeLinkDeviceId,
-        FakeNetworkSpec, FakeTimerId, FakeWeakDeviceId, WithFakeFrameContext,
+        FakeNetworkSpec, FakeTimerId, FakeTxMetadata, FakeWeakDeviceId, WithFakeFrameContext,
     };
     use netstack3_base::{CtxPair, InstantContext as _, IntoCoreTimerCtx, TimerHandler};
     use netstack3_ip::nud::testutil::{
@@ -654,6 +661,7 @@ mod tests {
     use crate::internal::ethernet::EthernetLinkDevice;
 
     const TEST_LOCAL_IPV4: Ipv4Addr = Ipv4Addr::new([1, 2, 3, 4]);
+    const TEST_LOCAL_IPV4_2: Ipv4Addr = Ipv4Addr::new([4, 5, 6, 7]);
     const TEST_REMOTE_IPV4: Ipv4Addr = Ipv4Addr::new([5, 6, 7, 8]);
     const TEST_ANOTHER_REMOTE_IPV4: Ipv4Addr = Ipv4Addr::new([9, 10, 11, 12]);
     const TEST_LOCAL_MAC: Mac = Mac::new([0, 1, 2, 3, 4, 5]);
@@ -663,7 +671,7 @@ mod tests {
     /// A fake `ArpContext` that stores frames, address resolution events, and
     /// address resolution failure events.
     struct FakeArpCtx {
-        proto_addr: Option<Ipv4Addr>,
+        proto_addrs: Vec<Ipv4Addr>,
         hw_addr: UnicastAddr<Mac>,
         arp_state: ArpState<EthernetLinkDevice, FakeBindingsCtxImpl>,
         inner: FakeArpInnerCtx,
@@ -681,7 +689,7 @@ mod tests {
     impl FakeArpCtx {
         fn new(bindings_ctx: &mut FakeBindingsCtxImpl) -> FakeArpCtx {
             FakeArpCtx {
-                proto_addr: Some(TEST_LOCAL_IPV4),
+                proto_addrs: vec![TEST_LOCAL_IPV4, TEST_LOCAL_IPV4_2],
                 hw_addr: UnicastAddr::new(TEST_LOCAL_MAC).unwrap(),
                 arp_state: ArpState::new::<_, IntoCoreTimerCtx>(
                     bindings_ctx,
@@ -787,12 +795,12 @@ mod tests {
             cb(&self.state.arp_state)
         }
 
-        fn get_protocol_addr(
-            &mut self,
-            _bindings_ctx: &mut FakeBindingsCtxImpl,
-            _device_id: &FakeLinkDeviceId,
-        ) -> Option<Ipv4Addr> {
-            self.state.proto_addr
+        fn addr_on_interface(&mut self, _device_id: &FakeLinkDeviceId, addr: Ipv4Addr) -> bool {
+            self.state.proto_addrs.iter().any(|&a| a == addr)
+        }
+
+        fn get_protocol_addr(&mut self, _device_id: &FakeLinkDeviceId) -> Option<Ipv4Addr> {
+            self.state.proto_addrs.first().copied()
         }
 
         fn get_hardware_addr(
@@ -855,6 +863,7 @@ mod tests {
             _bindings_ctx: &mut FakeBindingsCtxImpl,
             _dst_link_address: Mac,
             _body: S,
+            _tx_meta: FakeTxMetadata,
         ) -> Result<(), SendFrameError<S>> {
             Ok(())
         }
@@ -1006,6 +1015,7 @@ mod tests {
                 &FakeLinkDeviceId,
                 SpecifiedAddr::new(TEST_REMOTE_IPV4).unwrap(),
                 Buf::new([1], ..),
+                FakeTxMetadata::default(),
             ),
             Ok(())
         );
@@ -1034,8 +1044,9 @@ mod tests {
         assert_eq!(core_ctx.frames().len(), 1);
     }
 
-    #[test]
-    fn test_handle_arp_request() {
+    #[test_case(TEST_LOCAL_IPV4)]
+    #[test_case(TEST_LOCAL_IPV4_2)]
+    fn test_handle_arp_request(local_addr: Ipv4Addr) {
         // Test that, when we receive an ARP request, we cache the sender's
         // address information and send an ARP response.
 
@@ -1046,7 +1057,7 @@ mod tests {
             &mut bindings_ctx,
             ArpOp::Request,
             TEST_REMOTE_IPV4,
-            TEST_LOCAL_IPV4,
+            local_addr,
             TEST_REMOTE_MAC,
             TEST_LOCAL_MAC,
             FrameDestination::Individual { local: true },
@@ -1066,7 +1077,7 @@ mod tests {
             1,
             TEST_REMOTE_MAC,
             ArpOp::Response,
-            TEST_LOCAL_IPV4,
+            local_addr,
             TEST_REMOTE_IPV4,
             TEST_LOCAL_MAC,
             TEST_REMOTE_MAC,
@@ -1128,7 +1139,7 @@ mod tests {
                     let mut ctx = new_context();
                     let CtxPair { core_ctx, bindings_ctx: _ } = &mut ctx;
                     core_ctx.state.hw_addr = UnicastAddr::new(*hw_addr).unwrap();
-                    core_ctx.state.proto_addr = Some(*proto_addr);
+                    core_ctx.state.proto_addrs = vec![*proto_addr];
                     (*name, ctx)
                 })
             },
@@ -1173,6 +1184,7 @@ mod tests {
                     &FakeLinkDeviceId,
                     SpecifiedAddr::new(requested_remote_proto_addr).unwrap(),
                     Buf::new([1], ..),
+                    FakeTxMetadata::default(),
                 ),
                 Ok(())
             );
@@ -1286,6 +1298,7 @@ mod tests {
                 &FakeLinkDeviceId,
                 SpecifiedAddr::new(TEST_REMOTE_IPV4).unwrap(),
                 Buf::new([1], ..),
+                FakeTxMetadata::default(),
             ),
             Ok(())
         );

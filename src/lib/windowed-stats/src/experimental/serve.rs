@@ -8,8 +8,8 @@ use fuchsia_inspect::{Inspector, Node as InspectNode};
 use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
 use futures::{select, Future, FutureExt, StreamExt};
+use log::{error, info, warn};
 use std::sync::Arc;
-use tracing::{error, info, warn};
 
 use crate::experimental::clock::{Timed, Timestamp};
 use crate::experimental::series::buffer::BufferStrategy;

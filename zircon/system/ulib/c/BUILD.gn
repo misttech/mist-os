@@ -21,14 +21,16 @@ assert(libc == get_path_info(get_path_info(".", "abspath"), "dir"),
 # libc_test() suitable for inclusion in libc-unittests and Zircon's core-tests.
 libc_components = [
   "ctype",
+  "errno",
   "fenv",
+  "include",
   "inttypes",
   "math",
   "pthread",
   "scudo",
+  "startup",
   "stdio",
   "stdlib",
-  "errno",
 ]
 
 libc_testonly_components = []
@@ -274,6 +276,10 @@ if (current_toolchain == default_toolchain) {
   }
 
   group("libc_config_deps") {
+  }
+  group("libc_config_link_deps") {
+  }
+  group("libc_config_source_deps") {
     public_deps = [ "include:headers" ]
   }
 }
@@ -351,33 +357,6 @@ if (zircon_toolchain != false) {
   }
 }
 
-if (zircon_toolchain == false) {
-  # Don't build the C runtime startup object in the Fuchsia user
-  # toolchain, because this adds many unwanted dependencies to fdio,
-  # trace-engine and whatnot that are completely un-needed and also
-  # interfere with sysroot generation. Use the C library toolchain instead.
-  group("crt1") {
-    public_deps = [ ":crt1($libc_toolchain)" ]
-  }
-} else {
-  source_set("crt1") {
-    sources = [ "Scrt1.cc" ]
-
-    # This runs before all runtime setup.
-    configs += [ "//build/config/sanitizers:no_sanitizers" ]
-
-    # Minimize the code.  Even if there were lazy PLT resolution, it's never
-    # worthwhile to have PLT entries for main or __libc_start_main, since
-    # they are always used eagerly anyway.
-    cflags = [ "-fno-plt" ]
-
-    # The C runtime is needed for Go builds and the SDK, so always download this locally.
-    if (cxx_rbe_enable && !cxx_rbe_download_obj_files) {
-      configs += [ "//build/config:download_outputs" ]
-    }
-  }
-}
-
 # This gets the actual shared_library() target defined above.
 libc_impl_label = ":libc.so($libc_toolchain)"
 
@@ -434,8 +413,8 @@ verify_public_symbols("verify_abi") {
 }
 
 # This is the linking stub that binaries are actually linked against.
-# //zircon/public/sysroot:cpp_binary_deps is in the implicit deps added to
-# every target, and it uses this.
+# //zircon/public/sysroot is in the implicit deps added to every linking
+# target, and it uses this.
 ifs_shared_library("c") {
   abi = "libc.ifs"
 }

@@ -33,6 +33,16 @@ type LastReboot = table {
 
     /// The uptime of the device before it rebooted.
     3: uptime zx.Duration;
+
+    /// Whether the last reboot was planned, i.e. the device rebooted in accordance to a schedule
+    /// applied by the system.
+    ///
+    /// This field allows clients to know whether the last reboot was planned without having to
+    /// parse the |reason| field.
+    ///
+    /// Planned reboots are by nature, graceful.
+    @available(added=26)
+    4: planned bool;
 };
 
 /// Reasons why a device last rebooted.
@@ -79,9 +89,6 @@ type RebootReason = strict(removed=9) flexible(added=9) enum : uint16 {
     /// human or a program that interacts with the device on behalf of a human, such as SL4F or RCS.
     USER_REQUEST = 9;
 
-    /// The device rebooted because of an OTA.
-    SYSTEM_UPDATE = 10;
-
     /// The device rebooted because applying the OTA failed and we want to retry.
     RETRY_SYSTEM_UPDATE = 17;
 
@@ -105,4 +112,17 @@ type RebootReason = strict(removed=9) flexible(added=9) enum : uint16 {
 
     /// The device rebooted to apply the swap of Zircon boot images.
     ZBI_SWAP = 18;
+
+    // ///////////////////////////////////////////////////////////////////////////////////////////
+    // Planned reboot reasons
+    // |planned| has a value of true in LastReboot above.
+
+    /// The device rebooted because of an OTA.
+    SYSTEM_UPDATE = 10;
+
+    /// The Netstack component is changing versions.
+    // TODO(https://fxbug.dev/42081574): Remove this reason once Netstack2 is
+    // fully migrated to Netstack3.
+    @available(added=26)
+    NETSTACK_MIGRATION = 20;
 };

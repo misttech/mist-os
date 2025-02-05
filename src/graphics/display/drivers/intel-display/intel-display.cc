@@ -16,6 +16,7 @@
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zbi-format/graphics.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/items/graphics.h>
 #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
@@ -128,16 +129,16 @@ struct FramebufferInfo {
 };
 
 // The bootloader (UEFI and Depthcharge) informs zircon of the framebuffer information using a
-// ZBI_TYPE_FRAMEBUFFER entry. We assume this information to be valid and unmodified by an
-// unauthorized call to zx_framebuffer_set_range(), however this is potentially an issue.
-// See https://fxbug.dev/42157524.
-zx::result<FramebufferInfo> GetFramebufferInfo(const zx::unowned_resource& framebuffer_resource) {
-  FramebufferInfo info;
-  zx_status_t status = zx_framebuffer_get_info(framebuffer_resource->get(), &info.format,
-                                               &info.width, &info.height, &info.stride);
-  if (status != ZX_OK) {
-    return zx::error(status);
+// ZBI_TYPE_FRAMEBUFFER entry.
+zx::result<FramebufferInfo> GetFramebufferInfo(std::optional<zbi_swfb_t> fb_info) {
+  if (!fb_info.has_value()) {
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
+  FramebufferInfo info;
+  info.width = fb_info->width;
+  info.height = fb_info->height;
+  info.stride = fb_info->stride;
+  info.format = fb_info->format;
   info.bytes_per_pixel = zbitl::BytesPerPixel(info.format);
   info.size = info.stride * info.height * info.bytes_per_pixel;
   return zx::ok(info);
@@ -528,7 +529,7 @@ std::unique_ptr<DisplayDevice> Controller::QueryDisplay(DdiId ddi_id,
       FDF_LOG(DEBUG, "DDI %d PHY not available. Skip querying.", ddi_id);
     } else {
       auto dp_disp = fbl::make_unique_checked<DpDisplay>(
-          &ac, this, display_id, ddi_id, &dp_auxs_[ddi_id], &pch_engine_.value(),
+          &ac, this, display_id, ddi_id, &dp_aux_channels_[ddi_id], &pch_engine_.value(),
           std::move(ddi_reference_maybe), &root_node_);
       if (ac.check() && reinterpret_cast<DisplayDevice*>(dp_disp.get())->Query()) {
         return dp_disp;
@@ -542,7 +543,7 @@ std::unique_ptr<DisplayDevice> Controller::QueryDisplay(DdiId ddi_id,
       FDF_LOG(DEBUG, "DDI %d PHY not available. Skip querying.", ddi_id);
     } else {
       auto hdmi_disp = fbl::make_unique_checked<HdmiDisplay>(
-          &ac, this, display_id, ddi_id, std::move(ddi_reference_maybe), gmbus_i2cs_[ddi_id].i2c());
+          &ac, this, display_id, ddi_id, std::move(ddi_reference_maybe), &gmbus_i2cs_[ddi_id]);
       if (ac.check() && reinterpret_cast<DisplayDevice*>(hdmi_disp.get())->Query()) {
         return hdmi_disp;
       }
@@ -1558,7 +1559,7 @@ bool Controller::CheckDisplayLimits(
 }
 
 config_check_result_t Controller::DisplayEngineCheckConfiguration(
-    const display_config_t* banjo_display_configs, size_t display_config_count,
+    const display_config_t* banjo_display_config,
     layer_composition_operations_t* out_layer_composition_operations_list,
     size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual) {
   fbl::AutoLock lock(&display_lock_);
@@ -1567,11 +1568,7 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
     *out_layer_composition_operations_actual = 0;
   }
 
-  cpp20::span banjo_display_configs_span(banjo_display_configs, display_config_count);
-  if (banjo_display_configs_span.empty()) {
-    // All displays off is supported
-    return CONFIG_CHECK_RESULT_OK;
-  }
+  cpp20::span banjo_display_configs_span(banjo_display_config, 1);
 
   std::array<display::DisplayId, PipeIds<registers::Platform::kKabyLake>().size()>
       display_allocated_to_pipe;
@@ -1579,163 +1576,148 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
     return CONFIG_CHECK_RESULT_TOO_MANY;
   }
 
-  int total_layer_count = std::accumulate(
-      banjo_display_configs, banjo_display_configs + display_config_count, 0,
-      [](int total, const display_config_t& config) { return total += config.layer_count; });
-  ZX_DEBUG_ASSERT(layer_composition_operations_count >= static_cast<size_t>(total_layer_count));
+  ZX_DEBUG_ASSERT(layer_composition_operations_count >= banjo_display_config->layer_count);
   cpp20::span<layer_composition_operations_t> layer_composition_operations(
-      out_layer_composition_operations_list, total_layer_count);
+      out_layer_composition_operations_list, banjo_display_config->layer_count);
   std::fill(layer_composition_operations.begin(), layer_composition_operations.end(), 0);
   if (out_layer_composition_operations_actual != nullptr) {
-    *out_layer_composition_operations_actual = total_layer_count;
+    *out_layer_composition_operations_actual = banjo_display_config->layer_count;
   }
 
   if (!CheckDisplayLimits(banjo_display_configs_span, layer_composition_operations)) {
     return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
   }
 
+  const display::DisplayId display_id = display::ToDisplayId(banjo_display_config->display_id);
+  DisplayDevice* display = nullptr;
+  for (auto& d : display_devices_) {
+    if (d->id() == display_id) {
+      display = d.get();
+      break;
+    }
+  }
+  if (display == nullptr) {
+    FDF_LOG(INFO, "Got config with no display - assuming hotplug and skipping");
+    return CONFIG_CHECK_RESULT_OK;
+  }
+
   config_check_result_t check_result = CONFIG_CHECK_RESULT_OK;
-  int layer_composition_operations_offset = 0;
-  for (unsigned i = 0; i < banjo_display_configs_span.size(); i++) {
-    const display_config_t& banjo_display_config = banjo_display_configs_span[i];
-    cpp20::span<layer_composition_operations_t> current_display_layer_composition_operations =
-        layer_composition_operations.subspan(layer_composition_operations_offset,
-                                             banjo_display_config.layer_count);
-    layer_composition_operations_offset += banjo_display_config.layer_count;
-
-    const display::DisplayId display_id = display::ToDisplayId(banjo_display_config.display_id);
-    DisplayDevice* display = nullptr;
-    for (auto& d : display_devices_) {
-      if (d->id() == display_id) {
-        display = d.get();
-        break;
+  bool merge_all = false;
+  if (banjo_display_config->layer_count > 3) {
+    bool layer0_is_solid_color_fill =
+        (banjo_display_config->layer_list[0].image_metadata.dimensions.width == 0 ||
+         banjo_display_config->layer_list[0].image_metadata.dimensions.height == 0);
+    merge_all = banjo_display_config->layer_count > 4 || layer0_is_solid_color_fill;
+  }
+  if (!merge_all && banjo_display_config->cc_flags) {
+    if (banjo_display_config->cc_flags & COLOR_CONVERSION_PREOFFSET) {
+      for (int i = 0; i < 3; i++) {
+        merge_all |= banjo_display_config->cc_preoffsets[i] <= -1;
+        merge_all |= banjo_display_config->cc_preoffsets[i] >= 1;
       }
     }
-    if (display == nullptr) {
-      FDF_LOG(INFO, "Got config with no display - assuming hotplug and skipping");
-      continue;
-    }
-
-    bool merge_all = false;
-    if (banjo_display_config.layer_count > 3) {
-      bool layer0_is_solid_color_fill =
-          (banjo_display_config.layer_list[0].image_metadata.dimensions.width == 0 ||
-           banjo_display_config.layer_list[0].image_metadata.dimensions.height == 0);
-      merge_all = banjo_display_config.layer_count > 4 || layer0_is_solid_color_fill;
-    }
-    if (!merge_all && banjo_display_config.cc_flags) {
-      if (banjo_display_config.cc_flags & COLOR_CONVERSION_PREOFFSET) {
-        for (int i = 0; i < 3; i++) {
-          merge_all |= banjo_display_config.cc_preoffsets[i] <= -1;
-          merge_all |= banjo_display_config.cc_preoffsets[i] >= 1;
-        }
-      }
-      if (banjo_display_config.cc_flags & COLOR_CONVERSION_POSTOFFSET) {
-        for (int i = 0; i < 3; i++) {
-          merge_all |= banjo_display_config.cc_postoffsets[i] <= -1;
-          merge_all |= banjo_display_config.cc_postoffsets[i] >= 1;
-        }
+    if (banjo_display_config->cc_flags & COLOR_CONVERSION_POSTOFFSET) {
+      for (int i = 0; i < 3; i++) {
+        merge_all |= banjo_display_config->cc_postoffsets[i] <= -1;
+        merge_all |= banjo_display_config->cc_postoffsets[i] >= 1;
       }
     }
+  }
 
-    uint32_t total_scalers_needed = 0;
-    for (unsigned j = 0; j < banjo_display_config.layer_count; j++) {
-      const layer_t& layer = banjo_display_config.layer_list[j];
+  uint32_t total_scalers_needed = 0;
+  for (size_t j = 0; j < banjo_display_config->layer_count; ++j) {
+    const layer_t& layer = banjo_display_config->layer_list[j];
 
-      if (layer.image_metadata.dimensions.width != 0 &&
-          layer.image_metadata.dimensions.height != 0) {
-        if (layer.image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_90 ||
-            layer.image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_270) {
-          // Linear and x tiled images don't support 90/270 rotation
-          if (layer.image_metadata.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
-              layer.image_metadata.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
-            current_display_layer_composition_operations[j] |=
-                LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
-            check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-          }
-        } else if (layer.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY &&
-                   layer.image_source_transformation != COORDINATE_TRANSFORMATION_ROTATE_CCW_180) {
-          // Cover unsupported rotations
-          current_display_layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
-          check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-        }
-
-        uint32_t src_width, src_height;
-        GetPostTransformWidth(banjo_display_config.layer_list[j], &src_width, &src_height);
-
-        // If the plane is too wide, force the client to do all composition
-        // and just give us a simple configuration.
-        uint32_t max_width;
+    if (layer.image_metadata.dimensions.width != 0 && layer.image_metadata.dimensions.height != 0) {
+      if (layer.image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_90 ||
+          layer.image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_270) {
+        // Linear and x tiled images don't support 90/270 rotation
         if (layer.image_metadata.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
             layer.image_metadata.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
-          max_width = 8192;
+          layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
+          check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+        }
+      } else if (layer.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY &&
+                 layer.image_source_transformation != COORDINATE_TRANSFORMATION_ROTATE_CCW_180) {
+        // Cover unsupported rotations
+        layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
+        check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+      }
+
+      uint32_t src_width, src_height;
+      GetPostTransformWidth(banjo_display_config->layer_list[j], &src_width, &src_height);
+
+      // If the plane is too wide, force the client to do all composition
+      // and just give us a simple configuration.
+      uint32_t max_width;
+      if (layer.image_metadata.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
+          layer.image_metadata.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
+        max_width = 8192;
+      } else {
+        max_width = 4096;
+      }
+      if (src_width > max_width) {
+        merge_all = true;
+      }
+
+      if (layer.display_destination.width != src_width ||
+          layer.display_destination.height != src_height) {
+        float ratio = registers::PipeScalerControlSkylake::k7x5MaxRatio;
+        uint32_t max_width = static_cast<uint32_t>(static_cast<float>(src_width) * ratio);
+        uint32_t max_height = static_cast<uint32_t>(static_cast<float>(src_height) * ratio);
+        uint32_t scalers_needed = 1;
+        // The 7x5 scaler (i.e. 2 scaler resources) is required if the src width is
+        // >2048 and the required vertical scaling is greater than 1.99.
+        if (layer.image_source.width > 2048) {
+          float ratio = registers::PipeScalerControlSkylake::kDynamicMaxVerticalRatio2049;
+          uint32_t max_dynamic_height =
+              static_cast<uint32_t>(static_cast<float>(src_height) * ratio);
+          if (max_dynamic_height < layer.display_destination.height) {
+            scalers_needed = 2;
+          }
+        }
+
+        // Verify that there are enough scaler resources
+        // Verify that the scaler input isn't too large or too small
+        // Verify that the required scaling ratio isn't too large
+        bool using_c = display_allocated_to_pipe[PipeId::PIPE_C] == display->id();
+        if ((total_scalers_needed + scalers_needed) >
+                (using_c ? registers::PipeScalerControlSkylake::kPipeCScalersAvailable
+                         : registers::PipeScalerControlSkylake::kPipeABScalersAvailable) ||
+            src_width > registers::PipeScalerControlSkylake::kMaxSrcWidthPx ||
+            src_width < registers::PipeScalerControlSkylake::kMinSrcSizePx ||
+            src_height < registers::PipeScalerControlSkylake::kMinSrcSizePx ||
+            max_width < layer.display_destination.width ||
+            max_height < layer.display_destination.height) {
+          layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE;
+          check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
         } else {
-          max_width = 4096;
+          total_scalers_needed += scalers_needed;
         }
-        if (src_width > max_width) {
-          merge_all = true;
-        }
-
-        if (layer.display_destination.width != src_width ||
-            layer.display_destination.height != src_height) {
-          float ratio = registers::PipeScalerControlSkylake::k7x5MaxRatio;
-          uint32_t max_width = static_cast<uint32_t>(static_cast<float>(src_width) * ratio);
-          uint32_t max_height = static_cast<uint32_t>(static_cast<float>(src_height) * ratio);
-          uint32_t scalers_needed = 1;
-          // The 7x5 scaler (i.e. 2 scaler resources) is required if the src width is
-          // >2048 and the required vertical scaling is greater than 1.99.
-          if (layer.image_source.width > 2048) {
-            float ratio = registers::PipeScalerControlSkylake::kDynamicMaxVerticalRatio2049;
-            uint32_t max_dynamic_height =
-                static_cast<uint32_t>(static_cast<float>(src_height) * ratio);
-            if (max_dynamic_height < layer.display_destination.height) {
-              scalers_needed = 2;
-            }
-          }
-
-          // Verify that there are enough scaler resources
-          // Verify that the scaler input isn't too large or too small
-          // Verify that the required scaling ratio isn't too large
-          bool using_c = display_allocated_to_pipe[PipeId::PIPE_C] == display->id();
-          if ((total_scalers_needed + scalers_needed) >
-                  (using_c ? registers::PipeScalerControlSkylake::kPipeCScalersAvailable
-                           : registers::PipeScalerControlSkylake::kPipeABScalersAvailable) ||
-              src_width > registers::PipeScalerControlSkylake::kMaxSrcWidthPx ||
-              src_width < registers::PipeScalerControlSkylake::kMinSrcSizePx ||
-              src_height < registers::PipeScalerControlSkylake::kMinSrcSizePx ||
-              max_width < layer.display_destination.width ||
-              max_height < layer.display_destination.height) {
-            current_display_layer_composition_operations[j] |=
-                LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE;
-            check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-          } else {
-            total_scalers_needed += scalers_needed;
-          }
-        }
-        break;
-      }
-
-      if (j != 0) {
-        current_display_layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_USE_IMAGE;
-        check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-      }
-      const auto format =
-          static_cast<fuchsia_images2::wire::PixelFormat>(layer.fallback_color.format);
-      if (format != fuchsia_images2::wire::PixelFormat::kB8G8R8A8 &&
-          format != fuchsia_images2::wire::PixelFormat::kR8G8B8A8) {
-        current_display_layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_USE_IMAGE;
-        check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
       }
       break;
     }
 
-    if (merge_all) {
-      current_display_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
-      for (unsigned j = 1; j < banjo_display_config.layer_count; j++) {
-        current_display_layer_composition_operations[j] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
-      }
+    if (j != 0) {
+      layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_USE_IMAGE;
       check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
+    const auto format =
+        static_cast<fuchsia_images2::wire::PixelFormat>(layer.fallback_color.format);
+    if (format != fuchsia_images2::wire::PixelFormat::kB8G8R8A8 &&
+        format != fuchsia_images2::wire::PixelFormat::kR8G8B8A8) {
+      layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_USE_IMAGE;
+      check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    }
+    break;
+  }
+
+  if (merge_all) {
+    layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
+    for (size_t j = 1; j < banjo_display_config->layer_count; ++j) {
+      layer_composition_operations[j] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
+    }
+    check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }
 
   // CalculateMinimumAllocations ignores layers after kImagePlaneCount. That's fine, since
@@ -1752,25 +1734,17 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
       ZX_ASSERT(pipe->in_use());  // If the allocation failed, it should be in use
       display::DisplayId pipe_attached_display_id = pipe->attached_display_id();
 
-      int layer_composition_operations_offset = 0;
-      for (unsigned i = 0; i < display_config_count; i++) {
-        cpp20::span<layer_composition_operations_t> current_display_layer_composition_operations =
-            layer_composition_operations.subspan(layer_composition_operations_offset,
-                                                 banjo_display_configs[i].layer_count);
-        layer_composition_operations_offset += banjo_display_configs[i].layer_count;
-
-        display::DisplayId display_id = display::ToDisplayId(banjo_display_configs[i].display_id);
-        if (display_id != pipe_attached_display_id) {
-          continue;
-        }
-
-        current_display_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
-        for (unsigned j = 1; j < banjo_display_configs[i].layer_count; j++) {
-          current_display_layer_composition_operations[j] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
-        }
-        check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-        break;
+      display::DisplayId display_id = display::ToDisplayId(banjo_display_config->display_id);
+      if (display_id != pipe_attached_display_id) {
+        continue;
       }
+
+      layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
+      for (size_t j = 1; j < banjo_display_config->layer_count; ++j) {
+        layer_composition_operations[j] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
+      }
+      check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+      break;
     }
   }
   return check_result;
@@ -1830,16 +1804,14 @@ uint16_t Controller::DataBufferBlockCount() const {
   return is_tgl(device_id_) ? kTigerLakeDataBufferBlockCount : kKabyLakeDataBufferBlockCount;
 }
 
-void Controller::DisplayEngineApplyConfiguration(const display_config_t* banjo_display_configs,
-                                                 size_t display_config_count,
+void Controller::DisplayEngineApplyConfiguration(const display_config_t* banjo_display_config,
                                                  const config_stamp_t* banjo_config_stamp) {
   fbl::AutoLock lock(&display_lock_);
   ZX_DEBUG_ASSERT(display_devices_.size() <= kMaximumConnectedDisplayCount);
   display::DisplayId fake_vsync_display_ids[kMaximumConnectedDisplayCount];
   size_t fake_vsync_size = 0;
 
-  cpp20::span<const display_config_t> banjo_display_configs_span(banjo_display_configs,
-                                                                 display_config_count);
+  cpp20::span<const display_config_t> banjo_display_configs_span(banjo_display_config, 1);
   ReallocatePlaneBuffers(banjo_display_configs_span,
                          /* reallocate_pipes */ pipe_manager_->PipeReallocated());
 
@@ -1978,6 +1950,44 @@ zx_status_t Controller::DisplayEngineSetBufferCollectionConstraints(
   }
 
   return ZX_OK;
+}
+
+config_check_result_t Controller::DisplayEngineCheckConfiguration(
+    const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
+    layer_composition_operations_t* out_layer_composition_operations_list,
+    size_t out_layer_composition_operations_size, size_t* out_layer_composition_operations_actual) {
+  // The display coordinator currently uses zero-display configs to blank all
+  // displays. We'll remove this eventually.
+  if (banjo_display_configs_count == 0) {
+    return CONFIG_CHECK_RESULT_OK;
+  }
+
+  // This adapter does not support multiple-display operation. None of our
+  // drivers supports this mode.
+  if (banjo_display_configs_count > 1) {
+    ZX_DEBUG_ASSERT_MSG(false, "Multiple displays registered with the display coordinator");
+    return CONFIG_CHECK_RESULT_TOO_MANY;
+  }
+
+  return DisplayEngineCheckConfiguration(
+      banjo_display_configs_array, out_layer_composition_operations_list,
+      out_layer_composition_operations_size, out_layer_composition_operations_actual);
+}
+
+void Controller::DisplayEngineApplyConfiguration(
+    const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
+    const config_stamp_t* banjo_config_stamp) {
+  // The display coordinator currently uses zero-display configs to blank all
+  // displays. We'll remove this eventually.
+  if (banjo_display_configs_count == 0) {
+    return;
+  }
+
+  // This adapter does not support multiple-display operation. None of our
+  // drivers supports this mode.
+  ZX_DEBUG_ASSERT_MSG(banjo_display_configs_count == 1,
+                      "Display coordinator applied rejected multi-display config");
+  DisplayEngineApplyConfiguration(banjo_display_configs_array, banjo_config_stamp);
 }
 
 // Intel GPU core methods
@@ -2140,7 +2150,7 @@ void Controller::PrepareStopOnPowerStateTransition(
     fuchsia_system_state::SystemPowerState power_state, fdf::PrepareStopCompleter completer) {
   // TODO(https://fxbug.dev/42119483): Implement the suspend hook based on suspendtxn
   if (power_state == fuchsia_system_state::SystemPowerState::kMexec) {
-    zx::result<FramebufferInfo> fb_status = GetFramebufferInfo(resources_.framebuffer);
+    zx::result<FramebufferInfo> fb_status = GetFramebufferInfo(framebuffer_info_);
     if (fb_status.is_error()) {
       completer(zx::ok());
       return;
@@ -2267,9 +2277,9 @@ zx_status_t Controller::Init() {
   for (unsigned i = 0; i < ddis_.size(); i++) {
     gmbus_i2cs_.push_back(GMBusI2c(ddis_[i], GetPlatform(device_id_), mmio_space()));
 
-    dp_auxs_.push_back(DpAux(mmio_space(), ddis_[i], device_id_));
+    dp_aux_channels_.push_back(DpAuxChannelImpl(mmio_space(), ddis_[i], device_id_));
     FDF_LOG(TRACE, "DDI %d AUX channel initial configuration:", ddis_[i]);
-    dp_auxs_[dp_auxs_.size() - 1].aux_channel().Log();
+    dp_aux_channels_[dp_aux_channels_.size() - 1].aux_channel().Log();
   }
 
   if (!is_tgl(device_id_)) {
@@ -2294,7 +2304,7 @@ zx_status_t Controller::Init() {
     // Prevent clients from allocating memory in this region by telling |gtt_| to exclude it from
     // the region allocator.
     uint32_t offset = 0u;
-    auto fb = GetFramebufferInfo(resources_.framebuffer);
+    auto fb = GetFramebufferInfo(framebuffer_info_);
     if (fb.is_error()) {
       FDF_LOG(INFO, "Failed to obtain framebuffer size (%s)", fb.status_string());
       // It is possible for zx_framebuffer_get_info to fail in a headless system as the bootloader
@@ -2358,8 +2368,10 @@ zx::result<ddk::AnyProtocol> Controller::GetProtocol(uint32_t proto_id) {
 
 Controller::Controller(fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
                        fidl::ClientEnd<fuchsia_hardware_pci::Device> pci,
-                       ControllerResources resources, inspect::Inspector inspector)
+                       ControllerResources resources, std::optional<zbi_swfb_t> framebuffer_info,
+                       inspect::Inspector inspector)
     : resources_(std::move(resources)),
+      framebuffer_info_(framebuffer_info),
       sysmem_(std::move(sysmem)),
       pci_(std::move(pci)),
       inspector_(std::move(inspector)) {}
@@ -2380,11 +2392,11 @@ Controller::~Controller() {
 zx::result<std::unique_ptr<Controller>> Controller::Create(
     fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
     fidl::ClientEnd<fuchsia_hardware_pci::Device> pci, ControllerResources resources,
-    inspect::Inspector inspector) {
+    std::optional<zbi_swfb_t> framebuffer_info, inspect::Inspector inspector) {
   fbl::AllocChecker alloc_checker;
-  auto controller =
-      fbl::make_unique_checked<Controller>(&alloc_checker, std::move(sysmem), std::move(pci),
-                                           std::move(resources), std::move(inspector));
+  auto controller = fbl::make_unique_checked<Controller>(&alloc_checker, std::move(sysmem),
+                                                         std::move(pci), std::move(resources),
+                                                         framebuffer_info, std::move(inspector));
   if (!alloc_checker.check()) {
     FDF_LOG(ERROR, "Failed to allocate memory for Controller");
     return zx::error(ZX_ERR_NO_MEMORY);

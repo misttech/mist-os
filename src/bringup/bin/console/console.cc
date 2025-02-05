@@ -89,12 +89,23 @@ void Console::Describe(DescribeCompleter::Sync& completer) {
   }
 }
 
+void Console::Reset() { rx_event_.signal(ZX_USER_SIGNAL_ALL, 0); }
+
+void Console::SetEvent(bool enable, uint32_t mask) {
+  event_mask_ = mask;
+  rx_event_.signal(0, ZX_USER_SIGNAL_1);
+}
+
+uint32_t Console::features() { return features_; }
+
 void Console::OpenClient(OpenClientRequestView request, OpenClientCompleter::Sync& completer) {
   completer.Reply(ZX_ERR_NOT_SUPPORTED);
 }
 void Console::ClrSetFeature(ClrSetFeatureRequestView request,
                             ClrSetFeatureCompleter::Sync& completer) {
-  completer.Reply(ZX_ERR_NOT_SUPPORTED, {});
+  features_ |= request->set;
+  features_ &= ~request->clr;
+  completer.Reply(ZX_OK, features_);
 }
 void Console::GetWindowSize(GetWindowSizeCompleter::Sync& completer) {
   completer.Reply(ZX_ERR_NOT_SUPPORTED, {});
@@ -103,7 +114,9 @@ void Console::MakeActive(MakeActiveRequestView request, MakeActiveCompleter::Syn
   completer.Reply(ZX_ERR_NOT_SUPPORTED);
 }
 void Console::ReadEvents(ReadEventsCompleter::Sync& completer) {
-  completer.Reply(ZX_ERR_NOT_SUPPORTED, {});
+  completer.Reply(ZX_OK, event_mask_);
+  event_mask_ = 0;
+  Reset();
 }
 void Console::SetWindowSize(SetWindowSizeRequestView request,
                             SetWindowSizeCompleter::Sync& completer) {
@@ -116,6 +129,12 @@ void Console::DebugReaderThread() {
     zx_status_t status = rx_source_(&ch);
     if (status != ZX_OK) {
       return;
+    }
+    if (!(features_ & fuchsia_hardware_pty::wire::kFeatureRaw)) {
+      if (ch == 3) {
+        SetEvent(true, fuchsia_hardware_pty::wire::kEventInterrupt);
+        continue;
+      }
     }
     size_t actual;
     rx_fifo_.Write(&ch, 1, &actual);

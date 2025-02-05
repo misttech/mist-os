@@ -12,7 +12,7 @@ pub struct TextValidator;
 impl Validator for TextValidator {
     /// Validates that the given file contains only UTF-8 encoded text.
     fn validate(&self, file_name: &str, contents: &[u8]) -> Result<(), ValidatorError> {
-        tracing::info!("Validating {} is only UTF-8 encoded text", file_name);
+        log::info!("Validating {} is only UTF-8 encoded text", file_name);
         from_utf8(contents).map(|_| ()).map_err(|cause| ValidatorError::FailedToValidate {
             cause: Error::from(cause),
             file_name: file_name.to_string(),

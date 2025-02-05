@@ -23,18 +23,7 @@
             to: "#echo_client",
         },
 
-        // Route LogSink and InspectSink protocols to both children.
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "parent",
-            to: [
-                "#echo_client",
-                "#echo_server",
-            ],
-        },
+        // Route diagnostics protocols to both children.
         {
             dictionary: "diagnostics",
             from: "parent",

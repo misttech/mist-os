@@ -28,7 +28,7 @@ fn common_filters(watcher: fuchsia_fs::directory::Watcher) -> stream::BoxStream<
                 Some(filename.to_str().unwrap().to_owned())
             }
             Err(error) => {
-                tracing::error!(?error, "fshost block watcher stream error");
+                log::error!(error:?; "fshost block watcher stream error");
                 None
             }
             _ => None,
@@ -76,7 +76,7 @@ impl WatchSource for PathSource {
                 }
             }
             .map_err(|e| {
-                tracing::warn!("Failed to create device (maybe it went away?): {:?}", e);
+                log::warn!("Failed to create device (maybe it went away?): {:?}", e);
                 e
             })
             .ok()
@@ -109,12 +109,12 @@ impl WatchSource for DirSource {
             let dir = dir.clone();
             async move {
                 let dir_clone = fuchsia_fs::directory::clone(&dir)
-                    .map_err(|err| tracing::warn!(?err, "Failed to clone dir"))
+                    .map_err(|err| log::warn!(err:?; "Failed to clone dir"))
                     .ok()?;
                 VolumeProtocolDevice::new(dir_clone, filename)
                     .map(|d| Box::new(d) as Box<dyn Device>)
                     .map_err(|err| {
-                        tracing::warn!(?err, "Failed to create device (maybe it went away?)");
+                        log::warn!(err:?; "Failed to create device (maybe it went away?)");
                         err
                     })
                     .ok()
@@ -194,7 +194,7 @@ mod tests {
                 match request {
                     Ok(ControllerRequest::GetTopologicalPath { responder, .. }) => {
                         responder.send(Ok(path)).unwrap_or_else(|e| {
-                            tracing::error!(
+                            log::error!(
                                 "failed to send GetTopologicalPath response. error: {:?}",
                                 e
                             );

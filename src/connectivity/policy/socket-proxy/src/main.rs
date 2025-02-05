@@ -5,7 +5,8 @@
 //! Implementation of the network socket proxy.
 //!
 //! Runs proxied versions of fuchsia.posix.socket.Provider and fuchsia.posix.socket.raw.Provider.
-//! Exposes fuchsia.netpol.socketproxy.StarnixNetworks and
+//! Exposes fuchsia.netpol.socketproxy.StarnixNetworks,
+//! fuchsia.netpol.socketproxy.FuchsiaNetworks, and
 //! fuchsia.netpol.socketproxy.DnsServerWatcher.
 
 use fidl_fuchsia_posix_socket::{self as fposix_socket, OptionalUint32};
@@ -15,8 +16,8 @@ use fuchsia_inspect_derive::{Inspect, WithInspect as _};
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::StreamExt as _;
+use log::error;
 use std::sync::Arc;
-use tracing::error;
 
 mod dns_watcher;
 mod registry;
@@ -26,6 +27,15 @@ mod socket_provider;
 struct SocketMarks {
     mark_1: OptionalUint32,
     mark_2: OptionalUint32,
+}
+
+impl From<SocketMarks> for Vec<fposix_socket::Marks> {
+    fn from(SocketMarks { mark_1, mark_2 }: SocketMarks) -> Self {
+        vec![
+            fposix_socket::Marks { domain: fposix_socket::MarkDomain::Mark1, mark: mark_1 },
+            fposix_socket::Marks { domain: fposix_socket::MarkDomain::Mark2, mark: mark_2 },
+        ]
+    }
 }
 
 impl SocketMarks {
@@ -68,6 +78,7 @@ impl SocketProxy {
 
 enum IncomingService {
     StarnixNetworks(fidl_fuchsia_netpol_socketproxy::StarnixNetworksRequestStream),
+    FuchsiaNetworks(fidl_fuchsia_netpol_socketproxy::FuchsiaNetworksRequestStream),
     DnsServerWatcher(fidl_fuchsia_netpol_socketproxy::DnsServerWatcherRequestStream),
     PosixSocket(fidl_fuchsia_posix_socket::ProviderRequestStream),
     PosixSocketRaw(fidl_fuchsia_posix_socket_raw::ProviderRequestStream),
@@ -88,6 +99,7 @@ pub async fn main() -> Result<(), anyhow::Error> {
     let _: &mut ServiceFsDir<'_, _> = fs
         .dir("svc")
         .add_fidl_service(IncomingService::StarnixNetworks)
+        .add_fidl_service(IncomingService::FuchsiaNetworks)
         .add_fidl_service(IncomingService::DnsServerWatcher)
         .add_fidl_service(IncomingService::PosixSocket)
         .add_fidl_service(IncomingService::PosixSocketRaw);
@@ -99,6 +111,7 @@ pub async fn main() -> Result<(), anyhow::Error> {
     fs.for_each_concurrent(100, |service| async {
         match service {
             IncomingService::StarnixNetworks(stream) => proxy.registry.run_starnix(stream).await,
+            IncomingService::FuchsiaNetworks(stream) => proxy.registry.run_fuchsia(stream).await,
             IncomingService::DnsServerWatcher(stream) => proxy.dns_watcher.run(stream).await,
             IncomingService::PosixSocket(stream) => proxy.socket_provider.run(stream).await,
             IncomingService::PosixSocketRaw(stream) => proxy.socket_provider.run_raw(stream).await,

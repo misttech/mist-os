@@ -26,7 +26,7 @@ int main(int argc, const char** argv) {
   FX_LOGS(INFO) << "Starting fake fuchsia.hardware.display.Provider service.";
 
   static constexpr fake_display::FakeDisplayDeviceConfig kFakeDisplayDeviceConfig = {
-      .manual_vsync_trigger = false,
+      .periodic_vsync = true,
       .no_buffer_access = false,
   };
 

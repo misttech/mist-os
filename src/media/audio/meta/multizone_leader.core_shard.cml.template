@@ -33,6 +33,13 @@
             from: "#mediasession",
             to: "#multizone_leader",
         },
+        // TODO(b/345827642): Remove once dictionaries
+        // are routed through the SDK.
+        {
+            protocol: ["fuchsia.inspect.InspectSink", "fuchsia.logger.LogSink"],
+            from: "parent/diagnostics",
+            to: "#multizone_leader",
+        },
         {
             protocol: [
                 "fuchsia.net.interfaces.State",

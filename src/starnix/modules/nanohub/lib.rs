@@ -6,4 +6,4 @@ mod nanohub;
 mod nanohub_comms_directory;
 mod socket_tunnel_file;
 
-pub use nanohub::nanohub_device_init;
+pub use nanohub::{nanohub_device_init, nanohub_procfs_builder};

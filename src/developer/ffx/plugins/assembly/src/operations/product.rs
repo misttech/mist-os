@@ -3,16 +3,16 @@
 // found in the LICENSE file.
 
 use crate::operations::product::assembly_builder::ImageAssemblyConfigBuilder;
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use assembly_config_schema::assembly_config::{
-    AssemblyConfigWrapperForOverrides, CompiledComponentDefinition, CompiledPackageDefinition,
+    CompiledComponentDefinition, CompiledPackageDefinition,
 };
 use assembly_config_schema::developer_overrides::DeveloperOverrides;
-use assembly_config_schema::platform_config::PlatformConfig;
 use assembly_config_schema::{
     AssemblyConfig, BoardInformation, BoardInputBundle, FeatureSupportLevel,
 };
 use assembly_constants::{BlobfsCompiledPackageDestination, CompiledPackageDestination};
+use assembly_container::AssemblyContainer;
 use assembly_file_relative_path::SupportsFileRelativePaths;
 use assembly_images_config::{FilesystemImageMode, ImagesConfig};
 use assembly_tool::SdkToolProvider;
@@ -33,6 +33,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         legacy_bundle,
         package_validation,
         custom_kernel_aib,
+        suppress_overrides_warning,
         developer_overrides,
     } = args;
 
@@ -51,19 +52,24 @@ Resulting product is not supported and may misbehave!
     }
 
     let product_path = product;
+    let product_config_dir = product_path
+        .parent()
+        .ok_or_else(|| anyhow!("Product config path does not have a parent: {}", &product_path))?;
+    let product_config_path = product_path.file_name().ok_or_else(|| {
+        anyhow!("Product config path does not have a filename: {}", &product_path)
+    })?;
 
     let board_info_path = board_info;
 
+    let product_config =
+        AssemblyConfig::from_dir_with_config_path(&product_config_dir, &product_config_path)
+            .context("Reading product configuration")?;
+
     // If there are developer overrides, then those need to be parsed  and applied before other
     // actions can be taken, since they impact how the rest of the assembly process works.
-    let (platform, product, board_info, developer_overrides) = if let Some(overrides_path) =
+    let (product_config, board_info, developer_overrides) = if let Some(overrides_path) =
         developer_overrides
     {
-        // If developer overrides are in use, parse to intermediate types so
-        // that overrides can be applied.
-        let AssemblyConfigWrapperForOverrides { platform, product, file_relative_paths } =
-            read_config(&product_path).context("Reading product configuration")?;
-
         let developer_overrides = read_config::<DeveloperOverrides>(&overrides_path)
             .context("Reading developer overrides")?
             .resolve_paths_from_file(&overrides_path)
@@ -73,29 +79,22 @@ Resulting product is not supported and may misbehave!
             "Merging developer-provided file paths into developer-provided configuration.",
         )?;
 
-        print_developer_overrides_banner(&developer_overrides, &overrides_path)
-            .context("Displaying developer overrides.")?;
+        if !suppress_overrides_warning {
+            print_developer_overrides_banner(&developer_overrides, &overrides_path)
+                .context("Displaying developer overrides.")?;
+        }
 
-        // Extract the platform, product, and board config developer overrides so that we can apply
-        // them to the product and board configs.
-        let platform_config_overrides = developer_overrides.platform;
-        let product_config_overrides = developer_overrides.product;
+        // Apply the platform and product overrides.
+        let product_config_overrides = serde_json::json!({
+            "platform": developer_overrides.platform,
+            "product": developer_overrides.product,
+        });
+        let mut product_config = product_config
+            .apply_overrides(product_config_overrides)
+            .context("Merging developer overrides into product configuration")?;
+
+        // Apply the board overrides.
         let board_config_overrides = developer_overrides.board;
-
-        let product_config_path = if file_relative_paths { Some(&product_path) } else { None };
-
-        let mut platform: PlatformConfig = merge_override_values_with_resolved_paths(
-            platform,
-            product_config_path,
-            platform_config_overrides,
-        )
-        .context("Merging developer overrides into platform configuration")?;
-        let product = merge_override_values_with_resolved_paths(
-            product,
-            product_config_path,
-            product_config_overrides,
-        )
-        .context("Merging developer overrides into product configuration")?;
         let board_info = read_config::<serde_json::Value>(&board_info_path)
             .context("Reading board information")?;
         let board_info = merge_override_values_with_resolved_paths(
@@ -117,27 +116,20 @@ Resulting product is not supported and may misbehave!
         // If the developer overrides specifies `netboot_mode`, then we override
         // the image mode to 'ramdisk'.
         if developer_overrides.developer_only_options.netboot_mode {
-            platform.storage.filesystems.image_mode = FilesystemImageMode::Ramdisk;
+            product_config.platform.storage.filesystems.image_mode = FilesystemImageMode::Ramdisk;
         }
-        let platform = platform;
 
-        (platform, product, board_info, Some(developer_overrides))
+        (product_config, board_info, Some(developer_overrides))
     } else {
-        let config = read_config::<AssemblyConfig>(&product_path)
-            .context("Reading product configuration")?;
-        let config = if config.file_relative_paths {
-            config
-                .resolve_paths_from_file(&product_path)
-                .context("Resolving paths in product config")?
-        } else {
-            config
-        };
         let board_info = read_config::<BoardInformation>(&board_info_path)
             .context("Reading board configuration")?
             .resolve_paths_from_file(&board_info_path)
             .context("Resolving paths in board config")?;
-        (config.platform, config.product, board_info, None)
+        (product_config, board_info, None)
     };
+
+    let platform = product_config.platform;
+    let product = product_config.product;
 
     // Parse the board's Board Input Bundles, if it has them, and merge their
     // configuration fields into that of the board_info struct.
@@ -354,15 +346,19 @@ Resulting product is not supported and may misbehave!
     // Get the tool set.
     let tools = SdkToolProvider::try_new()?;
 
-    // Do the actual building of everything for the Image Assembly config.
-    let image_assembly =
-        builder.build(&outdir, &tools).context("Building Image Assembly config")?;
+    // Do the actual building and validation of everything for the Image
+    // Assembly config.
+    let (image_assembly, validation_error) = builder
+        .build_and_validate(
+            &outdir,
+            &tools,
+            package_validation == PackageValidationHandling::Warning,
+        )
+        .context("Building Image Assembly config")?;
 
-    // Validate the built product assembly.
-    assembly_validate_product::validate_product(
-        &image_assembly,
-        package_validation == PackageValidationHandling::Warning,
-    )?;
+    if let Some(validation_error) = validation_error {
+        return Err(validation_error.into());
+    }
 
     // Serialize out the Image Assembly configuration.
     let image_assembly_path = outdir.join("image_assembly.json");

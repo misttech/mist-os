@@ -138,7 +138,8 @@ static int mutex_inherit_test() {
         // wait on a event for a period of time, to try to have other grabber threads
         // need to tweak our priority in either one of the mutexes we hold or the
         // blocking event
-        args->test_blocker.WaitDeadline(current_time() + ZX_USEC(rand() % 10u), Interruptible::Yes);
+        args->test_blocker.WaitDeadline(current_mono_time() + ZX_USEC(rand() % 10u),
+                                        Interruptible::Yes);
 
         // release in reverse order
         for (int j = r - 1; j >= 0; j--) {
@@ -383,7 +384,7 @@ static ktl::atomic<int> preempt_count;
 static int preempt_tester(void* arg) {
   spin(1000000);
 
-  printf("exiting ts %" PRIi64 " ns\n", current_time());
+  printf("exiting ts %" PRIi64 " ns\n", current_mono_time());
 
   preempt_count.fetch_sub(1);
 
@@ -545,9 +546,9 @@ static void spinlock_test() {
 static int sleeper_kill_thread(void* arg) {
   Thread::Current::SleepRelative(ZX_MSEC(100));
 
-  zx_time_t t = current_time();
+  zx_instant_mono_t t = current_mono_time();
   zx_status_t err = Thread::Current::SleepInterruptible(t + ZX_SEC(5));
-  zx_duration_t duration = (current_time() - t) / ZX_MSEC(1);
+  zx_duration_mono_t duration = (current_mono_time() - t) / ZX_MSEC(1);
   TRACEF("thread_sleep_interruptible returns %d after %" PRIi64 " msecs\n", err, duration);
 
   return 0;
@@ -558,9 +559,9 @@ static int waiter_kill_thread_infinite_wait(void* arg) {
 
   Thread::Current::SleepRelative(ZX_MSEC(100));
 
-  zx_time_t t = current_time();
+  zx_instant_mono_t t = current_mono_time();
   zx_status_t err = e->WaitDeadline(ZX_TIME_INFINITE, Interruptible::Yes);
-  zx_duration_t duration = (current_time() - t) / ZX_MSEC(1);
+  zx_duration_mono_t duration = (current_mono_time() - t) / ZX_MSEC(1);
   TRACEF("event_wait_deadline returns %d after %" PRIi64 " msecs\n", err, duration);
 
   return 0;
@@ -571,9 +572,9 @@ static int waiter_kill_thread(void* arg) {
 
   Thread::Current::SleepRelative(ZX_MSEC(100));
 
-  zx_time_t t = current_time();
+  zx_instant_mono_t t = current_mono_time();
   zx_status_t err = e->WaitDeadline(t + ZX_SEC(5), Interruptible::Yes);
-  zx_duration_t duration = (current_time() - t) / ZX_MSEC(1);
+  zx_duration_mono_t duration = (current_mono_time() - t) / ZX_MSEC(1);
   TRACEF("event_wait_deadline with deadline returns %d after %" PRIi64 " msecs\n", err, duration);
 
   return 0;
@@ -646,10 +647,10 @@ struct affinity_test_state {
 };
 
 template <typename T>
-static void spin_while(zx_time_t t, T func) {
-  zx_time_t start = current_time();
+static void spin_while(zx_instant_mono_t t, T func) {
+  zx_instant_mono_t start = current_mono_time();
 
-  while ((current_time() - start) < t) {
+  while ((current_mono_time() - start) < t) {
     func();
   }
 }

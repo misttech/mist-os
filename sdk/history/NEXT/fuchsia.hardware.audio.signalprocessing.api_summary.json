@@ -318,6 +318,12 @@
         "type": "fuchsia.hardware.audio.signalprocessing/TypeSpecificElementState"
     },
     {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/ElementState.vendor_specific_data",
+        "ordinal": "4",
+        "type": "vector<uint8>:4096"
+    },
+    {
         "kind": "table",
         "name": "fuchsia.hardware.audio.signalprocessing/ElementState"
     },
@@ -680,6 +686,12 @@
     },
     {
         "kind": "const",
+        "name": "fuchsia.hardware.audio.signalprocessing/MAX_BYTES_ELEMENT_VENDOR_SPECIFIC",
+        "type": "uint32",
+        "value": "4096"
+    },
+    {
+        "kind": "const",
         "name": "fuchsia.hardware.audio.signalprocessing/MAX_COUNT_DYNAMICS_BANDS",
         "type": "uint32",
         "value": "64"
@@ -774,6 +786,14 @@
         "response": "fuchsia.hardware.audio.signalprocessing/ReaderWatchElementStateResponse"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/Reader.WatchTopology",
+        "strictness": "flexible",
+        "ordinal": "7408828948738909993",
+        "direction": "two_way",
+        "response": "fuchsia.hardware.audio.signalprocessing/Reader_WatchTopology_Response"
+    },
+    {
         "kind": "protocol",
         "name": "fuchsia.hardware.audio.signalprocessing/Reader",
         "openness": "open",
@@ -820,6 +840,16 @@
         "name": "fuchsia.hardware.audio.signalprocessing/Reader_GetTopologies_Response"
     },
     {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/Reader_WatchTopology_Response.topology_id",
+        "ordinal": "1",
+        "type": "uint64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.audio.signalprocessing/Reader_WatchTopology_Response"
+    },
+    {
         "kind": "table/member",
         "name": "fuchsia.hardware.audio.signalprocessing/SettableElementState.bypassed",
         "ordinal": "4",
@@ -836,6 +866,12 @@
         "name": "fuchsia.hardware.audio.signalprocessing/SettableElementState.type_specific",
         "ordinal": "1",
         "type": "fuchsia.hardware.audio.signalprocessing/SettableTypeSpecificElementState"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/SettableElementState.vendor_specific_data",
+        "ordinal": "2",
+        "type": "vector<uint8>:4096"
     },
     {
         "kind": "table",
@@ -916,6 +952,14 @@
         "direction": "two_way",
         "request": "fuchsia.hardware.audio.signalprocessing/ReaderWatchElementStateRequest",
         "response": "fuchsia.hardware.audio.signalprocessing/ReaderWatchElementStateResponse"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessing.WatchTopology",
+        "strictness": "flexible",
+        "ordinal": "7408828948738909993",
+        "direction": "two_way",
+        "response": "fuchsia.hardware.audio.signalprocessing/Reader_WatchTopology_Response"
     },
     {
         "kind": "protocol",

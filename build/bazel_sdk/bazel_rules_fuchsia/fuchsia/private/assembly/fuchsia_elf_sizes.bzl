@@ -67,7 +67,7 @@ def _fuchsia_elf_sizes_impl(ctx):
 fuchsia_elf_sizes = rule(
     doc = """Create a ELF sizes summary file for a Fuchsia product.""",
     implementation = _fuchsia_elf_sizes_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "product": attr.label(
             doc = "The fuchsia product to check the size of.",

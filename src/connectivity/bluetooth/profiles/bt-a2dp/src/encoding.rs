@@ -10,9 +10,9 @@ use futures::io::AsyncWrite;
 use futures::stream::BoxStream;
 use futures::task::{Context, Poll};
 use futures::{FutureExt, Stream, StreamExt};
+use log::info;
 use std::collections::VecDeque;
 use std::pin::Pin;
-use tracing::info;
 use {bt_a2dp as a2dp, fuchsia_async as fasync, fuchsia_trace as trace};
 
 pub struct EncodedStream {

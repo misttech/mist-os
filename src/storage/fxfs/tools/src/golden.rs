@@ -225,6 +225,9 @@ async fn check_image(path: &Path) -> Result<(), Error> {
             bail!("Unexpected file content in new file");
         }
     }
+
+    fs.journal().compact().await?;
+    assert_eq!(fs.journal().super_block_header().earliest_version, LATEST_VERSION);
     fs.close().await
 }
 

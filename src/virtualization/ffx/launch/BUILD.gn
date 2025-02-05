@@ -7,7 +7,6 @@ import("//src/developer/ffx/build/ffx_plugin.gni")
 ffx_plugin("ffx_guest_launch") {
   version = "0.1.0"
   edition = "2021"
-  sdk_category = "internal"
 
   args_sources = [ "src/args.rs" ]
   args_deps = [ "//src/virtualization/lib/cli/args:guest_cli_args" ]

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 use crate::legacy::IfaceRef;
 use futures::prelude::*;
-use tracing::{debug, error};
+use log::{debug, error};
 use {fidl_fuchsia_wlan_product_deprecatedclient as deprecated, fidl_fuchsia_wlan_sme as fidl_sme};
 
 const MAX_CONCURRENT_WLAN_REQUESTS: usize = 1000;

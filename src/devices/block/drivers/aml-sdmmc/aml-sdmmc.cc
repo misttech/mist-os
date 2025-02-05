@@ -314,9 +314,14 @@ zx::result<> AmlSdmmc::InitResources(
     }
   }
 
-  if (config_.enable_suspend()) {
+  {
     auto result = ConfigurePowerManagement(pdev);
-    if (!result.is_ok()) {
+
+    if (result.is_ok()) {
+      FDF_LOGL(INFO, logger(), "Configured power management successfully.");
+    } else if (config_.enable_suspend()) {
+      // Only log and return error on a failed power configuration if enable_suspend was true.
+      FDF_LOGL(ERROR, logger(), "Failed to configure power management: %s", result.status_string());
       return result.take_error();
     }
   }

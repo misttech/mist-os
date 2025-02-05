@@ -8,7 +8,7 @@ use fidl_fuchsia_diagnostics::{
     BatchIteratorMarker, ClientSelectorConfiguration, DataType, Format, StreamMode,
     StreamParameters,
 };
-use tracing::warn;
+use log::warn;
 use {
     fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_diagnostics_host as fhost,
     fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync,
@@ -94,7 +94,7 @@ impl<'a> IsolatedLogsProvider<'a> {
             ..Default::default()
         };
         self.accessor.stream_diagnostics(&stream_parameters, iterator).map_err(|err| {
-            warn!(%err, ?data_type, "Failed to subscribe to isolated diagnostics data");
+            warn!(err:%, data_type:?; "Failed to subscribe to isolated diagnostics data");
             err
         })?;
         Ok(())

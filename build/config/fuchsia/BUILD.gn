@@ -5,6 +5,7 @@
 import("//build/board.gni")
 import("//build/config/build_id.gni")
 import("//build/config/clang/clang.gni")
+import("//build/config/clang/clang_target_toolchain_info.gni")
 import("//build/config/current_target_tuple.gni")
 import("//build/config/fuchsia/target_api_level.gni")
 import("//build/config/sanitizers/sanitizer_default_options.gni")
@@ -16,7 +17,6 @@ import("//src/lib/icu/third_party_icu_headers.gni")
 
 if (support_rust) {
   import("//build/rust/config.gni")
-  import("//zircon/public/sysroot/rust.gni")
 }
 
 # ccache, at least in some configurations, caches preprocessed content. This
@@ -70,17 +70,8 @@ config("compiler") {
       configs += [ "//build/config/rust:one_codegen_unit" ]
     }
 
-    # TODO(phosek): this is inefficient, rather this should come from a JSON file.
-    # Relative path makes command-lines remote-portable.
     _clang_resource_dir =
-        rebase_path(exec_script("$clang_prefix/clang",
-                                [
-                                  "--target=$current_target_tuple",
-                                  "-print-resource-dir",
-                                ],
-                                "trim string",
-                                []),
-                    root_build_dir)
+        "${rebased_clang_dir}/${clang_target_toolchain_info.resource_dir}"
 
     # When linking C++ runtime libraries into Rust binaries, we should use
     # the correct multilib variant.
@@ -104,9 +95,9 @@ config("compiler") {
 
     rustflags = [
       "-L",
-      rebase_path(rust_sysroot_dir, root_build_dir) + "/lib",
+      rebase_path("$sysroot/lib", root_build_dir),
       "-Clinker=$rebased_clang_prefix/lld",
-      "-Clink-arg=--sysroot=" + rebase_path(rust_sysroot_dir, root_build_dir),
+      "-Clink-arg=--sysroot=" + rebase_path(sysroot, root_build_dir),
 
       # These could alternatively come from clang's '--print-search-dirs', but that would require an
       # exec_script and post-processing of the output or a JSON file generated during the toolchain
@@ -142,7 +133,7 @@ config("compiler_target") {
 }
 
 config("compiler_fuchsia_api_level") {
-  if (is_gcc || !is_fuchsia) {
+  if (is_gcc || !(is_fuchsia || is_mistos)) {
     defines =
         [ "__Fuchsia_API_level__=${current_build_target_api_level_as_integer}" ]
   } else {
@@ -241,15 +232,13 @@ config("integer-paranoia") {
 
 # clang_libunwind is only available on fuchsia.
 # See the definition in //build/config/clang/clang.gni.
-if (is_fuchsia) {
-  # TODO(https://fxbug.dev/42135607): Get this information from runtime.json instead.
-  _clang_libunwind = exec_script("$clang_prefix/clang++",
-                                 [
-                                   "--target=$current_target_tuple",
-                                   "-print-file-name=libunwind.so",
-                                 ],
-                                 "trim string",
-                                 [])
+if (is_fuchsia || is_mistos) {
+  # LINT.IfChange
+  # TODO(https://fxbug.dev/42135607): Get this information from runtime.json instead
+  _clang_libunwind =
+      "${rebased_clang_prefix}/../${clang_target_toolchain_info.libunwind_so}"
+
+  # LINT.ThenChange(//build/config/clang/generate_config_json.py)
 
   config("libunwind") {
     libs = [ _clang_libunwind ]
@@ -292,6 +281,7 @@ group("uses-outline-atomics-fxbug98632") {
     "//src/developer/debug/e2e_tests/inferiors:*",
     "//src/graphics/examples/vkproto:*",
     "//src/graphics/examples/vkproto/cmd-buf-benchmark:*",
+    "//third_party/boringssl:*",
     "//third_party/ffmpeg:*",
     "//third_party/icu/default:*",
     "//third_party/icu/latest:*",
@@ -299,5 +289,74 @@ group("uses-outline-atomics-fxbug98632") {
   ]
   if (current_cpu == "arm64" && is_fuchsia) {
     deps = [ "//src/zircon/lib/zircon" ]
+  }
+}
+
+# toolchain_variant.{executable_,source,}deps point to these usually, so
+# BUILDCONFIG.gn (for $default_toolchain) and the toolchain definitions don't
+# have to keep the details in sync.  These use only data_deps so that there is
+# no automatic retriggering of the dependent target just because one of the
+# sysroot actions re-runs, only if a file found via depfile changed.  Note this
+# could mean that newly-added sysroot files that would now be seen in a search
+# path but were not before don't cause rebuilds that would now pick them up.
+# But that won't happen if the old files previously found instead were removed
+# from the sysroot, since the additions cause the cleanup scan that would
+# remove old files and thereby cause rebuilds of their dependents via depfile.
+
+group("terminal_link_deps") {
+  # toolchain_variant.deps is used by loadable_module() and executable().  It's
+  # responsible for making sure there are data_deps for any shared_library()
+  # targets that may be runtime file dependencies.  This gets those files into
+  # the Fuchsia package via their distribution_entries metadata.
+  data_deps = [ "//zircon/public/sysroot:data($variant_base_toolchain)" ]
+}
+
+group("executable_deps") {
+  # Every normal executable() depends on this.  But since :link_deps has to
+  # include the startfiles because of the RBE wrapper, it has nothing do do.
+}
+
+group("link_deps") {
+  # Every linking target depends on this.  The RBE wrapper requires that
+  # Scrt1.o be present for all links, not just executable links (which might
+  # actually use it).  If the RBE support were more sophisticated, installing
+  # Scrt1.o could be just in :executable_deps instead.  But it's not.  So this
+  # ensures that things are in place for Scrt1.o and the like to be found in
+  # the sysroot where the compiler will look for them before the executable()
+  # is linked.  But it doesn't contribute any link inputs as a GN target, so it
+  # does no harm to have it in deps even when the link uses -nostartfiles or
+  # equivalent.
+  data_deps = [ "//zircon/public/sysroot:startfiles($variant_base_toolchain)" ]
+}
+
+group("source_deps") {
+  # Every normal target that has $sources it compiles depends on this.  Note
+  # this includes linking targets as well as compilation-only targets, both
+  # terminal and non-terminal (shared_library() targets).
+  #
+  # It ensures that everything the compiler expects to find in the sysroot is
+  # ready for a compilation step or linking step that's not an executable(),
+  # i.e. doesn't use startfiles.  It doesn't modify how anything gets compiled
+  # or linked (by propagating configs or link inputs, etc.).  So it's harmless
+  # to have it in deps even for a target that doesn't use the sysroot headers
+  # or linking stubs.
+  #
+  # The individual compilation steps do not wait for data_deps, only the target
+  # as a whole.  So these must be deps and action re-runs will cause rebuilds.
+  # But the link steps have direct order-only Ninja deps on their data_deps, so
+  # action re-runs for those alone won't always cause relinks.
+  deps = [
+    "//zircon/public/sysroot:include($variant_base_toolchain)",
+    "//zircon/public/sysroot:lib($variant_base_toolchain)",
+  ]
+}
+
+if (is_mistos) {
+  config("mistos_define") {
+    defines = [ "__mist_os__" ]
+  }
+
+  config("mistos_config") {
+    rustflags = [ "--cfg=mistos" ]
   }
 }

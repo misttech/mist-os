@@ -19,10 +19,8 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <mutex>
 #include <unordered_map>
-
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
 
 #include "src/graphics/display/drivers/fake/image-info.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
@@ -33,9 +31,16 @@
 namespace fake_display {
 
 struct FakeDisplayDeviceConfig {
-  // If enabled, the fake display device will not automatically emit Vsync
-  // events. `SendVsync()` must be called to emit a Vsync event manually.
-  bool manual_vsync_trigger = false;
+  // Enables periodically-generated VSync events.
+  //
+  // By default, this member is false. Tests must call `FakeDisplay::TriggerVsync()`
+  // explicitly to get VSync events.
+  //
+  // If set to true, the `FakeDisplay` implementation will periodically generate
+  // VSync events. These periodically-generated VSync events are a source of
+  // non-determinism. They can lead to flaky tests, when coupled with overly
+  // strict assertions around event timing.
+  bool periodic_vsync = false;
 
   // If true, the fake display device will never access imported image buffers,
   // and it will not add extra image format constraints to the imported buffer
@@ -111,13 +116,8 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   // Just for display core unittests.
   zx::result<display::DriverImageId> ImportVmoImageForTesting(zx::vmo vmo, size_t offset);
 
-  size_t TEST_imported_images_count() const {
-    fbl::AutoLock lock(&image_mutex_);
-    return imported_images_.size();
-  }
-
   uint8_t GetClampRgbValue() const {
-    fbl::AutoLock lock(&capture_mutex_);
+    std::lock_guard capture_lock(capture_mutex_);
     return clamp_rgb_value_;
   }
 
@@ -172,15 +172,15 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   thrd_t capture_thread_;
 
   // Guards display coordinator interface.
-  mutable fbl::Mutex engine_listener_mutex_;
+  mutable std::mutex engine_listener_mutex_;
 
   // Guards imported images and references to imported images.
-  mutable fbl::Mutex image_mutex_;
+  mutable std::mutex image_mutex_;
 
   // Guards imported capture buffers, capture interface and state.
   // `capture_mutex_` must never be acquired when `image_mutex_` is already
   // held.
-  mutable fbl::Mutex capture_mutex_;
+  mutable std::mutex capture_mutex_;
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
   fidl::SyncClient<fuchsia_sysmem2::Allocator> sysmem_;

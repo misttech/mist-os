@@ -42,13 +42,14 @@ pub enum SystemImageHashError {
     MissingValue,
 
     #[error(
-        "boot arg for key {} does not start with {}: {0:?}",
+        "boot arg for key {} does not start with {}: {:?}",
         PKGFS_BOOT_ARG_KEY,
-        PKGFS_BOOT_ARG_VALUE_PREFIX
+        PKGFS_BOOT_ARG_VALUE_PREFIX,
+        .0
     )]
     BadPrefix(String),
 
-    #[error("boot arg for key {} has invalid hash {0:?}", PKGFS_BOOT_ARG_KEY)]
+    #[error("boot arg for key {} has invalid hash {:?}", PKGFS_BOOT_ARG_KEY, .0)]
     BadHash(#[source] fuchsia_hash::ParseHashError),
 }
 

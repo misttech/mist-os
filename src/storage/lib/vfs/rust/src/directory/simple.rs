@@ -128,12 +128,16 @@ impl Simple {
         let (name, path_ref) = match path.next_with_ref() {
             (path_ref, Some(name)) => (name, path_ref),
             (_, None) => {
+                if protocols.create_unnamed_temporary_in_directory_path() {
+                    // Creating an entry is not supported.
+                    return Err(Status::NOT_SUPPORTED);
+                }
                 return object_request.spawn_connection(
                     scope,
                     self,
                     protocols,
                     ImmutableConnection::create,
-                )
+                );
             }
         };
 
@@ -150,9 +154,26 @@ impl Simple {
                 }
                 Err(Status::NOT_FOUND)
             }
-            (None, true, CreationMode::Always | CreationMode::AllowExisting) => {
+            (
+                None,
+                true,
+                CreationMode::Always
+                | CreationMode::AllowExisting
+                | CreationMode::UnnamedTemporary
+                | CreationMode::UnlinkableUnnamedTemporary,
+            ) => {
                 // We're at the last directory and the entry doesn't exist and creating the entry
                 // was requested which isn't supported.
+                Err(Status::NOT_SUPPORTED)
+            }
+            (
+                Some(_),
+                true,
+                CreationMode::UnnamedTemporary | CreationMode::UnlinkableUnnamedTemporary,
+            ) => {
+                // We're at the last directory and the entry exists and it was requested to create
+                // an unnamed temporary object in this entry (this is not supported for simple
+                // pseudo directory).
                 Err(Status::NOT_SUPPORTED)
             }
             (Some(_), true, CreationMode::Always) => {
@@ -242,7 +263,7 @@ impl Directory for Simple {
                         //   where
                         //     K: Borrow<T>,
                         //     R: RangeBounds<T>,
-                        //     T: Ord + ?Sized,
+                        //     T: Ord + Sized:?,
                         //
                         // for some reason here.  It says:
                         //

@@ -27,7 +27,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "primitive",
         "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
@@ -57,7 +56,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "primitive",
         "kind_v2": "primitive",
         "subtype": "uint64",
         "type_shape_v2": {
@@ -128,7 +126,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "primitive",
         "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
@@ -219,7 +216,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "primitive",
         "kind_v2": "primitive",
         "subtype": "uint64",
         "type_shape_v2": {

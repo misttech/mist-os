@@ -317,17 +317,17 @@ void UserPager::ReleaseVmo(Vmo* vmo) {
 }
 
 bool UserPager::WaitForPageRead(Vmo* vmo, uint64_t page_offset, uint64_t page_count,
-                                zx_time_t deadline) {
+                                zx_instant_mono_t deadline) {
   return WaitForPageRequest(ZX_PAGER_VMO_READ, vmo, page_offset, page_count, deadline);
 }
 
 bool UserPager::WaitForPageDirty(Vmo* vmo, uint64_t page_offset, uint64_t page_count,
-                                 zx_time_t deadline) {
+                                 zx_instant_mono_t deadline) {
   return WaitForPageRequest(ZX_PAGER_VMO_DIRTY, vmo, page_offset, page_count, deadline);
 }
 
 bool UserPager::WaitForPageRequest(uint16_t command, Vmo* vmo, uint64_t page_offset,
-                                   uint64_t page_count, zx_time_t deadline) {
+                                   uint64_t page_count, zx_instant_mono_t deadline) {
   zx_packet_page_request_t req = {};
   req.command = command;
   req.offset = page_offset * zx_system_get_page_size();
@@ -335,14 +335,14 @@ bool UserPager::WaitForPageRequest(uint16_t command, Vmo* vmo, uint64_t page_off
   return WaitForRequest(vmo, vmo->key(), req, deadline);
 }
 
-bool UserPager::WaitForPageComplete(uint64_t key, zx_time_t deadline) {
+bool UserPager::WaitForPageComplete(uint64_t key, zx_instant_mono_t deadline) {
   zx_packet_page_request_t req = {};
   req.command = ZX_PAGER_VMO_COMPLETE;
   return WaitForRequest(nullptr, key, req, deadline);
 }
 
 bool UserPager::WaitForRequest(Vmo* vmo, uint64_t key, const zx_packet_page_request& req,
-                               zx_time_t deadline) {
+                               zx_instant_mono_t deadline) {
   zx_port_packet_t expected = {
       .key = key,
       .type = ZX_PKT_TYPE_PAGE_REQUEST,
@@ -363,18 +363,18 @@ bool UserPager::WaitForRequest(Vmo* vmo, uint64_t key, const zx_packet_page_requ
       deadline);
 }
 
-bool UserPager::GetPageReadRequest(Vmo* vmo, zx_time_t deadline, uint64_t* offset,
+bool UserPager::GetPageReadRequest(Vmo* vmo, zx_instant_mono_t deadline, uint64_t* offset,
                                    uint64_t* length) {
   return GetPageRequest(vmo, ZX_PAGER_VMO_READ, deadline, offset, length);
 }
 
-bool UserPager::GetPageDirtyRequest(Vmo* vmo, zx_time_t deadline, uint64_t* offset,
+bool UserPager::GetPageDirtyRequest(Vmo* vmo, zx_instant_mono_t deadline, uint64_t* offset,
                                     uint64_t* length) {
   return GetPageRequest(vmo, ZX_PAGER_VMO_DIRTY, deadline, offset, length);
 }
 
-bool UserPager::GetPageRequest(Vmo* vmo, uint16_t command, zx_time_t deadline, uint64_t* offset,
-                               uint64_t* length) {
+bool UserPager::GetPageRequest(Vmo* vmo, uint16_t command, zx_instant_mono_t deadline,
+                               uint64_t* offset, uint64_t* length) {
   return WaitForRequest(
       vmo,
       [vmo, command, offset, length](const zx_port_packet& packet) -> bool {
@@ -390,7 +390,7 @@ bool UserPager::GetPageRequest(Vmo* vmo, uint16_t command, zx_time_t deadline, u
 }
 
 bool UserPager::WaitForRequest(Vmo* vmo, fit::function<bool(const zx_port_packet_t& packet)> cmp_fn,
-                               zx_time_t deadline) {
+                               zx_instant_mono_t deadline) {
   {
     std::lock_guard guard{pager_mutex_};
     for (auto& iter : requests_) {
@@ -401,7 +401,7 @@ bool UserPager::WaitForRequest(Vmo* vmo, fit::function<bool(const zx_port_packet
     }
   }
 
-  zx_time_t now = zx_clock_get_monotonic();
+  zx_instant_mono_t now = zx_clock_get_monotonic();
   if (deadline < now) {
     deadline = now;
   }

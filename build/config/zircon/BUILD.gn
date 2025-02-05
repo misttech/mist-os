@@ -85,7 +85,7 @@ config("compiler") {
   # This is done even if !is_fuchsia to catch cases like the kernel.efi
   # environment, where current_os != "fuchsia" but nonetheless Fuchsia-specific
   # code is built.
-  configs += [ "//build/config/mistos:compiler_fuchsia_api_level" ]
+  configs += [ "//build/config/fuchsia:compiler_fuchsia_api_level" ]
 
   if (is_gcc) {
     # This is predefined by Clang but not by GCC.
@@ -467,4 +467,17 @@ config("no-synthetic-sections") {
       "-Wl,--no-dynamic-linker",  # Don't generate .interp section.
     ]
   }
+}
+
+# This is used by the basic_executable() for an hermetic partial link step.
+config("hermetic_source_set.config") {
+  # The partial link with --gc-sections will drop some sections that should
+  # survive (while not directly referenced) into the outer link to be
+  # implicitly referenced later, e.g. via a generated .eh_frame_hdr.
+  inputs = [ "//build/toolchain/hermetic_source_set.ld" ]
+  ldflags = [
+    "-r",
+    "-static",
+    "-Wl,-T," + rebase_path(inputs[0], root_build_dir),
+  ]
 }

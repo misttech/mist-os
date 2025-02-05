@@ -5,7 +5,7 @@
 use super::QueuedResolver;
 use crate::eager_package_manager::EagerPackageManager;
 use anyhow::anyhow;
-use tracing::{error, info};
+use log::{error, info};
 use {
     fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics, fidl_fuchsia_pkg as fpkg,
     fidl_fuchsia_pkg_ext as pkg,

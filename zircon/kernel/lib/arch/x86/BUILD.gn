@@ -6,7 +6,6 @@
 
 import("//build/cpp/library_headers.gni")
 import("//build/toolchain/toolchain_environment.gni")
-import("//zircon/system/ulib/hwreg/hwreg_asm_header.gni")
 
 library_headers("headers") {
   visibility = [ "../*" ]
@@ -26,22 +25,15 @@ library_headers("headers") {
     # <lib/arch/x86/cpuid.h> has #include <hwreg/bitfields.h>.
     "//zircon/system/ulib/hwreg:headers",
   ]
-
-  if (!is_host) {
-    public_deps += [ ":gen-cpuid-asm" ]
-  }
 }
 
 static_library("x86") {
   visibility = [ "../*" ]
 
-  public_deps = [ ":headers" ]
   sources = []
-  deps = [ "//zircon/system/ulib/hwreg" ]
-
-  include_dirs = [
-    "include",
-    "../include",
+  deps = [
+    "..:headers",
+    "//zircon/system/ulib/hwreg",
   ]
 
   if (is_kernel) {
@@ -52,7 +44,6 @@ static_library("x86") {
       "standard-segments.cc",
     ]
     deps += [
-      ":gen-cpuid-asm",
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",
       "//zircon/kernel/lib/special-sections",
@@ -64,11 +55,4 @@ static_library("x86") {
       sources += [ "descriptor-regs.S" ]
     }
   }
-}
-
-hwreg_asm_header("gen-cpuid-asm") {
-  output_name = "lib/arch/x86/cpuid-asm.h"
-  defines = [ "LIB_ARCH_PRINTERS" ]
-  sources = [ "gen-cpuid-asm.cc" ]
-  deps = [ ".." ]
 }

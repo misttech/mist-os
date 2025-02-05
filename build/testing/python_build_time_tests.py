@@ -59,7 +59,7 @@ def main():
             print(
                 f"FAILURE: STDOUT -----\n{ret.stdout}\nSTDERR -----------\n{ret.stderr}\n"
             )
-            failures.append(test_file)
+            failures.append(str(test_file))
 
     count = len(test_files)
 

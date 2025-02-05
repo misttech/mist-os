@@ -29,7 +29,7 @@ impl OtCliCommand {
             let mut exec = fasync::LocalExecutor::new();
 
             let fut = async {
-                let mut rl = Editor::<()>::new();
+                let mut rl = Editor::<(), _>::new()?;
                 loop {
                     let readline = rl.readline("> ");
                     match readline {

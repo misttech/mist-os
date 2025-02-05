@@ -118,28 +118,11 @@ void AddressSpace::IdentityMapRam() {
 }
 
 void AddressSpace::IdentityMapUart() {
-  auto mapper = [this](uint64_t uart_mmio_base, size_t uart_mmio_size) -> volatile void* {
-    // Page aligned base and size.
-    uint64_t base = uart_mmio_base & ~(uint64_t{ZX_PAGE_SIZE} - 1);
-    uint64_t size = fbl::round_up(uart_mmio_base + uart_mmio_size, ZX_PAGE_SIZE) - base;
-    auto result = IdentityMap(base, size, MmioMapSettings());
-    if (result.is_error()) {
-      ZX_PANIC("Failed to map in UART range: [%#" PRIx64 ", %#" PRIx64 ")", uart_mmio_base,
-               uart_mmio_base + size);
+  GetUartDriver().Visit([this]<typename KernelDriver>(const KernelDriver& driver) {
+    if (ktl::optional<memalloc::Range> range = GetUartMmioRange(driver, ZX_PAGE_SIZE)) {
+      auto result = IdentityMap(range->addr, range->size, MmioMapSettings());
+      ZX_ASSERT_MSG(result.is_ok(), "Failed to map in UART range: [%#" PRIx64 ", %#" PRIx64 ")",
+                    range->addr, range->size);
     }
-    return reinterpret_cast<volatile void*>(uart_mmio_base);
-  };
-
-  GetUartDriver().Visit([mapper = ktl::move(mapper)](auto&& driver) {
-    using uart_type = ktl::decay_t<decltype(driver.uart())>;
-    using config_type = typename uart_type::config_type;
-    if constexpr (ktl::is_same_v<config_type, zbi_dcfg_simple_t>) {
-      driver.io() = uart::BasicIoProvider<config_type, uart_type::kIoType>{
-          driver.uart().config(),
-          driver.uart().io_slots(),
-          ktl::move(mapper),
-      };
-    }
-    // Extend as more MMIO config types surface...
   });
 }

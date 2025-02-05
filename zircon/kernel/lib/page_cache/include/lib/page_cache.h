@@ -112,8 +112,8 @@ class PageCache {
     DEBUG_ASSERT(Thread::Current::memory_allocation_state().IsEnabled());
     DEBUG_ASSERT(per_cpu_caches_);
 
-    // Fall back to the PMM for low mem/loaned pages.
-    if (alloc_flags & (PMM_ALLOC_FLAG_LO_MEM | PMM_ALLOC_FLAG_LOANED)) {
+    // Fall back to the PMM for low mem pages.
+    if (alloc_flags & PMM_ALLOC_FLAG_LO_MEM) {
       list_node page_list = LIST_INITIAL_VALUE(page_list);
       const zx_status_t status = pmm_alloc_pages(page_count, alloc_flags, &page_list);
       if (status != ZX_OK) {
@@ -230,7 +230,8 @@ class PageCache {
     list_node* temp;
     list_for_every_safe(page_list, node, temp) {
       vm_page* page = containerof(node, vm_page, queue_node);
-      if (entry.available_pages < reserve_pages_ && !page->is_loaned()) {
+      DEBUG_ASSERT(!page->is_loaned());
+      if (entry.available_pages < reserve_pages_) {
         page->set_state(vm_page_state::CACHE);
 
         list_delete(node);

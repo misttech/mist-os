@@ -23,8 +23,6 @@ import (
 	"sync"
 	"time"
 
-	resultpb "go.chromium.org/luci/resultdb/proto/v1"
-	sinkpb "go.chromium.org/luci/resultdb/sink/proto/v1"
 	botanist "go.fuchsia.dev/fuchsia/tools/botanist"
 	botanistconstants "go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/botanist/targets"
@@ -35,7 +33,6 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/lib/retry"
-	"go.fuchsia.dev/fuchsia/tools/testing/resultdb"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 	"go.fuchsia.dev/fuchsia/tools/testing/tap"
 	"go.fuchsia.dev/fuchsia/tools/testing/testparser"
@@ -60,24 +57,16 @@ type Options struct {
 	// The output filename for the snapshot. This will be created in the outDir.
 	SnapshotFile string
 
-	// Whether to prefetch test packages. This is only useful when fetching
-	// packages ephemerally.
-	PrefetchPackages bool
-
 	// Whether to use serial to run tests on the target.
 	UseSerial bool
 
 	// The ffx instance to use.
 	FFX *ffxutil.FFXInstance
 
-	// The level of experimental ffx features to enable.
+	// The experiments to enable.
 	//
-	// See //tools/botanist/cmd/run.go for the mapping of features to levels.
-	FFXExperimentLevel int
-
-	// Whether to upload to upload test results to ResultDB from testrunner
-	// Bool enables soft transition from tefmocheck running in the recipe vs the processing happening in botanist.
-	UploadToResultDB bool
+	// See //tools/botanist/cmd/run.go for supported experiments.
+	Experiments botanist.Experiments
 
 	// The path to the llvm-profdata binary to use to merge profiles on the host.
 	// If given as `<path>=<version>`, the version should correspond to the version
@@ -163,7 +152,6 @@ func SetupAndExecute(ctx context.Context, opts Options, testsPath string) error 
 
 // for testability
 var (
-	sshTester    = NewFuchsiaSSHTester
 	serialTester = NewFuchsiaSerialTester
 )
 
@@ -173,7 +161,7 @@ var (
 var ffxInstance = func(
 	ctx context.Context,
 	ffxInstance *ffxutil.FFXInstance,
-	ffxExperimentalLevel int,
+	experiments botanist.Experiments,
 ) (FFXInstance, error) {
 	ffx, err := func() (FFXInstance, error) {
 		if ffxInstance == nil {
@@ -183,7 +171,7 @@ var ffxInstance = func(
 			// return false.
 			return nil, nil
 		}
-		if ffxExperimentalLevel == 3 {
+		if experiments.Contains(botanist.UseFFXTestParallel) {
 			if err := ffxInstance.ConfigSet(ctx, "test.enable_experimental_parallel_execution", "true"); err != nil {
 				return ffxInstance, err
 			}
@@ -217,17 +205,12 @@ func execute(
 	)
 
 	if !opts.UseSerial && sshKeyFile != "" {
-		ffx, err := ffxInstance(ctx, opts.FFX, opts.FFXExperimentLevel)
+		ffx, err := ffxInstance(ctx, opts.FFX, opts.Experiments)
 		if err != nil {
 			return err
 		}
 		if ffx != nil {
-			t, err := sshTester(
-				ctx, addr, sshKeyFile, outputs.OutDir, serialSocketPath)
-			if err != nil {
-				return fmt.Errorf("failed to initialize fuchsia tester: %w", err)
-			}
-			ffxTester, err := NewFFXTester(ctx, ffx, t, outputs.OutDir, opts.FFXExperimentLevel, opts.LLVMProfdataPath)
+			ffxTester, err := NewFFXTester(ctx, ffx, outputs.OutDir, opts.Experiments, opts.LLVMProfdataPath)
 			if err != nil {
 				return fmt.Errorf("failed to initialize ffx tester: %w", err)
 			}
@@ -239,33 +222,8 @@ func execute(
 					logger.Debugf(ctx, "%s", err)
 				}
 			}()
-			// Prefetching packages may possibly interfere with test execution and cause tests
-			// to time out or fail, so disable when using `ffx test`.
-			if ffxTester.EnabledForTesting() {
-				opts.PrefetchPackages = false
-			}
 			fuchsiaTester = ffxTester
 		}
-
-		if opts.PrefetchPackages {
-			// TODO(rudymathu): Remove this prefetching of packages once package
-			// delivery is fast enough.
-			resolveCtx, cancel := context.WithCancel(ctx)
-			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				resolveLog := filepath.Join(outDir, "resolve.log")
-				if err := ResolveTestPackages(resolveCtx, tests, addr, sshKeyFile, resolveLog); err != nil {
-					logger.Warningf(ctx, "package pre-fetching routine failed: %s", err)
-				}
-			}()
-			// We wait here to ensure that our log of resolved packages is
-			// correctly saved.
-			defer wg.Wait()
-			defer cancel()
-		}
-
 	}
 
 	// Function to select the tester to use for a test, along with destination
@@ -278,15 +236,10 @@ func execute(
 		case "fuchsia":
 			if fuchsiaTester == nil {
 				var err error
-				if !opts.UseSerial && sshKeyFile != "" {
-					fuchsiaTester, err = sshTester(
-						ctx, addr, sshKeyFile, outputs.OutDir, serialSocketPath)
-				} else {
-					if serialSocketPath == "" {
-						return nil, nil, fmt.Errorf("%q must be set if %q is not set", botanistconstants.SerialSocketEnvKey, botanistconstants.SSHKeyEnvKey)
-					}
-					fuchsiaTester, err = serialTester(ctx, serialSocketPath)
+				if serialSocketPath == "" {
+					return nil, nil, fmt.Errorf("%q must be set if %q is not set", botanistconstants.SerialSocketEnvKey, botanistconstants.SSHKeyEnvKey)
 				}
+				fuchsiaTester, err = serialTester(ctx, serialSocketPath)
 				if err != nil {
 					return nil, nil, fmt.Errorf("failed to initialize fuchsia tester: %w", err)
 				}
@@ -298,16 +251,6 @@ func execute(
 			}
 			if test.OS == "mac" && runtime.GOOS != "darwin" {
 				return nil, nil, fmt.Errorf("cannot run mac tests when GOOS = %q", runtime.GOOS)
-			}
-			// Initialize the fuchsia SSH tester to run the snapshot at the end in case
-			// we ran any host-target interaction tests.
-			if !opts.UseSerial && fuchsiaTester == nil && sshKeyFile != "" {
-				var err error
-				fuchsiaTester, err = sshTester(
-					ctx, addr, sshKeyFile, outputs.OutDir, serialSocketPath)
-				if err != nil {
-					logger.Errorf(ctx, "failed to initialize fuchsia tester: %s", err)
-				}
 			}
 			if localTester == nil {
 				var err error
@@ -322,16 +265,8 @@ func execute(
 		}
 	}
 
-	var client *resultdb.Client
-	var err error
-	if opts.UploadToResultDB {
-		client, err = resultdb.NewClient()
-		if err != nil {
-			return err
-		}
-	}
 	var finalError error
-	if err := runAndOutputTests(ctx, tests, testerForTest, outputs, outDir, client); err != nil {
+	if err := runAndOutputTests(ctx, tests, testerForTest, outputs, outDir); err != nil {
 		finalError = err
 	}
 
@@ -439,14 +374,12 @@ type testToRun struct {
 
 // runAndOutputTests runs all the tests, possibly with retries, and records the
 // results to `outputs`.
-// TODO(danikay): Make this testable by extracting an interface for resultdb
 func runAndOutputTests(
 	ctx context.Context,
 	tests []testsharder.Test,
 	testerForTest func(testsharder.Test) (Tester, *[]runtests.DataSinkReference, error),
 	outputs *TestOutputs,
 	globalOutDir string,
-	resultdbClient *resultdb.Client,
 ) error {
 	// Since only a single goroutine writes to and reads from the queue it would
 	// be more appropriate to use a true Queue data structure, but we'd need to
@@ -458,8 +391,6 @@ func runAndOutputTests(
 	for _, test := range tests {
 		testQueue <- testToRun{Test: test}
 	}
-
-	var resultdbResults []*sinkpb.TestResult
 
 	// `for test := range testQueue` might seem simpler, but it would block
 	// instead of exiting once the queue becomes empty. To exit the loop we
@@ -504,16 +435,6 @@ func runAndOutputTests(
 		}
 		testIndex++
 
-		// TODO(danikay): Temporarily using the existence of the resultdb client to
-		// enable the soft transition from uploading to resultdb from the fuchsia.py
-		// recipe to uploading the test results here, as they complete
-		if resultdbClient != nil {
-			testTags := testTagsToStringPairs(result.Tags)
-			testDetails := testDetailsFromTestResult(result.Name, result.StartTime, result)
-			testResults, _ := resultdb.TestCaseToResultSink(result.Cases, testTags, &testDetails, outDir)
-			resultdbResults = append(resultdbResults, testResults...)
-		}
-
 		if shouldKeepGoing(test.Test, result, test.totalDuration) {
 			// Schedule the test to be run again.
 			testQueue <- test
@@ -521,13 +442,6 @@ func runAndOutputTests(
 		// TODO(olivernewman): Add a unit test to make sure data sinks are
 		// recorded correctly.
 		*sinks = append(*sinks, result.DataSinks)
-	}
-	// TODO @danikay upload test results immediately as they happen, in a background
-	// go routine
-	if resultdbClient != nil {
-		if err := resultdbClient.ReportTestResults(resultdb.CreateTestResultsRequests(resultdbResults, 500)); err != nil {
-			return err
-		}
 	}
 	return nil
 }
@@ -757,27 +671,4 @@ func runTestOnce(
 	result.EndTime = endTime
 	result.Affected = test.Affected
 	return result, err
-}
-
-// Helper function to convert []build.TestTag to []resultpb.StringPair
-func testTagsToStringPairs(tags []build.TestTag) []*resultpb.StringPair {
-	stringPairs := make([]*resultpb.StringPair, 0, len(tags))
-
-	for _, tag := range tags {
-		stringPairs = append(stringPairs, &resultpb.StringPair{
-			Key:   tag.Key,
-			Value: tag.Value,
-		})
-	}
-
-	return stringPairs
-}
-
-// Helper function to create runtests.TestDetails from result.TestResult
-func testDetailsFromTestResult(name string, startTime time.Time, result *TestResult) runtests.TestDetails {
-	return runtests.TestDetails{
-		Name:      name,
-		StartTime: startTime,
-		Result:    result.Result,
-	}
 }

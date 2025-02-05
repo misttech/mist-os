@@ -71,6 +71,16 @@ impl BlockConnector for fidl_fuchsia_device::ControllerProxy {
     }
 }
 
+impl BlockConnector for fidl_fuchsia_storage_partitions::PartitionServiceProxy {
+    fn connect_volume(
+        &self,
+    ) -> Result<ClientEnd<fidl_fuchsia_hardware_block_volume::VolumeMarker>, Error> {
+        let (client, server) = fidl::endpoints::create_endpoints();
+        self.connect_channel_to_volume(server)?;
+        Ok(client)
+    }
+}
+
 /// Asynchronously manages a block device for filesystem operations.
 pub struct Filesystem {
     /// The filesystem struct keeps the FSConfig in a Box<dyn> instead of holding it directly for

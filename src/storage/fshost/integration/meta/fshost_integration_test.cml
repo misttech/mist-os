@@ -24,5 +24,11 @@
             from: "parent",
             to: "#realm_builder",
         },
+        {
+            protocol: "fuchsia.kernel.VmexResource",
+            from: "void",
+            to: "#fs-collection",
+            availability: "optional",
+        },
     ],
 }

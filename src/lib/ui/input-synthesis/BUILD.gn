@@ -34,8 +34,8 @@ rustc_library("input-synthesis") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:serde",
-    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [
@@ -67,7 +67,7 @@ rustc_binary("input-synthesis-bin") {
     "//src/lib/fuchsia-component",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/main.rs" ]

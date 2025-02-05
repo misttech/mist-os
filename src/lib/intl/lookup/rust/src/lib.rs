@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
+use log::error;
 use std::collections::BTreeMap;
 use std::{ffi, fs, io, mem, str};
-use tracing::error;
 use {
     intl_model as model, rust_icu_common as ucommon, rust_icu_sys as usys, rust_icu_uloc as uloc,
 };

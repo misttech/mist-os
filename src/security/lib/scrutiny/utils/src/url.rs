@@ -5,12 +5,12 @@
 use anyhow::{bail, Context, Result};
 use fuchsia_hash::Hash;
 use fuchsia_url::{AbsolutePackageUrl, PackageName, PackageVariant, RepositoryUrl};
+use log::warn;
 use std::fmt::Display;
-use tracing::warn;
 
 // TODO(https://fxbug.dev/42052037): Eliminate this API by requiring clients to declare a repository.
 pub fn from_package_name<D: Display>(name: D) -> Result<AbsolutePackageUrl> {
-    warn!(package_name = %name, "Assuming package is served from fuchsia-pkg://fuchsia.com");
+    warn!(package_name:% = name; "Assuming package is served from fuchsia-pkg://fuchsia.com");
     let url_string = format!("fuchsia-pkg://fuchsia.com/{}", name);
     let url = AbsolutePackageUrl::parse(&url_string)
         .with_context(|| format!("Error parsing URL {}", url_string))?;
@@ -28,7 +28,7 @@ pub fn from_package_name_variant_path<D1: Display>(
     name_variant_path: D1,
 ) -> Result<AbsolutePackageUrl> {
     warn!(
-        path = %name_variant_path,
+        path:% = name_variant_path;
         "Assuming package/variant is served from fuchsia-pkg://fuchsia.com",
     );
     let url_string = format!("fuchsia-pkg://fuchsia.com/{}", name_variant_path);
@@ -51,8 +51,8 @@ pub fn from_package_name_and_hash<D1: Display, D2: Display>(
     hash: D2,
 ) -> Result<AbsolutePackageUrl> {
     warn!(
-        package_name = %name,
-        %hash,
+        package_name:% = name,
+        hash:%;
         "Assuming package is served from fuchsia-pkg://fuchsia.com",
     );
     let url_string = format!("fuchsia-pkg://fuchsia.com/{}?hash={}", name, hash);

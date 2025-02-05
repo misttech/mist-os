@@ -3,33 +3,12 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/sys/time/timekeeper/config.shard.cml",
-        "inspect/client.shard.cml",
+        "//src/sys/time/timekeeper/meta/service.cml",
         "sys/component/realm_builder.shard.cml",
-        "syslog/client.shard.cml",
-    ],
-    program: {
-        runner: "elf",
-        binary: "bin/timekeeper",
-    },
-    collections: [
-        {
-            name: "timesource",
-            durability: "transient",
-        },
     ],
     use: [
         {
-            protocol: [
-                "fuchsia.metrics.MetricEventLoggerFactory",
-                "fuchsia.time.Maintenance",
-                "test.time.TimeSourceControl",
-            ],
-        },
-        {
-            directory: "dev-topological",
-            rights: [ "r*" ],
-            path: "/dev",
+            protocol: [ "test.time.TimeSourceControl" ],
         },
     ],
     offer: [

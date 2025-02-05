@@ -44,6 +44,10 @@
             protocol: "fuchsia.web.Debug",
             path: "/svc_from_session/fuchsia.web.Debug",
         },
+        {
+            protocol: "fuchsia.session.window.Manager",
+            path: "/svc_from_session/fuchsia.session.window.Manager",
+        },
     ],
     use: [
         {
@@ -180,7 +184,7 @@
         },
         {
             protocol: [
-                "fuchsia.fxfs.CryptManagement",
+                "fuchsia.fshost.StarnixVolumeProvider",
                 "fuchsia.pkg.PackageCache",
             ],
             from: "parent",
@@ -252,6 +256,7 @@
         {
             // Routed to session-manager via session_manager.core_shard.cml.
             protocol: [
+                "fuchsia.power.CollaborativeRebootInitiator",
                 "fuchsia.update.channel.Provider",
                 "fuchsia.update.channelcontrol.ChannelControl",
                 "fuchsia.update.Manager",
@@ -439,7 +444,11 @@
             availability: "same_as_target",
         },
         {
-            service: "fuchsia.power.broker.ElementInfoProviderService",
+            service: [
+                // TODO: b/392629126. Evaluate routing driver FIDL through session_manager.
+                "fuchsia.hardware.gnss.Service",
+                "fuchsia.power.broker.ElementInfoProviderService",
+            ],
             from: "parent",
             to: "#session",
             availability: "same_as_target",
@@ -492,7 +501,10 @@
             to: [ "#session" ],
         },
         {
-            dictionary: "diagnostics-accessors",
+            dictionary: [
+                "diagnostics",
+                "diagnostics-accessors",
+            ],
             from: "parent",
             to: "#session",
         },
@@ -568,6 +580,7 @@
             protocol: [
                 "fuchsia.element.GraphicalPresenter",
                 "fuchsia.element.Manager",
+                "fuchsia.session.window.Manager",
                 "fuchsia.web.Debug",
             ],
             from: "self",

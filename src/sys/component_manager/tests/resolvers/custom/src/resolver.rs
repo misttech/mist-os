@@ -5,7 +5,7 @@
 use anyhow::{Context, Error};
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
-use tracing::*;
+use log::*;
 use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
@@ -65,7 +65,7 @@ async fn serve_resolver(mut stream: fresolution::ResolverRequestStream) -> Resul
                 responder,
             } => {
                 error!(
-                    url=?component_url, ?context,
+                    url:? = component_url, context:?;
                     "custom resolver does not support ResolveWithContext, and could not resolve",
                 );
                 responder.send(Err(fresolution::ResolverError::InvalidArgs)).with_context(
@@ -78,7 +78,7 @@ async fn serve_resolver(mut stream: fresolution::ResolverRequestStream) -> Resul
                 )?;
             }
             fresolution::ResolverRequest::_UnknownMethod { ordinal, .. } => {
-                warn!(%ordinal, "Unknown Resolver request");
+                warn!(ordinal:%; "Unknown Resolver request");
             }
         }
     }
@@ -125,7 +125,7 @@ async fn main() -> Result<(), Error> {
             match request {
                 IncomingRequest::ResolverProtocol(stream) => match serve_resolver(stream).await {
                     Ok(()) => {}
-                    Err(error) => error!(%error, "resolver failed"),
+                    Err(error) => error!(error:%; "resolver failed"),
                 },
             }
         })

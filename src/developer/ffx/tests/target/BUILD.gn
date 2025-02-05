@@ -9,10 +9,7 @@ import("//build/rust/rustc_binary.gni")
 
 test_deps = []
 
-# TODO(https://fxbug.dev/42079810): optimize shouldn't be required here but needs more
-# investigation why it's a problem
-if (is_host && target_cpu == "x64" && build_uefi_disk &&
-    optimize != "sanitizer") {
+if (is_host && target_cpu == "x64" && build_uefi_disk) {
   rustc_test("ffx_target_test") {
     testonly = true
     edition = "2021"
@@ -30,20 +27,6 @@ if (is_host && target_cpu == "x64" && build_uefi_disk &&
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:futures",
     ]
-
-    if (target_cpu == "x64") {
-      # TODO(https://fxbug.dev/42080558): The x86 kernel gets loaded at a fixed physical
-      # address of 1MiB. The UEFI environment under QEMU has some memory
-      # reserved at about 8MiB. This limits the total kernel image size that
-      # can be loaded.  A larger kernel image size will get a panic in early
-      # boot (physboot).  Until the kernel's internal fixed-location constraint
-      # is removed, kernel images that are too big just can't be loaded. Some
-      # instrumented kernels like asan/ubsan builds can wind up too big.
-      # Machinery //zircon/kernel/BUILD.gn arranges to examine the actual
-      # kernel image and compare its required memory size to a known upper
-      # limit. If it's too big, then feature="big_zircon_kernel" is added.
-      deps += [ "//zircon/kernel:rust-cfg-big-zircon-kernel" ]
-    }
 
     # Only one emulator can be spawned at a time.
     args = [ "--test-threads=1" ]

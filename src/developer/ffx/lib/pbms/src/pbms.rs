@@ -23,7 +23,7 @@ pub(crate) const GS_SCHEME: &str = "gs";
 /// If the url has no scheme, the whole string is returned.
 /// E.g.
 /// - "/foo/bar" -> Some("/foo/bar")
-/// - "file://foo/bar" -> Some("/foo/bar")
+/// - "file:///foo/bar" -> Some("/foo/bar")
 /// - "http://foo/bar" -> None
 pub(crate) fn path_from_file_url(product_url: &url::Url) -> Option<PathBuf> {
     if product_url.scheme() == "file" {

@@ -90,7 +90,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads.imported/ImportStructPayload",
             "nullable": false,
@@ -122,7 +121,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads.imported/ImportStructPayload",
             "nullable": false,
@@ -138,7 +136,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads.imported/ImportStructPayload",
             "nullable": false,
@@ -169,7 +166,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads.imported/ImportStructPayload",
             "nullable": false,
@@ -185,7 +181,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads.imported/ComposedProtocol_TwoWayComposedWithError_Result",
             "nullable": false,
@@ -202,7 +197,6 @@
           "is_composed": true,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads.imported/ImportStructPayload",
             "nullable": false,
@@ -217,7 +211,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -246,7 +239,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads.imported/ImportStructPayload",
             "nullable": false,
@@ -277,7 +269,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads/LocalStructPayload",
             "nullable": false,
@@ -309,7 +300,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads/LocalStructPayload",
             "nullable": false,
@@ -325,7 +315,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads/LocalStructPayload",
             "nullable": false,
@@ -356,7 +345,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads/LocalStructPayload",
             "nullable": false,
@@ -372,7 +360,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads/MainProtocol_TwoWayLocalWithError_Result",
             "nullable": false,
@@ -389,7 +376,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads/LocalStructPayload",
             "nullable": false,
@@ -404,7 +390,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -433,7 +418,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads/LocalStructPayload",
             "nullable": false,
@@ -464,7 +448,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads.imported/ImportStructPayload",
             "nullable": false,
@@ -496,7 +479,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads.imported/ImportStructPayload",
             "nullable": false,
@@ -512,7 +494,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads.imported/ImportStructPayload",
             "nullable": false,
@@ -543,7 +524,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads.imported/ImportStructPayload",
             "nullable": false,
@@ -559,7 +539,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads/MainProtocol_TwoWayImportWithError_Result",
             "nullable": false,
@@ -576,7 +555,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads.imported/ImportStructPayload",
             "nullable": false,
@@ -591,7 +569,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -620,7 +597,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads.imported/ImportStructPayload",
             "nullable": false,
@@ -651,7 +627,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads/MainProtocolOneWayAnonRequest",
             "nullable": false,
@@ -683,7 +658,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads/MainProtocolTwoWayAnonRequest",
             "nullable": false,
@@ -699,7 +673,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads/MainProtocolTwoWayAnonResponse",
             "nullable": false,
@@ -730,7 +703,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads/MainProtocolTwoWayAnonWithErrorRequest",
             "nullable": false,
@@ -746,7 +718,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads/MainProtocol_TwoWayAnonWithError_Result",
             "nullable": false,
@@ -763,7 +734,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads/MainProtocol_TwoWayAnonWithError_Response",
             "nullable": false,
@@ -778,7 +748,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -807,7 +776,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads/MainProtocolOnAnonRequest",
             "nullable": false,
@@ -844,7 +812,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -872,7 +839,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -928,7 +894,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -956,7 +921,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1012,7 +976,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1040,7 +1003,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1096,7 +1058,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1124,7 +1085,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1180,7 +1140,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1208,7 +1167,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1264,7 +1222,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1292,7 +1249,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1349,7 +1305,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1377,7 +1332,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1433,7 +1387,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -1494,7 +1447,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads/MainProtocol_TwoWayAnonWithError_Response",
             "nullable": false,
@@ -1520,7 +1472,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1574,7 +1525,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads.imported/ImportStructPayload",
             "nullable": false,
@@ -1600,7 +1550,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1654,7 +1603,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolpayloads/LocalStructPayload",
             "nullable": false,
@@ -1680,7 +1628,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {

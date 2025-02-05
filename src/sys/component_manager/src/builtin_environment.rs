@@ -68,7 +68,6 @@ use builtins::debug_resource::DebugResource;
 use builtins::debuglog_resource::DebuglogResource;
 use builtins::energy_info_resource::EnergyInfoResource;
 use builtins::factory_items::FactoryItems;
-use builtins::framebuffer_resource::FramebufferResource;
 use builtins::hypervisor_resource::HypervisorResource;
 use builtins::info_resource::InfoResource;
 use builtins::iommu_resource::IommuResource;
@@ -81,6 +80,7 @@ use builtins::msi_resource::MsiResource;
 use builtins::power_resource::PowerResource;
 use builtins::profile_resource::ProfileResource;
 use builtins::root_job::RootJob;
+use builtins::stall_resource::StallResource;
 use builtins::vmex_resource::VmexResource;
 use cm_config::{RuntimeConfig, SecurityPolicy, VmexSource};
 use cm_rust::{
@@ -103,10 +103,10 @@ use fuchsia_zbi::{ZbiParser, ZbiType};
 use futures::future::{self, BoxFuture};
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use hooks::EventType;
+use log::{error, info, warn};
 use moniker::ExtendedMoniker;
 use routing::resolving::ComponentAddress;
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use vfs::directory::entry::OpenRequest;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
@@ -870,10 +870,10 @@ impl BuiltinEnvironment {
                             });
                         }
                     }
-                    Err(e) => tracing::warn!("failed to read entries in /parent-offered: {e}"),
+                    Err(e) => log::warn!("failed to read entries in /parent-offered: {e}"),
                 },
                 Err(e) => {
-                    tracing::warn!("failed to open /parent-offered dir: {e}");
+                    log::warn!("failed to open /parent-offered dir: {e}");
                 }
             }
         }
@@ -951,6 +951,7 @@ impl BuiltinEnvironment {
                     .set_store_item(ZbiType::CpuTopology)
                     .set_store_item(ZbiType::AcpiRsdp)
                     .set_store_item(ZbiType::Smbios)
+                    .set_store_item(ZbiType::Framebuffer)
                     .parse()?,
             ),
             None => None,
@@ -1184,29 +1185,6 @@ impl BuiltinEnvironment {
             );
         }
 
-        // Set up the FramebufferResource service.
-        let framebuffer_resource = system_resource_handle
-            .as_ref()
-            .and_then(|handle| {
-                handle
-                    .create_child(
-                        zx::ResourceKind::SYSTEM,
-                        None,
-                        zx::sys::ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE,
-                        1,
-                        b"framebuffer",
-                    )
-                    .ok()
-            })
-            .map(FramebufferResource::new)
-            .and_then(Result::ok);
-        if let Some(framebuffer_resource) = framebuffer_resource {
-            root_input_builder
-                .add_builtin_protocol_if_enabled::<fkernel::FramebufferResourceMarker>(
-                    move |stream| framebuffer_resource.clone().serve(stream).boxed(),
-                );
-        }
-
         // Set up the HypervisorResource service.
         let hypervisor_resource = system_resource_handle
             .as_ref()
@@ -1359,6 +1337,28 @@ impl BuiltinEnvironment {
         if let Some(profile_resource) = profile_resource {
             root_input_builder.add_builtin_protocol_if_enabled::<fkernel::ProfileResourceMarker>(
                 move |stream| profile_resource.clone().serve(stream).boxed(),
+            );
+        }
+
+        // Set up the StallResource service.
+        let stall_resource = system_resource_handle
+            .as_ref()
+            .and_then(|handle| {
+                handle
+                    .create_child(
+                        zx::ResourceKind::SYSTEM,
+                        None,
+                        zx::sys::ZX_RSRC_SYSTEM_STALL_BASE,
+                        1,
+                        b"stall",
+                    )
+                    .ok()
+            })
+            .map(StallResource::new)
+            .and_then(Result::ok);
+        if let Some(stall_resource) = stall_resource {
+            root_input_builder.add_builtin_protocol_if_enabled::<fkernel::StallResourceMarker>(
+                move |stream| stall_resource.clone().serve(stream).boxed(),
             );
         }
 
@@ -1723,7 +1723,7 @@ impl BuiltinEnvironment {
             scope.spawn(async move {
                 if let Ok(root) = root.upgrade() {
                     if let Err(err) = capability::open_framework(&cap, &root, server.into()).await {
-                        warn!(%err, "Failed to open framework protocol from root {}", M::DEBUG_NAME);
+                        warn!(err:%; "Failed to open framework protocol from root {}", M::DEBUG_NAME);
                     }
                 }
             });
@@ -1835,7 +1835,7 @@ async fn register_boot_resolver(
         FuchsiaBootResolver::new(path).await.context("Failed to create boot resolver")?;
     match resolver {
         None => {
-            info!(%path, "fuchsia-boot resolver unavailable, not in namespace");
+            info!(path:%; "fuchsia-boot resolver unavailable, not in namespace");
             Ok(None)
         }
         Some((component, package)) => {

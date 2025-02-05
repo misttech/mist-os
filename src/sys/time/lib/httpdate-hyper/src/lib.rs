@@ -281,9 +281,9 @@ mod test {
     use hyper::service::{make_service_fn, service_fn};
     use hyper::{Body, Response, Server, StatusCode};
     use lazy_static::lazy_static;
+    use log::warn;
     use std::convert::Infallible;
     use std::net::{Ipv6Addr, SocketAddr};
-    use tracing::warn;
 
     lazy_static! {
         static ref TEST_CERT_CHAIN: Vec<rustls::Certificate> =

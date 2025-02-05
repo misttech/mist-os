@@ -68,9 +68,14 @@ executable("system-metrics") {
   ]
 }
 
-fuchsia_package_with_single_component("cobalt_system_metrics") {
+fuchsia_component("cobalt_system_metrics_component") {
   manifest = "meta/cobalt_system_metrics.cml"
+  component_name = "cobalt_system_metrics"
   deps = [ ":system-metrics" ]
+}
+
+fuchsia_package("cobalt_system_metrics") {
+  deps = [ ":cobalt_system_metrics_component" ]
 }
 
 cc_test_executable("cobalt_system_metrics_unittests") {

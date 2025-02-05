@@ -133,13 +133,10 @@ def _fuchsia_api_level_impl(ctx):
             # which is the default, and the label of the rule. We do not know why the rule is being
             # analyzed, though most likely it is FUCHSIA_API_LEVEL_TARGET_NAME being analyzed for a
             # target after `fuchsia_transition`, meaning none of the API level mechanisms were set.
-            fail("ERROR: `{}` has not been set to an API level. Has an API level been specified for this target? Valid API levels are {}".format(
-                ctx.label,
-                _valid_api_level_names(),
-            ))
+            fail("ERROR: An API level has not been specified for this target or the repository.")
 
         if raw_level not in _valid_api_level_names():
-            fail('ERROR: "{}" is not an API level supported by this SDK. API level should be one of {}'.format(
+            fail('ERROR: "{}" is not an API level supported by this SDK. API level should be one of {}.'.format(
                 raw_level,
                 _valid_api_level_names(),
             ))

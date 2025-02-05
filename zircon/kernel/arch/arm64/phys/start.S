@@ -4,8 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include <lib/arch/arm64/sysreg-asm.h>
 #include <lib/arch/arm64/exception-asm.h>
+#include <lib/arch/arm64/feature-asm.h>
 #include <lib/arch/asm.h>
 #include <lib/arch/ticks.h>
 #include <zircon/tls.h>

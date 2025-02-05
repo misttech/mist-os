@@ -21,10 +21,10 @@ use async_trait::async_trait;
 use cm_rust::{ExposeDecl, ExposeDeclCommon, UseStorageDecl};
 use cm_types::{Availability, Name};
 use errors::ModelError;
+use log::error;
 use router_error::RouterError;
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use vfs::directory::entry::OpenRequest;
 
 pub use bedrock::RouteRequest as BedrockRouteRequest;
@@ -152,7 +152,7 @@ impl ErrorReporter for RoutingFailureErrorReporter {
                 report_routing_failure(request, Some(request.availability()), &target, err).await;
             }
             Err(upgrade_err) => {
-                error!(%upgrade_err, %err,
+                error!(upgrade_err:%, err:%;
                     "Failed to upgrade WeakComponentInstance while reporting routing error.")
             }
         }
@@ -167,40 +167,44 @@ pub async fn report_routing_failure(
     target: &Arc<ComponentInstance>,
     err: impl std::error::Error,
 ) {
-    target
-        .with_logger_as_default(|| {
-            let availability = availability.unwrap_or(Availability::Required);
-            let moniker = &target.moniker;
-            match availability {
-                Availability::Required => {
-                    // TODO(https://fxbug.dev/42060474): consider changing this to `error!()`
-                    warn!(
+    let availability = availability.unwrap_or(Availability::Required);
+    let moniker = &target.moniker;
+    match availability {
+        Availability::Required => {
+            // TODO(https://fxbug.dev/42060474): consider changing this to `error!()`
+            target
+                .log(
+                    log::Level::Warn,
+                    format!(
                         "{capability_requested} was not available for target `{moniker}`:\n\t\
                         {err}\n\tFor more, run `ffx component doctor {moniker}`",
-                    );
-                }
-                Availability::Optional
-                | Availability::SameAsTarget
-                | Availability::Transitional => {
-                    // If the target declared the capability as optional, but
-                    // the capability could not be routed (such as if the source
-                    // component is not available) the component _should_
-                    // tolerate the missing optional capability. However, this
-                    // should be logged. Developers are encouraged to change how
-                    // they build and/or assemble different product
-                    // configurations so declared routes are always end-to-end
-                    // complete routes.
-                    // TODO(https://fxbug.dev/42060474): if we change the log for
-                    // `Required` capabilities to `error!()`, consider also
-                    // changing this log for `Optional` to `warn!()`.
-                    info!(
-                        "{availability} {capability_requested} was not available for target `{moniker}`:\n\t\
-                        {err}\n\tFor more, run `ffx component doctor {moniker}`",
-                    );
-                }
-            }
-        })
-        .await
+                    ),
+                    &[],
+                )
+                .await;
+        }
+        Availability::Optional | Availability::SameAsTarget | Availability::Transitional => {
+            // If the target declared the capability as optional, but
+            // the capability could not be routed (such as if the source
+            // component is not available) the component _should_
+            // tolerate the missing optional capability. However, this
+            // should be logged. Developers are encouraged to change how
+            // they build and/or assemble different product
+            // configurations so declared routes are always end-to-end
+            // complete routes.
+            // TODO(https://fxbug.dev/42060474): if we change the log for
+            // `Required` capabilities to `error!()`, consider also
+            // changing this log for `Optional` to `warn!()`.
+            target.log(
+                log::Level::Info,
+                format!(
+                    "{availability} {capability_requested} was not available for target `{moniker}`:\n\t\
+                    {err}\n\tFor more, run `ffx component doctor {moniker}`"
+                ),
+                &[]
+            ).await;
+        }
+    }
 }
 
 /// Group exposes by `target_name`. This will group all exposes that form an aggregate capability

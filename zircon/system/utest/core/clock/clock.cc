@@ -37,7 +37,7 @@ TEST(ClockTest, DeadlineAfter) {
   // Make sure that zx_deadline_after always gives results which are consistent
   // with simply getting clock monotonic and adding our own offset.
   for (auto offset : Offsets) {
-    zx_time_t before, after, deadline;
+    zx_instant_mono_t before, after, deadline;
 
     before = zx_time_add_duration(zx_clock_get_monotonic(), offset);
     deadline = zx_deadline_after(offset);

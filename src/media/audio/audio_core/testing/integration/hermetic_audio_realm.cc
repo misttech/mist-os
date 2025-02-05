@@ -27,6 +27,7 @@
 namespace media::audio::test {
 
 namespace {
+
 class InspectSinkMock : public component_testing::LocalComponentImpl,
                         public fidl::WireServer<fuchsia_inspect::InspectSink> {
  public:
@@ -75,9 +76,10 @@ class InspectSinkMock : public component_testing::LocalComponentImpl,
 void ConnectToVirtualAudio(component_testing::RealmRoot& root,
                            fidl::SynchronousInterfacePtr<fuchsia::virtualaudio::Control>& out) {
   // Connect to dev.
-  fidl::InterfaceHandle<fuchsia::io::Node> dev;
-  ASSERT_EQ(root.component().Connect("dev-topological", dev.NewRequest().TakeChannel()), ZX_OK);
-
+  fidl::InterfaceHandle<fuchsia::io::Directory> dev;
+  ASSERT_EQ(root.component().exposed()->Open3("dev-topological", fuchsia::io::PERM_READABLE, {},
+                                              dev.NewRequest().TakeChannel()),
+            ZX_OK);
   fbl::unique_fd dev_fd;
   ASSERT_EQ(fdio_fd_create(dev.TakeChannel().release(), dev_fd.reset_and_get_address()), ZX_OK);
 
@@ -196,10 +198,13 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
   auto builder = component_testing::RealmBuilder::Create();
 
   using component_testing::ChildRef;
+  using component_testing::Dictionary;
+  using component_testing::DictionaryRef;
   using component_testing::Directory;
   using component_testing::DirectoryContents;
   using component_testing::ParentRef;
   using component_testing::Protocol;
+  using component_testing::SelfRef;
 
   builder.AddChild(kAudioCore, "#meta/audio_core.cm");
 
@@ -226,12 +231,15 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
       .targets = {ParentRef()},
   });
 
+  builder.AddCapability(fuchsia::component::decl::Capability::WithDictionary(
+      std::move(fuchsia::component::decl::Dictionary().set_name("test-diagnostics"))));
+
   builder.AddRoute({
       .capabilities =
           {
-              Protocol{"fuchsia.inspect.InspectSink"},
+              Dictionary{.name = "test-diagnostics", .as = "diagnostics"},
           },
-      .source = ChildRef{InspectSinkMock::kName},
+      .source = SelfRef{},
       .targets = {ChildRef{kAudioCore}},
   });
 
@@ -239,13 +247,30 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
   builder.AddRoute({
       .capabilities =
           {
-              Protocol{"fuchsia.logger.LogSink"},
               Protocol{"fuchsia.scheduler.RoleManager"},
               // Not necessary for tests but can be useful when debugging tests.
               Protocol{"fuchsia.tracing.provider.Registry"},
           },
       .source = ParentRef(),
       .targets = {ChildRef{kAudioCore}},
+  });
+
+  builder.AddRoute({
+      .capabilities =
+          {
+              Protocol{"fuchsia.inspect.InspectSink"},
+          },
+      .source = ChildRef{InspectSinkMock::kName},
+      .targets = {DictionaryRef{"self/test-diagnostics"}},
+  });
+
+  builder.AddRoute({
+      .capabilities =
+          {
+              Protocol{.name = "fuchsia.logger.LogSink", .from_dictionary = "diagnostics"},
+          },
+      .source = ParentRef(),
+      .targets = {DictionaryRef{"self/test-diagnostics"}},
   });
 
   switch (options.audio_core_config_data.index()) {
@@ -314,16 +339,6 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
       .targets = {ChildRef{kAudioCore}},
   });
 
-  // Route some capabilities to the driver realm.
-  builder.AddRoute({
-      .capabilities =
-          {
-              Protocol{"fuchsia.logger.LogSink"},
-          },
-      .source = ParentRef(),
-      .targets = {ChildRef{"driver_test_realm"}},
-  });
-
   // Some tests need to control the thermal state.
   // For simplicity, always add this test thermal control server.
   builder.AddChild(kThermalTestControl, "#meta/thermal_test_control.cm");
@@ -340,9 +355,9 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
   builder.AddRoute({
       .capabilities =
           {
-              Protocol{"fuchsia.logger.LogSink"},
+              Dictionary{.name = "test-diagnostics", .as = "diagnostics"},
           },
-      .source = ParentRef(),
+      .source = SelfRef(),
       .targets = {ChildRef{kThermalTestControl}},
   });
 
@@ -356,9 +371,9 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
   builder.AddRoute({
       .capabilities =
           {
-              Protocol{"fuchsia.logger.LogSink"},
+              Dictionary{.name = "test-diagnostics", .as = "diagnostics"},
           },
-      .source = ParentRef(),
+      .source = SelfRef(),
       .targets = {ChildRef{kFakeCobalt}},
   });
 

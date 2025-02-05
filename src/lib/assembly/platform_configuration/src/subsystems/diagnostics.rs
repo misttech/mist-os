@@ -148,7 +148,12 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
                     nested_type: ConfigNestedValueType::String { max_size: 4096 },
                     max_count: 512,
                 },
-                serde_json::to_value(component_log_initial_interests)?,
+                serde_json::to_value(
+                    component_log_initial_interests
+                        .iter()
+                        .map(|initial_interest| initial_interest.for_structured_config())
+                        .collect::<Vec<_>>(),
+                )?,
             ),
         )?;
 
@@ -285,7 +290,9 @@ where
 mod tests {
     use super::*;
     use crate::common::ConfigurationBuilderImpl;
-    use assembly_config_schema::platform_config::diagnostics_config::SamplerConfig;
+    use assembly_config_schema::platform_config::diagnostics_config::{
+        ComponentInitialInterest, SamplerConfig, UrlOrMoniker,
+    };
     use camino::Utf8PathBuf;
     use serde_json::{json, Number, Value};
     use tempfile::TempDir;
@@ -294,9 +301,6 @@ mod tests {
     fn test_define_configuration_default() {
         let temp_dir = TempDir::new().unwrap();
         let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-        let buckets_path = resource_dir.join("buckets.json");
-        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
-        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
 
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Standard,
@@ -344,9 +348,6 @@ mod tests {
     fn test_define_configuration_additional_serial_log_components() {
         let temp_dir = TempDir::new().unwrap();
         let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-        let buckets_path = resource_dir.join("buckets.json");
-        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
-        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
 
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Standard,
@@ -376,9 +377,6 @@ mod tests {
     fn test_define_configuration_low_mem() {
         let temp_dir = TempDir::new().unwrap();
         let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-        let buckets_path = resource_dir.join("buckets.json");
-        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
-        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
 
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Standard,
@@ -410,9 +408,6 @@ mod tests {
     fn test_default_on_bootstrap() {
         let temp_dir = TempDir::new().unwrap();
         let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-        let buckets_path = resource_dir.join("buckets.json");
-        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
-        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
 
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Bootstrap,
@@ -440,9 +435,6 @@ mod tests {
     fn test_default_for_user() {
         let temp_dir = TempDir::new().unwrap();
         let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-        let buckets_path = resource_dir.join("buckets.json");
-        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
-        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
 
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Standard,
@@ -472,9 +464,6 @@ mod tests {
     fn test_fire_config() {
         let temp_dir = TempDir::new().unwrap();
         let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-        let buckets_path = resource_dir.join("buckets.json");
-        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
-        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
 
         let fire_config_path = resource_dir.join("fire_config.json");
         let mut fire_config = std::fs::File::create(&fire_config_path).unwrap();
@@ -512,9 +501,6 @@ mod tests {
     fn test_invalid_fire_config() {
         let temp_dir = TempDir::new().unwrap();
         let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-        let buckets_path = resource_dir.join("buckets.json");
-        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
-        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
 
         let fire_config_path = resource_dir.join("fire_config.json");
         let mut fire_config = std::fs::File::create(&fire_config_path).unwrap();
@@ -542,5 +528,45 @@ mod tests {
         let mut builder = ConfigurationBuilderImpl::default();
         assert!(DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder)
             .is_err());
+    }
+
+    #[test]
+    fn test_define_configuration_initial_log_interests() {
+        let temp_dir = TempDir::new().unwrap();
+        let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
+
+        let context = ConfigurationContext {
+            feature_set_level: &FeatureSupportLevel::Standard,
+            build_type: &BuildType::Eng,
+            resource_dir,
+            ..ConfigurationContext::default_for_tests()
+        };
+        let diagnostics = DiagnosticsConfig {
+            component_log_initial_interests: vec![
+                ComponentInitialInterest {
+                    component: UrlOrMoniker::Url(
+                        "fuchsia-pkg://fuchsia.com/foo#meta/bar.cm".into(),
+                    ),
+                    log_severity: Severity::Debug,
+                },
+                ComponentInitialInterest {
+                    component: UrlOrMoniker::Moniker("core/coll:foo/bar".into()),
+                    log_severity: Severity::Warn,
+                },
+            ],
+            ..Default::default()
+        };
+        let mut builder = ConfigurationBuilderImpl::default();
+
+        DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder).unwrap();
+        let config = builder.build();
+        assert_eq!(
+            config.configuration_capabilities["fuchsia.diagnostics.ComponentInitialInterests"]
+                .value(),
+            Value::Array(vec![
+                "fuchsia-pkg://fuchsia.com/foo#meta/bar.cm:DEBUG".into(),
+                "core/coll:foo/bar:WARN".into(),
+            ])
+        );
     }
 }

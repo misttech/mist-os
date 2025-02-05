@@ -15,7 +15,7 @@ use netstack3_base::socket::{SocketIpAddr, SocketIpAddrExt as _};
 use netstack3_base::{
     trace_duration, AnyDevice, CounterContext, DeviceIdContext, DeviceIdentifier, EitherDeviceId,
     InstantContext, IpDeviceAddr, IpExt, Mms, SendFrameErrorReason, StrongDeviceIdentifier,
-    TracingContext, WeakDeviceIdentifier,
+    TracingContext, TxMetadataBindingsTypes, WeakDeviceIdentifier,
 };
 use netstack3_filter::{
     self as filter, FilterBindingsContext, FilterHandler as _, InterfaceProperties, RawIpBody,
@@ -37,7 +37,9 @@ use crate::internal::types::{InternalForwarding, ResolvedRoute, RoutableIpAddr};
 use crate::{HopLimits, NextHop};
 
 /// An execution context defining a type of IP socket.
-pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
+pub trait IpSocketHandler<I: IpExt, BC: TxMetadataBindingsTypes>:
+    DeviceIdContext<AnyDevice>
+{
     /// Constructs a new [`IpSock`].
     ///
     /// `new_ip_socket` constructs a new `IpSock` to the given remote IP
@@ -82,6 +84,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         socket: &IpSock<I, Self::WeakDeviceId>,
         body: S,
         options: &O,
+        tx_metadata: BC::TxMetadata,
     ) -> Result<(), IpSockSendError>
     where
         S: TransportPacketSerializer<I>,
@@ -131,6 +134,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         remote_ip: RoutableIpAddr<I::Addr>,
         proto: I::Proto,
         options: &O,
+        tx_metadata: BC::TxMetadata,
         get_body_from_src_ip: F,
     ) -> Result<(), SendOneShotIpPacketError<E>>
     where
@@ -144,7 +148,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
             .map_err(|err| SendOneShotIpPacketError::CreateAndSendError { err: err.into() })?;
         let packet = get_body_from_src_ip(*tmp.local_ip())
             .map_err(SendOneShotIpPacketError::SerializeError)?;
-        self.send_ip_packet(bindings_ctx, &tmp, packet, options)
+        self.send_ip_packet(bindings_ctx, &tmp, packet, options, tx_metadata)
             .map_err(|err| SendOneShotIpPacketError::CreateAndSendError { err: err.into() })
     }
 
@@ -157,6 +161,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         remote_ip: SocketIpAddr<I::Addr>,
         proto: I::Proto,
         options: &O,
+        tx_metadata: BC::TxMetadata,
         get_body_from_src_ip: F,
     ) -> Result<(), IpSockCreateAndSendError>
     where
@@ -172,6 +177,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
             remote_ip,
             proto,
             options,
+            tx_metadata,
             |ip| Ok::<_, Infallible>(get_body_from_src_ip(ip)),
         )
         .map_err(|err| match err {
@@ -356,8 +362,14 @@ impl<I: IpExt, D> IpSock<I, D> {
 // raw IP sockets once we support those.
 
 /// The bindings execution context for IP sockets.
-pub trait IpSocketBindingsContext: InstantContext + TracingContext + FilterBindingsContext {}
-impl<BC: InstantContext + TracingContext + FilterBindingsContext> IpSocketBindingsContext for BC {}
+pub trait IpSocketBindingsContext:
+    InstantContext + TracingContext + FilterBindingsContext + TxMetadataBindingsTypes
+{
+}
+impl<BC: InstantContext + TracingContext + FilterBindingsContext + TxMetadataBindingsTypes>
+    IpSocketBindingsContext for BC
+{
+}
 
 /// The context required in order to implement [`IpSocketHandler`].
 ///
@@ -463,6 +475,7 @@ where
         ip_sock: &IpSock<I, CC::WeakDeviceId>,
         body: S,
         options: &O,
+        tx_metadata: BC::TxMetadata,
     ) -> Result<(), IpSockSendError>
     where
         S: TransportPacketSerializer<I>,
@@ -472,7 +485,7 @@ where
         // TODO(joshlf): Call `trace!` with relevant fields from the socket.
         self.increment(|counters| &counters.send_ip_packet);
 
-        send_ip_packet(self, bindings_ctx, ip_sock, body, options)
+        send_ip_packet(self, bindings_ctx, ip_sock, body, options, tx_metadata)
     }
 
     fn confirm_reachable<O>(
@@ -778,6 +791,7 @@ fn send_ip_packet<I, S, BC, CC, O>(
     socket: &IpSock<I, CC::WeakDeviceId>,
     mut body: S,
     options: &O,
+    tx_metadata: BC::TxMetadata,
 ) -> Result<(), IpSockSendError>
 where
     I: IpExt + IpDeviceStateIpExt,
@@ -849,7 +863,7 @@ where
 
     let previous_dst = remote_ip.addr();
     let mut packet = filter::TxPacket::new(local_ip.addr(), remote_ip.addr(), *proto, &mut body);
-    let mut packet_metadata = IpLayerPacketMetadata::default();
+    let mut packet_metadata = IpLayerPacketMetadata::from_tx_metadata(tx_metadata);
 
     match core_ctx.filter_handler().local_egress_hook(
         bindings_ctx,
@@ -1513,9 +1527,12 @@ pub(crate) mod testutil {
         type WeakDeviceId = D::Weak;
     }
 
-    impl<I: IpExt, State: InnerFakeIpSocketCtx<I, D>, Meta, D: FakeStrongDeviceId, BC>
-        IpSocketHandler<I, BC> for FakeCoreCtx<State, Meta, D>
+    impl<I, State, D, Meta, BC> IpSocketHandler<I, BC> for FakeCoreCtx<State, Meta, D>
     where
+        I: IpExt,
+        State: InnerFakeIpSocketCtx<I, D>,
+        D: FakeStrongDeviceId,
+        BC: TxMetadataBindingsTypes,
         FakeCoreCtx<State, Meta, D>:
             SendFrameContext<BC, SendIpPacketMeta<I, Self::DeviceId, SpecifiedAddr<I::Addr>>>,
     {
@@ -1546,6 +1563,9 @@ pub(crate) mod testutil {
             socket: &IpSock<I, Self::WeakDeviceId>,
             body: S,
             options: &O,
+            // NB: Tx metadata plumbing is not supported for fake socket
+            // contexts. Drop at the end of the scope.
+            _tx_meta: BC::TxMetadata,
         ) -> Result<(), IpSockSendError>
         where
             S: TransportPacketSerializer<I>,
@@ -1610,6 +1630,7 @@ pub(crate) mod testutil {
         I: IpExt,
         D: FakeStrongDeviceId,
         State: InnerFakeIpSocketCtx<I, D>,
+        BC: TxMetadataBindingsTypes,
         Self: IpSocketHandler<I, BC, DeviceId = D, WeakDeviceId = FakeWeakDeviceId<D>>,
     {
         type DevicesWithAddrIter<'a> = Box<dyn Iterator<Item = D> + 'a>;

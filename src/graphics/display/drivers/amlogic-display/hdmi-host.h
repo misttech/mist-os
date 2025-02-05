@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_HDMI_HOST_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_HDMI_HOST_H_
 
-#include <fuchsia/hardware/i2cimpl/c/banjo.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/result.h>
@@ -89,7 +88,7 @@ class HdmiHost {
   // timing and clock of `timing` is supported.
   zx_status_t ModeSet(const display::DisplayTiming& timing);
 
-  zx_status_t EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count);
+  zx::result<fbl::Vector<uint8_t>> ReadExtendedEdid();
 
   // Returns true iff a display timing is supported by the display engine driver
   // and can be used in a display configuration.

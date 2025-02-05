@@ -9,17 +9,6 @@
 
 namespace magma {
 
-static_assert(ZX_CACHE_POLICY_CACHED == static_cast<int>(PlatformMmio::CACHE_POLICY_CACHED),
-              "enum mismatch");
-static_assert(ZX_CACHE_POLICY_UNCACHED == static_cast<int>(PlatformMmio::CACHE_POLICY_UNCACHED),
-              "enum mismatch");
-static_assert(ZX_CACHE_POLICY_UNCACHED_DEVICE ==
-                  static_cast<int>(PlatformMmio::CACHE_POLICY_UNCACHED_DEVICE),
-              "enum mismatch");
-static_assert(ZX_CACHE_POLICY_WRITE_COMBINING ==
-                  static_cast<int>(PlatformMmio::CACHE_POLICY_WRITE_COMBINING),
-              "enum mismatch");
-
 ZirconPlatformMmio::ZirconPlatformMmio(fdf::MmioBuffer mmio)
     : PlatformMmio(mmio.get(), mmio.get_size()), mmio_(std::move(mmio)) {}
 

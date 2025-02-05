@@ -23,7 +23,8 @@ use netstack3_base::{
     AddressResolutionFailed, AnyDevice, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
     DeviceIdentifier, ErrorAndSerializer, EventContext, HandleableTimer, Instant,
     InstantBindingsTypes, LinkAddress, LinkDevice, LinkUnicastAddress, LocalTimerHeap,
-    SendFrameError, StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
+    SendFrameError, StrongDeviceIdentifier, TimerBindingsTypes, TimerContext,
+    TxMetadataBindingsTypes, WeakDeviceIdentifier,
 };
 use packet::{
     Buf, BufferMut, GrowBuffer as _, ParsablePacket as _, ParseBufferMut as _, SerializeError,
@@ -121,7 +122,14 @@ pub enum DynamicNeighborUpdateSource {
 /// A neighbor's state.
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""))]
-#[cfg_attr(any(test, feature = "testutils"), derivative(Clone, PartialEq(bound = ""), Eq))]
+#[cfg_attr(
+    any(test, feature = "testutils"),
+    derivative(
+        Clone(bound = "BT::TxMetadata: Clone"),
+        PartialEq(bound = "BT::TxMetadata: PartialEq"),
+        Eq(bound = "BT::TxMetadata: Eq")
+    )
+)]
 #[allow(missing_docs)]
 pub enum NeighborState<D: LinkDevice, BT: NudBindingsTypes<D>> {
     Dynamic(DynamicNeighborState<D, BT>),
@@ -138,7 +146,11 @@ pub enum NeighborState<D: LinkDevice, BT: NudBindingsTypes<D>> {
 #[derivative(Debug(bound = ""))]
 #[cfg_attr(
     any(test, feature = "testutils"),
-    derivative(Clone(bound = ""), PartialEq(bound = ""), Eq)
+    derivative(
+        Clone(bound = "BT::TxMetadata: Clone"),
+        PartialEq(bound = "BT::TxMetadata: PartialEq"),
+        Eq(bound = "BT::TxMetadata: Eq")
+    )
 )]
 pub enum DynamicNeighborState<D: LinkDevice, BT: NudBindingsTypes<D>> {
     /// Address resolution is being performed on the entry.
@@ -146,7 +158,7 @@ pub enum DynamicNeighborState<D: LinkDevice, BT: NudBindingsTypes<D>> {
     /// Specifically, a probe has been sent to the solicited-node multicast
     /// address of the target, but the corresponding confirmation has not yet
     /// been received.
-    Incomplete(Incomplete<D, BT::Notifier>),
+    Incomplete(Incomplete<D, BT::Notifier, BT::TxMetadata>),
 
     /// Positive confirmation was received within the last ReachableTime
     /// milliseconds that the forward path to the neighbor was functioning
@@ -342,17 +354,17 @@ where
 
 /// The state for an incomplete neighbor entry.
 #[derive(Debug, Derivative)]
-#[cfg_attr(any(test, feature = "testutils"), derivative(PartialEq, Eq))]
-pub struct Incomplete<D: LinkDevice, N: LinkResolutionNotifier<D>> {
+#[cfg_attr(any(test, feature = "testutils"), derivative(PartialEq(bound = "M: PartialEq"), Eq))]
+pub struct Incomplete<D: LinkDevice, N: LinkResolutionNotifier<D>, M> {
     transmit_counter: Option<NonZeroU16>,
-    pending_frames: VecDeque<Buf<Vec<u8>>>,
+    pending_frames: VecDeque<(Buf<Vec<u8>>, M)>,
     #[derivative(PartialEq = "ignore")]
     notifiers: Vec<N>,
     _marker: PhantomData<D>,
 }
 
 #[cfg(any(test, feature = "testutils"))]
-impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Clone for Incomplete<D, N> {
+impl<D: LinkDevice, N: LinkResolutionNotifier<D>, M: Clone> Clone for Incomplete<D, N, M> {
     fn clone(&self) -> Self {
         // Do not clone `notifiers` since the LinkResolutionNotifier type is not
         // required to implement `Clone` and notifiers are not used in equality
@@ -367,7 +379,7 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Clone for Incomplete<D, N> {
     }
 }
 
-impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Drop for Incomplete<D, N> {
+impl<D: LinkDevice, N: LinkResolutionNotifier<D>, M> Drop for Incomplete<D, N, M> {
     fn drop(&mut self) {
         let Self { transmit_counter: _, pending_frames: _, notifiers, _marker } = self;
         for notifier in notifiers.drain(..) {
@@ -376,12 +388,12 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Drop for Incomplete<D, N> {
     }
 }
 
-impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
+impl<D: LinkDevice, N: LinkResolutionNotifier<D>, M> Incomplete<D, N, M> {
     /// Creates a new `Incomplete` entry with `pending_frames` and remaining
     /// transmits `transmit_counter`.
     #[cfg(any(test, feature = "testutils"))]
     pub fn new_with_pending_frames_and_transmit_counter(
-        pending_frames: VecDeque<Buf<Vec<u8>>>,
+        pending_frames: VecDeque<(Buf<Vec<u8>>, M)>,
         transmit_counter: Option<NonZeroU16>,
     ) -> Self {
         Self {
@@ -398,6 +410,7 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
         timers: &mut TimerHeap<I, BC>,
         neighbor: SpecifiedAddr<I::Addr>,
         packet: S,
+        meta: M,
     ) -> Result<Self, ErrorAndSerializer<SerializeError<Never>, S>>
     where
         I: Ip,
@@ -419,7 +432,7 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
 
         let mut this = Incomplete {
             transmit_counter: Some(core_ctx.max_multicast_solicit()),
-            pending_frames: VecDeque::from([packet]),
+            pending_frames: VecDeque::from([(packet, meta)]),
             notifiers: Vec::new(),
             _marker: PhantomData,
         };
@@ -487,6 +500,7 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
     fn queue_packet<B, S>(
         &mut self,
         body: S,
+        meta: M,
     ) -> Result<(), ErrorAndSerializer<SerializeError<Never>, S>>
     where
         B: BufferMut,
@@ -501,12 +515,13 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
         // processing the segment with data since the segment completing the handshake
         // has not been received and handled yet.
         if pending_frames.len() < MAX_PENDING_FRAMES {
-            pending_frames.push_back(
+            pending_frames.push_back((
                 body.serialize_vec_outer()
                     .map_err(|(error, serializer)| ErrorAndSerializer { error, serializer })?
                     .map_a(|b| Buf::new(b.as_ref().to_vec(), ..))
                     .into_inner(),
-            );
+                meta,
+            ));
         }
         Ok(())
     }
@@ -521,7 +536,7 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
     ) where
         I: Ip,
         D: LinkDevice,
-        BC: NudBindingsContext<I, D, CC::DeviceId>,
+        BC: NudBindingsContext<I, D, CC::DeviceId, TxMetadata = M>,
         CC: NudSenderContext<I, D, BC>,
     {
         let Self { pending_frames, notifiers, transmit_counter: _, _marker } = self;
@@ -533,12 +548,12 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
         // thread could take the NUD lock, observe that neighbor resolution is complete,
         // and send a packet *before* these pending packets are sent out, resulting in
         // out-of-order transmission to the device.
-        for body in pending_frames.drain(..) {
+        for (body, meta) in pending_frames.drain(..) {
             // Ignore any errors on sending the IP packet, because a failure at this point
             // is not actionable for the caller: failing to send a previously-queued packet
             // doesn't mean that updating the neighbor entry should fail.
             core_ctx
-                .send_ip_packet_to_neighbor_link_addr(bindings_ctx, link_address, body)
+                .send_ip_packet_to_neighbor_link_addr(bindings_ctx, link_address, body, meta)
                 .unwrap_or_else(|err| {
                     error!("failed to send pending IP packet to neighbor {link_address:?} {err:?}")
                 })
@@ -862,8 +877,8 @@ impl<D: LinkDevice, BT: NudBindingsTypes<D>> NeighborState<D, BT> {
     }
 }
 
-impl<D: LinkDevice, BT: NudBindingsTypes<D>> DynamicNeighborState<D, BT> {
-    fn cancel_timer<I, BC, DeviceId>(
+impl<D: LinkDevice, BC: NudBindingsTypes<D>> DynamicNeighborState<D, BC> {
+    fn cancel_timer<I, DeviceId>(
         &mut self,
         bindings_ctx: &mut BC,
         timers: &mut TimerHeap<I, BC>,
@@ -909,7 +924,7 @@ impl<D: LinkDevice, BT: NudBindingsTypes<D>> DynamicNeighborState<D, BT> {
         );
     }
 
-    fn cancel_timer_and_complete_resolution<I, CC, BC>(
+    fn cancel_timer_and_complete_resolution<I, CC>(
         mut self,
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
@@ -953,7 +968,7 @@ impl<D: LinkDevice, BT: NudBindingsTypes<D>> DynamicNeighborState<D, BT> {
     }
 
     // Enters reachable state.
-    fn enter_reachable<I, CC, BC>(
+    fn enter_reachable<I, CC>(
         &mut self,
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
@@ -963,7 +978,7 @@ impl<D: LinkDevice, BT: NudBindingsTypes<D>> DynamicNeighborState<D, BT> {
         link_address: D::Address,
     ) where
         I: Ip,
-        BC: NudBindingsContext<I, D, CC::DeviceId, Instant = BT::Instant>,
+        BC: NudBindingsContext<I, D, CC::DeviceId>,
         CC: NudSenderContext<I, D, BC>,
     {
         // TODO(https://fxbug.dev/42075782): if the new state matches the current state,
@@ -1018,7 +1033,7 @@ impl<D: LinkDevice, BT: NudBindingsTypes<D>> DynamicNeighborState<D, BT> {
     // Panics if `self` is already in Stale with a link address equal to
     // `link_address`, i.e. this function should only be called when state
     // actually changes.
-    fn enter_stale<I, CC, BC>(
+    fn enter_stale<I, CC>(
         &mut self,
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
@@ -1063,7 +1078,7 @@ impl<D: LinkDevice, BT: NudBindingsTypes<D>> DynamicNeighborState<D, BT> {
     /// accordingly (as if a packet had been sent to the neighbor).
     ///
     /// Also returns whether a multicast neighbor probe should be sent as a result.
-    fn resolve_link_addr<I, DeviceId, BC, CC>(
+    fn resolve_link_addr<I, DeviceId, CC>(
         &mut self,
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
@@ -1080,7 +1095,7 @@ impl<D: LinkDevice, BT: NudBindingsTypes<D>> DynamicNeighborState<D, BT> {
     where
         I: Ip,
         DeviceId: StrongDeviceIdentifier,
-        BC: NudBindingsContext<I, D, DeviceId, Notifier = BT::Notifier>,
+        BC: NudBindingsContext<I, D, DeviceId>,
         CC: NudConfigContext<I>,
     {
         match self {
@@ -1143,7 +1158,7 @@ impl<D: LinkDevice, BT: NudBindingsTypes<D>> DynamicNeighborState<D, BT> {
     /// address, and advance the NUD state machine accordingly.
     ///
     /// Returns whether a multicast neighbor probe should be sent as a result.
-    fn handle_packet_queued_to_send<I, BC, CC, S>(
+    fn handle_packet_queued_to_send<I, CC, S>(
         &mut self,
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
@@ -1151,6 +1166,7 @@ impl<D: LinkDevice, BT: NudBindingsTypes<D>> DynamicNeighborState<D, BT> {
         device_id: &CC::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         body: S,
+        meta: BC::TxMetadata,
     ) -> Result<bool, SendFrameError<S>>
     where
         I: Ip,
@@ -1161,7 +1177,7 @@ impl<D: LinkDevice, BT: NudBindingsTypes<D>> DynamicNeighborState<D, BT> {
     {
         match self {
             DynamicNeighborState::Incomplete(incomplete) => {
-                incomplete.queue_packet(body).map(|()| false).map_err(|e| e.err_into())
+                incomplete.queue_packet(body, meta).map(|()| false).map_err(|e| e.err_into())
             }
             // Send the IP packet while holding the NUD lock to prevent a potential
             // ordering violation.
@@ -1188,20 +1204,35 @@ impl<D: LinkDevice, BT: NudBindingsTypes<D>> DynamicNeighborState<D, BT> {
                     bindings_ctx.now(),
                 ));
 
-                core_ctx.send_ip_packet_to_neighbor_link_addr(bindings_ctx, link_address, body)?;
+                core_ctx.send_ip_packet_to_neighbor_link_addr(
+                    bindings_ctx,
+                    link_address,
+                    body,
+                    meta,
+                )?;
 
                 Ok(false)
             }
             DynamicNeighborState::Reachable(Reachable { link_address, last_confirmed_at: _ })
             | DynamicNeighborState::Delay(Delay { link_address })
             | DynamicNeighborState::Probe(Probe { link_address, transmit_counter: _ }) => {
-                core_ctx.send_ip_packet_to_neighbor_link_addr(bindings_ctx, *link_address, body)?;
+                core_ctx.send_ip_packet_to_neighbor_link_addr(
+                    bindings_ctx,
+                    *link_address,
+                    body,
+                    meta,
+                )?;
 
                 Ok(false)
             }
             DynamicNeighborState::Unreachable(unreachable) => {
                 let Unreachable { link_address, mode: _ } = unreachable;
-                core_ctx.send_ip_packet_to_neighbor_link_addr(bindings_ctx, *link_address, body)?;
+                core_ctx.send_ip_packet_to_neighbor_link_addr(
+                    bindings_ctx,
+                    *link_address,
+                    body,
+                    meta,
+                )?;
 
                 let do_multicast_solicit = unreachable.handle_packet_queued_to_send(
                     core_ctx,
@@ -1214,7 +1245,7 @@ impl<D: LinkDevice, BT: NudBindingsTypes<D>> DynamicNeighborState<D, BT> {
         }
     }
 
-    fn handle_probe<I, CC, BC>(
+    fn handle_probe<I, CC>(
         &mut self,
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
@@ -1264,7 +1295,7 @@ impl<D: LinkDevice, BT: NudBindingsTypes<D>> DynamicNeighborState<D, BT> {
         }
     }
 
-    fn handle_confirmation<I, CC, BC>(
+    fn handle_confirmation<I, CC>(
         &mut self,
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
@@ -1277,7 +1308,7 @@ impl<D: LinkDevice, BT: NudBindingsTypes<D>> DynamicNeighborState<D, BT> {
         last_gc: &mut Option<BC::Instant>,
     ) where
         I: Ip,
-        BC: NudBindingsContext<I, D, CC::DeviceId, Instant = BT::Instant>,
+        BC: NudBindingsContext<I, D, CC::DeviceId>,
         CC: NudSenderContext<I, D, BC>,
     {
         let ConfirmationFlags { solicited_flag, override_flag } = flags;
@@ -1429,7 +1460,7 @@ pub(crate) mod testutil {
     ) where
         I: Ip,
         D: LinkDevice + PartialEq,
-        BC: NudBindingsContext<I, D, CC::DeviceId>,
+        BC: NudBindingsContext<I, D, CC::DeviceId, TxMetadata: PartialEq>,
         CC: NudContext<I, D, BC>,
     {
         core_ctx.with_nud_state_mut(&device_id, |NudState { neighbors, .. }, _config| {
@@ -1667,6 +1698,7 @@ pub trait NudBindingsContext<I: Ip, D: LinkDevice, DeviceId>:
     TimerContext
     + LinkResolutionContext<D>
     + EventContext<Event<D::Address, DeviceId, I, <Self as InstantBindingsTypes>::Instant>>
+    + NudBindingsTypes<D>
 {
 }
 
@@ -1676,21 +1708,25 @@ impl<
         DeviceId,
         BC: TimerContext
             + LinkResolutionContext<D>
-            + EventContext<Event<D::Address, DeviceId, I, <Self as InstantBindingsTypes>::Instant>>,
+            + EventContext<Event<D::Address, DeviceId, I, <Self as InstantBindingsTypes>::Instant>>
+            + NudBindingsTypes<D>,
     > NudBindingsContext<I, D, DeviceId> for BC
 {
 }
 
 /// A marker trait for types provided by bindings to NUD.
 pub trait NudBindingsTypes<D: LinkDevice>:
-    LinkResolutionContext<D> + InstantBindingsTypes + TimerBindingsTypes
+    LinkResolutionContext<D> + InstantBindingsTypes + TimerBindingsTypes + TxMetadataBindingsTypes
 {
 }
 
 impl<BT, D> NudBindingsTypes<D> for BT
 where
     D: LinkDevice,
-    BT: LinkResolutionContext<D> + InstantBindingsTypes + TimerBindingsTypes,
+    BT: LinkResolutionContext<D>
+        + InstantBindingsTypes
+        + TimerBindingsTypes
+        + TxMetadataBindingsTypes,
 {
 }
 
@@ -1984,7 +2020,7 @@ pub trait NudConfigContext<I: Ip> {
 
 /// The execution context for NUD for a link device that allows sending IP
 /// packets to specific neighbors.
-pub trait NudSenderContext<I: Ip, D: LinkDevice, BC>:
+pub trait NudSenderContext<I: Ip, D: LinkDevice, BC: NudBindingsTypes<D>>:
     NudConfigContext<I> + DeviceIdContext<D>
 {
     /// Send an IP frame to the neighbor with the specified link address.
@@ -1993,6 +2029,7 @@ pub trait NudSenderContext<I: Ip, D: LinkDevice, BC>:
         bindings_ctx: &mut BC,
         neighbor_link_addr: D::Address,
         body: S,
+        meta: BC::TxMetadata,
     ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
@@ -2039,9 +2076,7 @@ pub enum LinkResolutionResult<A: LinkAddress, Observer> {
 }
 
 /// An implementation of NUD for a link device.
-pub trait NudHandler<I: Ip, D: LinkDevice, BC: LinkResolutionContext<D>>:
-    DeviceIdContext<D>
-{
+pub trait NudHandler<I: Ip, D: LinkDevice, BC: NudBindingsTypes<D>>: DeviceIdContext<D> {
     /// Sets a dynamic neighbor's entry state to the specified values in
     /// response to the source packet.
     fn handle_neighbor_update(
@@ -2071,6 +2106,7 @@ pub trait NudHandler<I: Ip, D: LinkDevice, BC: LinkResolutionContext<D>>:
         device_id: &Self::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         body: S,
+        meta: BC::TxMetadata,
     ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
@@ -2111,9 +2147,9 @@ fn handle_neighbor_timer<I, D, CC, BC>(
     BC: NudBindingsContext<I, D, CC::DeviceId>,
     CC: NudContext<I, D, BC> + NudIcmpContext<I, D, BC> + CounterContext<NudCounters<I>>,
 {
-    enum Action<L, A> {
+    enum Action<L, A, M> {
         TransmitProbe { probe: TransmitProbe<L>, to: A },
-        SendIcmpDestUnreachable(VecDeque<Buf<Vec<u8>>>),
+        SendIcmpDestUnreachable(VecDeque<(Buf<Vec<u8>>, M)>),
     }
     let action = core_ctx.with_nud_state_mut(
         &device_id,
@@ -2284,7 +2320,11 @@ fn handle_neighbor_timer<I, D, CC, BC>(
 
     match action {
         Some(Action::SendIcmpDestUnreachable(mut pending_frames)) => {
-            for mut frame in pending_frames.drain(..) {
+            for (mut frame, meta) in pending_frames.drain(..) {
+                // This frame is being dropped from the pending NUD queue, we
+                // can release its tx metadata.
+                core::mem::drop(meta);
+
                 // TODO(https://fxbug.dev/323585811): Avoid needing to parse the packet to get
                 // IP header fields by extracting them from the serializer passed into the NUD
                 // layer and storing them alongside the pending frames instead.
@@ -2450,6 +2490,7 @@ impl<
         device_id: &Self::DeviceId,
         lookup_addr: SpecifiedAddr<I::Addr>,
         body: S,
+        meta: BC::TxMetadata,
     ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
@@ -2467,6 +2508,7 @@ impl<
                             timer_heap,
                             lookup_addr,
                             body,
+                            meta,
                         )
                         .map_err(|e| e.err_into())?;
                         insert_new_entry(
@@ -2491,6 +2533,7 @@ impl<
                                     bindings_ctx,
                                     *link_address,
                                     body,
+                                    meta,
                                 )?;
 
                                 Ok(false)
@@ -2503,6 +2546,7 @@ impl<
                                     device_id,
                                     lookup_addr,
                                     body,
+                                    meta,
                                 )?;
 
                                 Ok(do_multicast_solicit)
@@ -2756,7 +2800,7 @@ mod tests {
     use net_types::ip::{Ipv4Addr, Ipv6Addr};
     use netstack3_base::testutil::{
         FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeLinkAddress, FakeLinkDevice,
-        FakeLinkDeviceId, FakeTimerCtxExt as _, FakeWeakDeviceId,
+        FakeLinkDeviceId, FakeTimerCtxExt as _, FakeTxMetadata, FakeWeakDeviceId,
     };
     use netstack3_base::{
         CtxPair, InstantContext, IntoCoreTimerCtx, SendFrameContext as _, SendFrameErrorReason,
@@ -2940,6 +2984,7 @@ mod tests {
             bindings_ctx: &mut FakeBindingsCtxImpl<I>,
             dst_link_address: FakeLinkAddress,
             body: S,
+            _tx_meta: FakeTxMetadata,
         ) -> Result<(), SendFrameError<S>>
         where
             S: Serializer,
@@ -3103,6 +3148,7 @@ mod tests {
                 &FakeLinkDeviceId,
                 neighbor,
                 Buf::new(body, ..),
+                FakeTxMetadata::default(),
             ),
             Ok(())
         );
@@ -3117,7 +3163,11 @@ mod tests {
             neighbor,
             DynamicNeighborState::Incomplete(Incomplete {
                 transmit_counter: NonZeroU16::new(max_multicast_solicit - 1),
-                pending_frames: pending_frames.clone(),
+                pending_frames: pending_frames
+                    .iter()
+                    .cloned()
+                    .map(|buf| (buf, FakeTxMetadata::default()))
+                    .collect(),
                 notifiers: Vec::new(),
                 _marker: PhantomData,
             }),
@@ -3244,6 +3294,7 @@ mod tests {
                 &FakeLinkDeviceId,
                 ip_address,
                 Buf::new([1], ..),
+                FakeTxMetadata::default(),
             ),
             Ok(())
         );
@@ -3564,6 +3615,7 @@ mod tests {
                 &FakeLinkDeviceId,
                 I::LOOKUP_ADDR1,
                 packet,
+                FakeTxMetadata::default(),
             ),
             Err(ErrorAndSerializer { error, serializer: _ }) => error
         );
@@ -3993,6 +4045,7 @@ mod tests {
                 &FakeLinkDeviceId,
                 I::LOOKUP_ADDR1,
                 Buf::new([body], ..),
+                FakeTxMetadata::default(),
             ),
             Ok(())
         );
@@ -4094,6 +4147,7 @@ mod tests {
                 &FakeLinkDeviceId,
                 I::LOOKUP_ADDR1,
                 Buf::new([BODY], ..),
+                FakeTxMetadata::default(),
             ),
             Ok(())
         );
@@ -4133,6 +4187,7 @@ mod tests {
                     &FakeLinkDeviceId,
                     I::LOOKUP_ADDR1,
                     Buf::new([BODY + i], ..),
+                    FakeTxMetadata::default(),
                 ),
                 Ok(())
             );
@@ -4175,6 +4230,7 @@ mod tests {
                 &FakeLinkDeviceId,
                 I::LOOKUP_ADDR1,
                 Buf::new([BODY], ..),
+                FakeTxMetadata::default(),
             ),
             Ok(())
         );
@@ -4229,17 +4285,19 @@ mod tests {
         // which requires resolution. This should cause all frames to be queued
         // pending resolution completion.
         const MAX_PENDING_FRAMES_U8: u8 = MAX_PENDING_FRAMES as u8;
-        let expected_pending_frames =
-            (0..MAX_PENDING_FRAMES_U8).map(|i| Buf::new(vec![i], ..)).collect::<VecDeque<_>>();
+        let expected_pending_frames = (0..MAX_PENDING_FRAMES_U8)
+            .map(|i| (Buf::new(vec![i], ..), FakeTxMetadata::default()))
+            .collect::<VecDeque<_>>();
 
-        for body in expected_pending_frames.iter() {
+        for (body, meta) in expected_pending_frames.iter() {
             assert_eq!(
                 NudHandler::send_ip_packet_to_neighbor(
                     &mut core_ctx,
                     &mut bindings_ctx,
                     &FakeLinkDeviceId,
                     I::LOOKUP_ADDR1,
-                    body.clone()
+                    body.clone(),
+                    meta.clone(),
                 ),
                 Ok(())
             );
@@ -4267,6 +4325,7 @@ mod tests {
                 &FakeLinkDeviceId,
                 I::LOOKUP_ADDR1,
                 Buf::new([123], ..),
+                FakeTxMetadata::default(),
             ),
             Ok(())
         );
@@ -4327,7 +4386,7 @@ mod tests {
             core_ctx.inner.take_frames(),
             expected_pending_frames
                 .into_iter()
-                .map(|p| (
+                .map(|(p, FakeTxMetadata)| (
                     FakeNudMessageMeta::IpFrame { dst_link_address: LINK_ADDR1 },
                     p.as_ref().to_vec()
                 ))
@@ -4483,7 +4542,11 @@ mod tests {
                 &mut bindings_ctx,
                 DynamicNeighborState::Incomplete(Incomplete {
                     transmit_counter: NonZeroU16::new(max_multicast_solicit - i),
-                    pending_frames: pending_frames.clone(),
+                    pending_frames: pending_frames
+                        .iter()
+                        .cloned()
+                        .map(|b| (b, FakeTxMetadata::default()))
+                        .collect(),
                     notifiers: Vec::new(),
                     _marker: PhantomData,
                 }),
@@ -4568,6 +4631,8 @@ mod tests {
             I::LOOKUP_ADDR3,
             true,
         );
+        let pending_frames =
+            pending_frames.into_iter().map(|b| (b, FakeTxMetadata::default())).collect();
 
         let max_multicast_solicit = core_ctx.inner.max_multicast_solicit().get();
         assert_eq!(
@@ -4584,7 +4649,7 @@ mod tests {
                     I::LOOKUP_ADDR3,
                     NeighborState::Dynamic(DynamicNeighborState::Incomplete(Incomplete {
                         transmit_counter: NonZeroU16::new(max_multicast_solicit - 1),
-                        pending_frames: pending_frames,
+                        pending_frames,
                         notifiers: Vec::new(),
                         _marker: PhantomData,
                     })),

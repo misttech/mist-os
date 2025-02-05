@@ -29,12 +29,11 @@ class MetadataServerTest : public gtest::TestLoopFixture {
     ASSERT_TRUE(start_result.is_ok()) << start_result.error_value();
 
     // Connect to devfs directory.
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_EQ(endpoints.status_value(), ZX_OK);
-    ASSERT_EQ(realm_->component().Connect("dev-topological", endpoints->server.TakeChannel()),
+    auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_EQ(realm_->component().exposed()->Open3("dev-topological", fuchsia::io::PERM_READABLE,
+                                                   {}, server.TakeChannel()),
               ZX_OK);
-
-    ASSERT_EQ(fdio_fd_create(endpoints->client.TakeChannel().release(), &dev_fd_), ZX_OK);
+    ASSERT_EQ(fdio_fd_create(client.TakeChannel().release(), &dev_fd_), ZX_OK);
   }
 
  protected:

@@ -9,12 +9,12 @@ use anyhow::{format_err, Context as _, Error};
 use fidl_fuchsia_recovery::{FactoryResetMarker, FactoryResetProxy};
 use fidl_fuchsia_update_channel::{ProviderMarker, ProviderProxy};
 use fuchsia_component::client::connect_to_protocol;
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::path::PathBuf;
-use tracing::{info, warn};
 
 const DEVICE_INDEX_FILE: &str = "stored-index.json";
 const CONFIGURED_INDEX_FILE: &str = "forced-fdr-channel-indices.config";
@@ -89,7 +89,7 @@ impl ForcedFDR {
 /// where the library is unable to determine if an FDR is necessary. In
 /// all of these cases, the library will *not* FDR.
 pub async fn perform_fdr_if_necessary() {
-    perform_fdr_if_necessary_impl().await.unwrap_or_else(|err| info!(tag = "forced-fdr", ?err))
+    perform_fdr_if_necessary_impl().await.unwrap_or_else(|err| info!(tag = "forced-fdr", err:?; ""))
 }
 
 async fn perform_fdr_if_necessary_impl() -> Result<(), Error> {
@@ -113,7 +113,7 @@ async fn run(fdr: ForcedFDR) -> Result<(), Error> {
     let device_index = match get_stored_index(&fdr, &current_channel) {
         Ok(index) => index,
         Err(err) => {
-            info!(%err, "Unable to read stored index");
+            info!(err:%; "Unable to read stored index");
             // The device index is missing so it should be
             // written in preparation for the next FDR ota.
             // The index will always be missing right after

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::block_devices::RamdiskFactory;
 use crate::filesystems::{BlobFilesystem, DeliveryBlob};
+use crate::testing::RamdiskFactory;
 use delivery_blob::CompressionMode;
 use std::fs::OpenOptions;
 use std::io::{Read, Write};

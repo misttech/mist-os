@@ -62,7 +62,7 @@ async fn run_virtio_mem(mut virtio_mem_fidl: VirtioMemRequestStream) -> Result<(
                 if let Err(e) =
                     mem_device.process_guest_request_chain(ReadableChain::new(chain, &guest_mem))
                 {
-                    tracing::warn!("Failed to process guest request chain {}", e);
+                    log::warn!("Failed to process guest request chain {}", e);
                 }
                 Ok(())
             })
@@ -83,7 +83,7 @@ async fn main() -> Result<(), anyhow::Error> {
     fs.take_and_serve_directory_handle().context("Error starting server")?;
     fs.for_each_concurrent(None, |stream| async {
         if let Err(e) = run_virtio_mem(stream).await {
-            tracing::error!("Error running virtio_mem service: {}", e);
+            log::error!("Error running virtio_mem service: {}", e);
         }
     })
     .await;

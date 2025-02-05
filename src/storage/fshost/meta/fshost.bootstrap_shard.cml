@@ -60,14 +60,6 @@
             to: "#fshost",
         },
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: "#fshost",
-        },
-        {
             config: [
                 "fuchsia.fshost.Blobfs",
                 "fuchsia.fshost.BlobfsInitialInodes",
@@ -92,6 +84,7 @@
                 "fuchsia.fshost.Netboot",
                 "fuchsia.fshost.NoZxcrypt",
                 "fuchsia.fshost.RamdiskImage",
+                "fuchsia.fshost.StarnixVolumeName",
                 "fuchsia.fshost.StorageHost",
                 "fuchsia.fshost.UseDiskMigration",
             ],
@@ -131,8 +124,25 @@
             from: "#fshost",
         },
         {
-            protocol: "fuchsia.fxfs.CryptManagement",
+            protocol: "fuchsia.fshost.StarnixVolumeProvider",
             from: "#fshost",
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.storage.partitions.PartitionsManager",
+            from: "#fshost",
+            availability: "optional",
+        },
+        {
+            service: "fuchsia.storage.partitions.PartitionService",
+            from: "#fshost",
+            availability: "optional",
+        },
+
+        // TODO(https://fxbug.dev/391474592): Remove after per-container volumes land.
+        {
+            protocol: "fuchsia.fxfs.CryptManagement",
+            from: "void",
             availability: "optional",
         },
     ],

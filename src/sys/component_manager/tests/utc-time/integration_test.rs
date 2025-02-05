@@ -9,7 +9,7 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::*;
 use futures::future::BoxFuture;
 use futures::{FutureExt, StreamExt};
-use tracing::*;
+use log::*;
 use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::read_only;

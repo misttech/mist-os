@@ -10,8 +10,7 @@ use hmac::Mac as _;
 use net_types::ip::{Ipv6Addr, Subnet};
 use rand::Rng;
 
-/// The length in bytes of the `secret_key` argument to
-/// [`generate_opaque_interface_identifier`].
+/// The length in bytes of the [`IidSecret`] secret key.
 const IID_SECRET_KEY_BYTES: usize = 32;
 
 /// A secret for generating [`OpaqueIid`]s.
@@ -28,6 +27,16 @@ impl IidSecret {
         let mut bytes = [0u8; IID_SECRET_KEY_BYTES];
         rng.fill(&mut bytes[..]);
         Self(bytes)
+    }
+
+    /// Creates a new secret from the provided bytes.
+    pub fn new(bytes: [u8; IID_SECRET_KEY_BYTES]) -> Self {
+        Self(bytes)
+    }
+
+    /// Returns the inner bytes of the secret.
+    pub fn into_inner(self) -> [u8; IID_SECRET_KEY_BYTES] {
+        self.0
     }
 }
 
@@ -48,8 +57,8 @@ impl OpaqueIid {
     /// Computes an opaque interface identifier (IID) using the algorithm in [RFC
     /// 7217 Section 5].
     ///
-    /// Each argument to `generate_opaque_interface_identifier` corresponds to an
-    /// argument from Section 5 of the RFC:
+    /// Each argument to this function corresponds to an argument from Section 5 of
+    /// the RFC:
     /// - `prefix` corresponds to the "Prefix" argument
     /// - `net_iface` corresponds to the "Net_Iface" argument
     /// - `net_id` corresponds to the "Network_ID" argument
@@ -62,14 +71,14 @@ impl OpaqueIid {
     /// properties as the original algorithm specified in the RFC without requiring
     /// that they keep state in the form of a DAD count.
     ///
-    /// For fixed inputs, the output of `generate_opaque_interface_identifier` is
-    /// guaranteed to be stable across versions this codebase.
+    /// For fixed inputs, the output of this function is guaranteed to be stable
+    /// across versions of this codebase.
     ///
     /// [RFC 7217 Section 5]: https://tools.ietf.org/html/rfc7217#section-5
     pub fn new<IF, ID>(
         prefix: Subnet<Ipv6Addr>,
         net_iface: IF,
-        net_id: ID,
+        net_id: Option<ID>,
         dad_counter: OpaqueIidNonce,
         secret_key: &IidSecret,
     ) -> Self
@@ -103,16 +112,16 @@ impl OpaqueIid {
         //
         // ALGORITHM
         //
-        // Our primary goal is to ensure that `generate_opaque_interface_identifier`
-        // implements a PRF. Our HMAC implements a PRF, and we just truncate its
-        // output to 128 bits and return it. [5] Thus, all we need to do is not
-        // somehow negate the HMAC's PRF property in constructing its input.
+        // Our primary goal is to ensure that `OpaqueIid` implements a PRF. Our HMAC
+        // implements a PRF, and we just truncate its output to 128 bits and return it.
+        // [5] Thus, all we need to do is not somehow negate the HMAC's PRF property in
+        // constructing its input.
         //
         // A trivial way to do this is to ensure that any two distinct inputs to
-        // `generate_opaque_interface_identifier` will result in a distinct byte
-        // sequence being fed to the HMAC. We do this by feeding each input to the
-        // HMAC one at a time and, for the variable-length inputs, prefixing them
-        // with a fixed-length binary representation of their length. [6]
+        // `OpaqueIid::new` will result in a distinct byte sequence being fed to the
+        // HMAC. We do this by feeding each input to the HMAC one at a time and, for the
+        // variable-length inputs, prefixing them with a fixed-length binary
+        // representation of their length. [6]
         //
         // [1] See [2]. There is some subtlety [3], however HMAC-SHA256 is used as a
         //     PRF in existing standards (e.g., [4]), and thus it is almost
@@ -140,9 +149,8 @@ impl OpaqueIid {
         //     version of f, is a PRF.
         // [6] This representation ensures that it is always possible to reverse the
         //     encoding and decompose the encoding into the separate arguments to
-        //     `generate_opaque_interface_identifier`. This implies that no two
-        //     sets of inputs to `generate_opaque_interface_identifier` will ever
-        //     produce the same encoding.
+        //     `OpaqueIid::new`. This implies that no two sets of inputs to
+        //     `OpaqueIid::new` will ever produce the same encoding.
         // [7] https://en.wikipedia.org/wiki/Random_oracle
 
         fn write_u64(hmac: &mut HmacSha256, u: u64) {
@@ -153,9 +161,9 @@ impl OpaqueIid {
             // Write `usize` values as `u64` so that we always write the same number
             // of bytes regardless of the platform.
             //
-            // This `unwrap` is guaranteed not to panic unless we a) run on a
-            // 128-bit platform and, b) call `generate_opaque_interface_identifier`
-            // on a byte slice which is larger than 2^64 bytes.
+            // This `unwrap` is guaranteed not to panic unless we a) run on a 128-bit
+            // platform and, b) call `OpaqueIid::new` on a byte slice which is larger than
+            // 2^64 bytes.
             write_u64(hmac, u.try_into().unwrap())
         }
 
@@ -180,9 +188,18 @@ impl OpaqueIid {
         // call `net_iface.as_ref()` once and then use its return value in case the
         // `AsRef::as_ref` implementation doesn't always return the same number of
         // bytes, which would break the security of this algorithm.
-        let net_id = net_id.as_ref();
-        write_usize(&mut hmac, net_id.len());
-        hmac.update(net_id);
+        if let Some(net_id) = net_id {
+            let net_id = net_id.as_ref();
+            write_usize(&mut hmac, net_id.len());
+            hmac.update(net_id);
+        } else {
+            // In a previous version of this function, `net_id` was not optional, and to
+            // signify its absence a caller would pass an empty byte slice or array. The
+            // zero length would then have been written to `hmac`. To maintain compatibility
+            // with `OpaqueIid`s generated before this change, write zero for an unspecified
+            // `net_id`.
+            write_usize(&mut hmac, 0);
+        }
 
         write_u64(&mut hmac, dad_counter.into());
 
@@ -197,15 +214,14 @@ impl OpaqueIid {
     }
 }
 
-/// Describes the value being used as the nonce for
-/// [`generate_opaque_interface_identifier`].
+/// Describes the value being used as the nonce for [`OpaqueIid`].
 ///
 /// See the function documentation for more info.
 #[derive(Copy, Clone, Debug)]
 #[allow(missing_docs)]
 pub enum OpaqueIidNonce {
     // TODO(https://fxbug.dev/42148800): Remove cfg(test) when this is used
-    // to generate static opaque identifiers.
+    // to generate stable opaque identifiers.
     #[cfg(test)]
     DadCounter(u8),
     Random(u64),
@@ -241,14 +257,14 @@ mod tests {
         let iid0 = OpaqueIid::new(
             default_prefix,
             default_net_iface,
-            default_net_id,
+            Some(default_net_id),
             default_dad_counter,
             default_secret_key,
         );
         let iid1 = OpaqueIid::new(
             default_prefix,
             default_net_iface,
-            default_net_id,
+            Some(default_net_id),
             default_dad_counter,
             default_secret_key,
         );
@@ -260,7 +276,7 @@ mod tests {
         let iid0 = OpaqueIid::new(
             default_prefix,
             &net_iface[..],
-            default_net_id,
+            Some(default_net_id),
             default_dad_counter,
             default_secret_key,
         );
@@ -269,7 +285,7 @@ mod tests {
             let iid1 = OpaqueIid::new(
                 default_prefix,
                 &net_iface[..],
-                default_net_id,
+                Some(default_net_id),
                 default_dad_counter,
                 default_secret_key,
             );
@@ -283,7 +299,7 @@ mod tests {
         let iid0 = OpaqueIid::new(
             default_prefix,
             default_net_iface,
-            &net_id[..],
+            Some(&net_id[..]),
             default_dad_counter,
             default_secret_key,
         );
@@ -292,7 +308,7 @@ mod tests {
             let iid1 = OpaqueIid::new(
                 default_prefix,
                 default_net_iface,
-                &net_id[..],
+                Some(&net_id[..]),
                 default_dad_counter,
                 default_secret_key,
             );
@@ -305,21 +321,21 @@ mod tests {
         let iid0 = OpaqueIid::new(
             default_prefix,
             &[0, 1, 2],
-            &[3, 4, 5],
+            Some(&[3, 4, 5]),
             default_dad_counter,
             default_secret_key,
         );
         let iid1 = OpaqueIid::new(
             default_prefix,
             &[0, 1, 2, 3],
-            &[4, 5],
+            Some(&[4, 5]),
             default_dad_counter,
             default_secret_key,
         );
         let iid2 = OpaqueIid::new(
             default_prefix,
             &[0, 1],
-            &[2, 3, 4, 5],
+            Some(&[2, 3, 4, 5]),
             default_dad_counter,
             default_secret_key,
         );
@@ -331,14 +347,14 @@ mod tests {
         let iid0 = OpaqueIid::new(
             default_prefix,
             default_net_iface,
-            default_net_id,
+            Some(default_net_id),
             default_dad_counter,
             default_secret_key,
         );
         let iid1 = OpaqueIid::new(
             default_prefix,
             default_net_iface,
-            default_net_id,
+            Some(default_net_id),
             OpaqueIidNonce::DadCounter(1),
             default_secret_key,
         );
@@ -348,7 +364,7 @@ mod tests {
         let iid0 = OpaqueIid::new(
             default_prefix,
             default_net_iface,
-            default_net_id,
+            Some(default_net_id),
             default_dad_counter,
             default_secret_key,
         );
@@ -357,7 +373,7 @@ mod tests {
         let iid1 = OpaqueIid::new(
             default_prefix,
             default_net_iface,
-            default_net_id,
+            Some(default_net_id),
             default_dad_counter,
             &secret_key,
         );
@@ -370,12 +386,17 @@ mod tests {
         // codebase versions. This test case asserts that, and should not be changed!
         const PREFIX: Subnet<Ipv6Addr> = Ipv6::SITE_LOCAL_UNICAST_SUBNET;
         const NET_IFACE: &[u8] = &[0, 1, 2];
-        const NET_ID: &[u8] = &[3, 4, 5];
+        const NET_ID: Option<&[u8]> = Some(&[3, 4, 5]);
         const DAD_COUNTER: OpaqueIidNonce = OpaqueIidNonce::DadCounter(0);
 
         assert_eq!(
             OpaqueIid::new(PREFIX, NET_IFACE, NET_ID, DAD_COUNTER, &IidSecret::ALL_ONES),
             OpaqueIid(255541303695013087662815070945404751656),
+        );
+
+        assert_eq!(
+            OpaqueIid::new(PREFIX, NET_IFACE, None::<[_; 0]>, DAD_COUNTER, &IidSecret::ALL_ONES),
+            OpaqueIid(195123822206027417085233478881498908845),
         );
     }
 }

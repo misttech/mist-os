@@ -4,7 +4,15 @@
 
 #include <lib/driver/compat/cpp/connect.h>
 
+#include <string_view>
+
 namespace compat {
+
+namespace {
+
+const std::string kCompatServicePath = std::string("/svc/") + fuchsia_driver_compat::Service::Name;
+
+}
 
 fdf::async_helpers::AsyncTask FindDirectoryEntries(fidl::ClientEnd<fuchsia_io::Directory> dir,
                                                    async_dispatcher_t* dispatcher,
@@ -99,7 +107,8 @@ zx::result<std::vector<std::string>> FindDirectoryEntries(
 
 fdf::async_helpers::AsyncTask ConnectToParentDevices(async_dispatcher_t* dispatcher,
                                                      const fdf::Namespace* ns, ConnectCallback cb) {
-  auto result = ns->Connect<fuchsia_io::Directory>(fuchsia_driver_compat::Service::Name);
+  auto result =
+      ns->Open<fuchsia_io::Directory>(kCompatServicePath.c_str(), fuchsia_io::wire::kPermReadable);
 
   if (result.is_error()) {
     cb(result.take_error());
@@ -140,7 +149,8 @@ fdf::async_helpers::AsyncTask ConnectToParentDevices(async_dispatcher_t* dispatc
 }
 
 zx::result<std::vector<ParentDevice>> ConnectToParentDevices(const fdf::Namespace* ns) {
-  auto result = ns->Connect<fuchsia_io::Directory>(fuchsia_driver_compat::Service::Name);
+  auto result =
+      ns->Open<fuchsia_io::Directory>(kCompatServicePath.c_str(), fuchsia_io::wire::kPermReadable);
   if (result.is_error()) {
     return result.take_error();
   }

@@ -5,10 +5,10 @@
 use crate::zstd;
 use anyhow::{Error, Result};
 use byteorder::{LittleEndian, ReadBytesExt};
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use thiserror::Error;
-use tracing::info;
 
 /// ZBIs must start with a container type that contains all of the sections in
 /// the ZBI. It is largely there to verify the binary blob is actually a ZBI and
@@ -250,7 +250,7 @@ impl VBootSeeker {
             header = ZbiHeader::parse(cursor)?;
         }
         cursor.set_position(cursor.position() - ZBI_HEADER_SIZE);
-        info!(position = %cursor.position(), "Found ZBI inside VBoot");
+        info!(position:% = cursor.position(); "Found ZBI inside VBoot");
         Ok(())
     }
 }

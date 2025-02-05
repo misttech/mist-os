@@ -52,7 +52,7 @@ class PipeManagerTest : public ::testing::Test {
   Controller controller_;
 };
 
-class FakeDisplay : public DisplayDevice {
+class FakeDisplay final : public DisplayDevice {
  public:
   FakeDisplay(Controller* controller, display::DisplayId id, DdiId ddi_id, Type type)
       : DisplayDevice(controller, id, ddi_id, DdiReference(), type) {}
@@ -61,6 +61,17 @@ class FakeDisplay : public DisplayDevice {
   // DisplayDevice overrides:
   bool Query() final { return true; }
   bool InitWithDdiPllConfig(const DdiPllConfig& pll_config) final { return true; }
+  raw_display_info_t CreateRawDisplayInfo() final {
+    return raw_display_info_t{
+        .display_id = display::ToBanjoDisplayId(id()),
+        .preferred_modes_list = nullptr,
+        .preferred_modes_count = 0,
+        .edid_bytes_list = nullptr,
+        .edid_bytes_count = 0,
+        .pixel_formats_list = nullptr,
+        .pixel_formats_count = 0,
+    };
+  }
 
  private:
   // DisplayDevice overrides:
@@ -76,7 +87,6 @@ class FakeDisplay : public DisplayDevice {
   }
   DdiPllConfig ComputeDdiPllConfig(int32_t pixel_clock_khz) final { return {}; }
   int32_t LoadPixelRateForTranscoderKhz(TranscoderId transcoder_id) final { return 0; }
-  ddk::I2cImplProtocolClient i2c() final { return {}; }
   bool CheckPixelRate(int64_t pixel_rate_hz) final { return true; }
 };
 

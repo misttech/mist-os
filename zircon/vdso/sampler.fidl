@@ -49,7 +49,7 @@ closed protocol Sampler {
     /// typedef struct {
     ///     // How long an individual cpu core will wait in nanoseconds between
     ///     // taking each sample. The minimum period is ZX_SAMPLER_MIN_PERIOD (10000ns).
-    ///     zx_duration_t period;
+    ///     zx_duration_mono_t period;
     ///
     ///     // The requested size of the region in bytes. The size will be
     ///     // rounded up to the next system page size boundary, as reported by

@@ -88,7 +88,7 @@ pub struct Client<T: Transport, P> {
 
 impl<T: Transport, P> Client<T, P> {
     /// Creates a new client from a client end.
-    pub fn new(client_end: ClientEnd<T, P>) -> Client<T, P> {
+    pub fn new(client_end: ClientEnd<T, P>) -> Self {
         Self { client: protocol::Client::new(client_end.into_untyped()), _protocol: PhantomData }
     }
 

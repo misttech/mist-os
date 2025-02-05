@@ -378,7 +378,7 @@ impl gesture_arena::MatchedContender for MatchedContender {
         // This verify_event expected not call because all other recognizers
         // should exit on 2 finger button down.
 
-        tracing::error!("Unexpected MatchedContender::verify_event() called");
+        log::error!("Unexpected MatchedContender::verify_event() called");
 
         VerifyEventResult::MatchedContender(self)
     }

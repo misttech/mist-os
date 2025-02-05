@@ -140,8 +140,15 @@ int zxc_dm(int argc, char** argv) {
   } else if (command_cmp("reboot", NULL, argv[1], &command_length)) {
     return send_statecontrol_admin_command(
         [](fidl::WireSyncClient<fuchsia_hardware_power_statecontrol::Admin> client) {
-          return client->Reboot(
-              fuchsia_hardware_power_statecontrol::wire::RebootReason::kUserRequest);
+          fidl::Arena arena;
+          auto builder = fuchsia_hardware_power_statecontrol::wire::RebootOptions::Builder(arena);
+          std::vector<fuchsia_hardware_power_statecontrol::RebootReason2> reasons = {
+              fuchsia_hardware_power_statecontrol::RebootReason2::kUserRequest};
+          auto vector_view =
+              fidl::VectorView<fuchsia_hardware_power_statecontrol::RebootReason2>::FromExternal(
+                  reasons);
+          builder.reasons(vector_view);
+          return client->PerformReboot(builder.Build());
         });
 
   } else if (command_cmp("reboot-bootloader", "rb", argv[1], &command_length)) {

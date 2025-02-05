@@ -85,7 +85,7 @@ impl<B: BalloonBackend> BalloonDevice<B> {
             Ok(remaining) => {
                 // each PFN is LE32, so we divide the amount of memory in read chain by 4
                 let num_deflated_pages = remaining.bytes / 4;
-                tracing::trace!("Deflated {} KiB", num_deflated_pages * PAGE_SIZE / 1024);
+                log::trace!("Deflated {} KiB", num_deflated_pages * PAGE_SIZE / 1024);
                 self.num_inflated_pages.subtract(num_deflated_pages as i64);
             }
             Err(_) => {}
@@ -123,7 +123,7 @@ impl<B: BalloonBackend> BalloonDevice<B> {
                     // For the descending run we want to offset the base position
                     base -= run - 1;
                 }
-                tracing::trace!("inflate pfn range base={}, size={} dir={}", base, run, dir);
+                log::trace!("inflate pfn range base={}, size={} dir={}", base, run, dir);
                 self.backend.decommit_range(base * PAGE_SIZE as u64, run * PAGE_SIZE as u64)?;
                 self.num_inflated_pages.add(run as i64);
             }
@@ -137,11 +137,11 @@ impl<B: BalloonBackend> BalloonDevice<B> {
                 // For the descending run we want to offset the base position
                 base -= run - 1;
             }
-            tracing::trace!("inflate pfn range base={}, size={} dir={}", base, run, dir);
+            log::trace!("inflate pfn range base={}, size={} dir={}", base, run, dir);
             self.backend.decommit_range(base * PAGE_SIZE as u64, run * PAGE_SIZE as u64)?;
             self.num_inflated_pages.add(run as i64);
         }
-        tracing::trace!("Inflated {} KiB", num_inflated_pages * PAGE_SIZE / 1024);
+        log::trace!("Inflated {} KiB", num_inflated_pages * PAGE_SIZE / 1024);
         Ok(())
     }
 
@@ -191,7 +191,7 @@ impl<B: BalloonBackend> BalloonDevice<B> {
             total_len += range.len();
             self.backend.decommit_range(range.0.start as u64, range.len() as u64)?;
         }
-        tracing::trace!("Reclaimed {} MiB", total_len / 1024 / 1024);
+        log::trace!("Reclaimed {} MiB", total_len / 1024 / 1024);
         self.num_reported_free_pages.add(total_len as u64 / PAGE_SIZE as u64);
         Ok(())
     }

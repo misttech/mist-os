@@ -12,7 +12,7 @@ use anyhow::{Context, Result};
 
 use ffx_config::global_env_context;
 use ffx_process_args::{Args, ProcessCommand, Task};
-use fho::{moniker, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_buildinfo::{BuildInfo, ProviderProxy};
 use fidl_fuchsia_process_explorer::{
     ProcessExplorerGetStackTraceRequest, ProcessExplorerKillTaskRequest, ProcessExplorerProxy,
@@ -24,6 +24,7 @@ use processes_data::{processed, raw};
 use std::collections::HashSet;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
+use target_holders::moniker;
 use write_human_readable_output::{
     pretty_print_invalid_koids, pretty_print_processes_data, pretty_print_processes_name_and_koid,
 };
@@ -286,7 +287,7 @@ async fn stack_trace_subcommand(
 }
 
 async fn write_symbolized_stack_traces(mut w: Writer, stack_trace: String) -> Result<()> {
-    let sdk = global_env_context().context("Loading global environment context")?.get_sdk().await?;
+    let sdk = global_env_context().context("Loading global environment context")?.get_sdk()?;
     if let Err(e) = symbol_index::ensure_symbol_index_registered(&sdk) {
         tracing::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
     }
@@ -335,6 +336,7 @@ async fn write_symbolized_stack_traces(mut w: Writer, stack_trace: String) -> Re
 mod tests {
     use super::*;
     use futures::AsyncWriteExt;
+    use target_holders::fake_proxy;
 
     lazy_static::lazy_static! {
     static ref EXPECTED_PROCESSES_DATA: raw::ProcessesData = raw::ProcessesData{
@@ -398,7 +400,7 @@ mod tests {
 
     /// Returns a fake query service that writes `EXPECTED_PROCESSES_DATA` serialized to JSON to the socket when `WriteJsonProcessesData` is called.
     fn setup_fake_query_svc() -> QueryProxy {
-        fho::testing::fake_proxy(|request| match request {
+        fake_proxy(|request| match request {
             QueryRequest::WriteJsonProcessesData { socket, .. } => {
                 let mut s = fidl::AsyncSocket::from_socket(socket);
                 fuchsia_async::Task::local(async move {

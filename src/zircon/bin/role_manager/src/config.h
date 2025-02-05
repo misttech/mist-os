@@ -26,6 +26,7 @@ namespace zircon_profile {
 enum class ProfileScope {
   None = 0,
   Bringup,
+  Board,
   Core,
   Product,
   Builtin,
@@ -44,8 +45,8 @@ struct Profile {
 };
 
 struct MediaRole {
-  zx_duration_t capacity;
-  zx_duration_t deadline;
+  zx_duration_mono_t capacity;
+  zx_duration_mono_t deadline;
 };
 
 class Role {

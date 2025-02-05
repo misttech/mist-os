@@ -139,4 +139,70 @@ zx::result<fio::wire::FilesystemInfo> Connection::NodeQueryFilesystem() const {
   return zx::ok(info.value().ToFidl());
 }
 
+namespace {
+// Helper function to reduce verbosity in |NodeAttributes:Build| impl below by using type deduction.
+// Returns an external (non-owning) |fidl::ObjectView| to |obj|.
+template <typename T>
+fidl::ObjectView<T> ExternalView(T* obj) {
+  return fidl::ObjectView<T>::FromExternal(obj);
+}
+}  // namespace
+
+zx::result<fio::wire::NodeAttributes2*> NodeAttributeBuilder::Build(
+    fuchsia_io::NodeAttributesQuery query) {
+  if (attributes_.is_error()) {
+    return zx::error(attributes_.error_value());
+  }
+  fs::VnodeAttributes* attributes = &attributes_.value();
+  // Immutable attributes:
+  auto immutable_builder = ImmutableAttrs::ExternalBuilder(ExternalView(&immutable_frame_));
+  if (query & fio::NodeAttributesQuery::kProtocols) {
+    immutable_builder.protocols(ExternalView(&protocols_));
+  }
+  if (query & fio::NodeAttributesQuery::kAbilities) {
+    immutable_builder.abilities(ExternalView(&abilities_));
+  }
+  if (query & fio::NodeAttributesQuery::kContentSize && attributes->content_size) {
+    immutable_builder.content_size(ExternalView(&*attributes->content_size));
+  }
+  if (query & fio::NodeAttributesQuery::kStorageSize && attributes->storage_size) {
+    immutable_builder.storage_size(ExternalView(&*attributes->storage_size));
+  }
+  if (query & fio::NodeAttributesQuery::kLinkCount && attributes->link_count) {
+    immutable_builder.link_count(ExternalView(&*attributes->link_count));
+  }
+  if (query & fio::NodeAttributesQuery::kId && attributes->id) {
+    immutable_builder.id(ExternalView(&*attributes->id));
+  }
+  // Mutable attributes:
+  auto mutable_builder = MutableAttrs::ExternalBuilder(ExternalView(&mutable_frame_));
+  if (query & fio::NodeAttributesQuery::kCreationTime && attributes->creation_time) {
+    mutable_builder.creation_time(ExternalView(&*attributes->creation_time));
+  }
+  if (query & fio::NodeAttributesQuery::kModificationTime && attributes->modification_time) {
+    mutable_builder.modification_time(ExternalView(&*attributes->modification_time));
+  }
+#if !defined(__Fuchsia__) || FUCHSIA_API_LEVEL_AT_LEAST(18)
+  if (query & fio::NodeAttributesQuery::kMode && attributes->mode) {
+    mutable_builder.mode(*attributes->mode);
+  }
+  if (query & fio::NodeAttributesQuery::kUid && attributes->uid) {
+    mutable_builder.uid(*attributes->uid);
+  }
+  if (query & fio::NodeAttributesQuery::kGid && attributes->gid) {
+    mutable_builder.gid(*attributes->gid);
+  }
+  if (query & fio::NodeAttributesQuery::kRdev && attributes->rdev) {
+    mutable_builder.rdev(ExternalView(&*attributes->rdev));
+  }
+#endif
+
+  // Build the wire table, which is now valid as long as this object remains in scope.
+  wire_table_ = NodeAttributes2{
+      .mutable_attributes = mutable_builder.Build(),
+      .immutable_attributes = immutable_builder.Build(),
+  };
+  return zx::ok(&wire_table_);
+}
+
 }  // namespace fs::internal

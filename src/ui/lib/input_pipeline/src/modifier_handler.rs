@@ -51,7 +51,7 @@ impl UnhandledInputHandler for ModifierHandler {
                 event = event
                     .into_with_lock_state(Some(self.lock_state.borrow().get_state()))
                     .into_with_modifiers(Some(self.modifier_state.borrow().get_state()));
-                tracing::debug!("modifiers and lock state applied: {:?}", &event);
+                log::debug!("modifiers and lock state applied: {:?}", &event);
                 vec![InputEvent {
                     device_event: InputDeviceEvent::Keyboard(event),
                     device_descriptor,
@@ -138,7 +138,7 @@ impl UnhandledInputHandler for ModifierMeaningHandler {
                     let new_modifier = event.get_modifiers().unwrap_or(Modifiers::empty())
                         | self.modifier_state.borrow().get_state();
                     event = event.into_with_modifiers(Some(new_modifier));
-                    tracing::debug!("additinal modifiers and lock state applied: {:?}", &event);
+                    log::debug!("additinal modifiers and lock state applied: {:?}", &event);
                 }
                 vec![InputEvent {
                     device_event: InputDeviceEvent::Keyboard(event),

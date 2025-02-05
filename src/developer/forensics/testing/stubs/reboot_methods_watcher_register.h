@@ -22,20 +22,20 @@ using RebootMethodsWatcherRegisterBase = SINGLE_BINDING_STUB_FIDL_SERVER(
 // watcher.
 class RebootMethodsWatcherRegister : public RebootMethodsWatcherRegisterBase {
  public:
-  RebootMethodsWatcherRegister(fuchsia::hardware::power::statecontrol::RebootReason reason)
+  RebootMethodsWatcherRegister(fuchsia::hardware::power::statecontrol::RebootReason2 reason)
       : reason_(reason) {}
 
   // |fuchsia::hardware::power::statecontrol::RebootMethodsWatcherRegister|.
   void Register(
       ::fidl::InterfaceHandle<fuchsia::hardware::power::statecontrol::RebootMethodsWatcher> watcher)
       override;
-  void RegisterWithAck(
-      ::fidl::InterfaceHandle<fuchsia::hardware::power::statecontrol::RebootMethodsWatcher> watcher,
-      RegisterWithAckCallback callback) override;
+  void RegisterWatcher(
+      ::fidl::InterfaceHandle<fuchsia::hardware::power::statecontrol::RebootWatcher> watcher,
+      RegisterWatcherCallback callback) override;
 
  private:
-  fuchsia::hardware::power::statecontrol::RebootReason reason_;
-  fuchsia::hardware::power::statecontrol::RebootMethodsWatcherPtr watcher_;
+  fuchsia::hardware::power::statecontrol::RebootReason2 reason_;
+  fuchsia::hardware::power::statecontrol::RebootWatcherPtr watcher_;
 };
 
 // A RebootMethodsWatcherRegister that binds and then does nothing.
@@ -47,12 +47,12 @@ class RebootMethodsWatcherRegisterHangs : public RebootMethodsWatcherRegisterBas
   void Register(
       ::fidl::InterfaceHandle<fuchsia::hardware::power::statecontrol::RebootMethodsWatcher> watcher)
       override;
-  void RegisterWithAck(
-      ::fidl::InterfaceHandle<fuchsia::hardware::power::statecontrol::RebootMethodsWatcher> watcher,
-      RegisterWithAckCallback callback) override;
+  void RegisterWatcher(
+      ::fidl::InterfaceHandle<fuchsia::hardware::power::statecontrol::RebootWatcher> watcher,
+      RegisterWatcherCallback callback) override;
 
  private:
-  fuchsia::hardware::power::statecontrol::RebootMethodsWatcherPtr watcher_;
+  fuchsia::hardware::power::statecontrol::RebootWatcherPtr watcher_;
 };
 
 }  // namespace stubs

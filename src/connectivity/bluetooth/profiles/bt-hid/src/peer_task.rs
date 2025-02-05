@@ -8,13 +8,13 @@ use fuchsia_bluetooth::profile::{psm_from_protocol, Psm};
 use fuchsia_bluetooth::types::{Channel, PeerId};
 use futures::channel::mpsc;
 use futures::{select, StreamExt};
+use log::{debug, error, info, warn};
 use profile_client::ProfileEvent;
 use std::convert::TryInto;
 use std::default::Default;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tracing::{debug, error, info, warn};
 use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync};
 
 use crate::peer_info::PeerInfo;

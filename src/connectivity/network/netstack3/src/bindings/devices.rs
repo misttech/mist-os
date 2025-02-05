@@ -13,14 +13,15 @@ use assert_matches::assert_matches;
 use derivative::Derivative;
 use futures::future::FusedFuture;
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _};
+use itertools::Itertools as _;
 use net_types::ethernet::Mac;
 use net_types::ip::{IpAddr, Mtu};
 use net_types::{SpecifiedAddr, UnicastAddr};
 use netstack3_core::device::{
-    BatchSize, DeviceClassMatcher, DeviceId, DeviceIdAndNameMatcher, DeviceProvider,
-    DeviceSendFrameError, EthernetLinkDevice, LoopbackDeviceId, PureIpDevice, WeakDeviceId,
+    BatchSize, DeviceClassMatcher, DeviceId, DeviceIdAndNameMatcher, DeviceSendFrameError,
+    EthernetLinkDevice, LoopbackDeviceId, PureIpDevice, WeakDeviceId,
 };
-use netstack3_core::sync::{Mutex as CoreMutex, RwLock as CoreRwLock};
+use netstack3_core::sync::RwLock as CoreRwLock;
 use netstack3_core::types::WorkQueueReport;
 
 use {
@@ -30,11 +31,33 @@ use {
 
 use crate::bindings::power::TransmitSuspensionHandler;
 use crate::bindings::util::NeedsDataNotifier;
-use crate::bindings::{interfaces_admin, neighbor_worker, netdevice_worker, BindingsCtx, Ctx};
+use crate::bindings::{
+    interfaces_admin, neighbor_worker, netdevice_worker, BindingsCtx, Ctx, InterfaceEventProducer,
+};
 
 pub(crate) const LOOPBACK_MAC: Mac = Mac::new([0, 0, 0, 0, 0, 0]);
 
 pub(crate) type BindingId = NonZeroU64;
+
+/// A witness that a given binding ID has been allocated and its name reserved.
+/// This type will cause a panic if dropped, so it should be allocated only after any
+/// necessary fallible operations are performed.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct BindingIdAllocation(BindingId);
+
+impl Drop for BindingIdAllocation {
+    fn drop(&mut self) {
+        unreachable!("BindingIdAllocation should never be dropped")
+    }
+}
+
+impl BindingIdAllocation {
+    fn into_inner(self) -> BindingId {
+        let id = self.0;
+        std::mem::forget(self);
+        id
+    }
+}
 
 /// Keeps tabs on devices.
 ///
@@ -45,39 +68,90 @@ pub(crate) type BindingId = NonZeroU64;
 /// device. The type parameters are there to allow testing without dependencies
 /// on `core`.
 pub(crate) struct Devices<C> {
-    id_map: CoreRwLock<HashMap<BindingId, C>>,
-    last_id: CoreMutex<BindingId>,
+    inner: CoreRwLock<DevicesInner<C>>,
+}
+
+#[derive(PartialEq, Eq, Debug)]
+struct DevicesInner<C> {
+    id_map: HashMap<BindingId, IdMapEntry<C>>,
+    last_id: BindingId,
+}
+
+impl<C> DevicesInner<C> {
+    fn reserve_name_and_alloc_id(&mut self, name: String) -> (BindingId, BindingIdAllocation) {
+        let DevicesInner { id_map, last_id } = self;
+
+        let id = *last_id;
+        *last_id = last_id.checked_add(1).expect("exhausted binding device IDs");
+
+        assert!(id_map.insert(id, IdMapEntry::ReservedName(name)).is_none());
+        (id, BindingIdAllocation(id))
+    }
+}
+
+impl<C: HasDeviceName + Clone + std::fmt::Debug + PartialEq> DevicesInner<C> {
+    fn iter_device_names(&self) -> impl Iterator<Item = &String> + '_ {
+        self.id_map.values().map(|entry| match entry {
+            IdMapEntry::ReservedName(s) => s,
+            IdMapEntry::CoreId(c) => c.device_name(),
+        })
+    }
+}
+
+pub(crate) struct IdMapIterator<'a, C> {
+    inner: hash_map::Values<'a, BindingId, IdMapEntry<C>>,
+}
+
+impl<'a, C> Iterator for IdMapIterator<'a, C> {
+    type Item = &'a C;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner
+            .by_ref()
+            .filter_map(|entry| match entry {
+                IdMapEntry::ReservedName(_) => None,
+                IdMapEntry::CoreId(c) => Some(c),
+            })
+            .next()
+    }
 }
 
 impl<C> Default for Devices<C> {
     fn default() -> Self {
-        Self { id_map: Default::default(), last_id: CoreMutex::new(BindingId::MIN) }
+        Self {
+            inner: CoreRwLock::new(DevicesInner {
+                id_map: Default::default(),
+                last_id: BindingId::MIN,
+            }),
+        }
     }
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum IdMapEntry<C> {
+    ReservedName(String),
+    CoreId(C),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct NameNotAvailableError;
 
 impl<C> Devices<C>
 where
     C: Clone + std::fmt::Debug + PartialEq,
 {
-    /// Allocates a new [`BindingId`].
-    #[must_use]
-    pub(crate) fn alloc_new_id(&self) -> BindingId {
-        let Self { id_map: _, last_id } = self;
-        let mut last_id = last_id.lock();
-        let id = *last_id;
-        *last_id = last_id.checked_add(1).expect("exhausted binding device IDs");
-        id
-    }
-
-    /// Adds a new device.
+    /// Adds a new device with the id corresponding to the given [`BindingIdAllocation`].
     ///
-    /// Adds a new device if the informed `core_id` is valid (i.e., not
-    /// currently tracked by [`Devices`]). A new [`BindingId`] will be allocated
-    /// and a [`DeviceInfo`] struct will be created with the provided `info` and
-    /// IDs.
-    pub(crate) fn add_device(&self, id: BindingId, core_id: C) {
-        let Self { id_map, last_id: _ } = self;
-        assert_matches!(id_map.write().insert(id, core_id), None);
+    /// Consumes the [`BindingIdAllocation`] witness.
+    pub(crate) fn add_device(&self, id: BindingIdAllocation, core_id: C) {
+        let mut inner = self.inner.write();
+        let DevicesInner { id_map, last_id: _ } = inner.deref_mut();
+
+        let id = id.into_inner();
+        assert_matches!(
+            id_map.insert(id, IdMapEntry::CoreId(core_id)),
+            Some(IdMapEntry::ReservedName(_))
+        );
     }
 
     /// Removes a device from the internal list.
@@ -85,33 +159,91 @@ where
     /// Removes a device from the internal [`Devices`] list and returns the
     /// associated [`DeviceInfo`] if `id` is found or `None` otherwise.
     pub(crate) fn remove_device(&self, id: BindingId) -> Option<C> {
-        let Self { id_map, last_id: _ } = self;
-        id_map.write().remove(&id)
+        let mut inner = self.inner.write();
+        let DevicesInner { id_map, last_id: _ } = inner.deref_mut();
+        id_map.remove(&id).and_then(|entry| match entry {
+            IdMapEntry::ReservedName(_) => None,
+            IdMapEntry::CoreId(c) => Some(c),
+        })
     }
 
     /// Retrieve associated `core_id` for [`BindingId`].
     pub(crate) fn get_core_id(&self, id: BindingId) -> Option<C> {
-        self.id_map.read().get(&id).cloned()
+        self.inner.read().id_map.get(&id).and_then(|entry| match entry {
+            IdMapEntry::ReservedName(_) => None,
+            IdMapEntry::CoreId(c) => Some(c.clone()),
+        })
     }
 
     /// Call the provided callback with an iterator over the devices.
-    pub(crate) fn with_devices<R>(
-        &self,
-        f: impl FnOnce(hash_map::Values<'_, BindingId, C>) -> R,
-    ) -> R {
-        let Self { id_map, last_id: _ } = self;
-        f(id_map.read().values())
+    pub(crate) fn with_devices<R>(&self, f: impl FnOnce(IdMapIterator<'_, C>) -> R) -> R {
+        let inner = self.inner.read();
+        let DevicesInner { id_map, last_id: _ } = &*inner;
+        f(IdMapIterator { inner: id_map.values() })
     }
 }
 
-impl Devices<DeviceId<BindingsCtx>> {
+pub(crate) trait HasDeviceName {
+    fn device_name(&self) -> &String;
+}
+
+impl HasDeviceName for DeviceId<BindingsCtx> {
+    fn device_name(&self) -> &String {
+        &self.bindings_id().name
+    }
+}
+
+impl<C: HasDeviceName + Clone + std::fmt::Debug + PartialEq> Devices<C> {
+    /// Reserves the given name and allocates a new [`BindingId`].
+    /// If the name is already taken, returns an error.
+    ///
+    /// Returns both a [`BindingId`] and a [`BindingIdAllocation`] witnessing the same
+    /// [`BindingId`]. The `BindingIdAllocation` must be passed to [`Devices::add_device`]; if
+    /// dropped it will cause a panic.
+    pub(crate) fn try_reserve_name_and_alloc_new_id(
+        &self,
+        name: String,
+    ) -> Result<(BindingId, BindingIdAllocation), NameNotAvailableError> {
+        let mut inner = self.inner.write();
+        let inner = inner.deref_mut();
+
+        if inner.iter_device_names().any(|s| s == &name) {
+            return Err(NameNotAvailableError);
+        }
+
+        let id = inner.reserve_name_and_alloc_id(name);
+        Ok(id)
+    }
+
+    /// Generates and reserves name with the prefix and allocates a new [`BindingId`].
+    ///
+    /// In addition to the generated name, returns both a [`BindingId`] and a
+    /// [`BindingIdAllocation`] witnessing the same [`BindingId`]. The `BindingIdAllocation` must be
+    /// passed to [`Devices::add_device`]; if dropped it will cause a panic.
+    pub(crate) fn generate_and_reserve_name_and_alloc_new_id(
+        &self,
+        prefix: &'static str,
+    ) -> (BindingId, BindingIdAllocation, String) {
+        let mut inner = self.inner.write();
+        let inner = inner.deref_mut();
+
+        let name = {
+            let next_id = inner.last_id;
+            let name_candidates = std::iter::once(format!("{prefix}{next_id}"))
+                .chain((0..).map(|n| format!("{prefix}{next_id}_{n}")));
+            name_candidates
+                .filter(|name| !inner.iter_device_names().contains(&name))
+                .next()
+                .expect("should find available name")
+        };
+
+        let (id, allocation) = inner.reserve_name_and_alloc_id(name.clone());
+        (id, allocation, name)
+    }
+
     /// Retrieves the device with the given name.
-    pub(crate) fn get_device_by_name(&self, name: &str) -> Option<DeviceId<BindingsCtx>> {
-        self.id_map
-            .read()
-            .iter()
-            .find_map(|(_binding_id, c)| (c.bindings_id().name == name).then_some(c))
-            .cloned()
+    pub(crate) fn get_device_by_name(&self, name: &str) -> Option<C> {
+        self.with_devices(|mut devices| devices.find(|c| c.device_name() == name).cloned())
     }
 }
 
@@ -120,6 +252,7 @@ pub(crate) enum OwnedDeviceSpecificInfo {
     Loopback(LoopbackInfo),
     Ethernet(EthernetInfo),
     PureIp(PureIpDeviceInfo),
+    Blackhole(BlackholeDeviceInfo),
 }
 
 impl From<LoopbackInfo> for OwnedDeviceSpecificInfo {
@@ -140,18 +273,26 @@ impl From<PureIpDeviceInfo> for OwnedDeviceSpecificInfo {
     }
 }
 
+impl From<BlackholeDeviceInfo> for OwnedDeviceSpecificInfo {
+    fn from(info: BlackholeDeviceInfo) -> Self {
+        Self::Blackhole(info)
+    }
+}
+
 /// Borrowed device specific information.
 #[derive(Debug)]
 pub(crate) enum DeviceSpecificInfo<'a> {
     Loopback(&'a LoopbackInfo),
     Ethernet(&'a EthernetInfo),
     PureIp(&'a PureIpDeviceInfo),
+    Blackhole(&'a BlackholeDeviceInfo),
 }
 
 impl DeviceSpecificInfo<'_> {
     pub(crate) fn static_common_info(&self) -> &StaticCommonInfo {
         match self {
             Self::Loopback(i) => &i.static_common_info,
+            Self::Blackhole(i) => &i.common_info,
             Self::Ethernet(i) => &i.common_info,
             Self::PureIp(i) => &i.common_info,
         }
@@ -160,6 +301,7 @@ impl DeviceSpecificInfo<'_> {
     pub(crate) fn with_common_info<O, F: FnOnce(&DynamicCommonInfo) -> O>(&self, cb: F) -> O {
         match self {
             Self::Loopback(i) => i.with_dynamic_info(cb),
+            Self::Blackhole(i) => i.with_dynamic_info(cb),
             Self::Ethernet(i) => i.with_dynamic_info(|dynamic| cb(&dynamic.netdevice.common_info)),
             Self::PureIp(i) => i.with_dynamic_info(|dynamic| cb(&dynamic.common_info)),
         }
@@ -171,6 +313,7 @@ impl DeviceSpecificInfo<'_> {
     ) -> O {
         match self {
             Self::Loopback(i) => i.with_dynamic_info_mut(cb),
+            Self::Blackhole(i) => i.with_dynamic_info_mut(cb),
             Self::Ethernet(i) => {
                 i.with_dynamic_info_mut(|dynamic| cb(&mut dynamic.netdevice.common_info))
             }
@@ -345,16 +488,19 @@ pub(crate) async fn tx_task(
             DeviceSpecificInfo::Loopback(_) => {
                 unimplemented!("tx task is not supported for loopback devices")
             }
+            DeviceSpecificInfo::Blackhole(_) => {
+                unimplemented!("tx task is not supported for blackhole devices")
+            }
             DeviceSpecificInfo::Ethernet(EthernetInfo { netdevice, .. })
             | DeviceSpecificInfo::PureIp(PureIpDeviceInfo { netdevice, .. }) => {
                 // Attempt to preallocate buffers to handle the queue.
-                let queue_len = netstack3_core::for_any_device_id!(
-                    DeviceId,
-                    DeviceProvider,
-                    D,
-                    &device_id,
-                    id => ctx.api().transmit_queue::<D>().count(id)
-                );
+                let queue_len = match &device_id {
+                    DeviceId::Ethernet(id) => {
+                        ctx.api().transmit_queue::<EthernetLinkDevice>().count(id)
+                    }
+                    DeviceId::PureIp(id) => ctx.api().transmit_queue::<PureIpDevice>().count(id),
+                    DeviceId::Loopback(_) | DeviceId::Blackhole(_) => unreachable!(),
+                };
 
                 match queue_len {
                     Some(queue_len) => {
@@ -384,6 +530,9 @@ pub(crate) async fn tx_task(
         let r = match &device_id {
             DeviceId::Loopback(_) => {
                 unimplemented!("tx task is not supported for loopback devices")
+            }
+            DeviceId::Blackhole(_) => {
+                unimplemented!("tx task is not supported for blackhole devices")
             }
             DeviceId::Ethernet(id) => ctx
                 .api()
@@ -447,6 +596,25 @@ pub(crate) struct DynamicCommonInfo {
     pub(crate) addresses: HashMap<SpecifiedAddr<IpAddr>, AddressInfo>,
 }
 
+impl DynamicCommonInfo {
+    pub(crate) fn new(
+        mtu: Mtu,
+        events: InterfaceEventProducer,
+        control_hook: futures::channel::mpsc::Sender<interfaces_admin::OwnedControlHandle>,
+    ) -> Self {
+        Self { mtu, admin_enabled: false, events, control_hook, addresses: HashMap::new() }
+    }
+
+    /// Only loopback should start with `admin_enabled` = true.
+    pub(crate) fn new_for_loopback(
+        mtu: Mtu,
+        events: super::InterfaceEventProducer,
+        control_hook: futures::channel::mpsc::Sender<interfaces_admin::OwnedControlHandle>,
+    ) -> Self {
+        Self { mtu, admin_enabled: true, events, control_hook, addresses: HashMap::new() }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct AddressInfo {
     // The `AddressStateProvider` FIDL protocol worker.
@@ -501,7 +669,10 @@ impl DeviceClassMatcher<fidl_fuchsia_net_interfaces::PortClass> for LoopbackInfo
             fidl_fuchsia_net_interfaces::PortClass::Loopback(
                 fidl_fuchsia_net_interfaces::Empty {},
             ) => true,
-            fidl_fuchsia_net_interfaces::PortClass::Device(_) => false,
+            fidl_fuchsia_net_interfaces::PortClass::Blackhole(
+                fidl_fuchsia_net_interfaces::Empty {},
+            )
+            | fidl_fuchsia_net_interfaces::PortClass::Device(_) => false,
             fidl_fuchsia_net_interfaces::PortClass::__SourceBreaking { unknown_ordinal } => {
                 panic!("unknown device class ordinal {unknown_ordinal:?}")
             }
@@ -527,6 +698,9 @@ impl StaticNetdeviceInfo {
     fn device_class_matches(&self, port_class: &fidl_fuchsia_net_interfaces::PortClass) -> bool {
         match port_class {
             fidl_fuchsia_net_interfaces::PortClass::Loopback(
+                fidl_fuchsia_net_interfaces::Empty {},
+            )
+            | fidl_fuchsia_net_interfaces::PortClass::Blackhole(
                 fidl_fuchsia_net_interfaces::Empty {},
             ) => false,
             fidl_fuchsia_net_interfaces::PortClass::Device(port_class) => {
@@ -610,6 +784,43 @@ impl DeviceClassMatcher<fidl_fuchsia_net_interfaces::PortClass> for PureIpDevice
     }
 }
 
+/// Blackhole device information.
+#[derive(Debug)]
+pub(crate) struct BlackholeDeviceInfo {
+    pub(crate) dynamic_common_info: CoreRwLock<DynamicCommonInfo>,
+    pub(crate) common_info: StaticCommonInfo,
+}
+
+impl BlackholeDeviceInfo {
+    pub(crate) fn with_dynamic_info<O, F: FnOnce(&DynamicCommonInfo) -> O>(&self, cb: F) -> O {
+        cb(self.dynamic_common_info.read().deref())
+    }
+
+    pub(crate) fn with_dynamic_info_mut<O, F: FnOnce(&mut DynamicCommonInfo) -> O>(
+        &self,
+        cb: F,
+    ) -> O {
+        cb(self.dynamic_common_info.write().deref_mut())
+    }
+}
+
+impl DeviceClassMatcher<fidl_fuchsia_net_interfaces::PortClass> for BlackholeDeviceInfo {
+    fn device_class_matches(&self, port_class: &fidl_fuchsia_net_interfaces::PortClass) -> bool {
+        match port_class {
+            fidl_fuchsia_net_interfaces::PortClass::Blackhole(
+                fidl_fuchsia_net_interfaces::Empty {},
+            ) => true,
+            fidl_fuchsia_net_interfaces::PortClass::Loopback(
+                fidl_fuchsia_net_interfaces::Empty {},
+            )
+            | fidl_fuchsia_net_interfaces::PortClass::Device(_)
+            | fidl_fuchsia_net_interfaces::PortClass::__SourceBreaking { unknown_ordinal: _ } => {
+                false
+            }
+        }
+    }
+}
+
 pub(crate) struct DeviceIdAndName {
     pub(crate) id: BindingId,
     pub(crate) name: String,
@@ -635,5 +846,235 @@ impl DeviceIdAndNameMatcher for DeviceIdAndName {
 
     fn name_matches(&self, name: &str) -> bool {
         self.name == name
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[derive(Debug, PartialEq, Eq, Clone)]
+    struct TestCoreId(String);
+
+    impl HasDeviceName for TestCoreId {
+        fn device_name(&self) -> &String {
+            &self.0
+        }
+    }
+
+    fn devices_inner(
+        last_id: u64,
+        id_map: impl IntoIterator<Item = (u64, IdMapEntry<TestCoreId>)>,
+    ) -> DevicesInner<TestCoreId> {
+        DevicesInner {
+            last_id: NonZeroU64::new(last_id).unwrap(),
+            id_map: HashMap::from_iter(
+                id_map.into_iter().map(|(id, entry)| (NonZeroU64::new(id).unwrap(), entry)),
+            ),
+        }
+    }
+
+    #[test]
+    fn add_device() {
+        let devices = Devices::<TestCoreId>::default();
+
+        const NAME: &str = "name";
+        let (id, allocation) =
+            devices.try_reserve_name_and_alloc_new_id(NAME.to_string()).expect("should succeed");
+        assert_eq!(id.get(), 1);
+
+        {
+            let inner = devices.inner.read();
+            assert_eq!(
+                inner.deref(),
+                &devices_inner(2, [(1, IdMapEntry::ReservedName(NAME.to_string()))])
+            );
+        }
+
+        devices.add_device(allocation, TestCoreId(NAME.to_string()));
+
+        {
+            let inner = devices.inner.read();
+            assert_eq!(
+                inner.deref(),
+                &devices_inner(2, [(1, IdMapEntry::CoreId(TestCoreId(NAME.to_string())))])
+            );
+        }
+    }
+
+    #[test]
+    fn add_device_avoids_conflict_with_existing_device() {
+        let devices = Devices::<TestCoreId>::default();
+
+        const NAME: &str = "name";
+        let (_id, allocation) =
+            devices.try_reserve_name_and_alloc_new_id(NAME.to_string()).expect("should succeed");
+        devices.add_device(allocation, TestCoreId(NAME.to_string()));
+
+        {
+            let inner = devices.inner.read();
+            assert_eq!(
+                inner.deref(),
+                &devices_inner(2, [(1, IdMapEntry::CoreId(TestCoreId(NAME.to_string())))])
+            );
+        }
+
+        let result = devices.try_reserve_name_and_alloc_new_id(NAME.to_string());
+        assert_eq!(result, Err(NameNotAvailableError));
+
+        {
+            let inner = devices.inner.read();
+            assert_eq!(
+                inner.deref(),
+                &devices_inner(2, [(1, IdMapEntry::CoreId(TestCoreId(NAME.to_string())))])
+            );
+        }
+    }
+
+    #[test]
+    fn add_device_avoids_conflict_with_reserved_name() {
+        let devices = Devices::<TestCoreId>::default();
+
+        const NAME: &str = "name";
+        let (_id, allocation) =
+            devices.try_reserve_name_and_alloc_new_id(NAME.to_string()).expect("should succeed");
+
+        {
+            let inner = devices.inner.read();
+            assert_eq!(
+                inner.deref(),
+                &devices_inner(2, [(1, IdMapEntry::ReservedName(NAME.to_string()))])
+            );
+        }
+        // Need to do this to avoid BindingIdAllocation's panic on drop.
+        let _ = allocation.into_inner();
+
+        let result = devices.try_reserve_name_and_alloc_new_id(NAME.to_string());
+        assert_eq!(result, Err(NameNotAvailableError));
+
+        {
+            let inner = devices.inner.read();
+            assert_eq!(
+                inner.deref(),
+                &devices_inner(2, [(1, IdMapEntry::ReservedName(NAME.to_string()))])
+            );
+        }
+    }
+
+    #[test]
+    fn add_device_with_generated_name() {
+        let devices = Devices::<TestCoreId>::default();
+
+        const PREFIX: &str = "prefix";
+        const EXPECTED_NAME: &str = "prefix1";
+        let (id, allocation, name) = devices.generate_and_reserve_name_and_alloc_new_id(PREFIX);
+        assert_eq!(id.get(), 1);
+        assert_eq!(&name, EXPECTED_NAME);
+
+        {
+            let inner = devices.inner.read();
+            assert_eq!(
+                inner.deref(),
+                &devices_inner(2, [(1, IdMapEntry::ReservedName(EXPECTED_NAME.to_string()))])
+            );
+        }
+
+        devices.add_device(allocation, TestCoreId(name));
+
+        {
+            let inner = devices.inner.read();
+            assert_eq!(
+                inner.deref(),
+                &devices_inner(2, [(1, IdMapEntry::CoreId(TestCoreId(EXPECTED_NAME.to_string())))])
+            );
+        }
+    }
+
+    #[test]
+    fn add_device_avoids_conflict_with_existing_interface_when_generating_name() {
+        let devices = Devices::<TestCoreId>::default();
+
+        // Chosen so that it will clash with the generated name.
+        const EXISTING_NAME: &str = "prefix2";
+        const PREFIX: &str = "prefix";
+        const EXPECTED_GENERATED_NAME: &str = "prefix2_0";
+
+        let (_id, allocation) = devices
+            .try_reserve_name_and_alloc_new_id(EXISTING_NAME.to_string())
+            .expect("should succeed");
+        devices.add_device(allocation, TestCoreId(EXISTING_NAME.to_string()));
+        {
+            let inner = devices.inner.read();
+            assert_eq!(
+                inner.deref(),
+                &devices_inner(2, [(1, IdMapEntry::CoreId(TestCoreId(EXISTING_NAME.to_string())))])
+            );
+        }
+
+        let (id, allocation, name) = devices.generate_and_reserve_name_and_alloc_new_id(PREFIX);
+        assert_eq!(id.get(), 2);
+        assert_eq!(&name, EXPECTED_GENERATED_NAME);
+
+        {
+            let inner = devices.inner.read();
+            assert_eq!(
+                inner.deref(),
+                &devices_inner(
+                    3,
+                    [
+                        (1, IdMapEntry::CoreId(TestCoreId(EXISTING_NAME.to_string()))),
+                        (2, IdMapEntry::ReservedName(EXPECTED_GENERATED_NAME.to_string()))
+                    ]
+                )
+            );
+        }
+
+        // Need to do this to avoid BindingIdAllocation's panic on drop.
+        let _ = allocation.into_inner();
+    }
+
+    #[test]
+    fn add_device_avoids_conflict_with_reserved_name_when_generating_name() {
+        let devices = Devices::<TestCoreId>::default();
+
+        // Chosen so that it will clash with the generated name.
+        const EXISTING_NAME: &str = "prefix2";
+        const PREFIX: &str = "prefix";
+        const EXPECTED_GENERATED_NAME: &str = "prefix2_0";
+
+        let (_id, allocation) = devices
+            .try_reserve_name_and_alloc_new_id(EXISTING_NAME.to_string())
+            .expect("should succeed");
+        {
+            let inner = devices.inner.read();
+            assert_eq!(
+                inner.deref(),
+                &devices_inner(2, [(1, IdMapEntry::ReservedName(EXISTING_NAME.to_string()))])
+            );
+        }
+
+        // Need to do this to avoid BindingIdAllocation's panic on drop.
+        let _ = allocation.into_inner();
+
+        let (id, allocation, name) = devices.generate_and_reserve_name_and_alloc_new_id(PREFIX);
+        assert_eq!(id.get(), 2);
+        assert_eq!(&name, EXPECTED_GENERATED_NAME);
+
+        {
+            let inner = devices.inner.read();
+            assert_eq!(
+                inner.deref(),
+                &devices_inner(
+                    3,
+                    [
+                        (1, IdMapEntry::ReservedName(EXISTING_NAME.to_string())),
+                        (2, IdMapEntry::ReservedName(EXPECTED_GENERATED_NAME.to_string()))
+                    ]
+                )
+            );
+        }
+
+        // Need to do this to avoid BindingIdAllocation's panic on drop.
+        let _ = allocation.into_inner();
     }
 }

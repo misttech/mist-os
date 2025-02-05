@@ -13,7 +13,7 @@ from trace_processing.metrics import power, suspend
 
 # Boilerplate-busting constants:
 U = trace_metrics.Unit
-TCR = trace_metrics.TestCaseResult
+TestCaseResult = trace_metrics.TestCaseResult
 
 
 class PowerMetricsTest(unittest.TestCase):
@@ -155,10 +155,11 @@ class PowerMetricsTest(unittest.TestCase):
         results = power.PowerMetricsProcessor().process_metrics(model)
         # Power samples should start to count the instant load generation stops, so expect
         # to count the .1A and .6A sample
+        desc_base = power._AggregateMetrics.DESCRIPTION_BASE
         expected_results = [
-            TCR(label="MinPower", unit=U.watts, values=[1.2]),
-            TCR(label="MeanPower", unit=U.watts, values=[4.2]),
-            TCR(label="MaxPower", unit=U.watts, values=[7.2]),
+            TestCaseResult("MinPower", U.watts, [1.2], f"{desc_base}, minimum"),
+            TestCaseResult("MeanPower", U.watts, [4.2], f"{desc_base}, mean"),
+            TestCaseResult("MaxPower", U.watts, [7.2], f"{desc_base}, maximum"),
         ]
         self.assertEqual(expected_results, results)
 
@@ -235,10 +236,11 @@ class PowerMetricsTest(unittest.TestCase):
         model.scheduling_records = {0: records_0, 1: records_1}
 
         results = power.PowerMetricsProcessor().process_metrics(model)
+        desc_base = power._AggregateMetrics.DESCRIPTION_BASE
         expected_results = [
-            TCR(label="MinPower", unit=U.watts, values=[1.2]),
-            TCR(label="MeanPower", unit=U.watts, values=[4.2]),
-            TCR(label="MaxPower", unit=U.watts, values=[7.2]),
+            TestCaseResult("MinPower", U.watts, [1.2], f"{desc_base}, minimum"),
+            TestCaseResult("MeanPower", U.watts, [4.2], f"{desc_base}, mean"),
+            TestCaseResult("MaxPower", U.watts, [7.2], f"{desc_base}, maximum"),
         ]
         self.assertEqual(expected_results, results)
 
@@ -305,10 +307,11 @@ class PowerMetricsTest(unittest.TestCase):
         results = power.PowerMetricsProcessor().process_metrics(model)
         # Power samples should start to count the instant load generation stops, so expect
         # to count the .1A and .6A sample
+        desc_base = power._AggregateMetrics.DESCRIPTION_BASE
         expected_results = [
-            TCR(label="MinPower", unit=U.watts, values=[1.2]),
-            TCR(label="MeanPower", unit=U.watts, values=[4.2]),
-            TCR(label="MaxPower", unit=U.watts, values=[7.2]),
+            TestCaseResult("MinPower", U.watts, [1.2], f"{desc_base}, minimum"),
+            TestCaseResult("MeanPower", U.watts, [4.2], f"{desc_base}, mean"),
+            TestCaseResult("MaxPower", U.watts, [7.2], f"{desc_base}, maximum"),
         ]
         self.assertEqual(expected_results, results)
 
@@ -451,17 +454,50 @@ class PowerMetricsTest(unittest.TestCase):
         model.scheduling_records = {0: records_0}
         model.processes.append(suspender)
         results = power.PowerMetricsProcessor().process_metrics(model)
+        desc_base = power._AggregateMetrics.DESCRIPTION_BASE
+        suspend_condition = "while device is suspended"
+        awake_condition = "while device is awake"
         expected_results = frozenset(
             (
-                TCR(label="MinPower_suspend", unit=U.watts, values=[1.2]),
-                TCR(label="MeanPower_suspend", unit=U.watts, values=[1.2]),
-                TCR(label="MaxPower_suspend", unit=U.watts, values=[1.2]),
-                TCR(label="MinPower_running", unit=U.watts, values=[7.2]),
-                TCR(label="MeanPower_running", unit=U.watts, values=[7.2]),
-                TCR(label="MaxPower_running", unit=U.watts, values=[7.2]),
+                TestCaseResult(
+                    label="MinPower_suspend",
+                    unit=U.watts,
+                    values=[1.2],
+                    doc=f"{desc_base} {suspend_condition}, minimum",
+                ),
+                TestCaseResult(
+                    label="MeanPower_suspend",
+                    unit=U.watts,
+                    values=[1.2],
+                    doc=f"{desc_base} {suspend_condition}, mean",
+                ),
+                TestCaseResult(
+                    label="MaxPower_suspend",
+                    unit=U.watts,
+                    values=[1.2],
+                    doc=f"{desc_base} {suspend_condition}, maximum",
+                ),
+                TestCaseResult(
+                    label="MinPower_running",
+                    unit=U.watts,
+                    values=[7.2],
+                    doc=f"{desc_base} {awake_condition}, minimum",
+                ),
+                TestCaseResult(
+                    label="MeanPower_running",
+                    unit=U.watts,
+                    values=[7.2],
+                    doc=f"{desc_base} {awake_condition}, mean",
+                ),
+                TestCaseResult(
+                    label="MaxPower_running",
+                    unit=U.watts,
+                    values=[7.2],
+                    doc=f"{desc_base} {awake_condition}, maximum",
+                ),
             )
         )
-        self.assertEmpty(expected_results - set(results))
+        self.assertLessEqual(expected_results, set(results))
         results = power.PowerMetricsProcessor(lambda w: False).process_metrics(
             model
         )

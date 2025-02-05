@@ -6,9 +6,9 @@
 
 use anyhow::{anyhow, Context};
 use camino::Utf8Path;
+use ffx_command_error::{return_user_error, Result};
 use ffx_repository_serve_args::ServeCommand;
-use ffx_target::{knock_target, TargetProxy};
-use fho::{return_user_error, Connector, Result};
+use ffx_target::knock_target;
 use fidl_fuchsia_developer_ffx::{
     RepositoryStorageType, RepositoryTarget as FfxCliRepositoryTarget, TargetInfo,
 };
@@ -25,6 +25,8 @@ use pkg::repo::register_target_with_fidl_proxies;
 use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
+use target_connector::Connector;
+use target_holders::{RemoteControlProxyHolder, TargetProxyHolder};
 use timeout::timeout;
 
 const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";
@@ -94,8 +96,8 @@ async fn inner_connect_loop(
     server_addr: core::net::SocketAddr,
     connect_timeout: std::time::Duration,
     repo_manager: &Arc<RepositoryManager>,
-    rcs_proxy: &Connector<RemoteControlProxy>,
-    target_proxy: &Connector<TargetProxy>,
+    rcs_proxy: &Connector<RemoteControlProxyHolder>,
+    target_proxy: &Connector<TargetProxyHolder>,
     writer: &mut impl Write,
 ) -> Result<()> {
     let mut target_spec_from_rcs_proxy: Option<String> = None;
@@ -210,8 +212,8 @@ pub(crate) async fn main_connect_loop(
     connect_timeout: std::time::Duration,
     repo_manager: Arc<RepositoryManager>,
     mut loop_stop_rx: futures::channel::mpsc::Receiver<()>,
-    rcs_proxy: Connector<RemoteControlProxy>,
-    target_proxy: Connector<TargetProxy>,
+    rcs_proxy: Connector<RemoteControlProxyHolder>,
+    target_proxy: Connector<TargetProxyHolder>,
     writer: &mut (impl Write + 'static),
 ) -> Result<()> {
     // We try to reconnect unless MAX_CONSECUTIVE_CONNECT_ATTEMPTS reconnect

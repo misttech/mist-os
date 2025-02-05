@@ -26,19 +26,14 @@ power_manager_deps = [
   "system_power_mode_config/parser",
   "thermal_config/parser",
   "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
-  "//sdk/fidl/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_rust",
-  "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_rust",
   "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
   "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature_rust",
-  "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
   "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
   "//sdk/fidl/fuchsia.power.clientlevel:fuchsia.power.clientlevel_rust",
   "//sdk/fidl/fuchsia.power.manager.debug:fuchsia.power.manager.debug_rust",
   "//sdk/fidl/fuchsia.power.profile:fuchsia.power.profile_rust",
   "//sdk/fidl/fuchsia.power.systemmode:fuchsia.power.systemmode_rust",
   "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust",
-  "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
-  "//sdk/fidl/fuchsia.system.state:fuchsia.system.state_rust",
   "//sdk/fidl/fuchsia.thermal:fuchsia.thermal_rust",
   "//sdk/fidl/fuchsia.ui.activity:fuchsia.ui.activity_rust",
   "//sdk/rust/zx",
@@ -77,14 +72,11 @@ power_manager_sources = [
   "src/debug_service.rs",
   "src/error.rs",
   "src/input_settings_handler.rs",
-  "src/lid_shutdown.rs",
   "src/main.rs",
   "src/message.rs",
   "src/node.rs",
   "src/platform_metrics.rs",
   "src/power_manager.rs",
-  "src/shutdown_request.rs",
-  "src/shutdown_watcher.rs",
   "src/system_power_mode_handler.rs",
   "src/system_profile_handler.rs",
   "src/system_shutdown_handler.rs",
@@ -190,11 +182,6 @@ node_config("base") {
   output = "base_node_config.json5"
 }
 
-node_config("chromebook") {
-  source = "node_config/chromebook_node_config.json5"
-  output = "chromebook_node_config.json5"
-}
-
 node_config("nelson") {
   source = "node_config/nelson_node_config.json5"
   output = "nelson_node_config.json5"
@@ -216,7 +203,6 @@ fuchsia_unittest_package("power-manager-tests") {
     ":astro",
     ":base",
     ":bin_test",
-    ":chromebook",
     ":nelson",
     ":sherlock",
     ":vim3_devicetree",

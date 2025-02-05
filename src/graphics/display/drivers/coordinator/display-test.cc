@@ -125,7 +125,7 @@ TEST_F(CoordinatorClientWithListenerTest, ClientVSyncOk) {
   ASSERT_OK(clientproxy.InitForTesting(std::move(coordinator_server_end),
                                        std::move(listener_client_end)));
 
-  clientproxy.EnableVsync(true);
+  clientproxy.SetVsyncEventDelivery(true);
   fbl::AutoLock lock(controller.mtx());
   clientproxy.UpdateConfigStampMapping({
       .controller_stamp = kControllerStampValue,
@@ -168,7 +168,7 @@ TEST_F(CoordinatorClientWithListenerTest, ClientVSyncPeerClosed) {
   ASSERT_OK(clientproxy.InitForTesting(std::move(coordinator_server_end),
                                        std::move(listener_client_end)));
 
-  clientproxy.EnableVsync(true);
+  clientproxy.SetVsyncEventDelivery(true);
   fbl::AutoLock lock(controller.mtx());
   listener_client_end.reset();
   EXPECT_OK(
@@ -232,7 +232,7 @@ TEST_F(CoordinatorClientWithListenerTest, ClientMustDrainPendingStamps) {
   ASSERT_OK(clientproxy.InitForTesting(std::move(coordinator_server_end),
                                        std::move(listener_client_end)));
 
-  clientproxy.EnableVsync(false);
+  clientproxy.SetVsyncEventDelivery(false);
   fbl::AutoLock lock(controller.mtx());
   for (size_t i = 0; i < kNumPendingStamps; i++) {
     clientproxy.UpdateConfigStampMapping({

@@ -7,13 +7,10 @@ use diagnostics_log_types::Severity;
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_logger::{LogSinkProxy, LogSinkSynchronousProxy};
-use std::cmp;
 use std::future::Future;
-use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 
 pub(crate) struct InterestFilter {
-    min_severity: Arc<AtomicSeverity>,
     listener: Arc<Mutex<Option<Box<dyn OnInterestChanged + Send + Sync + 'static>>>>,
 }
 
@@ -44,18 +41,11 @@ impl InterestFilter {
             (proxy, default_severity)
         };
 
-        // Keep the max level from the log frontend synchronized.
-        log::set_max_level(level_filter_from_severity(&min_severity));
+        log::set_max_level(min_severity.into());
 
         let listener = Arc::new(Mutex::new(None));
-        let min_severity = Arc::new(AtomicSeverity::from(min_severity));
-        let filter = Self { min_severity: min_severity.clone(), listener: listener.clone() };
-        (filter, Self::listen_to_interest_changes(listener, default_severity, min_severity, proxy))
-    }
-
-    /// Sets the minimum severity.
-    pub fn set_minimum_severity(&self, severity: Severity) {
-        self.min_severity.set(severity);
+        let filter = Self { listener: listener.clone() };
+        (filter, Self::listen_to_interest_changes(listener, default_severity, proxy))
     }
 
     /// Sets the interest listener.
@@ -70,17 +60,12 @@ impl InterestFilter {
     async fn listen_to_interest_changes(
         listener: Arc<Mutex<Option<Box<dyn OnInterestChanged + Send + Sync>>>>,
         default_severity: Severity,
-        min_severity: Arc<AtomicSeverity>,
         proxy: LogSinkProxy,
     ) {
         while let Ok(Ok(interest)) = proxy.wait_for_interest_change().await {
-            let new_min_severity = {
-                let severity =
-                    interest.min_severity.map(Severity::from).unwrap_or(default_severity);
-                min_severity.set(severity);
-                severity
-            };
-            log::set_max_level(level_filter_from_severity(&new_min_severity));
+            let new_min_severity =
+                interest.min_severity.map(Severity::from).unwrap_or(default_severity);
+            log::set_max_level(new_min_severity.into());
             let callback_guard = listener.lock().unwrap();
             if let Some(callback) = &*callback_guard {
                 callback.on_changed(new_min_severity);
@@ -88,120 +73,53 @@ impl InterestFilter {
         }
     }
 
-    pub fn enabled(&self, severity: Severity) -> bool {
-        *self.min_severity <= severity
-    }
-
     pub fn enabled_for_testing(&self, record: &TestRecord<'_>) -> bool {
-        *self.min_severity <= record.severity
-    }
-}
-
-fn level_filter_from_severity(severity: &Severity) -> log::LevelFilter {
-    match severity {
-        Severity::Error => log::LevelFilter::Error,
-        Severity::Warn => log::LevelFilter::Warn,
-        Severity::Info => log::LevelFilter::Info,
-        Severity::Debug => log::LevelFilter::Debug,
-        Severity::Trace => log::LevelFilter::Trace,
-        // NB: Not a clean mapping.
-        Severity::Fatal => log::LevelFilter::Error,
-    }
-}
-
-#[derive(Debug)]
-struct AtomicSeverity {
-    value: AtomicU8,
-}
-
-impl AtomicSeverity {
-    fn set(&self, value: Severity) {
-        self.value.store(value as u8, Ordering::Relaxed);
-    }
-}
-
-impl From<Severity> for AtomicSeverity {
-    fn from(severity: Severity) -> Self {
-        Self { value: AtomicU8::new(severity as u8) }
-    }
-}
-
-impl PartialOrd<u8> for AtomicSeverity {
-    fn partial_cmp(&self, other: &u8) -> Option<cmp::Ordering> {
-        self.value.load(Ordering::Relaxed).partial_cmp(other)
-    }
-}
-
-impl PartialEq<u8> for AtomicSeverity {
-    fn eq(&self, other: &u8) -> bool {
-        self.value.load(Ordering::Relaxed).eq(other)
-    }
-}
-
-impl PartialOrd<Severity> for AtomicSeverity {
-    fn partial_cmp(&self, other: &Severity) -> Option<cmp::Ordering> {
-        self.value.load(Ordering::Relaxed).partial_cmp(&(*other as u8))
-    }
-}
-
-impl PartialEq<Severity> for AtomicSeverity {
-    fn eq(&self, other: &Severity) -> bool {
-        self.value.load(Ordering::Relaxed).eq(&(*other as u8))
+        let min_severity = Severity::try_from(log::max_level()).map(|s| s as u8).unwrap_or(u8::MAX);
+        min_severity <= record.severity
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fuchsia::SeverityExt;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest, LogSinkRequestStream};
     use futures::channel::mpsc;
     use futures::{StreamExt, TryStreamExt};
-    use tracing::{debug, error, info, trace, warn, Event, Metadata, Subscriber};
-    use tracing_subscriber::layer::{Context, SubscriberExt};
-    use tracing_subscriber::{Layer, Registry};
-
-    impl<S: Subscriber> Layer<S> for InterestFilter {
-        /// Always returns `sometimes` so that we can later change the filter on the fly.
-        fn register_callsite(
-            &self,
-            _metadata: &'static Metadata<'static>,
-        ) -> tracing::subscriber::Interest {
-            tracing::subscriber::Interest::sometimes()
-        }
-
-        fn enabled(&self, metadata: &Metadata<'_>, _ctx: Context<'_, S>) -> bool {
-            self.enabled(metadata.severity())
-        }
-    }
+    use log::{debug, error, info, trace, warn};
 
     struct SeverityTracker {
-        counts: Arc<Mutex<SeverityCount>>,
+        _filter: InterestFilter,
+        severity_counts: Arc<Mutex<SeverityCount>>,
+    }
+
+    impl log::Log for SeverityTracker {
+        fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
+            true
+        }
+
+        fn log(&self, record: &log::Record<'_>) {
+            let mut count = self.severity_counts.lock().unwrap();
+            let to_increment = match record.level() {
+                log::Level::Trace => &mut count.trace,
+                log::Level::Debug => &mut count.debug,
+                log::Level::Info => &mut count.info,
+                log::Level::Warn => &mut count.warn,
+                log::Level::Error => &mut count.error,
+            };
+            *to_increment += 1;
+        }
+
+        fn flush(&self) {}
     }
 
     #[derive(Debug, Default, Eq, PartialEq)]
     struct SeverityCount {
-        num_trace: u64,
-        num_debug: u64,
-        num_info: u64,
-        num_warn: u64,
-        num_error: u64,
-    }
-
-    impl<S: Subscriber> Layer<S> for SeverityTracker {
-        fn on_event(&self, event: &Event<'_>, _cx: Context<'_, S>) {
-            let mut count = self.counts.lock().unwrap();
-            let to_increment = match event.metadata().severity() {
-                Severity::Trace => &mut count.num_trace,
-                Severity::Debug => &mut count.num_debug,
-                Severity::Info => &mut count.num_info,
-                Severity::Warn => &mut count.num_warn,
-                Severity::Error => &mut count.num_error,
-                Severity::Fatal => unreachable!("tracing crate doesn't have a fatal level"),
-            };
-            *to_increment += 1;
-        }
+        trace: u64,
+        debug: u64,
+        info: u64,
+        warn: u64,
+        error: u64,
     }
 
     struct InterestChangedListener(mpsc::UnboundedSender<()>);
@@ -218,22 +136,23 @@ mod tests {
         let (filter, _on_changes) =
             InterestFilter::new(proxy, fdiagnostics::Interest::default(), false);
         let observed = Arc::new(Mutex::new(SeverityCount::default()));
-        tracing::subscriber::set_global_default(
-            Registry::default().with(SeverityTracker { counts: observed.clone() }).with(filter),
-        )
+        log::set_boxed_logger(Box::new(SeverityTracker {
+            severity_counts: observed.clone(),
+            _filter: filter,
+        }))
         .unwrap();
         let mut expected = SeverityCount::default();
 
         error!("oops");
-        expected.num_error += 1;
+        expected.error += 1;
         assert_eq!(&*observed.lock().unwrap(), &expected);
 
         warn!("maybe");
-        expected.num_warn += 1;
+        expected.warn += 1;
         assert_eq!(&*observed.lock().unwrap(), &expected);
 
         info!("ok");
-        expected.num_info += 1;
+        expected.info += 1;
         assert_eq!(&*observed.lock().unwrap(), &expected);
 
         debug!("hint");
@@ -272,10 +191,11 @@ mod tests {
         filter.set_interest_listener(InterestChangedListener(send));
         let _on_changes_task = fuchsia_async::Task::spawn(on_changes);
         let observed = Arc::new(Mutex::new(SeverityCount::default()));
-        tracing::subscriber::set_global_default(
-            Registry::default().with(SeverityTracker { counts: observed.clone() }).with(filter),
-        )
-        .unwrap();
+        log::set_boxed_logger(Box::new(SeverityTracker {
+            severity_counts: observed.clone(),
+            _filter: filter,
+        }))
+        .expect("set logger");
 
         // After overriding to info, filtering is at info level. The mpsc channel is used to
         // get a signal as to when the filter has processed the update.
@@ -284,15 +204,15 @@ mod tests {
 
         let mut expected = SeverityCount::default();
         error!("oops");
-        expected.num_error += 1;
+        expected.error += 1;
         assert_eq!(&*observed.lock().unwrap(), &expected);
 
         warn!("maybe");
-        expected.num_warn += 1;
+        expected.warn += 1;
         assert_eq!(&*observed.lock().unwrap(), &expected);
 
         info!("ok");
-        expected.num_info += 1;
+        expected.info += 1;
         assert_eq!(&*observed.lock().unwrap(), &expected);
 
         debug!("hint");
@@ -306,11 +226,11 @@ mod tests {
         recv.next().await.unwrap();
 
         error!("oops");
-        expected.num_error += 1;
+        expected.error += 1;
         assert_eq!(&*observed.lock().unwrap(), &expected);
 
         warn!("maybe");
-        expected.num_warn += 1;
+        expected.warn += 1;
         assert_eq!(&*observed.lock().unwrap(), &expected);
 
         info!("ok");
@@ -346,8 +266,8 @@ mod tests {
                 other => panic!("Got unexpected: {:?}", other),
             };
         }
-        let filter = t.join().unwrap();
-        assert_eq!(*filter.min_severity, Severity::Trace);
+        let _filter = t.join().unwrap();
+        assert_eq!(log::max_level(), log::Level::Trace);
     }
 
     #[fuchsia::test(logging = false)]

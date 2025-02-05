@@ -12,13 +12,13 @@ use ffx_component_config_args::{
     ConfigComponentCommand, ListArgs, SetArgs, SubCommandEnum, UnsetArgs,
 };
 use fho::{FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_developer_remotecontrol as rc;
+use target_holders::RemoteControlProxyHolder;
 
 #[derive(FfxTool)]
 pub struct ConfigTool {
     #[command]
     cmd: ConfigComponentCommand,
-    rcs: rc::RemoteControlProxy,
+    rcs: RemoteControlProxyHolder,
 }
 
 fho::embedded_plugin!(ConfigTool);

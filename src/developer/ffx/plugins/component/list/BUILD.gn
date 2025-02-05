@@ -5,13 +5,14 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_component_list") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
   deps = [
-    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/plugins/component/common:ffx_component",
     "//src/sys/lib/component_debug",
     "//third_party/rust_crates:async-trait",
@@ -19,6 +20,7 @@ ffx_plugin("ffx_component_list") {
     "//third_party/rust_crates:serde",
   ]
   test_deps = [
+    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//src/developer/ffx/lib/rcs:lib",
     "//src/diagnostics/iquery/test_support:iquery_test_support",
     "//src/lib/fidl/rust/fidl",
@@ -31,7 +33,11 @@ ffx_plugin("ffx_component_list") {
     "//third_party/rust_crates:serde_json",
   ]
 
-  args_deps = [ "//src/sys/lib/component_debug" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//src/sys/lib/component_debug",
+    "//third_party/rust_crates:argh",
+  ]
 
   args_sources = [ "src/args.rs" ]
 

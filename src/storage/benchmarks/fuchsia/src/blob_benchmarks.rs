@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use delivery_blob::CompressionMode;
 use fidl_fuchsia_io as fio;
 use fuchsia_pkg_testing::PackageBuilder;
-use fuchsia_storage_benchmarks_lib::filesystems::{BlobFilesystem, DeliveryBlob, PkgDirInstance};
+use fuchsia_storage_benchmarks::filesystems::{BlobFilesystem, DeliveryBlob, PkgDirInstance};
 use futures::stream::{self, StreamExt};
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::seq::SliceRandom;
@@ -392,8 +392,8 @@ async fn page_in_blob_benchmark(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_storage_benchmarks_lib::block_devices::RamdiskFactory;
-    use fuchsia_storage_benchmarks_lib::filesystems::{Blobfs, Fxblob, PkgDirTest};
+    use fuchsia_storage_benchmarks::filesystems::{Blobfs, Fxblob, PkgDirTest};
+    use fuchsia_storage_benchmarks::testing::RamdiskFactory;
     use storage_benchmarks::FilesystemConfig;
     use test_util::assert_lt;
     const PAGE_COUNT: usize = 32;

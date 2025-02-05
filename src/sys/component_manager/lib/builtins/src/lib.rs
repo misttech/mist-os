@@ -8,7 +8,6 @@ pub mod debug_resource;
 pub mod debuglog_resource;
 pub mod energy_info_resource;
 pub mod factory_items;
-pub mod framebuffer_resource;
 pub mod hypervisor_resource;
 pub mod info_resource;
 pub mod iommu_resource;
@@ -25,4 +24,5 @@ pub mod profile_resource;
 pub mod root_job;
 #[cfg(target_arch = "aarch64")]
 pub mod smc_resource;
+pub mod stall_resource;
 pub mod vmex_resource;

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::container_namespace::ContainerNamespace;
 use crate::device::mem::new_null_file;
 use crate::execution::execute_task_with_prerun_result;
 use crate::fs::fuchsia::RemoteFs;
@@ -160,14 +161,14 @@ fn create_test_kernel(
     Kernel::new(
         b"".into(),
         Default::default(),
-        None,
-        None,
+        ContainerNamespace::new(),
         None,
         None,
         fuchsia_inspect::Node::default(),
         #[cfg(not(feature = "starnix_lite"))]
         None,
         security::testing::kernel_state(security_server),
+        Vec::new(),
     )
     .expect("failed to create kernel")
 }
@@ -203,7 +204,10 @@ fn create_test_init_task(
     kernel.kthreads.init(system_task).expect("failed to initialize kthreads");
 
     let system_task = kernel.kthreads.system_task();
-    kernel.hrtimer_manager.init(&system_task).expect("init hrtimer manager worker thread");
+    kernel
+        .hrtimer_manager
+        .init(&system_task, /*wake_channel=*/ None)
+        .expect("init hrtimer manager worker thread");
 
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
     // will trigger the tracing-mutex at the right call site.

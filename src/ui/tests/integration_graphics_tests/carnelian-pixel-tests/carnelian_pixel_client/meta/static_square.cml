@@ -18,7 +18,6 @@
     use: [
         {
             protocol: [
-                "fuchsia.logger.LogSink",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
                 "fuchsia.tracing.provider.Registry",

@@ -13,7 +13,7 @@ use cargo_metadata::Package;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt::Display;
-use std::io::{self, Write};
+use std::io;
 use std::path::Path;
 use walkdir::WalkDir;
 
@@ -112,30 +112,8 @@ pub fn write_fuchsia_sdk_metadata<W: io::Write>(
     output: &mut W,
     platform: Option<&str>,
     pkg: &Package,
-    abs_dir: &Path,
-    rel_dir: &Path,
 ) -> Result<()> {
-    // TODO: add features, and registry
-    std::fs::create_dir_all(abs_dir)
-        .with_context(|| format!("while making directories for {}", abs_dir.display()))?;
-
-    let file_name = format!("{}.sdk.meta.json", pkg.name);
-    let abs_path = abs_dir.join(&file_name);
-    let rel_path = rel_dir.join(&file_name);
-    let mut metadata_output = std::fs::File::create(&abs_path)
-        .with_context(|| format!("while writing {}", abs_path.display()))?;
-    writeln!(
-        metadata_output,
-        r#"{{
-    "type": "{sdk_atom_type}",
-    "name": "{group_name}",
-    "version": "{version}"
-}}"#,
-        sdk_atom_type = if pkg.is_proc_macro() { "rust_3p_proc_macro" } else { "rust_3p_library" },
-        group_name = pkg.name,
-        version = pkg.version,
-    )?;
-
+    // TODO: add features and registry to metadata
     let platform_constraint = if let Some(p) = platform {
         format!(" && {}", target_to_gn_conditional(p)?)
     } else {
@@ -147,18 +125,23 @@ pub fn write_fuchsia_sdk_metadata<W: io::Write>(
         r#" if (_generating_sdk{constraint}) {{
             sdk_atom("{group_name}_sdk") {{
                 id = "sdk://${{_sdk_prefix}}third_party/rust_crates/{group_name}"
-                category = "internal"
+                category = "partner_internal"
                 meta = {{
-                    source = "{source}"
+                    value = {{
+                        type = "{sdk_atom_type}"
+                        name = "{group_name}"
+                        version = "{version}"
+                    }}
                     dest = "${{_sdk_prefix}}third_party/rust_crates/{group_name}/meta.json"
-                    schema = "3p_rust_library"
+                    schema = "rust_3p_library"
                 }}
             }}
         }}
         "#,
         constraint = platform_constraint,
-        source = rel_path.display(),
         group_name = pkg.name,
+        sdk_atom_type = "rust_3p_library",
+        version = pkg.version,
     )?;
 
     Ok(())
@@ -421,6 +404,7 @@ pub fn write_rule<W: io::Write>(
     let mut visibility = vec![];
 
     let mut uses_fuchsia_license = false;
+    let mut license_files = vec![];
 
     if let Some(custom_build) = custom_build {
         for (platform, cfg) in custom_build {
@@ -460,6 +444,9 @@ pub fn write_rule<W: io::Write>(
             }
             if let Some(ref uses) = cfg.uses_fuchsia_license {
                 uses_fuchsia_license = *uses;
+            }
+            if let Some(ref lics) = cfg.license_files {
+                license_files = (*lics.clone()).to_vec();
             }
         }
     }
@@ -538,11 +525,50 @@ pub fn write_rule<W: io::Write>(
     let mut license_files_found = false;
     let mut applicable_licenses = GnField::new("applicable_licenses");
     let gn_crate_name = target.name().replace('-', "_");
+    let mut license_file_labels = vec![];
 
-    if scan_for_licenses {
+    let mut create_license_target =
+        |license_file_labels: &Vec<String>| -> Result<(), std::io::Error> {
+            // Define a license target
+            let license_target_name = format!("{}.license", target_name);
+            // Directory iteration order is random, so sort alphabetically.
+            let mut license_files_param = GnField::new("license_files");
+            for entry in license_file_labels {
+                license_files_param.add_cfg(entry);
+            }
+
+            writeln!(
+                output,
+                include_str!("../templates/gn_license.template"),
+                target_name = license_target_name,
+                public_package_name = gn_crate_name,
+                license_files = license_files_param.render_gn(),
+            )?;
+
+            applicable_licenses.add_cfg(format!(":{}", license_target_name));
+            Ok(())
+        };
+
+    if !license_files.is_empty() {
+        for license_file in license_files {
+            let license_file_label = format!(
+                "//{}/{}",
+                target
+                    .package_root()
+                    .canonicalize()
+                    .unwrap()
+                    .strip_prefix(project_root)
+                    .unwrap()
+                    .to_string_lossy(),
+                license_file
+            );
+            license_file_labels.push(license_file_label);
+        }
+        license_file_labels.sort();
+        create_license_target(&license_file_labels)?;
+    } else if scan_for_licenses {
         // Scan for LICENSE* files in the crate's root dir.
         // Disabled in unit tests, where package_root always fails.
-        let mut license_files = vec![];
 
         for entry in WalkDir::new(target.package_root()).follow_links(false).into_iter() {
             let entry = entry.unwrap();
@@ -561,7 +587,7 @@ pub fn write_rule<W: io::Write>(
                         .unwrap()
                         .to_string_lossy()
                 );
-                license_files.push(license_file_label);
+                license_file_labels.push(license_file_label);
                 license_files_found = true;
             }
         }
@@ -570,25 +596,8 @@ pub fn write_rule<W: io::Write>(
             if uses_fuchsia_license {
                 anyhow::bail!("ERROR: Crate {}.{} has license files but is set with uses_fuchsia_license = true", target.name(), target.version())
             }
-
-            // Define a license target
-            let license_target_name = format!("{}.license", target_name);
-            // Directory iteration order is random, so sort alphabetically.
-            license_files.sort();
-            let mut license_files_param = GnField::new("license_files");
-            for entry in license_files {
-                license_files_param.add_cfg(entry);
-            }
-
-            writeln!(
-                output,
-                include_str!("../templates/gn_license.template"),
-                target_name = license_target_name,
-                public_package_name = gn_crate_name,
-                license_files = license_files_param.render_gn(),
-            )?;
-
-            applicable_licenses.add_cfg(format!(":{}", license_target_name));
+            license_file_labels.sort();
+            create_license_target(&license_file_labels)?;
         } else if uses_fuchsia_license ||
             // Empty crates are stubs crates authored by Fuchsia.
             target.package_root().parent().unwrap().ends_with("third_party/rust_crates/empty")

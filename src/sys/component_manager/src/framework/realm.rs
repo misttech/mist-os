@@ -12,15 +12,15 @@ use anyhow::Error;
 use async_trait::async_trait;
 use cm_config::RuntimeConfig;
 use cm_rust::FidlIntoNative;
-use cm_types::{Name, OPEN_FLAGS_MAX_POSSIBLE_RIGHTS};
+use cm_types::{Name, FLAGS_MAX_POSSIBLE_RIGHTS};
 use errors::OpenExposedDirError;
 use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
 use futures::prelude::*;
 use lazy_static::lazy_static;
+use log::{debug, error, warn};
 use moniker::{ChildName, Moniker};
 use std::cmp;
 use std::sync::{Arc, Weak};
-use tracing::{debug, error, warn};
 use vfs::directory::entry::OpenRequest;
 use vfs::path::Path;
 use vfs::ToObjectRequest;
@@ -57,7 +57,7 @@ impl InternalCapabilityProvider for RealmCapabilityProvider {
         let serve_result = self.serve(weak, server_end.into_stream()).await;
         if let Err(error) = serve_result {
             // TODO: Set an epitaph to indicate this was an unexpected error.
-            warn!(%error, "serve failed");
+            warn!(error:%; "serve failed");
         }
     }
 }
@@ -104,7 +104,7 @@ impl RealmCapabilityProvider {
                 // If the error was PEER_CLOSED then we don't need to log it as a client can
                 // disconnect while we are processing its request.
                 Err(error) if !error.is_closed() => {
-                    warn!(%method_name, %error, "Couldn't send Realm response");
+                    warn!(method_name:%, error:%; "Couldn't send Realm response");
                 }
                 _ => {}
             }
@@ -158,7 +158,7 @@ impl RealmCapabilityProvider {
         let component = weak.upgrade().map_err(|_| fcomponent::Error::InstanceDied)?;
 
         cm_fidl_validator::validate_dynamic_child(&child_decl).map_err(|error| {
-            warn!(%error, "failed to create dynamic child. child decl is invalid");
+            warn!(error:%; "failed to create dynamic child. child decl is invalid");
             fcomponent::Error::InvalidArguments
         })?;
         let child_decl = child_decl.fidl_into_native();
@@ -188,7 +188,7 @@ impl RealmCapabilityProvider {
                 ));
             }
             None => {
-                debug!(?child, "open_controller() failed: instance not found");
+                debug!(child:?; "open_controller() failed: instance not found");
                 return Err(fcomponent::Error::InstanceNotFound);
             }
         }
@@ -210,11 +210,8 @@ impl RealmCapabilityProvider {
                     );
                     return fcomponent::Error::InstanceCannotResolve;
                 })?;
-                // open_exposed does not have a rights input parameter, so this
-                // makes use of the  POSIX_[WRITABLE|EXECUTABLE] flags to open
-                // a connection with those rights if available from the parent
-                // directory connection but without failing if not available.
-                let flags = OPEN_FLAGS_MAX_POSSIBLE_RIGHTS | fio::OpenFlags::DIRECTORY;
+                // We request the maximum possible rights from the parent directory connection.
+                let flags = FLAGS_MAX_POSSIBLE_RIGHTS | fio::Flags::PROTOCOL_DIRECTORY;
                 let mut object_request = flags.to_object_request(exposed_dir);
                 child
                     .open_exposed(OpenRequest::new(
@@ -233,7 +230,7 @@ impl RealmCapabilityProvider {
                     })?;
             }
             None => {
-                debug!(?child, "open_exposed_dir() failed: instance not found");
+                debug!(child:?; "open_exposed_dir() failed: instance not found");
                 return Err(fcomponent::Error::InstanceNotFound);
             }
         }
@@ -249,7 +246,7 @@ impl RealmCapabilityProvider {
         let child_moniker = ChildName::try_new(&child.name, child.collection.as_ref())
             .map_err(|_| fcomponent::Error::InvalidArguments)?;
         component.remove_dynamic_child(&child_moniker).await.map_err(|error| {
-            debug!(%error, ?child, "remove_dynamic_child() failed");
+            debug!(error:%, child:?; "remove_dynamic_child() failed");
             error
         })?;
         Ok(())
@@ -261,7 +258,7 @@ impl RealmCapabilityProvider {
     ) -> Result<Option<Arc<ComponentInstance>>, fcomponent::Error> {
         let parent = parent.upgrade().map_err(|_| fcomponent::Error::InstanceDied)?;
         let state = parent.lock_resolved_state().await.map_err(|error| {
-            debug!(%error, moniker=%parent.moniker, "failed to resolve instance");
+            debug!(error:%, moniker:% = parent.moniker; "failed to resolve instance");
             fcomponent::Error::InstanceCannotResolve
         })?;
         let child_moniker = ChildName::try_new(&child.name, child.collection.as_ref())
@@ -277,7 +274,7 @@ impl RealmCapabilityProvider {
     ) -> Result<(), fcomponent::Error> {
         let component = component.upgrade().map_err(|_| fcomponent::Error::InstanceDied)?;
         let state = component.lock_resolved_state().await.map_err(|error| {
-            error!(%error, "failed to resolve InstanceState");
+            error!(error:%; "failed to resolve InstanceState");
             fcomponent::Error::Internal
         })?;
         let decl = state.decl();
@@ -313,7 +310,7 @@ impl RealmCapabilityProvider {
         fasync::Task::spawn(async move {
             if let Err(error) = Self::serve_child_iterator(children, stream, batch_size).await {
                 // TODO: Set an epitaph to indicate this was an unexpected error.
-                warn!(%error, "serve_child_iterator failed");
+                warn!(error:%; "serve_child_iterator failed");
             }
         })
         .detach();
@@ -1166,19 +1163,15 @@ mod tests {
             .now_or_never();
         assert!(event.is_none());
 
-        // Check flags on directory opened. These are not exactly the flags we
-        // set in `open_exposed_dir`, because fuchsia.io transforms POSIX_*
-        // flags into their respective {RIGHT_READABLE, RIGHT_WRITABLE,
-        // RIGHT_EXECUTABLE} variants if and only if all intermediate nodes are
-        // readable, writable, or executable. Additionally, we already know
-        // this is a directory, and fuchsia.io does not propagate that flag.
-        let (status, flags) = dir_proxy.get_flags().await.expect("getting exposed dir flags");
-        assert_matches!(zx::Status::ok(status), Ok(()));
+        // Check flags on directory opened. This should match the maximum set of rights for every
+        // directory connection along the open chain.
+        let flags = dir_proxy.get_flags().await.expect("FIDL error").expect("GetFlags error");
         assert_eq!(
             flags,
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::RIGHT_EXECUTABLE
+            fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::PERM_EXECUTABLE
+                | fio::Flags::PROTOCOL_DIRECTORY
         );
 
         // Now that it was asserted that "system:0" has yet to start,

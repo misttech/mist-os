@@ -79,7 +79,7 @@ where
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceTxQueue>>
     TransmitQueueCommon<PureIpDevice, BC> for CoreCtx<'_, BC, L>
 {
-    type Meta = PureIpDeviceTxQueueFrameMetadata;
+    type Meta = PureIpDeviceTxQueueFrameMetadata<BC>;
     type Allocator = BufVecU8Allocator;
     type Buffer = Buf<Vec<u8>>;
     type DequeueContext = BC::DequeueContext;
@@ -88,7 +88,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceTxQueu
         buf: &'a [u8],
         meta: &'b Self::Meta,
     ) -> Result<SentFrame<&'a [u8]>, ParseSentFrameError> {
-        let PureIpDeviceTxQueueFrameMetadata { ip_version } = meta;
+        let PureIpDeviceTxQueueFrameMetadata { ip_version, tx_metadata: _ } = meta;
         // NB: For conformance with Linux, don't verify that the contents of
         // of the buffer are a valid IPv4/IPv6 packet. Device sockets are
         // allowed to receive malformed packets.
@@ -133,7 +133,11 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceTxQueu
         meta: Self::Meta,
         buf: Self::Buffer,
     ) -> Result<(), DeviceSendFrameError> {
-        let PureIpDeviceTxQueueFrameMetadata { ip_version } = meta;
+        let PureIpDeviceTxQueueFrameMetadata {
+            ip_version,
+            // Drop metadata at the end of scope after publishing to bindings.
+            tx_metadata: _tx_metadata,
+        } = meta;
         DeviceLayerEventDispatcher::send_ip_packet(
             bindings_ctx,
             device_id,
@@ -174,13 +178,13 @@ impl<BT: BindingsTypes> LockLevelFor<IpLinkDeviceState<PureIpDevice, BT>>
     for crate::lock_ordering::PureIpDeviceTxQueue
 {
     type Data =
-        TransmitQueueState<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>, BufVecU8Allocator>;
+        TransmitQueueState<PureIpDeviceTxQueueFrameMetadata<BT>, Buf<Vec<u8>>, BufVecU8Allocator>;
 }
 
 impl<BT: BindingsTypes> LockLevelFor<IpLinkDeviceState<PureIpDevice, BT>>
     for crate::lock_ordering::PureIpDeviceTxDequeue
 {
-    type Data = DequeueState<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>>;
+    type Data = DequeueState<PureIpDeviceTxQueueFrameMetadata<BT>, Buf<Vec<u8>>>;
 }
 
 impl<BT: BindingsTypes> UnlockedAccessMarkerFor<IpLinkDeviceState<PureIpDevice, BT>>

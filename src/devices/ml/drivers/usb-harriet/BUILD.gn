@@ -40,7 +40,10 @@ fuchsia_cc_driver("usb-harriet-driver") {
 }
 
 fuchsia_driver_component("usb-harriet") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/devices/ml:drivers",
+  ]
   info = "meta/usb-harriet-info.json"
   component_name = "usb-harriet"
   deps = [ ":usb-harriet-driver" ]

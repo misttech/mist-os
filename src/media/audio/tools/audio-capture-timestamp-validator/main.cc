@@ -284,7 +284,7 @@ void PlaySound(fuchsia::media::AudioCorePtr& audio, zx::clock reference_clock,
     Shutdown();
   });
   r->SetReferenceClock(std::move(reference_clock));
-  r->SetUsage(fuchsia::media::AudioRenderUsage::MEDIA);
+  r->SetUsage2(fuchsia::media::AudioRenderUsage2::MEDIA);
   r->SetPcmStreamType(kImpulseFormat.stream_type());
 
   // Setup the payload.
@@ -438,9 +438,9 @@ int main(int argc, const char** argv) {
   // Set the volume to 100%.
   fuchsia::media::AudioCorePtr audio_core = ctx->svc()->Connect<fuchsia::media::AudioCore>();
   fuchsia::media::audio::VolumeControlPtr volume_control;
-  audio_core->BindUsageVolumeControl(
-      fuchsia::media::Usage::WithRenderUsage(fuchsia::media::AudioRenderUsage::MEDIA),
-      volume_control.NewRequest());
+  audio_core->BindUsageVolumeControl2(fuchsia::media::Usage2::WithRenderUsage(
+                                          fidl::Clone(fuchsia::media::AudioRenderUsage2::MEDIA)),
+                                      volume_control.NewRequest());
 
   std::optional<float> old_volume;
   volume_control.events().OnVolumeMuteChanged = [&old_volume](float v, bool muted) {

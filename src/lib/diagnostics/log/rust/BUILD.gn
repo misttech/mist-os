@@ -3,69 +3,83 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
+import("//build/rust/rustc_test.gni")
 
 group("tests") {
   testonly = true
 
   deps = [
     ":diagnostics-log-tests",
-    ":rust_test($host_toolchain)",
+    ":diagnostics_log_lib_test($host_toolchain)",
   ]
 }
+
+LIB_DEPS = [
+  "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
+  "//src/lib/diagnostics/log/types",
+  "//third_party/rust_crates:thiserror",
+  "//third_party/rust_crates:log",
+]
+
+if (is_fuchsia || is_mistos) {
+  LIB_DEPS += [
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
+    "//sdk/lib/syslog:client_includes",
+    "//sdk/rust/zx",
+    "//src/lib/diagnostics/log/encoding/rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-runtime",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:paste",
+  ]
+} else {
+  LIB_DEPS += [ "//third_party/rust_crates:chrono" ]
+}
+
+LIB_SOURCES = [
+  "src/fuchsia/filter.rs",
+  "src/fuchsia/mod.rs",
+  "src/fuchsia/sink.rs",
+  "src/lib.rs",
+  "src/portable/mod.rs",
+]
 
 rustc_library("rust") {
   name = "diagnostics_log"
-  with_unit_tests = true
   edition = "2021"
-
-  deps = [
-    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
-    "//src/lib/diagnostics/log/types",
-    "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:tracing-log",
-    "//third_party/rust_crates:tracing-subscriber",
-  ]
-
-  if (is_fuchsia || is_mistos) {
-    deps += [
-      "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
-      "//sdk/lib/syslog:client_includes",
-      "//sdk/rust/zx",
-      "//src/lib/diagnostics/log/encoding/rust",
-      "//src/lib/fidl/rust/fidl",
-      "//src/lib/fuchsia-async",
-      "//src/lib/fuchsia-component",
-      "//src/lib/fuchsia-runtime",
-      "//third_party/rust_crates:futures",
-      "//third_party/rust_crates:log",
-      "//third_party/rust_crates:paste",
-      "//third_party/rust_crates:tracing-core",
-    ]
-
-    test_deps = [
-      "//src/lib/diagnostics/reader/rust",
-      "//src/lib/fuchsia",
-      "//src/lib/fuchsia-async",
-      "//third_party/rust_crates:futures",
-      "//third_party/rust_crates:itertools",
-    ]
-  } else {
-    test_deps = [ "//third_party/rust_crates:regex" ]
-  }
-
-  sources = [
-    "src/fuchsia/filter.rs",
-    "src/fuchsia/mod.rs",
-    "src/fuchsia/sink.rs",
-    "src/lib.rs",
-    "src/portable/mod.rs",
-  ]
-
+  deps = LIB_DEPS
+  sources = LIB_SOURCES
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
+rustc_test("diagnostics_log_lib_test") {
+  edition = "2021"
+
+  sources = LIB_SOURCES
+  deps = LIB_DEPS
+
+  if (is_host) {
+    deps += [ "//third_party/rust_crates:regex" ]
+
+    # We use a single thread for host tests to enable setting the global static
+    # test logger per test case without overwriting it when tests run
+    # concurrently. For Fuchsia we don't need to do this since we run each test
+    # case as a process.
+    args = [ "--test-threads=1" ]
+  } else {
+    deps += [
+      "//src/lib/diagnostics/reader/rust",
+      "//src/lib/fuchsia",
+      "//src/lib/fuchsia-async",
+      "//src/lib/test_util",
+      "//third_party/rust_crates:futures",
+    ]
+  }
+}
+
 fuchsia_unittest_package("diagnostics-log-tests") {
-  deps = [ ":rust_test" ]
+  deps = [ ":diagnostics_log_lib_test" ]
   manifest = "meta/test.cml"
 }

@@ -59,7 +59,7 @@ a particular machine and isn't checked in may include absolute paths and still
 work (successfully build and/or run).
 
 Fuchsia utilizes many tools to generate source code. For instance [FIDL][fidl]
-uses [`fidlc`][fidlc] and [Banjo][banjo] uses a similar tool.
+uses [`fidlc`][fidlc] and Banjo uses a similar tool.
 
 ## Motivation
 
@@ -397,7 +397,6 @@ A great Jedi once said: "Only a Sith deals in absolutes."
 
 [action-tracer]: /docs/contribute/open_projects/build/hermetic_actions.md#reproducing_the_issue
 [arch-linux-chroot]: https://wiki.archlinux.org/title/DeveloperWiki:Building_in_a_clean_chroot
-[banjo]: /docs/development/drivers/tutorials/banjo-tutorial.md
 [bazel-sandboxfs]: https://blog.bazel.build/2017/08/25/introducing-sandboxfs.html
 [chroot]: https://en.wikipedia.org/wiki/Chroot
 [fidl]: /docs/development/languages/fidl/README.md

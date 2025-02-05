@@ -249,8 +249,8 @@ closed protocol Vmar {
     /// - `ZX_VM_OFFSET_IS_UPPER_LIMIT`  Interpret the *vmar_offset* as an upper limit
     ///   to constrain the selection of the offset by the kernel, invalid if *handle*
     ///   does not have the `ZX_VM_CAN_MAP_SPECIFIC` permission. The resulting mapping
-    ///   will have an offset + *len* that is <= *vmar_offset*. This option cannot be
-    ///   specified if `ZX_VM_SPECIFIC` or `ZX_VM_SPECIFIC_OVERWRITE` is used.
+    ///   will have an offset + *len* that is <= vmar_base + *vmar_offset*. This option
+    ///   cannot be specified if `ZX_VM_SPECIFIC` or `ZX_VM_SPECIFIC_OVERWRITE` is used.
     /// - `ZX_VM_PERM_READ`  Map *vmo* as readable.  It is an error if *handle*
     ///   does not have `ZX_VM_CAN_MAP_READ` permissions, the *handle* does
     ///   not have the `ZX_RIGHT_READ` right, or the *vmo* handle does not have the

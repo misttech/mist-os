@@ -56,7 +56,8 @@ use netstack3_base::{
     InstantBindingsTypes, IpDeviceAddr, IpExt, LocalAddressError, Mss,
     OwnedOrRefsBidirectionalConverter, PortAllocImpl, ReferenceNotifiersExt as _,
     RemoveResourceResult, RngContext, Segment, SeqNum, StrongDeviceIdentifier as _,
-    TimerBindingsTypes, TimerContext, TracingContext, WeakDeviceIdentifier, ZonedAddressError,
+    TimerBindingsTypes, TimerContext, TracingContext, TxMetadataBindingsTypes,
+    WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_filter::Tuple;
 use netstack3_ip::socket::{
@@ -448,7 +449,9 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>
 /// |receive buffer     send buffer |
 /// +-------------------------------+
 
-pub trait TcpBindingsTypes: InstantBindingsTypes + TimerBindingsTypes + 'static {
+pub trait TcpBindingsTypes:
+    InstantBindingsTypes + TimerBindingsTypes + TxMetadataBindingsTypes + 'static
+{
     /// Receive buffer used by TCP.
     type ReceiveBuffer: ReceiveBuffer + Send + Sync;
     /// Send buffer used by TCP.
@@ -5403,11 +5406,16 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
     D: WeakDeviceIdentifier,
 {
     let control = segment.header.control;
+    // NB: TCP does not use tx metadata to enforce send buffer. The TCP
+    // application buffers only open send buffer space once the data is
+    // acknowledged by the peer. That lives entirely in the TCP module and we
+    // don't need to track segments sitting in device queues.
+    let tx_metadata: BC::TxMetadata = Default::default();
     let result = match ip_sock {
         Some(ip_sock) => {
             let body = tcp_serialize_segment(segment, conn_addr);
             core_ctx
-                .send_ip_packet(bindings_ctx, ip_sock, body, ip_sock_options)
+                .send_ip_packet(bindings_ctx, ip_sock, body, ip_sock_options, tx_metadata)
                 .map_err(|err| IpSockCreateAndSendError::Send(err))
         }
         None => {
@@ -5419,6 +5427,7 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
                 remote_ip,
                 IpProto::Tcp.into(),
                 ip_sock_options,
+                tx_metadata,
                 |_addr| tcp_serialize_segment(segment, conn_addr),
             )
         }
@@ -5463,8 +5472,9 @@ mod tests {
     use netstack3_base::testutil::{
         new_rng, run_with_many_seeds, set_logger_for_test, FakeAtomicInstant, FakeCoreCtx,
         FakeCryptoRng, FakeDeviceId, FakeInstant, FakeNetwork, FakeNetworkSpec, FakeStrongDeviceId,
-        FakeTimerCtx, FakeTimerId, FakeWeakDeviceId, InstantAndData, MultipleDevicesId,
-        PendingFrameData, StepResult, TestIpExt, WithFakeFrameContext, WithFakeTimerContext,
+        FakeTimerCtx, FakeTimerId, FakeTxMetadata, FakeWeakDeviceId, InstantAndData,
+        MultipleDevicesId, PendingFrameData, StepResult, TestIpExt, WithFakeFrameContext,
+        WithFakeTimerContext,
     };
     use netstack3_base::{
         ContextProvider, IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, Instant as _, InstantContext,
@@ -5776,6 +5786,10 @@ mod tests {
         }
     }
 
+    impl<D: FakeStrongDeviceId> TxMetadataBindingsTypes for TcpBindingsCtx<D> {
+        type TxMetadata = FakeTxMetadata;
+    }
+
     impl<D: FakeStrongDeviceId> TcpBindingsTypes for TcpBindingsCtx<D> {
         type ReceiveBuffer = Arc<Mutex<RingBuffer>>;
         type SendBuffer = TestSendBuffer;
@@ -5886,13 +5900,14 @@ mod tests {
             socket: &IpSock<I, Self::WeakDeviceId>,
             body: S,
             options: &O,
+            tx_meta: BC::TxMetadata,
         ) -> Result<(), IpSockSendError>
         where
             S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,
             O: SendOptions<I> + RouteResolutionOptions<I>,
         {
-            self.ip_socket_ctx.send_ip_packet(bindings_ctx, socket, body, options)
+            self.ip_socket_ctx.send_ip_packet(bindings_ctx, socket, body, options, tx_meta)
         }
 
         fn confirm_reachable<O>(

@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_test_package_group.gni")
+
 group("tests") {
   testonly = true
   deps = [
@@ -16,6 +18,7 @@ group("tests_no_e2e") {
 
   # Add the tests themselves
   deps = [
+    ":bazel_tests",
     "bringup:tests",
     "camera:tests",
     "chromium:tests",
@@ -51,15 +54,117 @@ group("tests_no_e2e") {
   ]
 }
 
+bazel_test_package_group("bazel_tests") {
+  tests = [
+    {
+      test_package_target = "//src/devices/board/drivers/vim3-devicetree:vim3-devicetree-test-package"
+      test_package_name = "vim3-devicetree-test"
+      test_component_names = [ "vim3-devicetree-test" ]
+
+      # Integration test for the board driver requires these prebuilt artifacts:
+      #   - devicetree blob (.dtb)
+      #   - Platform bus driver (.far)
+      #   - driver-test-realm package (.far)
+      deps = [
+        "//sdk/lib/driver/devicetree/testing:devicetree-test-bazel-inputs",
+        "//src/devices/board/drivers/vim3-devicetree:vim3-dtb",
+      ]
+    },
+    {
+      test_package_target =
+          "//src/devices/clock/drivers/vim3-clk:vim3-clk-test-package"
+      test_package_name = "vim3-clk-test"
+      test_component_names = [ "vim3-clk-test-bin" ]
+    },
+    {
+      test_package_target =
+          "//src/devices/gpio/drivers/aml-gpio:aml-gpio-test-package"
+      test_package_name = "aml-gpio-test"
+      test_component_names = [ "aml-gpio-test-bin" ]
+      test_specs = {
+        log_settings = {
+          max_severity = "ERROR"
+        }
+      }
+    },
+    {
+      test_package_target =
+          "//src/devices/i2c/drivers/aml-i2c:aml-i2c-test-package"
+      test_package_name = "aml-i2c-test"
+      test_component_names = [ "aml-i2c-test-bin" ]
+      test_specs = {
+        log_settings = {
+          max_severity = "ERROR"
+        }
+      }
+    },
+    {
+      test_package_target =
+          "//src/devices/usb/drivers/aml-usb-phy:aml-usb-phy-test-package"
+      test_package_name = "aml-usb-phy-test"
+      test_component_names = [ "aml-usb-phy-test-bin" ]
+      test_specs = {
+        log_settings = {
+          max_severity = "ERROR"
+        }
+      }
+    },
+    {
+      test_package_target =
+          "//src/ui/input/drivers/adc-buttons:adc-buttons-test-package"
+      test_package_name = "adc-buttons-test"
+      test_component_names = [ "adc-buttons-test-bin" ]
+      test_specs = {
+        log_settings = {
+          max_severity = "ERROR"
+        }
+      }
+    },
+    {
+      test_package_target =
+          "//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite-test-package"
+      test_package_name = "aml-g12-composite-test"
+      test_component_names = [ "aml-g12-composite-test-bin" ]
+      test_specs = {
+        log_settings = {
+          max_severity = "ERROR"
+        }
+      }
+    },
+    {
+      test_package_target = "//src/devices/spmi/lib/hwreg-spmi:spmi-hwreg-test"
+      test_package_name = "spmi-hwreg-test"
+      test_component_names = [ "spmi-hwreg-test-bin" ]
+    },
+    {
+      test_package_target = "//src/devices/usb/drivers/dwc3:dwc3-test-package"
+      test_package_name = "dwc3-test"
+      test_component_names = [ "dwc3-test-bin" ]
+      test_specs = {
+        log_settings = {
+          max_severity = "ERROR"
+        }
+      }
+    },
+    {
+      test_package_target =
+          "//src/diagnostics/archivist/tests/pipeline_test:pipeline_test"
+      test_component_names = [ "pipeline_test" ]
+    },
+  ]
+}
+
 group("e2e_tests") {
   testonly = true
   deps = [
     "developer:e2e_tests",
+    "devices:e2e_tests",
     "recovery:e2e_tests",
     "testing:e2e_tests",
     "tests",
     "//src/connectivity/network:e2e_tests",
     "//src/storage/lib/paver/e2e_tests",
     "//src/sys/pkg:e2e_tests",
+    "//src/zircon:e2e_tests",
   ]
 }

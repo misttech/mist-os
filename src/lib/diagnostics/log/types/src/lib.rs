@@ -127,30 +127,6 @@ macro_rules! impl_from_unsigned {
 impl_from_signed!(i8, i16, i32, i64, i128);
 impl_from_unsigned!(u8, u16, u32, u64, u128);
 
-impl From<Severity> for tracing::Level {
-    fn from(s: Severity) -> tracing::Level {
-        match s {
-            Severity::Trace => tracing::Level::TRACE,
-            Severity::Debug => tracing::Level::DEBUG,
-            Severity::Info => tracing::Level::INFO,
-            Severity::Warn => tracing::Level::WARN,
-            Severity::Fatal | Severity::Error => tracing::Level::ERROR,
-        }
-    }
-}
-
-impl From<tracing::Level> for Severity {
-    fn from(level: tracing::Level) -> Severity {
-        match level {
-            tracing::Level::TRACE => Severity::Trace,
-            tracing::Level::DEBUG => Severity::Debug,
-            tracing::Level::INFO => Severity::Info,
-            tracing::Level::WARN => Severity::Warn,
-            tracing::Level::ERROR => Severity::Error,
-        }
-    }
-}
-
 impl From<log::Level> for Severity {
     fn from(level: log::Level) -> Severity {
         match level {
@@ -159,6 +135,32 @@ impl From<log::Level> for Severity {
             log::Level::Info => Severity::Info,
             log::Level::Warn => Severity::Warn,
             log::Level::Error => Severity::Error,
+        }
+    }
+}
+
+impl TryFrom<log::LevelFilter> for Severity {
+    type Error = ();
+    fn try_from(s: log::LevelFilter) -> Result<Severity, ()> {
+        match s {
+            log::LevelFilter::Off => Err(()),
+            log::LevelFilter::Trace => Ok(Severity::Trace),
+            log::LevelFilter::Debug => Ok(Severity::Debug),
+            log::LevelFilter::Info => Ok(Severity::Info),
+            log::LevelFilter::Warn => Ok(Severity::Warn),
+            log::LevelFilter::Error => Ok(Severity::Error),
+        }
+    }
+}
+
+impl From<Severity> for log::LevelFilter {
+    fn from(s: Severity) -> log::LevelFilter {
+        match s {
+            Severity::Trace => log::LevelFilter::Trace,
+            Severity::Debug => log::LevelFilter::Debug,
+            Severity::Info => log::LevelFilter::Info,
+            Severity::Warn => log::LevelFilter::Warn,
+            Severity::Fatal | Severity::Error => log::LevelFilter::Error,
         }
     }
 }

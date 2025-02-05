@@ -6,8 +6,7 @@ use async_trait::async_trait;
 use chrono::{Datelike, Local, Timelike};
 use ffx_snapshot_args::SnapshotCommand;
 use fho::{
-    bug, moniker, return_bug, return_user_error, Error, FfxMain, FfxTool, Result,
-    VerifiedMachineWriter,
+    bug, return_bug, return_user_error, Error, FfxMain, FfxTool, Result, VerifiedMachineWriter,
 };
 use fidl_fuchsia_feedback::{
     Annotation, DataProviderProxy, GetAnnotationsParameters, GetSnapshotParameters,
@@ -21,6 +20,7 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+use target_holders::moniker;
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -283,6 +283,7 @@ mod test {
     use fidl::endpoints::ServerEnd;
     use fidl_fuchsia_feedback::{Annotations, DataProviderRequest, Snapshot};
     use futures::TryStreamExt;
+    use target_holders::fake_proxy;
 
     fn serve_fake_file(server: ServerEnd<fio::FileMarker>) {
         fuchsia_async::Task::local(async move {
@@ -326,7 +327,7 @@ mod test {
     }
 
     fn setup_fake_data_provider_server(annotations: Annotations) -> DataProviderProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             DataProviderRequest::GetSnapshot { params, responder } => {
                 let channel = params.response_channel.unwrap();
                 let server_end = ServerEnd::<fio::FileMarker>::new(channel);

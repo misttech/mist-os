@@ -4,8 +4,8 @@
 
 use clonable_error::ClonableError;
 
+use log::error;
 use thiserror::Error;
-use tracing::error;
 
 /// Errors produced when starting a component.
 #[derive(Debug, Clone, Error)]

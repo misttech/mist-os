@@ -113,7 +113,6 @@
         }
       ],
       "type": {
-        "kind": "primitive",
         "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
@@ -245,7 +244,6 @@
         }
       ],
       "type": {
-        "kind": "primitive",
         "kind_v2": "primitive",
         "subtype": "bool",
         "type_shape_v2": {
@@ -308,7 +306,6 @@
         }
       ],
       "type": {
-        "kind": "primitive",
         "kind_v2": "primitive",
         "subtype": "bool",
         "type_shape_v2": {
@@ -395,7 +392,6 @@
         }
       ],
       "type": {
-        "kind": "primitive",
         "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
@@ -849,13 +845,11 @@
       "members": [
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "endpoint",
             "role": "client",
             "protocol": "test.versions/Protocol",
             "nullable": false,
             "protocol_transport": "Channel",
-            "identifier": "test.versions/Protocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -1000,7 +994,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1164,7 +1157,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1324,7 +1316,6 @@
           "ordinal": 1,
           "name": "x",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1482,7 +1473,6 @@
         "nullable": false
       },
       "type": {
-        "kind": "string",
         "kind_v2": "string",
         "nullable": false,
         "type_shape_v2": {

@@ -1178,7 +1178,7 @@ closed protocol Object {
     ///     // Total accumulated running time of the thread.
     ///     //
     ///     // Note: See zx_info_task_runtime for queue time in addition to runtime.
-    ///     zx_duration_t total_runtime;
+    ///     zx_duration_mono_t total_runtime;
     ///
     ///     // CPU number that this thread was last scheduled on, or ZX_INFO_INVALID_CPU
     ///     // if the thread has never been scheduled on a CPU. By the time this call
@@ -1248,7 +1248,7 @@ closed protocol Object {
     ///     uint32_t cpu_number;
     ///     uint32_t flags;
     ///
-    ///     zx_duration_t idle_time;
+    ///     zx_duration_mono_t idle_time;
     ///
     ///     // kernel scheduler counters
     ///     uint64_t reschedules;
@@ -1450,11 +1450,11 @@ closed protocol Object {
     ///     // The options passed to zx_timer_create().
     ///     uint32_t options;
     ///
-    ///     // The deadline with respect to ZX_CLOCK_MONOTONIC at which the timer will
-    ///     // fire next.
+    ///     // The deadline with respect to ZX_CLOCK_MONOTONIC or ZX_CLOCK_BOOT at which
+    ///     // the timer will fire next.
     ///     //
     ///     // This value will be zero if the timer is not set to fire.
-    ///     zx_time_t deadline;
+    ///     zx_instant_mono_t deadline;
     ///
     ///     // Specifies a range from deadline - slack to deadline + slack during which
     ///     // the timer is allowed to fire. The system uses this parameter as a hint to
@@ -1555,7 +1555,7 @@ closed protocol Object {
     ///     // exited).
     ///     // * Jobs include the runtime for all of their processes (including processes that previously
     ///     // exited).
-    ///     zx_duration_t cpu_time;
+    ///     zx_duration_mono_t cpu_time;
     ///
     ///     // The total amount of time this task and its children were queued
     ///     // to run (ready) but not actually using a CPU.
@@ -1564,7 +1564,7 @@ closed protocol Object {
     ///     // previously exited).
     ///     // * Jobs include the queue time for all of their processes (including processes that previously
     ///     // exited).
-    ///     zx_duration_t queue_time;
+    ///     zx_duration_mono_t queue_time;
     ///
     ///     // The total amount of time this task and its children spent handling page faults.
     ///     // * Threads include only their own page fault handling time.
@@ -1572,7 +1572,7 @@ closed protocol Object {
     ///     // previously exited).
     ///     // * Jobs include the page fault time for all of their processes (including processes that
     ///     // previously exited).
-    ///     zx_duration_t page_fault_time;
+    ///     zx_duration_mono_t page_fault_time;
     ///
     ///     // The total amount of time this task and its children spent waiting on contended kernel locks.
     ///     // * Threads include only their own wait time.
@@ -1580,7 +1580,7 @@ closed protocol Object {
     ///     // previously exited).
     ///     // * Jobs include the wait time for all of their processes (including processes that
     ///     // previously exited).
-    ///     zx_duration_t lock_contention_time;
+    ///     zx_duration_mono_t lock_contention_time;
     /// } zx_info_task_runtime_t;
     /// ```
     ///
@@ -1962,12 +1962,12 @@ closed protocol Object {
     ///     // Total amount of CPU time spent on compression across all threads.
     ///     // Compression may happen in parallel and so this can be larger than
     ///     // wall clock time.
-    ///     zx_duration_t compression_time;
+    ///     zx_duration_mono_t compression_time;
     ///
     ///     // Total amount of time decompression has spent on a CPU across all threads.
     ///     // Decompression may happen in parallel and so this can increase faster than
     ///     // wall clock time.
-    ///     zx_duration_t decompression_time;
+    ///     zx_duration_mono_t decompression_time;
     ///
     ///     // Total number of times compression has been done on a page, regardless of
     ///     // whether the compressed result was ultimately retained.
@@ -2140,6 +2140,32 @@ closed protocol Object {
     /// } zx_power_domain_info_t;
     ///```
     ///
+    /// ### ZX_INFO_MEMORY_STALL
+    ///
+    /// Returns the total stall time measured since boot. The stall timers are
+    /// monotonic counters that increase at the rate of the monotonic clock
+    /// multiplied by (approximately) the fraction of time spent with at least
+    /// one/all threads in a memory stall state.
+    ///
+    /// A memory stall is, in principle, any kind of delay induced by memory
+    /// pressure that prevents a thread from otherwise doing useful work. In
+    /// practice, only select code paths in the kernel are regarded as memory
+    /// stalls.
+    ///
+    /// *handle* type: `Resource` (Specifically, the stall resource)
+    ///
+    /// *buffer* type: `zx_info_memory_stall_t[1]`
+    ///
+    /// ```c
+    /// typedef struct zx_info_memory_stall {
+    ///   // Total monotonic time spent with at least one memory-stalled thread.
+    ///   zx_duration_t stall_time_some;
+    ///
+    ///   // Total monotonic time spent with all threads memory-stalled.
+    ///   zx_duration_t stall_time_full;
+    /// } zx_info_memory_stall_t;
+    /// ```
+    ///
     /// ## Rights
     ///
     /// If *topic* is `ZX_INFO_PROCESS`, *handle* must be of type `ZX_OBJ_TYPE_PROCESS` and have `ZX_RIGHT_INSPECT`.
@@ -2193,6 +2219,8 @@ closed protocol Object {
     /// If *topic* is `ZX_INFO_TASK_RUNTIME`, *handle* must be of type `ZX_OBJ_TYPE_THREAD`, `ZX_OBJ_TYPE_PROCESS`, or `ZX_OBJ_TYPE_JOB`, and have `ZX_RIGHT_INSPECT`.
     ///
     /// If *topic* is `ZX_INFO_POWER_DOMAINS`, *handle* must have resource kind `ZX_RSRC_KIND_SYSTEM` with base `ZX_RSRC_SYSTEM_INFO_BASE`.
+    ///
+    /// If *topic* is `ZX_INFO_MEMORY_STALL`, *handle* must have resource kind `ZX_RSRC_KIND_SYSTEM` with base `ZX_RSRC_SYSTEM_STALL_BASE`.
     ///
     /// ## Return value
     ///

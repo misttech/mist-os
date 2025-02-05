@@ -9,6 +9,7 @@ use assembly_util::write_json_file;
 use camino::Utf8PathBuf;
 use serde_json::json;
 use std::collections::BTreeMap;
+use std::fmt;
 use url::Url;
 
 /// The type of the image used to correlate a partition with an image in the
@@ -25,6 +26,19 @@ pub enum ImageType {
     Fxfs,
     /// Device Tree Blob Overlay.
     Dtbo,
+}
+
+impl fmt::Display for ImageType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let message = match self {
+            Self::ZBI => "ZBI",
+            Self::VBMeta => "VBMeta",
+            Self::FVM => "FVM",
+            Self::Fxfs => "Fxfs",
+            Self::Dtbo => "Dtbo",
+        };
+        write!(f, "{}", message)
+    }
 }
 
 /// A pair of an image path mapped to a specific partition.
@@ -50,31 +64,42 @@ impl PartitionImageMapper {
 
     /// Map a set images that are intended for a specific slot to partitions.
     pub fn map_images_to_slot(&mut self, images: &Vec<Image>, slot: Slot) -> Result<()> {
+        log::debug!("Mapping images: {:#?} to slot: {}", images, slot);
         let slot_entry = self.images.entry(slot).or_insert(BTreeMap::new());
         for image in images.iter() {
             match image {
                 Image::ZBI { path, .. } => {
-                    slot_entry.insert(ImageType::ZBI, path.clone());
+                    let image_type = ImageType::ZBI;
+                    log::debug!("Adding image type: {} from path {}", image_type, path.clone());
+                    slot_entry.insert(image_type, path.clone());
                 }
                 Image::VBMeta(path) => {
-                    slot_entry.insert(ImageType::VBMeta, path.clone());
+                    let image_type = ImageType::VBMeta;
+                    log::debug!("Adding image type: {} from path {}", image_type, path.clone());
+                    slot_entry.insert(image_type, path.clone());
                 }
                 Image::FVMFastboot(path) => {
                     if let Slot::R = slot {
                         // Recovery should not include a separate FVM, because it is embedded into the
                         // ZBI as a ramdisk.
+                        log::debug!("Skipping image at path: {} as recovery should not include a separate FVM", path.clone());
                         continue;
                     } else {
-                        slot_entry.insert(ImageType::FVM, path.clone());
+                        let image_type = ImageType::FVM;
+                        log::debug!("Adding image type: {} from path {}", image_type, path.clone());
+                        slot_entry.insert(image_type, path.clone());
                     }
                 }
                 Image::FxfsSparse { path, .. } => {
                     if let Slot::R = slot {
                         // Recovery should not include a separate FVM, because it is embedded into the
                         // ZBI as a ramdisk.
+                        log::debug!("Skipping image at path: {} as recovery should not include a separate FVM", path.clone());
                         continue;
                     } else {
-                        slot_entry.insert(ImageType::Fxfs, path.clone());
+                        let image_type = ImageType::Fxfs;
+                        log::debug!("Adding image type: {} from path {}", image_type, path.clone());
+                        slot_entry.insert(image_type, path.clone());
                     }
                 }
                 Image::Dtbo(path) => {
@@ -82,7 +107,9 @@ impl PartitionImageMapper {
                     if slot == Slot::R {
                         bail!("devicetree_overlay cannot be mapped to slot R");
                     }
-                    slot_entry.insert(ImageType::Dtbo, path.clone());
+                    let image_type = ImageType::Dtbo;
+                    log::debug!("Adding image type: {} from path {}", image_type, path.clone());
+                    slot_entry.insert(image_type, path.clone());
                 }
                 _ => {}
             }

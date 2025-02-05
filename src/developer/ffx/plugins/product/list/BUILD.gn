@@ -5,11 +5,16 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_product_list") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
 
-  args_deps = [ "//src/developer/ffx/lib/pbms:lib" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//src/developer/ffx/lib/pbms:lib",
+    "//third_party/rust_crates:argh",
+  ]
   args_sources = [ "src/args.rs" ]
   sources = [ "src/lib.rs" ]
 

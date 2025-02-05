@@ -23,13 +23,14 @@ use crate::{Config, MlmeRequest, MlmeSink, MlmeStream};
 use fuchsia_inspect_auto_persist::{self as auto_persist, AutoPersist};
 use futures::channel::{mpsc, oneshot};
 use ieee80211::{Bssid, MacAddrBytes, Ssid};
+use log::{error, info, warn};
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use wlan_common::bss::{BssDescription, Protection as BssProtection};
 use wlan_common::capabilities::derive_join_capabilities;
 use wlan_common::ie::rsn::rsne;
 use wlan_common::ie::{self, wsc};
-use wlan_common::scan::{Compatibility, ScanResult};
+use wlan_common::mac::MacRole;
+use wlan_common::scan::{Compatibility, Compatible, Incompatible, ScanResult};
 use wlan_common::security::{SecurityAuthenticator, SecurityDescriptor};
 use wlan_common::sink::UnboundedSink;
 use wlan_common::timer;
@@ -109,12 +110,25 @@ impl ClientConfig {
         bss: &BssDescription,
         device_info: &fidl_mlme::DeviceInfo,
         security_support: &fidl_common::SecuritySupport,
-    ) -> Option<Compatibility> {
+    ) -> Compatibility {
+        // TODO(https://fxbug.dev/384797729): Include information about disjoint channels and data
+        //                                    rates in `Incompatible`.
         self.has_compatible_channel_and_data_rates(bss, device_info)
             .then(|| {
-                Compatibility::try_new(self.security_protocol_intersection(bss, security_support))
+                Compatible::try_from_features(
+                    self.security_protocol_intersection(bss, security_support),
+                )
             })
             .flatten()
+            .ok_or_else(|| {
+                Incompatible::try_from_features(
+                    "incompatible channel, PHY data rates, or security protocols",
+                    Some(self.security_protocols_by_mac_role(bss)),
+                )
+                .unwrap_or_else(|| {
+                    Incompatible::from_description("incompatible channel or PHY data rates")
+                })
+            })
     }
 
     /// Gets the intersection of security protocols supported by the BSS and local interface.
@@ -132,9 +146,9 @@ impl ClientConfig {
         let has_wep_support = || self.cfg.wep_supported;
         let has_wpa1_support = || self.cfg.wpa1_supported;
         let has_wpa2_support = || {
-            // TODO(https://fxbug.dev/42059694): Unlike other protocols, hardware and driver support for WPA2
-            //                         is assumed here. Query and track this as with other security
-            //                         protocols.
+            // TODO(https://fxbug.dev/42059694): Unlike other protocols, hardware and driver
+            //                                   support for WPA2 is assumed here. Query and track
+            //                                   this as with other security protocols.
             has_privacy
                 && bss.rsne().is_some_and(|rsne| {
                     rsne::from_bytes(rsne)
@@ -184,6 +198,53 @@ impl ClientConfig {
             BssProtection::Wpa2Enterprise | BssProtection::Wpa3Enterprise => vec![],
             BssProtection::Unknown => vec![],
         }
+    }
+
+    fn security_protocols_by_mac_role(
+        &self,
+        bss: &BssDescription,
+    ) -> impl Iterator<Item = (SecurityDescriptor, MacRole)> {
+        let has_privacy = wlan_common::mac::CapabilityInfo(bss.capability_info).privacy();
+        let has_wep_support = || self.cfg.wep_supported;
+        let has_wpa1_support = || self.cfg.wpa1_supported;
+        let has_wpa2_support = || {
+            // TODO(https://fxbug.dev/42059694): Unlike other protocols, hardware and driver
+            //                                   support for WPA2 is assumed here. Query and track
+            //                                   this as with other security protocols.
+            has_privacy
+        };
+        let has_wpa3_support = || self.wpa3_supported && has_privacy;
+        let client_security_protocols = Some(SecurityDescriptor::OPEN)
+            .into_iter()
+            .chain(has_wep_support().then_some(SecurityDescriptor::WEP))
+            .chain(has_wpa1_support().then_some(SecurityDescriptor::WPA1))
+            .chain(has_wpa2_support().then_some(SecurityDescriptor::WPA2_PERSONAL))
+            .chain(has_wpa3_support().then_some(SecurityDescriptor::WPA3_PERSONAL))
+            .map(|descriptor| (descriptor, MacRole::Client));
+
+        let bss_security_protocols = match bss.protection() {
+            BssProtection::Open => &[SecurityDescriptor::OPEN][..],
+            BssProtection::Wep => &[SecurityDescriptor::WEP][..],
+            BssProtection::Wpa1 => &[SecurityDescriptor::WPA1][..],
+            BssProtection::Wpa1Wpa2PersonalTkipOnly | BssProtection::Wpa1Wpa2Personal => {
+                &[SecurityDescriptor::WPA1, SecurityDescriptor::WPA2_PERSONAL][..]
+            }
+            BssProtection::Wpa2PersonalTkipOnly | BssProtection::Wpa2Personal => {
+                &[SecurityDescriptor::WPA2_PERSONAL][..]
+            }
+            BssProtection::Wpa2Wpa3Personal => {
+                &[SecurityDescriptor::WPA3_PERSONAL, SecurityDescriptor::WPA2_PERSONAL][..]
+            }
+            BssProtection::Wpa3Personal => &[SecurityDescriptor::WPA3_PERSONAL][..],
+            // TODO(https://fxbug.dev/42174395): Implement conversions for WPA Enterprise protocols.
+            BssProtection::Wpa2Enterprise | BssProtection::Wpa3Enterprise => &[],
+            BssProtection::Unknown => &[],
+        }
+        .iter()
+        .cloned()
+        .map(|descriptor| (descriptor, MacRole::Ap));
+
+        client_security_protocols.chain(bss_security_protocols)
     }
 
     fn has_compatible_channel_and_data_rates(
@@ -674,7 +735,7 @@ impl ClientSme {
                 &self.context.device_info,
                 &self.context.security_support,
             )
-            .is_none()
+            .is_err()
         {
             warn!("BSS is incompatible");
             connect_txn_sink
@@ -769,6 +830,8 @@ impl ClientSme {
     }
 
     pub fn status(&self) -> ClientSmeStatus {
+        // `self.state` is always set to another state on transition and thus always present
+        #[expect(clippy::expect_used)]
         self.state.as_ref().expect("expected state to be always present").status()
     }
 
@@ -912,6 +975,7 @@ mod tests {
     use crate::Config as SmeConfig;
     use ieee80211::MacAddr;
     use lazy_static::lazy_static;
+    use std::collections::HashSet;
     use test_case::test_case;
     use wlan_common::{
         assert_variant,
@@ -1008,7 +1072,42 @@ mod tests {
     #[test_case(FakeProtectionCfg::Wpa2TkipOnly)]
     #[test_case(FakeProtectionCfg::Wpa2)]
     #[test_case(FakeProtectionCfg::Wpa2Wpa3)]
-    fn default_client_protection_compatible(protection: FakeProtectionCfg) {
+    fn default_client_protection_is_bss_compatible(protection: FakeProtectionCfg) {
+        let cfg = ClientConfig::default();
+        let fake_device_info = test_utils::fake_device_info([1u8; 6].into());
+        assert!(cfg
+            .bss_compatibility(
+                &fake_bss_description!(protection => protection),
+                &fake_device_info,
+                &fake_security_support_empty()
+            )
+            .is_ok(),);
+    }
+
+    #[test_case(FakeProtectionCfg::Wpa1)]
+    #[test_case(FakeProtectionCfg::Wpa3)]
+    #[test_case(FakeProtectionCfg::Wpa3Transition)]
+    #[test_case(FakeProtectionCfg::Eap)]
+    fn default_client_protection_is_bss_incompatible(protection: FakeProtectionCfg) {
+        let cfg = ClientConfig::default();
+        let fake_device_info = test_utils::fake_device_info([1u8; 6].into());
+        assert!(cfg
+            .bss_compatibility(
+                &fake_bss_description!(protection => protection),
+                &fake_device_info,
+                &fake_security_support_empty()
+            )
+            .is_err(),);
+    }
+
+    #[test_case(FakeProtectionCfg::Open)]
+    #[test_case(FakeProtectionCfg::Wpa1Wpa2TkipOnly)]
+    #[test_case(FakeProtectionCfg::Wpa2TkipOnly)]
+    #[test_case(FakeProtectionCfg::Wpa2)]
+    #[test_case(FakeProtectionCfg::Wpa2Wpa3)]
+    fn compatible_default_client_protection_security_protocol_intersection_is_non_empty(
+        protection: FakeProtectionCfg,
+    ) {
         let cfg = ClientConfig::default();
         assert!(!cfg
             .security_protocol_intersection(
@@ -1022,14 +1121,44 @@ mod tests {
     #[test_case(FakeProtectionCfg::Wpa3)]
     #[test_case(FakeProtectionCfg::Wpa3Transition)]
     #[test_case(FakeProtectionCfg::Eap)]
-    fn default_client_bss_protection_incompatible(protection: FakeProtectionCfg) {
+    fn incompatible_default_client_protection_security_protocol_intersection_is_empty(
+        protection: FakeProtectionCfg,
+    ) {
         let cfg = ClientConfig::default();
         assert!(cfg
             .security_protocol_intersection(
                 &fake_bss_description!(protection => protection),
                 &fake_security_support_empty()
             )
-            .is_empty());
+            .is_empty(),);
+    }
+
+    #[test_case(FakeProtectionCfg::Wpa1, [SecurityDescriptor::WPA1])]
+    #[test_case(FakeProtectionCfg::Wpa3, [SecurityDescriptor::WPA3_PERSONAL])]
+    #[test_case(FakeProtectionCfg::Wpa3Transition, [SecurityDescriptor::WPA3_PERSONAL])]
+    // This BSS configuration is not specific enough to detect security protocols.
+    #[test_case(FakeProtectionCfg::Eap, [])]
+    fn default_client_protection_security_protocols_by_mac_role_eq(
+        protection: FakeProtectionCfg,
+        expected: impl IntoIterator<Item = SecurityDescriptor>,
+    ) {
+        let cfg = ClientConfig::default();
+        let security_protocols: HashSet<_> = cfg
+            .security_protocols_by_mac_role(&fake_bss_description!(protection => protection))
+            .collect();
+        // The protocols here are not necessarily disjoint between client and AP. Note that
+        // security descriptors are less specific than BSS fixtures.
+        assert_eq!(
+            security_protocols,
+            HashSet::from_iter(
+                [
+                    (SecurityDescriptor::OPEN, MacRole::Client),
+                    (SecurityDescriptor::WPA2_PERSONAL, MacRole::Client),
+                ]
+                .into_iter()
+                .chain(expected.into_iter().map(|protocol| (protocol, MacRole::Ap)))
+            ),
+        );
     }
 
     #[test]
@@ -1116,7 +1245,7 @@ mod tests {
         assert_eq!(
             scan_result,
             ScanResult {
-                compatibility: Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),
+                compatibility: Compatible::expect_ok([SecurityDescriptor::WPA2_PERSONAL]),
                 timestamp,
                 bss_description,
             }
@@ -1146,7 +1275,7 @@ mod tests {
         assert_eq!(
             scan_result,
             ScanResult {
-                compatibility: Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),
+                compatibility: Compatible::expect_ok([SecurityDescriptor::WPA2_PERSONAL]),
                 timestamp,
                 bss_description,
             }
@@ -1169,7 +1298,21 @@ mod tests {
             &device_info,
             &fake_security_support(),
         );
-        assert_eq!(scan_result, ScanResult { compatibility: None, timestamp, bss_description },);
+        assert_eq!(
+            scan_result,
+            ScanResult {
+                compatibility: Incompatible::expect_err(
+                    "incompatible channel, PHY data rates, or security protocols",
+                    Some([
+                        (SecurityDescriptor::WEP, MacRole::Ap),
+                        (SecurityDescriptor::OPEN, MacRole::Client),
+                        (SecurityDescriptor::WPA2_PERSONAL, MacRole::Client),
+                    ])
+                ),
+                timestamp,
+                bss_description,
+            },
+        );
 
         let cfg = ClientConfig::from_config(Config::default().with_wep(), false);
         let bss_description = fake_bss_description!(Wep,
@@ -1192,7 +1335,7 @@ mod tests {
         assert_eq!(
             scan_result,
             ScanResult {
-                compatibility: Compatibility::expect_some([SecurityDescriptor::WEP]),
+                compatibility: Compatible::expect_ok([SecurityDescriptor::WEP]),
                 timestamp,
                 bss_description,
             }

@@ -16,8 +16,12 @@
     ],
     offer: [
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#netemul-guest",
+        },
+        {
             protocol: [
-                "fuchsia.inspect.InspectSink",
                 "fuchsia.kernel.HypervisorResource",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.logger.LogSink",

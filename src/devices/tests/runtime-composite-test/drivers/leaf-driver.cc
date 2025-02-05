@@ -39,7 +39,7 @@ zx_status_t LeafDriver::Bind(void* ctx, zx_device_t* device) {
                                        bind_test::TEST_PROP_VALUE_2.c_str()};
   const ddk::BindRule node_2_bind_rules[] = {
       ddk::MakeAcceptBindRuleList(bind_test::TEST_PROP, node_2_props_values),
-      ddk::MakeRejectBindRule(20, 10),
+      ddk::MakeRejectBindRule(bind_fuchsia::USB_VID, 10u),
   };
 
   const device_bind_prop_t node_2_properties[] = {

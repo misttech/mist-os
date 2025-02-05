@@ -80,15 +80,14 @@ void Fence::OnRefDisarmed(FenceReference* ref) {
 void Fence::OnReady(async_dispatcher_t* dispatcher, async::WaitBase* self, zx_status_t status,
                     const zx_packet_signal_t* signal) {
   ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent() == fence_creation_dispatcher_);
-
-  ZX_DEBUG_ASSERT(status == ZX_OK && (signal->observed & ZX_EVENT_SIGNALED));
+  ZX_DEBUG_ASSERT_MSG(status == ZX_OK, "Fence::OnReady failed: %s", zx_status_get_string(status));
+  ZX_DEBUG_ASSERT(signal->observed & ZX_EVENT_SIGNALED);
   TRACE_DURATION("gfx", "Display::Fence::OnReady");
   TRACE_FLOW_END("gfx", "event_signal", koid_);
 
   event_.signal(ZX_EVENT_SIGNALED, 0);
 
   fbl::RefPtr<FenceReference> ref = armed_refs_.pop_front();
-  ref->OnReady();
   cb_->OnFenceFired(ref.get());
 
   if (!armed_refs_.is_empty()) {
@@ -129,14 +128,6 @@ void FenceReference::ResetReadyWait() {
   fence_->OnRefDisarmed(this);
 }
 
-void FenceReference::OnReady() {
-  ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent() == fence_creation_dispatcher_);
-  if (release_fence_) {
-    release_fence_->Signal();
-    release_fence_ = nullptr;
-  }
-}
-
 void FenceReference::Signal() const { fence_->Signal(); }
 
 FenceReference::FenceReference(fbl::RefPtr<Fence> fence,
@@ -173,26 +164,17 @@ void FenceCollection::Clear() {
 
 zx_status_t FenceCollection::ImportEvent(zx::event event, display::EventId id) {
   fbl::AutoLock lock(&mtx_);
-  auto fence = fences_.find(id);
-  // Create and ref a new fence.
-  if (!fence.IsValid()) {
-    // TODO(stevensd): it would be good for this not to be able to fail due to allocation failures
-    fbl::AllocChecker ac;
-    auto new_fence = fbl::AdoptRef(new (&ac) Fence(this, dispatcher_, id, std::move(event)));
-    if (ac.check() && new_fence->CreateRef()) {
-      fences_.insert_or_find(std::move(new_fence));
-    } else {
-      FDF_LOG(ERROR, "Failed to allocate fence ref for event#%ld", id.value());
-      return ZX_ERR_NO_MEMORY;
-    }
-    return ZX_OK;
+  Fence::Map::iterator fence = fences_.find(id);
+  if (fence.IsValid()) {
+    FDF_LOG(ERROR, "Illegal to import an event with existing ID#%ld", id.value());
+    return ZX_ERR_ALREADY_EXISTS;
   }
 
-  // Ref an existing fence
-  if (fence->event() != event.get()) {
-    FDF_LOG(ERROR, "Cannot reuse event#%ld for zx::event %u", id.value(), event.get());
-    return ZX_ERR_INVALID_ARGS;
-  } else if (!fence->CreateRef()) {
+  fbl::AllocChecker ac;
+  auto new_fence = fbl::AdoptRef(new (&ac) Fence(this, dispatcher_, id, std::move(event)));
+  if (ac.check() && new_fence->CreateRef()) {
+    fences_.insert_or_find(std::move(new_fence));
+  } else {
     FDF_LOG(ERROR, "Failed to allocate fence ref for event#%ld", id.value());
     return ZX_ERR_NO_MEMORY;
   }

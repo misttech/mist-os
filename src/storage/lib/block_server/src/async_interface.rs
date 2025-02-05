@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{
-    DecodedRequest, GroupOrRequest, IntoSessionManager, Operation, PartitionInfo, SessionHelper,
-};
+use super::{DecodedRequest, IntoSessionManager, Operation, PartitionInfo, SessionHelper};
 use anyhow::Error;
-use block_protocol::{BlockFifoRequest, BlockFifoResponse, WriteOptions};
+use block_protocol::{BlockFifoRequest, WriteOptions};
 use fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _};
 use futures::stream::StreamExt as _;
 use futures::FutureExt;
@@ -136,30 +134,13 @@ impl<I: Interface> super::SessionManager for SessionManager<I> {
                             let fifo = fifo.clone();
                             let helper = helper.clone();
                             scope_ref.spawn(async move {
-                                let group_or_request = decoded_request.group_or_request;
+                                let tracking = decoded_request.request_tracking;
                                 let status =
                                     process_fifo_request(interface, decoded_request).await.into();
-                                match group_or_request {
-                                    GroupOrRequest::Group(group_id) => {
-                                        if let Some(response) =
-                                            helper.message_groups.complete(group_id, status)
-                                        {
-                                            if let Err(_) = fifo.write_entries(&response).await {
-                                                return;
-                                            }
-                                        }
-                                    }
-                                    GroupOrRequest::Request(reqid) => {
-                                        if let Err(_) = fifo
-                                            .write_entries(&BlockFifoResponse {
-                                                status: status.into_raw(),
-                                                reqid,
-                                                ..Default::default()
-                                            })
-                                            .await
-                                        {
-                                            return;
-                                        }
+                                if let Some(response) = helper.finish_fifo_request(tracking, status)
+                                {
+                                    if let Err(_) = fifo.write_entries(&response).await {
+                                        return;
                                     }
                                 }
                             });

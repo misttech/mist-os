@@ -42,6 +42,8 @@ class FakeLogSink : public fuchsia::logger::LogSink {
     // Ignored.
   }
 
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override { abort(); }
+
   struct Wait : async_wait_t {
     FakeLogSink* this_ptr;
     Wait* next = this;

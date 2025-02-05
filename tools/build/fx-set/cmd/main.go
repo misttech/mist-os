@@ -113,12 +113,12 @@ func mainImpl(ctx context.Context) error {
 	}
 
 	var staticSpec *fintpb.Static
+	canUseRbe, err := canAccessRbe(args.checkoutDir)
+	if err != nil {
+		fmt.Printf("Unable to determine RBE access, assuming False.")
+		canUseRbe = false
+	}
 	if args.fintParamsPath == "" {
-		canUseRbe, err := canAccessRbe(args.checkoutDir)
-		if err != nil {
-			fmt.Printf("Unable to determine RBE access, assuming False.")
-			canUseRbe = false
-		}
 		staticSpec, err = constructStaticSpec(args.checkoutDir, args, canUseRbe)
 		if err != nil {
 			return err
@@ -133,6 +133,10 @@ func mainImpl(ctx context.Context) error {
 			return err
 		}
 		staticSpec.GnArgs = append(staticSpec.GnArgs, args.gnArgs...)
+		staticSpec, err = applyRbeSettings(staticSpec, args, canUseRbe)
+		if err != nil {
+			return err
+		}
 	}
 
 	contextSpec := &fintpb.Context{
@@ -380,6 +384,47 @@ func constructStaticSpec(checkoutDir string, args *setArgs, canUseRbe bool) (*fi
 		variants = append(variants, fuzzerVariants(sanitizer)...)
 	}
 
+	gnArgs := args.gnArgs
+
+	// fint already translates the *_rbe_enable variables into GN args.
+
+	if args.buildEventService != "" {
+		gnArgs = append(gnArgs, fmt.Sprintf("bazel_upload_build_events = \"%s\"", args.buildEventService))
+	}
+
+	if args.includeClippy {
+		gnArgs = append(gnArgs, "include_clippy=true")
+	}
+
+	hostLabels := args.hostLabels
+	if args.cargoTOMLGen {
+		hostLabels = append(hostLabels, "//build/rust:cargo_toml_gen")
+	}
+
+	static := &fintpb.Static{
+		Board:               boardPath,
+		Product:             productPath,
+		MainPbLabel:         args.mainPbLabel,
+		CompilationMode:     compilationMode,
+		BasePackages:        args.basePackages,
+		CachePackages:       args.cachePackages,
+		UniversePackages:    args.universePackages,
+		HostLabels:          hostLabels,
+		DeveloperTestLabels: args.testLabels,
+		Variants:            variants,
+		GnArgs:              gnArgs,
+		RustRbeEnable:       args.enableRustRbe,
+		LinkRbeEnable:       args.enableLinkRbe,
+		BazelRbeEnable:      args.enableBazelRbe,
+		BuildEventService:   args.buildEventService,
+		IdeFiles:            args.ideFiles,
+		JsonIdeScripts:      args.jsonIDEScripts,
+		ExportRustProject:   true,
+	}
+	return applyRbeSettings(static, args, canUseRbe)
+}
+
+func applyRbeSettings(static *fintpb.Static, args *setArgs, canUseRbe bool) (*fintpb.Static, error) {
 	rbeSupported := rbeIsSupported()
 	rbeMode := args.rbeMode
 	if rbeMode == "auto" {
@@ -439,7 +484,7 @@ func constructStaticSpec(checkoutDir string, args *setArgs, canUseRbe bool) (*fi
 		useCcacheFinal = false
 	}
 
-	gnArgs := args.gnArgs
+	gnArgs := static.GnArgs
 	if useCcacheFinal {
 		gnArgs = append(gnArgs, "use_ccache=true")
 	}
@@ -448,42 +493,9 @@ func constructStaticSpec(checkoutDir string, args *setArgs, canUseRbe bool) (*fi
 	// This makes it easier for users to `fx args` and edit.
 	gnArgs = append(gnArgs, fmt.Sprintf("rbe_mode=\"%s\"", rbeMode))
 
-	// fint already translates the *_rbe_enable variables into GN args.
-
-	if args.buildEventService != "" {
-		gnArgs = append(gnArgs, fmt.Sprintf("bazel_upload_build_events = \"%s\"", args.buildEventService))
-	}
-
-	if args.includeClippy {
-		gnArgs = append(gnArgs, "include_clippy=true")
-	}
-
-	hostLabels := args.hostLabels
-	if args.cargoTOMLGen {
-		hostLabels = append(hostLabels, "//build/rust:cargo_toml_gen")
-	}
-
-	return &fintpb.Static{
-		Board:               boardPath,
-		Product:             productPath,
-		MainPbLabel:         args.mainPbLabel,
-		CompilationMode:     compilationMode,
-		BasePackages:        args.basePackages,
-		CachePackages:       args.cachePackages,
-		UniversePackages:    args.universePackages,
-		HostLabels:          hostLabels,
-		DeveloperTestLabels: args.testLabels,
-		Variants:            variants,
-		GnArgs:              gnArgs,
-		RustRbeEnable:       args.enableRustRbe,
-		CxxRbeEnable:        useCxxRbeFinal,
-		LinkRbeEnable:       args.enableLinkRbe,
-		BazelRbeEnable:      args.enableBazelRbe,
-		BuildEventService:   args.buildEventService,
-		IdeFiles:            args.ideFiles,
-		JsonIdeScripts:      args.jsonIDEScripts,
-		ExportRustProject:   true,
-	}, nil
+	static.GnArgs = gnArgs
+	static.CxxRbeEnable = useCxxRbeFinal
+	return static, nil
 }
 
 // fuzzerVariants produces the variants for enabling a sanitizer on fuzzers.

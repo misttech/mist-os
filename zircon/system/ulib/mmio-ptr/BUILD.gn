@@ -10,16 +10,10 @@ zx_library("mmio-ptr") {
   sdk = "source"
   stable = true
   sdk_publishable = "partner"
-  sdk_headers = [ "lib/mmio-ptr/mmio-ptr.h" ]
-}
-
-zx_library("mmio-ptr-fake") {
-  sources = []
-  deps = [ ":mmio-ptr" ]
-
-  sdk = "source"
-  sdk_publishable = "internal"
-  sdk_headers = [ "lib/mmio-ptr/fake.h" ]
+  sdk_headers = [
+    "lib/mmio-ptr/fake.h",
+    "lib/mmio-ptr/mmio-ptr.h",
+  ]
 }
 
 group("tests") {

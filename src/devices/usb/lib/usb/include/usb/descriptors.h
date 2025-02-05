@@ -139,6 +139,7 @@
 #define USB_ENDPOINT_IMPLICIT_FEEDBACK 0x20
 #define USB_ENDPOINT_USAGE_MASK 0x30
 
+/* Endpoint feature selectors */
 #define USB_ENDPOINT_HALT 0x00
 
 typedef uint32_t usb_mode_t;

@@ -16,10 +16,10 @@ use fuchsia_inspect::Node as InspectNode;
 use fuchsia_sync::Mutex;
 use futures::channel::{mpsc, oneshot};
 use futures::{select, Future, StreamExt};
+use log::{info, warn};
 use static_assertions::const_assert_eq;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tracing::{info, warn};
 use windowed_stats::aggregations::SumAndCount;
 use {fuchsia_async as fasync, network_policy_metrics_registry as metrics};
 

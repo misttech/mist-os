@@ -44,7 +44,10 @@ fuchsia_cc_driver("usb-mass-storage-driver") {
 }
 
 fuchsia_driver_component("usb-mass-storage") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/devices/block:drivers",
+  ]
   component_name = "usb-mass-storage"
   deps = [ ":usb-mass-storage-driver" ]
   info = "meta/usb-mass-storage-info.json"

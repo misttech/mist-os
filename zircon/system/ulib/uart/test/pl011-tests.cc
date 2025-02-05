@@ -10,6 +10,9 @@
 
 #include <zxtest/zxtest.h>
 
+#include "lib/uart/sync.h"
+#include "lib/zircon-internal/macros.h"
+
 namespace {
 
 using SimpleTestDriver =
@@ -113,6 +116,9 @@ TEST(Pl011Tests, InitInterrupt) {
   EXPECT_TRUE(unmasked_irq);
 }
 
+using UnsyncronizedGuard =
+    uart::UnsynchronizedPolicy::Guard<uart::UnsynchronizedPolicy::DefaultLockPolicy>;
+
 TEST(Pl011Tests, RxIrqEmptyFifo) {
   SimpleTestDriver driver(kTestConfig);
 
@@ -127,9 +133,8 @@ TEST(Pl011Tests, RxIrqEmptyFifo) {
   // Empty Fifo bit is set, so it should just return.
 
   int call_count = 0;
-  driver.Interrupt([](auto& sync, auto& waiter,
-                      auto&& disable_tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
-                   [&](auto& sync, auto&& reader, auto&& full) { call_count++; });
+  driver.Interrupt([](auto& rx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
+                   [&](auto& rx_rq) { call_count++; });
 
   driver.io().mock().VerifyAndClear();
   EXPECT_EQ(call_count, 0);
@@ -151,12 +156,12 @@ TEST(Pl011Tests, RxIrqWithNonEmptyFifoAndNonFullQueue) {
       .ExpectRead<uint16_t>(0b1'0000, 0x18);  // Read from flag register, fifo is empty.
 
   int call_count = 0;
-  driver.Interrupt([](auto& sync, auto& waiter,
-                      auto&& disable_tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
-                   [&](auto& sync, auto&& reader, auto&& full) {
+  driver.Interrupt([](auto& tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
+                   [&](auto& rx_irq) {
                      char expected_c = call_count == 0 ? 123 : 111;
                      call_count++;
-                     auto c = reader();
+                     UnsyncronizedGuard g(&rx_irq.lock(), SOURCE_TAG);
+                     auto c = rx_irq.ReadChar();
                      ASSERT_TRUE(c);
                      EXPECT_EQ(c, expected_c);
                    });
@@ -180,12 +185,12 @@ TEST(Pl011Tests, RxTimeoutIrqWithNonEmptyFifoAndNonFullQueue) {
       .ExpectRead<uint16_t>(0b1'0000, 0x18);   // Read from flag register, fifo is empty.
 
   int call_count = 0;
-  driver.Interrupt([](auto& sync, auto& waiter,
-                      auto&& disable_tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
-                   [&](auto& sync, auto&& reader, auto&& full) {
+  driver.Interrupt([](auto& tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
+                   [&](auto& rx_irq) {
                      char expected_c = call_count == 0 ? 123 : 111;
                      call_count++;
-                     auto c = reader();
+                     UnsyncronizedGuard g(&rx_irq.lock(), SOURCE_TAG);
+                     auto c = rx_irq.ReadChar();
                      ASSERT_TRUE(c);
                      EXPECT_EQ(c, expected_c);
                    });
@@ -208,10 +213,10 @@ TEST(Pl011Tests, RxIrqWithNonEmptyFifoAndFullQueue) {
           0, 0x38);  // The SW queue is full, so we should disable the RX interrupts.
 
   int call_count = 0;
-  driver.Interrupt([](auto& sync, auto& waiter,
-                      auto&& disable_tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
-                   [&](auto& sync, auto&& reader, auto&& full) {
-                     full();
+  driver.Interrupt([](auto& tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
+                   [&](auto& rx_irq) {
+                     UnsyncronizedGuard g(&rx_irq.lock(), SOURCE_TAG);
+                     rx_irq.DisableInterrupt();
                      call_count++;
                    });
 
@@ -232,13 +237,12 @@ TEST(Pl011Tests, TxIrqOnly) {
 
   int call_count = 0;
   driver.Interrupt(
-      [&](auto& sync, auto& waiter, auto&& disable_tx_irq) {
+      [&](auto& rx_irq) {
         call_count++;
-        disable_tx_irq();
+        UnsyncronizedGuard g(&rx_irq.lock(), SOURCE_TAG);
+        rx_irq.DisableInterrupt();
       },
-      [](auto& sync, auto&& reader, auto&& full) {
-        FAIL("Unexpected call on |tx| irq callback.");
-      });
+      [](auto& tx_irq) { FAIL("Unexpected call on |tx| irq callback."); });
 
   EXPECT_EQ(call_count, 1);
 }

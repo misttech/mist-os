@@ -90,6 +90,7 @@
 #include <linux/un.h>
 #include <linux/unistd.h>
 #include <linux/usb/functionfs.h>
+#include <linux/userfaultfd.h>
 #include <linux/utsname.h>
 #include <linux/vm_sockets.h>
 #include <linux/wait.h>

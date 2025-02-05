@@ -233,7 +233,10 @@ impl ObjectManager {
             self.open_store(&root_store, store_id).await?;
         }
 
-        self.init_metadata_reservation()?;
+        // This can fail if a filesystem is created and truncated to a size
+        // that doesn't leave enough free space for metadata reservations.
+        self.init_metadata_reservation()
+            .context("Insufficient free space for metadata reservation.")?;
 
         Ok(())
     }
@@ -284,7 +287,7 @@ impl ObjectManager {
         context: &ApplyContext<'_, '_>,
         associated_object: AssocObj<'_>,
     ) -> Result<(), Error> {
-        debug!(oid = object_id, ?mutation, "applying mutation");
+        debug!(oid = object_id, mutation:?; "applying mutation");
         let object = {
             let mut inner = self.inner.write().unwrap();
             match mutation {
@@ -354,7 +357,7 @@ impl ObjectManager {
         context: &ApplyContext<'_, '_>,
         end_offset: u64,
     ) -> Result<(), Error> {
-        debug!(checkpoint = context.checkpoint.file_offset, "REPLAY");
+        debug!(checkpoint = context.checkpoint.file_offset; "REPLAY");
         let txn_size = {
             let mut inner = self.inner.write().unwrap();
             if end_offset > inner.last_end_offset {
@@ -420,7 +423,7 @@ impl ObjectManager {
         let old_amount = self.metadata_reservation().amount();
         let old_required = self.inner.read().unwrap().required_reservation();
 
-        debug!(checkpoint = checkpoint.file_offset, "BEGIN TXN");
+        debug!(checkpoint = checkpoint.file_offset; "BEGIN TXN");
         let mutations = transaction.take_mutations();
         let context =
             ApplyContext { mode: ApplyMode::Live(transaction), checkpoint: checkpoint.clone() };

@@ -2,22 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/toolchain/basic_toolchain.gni")
-
-# Define a toolchain to build the Zircon sysroot.
-basic_toolchain("sysroot_toolchain") {
-  # As a special case, it is necesssary to perform variant selection
-  # for the user.libc_$cpu toolchain, within the context of sysroot_toolchain.
-  # This happens in //zircon/system/ulib/c/libc_toolchain.gni
-  # To make this work, it is necessary to pass the select_variant_canonical
-  # global variable to the new toolchain instance.
-  _select_variant_canonical = select_variant_canonical
-  toolchain_args = {
-    select_variant_canonical = []
-    select_variant_canonical = _select_variant_canonical
-  }
-}
-
 # The zx_library() template accepts an optional `sdk_publishable` argument that
 # indicates that the library should be included in the SDK in the specified
 # category. Since "partner" is the only category that is published, this should
@@ -36,6 +20,7 @@ group("sdk_category_partner_allowlist") {
     "//src/devices/lib/mmio/*",
   ]
 }
+
 group("sdk_category_internal_allowlist") {
   # See https://fxbug.dev/333125197 and https://fxbug.dev/331961405.
   # TODO(https://fxbug.dev/333907192) Remove once @internal_sdk is eliminated.
@@ -48,6 +33,7 @@ group("sdk_category_internal_allowlist") {
     "//zircon/system/ulib/mmio-ptr/*",
   ]
 }
+
 group("sdk_category_firmware_allowlist") {
   # See https://fxbug.dev/331962496 and https://fxbug.dev/331961405. This can be
   # removed when the firmware SDK is no longer using zx_library().

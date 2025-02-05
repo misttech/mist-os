@@ -25,12 +25,13 @@
 
 #include "src/devices/lib/log/log.h"
 #include "src/devices/misc/drivers/compat/compat_driver_server.h"
-#include "src/devices/misc/drivers/compat/loader.h"
 #include "src/lib/driver_symbols/symbols.h"
 
 namespace fboot = fuchsia_boot;
 namespace fdf {
+
 using namespace fuchsia_driver_framework;
+
 }
 namespace fio = fuchsia_io;
 namespace fkernel = fuchsia_kernel;
@@ -44,18 +45,12 @@ using fpromise::ok;
 using fpromise::promise;
 using fpromise::result;
 
-// This lock protects any globals, as globals could be accessed by other
-// drivers and other threads within the process.
-// Currently this protects the root resource and the loader service.
-std::mutex kDriverGlobalsLock;
-
 namespace {
 
 constexpr auto kOpenFlags =
     fio::Flags::kPermRead | fio::Flags::kPermExecute | fio::Flags::kProtocolFile;
 constexpr auto kVmoFlags =
     fio::wire::VmoFlags::kRead | fio::wire::VmoFlags::kExecute | fio::wire::VmoFlags::kPrivateClone;
-constexpr auto kLibDriverPath = "/pkg/driver/compat.so";
 
 std::string_view GetFilename(std::string_view path) {
   size_t index = path.rfind('/');
@@ -103,18 +98,6 @@ zx::result<zx::resource> GetPowerResource(fdf::Namespace& ns) {
 
 zx::result<zx::resource> GetIommuResource(fdf::Namespace& ns) {
   zx::result resource = ns.Connect<fkernel::IommuResource>();
-  if (resource.is_error()) {
-    return resource.take_error();
-  }
-  fidl::WireResult result = fidl::WireCall(resource.value())->Get();
-  if (!result.ok()) {
-    return zx::error(result.status());
-  }
-  return zx::ok(std::move(result.value().resource));
-}
-
-zx::result<zx::resource> GetFramebufferResource(fdf::Namespace& ns) {
-  zx::result resource = ns.Connect<fkernel::FramebufferResource>();
   if (resource.is_error()) {
     return resource.take_error();
   }
@@ -247,6 +230,17 @@ promise<void, zx_status_t> GetAndAddMetadata(
   return bridge.consumer.promise_or(error(ZX_ERR_INTERNAL));
 }
 
+bool GlobalLoggerList::LoggerInstances::IsSeverityEnabled(FuchsiaLogSeverity severity) const {
+  std::lock_guard guard(kGlobalLoggerListLock);
+  auto it = loggers_.begin();
+
+  if (it == loggers_.end()) {
+    return severity >= driver_logger::GetLogger().GetSeverity();
+  }
+
+  return severity >= (*it)->GetSeverity();
+}
+
 void GlobalLoggerList::LoggerInstances::Log(FuchsiaLogSeverity severity, const char* tag,
                                             const char* file, int line, const char* msg,
                                             va_list args) {
@@ -353,13 +347,6 @@ Driver::~Driver() {
 }
 
 void Driver::Start(fdf::StartCompleter completer) {
-  zx::result loader_vmo = LoadVmo(*incoming(), kLibDriverPath, kOpenFlags);
-  if (loader_vmo.is_error()) {
-    logger_->log(fdf::ERROR, "Failed to open loader vmo: {}", loader_vmo);
-    completer(loader_vmo.take_error());
-    return;
-  }
-
   zx::result driver_vmo = LoadVmo(*incoming(), driver_path_.c_str(), kOpenFlags);
   if (driver_vmo.is_error()) {
     logger_->log(fdf::ERROR, "Failed to open driver vmo: {}", driver_vmo);
@@ -375,7 +362,7 @@ void Driver::Start(fdf::StartCompleter completer) {
     // We don't need to exit on this error, there will just be less debugging information.
   }
 
-  if (zx::result result = LoadDriver(std::move(loader_vmo.value()), std::move(driver_vmo.value()));
+  if (zx::result result = LoadDriver(driver_path_, std::move(driver_vmo.value()));
       result.is_error()) {
     logger_->log(fdf::ERROR, "Failed to load driver: {}", result);
     completer(result.take_error());
@@ -455,18 +442,6 @@ zx_handle_t Driver::GetIommuResource() {
     }
   }
   return iommu_resource_.get();
-}
-
-zx_handle_t Driver::GetFramebufferResource() {
-  if (!framebuffer_resource_.is_valid()) {
-    zx::result resource = ::GetFramebufferResource(*incoming());
-    if (resource.is_ok()) {
-      framebuffer_resource_ = std::move(resource.value());
-    } else {
-      logger_->log(fdf::WARN, "Failed to get framebuffer_resource '{}'", resource);
-    }
-  }
-  return framebuffer_resource_.get();
 }
 
 zx_handle_t Driver::GetIoportResource() {
@@ -626,65 +601,34 @@ void Driver::PrepareStop(fdf::PrepareStopCompleter completer) {
       }));
 }
 
-zx::result<> Driver::LoadDriver(zx::vmo loader_vmo, zx::vmo driver_vmo) {
+zx::result<> Driver::LoadDriver(std::string_view module_name, zx::vmo driver_vmo) {
   std::string_view url_str = url().value();
 
-  // Replace loader service to load the DFv1 driver, load the driver,
-  // then place the original loader service back.
-  {
-    // This requires a lock because the loader is a global variable.
-    std::scoped_lock lock(kDriverGlobalsLock);
-    zx::result new_loader_endpoints = fidl::CreateEndpoints<fldsvc::Loader>();
-    if (new_loader_endpoints.is_error()) {
-      return new_loader_endpoints.take_error();
+  auto result = driver_symbols::FindRestrictedSymbols(driver_vmo, url_str);
+  if (result.is_error()) {
+    logger_->log(fdf::WARN, "Driver '{}' failed to validate as ELF: {}", url_str,
+                 result.status_value());
+  } else if (result->size() > 0) {
+    logger_->log(fdf::ERROR, "Driver '{}' referenced {} restricted libc symbols: ", url_str,
+                 result->size());
+    for (auto& str : *result) {
+      LOGF(ERROR, str.c_str());
     }
-    fidl::ClientEnd<fldsvc::Loader> original_loader(
-        zx::channel(dl_set_loader_service(new_loader_endpoints->client.channel().release())));
-    auto reset_loader = fit::defer([&original_loader]() {
-      zx::channel l = zx::channel(dl_set_loader_service(original_loader.TakeChannel().release()));
-    });
-
-    // Start loader.
-    async::Loop loader_loop(&kAsyncLoopConfigNeverAttachToThread);
-    zx_status_t status = loader_loop.StartThread("loader-loop");
-    if (status != ZX_OK) {
-      logger_->log(fdf::ERROR,
-                   "Failed to load driver '{}', could not start thread for loader loop: {}",
-                   url_str, zx::make_result(status));
-      return zx::error(status);
-    }
-    Loader loader(loader_loop.dispatcher(), original_loader.borrow(), std::move(loader_vmo));
-    fidl::BindServer(loader_loop.dispatcher(), std::move(new_loader_endpoints->server), &loader);
-
-    auto result = driver_symbols::FindRestrictedSymbols(driver_vmo, url_str);
-    if (result.is_error()) {
-      LOGF(WARNING, "Driver '{}' failed to validate as ELF: {}", url_str, result.status_value());
-    } else if (result->size() > 0) {
-      LOGF(ERROR, "Driver '{}' referenced {} restricted libc symbols: ", url_str, result->size());
-      for (auto& str : *result) {
-        LOGF(ERROR, str.c_str());
-      }
-      return zx::error(ZX_ERR_NOT_SUPPORTED);
-    }
-
-    // Open driver.
-    library_ = dlopen_vmo(driver_vmo.get(), RTLD_NOW);
-    if (library_ == nullptr) {
-      logger_->log(fdf::ERROR, "Failed to load driver '{}', could not load library: {}", url_str,
-                   dlerror());
-      return zx::error(ZX_ERR_INTERNAL);
-    }
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
-  // Load and verify symbols.
-  auto note = static_cast<const zircon_driver_note_t*>(dlsym(library_, "__zircon_driver_note__"));
+  // Find symbols
+  module_name.remove_prefix(5);  // Remove leading "/pkg/"
+  auto* note = fdf_internal::GetSymbol<const zircon_driver_note_t*>(symbols(), module_name,
+                                                                    "__zircon_driver_note__");
   if (note == nullptr) {
     logger_->log(fdf::ERROR, "Failed to load driver '{}', driver note not found", url_str);
     return zx::error(ZX_ERR_BAD_STATE);
   }
   driver_name_ = note->payload.name;
   logger_->log(fdf::INFO, "Loaded driver '{}'", driver_name_);
-  record_ = static_cast<zx_driver_rec_t*>(dlsym(library_, "__zircon_driver_rec__"));
+  record_ =
+      fdf_internal::GetSymbol<zx_driver_rec_t*>(symbols(), module_name, "__zircon_driver_rec__");
   if (record_ == nullptr) {
     logger_->log(fdf::ERROR, "Failed to load driver '{}', driver record not found", url_str);
     return zx::error(ZX_ERR_BAD_STATE);

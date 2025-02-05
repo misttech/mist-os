@@ -25,6 +25,11 @@
             subdir: "data",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: "#vsock-sshd-host",
+        },
+        {
             directory: "boot",
             from: "parent",
             as: "config",

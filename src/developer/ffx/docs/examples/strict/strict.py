@@ -32,5 +32,42 @@ ssh_key = f"{os.environ['HOME']}/.ssh/fuchsia_ed25519"
 runner = ffx.FfxRunner("my.log", ssh_key)
 # runner.discover_target()
 runner.set_target(os.environ["FUCHSIA_NODENAME"])
-out = runner.target_echo("foo")
-assert out == "foo", f"expected:\n\t'foo'\ngot:\n\t'{out}'"
+
+# Print the output from `ffx target echo Hello`.
+print("Running ffx target echo Hello in strict mode:")
+out = runner.target_echo("Hello")
+print(out)
+print()
+
+# Make sure that the returned message is "Hello".
+assert out == "Hello", f"expected:\n\t'Hello'\ngot:\n\t'{out}'"
+
+# Print the output from `ffx target list`.
+print("Running ffx target list in strict mode:")
+target_list = runner.target_list(None)
+print(target_list)
+print()
+
+# Make sure that the returned target_state is "Product".
+target_state = target_list[0]["target_state"]
+assert (
+    target_state == "Product"
+), f"expected:\n\t'Product'\ngot:\n\t'{target_state}'"
+
+# Print the output from `ffx target show`
+print("Running ffx target show in strict mode:")
+target_show = runner.target_show()
+print(target_show)
+print()
+
+# Make sure that the returned compatibility_state is "supported".
+compatibility_state = target_show["target"]["compatibility_state"]
+assert (
+    compatibility_state == "supported"
+), f"expected:\n\t'supported'\ngot:\n\t'{compatibility_state}'"
+
+# Print the number of components returned from `ffx component list`
+print("Running ffx component list in strict mode:")
+component_list = runner.component_list()
+print(f"{len(component_list)} components are found on this target device.")
+print()

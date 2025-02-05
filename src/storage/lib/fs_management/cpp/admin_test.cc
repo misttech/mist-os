@@ -80,7 +80,7 @@ class OutgoingDirectoryFixture : public testing::Test {
 
       zx_status_t status;
       if (format_ == kDiskFormatFxfs) {
-        zx::result service = fs_test::GetCryptService();
+        zx::result service = fs_test::InitializeCryptService();
         ASSERT_TRUE(service.is_ok());
         zx::result status =
             MkfsWithDefault(ramdisk_.path().c_str(), *component_, {}, *std::move(service));
@@ -99,12 +99,11 @@ class OutgoingDirectoryFixture : public testing::Test {
 
     if (format_ == kDiskFormatFxfs) {
       options.crypt_client = [] {
-        if (auto service = fs_test::GetCryptService(); service.is_error()) {
-          ADD_FAILURE() << "Unable to get crypt service";
-          return zx::channel();
-        } else {
-          return *std::move(service);
+        zx::result crypt_service = fs_test::InitializeCryptService();
+        if (crypt_service.is_error()) {
+          ADD_FAILURE() << "Unable to get crypt service: " << crypt_service.status_string();
         }
+        return crypt_service;
       };
       auto fs = MountMultiVolumeWithDefault(std::move(device.value()), *component_, options);
       ASSERT_TRUE(fs.is_ok()) << fs.status_string();

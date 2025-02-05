@@ -31,7 +31,7 @@
             to: "#test_realm_factory",
         },
         {
-            protocol: [ "fuchsia.inspect.InspectSink" ],
+            dictionary: "diagnostics",
             from: "parent",
             to: "#test_realm_factory",
         },

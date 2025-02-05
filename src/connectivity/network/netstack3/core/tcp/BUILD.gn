@@ -10,6 +10,7 @@ import(
 rustc_library_with_features("netstack3-tcp") {
   edition = "2021"
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+  check_cfgs = [ "test" ]
   sources = [
     "src/base.rs",
     "src/buffer.rs",
@@ -39,9 +40,6 @@ rustc_library_with_features("netstack3-tcp") {
     "//third_party/rust_crates:siphasher",
     "//third_party/rust_crates:smallvec",
     "//third_party/rust_crates:thiserror",
-
-    # TODO(https://github.com/rust-lang/rust/issues/62502): remove this module.
-    "//src/connectivity/network/netstack3/core/fakestd",
   ]
 
   _testutils_deps = [ "//third_party/rust_crates:either" ]

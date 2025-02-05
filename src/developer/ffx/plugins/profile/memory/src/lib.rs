@@ -18,12 +18,13 @@ use async_trait::async_trait;
 use digest::{processed, raw};
 use ffx_profile_memory_args::MemoryCommand;
 use ffx_writer::ToolIO;
-use fho::{moniker, FfxMain, FfxTool, MachineWriter};
+use fho::{FfxMain, FfxTool, MachineWriter};
 use fidl_fuchsia_memory_inspection::CollectorProxy;
 use futures::AsyncReadExt;
 use plugin_output::ProfileMemoryOutput;
 use std::io::Write;
 use std::time::Duration;
+use target_holders::moniker;
 
 #[derive(FfxTool)]
 pub struct MemoryTool {
@@ -129,6 +130,7 @@ async fn get_output(collector: &CollectorProxy) -> anyhow::Result<raw::MemoryMon
 mod tests {
     use super::*;
     use futures::AsyncWriteExt;
+    use target_holders::fake_proxy;
 
     lazy_static::lazy_static! {
         static ref EXPECTED_CAPTURE: raw::Capture = raw::Capture{
@@ -171,7 +173,7 @@ mod tests {
     }
 
     fn create_fake_collector_proxy() -> CollectorProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             fidl_fuchsia_memory_inspection::CollectorRequest::CollectJsonStats {
                 socket, ..
             } => {

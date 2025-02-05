@@ -49,7 +49,7 @@ void sync_condition_wait(sync_condition_t* condition, sync_mutex_t* mutex);
 //      ZX_OK if |condition| was signaled or a spurious wake up occurred.
 //      ZX_ERR_TIMED_OUT if the wait timed out.
 zx_status_t sync_condition_timedwait(sync_condition_t* condition, sync_mutex_t* mutex,
-                                     zx_time_t deadline);
+                                     zx_instant_mono_t deadline);
 
 // Wake up one thread waiting for |condition|.
 //
@@ -58,7 +58,7 @@ zx_status_t sync_condition_timedwait(sync_condition_t* condition, sync_mutex_t* 
 // where this makes a difference, consider the following implementation of a multi-producer,
 // multi-consumer queue:
 //
-// Message* MessageQueue::DequeueTimeout(zx_time_t deadline) {
+// Message* MessageQueue::DequeueTimeout(zx_instant_mono_t deadline) {
 //    sync_mutex_lock(&mutex_);
 //    for (;;) {
 //        if (!list_.empty()) {

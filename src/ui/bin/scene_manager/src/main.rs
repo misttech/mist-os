@@ -3,9 +3,12 @@
 // found in the LICENSE file.
 
 use crate::color_transform_manager::ColorTransformManager;
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
-use ::input_pipeline::activity::ActivityManager;
 use ::input_pipeline::input_device::InputDeviceType;
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+use ::input_pipeline::interaction_state_handler::{
+    handle_interaction_aggregator_request_stream, handle_interaction_notifier_request_stream,
+    init_interaction_hanging_get,
+};
 use ::input_pipeline::light_sensor::Configuration as LightSensorConfiguration;
 use anyhow::{Context, Error};
 use fidl_fuchsia_accessibility::{ColorTransformHandlerMarker, ColorTransformMarker};
@@ -34,12 +37,12 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use futures::lock::Mutex;
 use futures::{StreamExt, TryStreamExt};
+use log::{error, info, warn};
 use scene_management::{SceneManager, SceneManagerTrait, ViewingDistance};
 use scene_manager_structured_config::Config;
 use std::fs::File;
 use std::io::Read;
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use {
     fidl_fuchsia_accessibility_scene as a11y_view, fidl_fuchsia_ui_composition as flatland,
     fidl_fuchsia_ui_composition_internal as fcomp, fidl_fuchsia_ui_display_color as color,
@@ -246,6 +249,10 @@ async fn inner_main() -> Result<(), Error> {
     // Create a node under root to hang all input pipeline inspect data off of.
     let inspect_node = inspector.root().create_child("input_pipeline");
 
+    // Create state publisher for InteractionStateHandler.
+    let mut interaction_hanging_get = init_interaction_hanging_get();
+    let interaction_state_publisher = interaction_hanging_get.new_publisher();
+
     // Start input pipeline.
     let has_light_sensor_configuration = light_sensor_configuration.is_some();
     if let Ok(input_pipeline) = input_pipeline::handle_input(
@@ -261,6 +268,9 @@ async fn inner_main() -> Result<(), Error> {
         focus_chain_publisher,
         supported_input_devices,
         light_sensor_configuration,
+        idle_threshold_ms as i64,
+        interaction_state_publisher,
+        suspend_enabled,
     )
     .await
     {
@@ -271,14 +281,6 @@ async fn inner_main() -> Result<(), Error> {
         }
         fasync::Task::local(input_pipeline.handle_input_events()).detach();
     };
-
-    // Create Activity Manager.
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
-    let activity_manager = ActivityManager::new(
-        zx::MonotonicDuration::from_millis(idle_threshold_ms as i64),
-        suspend_enabled,
-    )
-    .await;
 
     // Create and register a ColorTransformManager.
     let color_converter = connect_to_protocol::<color::ConverterMarker>()?;
@@ -406,10 +408,8 @@ async fn inner_main() -> Result<(), Error> {
             ExposedServices::UserInteractionObservation(stream) => {
                 #[cfg(fuchsia_api_level_at_least = "HEAD")]
                 {
-                    let activity_manager = activity_manager.clone();
                     fasync::Task::local(async move {
-                    match activity_manager
-                        .handle_interaction_aggregator_request_stream(stream)
+                    match handle_interaction_aggregator_request_stream(stream)
                         .await
                     {
                         Ok(()) => (),
@@ -424,15 +424,15 @@ async fn inner_main() -> Result<(), Error> {
                 #[cfg(fuchsia_api_level_less_than = "HEAD")]
                 {
                     let _ = stream;
-                    error!("scene_manager built without ActivityMonitor due to stable API level.")
+                    error!("scene_manager built without InteractionStateHandler due to stable API level.")
                 }
             }
             ExposedServices::UserInteraction(stream) => {
                 #[cfg(fuchsia_api_level_at_least = "HEAD")]
                 {
-                    let activity_manager = activity_manager.clone();
+                    let subscriber = interaction_hanging_get.new_subscriber();
                     fasync::Task::local(async move {
-                        match activity_manager.handle_interaction_notifier_request_stream(stream).await
+                        match handle_interaction_notifier_request_stream(stream, subscriber).await
                         {
                             Ok(()) => (),
                             Err(e) => {
@@ -448,7 +448,7 @@ async fn inner_main() -> Result<(), Error> {
                 #[cfg(fuchsia_api_level_less_than = "HEAD")]
                 {
                     let _ = stream;
-                    error!("scene_manager built without ActivityMonitor due to stable API level.")
+                    error!("scene_manager built without InteractionStateHandler due to stable API level.")
                 }
             }
             ExposedServices::GraphicalPresenter(stream) => {

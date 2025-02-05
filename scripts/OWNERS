@@ -8,5 +8,4 @@ per-file fuchsia-vendored-python*,fx,fx-*,hermetic-env = crjohns@google.com
 # FIDL-related scripts.
 per-file generate-fidl-* = file://tools/fidl/OWNERS
 
-per-file generate_cargo.py = pineapple@google.com
 

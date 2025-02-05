@@ -6,7 +6,7 @@ use fidl::endpoints::Proxy;
 use fidl_fuchsia_bluetooth_fastpair::ProviderWatcherProxy;
 use fuchsia_bluetooth::types::PeerId;
 use futures::future::{self, Future, FutureExt};
-use tracing::{debug, warn};
+use log::{debug, warn};
 
 use crate::types::Error;
 

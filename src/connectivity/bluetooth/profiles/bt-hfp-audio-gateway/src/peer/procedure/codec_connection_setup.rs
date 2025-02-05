@@ -8,8 +8,8 @@ use crate::features::CodecId;
 use crate::peer::service_level_connection::SlcState;
 
 use at_commands as at;
+use log::warn;
 use std::mem;
-use tracing::warn;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CodecConnectionSetupProcedure {
@@ -74,7 +74,7 @@ impl Procedure for CodecConnectionSetupProcedure {
                 setup_request()
             }
             (state, update) => {
-                warn!(?state, ?update, "CodecConnectionSetup: unexpected HF");
+                warn!(state:?, update:?; "CodecConnectionSetup: unexpected HF");
                 slc_state.codec_connection_setup_in_progress = false;
                 ProcedureRequest::Error(ProcedureError::UnexpectedHf(update))
             }
@@ -120,7 +120,7 @@ impl Procedure for CodecConnectionSetupProcedure {
                 ProcedureRequest::None
             }
             (state, update) => {
-                warn!(?state, ?update, "CodecConnectionSetup: unexpected AG");
+                warn!(state:?, update:?; "CodecConnectionSetup: unexpected AG");
                 slc_state.codec_connection_setup_in_progress = false;
                 ProcedureRequest::Error(ProcedureError::UnexpectedAg(update))
             }

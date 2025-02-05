@@ -2743,3 +2743,77 @@ async fn dhcpv4_client_restarts_after_delay() {
     )
     .await;
 }
+
+#[netstack_test]
+#[variant(M, Manager)]
+async fn add_blackhole_interface<M: Manager>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox
+        .create_netstack_realm_with::<Netstack3, _, _>(
+            name,
+            [
+                KnownServiceProvider::Manager {
+                    agent: M::MANAGEMENT_AGENT,
+                    config: ManagerConfig::WithBlackhole,
+                    use_dhcp_server: false,
+                    use_out_of_stack_dhcp_client: true,
+                },
+                KnownServiceProvider::DnsResolver,
+                KnownServiceProvider::FakeClock,
+                KnownServiceProvider::DhcpClient,
+            ],
+        )
+        .expect("create netstack realm");
+
+    let wait_for_netmgr =
+        wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None);
+
+    let interface_state = realm
+        .connect_to_protocol::<fnet_interfaces::StateMarker>()
+        .expect("connect to fuchsia.net.interfaces/State service");
+    let interfaces_stream =
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+        >(&interface_state, fnet_interfaces_ext::IncludedAddresses::OnlyAssigned)
+        .expect("get interface event stream")
+        .map(|r| r.expect("watcher error"))
+        .filter_map(|event| {
+            futures::future::ready(match event.into_inner() {
+                fidl_fuchsia_net_interfaces::Event::Added(
+                    fidl_fuchsia_net_interfaces::Properties { id, name, .. },
+                )
+                | fidl_fuchsia_net_interfaces::Event::Existing(
+                    fidl_fuchsia_net_interfaces::Properties { id, name, .. },
+                ) => Some(InterfaceWatcherEvent::Added {
+                    id: id.expect("missing interface ID"),
+                    name: name.expect("missing interface name"),
+                }),
+                fidl_fuchsia_net_interfaces::Event::Removed(id) => {
+                    Some(InterfaceWatcherEvent::Removed { id })
+                }
+                fidl_fuchsia_net_interfaces::Event::Idle(fidl_fuchsia_net_interfaces::Empty {})
+                | fidl_fuchsia_net_interfaces::Event::Changed(
+                    fidl_fuchsia_net_interfaces::Properties { .. },
+                ) => None,
+            })
+        });
+    let interfaces_stream = futures::stream::select(
+        interfaces_stream,
+        futures::stream::once(wait_for_netmgr.map(|r| panic!("network manager exited {:?}", r))),
+    )
+    .fuse();
+    let mut interfaces_stream = pin!(interfaces_stream);
+    // Observe the initially existing loopback interface.
+    let name = assert_matches!(
+        interfaces_stream.select_next_some().await,
+        InterfaceWatcherEvent::Added { id: 1, name } => name
+    );
+    assert_eq!(name, "lo");
+
+    // Observe the blackhole interface.
+    let name = assert_matches!(
+        interfaces_stream.select_next_some().await,
+        InterfaceWatcherEvent::Added { id: 2, name } => name
+    );
+    assert_eq!(name, "testblackhole");
+}

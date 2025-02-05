@@ -7,7 +7,6 @@ use crate::log_if_err;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::platform_metrics::PlatformMetric;
-use crate::shutdown_request::{RebootReason, ShutdownRequest};
 use crate::temperature_handler::TemperatureFilter;
 use crate::timer::get_periodic_timer_stream;
 use crate::types::{Celsius, Nanoseconds, Seconds, ThermalLoad};
@@ -416,12 +415,9 @@ impl ThermalPolicy {
 
             self.log_platform_metric(PlatformMetric::ThrottlingResultShutdown).await;
 
-            self.send_message(
-                &self.config.sys_pwr_handler,
-                &Message::SystemShutdown(ShutdownRequest::Reboot(RebootReason::HighTemperature)),
-            )
-            .await
-            .map_err(|e| format_err!("Failed to shut down the system: {}", e))?;
+            self.send_message(&self.config.sys_pwr_handler, &Message::HighTemperatureReboot)
+                .await
+                .map_err(|e| format_err!("Failed to shut down the system: {}", e))?;
         }
 
         Ok(())

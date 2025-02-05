@@ -30,7 +30,7 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
 use futures::future::TryFutureExt;
 use futures::stream::{StreamExt, TryStreamExt};
-use tracing::info;
+use log::info;
 use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;

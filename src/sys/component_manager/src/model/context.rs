@@ -165,9 +165,9 @@ impl ModelContext {
         for scoped_component in scoped_components {
             match self.remove_config_developer_override(&scoped_component).await {
                 Ok(()) => (),
-                Err(e) => tracing::warn!(
-                    "config overrides not found for component {scoped_component}: {e}"
-                ),
+                Err(e) => {
+                    log::warn!("config overrides not found for component {scoped_component}: {e}")
+                }
             }
         }
     }

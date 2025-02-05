@@ -9,15 +9,15 @@ use errors::FfxError;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_list_args::ComponentListCommand;
 use fho::{FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
-use fidl_fuchsia_developer_remotecontrol as rc;
 use schemars::JsonSchema;
 use serde::Serialize;
+use target_holders::RemoteControlProxyHolder;
 
 #[derive(FfxTool)]
 pub struct ListTool {
     #[command]
     cmd: ComponentListCommand,
-    rcs: rc::RemoteControlProxy,
+    rcs: RemoteControlProxyHolder,
 }
 
 fho::embedded_plugin!(ListTool);
@@ -109,7 +109,7 @@ mod test {
     #[fuchsia::test]
     async fn test_schema() -> Result<()> {
         let cmd = ComponentListCommand { filter: None, verbose: false };
-        let tool = ListTool { cmd, rcs: setup_fake_rcs(vec![]) };
+        let tool = ListTool { cmd, rcs: setup_fake_rcs(vec![]).into() };
         let buffers = TestBuffers::default();
 
         let writer = <ListTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);

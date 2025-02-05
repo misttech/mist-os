@@ -7,7 +7,6 @@ use crate::log_if_err;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::platform_metrics::PlatformMetric;
-use crate::shutdown_request::{RebootReason, ShutdownRequest};
 use crate::temperature_handler::TemperatureFilter;
 use crate::types::{Celsius, Seconds, ThermalLoad};
 use anyhow::{format_err, Error, Result};
@@ -254,13 +253,7 @@ impl ThermalLoadDriver {
             "Failed to send ThrottlingResultShutdown metric"
         );
 
-        match self
-            .send_message(
-                &self.system_shutdown_node,
-                &Message::SystemShutdown(ShutdownRequest::Reboot(RebootReason::HighTemperature)),
-            )
-            .await
-        {
+        match self.send_message(&self.system_shutdown_node, &Message::HighTemperatureReboot).await {
             Ok(_) => Ok(()),
             Err(e) => Err(e.into()),
         }
@@ -382,6 +375,7 @@ impl TemperatureInputInspect {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::message::Message;
     use crate::test::mock_node::{create_dummy_node, MessageMatcher, MockNode, MockNodeMaker};
     use crate::{msg_eq, msg_ok_return};
     use diagnostics_assertions::assert_data_tree;
@@ -650,10 +644,7 @@ mod tests {
         let mock_thermal_load_receiver = mock_maker.make("mock_thermal_load_receiver", vec![]);
         let system_shutdown_node = mock_maker.make(
             "mock_system_shutdown_node",
-            vec![(
-                msg_eq!(SystemShutdown(ShutdownRequest::Reboot(RebootReason::HighTemperature))),
-                msg_ok_return!(SystemShutdown),
-            )],
+            vec![(msg_eq!(HighTemperatureReboot), msg_ok_return!(SystemShutdown))],
         );
 
         // The ThermalLoadDriver asks for the driver name of all TemperatureHandler nodes during
@@ -815,7 +806,7 @@ mod tests {
 
         // Verify if a sensor causes thermal shutdown then `ThrottlingResultShutdown` is sent
         mock_system_shutdown_node.add_msg_response_pair((
-            msg_eq!(SystemShutdown(ShutdownRequest::Reboot(RebootReason::HighTemperature))),
+            msg_eq!(HighTemperatureReboot),
             msg_ok_return!(SystemShutdown),
         ));
         mock_platform_metrics.add_msg_response_pair((

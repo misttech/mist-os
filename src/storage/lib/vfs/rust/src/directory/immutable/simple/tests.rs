@@ -481,8 +481,10 @@ fn open_subdir_with_posix_flag_rights_expansion() {
                     let subdir_flags = fio::OpenFlags::DESCRIBE | *subdir_flags;
                     let subdir_proxy =
                         open_get_directory_proxy_assert_ok!(&root_proxy, subdir_flags, "etc/ssh");
-                    let (_, resulting_subdir_flags) =
-                        subdir_proxy.get_flags().await.expect("Failed to get node flags!");
+                    let (_, resulting_subdir_flags) = subdir_proxy
+                        .deprecated_get_flags()
+                        .await
+                        .expect("Failed to get node flags!");
                     // Ensure resulting rights on the subdirectory are expanded correctly and do
                     // not exceed those of the cloned root directory connection.
                     validate_expanded_rights(root_flags, subdir_flags, resulting_subdir_flags);

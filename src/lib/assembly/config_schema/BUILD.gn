@@ -33,6 +33,7 @@ rustc_library("config_schema") {
   inputs = [ _git_info ]
   deps = [
     "//src/lib/assembly/constants",
+    "//src/lib/assembly/container",
     "//src/lib/assembly/file_relative_path",
     "//src/lib/assembly/images_config",
     "//src/lib/assembly/package_utils",
@@ -40,6 +41,7 @@ rustc_library("config_schema") {
     "//src/lib/fuchsia-url",
     "//src/lib/include_str_from_working_dir",
     "//src/sys/lib/moniker",
+    "//src/sys/pkg/lib/fuchsia-pkg",
     "//src/ui/lib/input-device-constants:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
@@ -52,7 +54,7 @@ rustc_library("config_schema") {
 
   test_deps = [
     "//src/lib/assembly/util",
-    "//third_party/rust_crates:serde_json5",
+    "//third_party/rust_crates:tempfile",
   ]
 
   non_rust_deps = [ ":git_info_json" ]
@@ -73,6 +75,7 @@ rustc_library("config_schema") {
     "src/platform_config/diagnostics_config.rs",
     "src/platform_config/driver_framework_config.rs",
     "src/platform_config/example_config.rs",
+    "src/platform_config/factory_store_providers_config.rs",
     "src/platform_config/fonts_config.rs",
     "src/platform_config/forensics_config.rs",
     "src/platform_config/graphics_config.rs",
@@ -91,6 +94,7 @@ rustc_library("config_schema") {
     "src/platform_config/storage_config.rs",
     "src/platform_config/swd_config.rs",
     "src/platform_config/sysmem_config.rs",
+    "src/platform_config/system_sounds_config.rs",
     "src/platform_config/timekeeper_config.rs",
     "src/platform_config/ui_config.rs",
     "src/platform_config/usb_config.rs",

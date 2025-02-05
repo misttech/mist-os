@@ -13,8 +13,8 @@ use futures::channel::mpsc;
 use futures::stream::FuturesUnordered;
 use futures::{select, StreamExt};
 use ieee80211::{MacAddr, MacAddrBytes, NULL_ADDR};
+use log::{error, info, warn};
 use std::sync::atomic::Ordering;
-use tracing::{error, info, warn};
 use wlan_fidl_ext::{ResponderExt, WithName};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_device as fidl_dev,

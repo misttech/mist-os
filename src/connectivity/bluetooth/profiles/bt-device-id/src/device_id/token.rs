@@ -8,7 +8,7 @@ use fidl_fuchsia_bluetooth_deviceid as di;
 use futures::future::FusedFuture;
 use futures::stream::StreamFuture;
 use futures::{Future, FutureExt, StreamExt};
-use tracing::{debug, info, warn};
+use log::{debug, info, warn};
 
 use crate::device_id::server::BrEdrProfileAdvertisement;
 use crate::device_id::service_record::DeviceIdentificationService;
@@ -99,7 +99,7 @@ impl FusedFuture for DeviceIdRequestToken {
 impl Drop for DeviceIdRequestToken {
     fn drop(&mut self) {
         if let Some(responder) = self.responder.take() {
-            warn!(service = ?self.service, "DeviceIdRequestToken unexpectedly dropped");
+            warn!(service:? = self.service; "DeviceIdRequestToken unexpectedly dropped");
             let _ = responder.send(Err(zx::Status::CANCELED.into_raw()));
         }
     }

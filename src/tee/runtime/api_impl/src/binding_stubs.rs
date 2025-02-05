@@ -11,7 +11,7 @@
 #![allow(unused_variables)]
 
 use crate::props::is_propset_pseudo_handle;
-use crate::{mem, props, storage, time};
+use crate::{context, mem, storage, time};
 use num_traits::FromPrimitive;
 use tee_internal::binding::{
     TEE_Attribute, TEE_BigInt, TEE_BigIntFMM, TEE_BigIntFMMContext, TEE_Identity,
@@ -20,9 +20,9 @@ use tee_internal::binding::{
     TEE_Time, TEE_Whence, TEE_SUCCESS, TEE_UUID,
 };
 use tee_internal::{
-    to_tee_result, Attribute, AttributeId, Error, HandleFlags, ObjectEnumHandle, ObjectHandle,
-    PropSetHandle, Result as TeeResult, Storage, Type, Usage, ValueFields, Whence,
-    OBJECT_ID_MAX_LEN,
+    to_tee_result, Algorithm, Attribute, AttributeId, Error, HandleFlags, Mode, ObjectEnumHandle,
+    ObjectHandle, OperationHandle, PropSetHandle, Result as TeeResult, Storage as TeeStorage, Type,
+    Usage, ValueFields, Whence, OBJECT_ID_MAX_LEN,
 };
 
 // This function returns a list of the C entry point that we want to expose from
@@ -158,7 +158,7 @@ pub fn exposed_c_entry_points() -> &'static [*const extern "C" fn()] {
         TEE_AEEncryptFinal as *const extern "C" fn(),
         TEE_AEDecryptFinal as *const extern "C" fn(),
 
-        // Asymmmetric Functions
+        // Asymmetric Functions
         TEE_AsymmetricEncrypt as *const extern "C" fn(),
         TEE_AsymmetricDecrypt as *const extern "C" fn(),
         TEE_AsymmetricSignDigest as *const extern "C" fn(),
@@ -343,22 +343,23 @@ extern "C" fn TEE_GetPropertyAsString(
         // is the responsibility of the caller (e.g. out-of-bounds or freed memory pointers).
         let initial_buf_len = unsafe { *valueBufferLen };
         let mut buf = slice_from_raw_parts_mut(valueBuffer, initial_buf_len);
-
-        let (len, result) = match props::get_property_as_string(handle, name, &mut buf) {
-            Ok(written) => {
-                // written.len() does not include the NUL terminator byte, so cases where we
-                // write the exact buffer length are captured by `<` rather than `<=`.
-                debug_assert!(written.len() < initial_buf_len);
-                (written.len(), Ok(()))
-            }
-            Err(err) => {
-                if err.error == Error::ShortBuffer {
-                    (err.actual_length, Err(err.error))
-                } else {
-                    (err.written.len(), Err(err.error))
+        let (len, result) = context::with_current(|context| {
+            match context.properties.get_property_as_string(handle, name, &mut buf) {
+                Ok(written) => {
+                    // written.len() does not include the NUL terminator byte, so cases where we
+                    // write the exact buffer length are captured by `<` rather than `<=`.
+                    debug_assert!(written.len() < initial_buf_len);
+                    (written.len(), Ok(()))
+                }
+                Err(err) => {
+                    if err.error == Error::ShortBuffer {
+                        (err.actual_length, Err(err.error))
+                    } else {
+                        (err.written.len(), Err(err.error))
+                    }
                 }
             }
-        };
+        });
 
         // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
         // other validity concerns for `ptr::write()`.
@@ -387,7 +388,8 @@ extern "C" fn TEE_GetPropertyAsBool(
         } else {
             ""
         };
-        let val = props::get_property_as_bool(handle, name)?;
+        let val =
+            context::with_current(|context| context.properties.get_property_as_bool(handle, name))?;
         // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
         // other validity concerns for `ptr::write()`.
         unsafe {
@@ -413,7 +415,8 @@ extern "C" fn TEE_GetPropertyAsU32(
         } else {
             ""
         };
-        let val = props::get_property_as_u32(handle, name)?;
+        let val =
+            context::with_current(|context| context.properties.get_property_as_u32(handle, name))?;
         // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
         // other validity concerns for `ptr::write()`.
         unsafe {
@@ -439,7 +442,8 @@ extern "C" fn TEE_GetPropertyAsU64(
         } else {
             ""
         };
-        let val = props::get_property_as_u64(handle, name)?;
+        let val =
+            context::with_current(|context| context.properties.get_property_as_u64(handle, name))?;
         // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
         // other validity concerns for `ptr::write()`.
         unsafe {
@@ -471,20 +475,22 @@ extern "C" fn TEE_GetPropertyAsBinaryBlock(
         let initial_buf_len = unsafe { *valueBufferLen };
         let mut buf = slice_from_raw_parts_mut(valueBuffer as *mut u8, initial_buf_len);
 
-        let (len, result) = match props::get_property_as_binary_block(handle, name, &mut buf) {
-            Ok(bytes_written) => {
-                debug_assert!(bytes_written.len() <= initial_buf_len);
-                (bytes_written.len(), Ok(()))
+        let (len, result) = context::with_current(|context| {
+            match context.properties.get_property_as_binary_block(handle, name, &mut buf) {
+                Ok(bytes_written) => {
+                    debug_assert!(bytes_written.len() <= initial_buf_len);
+                    (bytes_written.len(), Ok(()))
+                }
+                Err(err) => {
+                    let len = match err.error {
+                        Error::ShortBuffer => err.actual_length,
+                        Error::BadFormat => 0,
+                        _ => err.written.len(),
+                    };
+                    (len, Err(err.error))
+                }
             }
-            Err(err) => {
-                let len = match err.error {
-                    Error::ShortBuffer => err.actual_length,
-                    Error::BadFormat => 0,
-                    _ => err.written.len(),
-                };
-                (len, Err(err.error))
-            }
-        };
+        });
 
         // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
         // other validity concerns for `ptr::write()`.
@@ -512,7 +518,8 @@ extern "C" fn TEE_GetPropertyAsUUID(
         } else {
             ""
         };
-        let uuid = props::get_property_as_uuid(handle, name)?;
+        let uuid =
+            context::with_current(|context| context.properties.get_property_as_uuid(handle, name))?;
         // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
         // other validity concerns for `ptr::write()`.
         unsafe {
@@ -538,7 +545,9 @@ extern "C" fn TEE_GetPropertyAsIdentity(
         } else {
             ""
         };
-        let identity = props::get_property_as_identity(handle, name)?;
+        let identity = context::with_current(|context| {
+            context.properties.get_property_as_identity(handle, name)
+        })?;
         // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
         // other validity concerns for `ptr::write()`.
         unsafe {
@@ -552,7 +561,8 @@ extern "C" fn TEE_GetPropertyAsIdentity(
 extern "C" fn TEE_AllocatePropertyEnumerator(enumerator: *mut TEE_PropSetHandle) -> TEE_Result {
     assert!(!enumerator.is_null());
     assert!(enumerator.is_aligned());
-    let handle = props::allocate_property_enumerator();
+    let handle =
+        context::with_current_mut(|context| context.properties.allocate_property_enumerator());
     // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
     // other validity concerns for `ptr::write()`.
     unsafe {
@@ -563,7 +573,9 @@ extern "C" fn TEE_AllocatePropertyEnumerator(enumerator: *mut TEE_PropSetHandle)
 
 #[no_mangle]
 extern "C" fn TEE_FreePropertyEnumerator(enumerator: TEE_PropSetHandle) {
-    props::free_property_enumerator(*PropSetHandle::from_binding(&enumerator));
+    context::with_current_mut(|context| {
+        context.properties.free_property_enumerator(*PropSetHandle::from_binding(&enumerator))
+    });
 }
 
 #[no_mangle]
@@ -571,15 +583,19 @@ extern "C" fn TEE_StartPropertyEnumerator(
     enumerator: TEE_PropSetHandle,
     propSet: TEE_PropSetHandle,
 ) {
-    props::start_property_enumerator(
-        *PropSetHandle::from_binding(&enumerator),
-        *PropSetHandle::from_binding(&propSet),
-    );
+    context::with_current_mut(|context| {
+        context.properties.start_property_enumerator(
+            *PropSetHandle::from_binding(&enumerator),
+            *PropSetHandle::from_binding(&propSet),
+        )
+    });
 }
 
 #[no_mangle]
 extern "C" fn TEE_ResetPropertyEnumerator(enumerator: TEE_PropSetHandle) {
-    props::reset_property_enumerator(*PropSetHandle::from_binding(&enumerator));
+    context::with_current_mut(|context| {
+        context.properties.reset_property_enumerator(*PropSetHandle::from_binding(&enumerator))
+    });
 }
 
 #[no_mangle]
@@ -601,21 +617,23 @@ extern "C" fn TEE_GetPropertyName(
         let initial_buf_len = unsafe { *nameBufferLen };
         let mut buf = slice_from_raw_parts_mut(nameBuffer, initial_buf_len);
 
-        let (len, result) = match props::get_property_name(handle, &mut buf) {
-            Ok(written) => {
-                // written.len() does not include the NUL terminator byte, so cases where we
-                // write the exact buffer length are captured by `<` rather than `<=`.
-                debug_assert!(written.len() < initial_buf_len);
-                (written.len(), Ok(()))
-            }
-            Err(err) => {
-                if err.error == Error::ShortBuffer {
-                    (err.actual_length, Err(err.error))
-                } else {
-                    (err.written.len(), Err(err.error))
+        let (len, result) = context::with_current(|context| {
+            match context.properties.get_property_name(handle, &mut buf) {
+                Ok(written) => {
+                    // written.len() does not include the NUL terminator byte, so cases where we
+                    // write the exact buffer length are captured by `<` rather than `<=`.
+                    debug_assert!(written.len() < initial_buf_len);
+                    (written.len(), Ok(()))
+                }
+                Err(err) => {
+                    if err.error == Error::ShortBuffer {
+                        (err.actual_length, Err(err.error))
+                    } else {
+                        (err.written.len(), Err(err.error))
+                    }
                 }
             }
-        };
+        });
 
         // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
         // other validity concerns for `ptr::write()`.
@@ -631,7 +649,9 @@ extern "C" fn TEE_GetPropertyName(
 #[no_mangle]
 extern "C" fn TEE_GetNextProperty(enumerator: TEE_PropSetHandle) -> TEE_Result {
     to_tee_result((|| -> TeeResult {
-        props::get_next_property(*PropSetHandle::from_binding(&enumerator))
+        context::with_current_mut(|context| {
+            context.properties.get_next_property(*PropSetHandle::from_binding(&enumerator))
+        })
     })())
 }
 
@@ -753,7 +773,7 @@ extern "C" fn TEE_GetObjectInfo1(
     assert!(!objectInfo.is_null());
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
-        let info = storage::get_object_info(object);
+        let info = context::with_current(|context| context.storage.get_object_info(object));
         // SAFETY: `objectInfo` nullity checked above.
         unsafe {
             *objectInfo = *info.to_binding();
@@ -772,7 +792,7 @@ extern "C" fn TEE_RestrictObjectUsage1(object: TEE_ObjectHandle, objectUsage: u3
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
         let usage = Usage::from_bits_retain(objectUsage);
-        storage::restrict_object_usage(object, usage);
+        context::with_current(|context| context.storage.restrict_object_usage(object, usage));
         Ok(())
     }())
 }
@@ -796,14 +816,15 @@ extern "C" fn TEE_GetObjectBufferAttribute(
         // SAFETY: `size` nullity checked above.
         let initial_size = unsafe { *size };
         let buffer = slice_from_raw_parts_mut(buffer, initial_size);
-        let (attribute_size, result) =
-            match storage::get_object_buffer_attribute(object, id, buffer) {
-                Ok(written) => {
-                    debug_assert!(written.len() <= initial_size);
-                    (written.len(), Ok(()))
-                }
-                Err(err) => (err.actual_size, Err(err.error)),
-            };
+        let (attribute_size, result) = match context::with_current(|context| {
+            context.storage.get_object_buffer_attribute(object, id, buffer)
+        }) {
+            Ok(written) => {
+                debug_assert!(written.len() <= initial_size);
+                (written.len(), Ok(()))
+            }
+            Err(err) => (err.actual_size, Err(err.error)),
+        };
         // SAFETY: `size` nullity checked above.
         unsafe {
             *size = attribute_size;
@@ -824,7 +845,9 @@ extern "C" fn TEE_GetObjectValueAttribute(
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
         let id = AttributeId::from_u32(attributeID).unwrap();
-        let val = storage::get_object_value_attribute(object, id)?;
+        let val = context::with_current(|context| {
+            context.storage.get_object_value_attribute(object, id)
+        })?;
         // SAFETY: `a` and `b` nullity checked above.
         unsafe {
             (*a, *b) = (val.a, val.b);
@@ -836,7 +859,7 @@ extern "C" fn TEE_GetObjectValueAttribute(
 #[no_mangle]
 extern "C" fn TEE_CloseObject(object: TEE_ObjectHandle) {
     let object = *ObjectHandle::from_binding(&object);
-    storage::close_object(object);
+    context::with_current_mut(|context| context.storage.close_object(object));
 }
 
 #[no_mangle]
@@ -847,8 +870,10 @@ extern "C" fn TEE_AllocateTransientObject(
 ) -> TEE_Result {
     assert!(!object.is_null());
     to_tee_result(|| -> TeeResult {
-        let object_type = Type::from_u32(objectType).unwrap();
-        let obj = storage::allocate_transient_object(object_type, maxObjectSize)?;
+        let object_type = Type::from_u32(objectType).ok_or(Error::NotSupported)?;
+        let obj = context::with_current_mut(|context| {
+            context.storage.allocate_transient_object(object_type, maxObjectSize)
+        })?;
         // SAFETY: `object` nullity checked above.
         unsafe {
             *object = *obj.to_binding();
@@ -860,13 +885,13 @@ extern "C" fn TEE_AllocateTransientObject(
 #[no_mangle]
 extern "C" fn TEE_FreeTransientObject(object: TEE_ObjectHandle) {
     let object = *ObjectHandle::from_binding(&object);
-    storage::free_transient_object(object);
+    context::with_current_mut(|context| context.storage.free_transient_object(object));
 }
 
 #[no_mangle]
 extern "C" fn TEE_ResetTransientObject(object: TEE_ObjectHandle) {
     let object = *ObjectHandle::from_binding(&object);
-    storage::reset_transient_object(object);
+    context::with_current_mut(|context| context.storage.reset_transient_object(object));
 }
 
 #[no_mangle]
@@ -886,7 +911,9 @@ extern "C" fn TEE_PopulateTransientObject(
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
         let attrs = slice_from_raw_parts(attrs, attrCount as usize);
-        storage::populate_transient_object(object, attrs as &[Attribute])
+        context::with_current(|context| {
+            context.storage.populate_transient_object(object, attrs as &[Attribute])
+        })
     }())
 }
 
@@ -922,7 +949,7 @@ extern "C" fn TEE_CopyObjectAttributes1(
     to_tee_result(|| -> TeeResult {
         let src = *ObjectHandle::from_binding(&srcObject);
         let dest = *ObjectHandle::from_binding(&destObject);
-        storage::copy_object_attributes(src, dest)
+        context::with_current_mut(|context| context.storage.copy_object_attributes(src, dest))
     }())
 }
 
@@ -941,7 +968,7 @@ extern "C" fn TEE_GenerateKey(
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
         let params = slice_from_raw_parts(params, paramCount as usize);
-        storage::generate_key(object, keySize, params)
+        context::with_current_mut(|context| context.storage.generate_key(object, keySize, params))
     }())
 }
 
@@ -955,10 +982,12 @@ extern "C" fn TEE_OpenPersistentObject(
 ) -> TEE_Result {
     assert!(!object.is_null());
     to_tee_result(|| -> TeeResult {
-        let storage = Storage::from_u32(storageID).ok_or(Error::ItemNotFound)?;
+        let storage = TeeStorage::from_u32(storageID).ok_or(Error::ItemNotFound)?;
         let flags = HandleFlags::from_bits_retain(flags);
         let id = slice_from_raw_parts(objectID, objectIDLen);
-        let obj = storage::open_persistent_object(storage, id, flags)?;
+        let obj = context::with_current_mut(|context| {
+            context.storage.open_persistent_object(storage, id, flags)
+        })?;
         // SAFETY: `object` nullity checked above.
         unsafe {
             *object = *obj.to_binding();
@@ -979,22 +1008,30 @@ extern "C" fn TEE_CreatePersistentObject(
     object: *mut TEE_ObjectHandle,
 ) -> TEE_Result {
     to_tee_result(|| -> TeeResult {
-        let storage = Storage::from_u32(storageID).ok_or(Error::ItemNotFound)?;
+        let storage = TeeStorage::from_u32(storageID).ok_or(Error::ItemNotFound)?;
         let flags = HandleFlags::from_bits_retain(flags);
         let id = slice_from_raw_parts(objectID, objectIDLen);
         let attrs = *ObjectHandle::from_binding(&attributes);
         let initial_data = slice_from_raw_parts(initialData, initialDataLen);
-        let obj = storage::create_persistent_object(storage, id, flags, attrs, initial_data)?;
-        if object.is_null() {
-            // The user doesn't want a handle, so just close the newly minted one.
-            storage::close_object(obj);
-        } else {
-            // SAFETY: `object` is non-null in this branch.
-            unsafe {
-                *object = *obj.to_binding();
+        context::with_current_mut(|context| -> TeeResult {
+            let obj = context.storage.create_persistent_object(
+                storage,
+                id,
+                flags,
+                attrs,
+                initial_data,
+            )?;
+            if object.is_null() {
+                // The user doesn't want a handle, so just close the newly minted one.
+                context.storage.close_object(obj);
+            } else {
+                // SAFETY: `object` is non-null in this branch.
+                unsafe {
+                    *object = *obj.to_binding();
+                }
             }
-        }
-        Ok(())
+            Ok(())
+        })
     }())
 }
 
@@ -1002,7 +1039,9 @@ extern "C" fn TEE_CreatePersistentObject(
 extern "C" fn TEE_CloseAndDeletePersistentObject1(object: TEE_ObjectHandle) -> TEE_Result {
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
-        storage::close_and_delete_persistent_object(object)
+        context::with_current_mut(|context| {
+            context.storage.close_and_delete_persistent_object(object)
+        })
     }())
 }
 
@@ -1020,7 +1059,9 @@ extern "C" fn TEE_RenamePersistentObject(
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
         let new_id = slice_from_raw_parts(newObjectID, newObjectIDLen);
-        storage::rename_persistent_object(object, new_id)
+        context::with_current_mut(|context| {
+            context.storage.rename_persistent_object(object, new_id)
+        })
     }())
 }
 
@@ -1030,7 +1071,9 @@ extern "C" fn TEE_AllocatePersistentObjectEnumerator(
 ) -> TEE_Result {
     assert!(!objectEnumerator.is_null());
     to_tee_result(|| -> TeeResult {
-        let enumerator = storage::allocate_persistent_object_enumerator();
+        let enumerator = context::with_current_mut(|context| {
+            context.storage.allocate_persistent_object_enumerator()
+        });
         // SAFETY: `objectEnumerator` nullity checked above.
         unsafe {
             *objectEnumerator = *enumerator.to_binding();
@@ -1042,13 +1085,17 @@ extern "C" fn TEE_AllocatePersistentObjectEnumerator(
 #[no_mangle]
 extern "C" fn TEE_FreePersistentObjectEnumerator(objectEnumerator: TEE_ObjectEnumHandle) {
     let enumerator = *ObjectEnumHandle::from_binding(&objectEnumerator);
-    storage::free_persistent_object_enumerator(enumerator);
+    context::with_current_mut(|context| {
+        context.storage.free_persistent_object_enumerator(enumerator)
+    });
 }
 
 #[no_mangle]
 extern "C" fn TEE_ResetPersistentObjectEnumerator(objectEnumerator: TEE_ObjectEnumHandle) {
     let enumerator = *ObjectEnumHandle::from_binding(&objectEnumerator);
-    storage::reset_persistent_object_enumerator(enumerator);
+    context::with_current_mut(|context| {
+        context.storage.reset_persistent_object_enumerator(enumerator)
+    });
 }
 
 #[no_mangle]
@@ -1058,8 +1105,10 @@ extern "C" fn TEE_StartPersistentObjectEnumerator(
 ) -> TEE_Result {
     to_tee_result(|| -> TeeResult {
         let enumerator = *ObjectEnumHandle::from_binding(&objectEnumerator);
-        let storage = Storage::from_u32(storageID).ok_or(Error::ItemNotFound)?;
-        storage::start_persistent_object_enumerator(enumerator, storage)
+        let storage = TeeStorage::from_u32(storageID).ok_or(Error::ItemNotFound)?;
+        context::with_current_mut(|context| {
+            context.storage.start_persistent_object_enumerator(enumerator, storage)
+        })
     }())
 }
 
@@ -1075,7 +1124,9 @@ extern "C" fn TEE_GetNextPersistentObject(
     to_tee_result(|| -> TeeResult {
         let enumerator = *ObjectEnumHandle::from_binding(&objectEnumerator);
         let id_buf = slice_from_raw_parts_mut(objectID, OBJECT_ID_MAX_LEN);
-        let (info, id) = storage::get_next_persistent_object(enumerator, id_buf)?;
+        let (info, id) = context::with_current(|context| {
+            context.storage.get_next_persistent_object(enumerator, id_buf)
+        })?;
         // SAFETY: `objectIDLen` nullity checked above.
         unsafe {
             *objectIDLen = id.len();
@@ -1101,7 +1152,8 @@ extern "C" fn TEE_ReadObjectData(
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
         let buffer = slice_from_raw_parts_mut(buffer, size);
-        let written = storage::read_object_data(object, buffer)?;
+        let written =
+            context::with_current(|context| context.storage.read_object_data(object, buffer))?;
         // SAFETY: `count` nullity checked above.
         unsafe {
             *count = written.len();
@@ -1119,7 +1171,7 @@ extern "C" fn TEE_WriteObjectData(
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
         let buffer = slice_from_raw_parts(buffer, size);
-        storage::write_object_data(object, buffer)
+        context::with_current(|context| context.storage.write_object_data(object, buffer))
     }())
 }
 
@@ -1127,7 +1179,7 @@ extern "C" fn TEE_WriteObjectData(
 extern "C" fn TEE_TruncateObjectData(object: TEE_ObjectHandle, size: usize) -> TEE_Result {
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
-        storage::truncate_object_data(object, size)
+        context::with_current(|context| context.storage.truncate_object_data(object, size))
     }())
 }
 
@@ -1140,7 +1192,9 @@ extern "C" fn TEE_SeekObjectData(
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
         let whence = Whence::from_u32(whence).unwrap();
-        storage::seek_data_object(object, offset.try_into().unwrap(), whence)
+        context::with_current(|context| {
+            context.storage.seek_data_object(object, offset.try_into().unwrap(), whence)
+        })
     }())
 }
 
@@ -1151,12 +1205,24 @@ extern "C" fn TEE_AllocateOperation(
     mode: u32,
     maxKeySize: u32,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!operation.is_null());
+    to_tee_result(|| -> TeeResult {
+        let algorithm = Algorithm::from_u32(algorithm).ok_or(Error::NotSupported)?;
+        let mode = Mode::from_u32(mode).ok_or(Error::NotSupported)?;
+        context::with_current_mut(|context| {
+            let operation_handle = context.operations.allocate(algorithm, mode, maxKeySize)?;
+            // Safety: |operation| is checked as non-null above.
+            unsafe { *operation = *operation_handle.to_binding() };
+            Ok(())
+        })
+    }())
 }
 
 #[no_mangle]
 extern "C" fn TEE_FreeOperation(operation: TEE_OperationHandle) {
-    unimplemented!()
+    context::with_current_mut(|context| {
+        context.operations.free(*OperationHandle::from_binding(&operation))
+    });
 }
 
 #[no_mangle]
@@ -1186,7 +1252,18 @@ extern "C" fn TEE_SetOperationKey(
     operation: TEE_OperationHandle,
     key: TEE_ObjectHandle,
 ) -> TEE_Result {
-    unimplemented!()
+    to_tee_result(|| -> TeeResult {
+        context::with_current_mut(|context| {
+            let operation = *OperationHandle::from_binding(&operation);
+            let key = *ObjectHandle::from_binding(&key);
+            if key.is_null() {
+                context.operations.clear_key(operation)
+            } else {
+                let key_object = context.storage.get(key);
+                context.operations.set_key(operation, key_object)
+            }
+        })
+    }())
 }
 
 #[no_mangle]

@@ -6,7 +6,7 @@ use anyhow::{format_err, Error};
 use at::BluetoothHFIndicator;
 use at_commands as at;
 use core::fmt::Debug;
-use tracing::warn;
+use log::warn;
 
 /// This mode's behavior is to forward unsolicited result codes directly per
 /// 3GPP TS 27.007 version 6.8.0, Section 8.10.

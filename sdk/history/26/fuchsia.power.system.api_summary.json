@@ -1,0 +1,79 @@
+[
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.power.system/AcquireWakeLeaseError.INTERNAL",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.power.system/AcquireWakeLeaseError.INVALID_NAME",
+        "value": "2"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.power.system/AcquireWakeLeaseError",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.power.system/ActivityGovernor.AcquireWakeLease",
+        "strictness": "flexible",
+        "ordinal": "3306304846648819971",
+        "direction": "two_way",
+        "request": "fuchsia.power.system/ActivityGovernorAcquireWakeLeaseRequest",
+        "response": "fuchsia.power.system/ActivityGovernor_AcquireWakeLease_Response",
+        "error": "fuchsia.power.system/AcquireWakeLeaseError"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.power.system/ActivityGovernor",
+        "openness": "open",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.power.system/ActivityGovernorAcquireWakeLeaseRequest.name",
+        "ordinal": "1",
+        "type": "string:64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.power.system/ActivityGovernorAcquireWakeLeaseRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.power.system/ActivityGovernor_AcquireWakeLease_Response.token",
+        "ordinal": "1",
+        "type": "zx/Handle:<EVENTPAIR,zx.DUPLICATE,zx.TRANSFER,zx.WAIT>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.power.system/ActivityGovernor_AcquireWakeLease_Response",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.power.system/BootControl.SetBootComplete",
+        "strictness": "flexible",
+        "ordinal": "4367259243539899061",
+        "direction": "two_way",
+        "response": "fuchsia.power.system/BootControl_SetBootComplete_Response"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.power.system/BootControl",
+        "openness": "open",
+        "transport": "channel"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.power.system/MAX_ELEMENT_NAME_LEN",
+        "type": "uint8",
+        "value": "64"
+    },
+    {
+        "kind": "library",
+        "name": "fuchsia.power.system"
+    }
+]

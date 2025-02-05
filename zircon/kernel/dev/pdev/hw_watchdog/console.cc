@@ -69,8 +69,8 @@ static int cmd_watchdog(int argc, const cmd_args* argv, uint32_t flags) {
 
   switch (command) {
     case Cmd::Status: {
-      zx_time_t last_pet = hw_watchdog_get_last_pet_time();
-      zx_time_t now = current_time();
+      zx_instant_boot_t last_pet = hw_watchdog_get_last_pet_time();
+      zx_instant_boot_t now = current_boot_time();
       printf("Enabled  : %s\n", hw_watchdog_is_enabled() ? "yes" : "no");
       printf("Timeout  : %ld mSec\n", hw_watchdog_get_timeout_nsec() / ZX_MSEC(1));
       printf("Last Pet : %ld.%03ld (%ld mSec ago)\n", last_pet / ZX_SEC(1),
@@ -133,10 +133,10 @@ static int cmd_watchdog(int argc, const cmd_args* argv, uint32_t flags) {
       // the system.
       dlog_panic_start();
 
-      zx_time_t deadline =
+      zx_instant_boot_t deadline =
           zx_time_add_duration(hw_watchdog_get_last_pet_time(), hw_watchdog_get_timeout_nsec());
       printf("System wedged!  Watchdog will fire in %ld mSec\n",
-             (deadline - current_time()) / ZX_MSEC(1));
+             (deadline - current_mono_time()) / ZX_MSEC(1));
 
       // Spin forever.  The watchdog should reboot us.
       while (true)
@@ -150,10 +150,10 @@ static int cmd_watchdog(int argc, const cmd_args* argv, uint32_t flags) {
       if (!hw_watchdog_is_enabled()) {
         printf("WDT petting is now suppressed, but the WDT is not currently enabled.\n");
       } else {
-        zx_time_t deadline =
+        zx_instant_boot_t deadline =
             zx_time_add_duration(hw_watchdog_get_last_pet_time(), hw_watchdog_get_timeout_nsec());
         printf("WDT petting is now suppressed, WDT will fire in %ld mSec\n",
-               (deadline - current_time()) / ZX_MSEC(1));
+               (deadline - current_mono_time()) / ZX_MSEC(1));
       }
     } break;
   };

@@ -14,6 +14,7 @@ use block_server::async_interface::{Interface, SessionManager};
 use block_server::{BlockServer, PartitionInfo};
 use device::Device;
 use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd};
+use fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream};
 use fidl_fuchsia_fs_startup::{
     CompressionAlgorithm, CreateOptions, EvictionPolicyOverride, FormatOptions, MountOptions,
     StartOptions, StartupMarker, StartupRequest, StartupRequestStream, VolumeRequest,
@@ -21,10 +22,12 @@ use fidl_fuchsia_fs_startup::{
 };
 use fidl_fuchsia_hardware_block::BlockMarker;
 use fs_management::filesystem::{BlockConnector, Filesystem};
+use fs_management::format::{detect_disk_format, DiskFormat};
 use fs_management::{ComponentType, FSConfig, Options};
 use fuchsia_runtime::HandleType;
 use futures::future::BoxFuture;
 use futures::stream::{FuturesUnordered, TryStreamExt as _};
+use log::{debug, error, info, warn};
 use mapping::{Mapping, MappingExt as _};
 use regex::Regex;
 use sha2::{Digest, Sha256};
@@ -36,8 +39,8 @@ use std::fmt::Formatter;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
@@ -416,7 +419,8 @@ impl Fvm {
         }
 
         info!(
-            "Mounted fvm, partitions: {:?}",
+            "Mounted fvm, slice size {} partitions: {:?}",
+            metadata.header.slice_size,
             metadata.partitions.iter().map(|(_, e)| e.name()).collect::<Vec<_>>()
         );
 
@@ -446,7 +450,7 @@ impl Fvm {
             .filter_map(|(index, metadata)| match metadata {
                 Ok(metadata) => Some((index, metadata)),
                 Err(error) => {
-                    warn!(?error, "Bad metadata {index}");
+                    warn!(error:?; "Bad metadata {index}");
                     None
                 }
             })
@@ -780,12 +784,50 @@ impl IoTrait for WriteFromMem<'_> {
     }
 }
 
+struct MountedVolumeInner {
+    pub scope: ExecutionScope,
+    pub block_server: BlockServer<SessionManager<PartitionInterface>>,
+    pub shutdown: AtomicBool,
+}
+
+#[derive(Clone)]
+struct MountedVolume(Arc<MountedVolumeInner>);
+
+impl Deref for MountedVolume {
+    type Target = Arc<MountedVolumeInner>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl MountedVolume {
+    pub fn new(block_server: BlockServer<SessionManager<PartitionInterface>>) -> Self {
+        Self(Arc::new(MountedVolumeInner {
+            scope: ExecutionScope::new(),
+            block_server,
+            shutdown: AtomicBool::new(false),
+        }))
+    }
+}
+
+impl BlockConnector for MountedVolume {
+    fn connect_volume(&self) -> Result<ClientEnd<fvolume::VolumeMarker>, Error> {
+        let (client, stream) = fidl::endpoints::create_request_stream();
+        let this = self.clone();
+        self.scope.spawn(async move {
+            let _ = this.block_server.handle_requests(stream).await;
+        });
+        Ok(client)
+    }
+}
+
 /// Serves a multi-filesystem component that uses the FVM format.
 struct Component {
     export_dir: Arc<vfs::directory::immutable::Simple>,
     scope: ExecutionScope,
     fvm: Mutex<Option<Arc<Fvm>>>,
-    mounted: Mutex<HashMap<u16, Arc<BlockServer<SessionManager<PartitionInterface>>>>>,
+    mounted: Mutex<HashMap<u16, MountedVolume>>,
     volumes_directory: Arc<vfs::directory::immutable::Simple>,
 }
 
@@ -825,6 +867,18 @@ impl Component {
                 async move {
                     if let Some(me) = weak.upgrade() {
                         let _ = me.handle_volumes_requests(requests).await;
+                    }
+                }
+            }),
+        )?;
+        let weak = Arc::downgrade(self);
+        svc_dir.add_entry(
+            AdminMarker::PROTOCOL_NAME,
+            vfs::service::host(move |requests| {
+                let weak = weak.clone();
+                async move {
+                    if let Some(me) = weak.upgrade() {
+                        let _ = me.handle_admin_requests(requests).await;
                     }
                 }
             }),
@@ -918,6 +972,7 @@ impl Component {
                     create_options,
                     mount_options,
                 } => {
+                    log::info!(name:?; "Create volume");
                     responder.send(
                         self.handle_create_volume(
                             &name,
@@ -927,14 +982,15 @@ impl Component {
                         )
                         .await
                         .map_err(|error| {
-                            tracing::warn!(?error, "Create volume failed");
+                            log::warn!(error:?; "Create volume failed");
                             map_to_raw_status(error)
                         }),
                     )?;
                 }
                 VolumesRequest::Remove { responder, name } => {
+                    log::info!(name:?; "Remove volume");
                     responder.send(self.handle_remove_volume(&name).await.map_err(|error| {
-                        tracing::warn!(?error, "Remove volume failed");
+                        log::warn!(error:?; "Remove volume failed");
                         map_to_raw_status(error)
                     }))?;
                 }
@@ -957,8 +1013,17 @@ impl Component {
                     self.handle_mount(partition_index, outgoing_directory, options, false)
                         .await
                         .map_err(|error| {
-                            error!(?error, partition_index, "Failed to mount volume");
-                            map_to_raw_status(error)
+                            let error = map_to_status(error);
+                            if error == zx::Status::WRONG_TYPE {
+                                warn!(
+                                    error:?,
+                                    partition_index;
+                                    "Volume had unexpected format. Not continuing mount."
+                                );
+                            } else {
+                                error!(error:?, partition_index; "Failed to mount volume");
+                            }
+                            error.into_raw()
                         }),
                 )?,
                 VolumeRequest::SetLimit { responder, bytes } => {
@@ -1012,10 +1077,10 @@ impl Component {
             None
         };
 
-        let block_server = Arc::new(BlockServer::new(
+        let block_server = BlockServer::new(
             fvm.block_size(),
             Arc::new(PartitionInterface { partition_index, partition_info, key, fvm: fvm.clone() }),
-        ));
+        );
 
         let server_end = server_end.into_channel();
 
@@ -1054,23 +1119,20 @@ impl Component {
                 }
             }
 
-            struct Server(ExecutionScope, Arc<BlockServer<SessionManager<PartitionInterface>>>);
+            let volume = MountedVolume::new(block_server);
+            let volume_scope = volume.scope.clone();
 
-            impl BlockConnector for Server {
-                fn connect_volume(&self) -> Result<ClientEnd<fvolume::VolumeMarker>, Error> {
-                    let (client, stream) = fidl::endpoints::create_request_stream();
-                    let block_server = self.1.clone();
-                    self.0.spawn(async move {
-                        let _ = block_server.handle_requests(stream).await;
-                    });
-                    Ok(client)
-                }
+            if !format && caps[1].to_string() == "minfs" {
+                // It's relatively normal to try to mount a filesystem, discover it's not the right
+                // format, and reformat it so it is. If this filesystem is supposed to be minfs,
+                // spot-check that this partition is the right format before we try serving, and
+                // return the proper error without logging scary things if it is not.
+                let block_proxy = volume.connect_block()?.into_proxy();
+                let detected_format = detect_disk_format(block_proxy).await;
+                ensure!(detected_format == DiskFormat::Minfs, zx::Status::WRONG_TYPE);
             }
 
-            let mut fs = Filesystem::new(
-                Server(self.scope.clone(), block_server.clone()),
-                ComponentName(caps[1].to_string()),
-            );
+            let mut fs = Filesystem::new(volume.clone(), ComponentName(caps[1].to_string()));
 
             if format {
                 fs.format().await?;
@@ -1080,16 +1142,40 @@ impl Component {
             // For now, just leak the mounted filesystem.
             let exposed_dir = fs.serve().await?.take_exposed_dir();
 
-            self.mounted.lock().unwrap().insert(partition_index, block_server);
+            self.mounted.lock().unwrap().insert(partition_index, volume);
 
-            let _ = exposed_dir.open3(
+            let outgoing_dir = vfs::directory::immutable::simple();
+            // TODO(https://fxbug.dev/392184892): fxfs volumes have an svc directory instead of the
+            // flat hierarchy a component exposed dir has. We temporarily mimic this structure by
+            // putting the whole exposed dir into an svc directory.
+            let (svc_proxy, svc_server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+            outgoing_dir.add_entry("svc", vfs::remote::remote_dir(svc_proxy))?;
+            exposed_dir.open3(
                 ".",
                 fio::PERM_READABLE
                     | fio::Flags::PERM_INHERIT_EXECUTE
                     | fio::Flags::PERM_INHERIT_WRITE,
                 &fio::Options::default(),
-                server_end,
-            );
+                svc_server_end.into_channel(),
+            )?;
+            let (root_proxy, root_server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+            outgoing_dir.add_entry("root", vfs::remote::remote_dir(root_proxy))?;
+            exposed_dir.open3(
+                "root",
+                fio::PERM_READABLE
+                    | fio::Flags::PERM_INHERIT_EXECUTE
+                    | fio::Flags::PERM_INHERIT_WRITE,
+                &fio::Options::default(),
+                root_server_end.into_channel(),
+            )?;
+            let flags = fio::Flags::PROTOCOL_DIRECTORY
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::PERM_EXECUTABLE;
+            ObjectRequest::new(flags, &fio::Options::default(), server_end)
+                .handle(|request| outgoing_dir.open3(volume_scope, Path::dot(), flags, request));
         } else {
             // Expose the volume as a block device.
             let outgoing_dir = vfs::directory::immutable::simple();
@@ -1108,15 +1194,18 @@ impl Component {
                 }),
             )?;
 
-            self.mounted.lock().unwrap().insert(partition_index, block_server.clone());
+            let volume = MountedVolume::new(block_server);
+            let volume_clone = volume.clone();
+            let volume_scope = volume.scope.clone();
+            self.mounted.lock().unwrap().insert(partition_index, volume);
 
             // Unmount when the last connection is closed (i.e. when `scope` terminates).
-            let scope = ExecutionScope::new();
-            let scope_clone = scope.clone();
             let this = self.clone();
             fasync::Task::spawn(async move {
-                scope_clone.wait().await;
-                this.mounted.lock().unwrap().remove(&partition_index);
+                volume_clone.scope.wait().await;
+                if !volume_clone.shutdown.swap(true, Ordering::Relaxed) {
+                    this.mounted.lock().unwrap().remove(&partition_index);
+                }
             })
             .detach();
 
@@ -1125,7 +1214,7 @@ impl Component {
                 | fio::PERM_WRITABLE
                 | fio::PERM_EXECUTABLE;
             ObjectRequest::new(flags, &fio::Options::default(), server_end)
-                .handle(|request| outgoing_dir.open3(scope, Path::dot(), flags, request));
+                .handle(|request| outgoing_dir.open3(volume_scope, Path::dot(), flags, request));
         }
 
         Ok(())
@@ -1137,7 +1226,7 @@ impl Component {
         requests: fvolume::VolumeRequestStream,
     ) -> Result<(), Error> {
         let partition = self.mounted.lock().unwrap()[&partition_index].clone();
-        partition.handle_requests(requests).await
+        partition.block_server.handle_requests(requests).await
     }
 
     async fn handle_create_volume(
@@ -1150,16 +1239,17 @@ impl Component {
         let fvm = self.fvm.lock().unwrap().as_ref().unwrap().clone();
         let inner = fvm.inner.upgradable_read().await;
         let Some(type_guid) = create_options.type_guid else {
-            warn!("Unable to create volume; missing type GUID");
-            bail!(zx::Status::INVALID_ARGS);
+            return Err(anyhow!(zx::Status::INVALID_ARGS).context("Missing type GUID"));
         };
         let guid = create_options.guid.unwrap_or_else(|| Uuid::new_v4().to_bytes_le());
         let slices = match create_options.initial_size {
             Some(x) => {
-                ensure!(x % inner.metadata.header.slice_size == 0, zx::Status::INVALID_ARGS);
+                if x % inner.metadata.header.slice_size > 0 {
+                    return Err(anyhow!(zx::Status::INVALID_ARGS).context("Invalid volume size"));
+                }
                 (x / inner.metadata.header.slice_size)
                     .try_into()
-                    .map_err(|_| zx::Status::INVALID_ARGS)?
+                    .map_err(|_| anyhow!(zx::Status::INVALID_ARGS).context("Invalid volume size"))?
             }
             None => 1,
         };
@@ -1175,7 +1265,7 @@ impl Component {
         }
         .await
         .map_err(|error| {
-            warn!(?error, "Created partition {name}, but failed to mount");
+            warn!(error:?; "Created partition {name}, but failed to mount");
             error
         })
     }
@@ -1188,10 +1278,14 @@ impl Component {
         else {
             bail!(zx::Status::NOT_FOUND);
         };
-        ensure!(
-            !self.mounted.lock().unwrap().contains_key(&partition_index),
-            zx::Status::ALREADY_BOUND
-        );
+        let volume = self.mounted.lock().unwrap().get(&partition_index).cloned();
+        if let Some(volume) = volume {
+            volume.scope.shutdown();
+            volume.scope.wait().await;
+            if !volume.shutdown.swap(true, Ordering::Relaxed) {
+                self.mounted.lock().unwrap().remove(&partition_index);
+            }
+        }
         let mut new_metadata = inner.metadata.clone();
         let mut removed_slices = 0u64;
         for slice_entry in &mut new_metadata.allocations {
@@ -1209,10 +1303,35 @@ impl Component {
         inner.partition_state.remove(&partition_index);
 
         if let Err(error) = self.volumes_directory.remove_entry(name, false) {
-            warn!(?error, "Removed volume from FVM, but failed to remove entry from directory");
+            warn!(error:?; "Removed volume from FVM, but failed to remove entry from directory");
         }
 
         Ok(())
+    }
+
+    async fn handle_admin_requests(
+        self: &Arc<Self>,
+        mut stream: AdminRequestStream,
+    ) -> Result<(), Error> {
+        match stream.try_next().await? {
+            None => Ok(()),
+            Some(AdminRequest::Shutdown { responder }) => {
+                info!("Received admin shutdown request");
+                // Shut down any remaining volumes.
+                let volumes = self.mounted.lock().unwrap();
+                for volume in volumes.values() {
+                    volume.scope.shutdown();
+                }
+                // Shut down the main scope. The main thread is waiting on this shutdown to exit,
+                // so it should be the ~last thing we do.
+                self.scope.shutdown();
+                responder
+                    .send()
+                    .unwrap_or_else(|error| warn!(error:?; "Failed to send shutdown response"));
+                info!("Shutdown complete");
+                Ok(())
+            }
+        }
     }
 }
 
@@ -1283,7 +1402,7 @@ impl Interface for PartitionInterface {
                 .await
         }
         .map_err(|error| {
-            warn!(?error, "Read failed");
+            warn!(error:?; "Read failed");
             map_to_status(error)
         })
     }
@@ -1339,7 +1458,7 @@ impl Interface for PartitionInterface {
                 .await
         }
         .map_err(|error| {
-            warn!(?error, "Write failed");
+            warn!(error:?; "Write failed");
             map_to_status(error)
         })
     }
@@ -1604,7 +1723,7 @@ fn map_to_status(error: anyhow::Error) -> zx::Status {
         status.clone()
     } else {
         // Print the internal error if we re-map it because we will lose any context after this.
-        warn!(?error, "Internal error");
+        warn!(error:?; "Internal error");
         zx::Status::INTERNAL
     }
 }
@@ -1681,6 +1800,7 @@ mod tests {
     };
     use fake_block_server::{FakeServer, FakeServerOptions};
     use fidl::endpoints::RequestStream;
+    use fidl_fuchsia_fs::AdminMarker;
     use fidl_fuchsia_fs_startup::{
         CheckOptions, CompressionAlgorithm, CreateOptions, EvictionPolicyOverride, MountOptions,
         StartOptions, StartupMarker, VolumeMarker, VolumesMarker,
@@ -1995,7 +2115,7 @@ mod tests {
                 fixture.fake_server
             };
 
-            tracing::info!("Created {partition_count} partitions");
+            log::info!("Created {partition_count} partitions");
 
             // Reopen and check we can mount all the partitions we created.
             let fixture = Fixture::from_fake_server(fake_server).await;
@@ -2051,16 +2171,6 @@ mod tests {
                 .expect("create failed (FIDL)"),
             Err(zx::sys::ZX_ERR_NO_SPACE)
         );
-
-        // Should fail because the volume is mounted.
-        assert_eq!(
-            volumes_proxy.remove("foo").await.expect("remove failed (FIDL)"),
-            Err(zx::sys::ZX_ERR_ALREADY_BOUND)
-        );
-
-        let fixture = Fixture::from_fake_server(fixture.take_fake_server()).await;
-        let volumes_proxy =
-            connect_to_protocol_at_dir_svc::<VolumesMarker>(&fixture.outgoing_dir).unwrap();
 
         volumes_proxy.remove("foo").await.expect("remove failed (FIDL)").expect("remove failed");
 
@@ -2126,15 +2236,12 @@ mod tests {
                 .expect("create failed (FIDL)")
                 .expect("create failed");
 
-            // Should fail because the volume is mounted.
-            assert_eq!(
-                volumes_proxy.remove("foo").await.expect("remove failed (FIDL)"),
-                Err(zx::sys::ZX_ERR_ALREADY_BOUND)
-            );
+            volumes_proxy
+                .remove("foo")
+                .await
+                .expect("remove failed (FIDL)")
+                .expect("remove failed");
         }
-
-        // Should succeed after dropping the volume's outgoing directory.
-        volumes_proxy.remove("foo").await.expect("remove failed (FIDL)").expect("remove failed");
 
         let expected = HashSet::from(["blobfs".to_string(), "data".to_string()]);
         let volumes_dir =
@@ -2780,5 +2887,88 @@ mod tests {
         client.read_at(MutableBufferSlice::Memory(&mut read), 0).await.unwrap();
 
         assert_eq!(&read, &data);
+    }
+
+    #[fuchsia::test(threads = 2)]
+    async fn test_unmount_volume_race() {
+        let fixture = Fixture::new(SLICE_SIZE).await;
+
+        let volumes_proxy =
+            connect_to_protocol_at_dir_svc::<VolumesMarker>(&fixture.outgoing_dir).unwrap();
+
+        for _ in 0..100 {
+            let (dir_proxy, dir_server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+            let volumes_proxy = volumes_proxy.clone();
+            volumes_proxy
+                .create(
+                    "foo",
+                    dir_server_end,
+                    CreateOptions { type_guid: Some([1; 16]), ..CreateOptions::default() },
+                    MountOptions::default(),
+                )
+                .await
+                .expect("create failed (FIDL)")
+                .expect("create failed");
+
+            // Drop the volume in one thread, remove it explicitly in the other.  Neither branch
+            // should ever fail, regardless of who wins the race.
+            futures::join! {
+                async move {
+                    std::mem::drop(dir_proxy);
+                },
+                async move {
+                    volumes_proxy
+                        .remove("foo").await.expect("remove failed (FIDL)").expect("remove failed");
+                },
+            };
+
+            let expected = HashSet::from(["blobfs".to_string(), "data".to_string()]);
+            let volumes_dir = open_directory(&fixture.outgoing_dir, "volumes", fio::Flags::empty())
+                .await
+                .unwrap();
+            assert_eq!(
+                &readdir(&volumes_dir)
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|d| d.name)
+                    .collect::<HashSet<_>>(),
+                &expected,
+            );
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_admin_shutdown_no_volumes() {
+        let fixture = Fixture::new(SLICE_SIZE).await;
+        let admin_proxy =
+            connect_to_protocol_at_dir_svc::<AdminMarker>(&fixture.outgoing_dir).unwrap();
+        admin_proxy.shutdown().await.unwrap();
+        fixture.component.scope.wait().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_admin_shutdown_with_volumes() {
+        let fixture = Fixture::new(SLICE_SIZE).await;
+
+        let (_dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+        let volumes_proxy =
+            connect_to_protocol_at_dir_svc::<VolumesMarker>(&fixture.outgoing_dir).unwrap();
+        volumes_proxy
+            .create(
+                "foo",
+                dir_server_end,
+                CreateOptions { type_guid: Some([1; 16]), ..CreateOptions::default() },
+                MountOptions::default(),
+            )
+            .await
+            .expect("create failed (FIDL)")
+            .expect("create failed");
+
+        let admin_proxy =
+            connect_to_protocol_at_dir_svc::<AdminMarker>(&fixture.outgoing_dir).unwrap();
+        admin_proxy.shutdown().await.unwrap();
+        fixture.component.scope.wait().await;
     }
 }

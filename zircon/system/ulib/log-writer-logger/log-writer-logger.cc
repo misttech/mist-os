@@ -118,7 +118,7 @@ void LoggerWriter::Write(const log_message* message) {
     return;
   }
 
-  zx_time_t time = zx_clock_get_monotonic();
+  zx_instant_mono_t time = zx_clock_get_monotonic();
   log_packet_t packet;
   memset(&packet, 0, sizeof(packet));
   constexpr size_t kDataSize = sizeof(packet.data);

@@ -21,12 +21,58 @@ impl<T: Transport> ServerHandler<T> for Ignore {
 }
 
 pub async fn test_close_on_drop<T: Transport>(client_end: T, server_end: T) {
-    let mut client_dispatcher = Client::new(client_end);
-    let client_task = Task::spawn(async move { client_dispatcher.run(Ignore).await });
-    let mut server_dispatcher = Server::new(server_end);
-    let server_task = Task::spawn(async move { server_dispatcher.run(Ignore).await });
+    struct TestServer {
+        scope: Scope,
+    }
 
+    impl<T: Transport> ServerHandler<T> for TestServer {
+        fn on_one_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer) {
+            panic!("unexpected event");
+        }
+
+        fn on_two_way(
+            &mut self,
+            server: &ServerSender<T>,
+            ordinal: u64,
+            mut buffer: T::RecvBuffer,
+            responder: Responder,
+        ) {
+            let server = server.clone();
+            self.scope.spawn(async move {
+                assert_eq!(ordinal, 42);
+                let message = T::decoder(&mut buffer)
+                    .decode_last::<WireString<'_>>()
+                    .expect("failed to decode request");
+                assert_eq!(&**message, "Ping");
+
+                server
+                    .send_response(responder, 42, &mut "Pong".to_string())
+                    .expect("failed to encode response")
+                    .await
+                    .expect("failed to send response");
+            });
+        }
+    }
+
+    let mut client = Client::new(client_end);
+    let client_sender = client.sender().clone();
+    let client_task = Task::spawn(async move { client.run(Ignore).await });
+    let mut server = Server::new(server_end);
+    let server_task =
+        Task::spawn(async move { server.run(TestServer { scope: Scope::new() }).await });
+
+    let mut buffer = client_sender
+        .send_two_way(42, &mut "Ping".to_string())
+        .expect("client failed to encode request")
+        .await
+        .expect("client failed to send request and receive response");
+    let message =
+        T::decoder(&mut buffer).decode_last::<WireString<'_>>().expect("failed to decode response");
+    assert_eq!(&**message, "Pong");
+
+    drop(client_sender);
     drop(client_task);
+
     server_task.await.expect("server encountered an error");
 }
 
@@ -47,18 +93,18 @@ pub async fn test_one_way<T: Transport>(client_end: T, server_end: T) {
         }
     }
 
-    let mut client_dispatcher = Client::new(client_end);
-    let client = client_dispatcher.sender().clone();
-    let client_task = Task::spawn(async move { client_dispatcher.run(Ignore).await });
-    let mut server_dispatcher = Server::new(server_end);
-    let server_task = Task::spawn(async move { server_dispatcher.run(TestServer).await });
+    let mut client = Client::new(client_end);
+    let client_sender = client.sender().clone();
+    let client_task = Task::spawn(async move { client.run(Ignore).await });
+    let mut server = Server::new(server_end);
+    let server_task = Task::spawn(async move { server.run(TestServer).await });
 
-    client
+    client_sender
         .send_one_way(42, &mut "Hello world".to_string())
         .expect("client failed to encode request")
         .await
         .expect("client failed to send request");
-    client.close();
+    client_sender.close();
 
     client_task.await.expect("client encountered an error");
     server_task.await.expect("server encountered an error");
@@ -98,14 +144,14 @@ pub async fn test_two_way<T: Transport>(client_end: T, server_end: T) {
         }
     }
 
-    let mut client_dispatcher = Client::new(client_end);
-    let client = client_dispatcher.sender().clone();
-    let client_task = Task::spawn(async move { client_dispatcher.run(Ignore).await });
-    let mut server_dispatcher = Server::new(server_end);
+    let mut client = Client::new(client_end);
+    let client_sender = client.sender().clone();
+    let client_task = Task::spawn(async move { client.run(Ignore).await });
+    let mut server = Server::new(server_end);
     let server_task =
-        Task::spawn(async move { server_dispatcher.run(TestServer { scope: Scope::new() }).await });
+        Task::spawn(async move { server.run(TestServer { scope: Scope::new() }).await });
 
-    let mut buffer = client
+    let mut buffer = client_sender
         .send_two_way(42, &mut "Ping".to_string())
         .expect("client failed to encode request")
         .await
@@ -114,7 +160,7 @@ pub async fn test_two_way<T: Transport>(client_end: T, server_end: T) {
         T::decoder(&mut buffer).decode_last::<WireString<'_>>().expect("failed to decode response");
     assert_eq!(&**message, "Pong");
 
-    client.close();
+    client_sender.close();
 
     client_task.await.expect("client encountered an error");
     server_task.await.expect("server encountered an error");
@@ -161,19 +207,22 @@ pub async fn test_multiple_two_way<T: Transport>(client_end: T, server_end: T) {
         }
     }
 
-    let mut client_dispatcher = Client::new(client_end);
-    let client = client_dispatcher.sender().clone();
-    let client_task = Task::spawn(async move { client_dispatcher.run(Ignore).await });
-    let mut server_dispatcher = Server::new(server_end);
+    let mut client = Client::new(client_end);
+    let client_sender = client.sender().clone();
+    let client_task = Task::spawn(async move { client.run(Ignore).await });
+    let mut server = Server::new(server_end);
     let server_task =
-        Task::spawn(async move { server_dispatcher.run(TestServer { scope: Scope::new() }).await });
+        Task::spawn(async move { server.run(TestServer { scope: Scope::new() }).await });
 
-    let send_one =
-        client.send_two_way(1, &mut "One".to_string()).expect("client failed to encode request");
-    let send_two =
-        client.send_two_way(2, &mut "Two".to_string()).expect("client failed to encode request");
-    let send_three =
-        client.send_two_way(3, &mut "Three".to_string()).expect("client failed to encode request");
+    let send_one = client_sender
+        .send_two_way(1, &mut "One".to_string())
+        .expect("client failed to encode request");
+    let send_two = client_sender
+        .send_two_way(2, &mut "Two".to_string())
+        .expect("client failed to encode request");
+    let send_three = client_sender
+        .send_two_way(3, &mut "Three".to_string())
+        .expect("client failed to encode request");
     let (response_one, response_two, response_three) =
         futures::join!(send_one, send_two, send_three);
 
@@ -196,7 +245,7 @@ pub async fn test_multiple_two_way<T: Transport>(client_end: T, server_end: T) {
         .expect("failed to decode response");
     assert_eq!(&**message_three, "Three");
 
-    client.close();
+    client_sender.close();
 
     client_task.await.expect("client encountered an error");
     server_task.await.expect("server encountered an error");
@@ -217,13 +266,13 @@ pub async fn test_event<T: Transport>(client_end: T, server_end: T) {
         }
     }
 
-    let mut client_dispatcher = Client::new(client_end);
-    let client_task = Task::spawn(async move { client_dispatcher.run(TestClient).await });
-    let mut server_dispatcher = Server::new(server_end);
-    let server = server_dispatcher.sender().clone();
-    let server_task = Task::spawn(async move { server_dispatcher.run(Ignore).await });
+    let mut client = Client::new(client_end);
+    let client_task = Task::spawn(async move { client.run(TestClient).await });
+    let mut server = Server::new(server_end);
+    let server_sender = server.sender().clone();
+    let server_task = Task::spawn(async move { server.run(Ignore).await });
 
-    server
+    server_sender
         .send_event(10, &mut "Surprise!".to_string())
         .expect("server failed to encode response")
         .await

@@ -6,7 +6,6 @@
 
 #include <gmock/gmock.h>
 
-#include "src/media/audio/audio_core/shared/process_config.h"
 #include "src/media/audio/audio_core/v1/packet_queue.h"
 #include "src/media/audio/audio_core/v1/testing/fake_stream.h"
 #include "src/media/audio/audio_core/v1/testing/packet_factory.h"
@@ -22,9 +21,9 @@ namespace media::audio {
 namespace {
 
 // Used when the ReadLockContext is unused by the test.
-static media::audio::ReadableStream::ReadLockContext rlctx;
+media::audio::ReadableStream::ReadLockContext rlctx;
 
-static const Format k48k2ChanFloatFormat =
+const Format k48k2ChanFloatFormat =
     Format::Create(fuchsia::media::AudioStreamType{
                        .sample_format = fuchsia::media::AudioSampleFormat::FLOAT,
                        .channels = 2,
@@ -155,7 +154,7 @@ TEST_F(EffectsStageV1Test, ApplyEffectsWithOffsetSourcePosition) {
     // should be processed in one block. Therefore we start with 240 1.0s
     // (0.0+1.0) followed by 240 2.0s (1.0+1.1).
     auto& arr1 = as_array<float, 240>(buf->payload(), 0);
-    auto& arr2 = as_array<float, 240>(buf->payload(), 240 * effects_stage->format().channels());
+    auto& arr2 = as_array<float, 240>(buf->payload(), 240ul * effects_stage->format().channels());
     EXPECT_THAT(arr1, Each(FloatEq(1.0f)));
     EXPECT_THAT(arr2, Each(FloatEq(2.0f)));
   }
@@ -365,20 +364,21 @@ TEST_F(EffectsStageV1Test, RespectBlockSize) {
     EXPECT_EQ(buffer->start().Floor(), 0);
     ASSERT_EQ(buffer->length(), 138);
     EXPECT_EQ(reinterpret_cast<float*>(buffer->payload())[0], 1.0);
-    memset(buffer->payload(), 0, kBlockSize * k48k2ChanFloatFormat.bytes_per_frame());
+    memset(buffer->payload(), 0,
+           static_cast<uint64_t>(kBlockSize) * k48k2ChanFloatFormat.bytes_per_frame());
   }
 
   // Ask for the second and third blocks. The rest of the second block is immediately available.
   {
-    auto buffer = effects_stage->ReadLock(rlctx, Fixed(138), 2 * kBlockSize);
+    auto buffer = effects_stage->ReadLock(rlctx, Fixed(138), 2ul * kBlockSize);
     EXPECT_EQ(buffer->start().Floor(), 138);
-    ASSERT_EQ(buffer->length(), 2 * kBlockSize - 138);
+    ASSERT_EQ(buffer->length(), (2 * kBlockSize) - 138);
     EXPECT_EQ(reinterpret_cast<float*>(buffer->payload())[0], 1.0);
   }
 
   // Ask for the third block.
   {
-    auto buffer = effects_stage->ReadLock(rlctx, Fixed(2 * kBlockSize), kBlockSize);
+    auto buffer = effects_stage->ReadLock(rlctx, Fixed(2ul * kBlockSize), kBlockSize);
     EXPECT_EQ(buffer->start().Floor(), 2 * kBlockSize);
     ASSERT_EQ(buffer->length(), kBlockSize);
     EXPECT_EQ(reinterpret_cast<float*>(buffer->payload())[0], 1.0);
@@ -415,7 +415,8 @@ TEST_F(EffectsStageV1Test, TruncateToMaxBufferSize) {
     EXPECT_EQ(buffer->start().Floor(), 0);
     ASSERT_EQ(buffer->length(), 256);
     EXPECT_EQ(reinterpret_cast<float*>(buffer->payload())[0], 1.0);
-    memset(buffer->payload(), 0, kBlockSize * k48k2ChanFloatFormat.bytes_per_frame());
+    memset(buffer->payload(), 0,
+           static_cast<uint64_t>(kBlockSize) * k48k2ChanFloatFormat.bytes_per_frame());
   }
 }
 
@@ -497,9 +498,9 @@ TEST_F(EffectsStageV1Test, AddDelayFramesIntoMinLeadTime) {
   EXPECT_EQ(effect_lead_time + external_lead_time, effects_stage->GetPresentationDelay());
 }
 
-static const std::string kInstanceName = "instance_name";
-static const std::string kInitialConfig = "different size than kConfig";
-static const std::string kConfig = "config";
+const std::string kInstanceName = "instance_name";
+const std::string kInitialConfig = "different size than kConfig";
+const std::string kConfig = "config";
 
 TEST_F(EffectsStageV1Test, UpdateEffect) {
   // Create a packet queue to use as our source stream.
@@ -598,10 +599,10 @@ TEST_F(EffectsStageV1Test, CreateStageWithRechannelization) {
       // initialized as 0's. The second effect will increment all channels, so channels 0,1 will be
       // incremented twice and channels 2,3 will be incremented once. So we expect each frame to be
       // the samples [3.0, 3.0, 1.0, 1.0].
-      ASSERT_FLOAT_EQ(arr[i * 4 + 0], 3.0f) << i;
-      ASSERT_FLOAT_EQ(arr[i * 4 + 1], 3.0f) << i;
-      ASSERT_FLOAT_EQ(arr[i * 4 + 2], 1.0f) << i;
-      ASSERT_FLOAT_EQ(arr[i * 4 + 3], 1.0f) << i;
+      ASSERT_FLOAT_EQ(arr[(i * 4) + 0], 3.0f) << i;
+      ASSERT_FLOAT_EQ(arr[(i * 4) + 1], 3.0f) << i;
+      ASSERT_FLOAT_EQ(arr[(i * 4) + 2], 1.0f) << i;
+      ASSERT_FLOAT_EQ(arr[(i * 4) + 3], 1.0f) << i;
     }
   }
 }
@@ -664,19 +665,23 @@ TEST_F(EffectsStageV1Test, SendStreamInfoToEffects) {
 
   // Multiple usages in the mask.
   input->set_gain_db(-4.0);
-  input->set_usage_mask(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::MEDIA),
-                                         StreamUsage::WithRenderUsage(RenderUsage::INTERRUPTION)}));
+  input->set_usage_mask(
+      StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::MEDIA),
+                       StreamUsage::WithRenderUsage(RenderUsage::INTERRUPTION),
+                       StreamUsage::WithRenderUsage(RenderUsage::ACCESSIBILITY)}));
   {
     auto buf = effects_stage->ReadLock(rlctx, Fixed(first_frame), kRequestedFrames);
     ASSERT_TRUE(buf);
     EXPECT_EQ(buf->usage_mask(),
               StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::MEDIA),
-                               StreamUsage::WithRenderUsage(RenderUsage::INTERRUPTION)}));
+                               StreamUsage::WithRenderUsage(RenderUsage::INTERRUPTION),
+                               StreamUsage::WithRenderUsage(RenderUsage::ACCESSIBILITY)}));
     EXPECT_FLOAT_EQ(buf->total_applied_gain_db(), -4.0);
     test_effects_v1_inspect_state effect_state;
     EXPECT_EQ(ZX_OK, test_effects().InspectInstance(
                          effects_stage->effects_processor().GetEffectAt(0).get(), &effect_state));
-    EXPECT_EQ(FUCHSIA_AUDIO_EFFECTS_USAGE_MEDIA | FUCHSIA_AUDIO_EFFECTS_USAGE_INTERRUPTION,
+    EXPECT_EQ(FUCHSIA_AUDIO_EFFECTS_USAGE_MEDIA | FUCHSIA_AUDIO_EFFECTS_USAGE_INTERRUPTION |
+                  FUCHSIA_AUDIO_EFFECTS_USAGE_ACCESSIBILITY,
               effect_state.stream_info.usage_mask);
     EXPECT_FLOAT_EQ(-4.0, effect_state.stream_info.gain_dbfs);
     first_frame = buf->end().Floor();
@@ -723,7 +728,7 @@ TEST_F(EffectsStageV1Test, RingOut) {
 
   // Now we expect 3 buffers of ringout; Read the first.
   {
-    auto buf = effects_stage->ReadLock(rlctx, Fixed(1 * kBlockSize), kBlockSize);
+    auto buf = effects_stage->ReadLock(rlctx, Fixed(1ul * kBlockSize), kBlockSize);
     ASSERT_TRUE(buf);
     EXPECT_EQ(kBlockSize, buf->start().Floor());
     EXPECT_EQ(kBlockSize, buf->length());
@@ -733,7 +738,7 @@ TEST_F(EffectsStageV1Test, RingOut) {
   // The skipped buffer:
   //     buf = effects_stage->ReadLock(rlctx, Fixed(2 * kBlockSize), kBlockSize);
   {
-    auto buf = effects_stage->ReadLock(rlctx, Fixed(3 * kBlockSize), kBlockSize);
+    auto buf = effects_stage->ReadLock(rlctx, Fixed(3ul * kBlockSize), kBlockSize);
     ASSERT_TRUE(buf);
     EXPECT_EQ(3 * kBlockSize, buf->start().Floor());
     EXPECT_EQ(kBlockSize, buf->length());
@@ -741,7 +746,7 @@ TEST_F(EffectsStageV1Test, RingOut) {
 
   // Nothing after the last frame of ringout.
   {
-    auto buf = effects_stage->ReadLock(rlctx, Fixed(4 * kBlockSize), kBlockSize);
+    auto buf = effects_stage->ReadLock(rlctx, Fixed(4ul * kBlockSize), kBlockSize);
     ASSERT_FALSE(buf);
   }
 }

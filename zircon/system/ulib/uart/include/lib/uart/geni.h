@@ -13,6 +13,7 @@
 
 #include <hwreg/bitfields.h>
 
+#include "interrupt.h"
 #include "uart.h"
 
 namespace uart::geni {
@@ -320,7 +321,7 @@ class Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_s
   static constexpr auto kDevicetreeBindings =
       cpp20::to_array<std::string_view>({"qcom,geni-debug-uart"});
 
-  static constexpr std::string_view config_name() { return "geni"; }
+  static constexpr std::string_view kConfigName = "geni";
 
   template <typename... Args>
   explicit Driver(Args&&... args)
@@ -556,7 +557,7 @@ class Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_s
         uint32_t value = RxFifoRegister::Get().ReadFrom(io.io()).data();
         to_drain -= fifo_len;
         for (uint32_t c = 0; c < fifo_len && !rx_disabled; ++c) {
-          rx(
+          auto rx_irq = RxInterrupt(
               lock, [&]() { return ignore_rx ? 0 : (value >> (c * CHAR_BIT)) & 0xff; },
               [&]() {
                 // If the buffer is full, disable the receive interrupt instead
@@ -564,6 +565,8 @@ class Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_s
                 EnableRxInterrupt(io, false);
                 rx_disabled = true;
               });
+
+          rx(rx_irq);
         }
       }
     }
@@ -571,7 +574,8 @@ class Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_s
     // If any of the conditions below have been raised, attempting to transmit is ok.
     if (m_status.tx_fifo_watermark() || m_status.command_done() || m_status.command_cancel() ||
         m_status.command_abort()) {
-      tx(lock, waiter, [&]() { EnableTxInterrupt(io, false); });
+      auto tx_irq = TxInterrupt(lock, waiter, [&]() { EnableTxInterrupt(io, false); });
+      tx(tx_irq);
     }
 
     // Clear the flags we're handling.

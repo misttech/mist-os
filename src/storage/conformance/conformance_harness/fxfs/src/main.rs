@@ -12,8 +12,8 @@ use fidl_fuchsia_io_test::{
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
 use fxfs_testing::{open_dir, open_file, TestFixture};
+use log::error;
 use std::sync::atomic::{AtomicU64, Ordering};
-use tracing::error;
 
 struct Harness(TestHarnessRequestStream);
 
@@ -86,6 +86,7 @@ async fn run(mut stream: TestHarnessRequestStream, fixture: &TestFixture) -> Res
                         | fio::NodeAttributesQuery::CASEFOLD
                         | fio::NodeAttributesQuery::SELINUX_CONTEXT,
                     supports_services: false,
+                    supports_unnamed_temporary_file: false,
                 })?;
             }
             TestHarnessRequest::CreateDirectory {

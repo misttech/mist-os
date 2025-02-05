@@ -191,7 +191,7 @@ impl<T: Releasable> OwnedRef<T> {
 
 impl<T: std::fmt::Debug> std::fmt::Debug for OwnedRef<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("OwnedRef").field(&Self::inner(self).value).finish()
+        Self::inner(self).value.fmt(f)
     }
 }
 
@@ -375,6 +375,15 @@ impl<T> std::ops::Deref for WeakRefKey<T> {
 // across threads.
 pub struct TempRef<'a, T>(Arc<RefInner<T>>, std::marker::PhantomData<(&'a T, *mut u8)>);
 
+impl<'a, T> std::fmt::Debug for TempRef<'a, T>
+where
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.deref().fmt(f)
+    }
+}
+
 impl<'a, T> Drop for TempRef<'a, T> {
     fn drop(&mut self) {
         self.0.dec_temp_ref();
@@ -412,6 +421,12 @@ impl<'a, T> TempRef<'a, T> {
 
 impl<'a, T> From<&TempRef<'a, T>> for WeakRef<T> {
     fn from(temp_ref: &TempRef<'a, T>) -> Self {
+        Self(Arc::downgrade(&temp_ref.0))
+    }
+}
+
+impl<'a, T> From<TempRef<'a, T>> for WeakRef<T> {
+    fn from(temp_ref: TempRef<'a, T>) -> Self {
         Self(Arc::downgrade(&temp_ref.0))
     }
 }

@@ -177,7 +177,7 @@ impl TwoWayAddResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })

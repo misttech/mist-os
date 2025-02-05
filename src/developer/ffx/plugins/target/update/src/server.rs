@@ -3,16 +3,14 @@
 // found in the LICENSE file.
 
 use ffx_config::EnvironmentContext;
-use ffx_target::TargetProxy;
 use fho::{
-    bug, return_bug, return_user_error, user_error, Connector, Deferred, FfxMain, Result,
+    bug, return_bug, return_user_error, user_error, Deferred, FfxMain, Result,
     VerifiedMachineWriter,
 };
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx::{
     RepositoryRegistrationAliasConflictMode, RepositoryRegistryProxy,
 };
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_pkg::RepositoryManagerProxy;
 use fidl_fuchsia_pkg_rewrite::EngineProxy;
@@ -24,6 +22,8 @@ use std::net::Ipv6Addr;
 use std::path::PathBuf;
 use std::process;
 use std::time::Duration;
+use target_connector::Connector;
+use target_holders::{RemoteControlProxyHolder, TargetProxyHolder};
 use timeout::timeout;
 use zx_status::Status;
 
@@ -61,11 +61,12 @@ pub(crate) struct PackageServerTask {
 }
 
 pub(crate) async fn package_server_task(
-    target_proxy_connector: Connector<TargetProxy>,
-    rcs_proxy_connector: Connector<RemoteControlProxy>,
+    target_proxy_connector: Connector<TargetProxyHolder>,
+    rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
     repos: Deferred<RepositoryRegistryProxy>,
     context: EnvironmentContext,
     product_bundle: PathBuf,
+    repo_port: u16,
 ) -> Result<Option<PackageServerTask>> {
     tracing::info!("starting package server for {product_bundle:?}");
 
@@ -74,8 +75,8 @@ pub(crate) async fn package_server_task(
     let repo_name = format!("{repo_name_prefix}{}", process::id());
 
     let cmd = ffx_repository_server_start_args::StartCommand {
-        // Start a server on a dynamic port.
-        address: Some((Ipv6Addr::UNSPECIFIED, 0).into()),
+        // Start a server on the given port.
+        address: Some((Ipv6Addr::UNSPECIFIED, repo_port).into()),
         foreground: true,
         // Give it a name. This is actually a prefix of the name when running a product bundle.
         repository: Some(repo_name.clone()),
@@ -141,7 +142,7 @@ pub(crate) async fn package_server_task(
 
 pub(crate) async fn wait_for_device_task(
     repo_name: String,
-    rcs_proxy_connector: Connector<RemoteControlProxy>,
+    rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
 ) -> Result<()> {
     // Once the server task is running, wait until the registration appears on the device.
     let registered = timeout::<_, fho::Result<()>>(Duration::from_secs(30), async {
@@ -173,7 +174,7 @@ pub(crate) async fn wait_for_device_task(
 /// be rebooting.
 pub(crate) async fn unregister_pb_repo_server(
     repo_name_prefix: &str,
-    rcs_proxy_connector: Connector<RemoteControlProxy>,
+    rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
 ) -> Result<()> {
     let mut retry = true;
 
@@ -246,7 +247,7 @@ pub(crate) async fn unregister_pb_repo_server(
 /// server that has the given prefix.
 async fn is_server_registered(
     repo_name: &str,
-    rcs_proxy_connector: Connector<RemoteControlProxy>,
+    rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
     time_to_wait: Duration,
 ) -> Result<bool> {
     let repo_manager_proxy = get_repo_manager_proxy(rcs_proxy_connector, time_to_wait).await?;
@@ -273,7 +274,7 @@ async fn is_server_registered(
 
 async fn deregister_standalone(
     repo_name: &str,
-    rcs_proxy_connector: Connector<RemoteControlProxy>,
+    rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
     time_to_wait: Duration,
 ) -> Result<()> {
     let repo_url = if repo_name.starts_with("fuchsia-pkg://") {
@@ -363,7 +364,7 @@ async fn remove_aliases(repo_url: &str, rewrite_proxy: EngineProxy) -> Result<()
 }
 
 async fn get_rewrite_proxy(
-    rcs_proxy_connector: Connector<RemoteControlProxy>,
+    rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
     time_to_wait: Duration,
 ) -> Result<EngineProxy> {
     let rcs_proxy = try_rcs_proxy_connection(rcs_proxy_connector, time_to_wait).await?;
@@ -390,7 +391,7 @@ async fn get_rewrite_proxy(
 }
 
 async fn get_repo_manager_proxy(
-    rcs_proxy_connector: Connector<RemoteControlProxy>,
+    rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
     time_to_wait: Duration,
 ) -> Result<RepositoryManagerProxy> {
     let rcs_proxy = try_rcs_proxy_connection(rcs_proxy_connector, time_to_wait).await?;
@@ -416,9 +417,9 @@ async fn get_repo_manager_proxy(
 }
 
 async fn try_rcs_proxy_connection(
-    rcs_proxy_connector: Connector<RemoteControlProxy>,
+    rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
     time_to_wait: Duration,
-) -> Result<RemoteControlProxy> {
+) -> Result<RemoteControlProxyHolder> {
     let rcs_proxy = timeout(
         time_to_wait,
         rcs_proxy_connector.try_connect(|target, _err| {
@@ -443,9 +444,11 @@ async fn try_rcs_proxy_connection(
 mod tests {
     use super::*;
     use ffx_config::TestEnv;
-    use fho::testing::ToolEnv;
-    use fho::TryFromEnv as _;
-    use fidl_fuchsia_developer_remotecontrol::{ConnectCapabilityError, RemoteControlRequest};
+    use ffx_target::TargetProxy;
+    use fho::{FhoEnvironment, TryFromEnv as _};
+    use fidl_fuchsia_developer_remotecontrol::{
+        ConnectCapabilityError, RemoteControlProxy, RemoteControlRequest,
+    };
     use fidl_fuchsia_pkg::{
         RepositoryConfig, RepositoryIteratorRequest, RepositoryManagerMarker,
         RepositoryManagerRequest, RepositoryManagerRequestStream,
@@ -457,33 +460,39 @@ mod tests {
     use futures::channel::mpsc;
     use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
     use std::sync::{Arc, Mutex};
+    use target_holders::{fake_proxy, FakeInjector, RemoteControlProxyHolder};
 
     struct FakeTestEnv {
         pub context: EnvironmentContext,
-        pub rcs_proxy_connector: Connector<RemoteControlProxy>,
-        pub target_proxy_connector: Connector<TargetProxy>,
+        pub rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
+        pub target_proxy_connector: Connector<TargetProxyHolder>,
         pub repo_proxy: Deferred<RepositoryRegistryProxy>,
     }
 
     impl FakeTestEnv {
         async fn new(test_env: &TestEnv) -> Self {
             let fake_rcs_proxy: RemoteControlProxy =
-                fho::testing::fake_proxy(move |req| handle_rcs_proxy_request(req));
+                fake_proxy(move |req| handle_rcs_proxy_request(req));
             let fake_target_proxy: TargetProxy =
-                fho::testing::fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
-            let fake_repo_proxy = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| {
+                fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
+            let fake_repo_proxy = Deferred::from_output(Ok(fake_proxy(move |req| {
                 panic!("Unexpected request: {:?}", req)
             })));
-            let tool_env = ToolEnv::new()
-                .remote_factory_closure(move || {
+            let fake_injector = FakeInjector {
+                remote_factory_closure: Box::new(move || {
                     let value = fake_rcs_proxy.clone();
-                    async move { Ok(value) }
-                })
-                .target_factory_closure(move || {
+                    Box::pin(async move { Ok(value) })
+                }),
+                target_factory_closure: Box::new(move || {
                     let value = fake_target_proxy.clone();
-                    async { Ok(value) }
-                });
-            let fho_env = tool_env.make_environment(test_env.context.clone());
+                    Box::pin(async { Ok(value) })
+                }),
+                ..Default::default()
+            };
+            let fho_env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
+            fho_env
+                .set_behavior(fho::FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)))
+                .await;
 
             let target_proxy_connector = Connector::try_from_env(&fho_env)
                 .await
@@ -678,6 +687,7 @@ mod tests {
             fake_env.repo_proxy,
             fake_env.context,
             product_bundle,
+            0,
         )
         .await;
         assert!(result.is_ok(), "got {:?}", result.err());

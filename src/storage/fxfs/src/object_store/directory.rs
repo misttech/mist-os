@@ -950,13 +950,31 @@ impl<S: HandleOwner> Directory<S> {
     ) -> Result<(), Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
         let sub_dirs_delta = if descriptor == ObjectDescriptor::Directory { 1 } else { 0 };
-        transaction.add(
-            self.store().store_object_id(),
-            Mutation::replace_or_insert_object(
-                ObjectKey::child(self.object_id(), name, self.casefold()),
-                ObjectValue::child(object_id, descriptor),
-            ),
-        );
+        // TODO(https://fxbug.dev/360171961): Add fscrypt symlink support.
+        if self.wrapping_key_id.lock().unwrap().is_some() {
+            if !matches!(descriptor, ObjectDescriptor::File | ObjectDescriptor::Directory) {
+                return Err(anyhow!(FxfsError::InvalidArgs)
+                    .context("Encrypted directories can only have file or directory children"));
+            }
+            let key = self.get_fscrypt_key().await?.ok_or(FxfsError::NoKey)?;
+            let casefold_hash = get_casefold_hash(Some(&key), name, self.casefold());
+            let encrypted_name = encrypt_filename(&key, self.object_id(), name)?;
+            transaction.add(
+                self.store().store_object_id(),
+                Mutation::replace_or_insert_object(
+                    ObjectKey::encrypted_child(self.object_id(), encrypted_name, casefold_hash),
+                    ObjectValue::child(object_id, descriptor),
+                ),
+            );
+        } else {
+            transaction.add(
+                self.store().store_object_id(),
+                Mutation::replace_or_insert_object(
+                    ObjectKey::child(self.object_id(), &name, self.casefold()),
+                    ObjectValue::child(object_id, descriptor),
+                ),
+            );
+        }
         let now = Timestamp::now();
         self.update_dir_attributes_internal(
             transaction,

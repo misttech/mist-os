@@ -265,7 +265,7 @@ impl ClientImpl {
                         match state {
                             State::Startup => {
                                 if let Some(Err(e)) = controller.change_state(state).await {
-                                    tracing::error!(
+                                    log::error!(
                                         "Failed startup phase for SettingType {:?} {}",
                                         setting_type,
                                         e
@@ -282,7 +282,7 @@ impl ClientImpl {
                             }
                             State::Teardown => {
                                 if let Some(Err(e)) = controller.change_state(state).await {
-                                    tracing::error!(
+                                    log::error!(
                                         "Failed teardown phase for SettingType {:?} {}",
                                         setting_type,
                                         e
@@ -505,7 +505,7 @@ pub mod persist {
                     }
 
                     return result.map_err(|e| {
-                        tracing::error!("Failed to write setting: {:?}", e);
+                        log::error!("Failed to write setting: {:?}", e);
                         ControllerError::WriteFailure(setting_type)
                     });
                 }

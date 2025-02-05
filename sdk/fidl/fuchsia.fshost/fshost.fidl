@@ -98,3 +98,19 @@ closed protocol Recovery {
                 vector<fuchsia.storage.partitions.PartitionInfo>:fuchsia.storage.partitions.MAX_PARTITIONS;
     }) -> () error zx.Status;
 };
+
+/// Provides access to the volume which will be used by Starnix to store its data.
+@discoverable
+closed protocol StarnixVolumeProvider {
+    /// Mounts the main starnix volume using `crypt`, creating the volume if it does not already
+    /// exist. `exposed_dir` will be connected to the exposed directory of the mounted starnix
+    /// volume.
+    strict Mount(resource struct {
+        crypt client_end:fuchsia.fxfs.Crypt;
+        exposed_dir server_end:fuchsia.io.Directory;
+    }) -> () error zx.Status;
+
+    /// Shuts down the main starnix volume. Fails if the starnix volume was not mounted.
+    // TODO(https://fxbug.dev/392147351): Consider reusing Admin.Shutdown.
+    strict Unmount() -> () error zx.Status;
+};

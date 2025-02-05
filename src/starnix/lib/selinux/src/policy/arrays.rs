@@ -201,8 +201,8 @@ impl<PS: ParseStrategy> AccessVector<PS> {
         PS::deref(&self.metadata).is_dontaudit()
     }
 
-    /// Returns whether this access vector compes from a
-    /// `type_transtion [source] [target]:[class] [new_type];` policy statement.
+    /// Returns whether this access vector comes from a
+    /// `type_transition [source] [target]:[class] [new_type];` policy statement.
     pub fn is_type_transition(&self) -> bool {
         PS::deref(&self.metadata).is_type_transition()
     }
@@ -502,6 +502,24 @@ pub(super) struct FilenameTransition<PS: ParseStrategy> {
     items: SimpleArray<PS, FilenameTransitionItems<PS>>,
 }
 
+impl<PS: ParseStrategy> FilenameTransition<PS> {
+    pub(super) fn name_bytes(&self) -> &[u8] {
+        PS::deref_slice(&self.filename.data)
+    }
+
+    pub(super) fn target_type(&self) -> TypeId {
+        TypeId(NonZeroU32::new(PS::deref(&self.transition_type).get()).unwrap())
+    }
+
+    pub(super) fn target_class(&self) -> ClassId {
+        ClassId(NonZeroU32::new(PS::deref(&self.transition_class).get()).unwrap())
+    }
+
+    pub(super) fn outputs(&self) -> &[FilenameTransitionItem<PS>] {
+        &self.items.data
+    }
+}
+
 impl<PS: ParseStrategy> Parse<PS> for FilenameTransition<PS>
 where
     SimpleArray<PS, PS::Slice<u8>>: Parse<PS>,
@@ -546,6 +564,16 @@ pub(super) type FilenameTransitionItems<PS> = Vec<FilenameTransitionItem<PS>>;
 pub(super) struct FilenameTransitionItem<PS: ParseStrategy> {
     stypes: ExtensibleBitmap<PS>,
     out_type: PS::Output<le::U32>,
+}
+
+impl<PS: ParseStrategy> FilenameTransitionItem<PS> {
+    pub(super) fn has_source_type(&self, source_type: TypeId) -> bool {
+        self.stypes.is_set(source_type.0.get() - 1)
+    }
+
+    pub(super) fn out_type(&self) -> TypeId {
+        TypeId(NonZeroU32::new(PS::deref(&self.out_type).get()).unwrap())
+    }
 }
 
 impl<PS: ParseStrategy> Parse<PS> for FilenameTransitionItem<PS>

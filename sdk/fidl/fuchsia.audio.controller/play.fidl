@@ -30,8 +30,8 @@ open protocol Player {
                 1: standard_renderer @generated_name("StandardRendererConfig") table {
                     /// The usage of the audio stream.
                     ///
-                    /// Required.
-                    1: usage fuchsia.media.AudioRenderUsage;
+                    /// One of 'usage' or 'usage2' is required.
+                    1: usage fuchsia.media.AudioRenderUsage2;
 
                     /// The reference clock type used by the stream.
                     ///

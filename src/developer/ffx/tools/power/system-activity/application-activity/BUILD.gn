@@ -12,6 +12,7 @@ import("//build/assembly/product_assembly_configuration.gni")
 import("//build/sdk/product_bundle.gni")
 
 ffx_plugin("ffx_power_system_activity_application_activity") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
 
@@ -19,11 +20,16 @@ ffx_plugin("ffx_power_system_activity_application_activity") {
   deps = [
     "//sdk/fidl/fuchsia.power.topology.test:fuchsia.power.topology.test_rust",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
   ]
 
   args_sources = [ "src/args.rs" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
   args_with_unit_tests = true
 }
 

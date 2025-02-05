@@ -85,9 +85,9 @@ impl ServerPty {
 
         let Self { proxy } = self;
         let (client_end, server_end) = fidl::endpoints::create_endpoints();
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "26")]
         let () = proxy.clone(server_end)?;
-        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+        #[cfg(not(fuchsia_api_level_at_least = "26"))]
         let () = proxy.clone2(server_end)?;
         let file: File = fdio::create_fd(client_end.into())
             .context("failed to create FD from server PTY")?
@@ -176,7 +176,6 @@ impl ShellProcess {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cstr::cstr;
     use fuchsia_async as fasync;
     use futures::io::AsyncWriteExt as _;
     use std::os::unix::io::AsRawFd as _;
@@ -200,7 +199,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn can_spawn_shell_process() -> Result<(), Error> {
         let server_pty = ServerPty::new()?;
-        let cmd = cstr!("/pkg/bin/sh");
+        let cmd = c"/pkg/bin/sh";
         let process = server_pty.spawn_with_argv(&cmd, &[cmd], None).await?;
 
         let mut started = false;
@@ -242,9 +241,7 @@ mod tests {
 
         // While argv[0] is usually the executable path, this particular program expects it to be
         // an integer which is then parsed and returned as the status code.
-        let process = pty
-            .spawn_with_argv(&cstr!("/pkg/bin/exit_with_code_util"), &[cstr!("42")], None)
-            .await?;
+        let process = pty.spawn_with_argv(&c"/pkg/bin/exit_with_code_util", &[c"42"], None).await?;
         let () = process.pty.resize(window_size).await?;
 
         // Since these tests don't seem to timeout automatically, we must

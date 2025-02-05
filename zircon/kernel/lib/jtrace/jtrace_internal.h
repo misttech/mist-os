@@ -61,12 +61,14 @@ class TraceHooks {
 
 // A traits struct which holds the configuration of an instance of the debug trace subsystem.
 template <size_t _kTargetBufferSize, size_t _kLastEntryStorage,
-          ::jtrace::IsPersistent _kIsPersistent, ::jtrace::UseLargeEntries _kUseLargeEntries>
+          ::jtrace::IsPersistent _kIsPersistent, ::jtrace::UseLargeEntries _kUseLargeEntries,
+          ::jtrace::UseMonoTimestamps _kUseMonoTimestamps>
 struct Config {
   static constexpr size_t kTargetBufferSize = _kTargetBufferSize;
   static constexpr size_t kLastEntryStorage = _kLastEntryStorage;
   static constexpr ::jtrace::IsPersistent kIsPersistent = _kIsPersistent;
   static constexpr ::jtrace::UseLargeEntries kUseLargeEntries = _kUseLargeEntries;
+  static constexpr ::jtrace::UseMonoTimestamps kUseMonoTimestamps = _kUseMonoTimestamps;
   using Entry = ::jtrace::Entry<kUseLargeEntries>;
 };
 
@@ -206,7 +208,11 @@ class JTrace {
         Thread::Current::preemption_state().PreemptDisable();
       }
 
-      entry.ts_ticks = current_ticks();
+      if constexpr (Config::kUseMonoTimestamps == UseMonoTimestamps::Yes) {
+        entry.ts_ticks = current_mono_ticks();
+      } else {
+        entry.ts_ticks = current_boot_ticks();
+      }
       if (entry.ts_ticks == 0) {
         entry.ts_ticks = kZeroReplacement;
       }
@@ -236,7 +242,7 @@ class JTrace {
 
   // |timeout| controls how long this method will wait (spin) for other threads
   // to complete in progress writes before continuing on and dumping the buffer.
-  void Dump(zx_duration_t timeout) {
+  void Dump(zx_duration_boot_t timeout) {
     if (hdr() == nullptr) {
       hooks_.PrintWarning("No debug trace buffer was ever configured\n");
       return;
@@ -250,17 +256,17 @@ class JTrace {
     SetTraceEnabled(false);
 
     const affine::Ratio ticks_to_time_ratio = timer_get_ticks_to_time_ratio();
-    const zx_ticks_t deadline =
-        zx_ticks_add_ticks(current_ticks(), ticks_to_time_ratio.Inverse().Scale(timeout));
+    const zx_instant_boot_ticks_t deadline =
+        zx_ticks_add_ticks(current_boot_ticks(), ticks_to_time_ratio.Inverse().Scale(timeout));
     while ((trace_ops_in_flight_.load(ktl::memory_order_acquire) > 0) &&
-           (current_ticks() < deadline)) {
+           (current_boot_ticks() < deadline)) {
       // just spin while we wait.
       arch::Yield();
     }
 
     // Print a warning if we never saw the in flight op-count hit zero, then go
     // ahead and dump the current buffer.
-    if (current_ticks() >= deadline) {
+    if (current_boot_ticks() >= deadline) {
       hooks_.PrintWarning(
           "Warning: ops in flight was never observed at zero while waiting to dump the current "
           "trace buffer.  Some trace records might be corrupt.\n");

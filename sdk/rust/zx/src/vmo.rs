@@ -384,7 +384,7 @@ bitflags! {
 
 /// Flags that may be set when receiving info on a `Vmo`.
 #[repr(transparent)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, FromBytes, Immutable)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, FromBytes, Immutable)]
 pub struct VmoInfoFlags(u32);
 
 bitflags! {
@@ -399,6 +399,12 @@ bitflags! {
         const DISCARDABLE = sys::ZX_INFO_VMO_DISCARDABLE;
         const IMMUTABLE = sys::ZX_INFO_VMO_IMMUTABLE;
         const VIA_IOB_HANDLE = sys::ZX_INFO_VMO_VIA_IOB_HANDLE;
+    }
+}
+
+impl std::fmt::Debug for VmoInfoFlags {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        bitflags::parser::to_writer(self, f)
     }
 }
 

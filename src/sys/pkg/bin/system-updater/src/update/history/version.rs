@@ -6,9 +6,9 @@ use crate::update::{paver, BuildInfo, SystemInfo};
 use anyhow::{anyhow, Context as _};
 use epoch::EpochFile;
 use fidl_fuchsia_paver::{Asset, BootManagerProxy, DataSinkProxy};
+use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use tracing::{error, info, warn};
 use update_package::{SystemVersion, UpdatePackage};
 use {fidl_fuchsia_mem as fmem, fuchsia_inspect as inspect};
 
@@ -248,7 +248,7 @@ fn sha256_hash_ignore_trailing_zeros(
         anyhow::bail!("buffer size {size} larger than vmo size {}", mapping.len());
     }
     let n = mapping[..size].iter().rposition(|b| *b != 0).map(|p| p + 1).unwrap_or_else(|| {
-        warn!(size, "entire buffer is 0");
+        warn!(size; "entire buffer is 0");
         0
     });
     Ok(From::from(*AsRef::<[u8; 32]>::as_ref(&<sha2::Sha256 as sha2::Digest>::digest(

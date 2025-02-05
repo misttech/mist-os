@@ -2,16 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "inspect/offer.shard.cml",
-        "syslog/offer.shard.cml",
-    ],
-    collections: [
-        {
-            name: "storage-host",
-            durability: "transient",
-        },
-    ],
     capabilities: [
         {
             directory: "blob",
@@ -27,7 +17,12 @@
             path: "/fs/blob/root",
         },
         {
-            protocol: [ "fuchsia.update.verify.BlobfsVerifier" ],
+            protocol: "fuchsia.update.verify.BlobfsVerifier",
+            path: "/fs/blob/svc/fuchsia.update.verify.BlobfsVerifier",
+        },
+        {
+            protocol: "fuchsia.update.verify.ComponentOtaHealthCheck",
+            path: "/fs/blob/svc/fuchsia.update.verify.ComponentOtaHealthCheck",
         },
         {
             protocol: "fuchsia.fxfs.BlobCreator",
@@ -49,16 +44,12 @@
                 "fuchsia.hardware.ramdisk.Service",
             ],
         },
-    ],
-    offer: [
+
+        // This is only here to facilitate shutdown ordering.
         {
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
-            from: "parent",
-            to: [
-                "#fvm",
-                "#storage-host",
-            ],
-            availability: "optional",
+            protocol: "fuchsia.fs.startup.Startup",
+            from: "#fvm2",
+            path: "/fvm/svc/fuchsia.fs.startup.Startup",
         },
     ],
     expose: [
@@ -71,16 +62,17 @@
         },
         {
             directory: "volumes",
-            from: "#fvm",
+            from: "#fvm2",
         },
         {
             protocol: "fuchsia.fs.startup.Volumes",
-            from: "#fvm",
+            from: "#fvm2",
         },
         {
             protocol: [
                 "fuchsia.fxfs.BlobCreator",
                 "fuchsia.update.verify.BlobfsVerifier",
+                "fuchsia.update.verify.ComponentOtaHealthCheck",
             ],
             from: "self",
         },
@@ -88,6 +80,11 @@
             protocol: "fuchsia.fxfs.BlobReader",
             from: "self",
             availability: "same_as_target",
+        },
+        {
+            protocol: "fuchsia.fshost.StarnixVolumeProvider",
+            from: "void",
+            availability: "optional",
         },
     ],
 }

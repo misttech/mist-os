@@ -67,6 +67,7 @@
                 "fuchsia.fshost.Netboot",
                 "fuchsia.fshost.NoZxcrypt",
                 "fuchsia.fshost.RamdiskImage",
+                "fuchsia.fshost.StarnixVolumeName",
                 "fuchsia.fshost.StorageHost",
                 "fuchsia.fshost.UseDiskMigration",
                 "fuchsia.pkgcache.AllPackagesExecutable",
@@ -75,6 +76,7 @@
                 "fuchsia.pkgcache.UseSystemImage",
                 "fuchsia.platform.bus.SoftwareDeviceIds",
                 "fuchsia.platform.bus.SoftwareDeviceNames",
+                "fuchsia.power.StoragePowerManagementEnabled",
                 "fuchsia.power.SuspendEnabled",
                 "fuchsia.power.UseSuspender",
                 "fuchsia.power.WaitForSuspendingToken",
@@ -119,30 +121,6 @@
             to: "#elf_runner",
         },
 
-        // The LogSink capability comes from an ELF component, but running ELF components
-        // requires an ELF runner. Therefore the ELF runner can't get the LogSink capability.
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "void",
-            to: "#elf_runner",
-            availability: "optional",
-        },
-
-        // We route these from void to bootstrap to satisfy the requirement
-        // that the protocols routed everywhere. Bootstrap is exposing them itself.
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "void",
-            to: [
-                "#bootstrap",
-                "#config",
-            ],
-            availability: "optional",
-        },
-
         // Capabilities routed from "parent" at the root are either provided by
         // bootsvc through component_manager's namespace or by component_manager
         // itself as a builtin service
@@ -163,7 +141,6 @@
                 "fuchsia.kernel.DebuglogResource",
                 "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.EnergyInfoResource",
-                "fuchsia.kernel.FramebufferResource",
                 "fuchsia.kernel.HypervisorResource",
                 "fuchsia.kernel.InfoResource",
                 "fuchsia.kernel.IommuResource",
@@ -374,7 +351,10 @@
     expose: [
         // For reboot_on_terminate
         {
-            protocol: "fuchsia.hardware.power.statecontrol.Admin",
+            protocol: [
+                "fuchsia.hardware.power.statecontrol.Admin",
+                "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
+            ],
             from: "#bootstrap",
         },
     ],

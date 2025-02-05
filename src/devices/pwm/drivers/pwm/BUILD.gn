@@ -29,7 +29,11 @@ fuchsia_cc_driver("pwm-driver") {
 }
 
 fuchsia_driver_component("pwm") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/devices/pwm:drivers",
+    "//src/devices/pwm/drivers:pwm",
+  ]
   info = "meta/pwm-info.json"
   component_name = "pwm"
   deps = [ ":pwm-driver" ]

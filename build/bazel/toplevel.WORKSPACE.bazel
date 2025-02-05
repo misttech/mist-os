@@ -81,9 +81,19 @@ load("@rules_python//python:repositories.bzl", "py_repositories")
 
 py_repositories()
 
+# @rules_proto is the deprecated set of rules to generate protobuf-related
+# actions. @com_google_protobuf should be used instead, but many other
+# repositories still depend on it implicitly.
 local_repository(
     name = "rules_proto",
     path = "third_party/bazel_rules_proto",
+)
+
+# @com_google_protobuf is the new set of rules for protobuf actions.
+# This is now required by pigweed.
+local_repository(
+    name = "com_google_protobuf",
+    path = "third_party/protobuf",
 )
 
 local_repository(
@@ -138,7 +148,7 @@ fuchsia_icu_config_repository(
     name = "fuchsia_icu_config",
     # LINT.IfChange
     content_hash_file = "fuchsia_build_generated/fuchsia_icu_config.hash",
-    # LINT.ThenChange(scripts/update_workspace.py)
+    # LINT.ThenChange(scripts/workspace_utils.py)
 )
 
 # buildifier: disable=load-on-top
@@ -203,7 +213,7 @@ fuchsia_build_info_repository(
     name = "fuchsia_build_info",
     # LINT.IfChange
     args = "//:fuchsia_build_generated/args.json",
-    # LINT.ThenChange(scripts/update_workspace.py)
+    # LINT.ThenChange(scripts/workspace_utils.py)
 )
 
 # googletest is a dependency from @fuchsia_sdk amd requires a local
@@ -216,7 +226,7 @@ googletest_repository(
     name = "com_google_googletest",
     # LINT.IfChange
     content_hash_file = "fuchsia_build_generated/com_google_googletest.hash",
-    # LINT.ThenChange(scripts/update_workspace.py)
+    # LINT.ThenChange(scripts/workspace_utils.py)
 )
 
 # buildifier: disable=load-on-top
@@ -226,7 +236,7 @@ boringssl_repository(
     name = "boringssl",
     # LINT.IfChange
     content_hash_file = "fuchsia_build_generated/boringssl.hash",
-    # LINT.ThenChange(scripts/update_workspace.py)
+    # LINT.ThenChange(scripts/workspace_utils.py)
 )
 
 # buildifier: disable=load-on-top
@@ -304,7 +314,11 @@ fuchsia_sdk_repository(
     use_rules_fuchsia = True,
 )
 
-register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
+# buildifier: disable=load-on-top
+load("@rules_fuchsia//fuchsia:deps.bzl", "register_fuchsia_sdk_toolchain")
+
+# Register the fuchsia toolchain for the fuchsia SDK
+register_fuchsia_sdk_toolchain()
 
 register_toolchains("//:fuchsia_sdk_devicetree_toolchain")
 
@@ -360,7 +374,7 @@ generate_prebuilt_clang_toolchain_repository(
     clang_install_dir = _clang_dir,
     # LINT.IfChange
     repository_version_file = "fuchsia_build_generated/prebuilt_clang.hash",
-    # LINT.ThenChange(scripts/update_workspace.py)
+    # LINT.ThenChange(scripts/workspace_utils.py)
 )
 register_toolchains("@prebuilt_clang//:host_clang_%s_x64_cc_toolchain" % fuchsia_host_os)
 register_toolchains("@prebuilt_clang//:host_clang_%s_arm64_cc_toolchain" % fuchsia_host_os)
@@ -375,7 +389,7 @@ compact_python_runtime_repository(
     name = "prebuilt_python",
     # LINT.IfChange
     content_hash_file = "fuchsia_build_generated/prebuilt_python.hash",
-    # LINT.ThenChange(scripts/update_workspace.py)
+    # LINT.ThenChange(scripts/workspace_utils.py)
 )
 
 register_toolchains("@prebuilt_python//:py_toolchain")

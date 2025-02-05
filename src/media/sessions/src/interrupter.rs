@@ -16,7 +16,7 @@ const LOG_TAG: &str = "interrupter";
 /// Reports interruptions of audio usages.
 pub struct Interrupter {
     usage_reporter: UsageReporterProxy,
-    usage_watcher_requests: StreamMap<AudioRenderUsage, UsageWatcherRequestStream>,
+    usage_watcher_requests: StreamMap<AudioRenderUsage2, UsageWatcher2RequestStream>,
 }
 
 impl Interrupter {
@@ -24,13 +24,13 @@ impl Interrupter {
         Self { usage_reporter, usage_watcher_requests: StreamMap::empty() }
     }
 
-    pub async fn watch_usage(&mut self, usage: AudioRenderUsage) -> Result<()> {
+    pub async fn watch_usage(&mut self, usage: AudioRenderUsage2) -> Result<()> {
         if self.usage_watcher_requests.contains_key(&usage) {
             return Ok(());
         }
 
         let (usage_watcher, usage_watcher_requests) = create_request_stream();
-        self.usage_reporter.watch(&Usage::RenderUsage(usage), usage_watcher)?;
+        self.usage_reporter.watch2(&Usage2::RenderUsage(usage), usage_watcher)?;
 
         self.usage_watcher_requests.insert(usage, usage_watcher_requests);
         Ok(())
@@ -39,7 +39,7 @@ impl Interrupter {
 
 #[derive(Debug, PartialEq)]
 pub struct Interruption {
-    pub usage: AudioRenderUsage,
+    pub usage: AudioRenderUsage2,
     pub stage: InterruptionStage,
 }
 
@@ -59,7 +59,7 @@ impl Stream for Interrupter {
         };
 
         let (usage, state) = match next_report.map_err(anyhow::Error::from).and_then(
-            |UsageWatcherRequest::OnStateChanged { usage, state, responder }| {
+            |UsageWatcher2Request::OnStateChanged { usage, state, responder }| {
                 responder.send()?;
                 Ok((usage, state))
             },
@@ -71,8 +71,8 @@ impl Stream for Interrupter {
             }
         };
 
-        let usage = match usage {
-            Usage::RenderUsage(usage) => usage,
+        let render_usage = match usage {
+            Usage2::RenderUsage(usage) => usage,
             _ => {
                 warn!(
                     tag = LOG_TAG;
@@ -94,7 +94,7 @@ impl Stream for Interrupter {
             }
         };
 
-        Poll::Ready(Some(Interruption { usage, stage }))
+        Poll::Ready(Some(Interruption { usage: render_usage, stage }))
     }
 }
 
@@ -133,15 +133,15 @@ mod test {
     async fn reports_interruption_on_multiple_watchers() {
         let (mut interrupter, mut usage_reporter_requests) = test_interrupter();
 
-        interrupter.watch_usage(AudioRenderUsage::Media).await.expect("Watching media usage");
+        interrupter.watch_usage(AudioRenderUsage2::Media).await.expect("Watching media usage");
         let (usage, media_watcher, _) = usage_reporter_requests
             .try_next()
             .await
             .expect("Reading usage reporter request")
             .expect("Reading Ok variant of request stream element")
-            .into_watch()
-            .expect("Reading watch request");
-        assert_matches!(usage, Usage::RenderUsage(AudioRenderUsage::Media));
+            .into_watch2()
+            .expect("Reading watch2 request");
+        assert_matches!(usage, Usage2::RenderUsage(AudioRenderUsage2::Media));
         let media_watcher = media_watcher.into_proxy();
         let media_send_fut =
             media_watcher.on_state_changed(&usage, &UsageState::Muted(UsageStateMuted::default()));
@@ -150,28 +150,28 @@ mod test {
         send.expect("Sending mute event to interrupter");
         assert_matches!(
             interruption,
-            Some(Interruption { usage: AudioRenderUsage::Media, stage: InterruptionStage::Begin })
+            Some(Interruption { usage: AudioRenderUsage2::Media, stage: InterruptionStage::Begin })
         );
 
-        interrupter.watch_usage(AudioRenderUsage::Background).await.expect("Watching media usage");
+        interrupter.watch_usage(AudioRenderUsage2::Background).await.expect("Watching media usage");
         let (usage, background_watcher, _) = usage_reporter_requests
             .try_next()
             .await
             .expect("Reading usage reporter request")
             .expect("Reading Ok variant of request stream element")
-            .into_watch()
-            .expect("Reading watch request");
-        assert_matches!(usage, Usage::RenderUsage(AudioRenderUsage::Background));
+            .into_watch2()
+            .expect("Reading watch2 request");
+        assert_matches!(usage, Usage2::RenderUsage(AudioRenderUsage2::Background));
         let background_watcher = background_watcher.into_proxy();
         let background_send_fut = background_watcher
             .on_state_changed(&usage, &UsageState::Unadjusted(UsageStateUnadjusted::default()));
 
         let (send, interruption) = future::join(background_send_fut, interrupter.next()).await;
-        send.expect("Sending mute event to interrupter");
+        send.expect("Sending unmute event to interrupter");
         assert_matches!(
             interruption,
             Some(Interruption {
-                usage: AudioRenderUsage::Background,
+                usage: AudioRenderUsage2::Background,
                 stage: InterruptionStage::End
             })
         );
@@ -181,15 +181,15 @@ mod test {
     async fn reports_interruption() {
         let (mut interrupter, mut usage_reporter_requests) = test_interrupter();
 
-        interrupter.watch_usage(AudioRenderUsage::Media).await.expect("Watching media usage");
+        interrupter.watch_usage(AudioRenderUsage2::Media).await.expect("Watching media usage");
         let (usage, watcher, _) = usage_reporter_requests
             .try_next()
             .await
             .expect("Reading usage reporter request")
             .expect("Reading Ok variant of request stream element")
-            .into_watch()
-            .expect("Reading watch request");
-        assert_matches!(usage, Usage::RenderUsage(AudioRenderUsage::Media));
+            .into_watch2()
+            .expect("Reading watch2 request");
+        assert_matches!(usage, Usage2::RenderUsage(AudioRenderUsage2::Media));
 
         let watcher = watcher.into_proxy();
 
@@ -200,17 +200,17 @@ mod test {
         send.expect("Sending mute event to interrupter");
         assert_matches!(
             interruption,
-            Some(Interruption { usage: AudioRenderUsage::Media, stage: InterruptionStage::Begin })
+            Some(Interruption { usage: AudioRenderUsage2::Media, stage: InterruptionStage::Begin })
         );
 
         let send_fut = watcher
             .on_state_changed(&usage, &UsageState::Unadjusted(UsageStateUnadjusted::default()));
 
         let (send, interruption) = future::join(send_fut, interrupter.next()).await;
-        send.expect("Sending mute event to interrupter");
+        send.expect("Sending unmute event to interrupter");
         assert_matches!(
             interruption,
-            Some(Interruption { usage: AudioRenderUsage::Media, stage: InterruptionStage::End })
+            Some(Interruption { usage: AudioRenderUsage2::Media, stage: InterruptionStage::End })
         );
     }
 }

@@ -292,7 +292,14 @@ pub fn sys_lstat(
 ) -> Result<(), Errno> {
     // TODO(https://fxbug.dev/42172993): Add the `AT_NO_AUTOMOUNT` flag once it is supported in
     // `sys_newfstatat`.
-    sys_newfstatat(locked, current_task, FdNumber::AT_FDCWD, user_path, buffer, AT_SYMLINK_NOFOLLOW)
+    sys_newfstatat(
+        locked,
+        current_task,
+        FdNumber::AT_FDCWD,
+        user_path,
+        buffer.into(),
+        AT_SYMLINK_NOFOLLOW,
+    )
 }
 
 pub fn sys_mkdir(
@@ -413,7 +420,7 @@ pub fn sys_stat(
 ) -> Result<(), Errno> {
     // TODO(https://fxbug.dev/42172993): Add the `AT_NO_AUTOMOUNT` flag once it is supported in
     // `sys_newfstatat`.
-    sys_newfstatat(locked, current_task, FdNumber::AT_FDCWD, user_path, buffer, 0)
+    sys_newfstatat(locked, current_task, FdNumber::AT_FDCWD, user_path, buffer.into(), 0)
 }
 
 // https://man7.org/linux/man-pages/man2/symlink.2.html

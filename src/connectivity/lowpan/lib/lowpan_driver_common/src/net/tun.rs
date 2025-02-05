@@ -314,8 +314,8 @@ impl NetworkInterface for TunNetworkInterface {
                         .expect("add_forwarding_entry");
                     routes.insert(subnet, HashSet::from([addr.into()]));
                     info!(
-                        "TunNetworkInterface: Successfully added forwarding entry for {:?}",
-                        addr
+                        "TunNetworkInterface: Successfully added forwarding entry for {}",
+                        std::net::Ipv6Addr::from(addr)
                     );
                 }
             }
@@ -359,8 +359,8 @@ impl NetworkInterface for TunNetworkInterface {
                             .del_forwarding_entry(&forwarding_entry, zx::MonotonicInstant::INFINITE)
                             .squash_result()?;
                         info!(
-                            "TunNetworkInterface: Successfully removed forwarding entry for {:?}",
-                            addr
+                            "TunNetworkInterface: Successfully removed forwarding entry for {}",
+                            std::net::Ipv6Addr::from(addr)
                         );
                     }
                 }
@@ -371,25 +371,29 @@ impl NetworkInterface for TunNetworkInterface {
     }
 
     fn add_external_route(&self, addr: &Subnet) -> Result<(), Error> {
-        info!("TunNetworkInterface: Adding external route: {:?} (CURRENTLY IGNORED)", addr);
+        let subnet_addr: std::net::Ipv6Addr = addr.addr;
+        let subnet_length = addr.prefix_len;
+        info!("TunNetworkInterface: Adding external route: {} with prefix length {} (CURRENTLY IGNORED)", subnet_addr, subnet_length);
         Ok(())
     }
 
     fn remove_external_route(&self, addr: &Subnet) -> Result<(), Error> {
-        info!("TunNetworkInterface: Removing external route: {:?} (CURRENTLY IGNORED)", addr);
+        let subnet_addr: std::net::Ipv6Addr = addr.addr;
+        let subnet_length = addr.prefix_len;
+        info!("TunNetworkInterface: Removing external route: {} with prefix length {} (CURRENTLY IGNORED)", subnet_addr, subnet_length);
         Ok(())
     }
 
     /// Has the interface join the given multicast group.
     fn join_mcast_group(&self, addr: &std::net::Ipv6Addr) -> Result<(), Error> {
-        info!("TunNetworkInterface: Joining multicast group: {:?}", addr);
+        info!("TunNetworkInterface: Joining multicast group: {}", addr);
         self.mcast_socket.as_ref().join_multicast_v6(addr, self.id.try_into().unwrap())?;
         Ok(())
     }
 
     /// Has the interface leave the given multicast group.
     fn leave_mcast_group(&self, addr: &std::net::Ipv6Addr) -> Result<(), Error> {
-        info!("TunNetworkInterface: Leaving multicast group: {:?}", addr);
+        info!("TunNetworkInterface: Leaving multicast group: {}", addr);
         self.mcast_socket.as_ref().leave_multicast_v6(addr, self.id.try_into().unwrap())?;
         Ok(())
     }

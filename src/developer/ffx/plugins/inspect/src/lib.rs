@@ -6,13 +6,14 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use errors::{ffx_bail, ffx_error};
 use ffx_inspect_args::{InspectCommand, InspectSubCommand};
-use fho::{deferred, toolbox_or, Deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{deferred, Deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorProxy;
 use iquery::commands::{Command, ListAccessorsResult, ListResult, SelectorsResult, ShowResult};
 use serde::Serialize;
 use std::fmt;
 use std::io::Write;
+use target_holders::{toolbox_or, RemoteControlProxyHolder};
 
 mod accessor_provider;
 mod apply_selectors;
@@ -29,7 +30,7 @@ pub struct InspectTool {
     cmd: InspectCommand,
     #[with(deferred(toolbox_or("bootstrap/archivist")))]
     archive_accessor: Deferred<ArchiveAccessorProxy>,
-    rcs: Deferred<RemoteControlProxy>,
+    rcs: Deferred<RemoteControlProxyHolder>,
 }
 
 #[async_trait(?Send)]
@@ -52,6 +53,7 @@ impl FfxMain for InspectTool {
                 ffx_bail!("{msg}");
             }
         };
+        let rcs = (&*rcs).clone();
         match cmd.sub_command {
             InspectSubCommand::ApplySelectors(cmd) => {
                 apply_selectors::execute(rcs, archive_accessor, cmd).await?;

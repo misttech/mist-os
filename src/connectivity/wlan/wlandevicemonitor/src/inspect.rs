@@ -7,9 +7,9 @@ use fuchsia_inspect::{InspectType, Inspector};
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_sync::Mutex;
 use futures::FutureExt;
+use log::error;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
-use tracing::error;
 
 const MAX_CACHED_IFACES: usize = 3;
 pub const VMO_SIZE_BYTES: usize = 1000 * 1024;

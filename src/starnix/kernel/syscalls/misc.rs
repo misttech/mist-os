@@ -20,7 +20,8 @@ use crate::device::android::bootloader_message_store::BootloaderMessage;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::{FdNumber, FsString};
-use starnix_logging::{log_error, log_info, log_warn, track_stub};
+use starnix_logging::{log_debug, log_error, log_info, log_warn, track_stub};
+use starnix_sync::InterruptibleEvent;
 #[cfg(feature = "arch32")]
 use starnix_syscalls::{for_each_arch32_syscall, syscall_arch32_number_to_name_literal_callback};
 use starnix_syscalls::{
@@ -235,6 +236,7 @@ pub fn sys_getrandom(
     Ok(bytes_written)
 }
 
+#[track_caller]
 fn panic_or_error(kernel: &Kernel, errno: Errno) -> Result<(), Errno> {
     if kernel.features.error_on_failed_reboot {
         return Err(errno);
@@ -269,6 +271,12 @@ pub fn sys_reboot(
     } else {
         FsString::default()
     };
+
+    if current_task.kernel().is_shutting_down() {
+        log_debug!("Ignoring reboot() and parking caller, already shutting down.");
+        let event = InterruptibleEvent::new();
+        return current_task.block_until(event.begin_wait(), zx::MonotonicInstant::INFINITE);
+    }
 
     let proxy = connect_to_protocol_sync::<fpower::AdminMarker>().or_else(|_| error!(EINVAL))?;
 
@@ -318,10 +326,12 @@ pub fn sys_reboot(
                 }
             }
 
+            // TODO(https://391585107): Loop through all the arguments and
+            // generate a list of reboot reasons.
             let reboot_reason = if reboot_args.contains(&&b"ota_update"[..])
                 || reboot_args.contains(&&b"System update during setup"[..])
             {
-                fpower::RebootReason::SystemUpdate
+                fpower::RebootReason2::SystemUpdate
             } else if reboot_args.contains(&&b"recovery"[..]) {
                 // Read the bootloader message from the misc partition to determine whether the
                 // device is rebooting to perform an FDR.
@@ -358,23 +368,26 @@ pub fn sys_reboot(
                     }
                 }
                 log_warn!("Recovery mode isn't supported yet, rebooting as normal...");
-                fpower::RebootReason::UserRequest
+                fpower::RebootReason2::UserRequest
             } else if reboot_args == [b""] // args empty? splitting "" returns [""], not []
                 || reboot_args.contains(&&b"shell"[..])
                 || reboot_args.contains(&&b"userrequested"[..])
             {
-                fpower::RebootReason::UserRequest
+                fpower::RebootReason2::UserRequest
             } else {
                 log_warn!("Unknown reboot args: {arg_bytes:?}");
                 track_stub!(
                     TODO("https://fxbug.dev/322874610"),
                     "unknown reboot args, see logs for strings"
                 );
-                fpower::RebootReason::UserRequest
+                fpower::RebootReason2::UserRequest
             };
 
             log_info!("Rebooting... reason: {:?}", reboot_reason);
-            match proxy.reboot(reboot_reason, zx::MonotonicInstant::INFINITE) {
+            match proxy.perform_reboot(
+                &fpower::RebootOptions { reasons: Some(vec![reboot_reason]), ..Default::default() },
+                zx::MonotonicInstant::INFINITE,
+            ) {
                 Ok(_) => {
                     // System is rebooting... wait until runtime ends.
                     zx::MonotonicInstant::INFINITE.sleep();

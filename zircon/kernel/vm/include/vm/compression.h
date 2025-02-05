@@ -160,10 +160,10 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
   using FailTag = VmCompressor::FailTag;
   using ZeroTag = VmCompressor::ZeroTag;
   using CompressResult = VmCompressor::CompressResult;
-  CompressResult Compress(const void* page_src, zx_ticks_t now);
+  CompressResult Compress(const void* page_src, zx_instant_mono_ticks_t now);
 
-  // Wrapper that passes current_ticks() as |now|
-  CompressResult Compress(const void* page_src) { return Compress(page_src, current_ticks()); }
+  // Wrapper that passes current_mono_ticks() as |now|
+  CompressResult Compress(const void* page_src) { return Compress(page_src, current_mono_ticks()); }
 
   // Decompresses and frees the provided reference into |page_dest| and |metadata_dest|. This cannot
   // fail and always produces PAGE_SIZE worth of data. After calling this the reference is no longer
@@ -174,11 +174,12 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
   //
   // Note that the temporary reference may be passed into here, however the same locking
   // requirements as |MoveReference| must be observed.
-  void Decompress(CompressedRef ref, void* page_dest, uint32_t* metadata_dest, zx_ticks_t now);
+  void Decompress(CompressedRef ref, void* page_dest, uint32_t* metadata_dest,
+                  zx_instant_mono_ticks_t now);
 
-  // Wrapper that passes current_ticks() as |now|
+  // Wrapper that passes current_mono_ticks() as |now|
   void Decompress(CompressedRef ref, void* page_dest, uint32_t* metadata_dest) {
-    Decompress(ref, page_dest, metadata_dest, current_ticks());
+    Decompress(ref, page_dest, metadata_dest, current_mono_ticks());
   }
 
   // Free the compressed reference without decompressing it.
@@ -227,15 +228,17 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
    public:
     ~CompressorGuard();
     CompressorGuard(CompressorGuard&& instance) noexcept
-        : instance_guard_(AdoptLock, ktl::move(instance.instance_guard_)),
+        : instance_guard_(AdoptLock, &instance.instance_.compressor_.instance_lock_,
+                          instance.instance_guard_.take()),
           instance_(instance.instance_) {}
 
     // Return a reference to the VmCompressor. Reference must not outlive this object.
     VmCompressor& get() { return instance_; }
 
    private:
-    CompressorGuard(VmCompressor& instance, Guard<Mutex>&& guard)
-        : instance_guard_(AdoptLock, ktl::move(guard)), instance_(instance) {}
+    CompressorGuard(VmCompressor& instance, Guard<Mutex>* guard)
+        : instance_guard_(AdoptLock, &instance.compressor_.instance_lock_, guard->take()),
+          instance_(instance) {}
     friend VmCompression;
     // Guard that keeps the instance owned by us, must never be released for the lifetime of this
     // object and the reference to instance_.
@@ -256,8 +259,8 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
   static constexpr size_t kNumLogBuckets = 8;
   struct Stats {
     VmCompressedStorage::MemoryUsage memory_usage;
-    zx_duration_t compression_time = 0;
-    zx_duration_t decompression_time = 0;
+    zx_duration_mono_t compression_time = 0;
+    zx_duration_mono_t decompression_time = 0;
     uint64_t total_page_compression_attempts = 0;
     uint64_t failed_page_compression_attempts = 0;
     uint64_t total_page_decompressions = 0;
@@ -301,8 +304,8 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
   void FreeTempReference(CompressedRef ref);
 
   // Statistics
-  RelaxedAtomic<zx_duration_t> compression_time_ = 0;
-  RelaxedAtomic<zx_duration_t> decompression_time_ = 0;
+  RelaxedAtomic<zx_duration_mono_t> compression_time_ = 0;
+  RelaxedAtomic<zx_duration_mono_t> decompression_time_ = 0;
   RelaxedAtomic<uint64_t> compression_attempts_ = 0;
   RelaxedAtomic<uint64_t> compression_success_ = 0;
   RelaxedAtomic<uint64_t> compression_zero_page_ = 0;

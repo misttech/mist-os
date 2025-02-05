@@ -265,7 +265,7 @@ zx_status_t PcieDevice::DoFunctionLevelReset() {
 
   // 3) Poll the transaction pending bit until it clears.  This may take
   //    "several seconds"
-  zx_time_t start = current_time();
+  zx_instant_mono_t start = current_mono_time();
   ret = ZX_ERR_TIMED_OUT;
   do {
     if (!check_trans_pending(this)) {
@@ -273,7 +273,7 @@ zx_status_t PcieDevice::DoFunctionLevelReset() {
       break;
     }
     Thread::Current::SleepRelative(ZX_MSEC(1));
-  } while (zx_time_sub_time(current_time(), start) < ZX_SEC(5));
+  } while (zx_time_sub_time(current_mono_time(), start) < ZX_SEC(5));
 
   if (ret != ZX_OK) {
     TRACEF(
@@ -300,7 +300,7 @@ zx_status_t PcieDevice::DoFunctionLevelReset() {
   // return all 0xFFs until the device finally resets and comes back.
   // Poll the Vendor ID field until the device finally completes it's
   // reset.
-  start = current_time();
+  start = current_mono_time();
   ret = ZX_ERR_TIMED_OUT;
   do {
     if (cfg_->Read(PciConfig::kVendorId) != PCIE_INVALID_VENDOR_ID) {
@@ -308,7 +308,7 @@ zx_status_t PcieDevice::DoFunctionLevelReset() {
       break;
     }
     Thread::Current::SleepRelative(ZX_MSEC(1));
-  } while (zx_time_sub_time(current_time(), start) < ZX_SEC(5));
+  } while (zx_time_sub_time(current_mono_time(), start) < ZX_SEC(5));
 
   if (ret == ZX_OK) {
     // 6) Software reconfigures the function and enables it for normal operation

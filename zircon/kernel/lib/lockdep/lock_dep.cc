@@ -110,8 +110,8 @@ int CommandLockDep(int argc, const cmd_args* argv, uint32_t flags) {
 }  // anonymous namespace
 
 // Wait for a loop detection pass to complete, or timeout. This is exposed for tests.
-zx_status_t TriggerAndWaitForLoopDetection(zx_time_t deadline);
-zx_status_t TriggerAndWaitForLoopDetection(zx_time_t deadline) {
+zx_status_t TriggerAndWaitForLoopDetection(zx_instant_mono_t deadline);
+zx_status_t TriggerAndWaitForLoopDetection(zx_instant_mono_t deadline) {
   Guard<Mutex> guard{DetectionCompleteLock::Get()};
   detection_complete_event.Unsignal();
   lockdep::SystemTriggerLoopDetection();

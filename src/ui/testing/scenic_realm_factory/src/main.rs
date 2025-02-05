@@ -50,7 +50,7 @@ async fn main() -> Result<(), Error> {
 async fn run_realm_factory_server(stream: ui_test_context::ScenicRealmFactoryRequestStream) {
     stream
         .try_for_each_concurrent(None, |request| async {
-            tracing::debug!("received a request: {:?}", &request);
+            log::debug!("received a request: {:?}", &request);
             let mut task_group = fasync::TaskGroup::new();
             match request {
                 ui_test_context::ScenicRealmFactoryRequest::CreateRealm { payload, responder } => {
@@ -76,7 +76,7 @@ async fn run_realm_factory_server(stream: ui_test_context::ScenicRealmFactoryReq
                     control_handle,
                     ..
                 } => {
-                    tracing::warn!("realm factory receive an unknown request");
+                    log::warn!("realm factory receive an unknown request");
                     control_handle.shutdown_with_epitaph(zx_status::Status::NOT_SUPPORTED);
                     unimplemented!();
                 }

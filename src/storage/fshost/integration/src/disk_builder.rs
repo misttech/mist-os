@@ -345,7 +345,7 @@ impl DiskBuilder {
     }
 
     pub fn format_data(&mut self, data_spec: DataSpec) -> &mut Self {
-        tracing::info!(?data_spec, "formatting data volume");
+        log::info!(data_spec:?; "formatting data volume");
         if !self.volumes_spec.fxfs_blob {
             assert!(self.format_volume_manager);
         } else {

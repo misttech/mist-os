@@ -3,16 +3,17 @@
 // found in the LICENSE file.
 
 use anyhow::{bail, Context, Error};
+use fidl::endpoints::ProtocolMarker;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_sync::Mutex;
 use futures::future::OptionFuture;
 use futures::{FutureExt, StreamExt};
 use ieee80211::{Bssid, MacAddrBytes};
+use log::{debug, error, info, warn};
 use netlink_packet_core::{NetlinkDeserializable, NetlinkHeader, NetlinkSerializable};
 use netlink_packet_generic::GenlMessage;
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
 use wlan_common::bss::BssDescription;
 use wlan_common::channel::{Cbw, Channel};
 use wlan_telemetry::{self, TelemetryEvent, TelemetrySender};
@@ -154,9 +155,19 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
                 }
             }
         }
-        fidl_wlanix::WifiChipRequest::SetCountryCode { payload: _, responder } => {
+        fidl_wlanix::WifiChipRequest::SetCountryCode { payload, responder } => {
             info!("fidl_wlanix::WifiChipRequest::SetCountryCode");
-            responder.send(Ok(())).context("send SetCountryCode response")?;
+            let result = match payload.code {
+                Some(code) => iface_manager.set_country(chip_id, code).await.map_err(|e| {
+                    error!("Failed to set country code {:?} in phy: {}", code, e);
+                    zx::sys::ZX_ERR_INTERNAL
+                }),
+                None => {
+                    error!("SetCountryCode missing country code");
+                    Err(zx::sys::ZX_ERR_INVALID_ARGS)
+                }
+            };
+            responder.send(result).context("send SetCountryCode response")?;
         }
         // TODO(https://fxbug.dev/366027488): GetAvailableModes is hardcoded.
         fidl_wlanix::WifiChipRequest::GetAvailableModes { responder } => {
@@ -237,26 +248,26 @@ async fn serve_wifi_chip<I: IfaceManager>(
     .await;
 }
 
-fn run_callbacks<T>(
+fn maybe_run_callback<T: fidl::endpoints::Proxy>(
+    event_name: &'static str,
     callback_fn: impl Fn(&T) -> Result<(), fidl::Error>,
-    callbacks: &[T],
-    ctx: &'static str,
+    callback: &mut Option<T>,
 ) {
-    let mut failed_callbacks = 0u32;
-    for callback in callbacks {
-        if let Err(_e) = callback_fn(callback) {
-            failed_callbacks += 1;
-        }
+    let dropped = callback.take_if(|c| c.is_closed());
+    if dropped.is_some() {
+        warn!("Dropped {} proxy because channel is closed", T::Protocol::DEBUG_NAME);
     }
-    if failed_callbacks > 0 {
-        warn!("Failed sending {} event to {} subscribers", ctx, failed_callbacks);
+    if let Some(callback) = callback {
+        if let Err(e) = callback_fn(callback) {
+            warn!("Failed sending {} event: {}", event_name, e);
+        }
     }
 }
 
 #[derive(Default)]
 struct WifiState {
     started: bool,
-    callbacks: Vec<fidl_wlanix::WifiEventCallbackProxy>,
+    callback: Option<fidl_wlanix::WifiEventCallbackProxy>,
     scan_multicast_proxy: Option<fidl_wlanix::Nl80211MulticastProxy>,
     mlme_multicast_proxy: Option<fidl_wlanix::Nl80211MulticastProxy>,
 }
@@ -271,7 +282,9 @@ async fn handle_wifi_request<I: IfaceManager>(
         fidl_wlanix::WifiRequest::RegisterEventCallback { payload, .. } => {
             info!("fidl_wlanix::WifiRequest::RegisterEventCallback");
             if let Some(callback) = payload.callback {
-                state.lock().callbacks.push(callback.into_proxy());
+                if state.lock().callback.replace(callback.into_proxy()).is_some() {
+                    warn!("Replaced a WifiEventCallbackProxy when there's one existing");
+                }
             }
         }
         fidl_wlanix::WifiRequest::Start { responder } => {
@@ -279,10 +292,10 @@ async fn handle_wifi_request<I: IfaceManager>(
             let mut state = state.lock();
             state.started = true;
             responder.send(Ok(())).context("send Start response")?;
-            run_callbacks(
+            maybe_run_callback(
+                "WifiEventCallbackProxy::OnStart",
                 fidl_wlanix::WifiEventCallbackProxy::on_start,
-                &state.callbacks[..],
-                "OnStart",
+                &mut state.callback,
             );
 
             let event = wlan_telemetry::ClientConnectionsToggleEvent::Enabled;
@@ -301,10 +314,10 @@ async fn handle_wifi_request<I: IfaceManager>(
             }
             let mut state = state.lock();
             state.started = false;
-            run_callbacks(
+            maybe_run_callback(
+                "WifiEventCallbackProxy::OnStop",
                 fidl_wlanix::WifiEventCallbackProxy::on_stop,
-                &state.callbacks[..],
-                "OnStop",
+                &mut state.callback,
             );
 
             let event = wlan_telemetry::ClientConnectionsToggleEvent::Disabled;
@@ -398,7 +411,7 @@ struct SupplicantStaNetworkState {
 }
 
 struct SupplicantStaIfaceState {
-    callbacks: Vec<fidl_wlanix::SupplicantStaIfaceCallbackProxy>,
+    callback: Option<fidl_wlanix::SupplicantStaIfaceCallbackProxy>,
 }
 
 struct ConnectionContext {
@@ -413,8 +426,8 @@ struct ConnectionContext {
 fn send_disconnect_event<C: ClientIface>(
     source: &fidl_sme::DisconnectSource,
     ctx: &ConnectionContext,
-    sta_iface_state: &SupplicantStaIfaceState,
-    wifi_state: &WifiState,
+    sta_iface_state: &mut SupplicantStaIfaceState,
+    wifi_state: &mut WifiState,
     iface: &C,
     iface_id: u16,
 ) {
@@ -433,10 +446,10 @@ fn send_disconnect_event<C: ClientIface>(
         reason_code: Some(reason_code),
         ..Default::default()
     };
-    run_callbacks(
+    maybe_run_callback(
+        "SupplicantStaIfaceCallbackProxy::onDisconnected",
         |callback_proxy| callback_proxy.on_disconnected(&disconnected_event),
-        &sta_iface_state.callbacks[..],
-        "on_disconnected",
+        &mut sta_iface_state.callback,
     );
     let state_changed_event = fidl_wlanix::SupplicantStaIfaceCallbackOnStateChangedRequest {
         new_state: Some(fidl_wlanix::StaIfaceCallbackState::Disconnected),
@@ -446,10 +459,10 @@ fn send_disconnect_event<C: ClientIface>(
         ssid: Some(ctx.original_bss_desc.ssid.to_vec()),
         ..Default::default()
     };
-    run_callbacks(
+    maybe_run_callback(
+        "SupplicantStaIfaceCallbackProxy::onStateChanged",
         |callback_proxy| callback_proxy.on_state_changed(&state_changed_event),
-        &sta_iface_state.callbacks[..],
-        "on_state_changed",
+        &mut sta_iface_state.callback,
     );
     // Also communicate the state change via nl80211.
     if let Some(proxy) = &wifi_state.mlme_multicast_proxy {
@@ -501,8 +514,8 @@ async fn handle_client_connect_transactions<C: ClientIface>(
                             send_disconnect_event(
                                 info,
                                 &ctx,
-                                &sta_iface_state.lock(),
-                                &wifi_state.lock(),
+                                &mut sta_iface_state.lock(),
+                                &mut wifi_state.lock(),
                                 &*iface,
                                 iface_id,
                             );
@@ -542,8 +555,8 @@ async fn handle_client_connect_transactions<C: ClientIface>(
                         send_disconnect_event(
                             &source,
                             &ctx,
-                            &sta_iface_state.lock(),
-                            &wifi_state.lock(),
+                            &mut sta_iface_state.lock(),
+                            &mut wifi_state.lock(),
                             &*iface,
                             iface_id,
                         );
@@ -575,8 +588,8 @@ async fn handle_client_connect_transactions<C: ClientIface>(
                     send_disconnect_event(
                         &info.disconnect_source,
                         &ctx,
-                        &sta_iface_state.lock(),
-                        &wifi_state.lock(),
+                        &mut sta_iface_state.lock(),
+                        &mut wifi_state.lock(),
                         &*iface,
                         iface_id,
                     );
@@ -653,10 +666,10 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                             ssid: Some(connected.bss.ssid.clone().into()),
                             ..Default::default()
                         };
-                        run_callbacks(
+                        maybe_run_callback(
+                            "SupplicantStaIfaceCallbackProxy::onStateChanged",
                             |callback_proxy| callback_proxy.on_state_changed(&event),
-                            &sta_iface_state.lock().callbacks[..],
-                            "on_state_changed",
+                            &mut sta_iface_state.lock().callback,
                         );
                         (
                             Ok(()),
@@ -684,10 +697,10 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                                 timed_out: Some(fail.timed_out),
                                 ..Default::default()
                             };
-                        run_callbacks(
+                        maybe_run_callback(
+                            "SupplicantStaIfaceCallbackProxy::onAssociationRejected",
                             |callback_proxy| callback_proxy.on_association_rejected(&event),
-                            &sta_iface_state.lock().callbacks[..],
-                            "on_association_rejected",
+                            &mut sta_iface_state.lock().callback,
                         );
                         (Err(zx::sys::ZX_ERR_INTERNAL), None)
                     }
@@ -790,7 +803,9 @@ async fn handle_supplicant_sta_iface_request<C: ClientIface>(
         fidl_wlanix::SupplicantStaIfaceRequest::RegisterCallback { payload, .. } => {
             info!("fidl_wlanix::SupplicantStaIfaceRequest::RegisterCallback");
             if let Some(callback) = payload.callback {
-                sta_iface_state.lock().callbacks.push(callback.into_proxy());
+                if sta_iface_state.lock().callback.replace(callback.into_proxy()).is_some() {
+                    warn!("Replaced a SupplicantStaIfaceCallbackProxy when there's one existing");
+                }
             } else {
                 warn!("Empty callback field in received RegisterCallback request.")
             }
@@ -846,9 +861,19 @@ async fn handle_supplicant_sta_iface_request<C: ClientIface>(
                 warn!("Failed to send disconnect response: {}", e);
             }
         }
-        fidl_wlanix::SupplicantStaIfaceRequest::SetStaCountryCode { payload: _, responder } => {
+        fidl_wlanix::SupplicantStaIfaceRequest::SetStaCountryCode { payload, responder } => {
             info!("fidl_wlanix::SupplicantStaIfaceRequest::SetStaCountryCode");
-            responder.send(Ok(())).context("send SetStaCountryCode response")?;
+            let result = match payload.code {
+                Some(code) => iface.set_country(code).await.map_err(|e| {
+                    error!("Failed to set country code {:?} for iface: {}", code, e);
+                    zx::sys::ZX_ERR_INTERNAL
+                }),
+                None => {
+                    error!("SetStaCountryCode missing country code");
+                    Err(zx::sys::ZX_ERR_INVALID_ARGS)
+                }
+            };
+            responder.send(result).context("send SetStaCountryCode response")?;
         }
         fidl_wlanix::SupplicantStaIfaceRequest::_UnknownMethod { ordinal, .. } => {
             warn!("Unknown SupplicantStaIfaceRequest ordinal: {}", ordinal);
@@ -864,7 +889,7 @@ async fn serve_supplicant_sta_iface<C: ClientIface>(
     iface: Arc<C>,
     iface_id: u16,
 ) {
-    let sta_iface_state = Arc::new(Mutex::new(SupplicantStaIfaceState { callbacks: vec![] }));
+    let sta_iface_state = Arc::new(Mutex::new(SupplicantStaIfaceState { callback: None }));
     reqs.for_each_concurrent(None, |req| async {
         match req {
             Ok(req) => {
@@ -1579,6 +1604,29 @@ mod tests {
     }
 
     #[test]
+    fn test_maybe_run_callback() {
+        let _exec = fasync::TestExecutor::new_with_fake_time();
+        let (callback_proxy, server_end) = create_proxy::<fidl_wlanix::WifiEventCallbackMarker>();
+        let mut callback = Some(callback_proxy);
+        // Simple validation that running callback works fine
+        maybe_run_callback(
+            "WifiEventCallbackProxy::onStart",
+            fidl_wlanix::WifiEventCallbackProxy::on_start,
+            &mut callback,
+        );
+        assert!(callback.is_some());
+
+        // Validate that dropping the server end would cause callback proxy to be removed
+        std::mem::drop(server_end);
+        maybe_run_callback(
+            "WifiEventCallbackProxy::onStart",
+            fidl_wlanix::WifiEventCallbackProxy::on_start,
+            &mut callback,
+        );
+        assert!(callback.is_none());
+    }
+
+    #[test]
     fn test_wifi_get_state_is_started() {
         let (mut test_helper, mut test_fut) = setup_wifi_test();
 
@@ -1678,6 +1726,30 @@ mod tests {
             Poll::Ready(Ok(response)) => response
         );
         assert_eq!(response.chip_ids, Some(vec![1]));
+    }
+
+    #[test]
+    fn test_wifi_set_country_code() {
+        let (mut test_helper, mut test_fut) = setup_wifi_test();
+        const COUNTRY_CODE: [u8; 2] = *b"WW";
+
+        let set_country_fut = test_helper.wifi_chip_proxy.set_country_code(
+            fidl_wlanix::WifiChipSetCountryCodeRequest {
+                code: Some(COUNTRY_CODE),
+                ..Default::default()
+            },
+        );
+        let mut set_country_fut = pin!(set_country_fut);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut set_country_fut), Poll::Pending);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let calls = test_helper.iface_manager.calls.lock();
+        assert_eq!(calls.len(), 2);
+        // CreateClientIface is called in setup_wifi_test.
+        assert_variant!(&calls[0], ifaces::test_utils::IfaceManagerCall::CreateClientIface(_));
+        assert_variant!(
+            &calls[1],
+            ifaces::test_utils::IfaceManagerCall::SetCountry { country, .. } => { assert_eq!(*country, COUNTRY_CODE) }
+        );
     }
 
     #[test]
@@ -1963,6 +2035,26 @@ mod tests {
             test_helper.exec.run_until_stalled(&mut disconnect_fut),
             Poll::Ready(Ok(()))
         );
+    }
+
+    #[test]
+    fn test_supplicant_sta_iface_set_sta_country_code() {
+        let (mut test_helper, mut test_fut) = setup_supplicant_test();
+        const COUNTRY_CODE: [u8; 2] = *b"WW";
+
+        let mut set_sta_country_fut = test_helper.supplicant_sta_iface_proxy.set_sta_country_code(
+            fidl_wlanix::SupplicantStaIfaceSetStaCountryCodeRequest {
+                code: Some(COUNTRY_CODE),
+                ..Default::default()
+            },
+        );
+        assert_variant!(
+            test_helper.exec.run_until_stalled(&mut set_sta_country_fut),
+            Poll::Pending
+        );
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let iface_calls = test_helper.iface_manager.get_iface_call_history();
+        assert_variant!(&iface_calls.lock()[0], ClientIfaceCall::SetCountry(country) => assert_eq!(*country, COUNTRY_CODE));
     }
 
     #[test]

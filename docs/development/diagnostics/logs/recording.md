@@ -8,10 +8,15 @@ There are a few ways you might see a Fuchsia program generate log messages:
 
 ## `LogSink`/syslog
 
-Components that want to generate log messages call [`fuchsia.logger/LogSink.Connect`]. The
-[`fuchsia.logger.LogSink`] service must be [`use`d in the component manifest][syslog-use-shard].
+Components that want to generate log messages call [`fuchsia.logger/LogSink.ConnectStructured`]. The
+[`fuchsia.logger.LogSink`] protocol must be [`use`d in the component manifest][syslog-use-shard].
+This protocol is routed as part of the `diagnostics` dictionary. A component
+must have the `fuchsia.logger.LogSink` protocol routed to it directly so it can use it form
+`parent`, or more commonly, have the full `diagnostics` dictionary routed to it, in which case it
+can use the `fuchsia.logger.LogSink` protocol from `parent/diagnostics`.
 
-`Connect` takes a socket, into which the actual log messages are [written] by the syslog library.
+`ConnectStructured` takes a socket, into which the actual log messages are [written] by the syslog
+library.
 
 If the socket's buffer is full, the [writing thread will drop logs]. Dropped messages on the writer
 side are counted and that count is sent in the next successful message, after which the counter is
@@ -75,7 +80,7 @@ archivist reads them into syslog -- these are not yet tracked.
 All kernel log messages are sent to the system log with INFO severity because the debuglog syscalls
 lack a way to express the severity of a message.
 
-[`fuchsia.logger/LogSink.Connect`]: https://fuchsia.dev/reference/fidl/fuchsia.logger#Connect
+[`fuchsia.logger/LogSink.ConnectStructured`]: https://fuchsia.dev/reference/fidl/fuchsia.logger#ConnectStructured
 [`fuchsia.logger.LogSink`]: https://fuchsia.dev/reference/fidl/fuchsia.logger#LogSink
 [syslog-use-shard]: /sdk/lib/syslog/use.shard.cml
 [written]: /zircon/system/ulib/syslog/fx_logger.cc?l=72&drc=1bdbf8a4e6f758c3b1782dee352071cc592ca3ab

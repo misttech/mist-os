@@ -6,8 +6,8 @@ use crate::root_dir::RootDir;
 use anyhow::anyhow;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
+use log::error;
 use std::sync::Arc;
-use tracing::error;
 use vfs::common::send_on_open_with_error;
 use vfs::directory::entry::EntryInfo;
 use vfs::directory::immutable::connection::ImmutableConnection;
@@ -318,18 +318,6 @@ mod tests {
 
             assert_eq!(fuchsia_fs::file::read(&proxy).await.unwrap(), b"bloblob".to_vec());
         }
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_open_unsets_posix_writable() {
-        let (_env, sub_dir) = TestEnv::new().await;
-
-        let () = crate::verify_open_adjusts_flags(
-            sub_dir,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE,
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await;
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

@@ -5,7 +5,7 @@
 use fidl_message::TransactionHeader;
 use futures::channel::mpsc::UnboundedSender;
 use futures::channel::oneshot::Sender;
-use futures::future::{poll_fn, Either};
+use futures::future::Either;
 use futures::stream::Stream as StreamTrait;
 use futures::FutureExt;
 use std::collections::hash_map::Entry;
@@ -32,7 +32,7 @@ pub mod fidl;
 use responder::{Responder, ResponderStatus};
 
 pub use channel::{
-    AnyHandle, Channel, ChannelMessage, ChannelMessageStream, ChannelWriter, HandleInfo,
+    AnyHandle, Channel, ChannelMessageStream, ChannelWriter, HandleInfo, MessageBuf,
 };
 pub use event::Event;
 pub use event_pair::Eventpair as EventPair;
@@ -63,7 +63,7 @@ fdomain_macros::extract_ordinals_env!("FDOMAIN_FIDL_PATH");
 fn write_fdomain_error(error: &FDomainError, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match error {
         FDomainError::TargetError(e) => write!(f, "Target-side error {e}"),
-        FDomainError::BadHid(proto::BadHid { id }) => {
+        FDomainError::BadHandleId(proto::BadHandleId { id }) => {
             write!(f, "Tried to use invalid handle id {id}")
         }
         FDomainError::WrongHandleType(proto::WrongHandleType { expected, got }) => write!(
@@ -79,10 +79,10 @@ fn write_fdomain_error(error: &FDomainError, f: &mut std::fmt::Formatter<'_>) ->
         FDomainError::NoErrorPending(proto::NoErrorPending {}) => {
             write!(f, "Tried to dismiss write errors on handle where none had occurred")
         }
-        FDomainError::NewHidOutOfRange(proto::NewHidOutOfRange { id }) => {
+        FDomainError::NewHandleIdOutOfRange(proto::NewHandleIdOutOfRange { id }) => {
             write!(f, "Tried to create a handle with id {id}, which is outside the valid range for client handles")
         }
-        FDomainError::NewHidReused(proto::NewHidReused { id, same_call }) => {
+        FDomainError::NewHandleIdReused(proto::NewHandleIdReused { id, same_call }) => {
             if *same_call {
                 write!(f, "Tried to create two or more new handles with the same id {id}")
             } else {
@@ -333,11 +333,11 @@ impl Transport {
 struct ClientInner {
     transport: Transport,
     transactions: HashMap<NonZeroU32, responder::Responder>,
-    socket_read_subscriptions: HashMap<proto::Hid, UnboundedSender<Result<Vec<u8>, Error>>>,
+    socket_read_subscriptions: HashMap<proto::HandleId, UnboundedSender<Result<Vec<u8>, Error>>>,
     channel_read_subscriptions:
-        HashMap<proto::Hid, UnboundedSender<Result<proto::ChannelMessage, Error>>>,
+        HashMap<proto::HandleId, UnboundedSender<Result<proto::ChannelMessage, Error>>>,
     next_tx_id: u32,
-    waiting_to_close: Vec<proto::Hid>,
+    waiting_to_close: Vec<proto::HandleId>,
 }
 
 impl ClientInner {
@@ -351,7 +351,7 @@ impl ClientInner {
         let tx_id = self.next_tx_id;
 
         let header = TransactionHeader::new(tx_id, ordinal, fidl_message::DynamicFlags::FLEXIBLE);
-        let msg = fidl_message::encode_message(header, request)?;
+        let msg = fidl_message::encode_message(header, request).expect("Could not encode request!");
         self.next_tx_id += 1;
         assert!(
             self.transactions.insert(tx_id.try_into().unwrap(), responder).is_none(),
@@ -389,14 +389,30 @@ impl ClientInner {
             }
             let Poll::Ready(Some(result)) = self.transport.poll_next(ctx) else { return Ok(()) };
             let data = result?;
-            let (header, data) = fidl_message::decode_transaction_header(&data)?;
+            let (header, data) = match fidl_message::decode_transaction_header(&data) {
+                Ok(x) => x,
+                Err(e) => {
+                    self.transport = Transport::Error(InnerError::Protocol(e));
+                    continue;
+                }
+            };
 
             let Some(tx_id) = NonZeroU32::new(header.tx_id) else {
-                return self.process_event(header, data);
+                if let Err(e) = self.process_event(header, data) {
+                    self.transport = Transport::Error(e);
+                }
+                continue;
             };
 
             let tx = self.transactions.remove(&tx_id).ok_or(::fidl::Error::InvalidResponseTxid)?;
-            if let ResponderStatus::WriteErrorOccurred(handle) = tx.handle(Ok((header, data)))? {
+            let responder_status = match tx.handle(Ok((header, data))) {
+                Ok(x) => x,
+                Err(e) => {
+                    self.transport = Transport::Error(InnerError::Protocol(e));
+                    continue;
+                }
+            };
+            if let ResponderStatus::WriteErrorOccurred(handle) = responder_status {
                 self.request(
                     ordinals::ACKNOWLEDGE_WRITE_ERROR,
                     proto::FDomainAcknowledgeWriteErrorRequest { handle },
@@ -514,9 +530,7 @@ impl Client {
     /// protocol.
     ///
     /// The second return item is a future that must be polled to keep
-    /// transactions running. It's *possibly* unnecessary if you always poll the
-    /// futures attached to calls but if you'd like to be able to drop those and
-    /// ignore results you have to poll this one to completion.
+    /// transactions running.
     pub fn new(
         transport: impl FDomainTransport + 'static,
     ) -> (Arc<Self>, impl Future<Output = ()> + Send + 'static) {
@@ -555,118 +569,143 @@ impl Client {
     }
 
     /// Create a new channel in the connected FDomain.
-    pub async fn create_channel(self: &Arc<Self>) -> Result<(Channel, Channel), Error> {
+    pub fn create_channel(self: &Arc<Self>) -> (Channel, Channel) {
         let id_a = self.new_hid();
         let id_b = self.new_hid();
-        self.transaction(
+        let fut = self.transaction(
             ordinals::CREATE_CHANNEL,
             proto::ChannelCreateChannelRequest { handles: [id_a, id_b] },
             Responder::CreateChannel,
-        )
-        .await?;
-        Ok((
+        );
+
+        fuchsia_async::Task::spawn(async move {
+            if let Err(e) = fut.await {
+                log::debug!("FDomain channel creation failed: {e}");
+            }
+        })
+        .detach();
+
+        (
             Channel(Handle { id: id_a.id, client: Arc::downgrade(self) }),
             Channel(Handle { id: id_b.id, client: Arc::downgrade(self) }),
-        ))
+        )
     }
 
     /// Creates client and server endpoints connected to by a channel.
-    pub async fn create_endpoints<F: crate::fidl::ProtocolMarker>(
+    pub fn create_endpoints<F: crate::fidl::ProtocolMarker>(
         self: &Arc<Self>,
-    ) -> Result<(crate::fidl::ClientEnd<F>, crate::fidl::ServerEnd<F>), Error> {
-        let (client, server) = self.create_channel().await?;
+    ) -> (crate::fidl::ClientEnd<F>, crate::fidl::ServerEnd<F>) {
+        let (client, server) = self.create_channel();
         let client_end = crate::fidl::ClientEnd::<F>::new(client);
         let server_end = crate::fidl::ServerEnd::new(server);
-        Ok((client_end, server_end))
+        (client_end, server_end)
     }
 
     /// Creates a client proxy and a server endpoint connected by a channel.
-    pub async fn create_proxy<F: crate::fidl::ProtocolMarker>(
+    pub fn create_proxy<F: crate::fidl::ProtocolMarker>(
         self: &Arc<Self>,
-    ) -> Result<(F::Proxy, crate::fidl::ServerEnd<F>), Error> {
-        let (client_end, server_end) = self.create_endpoints::<F>().await?;
-        Ok((client_end.into_proxy()?, server_end))
+    ) -> (F::Proxy, crate::fidl::ServerEnd<F>) {
+        let (client_end, server_end) = self.create_endpoints::<F>();
+        (client_end.into_proxy(), server_end)
     }
 
     /// Creates a client proxy and a server request stream connected by a channel.
-    pub async fn create_proxy_and_stream<F: crate::fidl::ProtocolMarker>(
+    pub fn create_proxy_and_stream<F: crate::fidl::ProtocolMarker>(
         self: &Arc<Self>,
-    ) -> Result<(F::Proxy, F::RequestStream), Error> {
-        let (client_end, server_end) = self.create_endpoints::<F>().await?;
-        Ok((client_end.into_proxy()?, server_end.into_stream()?))
+    ) -> (F::Proxy, F::RequestStream) {
+        let (client_end, server_end) = self.create_endpoints::<F>();
+        (client_end.into_proxy(), server_end.into_stream())
     }
 
     /// Create a new socket in the connected FDomain.
-    async fn create_socket(
-        self: &Arc<Self>,
-        options: proto::SocketType,
-    ) -> Result<(Socket, Socket), Error> {
+    fn create_socket(self: &Arc<Self>, options: proto::SocketType) -> (Socket, Socket) {
         let id_a = self.new_hid();
         let id_b = self.new_hid();
-        self.transaction(
+        let fut = self.transaction(
             ordinals::CREATE_SOCKET,
             proto::SocketCreateSocketRequest { handles: [id_a, id_b], options },
             Responder::CreateSocket,
-        )
-        .await?;
-        Ok((
+        );
+
+        fuchsia_async::Task::spawn(async move {
+            if let Err(e) = fut.await {
+                log::debug!("FDomain socket creation failed: {e}");
+            }
+        })
+        .detach();
+
+        (
             Socket(Handle { id: id_a.id, client: Arc::downgrade(self) }),
             Socket(Handle { id: id_b.id, client: Arc::downgrade(self) }),
-        ))
+        )
     }
 
     /// Create a new streaming socket in the connected FDomain.
-    pub async fn create_stream_socket(self: &Arc<Self>) -> Result<(Socket, Socket), Error> {
-        self.create_socket(proto::SocketType::Stream).await
+    pub fn create_stream_socket(self: &Arc<Self>) -> (Socket, Socket) {
+        self.create_socket(proto::SocketType::Stream)
     }
 
     /// Create a new datagram socket in the connected FDomain.
-    pub async fn create_datagram_socket(self: &Arc<Self>) -> Result<(Socket, Socket), Error> {
-        self.create_socket(proto::SocketType::Datagram).await
+    pub fn create_datagram_socket(self: &Arc<Self>) -> (Socket, Socket) {
+        self.create_socket(proto::SocketType::Datagram)
     }
 
     /// Create a new event pair in the connected FDomain.
-    pub async fn create_event_pair(self: &Arc<Self>) -> Result<(EventPair, EventPair), Error> {
+    pub fn create_event_pair(self: &Arc<Self>) -> (EventPair, EventPair) {
         let id_a = self.new_hid();
         let id_b = self.new_hid();
-        self.transaction(
+        let fut = self.transaction(
             ordinals::CREATE_EVENT_PAIR,
             proto::EventPairCreateEventPairRequest { handles: [id_a, id_b] },
             Responder::CreateEventPair,
-        )
-        .await?;
-        Ok((
+        );
+
+        fuchsia_async::Task::spawn(async move {
+            if let Err(e) = fut.await {
+                log::debug!("FDomain event pair creation failed: {e}");
+            }
+        })
+        .detach();
+
+        (
             EventPair(Handle { id: id_a.id, client: Arc::downgrade(self) }),
             EventPair(Handle { id: id_b.id, client: Arc::downgrade(self) }),
-        ))
+        )
     }
 
     /// Create a new event handle in the connected FDomain.
-    pub async fn create_event(self: &Arc<Self>) -> Result<Event, Error> {
+    pub fn create_event(self: &Arc<Self>) -> Event {
         let id = self.new_hid();
-        self.transaction(
+        let fut = self.transaction(
             ordinals::CREATE_EVENT,
             proto::EventCreateEventRequest { handle: id },
             Responder::CreateEvent,
-        )
-        .await?;
-        Ok(Event(Handle { id: id.id, client: Arc::downgrade(self) }))
+        );
+
+        fuchsia_async::Task::spawn(async move {
+            if let Err(e) = fut.await {
+                log::debug!("FDomain event creation failed: {e}");
+            }
+        })
+        .detach();
+
+        Event(Handle { id: id.id, client: Arc::downgrade(self) })
     }
 
     /// Allocate a new HID, which should be suitable for use with the connected FDomain.
-    pub(crate) fn new_hid(&self) -> proto::NewHid {
+    pub(crate) fn new_hid(&self) -> proto::NewHandleId {
         // TODO: On the target side we have to keep a table of these which means
         // we can automatically detect collisions in the random value. On the
         // client side we'd have to add a whole data structure just for that
         // purpose. Should we?
-        proto::NewHid { id: rand::random::<u32>() >> 1 }
+        proto::NewHandleId { id: rand::random::<u32>() >> 1 }
     }
 
     /// Create a future which sends a FIDL message to the connected FDomain and
     /// waits for a response.
     ///
     /// Calling this method queues the transaction synchronously. Awaiting is
-    /// only necessary to wait for the response and pump the transport.
+    /// only necessary to wait for the response.
     pub(crate) fn transaction<S: fidl_message::Body, R: 'static>(
         self: &Arc<Self>,
         ordinal: u64,
@@ -675,15 +714,9 @@ impl Client {
     ) -> impl Future<Output = Result<R, Error>> + 'static {
         let mut inner = self.0.lock().unwrap();
 
-        let (sender, mut receiver) = futures::channel::oneshot::channel();
+        let (sender, receiver) = futures::channel::oneshot::channel();
         match inner.request(ordinal, request, f(sender)) {
-            Ok(()) => {
-                let this = Arc::clone(self);
-                Either::Left(poll_fn(move |ctx| {
-                    this.0.lock().unwrap().poll_transport(ctx);
-                    receiver.poll_unpin(ctx).map(|x| x.expect("Oneshot went away without reply!"))
-                }))
-            }
+            Ok(()) => Either::Left(receiver.map(|x| x.expect("Oneshot went away without reply!"))),
             Err(e) => Either::Right(async move { Err(e.into()) }),
         }
     }
@@ -691,7 +724,7 @@ impl Client {
     /// Start getting streaming events for socket reads.
     pub(crate) fn start_socket_streaming(
         &self,
-        id: proto::Hid,
+        id: proto::HandleId,
         output: UnboundedSender<Result<Vec<u8>, Error>>,
     ) -> Result<(), Error> {
         let mut inner = self.0.lock().unwrap();
@@ -707,7 +740,7 @@ impl Client {
     /// Stop getting streaming events for socket reads. Doesn't return errors
     /// because it's exclusively called in destructors where we have nothing to
     /// do with them.
-    pub(crate) fn stop_socket_streaming(&self, id: proto::Hid) {
+    pub(crate) fn stop_socket_streaming(&self, id: proto::HandleId) {
         let mut inner = self.0.lock().unwrap();
         if inner.socket_read_subscriptions.remove(&id).is_some() {
             // TODO: Log?
@@ -722,7 +755,7 @@ impl Client {
     /// Start getting streaming events for socket reads.
     pub(crate) fn start_channel_streaming(
         &self,
-        id: proto::Hid,
+        id: proto::HandleId,
         output: UnboundedSender<Result<proto::ChannelMessage, Error>>,
     ) -> Result<(), Error> {
         let mut inner = self.0.lock().unwrap();
@@ -738,7 +771,7 @@ impl Client {
     /// Stop getting streaming events for socket reads. Doesn't return errors
     /// because it's exclusively called in destructors where we have nothing to
     /// do with them.
-    pub(crate) fn stop_channel_streaming(&self, id: proto::Hid) {
+    pub(crate) fn stop_channel_streaming(&self, id: proto::HandleId) {
         let mut inner = self.0.lock().unwrap();
         if inner.channel_read_subscriptions.remove(&id).is_some() {
             // TODO: Log?

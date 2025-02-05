@@ -177,6 +177,10 @@ class BaseCapturer : public AudioObject,
   void StartAsyncCapture(uint32_t frames_per_packet) final;
   void StopAsyncCapture(StopAsyncCaptureCallback cbk) final;
   void StopAsyncCaptureNoReply() final;
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) final {
+    FX_LOGS(ERROR) << "BaseCapturer: AudioCapturer::handle_unknown_method(ordinal " << ordinal
+                   << ", method_has_response " << method_has_response << ")";
+  }
 
   // Methods used by capture/mixer thread(s). Must be called from mix_domain.
   zx_status_t Process() FXL_EXCLUSIVE_LOCKS_REQUIRED(mix_domain_->token());

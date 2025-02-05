@@ -13,7 +13,7 @@ use fidl_fuchsia_time_external::{
 
 use futures::lock::Mutex;
 use futures::TryStreamExt;
-use tracing::warn;
+use log::warn;
 
 /// An |UpdateAlgorithm| trait produces time samples on demand.
 #[async_trait]

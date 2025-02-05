@@ -5,7 +5,6 @@
 
 import itertools
 import logging
-import statistics
 import sys
 from typing import Any, Iterable, Iterator, Self, Sequence, TypeAlias
 
@@ -14,6 +13,7 @@ from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 _CPU_USAGE_EVENT_NAME = "cpu_usage"
 _DEFAULT_PERCENT_CUTOFF = 0.0
+_ONE_S_IN_NS = 1000000000
 
 Breakdown: TypeAlias = list[dict[str, trace_metrics.JSON]]
 
@@ -56,38 +56,29 @@ class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
     ) -> Sequence[trace_metrics.TestCaseResult]:
         all_events: Iterator[trace_model.Event] = model.all_events()
         cpu_usage_events: Iterable[
-            trace_model.Event
+            trace_model.CounterEvent
         ] = trace_utils.filter_events(
             all_events,
-            category="system_metrics_logger",
+            category="system_metrics",
             name=_CPU_USAGE_EVENT_NAME,
             type=trace_model.CounterEvent,
         )
-        cpu_percentages: list[float] = list(
-            trace_utils.get_arg_values_from_events(
-                cpu_usage_events,
-                arg_key=_CPU_USAGE_EVENT_NAME,
-                arg_types=(int, float),
-            )
-        )
 
-        # TODO(b/156300857): Remove this fallback after all consumers have been
-        # updated to use system_metrics_logger.
-        if len(cpu_percentages) == 0:
-            all_events = model.all_events()
-            cpu_usage_events = trace_utils.filter_events(
-                all_events,
-                category="system_metrics",
-                name=_CPU_USAGE_EVENT_NAME,
-                type=trace_model.CounterEvent,
+        cpu_starts: list[float] = []
+        cpu_percentages: list[float] = []
+
+        # Parse the start time and percentage for each `Event`.
+        for event in cpu_usage_events:
+            cpu_starts.append(event.start.to_epoch_delta().to_nanoseconds())
+            cpu_percentages.append(
+                event.args.get("average_cpu_percentage") or 0
             )
-            cpu_percentages = list(
-                trace_utils.get_arg_values_from_events(
-                    cpu_usage_events,
-                    arg_key="average_cpu_percentage",
-                    arg_types=(int, float),
-                )
-            )
+
+        # The suspend times calculated from https://source.corp.google.com/h/turquoise-internal/turquoise/+/main:src/cobalt/bin/system-metrics/cpu_stats_fetcher_impl.cc
+        # are offset by 1 event. Add that event in. It's approximately 1 s.
+        cpu_durations: list[float] = [_ONE_S_IN_NS] + [
+            curr - prev for prev, curr in itertools.pairwise(cpu_starts)
+        ]
 
         if len(cpu_percentages) == 0:
             _LOGGER.info(
@@ -96,14 +87,18 @@ class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
             )
             return []
 
-        cpu_mean: float = statistics.mean(cpu_percentages)
-        _LOGGER.info(f"Average CPU Load: {cpu_mean}")
+        if len(cpu_durations) != len(cpu_percentages):
+            _LOGGER.warning(
+                "The number of CPU duration segments don't match the number "
+                "of percentages. Data may be truncated."
+            )
 
         if self.aggregates_only:
             return trace_utils.standard_metrics_set(
                 values=cpu_percentages,
                 label_prefix="Cpu",
                 unit=trace_metrics.Unit.percent,
+                durations=cpu_durations,
             )
         return [
             trace_metrics.TestCaseResult(

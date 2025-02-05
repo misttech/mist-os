@@ -35,6 +35,27 @@ struct AcpiDebugPortDescriptor;
 
 namespace uart {
 
+// Tagged configuration type, used to represent the configuration of `Driver` even if multiple types
+// of driver have the same `config_type`.
+template <typename Driver>
+class Config {
+ public:
+  using uart_type = Driver;
+  using config_type = typename Driver::config_type;
+
+  constexpr Config() = default;
+  explicit constexpr Config(const config_type& cfg) : config_(cfg) {}
+
+  constexpr config_type* operator->() { return &config_; }
+  constexpr const config_type* operator->() const { return &config_; }
+
+  constexpr config_type& operator*() { return config_; }
+  constexpr const config_type& operator*() const { return config_; }
+
+ private:
+  config_type config_;
+};
+
 //
 // These types are used in configuring the line control settings (i.e., in the
 // `SetLineControl()` method).
@@ -77,6 +98,9 @@ inline void UnparseConfig(const Config& config, FILE* out) {
 }
 
 enum class IoRegisterType {
+  // Null/Stub drivers.
+  kNone,
+
   // MMIO is performed without any scaling what so ever, this means that
   // registers offsets are treated as byte offsets from the base address.
   kMmio8,
@@ -92,9 +116,22 @@ enum class IoRegisterType {
 template <IoRegisterType IoRegType>
 using IoSlotType = std::conditional_t<IoRegType == IoRegisterType::kPio, uint16_t, size_t>;
 
+template <typename UartDriver>
+concept MmioDriver =
+    UartDriver::kIoType == IoRegisterType::kMmio32 || UartDriver::kIoType == IoRegisterType::kMmio8;
+
 // Constant indicating that the number of `io_slots()` is to be determined at
 // runtime.
 constexpr size_t kDynamicIoSlot = std::numeric_limits<size_t>::max();
+
+// Communicates the range where the configuration dictates the registers are located.
+//
+// It may need to be translated if the addressing used for the configuration is different from
+// the one used for execution (e.g. physical and virtual addressing).
+struct MmioRange {
+  uint64_t address;
+  uint64_t size;
+};
 
 // Specific hardware support is implemented in a class uart::xyz::Driver,
 // referred to here as UartDriver.  The uart::DriverBase template class
@@ -151,6 +188,9 @@ class DriverBase {
   // Register Io Type.
   static constexpr IoRegisterType kIoType = IoRegType;
 
+  static constexpr uint32_t kType = ZBI_TYPE_KERNEL_DRIVER;
+  static constexpr uint32_t kExtra = KdrvExtra;
+
   explicit DriverBase(const config_type& cfg) : cfg_(cfg) {}
 
   constexpr bool operator==(const Driver& other) const {
@@ -159,10 +199,7 @@ class DriverBase {
   constexpr bool operator!=(const Driver& other) const { return !(*this == other); }
 
   // API to fill a ZBI item describing this UART.
-  constexpr uint32_t type() const { return ZBI_TYPE_KERNEL_DRIVER; }
-  constexpr uint32_t extra() const { return KdrvExtra; }
-  constexpr size_t size() const { return sizeof(cfg_); }
-  void FillItem(void* payload) const { memcpy(payload, &cfg_, sizeof(cfg_)); }
+  void FillItem(void* payload) const { memcpy(payload, &cfg_, sizeof(config_type)); }
 
   // API to match a ZBI item describing this UART.
   static std::optional<Driver> MaybeCreate(const zbi_header_t& header, const void* payload) {
@@ -176,7 +213,7 @@ class DriverBase {
 
   // API to match a configuration string.
   static std::optional<Driver> MaybeCreate(std::string_view string) {
-    const auto config_name = Driver::config_name();
+    const auto config_name = Driver::kConfigName;
     if (string.substr(0, config_name.size()) == config_name) {
       string.remove_prefix(config_name.size());
       auto config = ParseConfig<KdrvConfig>(string);
@@ -215,8 +252,7 @@ class DriverBase {
 
   // API to reproduce a configuration string.
   void Unparse(FILE* out) const {
-    fprintf(out, "%.*s", static_cast<int>(Driver::config_name().size()),
-            Driver::config_name().data());
+    fprintf(out, "%.*s", static_cast<int>(Driver::kConfigName.size()), Driver::kConfigName.data());
     UnparseConfig<KdrvConfig>(cfg_, out);
   }
 
@@ -245,6 +281,17 @@ class DriverBase {
         !std::is_same_v<void, void>,
         "|IoSlots| must be different from |kDynamicIoSlot| or |io_slots| implementation must be provided in derived class.");
     return IoSlots;
+  }
+
+  template <MmioDriver UartDriver = Driver>
+  constexpr MmioRange mmio_range() const {
+    if constexpr (Driver::kIoType == IoRegisterType::kMmio32) {
+      // Each IoSlot represent 4 bytes.
+      return {.address = config().mmio_phys, .size = io_slots() * sizeof(uint32_t)};
+    } else if constexpr (Driver::kIoType == IoRegisterType::kMmio8) {
+      return {.address = config().mmio_phys, .size = io_slots()};
+    }
+    __UNREACHABLE;
   }
 
  protected:
@@ -347,6 +394,16 @@ inline auto DirectMapMmio(uint64_t phys, size_t size) {
   return reinterpret_cast<volatile void*>(phys);
 }
 
+// Specialization for Stub drivers, such as `null::Driver`.
+template <typename ConfigType>
+class BasicIoProvider<ConfigType, IoRegisterType::kNone> {
+ public:
+  constexpr BasicIoProvider(const ConfigType& cfg, size_t io_slots) {}
+  constexpr BasicIoProvider& operator=(BasicIoProvider&& other) {}
+
+  auto io() { return nullptr; }
+};
+
 // The specialization used most commonly handles simple MMIO devices.
 template <IoRegisterType IoType>
 class BasicIoProvider<zbi_dcfg_simple_t, IoType> {
@@ -426,7 +483,8 @@ class KernelDriver {
 
  public:
   using uart_type = UartDriver;
-  static_assert(std::is_copy_constructible_v<uart_type>);
+  using config_type = UartDriver::config_type;
+  static_assert(std::is_copy_constructible_v<uart_type> || std::is_same_v<uart_type, mock::Driver>);
   static_assert(std::is_trivially_destructible_v<uart_type> ||
                 std::is_same_v<uart_type, mock::Driver>);
 
@@ -447,6 +505,25 @@ class KernelDriver {
   // Access underlying hardware driver object.
   const auto& uart() const { return uart_; }
   auto& uart() { return uart_; }
+
+  template <typename LockPolicy = DefaultLockPolicy, MmioDriver = UartDriver>
+  constexpr MmioRange mmio_range() const {
+    Guard<LockPolicy> lock(&lock_, SOURCE_TAG);
+    return uart_.mmio_range();
+  }
+
+  template <typename LockPolicy = DefaultLockPolicy>
+  uart_type TakeUart() && {
+    Guard<LockPolicy> lock(&lock_, SOURCE_TAG);
+    return std::move(uart_);
+  }
+
+  // Returns a copy of the underlying uart config.
+  template <typename LockPolicy = DefaultLockPolicy>
+  config_type config() const {
+    Guard<LockPolicy> lock(&lock_, SOURCE_TAG);
+    return uart_.config();
+  }
 
   // Access IoProvider object.
   auto& io() { return io_; }

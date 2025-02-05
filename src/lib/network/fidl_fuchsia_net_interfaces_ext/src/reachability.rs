@@ -29,7 +29,10 @@ pub fn is_globally_routable<I: FieldInterests>(
     }: &Properties<I>,
 ) -> bool {
     match port_class {
-        PortClass::Loopback => return false,
+        // TODO(https://fxbug.dev/389732915): In the presence of particular TPROXY/NAT configs
+        // early-returning here might be incorrect, as we could potentially be providing upstream
+        // connectivity over loopback or blackhole interfaces.
+        PortClass::Loopback | PortClass::Blackhole => return false,
         PortClass::Virtual
         | PortClass::Ethernet
         | PortClass::WlanClient

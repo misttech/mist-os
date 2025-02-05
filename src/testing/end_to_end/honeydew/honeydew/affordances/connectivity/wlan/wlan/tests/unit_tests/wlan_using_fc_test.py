@@ -599,10 +599,7 @@ class WlanFCTests(unittest.TestCase):
 
                 self.wlan_obj._device_monitor_proxy.create_iface.return_value = _async_response(
                     f_wlan_device_service.DeviceMonitorCreateIfaceResponse(
-                        status=ZxStatus.ZX_OK,
-                        resp=f_wlan_device_service.CreateIfaceResponse(
-                            iface_id=phy_id,
-                        ),
+                        iface_id=phy_id,
                     )
                 )
                 self.assertEqual(
@@ -816,28 +813,26 @@ class WlanFCTests(unittest.TestCase):
                             _async_error(ZxStatus(zx_err))
                         )
                     else:
+                        compatibility = f_wlan_sme.Compatibility()
+                        compatibility.compatible = (
+                            f_wlan_common_security.Protocol.WPA2_PERSONAL
+                        )
                         res = f_wlan_sme.ClientSmeScanForControllerResult()
-                        res.response = f_wlan_sme.ClientSmeScanForControllerResponse(
-                            scan_results=[
-                                f_wlan_sme.ScanResult(
-                                    compatibility=f_wlan_sme.Compatibility(
-                                        mutual_security_protocols=[
-                                            f_wlan_common_security.Protocol.WPA2_PERSONAL,
-                                        ]
+                        res.response = (
+                            f_wlan_sme.ClientSmeScanForControllerResponse(
+                                scan_results=[
+                                    f_wlan_sme.ScanResult(
+                                        compatibility=compatibility,
+                                        timestamp_nanos=0,
+                                        bss_description=_TEST_BSS_DESC_1_FC,
                                     ),
-                                    timestamp_nanos=0,
-                                    bss_description=_TEST_BSS_DESC_1_FC,
-                                ),
-                                f_wlan_sme.ScanResult(
-                                    compatibility=f_wlan_sme.Compatibility(
-                                        mutual_security_protocols=[
-                                            f_wlan_common_security.Protocol.WPA2_PERSONAL,
-                                        ]
+                                    f_wlan_sme.ScanResult(
+                                        compatibility=compatibility,
+                                        timestamp_nanos=0,
+                                        bss_description=_TEST_BSS_DESC_2_FC,
                                     ),
-                                    timestamp_nanos=0,
-                                    bss_description=_TEST_BSS_DESC_2_FC,
-                                ),
-                            ],
+                                ],
+                            )
                         )
                         res.err = err
                         client_sme.scan_for_controller.return_value = (

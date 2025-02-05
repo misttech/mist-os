@@ -8,8 +8,8 @@ use fidl_fuchsia_fs::AdminRequestStream;
 use fuchsia_component::server::ServiceFs;
 use futures::lock::Mutex;
 use futures::prelude::*;
+use log::{error, info, warn};
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use zx::Status;
 
 mod device;
@@ -79,7 +79,7 @@ impl FatServer {
                     device.scope.wait().await;
                     device
                         .shut_down()
-                        .unwrap_or_else(|error| error!(?error, "Failed to shutdown fatfs"));
+                        .unwrap_or_else(|error| error!(error:?; "Failed to shutdown fatfs"));
                 }
                 let _ = shutdown_responder.send();
             }
@@ -91,7 +91,7 @@ impl FatServer {
         match service {
             Services::Admin(stream) => self.handle_admin(stream).await,
         }
-        .unwrap_or_else(|e| error!(?e));
+        .unwrap_or_else(|e| error!("{e:?}"));
     }
 }
 

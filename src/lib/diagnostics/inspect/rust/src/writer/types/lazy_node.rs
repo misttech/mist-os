@@ -37,7 +37,7 @@ mod tests {
     use crate::writer::testing_utils::GetBlockExt;
     use crate::writer::types::Inspector;
     use futures::FutureExt;
-    use inspect_format::{BlockType, LinkNodeDisposition};
+    use inspect_format::{BlockType, Link, LinkNodeDisposition};
 
     #[fuchsia::test]
     fn lazy_values() {
@@ -46,20 +46,20 @@ mod tests {
         {
             let lazy_node =
                 node.create_lazy_values("lazy", || async move { Ok(Inspector::default()) }.boxed());
-            lazy_node.get_block(|lazy_node_block| {
-                assert_eq!(lazy_node_block.block_type(), BlockType::LinkValue);
+            lazy_node.get_block::<_, Link>(|lazy_node_block| {
+                assert_eq!(lazy_node_block.block_type(), Some(BlockType::LinkValue));
                 assert_eq!(
-                    lazy_node_block.link_node_disposition().unwrap(),
-                    LinkNodeDisposition::Inline
+                    lazy_node_block.link_node_disposition(),
+                    Some(LinkNodeDisposition::Inline)
                 );
-                assert_eq!(*lazy_node_block.link_content_index().unwrap(), 6);
+                assert_eq!(*lazy_node_block.content_index(), 6);
             });
-            node.get_block(|node_block| {
-                assert_eq!(node_block.child_count().unwrap(), 1);
+            node.get_block::<_, inspect_format::Node>(|node_block| {
+                assert_eq!(node_block.child_count(), 1);
             });
         }
-        node.get_block(|node_block| {
-            assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block::<_, inspect_format::Node>(|node_block| {
+            assert_eq!(node_block.child_count(), 0);
         });
     }
 
@@ -70,20 +70,20 @@ mod tests {
         {
             let lazy_node =
                 node.create_lazy_child("lazy", || async move { Ok(Inspector::default()) }.boxed());
-            lazy_node.get_block(|lazy_node_block| {
-                assert_eq!(lazy_node_block.block_type(), BlockType::LinkValue);
+            lazy_node.get_block::<_, Link>(|lazy_node_block| {
+                assert_eq!(lazy_node_block.block_type(), Some(BlockType::LinkValue));
                 assert_eq!(
-                    lazy_node_block.link_node_disposition().unwrap(),
-                    LinkNodeDisposition::Child
+                    lazy_node_block.link_node_disposition(),
+                    Some(LinkNodeDisposition::Child)
                 );
-                assert_eq!(*lazy_node_block.link_content_index().unwrap(), 6);
+                assert_eq!(*lazy_node_block.content_index(), 6);
             });
-            node.get_block(|node_block| {
-                assert_eq!(node_block.child_count().unwrap(), 1);
+            node.get_block::<_, inspect_format::Node>(|node_block| {
+                assert_eq!(node_block.child_count(), 1);
             });
         }
-        node.get_block(|node_block| {
-            assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block::<_, inspect_format::Node>(|node_block| {
+            assert_eq!(node_block.child_count(), 0);
         });
     }
 }

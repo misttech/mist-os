@@ -103,7 +103,7 @@ void LocalVnode::UnlinkFromParent() {
 }
 
 zx_status_t LocalVnode::EnumerateInternal(PathBuffer* path, std::string_view name,
-                                          const EnumerateCallback& func) const {
+                                          const EnumerateCallback& func) {
   const size_t original_length = path->length();
 
   // Add this current node to the path, and enumerate it if it has a remote
@@ -122,11 +122,11 @@ zx_status_t LocalVnode::EnumerateInternal(PathBuffer* path, std::string_view nam
                      path->Append('/');
                    }
 
-                   c.ForAllEntries([&path, &func](const LocalVnode& child, std::string_view name) {
+                   c.ForAllEntries([&path, &func](LocalVnode& child, std::string_view name) {
                      return child.EnumerateInternal(path, name, func);
                    });
                  },
-                 [&path, &func](const LocalVnode::Remote& s) {
+                 [&path, &func](LocalVnode::Remote& s) {
                    // If we added a remote node, call the enumeration function on the remote node.
                    func(*path, s.Connection());
                  },
@@ -139,7 +139,7 @@ zx_status_t LocalVnode::EnumerateInternal(PathBuffer* path, std::string_view nam
   return ZX_OK;
 }
 
-zx_status_t LocalVnode::EnumerateRemotes(const EnumerateCallback& func) const {
+zx_status_t LocalVnode::EnumerateRemotes(const EnumerateCallback& func) {
   PathBuffer path;
   path.Append('/');
   return EnumerateInternal(&path, {}, func);

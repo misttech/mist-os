@@ -17,12 +17,13 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 
 }  // namespace
 
-namespace wlan_ieee80211 = wlan_ieee80211;
+namespace wlan_ieee80211 = fuchsia_wlan_ieee80211;
 using ::testing::NotNull;
 
 constexpr simulation::WlanTxInfo kDefaultTxInfo = {
     .channel = {.primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
-constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
+const fuchsia_wlan_ieee80211::Ssid kDefaultSsid = {'F', 'u', 'c', 'h', 's', 'i', 'a', ' ',
+                                                   'F', 'a', 'k', 'e', ' ', 'A', 'P'};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 constexpr auto kDefaultAssocStatus = wlan_ieee80211::StatusCode::kStatusInvalidPairwiseCipher;
 constexpr auto kDefaultDisassocReason = wlan_ieee80211::ReasonCode::kNoMoreStas;
@@ -33,10 +34,7 @@ void checkChannel(const wlan_common::WlanChannel& channel) {
   EXPECT_EQ(channel.secondary80, kDefaultTxInfo.channel.secondary80);
 }
 
-void checkSsid(const wlan_ieee80211::CSsid& ssid) {
-  EXPECT_EQ(ssid.len, kDefaultSsid.len);
-  EXPECT_EQ(std::memcmp(ssid.data.data(), kDefaultSsid.data.data(), kDefaultSsid.len), 0);
-}
+void checkSsid(const fuchsia_wlan_ieee80211::Ssid& ssid) { EXPECT_EQ(ssid, kDefaultSsid); }
 
 class SimStation : public wlan::simulation::StationIfc {
  public:

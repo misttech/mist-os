@@ -86,7 +86,7 @@ void HandleOnOomReboot() {
 
   printf("memory-pressure: pausing for %ums after OOM mem signal\n", gBootOptions->oom_timeout_ms);
   zx_status_t status =
-      HaltToken::Get().WaitForAck(Deadline::after(ZX_MSEC(gBootOptions->oom_timeout_ms)));
+      HaltToken::Get().WaitForAck(Deadline::after_mono(ZX_MSEC(gBootOptions->oom_timeout_ms)));
 
   switch (status) {
     case ZX_OK:
@@ -125,7 +125,7 @@ void HandleOnOomReboot() {
   // we have a full debuglog buffer of 128KB, at 115200 bps, with 8-N-1, it will take roughly
   // 11.4 seconds to drain the buffer.  The timeout should be long enough to allow a full DLOG
   // buffer to be drained.
-  zx_time_t deadline = current_time() + ZX_SEC(20);
+  zx_instant_mono_t deadline = current_mono_time() + ZX_SEC(20);
   status = dlog_shutdown(deadline);
   if (status != ZX_OK) {
     // If `dlog_shutdown` failed, there's not much we can do besides print an error (which
@@ -155,7 +155,7 @@ fbl::RefPtr<EventDispatcher> MemoryWatchdog::GetMemPressureEvent(uint32_t kind) 
   }
 }
 
-void MemoryWatchdog::EvictionTriggerCallback(Timer* timer, zx_time_t now, void* arg) {
+void MemoryWatchdog::EvictionTriggerCallback(Timer* timer, zx_instant_mono_t now, void* arg) {
   MemoryWatchdog* watchdog = reinterpret_cast<MemoryWatchdog*>(arg);
   watchdog->EvictionTrigger();
 }
@@ -192,7 +192,7 @@ void MemoryWatchdog::OnOom() {
   }
 }
 
-bool MemoryWatchdog::IsSignalDue(PressureLevel idx, zx_time_t time_now) const {
+bool MemoryWatchdog::IsSignalDue(PressureLevel idx, zx_instant_mono_t time_now) const {
   // We signal a memory state change immediately if any of these conditions are met:
   // 1) The current index is lower than the previous one signaled (i.e. available memory is lower
   // now), so that clients can act on the signal quickly.
@@ -243,7 +243,7 @@ void MemoryWatchdog::WorkerThread() {
       mem_event_idx_ = PressureLevel::kOutOfMemory;
     }
 
-    auto time_now = current_time();
+    auto time_now = current_mono_time();
 
     if (IsSignalDue(mem_event_idx_, time_now)) {
       CountPressureEvent(mem_event_idx_);

@@ -85,7 +85,7 @@ class RecurringCallback {
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(RecurringCallback);
 
-  static void CallbackWrapper(Timer* t, zx_time_t now, void* arg);
+  static void CallbackWrapper(Timer* t, zx_instant_mono_t now, void* arg);
 
   DECLARE_SPINLOCK(RecurringCallback) lock_;
   Timer timer_;

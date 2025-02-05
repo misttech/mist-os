@@ -16,6 +16,7 @@
 
 #include <hwreg/bitfields.h>
 
+#include "interrupt.h"
 #include "uart.h"
 
 // 8250 and derivatives, including 16550.
@@ -256,7 +257,7 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig, IoRegType
     }
   }();
 
-  static constexpr std::string_view config_name() {
+  static constexpr std::string_view kConfigName = []() {
     switch (KdrvExtra) {
       case ZBI_KERNEL_DRIVER_I8250_PIO_UART:
         return "ioport";
@@ -273,7 +274,7 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig, IoRegType
       default:
         return "ns8250";
     }
-  }
+  }();
 
   template <typename... Args>
   explicit DriverImpl(Args&&... args) : Base(std::forward<Args>(args)...) {}
@@ -542,14 +543,15 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig, IoRegType
 
       // Notify TX.
       if (lsr.tx_register_empty()) {
-        tx(lock, waiter, [&]() { EnableTxInterrupt(io, false); });
+        auto tx_irq = TxInterrupt(lock, waiter, [&]() { EnableTxInterrupt(io, false); });
+        tx(tx_irq);
       }
 
       // Drain RX while the line status bit is ready.
       bool should_drain_rx = true;
       for (; should_drain_rx && lsr.data_ready();
            lsr = LineStatusRegister::Get().ReadFrom(io.io())) {
-        rx(
+        auto rx_irq = RxInterrupt(
             lock,  //
             [&]() { return RxBufferRegister::Get().ReadFrom(io.io()).data(); },
             [&]() {
@@ -558,6 +560,7 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig, IoRegType
               EnableRxInterrupt(io, false);
               should_drain_rx = false;
             });
+        rx(rx_irq);
       }
     }
   }

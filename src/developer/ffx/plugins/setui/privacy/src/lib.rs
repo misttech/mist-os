@@ -5,8 +5,9 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use ffx_setui_privacy_args::Privacy;
-use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
+use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_settings::{PrivacyProxy, PrivacySettings};
+use target_holders::moniker;
 use utils::{handle_mixed_result, Either, WatchOrSetResult};
 
 #[derive(FfxTool)]
@@ -61,13 +62,14 @@ async fn command(proxy: PrivacyProxy, user_data_sharing_consent: Option<bool>) -
 mod test {
     use super::*;
     use fidl_fuchsia_settings::PrivacyRequest;
+    use target_holders::fake_proxy;
     use test_case::test_case;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_run_command() {
         const CONSENT: bool = true;
 
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             PrivacyRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -91,7 +93,7 @@ mod test {
     )]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_privacy_set_output(expected_user_data_sharing_consent: bool) -> Result<()> {
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             PrivacyRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -127,7 +129,7 @@ mod test {
     async fn validate_privacy_watch_output(
         expected_user_data_sharing_consent: Option<bool>,
     ) -> Result<()> {
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             PrivacyRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }

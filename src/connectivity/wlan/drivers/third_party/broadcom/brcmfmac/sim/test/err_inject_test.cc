@@ -137,9 +137,8 @@ TEST_F(ErrInjTest, CmdFirmwareErrorLifecycle) {
 
     // Initialize parameter for BRCMF_C_SET_SSID, here we use kDefaultSoftApSsid as the fake
     // association target, the content doesn't really affect the result.
-    memcpy(&join_params.ssid_le.SSID, SimInterface::kDefaultSoftApSsid.data.data(),
-           SimInterface::kDefaultSoftApSsid.len);
-    join_params.ssid_le.SSID_len = SimInterface::kDefaultSoftApSsid.len;
+    memcpy(&join_params.ssid_le.SSID, kDefaultSoftApSsid.data(), kDefaultSoftApSsid.size());
+    join_params.ssid_le.SSID_len = kDefaultSoftApSsid.size();
 
     kDefaultBssid.CopyTo(join_params.params_le.bssid);
     join_params.params_le.chanspec_num = 1;

@@ -5,9 +5,9 @@
 #include <lib/fdf/cpp/arena.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <format>
 #include <vector>
 
-#include <fbl/string_printf.h>
 #include <perftest/perftest.h>
 
 #include "src/devices/bin/driver_runtime/microbenchmarks/assert.h"
@@ -85,7 +85,7 @@ void RegisterTests() {
       32, 64, 1024, 8192, 65536,
   };
   for (auto block_size : kBlockSize) {
-    auto alloc_free_name = fbl::StringPrintf("Arena/AllocFree/%ubytes", block_size);
+    auto alloc_free_name = std::format("Arena/AllocFree/{}bytes", block_size);
     perftest::RegisterTest(alloc_free_name.c_str(), ArenaAllocFreeTest, block_size);
   }
 
@@ -93,8 +93,7 @@ void RegisterTests() {
       4 * 1024, 8 * 1024, 16 * 1024, 32 * 1024, 64 * 1024,
   };
   for (auto large_size : kLargeBlockSize) {
-    auto alloc_large_then_small_name =
-        fbl::StringPrintf("Arena/AllocLargeThenSmall/%ubytes", large_size);
+    auto alloc_large_then_small_name = std::format("Arena/AllocLargeThenSmall/{}bytes", large_size);
     perftest::RegisterTest(alloc_large_then_small_name.c_str(), ArenaAllocLargeThenSmallTest,
                            large_size);
   }
@@ -103,7 +102,7 @@ void RegisterTests() {
       1, 4, 16, 32, 1024,
   };
   for (auto num_blocks : kNumBlocks) {
-    auto contains_name = fbl::StringPrintf("Arena/Contains/%ublocks", num_blocks);
+    auto contains_name = std::format("Arena/Contains/{}blocks", num_blocks);
     perftest::RegisterTest(contains_name.c_str(), ArenaContainsTest, num_blocks);
   }
 }

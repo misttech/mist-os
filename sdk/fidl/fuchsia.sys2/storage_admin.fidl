@@ -100,7 +100,7 @@ closed protocol StorageAdmin {
     ///
     /// Opens the isolated directory for the given component. The open request will provision
     /// the storage if it hasn't been already.
-    @available(added=25, removed=NEXT)
+    @available(added=25, removed=26)
     @selector("OpenComponentStorage")
     strict DeprecatedOpenComponentStorage(resource struct {
         relative_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;

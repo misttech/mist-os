@@ -12,10 +12,11 @@ use fidl_fuchsia_bluetooth_snoop::{
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use futures::TryStreamExt;
+use log::{error, info, warn};
+use simplelog::{Config, LevelFilter, WriteLogger};
 use std::fs::File;
 use std::path::Path;
 use std::{fmt, io};
-use tracing::{error, info, warn};
 
 const PCAP_CMD: u8 = 0x01;
 const PCAP_ACL_DATA: u8 = 0x02;
@@ -251,12 +252,8 @@ fn main_res() -> Result<(), Error> {
 }
 
 fn main() {
-    tracing_subscriber::fmt()
-        .compact()
-        .with_max_level(tracing::Level::INFO)
-        .with_writer(io::stderr)
-        .init();
+    let _ = WriteLogger::init(LevelFilter::Info, Config::default(), io::stderr()).unwrap();
     if let Err(e) = main_res() {
-        error!("Error: {}", e);
+        error!("Error: {e}");
     }
 }

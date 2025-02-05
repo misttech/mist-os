@@ -17,7 +17,8 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 
 constexpr simulation::WlanTxInfo kDefaultTxInfo = {
     .channel = {.primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
-constexpr wlan_ieee80211::CSsid kApSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
+const fuchsia_wlan_ieee80211::Ssid kApSsid = {'F', 'u', 'c', 'h', 's', 'i', 'a', ' ',
+                                              'F', 'a', 'k', 'e', ' ', 'A', 'P'};
 const common::MacAddr kApBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 const common::MacAddr kClientMacAddr({0x11, 0x22, 0x33, 0x44, 0xee, 0xff});
 constexpr auto kClientDisassocReason = wlan_ieee80211::ReasonCode::kUnspecifiedReason;
@@ -114,10 +115,10 @@ TEST_F(AssocTest, RefuseIfNotAuthenticated) {
 }
 
 TEST_F(AssocTest, RefusedWrongSsid) {
-  static constexpr wlan_ieee80211::CSsid kWrongLenSsid = {.len = 14,
-                                                          .data = {.data_ = "Fuchsia Fake A"}};
-  static constexpr wlan_ieee80211::CSsid kWrongSsid = {.len = 15,
-                                                       .data = {.data_ = "Fuchsia Fake AA"}};
+  static const fuchsia_wlan_ieee80211::Ssid kWrongLenSsid = {'F', 'u', 'c', 'h', 's', 'i', 'a',
+                                                             ' ', 'F', 'a', 'k', 'e', ' ', 'A'};
+  static const fuchsia_wlan_ieee80211::Ssid kWrongSsid = {'F', 'u', 'c', 'h', 's', 'i', 'a', ' ',
+                                                          'F', 'a', 'k', 'e', ' ', 'A', 'A'};
 
   FinishAuth();
 

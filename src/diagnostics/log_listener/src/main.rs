@@ -15,13 +15,12 @@ use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
 use fidl_fuchsia_sys2::RealmQueryMarker;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
 use log_command as log_utils;
-use log_command::log_formatter;
-use log_formatter::{
+use log_command::{
     dump_logs_from_socket as read_logs_from_socket, DefaultLogFormatter, LogEntry, Symbolize,
     Timestamp, WriterContainer,
 };
-use log_utils::log_formatter::BootTimeAccessor;
-use log_utils::{LogCommand, LogSubCommand};
+use log_utils::{BootTimeAccessor, LogCommand, LogSubCommand};
+use std::future::pending;
 use std::io::Write;
 
 /// Target-side symbolizer implementation.
@@ -91,6 +90,15 @@ async fn main() -> Result<(), Error> {
         writeln!(formatter.writer().stderr(), "{warning}")?;
     }
     cmd.maybe_set_interest(&log_settings, &realm_proxy).await?;
+    if let Some(LogSubCommand::SetSeverity(options)) = cmd.sub_command {
+        if options.no_persist {
+            // Block forever.
+            pending::<()>().await;
+        } else {
+            // Interest persisted, exit.
+            return Ok(());
+        }
+    }
     formatter.set_boot_timestamp(boot_ts);
     let _ = read_logs_from_socket(
         fuchsia_async::Socket::from_socket(receiver),

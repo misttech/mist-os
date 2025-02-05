@@ -5,6 +5,7 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_daemon_plugin") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   plugin_deps = [
@@ -19,4 +20,8 @@ ffx_plugin("ffx_daemon_plugin") {
   ]
 
   args_sources = [ "src/args.rs" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
 }

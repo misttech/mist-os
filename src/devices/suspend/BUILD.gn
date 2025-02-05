@@ -4,7 +4,7 @@
 
 group("drivers") {
   testonly = true
-  deps = [ "drivers/aml-suspend:drivers" ]
+  deps = [ "drivers/generic-suspend:drivers" ]
 }
 
 group("tests") {

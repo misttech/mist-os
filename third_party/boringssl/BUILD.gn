@@ -180,6 +180,9 @@ if (!is_kernel) {
       ":crypto",
       ":ssl",
     ]
+
+    # TODO(https://fxbug.dev/42180987): workaround for the toolchain issue.
+    deps += [ "//build/config/fuchsia:uses-outline-atomics-fxbug98632" ]
   }
 
   ##############

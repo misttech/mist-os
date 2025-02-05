@@ -212,7 +212,7 @@ impl RunningThread {
                         match CurrentTask::create_kernel_thread(
                             &mut locked,
                             &system_task,
-                            CString::new("[kthreadd]").unwrap(),
+                            CString::new("kthreadd").unwrap(),
                         ) {
                             Ok(task) => task,
                             Err(e) => {

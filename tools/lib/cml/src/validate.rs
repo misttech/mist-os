@@ -689,6 +689,12 @@ which is almost certainly a mistake: {}",
         }
 
         match (&use_.from, &use_.dependency) {
+            (Some(UseFromRef::Named(name)), _) if use_.service.is_some() => {
+                self.validate_component_child_or_collection_ref(
+                    "\"use\" source",
+                    &AnyRef::Named(name),
+                )?;
+            }
             (Some(UseFromRef::Named(name)), _) => {
                 self.validate_component_child_or_capability_ref(
                     "\"use\" source",
@@ -1343,7 +1349,7 @@ which is almost certainly a mistake: {}",
     ) -> Result<(), Error> {
         match component_ref {
             AnyRef::Named(name) => {
-                // Ensure we have a child defined by that name.
+                // Ensure we have a child or collection defined by that name.
                 if !self.all_children.contains_key(name) && !self.all_collections.contains(name) {
                     return Err(Error::validate(format!(
                         "{} \"{}\" does not appear in \"children\" or \"collections\"",
@@ -1382,7 +1388,7 @@ which is almost certainly a mistake: {}",
         }
     }
 
-    /// Validates that the given child component or capability exists.
+    /// Validates that the given child component, collection, or capability exists.
     ///
     /// - `reference_description` is a human-readable description of the reference used in error
     ///   message, such as `"offer" source`.
@@ -2978,7 +2984,7 @@ mod tests {
         assert_matches!(
             result,
             Err(Error::Parse { err, location: Some(l), filename: Some(f) })
-                if &err == "invalid value: string \"bad\", expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", dictionary path, or none" &&
+                if &err == "invalid value: string \"bad\", expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", \"#<collection-name>\", dictionary path, or none" &&
                 l == Location { line: 5, column: 21 } &&
                 f.ends_with("test.cml")
         );
@@ -3393,7 +3399,7 @@ mod tests {
                   { "protocol": "CoolFonts", "from": "bad" }
                 ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"bad\", expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", dictionary path, or none"
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"bad\", expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", \"#<collection-name>\", dictionary path, or none"
         ),
         test_cml_use_invalid_from_dictionary(
             json!({
@@ -3401,7 +3407,7 @@ mod tests {
                   { "protocol": "CoolFonts", "from": "bad/dict" }
                 ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"bad/dict\", expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", dictionary path, or none"
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"bad/dict\", expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", \"#<collection-name>\", dictionary path, or none"
         ),
         test_cml_use_from_missing_capability(
             json!({
@@ -6375,7 +6381,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"bad/a\", expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", dictionary path, or none"
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"bad/a\", expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", \"#<collection-name>\", dictionary path, or none"
         ),
         test_cml_dictionary_ref_invalid_path(
             json!({
@@ -6386,7 +6392,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"parent//a\", expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", dictionary path, or none"
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"parent//a\", expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", \"#<collection-name>\", dictionary path, or none"
         ),
         test_cml_dictionary_ref_too_long(
             json!({
@@ -6397,7 +6403,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid length 4096, expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", dictionary path, or none"
+            Err(Error::Parse { err, .. }) if &err == "invalid length 4096, expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", \"#<collection-name>\", dictionary path, or none"
         ),
         test_cml_capability_name(
             json!({

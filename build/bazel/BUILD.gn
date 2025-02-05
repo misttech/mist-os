@@ -5,6 +5,7 @@
 import("//build/assembly/developer_overrides.gni")
 import("//build/assembly/sshd_config.gni")
 import("//build/bazel/bazel_action.gni")
+import("//build/bazel/bazel_content_hashes.gni")
 import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/bazel_workspace.gni")
 import("//build/bazel/generate_content_hash_file.gni")
@@ -14,63 +15,13 @@ import("//build/config/clang/clang.gni")
 import("//build/images/vbmeta.gni")
 import("//build/info/info.gni")
 import("//build/product.gni")
-import("//build/toolchain/rbe.gni")
 import("//src/connectivity/policy/netcfg/delegated_network_provisioning.gni")
 
 assert(
     current_toolchain == default_toolchain,
     "This BUILD.gn file should only be parsed in the default toolchain, to prevent generating Bazel workspace multiple times.")
 
-action("generate_main_workspace") {
-  script = "//build/bazel/scripts/update_workspace.py"
-
-  # The update script tracks the file and directory entries of FUCHSIA_DIR
-  # and will update the workspace if they change (i.e. if a file or
-  # directory is added to / removed from FUCHSIA_DIR itself). However,
-  # there is no way for Ninja to track these changes, and thus no way
-  # to enforce the action to be run when this happens, even though these
-  # are rare occurences, that could happen in the following cases:
-  #
-  # - A developer manually adds or removes a file to/from FUCHSIA_DIR.
-  #   In this case, manually calling the script is needed, and this
-  #   can be done by invoking any `fx bazel ...` command (even
-  #   `fx bazel version`) or `fx build bazel_workspace`.
-  #
-  # - A `jiri update` modifies the content of FUCHSIA_DIR. Depend on
-  #   the top-level //.git/index file to detect this. Note that the
-  #   script will not necessarily update the workspace in this case,
-  #   this simply ensures that it is run to do its checks.
-  #
-  # - A manual `git checkout HEAD^ -- .` command will modify the local
-  #   workspace without modifying the index, so also depend on
-  #   //.git/HEAD to detect this.
-  #
-  inputs = [
-    "//.git/index",
-    "//.git/HEAD",
-
-    # The bazel prebuilt is an implicit input for the script.
-    "//prebuilt/third_party/bazel/${host_os}-${host_cpu}/bazel",
-
-    # The script expands these templates
-    "//build/bazel/templates/template.bazel.sh",
-    "//build/bazel/templates/template.bazelrc",
-    "//build/bazel/templates/template.remote_services.bazelrc",
-    "//build/bazel/templates/template.platform_mappings",
-
-    # The script reads this configuration file
-    "//build/bazel/config/main_workspace_top_dir",
-
-    # The script imports these python files
-    "//build/bazel/scripts/check_ninja_build_plan.py",
-    "//build/bazel/scripts/compute_content_hash.py",
-    "//build/bazel/scripts/get_git_head_commit.py",
-
-    # The script reads RBE configs
-    rewrapper_config_file,
-    reproxy_config_file,
-  ]
-
+group("generate_main_workspace") {
   # This dependency is needed to properly populate the @fuchsia_sdk repository.
   deps = [ "//sdk:bazel_in_tree_idk" ]
 
@@ -78,52 +29,6 @@ action("generate_main_workspace") {
   # (see https://fxbug.dev/42063353).
   # TODO(https://fxbug.dev/333907192): Remove this.
   deps += [ "//sdk:bazel_internal_only_idk" ]
-
-  depfile = "${target_gen_dir}/${target_name}.d"
-
-  outputs = [
-    # LINT.IfChange
-    "${bazel_main_top_dir}/bazel",
-    "${bazel_main_top_dir}/download_config_file",
-    "${bazel_main_top_dir}/generated-info.json",
-    "${bazel_main_top_dir}/workspace/.bazelrc",
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/args.json",
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/git",
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/jiri_snapshot.xml",
-
-    # The list of content hash files
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/bazel_rules_fuchsia.hash",
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/boringssl.hash",
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/com_google_googletest.hash",
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/fuchsia_clang.hash",
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/prebuilt_clang.hash",
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/prebuilt_python.hash",
-
-    # Other files.
-    "${bazel_main_top_dir}/workspace/platform_mappings",
-    "${bazel_main_top_dir}/workspace/WORKSPACE.bazel",
-
-    # LINT.ThenChange(scripts/update_workspace.py)
-  ]
-
-  args = [
-    # rebased_clang_prefix points to bin under clang root.
-    "--clang_dir",
-    get_path_info(rebased_clang_prefix, "dir"),
-    "--gn_output_dir",
-    rebase_path(root_build_dir, root_build_dir),
-    "--target_arch",
-    target_cpu,
-    "--depfile",
-    rebase_path(depfile, root_build_dir),
-    "--remote_download_outputs",
-    bazel_rbe_download_outputs,
-  ]
-
-  # The generated wrapper includes the absolute path of the Ninja output
-  # directory, which will be read by Bazel repository rules during workspace
-  # setup.
-  no_output_dir_leaks = false
 }
 
 # Generate a symlink to the @fuchsia_sdk repository, after ensuring it was
@@ -137,23 +42,13 @@ group("generate_fuchsia_sdk_repository") {
 generate_content_hash_file("fuchsia_in_tree_idk.hash") {
   source_paths = [ "$root_build_dir/sdk/exported/bazel_in_tree_idk" ]
   output = "${bazel_main_top_dir}/workspace/fuchsia_build_generated/fuchsia_in_tree_idk.hash"
-  deps = [
-    # For now ensure this is run after update_workspace.py to avoid the content
-    # of fuchsia_build_generated/ from being rewritten by it.
-    ":generate_main_workspace",
-    "//sdk:bazel_in_tree_idk",
-  ]
+  deps = [ "//sdk:bazel_in_tree_idk" ]
 }
 
 generate_content_hash_file("fuchsia_internal_only_idk.hash") {
   source_paths = [ "$root_build_dir/sdk/exported/bazel_internal_only_idk" ]
   output = "${bazel_main_top_dir}/workspace/fuchsia_build_generated/fuchsia_internal_only_idk.hash"
-  deps = [
-    # For now ensure this is run after update_workspace.py to avoid the content
-    # of fuchsia_build_generated/ from being rewritten by it.
-    ":generate_main_workspace",
-    "//sdk:bazel_internal_only_idk",
-  ]
+  deps = [ "//sdk:bazel_internal_only_idk" ]
 }
 
 # The @fuchsia_sdk repository is populated from the same content as @fuchsia_in_tree_idk
@@ -245,6 +140,14 @@ bazel_action("final_fuchsia_in_tree_sdk") {
   }
 }
 
+# Write the content of bazel_content_hash_definitions to a JSON file
+# at `gn gen` time.
+generated_file("bazel_content_hashes_json") {
+  outputs = [ "$root_build_dir/bazel_content_hashes.json" ]
+  contents = bazel_content_hash_definitions
+  output_conversion = "json"
+}
+
 # Generate content hash files for python and Clang toolchains.
 #
 # These will be used to trigger new runs of the bazel_sdk_test_xxx targets
@@ -265,28 +168,6 @@ generate_prebuilt_dir_content_hash(prebuilt_content_hash_targets.clang) {
   source_dir = get_path_info(clang_prefix, "dir")
   output = prebuilt_content_hash_files.clang
   cipd_name = "clang"
-}
-
-# Generate remote service configs into a bazelrc.
-action("remote_services_bazelrc") {
-  script = "//build/bazel/scripts/generate_services_bazelrc.py"
-  _output = "$target_out_dir/remote_services.bazelrc"
-  outputs = [ _output ]
-  _template = "//build/bazel/templates/template.remote_services.bazelrc"
-  _configs = [
-    "//build/rbe/fuchsia-reproxy.cfg",
-    "//build/rbe/fuchsia-rewrapper.cfg",
-  ]
-  inputs = [ _template ] + _configs
-  args = [
-           "--template",
-           rebase_path(_template, root_build_dir),
-           "--output",
-           rebase_path(_output, root_build_dir),
-           "--remote_download_outputs",
-           bazel_rbe_download_outputs,
-           "--cfgs",
-         ] + rebase_path(_configs, root_build_dir)
 }
 
 # Pass the map of which developer overrides to use with which assembly label to
@@ -334,7 +215,6 @@ group("bazel_action_allowlist") {
   visibility += [
     "//build/images/updates/tests:bazel_pb_bazel_build_group",
     "//src/power/testing/system-integration/msd-arm-mali/custom-product:product_bundle_bazel_build_group",
-    "//src/power/testing/system-integration/storage/custom-product:product_bundle_bazel_build_group",
   ]
 
   # Bazel build related targets
@@ -342,9 +222,11 @@ group("bazel_action_allowlist") {
     "//build/bazel:final_fuchsia_in_tree_idk",
     "//build/bazel:final_fuchsia_in_tree_sdk",
     "//build/bazel/assembly:verify_assembly_configs.bazel_build_group",
+    "//build/bazel/bazel_sdk:in_tree_fuchsia_sdk",
     "//build/bazel/bazel_sdk:verify_fuchsia_sdk_repository",
     "//build/bazel/bazel_sdk/docs:docs.bazel_build_group",
     "//build/bazel/examples:examples",
+    "//build/bazel/examples/hello_world:hello_world",
   ]
 
   visibility += [ "//vendor/*" ]
@@ -360,6 +242,7 @@ group("bazel_action_allowlist") {
     "//examples/drivers/transport/driver/v2:parent_bazel_package.bazel_build",
     "//sdk/lib/driver/devicetree/examples/example-board:bazel_package.bazel_build",
     "//sdk/lib/driver/devicetree/examples/example-board:example-board-test-package.bazel_build",
+    "//src:bazel_tests.bazel_build",
     "//src/connectivity/bluetooth/core/bt-host:bazel_test_pkg.bazel_build",
     "//src/connectivity/bluetooth/core/bt-host:bt-host.bazel_build",
     "//src/connectivity/bluetooth/core/bt-host/att:test_pkg.bazel_build",

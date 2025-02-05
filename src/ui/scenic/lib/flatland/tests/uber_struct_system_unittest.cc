@@ -271,7 +271,7 @@ TEST(UberStructSystemTest, UpdateInstancesConsumesPreviousPresents) {
   EXPECT_EQ(iter->second->local_topology[0].handle, kTransform3);
 
   // Ensure there are no queued updates left.
-  EXPECT_EQ(queue->GetPendingSize(), 0ul);
+  EXPECT_EQ(queue->Pop(), std::nullopt);
 }
 
 TEST(UberStructSystemTest, BasicTopologyRetrieval) {

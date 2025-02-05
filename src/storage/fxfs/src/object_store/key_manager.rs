@@ -161,7 +161,7 @@ impl UnwrapResult {
         if cancelled {
             set_error(zx::Status::CANCELED);
         } else if let Err(error) = &result {
-            error!(?error, oid = object_id, "Failed to unwrap keys");
+            error!(error:?, oid = object_id; "Failed to unwrap keys");
             set_error(*error);
         }
         if let Entry::Occupied(o) = guard.unwrapping.entry(object_id) {
@@ -287,7 +287,7 @@ impl KeyManager {
             .take()
             .unwrap()
             .map_err(|error| {
-                error!(?error, "Failed to get wrapped keys");
+                error!(error:?; "Failed to get wrapped keys");
                 zx::Status::INTERNAL
             })
             .and_then(|keys| async move { crypt.unwrap_keys(&keys, object_id).await })

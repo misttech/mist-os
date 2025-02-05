@@ -23,12 +23,12 @@ rustc_binary("bin") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:itertools",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:serde_json5",
-    "//third_party/rust_crates:tracing",
   ]
   test_deps = [
     "//src/lib/fuchsia",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
   sources = [ "src/main.rs" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]

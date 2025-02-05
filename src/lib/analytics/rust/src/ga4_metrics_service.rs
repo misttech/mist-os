@@ -7,6 +7,7 @@ use fuchsia_hyper::{new_https_client, HttpsClient};
 use hyper::body::HttpBody;
 use hyper::{Body, Method, Request};
 use std::collections::{BTreeMap, HashMap};
+use std::ops::{Deref, DerefMut};
 
 use crate::env_info::{get_arch, get_os, is_googler};
 use crate::ga4_event::*;
@@ -16,18 +17,49 @@ use crate::notice::{BRIEF_NOTICE, FULL_NOTICE, GOOGLER_ENHANCED_NOTICE, SHOW_NOT
 const DOMAIN: &str = "www.google-analytics.com";
 const ENDPOINT: &str = "/mp/collect";
 
+#[derive(Clone)]
+enum GA4MetricsServiceState {
+    OptedIn(MetricsState, HttpsClient),
+    OptedOut(MetricsState),
+}
+
+impl Deref for GA4MetricsServiceState {
+    type Target = MetricsState;
+
+    fn deref(&self) -> &MetricsState {
+        match self {
+            GA4MetricsServiceState::OptedIn(state, _) | GA4MetricsServiceState::OptedOut(state) => {
+                state
+            }
+        }
+    }
+}
+
+impl DerefMut for GA4MetricsServiceState {
+    fn deref_mut(&mut self) -> &mut MetricsState {
+        match self {
+            GA4MetricsServiceState::OptedIn(state, _) | GA4MetricsServiceState::OptedOut(state) => {
+                state
+            }
+        }
+    }
+}
+
 /// The implementation of the GA4 Measurement Protocol metrics public api.
 #[derive(Clone)]
 pub struct GA4MetricsService {
-    state: MetricsState,
-    client: HttpsClient,
+    state: GA4MetricsServiceState,
     post: Post,
 }
 
 impl GA4MetricsService {
     pub(crate) fn new(state: MetricsState) -> Self {
-        let mut svc =
-            GA4MetricsService { state: state, client: new_https_client(), post: Post::default() };
+        let state = if state.is_opted_in() {
+            GA4MetricsServiceState::OptedIn(state, new_https_client())
+        } else {
+            GA4MetricsServiceState::OptedOut(state)
+        };
+        let mut svc = GA4MetricsService { state, post: Post::default() };
         svc.init_post();
         svc
     }
@@ -175,25 +207,28 @@ impl GA4MetricsService {
             return Ok(());
         }
         self.rewrite_ua_ffx_known_batch_to_ga4();
+
+        let GA4MetricsServiceState::OptedIn(_, ref client) = self.state else { unreachable!() };
+
         let _ = self.post.validate()?;
         let post_body = self.post.to_json();
         let url = self.get_url();
-        tracing::trace!(%url, %post_body, "POSTING GA4 ANALYTICS");
+        log::trace!(url:%, post_body:%; "POSTING GA4 ANALYTICS");
 
         let req = Request::builder()
             .method(Method::POST)
             .uri(url)
             .header("Content-Type", "application/json")
             .body(Body::from(post_body))?;
-        let res = self.client.request(req).await;
+        let res = client.request(req).await;
         Ok(match res {
             Ok(mut res) => {
-                tracing::trace!("GA 4 Analytics response: {}", res.status());
+                log::trace!("GA 4 Analytics response: {}", res.status());
                 while let Some(chunk) = res.body_mut().data().await {
-                    tracing::trace!(?chunk);
+                    log::trace!(chunk:?; "");
                 }
             }
-            Err(e) => tracing::trace!("Error posting GA 4 analytics: {}", e),
+            Err(e) => log::trace!("Error posting GA 4 analytics: {}", e),
         })
     }
 
@@ -206,7 +241,7 @@ impl GA4MetricsService {
             && self.post.events[0].name.eq_ignore_ascii_case("invoke")
             && self.post.events[1].name.eq_ignore_ascii_case("timing")
         {
-            tracing::trace!("Rewriting ffx batch invoke to ga4 post invoke");
+            log::trace!("Rewriting ffx batch invoke to ga4 post invoke");
             let events = &mut self.post.events;
             let invoke_event = &mut events[0].clone();
             let timing_event = events.remove(1);
@@ -273,7 +308,10 @@ fn is_googler_as_int() -> u64 {
 
 impl Default for GA4MetricsService {
     fn default() -> Self {
-        Self { state: MetricsState::default(), client: new_https_client(), post: Post::default() }
+        Self {
+            state: GA4MetricsServiceState::OptedIn(MetricsState::default(), new_https_client()),
+            post: Post::default(),
+        }
     }
 }
 
@@ -298,21 +336,17 @@ mod tests {
         ga4_key: String,
         disabled: bool,
     ) -> GA4MetricsService {
-        GA4MetricsService {
-            state: MetricsState::from_config(
-                app_support_dir_path,
-                app_name,
-                build_version,
-                sdk_version,
-                ga_product_code,
-                ga4_product_code,
-                ga4_key,
-                disabled,
-                None,
-            ),
-            client: new_https_client(),
-            post: Post::default(),
-        }
+        GA4MetricsService::new(MetricsState::from_config(
+            app_support_dir_path,
+            app_name,
+            build_version,
+            sdk_version,
+            ga_product_code,
+            ga4_product_code,
+            ga4_key,
+            disabled,
+            None,
+        ))
     }
 
     #[test]

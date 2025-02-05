@@ -14,7 +14,7 @@ use fuchsia_component_test::{
 };
 use futures::stream::StreamExt;
 use futures::{TryFutureExt, TryStreamExt};
-use tracing::info;
+use log::info;
 use zx::{self as zx, MonotonicDuration};
 use {
     fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_bredr_test as bredr_test,

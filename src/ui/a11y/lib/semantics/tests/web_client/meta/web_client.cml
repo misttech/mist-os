@@ -26,7 +26,6 @@
                 "fuchsia.fonts.Provider",
                 "fuchsia.intl.PropertyProvider",
                 "fuchsia.kernel.VmexResource",
-                "fuchsia.logger.LogSink",
                 "fuchsia.memorypressure.Provider",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.posix.socket.Provider",

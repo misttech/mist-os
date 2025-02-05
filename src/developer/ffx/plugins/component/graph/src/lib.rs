@@ -8,13 +8,13 @@ use errors::FfxError;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_graph_args::ComponentGraphCommand;
 use fho::{FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_developer_remotecontrol as rc;
+use target_holders::RemoteControlProxyHolder;
 
 #[derive(FfxTool)]
 pub struct GraphTool {
     #[command]
     cmd: ComponentGraphCommand,
-    rcs: rc::RemoteControlProxy,
+    rcs: RemoteControlProxyHolder,
 }
 
 fho::embedded_plugin!(GraphTool);

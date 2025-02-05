@@ -16,8 +16,8 @@ use futures::lock::{Mutex, MutexGuard};
 use futures::prelude::*;
 use futures::select;
 use futures::stream::FuturesUnordered;
+use log::{error, info, warn};
 use std::sync::Arc;
-use tracing::{error, info, warn};
 
 pub mod connection_selection;
 pub mod roaming;

@@ -8,6 +8,7 @@
 #include <lib/zx/vmo.h>
 #include <zircon/types.h>
 
+#include <algorithm>
 #include <sstream>
 
 #include <rapidjson/document.h>
@@ -243,8 +244,13 @@ inline fpromise::result<LogMessage, std::string> JsonToLogMessage(rapidjson::Val
   }
 
   // If there are no tags, automatically tag with the component name derived from the moniker.
-  if (ret.tags.size() == 0 && !moniker_string.empty()) {
-    ret.tags.emplace_back(GetComponentName(moniker_string));
+  auto component_name = GetComponentName(moniker_string);
+  if ((ret.tags.size() == 0 && !component_name.empty()) ||
+      (ret.tags.size() && (std::ranges::find(ret.tags, component_name) == ret.tags.end()) &&
+       !component_name.empty())) {
+    if (component_name != ".") {
+      ret.tags.emplace(ret.tags.begin(), component_name);
+    }
   }
 
   if (dropped_logs > 0) {

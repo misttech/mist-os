@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_process as fprocess;
-use tracing::error;
+use log::error;
 
 /// This main() is for the standalone devfs binary, which is used by the test component.
 #[fuchsia::main]
@@ -26,7 +26,7 @@ async fn main() {
         panic!("[devfs] could not obtain lifecycle handle");
     };
     if let Err(err) = devfs::main(ns_entries, directory_request.into(), lifecycle.into()).await {
-        error!(%err, "[devfs] error");
+        error!(err:%; "[devfs] error");
         std::process::exit(1);
     }
 }

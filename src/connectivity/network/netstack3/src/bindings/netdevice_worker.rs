@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::HashMap;
 use std::convert::{TryFrom as _, TryInto as _};
 use std::num::TryFromIntError;
 use std::sync::Arc;
@@ -16,9 +15,9 @@ use net_types::ethernet::Mac;
 use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6, Ipv6Addr, Mtu, Subnet};
 use net_types::UnicastAddr;
 use netstack3_core::device::{
-    DeviceProvider, EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice,
-    EthernetWeakDeviceId, MaxEthernetFrameSize, PureIpDevice, PureIpDeviceCreationProperties,
-    PureIpDeviceId, PureIpDeviceReceiveFrameMetadata, PureIpWeakDeviceId, RecvEthernetFrameMeta,
+    EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
+    MaxEthernetFrameSize, PureIpDevice, PureIpDeviceCreationProperties, PureIpDeviceId,
+    PureIpDeviceReceiveFrameMetadata, PureIpWeakDeviceId, RecvEthernetFrameMeta,
 };
 use netstack3_core::ip::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
@@ -468,34 +467,31 @@ impl DeviceHandler {
         };
         let Netstack { interfaces_event_sink, neighbor_event_sink, ctx } = ns;
 
-        // Check if there already exists an interface with this name.
-        // Interface names are unique.
-        let name = name
-            .map(|name| {
-                if let Some(_device_info) = ctx.bindings_ctx().devices.get_device_by_name(&name) {
-                    return Err(Error::DuplicateName(name));
-                };
-                Ok(name)
-            })
-            .transpose()?;
-
         let max_frame_size =
             mtu.try_into().map_err(|TryFromIntError { .. }| Error::ConfigurationNotSupported)?;
 
         let port_class = fnet_interfaces_ext::PortClass::try_from(hw_port_class)
             .map_err(Error::InvalidPortClass)?;
 
+        let (binding_id, binding_id_alloc, name) = match name {
+            None => ctx.bindings_ctx().devices.generate_and_reserve_name_and_alloc_new_id(
+                match wire_format {
+                    PortWireFormat::Ethernet => "eth",
+                    PortWireFormat::Ip => "ip",
+                },
+            ),
+            Some(name) => {
+                match ctx.bindings_ctx().devices.try_reserve_name_and_alloc_new_id(name.clone()) {
+                    Err(devices::NameNotAvailableError) => return Err(Error::DuplicateName(name)),
+                    Ok((id, alloc)) => (id, alloc, name),
+                }
+            }
+        };
+
         // Do the rest of the work in a closure so we don't accidentally add
         // errors after the binding ID is already allocated. This part of the
         // function should be infallible.
         let finalize = move || async move {
-            let binding_id = ctx.bindings_ctx().devices.alloc_new_id();
-
-            let name = name.unwrap_or_else(|| match wire_format {
-                PortWireFormat::Ethernet => format!("eth{}", binding_id),
-                PortWireFormat::Ip => format!("ip{}", binding_id),
-            });
-
             let tx_notifier = NeedsDataNotifier::default();
             let tx_watcher = tx_notifier.watcher();
             let static_netdevice_info = devices::StaticNetdeviceInfo {
@@ -511,17 +507,15 @@ impl DeviceHandler {
             };
             let dynamic_netdevice_info_builder = |mtu: Mtu| devices::DynamicNetdeviceInfo {
                 phy_up,
-                common_info: devices::DynamicCommonInfo {
+                common_info: devices::DynamicCommonInfo::new(
                     mtu,
-                    admin_enabled: false,
-                    events: crate::bindings::create_interface_event_producer(
+                    crate::bindings::create_interface_event_producer(
                         interfaces_event_sink,
                         binding_id,
                         crate::bindings::InterfaceProperties { name: name.clone(), port_class },
                     ),
-                    control_hook: control_hook,
-                    addresses: HashMap::new(),
-                },
+                    control_hook,
+                ),
             };
 
             let core_id = match properties {
@@ -567,12 +561,26 @@ impl DeviceHandler {
             };
 
             let tx_task = TxTask::new(ctx.clone(), core_id.downgrade(), tx_watcher);
-            netstack3_core::for_any_device_id!(DeviceId, DeviceProvider, D, &core_id, device => {
-                ctx.api().transmit_queue::<D>().set_configuration(
-                    device,
-                    netstack3_core::device::TransmitQueueConfiguration::Fifo,
-                );
-            });
+            match &core_id {
+                DeviceId::PureIp(device) => {
+                    ctx.api().transmit_queue::<PureIpDevice>().set_configuration(
+                        device,
+                        netstack3_core::device::TransmitQueueConfiguration::Fifo,
+                    );
+                }
+                DeviceId::Ethernet(device) => {
+                    ctx.api().transmit_queue::<EthernetLinkDevice>().set_configuration(
+                        device,
+                        netstack3_core::device::TransmitQueueConfiguration::Fifo,
+                    );
+                }
+                DeviceId::Loopback(device) => {
+                    unreachable!("loopback device should not be backed by netdevice: {device:?}")
+                }
+                DeviceId::Blackhole(device) => {
+                    unreachable!("blackhole device should not be backed by netdevice: {device:?}")
+                }
+            }
             add_initial_routes(ctx.bindings_ctx(), &core_id).await;
 
             let ip_config = IpDeviceConfigurationUpdate {
@@ -615,7 +623,7 @@ impl DeviceHandler {
                 .unwrap();
 
             info!("created interface {:?}", core_id);
-            ctx.bindings_ctx().devices.add_device(binding_id, core_id);
+            ctx.bindings_ctx().devices.add_device(binding_id_alloc, core_id);
 
             (binding_id, tx_task)
         };

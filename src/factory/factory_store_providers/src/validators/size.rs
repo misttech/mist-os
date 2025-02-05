@@ -130,7 +130,7 @@ impl Validator for SizeValidator {
     /// Any file passed to this validator whose name is not associated with a size constraint will
     /// result in a `ValidatorError::FailedToValidate` error.
     fn validate(&self, file_name: &str, contents: &[u8]) -> Result<(), ValidatorError> {
-        tracing::info!("Validating size of {}", file_name);
+        log::info!("Validating size of {}", file_name);
 
         let size_constraint =
             self.file_sizes.get(file_name).ok_or_else(|| ValidatorError::FailedToValidate {

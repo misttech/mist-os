@@ -151,7 +151,7 @@ void dlog_init_early();
 // On failure, the debuglog subsystem is left in an undefined state.
 //
 // Returns ZX_OK on success.
-zx_status_t dlog_shutdown(zx_time_t deadline);
+zx_status_t dlog_shutdown(zx_instant_mono_t deadline);
 
 // Called as soon as command line parsing is available to check for any kernel
 // command line options that may affect the debug log.

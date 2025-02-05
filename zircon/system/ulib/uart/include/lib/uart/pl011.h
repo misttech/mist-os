@@ -15,6 +15,7 @@
 
 #include <hwreg/bitfields.h>
 
+#include "interrupt.h"
 #include "uart.h"
 
 // PrimeCell® UART (PL011) Technical Reference Manual
@@ -152,7 +153,7 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_PL011_UART, zbi_dcfg
 
   static constexpr auto kDevicetreeBindings =
       cpp20::to_array<std::string_view>({"arm,primecell", "arm,pl011"});
-  static constexpr std::string_view config_name() { return "pl011"; }
+  static constexpr std::string_view kConfigName = "pl011";
 
   template <typename... Args>
   explicit Driver(Args&&... args) : Base(std::forward<Args>(args)...) {}
@@ -236,7 +237,7 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_PL011_UART, zbi_dcfg
       bool full = false;
       while (!full && !FlagRegister::Get().ReadFrom(io.io()).rx_fifo_empty()) {
         // Read the character if there's a place to put it.
-        rx(
+        auto rx_irq = RxInterrupt(
             lock,  //
             [&]() { return DataRegister::Get().ReadFrom(io.io()).data(); },
             [&]() {
@@ -245,10 +246,12 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_PL011_UART, zbi_dcfg
               EnableRxInterrupt(io, false);
               full = true;
             });
+        rx(rx_irq);
       }
     }
     if (misr.tx()) {
-      tx(lock, waiter, [&]() { EnableTxInterrupt(io, false); });
+      auto tx_irq = TxInterrupt(lock, waiter, [&]() { EnableTxInterrupt(io, false); });
+      tx(tx_irq);
     }
   }
 };

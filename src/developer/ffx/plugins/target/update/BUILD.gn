@@ -5,12 +5,12 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_update") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
   args_with_unit_tests = true
   deps = [
-    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
     "//sdk/fidl/fuchsia.pkg.rewrite:fuchsia.pkg.rewrite_rust",
@@ -21,7 +21,8 @@ ffx_plugin("ffx_update") {
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/fho:lib",
-    "//src/developer/ffx/lib/target:lib",
+    "//src/developer/ffx/lib/target/connector:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/timeout:lib",
     "//src/developer/ffx/plugins/repository/server/start:ffx_repository_server_start",
     "//src/developer/ffx/plugins/repository/server/start:ffx_repository_server_start_args",
@@ -40,6 +41,8 @@ ffx_plugin("ffx_update") {
   ]
 
   test_deps = [
+    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
+    "//src/developer/ffx/lib/target:lib",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/sys/pkg/testing/mock-installer",
@@ -47,6 +50,11 @@ ffx_plugin("ffx_update") {
   ]
 
   args_test_deps = [ "//third_party/rust_crates:assert_matches" ]
+  args_deps = [
+    "//src/developer/ffx/config:lib",
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
 
   args_sources = [ "src/args.rs" ]
 

@@ -19,8 +19,14 @@ use crate::vfs::{
     default_ioctl, CheckAccessReason, FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr,
     LookupContext, Message,
 };
-use ebpf::{EbpfRunContext, FieldMapping, StructMapping};
-use ebpf_api::{get_socket_filter_helpers, ProgramType, SocketFilterContext, SK_BUF_ID};
+use ebpf::{
+    BpfProgramContext, BpfValue, CbpfConfig, DataWidth, FieldMapping, Packet, ProgramArgument,
+    StructMapping, Type,
+};
+use ebpf_api::{
+    get_socket_filter_helpers, PinnedMap, ProgramType, SocketFilterContext, SK_BUF_ID, SK_BUF_TYPE,
+    SOCKET_FILTER_CBPF_CONFIG,
+};
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -36,7 +42,7 @@ use starnix_uapi::{
     SO_PASSCRED, SO_PEERCRED, SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR, SO_REUSEPORT, SO_SNDBUF,
 };
 use std::sync::{Arc, LazyLock};
-use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
+use zerocopy::IntoBytes;
 
 // From unix.go in gVisor.
 const SOCKET_MIN_SIZE: usize = 4 << 10;
@@ -925,8 +931,11 @@ impl UnixSocketInner {
                 return Some(message);
             };
             let mut context = UnixSocketEbpfHelpersContext {};
+
+            // TODO(https://fxbug.dev/385015056): Fill in SkBuf.
             let mut sk_buf = SkBuf::default();
-            let s = bpf_program.run(&mut context, &mut sk_buf);
+
+            let s = bpf_program.program.run(&mut context, &mut sk_buf);
             if s == 0 {
                 None
             } else {
@@ -989,7 +998,7 @@ where
 
 // Packet buffer representation used for eBPF filters.
 #[repr(C)]
-#[derive(Copy, Clone, IntoBytes, Immutable, KnownLayout, FromBytes, Default)]
+#[derive(Default)]
 struct SkBuf {
     // `data` and `data_end` fields in `__sk_buff` are remapped to the 64-bit fields below.
     sk_buff: __sk_buff,
@@ -997,6 +1006,13 @@ struct SkBuf {
     // Actual references to the buffer, remapped from the original 32-bit fields above.
     data: uref<u8>,
     data_end: uref<u8>,
+}
+
+impl Packet for &mut SkBuf {
+    fn load(&self, _offset: i32, _width: DataWidth) -> Option<BpfValue> {
+        // TODO(https://fxbug.dev/385015056): Implement packet access.
+        None
+    }
 }
 
 static SK_BUF_MAPPING: LazyLock<StructMapping> = LazyLock::new(|| StructMapping {
@@ -1028,9 +1044,18 @@ impl SocketFilterContext for UnixSocketEbpfHelpersContext {
     }
 }
 
+impl ProgramArgument for &'_ mut SkBuf {
+    fn get_type() -> &'static Type {
+        &*SK_BUF_TYPE
+    }
+}
+
 struct UnixSocketEbpfContext {}
-impl EbpfRunContext for UnixSocketEbpfContext {
-    type Context<'a> = UnixSocketEbpfHelpersContext;
+impl BpfProgramContext for UnixSocketEbpfContext {
+    type RunContext<'a> = UnixSocketEbpfHelpersContext;
+    type Packet<'a> = &'a mut SkBuf;
+    type Map = PinnedMap;
+    const CBPF_CONFIG: &'static CbpfConfig = &SOCKET_FILTER_CBPF_CONFIG;
 }
 
 type UnixSocketFilter = LinkedProgram<UnixSocketEbpfContext>;

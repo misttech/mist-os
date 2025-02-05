@@ -49,13 +49,13 @@ class MappedMutexGuard : public Guard<::Mutex> {
       : Guard{AdoptLock, ktl::move(adopt)}, data_{data} {}
 
   MappedMutexGuard(MappedMutexGuard&& other)
-      : Guard{AdoptLock, ktl::move(other.take())}, data_{other.data_} {
+      : Guard{AdoptLock, ktl::move(other)}, data_{other.data_} {
     other.data_ = nullptr;
   }
 
   MappedMutexGuard& operator=(MappedMutexGuard&& other) {
     if (this != &other) {
-      Guard::operator=(ktl::move(other.take()));
+      // Guard::operator=(ktl::move(other.take()));
       data_ = other.data_;
       other.data_ = nullptr;
     }
@@ -87,13 +87,13 @@ class MutexGuard : public Guard<::Mutex> {
   __WARN_UNUSED_CONSTRUCTOR explicit MutexGuard(Mutex<Data>* mtx)
       : Guard{&mtx->lock_}, data_{&mtx->data_} {}
 
-  MutexGuard(MutexGuard&& other) : Guard{AdoptLock, ktl::move(other.take())}, data_{other.data_} {
+  MutexGuard(MutexGuard&& other) : Guard{AdoptLock, ktl::move(other)}, data_{other.data_} {
     other.data_ = nullptr;
   }
 
   MutexGuard& operator=(MutexGuard&& other) {
     if (this != &other) {
-      Guard::operator=(ktl::move(other.take()));
+      // Guard::operator=(ktl::move(other.take()));
       data_ = other.data_;
       other.data_ = nullptr;
       return *this;
@@ -103,7 +103,7 @@ class MutexGuard : public Guard<::Mutex> {
   template <typename U, typename F>
   static MappedMutexGuard<U> map(MutexGuard&& self, F&& f) __TA_NO_THREAD_SAFETY_ANALYSIS {
     auto* data = f(self.data_);
-    return MappedMutexGuard<U>(ktl::move(self.take()), data);
+    return MappedMutexGuard<U>(ktl::move(self), data);
   }
 
   Data* operator->() const { return data_; }
@@ -161,7 +161,7 @@ class RwLockGuard : public Guard<BrwLockPi, Option> {
       : Guard<BrwLockPi, Option>(&mtx->lock_), mtx_(mtx) {}
 
   RwLockGuard(RwLockGuard&& other) noexcept
-      : Guard<BrwLockPi, Option>(AdoptLock, ktl::move(other.take())), mtx_(other.mtx_) {
+      : Guard<BrwLockPi, Option>(AdoptLock, ktl::move(other)), mtx_(other.mtx_) {
     other.mtx_ = nullptr;
   }
 

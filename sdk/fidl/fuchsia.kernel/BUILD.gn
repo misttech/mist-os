@@ -15,7 +15,6 @@ fidl("fuchsia.kernel") {
     "debug-resource.fidl",
     "debuglog-resource.fidl",
     "energy-info-resource.fidl",
-    "framebuffer-resource.fidl",
     "hypervisor-resource.fidl",
     "info-resource.fidl",
     "iommu-resource.fidl",
@@ -32,6 +31,7 @@ fidl("fuchsia.kernel") {
     "profile-resource.fidl",
     "root-job.fidl",
     "smc-resource.fidl",
+    "stall-resource.fidl",
     "vmex-resource.fidl",
   ]
 

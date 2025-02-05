@@ -39,7 +39,7 @@ pub fn node_to_device_property(
         // The duplicate key needs to be fixed since this is incorrect and is working by luck.
         if key != BIND_PROTOCOL_KEY {
             if device_properties.contains_key(&key) && device_properties.get(&key) != Some(&value) {
-                tracing::error!(
+                log::error!(
                     "Node property key {:?} contains multiple values: {:?} and {:?}",
                     key,
                     device_properties.get(&key),
@@ -80,7 +80,7 @@ pub fn get_composite_rules_from_composite_driver<'a>(
 ) -> Result<&'a DecodedCompositeBindRules, i32> {
     match &composite_driver.bind_rules {
         bind::interpreter::decode_bind_rules::DecodedRules::Normal(_) => {
-            tracing::error!("Cannot extract composite bind rules from a non-composite driver.");
+            log::error!("Cannot extract composite bind rules from a non-composite driver.");
             Err(Status::INTERNAL.into_raw())
         }
         bind::interpreter::decode_bind_rules::DecodedRules::Composite(rules) => Ok(rules),

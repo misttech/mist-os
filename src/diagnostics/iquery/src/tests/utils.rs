@@ -6,7 +6,7 @@
 
 use argh::FromArgs;
 use fuchsia_component_test::{
-    Capability, ChildOptions, ChildRef, RealmBuilder, RealmInstance, Ref, Route, SubRealmBuilder,
+    Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route, SubRealmBuilder,
 };
 use iquery::command_line::CommandLine;
 use iquery::commands::*;
@@ -59,7 +59,6 @@ impl TestComponent {
 struct TestBuilder {
     builder: RealmBuilder,
     test_realm: SubRealmBuilder,
-    archivist_ref: ChildRef,
 }
 
 impl TestBuilder {
@@ -73,11 +72,15 @@ impl TestBuilder {
             .add_child("archivist", ARCHIVIST_URL, ChildOptions::new().eager())
             .await
             .expect("add child archivist");
+
+        let capabilities_from_parent = Route::new()
+            .capability(Capability::protocol::<ftracing::RegistryMarker>().optional())
+            .capability(Capability::dictionary("diagnostics"));
+
         builder
             .add_route(
-                Route::new()
-                    .capability(Capability::protocol::<flogger::LogSinkMarker>())
-                    .capability(Capability::protocol::<ftracing::RegistryMarker>().optional())
+                capabilities_from_parent
+                    .clone()
                     .capability(
                         Capability::event_stream("capability_requested").with_scope(&test_realm),
                     )
@@ -90,15 +93,14 @@ impl TestBuilder {
         // Routes for Archivist
         test_realm
             .add_route(
-                Route::new()
-                    .capability(Capability::protocol::<flogger::LogSinkMarker>())
-                    .capability(Capability::protocol::<ftracing::RegistryMarker>().optional())
+                capabilities_from_parent
                     .capability(Capability::event_stream("capability_requested"))
                     .from(Ref::parent())
                     .to(&archivist),
             )
             .await
             .expect("added routes from parent to archivist");
+
         test_realm
             .add_route(
                 Route::new()
@@ -108,6 +110,25 @@ impl TestBuilder {
             )
             .await
             .expect("added routes from archivist to parent");
+
+        test_realm
+            .add_capability(cm_rust::CapabilityDecl::Dictionary(cm_rust::DictionaryDecl {
+                name: "diagnostics".parse().unwrap(),
+                source_path: None,
+            }))
+            .await
+            .expect("added diagnostics dictionary");
+
+        test_realm
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol::<finspect::InspectSinkMarker>())
+                    .capability(Capability::protocol::<flogger::LogSinkMarker>())
+                    .from(&archivist)
+                    .to(Ref::dictionary("self/diagnostics")),
+            )
+            .await
+            .expect("route InspectSink and LogSink to self/diagnostics");
 
         // The realm query scoped to the test
         test_realm
@@ -131,7 +152,7 @@ impl TestBuilder {
             .await
             .expect("Can route realm query to parent");
 
-        Self { builder, test_realm, archivist_ref: archivist }
+        Self { builder, test_realm }
     }
 
     async fn start(self) -> TestInExecution {
@@ -152,20 +173,12 @@ impl TestBuilder {
     async fn add_child(&mut self, name: &str, url: &str) {
         let child_ref =
             self.test_realm.add_child(name, url, ChildOptions::new().eager()).await.unwrap();
+
         self.test_realm
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol::<finspect::InspectSinkMarker>())
-                    .from(&self.archivist_ref)
-                    .to(&child_ref),
-            )
-            .await
-            .unwrap();
-        self.test_realm
-            .add_route(
-                Route::new()
-                    .capability(Capability::protocol::<flogger::LogSinkMarker>())
-                    .from(Ref::parent())
+                    .capability(Capability::dictionary("diagnostics"))
+                    .from(Ref::self_())
                     .to(&child_ref),
             )
             .await

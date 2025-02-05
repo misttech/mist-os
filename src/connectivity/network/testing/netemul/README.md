@@ -265,11 +265,11 @@ management APIs.
 The `sync-manager` is a support component used to synchronize components running
 in a Netemul Runner test “out-of-band”, i.e. without direct communication over
 FIDL APIs or the network. For example, in
-[this test](https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/network/testing/netemul/configurable-netstack/tests/meta/configurable-netstack-test.cml;drc=1013f1e00fb6f80b32affff6867fc079b5b36035),
+[this test](https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/network/testing/netemul/configurable-netstack/tests/meta/configurable-netstack-test.shard.cml;drc=1013f1e00fb6f80b32affff6867fc079b5b36035),
 the client uses the `sync-manager` to wait until the server is accepting
 connections before attempting to connect to the server, because attempts to
 connect before the server has had a chance to bind to its
-[assigned IP addresses](https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/network/testing/netemul/configurable-netstack/tests/meta/configurable-netstack-test.cml;l=66;drc=1013f1e00fb6f80b32affff6867fc079b5b36035)
+[assigned IP addresses](https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/network/testing/netemul/configurable-netstack/tests/meta/configurable-netstack-test.shard.cml;l=66;drc=1013f1e00fb6f80b32affff6867fc079b5b36035)
 would fail. To synchronize, the server
 [joins the bus](https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/network/testing/netemul/configurable-netstack/tests/src/server.rs;l=19;drc=1013f1e00fb6f80b32affff6867fc079b5b36035)
 once it’s bound, and the client

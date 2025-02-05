@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assembly_container::{FileType, WalkPaths};
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use camino::Utf8PathBuf;
 use schemars::JsonSchema;
@@ -91,17 +92,29 @@ impl std::fmt::Display for PackageSet {
 
 /// Details about a package that contains drivers.
 #[derive(
-    Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+    Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
 )]
 #[serde(deny_unknown_fields)]
 pub struct DriverDetails {
     /// The package containing the driver.
     #[schemars(schema_with = "path_schema")]
-    pub package: Utf8PathBuf,
+    #[file_relative_paths]
+    pub package: FileRelativePathBuf,
 
     /// The driver components within the package, e.g. meta/foo.cm.
     #[schemars(schema_with = "vec_path_schema")]
     pub components: Vec<Utf8PathBuf>,
+}
+
+impl WalkPaths for DriverDetails {
+    fn walk_paths_with_dest<F: assembly_container::WalkPathsFn>(
+        &mut self,
+        found: &mut F,
+        dest: Utf8PathBuf,
+    ) -> anyhow::Result<()> {
+        found(self.package.as_mut_utf8_pathbuf(), dest.join("package"), FileType::PackageManifest)?;
+        Ok(())
+    }
 }
 
 /// This defines one or more drivers in a package, and which package set they

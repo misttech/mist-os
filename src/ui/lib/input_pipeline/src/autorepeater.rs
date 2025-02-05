@@ -166,7 +166,7 @@ where
     for<'a> &'a T: std::fmt::Debug,
     T: 'static + Sync + Send,
 {
-    tracing::debug!("unbounded_send_logged: {:?}", &event);
+    log::debug!("unbounded_send_logged: {:?}", &event);
     sink.unbounded_send(event)?;
     Ok(())
 }
@@ -182,7 +182,7 @@ fn new_autorepeat_timer(
 ) -> Rc<Task<()>> {
     let task = Task::local(async move {
         Timer::new(MonotonicInstant::after(delay)).await;
-        tracing::debug!("autorepeat timeout");
+        log::debug!("autorepeat timeout");
         unbounded_send_logged(&sink, AnyEvent::Timeout).unwrap_or_else(|e| {
             metrics_logger.log_error(
                 InputPipelineErrorMetricDimensionEvent::AutorepeatCouldNotFireTimer,
@@ -303,7 +303,7 @@ impl Autorepeater {
     /// Run this function in an executor to start processing events. The
     /// transformed event stream is available in `output`.
     pub async fn run(self: &Rc<Self>, output: UnboundedSender<InputEvent>) -> Result<()> {
-        tracing::info!("key autorepeater installed");
+        log::info!("key autorepeater installed");
         let src = &mut *(self.event_source.borrow_mut());
         while let Some(event) = src.next().await {
             match event {
@@ -341,7 +341,7 @@ impl Autorepeater {
 
     // Replace the autorepeater state with a new one.
     fn set_state(self: &Rc<Self>, state: State) {
-        tracing::debug!("set state: {:?}", &state);
+        log::debug!("set state: {:?}", &state);
         self.state.replace(state);
     }
 
@@ -358,8 +358,8 @@ impl Autorepeater {
         output: &UnboundedSender<InputEvent>,
     ) -> Result<()> {
         let old_state = self.get_state();
-        tracing::debug!("process_event: current state: {:?}", &old_state);
-        tracing::debug!("process_event: inbound event: {:?}", &event);
+        log::debug!("process_event: current state: {:?}", &old_state);
+        log::debug!("process_event: inbound event: {:?}", &event);
         match (old_state, event.clone()) {
             // This is the initial state.  We wait for a key event with a printable
             // character, since those are autorepeatable.
@@ -394,7 +394,7 @@ impl Autorepeater {
                 // This is unexpected, but not fatal.  If you see this in the
                 // logs, we probably need to revisit the fuchsia_async::Task
                 // semantics.
-                tracing::warn!("spurious timeout in the autorepeater");
+                log::warn!("spurious timeout in the autorepeater");
             }
 
             // A keyboard event comes in while autorepeat is armed.

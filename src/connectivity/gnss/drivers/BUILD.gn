@@ -4,4 +4,5 @@
 
 group("tests") {
   testonly = true
+  deps = [ "//sdk/fidl/fuchsia.hardware.gnss:fuchsia.hardware.gnss_cpp" ]
 }

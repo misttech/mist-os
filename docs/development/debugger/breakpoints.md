@@ -222,10 +222,10 @@ for the `type` property of a `break` command.
 * `write`
 * `read-write`
 
-For example, to set a breakpoint of type `execution`:
+For example, to set a breakpoint of type `execute`:
 
 ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
-break --type=execution myfile.rs:123
+break --type=execute myfile.rs:123
 ```
 
 A `watch` is the same as using `break --type=read-write`. See

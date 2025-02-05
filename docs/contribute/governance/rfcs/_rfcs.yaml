@@ -3439,3 +3439,16 @@
   reviewers: ['cja@google.comm', 'csuter@google.com', 'geb@google.comm', 'surajmalhotra@google.com', 'eep@google.com', 'dgilhooley@google.com']
   submitted: '2024-08-25'
   reviewed: '2024-10-28'
+
+- name: 'RFC-0264'
+  title: 'Running unmodified AArch32 Linux programs on Fuchsia'
+  short_description: 'Enable unmodified, untrusted AArch32 guest code via restricted mode and starnix.'
+  authors: ['drewry@google.com']
+  file: '0264_running_unmodified_aarch32_linux_programs_on_fuchsia.md'
+  area: ['Foreign ABI Compatibility', 'Kernel', 'Security', 'Toolchain']
+  issue: ['388011178']
+  gerrit_change_id: ['1151293']
+  status: 'Accepted'
+  reviewers: ['jamesr@google.com', 'lindkvist@google.com', 'maniscalco@google.com', 'mcgrathr@google.com', 'mvanotti@google.com', 'phosek@google.com', 'travisg@google.com']
+  submitted: '2024-11-05'
+  reviewed: '2025-01-21'

@@ -4,17 +4,22 @@
 
 #include "decode.h"
 
+#include <Python.h>
+
 #include <cinttypes>
 #include <vector>
 
+#include <fuchsia_controller_abi/utils.h>
+
 #include "mod.h"
 #include "python_dict_visitor.h"
-#include "src/developer/ffx/lib/fuchsia-controller/cpp/abi/convert.h"
 #include "src/lib/fidl_codec/wire_parser.h"
 
-namespace decode {
+namespace fuchsia_controller::fidl_codec::decode {
 
 enum Direction : uint8_t { REQUEST, RESPONSE };
+
+namespace {
 
 std::unique_ptr<zx_handle_disposition_t[]> python_obj_to_handle_disps(PyObject *handles,
                                                                       Py_ssize_t *c_handles_len) {
@@ -30,14 +35,16 @@ std::unique_ptr<zx_handle_disposition_t[]> python_obj_to_handle_disps(PyObject *
     if (obj == nullptr) {
       return nullptr;
     }
-    zx_handle_t res = convert::PyLong_AsU32(obj);
-    if (res == convert::MINUS_ONE_U32 && PyErr_Occurred()) {
+    zx_handle_t res = utils::PyLong_AsU32(obj);
+    if (res == utils::MINUS_ONE_U32 && PyErr_Occurred()) {
       return nullptr;
     }
     c_handles[i] = zx_handle_disposition_t{.handle = res};
   }
   return c_handles;
 }
+
+}  // namespace
 
 PyObject *decode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds,  // NOLINT
                               Direction direction) {
@@ -57,9 +64,9 @@ PyObject *decode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds,  /
   if (c_handles == nullptr) {
     return nullptr;
   }
-  py::Buffer bytes(bytes_raw);
+  utils::Buffer bytes(bytes_raw);
   auto header = static_cast<const fidl_message_header_t *>(bytes.buf());
-  const std::vector<fidl_codec::ProtocolMethod *> *methods =
+  const std::vector<::fidl_codec::ProtocolMethod *> *methods =
       mod::get_module_state()->loader->GetByOrdinal(header->ordinal);
   if (methods == nullptr || methods->empty()) {
     PyErr_Format(PyExc_LookupError, "Unable to find any methods for method ordinal: %" PRIu64,
@@ -67,20 +74,20 @@ PyObject *decode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds,  /
     return nullptr;
   }
   // What is the approach here if there's more than one method?
-  const fidl_codec::ProtocolMethod *method = (*methods)[0];
-  std::unique_ptr<fidl_codec::Value> object;
+  const ::fidl_codec::ProtocolMethod *method = (*methods)[0];
+  std::unique_ptr<::fidl_codec::Value> object;
   std::ostringstream errors;
   bool successful;
   switch (direction) {
     case Direction::RESPONSE:
-      successful = fidl_codec::DecodeResponse(
+      successful = ::fidl_codec::DecodeResponse(
           method, static_cast<const uint8_t *>(bytes.buf()), static_cast<uint64_t>(bytes.len()),
           c_handles.get(), static_cast<uint64_t>(c_handles_len), &object, errors);
       break;
     case Direction::REQUEST:
-      successful = fidl_codec::DecodeRequest(method, static_cast<const uint8_t *>(bytes.buf()),
-                                             static_cast<uint64_t>(bytes.len()), c_handles.get(),
-                                             static_cast<uint64_t>(c_handles_len), &object, errors);
+      successful = ::fidl_codec::DecodeRequest(
+          method, static_cast<const uint8_t *>(bytes.buf()), static_cast<uint64_t>(bytes.len()),
+          c_handles.get(), static_cast<uint64_t>(c_handles_len), &object, errors);
       break;
   }
   if (!successful) {
@@ -118,7 +125,7 @@ PyObject *decode_standalone(PyObject *self, PyObject *args, PyObject *kwds) {  /
     return nullptr;
   }
   const std::string library_name(c_type_name, idx);
-  py::Buffer bytes(bytes_raw);
+  utils::Buffer bytes(bytes_raw);
   Py_ssize_t c_handles_len;
   auto c_handles = python_obj_to_handle_disps(handles, &c_handles_len);
   if (c_handles == nullptr) {
@@ -134,16 +141,16 @@ PyObject *decode_standalone(PyObject *self, PyObject *args, PyObject *kwds) {  /
                  type_name.c_str(), library_name.c_str());
     return nullptr;
   }
-  fidl_codec::InvalidType invalid_type;
+  ::fidl_codec::InvalidType invalid_type;
   if (type->Name() == invalid_type.Name()) {
     PyErr_Format(PyExc_TypeError, "Unable to find type %s in library %s", type_name.c_str(),
                  library_name.c_str());
     return nullptr;
   }
   std::ostringstream errors;
-  fidl_codec::MessageDecoder decoder(static_cast<uint8_t *>(bytes.buf()), bytes.len(),
-                                     c_handles.get(), c_handles_len, errors);
-  decoder.SkipObject(type->InlineSize(fidl_codec::WireVersion::kWireV2));
+  ::fidl_codec::MessageDecoder decoder(static_cast<uint8_t *>(bytes.buf()), bytes.len(),
+                                       c_handles.get(), c_handles_len, errors);
+  decoder.SkipObject(type->InlineSize(::fidl_codec::WireVersion::kWireV2));
   auto value = type->Decode(&decoder, 0);
   if (value == nullptr || decoder.HasError()) {
     PyErr_SetString(PyExc_RuntimeError, errors.str().c_str());
@@ -175,4 +182,4 @@ PyMethodDef decode_fidl_request_py_def = {
     "decode_fidl_request", reinterpret_cast<PyCFunction>(decode_fidl_request),
     METH_VARARGS | METH_KEYWORDS, "Decodes a FIDL request message from bytes and handles."};
 
-}  // namespace decode
+}  // namespace fuchsia_controller::fidl_codec::decode

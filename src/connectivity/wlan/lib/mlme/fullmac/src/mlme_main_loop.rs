@@ -9,8 +9,8 @@ use crate::{DriverState, FullmacDriverEvent, FullmacDriverEventSink};
 use anyhow::{bail, Context};
 use futures::channel::{mpsc, oneshot};
 use futures::{select, Future, StreamExt};
+use log::{error, info};
 use std::pin::Pin;
-use tracing::{error, info};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
@@ -86,7 +86,12 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
                 driver_event_sink,
             )
             .await;
-            ifc_server_stop_sender.send(()).unwrap();
+            info!("WlanFullmacImplIfc server stopped");
+
+            // This signals that the fullmac_ifc_server_task exited before the main loop. It's fine
+            // if the main loop exits and drops the receiver before this task exits, so we ignore
+            // the result of this send.
+            let _ = ifc_server_stop_sender.send(());
         });
 
         loop {
@@ -383,10 +388,7 @@ mod handle_mlme_request_tests {
         assert_eq!(driver_req.channels, Some(vec![2]));
         assert_eq!(driver_req.min_channel_time, Some(6));
         assert_eq!(driver_req.max_channel_time, Some(7));
-
-        let driver_cssids = driver_req.ssids.as_ref().unwrap();
-        assert_eq!(driver_cssids.len(), 1);
-        assert_eq!(driver_cssids[0].data[..driver_cssids[0].len as usize], [3u8; 4][..]);
+        assert_eq!(driver_req.ssids, Some(vec![vec![3u8; 4]]));
     }
 
     #[test]
@@ -641,8 +643,7 @@ mod handle_mlme_request_tests {
 
         let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::StartBss { req })) => req);
 
-        assert_eq!(driver_req.ssid.as_ref().unwrap().len as usize, SSID_LEN);
-        assert_eq!(driver_req.ssid.as_ref().unwrap().data[..SSID_LEN], [1u8; SSID_LEN][..]);
+        assert_eq!(driver_req.ssid, Some(vec![1u8; SSID_LEN]));
         assert_eq!(driver_req.bss_type, Some(fidl_common::BssType::Infrastructure));
         assert_eq!(driver_req.beacon_period, Some(3));
         assert_eq!(driver_req.dtim_period, Some(4));
@@ -661,8 +662,7 @@ mod handle_mlme_request_tests {
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::StopBss { req })) => req);
-        assert_eq!(driver_req.ssid.as_ref().unwrap().len as usize, SSID_LEN);
-        assert_eq!(driver_req.ssid.as_ref().unwrap().data[..SSID_LEN], [1u8; SSID_LEN][..]);
+        assert_eq!(driver_req.ssid, Some(vec![1u8; SSID_LEN]));
     }
 
     #[test]
@@ -845,18 +845,19 @@ mod handle_mlme_request_tests {
     #[test]
     fn test_get_iface_counter_stats() {
         let mut h = TestHelper::set_up();
-        let mocked_stats = fidl_fullmac::WlanFullmacIfaceCounterStats {
-            rx_unicast_drop: 11,
-            rx_unicast_total: 22,
-            rx_multicast: 33,
-            tx_total: 44,
-            tx_drop: 55,
+        let mocked_stats = fidl_stats::IfaceCounterStats {
+            rx_unicast_drop: Some(11),
+            rx_unicast_total: Some(22),
+            rx_multicast: Some(33),
+            tx_total: Some(44),
+            tx_drop: Some(55),
+            ..Default::default()
         };
-        h.fake_device.lock().unwrap().get_iface_counter_stats_mock.replace(
-            fidl_mlme::GetIfaceCounterStatsResponse::Stats(
-                fullmac_to_mlme::convert_iface_counter_stats(mocked_stats),
-            ),
-        );
+        h.fake_device
+            .lock()
+            .unwrap()
+            .get_iface_counter_stats_mock
+            .replace(fidl_mlme::GetIfaceCounterStatsResponse::Stats(mocked_stats));
         let (stats_responder, mut stats_receiver) = wlan_sme::responder::Responder::new();
         let fidl_req = wlan_sme::MlmeRequest::GetIfaceCounterStats(stats_responder);
 
@@ -869,11 +870,12 @@ mod handle_mlme_request_tests {
         assert_eq!(
             stats,
             fidl_stats::IfaceCounterStats {
-                rx_unicast_drop: 11,
-                rx_unicast_total: 22,
-                rx_multicast: 33,
-                tx_total: 44,
-                tx_drop: 55,
+                rx_unicast_drop: Some(11),
+                rx_unicast_total: Some(22),
+                rx_multicast: Some(33),
+                tx_total: Some(44),
+                tx_drop: Some(55),
+                ..Default::default()
             }
         );
     }
@@ -882,67 +884,51 @@ mod handle_mlme_request_tests {
     fn test_get_iface_histogram_stats() {
         let mut h = TestHelper::set_up();
 
-        let noise_floor_samples =
-            vec![fidl_fullmac::WlanFullmacHistBucket { bucket_index: 2, num_samples: 3 }];
-        let noise_floor_histograms = vec![fidl_fullmac::WlanFullmacNoiseFloorHistogram {
-            hist_scope: fidl_fullmac::WlanFullmacHistScope::Station,
-            antenna_id: fidl_fullmac::WlanFullmacAntennaId {
-                freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna2G,
-                index: 1,
-            },
-            noise_floor_samples,
-            invalid_samples: 4,
-        }];
-
-        let rssi_samples =
-            vec![fidl_fullmac::WlanFullmacHistBucket { bucket_index: 6, num_samples: 7 }];
-        let rssi_histograms = vec![fidl_fullmac::WlanFullmacRssiHistogram {
-            hist_scope: fidl_fullmac::WlanFullmacHistScope::PerAntenna,
-            antenna_id: fidl_fullmac::WlanFullmacAntennaId {
-                freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna5G,
-                index: 5,
-            },
-            rssi_samples,
-            invalid_samples: 8,
-        }];
-
-        let rx_rate_index_samples =
-            vec![fidl_fullmac::WlanFullmacHistBucket { bucket_index: 10, num_samples: 11 }];
-        let rx_rate_index_histograms = vec![fidl_fullmac::WlanFullmacRxRateIndexHistogram {
-            hist_scope: fidl_fullmac::WlanFullmacHistScope::Station,
-            antenna_id: fidl_fullmac::WlanFullmacAntennaId {
-                freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna5G,
-                index: 9,
-            },
-            rx_rate_index_samples,
-            invalid_samples: 12,
-        }];
-
-        let snr_samples =
-            vec![fidl_fullmac::WlanFullmacHistBucket { bucket_index: 14, num_samples: 15 }];
-        let snr_histograms = vec![fidl_fullmac::WlanFullmacSnrHistogram {
-            hist_scope: fidl_fullmac::WlanFullmacHistScope::PerAntenna,
-            antenna_id: fidl_fullmac::WlanFullmacAntennaId {
-                freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna2G,
-                index: 13,
-            },
-            snr_samples,
-            invalid_samples: 16,
-        }];
-
-        let mocked_stats = fidl_fullmac::WlanFullmacIfaceHistogramStats {
-            noise_floor_histograms: Some(noise_floor_histograms),
-            rssi_histograms: Some(rssi_histograms),
-            rx_rate_index_histograms: Some(rx_rate_index_histograms),
-            snr_histograms: Some(snr_histograms),
+        let mocked_stats = fidl_stats::IfaceHistogramStats {
+            noise_floor_histograms: Some(vec![fidl_stats::NoiseFloorHistogram {
+                hist_scope: fidl_stats::HistScope::Station,
+                antenna_id: None,
+                noise_floor_samples: vec![fidl_stats::HistBucket {
+                    bucket_index: 2,
+                    num_samples: 3,
+                }],
+                invalid_samples: 4,
+            }]),
+            rssi_histograms: Some(vec![fidl_stats::RssiHistogram {
+                hist_scope: fidl_stats::HistScope::PerAntenna,
+                antenna_id: Some(Box::new(fidl_stats::AntennaId {
+                    freq: fidl_stats::AntennaFreq::Antenna5G,
+                    index: 5,
+                })),
+                rssi_samples: vec![fidl_stats::HistBucket { bucket_index: 6, num_samples: 7 }],
+                invalid_samples: 8,
+            }]),
+            rx_rate_index_histograms: Some(vec![fidl_stats::RxRateIndexHistogram {
+                hist_scope: fidl_stats::HistScope::Station,
+                antenna_id: None,
+                rx_rate_index_samples: vec![fidl_stats::HistBucket {
+                    bucket_index: 10,
+                    num_samples: 11,
+                }],
+                invalid_samples: 12,
+            }]),
+            snr_histograms: Some(vec![fidl_stats::SnrHistogram {
+                hist_scope: fidl_stats::HistScope::PerAntenna,
+                antenna_id: Some(Box::new(fidl_stats::AntennaId {
+                    freq: fidl_stats::AntennaFreq::Antenna2G,
+                    index: 13,
+                })),
+                snr_samples: vec![fidl_stats::HistBucket { bucket_index: 14, num_samples: 15 }],
+                invalid_samples: 16,
+            }]),
             ..Default::default()
         };
 
-        h.fake_device.lock().unwrap().get_iface_histogram_stats_mock.replace(
-            fidl_mlme::GetIfaceHistogramStatsResponse::Stats(
-                fullmac_to_mlme::convert_iface_histogram_stats(mocked_stats),
-            ),
-        );
+        h.fake_device
+            .lock()
+            .unwrap()
+            .get_iface_histogram_stats_mock
+            .replace(fidl_mlme::GetIfaceHistogramStatsResponse::Stats(mocked_stats.clone()));
         let (stats_responder, mut stats_receiver) = wlan_sme::responder::Responder::new();
         let fidl_req = wlan_sme::MlmeRequest::GetIfaceHistogramStats(stats_responder);
 
@@ -951,47 +937,7 @@ mod handle_mlme_request_tests {
         assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::GetIfaceHistogramStats)));
         let stats = assert_variant!(stats_receiver.try_recv(), Ok(Some(stats)) => stats);
         let stats = assert_variant!(stats, fidl_mlme::GetIfaceHistogramStatsResponse::Stats(stats) => stats);
-        assert_eq!(
-            stats,
-            fidl_stats::IfaceHistogramStats {
-                noise_floor_histograms: vec![fidl_stats::NoiseFloorHistogram {
-                    hist_scope: fidl_stats::HistScope::Station,
-                    antenna_id: None,
-                    noise_floor_samples: vec![fidl_stats::HistBucket {
-                        bucket_index: 2,
-                        num_samples: 3,
-                    }],
-                    invalid_samples: 4,
-                }],
-                rssi_histograms: vec![fidl_stats::RssiHistogram {
-                    hist_scope: fidl_stats::HistScope::PerAntenna,
-                    antenna_id: Some(Box::new(fidl_stats::AntennaId {
-                        freq: fidl_stats::AntennaFreq::Antenna5G,
-                        index: 5,
-                    })),
-                    rssi_samples: vec![fidl_stats::HistBucket { bucket_index: 6, num_samples: 7 }],
-                    invalid_samples: 8,
-                }],
-                rx_rate_index_histograms: vec![fidl_stats::RxRateIndexHistogram {
-                    hist_scope: fidl_stats::HistScope::Station,
-                    antenna_id: None,
-                    rx_rate_index_samples: vec![fidl_stats::HistBucket {
-                        bucket_index: 10,
-                        num_samples: 11,
-                    }],
-                    invalid_samples: 12,
-                }],
-                snr_histograms: vec![fidl_stats::SnrHistogram {
-                    hist_scope: fidl_stats::HistScope::PerAntenna,
-                    antenna_id: Some(Box::new(fidl_stats::AntennaId {
-                        freq: fidl_stats::AntennaFreq::Antenna2G,
-                        index: 13,
-                    })),
-                    snr_samples: vec![fidl_stats::HistBucket { bucket_index: 14, num_samples: 15 }],
-                    invalid_samples: 16,
-                }],
-            }
-        );
+        assert_eq!(stats, mocked_stats);
     }
 
     #[test]

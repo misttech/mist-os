@@ -35,6 +35,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
     "//src/lib/sandbox",
+    "//src/sys/lib/cm_rust",
     "//src/sys/lib/component_id_index",
     "//src/sys/lib/moniker",
     "//third_party/rust_crates:anyhow",

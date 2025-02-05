@@ -8,8 +8,8 @@ use fuchsia_bluetooth::types::Channel;
 use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::Inspect;
 use futures::channel::mpsc;
+use log::{info, trace, warn};
 use std::collections::HashMap;
-use tracing::{info, trace, warn};
 
 use crate::rfcomm::inspect::SessionMultiplexerInspect;
 use crate::rfcomm::session::channel::{FlowControlMode, FlowControlledData, SessionChannel};
@@ -182,7 +182,7 @@ impl SessionMultiplexer {
         }
 
         self.set_role(role);
-        info!(?role, "RFCOMM Session multiplexer started");
+        info!(role:?; "RFCOMM Session multiplexer started");
         Ok(())
     }
 

@@ -38,6 +38,8 @@ struct DummyDriver : public null::Driver {
     return {};
   }
 
+  using null::Driver::Driver;
+
   void Unparse(FILE*) const { ZX_PANIC("DummyDriver should never be called!"); }
 };
 
@@ -85,6 +87,80 @@ using WithAllDrivers = Template<
 // to another, e.g. to hand off from physboot to the kernel.
 using Driver = WithAllDrivers<std::variant>;
 
+// This represents the a configuration tagged with a driver from the set of available drivers.
+// Helper methods allows us to generate a `uart::all::Driver`.
+//
+// The provided configuration object has the following properties:
+//    * `uart_type` alias for the uart driver type.
+//    * `config_type` alias for `uart_type::config_type`.
+//    * `operator()*` and `operator()->` return reference and pointer to the underlying
+//    `config_type` object.
+//
+// Note: There is no driver `state` being held in this object, just the configuration.
+template <typename UartDriver = Driver>
+class Config {
+ public:
+  Config() = default;
+  Config(const Config&) = default;
+  Config(Config&&) = default;
+
+  // Constructor to obtain configurations from a Uart.
+  template <typename Uart>
+  explicit(false) Config(const uart::Config<Uart>& config) : configs_(config) {}
+  template <typename Uart>
+  explicit Config(const Uart& uart) : configs_(uart::Config<Uart>(uart.config())) {}
+  template <typename Uart, template <typename, IoRegisterType> class IoProvider, typename Sync>
+  explicit Config(const uart::KernelDriver<Uart, IoProvider, Sync>& uart)
+      : configs_(uart::Config<Uart>(uart.config())) {}
+
+  Config& operator=(const Config&) = default;
+  Config& operator=(Config&&) = default;
+
+  template <typename Uart, template <typename, IoRegisterType> class IoProvider, typename Sync>
+  Config& operator=(const uart::KernelDriver<Uart, IoProvider, Sync>& driver) {
+    configs_ = uart::Config<Uart>(driver.config());
+    return *this;
+  }
+
+  template <typename T>
+  Config& operator=(const T& uart) {
+    configs_ = uart::Config<T>(uart.config());
+    return *this;
+  }
+
+  // Visitor to access the active configuration object.
+  template <typename T>
+  void Visit(T&& visitor) {
+    internal::Visit(std::forward<T>(visitor), configs_);
+  }
+
+  template <typename T>
+  void Visit(T&& visitor) const {
+    internal::Visit(std::forward<T>(visitor), configs_);
+  }
+
+ private:
+  template <typename T>
+  struct Variant;
+
+  template <typename... Args>
+  struct Variant<std::variant<Args...>> {
+    using type = std::variant<uart::Config<Args>...>;
+  };
+
+  typename Variant<UartDriver>::type configs_;
+};
+
+// Instantiates `uart::all::Driver` with `config`.
+template <typename UartDriver = uart::all::Driver>
+UartDriver MakeDriver(const uart::all::Config<UartDriver>& config) {
+  UartDriver driver;
+  config.Visit([&driver]<typename T>(const T& uart_config) {
+    driver.template emplace<typename T::uart_type>(*uart_config);
+  });
+  return driver;
+}
+
 // uart::all::KernelDriver is a variant across all the KernelDriver types.
 template <template <typename, IoRegisterType> class IoProvider, typename Sync,
           typename UartDriver = Driver>
@@ -103,6 +179,12 @@ class KernelDriver {
   // ...or from another all::KernelDriver::uart() result.
   explicit KernelDriver(const uart_type& uart) { *this = uart; }
 
+  explicit KernelDriver(const Config<UartDriver>& config) {
+    config.Visit([this]<typename ConfigType>(const ConfigType& driver_config) {
+      variant_.template emplace<OneDriver<typename ConfigType::uart_type>>(*driver_config);
+    });
+  }
+
   // Assignment is another way to reinitialize the configuration.
   KernelDriver& operator=(const uart_type& uart) {
     internal::Visit(
@@ -112,6 +194,12 @@ class KernelDriver {
         },
         uart);
     return *this;
+  }
+
+  Config<UartDriver> config() const {
+    Config<UartDriver> conf;
+    Visit([&conf](const auto& driver) { conf = driver; });
+    return conf;
   }
 
   // If this ZBI item matches a supported driver, instantiate that driver and
@@ -145,13 +233,13 @@ class KernelDriver {
   // Apply f to selected driver.
   template <typename T, typename... Args>
   void Visit(T&& f, Args... args) {
-    internal::Visit(std::forward<T>(f), variant_, std::forward<Args>(args)...);
+    internal::Visit(VariantVisitor<T>{std::forward<T>(f)}, variant_, std::forward<Args>(args)...);
   }
 
   // Apply f to selected driver.
   template <typename T, typename... Args>
   void Visit(T&& f, Args... args) const {
-    internal::Visit(std::forward<T>(f), variant_, std::forward<Args>(args)...);
+    internal::Visit(VariantVisitor<T>{std::forward<T>(f)}, variant_, std::forward<Args>(args)...);
   }
 
   // Extract the hardware configuration and state.  The return type is const
@@ -166,11 +254,27 @@ class KernelDriver {
     return driver;
   }
 
+  // Takes ownership of the underlying hardware management and state. This object will be left
+  // in an invalid state, and should be reinitialized before interacting with it.
+  uart_type TakeUart() && {
+    uart_type driver;
+    Visit([&driver](auto&& active) { driver = std::move(active).TakeUart(); });
+    // moved-from state.
+    variant_.template emplace<std::monostate>();
+    return driver;
+  }
+
+  // Returns true if the active `uart::KernelDriver<...>` is backed by `TargetUartDriver`.
+  template <typename TargetUartDriver>
+  bool holds_alternative() const {
+    return std::holds_alternative<OneDriver<TargetUartDriver>>(variant_);
+  }
+
  private:
   template <class Uart>
   using OneDriver = uart::KernelDriver<Uart, IoProvider, Sync>;
   template <class... Uart>
-  using Variant = std::variant<OneDriver<Uart>...>;
+  using Variant = std::variant<OneDriver<Uart>..., std::monostate>;
 
   template <typename T>
   struct OneDriverVariant;
@@ -183,9 +287,11 @@ class KernelDriver {
   template <size_t I, typename... Args>
   bool TryOneMatch(Args&&... args) {
     using Try = std::variant_alternative_t<I, decltype(variant_)>;
-    if (auto driver = Try::uart_type::MaybeCreate(std::forward<Args>(args)...)) {
-      variant_.template emplace<I>(*driver);
-      return true;
+    if constexpr (!std::is_same_v<Try, std::monostate>) {
+      if (auto driver = Try::uart_type::MaybeCreate(std::forward<Args>(args)...)) {
+        variant_.template emplace<I>(*driver);
+        return true;
+      }
     }
     return false;
   }
@@ -194,11 +300,13 @@ class KernelDriver {
   fit::inline_function<void(const zbi_dcfg_simple_t&)> TryOneMatch(
       const devicetree::PropertyDecoder& decoder) {
     using Try = std::variant_alternative_t<I, decltype(variant_)>;
-    using ConfigType = typename Try::uart_type::config_type;
 
-    if constexpr (std::is_same_v<ConfigType, zbi_dcfg_simple_t>) {
-      if (Try::uart_type::MatchDevicetree(decoder)) {
-        return [this](const zbi_dcfg_simple_t& config) { variant_.template emplace<I>(config); };
+    if constexpr (!std::is_same_v<Try, std::monostate>) {
+      using ConfigType = typename Try::uart_type::config_type;
+      if constexpr (std::is_same_v<ConfigType, zbi_dcfg_simple_t>) {
+        if (Try::uart_type::MatchDevicetree(decoder)) {
+          return [this](const zbi_dcfg_simple_t& config) { variant_.template emplace<I>(config); };
+        }
       }
     }
     return nullptr;
@@ -216,6 +324,24 @@ class KernelDriver {
     constexpr auto n = std::variant_size_v<decltype(variant_)>;
     return DoMatchHelper(std::make_index_sequence<n>(), std::forward<Args>(args)...);
   }
+
+  template <typename Delegate>
+  struct VariantVisitor {
+    template <typename T, typename... Args>
+    void operator()(T&& alternative, Args&&... args) const {
+      delegate(std::forward<T>(alternative), std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    void operator()(std::monostate, Args&&... args) const {
+      // We cannot use panic macros in this spot, since it will end up calling printf, which
+      // may end up visiting the same uart, whose invalid state(monostate) triggered this. Even
+      // this will cause a chain of exceptions.
+      __builtin_abort();
+    }
+
+    Delegate delegate;
+  };
 
   typename OneDriverVariant<UartDriver>::type variant_;
 };

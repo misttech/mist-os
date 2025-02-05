@@ -269,7 +269,6 @@
                 "fuchsia.kernel.DebuglogResource",
                 "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.EnergyInfoResource",
-                "fuchsia.kernel.FramebufferResource",
                 "fuchsia.kernel.HypervisorResource",
                 "fuchsia.kernel.InfoResource",
                 "fuchsia.kernel.IommuResource",
@@ -357,6 +356,22 @@
             protocol: "fuchsia.diagnostics.ArchiveAccessor",
             from: "parent/diagnostics-accessors",
             as: "fuchsia.diagnostics.RealArchiveAccessor",
+            to: "#system-tests",
+        },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#system-tests",
+        },
+
+        // TODO(b/345827642): Remove once out-of-tree users
+        // have been migrated to dictionaries.
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "parent/diagnostics",
             to: "#system-tests",
         },
         {

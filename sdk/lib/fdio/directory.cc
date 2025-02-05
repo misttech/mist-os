@@ -43,7 +43,10 @@ zx_status_t fdio_service_connect_by_name(const char* name, zx_handle_t request) 
     if (status != ZX_OK) {
       return zx::error(status);
     }
-    status = fdio_service_connect("/svc", request.release());
+    status = fdio_open3(
+        "/svc",
+        uint64_t{fuchsia_io::wire::kPermReadable | fuchsia_io::wire::Flags::kProtocolDirectory},
+        request.release());
     if (status != ZX_OK) {
       return zx::error(status);
     }

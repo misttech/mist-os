@@ -31,11 +31,15 @@ group("sdk_metadata") {
 if (_generating_sdk) {
   sdk_atom("sdk_metadata_sdk") {
     id = "sdk://${_sdk_prefix}third_party/rust_crates/sdk_metadata"
-    category = "internal"
+    category = "partner_internal"
     meta = {
-      source = "sdk_metas/sdk_metadata.sdk.meta.json"
+      value = {
+        type = "rust_3p_library"
+        name = "sdk_metadata"
+        version = "1.0.0"
+      }
       dest = "${_sdk_prefix}third_party/rust_crates/sdk_metadata/meta.json"
-      schema = "3p_rust_library"
+      schema = "rust_3p_library"
     }
   }
 }

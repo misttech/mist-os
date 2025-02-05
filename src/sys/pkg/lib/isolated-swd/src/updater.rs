@@ -69,7 +69,7 @@ impl Updater {
 
     async fn monitor_update_attempt(mut attempt: UpdateAttempt) -> Result<(), Error> {
         while let Some(state) = attempt.try_next().await.context("fetching next update state")? {
-            tracing::info!("Install: {:?}", state);
+            log::info!("Install: {:?}", state);
             if state.is_success() {
                 return Ok(());
             } else if state.is_failure() {
@@ -90,7 +90,7 @@ impl Updater {
             result
         {
             // board does not actually support ABR, so return.
-            tracing::info!("ABR not supported, not configuring slots.");
+            log::info!("ABR not supported, not configuring slots.");
             return Ok(());
         }
         let result = result?;

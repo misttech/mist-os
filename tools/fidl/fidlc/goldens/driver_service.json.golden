@@ -78,13 +78,11 @@
       "members": [
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "endpoint",
             "role": "client",
             "protocol": "test.driverservice/SomeDriverProtocol",
             "nullable": false,
             "protocol_transport": "Driver",
-            "identifier": "test.driverservice/SomeDriverProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,

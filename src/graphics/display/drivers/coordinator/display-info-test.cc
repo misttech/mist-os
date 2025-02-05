@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
@@ -35,7 +34,6 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueSingleBlock) {
       .preferred_modes_count = 0,
       .edid_bytes_list = edid::kHpZr30wEdid.data(),
       .edid_bytes_count = edid::kHpZr30wEdid.size(),
-      .eddc_client = {.ops = nullptr, .ctx = nullptr},
       .pixel_formats_list = pixel_formats.data(),
       .pixel_formats_count = pixel_formats.size(),
   };
@@ -65,7 +63,6 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueMultipleBlocks) {
       .preferred_modes_count = 0,
       .edid_bytes_list = edid::kSamsungCrg9Edid.data(),
       .edid_bytes_count = edid::kSamsungCrg9Edid.size(),
-      .eddc_client = {.ops = nullptr, .ctx = nullptr},
       .pixel_formats_list = pixel_formats.data(),
       .pixel_formats_count = pixel_formats.size(),
   };
@@ -99,7 +96,6 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueOfInvalidLength) {
       .preferred_modes_count = 0,
       .edid_bytes_list = edid::kSamsungCrg9Edid.data(),
       .edid_bytes_count = kInvalidEdidSizeBytes,
-      .eddc_client = {.ops = nullptr, .ctx = nullptr},
       .pixel_formats_list = pixel_formats.data(),
       .pixel_formats_count = pixel_formats.size(),
   };
@@ -123,7 +119,6 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueIncomplete) {
       .preferred_modes_count = 0,
       .edid_bytes_list = edid::kSamsungCrg9Edid.data(),
       .edid_bytes_count = kIncompleteEdidSizeBytes,
-      .eddc_client = {.ops = nullptr, .ctx = nullptr},
       .pixel_formats_list = pixel_formats.data(),
       .pixel_formats_count = pixel_formats.size(),
   };

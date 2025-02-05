@@ -12,25 +12,14 @@ rustc_library("lib") {
 
   deps = [
     "macro:lib",
-    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_fdomain",
-    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//src/developer/ffx/command:lib",
     "//src/developer/ffx/command/error:lib",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/core:lib",
-    "//src/developer/ffx/daemon/proxy:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
-    "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho/metadata:lib",
-    "//src/developer/ffx/lib/rcs:lib",
-    "//src/developer/ffx/lib/rcs:lib_fdomain",
     "//src/developer/ffx/lib/target:lib",
-    "//src/developer/ffx/lib/target_errors:lib",
-    "//src/developer/ffx/lib/version:lib",
     "//src/developer/ffx/lib/writer:lib",
-    "//src/lib/fdomain/client",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:async-lock",
@@ -44,22 +33,19 @@ rustc_library("lib") {
   ]
 
   test_deps = [
-    "//src/connectivity/overnet/lib/core",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
-    "//third_party/rust_crates:async-channel",
     "//third_party/rust_crates:tempfile",
   ]
 
   sources = [
     "src/adapters.rs",
     "src/connector.rs",
+    "src/fho_env.rs",
     "src/from_env.rs",
-    "src/from_env/from_toolbox.rs",
-    "src/from_env/helpers.rs",
     "src/lib.rs",
     "src/subtool.rs",
-    "src/testing.rs",
+    "src/try_from_env.rs",
   ]
 }
 

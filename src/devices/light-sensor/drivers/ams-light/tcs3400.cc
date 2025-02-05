@@ -90,13 +90,13 @@ bool FeatureValueValid(int64_t value, const T& axis) {
 }
 
 constexpr size_t kMaxFeatureReports = 10;
-const inspect::StringReference kEventTime("event_time");
-const inspect::StringReference kReportingIntervalUs("report_interval_us");
-const inspect::StringReference kReportingState("reporting_state");
-const inspect::StringReference kSensitivity("sensitivity");
-const inspect::StringReference kThresholdHigh("threshold_high");
-const inspect::StringReference kThresholdLow("threshold_low");
-const inspect::StringReference kIntegrationTimeUs("integration_time_us");
+constexpr std::string_view kEventTime("event_time");
+constexpr std::string_view kReportingIntervalUs("report_interval_us");
+constexpr std::string_view kReportingState("reporting_state");
+constexpr std::string_view kSensitivity("sensitivity");
+constexpr std::string_view kThresholdHigh("threshold_high");
+constexpr std::string_view kThresholdLow("threshold_low");
+constexpr std::string_view kIntegrationTimeUs("integration_time_us");
 
 void RecordReport(inspect::Node& n, tcs::Tcs3400FeatureReport report) {
   n.RecordUint(kEventTime, (report.event_time - zx::time()).to_nsecs());

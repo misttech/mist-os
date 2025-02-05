@@ -143,7 +143,6 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                     builder.platform_bundle("fshost_storage_host_fxfs");
                 }
                 VolumeConfig::Fvm(FvmVolumeConfig { blob, data, .. }) => {
-                    builder.platform_bundle("fshost_fvm");
                     blob_deprecated_padded = blob.blob_layout == BlobfsLayout::DeprecatedPadded;
                     match data.data_filesystem_format {
                         DataFilesystemFormat::Fxfs => {
@@ -210,6 +209,18 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
 
         let disable_automount =
             Config::new(ConfigValueType::Bool, storage_config.disable_automount.into());
+
+        let starnix_volume_name = match &storage_config.starnix_volume.name {
+            Some(name) => {
+                if !fxfs_blob {
+                    return Err(anyhow::anyhow!(
+                        "Cannot have a starnix volume set for a non-fxblob configuration"
+                    ));
+                }
+                Config::new(ConfigValueType::String { max_size: 64 }, name.clone().into())
+            }
+            None => Config::new(ConfigValueType::String { max_size: 64 }, "".into()),
+        };
         let algorithm = match &storage_config.filesystems.blobfs_write_compression_algorithm {
             Some(algorithm) => Config::new(
                 ConfigValueType::String { max_size: 20 },
@@ -266,6 +277,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 ),
             ),
             ("fuchsia.fshost.DisableAutomount", disable_automount),
+            ("fuchsia.fshost.StarnixVolumeName", starnix_volume_name),
             ("fuchsia.blobfs.WriteCompressionAlgorithm", algorithm),
             ("fuchsia.blobfs.CacheEvictionPolicy", policy),
         ];

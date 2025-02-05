@@ -9,8 +9,8 @@ use fuchsia_component::server::ServiceFs;
 use futures::channel::mpsc;
 use futures::prelude::*;
 use futures::{StreamExt, TryStreamExt};
+use log::info;
 use realm_client::{extend_namespace, InstalledNamespace};
-use tracing::info;
 use {
     fidl_fuchsia_driver_test as fdt, fidl_fuchsia_driver_testing as ftest, fidl_fuchsia_io as fio,
     fidl_fuchsia_nodegroup_test as ft, fuchsia_async as fasync,

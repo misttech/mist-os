@@ -91,7 +91,7 @@ type PacketGuestVcpu = struct {
 };
 
 type PacketInterrupt = struct {
-    timestamp InstantBoot;
+    timestamp Time;
     reserved0 uint64;
     reserved1 uint64;
     reserved2 uint64;

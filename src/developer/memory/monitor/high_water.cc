@@ -35,7 +35,9 @@ HighWater::HighWater(const std::string& dir, zx::duration poll_frequency,
       watcher_(poll_frequency, high_water_threshold, dispatcher, std::move(capture_cb),
                [this](const Capture& c) {
                  RecordHighWater(c);
-                 RecordHighWaterDigest(c);
+                 memory::Digest d;
+                 digest_cb_(c, &d);
+                 RecordHighWaterDigest(d);
                }),
       namer_(Summary::kNameMatches),
       digest_cb_(std::move(digest_cb)) {
@@ -64,10 +66,8 @@ void HighWater::RecordHighWater(const Capture& capture) {
   close(out_fd);
 }
 
-void HighWater::RecordHighWaterDigest(const Capture& capture) {
+void HighWater::RecordHighWaterDigest(const Digest& digest) {
   std::lock_guard<std::mutex> lock(mutex_);
-  Digest digest;
-  digest_cb_(capture, &digest);
   std::ofstream out;
   auto path = files::JoinPath(dir_, kLatestDigest);
   out.open(path);

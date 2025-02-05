@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@fuchsia_sdk//fuchsia:defs.bzl", "get_fuchsia_api_levels")
+load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_package", "get_fuchsia_api_levels")
 load("//fuchsia/packaging:common_utils.bzl", "failure_test", "no_repo_default_api_level_failure_test", "unknown_override_api_level_failure_test", "unknown_repo_default_api_level_failure_test")
 load("//test_utils:api_levels.bzl", "some_valid_numerical_api_level_as_string")
 load(":fuchsia_package_checker_test.bzl", "fuchsia_package_checker_test", "no_repo_default_api_level_fuchsia_package_checker_test", "repo_default_api_level_next_fuchsia_package_checker_test", "repo_default_unknown_and_override_next_api_level_fuchsia_package_checker_test", "repo_default_unknown_api_level_fuchsia_package_checker_test")
@@ -82,6 +82,7 @@ test_suite(
     # Tests are listed in the order they are defined.
     # buildifier: leave-alone, do not sort
     tests = [
+        ":empty_package_check",
         ":cc_pkg_test",
         ":cc_pkg_with_static_cpp_test",
         ":cc_test_pkg_test",
@@ -106,6 +107,23 @@ test_suite(
         ":cc_pkg_linkable_only_at_head_api_level",
     ],
     visibility = ["//visibility:public"],
+)
+
+fuchsia_package(
+    name = "empty",
+    package_name = "empty_package",
+    fuchsia_api_level = "HEAD",
+)
+
+fuchsia_package_checker_test(
+    name = "empty_package_check",
+    package_name = "empty_package",
+    size = "small",
+    expected_abi_revision = HEAD_ABI_REVISION,
+    expected_blobs_to_file_names = {},
+    manifests = [],
+    package_under_test = ":empty",
+    structured_config_files = [],
 )
 
 # Also serves the purpose of "cc_test_pkg_at_head".
@@ -422,7 +440,7 @@ repo_default_api_level_next_fuchsia_package_checker_test(
 
 no_repo_default_api_level_failure_test(
     name = "failure_test_pkg_without_api_level_and_no_repo_default",
-    expected_failure_message = '`@fuchsia_sdk//fuchsia:fuchsia_api_level` has not been set to an API level. Has an API level been specified for this target? Valid API levels are ["',
+    expected_failure_message = "ERROR: An API level has not been specified for this target or the repository.",
     tags = ["manual"],
 
     # With ":cc_component" included in the package, this test fails with:

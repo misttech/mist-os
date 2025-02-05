@@ -25,6 +25,7 @@ schemas = [
   "loadable_module.json",
   "manifest.json",
   "package.json",
+  "rust_3p_library.json",
   "sysroot.json",
   "version_history.json",
   "virtual_device.json",

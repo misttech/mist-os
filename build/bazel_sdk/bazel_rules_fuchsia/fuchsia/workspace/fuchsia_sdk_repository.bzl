@@ -225,7 +225,7 @@ def _fuchsia_sdk_repository_ext(ctx):
             local_paths = []
             for p in mod.tags.local:
                 if p.path:
-                    local_paths.extend(p.path)
+                    local_paths.append(p.path)
 
     fuchsia_sdk_repository(
         name = "fuchsia_sdk",

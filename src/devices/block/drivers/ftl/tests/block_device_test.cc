@@ -142,6 +142,13 @@ class FakeVolume final : public ftl::Volume {
     return ZX_OK;
   }
 
+  zx_status_t GetNewWearLeveling(bool* state) final {
+    *state = false;
+    return ZX_OK;
+  }
+
+  zx_status_t SetNewWearLeveling(bool state) final { return ZX_OK; }
+
   void UpdateWearCount(uint32_t wear_count) { wear_count_ = wear_count; }
 
   void UpdateInitialBadBlockCount(uint32_t initial_bad_blocks) {

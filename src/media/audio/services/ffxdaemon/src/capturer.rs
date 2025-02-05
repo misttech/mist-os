@@ -55,7 +55,7 @@ impl Capturer {
                         gain_settings.mute.and_then(|mute| gain_control_proxy.set_mute(mute).ok());
                     }
 
-                    config.usage.and_then(|usage| proxy.set_usage(usage).ok());
+                    config.usage.and_then(|usage| proxy.set_usage2(usage).ok());
 
                     if let Some(clock_type) = config.clock {
                         let reference_clock = create_reference_clock(clock_type)?;
@@ -159,6 +159,9 @@ impl Capturer {
                         }
                     }
                     fmedia::AudioCapturerEvent::OnEndOfStream {} => break,
+                    fmedia::AudioCapturerEvent::_UnknownEvent { .. } => {
+                        todo!("AudioCapturer UnknownEvent")
+                    }
                 }
             }
 

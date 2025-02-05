@@ -17,7 +17,7 @@
 //
 // If the halt token cannot be acquired, this function will block forever.
 void platform_graceful_halt_helper(platform_halt_action action, zircon_crash_reason_t,
-                                   zx_time_t panic_deadline);
+                                   zx_instant_mono_t panic_deadline);
 
 // Gracefully halt secondary (non-boot) CPUs.
 //
@@ -28,6 +28,6 @@ void platform_graceful_halt_helper(platform_halt_action action, zircon_crash_rea
 // reached.
 //
 // This function must be called from the primary (boot) CPU.
-zx_status_t platform_halt_secondary_cpus(zx_time_t deadline);
+zx_status_t platform_halt_secondary_cpus(zx_instant_mono_t deadline);
 
 #endif  // ZIRCON_KERNEL_INCLUDE_PLATFORM_HALT_HELPER_H_

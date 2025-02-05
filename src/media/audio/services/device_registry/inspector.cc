@@ -60,7 +60,7 @@ RunningIntervalInspectInstance::~RunningIntervalInspectInstance() {
 }
 
 void RunningIntervalInspectInstance::RecordStopTime(const zx::time& stopped_at) {
-  ADR_LOG_METHOD(kTraceInspector) << kStoppedAt.Data() << stopped_at.get();
+  ADR_LOG_METHOD(kTraceInspector) << kStoppedAt << stopped_at.get();
   stopped_at_ = running_interval_node_.CreateInt(kStoppedAt, stopped_at.get());
 }
 
@@ -76,7 +76,7 @@ RingBufferInspectInstance::RingBufferInspectInstance(inspect::Node ring_buffer_i
 RingBufferInspectInstance::~RingBufferInspectInstance() { ADR_LOG_METHOD(kTraceInspector); }
 
 void RingBufferInspectInstance::RecordDestructionTime(const zx::time& destroyed_at) {
-  ADR_LOG_METHOD(kTraceInspector) << kDestroyedAt.Data() << destroyed_at.get();
+  ADR_LOG_METHOD(kTraceInspector) << kDestroyedAt << destroyed_at.get();
   destroyed_at_ = ring_buffer_instance_node_.CreateInt(kDestroyedAt, destroyed_at.get());
 }
 
@@ -93,7 +93,7 @@ void RingBufferInspectInstance::RecordStartTime(const zx::time& started_at) {
 }
 
 void RingBufferInspectInstance::RecordStopTime(const zx::time& stopped_at) {
-  ADR_LOG_METHOD(kTraceInspector) << kStoppedAt.Data() << stopped_at.get();
+  ADR_LOG_METHOD(kTraceInspector) << kStoppedAt << stopped_at.get();
   if (!running_intervals_.empty()) {
     (*running_intervals_.rbegin())->RecordStopTime(stopped_at);
   }
@@ -205,7 +205,7 @@ std::shared_ptr<RingBufferElement> DeviceInspectInstance::RecordRingBufferElemen
 
 std::shared_ptr<RingBufferInspectInstance> DeviceInspectInstance::RecordRingBufferInstance(
     ElementId element_id, const zx::time& created_at) {
-  ADR_LOG_METHOD(kTraceInspector) << kElementId.Data() << element_id;
+  ADR_LOG_METHOD(kTraceInspector) << kElementId << element_id;
   auto found = std::find_if(ring_buffer_elements_.begin(), ring_buffer_elements_.end(),
                             [element_id](std::shared_ptr<RingBufferElement> rb_element) {
                               return (rb_element->element_id() == element_id);

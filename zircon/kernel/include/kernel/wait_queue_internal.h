@@ -54,7 +54,7 @@ inline zx_status_t WaitQueue::BlockEtcPreamble(Thread* const current_thread,
     TA_REQ(get_lock(), current_thread->get_lock()) {
   DEBUG_ASSERT(current_thread == Thread::Current::Get());
 
-  if (deadline.when() != ZX_TIME_INFINITE && deadline.when() <= current_time()) {
+  if (deadline.when() != ZX_TIME_INFINITE && deadline.when() <= current_mono_time()) {
     return ZX_ERR_TIMED_OUT;
   }
 

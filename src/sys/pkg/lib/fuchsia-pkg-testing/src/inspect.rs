@@ -22,7 +22,7 @@ pub async fn get_inspect_hierarchy(
         .next()
         .expect("there's one result");
     if data.payload.is_none() {
-        tracing::error!(?data, "Unexpected empty payload");
+        log::error!(data:?; "Unexpected empty payload");
     }
     data.payload.unwrap()
 }

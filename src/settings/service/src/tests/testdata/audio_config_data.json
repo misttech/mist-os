@@ -29,6 +29,12 @@
             "source": "User",
             "user_volume_level": 0.4,
             "user_volume_muted": false
+        },
+        {
+            "stream_type": "Accessibility",
+            "source": "User",
+            "user_volume_level": 0.35,
+            "user_volume_muted": false
         }
     ]
 }

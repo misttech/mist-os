@@ -28,7 +28,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "primitive",
         "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
@@ -156,7 +155,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.newtype/CalculatorAddRequest",
             "nullable": false,
@@ -172,7 +170,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.newtype/CalculatorAddResponse",
             "nullable": false,
@@ -211,7 +208,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -239,7 +235,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -295,7 +290,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -349,7 +343,6 @@
       "members": [
         {
           "type": {
-            "kind": "string",
             "kind_v2": "string",
             "nullable": false,
             "type_shape_v2": {
@@ -435,7 +428,6 @@
           "ordinal": 1,
           "name": "b",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
@@ -487,7 +479,6 @@
         "nullable": false
       },
       "type": {
-        "kind": "identifier",
         "kind_v2": "identifier",
         "identifier": "test.newtype/Struct",
         "nullable": false,
@@ -514,7 +505,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "identifier",
         "kind_v2": "identifier",
         "identifier": "test.newtype/Struct",
         "nullable": false,
@@ -544,7 +534,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "identifier",
         "kind_v2": "identifier",
         "identifier": "test.newtype/Bits",
         "nullable": false,
@@ -569,7 +558,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "identifier",
         "kind_v2": "identifier",
         "identifier": "test.newtype/Struct",
         "nullable": true,
@@ -594,13 +582,11 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "identifier",
         "kind_v2": "endpoint",
         "role": "client",
         "protocol": "test.newtype/Calculator",
         "nullable": false,
         "protocol_transport": "Channel",
-        "identifier": "test.newtype/Calculator",
         "type_shape_v2": {
           "inline_size": 4,
           "alignment": 4,
@@ -622,7 +608,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "identifier",
         "kind_v2": "identifier",
         "identifier": "test.newtype/Enum",
         "nullable": false,
@@ -647,13 +632,11 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "request",
         "kind_v2": "endpoint",
         "role": "server",
         "protocol": "test.newtype/Calculator",
         "nullable": false,
         "protocol_transport": "Channel",
-        "subtype": "test.newtype/Calculator",
         "type_shape_v2": {
           "inline_size": 4,
           "alignment": 4,
@@ -675,13 +658,11 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "request",
         "kind_v2": "endpoint",
         "role": "server",
         "protocol": "test.newtype/Calculator",
         "nullable": true,
         "protocol_transport": "Channel",
-        "subtype": "test.newtype/Calculator",
         "type_shape_v2": {
           "inline_size": 4,
           "alignment": 4,
@@ -703,7 +684,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "identifier",
         "kind_v2": "identifier",
         "identifier": "test.newtype/Struct",
         "nullable": false,
@@ -761,7 +741,6 @@
         }
       ],
       "type": {
-        "kind": "identifier",
         "kind_v2": "identifier",
         "identifier": "test.newtype/Struct",
         "nullable": false,
@@ -786,7 +765,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "identifier",
         "kind_v2": "identifier",
         "identifier": "test.newtype/Table",
         "nullable": false,
@@ -823,7 +801,6 @@
         }
       ],
       "type": {
-        "kind": "identifier",
         "kind_v2": "identifier",
         "identifier": "test.newtype/Table",
         "nullable": false,
@@ -848,7 +825,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "identifier",
         "kind_v2": "identifier",
         "identifier": "test.newtype/Union",
         "nullable": false,
@@ -873,10 +849,8 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "vector",
         "kind_v2": "vector",
         "element_type": {
-          "kind": "identifier",
           "kind_v2": "identifier",
           "identifier": "test.newtype/Union",
           "nullable": false,

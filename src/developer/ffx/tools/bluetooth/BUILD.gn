@@ -8,6 +8,7 @@ import("//src/developer/ffx/build/ffx_tool.gni")
 assert(is_host, "FFX tools can only be compiled in the host toolchain")
 
 ffx_plugin("ffx_bluetooth") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
 
@@ -18,6 +19,10 @@ ffx_plugin("ffx_bluetooth") {
     "src/peer:ffx_bluetooth_peer",
   ]
   args_sources = [ "src/args.rs" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
 
   deps = [ "//src/developer/ffx/lib/errors:lib" ]
 }

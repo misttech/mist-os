@@ -4,8 +4,8 @@
 
 use fidl_fuchsia_bluetooth_power::{WatcherRequest, WatcherRequestStream, WatcherWatchResponder};
 use futures::{Future, TryStreamExt};
+use log::debug;
 use std::sync::Arc;
-use tracing::debug;
 
 use crate::error::Error;
 use crate::peripheral_state::{PeripheralState, PeripheralSubscriber};

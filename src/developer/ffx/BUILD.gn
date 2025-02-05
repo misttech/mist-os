@@ -11,19 +11,12 @@ import("//build/tools/json_merge/json_merge.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
 import("config.gni")
 
-declare_args() {
-  # Label pointing to the main product bundle to work with if the default product in a multi-product
-  # build is not desired.
-  main_pb_label = ""
-}
-
 group("ffx") {
   testonly = true
 
   public_deps = [
     ":ffx-defaults.json($host_toolchain)",
     ":ffx_tool($host_toolchain)",
-    ":tests",
     "lib($host_toolchain)",
   ]
 }
@@ -99,8 +92,11 @@ if (current_toolchain == default_toolchain) {
             root = "!!BUILD_DIR"
           }
 
-          product = {
-            index = "!!BUILD_DIR/product_bundles.json"
+          pbms = {
+            base_urls = [
+              "file://!!BUILD_DIR",
+              "gs://fuchsia/development",
+            ]
           }
 
           # The "main" product bundle
@@ -108,8 +104,9 @@ if (current_toolchain == default_toolchain) {
           # that do not build any product bundles. In those builds, there is no product, so
           # it is OK to not set this value.
           if (defined(_product_path)) {
-            product.path =
-                "!!BUILD_DIR/" + rebase_path(_product_path, root_out_dir)
+            product = {
+              path = "!!BUILD_DIR/" + rebase_path(_product_path, root_out_dir)
+            }
           }
 
           # package repository
@@ -178,10 +175,9 @@ if (is_host) {
     # - the SDK as a whole (See the `host_test_data("sdk_exported")`, for example:
     #   ```
     #   host_test_data("sdk_exported") {
-    #     sources = [ get_label_info("//sdk:core($default_toolchain)",
-    #                                "root_out_dir") + "/sdk/exported/core" ]
-    #
-    #     deps = [ "//sdk:core($default_toolchain)" ]
+    #     _sdk_label = "//sdk:exported_idk_for_ffx_tests($default_toolchain)"
+    #     sources = [ get_label_info(_sdk_label, "root_out_dir") + "/sdk/exported/core" ]
+    #     deps = [ _sdk_label ]
     #   }
     #   ```
     #
@@ -298,6 +294,7 @@ group("tests") {
     "lib:tests($host_toolchain)",
     "playground:tests($host_toolchain)",
     "plugins/package:tests($host_toolchain)",
+    "plugins/trace:tests($host_toolchain)",
     "tests($host_toolchain)",
   ]
 }

@@ -7,6 +7,7 @@ use crate::package_types::PartialPackageDefinition;
 use anyhow::{anyhow, bail, format_err, Context, Result};
 use fuchsia_hash::Hash;
 use fuchsia_url::{AbsolutePackageUrl, PackageName, PackageVariant};
+use log::{info, warn};
 use scrutiny_collection::model::DataModel;
 use scrutiny_collection::zbi::Zbi;
 use scrutiny_utils::artifact::{ArtifactReader, FileArtifactReader};
@@ -19,7 +20,6 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
-use tracing::{info, warn};
 use update_package::parse_image_packages_json;
 
 /// The path of the file in bootfs that lists all the bootfs packages.
@@ -76,17 +76,17 @@ fn extract_zbi_from_update_package(
     let sections = zbi_reader.parse()?;
     let mut bootfs_files = HashMap::new();
     let mut cmdline = vec![];
-    info!(total = sections.len(), "Extracted sections from the ZBI");
+    info!(total = sections.len(); "Extracted sections from the ZBI");
     for section in sections.iter() {
-        info!(section_type = ?section.section_type, "Extracted sections");
+        info!(section_type:? = section.section_type; "Extracted sections");
         if section.section_type == ZbiType::StorageBootfs {
             let mut bootfs_reader = BootfsReader::new(section.buffer.clone());
             let bootfs_result = bootfs_reader.parse();
             if let Err(err) = bootfs_result {
-                warn!(%err, "Bootfs parse failed");
+                warn!(err:%; "Bootfs parse failed");
             } else {
                 bootfs_files = bootfs_result.unwrap();
-                info!(total = bootfs_files.len(), "Bootfs found files");
+                info!(total = bootfs_files.len(); "Bootfs found files");
             }
         } else if section.section_type == ZbiType::Cmdline {
             let mut cmd_buffer = section.buffer.clone();

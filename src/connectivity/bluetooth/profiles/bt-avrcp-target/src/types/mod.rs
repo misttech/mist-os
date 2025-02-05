@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Error};
+use log::warn;
 use std::fmt::Debug;
-use tracing::warn;
 use {fidl_fuchsia_bluetooth_avrcp as fidl_avrcp, fuchsia_async as fasync};
 
 pub mod bounded_queue;

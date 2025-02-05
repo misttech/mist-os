@@ -132,20 +132,20 @@ static void* c_memset(void* s, int c, size_t count) {
 
 static void* null_memcpy(void* dst, const void* src, size_t len) { return dst; }
 
-static zx_duration_t bench_memcpy_routine(void* memcpy_routine(void*, const void*, size_t),
-                                          size_t srcalign, size_t dstalign) {
+static zx_duration_mono_t bench_memcpy_routine(void* memcpy_routine(void*, const void*, size_t),
+                                               size_t srcalign, size_t dstalign) {
   int i;
-  zx_time_t t0;
+  zx_instant_mono_t t0;
 
-  t0 = current_time();
+  t0 = current_mono_time();
   for (i = 0; i < ITERATIONS; i++) {
     memcpy_routine(g_dst + dstalign, g_src + srcalign, BUFFER_SIZE);
   }
-  return current_time() - t0;
+  return current_mono_time() - t0;
 }
 
 static void bench_memcpy(void) {
-  zx_duration_t null, c, libc, mine;
+  zx_duration_mono_t null, c, libc, mine;
   size_t srcalign, dstalign;
 
   printf("memcpy speed test\n");
@@ -228,20 +228,20 @@ static void validate_memcpy(void) {
   }
 }
 
-static zx_duration_t bench_memset_routine(void* memset_routine(void*, int, size_t), size_t dstalign,
-                                          size_t len) {
+static zx_duration_mono_t bench_memset_routine(void* memset_routine(void*, int, size_t),
+                                               size_t dstalign, size_t len) {
   int i;
-  zx_time_t t0;
+  zx_instant_mono_t t0;
 
-  t0 = current_time();
+  t0 = current_mono_time();
   for (i = 0; i < ITERATIONS; i++) {
     memset_routine(g_dst + dstalign, 0, len);
   }
-  return current_time() - t0;
+  return current_mono_time() - t0;
 }
 
 static void bench_memset(void) {
-  zx_duration_t c, libc, mine;
+  zx_duration_mono_t c, libc, mine;
   size_t dstalign;
 
   printf("memset speed test\n");

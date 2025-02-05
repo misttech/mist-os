@@ -231,7 +231,7 @@ impl<B: MemBackend> MemDevice<B> {
         let request = match read_request(&mut chain) {
             Ok(request) => request,
             Err(e) => {
-                tracing::warn!(
+                log::warn!(
                     "Failed to parse guest request header chain_remaining = {:?}",
                     chain.remaining()
                 );
@@ -259,7 +259,7 @@ impl<B: MemBackend> MemDevice<B> {
                 let addr = request.addr.get();
                 let nb_blocks = request.nb_blocks.get();
                 let plugged_size_bytes = self.plugged_size_bytes_value;
-                tracing::trace!(?ty, ?addr, ?nb_blocks, ?plugged_size_bytes);
+                log::trace!(ty:?, addr:?, nb_blocks:?, plugged_size_bytes:?; "");
                 write_response(
                     chain,
                     wire::VirtioMemResponse {
@@ -270,7 +270,7 @@ impl<B: MemBackend> MemDevice<B> {
                 )
             }
             Err(e) => {
-                tracing::error!(
+                log::error!(
                     "{} ty = {} addr = {} nb_blocks = {}",
                     e,
                     request.ty.get(),

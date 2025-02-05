@@ -21,30 +21,25 @@ from fuchsia_controller_py import ZxStatus
 from parameterized import param, parameterized
 
 from honeydew import errors
+from honeydew.affordances.connectivity.bluetooth.avrcp import avrcp_using_sl4f
+from honeydew.affordances.connectivity.bluetooth.bluetooth_common import (
+    bluetooth_common_using_sl4f,
+)
+from honeydew.affordances.connectivity.bluetooth.gap import gap_using_fc
 from honeydew.affordances.connectivity.wlan.wlan import wlan_using_fc
 from honeydew.affordances.connectivity.wlan.wlan_policy import (
     wlan_policy_using_fc,
 )
-from honeydew.affordances.ffx import session as session_ffx
 from honeydew.affordances.ffx.ui import screenshot as screenshot_ffx
 from honeydew.affordances.fuchsia_controller import rtc as rtc_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
-from honeydew.affordances.fuchsia_controller.bluetooth.profiles import (
-    bluetooth_gap as bluetooth_gap_fc,
-)
 from honeydew.affordances.fuchsia_controller.ui import (
     user_input as user_input_fc,
 )
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller_using_starnix,
 )
-from honeydew.affordances.sl4f.bluetooth import bluetooth_common
-from honeydew.affordances.sl4f.bluetooth.profiles import (
-    bluetooth_avrcp as bluetooth_avrcp_sl4f,
-)
-from honeydew.affordances.sl4f.bluetooth.profiles import (
-    bluetooth_gap as bluetooth_gap_sl4f,
-)
+from honeydew.affordances.session import session_using_ffx
 from honeydew.fuchsia_device import fuchsia_device
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
@@ -343,7 +338,9 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
     def test_session(self) -> None:
         """Test case to make sure fuchsia_device supports session
         affordance implemented using FFX"""
-        self.assertIsInstance(self.fd_fc_obj.session, session_ffx.Session)
+        self.assertIsInstance(
+            self.fd_fc_obj.session, session_using_ffx.SessionUsingFfx
+        )
 
     def test_screenshot(self) -> None:
         """Test case to make sure fuchsia_device supports screenshot
@@ -425,7 +422,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             self.fd_fc_obj.bluetooth_avrcp  # pylint: disable=pointless-statement
 
     @mock.patch.object(
-        bluetooth_common.BluetoothCommon,
+        bluetooth_common_using_sl4f.BluetoothCommonUsingSl4f,
         "__init__",
         autospec=True,
         return_value=None,
@@ -437,12 +434,12 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         SL4F based bluetooth_avrcp affordance."""
         self.assertIsInstance(
             self.fd_sl4f_obj.bluetooth_avrcp,
-            bluetooth_avrcp_sl4f.BluetoothAvrcp,
+            avrcp_using_sl4f.AvrcpUsingSl4f,
         )
         mock_bluetooth_common_init.assert_called_once()
 
     @mock.patch.object(
-        bluetooth_gap_fc.BluetoothGap,
+        gap_using_fc.GapUsingFc,
         "__init__",
         autospec=True,
         return_value=None,
@@ -452,7 +449,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         Fuchsia-Controller based bluetooth_gap affordance."""
         self.assertIsInstance(
             self.fd_fc_obj.bluetooth_gap,
-            bluetooth_gap_fc.BluetoothGap,
+            gap_using_fc.GapUsingFc,
         )
         bt_gap_fc_init.assert_called_once_with(
             self.fd_fc_obj.bluetooth_gap,
@@ -460,23 +457,6 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             fuchsia_controller=self.fd_fc_obj.fuchsia_controller,
             reboot_affordance=self.fd_fc_obj,
         )
-
-    @mock.patch.object(
-        bluetooth_common.BluetoothCommon,
-        "__init__",
-        autospec=True,
-        return_value=None,
-    )
-    def test_bluetooth_gap_sl4f(
-        self, mock_bluetooth_common_init: mock.Mock
-    ) -> None:
-        """Test case to make sure fuchsia_device supports
-        SL4F based bluetooth_gap affordance."""
-        self.assertIsInstance(
-            self.fd_sl4f_obj.bluetooth_gap,
-            bluetooth_gap_sl4f.BluetoothGap,
-        )
-        mock_bluetooth_common_init.assert_called_once()
 
     @mock.patch.object(
         ffx_transport.FFX,
@@ -747,6 +727,29 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         mock_sl4f_check_connection.assert_called_once_with(
             self.fd_sl4f_obj.sl4f
         )
+
+    @mock.patch.object(
+        fuchsia_controller_transport.FuchsiaController,
+        "check_connection",
+        autospec=True,
+    )
+    @mock.patch.object(
+        ffx_transport.FFX,
+        "check_connection",
+        side_effect=errors.FfxConnectionError("ffx connection error"),
+        autospec=True,
+    )
+    def test_health_check_exception(
+        self,
+        mock_ffx_check_connection: mock.Mock,
+        mock_fc_check_connection: mock.Mock,
+    ) -> None:
+        """Testcase for FuchsiaDevice.health_check() raising HealthCheckError"""
+        with self.assertRaises(errors.HealthCheckError):
+            self.fd_fc_obj.health_check()
+
+        mock_ffx_check_connection.assert_called_once_with(self.fd_fc_obj.ffx)
+        mock_fc_check_connection.assert_not_called()
 
     @parameterized.expand(
         [

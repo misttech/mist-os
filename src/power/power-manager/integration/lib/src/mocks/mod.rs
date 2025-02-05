@@ -3,6 +3,6 @@
 // found in the LICENSE file.
 
 pub mod activity_service;
+pub mod admin;
 pub mod input_settings_service;
 pub mod kernel_service;
-pub mod system_controller;

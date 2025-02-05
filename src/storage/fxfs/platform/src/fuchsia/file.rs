@@ -116,8 +116,8 @@ impl FxFile {
         }
     }
 
-    pub fn verified_file(&self) -> bool {
-        self.handle.uncached_handle().verified_file()
+    pub fn is_verified_file(&self) -> bool {
+        self.handle.uncached_handle().is_verified_file()
     }
 
     pub fn handle(&self) -> &PagedObjectHandle {
@@ -226,7 +226,7 @@ impl FxFile {
             // If this file is no longer referenced by anything, do a final flush if needed.
             self.handle.owner().clone().spawn(async move {
                 if let Err(error) = self.handle.flush().await {
-                    warn!(?error, "flush on close failed");
+                    log::warn!(error:?; "flush on close failed");
                 }
             });
         }
@@ -326,7 +326,7 @@ impl vfs::node::Node for FxFile {
                 change_time: props.change_time.as_nanos(),
                 options: descriptor.clone().map(|a| a.0),
                 root_hash: descriptor.clone().map(|a| a.1),
-                verity_enabled: self.verified_file(),
+                verity_enabled: self.is_verified_file(),
             }
         ))
     }
@@ -363,6 +363,9 @@ impl vfs::node::Node for FxFile {
         if self.open_count.load(Ordering::Relaxed) & TO_BE_PURGED != 0 {
             return Err(zx::Status::NOT_FOUND);
         }
+        dir.check_fscrypt_hard_link_conditions(
+            self.fscrypt_wrapping_key_id().await?.map(|x| u128::from_le_bytes(x)),
+        )?;
         dir.link_object(transaction, &name, object_id, ObjectDescriptor::File).await
     }
 
@@ -476,7 +479,6 @@ impl File for FxFile {
         self.handle.store_handle().remove_extended_attribute(name).await.map_err(map_to_status)
     }
 
-    #[cfg(test)]
     async fn allocate(
         &self,
         offset: u64,
@@ -576,7 +578,7 @@ impl GetVmo for FxFile {
 #[cfg(test)]
 mod tests {
     use crate::fuchsia::testing::{
-        close_file_checked, open_file_checked, TestFixture, TestFixtureOptions,
+        close_file_checked, open_file, open_file_checked, TestFixture, TestFixtureOptions,
     };
     use anyhow::format_err;
     use fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions};
@@ -1722,11 +1724,60 @@ mod tests {
             .expect("FIDL transport error")
             .expect("enable verity failed");
 
+        // Writes via FIDL
         file.write(&[2; 8192])
             .await
             .expect("FIDL transport error")
             .map_err(Status::from_raw)
             .expect_err("write succeeded on fsverity-enabled file");
+        // Writes via the pager
+        let vmo = file
+            .get_backing_memory(fio::VmoFlags::READ | fio::VmoFlags::WRITE)
+            .await
+            .expect("FIDL transport error")
+            .map_err(Status::from_raw)
+            .expect("get_backing_memory failed");
+        fasync::unblock(move || {
+            vmo.write(&[2; 8192], 0).expect_err("write via VMO succeeded on fsverity-enabled file");
+        })
+        .await;
+        // Truncation
+        file.resize(1)
+            .await
+            .expect("FIDL transport error")
+            .map_err(Status::from_raw)
+            .expect_err("resize succeeded on fsverity-enabled file");
+
+        // Ensure that new writable handles can't be created
+        open_file(&root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
+            .await
+            .expect_err("open writable succeeded on fsverity-enabled file");
+
+        // Close the file and ensure that it cannot be reopened for writing
+        close_file_checked(file).await;
+        open_file(&root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
+            .await
+            .expect_err("open writable succeeded on fsverity-enabled file");
+
+        // Reopen the filesystem and ensure that the file can't be opened for writing
+        let device = fixture.close().await;
+        device.ensure_unique();
+        device.reopen(false);
+        let fixture = TestFixture::open(
+            device,
+            TestFixtureOptions {
+                format: false,
+                encrypted: true,
+                as_blob: false,
+                serve_volume: false,
+            },
+        )
+        .await;
+
+        let root = fixture.root();
+        open_file(&root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
+            .await
+            .expect_err("open writable succeeded on fsverity-enabled file");
 
         fixture.close().await;
     }

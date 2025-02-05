@@ -237,7 +237,7 @@ zx::result<std::string> Fastboot::GetVarHwRevision(const std::vector<std::string
     return zx::error(svc_root.status_value());
   }
 
-  auto connect_result = component::ConnectAt<fuchsia_buildinfo::Provider>(*svc_root.value());
+  auto connect_result = component::ConnectAt<fuchsia_buildinfo::Provider>(svc_root.value());
   if (connect_result.is_error()) {
     return zx::error(connect_result.status_value());
   }
@@ -270,27 +270,19 @@ zx::result<std::string> Fastboot::GetVarIsUserspace(const std::vector<std::strin
   return zx::ok("yes");
 }
 
-zx::result<fidl::ClientEnd<fuchsia_io::Directory>*> Fastboot::GetSvcRoot() {
+zx::result<fidl::UnownedClientEnd<fuchsia_io::Directory>> Fastboot::GetSvcRoot() {
   // If `svc_root_` is not set, use the system svc root.
   if (!svc_root_) {
-    zx::channel request, service_root;
-    zx_status_t status = zx::channel::create(0, &request, &service_root);
-    if (status != ZX_OK) {
+    auto svc_root = component::OpenServiceRoot();
+    if (svc_root.is_error()) {
       FX_LOGST(ERROR, kFastbootLogTag)
-          << "Failed to create channel " << zx_status_get_string(status);
+          << "Failed to connect to svc root " << svc_root.status_string();
       return zx::error(ZX_ERR_INTERNAL);
     }
-
-    status = fdio_service_connect("/svc", request.release());
-    if (status != ZX_OK) {
-      FX_LOGST(ERROR, kFastbootLogTag)
-          << "Failed to connect to svc root " << zx_status_get_string(status);
-      return zx::error(ZX_ERR_INTERNAL);
-    }
-    svc_root_ = fidl::ClientEnd<fuchsia_io::Directory>(std::move(service_root));
+    svc_root_ = std::move(*svc_root);
   }
 
-  return zx::ok(&svc_root_);
+  return zx::ok(fidl::UnownedClientEnd<fuchsia_io::Directory>(svc_root_));
 }
 
 zx::result<fidl::WireSyncClient<fuchsia_paver::Paver>> Fastboot::ConnectToPaver() {
@@ -300,7 +292,7 @@ zx::result<fidl::WireSyncClient<fuchsia_paver::Paver>> Fastboot::ConnectToPaver(
     return zx::error(svc_root.status_value());
   }
 
-  auto paver_svc = component::ConnectAt<fuchsia_paver::Paver>(*svc_root.value());
+  auto paver_svc = component::ConnectAt<fuchsia_paver::Paver>(*svc_root);
   if (!paver_svc.is_ok()) {
     FX_LOGST(ERROR, kFastbootLogTag) << "Unable to open /svc/fuchsia.paver.Paver";
     return zx::error(paver_svc.error_value());
@@ -529,8 +521,7 @@ Fastboot::ConnectToPowerStateControl() {
     return zx::error(svc_root.status_value());
   }
 
-  auto connect_result =
-      component::ConnectAt<fuchsia_hardware_power_statecontrol::Admin>(*svc_root.value());
+  auto connect_result = component::ConnectAt<fuchsia_hardware_power_statecontrol::Admin>(*svc_root);
   if (connect_result.is_error()) {
     return zx::error(connect_result.status_value());
   }
@@ -555,8 +546,14 @@ zx::result<> Fastboot::Reboot(const std::string& command, Transport* transport) 
   // Wait for 1s to make sure the response is sent over to the transport
   std::this_thread::sleep_for(std::chrono::seconds(1));
 
-  auto resp = connect_result.value()->Reboot(
-      fuchsia_hardware_power_statecontrol::RebootReason::kUserRequest);
+  fidl::Arena arena;
+  auto builder = fuchsia_hardware_power_statecontrol::wire::RebootOptions::Builder(arena);
+  fuchsia_hardware_power_statecontrol::RebootReason2 reasons[1] = {
+      fuchsia_hardware_power_statecontrol::RebootReason2::kUserRequest};
+  auto vector_view =
+      fidl::VectorView<fuchsia_hardware_power_statecontrol::RebootReason2>::FromExternal(reasons);
+  builder.reasons(vector_view);
+  auto resp = connect_result.value()->PerformReboot(builder.Build());
   if (!resp.ok()) {
     return zx::error(resp.status());
   }
@@ -624,7 +621,7 @@ zx::result<> Fastboot::OemAddStagedBootloaderFile(const std::string& command,
     return zx::error(svc_root.status_value());
   }
 
-  auto connect_result = component::ConnectAt<fuchsia_fshost::Admin>(*svc_root.value());
+  auto connect_result = component::ConnectAt<fuchsia_fshost::Admin>(*svc_root);
   if (connect_result.is_error()) {
     return SendResponse(ResponseType::kFail, "Failed to connect to fshost", transport,
                         zx::error(connect_result.status_value()));

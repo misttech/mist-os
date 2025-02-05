@@ -39,6 +39,8 @@ class DriverDevelopmentService : public fidl::WireServer<fuchsia_driver_developm
   void RemoveTestNode(RemoveTestNodeRequestView request,
                       RemoveTestNodeCompleter::Sync& completer) override;
   void WaitForBootup(WaitForBootupCompleter::Sync& completer) override;
+  void RestartWithDictionary(RestartWithDictionaryRequestView request,
+                             RestartWithDictionaryCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_driver_development::Manager> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;

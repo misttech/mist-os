@@ -141,6 +141,18 @@ type ProofOfInterfaceAuthorization = resource struct {
     token zx.Handle:<EVENT, 0>;
 };
 
+/// Options for creating an interface.
+type Options = table {
+    /// New interface name.
+    ///
+    /// If not set, an implementation-defined name will be selected.
+    1: name fuchsia.net.interfaces.Name;
+    /// The default metric value used for routes through this interface.
+    ///
+    /// If not set, the server will use a sensible default.
+    2: metric fuchsia.net.RouteMetric;
+};
+
 /// Provides control over an interface.
 ///
 /// This protocol encodes the underlying interface's lifetime in both
@@ -337,6 +349,17 @@ closed protocol Installer {
         device client_end:fuchsia.hardware.network.Device;
         device_control server_end:DeviceControl;
     });
+
+    /// Installs a blackhole interface on the network stack.
+    ///
+    /// A "blackhole" interface is an interface that drops any outbound traffic
+    /// transmitted through it, and never receives any inbound traffic.
+    ///
+    /// + request `interface` grants access to the installed interface.
+    strict InstallBlackholeInterface(resource struct {
+        interface server_end:Control;
+        options Options;
+    });
 };
 
 /// Administrative control over an installed device on the network stack.
@@ -369,16 +392,7 @@ closed protocol DeviceControl {
     strict CreateInterface(resource struct {
         port fuchsia.hardware.network.PortId;
         control server_end:Control;
-        options table {
-            /// New interface name.
-            ///
-            /// If not set, an implementation-defined name will be selected.
-            1: name fuchsia.net.interfaces.Name;
-            /// The default metric value used for routes through this interface.
-            ///
-            /// If not set, the server will use a sensible default.
-            2: metric fuchsia.net.RouteMetric;
-        };
+        options Options;
     });
 
     /// Detaches the client end from the device's lifetime.

@@ -113,9 +113,9 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/aml-trip.cm" ]
     },
     {
-      package_target = "//src/devices/suspend/drivers/aml-suspend:package"
+      package_target = "//src/devices/suspend/drivers/generic-suspend:package"
       package_set = "bootfs"
-      driver_components = [ "meta/aml-suspend.cm" ]
+      driver_components = [ "meta/generic-suspend.cm" ]
     },
     {
       package_target = "//src/devices/usb/drivers/dwc2:package"
@@ -243,7 +243,7 @@ group("vim3-release") {
     "//src/devices/pwm/drivers/aml-pwm:package-archive",
     "//src/devices/pwm/drivers/aml-pwm-init:package-archive",
     "//src/devices/serial/drivers/aml-uart:package-archive",
-    "//src/devices/suspend/drivers/aml-suspend:package-archive",
+    "//src/devices/suspend/drivers/generic-suspend:package-archive",
     "//src/devices/temperature/drivers/aml-trip:package-archive",
     "//src/devices/thermal/drivers/aml-thermal:package-archive",
     "//src/devices/usb/drivers/aml-usb-phy:bazel_package-archive",

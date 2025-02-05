@@ -142,8 +142,8 @@ fn parse_ffx_args(cmd: &str, args: &[impl AsRef<str>]) -> Result<Ffx, Exit> {
 fn run_update_command(mut command: Command) -> Result<Output, Exit> {
     let program = command.get_program().to_owned();
     let output = command.stderr(Stdio::inherit()).output().map_err(|err| {
-        tracing::warn!("Command could not be run: {command:?}");
-        tracing::warn!("Error from failed command: {err:?}");
+        log::warn!("Command could not be run: {command:?}");
+        log::warn!("Error from failed command: {err:?}");
         Exit {
             message: Box::new(format!("Failed to run check script {program:?}:\n{err}")),
             code: SCRIPT_FAILED,
@@ -151,11 +151,11 @@ fn run_update_command(mut command: Command) -> Result<Output, Exit> {
     })?;
 
     if output.status.success() {
-        tracing::trace!("Command succeeded: {command:?}");
+        log::trace!("Command succeeded: {command:?}");
         Ok(output)
     } else {
-        tracing::debug!("Command failed: {command:?}");
-        tracing::debug!("Failed command output: {output:?}");
+        log::debug!("Command failed: {command:?}");
+        log::debug!("Failed command output: {output:?}");
         Err(Exit {
             message: Box::new(format!(
                 "Check script {program:?} did not succeed. Output:\n\n{}",
@@ -177,7 +177,7 @@ fn sdk_tool_not_found_err(err: anyhow::Error) -> Exit {
 fn ensure_config(domain: &mut ConfigDomain) -> Result<(), Exit> {
     if let Some(cmd) = domain.needs_config_bootstrap() {
         // run the command
-        tracing::trace!("Running bootstrap command: {cmd:?}");
+        log::trace!("Running bootstrap command: {cmd:?}");
         let output = run_update_command(cmd)?;
         // double check we don't still need bootstrapping, and return an
         // error if we do.
@@ -191,20 +191,17 @@ fn ensure_config(domain: &mut ConfigDomain) -> Result<(), Exit> {
     Ok(())
 }
 
-async fn load_domain_sdk_root(
-    env: &EnvironmentContext,
-    domain: &ConfigDomain,
-) -> Result<SdkRoot, Exit> {
+fn load_domain_sdk_root(env: &EnvironmentContext, domain: &ConfigDomain) -> Result<SdkRoot, Exit> {
     // load details we need for the sdk updating process and check if we
     // need to and how
-    let sdk_root = env.get_sdk_root().await.map_err(sdk_load_err)?;
+    let sdk_root = env.get_sdk_root().map_err(sdk_load_err)?;
     let Some(mut known_states) = domain.load_sdk_check_manifest() else {
         // no configured manifest, so no way to check
         return Ok(sdk_root);
     };
     if let Some(cmd) = domain.needs_sdk_update(&sdk_root, &mut known_states) {
         // run the command
-        tracing::trace!("Running sdk update command: {cmd:?}");
+        log::trace!("Running sdk update command: {cmd:?}");
         let output = run_update_command(cmd)?;
         // double check we have an sdk in place now.
         if !sdk_root.manifest_exists() {
@@ -221,7 +218,7 @@ async fn load_domain_sdk_root(
     Ok(sdk_root)
 }
 
-async fn run(
+fn run(
     args: impl IntoIterator<Item = String>,
     env: impl IntoIterator<Item = (String, String)>,
 ) -> Result<(), Exit> {
@@ -235,9 +232,9 @@ async fn run(
     // then re-borrow immutably to verify the SDK, or just get the sdk root
     // normally if we're not in a config domain.
     let sdk_root = if let Some(domain) = env.get_config_domain() {
-        load_domain_sdk_root(&env, domain).await?
+        load_domain_sdk_root(&env, domain)?
     } else {
-        env.get_sdk_root().await.map_err(sdk_load_err)?
+        env.get_sdk_root().map_err(sdk_load_err)?
     };
     // and finally load the sdk for good.
     let sdk = sdk_root.get_sdk().map_err(sdk_load_err)?;
@@ -252,8 +249,8 @@ async fn run(
 }
 
 #[fuchsia::main(logging_minimum_severity = "warn")]
-async fn main() {
-    let exit_code = match run(std::env::args(), std::env::vars()).await {
+fn main() {
+    let exit_code = match run(std::env::args(), std::env::vars()) {
         Ok(()) => {
             eprintln!("ERROR: fuchsia-sdk-run exited without error or running a host tool!");
             NOT_FOUND_CODE
@@ -289,17 +286,14 @@ mod test {
         assert_eq!(res.code, SCRIPT_FAILED, "script failure exit code");
     }
 
-    async fn test_bootstrap_with(
-        test_env: &TestEnv,
-        fuchsia_env: &FuchsiaEnv,
-    ) -> Result<SdkRoot, Exit> {
+    fn test_bootstrap_with(test_env: &TestEnv, fuchsia_env: &FuchsiaEnv) -> Result<SdkRoot, Exit> {
         let root = Utf8Path::from_path(test_env.isolate_root.path()).expect("utf8 path");
         let mut domain =
             ConfigDomain::load_from_contents(root.join("fuchsia_env.toml"), fuchsia_env.clone())
                 .expect("to load domain");
 
         ensure_config(&mut domain)?;
-        load_domain_sdk_root(&test_env.context, &domain).await
+        load_domain_sdk_root(&test_env.context, &domain)
     }
 
     async fn set_sdk_root_config(test_env: &TestEnv) {
@@ -331,47 +325,43 @@ mod test {
         // empty config domain should be able to find the sdk root with
         // no bootstrapping necessary
         test_bootstrap_with(&test_env, &fuchsia_env)
-            .await
             .expect("empty config domain should find the sdk");
 
         // if the config file doesn't exist and there's no bootstrap command set it should
         // not require bootstrapping
         fuchsia_env.fuchsia.project.build_config_path = Some(ConfigPath::relative("config.json"));
         test_bootstrap_with(&test_env, &fuchsia_env)
-            .await
             .expect("no bootstrap command should still find the sdk");
 
         // if the bootstrap command is set, it should require running the command
         // and will fail if it returns false
         fuchsia_env.fuchsia.project.bootstrap_command = Some(shell_cmd("false"));
         test_bootstrap_with(&test_env, &fuchsia_env)
-            .await
             .expect_err("bootstrap command that exits unsuccessfully should fail to load the sdk");
 
         // if the bootstrap command is set, and it returns true, it should still
         // error if the config file still isn't there
         fuchsia_env.fuchsia.project.bootstrap_command = Some(shell_cmd("true"));
-        test_bootstrap_with(&test_env, &fuchsia_env).await.expect_err(
+        test_bootstrap_with(&test_env, &fuchsia_env).expect_err(
             "bootstrap command that doesn't set up the config file should fail to load the sdk",
         );
 
         // if the file now exists, it should be happy again!
         fuchsia_env.fuchsia.project.bootstrap_command = Some(shell_cmd("touch config.json"));
         test_bootstrap_with(&test_env, &fuchsia_env)
-            .await
             .expect("bootstrap command that succeeds and lays down the file should find the sdk");
 
         // but if we switch it to looking for a relative path, it should be unhappy again
         fuchsia_env.fuchsia.project.build_config_path =
             Some(ConfigPath::path_ref("config.json.file"));
-        test_bootstrap_with(&test_env, &fuchsia_env).await.expect_err(
+        test_bootstrap_with(&test_env, &fuchsia_env).expect_err(
             "bootstrap command that doesn't set up the path ref file should fail to load the sdk",
         );
 
         // and then if we make that point at the right file, it should be good again.
         fuchsia_env.fuchsia.project.bootstrap_command =
             Some(shell_cmd("echo config.json > config.json.file"));
-        test_bootstrap_with(&test_env, &fuchsia_env).await.expect(
+        test_bootstrap_with(&test_env, &fuchsia_env).expect(
             "bootstrap command that succeeds and lays down the file ref file should find the sdk",
         );
 
@@ -379,31 +369,27 @@ mod test {
         fuchsia_env.fuchsia.project.build_config_path =
             Some(ConfigPath::out_dir_ref("config.json"));
         test_bootstrap_with(&test_env, &fuchsia_env)
-            .await
             .expect_err("bootstrap command that doesn't set up the output directory should fail");
 
         // now set up an output directory and it should fail until the config file exists there
         fuchsia_env.fuchsia.project.build_out_dir = Some(ConfigPath::relative("out"));
         test_bootstrap_with(&test_env, &fuchsia_env)
-            .await
             .expect_err("bootstrap command that doesn't set up the output directory should fail");
 
         // now set up an output directory and it should fail until the config file exists there
         fuchsia_env.fuchsia.project.bootstrap_command =
             Some(shell_cmd("mkdir -p out && touch out/config.json"));
         test_bootstrap_with(&test_env, &fuchsia_env)
-            .await
             .expect("bootstrap command that does set up the output directory should succeed");
 
         // but not if it's a path_ref that doesn't exist
         fuchsia_env.fuchsia.project.build_out_dir = Some(ConfigPath::path_ref("out.path"));
         test_bootstrap_with(&test_env, &fuchsia_env)
-            .await
             .expect_err("bootstrap command that doesn't set up the output directory should fail");
 
         // now set up an output directory and it should fail until the config file exists there
         fuchsia_env.fuchsia.project.bootstrap_command = Some(shell_cmd("echo out > out.path"));
-        test_bootstrap_with(&test_env, &fuchsia_env).await.expect(
+        test_bootstrap_with(&test_env, &fuchsia_env).expect(
             "bootstrap command that does set up the output directory path_ref should succeed",
         );
     }
@@ -420,14 +406,12 @@ mod test {
         fuchsia_env.fuchsia.sdk.version_check_files = Some(vec!["test_file_1".into()]);
         fuchsia_env.fuchsia.sdk.version_check_command = Some(shell_cmd("false"));
         test_bootstrap_with(&test_env, &fuchsia_env)
-            .await
             .expect_err("sdk check script should fail if it exits unsuccessfully");
 
         // then switch to a command that returns true
         fuchsia_env.fuchsia.sdk.version_check_files = Some(vec!["test_file_1".into()]);
         fuchsia_env.fuchsia.sdk.version_check_command = Some(shell_cmd("true"));
         test_bootstrap_with(&test_env, &fuchsia_env)
-            .await
             .expect("sdk check script should succeed if the test command succeeds");
 
         // and now switch back to to a command that returns false to check
@@ -436,27 +420,23 @@ mod test {
         // its state hasn't changed.
         fuchsia_env.fuchsia.sdk.version_check_command = Some(shell_cmd("false"));
         test_bootstrap_with(&test_env, &fuchsia_env)
-            .await
             .expect("sdk check script should succeed if the state hasn't changed");
 
         // now make that file exist and so its state has changed
         std::fs::File::create(test_env.isolate_root.path().join("test_file_1")).unwrap();
         test_bootstrap_with(&test_env, &fuchsia_env)
-            .await
             .expect_err("sdk check script should fail if it exits unsuccessfully");
 
         // put the command back to one that succeeds so that we can 'bootstrap'
         // properly
         fuchsia_env.fuchsia.sdk.version_check_command = Some(shell_cmd("true"));
         test_bootstrap_with(&test_env, &fuchsia_env)
-            .await
             .expect("sdk check script should succeed if the test command succeeds");
 
         // and again switch back to the 'false' command to make sure that it
         // doesn't re-run if the file doesn't change
         fuchsia_env.fuchsia.sdk.version_check_command = Some(shell_cmd("false"));
         test_bootstrap_with(&test_env, &fuchsia_env)
-            .await
             .expect("sdk check script should succeed if the state hasn't changed");
     }
 }

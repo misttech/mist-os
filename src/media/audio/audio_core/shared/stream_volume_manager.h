@@ -37,7 +37,7 @@ struct VolumeCommand {
 class StreamVolume {
  public:
   virtual ~StreamVolume() = default;
-  virtual fuchsia::media::Usage GetStreamUsage() const = 0;
+  virtual fuchsia::media::Usage2 GetStreamUsage() const = 0;
 
   // Returns true if this stream should receive volume commands that factor in
   // transient loudness adjustments made by audio policy, such as ducking.
@@ -64,10 +64,10 @@ class StreamVolumeManager {
   const UsageGainSettings& GetUsageGainSettings() const;
 
   // Sets usage gain settings and updates affected streams.
-  void SetUsageGain(fuchsia::media::Usage usage, float gain_db);
-  void SetUsageGainAdjustment(fuchsia::media::Usage usage, float gain_db);
+  void SetUsageGain(fuchsia::media::Usage2 usage, float gain_db);
+  void SetUsageGainAdjustment(fuchsia::media::Usage2 usage, float gain_db);
 
-  void BindUsageVolumeClient(fuchsia::media::Usage usage,
+  void BindUsageVolumeClient(fuchsia::media::Usage2 usage,
                              fidl::InterfaceRequest<fuchsia::media::audio::VolumeControl> request);
 
   // Prompts the volume manager to recompute the stream's adjusted gain and send a realization
@@ -81,26 +81,26 @@ class StreamVolumeManager {
  private:
   class VolumeSettingImpl final : public VolumeSetting {
    public:
-    VolumeSettingImpl(fuchsia::media::Usage usage, StreamVolumeManager* owner);
+    VolumeSettingImpl(fuchsia::media::Usage2 usage, StreamVolumeManager* owner);
 
     void SetVolume(float volume) override;
 
    private:
-    fuchsia::media::Usage usage_;
+    fuchsia::media::Usage2 usage_;
     StreamVolumeManager* owner_;
   };
 
-  void SetUsageVolume(fuchsia::media::Usage usage, float volume);
+  void SetUsageVolume(fuchsia::media::Usage2 usage, float volume);
 
-  void UpdateStreamsWithUsage(fuchsia::media::Usage usage);
+  void UpdateStreamsWithUsage(fuchsia::media::Usage2 usage);
   void UpdateStream(StreamVolume* stream, std::optional<Ramp> ramp);
 
-  std::array<VolumeSettingImpl, fuchsia::media::RENDER_USAGE_COUNT>
+  std::array<VolumeSettingImpl, fuchsia::media::RENDER_USAGE2_COUNT>
       render_usage_volume_setting_impls_;
-  std::array<VolumeSettingImpl, fuchsia::media::CAPTURE_USAGE_COUNT>
+  std::array<VolumeSettingImpl, fuchsia::media::CAPTURE_USAGE2_COUNT>
       capture_usage_volume_setting_impls_;
-  std::array<VolumeControl, fuchsia::media::RENDER_USAGE_COUNT> render_usage_volume_controls_;
-  std::array<VolumeControl, fuchsia::media::CAPTURE_USAGE_COUNT> capture_usage_volume_controls_;
+  std::array<VolumeControl, fuchsia::media::RENDER_USAGE2_COUNT> render_usage_volume_controls_;
+  std::array<VolumeControl, fuchsia::media::CAPTURE_USAGE2_COUNT> capture_usage_volume_controls_;
   std::unordered_set<StreamVolume*> stream_volumes_;
   UsageGainSettings usage_gain_settings_;
   UsageVolumeSettings usage_volume_settings_;

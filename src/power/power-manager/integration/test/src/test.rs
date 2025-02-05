@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use power_manager_integration_test_lib::client_connectors::{RebootWatcherClient, ThermalClient};
+use power_manager_integration_test_lib::client_connectors::ThermalClient;
 use power_manager_integration_test_lib::TestEnvBuilder;
-use {fidl_fuchsia_hardware_power_statecontrol as fpower, fuchsia_async as fasync};
 
 /// Integration test for Power Manager to verify correct behavior of the thermal client service.
 #[fuchsia::test]
@@ -39,40 +38,6 @@ async fn thermal_client_service_test() {
 
     // Verify client0 thermal state goes back to 0
     assert_eq!(client0.get_thermal_state().await.unwrap(), 0);
-
-    env.destroy().await;
-}
-
-/// Verifies that shutdown/reboot requests sent to the Power Manager are handled as expected:
-///     1) forward the reboot reason to connected RebootWatcher clients
-///     2) update Driver Manager with the appropriate termination SystemPowerState
-///     3) send a shutdown request to the system controller
-#[fuchsia::test]
-async fn shutdown_test() {
-    let mut env = TestEnvBuilder::new()
-        .power_manager_node_config_path(&"/pkg/shutdown_test/power_manager_node_config.json5")
-        .build()
-        .await;
-
-    // Check the device has finished enumerating before proceeding with the test
-    env.wait_for_device("/dev/sys/platform/soc_thermal").await;
-
-    let mut reboot_watcher = RebootWatcherClient::new(&env).await;
-
-    // Send a reboot request to the Power Manager (in a separate Task because it never returns)
-    let shutdown_client = env.connect_to_protocol::<fpower::AdminMarker>();
-    let _shutdown_task =
-        fasync::Task::local(shutdown_client.reboot(fpower::RebootReason::SystemUpdate));
-
-    // Verify Power Manager forwards the reboot reason to the watcher client
-    assert_eq!(reboot_watcher.get_reboot_reason().await, fpower::RebootReason::SystemUpdate);
-
-    // Verify the system controller service gets the shutdown request from Power Manager
-    env.mocks.system_controller_service.wait_for_shutdown_request().await;
-
-    // TODO(https://fxbug.dev/42071033): Update integration tests to ensure interaction between driver
-    // manager and shutdown shim works as intended. This likely requires using shutdown shim in
-    // this integration test.
 
     env.destroy().await;
 }

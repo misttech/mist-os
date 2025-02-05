@@ -108,6 +108,8 @@ class Stats {
 
 std::string OutputPipelineBenchmark::Input::ToString() const {
   switch (usage) {
+    case RenderUsage::ACCESSIBILITY:
+      return "A";
     case RenderUsage::BACKGROUND:
       return "B";
     case RenderUsage::COMMUNICATION:
@@ -155,6 +157,9 @@ OutputPipelineBenchmark::Input OutputPipelineBenchmark::Input::FromString(const 
   FX_CHECK(str.size() == 1);
   RenderUsage usage;
   switch (str[0]) {
+    case 'A':
+      usage = RenderUsage::ACCESSIBILITY;
+      break;
     case 'B':
       usage = RenderUsage::BACKGROUND;
       break;
@@ -301,6 +306,7 @@ void OutputPipelineBenchmark::PrintLegend(zx::duration mix_period) {
       "    The mixer config has the form X/VZ, where X is a list of input\n"
       "    streams, each of which has one of the following usages:\n"
       "\n"
+      "        A: ACCESSIBILITY\n"
       "        B: BACKGROUND\n"
       "        C: COMMUNICATION\n"
       "        I: INTERRUPTION\n"

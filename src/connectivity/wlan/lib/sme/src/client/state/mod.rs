@@ -21,7 +21,7 @@ use fuchsia_inspect_contrib::inspect_log;
 use fuchsia_inspect_contrib::log::InspectBytes;
 use ieee80211::{Bssid, MacAddr, MacAddrBytes, Ssid};
 use link_state::LinkState;
-use tracing::{error, info, warn};
+use log::{error, info, warn};
 use wlan_common::bss::BssDescription;
 use wlan_common::ie::rsn::cipher;
 use wlan_common::ie::rsn::suite_selector::OUI;
@@ -74,6 +74,23 @@ pub struct Connecting {
     reassociation_loop_count: u32,
 }
 
+// When a roam attempt starts, SME needs to keep track of where the attempt initiated, in order to
+// handle a failure.
+#[derive(Debug)]
+enum RoamInitiator {
+    RoamStartInd,
+    RoamRequest,
+}
+
+impl From<RoamInitiator> for fidl_sme::DisconnectMlmeEventName {
+    fn from(roam_initiator: RoamInitiator) -> fidl_sme::DisconnectMlmeEventName {
+        match roam_initiator {
+            RoamInitiator::RoamStartInd => fidl_sme::DisconnectMlmeEventName::RoamStartIndication,
+            RoamInitiator::RoamRequest => fidl_sme::DisconnectMlmeEventName::RoamRequest,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Associated {
     cfg: ClientConfig,
@@ -88,6 +105,8 @@ pub struct Associated {
     last_channel_switch_time: Option<zx::MonotonicInstant>,
     reassociation_loop_count: u32,
     authentication: Authentication,
+    // If a roam is in progress, track the type of roam here.
+    roam_in_progress: Option<RoamInitiator>,
 }
 
 #[derive(Debug)]
@@ -379,6 +398,7 @@ impl Connecting {
             last_channel_switch_time: None,
             reassociation_loop_count: self.reassociation_loop_count,
             authentication: self.cmd.authentication,
+            roam_in_progress: None,
         })
     }
 
@@ -584,22 +604,43 @@ impl Associated {
         } else {
             fidl_sme::DisconnectSource::Ap(disconnect_reason)
         };
+        let disconnect_info =
+            fidl_sme::DisconnectInfo { is_sme_reconnecting: false, disconnect_source };
 
         match connected_duration {
             Some(_duration) => {
-                let fidl_disconnect_info =
-                    fidl_sme::DisconnectInfo { is_sme_reconnecting: false, disconnect_source };
                 self.connect_txn_sink
-                    .send(ConnectTransactionEvent::OnDisconnect { info: fidl_disconnect_info });
+                    .send(ConnectTransactionEvent::OnDisconnect { info: disconnect_info });
             }
-            None => {
-                let connect_result = EstablishRsnaFailure {
-                    auth_method: self.auth_method,
-                    reason: EstablishRsnaFailureReason::InternalError,
+            None => match self.roam_in_progress {
+                Some(_) => {
+                    report_roam_finished(
+                        &mut self.connect_txn_sink,
+                        RoamFailure {
+                            failure_type: RoamFailureType::EstablishRsnaFailure,
+                            selected_bss: Some(*self.latest_ap_state.clone()),
+                            disconnect_info,
+                            selected_bssid: self.latest_ap_state.bssid,
+                            auth_method: self.auth_method,
+                            status_code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+                            establish_rsna_failure_reason: Some(
+                                EstablishRsnaFailureReason::InternalError,
+                            ),
+                        }
+                        .into(),
+                    );
                 }
-                .into();
-                report_connect_finished(&mut self.connect_txn_sink, connect_result);
-            }
+                _ => {
+                    report_connect_finished(
+                        &mut self.connect_txn_sink,
+                        EstablishRsnaFailure {
+                            auth_method: self.auth_method,
+                            reason: EstablishRsnaFailureReason::InternalError,
+                        }
+                        .into(),
+                    );
+                }
+            },
         }
 
         let _ = state_change_ctx.replace(StateChangeContext::Disconnect {
@@ -641,11 +682,36 @@ impl Associated {
             Err(failure_reason) => {
                 send_deauthenticate_request(&self.latest_ap_state.bssid, &context.mlme_sink);
                 let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
-                report_connect_finished(
-                    &mut self.connect_txn_sink,
-                    EstablishRsnaFailure { auth_method: self.auth_method, reason: failure_reason }
-                        .into(),
-                );
+                match self.roam_in_progress {
+                    Some(roam_initiator) => {
+                        report_roam_finished(
+                            &mut self.connect_txn_sink,
+                            RoamFailure {
+                                failure_type: RoamFailureType::EstablishRsnaFailure,
+                                selected_bssid: self.latest_ap_state.bssid,
+                                status_code: fidl_ieee80211::StatusCode::EstablishRsnaFailure,
+                                disconnect_info: make_roam_disconnect_info(
+                                    roam_initiator.into(),
+                                    None,
+                                ),
+                                auth_method: self.auth_method,
+                                selected_bss: Some(*self.latest_ap_state),
+                                establish_rsna_failure_reason: Some(failure_reason),
+                            }
+                            .into(),
+                        );
+                    }
+                    _ => {
+                        report_connect_finished(
+                            &mut self.connect_txn_sink,
+                            EstablishRsnaFailure {
+                                auth_method: self.auth_method,
+                                reason: failure_reason,
+                            }
+                            .into(),
+                        );
+                    }
+                }
                 return Err(Disconnecting {
                     cfg: self.cfg,
                     action: PostDisconnectAction::None,
@@ -656,7 +722,18 @@ impl Associated {
 
         if let LinkState::LinkUp(_) = link_state {
             if was_establishing_rsna {
-                report_connect_finished(&mut self.connect_txn_sink, ConnectResult::Success);
+                match self.roam_in_progress {
+                    Some(_roam_initiator) => {
+                        report_roam_finished(
+                            &mut self.connect_txn_sink,
+                            RoamResult::Success(Box::new(*self.latest_ap_state.clone())),
+                        );
+                        self.roam_in_progress = None;
+                    }
+                    _ => {
+                        report_connect_finished(&mut self.connect_txn_sink, ConnectResult::Success);
+                    }
+                }
                 self.reassociation_loop_count = 0;
             }
         }
@@ -743,11 +820,36 @@ impl Associated {
             Err(failure_reason) => {
                 send_deauthenticate_request(&self.latest_ap_state.bssid, &context.mlme_sink);
                 let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
-                report_connect_finished(
-                    &mut self.connect_txn_sink,
-                    EstablishRsnaFailure { auth_method: self.auth_method, reason: failure_reason }
-                        .into(),
-                );
+                match self.roam_in_progress {
+                    Some(roam_initiator) => {
+                        report_roam_finished(
+                            &mut self.connect_txn_sink,
+                            RoamFailure {
+                                failure_type: RoamFailureType::EstablishRsnaFailure,
+                                selected_bssid: self.latest_ap_state.bssid,
+                                status_code: fidl_ieee80211::StatusCode::EstablishRsnaFailure,
+                                disconnect_info: make_roam_disconnect_info(
+                                    roam_initiator.into(),
+                                    Some(fidl_ieee80211::ReasonCode::Timeout),
+                                ),
+                                auth_method: self.auth_method,
+                                selected_bss: Some(*self.latest_ap_state),
+                                establish_rsna_failure_reason: Some(failure_reason),
+                            }
+                            .into(),
+                        );
+                    }
+                    _ => {
+                        report_connect_finished(
+                            &mut self.connect_txn_sink,
+                            EstablishRsnaFailure {
+                                auth_method: self.auth_method,
+                                reason: failure_reason,
+                            }
+                            .into(),
+                        );
+                    }
+                }
 
                 Err(Disconnecting { cfg: self.cfg, action: PostDisconnectAction::None, timeout_id })
             }
@@ -765,13 +867,6 @@ impl Associated {
 enum AfterRoamFailureState {
     Idle(Idle),
     Disconnecting(Disconnecting),
-}
-
-// When a roam attempt starts, SME needs to keep track of where the attempt initiated, in order to
-// handle a failure.
-enum RoamInitiator {
-    RoamStartInd,
-    RoamRequest,
 }
 
 impl Roaming {
@@ -1012,6 +1107,9 @@ impl ClientState {
             Self::Associated(state) => match state.link_state {
                 LinkState::EstablishingRsna(_) => RSNA_STATE,
                 LinkState::LinkUp(_) => LINK_UP_STATE,
+                // LinkState always transition to EstablishingRsna or LinkUp on initialization
+                // and never transition back
+                #[expect(clippy::unreachable)]
                 _ => unreachable!(),
             },
             Self::Roaming(_) => ROAMING_STATE,
@@ -1484,6 +1582,9 @@ impl ClientState {
                         wmm_param: associated.wmm_param,
                     })
                 }
+                // LinkState always transition to EstablishingRsna or LinkUp on initialization
+                // and never transition back
+                #[expect(clippy::unreachable)]
                 _ => unreachable!(),
             },
             Self::Roaming(roaming) => ClientSmeStatus::Roaming(roaming.cmd.bss.bssid),
@@ -1721,10 +1822,18 @@ fn roam_handle_result(
                 bssid: state.cmd.bss.bssid.clone(),
                 ssid,
             });
-            state
-                .cmd
-                .connect_txn_sink
-                .send_roam_result(RoamResult::Success(Box::new(*state.cmd.bss.clone())));
+
+            let roam_in_progress = match link_state {
+                LinkState::LinkUp(_) => {
+                    report_roam_finished(
+                        &mut state.cmd.connect_txn_sink,
+                        RoamResult::Success(Box::new(*state.cmd.bss.clone())),
+                    );
+                    None
+                }
+                _ => Some(roam_initiator),
+            };
+
             Ok(Associated {
                 cfg: state.cfg,
                 connect_txn_sink: state.cmd.connect_txn_sink,
@@ -1738,6 +1847,7 @@ fn roam_handle_result(
                 last_channel_switch_time: None,
                 reassociation_loop_count: 0,
                 authentication: state.cmd.authentication,
+                roam_in_progress,
             })
         }
         // Roam attempt failed.
@@ -3577,7 +3687,7 @@ mod tests {
         let mut h = TestHelper::new();
         let (supplicant, suppl_mock) = mock_psk_supplicant();
 
-        let (cmd, mut connect_txn_stream) = connect_command_wpa2(supplicant);
+        let (cmd, _) = connect_command_wpa2(supplicant);
         let bss = (*cmd.bss).clone();
         let mut selected_bss = bss.clone();
         let selected_bssid = [1, 2, 3, 4, 5, 6];
@@ -3619,15 +3729,10 @@ mod tests {
             assert_variant!(&state.link_state, LinkState::EstablishingRsna { .. });
         });
 
+        expect_state_events_link_up_roaming_rsna(&h.inspector, selected_bss);
+
         // Note: because a new supplicant is created for the roam to the target, we can't easily
         // test the 802.1X portion of the roam.
-
-        // User should be notified that the roam succeeded.
-        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnRoamResult {result})) => {
-            assert_eq!(result, RoamResult::Success(Box::new(selected_bss.clone())));
-        });
-
-        expect_state_events_link_up_roaming_rsna(&h.inspector, selected_bss);
     }
 
     #[test]
@@ -3635,7 +3740,7 @@ mod tests {
         let mut h = TestHelper::new();
         let (supplicant, suppl_mock) = mock_psk_supplicant();
 
-        let (cmd, mut connect_txn_stream) = connect_command_wpa2(supplicant);
+        let (cmd, _) = connect_command_wpa2(supplicant);
         let bss = (*cmd.bss).clone();
         let mut selected_bss = bss.clone();
         let selected_bssid = [1, 2, 3, 4, 5, 6];
@@ -3668,15 +3773,10 @@ mod tests {
             assert_variant!(&state.link_state, LinkState::EstablishingRsna { .. });
         });
 
+        expect_state_events_link_up_roaming_rsna(&h.inspector, selected_bss);
+
         // Note: because a new supplicant is created for the roam to the target, we can't easily
         // test the 802.1X portion of the roam.
-
-        // User should be notified that the roam succeeded.
-        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnRoamResult {result})) => {
-            assert_eq!(result, RoamResult::Success(Box::new(selected_bss.clone())));
-        });
-
-        expect_state_events_link_up_roaming_rsna(&h.inspector, selected_bss);
     }
 
     fn expect_roam_failure_emitted(
@@ -5455,6 +5555,7 @@ mod tests {
             last_channel_switch_time: None,
             reassociation_loop_count: 0,
             authentication: cmd.authentication,
+            roam_in_progress: None,
         })
         .into()
     }
@@ -5479,6 +5580,7 @@ mod tests {
             last_channel_switch_time: None,
             reassociation_loop_count: 0,
             authentication: cmd.authentication,
+            roam_in_progress: None,
         })
         .into()
     }

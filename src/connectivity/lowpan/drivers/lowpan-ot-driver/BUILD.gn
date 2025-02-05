@@ -95,7 +95,7 @@ rustc_binary("bin") {
       [ "//src/connectivity/openthread/third_party/openthread/platform" ]
   configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
 
-  # TODO(https://fxbug.dev/356474618): re-enable and fix existing lints
+  # TODO(https://fxbug.dev/356474618): Re-enable and fix existing lints.
   # configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 

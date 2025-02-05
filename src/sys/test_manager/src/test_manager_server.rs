@@ -19,8 +19,8 @@ use fidl_fuchsia_test_manager::{QueryEnumerateInRealmResponder, QueryEnumerateRe
 use ftest_manager::LaunchError;
 use fuchsia_async::{self as fasync};
 use futures::prelude::*;
+use log::warn;
 use std::sync::Arc;
-use tracing::warn;
 
 /// Start `RunBuilder` server and serve it over `stream`.
 pub async fn run_test_manager_run_builder_server(
@@ -249,12 +249,12 @@ pub async fn run_test_manager_query_server(
                         }
                     }
                     Err(err) => {
-                        warn!(?err, "cannot enumerate tests for {}", test_url);
+                        warn!(err:?; "cannot enumerate tests for {}", test_url);
                         responder.send(Err(LaunchError::CaseEnumeration)).ok();
                     }
                 }
                 if let Err(err) = t.await {
-                    warn!(?err, "Error destroying test realm for {}", test_url);
+                    warn!(err:?; "Error destroying test realm for {}", test_url);
                 }
             }
             Err(e) => {
@@ -402,12 +402,12 @@ pub async fn run_test_manager_test_case_enumerator_server(
                                 }
                             }
                             Err(err) => {
-                                warn!(?err, "cannot enumerate tests for {}", test_suite_url);
+                                warn!(err:?; "cannot enumerate tests for {}", test_suite_url);
                                 responder.send(Err(LaunchError::CaseEnumeration)).ok();
                             }
                         }
                         if let Err(err) = t.await {
-                            warn!(?err, "Error destroying test realm for {}", test_suite_url);
+                            warn!(err:?; "Error destroying test realm for {}", test_suite_url);
                         }
                     }
                     Err(e) => {

@@ -15,6 +15,7 @@
         {
             protocol: [
                 "fuchsia.netpol.socketproxy.DnsServerWatcher",
+                "fuchsia.netpol.socketproxy.FuchsiaNetworks",
                 "fuchsia.netpol.socketproxy.StarnixNetworks",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.posix.socket.raw.Provider",
@@ -33,6 +34,7 @@
         {
             protocol: [
                 "fuchsia.netpol.socketproxy.DnsServerWatcher",
+                "fuchsia.netpol.socketproxy.FuchsiaNetworks",
                 "fuchsia.netpol.socketproxy.StarnixNetworks",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.posix.socket.raw.Provider",

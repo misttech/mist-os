@@ -69,11 +69,11 @@ icu_rustc_library("lib") {
     "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:glob",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:paste",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
   ]
 
   test_configs = [
@@ -312,7 +312,7 @@ icu_rustc_binary("bin") {
     "//src/settings/storage:settings_storage",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   test_deps = [
@@ -366,9 +366,9 @@ rustc_binary("setui-config-test") {
     ":lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:tracing",
   ]
 
   source_root = "src/setui_config_test.rs"

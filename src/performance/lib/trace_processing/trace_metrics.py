@@ -10,13 +10,13 @@ See https://fuchsia.dev/fuchsia-src/development/performance/fuchsiaperf_format
 for more details.
 """
 
-import abc
 import dataclasses
 import enum
+import inspect as py_inspect
 import json
 import logging
 import pathlib
-from typing import Any, Iterable, Mapping, Sequence, TypeAlias
+from typing import Any, Iterable, Mapping, Sequence, TypeAlias, TypedDict
 
 from trace_processing import trace_model
 
@@ -52,6 +52,23 @@ class Unit(enum.StrEnum):
     watts = "Watts"
 
 
+class MetricDescription(TypedDict):
+    """Describes a single metric."""
+
+    name: str
+    doc: str
+
+
+class MetricsProcessorDescription(TypedDict):
+    """Documents a single metrics processor."""
+
+    classname: str
+    doc: str
+    code_path: str
+    line_no: int
+    metrics: list[MetricDescription]
+
+
 @dataclasses.dataclass(frozen=True)
 class TestCaseResult:
     """The results for a single test case.
@@ -62,12 +79,20 @@ class TestCaseResult:
     label: str
     unit: Unit
     values: tuple[float, ...]
+    doc: str
 
-    def __init__(self, label: str, unit: Unit, values: Sequence[float]):
+    def __init__(
+        self,
+        label: str,
+        unit: Unit,
+        values: Sequence[float],
+        doc: str = "",
+    ):
         """Allows any Sequence to be used for values while staying hashable."""
         object.__setattr__(self, "label", label)
         object.__setattr__(self, "unit", unit)
         object.__setattr__(self, "values", tuple(values))
+        object.__setattr__(self, "doc", doc)
 
     def to_json(self, test_suite: str) -> dict[str, Any]:
         return {
@@ -76,6 +101,9 @@ class TestCaseResult:
             "unit": str(self.unit),
             "values": list(self.values),
         }
+
+    def describe(self) -> MetricDescription:
+        return MetricDescription(name=self.label, doc=self.doc)
 
     @staticmethod
     def write_fuchsiaperf_json(
@@ -100,10 +128,10 @@ class TestCaseResult:
         _LOGGER.info(f"Wrote {len(results_json)} results into {output_path}")
 
 
-class MetricsProcessor(abc.ABC):
+class MetricsProcessor:
     """MetricsProcessor converts a trace_model.Model into TestCaseResults.
 
-    This abstract class is extended to implement various types of metrics.
+    This base class is extended to implement various types of metrics.
 
     MetricsProcessor subclasses can be used as follows:
 
@@ -137,7 +165,7 @@ class MetricsProcessor(abc.ABC):
             model: The input trace model.
 
         Returns:
-            list[TestCaseResult]: The generated metrics.
+            The generated metrics.
         """
         return []
 
@@ -163,6 +191,20 @@ class MetricsProcessor(abc.ABC):
             JSON: structure holding aggregated metrics, or None if not supported.
         """
         return (self.name, None)
+
+    @classmethod
+    def describe(
+        cls, metrics: Sequence[TestCaseResult]
+    ) -> MetricsProcessorDescription:
+        docstring = py_inspect.getdoc(cls)
+        assert docstring
+        return MetricsProcessorDescription(
+            classname=cls.__name__,
+            doc=docstring,
+            code_path=py_inspect.getfile(cls),
+            line_no=py_inspect.getsourcelines(cls)[1],
+            metrics=[tcr.describe() for tcr in metrics],
+        )
 
 
 class ConstantMetricsProcessor(MetricsProcessor):

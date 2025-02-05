@@ -93,6 +93,7 @@ mod tests {
     use super::*;
     use crate::writer::testing_utils::GetBlockExt;
     use crate::writer::Inspector;
+    use inspect_format::{Array, Uint};
 
     #[fuchsia::test]
     fn test_uint_exp_histogram() {
@@ -112,25 +113,25 @@ mod tests {
             uint_histogram.insert_multiple(0, 2); // underflow
             uint_histogram.insert(8);
             uint_histogram.insert(500); // overflow
-            uint_histogram.array.get_block(|block| {
+            uint_histogram.array.get_block::<_, Array<Uint>>(|block| {
                 for (i, value) in [1, 1, 2, 2, 0, 0, 0, 1, 1].iter().enumerate() {
-                    assert_eq!(block.array_get_uint_slot(i).unwrap(), *value);
+                    assert_eq!(block.get(i).unwrap(), *value);
                 }
             });
 
             uint_histogram.clear();
-            uint_histogram.array.get_block(|block| {
+            uint_histogram.array.get_block::<_, Array<Uint>>(|block| {
                 for (i, value) in [1, 1, 2, 0, 0, 0, 0, 0, 0].iter().enumerate() {
-                    assert_eq!(*value, block.array_get_uint_slot(i).unwrap());
+                    assert_eq!(*value, block.get(i).unwrap());
                 }
             });
 
-            node.get_block(|node_block| {
-                assert_eq!(node_block.child_count().unwrap(), 1);
+            node.get_block::<_, inspect_format::Node>(|node_block| {
+                assert_eq!(node_block.child_count(), 1);
             });
         }
-        node.get_block(|node_block| {
-            assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block::<_, inspect_format::Node>(|node_block| {
+            assert_eq!(node_block.child_count(), 0);
         });
     }
 }

@@ -160,6 +160,30 @@ _all_named_fuchsia_envs += [
   },
 ]
 
+lilac_env = {
+  dimensions = {
+    device_type = "Lilac"
+  }
+}
+_all_named_fuchsia_envs += [
+  {
+    name = "lilac"
+    env = lilac_env
+  },
+]
+
+maple_env = {
+  dimensions = {
+    device_type = "Maple"
+  }
+}
+_all_named_fuchsia_envs += [
+  {
+    name = "maple"
+    env = maple_env
+  },
+]
+
 sorrel_env = {
   dimensions = {
     device_type = "Sorrel"
@@ -223,9 +247,6 @@ _all_named_fuchsia_envs += [
 
 qemu_1cpu_env = {
   forward_variables_from(qemu_env, "*")
-  emu_dimensions = {
-    cores = 1
-  }
   virtual_device_spec = {
     name = "virtual_device_min"
     env_name = "1cpu"

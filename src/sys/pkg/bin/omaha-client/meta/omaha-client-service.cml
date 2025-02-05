@@ -28,9 +28,13 @@
                 "fuchsia.cobalt.SystemDataUpdater",
                 "fuchsia.feedback.ComponentDataRegister",
                 "fuchsia.feedback.CrashReporter",
-                "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.pkg.Cup",
+
+                // TODO(https://fxbug.dev/389134835): Remove the initiator
+                // capability.
+                "fuchsia.power.CollaborativeRebootInitiator",
+                "fuchsia.power.internal.CollaborativeRebootScheduler",
                 "fuchsia.stash.Store2",
                 "fuchsia.update.CommitStatusProvider",
                 "fuchsia.update.installer.Installer",

@@ -88,7 +88,7 @@ fuchsia_package_size_check = rule(
     doc = """Create a size report for a set of fuchsia packages.""",
     implementation = _fuchsia_package_size_check_impl,
     provides = [FuchsiaSizeCheckerInfo],
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "size_report_name": attr.string(
             doc = "The name to add to the size report for viewing in Gerrit.",

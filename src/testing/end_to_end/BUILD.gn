@@ -63,9 +63,7 @@ group_with_no_dir_target_deps("core_x64_stable_tests") {
   public_deps = [
     "examples/test_case_revive_example:run_wo_test_case_revive($host_toolchain)",
     "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
-
-    # TODO(https://fxbug.dev/384233293): This test caused buildbot infra errors. Fix the flaky test.
-    # "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
     "examples/test_power_cycle:power_cycle_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
@@ -132,6 +130,9 @@ group_with_no_dir_target_deps("core_vim3_stable_tests") {
   testonly = true
   public_deps = [
     "examples/test_case_revive_example:run_wo_test_case_revive($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
+    "examples/test_power_cycle:power_cycle_test($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
     "honeydew/honeydew/affordances/power/system_power_state_controller/tests/functional_tests/test_system_power_state_controller:system_power_state_controller_test_on_non_starnix($host_toolchain)",
     "honeydew/tests/functional_tests:core_vim3_stable_tests",
@@ -141,10 +142,7 @@ group_with_no_dir_target_deps("core_vim3_stable_tests") {
 group_with_no_dir_target_deps("core_vim3_unstable_tests") {
   testonly = true
   public_deps = [
-    "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
     "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
-    "examples/test_power_cycle:power_cycle_test($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "honeydew/tests/functional_tests:core_vim3_unstable_tests",
   ]
 }
@@ -186,38 +184,6 @@ group("workbench_vim3_staging_tests") {
   ]
 }
 
-# starnix.vim3
-# Note: This will be run on internal *.vim3 builder, hence using `starnix` here
-# instead of internal `<PRODUCT>` name.
-group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
-  testonly = true
-  public_deps = [
-    "examples/test_case_revive_example:run_wo_test_case_revive($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
-    "examples/test_power_cycle:power_cycle_test($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
-    "honeydew/tests/functional_tests:starnix_vim3_stable_tests",
-  ]
-}
-
-group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
-  testonly = true
-  public_deps = [
-    "honeydew/tests/functional_tests:starnix_vim3_unstable_tests",
-    "//src/performance/memory/attribution/monitor/tests/e2e:tests",
-  ]
-}
-
-group("starnix_vim3_staging_tests") {
-  testonly = true
-  public_deps = [
-    ":starnix_vim3_stable_tests",
-    ":starnix_vim3_unstable_tests",
-  ]
-}
-
 # starnix.arm64
 # Note: This will be run on internal *.arm64 builder, hence using `starnix` here
 # instead of internal `<PRODUCT>` name.
@@ -225,6 +191,9 @@ group_with_no_dir_target_deps("starnix_arm64_stable_tests") {
   testonly = true
   public_deps = [
     "examples/test_case_revive_example:run_wo_test_case_revive($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
+    "examples/test_power_cycle:power_cycle_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
     "honeydew/tests/functional_tests:starnix_arm64_stable_tests",
@@ -233,13 +202,8 @@ group_with_no_dir_target_deps("starnix_arm64_stable_tests") {
 
 group_with_no_dir_target_deps("starnix_arm64_unstable_tests") {
   testonly = true
-  public_deps = [
-    "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
-    "examples/test_power_cycle:power_cycle_test($host_toolchain)",
-    "honeydew/tests/functional_tests:starnix_arm64_unstable_tests",
-    "//src/performance/memory/attribution/monitor/tests/e2e:tests",
-  ]
+  public_deps =
+      [ "honeydew/tests/functional_tests:starnix_arm64_unstable_tests" ]
 }
 
 group("starnix_arm64_staging_tests") {
@@ -253,14 +217,15 @@ group("starnix_arm64_staging_tests") {
 # smart_display.nelson
 group_with_no_dir_target_deps("smart_display_nelson_stable_tests") {
   testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:smart_display_nelson_stable_tests" ]
+  public_deps = [
+    "examples/test_power_cycle:power_cycle_test($host_toolchain)",
+    "honeydew/tests/functional_tests:smart_display_nelson_stable_tests",
+  ]
 }
 
 group_with_no_dir_target_deps("smart_display_nelson_unstable_tests") {
   testonly = true
   public_deps = [
-    "examples/test_power_cycle:power_cycle_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "honeydew/tests/functional_tests:smart_display_nelson_unstable_tests",
   ]

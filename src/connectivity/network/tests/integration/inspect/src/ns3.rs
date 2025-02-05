@@ -533,35 +533,71 @@ async fn inspect_routes(name: &str) {
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
-        "Routes": {
-            "0": {
-                Destination: "127.0.0.0/8",
-                InterfaceId: loopback_id,
-                Gateway: "[NONE]",
-                Metric: 100u64,
-                MetricTracksInterface: true,
+        Routes: {
+            Ipv4: {
+                Rules: {
+                    "0": {
+                        Matchers: {
+                            SourceAddressMatcher: "",
+                            TrafficOriginMatcher: "None",
+                            MarkMatchers: {}
+                        },
+                        Action: {
+                            Lookup: "0",
+                        }
+                    }
+                },
+                RoutingTables: {
+                    "0": {
+                        "0": {
+                            Destination: "127.0.0.0/8",
+                            InterfaceId: loopback_id,
+                            Gateway: "[NONE]",
+                            Metric: 100u64,
+                            MetricTracksInterface: true,
+                        },
+                        "1": {
+                            Destination: "224.0.0.0/4",
+                            InterfaceId: loopback_id,
+                            Gateway: "[NONE]",
+                            Metric: 100u64,
+                            MetricTracksInterface: true,
+                        },
+                    },
+                }
             },
-            "1": {
-                Destination: "224.0.0.0/4",
-                InterfaceId: loopback_id,
-                Gateway: "[NONE]",
-                Metric: 100u64,
-                MetricTracksInterface: true,
-            },
-            "2": {
-                Destination: "::1/128",
-                InterfaceId: loopback_id,
-                Gateway: "[NONE]",
-                Metric: 100u64,
-                MetricTracksInterface: true,
-            },
-            "3": {
-                Destination: "ff00::/8",
-                InterfaceId: loopback_id,
-                Gateway: "[NONE]",
-                Metric: 100u64,
-                MetricTracksInterface: true,
-            },
+            Ipv6: {
+                Rules: {
+                    "0": {
+                        Matchers: {
+                            SourceAddressMatcher: "",
+                            TrafficOriginMatcher: "None",
+                            MarkMatchers: {}
+                        },
+                        Action: {
+                            Lookup: "1",
+                        }
+                    }
+                },
+                RoutingTables: {
+                    "1": {
+                        "0": {
+                            Destination: "::1/128",
+                            InterfaceId: loopback_id,
+                            Gateway: "[NONE]",
+                            Metric: 100u64,
+                            MetricTracksInterface: true,
+                        },
+                        "1": {
+                            Destination: "ff00::/8",
+                            InterfaceId: loopback_id,
+                            Gateway: "[NONE]",
+                            Metric: 100u64,
+                            MetricTracksInterface: true,
+                        },
+                    },
+                }
+            }
         }
     })
 }

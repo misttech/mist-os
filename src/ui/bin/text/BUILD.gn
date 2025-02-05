@@ -46,7 +46,7 @@ rustc_binary("bin") {
     "//src/lib/ui/keymaps",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:unicode-normalization",
     "//third_party/rust_crates:unicode-segmentation",
   ]
@@ -115,8 +115,8 @@ rustc_test("keyboard3_integration_test_bin") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:test-case",
-    "//third_party/rust_crates:tracing",
   ]
   source_root = "tests/keyboard3.rs"
 

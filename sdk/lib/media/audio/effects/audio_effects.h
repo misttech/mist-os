@@ -35,9 +35,10 @@ const uint32_t FUCHSIA_AUDIO_EFFECTS_USAGE_MEDIA = (1 << 1);
 const uint32_t FUCHSIA_AUDIO_EFFECTS_USAGE_INTERRUPTION = (1 << 2);
 const uint32_t FUCHSIA_AUDIO_EFFECTS_USAGE_SYSTEM_AGENT = (1 << 3);
 const uint32_t FUCHSIA_AUDIO_EFFECTS_USAGE_COMMUNICATION = (1 << 4);
+const uint32_t FUCHSIA_AUDIO_EFFECTS_USAGE_ACCESSIBILITY = (1 << 5);
 // Mask of all valid usage flags. Any bits not covered by this mask may be ignored by
 // fuchsia_audio_effects_module_v1::set_usages
-const uint32_t FUCHSIA_AUDIO_EFFECTS_USAGE_VALID_MASK = (1 << 5) - 1;
+const uint32_t FUCHSIA_AUDIO_EFFECTS_USAGE_VALID_MASK = (1 << 6) - 1;
 
 typedef struct {
   char name[FUCHSIA_AUDIO_EFFECTS_MAX_NAME_LENGTH];

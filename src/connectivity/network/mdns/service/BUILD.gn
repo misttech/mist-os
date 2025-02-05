@@ -285,27 +285,51 @@ fuchsia_test_component("device-name-provider-remote") {
   deps = [ "//src/bringup/bin/device-name-provider" ]
 }
 
-fuchsia_test_component("mdns-netemul-test") {
-  manifest = "meta/mdns-netemul-test.cml"
+fuchsia_test_component("mdns-netemul-test-ns2") {
+  manifest = "meta/mdns-netemul-test-ns2.cml"
   deps = [
     ":component",
     ":device-name-provider-local",
     ":device-name-provider-remote",
     ":publisher",
     ":test-driver",
-    "//src/connectivity/network/testing/netemul/configurable-netstack",
+    "//src/connectivity/network/testing/netemul/configurable-netstack:netstack2",
   ]
 }
 
-fuchsia_test_component("mdns-netemul-v6-test") {
-  manifest = "meta/mdns-netemul-v6-test.cml"
+fuchsia_test_component("mdns-netemul-test-ns3") {
+  manifest = "meta/mdns-netemul-test-ns3.cml"
   deps = [
     ":component",
     ":device-name-provider-local",
     ":device-name-provider-remote",
     ":publisher",
     ":test-driver",
-    "//src/connectivity/network/testing/netemul/configurable-netstack",
+    "//src/connectivity/network/testing/netemul/configurable-netstack:netstack3",
+  ]
+}
+
+fuchsia_test_component("mdns-netemul-v6-test-ns2") {
+  manifest = "meta/mdns-netemul-v6-test-ns2.cml"
+  deps = [
+    ":component",
+    ":device-name-provider-local",
+    ":device-name-provider-remote",
+    ":publisher",
+    ":test-driver",
+    "//src/connectivity/network/testing/netemul/configurable-netstack:netstack2",
+  ]
+}
+
+fuchsia_test_component("mdns-netemul-v6-test-ns3") {
+  manifest = "meta/mdns-netemul-v6-test-ns3.cml"
+  deps = [
+    ":component",
+    ":device-name-provider-local",
+    ":device-name-provider-remote",
+    ":publisher",
+    ":test-driver",
+    "//src/connectivity/network/testing/netemul/configurable-netstack:netstack3",
   ]
 }
 
@@ -339,20 +363,33 @@ fuchsia_test_component("remote-multi-network") {
   deps = [ ":mdns_netemul_multi_network_test_agent" ]
 }
 
-fuchsia_test_component("mdns-netemul-multi-network-test") {
-  manifest = "meta/mdns-netemul-multi-network-test.cml"
+fuchsia_test_component("mdns-netemul-multi-network-test-ns2") {
+  manifest = "meta/mdns-netemul-multi-network-test-ns2.cml"
   deps = [
     ":remote-multi-network",
     ":test-driver-multi-network",
-    "//src/connectivity/network/testing/netemul/configurable-netstack",
+    "//src/connectivity/network/testing/netemul/configurable-netstack:netstack2",
+    "//src/connectivity/network/testing/netemul/sync-manager",
+  ]
+}
+
+fuchsia_test_component("mdns-netemul-multi-network-test-ns3") {
+  manifest = "meta/mdns-netemul-multi-network-test-ns3.cml"
+  deps = [
+    ":remote-multi-network",
+    ":test-driver-multi-network",
+    "//src/connectivity/network/testing/netemul/configurable-netstack:netstack3",
     "//src/connectivity/network/testing/netemul/sync-manager",
   ]
 }
 
 fuchsia_test_package("mdns-netemul-tests") {
   test_components = [
-    ":mdns-netemul-test",
-    ":mdns-netemul-v6-test",
-    ":mdns-netemul-multi-network-test",
+    ":mdns-netemul-test-ns2",
+    ":mdns-netemul-test-ns3",
+    ":mdns-netemul-v6-test-ns2",
+    ":mdns-netemul-v6-test-ns3",
+    ":mdns-netemul-multi-network-test-ns2",
+    ":mdns-netemul-multi-network-test-ns3",
   ]
 }

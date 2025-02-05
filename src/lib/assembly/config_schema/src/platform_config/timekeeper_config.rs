@@ -27,6 +27,9 @@ pub struct TimekeeperConfig {
     /// If set, Timekeeper will serve `fuchsia.time.alarms` and will connect
     /// to the appropriate hardware device to do so.
     pub serve_fuchsia_time_alarms: bool,
+    /// If set, the hardware has a counter that is always on and operates even
+    /// if the rest of the hardware system is in a low power state.
+    pub always_on_counter: bool,
 }
 
 impl Default for TimekeeperConfig {
@@ -39,6 +42,7 @@ impl Default for TimekeeperConfig {
             serve_test_protocols: false,
             utc_start_at_startup_when_invalid_rtc: false,
             serve_fuchsia_time_alarms: false,
+            always_on_counter: false,
         }
     }
 }

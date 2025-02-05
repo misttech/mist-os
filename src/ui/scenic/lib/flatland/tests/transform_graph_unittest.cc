@@ -470,10 +470,13 @@ TEST(TransformGraphTest, ReplaceChildren) {
   std::vector<TransformHandle> duplicate_children = {transforms[1], transforms[1]};
   EXPECT_FALSE(graph.ReplaceChildren(transforms[0], duplicate_children));
 
-  // AddChild operations expected to return false when child transform already present in parent.
-  EXPECT_FALSE(graph.AddChild(transforms[0], transforms[6]));
-  EXPECT_FALSE(graph.AddChild(transforms[0], transforms[7]));
-  EXPECT_FALSE(graph.AddChild(transforms[0], transforms[8]));
+  // Verify that ReplaceChildren adds new_children to transforms[0] in order.
+  auto children_order =
+      graph.ComputeAndCleanup(transforms[0], kLongIterationLength).sorted_transforms;
+  for (size_t i = 0; i < new_children.size(); i++) {
+    // TopologyVector starts with parent
+    EXPECT_EQ(children_order[i + 1].handle, new_children[i]);
+  }
 
   // AddChild operations expected to return true when successful and child transform was not
   // already present in parent. We expect true because transforms[1] and transforms[2] should have

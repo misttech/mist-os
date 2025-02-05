@@ -57,6 +57,7 @@ fuchsia_cc_driver(
     name = "template-driver",
     srcs = ["template_driver.cc"],  # Satisfy FUCHSIA_DRIVER_EXPORT check.
     linkshared = True,
+    output_name = "template",
     deps = [":common"],
 )
 
@@ -83,7 +84,6 @@ fuchsia_package(
 
 fuchsia_cc_test(
     name = "template-test-bin",
-    size = "small",
     srcs = ["tests/test.cc"],
     deps = [
         ":common",

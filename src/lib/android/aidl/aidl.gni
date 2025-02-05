@@ -441,6 +441,9 @@ template("aidl_cpp") {
 #     Which stable version; this being set also causes getInterfaceVersion code
 #     to be generated.
 #
+#   rust_crate_name (optional)
+#     Name of the generated Rust crate. If not set, derived from the directory path
+#     relative to the base.
 template("aidl_rust") {
   main_target_name = target_name
   rust_aidl_gen_dir = "$target_gen_dir/${main_target_name}_aidl"
@@ -486,11 +489,16 @@ template("aidl_rust") {
     }
   }
 
-  if (package == "." || package == "") {
+  name = ""
+  if (defined(invoker.rust_crate_name)) {
+    name = invoker.rust_crate_name
+  } else if (package == "." || package == "") {
     message = "Failed to infer AIDL package name. The base path may not be set correctly. "
     message += "The `.aidl` files should be located under a path like "
     message += "\${base}/my/package/name/SomeFile.aidl."
     assert(package != "." && package != "", message)
+  } else {
+    name = string_replace(package, "/", "_")
   }
 
   aidl_args = [
@@ -538,7 +546,7 @@ template("aidl_rust") {
   rustc_library(main_target_name) {
     edition = "2018"
     sources = [ root_rust_file ]
-    name = string_replace(package, "/", "_")
+    name = name
     deps = [
       ":${main_target_name}_aidl_rust_glue",
       "//src/lib/android/binder/rust:binder",
@@ -593,6 +601,10 @@ template("aidl_rust") {
 #   version (optional)
 #     Which stable version; this being set also causes getInterfaceVersion code
 #     to be generated.
+#
+#   rust_crate_name (optional)
+#     Name of the generated Rust crate. If not set, derived from the directory path
+#     relative to the base. Only relevant for the "rust" backend.
 template("aidl") {
   if (defined(invoker.backends)) {
     backends = invoker.backends
@@ -611,6 +623,7 @@ template("aidl") {
                              [
                                "backends",
                                "deps",
+                               "rust_crate_name",
                              ])
       deps = []
       if (defined(invoker.deps)) {
@@ -619,6 +632,10 @@ template("aidl") {
           dep_name = get_label_info(dep, "name")
           deps += [ "$dep_dir:${dep_name}_${backend}" ]
         }
+      }
+
+      if (backend == "rust" && defined(invoker.rust_crate_name)) {
+        rust_crate_name = invoker.rust_crate_name
       }
     }
   }

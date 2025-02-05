@@ -16,6 +16,48 @@ _OPT_PATTERN = re.compile("[\W]+")
 
 _SHOULD_LOG = False
 
+_CPU_MAP = {"aarch64": "arm64", "x86_64": "x64"}
+
+
+def _map_cpu(cpu):
+    return _CPU_MAP.get(cpu, cpu)
+
+
+# These regex patterns are a tuple of compiled regex's to lambdas that will be
+# invoked with the match object if there is on. These regexes are usually used
+# to transform a bazel path to one that is in GN.
+_REGEX_PATH_PATTERNS = [
+    # Fidl libraries defined in GN in the SDK
+    (
+        re.compile(
+            ".*bazel-out.*\/fuchsia_sdk\/fidl\/.*\/_virtual_includes\/(?P<name>.*)_cpp"
+        ),
+        lambda m: "-Ifidling/gen/sdk/fidl/{fidl_lib}/{fidl_lib}/cpp".format(
+            fidl_lib=m["name"]
+        ),
+    ),
+    # Fidl libraries defined in Bazel in the SDK
+    (
+        re.compile(
+            ".*bazel-out.*\/bin\/sdk\/fidl\/.*\/_virtual_includes\/(?P<name>.*)_cpp"
+        ),
+        lambda m: "-Ifidling/gen/sdk/fidl/{fidl_lib}/{fidl_lib}/cpp".format(
+            fidl_lib=m["name"]
+        ),
+    ),
+    # bind libraries defined in tree under //src/devices/bind
+    (
+        re.compile(
+            ".*bazel-out.*\/(?P<arch>[a-zA-Z0-9]+)-.*\/bin\/src\/devices\/bind\/(?P<name>.*)\/_virtual_includes.*"
+        ),
+        # _map_cpu
+        lambda m: "-I{cpu}-shared/gen/src/devices/bind/{name}/{name}/bind_cpp".format(
+            cpu=_map_cpu(m["arch"]),
+            name=m["name"],
+        ),
+    ),
+]
+
 
 class Action:
     """Represents an action that comes from aquery"""
@@ -76,9 +118,31 @@ class CompDBFormatter:
         if file_path.startswith(("sdk/", "src/", "vendor/", "zircon/")):
             return "../../" + file_path
 
-        # bazel-out needs to be checked first because it contains external/ paths
+        # If we are incliding a generated fidl file change it to point to the fidling
+        # directory. This is needed because the fidl libraries use a _virtual_include
+        # path when we run the original query which does not seem to point to a valid
+        # location. Instead we can fall back to the gn generated code. This is currently
+        # a best effort attempt.
+        # fidl_match = _FIDL_FUCHSIA_SDK_REGEX_PATTERN.match(file_path)
+        # if fidl_match:
+        #     fidl_lib = fidl_match.group(1)
+        #     return f"-Ifidling/gen/sdk/fidl/{fidl_lib}/{fidl_lib}/cpp"
+
+        # Check to see if any of our regex path patterns match. These paths often
+        # represent files that are generated and have _virtual_includes in the
+        # path. The _virtual_includes tend to not point to files that exist when
+        # working in our hybrid build system so we end up just pointing to the
+        # GN paths instead.
+        for pattern, replacement in _REGEX_PATH_PATTERNS:
+            match_obj = pattern.match(file_path)
+            if match_obj:
+                return replacement(match_obj)
+
+        # map bazel-out/ paths to that of our output_path
         if "bazel-out/" in file_path:
-            return file_path.replace("bazel-out/", self.output_path_rel + "/")
+            return file_path.replace(
+                "bazel-out/", self.output_path_rel + "/", 1
+            )
 
         # Look for arguments to files in external/ paths. This is usually
         # the clang binary and include roots
@@ -86,6 +150,7 @@ class CompDBFormatter:
             return file_path.replace(
                 "external/",
                 os.path.join(self.output_base_rel, "external") + "/",
+                1,
             )
 
         # Just a regular argument
@@ -273,6 +338,24 @@ def main(argv: Sequence[str]):
         default=False,
         action="store_true",
     )
+    parser.add_argument(
+        "--self-test-filter",
+        required=False,
+        help="""If provided will run a self-test on the files that match the filter.
+
+        The self-test will attempt to compile the file given the set of arguments
+        in the compile commands. This check can be very slow because it needs to
+        compile every file that matches the filter. It is directly invoking clang
+        do it does not benefit from the cached results. This flag should only be
+        used for debugging.
+
+        When used in conjunction with --verbose, the command will print out the
+        clang errors.
+
+        The filter will perform a re.search on the file.
+        """,
+        default=None,
+    )
     args = parser.parse_args(argv)
     init_logger(args)
 
@@ -334,6 +417,42 @@ def main(argv: Sequence[str]):
         "w",
     ) as f:
         json.dump(list(compile_commands_dict.values()), f, indent=2)
+
+    if args.self_test_filter:
+        commands_to_check = [
+            c
+            for c in compile_commands
+            if re.search(args.self_test_filter, c["file"])
+        ]
+        info("CHECKING {} commands".format(len(commands_to_check)))
+        info(
+            "SKIPPING {} commands".format(
+                len(compile_commands) - len(commands_to_check)
+            )
+        )
+        num_failures = 0
+
+        for command in commands_to_check:
+            if "arguments" in command:
+                clang_args = command["arguments"]
+            else:
+                clang_args = command["command"].split()
+
+            try:
+                subprocess.check_output(
+                    clang_args,
+                    text=True,
+                    cwd=command["directory"],
+                    stderr=None if args.verbose else subprocess.DEVNULL,
+                )
+            except subprocess.CalledProcessError:
+                num_failures += 1
+
+        if num_failures > 0:
+            info(f"SELF TEST RESULTS: {num_failures} FAILURES")
+            sys.exit(1)
+        else:
+            info("SELF TEST PASSED WITH NO FAILURES")
 
 
 if __name__ == "__main__":

@@ -391,14 +391,12 @@ TEST(Bti, DecommitRace) {
     ;
 
   // Perform pin+unpin for 10 seconds or 20000 iterations (whichever happens
-  // first) to see if we hit the race condition. We also assert that at least
-  // 100 iterations are run.
+  // first) to see if we hit the race condition.
   const int max_iterations = 20000;
-  const int min_iterations = 100;
-  const zx_ticks_t max_elapsed_ticks = 10 * zx::ticks::per_second().get();
+  const zx_duration_mono_ticks_t max_elapsed_ticks = 10 * zx::ticks::per_second().get();
   const zx::ticks start = zx::ticks::now();
 
-  zx_ticks_t elapsed_ticks = 0;
+  zx_duration_mono_ticks_t elapsed_ticks = 0;
   int iterations = 0;
   while (elapsed_ticks < max_elapsed_ticks && iterations < max_iterations) {
     zx::pmt pmt;
@@ -407,7 +405,6 @@ TEST(Bti, DecommitRace) {
     elapsed_ticks = (zx::ticks::now() - start).get();
     iterations++;
   }
-  ASSERT_GE(iterations, min_iterations);
 
   running = false;
   thread.join();

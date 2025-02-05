@@ -70,7 +70,7 @@ static bool smoke_test() {
 static bool timeout_test() {
   BEGIN_TEST;
 
-  auto dealine = Deadline::after(ZX_USEC(10));
+  auto dealine = Deadline::after_mono(ZX_USEC(10));
 
   Semaphore sema;
   ASSERT_EQ(0, sema.count());

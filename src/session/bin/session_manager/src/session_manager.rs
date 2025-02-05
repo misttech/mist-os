@@ -8,8 +8,8 @@ use fidl::endpoints::{create_proxy, ClientEnd, ServerEnd};
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use log::{error, warn};
 use std::sync::{Arc, Mutex};
-use tracing::{error, warn};
 use zx::HandleBased;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
@@ -132,13 +132,13 @@ impl PowerState {
         &self,
     ) -> Result<ClientEnd<fbroker::LeaseControlMarker>, fpower::HandoffError> {
         if !self.suspend_enabled {
-            tracing::warn!(
+            log::warn!(
                 "Session component wants to take our power lease, but the platform is \
                 configured to not support suspend"
             );
             return Err(fpower::HandoffError::Unavailable);
         }
-        tracing::info!("Session component is taking our power lease");
+        log::info!("Session component is taking our power lease");
         let lease = match &mut *self.power_element.lock().await {
             Some(power_element) => power_element.take_lease(),
             None => return Err(fpower::HandoffError::Unavailable),
@@ -348,7 +348,7 @@ impl SessionManager {
             async move {
                 session_manager
                     .handle_incoming_request(request)
-                    .unwrap_or_else(|err| error!(?err))
+                    .unwrap_or_else(|err| error!("{err:?}"))
                     .await
             }
         })
@@ -409,7 +409,7 @@ impl SessionManager {
                     let result = self.handle_launch_request(configuration).await;
                     let _ = responder.send(result);
                 }
-            };
+            }
         }
         Ok(())
     }
@@ -433,7 +433,7 @@ impl SessionManager {
                     let result = self.handle_restart_request().await;
                     let _ = responder.send(result);
                 }
-            };
+            }
         }
         Ok(())
     }
@@ -466,9 +466,9 @@ impl SessionManager {
                     let _ = responder.send(result);
                 }
                 fsession::LifecycleRequest::_UnknownMethod { ordinal, .. } => {
-                    warn!(%ordinal, "Lifecycle received an unknown method");
+                    warn!(ordinal:%; "Lifecycle received an unknown method");
                 }
-            };
+            }
         }
         Ok(())
     }
@@ -486,7 +486,7 @@ impl SessionManager {
                     let _ = responder.send(result.map(|lease| lease.into_channel().into_handle()));
                 }
                 fpower::HandoffRequest::_UnknownMethod { ordinal, .. } => {
-                    warn!(%ordinal, "Lifecycle received an unknown method")
+                    warn!(ordinal:%; "Lifecycle received an unknown method")
                 }
             }
         }
@@ -541,7 +541,7 @@ impl SessionManager {
     async fn handle_handoff_take_request(
         &mut self,
     ) -> Result<ClientEnd<fbroker::LeaseControlMarker>, fpower::HandoffError> {
-        self.state.take_power_lease().await.map_err(Into::into)
+        self.state.take_power_lease().await
     }
 }
 
@@ -554,8 +554,8 @@ mod tests {
     use fidl::endpoints::{create_proxy_and_stream, spawn_stream_handler, ServerEnd};
     use futures::channel::mpsc;
     use futures::prelude::*;
-    use lazy_static::lazy_static;
     use session_testing::{spawn_directory_server, spawn_noop_directory_server, spawn_server};
+    use std::sync::LazyLock;
     use test_util::Counter;
     use {
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
@@ -664,7 +664,7 @@ mod tests {
                     let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
-            };
+            }
         });
 
         let inspector = fuchsia_inspect::Inspector::default();
@@ -707,7 +707,7 @@ mod tests {
                     let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
-            };
+            }
         });
 
         let inspector = fuchsia_inspect::Inspector::default();
@@ -779,7 +779,7 @@ mod tests {
                     let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
-            };
+            }
         });
 
         let inspector = fuchsia_inspect::Inspector::default();
@@ -822,7 +822,7 @@ mod tests {
                     let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
-            };
+            }
         });
 
         let inspector = fuchsia_inspect::Inspector::default();
@@ -846,9 +846,7 @@ mod tests {
     /// Verifies that Lifecycle.Stop stops an existing session by destroying its component.
     #[fuchsia::test]
     async fn test_stop_destroys_component() {
-        lazy_static! {
-            static ref NUM_DESTROY_CHILD_CALLS: Counter = Counter::new(0);
-        }
+        static NUM_DESTROY_CHILD_CALLS: LazyLock<Counter> = LazyLock::new(|| Counter::new(0));
 
         let session_url = "session";
 
@@ -868,7 +866,7 @@ mod tests {
                     let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
-            };
+            }
         });
 
         let inspector = fuchsia_inspect::Inspector::default();
@@ -916,7 +914,7 @@ mod tests {
                     let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
-            };
+            }
         });
 
         let inspector = fuchsia_inspect::Inspector::default();
@@ -979,7 +977,7 @@ mod tests {
                         let _ = responder.send(Ok(()));
                     }
                     _ => panic!("Realm handler received an unexpected request"),
-                };
+                }
             }
         });
 
@@ -1040,7 +1038,7 @@ mod tests {
                         let _ = responder.send(Ok(()));
                     }
                     _ => panic!("Realm handler received an unexpected request"),
-                };
+                }
             }
         });
 

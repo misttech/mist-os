@@ -8,9 +8,9 @@ use fidl_fuchsia_ui_test_conformance::{
     PuppetSetEmbeddedViewPropertiesResponse, Result_,
 };
 use futures::TryStreamExt;
+use log::info;
 use std::cell::RefCell;
 use std::rc::Rc;
-use tracing::info;
 
 mod presentation_loop;
 mod view;

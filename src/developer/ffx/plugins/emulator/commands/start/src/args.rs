@@ -70,8 +70,8 @@ pub struct StartCommand {
     /// the virtual device specification used to configure the emulator. This can be the name of a
     /// device listed in the product bundle, or the path to a custom virtual device file. A default
     /// for this flag can be set by running `ffx config set emu.device <type>`. If --device is not
-    /// specified and no default is set, then `ffx emu` will attempt to use the first device listed
-    /// in the PBM(v1), or the product bundle's recommended device(v2).
+    /// specified and no default is set, then `ffx emu` will attempt to use the product bundle's
+    /// recommended device.
     #[argh(option)]
     #[ffx_config_default(key = "emu.device")]
     pub device: Option<String>,
@@ -92,7 +92,8 @@ pub struct StartCommand {
 
     /// emulation engine to use for this instance. Allowed values are "femu" which is based on
     /// Android Emulator, and "qemu" which uses the version of Qemu packaged with Fuchsia. Default
-    /// is "femu". This can be overridden by running `ffx config set emu.engine <type>`.
+    /// is "femu", which can be overridden by running `ffx config set emu.engine <type>`. Engine
+    /// defaults are overridden to "qemu" in cases of incompatibility (cross cpu or uefi emulation).
     #[argh(option)]
     #[ffx_config_default(key = "emu.engine", default = "femu")]
     pub engine: Option<String>,

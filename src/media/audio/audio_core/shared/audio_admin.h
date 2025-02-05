@@ -35,7 +35,7 @@ class AudioAdmin {
   // taken on them.
   class PolicyActionReporter {
    public:
-    virtual void ReportPolicyAction(fuchsia::media::Usage usage,
+    virtual void ReportPolicyAction(fuchsia::media::Usage2 usage,
                                     fuchsia::media::Behavior policy_action) = 0;
   };
 
@@ -44,13 +44,11 @@ class AudioAdmin {
    public:
     virtual ~ActivityDispatcher() {}
 
-    using RenderActivity = std::bitset<fuchsia::media::RENDER_USAGE_COUNT>;
-    virtual void OnRenderActivityChanged(
-        std::bitset<fuchsia::media::RENDER_USAGE_COUNT> activity) = 0;
+    using RenderActivity = std::bitset<fuchsia::media::RENDER_USAGE2_COUNT>;
+    virtual void OnRenderActivityChanged(RenderActivity activity) = 0;
 
-    using CaptureActivity = std::bitset<fuchsia::media::CAPTURE_USAGE_COUNT>;
-    virtual void OnCaptureActivityChanged(
-        std::bitset<fuchsia::media::CAPTURE_USAGE_COUNT> activity) = 0;
+    using CaptureActivity = std::bitset<fuchsia::media::CAPTURE_USAGE2_COUNT>;
+    virtual void OnCaptureActivityChanged(CaptureActivity activity) = 0;
   };
 
   static constexpr BehaviorGain kDefaultGainBehavior = {
@@ -73,7 +71,7 @@ class AudioAdmin {
              BehaviorGain behavior_gain = kDefaultGainBehavior);
 
   // Sets the interaction behavior between |active| and |affected| usages.
-  void SetInteraction(fuchsia::media::Usage active, fuchsia::media::Usage affected,
+  void SetInteraction(fuchsia::media::Usage2 active, fuchsia::media::Usage2 affected,
                       fuchsia::media::Behavior behavior);
 
   // Clears all configured behaviors.
@@ -94,9 +92,10 @@ class AudioAdmin {
   bool IsActive(CaptureUsage usage);
 
  protected:
-  using RendererPolicies = std::array<fuchsia::media::Behavior, fuchsia::media::RENDER_USAGE_COUNT>;
+  using RendererPolicies =
+      std::array<fuchsia::media::Behavior, fuchsia::media::RENDER_USAGE2_COUNT>;
   using CapturerPolicies =
-      std::array<fuchsia::media::Behavior, fuchsia::media::CAPTURE_USAGE_COUNT>;
+      std::array<fuchsia::media::Behavior, fuchsia::media::CAPTURE_USAGE2_COUNT>;
 
   std::unordered_set<fuchsia::media::AudioRenderer*>* active_streams_playback() {
     return active_streams_playback_;
@@ -130,25 +129,25 @@ class AudioAdmin {
       FXL_EXCLUSIVE_LOCKS_REQUIRED(fidl_thread_checker_);
 
   // Helpers to make the control of streams cleaner.
-  void SetUsageNone(fuchsia::media::AudioRenderUsage usage);
-  void SetUsageNone(fuchsia::media::AudioCaptureUsage usage);
+  void SetUsageNone(fuchsia::media::AudioRenderUsage2 usage);
+  void SetUsageNone(fuchsia::media::AudioCaptureUsage2 usage);
 
-  void SetUsageMute(fuchsia::media::AudioRenderUsage usage);
-  void SetUsageMute(fuchsia::media::AudioCaptureUsage usage);
+  void SetUsageMute(fuchsia::media::AudioRenderUsage2 usage);
+  void SetUsageMute(fuchsia::media::AudioCaptureUsage2 usage);
 
-  void SetUsageDuck(fuchsia::media::AudioRenderUsage usage);
-  void SetUsageDuck(fuchsia::media::AudioCaptureUsage usage);
+  void SetUsageDuck(fuchsia::media::AudioRenderUsage2 usage);
+  void SetUsageDuck(fuchsia::media::AudioCaptureUsage2 usage);
 
   void ApplyNewPolicies(const RendererPolicies& new_renderer_policies,
                         const CapturerPolicies& new_capturer_policies);
 
   class PolicyRules {
    public:
-    int ToIndex(fuchsia::media::AudioCaptureUsage usage) {
-      return fidl::ToUnderlying(usage) + fuchsia::media::RENDER_USAGE_COUNT;
+    int ToIndex(fuchsia::media::AudioCaptureUsage2 usage) {
+      return media::audio::ToIndex(usage) + fuchsia::media::RENDER_USAGE2_COUNT;
     }
 
-    int ToIndex(fuchsia::media::AudioRenderUsage usage) { return fidl::ToUnderlying(usage); }
+    int ToIndex(fuchsia::media::AudioRenderUsage2 usage) { return media::audio::ToIndex(usage); }
 
     template <typename T, typename U>
     void SetRule(T source, U target, fuchsia::media::Behavior policy) {
@@ -166,8 +165,9 @@ class AudioAdmin {
 
    private:
     fuchsia::media::Behavior
-        active_affected_[fuchsia::media::RENDER_USAGE_COUNT + fuchsia::media::CAPTURE_USAGE_COUNT]
-                        [fuchsia::media::RENDER_USAGE_COUNT + fuchsia::media::CAPTURE_USAGE_COUNT];
+        active_affected_[fuchsia::media::RENDER_USAGE2_COUNT + fuchsia::media::CAPTURE_USAGE2_COUNT]
+                        [fuchsia::media::RENDER_USAGE2_COUNT +
+                         fuchsia::media::CAPTURE_USAGE2_COUNT];
   };
   PolicyRules active_rules_ FXL_GUARDED_BY(fidl_thread_checker_);
 

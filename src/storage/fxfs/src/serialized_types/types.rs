@@ -33,7 +33,7 @@ use crate::serialized_types::{versioned_type, Version, Versioned, VersionedLates
 ///
 /// IMPORTANT: When changing this (major or minor), update the list of possible versions at
 /// https://cs.opensource.google/fuchsia/fuchsia/+/main:third_party/cobalt_config/fuchsia/local_storage/versions.txt.
-pub const LATEST_VERSION: Version = Version { major: 43, minor: 0 };
+pub const LATEST_VERSION: Version = Version { major: 44, minor: 0 };
 
 /// The version at which the new persistent_layer format was added.  Layer files are always written
 /// in this format going forward.
@@ -53,6 +53,10 @@ pub const _JOURNAL_DATA_CHECKSUM_RECORD: Version = Version { major: 34, minor: 0
 ///
 /// Also check the constant version numbers above for any code cleanup that can happen.
 pub const EARLIEST_SUPPORTED_VERSION: Version = Version { major: 32, minor: 0 };
+
+/// From this version of the filesystem, we shrink the size of the extents that are reserved for
+/// the superblock and root-parent store to a single block.
+pub const SMALL_SUPERBLOCK_VERSION: Version = Version { major: 44, minor: 0 };
 
 versioned_type! {
     32.. => AllocatorInfo,

@@ -57,6 +57,7 @@ rustc_binary("test_fxfs_bin") {
   sources = [ source_root ]
   deps = [
     ":fuchsia.fxfs.test_rust",
+    ":verity-benchmarks-test-fxfs-config",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
@@ -67,11 +68,24 @@ rustc_binary("test_fxfs_bin") {
     "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:futures",
   ]
+
+  # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
+  exclude_toolchain_tags = [ "profile" ]
+}
+
+fuchsia_component_manifest("verity-benchmarks-test-fxfs-component-manifest") {
+  component_name = "test_fxfs"
+  manifest = "meta/test_fxfs.cml"
+}
+
+fuchsia_structured_config_rust_lib("verity-benchmarks-test-fxfs-config") {
+  name = "verity_benchmarks_test_fxfs_config"
+  cm_label = ":verity-benchmarks-test-fxfs-component-manifest"
 }
 
 fuchsia_component("test_fxfs") {
   testonly = true
-  manifest = "meta/test_fxfs.cml"
+  cm_label = ":verity-benchmarks-test-fxfs-component-manifest"
   deps = [ ":test_fxfs_bin" ]
 }
 
@@ -79,7 +93,7 @@ fuchsia_test_component("fuchsia-verity-benchmarks-component") {
   component_name = "storage-verity-benchmarks"
   manifest = "meta/verity-benchmarks.cml"
   deps = [ ":verity-storage-benchmarks" ]
-  test_type = "system"
+  test_type = "storage"
 }
 
 fuchsia_test_package("verity-benchmarks") {
@@ -90,6 +104,7 @@ fuchsia_test_package("verity-benchmarks") {
     ":test_fxfs",
     "//src/starnix/containers/debian:container_resources",
     "//src/storage/crypt/fxfs",
+    "//src/storage/fvm:fvm-component",
     "//src/storage/fxfs:fxfs_component",
   ]
   subpackages = [
@@ -157,7 +172,7 @@ fuchsia_component("read_verified_file") {
 fuchsia_component_perf_test("verity-benchmarks-perf") {
   package = ":verity-benchmarks"
   component_name = "storage-verity-benchmarks"
-  test_type = "system"
+  test_type = "storage"
   expected_metric_names_filepath =
       "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.verity.txt"
 

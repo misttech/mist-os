@@ -48,7 +48,7 @@ pub async fn initialize_ga4_metrics_service(
             migrate_legacy_folder(&metrics_dir)?;
         }
         None => {
-            tracing::warn!("Analytics folder not set. Disabling analytics.");
+            log::warn!("Analytics folder not set. Disabling analytics.");
             disabled_by_init_failure = true;
             metrics_dir = PathBuf::from("");
         }

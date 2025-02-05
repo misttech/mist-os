@@ -239,12 +239,12 @@ void ImagePipeSurfaceDisplay::ControllerOnVsync(
     if (should_disable_vsyncs) {
       receiving_vsyncs_ = false;
 
-      OneWayResult result = display_coordinator_->EnableVsync(false);
+      OneWayResult result = display_coordinator_->SetVsyncEventDelivery(false);
       if (result.is_error()) {
         // We're probably irrevocably broken at this point, but this can't hurt.
         receiving_vsyncs_ = true;
 
-        fprintf(stderr, "%s: EnableVsync(false) failed: %s\n", kTag,
+        fprintf(stderr, "%s: SetVsyncEventDelivery(false) failed: %s\n", kTag,
                 result.error_value().FormatDescription().c_str());
       }
     }
@@ -811,12 +811,12 @@ void ImagePipeSurfaceDisplay::PresentImage(
 
     if (should_enable_vsyncs) {
       receiving_vsyncs_ = true;
-      OneWayResult result = display_coordinator_->EnableVsync(true);
+      OneWayResult result = display_coordinator_->SetVsyncEventDelivery(true);
       if (result.is_error()) {
         // We're probably irrevocably broken at this point, but this can't hurt.
         receiving_vsyncs_ = false;
 
-        fprintf(stderr, "%s: EnableVsync(true) failed: %s\n", kTag,
+        fprintf(stderr, "%s: SetVsyncEventDelivery(true) failed: %s\n", kTag,
                 result.error_value().FormatDescription().c_str());
       }
     }

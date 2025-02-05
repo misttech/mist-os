@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use log::{info, warn};
 use packet_encoding::{Decodable, Encodable};
-use tracing::{info, warn};
 
 use crate::packets::{
     adjust_byte_size, AdvancedDecodable, CharsetId, Error, PacketResult, StatusCode,
@@ -232,7 +232,7 @@ impl AdvancedDecodable for SetBrowsedPlayerResponseParams {
                 let mut name_arr = vec![0; name_len];
                 name_arr.copy_from_slice(&buf[next_idx..next_idx + name_len]);
                 String::from_utf8(name_arr).or_else(|e| {
-                    info!(%e, "Browsable player folder name conversion caused error, falling back to placeholder name {default_name}");
+                    info!(e:%; "Browsable player folder name conversion caused error, falling back to placeholder name {default_name}");
                     Ok(default_name)
                 })?
             } else {

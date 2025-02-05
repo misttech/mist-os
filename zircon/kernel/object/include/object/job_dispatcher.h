@@ -171,7 +171,7 @@ class JobDispatcher final
   void set_kill_on_oom(bool kill);
   bool get_kill_on_oom() const;
 
-  void GetInfo(zx_info_job_t* info) const;
+  zx_info_job_t GetInfo() const;
 
   // Aggregate the runtime for all processes that were previously running or are currently running
   // as children of this job.

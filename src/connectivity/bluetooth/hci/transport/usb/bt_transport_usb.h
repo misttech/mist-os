@@ -23,12 +23,22 @@
 namespace bt_transport_usb {
 
 class Device;
+
+// This class exists (rather than the implementation being on Device) to avoid the conflict between
+// the two AckReceive methods which have the exact same signature.
 class ScoConnectionServer : public fidl::Server<fuchsia_hardware_bluetooth::ScoConnection> {
-  using SendHandler = fit::function<void(std::vector<uint8_t>&, fit::function<void(void)>)>;
+  using SendHandler = fit::function<void(std::vector<uint8_t>&, SendCompleter::Sync&)>;
   using StopHandler = fit::function<void(void)>;
 
  public:
-  explicit ScoConnectionServer(SendHandler send_handler, StopHandler stop_handler);
+  ScoConnectionServer(async_dispatcher_t* dispatcher,
+                      fidl::ServerEnd<fuchsia_hardware_bluetooth::ScoConnection> server_end,
+                      SendHandler send_handler, StopHandler stop_handler,
+                      fit::function<void(fidl::UnbindInfo)> close_handler);
+
+  fit::result<fidl::OneWayError> OnReceive(const fuchsia_hardware_bluetooth::ScoPacket& payload) {
+    return fidl::SendEvent(binding_)->OnReceive(payload);
+  }
 
   // fuchsia_hardware_bluetooth::ScoConnection overrides.
   void Send(SendRequest& request, SendCompleter::Sync& completer) override;
@@ -41,6 +51,7 @@ class ScoConnectionServer : public fidl::Server<fuchsia_hardware_bluetooth::ScoC
  private:
   SendHandler send_handler_;
   StopHandler stop_handler_;
+  fidl::ServerBinding<fuchsia_hardware_bluetooth::ScoConnection> binding_;
 };
 
 // See ddk::Device in ddktl/device.h
@@ -101,7 +112,7 @@ class Device final : public DeviceType,
       ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop> metadata,
       ::fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  mtx_t mutex() { return mutex_; }
+  std::mutex& mutex() { return mutex_; }
 
  private:
   struct IsocEndpointDescriptors {
@@ -151,7 +162,8 @@ class Device final : public DeviceType,
 
   void HciScoWriteComplete(usb_request_t* req);
 
-  void OnScoData(std::vector<uint8_t>&, fit::function<void(void)>);
+  void OnScoData(std::vector<uint8_t>&,
+                 fidl::Server<fuchsia_hardware_bluetooth::ScoConnection>::SendCompleter::Sync&);
   void OnScoStop();
 
   zx_status_t AllocBtUsbPackets(int limit, uint64_t data_size, uint8_t ep_address, size_t req_size,
@@ -163,7 +175,7 @@ class Device final : public DeviceType,
   void HandleUsbResponseError(usb_request_t* req, const char* req_description)
       __TA_REQUIRES(mutex_);
 
-  mtx_t mutex_;
+  std::mutex mutex_;
 
   usb_protocol_t usb_ __TA_GUARDED(mutex_);
 
@@ -209,7 +221,7 @@ class Device final : public DeviceType,
   std::atomic_size_t allocated_requests_count_ = 0u;
   std::atomic_size_t pending_request_count_ = 0u;
   std::atomic_size_t pending_sco_write_request_count_ = 0u;
-  cnd_t pending_sco_write_request_count_0_cnd_;
+  std::condition_variable pending_sco_write_request_count_0_cnd_;
   sync_completion_t requests_freed_completion_;
 
   // Whether or not we are being unbound.
@@ -224,7 +236,7 @@ class Device final : public DeviceType,
   // requests remain).
   // This is separate from mutex_ so that request operations don't need to acquire mutex_ (which
   // may degrade performance).
-  mtx_t pending_request_lock_ __TA_ACQUIRED_AFTER(mutex_);
+  std::mutex pending_request_lock_ __TA_ACQUIRED_AFTER(mutex_);
 
   std::optional<component::OutgoingDirectory> outgoing_;
 
@@ -245,9 +257,7 @@ class Device final : public DeviceType,
   // is to mark whether the log has been emitted in each failure.
   bool snoop_warning_emitted_ = false;
 
-  ScoConnectionServer sco_connection_server_;
-  std::optional<fidl::ServerBinding<fuchsia_hardware_bluetooth::ScoConnection>>
-      sco_connection_binding_;
+  std::optional<ScoConnectionServer> sco_connection_server_;
   fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::HciTransport> hci_transport_binding_;
   std::optional<fidl::ServerBinding<fuchsia_hardware_bluetooth::Snoop>> snoop_server_;
 };

@@ -662,7 +662,7 @@ where
                         // increasing.
                         None => Err(TableIdOverflowsError),
                         Some(table_id) => {
-                            let core_id = ctx.api().routes().new_table();
+                            let core_id = ctx.api().routes().new_table(table_id);
                             let core_id = CoreId::User(core_id);
                             info!("Adding Route Table: name={name:?} ({core_id:?})");
                             let new_table = Table::new(

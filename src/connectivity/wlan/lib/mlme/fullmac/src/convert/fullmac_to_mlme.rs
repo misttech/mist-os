@@ -3,148 +3,12 @@
 // found in the LICENSE file.
 
 use anyhow::{bail, Context, Error, Result};
-use tracing::warn;
+use log::warn;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_stats as fidl_stats,
+    fidl_fuchsia_wlan_mlme as fidl_mlme,
 };
-
-pub fn convert_iface_counter_stats(
-    stats: fidl_fullmac::WlanFullmacIfaceCounterStats,
-) -> fidl_stats::IfaceCounterStats {
-    fidl_stats::IfaceCounterStats {
-        rx_unicast_total: stats.rx_unicast_total,
-        rx_unicast_drop: stats.rx_unicast_drop,
-        rx_multicast: stats.rx_multicast,
-        tx_total: stats.tx_total,
-        tx_drop: stats.tx_drop,
-    }
-}
-
-pub fn convert_iface_histogram_stats(
-    stats: fidl_fullmac::WlanFullmacIfaceHistogramStats,
-) -> fidl_stats::IfaceHistogramStats {
-    // TODO(https://fxbug.dev/356115270): Understand why these asserts are needed, or remove them if not.
-    assert!(stats.noise_floor_histograms.is_some());
-    assert_eq!(stats.noise_floor_histograms.as_ref().unwrap().len(), 1);
-
-    assert!(stats.rssi_histograms.is_some());
-    assert_eq!(stats.rssi_histograms.as_ref().unwrap().len(), 1);
-
-    assert!(stats.rx_rate_index_histograms.is_some());
-    assert_eq!(stats.rx_rate_index_histograms.as_ref().unwrap().len(), 1);
-
-    assert!(stats.snr_histograms.is_some());
-    assert_eq!(stats.snr_histograms.as_ref().unwrap().len(), 1);
-
-    fidl_stats::IfaceHistogramStats {
-        noise_floor_histograms: stats.noise_floor_histograms.map_or_else(
-            || vec![],
-            |histograms| {
-                histograms
-                    .into_iter()
-                    .map(|hist| {
-                        let (hist_scope, antenna_id) =
-                            convert_hist_scope_and_antenna_id(hist.hist_scope, hist.antenna_id);
-                        fidl_stats::NoiseFloorHistogram {
-                            hist_scope,
-                            antenna_id: antenna_id.map(Box::new),
-                            noise_floor_samples: hist
-                                .noise_floor_samples
-                                .iter()
-                                .filter(|s| s.num_samples > 0)
-                                .map(|s| fidl_stats::HistBucket {
-                                    bucket_index: s.bucket_index,
-                                    num_samples: s.num_samples,
-                                })
-                                .collect(),
-                            invalid_samples: hist.invalid_samples,
-                        }
-                    })
-                    .collect()
-            },
-        ),
-        rssi_histograms: stats.rssi_histograms.map_or_else(
-            || vec![],
-            |histograms| {
-                histograms
-                    .into_iter()
-                    .map(|hist| {
-                        let (hist_scope, antenna_id) =
-                            convert_hist_scope_and_antenna_id(hist.hist_scope, hist.antenna_id);
-                        fidl_stats::RssiHistogram {
-                            hist_scope,
-                            antenna_id: antenna_id.map(Box::new),
-                            rssi_samples: hist
-                                .rssi_samples
-                                .iter()
-                                .filter(|s| s.num_samples > 0)
-                                .map(|s| fidl_stats::HistBucket {
-                                    bucket_index: s.bucket_index,
-                                    num_samples: s.num_samples,
-                                })
-                                .collect(),
-                            invalid_samples: hist.invalid_samples,
-                        }
-                    })
-                    .collect()
-            },
-        ),
-        rx_rate_index_histograms: stats.rx_rate_index_histograms.map_or_else(
-            || vec![],
-            |histograms| {
-                histograms
-                    .into_iter()
-                    .map(|hist| {
-                        let (hist_scope, antenna_id) =
-                            convert_hist_scope_and_antenna_id(hist.hist_scope, hist.antenna_id);
-                        fidl_stats::RxRateIndexHistogram {
-                            hist_scope,
-                            antenna_id: antenna_id.map(Box::new),
-                            rx_rate_index_samples: hist
-                                .rx_rate_index_samples
-                                .iter()
-                                .filter(|s| s.num_samples > 0)
-                                .map(|s| fidl_stats::HistBucket {
-                                    bucket_index: s.bucket_index,
-                                    num_samples: s.num_samples,
-                                })
-                                .collect(),
-                            invalid_samples: hist.invalid_samples,
-                        }
-                    })
-                    .collect()
-            },
-        ),
-        snr_histograms: stats.snr_histograms.map_or_else(
-            || vec![],
-            |histograms| {
-                histograms
-                    .into_iter()
-                    .map(|hist| {
-                        let (hist_scope, antenna_id) =
-                            convert_hist_scope_and_antenna_id(hist.hist_scope, hist.antenna_id);
-                        fidl_stats::SnrHistogram {
-                            hist_scope,
-                            antenna_id: antenna_id.map(Box::new),
-                            snr_samples: hist
-                                .snr_samples
-                                .iter()
-                                .filter(|s| s.num_samples > 0)
-                                .map(|s| fidl_stats::HistBucket {
-                                    bucket_index: s.bucket_index,
-                                    num_samples: s.num_samples,
-                                })
-                                .collect(),
-                            invalid_samples: hist.invalid_samples,
-                        }
-                    })
-                    .collect()
-            },
-        ),
-    }
-}
 
 pub fn convert_device_info(
     info: fidl_fullmac::WlanFullmacImplQueryResponse,
@@ -181,6 +45,9 @@ pub fn convert_set_keys_resp(
     }
     let mut results = vec![];
     for i in 0..resp.statuslist.len() {
+        // Okay to index because `i` is less than the length of `resp.statuslist`, and we
+        // already checked that `keylist` is the same length as `resp.statuslist`
+        #[expect(clippy::indexing_slicing)]
         results.push(fidl_mlme::SetKeyResult {
             key_id: original_set_keys_req.keylist[i].key_id,
             status: resp.statuslist[i],
@@ -203,9 +70,10 @@ pub fn convert_scan_end(
     end: fidl_fullmac::WlanFullmacImplIfcOnScanEndRequest,
 ) -> Result<fidl_mlme::ScanEnd> {
     use fidl_fullmac::WlanScanResult;
+    let scan_result_code = end.code.context("missing code")?;
     Ok(fidl_mlme::ScanEnd {
         txn_id: end.txn_id.context("missing txn_id")?,
-        code: match end.code.context("missing code")? {
+        code: match scan_result_code {
             WlanScanResult::Success => fidl_mlme::ScanResultCode::Success,
             WlanScanResult::NotSupported => fidl_mlme::ScanResultCode::NotSupported,
             WlanScanResult::InvalidArgs => fidl_mlme::ScanResultCode::InvalidArgs,
@@ -217,7 +85,7 @@ pub fn convert_scan_end(
             _ => {
                 warn!(
                     "Invalid scan result code {}, defaulting to ScanResultCode::NotSupported",
-                    end.code.unwrap().into_primitive()
+                    scan_result_code.into_primitive()
                 );
                 fidl_mlme::ScanResultCode::NotSupported
             }
@@ -311,19 +179,18 @@ pub fn convert_authenticate_indication(
     ind: fidl_fullmac::WlanFullmacImplIfcAuthIndRequest,
 ) -> Result<fidl_mlme::AuthenticateIndication> {
     use fidl_fullmac::WlanAuthType;
+    let auth_type = ind.auth_type.context("missing auth type")?;
     Ok(fidl_mlme::AuthenticateIndication {
         peer_sta_address: ind.peer_sta_address.context("missing peer_sta_address")?,
-        auth_type: match ind.auth_type {
-            Some(WlanAuthType::OpenSystem) => fidl_mlme::AuthenticationTypes::OpenSystem,
-            Some(WlanAuthType::SharedKey) => fidl_mlme::AuthenticationTypes::SharedKey,
-            Some(WlanAuthType::FastBssTransition) => {
-                fidl_mlme::AuthenticationTypes::FastBssTransition
-            }
-            Some(WlanAuthType::Sae) => fidl_mlme::AuthenticationTypes::Sae,
+        auth_type: match auth_type {
+            WlanAuthType::OpenSystem => fidl_mlme::AuthenticationTypes::OpenSystem,
+            WlanAuthType::SharedKey => fidl_mlme::AuthenticationTypes::SharedKey,
+            WlanAuthType::FastBssTransition => fidl_mlme::AuthenticationTypes::FastBssTransition,
+            WlanAuthType::Sae => fidl_mlme::AuthenticationTypes::Sae,
             _ => {
                 warn!(
                     "Invalid auth type {}, defaulting to AuthenticationTypes::OpenSystem",
-                    ind.auth_type.expect("missing auth type").into_primitive()
+                    auth_type.into_primitive()
                 );
                 fidl_mlme::AuthenticationTypes::OpenSystem
             }
@@ -334,15 +201,10 @@ pub fn convert_authenticate_indication(
 pub fn convert_deauthenticate_confirm(
     conf: fidl_fullmac::WlanFullmacImplIfcDeauthConfRequest,
 ) -> fidl_mlme::DeauthenticateConfirm {
-    let peer_sta_address = conf
-        .peer_sta_address
-        .or_else(|| {
-            warn!(
-                "Got None for peer_sta_address when converting DeauthConf. Substituting all zeros."
-            );
-            Some([0 as u8; fidl_ieee80211::MAC_ADDR_LEN as usize])
-        })
-        .unwrap();
+    let peer_sta_address = conf.peer_sta_address.unwrap_or_else(|| {
+        warn!("Got None for peer_sta_address when converting DeauthConf. Substituting all zeros.");
+        [0 as u8; fidl_ieee80211::MAC_ADDR_LEN as usize]
+    });
     fidl_mlme::DeauthenticateConfirm { peer_sta_address }
 }
 
@@ -358,36 +220,27 @@ pub fn convert_deauthenticate_indication(
 pub fn convert_associate_indication(
     ind: fidl_fullmac::WlanFullmacImplIfcAssocIndRequest,
 ) -> Result<fidl_mlme::AssociateIndication> {
+    let ssid = ind.ssid.context("missing ssid")?;
+    let rsne = ind.rsne.context("missing rsne")?;
     Ok(fidl_mlme::AssociateIndication {
         peer_sta_address: ind.peer_sta_address.context("missing peer sta address")?,
         // TODO(https://fxbug.dev/42068281): Fix the discrepancy between WlanFullmacAssocInd and
         // fidl_mlme::AssociateIndication
         capability_info: 0,
         listen_interval: ind.listen_interval.context("missing listen interval")?,
-        ssid: if ind.ssid.clone().expect("missing ssid").len() > 0 {
-            Some(ind.ssid.expect("missing ssid"))
-        } else {
-            None
-        },
+        ssid: if ssid.len() > 0 { Some(ssid) } else { None },
         rates: vec![],
-        rsne: if ind.rsne.clone().expect("missing rsne").len() > 0 {
-            Some(ind.rsne.expect("missing rsne"))
-        } else {
-            None
-        },
+        rsne: if rsne.len() > 0 { Some(rsne) } else { None },
     })
 }
 
 pub fn convert_disassociate_confirm(
     conf: fidl_fullmac::WlanFullmacImplIfcDisassocConfRequest,
 ) -> fidl_mlme::DisassociateConfirm {
-    let status = conf
-        .status
-        .or_else(|| {
-            warn!("Got None for status when converting DisassocConf. Using error INTERNAL.");
-            Some(zx::Status::INTERNAL.into_raw())
-        })
-        .unwrap();
+    let status = conf.status.unwrap_or_else(|| {
+        warn!("Got None for status when converting DisassocConf. Using error INTERNAL.");
+        zx::Status::INTERNAL.into_raw()
+    });
     fidl_mlme::DisassociateConfirm { status }
 }
 
@@ -541,33 +394,6 @@ fn convert_band_cap(cap: fidl_fullmac::BandCapability) -> Result<fidl_mlme::Band
     })
 }
 
-fn convert_hist_scope_and_antenna_id(
-    scope: fidl_fullmac::WlanFullmacHistScope,
-    antenna_id: fidl_fullmac::WlanFullmacAntennaId,
-) -> (fidl_stats::HistScope, Option<fidl_stats::AntennaId>) {
-    match scope {
-        fidl_fullmac::WlanFullmacHistScope::Station => (fidl_stats::HistScope::Station, None),
-        fidl_fullmac::WlanFullmacHistScope::PerAntenna => {
-            let antenna_id = fidl_stats::AntennaId {
-                freq: match fidl_stats::AntennaFreq::from_primitive(
-                    antenna_id.freq.into_primitive(),
-                ) {
-                    Some(freq) => freq,
-                    None => {
-                        warn!(
-                            "Invalid antenna freq {}, defaulting to AntennaFreq::Antenna2G",
-                            antenna_id.freq.into_primitive()
-                        );
-                        fidl_stats::AntennaFreq::Antenna2G
-                    }
-                },
-                index: antenna_id.index,
-            };
-            (fidl_stats::HistScope::PerAntenna, Some(antenna_id))
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -582,182 +408,6 @@ mod tests {
             cipher_suite_oui: [77, 88, 99],
             cipher_suite_type: fidl_ieee80211::CipherSuiteType::Ccmp128,
         }
-    }
-
-    #[test]
-    fn test_convert_iface_histogram_stats() {
-        let stats = fidl_fullmac::WlanFullmacIfaceHistogramStats {
-            noise_floor_histograms: Some(vec![fidl_fullmac::WlanFullmacNoiseFloorHistogram {
-                hist_scope: fidl_fullmac::WlanFullmacHistScope::Station,
-                antenna_id: fidl_fullmac::WlanFullmacAntennaId {
-                    freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna2G,
-                    index: 0,
-                },
-                noise_floor_samples: vec![fidl_fullmac::WlanFullmacHistBucket {
-                    bucket_index: 1,
-                    num_samples: 1,
-                }],
-                invalid_samples: 1,
-            }]),
-            rssi_histograms: Some(vec![fidl_fullmac::WlanFullmacRssiHistogram {
-                hist_scope: fidl_fullmac::WlanFullmacHistScope::Station,
-                antenna_id: fidl_fullmac::WlanFullmacAntennaId {
-                    freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna2G,
-                    index: 0,
-                },
-                rssi_samples: vec![fidl_fullmac::WlanFullmacHistBucket {
-                    bucket_index: 2,
-                    num_samples: 2,
-                }],
-                invalid_samples: 1,
-            }]),
-            rx_rate_index_histograms: Some(vec![fidl_fullmac::WlanFullmacRxRateIndexHistogram {
-                hist_scope: fidl_fullmac::WlanFullmacHistScope::Station,
-                antenna_id: fidl_fullmac::WlanFullmacAntennaId {
-                    freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna2G,
-                    index: 0,
-                },
-                rx_rate_index_samples: vec![fidl_fullmac::WlanFullmacHistBucket {
-                    bucket_index: 3,
-                    num_samples: 3,
-                }],
-                invalid_samples: 1,
-            }]),
-            snr_histograms: Some(vec![fidl_fullmac::WlanFullmacSnrHistogram {
-                hist_scope: fidl_fullmac::WlanFullmacHistScope::Station,
-                antenna_id: fidl_fullmac::WlanFullmacAntennaId {
-                    freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna2G,
-                    index: 0,
-                },
-                snr_samples: vec![fidl_fullmac::WlanFullmacHistBucket {
-                    bucket_index: 4,
-                    num_samples: 4,
-                }],
-                invalid_samples: 1,
-            }]),
-            ..Default::default()
-        };
-
-        assert_eq!(
-            convert_iface_histogram_stats(stats),
-            fidl_stats::IfaceHistogramStats {
-                noise_floor_histograms: vec![fidl_stats::NoiseFloorHistogram {
-                    hist_scope: fidl_stats::HistScope::Station,
-                    antenna_id: None,
-                    noise_floor_samples: vec![fidl_stats::HistBucket {
-                        bucket_index: 1,
-                        num_samples: 1,
-                    }],
-                    invalid_samples: 1,
-                }],
-                rssi_histograms: vec![fidl_stats::RssiHistogram {
-                    hist_scope: fidl_stats::HistScope::Station,
-                    antenna_id: None,
-                    rssi_samples: vec![fidl_stats::HistBucket { bucket_index: 2, num_samples: 2 }],
-                    invalid_samples: 1,
-                }],
-                rx_rate_index_histograms: vec![fidl_stats::RxRateIndexHistogram {
-                    hist_scope: fidl_stats::HistScope::Station,
-                    antenna_id: None,
-                    rx_rate_index_samples: vec![fidl_stats::HistBucket {
-                        bucket_index: 3,
-                        num_samples: 3,
-                    }],
-                    invalid_samples: 1,
-                }],
-                snr_histograms: vec![fidl_stats::SnrHistogram {
-                    hist_scope: fidl_stats::HistScope::Station,
-                    antenna_id: None,
-                    snr_samples: vec![fidl_stats::HistBucket { bucket_index: 4, num_samples: 4 }],
-                    invalid_samples: 1,
-                }],
-            }
-        );
-    }
-
-    #[test]
-    fn test_convert_iface_histogram_stats_filters_out_samples_with_len_0() {
-        let stats = fidl_fullmac::WlanFullmacIfaceHistogramStats {
-            noise_floor_histograms: Some(vec![fidl_fullmac::WlanFullmacNoiseFloorHistogram {
-                hist_scope: fidl_fullmac::WlanFullmacHistScope::Station,
-                antenna_id: fidl_fullmac::WlanFullmacAntennaId {
-                    freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna2G,
-                    index: 0,
-                },
-                noise_floor_samples: vec![fidl_fullmac::WlanFullmacHistBucket {
-                    bucket_index: 0,
-                    num_samples: 0,
-                }],
-                invalid_samples: 1,
-            }]),
-            rssi_histograms: Some(vec![fidl_fullmac::WlanFullmacRssiHistogram {
-                hist_scope: fidl_fullmac::WlanFullmacHistScope::Station,
-                antenna_id: fidl_fullmac::WlanFullmacAntennaId {
-                    freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna2G,
-                    index: 0,
-                },
-                rssi_samples: vec![fidl_fullmac::WlanFullmacHistBucket {
-                    bucket_index: 0,
-                    num_samples: 0,
-                }],
-                invalid_samples: 1,
-            }]),
-            rx_rate_index_histograms: Some(vec![fidl_fullmac::WlanFullmacRxRateIndexHistogram {
-                hist_scope: fidl_fullmac::WlanFullmacHistScope::Station,
-                antenna_id: fidl_fullmac::WlanFullmacAntennaId {
-                    freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna2G,
-                    index: 0,
-                },
-                rx_rate_index_samples: vec![fidl_fullmac::WlanFullmacHistBucket {
-                    bucket_index: 0,
-                    num_samples: 0,
-                }],
-                invalid_samples: 1,
-            }]),
-            snr_histograms: Some(vec![fidl_fullmac::WlanFullmacSnrHistogram {
-                hist_scope: fidl_fullmac::WlanFullmacHistScope::Station,
-                antenna_id: fidl_fullmac::WlanFullmacAntennaId {
-                    freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna2G,
-                    index: 0,
-                },
-                snr_samples: vec![fidl_fullmac::WlanFullmacHistBucket {
-                    bucket_index: 0,
-                    num_samples: 0,
-                }],
-                invalid_samples: 1,
-            }]),
-            ..Default::default()
-        };
-
-        assert_eq!(
-            convert_iface_histogram_stats(stats),
-            fidl_stats::IfaceHistogramStats {
-                noise_floor_histograms: vec![fidl_stats::NoiseFloorHistogram {
-                    hist_scope: fidl_stats::HistScope::Station,
-                    antenna_id: None,
-                    noise_floor_samples: vec![],
-                    invalid_samples: 1,
-                }],
-                rssi_histograms: vec![fidl_stats::RssiHistogram {
-                    hist_scope: fidl_stats::HistScope::Station,
-                    antenna_id: None,
-                    rssi_samples: vec![],
-                    invalid_samples: 1,
-                }],
-                rx_rate_index_histograms: vec![fidl_stats::RxRateIndexHistogram {
-                    hist_scope: fidl_stats::HistScope::Station,
-                    antenna_id: None,
-                    rx_rate_index_samples: vec![],
-                    invalid_samples: 1,
-                }],
-                snr_histograms: vec![fidl_stats::SnrHistogram {
-                    hist_scope: fidl_stats::HistScope::Station,
-                    antenna_id: None,
-                    snr_samples: vec![],
-                    invalid_samples: 1,
-                }],
-            }
-        );
     }
 
     #[test]
@@ -911,59 +561,5 @@ mod tests {
         let mlme = convert_band_cap(fullmac).unwrap();
         assert!(mlme.ht_cap.is_none());
         assert!(mlme.vht_cap.is_none());
-    }
-
-    #[test]
-    fn test_convert_hist_scope_and_antenna_id_station_ignores_antenna_id() {
-        assert_eq!(
-            convert_hist_scope_and_antenna_id(
-                fidl_fullmac::WlanFullmacHistScope::Station,
-                fidl_fullmac::WlanFullmacAntennaId {
-                    freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna2G,
-                    index: 3,
-                }
-            ),
-            (fidl_stats::HistScope::Station, None)
-        );
-        assert_eq!(
-            convert_hist_scope_and_antenna_id(
-                fidl_fullmac::WlanFullmacHistScope::Station,
-                fidl_fullmac::WlanFullmacAntennaId {
-                    freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna5G,
-                    index: 3,
-                }
-            ),
-            (fidl_stats::HistScope::Station, None)
-        );
-    }
-
-    #[test]
-    fn test_convert_hist_scope_and_antenna_id_per_antenna_valid_freq() {
-        assert_eq!(
-            convert_hist_scope_and_antenna_id(
-                fidl_fullmac::WlanFullmacHistScope::PerAntenna,
-                fidl_fullmac::WlanFullmacAntennaId {
-                    freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna2G,
-                    index: 3,
-                }
-            ),
-            (
-                fidl_stats::HistScope::PerAntenna,
-                Some(fidl_stats::AntennaId { freq: fidl_stats::AntennaFreq::Antenna2G, index: 3 })
-            )
-        );
-        assert_eq!(
-            convert_hist_scope_and_antenna_id(
-                fidl_fullmac::WlanFullmacHistScope::PerAntenna,
-                fidl_fullmac::WlanFullmacAntennaId {
-                    freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna5G,
-                    index: 1,
-                }
-            ),
-            (
-                fidl_stats::HistScope::PerAntenna,
-                Some(fidl_stats::AntennaId { freq: fidl_stats::AntennaFreq::Antenna5G, index: 1 })
-            )
-        );
     }
 }

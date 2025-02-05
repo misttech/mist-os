@@ -11,10 +11,12 @@ use crate::signals::{
     SI_HEADER_SIZE,
 };
 use crate::task::{
-    CurrentTask, ProcessEntryRef, ProcessSelector, Task, TaskMutableState, ThreadGroup, WaitResult,
-    WaitableChildResult, Waiter,
+    CurrentTask, ProcessEntryRef, ProcessSelector, Task, TaskMutableState, ThreadGroup,
+    ThreadGroupLifecycleWaitValue, WaitResult, WaitableChildResult, Waiter,
 };
 use crate::vfs::{FdFlags, FdNumber};
+use starnix_uapi::uapi;
+use starnix_uapi::user_address::MultiArchUserRef;
 
 use starnix_logging::track_stub;
 use starnix_sync::{Locked, Unlocked};
@@ -141,11 +143,12 @@ pub fn sys_rt_sigprocmask(
     Ok(())
 }
 
-pub fn sys_sigaltstack(
-    _locked: &mut Locked<'_, Unlocked>,
+type SigAltStackPtr = MultiArchUserRef<uapi::sigaltstack, uapi::arch32::sigaltstack>;
+
+fn sigaltstack(
     current_task: &CurrentTask,
-    user_ss: UserRef<sigaltstack>,
-    user_old_ss: UserRef<sigaltstack>,
+    user_ss: SigAltStackPtr,
+    user_old_ss: SigAltStackPtr,
 ) -> Result<(), Errno> {
     let stack_pointer_register = current_task.thread_state.registers.stack_pointer_register();
     let mut state = current_task.write();
@@ -156,7 +159,7 @@ pub fn sys_sigaltstack(
         if on_signal_stack {
             return error!(EPERM);
         }
-        ss = current_task.read_object(user_ss)?;
+        ss = current_task.read_multi_arch_object(user_ss)?;
         if (ss.ss_flags & !((SS_AUTODISARM | SS_DISABLE) as i32)) != 0 {
             return error!(EINVAL);
         }
@@ -173,7 +176,7 @@ pub fn sys_sigaltstack(
         if on_signal_stack {
             old_ss.ss_flags = SS_ONSTACK as i32;
         }
-        current_task.write_object(user_old_ss, &old_ss)?;
+        current_task.write_multi_arch_object(user_old_ss, old_ss)?;
     }
 
     if !user_ss.is_null() {
@@ -185,6 +188,15 @@ pub fn sys_sigaltstack(
     }
 
     Ok(())
+}
+
+pub fn sys_sigaltstack(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    user_ss: UserRef<sigaltstack>,
+    user_old_ss: UserRef<sigaltstack>,
+) -> Result<(), Errno> {
+    sigaltstack(current_task, user_ss.into(), user_old_ss.into())
 }
 
 pub fn sys_rt_sigsuspend(
@@ -731,7 +743,9 @@ fn wait_on_pid(
                         }
                     }
                 }
-                thread_group.child_status_waiters.wait_async(&waiter);
+                thread_group
+                    .lifecycle_waiters
+                    .wait_async_value(&waiter, ThreadGroupLifecycleWaitValue::ChildStatus);
             }
         }
 
@@ -861,6 +875,33 @@ pub fn sys_wait4(
 fn negate_pid(pid: pid_t) -> Result<pid_t, Errno> {
     pid.checked_neg().ok_or_else(|| errno!(ESRCH))
 }
+
+// Syscalls for arch32 usage
+#[cfg(feature = "arch32")]
+mod arch32 {
+    use crate::signals::syscalls::{sigaltstack, SigAltStackPtr};
+    use crate::task::CurrentTask;
+    use starnix_sync::{Locked, Unlocked};
+    use starnix_uapi::errors::Errno;
+    use starnix_uapi::uapi;
+    use starnix_uapi::user_address::UserRef;
+
+    pub fn sys_arch32_sigaltstack(
+        _locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_ss: UserRef<uapi::arch32::sigaltstack>,
+        user_old_ss: UserRef<uapi::arch32::sigaltstack>,
+    ) -> Result<(), Errno> {
+        sigaltstack(
+            current_task,
+            SigAltStackPtr::from_32(user_ss),
+            SigAltStackPtr::from_32(user_old_ss),
+        )
+    }
+}
+
+#[cfg(feature = "arch32")]
+pub use arch32::*;
 
 #[cfg(test)]
 mod tests {

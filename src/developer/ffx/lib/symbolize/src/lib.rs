@@ -28,15 +28,15 @@ pub struct Symbolizer {
 
 impl Symbolizer {
     /// Create a new symbolizer instance.
-    pub async fn new() -> Result<Self, CreateSymbolizerError> {
+    pub fn new() -> Result<Self, CreateSymbolizerError> {
         let context = ffx_config::global_env_context()
             .ok_or(CreateSymbolizerError::NoFfxEnvironmentContext)?;
-        Self::with_context(&context).await
+        Self::with_context(&context)
     }
 
     /// Create a new symbolizer instance with a specific ffx context. Normally only needed in tests.
-    pub async fn with_context(context: &EnvironmentContext) -> Result<Self, CreateSymbolizerError> {
-        let sdk = context.get_sdk().await.map_err(CreateSymbolizerError::NoSdkAvailable)?;
+    pub fn with_context(context: &EnvironmentContext) -> Result<Self, CreateSymbolizerError> {
+        let sdk = context.get_sdk().map_err(CreateSymbolizerError::NoSdkAvailable)?;
 
         symbol_index::ensure_symbol_index_registered(&sdk)
             .map_err(CreateSymbolizerError::SymbolIndexRegistration)?;

@@ -23,8 +23,10 @@ AudioCapturer::AudioCapturer(fuchsia::media::AudioCapturerConfiguration configur
     usage_ = CaptureUsage::LOOPBACK;
   } else {
     context->volume_manager().AddStream(this);
-    if (configuration.input().has_usage()) {
-      usage_ = CaptureUsageFromFidlCaptureUsage(configuration.input().usage());
+    if (configuration.input().has_usage2()) {
+      usage_ = ToCaptureUsage(configuration.input().usage2());
+    } else if (configuration.input().has_usage()) {
+      usage_ = ToCaptureUsage(configuration.input().usage());
     }
   }
   reporter().SetUsage(usage_);
@@ -154,7 +156,12 @@ void AudioCapturer::BindGainControl(
 
 void AudioCapturer::SetUsage(fuchsia::media::AudioCaptureUsage usage) {
   TRACE_DURATION("audio", "AudioCapturer::SetUsage");
-  if (usage_ == CaptureUsageFromFidlCaptureUsage(usage)) {
+  SetUsage2(ToFidlCaptureUsage2(usage));
+}
+
+void AudioCapturer::SetUsage2(fuchsia::media::AudioCaptureUsage2 usage) {
+  TRACE_DURATION("audio", "AudioCapturer::SetUsage2");
+  if (usage_ == ToCaptureUsage(usage)) {
     return;
   }
   if (loopback_) {
@@ -167,7 +174,7 @@ void AudioCapturer::SetUsage(fuchsia::media::AudioCaptureUsage usage) {
     context().audio_admin().UpdateCapturerState(usage_, false, this);
   }
 
-  usage_ = CaptureUsageFromFidlCaptureUsage(usage);
+  usage_ = ToCaptureUsage(usage);
   reporter().SetUsage(usage_);
   context().volume_manager().NotifyStreamChanged(this);
   SetRoutingProfile(StateIsRoutable(state));
@@ -177,12 +184,12 @@ void AudioCapturer::SetUsage(fuchsia::media::AudioCaptureUsage usage) {
   }
 }
 
-fuchsia::media::Usage AudioCapturer::GetStreamUsage() const {
+fuchsia::media::Usage2 AudioCapturer::GetStreamUsage() const {
   // We should only be calling these from the StreamVolumeManager. We don't register LOOPBACK
   // capturers with the StreamVolumeManager since those capturers do not have a compatible usage.
   FX_CHECK(!loopback_);
-  fuchsia::media::Usage usage;
-  usage.set_capture_usage(FidlCaptureUsageFromCaptureUsage(usage_).value());
+  fuchsia::media::Usage2 usage;
+  usage.set_capture_usage(ToFidlCaptureUsage2(usage_));
   return usage;
 }
 
@@ -212,8 +219,8 @@ void AudioCapturer::RealizeVolume(VolumeCommand volume_command) {
         link.mixer->gain.SetDestGain(gain_db);
 
         if constexpr (kLogCaptureUsageVolumeGainActions) {
-          // TODO(https://fxbug.dev/42128197) Logging should be removed upon creation of inspect tool or
-          // other real-time method for gain observation
+          // TODO(https://fxbug.dev/42128197) Logging should be removed upon creation of inspect
+          // tool or other real-time method for gain observation
           FX_LOGS(INFO) << log_string;
         }
       }

@@ -223,9 +223,10 @@ zx::result<> BoardTestHelper::StartRealm() {
 
 zx::result<> BoardTestHelper::WaitOnDevices(const std::vector<std::string>& device_paths) {
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  auto result = realm_->component().Connect("dev-topological", server_end.TakeChannel());
+  auto result = realm_->component().exposed()->Open3("dev-topological", fuchsia::io::PERM_READABLE,
+                                                     {}, server_end.TakeChannel());
   if (result != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to connect to dev-topological : " << zx_status_get_string(result);
+    FX_LOGS(ERROR) << "Failed to open dev-topological : " << zx_status_get_string(result);
     return zx::error(result);
   }
 

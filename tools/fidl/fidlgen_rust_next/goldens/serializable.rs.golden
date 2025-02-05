@@ -298,7 +298,7 @@ impl Clone for WireSerializableUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireSerializableUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -397,7 +397,7 @@ impl Clone for WireOptionalSerializableUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalSerializableUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {

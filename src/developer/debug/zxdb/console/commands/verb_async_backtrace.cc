@@ -745,6 +745,14 @@ void OnStackReady(Stack& stack, fxl::RefPtr<CommandContext> cmd_context,
       expr = "self.ehandle.root_scope.inner->data.state.__0->data.data.value.data";
     } else if (func_name == "fuchsia_async::runtime::fuchsia::executor::send::SendExecutor::run") {
       expr = "self.root_scope.inner->data.state.__0->data.data.value.data";
+    } else if (func_name.starts_with("fuchsia_async::runtime::fuchsia::executor::send") &&
+               func_name.find("create_worker_threads::{closure") != std::string::npos) {
+      // TODO(sadmac): This is depending on a local closure capture. All of this
+      // code is delicate in the face of refactors of the fuchsia_async crate
+      // but depending on a *local* might be a bit too brittle. Ideally we'd
+      // fetch from the EXECUTOR thread-local static. Not sure how to get to
+      // that though.
+      expr = "root_scope.inner->data.state.__0->data.data.value.data";
     } else {
       continue;
     }

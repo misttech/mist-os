@@ -41,16 +41,12 @@ fn start_test_dir(config_path: &str) -> Result<fio::DirectoryProxy, Error> {
     let files: HashMap<String, String> = match File::open(&config_path) {
         Ok(file) => from_reader(file)?,
         Err(err) => {
-            tracing::warn!(
-                "publishing empty directory for {} due to error: {:?}",
-                &config_path,
-                err
-            );
+            log::warn!("publishing empty directory for {} due to error: {:?}", &config_path, err);
             HashMap::new()
         }
     };
 
-    tracing::info!("Files from {}: {:?}", &config_path, files);
+    log::info!("Files from {}: {:?}", &config_path, files);
 
     let mut tree = TreeBuilder::empty_dir();
 
@@ -186,7 +182,7 @@ async fn main() -> Result<(), Error> {
 
     fs.take_and_serve_directory_handle()?;
     fs.for_each_concurrent(10, |req| {
-        run_server(req, dir.clone()).unwrap_or_else(|e| tracing::error!("{:?}", e))
+        run_server(req, dir.clone()).unwrap_or_else(|e| log::error!("{:?}", e))
     })
     .await;
     Ok(())

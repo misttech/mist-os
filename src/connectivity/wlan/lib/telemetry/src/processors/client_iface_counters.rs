@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_wlan_stats as fidl_stats;
 use fuchsia_async::TimeoutExt;
-use fuchsia_sync::Mutex;
+use futures::lock::Mutex;
 
+use log::{error, warn};
 use std::sync::Arc;
-use tracing::{error, warn};
 use windowed_stats::experimental::clock::Timed;
 use windowed_stats::experimental::series::interpolation::LastSample;
 use windowed_stats::experimental::series::statistic::LatchMax;
@@ -60,19 +61,18 @@ impl ClientIfaceCountersLogger {
                 None
             }
         };
-        *self.iface_state.lock() = IfaceState::Created { iface_id, telemetry_proxy }
+        *self.iface_state.lock().await = IfaceState::Created { iface_id, telemetry_proxy }
     }
 
     pub async fn handle_iface_destroyed(&self, iface_id: u16) {
-        let destroyed = matches!(*self.iface_state.lock(), IfaceState::Created { iface_id: existing_iface_id, .. } if iface_id == existing_iface_id);
+        let destroyed = matches!(*self.iface_state.lock().await, IfaceState::Created { iface_id: existing_iface_id, .. } if iface_id == existing_iface_id);
         if destroyed {
-            *self.iface_state.lock() = IfaceState::NotAvailable;
+            *self.iface_state.lock().await = IfaceState::NotAvailable;
         }
     }
 
-    #[allow(clippy::await_holding_lock, reason = "mass allow for https://fxbug.dev/381896734")]
     pub async fn handle_periodic_telemetry(&self, is_connected: bool) {
-        match &*self.iface_state.lock() {
+        match &*self.iface_state.lock().await {
             IfaceState::NotAvailable => (),
             IfaceState::Created { telemetry_proxy, .. } => {
                 if let Some(telemetry_proxy) = &telemetry_proxy {
@@ -85,10 +85,19 @@ impl ClientIfaceCountersLogger {
                         .await
                     {
                         Ok(Ok(stats)) => {
-                            self.time_series_stats.log_rx_unicast_total(stats.rx_unicast_total);
-                            self.time_series_stats.log_rx_unicast_drop(stats.rx_unicast_drop);
-                            self.time_series_stats.log_tx_total(stats.tx_total);
-                            self.time_series_stats.log_tx_drop(stats.tx_drop);
+                            if let fidl_stats::IfaceCounterStats {
+                                rx_unicast_total: Some(rx_unicast_total),
+                                rx_unicast_drop: Some(rx_unicast_drop),
+                                tx_total: Some(tx_total),
+                                tx_drop: Some(tx_drop),
+                                ..
+                            } = stats
+                            {
+                                self.time_series_stats.log_rx_unicast_total(rx_unicast_total);
+                                self.time_series_stats.log_rx_unicast_drop(rx_unicast_drop);
+                                self.time_series_stats.log_tx_total(tx_total);
+                                self.time_series_stats.log_tx_drop(tx_drop);
+                            }
                         }
                         error => {
                             // It's normal for this call to fail while the device is not connected,
@@ -191,12 +200,13 @@ mod tests {
 
         let is_connected = true;
         let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
-        let counter_stats = fidl_fuchsia_wlan_stats::IfaceCounterStats {
-            rx_unicast_total: 100,
-            rx_unicast_drop: 5,
-            rx_multicast: 30,
-            tx_total: 50,
-            tx_drop: 2,
+        let counter_stats = fidl_stats::IfaceCounterStats {
+            rx_unicast_total: Some(100),
+            rx_unicast_drop: Some(5),
+            rx_multicast: Some(30),
+            tx_total: Some(50),
+            tx_drop: Some(2),
+            ..Default::default()
         };
         assert_eq!(
             test_helper.run_and_respond_iface_counter_stats_req(&mut test_fut, Ok(&counter_stats)),

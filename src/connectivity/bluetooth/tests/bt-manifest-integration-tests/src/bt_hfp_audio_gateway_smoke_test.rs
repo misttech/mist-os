@@ -16,9 +16,9 @@ use fuchsia_component_test::{
 };
 use futures::channel::mpsc;
 use futures::{SinkExt, StreamExt};
+use log::info;
 use realmbuilder_mock_helpers::{add_fidl_service_handler, mock_component, mock_dev};
 use std::collections::HashSet;
-use tracing::info;
 
 /// HFP Audio Gateway component URL.
 const HFP_AG_URL: &str =

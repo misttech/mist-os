@@ -73,13 +73,13 @@ class GenericWatchdog32 {
   }
 
   // Accessors
-  zx_duration_t timeout_nsec() const { return cfg_.watchdog_period_nsec; }
+  zx_duration_boot_t timeout_nsec() const { return cfg_.watchdog_period_nsec; }
   bool is_enabled() const TA_EXCL(lock_) {
     Guard<SpinLock, IrqSave> guard{&lock_};
     return is_enabled_;
   }
 
-  zx_time_t last_pet_time() const TA_EXCL(lock_) {
+  zx_instant_boot_t last_pet_time() const TA_EXCL(lock_) {
     Guard<SpinLock, IrqSave> guard{&lock_};
     return last_pet_time_;
   }
@@ -103,7 +103,7 @@ class GenericWatchdog32 {
     writel(val, action.addr);
   }
 
-  zx_time_t PetLocked() TA_REQ(lock_) {
+  zx_instant_boot_t PetLocked() TA_REQ(lock_) {
     // Even if petting is suppressed, take a look at the time just before the
     // pet was supposed to happen.  This is the value we will use when computing
     // the next pet timer, instead of basing it on the last_pet_time_.  This is
@@ -111,7 +111,7 @@ class GenericWatchdog32 {
     // _actually_ pet the dog, but if we use it to schedule our next timer
     // deadline, we might end up scheduling our timers in the past, causing our
     // core to get stuck in its timer handler.
-    zx_time_t now = current_time();
+    zx_instant_boot_t now = current_boot_time();
     if (!is_petting_suppressed_) {
       last_pet_time_ = now;
       TakeAction(cfg_.pet_action);
@@ -124,8 +124,8 @@ class GenericWatchdog32 {
   mutable DECLARE_SPINLOCK(GenericWatchdog32) lock_;
   zbi_dcfg_generic32_watchdog_t cfg_{};
   zx_status_t early_init_result_ = ZX_ERR_INTERNAL;
-  zx_time_t last_pet_time_ TA_GUARDED(lock_) = 0;
-  Timer pet_timer_ TA_GUARDED(lock_);
+  zx_instant_boot_t last_pet_time_ TA_GUARDED(lock_) = 0;
+  Timer pet_timer_ TA_GUARDED(lock_){ZX_CLOCK_BOOT};
   bool is_enabled_ TA_GUARDED(lock_) = false;
   bool is_petting_suppressed_ TA_GUARDED(lock_) = false;
 };
@@ -249,11 +249,11 @@ void GenericWatchdog32::Init() {
 
 void GenericWatchdog32::HandlePetTimer() {
   if (is_enabled_) {
-    zx_time_t next_pet_time = zx_time_add_duration(PetLocked(), timeout_nsec() / 2);
+    zx_instant_boot_t next_pet_time = zx_time_add_duration(PetLocked(), timeout_nsec() / 2);
     Deadline next_pet_deadline{next_pet_time, {(timeout_nsec() / 4), TIMER_SLACK_EARLY}};
     pet_timer_.Set(
         next_pet_deadline,
-        [](Timer*, zx_time_t now, void* arg) {
+        [](Timer*, zx_instant_boot_t now, void* arg) {
           auto thiz = reinterpret_cast<GenericWatchdog32*>(arg);
           Guard<SpinLock, IrqSave> guard{&thiz->lock_};
           thiz->HandlePetTimer();

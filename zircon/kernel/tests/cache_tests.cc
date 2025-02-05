@@ -19,7 +19,7 @@
 #include "tests.h"
 
 static void bench_cache(size_t bufsize, uint8_t* buf) {
-  zx_time_t t;
+  zx_instant_mono_t t;
   bool do_free;
 
   printf("cache line size %" PRIu32 "\n", arch_dcache_line_size());
@@ -36,17 +36,17 @@ static void bench_cache(size_t bufsize, uint8_t* buf) {
   if (!buf)
     return;
 
-  t = current_time();
+  t = current_mono_time();
   arch_clean_cache_range((vaddr_t)buf, bufsize);
-  zx_duration_t duration = current_time() - t;
+  zx_duration_mono_t duration = current_mono_time() - t;
 
   printf("took %" PRIi64 " nsecs to clean %zu bytes (cold)\n", duration, bufsize);
 
   memset(buf, 0x99, bufsize);
 
-  t = current_time();
+  t = current_mono_time();
   arch_clean_cache_range((vaddr_t)buf, bufsize);
-  duration = current_time() - t;
+  duration = current_mono_time() - t;
 
   if (do_free)
     free(buf);

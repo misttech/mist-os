@@ -259,7 +259,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.driverhandle/HandlesInProtocolSendHandlesRequest",
             "nullable": false,
@@ -330,13 +329,11 @@
       "members": [
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "endpoint",
             "role": "client",
             "protocol": "test.driverhandle/DriverProtocol",
             "nullable": false,
             "protocol_transport": "Driver",
-            "identifier": "test.driverhandle/DriverProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -390,7 +387,6 @@
       "members": [
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.driverhandle/T",
             "nullable": false,
@@ -478,13 +474,11 @@
       "members": [
         {
           "type": {
-            "kind": "request",
             "kind_v2": "endpoint",
             "role": "server",
             "protocol": "test.driverhandle/DriverProtocol",
             "nullable": false,
             "protocol_transport": "Driver",
-            "subtype": "test.driverhandle/DriverProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -543,7 +537,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 5,
             "subtype": "event",
@@ -572,13 +565,11 @@
         {
           "ordinal": 2,
           "type": {
-            "kind": "identifier",
             "kind_v2": "endpoint",
             "role": "client",
             "protocol": "test.driverhandle/DriverProtocol",
             "nullable": false,
             "protocol_transport": "Driver",
-            "identifier": "test.driverhandle/DriverProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,

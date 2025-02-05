@@ -55,7 +55,7 @@ impl TpmProtocol {
             let device = self.device_proxy.lock().await;
             handle_command_request(request, device)
                 .unwrap_or_else(|e| {
-                    tracing::error!("Error handling FIDL request: {:?}", e);
+                    log::error!("Error handling FIDL request: {:?}", e);
                 })
                 .await
         }
@@ -72,7 +72,7 @@ impl TpmProtocol {
             let device = self.device_proxy.lock().await;
             handle_provision_request(request, device)
                 .unwrap_or_else(|e| {
-                    tracing::error!("Error handling FIDL request: {:?}", e);
+                    log::error!("Error handling FIDL request: {:?}", e);
                 })
                 .await
         }
@@ -89,7 +89,7 @@ impl TpmProtocol {
             let device = self.device_proxy.lock().await;
             handle_deprovision_request(request, device)
                 .unwrap_or_else(|e| {
-                    tracing::error!("Error handling FIDL request: {:?}", e);
+                    log::error!("Error handling FIDL request: {:?}", e);
                 })
                 .await
         }

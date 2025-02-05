@@ -49,7 +49,7 @@ impl UnhandledInputHandler for TextSettingsHandler {
                 self.inspect_status
                     .count_received_event(input_device::InputEvent::from(unhandled_input_event));
                 let keymap_id = self.get_keymap_name();
-                tracing::debug!(
+                log::debug!(
                     "text_settings_handler::Instance::handle_unhandled_input_event: keymap_id = {:?}",
                     &keymap_id
                 );
@@ -117,7 +117,7 @@ impl TextSettingsHandler {
                 Some(fsettings::KeyboardSettings { keymap, autorepeat, .. }) => {
                     self.set_keymap_id(keymap);
                     self.set_autorepeat_settings(autorepeat.map(|e| e.into()));
-                    tracing::info!("keymap ID set to: {:?}", self.get_keymap_id());
+                    log::info!("keymap ID set to: {:?}", self.get_keymap_id());
                 }
                 e => {
                     self.metrics_logger.log_error(

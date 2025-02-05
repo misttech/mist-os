@@ -31,8 +31,8 @@ RamMappableCrashlog::RamMappableCrashlog(paddr_t phys, size_t len)
     : crashlog_buffer_(phys && len
                            ? ktl::span<char>{static_cast<char*>(paddr_to_physmap(phys)), len}
                            : ktl::span<char>{}),
-      render_target_(crashlog_buffer_.size() > sizeof(ram_crashlog_t)
-                         ? crashlog_buffer_.subspan(sizeof(ram_crashlog_t))
+      render_target_(crashlog_buffer_.size() > sizeof(ram_crashlog_v1_t)
+                         ? crashlog_buffer_.subspan(sizeof(ram_crashlog_v1_t))
                          : ktl::span<char>{}) {
   if (!crashlog_buffer_.empty()) {
     // Go ahead and "recover" the log right now.  All this will do is verify the
@@ -55,7 +55,7 @@ void RamMappableCrashlog::Finalize(zircon_crash_reason_t reason, size_t amt) {
   // The RAM crashlog library will gracefully handle a nullptr or 0 length here;
   // no need to explicitly check that they are valid.
   ram_crashlog_stow(crashlog_buffer_.data(), crashlog_buffer_.size(), render_target_.data(),
-                    static_cast<uint32_t>(amt), reason, current_time());
+                    static_cast<uint32_t>(amt), reason, current_boot_time(), current_mono_time());
 }
 
 size_t RamMappableCrashlog::Recover(FILE* tgt) {
@@ -246,13 +246,13 @@ void RamMappableCrashlog::UpdateUptimeLocked() {
     constexpr zx_duration_t kDefaultUpdateInterval = ZX_SEC(1);
 
     ram_crashlog_stow(crashlog_buffer_.data(), crashlog_buffer_.size(), nullptr, 0,
-                      ZirconCrashReason::Unknown, current_time());
+                      ZirconCrashReason::Unknown, current_boot_time(), current_mono_time());
 
-    Deadline next_update_time =
-        Deadline::after(kDefaultUpdateInterval, {kDefaultUpdateInterval / 2, TIMER_SLACK_CENTER});
+    Deadline next_update_time = Deadline::after_mono(
+        kDefaultUpdateInterval, {kDefaultUpdateInterval / 2, TIMER_SLACK_CENTER});
     uptime_updater_timer_.Set(
         next_update_time,
-        [](Timer*, zx_time_t now, void* arg) {
+        [](Timer*, zx_instant_mono_t now, void* arg) {
           auto thiz = reinterpret_cast<RamMappableCrashlog*>(arg);
           Guard<SpinLock, IrqSave> guard{&thiz->uptime_updater_lock_};
           thiz->UpdateUptimeLocked();

@@ -41,20 +41,36 @@ class AudioCoreImpl final : public fuchsia::media::AudioCore {
       fidl::InterfaceRequest<fuchsia::media::AudioCapturer> audio_capturer_request) final;
   void EnableDeviceSettings(bool enabled) final { ZX_PANIC("Not implemented"); }
   void SetRenderUsageGain(fuchsia::media::AudioRenderUsage usage, float gain_db) final;
+  void SetRenderUsageGain2(fuchsia::media::AudioRenderUsage2 usage, float gain_db) final;
   void SetCaptureUsageGain(fuchsia::media::AudioCaptureUsage usage, float gain_db) final;
+  void SetCaptureUsageGain2(fuchsia::media::AudioCaptureUsage2 usage, float gain_db) final;
   void BindUsageVolumeControl(
       fuchsia::media::Usage usage,
       fidl::InterfaceRequest<fuchsia::media::audio::VolumeControl> volume_control) final;
+  void BindUsageVolumeControl2(
+      fuchsia::media::Usage2 usage,
+      fidl::InterfaceRequest<fuchsia::media::audio::VolumeControl> volume_control) final;
   void GetDbFromVolume(fuchsia::media::Usage usage, float volume,
                        GetDbFromVolumeCallback callback) final;
-  void GetVolumeFromDb(fuchsia::media::Usage usage, float db,
+  void GetDbFromVolume2(fuchsia::media::Usage2 usage, float volume,
+                        GetDbFromVolume2Callback callback) final;
+  void GetVolumeFromDb(fuchsia::media::Usage usage, float gain_db,
                        GetVolumeFromDbCallback callback) final;
-
+  void GetVolumeFromDb2(fuchsia::media::Usage2 usage, float gain_db,
+                        GetVolumeFromDb2Callback callback) final;
   void SetInteraction(fuchsia::media::Usage active, fuchsia::media::Usage affected,
                       fuchsia::media::Behavior behavior) final;
+  void SetInteraction2(fuchsia::media::Usage2 active, fuchsia::media::Usage2 affected,
+                       fuchsia::media::Behavior behavior) final;
   void ResetInteractions() final;
   void LoadDefaults() final;
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) final {
+    FX_LOGS(ERROR) << "AudioCoreImpl: AudioCore::handle_unknown_method(ordinal " << ordinal
+                   << ", method_has_response " << method_has_response << ")";
+  }
 
+  float GetVolumeFromDbBase(const fuchsia::media::Usage2& usage, float gain_db);
+  float GetDbFromVolumeBase(const fuchsia::media::Usage2& usage, float volume);
   void Shutdown();
 
   fidl::BindingSet<fuchsia::media::AudioCore> bindings_;

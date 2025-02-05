@@ -17,10 +17,10 @@ use futures::lock::Mutex;
 use futures::select;
 use futures::stream::{FuturesUnordered, StreamExt};
 use itertools::Itertools;
+use log::{debug, error, info, trace, warn};
 use std::collections::HashMap;
 use std::pin::pin;
 use std::sync::Arc;
-use tracing::{debug, error, info, trace, warn};
 use {
     fidl_fuchsia_location_sensor as fidl_location_sensor, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme,
@@ -479,14 +479,16 @@ mod tests {
     use crate::mode_management::iface_manager_api::ConnectAttemptRequest;
     use crate::mode_management::{Defect, IfaceFailure};
     use crate::util::testing::fakes::FakeSavedNetworksManager;
-    use crate::util::testing::{generate_channel, generate_random_sme_scan_result};
+    use crate::util::testing::{
+        generate_channel, generate_random_sme_scan_result, run_until_completion,
+    };
     use fidl::endpoints::{create_proxy, ControlHandle, Responder};
     use futures::future;
     use futures::task::Poll;
     use std::pin::pin;
     use test_case::test_case;
     use wlan_common::ie::IeType;
-    use wlan_common::scan::{write_vmo, Compatibility};
+    use wlan_common::scan::{write_vmo, Compatible, Incompatible};
     use wlan_common::security::SecurityDescriptor;
     use wlan_common::test_utils::fake_frames::fake_unknown_rsne;
     use wlan_common::test_utils::fake_stas::IesOverrides;
@@ -635,9 +637,9 @@ mod tests {
     }
     fn create_scan_ap_data(observation: types::ScanObservation) -> MockScanData {
         let sme_result_1 = fidl_sme::ScanResult {
-            compatibility: Some(Box::new(fidl_sme::Compatibility {
+            compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
                 mutual_security_protocols: vec![fidl_security::Protocol::Wpa3Personal],
-            })),
+            }),
             timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
             bss_description: random_fidl_bss_description!(
                 Wpa3,
@@ -649,9 +651,9 @@ mod tests {
             ),
         };
         let sme_result_2 = fidl_sme::ScanResult {
-            compatibility: Some(Box::new(fidl_sme::Compatibility {
+            compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
                 mutual_security_protocols: vec![fidl_security::Protocol::Wpa2Personal],
-            })),
+            }),
             timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
             bss_description: random_fidl_bss_description!(
                 Wpa2,
@@ -663,7 +665,10 @@ mod tests {
             ),
         };
         let sme_result_3 = fidl_sme::ScanResult {
-            compatibility: None,
+            compatibility: fidl_sme::Compatibility::Incompatible(fidl_sme::Incompatible {
+                description: String::from("unknown"),
+                disjoint_security_protocols: None,
+            }),
             timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
             bss_description: random_fidl_bss_description!(
                 Wpa3,
@@ -689,9 +694,7 @@ mod tests {
                         timestamp: zx::MonotonicInstant::from_nanos(sme_result_1.timestamp_nanos),
                         channel: types::WlanChan::new(1, types::Cbw::Cbw20),
                         observation,
-                        compatibility: Compatibility::expect_some([
-                            SecurityDescriptor::WPA3_PERSONAL,
-                        ]),
+                        compatibility: Compatible::expect_ok([SecurityDescriptor::WPA3_PERSONAL]),
                         bss_description: sme_result_1.bss_description.clone().into(),
                     },
                     types::Bss {
@@ -700,7 +703,7 @@ mod tests {
                         timestamp: zx::MonotonicInstant::from_nanos(sme_result_3.timestamp_nanos),
                         channel: types::WlanChan::new(11, types::Cbw::Cbw20),
                         observation,
-                        compatibility: None,
+                        compatibility: Incompatible::unknown(),
                         bss_description: sme_result_3.bss_description.clone().into(),
                     },
                 ],
@@ -715,7 +718,7 @@ mod tests {
                     timestamp: zx::MonotonicInstant::from_nanos(sme_result_2.timestamp_nanos),
                     channel: types::WlanChan::new(8, types::Cbw::Cbw20),
                     observation,
-                    compatibility: Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),
+                    compatibility: Compatible::expect_ok([SecurityDescriptor::WPA2_PERSONAL]),
                     bss_description: sme_result_2.bss_description.clone().into(),
                 }],
                 compatibility: types::Compatibility::Supported,
@@ -1105,9 +1108,9 @@ mod tests {
     fn bss_to_network_map_duplicated_bss() {
         // Create some input data with duplicated BSSID and Network Identifiers
         let first_result = fidl_sme::ScanResult {
-            compatibility: Some(Box::new(fidl_sme::Compatibility {
+            compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
                 mutual_security_protocols: vec![fidl_security::Protocol::Wpa3Personal],
-            })),
+            }),
             timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
             bss_description: random_fidl_bss_description!(
                 Wpa3,
@@ -1119,9 +1122,9 @@ mod tests {
             ),
         };
         let second_result = fidl_sme::ScanResult {
-            compatibility: Some(Box::new(fidl_sme::Compatibility {
+            compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
                 mutual_security_protocols: vec![fidl_security::Protocol::Wpa3Personal],
-            })),
+            }),
             timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
             bss_description: random_fidl_bss_description!(
                 Wpa3,
@@ -1138,9 +1141,9 @@ mod tests {
             second_result.clone(),
             // same bssid as first_result
             fidl_sme::ScanResult {
-                compatibility: Some(Box::new(fidl_sme::Compatibility {
+                compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
                     mutual_security_protocols: vec![fidl_security::Protocol::Wpa3Personal],
-                })),
+                }),
                 timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
                 bss_description: random_fidl_bss_description!(
                     Wpa3,
@@ -1167,7 +1170,7 @@ mod tests {
                 timestamp: zx::MonotonicInstant::from_nanos(first_result.timestamp_nanos),
                 channel: types::WlanChan::new(1, types::Cbw::Cbw20),
                 observation: types::ScanObservation::Passive,
-                compatibility: Compatibility::expect_some([SecurityDescriptor::WPA3_PERSONAL]),
+                compatibility: Compatible::expect_ok([SecurityDescriptor::WPA3_PERSONAL]),
                 bss_description: first_result.bss_description.clone().into(),
             },
             types::Bss {
@@ -1176,7 +1179,7 @@ mod tests {
                 timestamp: zx::MonotonicInstant::from_nanos(second_result.timestamp_nanos),
                 channel: types::WlanChan::new(101, types::Cbw::Cbw40),
                 observation: types::ScanObservation::Passive,
-                compatibility: Compatibility::expect_some([SecurityDescriptor::WPA3_PERSONAL]),
+                compatibility: Compatible::expect_ok([SecurityDescriptor::WPA3_PERSONAL]),
                 bss_description: second_result.bss_description.clone().into(),
             },
         ];
@@ -1255,8 +1258,8 @@ mod tests {
 
     #[fuchsia::test]
     fn scan_returns_error_on_timeout() {
-        let mut exec = fasync::TestExecutor::new();
-        let (client, _sme_stream) = exec.run_singlethreaded(create_iface_manager());
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        let (client, _sme_stream) = run_until_completion(&mut exec, create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
 
@@ -1711,8 +1714,8 @@ mod tests {
         error_code: fidl_sme::ScanErrorCode,
         retry_succeeds: bool,
     ) {
-        let mut exec = fasync::TestExecutor::new();
-        let (iface_mgr, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        let (iface_mgr, mut sme_stream) = run_until_completion(&mut exec, create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
         let (location_sensor, _, _) = MockScanResultConsumer::new();
@@ -1811,8 +1814,8 @@ mod tests {
 
     #[fuchsia::test]
     fn scanning_loop_backs_off_after_cancelled_request() {
-        let mut exec = fasync::TestExecutor::new();
-        let (iface_mgr, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        let (iface_mgr, mut sme_stream) = run_until_completion(&mut exec, create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
         let (location_sensor, _, _) = MockScanResultConsumer::new();

@@ -132,7 +132,7 @@ impl InputHandler for MouseInjectorHandler {
 
                 // Report the event to the Activity Service.
                 if let Err(e) = self.report_mouse_activity(event_time).await {
-                    tracing::error!("report_mouse_activity failed: {}", e);
+                    log::error!("report_mouse_activity failed: {}", e);
                 }
 
                 // Consume the input event.
@@ -331,7 +331,7 @@ impl MouseInjectorHandler {
             .register(config, device_server)
             .await
             .context("Failed to register injector.")?;
-        tracing::info!("Registered injector with device id {:?}", mouse_descriptor.device_id);
+        log::info!("Registered injector with device id {:?}", mouse_descriptor.device_id);
 
         // Keep track of the injector.
         self.inner_mut().injectors.insert(mouse_descriptor.device_id, device_proxy.clone());

@@ -24,6 +24,7 @@
 namespace devmgr_integration_test {
 
 namespace {
+
 constexpr std::string_view kBootPath = "/boot/";
 constexpr std::string_view kBootUrlPrefix = "fuchsia-boot:///";
 
@@ -36,6 +37,7 @@ std::string PathToUrl(std::string_view path) {
   }
   return std::string(kBootUrlPrefix) + "#" + path.substr(kBootPath.size()).data();
 }
+
 }  // namespace
 
 __EXPORT
@@ -88,9 +90,9 @@ zx::result<IsolatedDevmgr> IsolatedDevmgr::Create(devmgr_launcher::Args args,
   ZX_ASSERT(result.is_ok());
 
   // Connect to dev.
-  fidl::InterfaceHandle<fuchsia::io::Node> dev;
-  if (zx_status_t status =
-          devmgr.realm_->component().Connect("dev-topological", dev.NewRequest().TakeChannel());
+  fidl::InterfaceHandle<fuchsia::io::Directory> dev;
+  if (zx_status_t status = devmgr.realm_->component().exposed()->Open3(
+          "dev-topological", fuchsia::io::PERM_READABLE, {}, dev.NewRequest().TakeChannel());
       status != ZX_OK) {
     return zx::error(status);
   }

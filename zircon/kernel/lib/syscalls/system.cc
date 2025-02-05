@@ -413,7 +413,7 @@ NO_ASAN zx_status_t sys_system_mexec(zx_handle_t resource, zx_handle_t kernel_vm
 
   platform_mexec_prep(final_bootimage_addr, bootimage_len);
 
-  const zx_instant_mono_t dlog_deadline = current_time() + ZX_SEC(5);
+  const zx_instant_mono_t dlog_deadline = current_mono_time() + ZX_SEC(5);
   dlog_shutdown(dlog_deadline);
 
   // Give the watchdog one last pet to hold it off until the new image has booted far enough to pet

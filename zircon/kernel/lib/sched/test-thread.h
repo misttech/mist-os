@@ -13,10 +13,12 @@
 // Utilities for readability's sake: using these inlined calls instead of raw
 // literals adds implicit documentation and avoids the reader confusing, say,
 // what a given duration among a soup of others represents.
-constexpr sched::Duration Capacity(zx_duration_t capacity) { return sched::Duration{capacity}; }
-constexpr sched::Duration Period(zx_duration_t period) { return sched::Duration{period}; }
-constexpr sched::Time Start(zx_time_t time) { return sched::Time{time}; }
-constexpr sched::Time Finish(zx_time_t time) { return sched::Time{time}; }
+constexpr sched::Duration Capacity(zx_duration_mono_t capacity) {
+  return sched::Duration{capacity};
+}
+constexpr sched::Duration Period(zx_duration_mono_t period) { return sched::Duration{period}; }
+constexpr sched::Time Start(zx_instant_mono_t time) { return sched::Time{time}; }
+constexpr sched::Time Finish(zx_instant_mono_t time) { return sched::Time{time}; }
 
 struct TestThread : public sched::ThreadBase<TestThread> {
   using sched::ThreadBase<TestThread>::ThreadBase;

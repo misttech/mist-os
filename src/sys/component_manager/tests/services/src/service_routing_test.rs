@@ -6,18 +6,22 @@ use anyhow::{format_err, Context, Error};
 use component_events::events::{Destroyed, Event, EventStream, Started};
 use component_events::matcher::EventMatcher;
 use component_events::sequence::*;
-use fidl::endpoints::ServiceMarker;
+use fidl::endpoints::{ServiceMarker, ServiceProxy};
 use fuchsia_component::client;
-use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route, ScopedInstance};
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route, ScopedInstance,
+};
 use futures::channel::mpsc;
-use futures::{FutureExt, SinkExt, StreamExt};
+use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt, TryStreamExt};
+use log::*;
 use moniker::ChildName;
+use std::collections::HashSet;
 use test_case::test_case;
-use tracing::*;
 use {
-    fidl_fidl_test_components as ftest, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_examples as fecho, fidl_fuchsia_examples_services as fexamples,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys2,
+    fidl_fidl_test_components as ftest, fidl_fuchsia_component as fcomponent,
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_examples as fecho,
+    fidl_fuchsia_examples_services as fexamples, fidl_fuchsia_io as fio,
+    fidl_fuchsia_sys2 as fsys2,
 };
 
 const BRANCHES_COLLECTION: &str = "branches";
@@ -95,26 +99,13 @@ async fn connect_to_instances_test(test_type: TestType) {
     start_provider(&branch, input.provider_b_moniker).await.expect("failed to start provider b");
 
     // List the instances in the BankAccount service.
-    let service_dir = fuchsia_fs::directory::open_directory(
-        branch.get_exposed_dir(),
-        fexamples::BankAccountMarker::SERVICE_NAME,
-        fio::Flags::empty(),
-    )
-    .await
-    .expect("failed to open service dir");
-    let instances = fuchsia_fs::directory::readdir(&service_dir)
-        .await
-        .expect("failed to read entries from service dir")
-        .into_iter()
-        .map(|dirent| dirent.name);
+    let service =
+        client::Service::open_from_dir(branch.get_exposed_dir(), fexamples::BankAccountMarker)
+            .expect("failed to open service");
+    let instances = service.enumerate().await.expect("failed to read entries from service dir");
 
     // Connect to every instance and ensure the protocols are functional.
-    for instance in instances {
-        let proxy = client::connect_to_service_instance_at_dir::<fexamples::BankAccountMarker>(
-            branch.get_exposed_dir(),
-            &instance,
-        )
-        .expect("failed to connect to service instance");
+    for proxy in instances {
         let read_only_account = proxy.connect_to_read_only().expect("read_only protocol");
         let owner = read_only_account.get_owner().await.expect("failed to get owner");
         let initial_balance = read_only_account.get_balance().await.expect("failed to get_balance");
@@ -306,30 +297,16 @@ async fn static_aggregate_expose() {
     let realm = builder.build().await.unwrap();
 
     let exposed_dir = realm.root.get_exposed_dir();
-    let echo_svc = fuchsia_fs::directory::open_directory(
-        exposed_dir,
-        fecho::EchoServiceMarker::SERVICE_NAME,
-        fio::Flags::empty(),
-    )
-    .await
-    .unwrap();
-    let instances = fuchsia_fs::directory::readdir(&echo_svc)
-        .await
+    let instances = client::Service::open_from_dir(exposed_dir, fecho::EchoServiceMarker)
         .unwrap()
-        .into_iter()
-        .map(|dirent| dirent.name);
+        .enumerate()
+        .await
+        .unwrap();
     // self, child in the aggregate x 3 instances each
     assert_eq!(instances.len(), 3 * 2);
-    drop(echo_svc);
 
     // Connect to every instance and ensure the protocols are functional.
-    for instance in instances {
-        let proxy = client::connect_to_service_instance_at_dir::<fecho::EchoServiceMarker>(
-            exposed_dir,
-            &instance,
-        )
-        .unwrap();
-
+    for proxy in instances {
         let echo_proxy = proxy.connect_to_regular_echo().unwrap();
         let res = echo_proxy.echo_string("hello").await.unwrap();
         assert!(res.ends_with("hello"));
@@ -388,7 +365,7 @@ async fn start_provider(branch: &ScopedInstance, child_moniker: &str) -> Result<
 
 /// Destroys a BankAccount provider component with the name `child_name`.
 async fn destroy_provider(branch: &ScopedInstance, child_moniker: &str) -> Result<(), Error> {
-    info!(%child_moniker, "destroying BankAccount provider");
+    info!(child_moniker:%; "destroying BankAccount provider");
 
     let lifecycle_controller_proxy =
         client::connect_to_protocol::<fsys2::LifecycleControllerMarker>()
@@ -431,4 +408,171 @@ async fn destroy_provider(branch: &ScopedInstance, child_moniker: &str) -> Resul
 fn verify_instances(instances: Vec<String>, expected_len: usize) {
     assert_eq!(instances.len(), expected_len);
     assert!(instances.iter().all(|id| id.len() == 32 && id.chars().all(|c| c.is_ascii_hexdigit())));
+}
+
+#[fuchsia::test]
+async fn use_from_collection() {
+    let builder = RealmBuilder::new().await.unwrap();
+    let (service_directory_sender, mut service_directory_receiver) = mpsc::unbounded();
+    let service_accessing_child = builder
+        .add_local_child(
+            "service_accessing_child",
+            move |h| {
+                let service_directory_sender = service_directory_sender.clone();
+                async move {
+                    let service_directory = h.open_service::<fecho::EchoServiceMarker>().unwrap();
+                    service_directory_sender.unbounded_send(service_directory).unwrap();
+                    futures::future::pending().await
+                }
+                .boxed()
+            },
+            ChildOptions::new(),
+        )
+        .await
+        .unwrap();
+    let service_accessing_child_decl =
+        builder.get_component_decl(&service_accessing_child).await.unwrap();
+    builder.replace_realm_decl(service_accessing_child_decl).await.unwrap();
+    let collection = builder
+        .add_collection(cm_rust::CollectionDecl {
+            name: "col".parse().unwrap(),
+            durability: fdecl::Durability::Transient,
+            environment: None,
+            allowed_offers: cm_types::AllowedOffers::StaticOnly,
+            allow_long_names: false,
+            persistent_storage: None,
+        })
+        .await
+        .unwrap();
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::service::<fecho::EchoServiceMarker>())
+                .from(&collection)
+                .to(Ref::self_()),
+        )
+        .await
+        .unwrap();
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol::<fcomponent::RealmMarker>())
+                .from(Ref::framework())
+                .to(Ref::parent()),
+        )
+        .await
+        .unwrap();
+    let instance =
+        builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
+    let realm_proxy =
+        instance.root.connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>().unwrap();
+
+    let publishing_child_builder = RealmBuilder::new().await.unwrap();
+    let publishing_child = publishing_child_builder
+        .add_local_child(
+            "publishing_child",
+            move |h| publishing_component_impl(h).boxed(),
+            ChildOptions::new(),
+        )
+        .await
+        .unwrap();
+    publishing_child_builder
+        .add_route(
+            Route::new()
+                .capability(Capability::service::<fecho::EchoServiceMarker>())
+                .from(&publishing_child)
+                .to(Ref::parent()),
+        )
+        .await
+        .unwrap();
+    let (url, _publishing_child_task) = publishing_child_builder.initialize().await.unwrap();
+
+    realm_proxy
+        .create_child(
+            &fdecl::CollectionRef { name: "col".to_string() },
+            &fdecl::Child {
+                name: Some("publishing_child".to_string()),
+                url: Some(url),
+                startup: Some(fdecl::StartupMode::Lazy),
+                ..Default::default()
+            },
+            Default::default(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+    let service_directory = service_directory_receiver.next().await.unwrap();
+    let dir_entries = fuchsia_fs::directory::readdir(&service_directory).await.unwrap();
+    assert_eq!(2, dir_entries.len());
+    let mut echo_results = HashSet::new();
+    for dir_entry in dir_entries {
+        let instance_dir = fuchsia_fs::directory::open_directory(
+            &service_directory,
+            &dir_entry.name,
+            fio::Flags::empty(),
+        )
+        .await
+        .expect("failed to open instance dir");
+        let echo_service_proxy = fecho::EchoServiceProxy::from_member_opener(Box::new(
+            client::ServiceInstanceDirectory(instance_dir, dir_entry.name.clone()),
+        ));
+        let echo_proxy = echo_service_proxy.connect_to_regular_echo().unwrap();
+        let echoed_string = echo_proxy.echo_string("Hello, world!").await.unwrap();
+        echo_results.insert(echoed_string);
+    }
+    assert_eq!(
+        HashSet::from(["Hello, world!".to_string(), "Greetings and Hello, world!".to_string()]),
+        echo_results
+    );
+}
+
+async fn publishing_component_impl(handles: LocalComponentHandles) -> Result<(), Error> {
+    let mut fs = fuchsia_component::server::ServiceFs::new();
+    fs.dir("svc").add_fidl_service_instance("default", IncomingService::Default);
+    fs.dir("svc").add_fidl_service_instance("hello", IncomingService::Hello);
+    fs.serve_connection(handles.outgoing_dir).unwrap();
+    fs.for_each_concurrent(None, |request| {
+        match request {
+            IncomingService::Default(fecho::EchoServiceRequest::RegularEcho(stream)) => {
+                run_echo_server(stream, "".to_string(), false)
+            }
+            IncomingService::Default(fecho::EchoServiceRequest::ReversedEcho(stream)) => {
+                run_echo_server(stream, "".to_string(), true)
+            }
+            IncomingService::Hello(fecho::EchoServiceRequest::RegularEcho(stream)) => {
+                run_echo_server(stream, "Greetings and ".to_string(), false)
+            }
+            IncomingService::Hello(fecho::EchoServiceRequest::ReversedEcho(stream)) => {
+                run_echo_server(stream, "Greetings and ".to_string(), true)
+            }
+        }
+        .unwrap_or_else(|e| {
+            info!("Error serving multi instance echo service {:?}", e);
+            error!("{:?}", e)
+        })
+    })
+    .await;
+    Ok(())
+}
+
+enum IncomingService {
+    Default(fecho::EchoServiceRequest),
+    Hello(fecho::EchoServiceRequest),
+}
+async fn run_echo_server(
+    mut stream: fecho::EchoRequestStream,
+    prefix: String,
+    reverse: bool,
+) -> Result<(), Error> {
+    while let Some(fecho::EchoRequest::EchoString { value, responder }) =
+        stream.try_next().await.context("error running echo server")?
+    {
+        println!("Received EchoString request for string {:?}", value);
+        let echo_string = if reverse { value.chars().rev().collect() } else { value.clone() };
+        let resp = vec![prefix.clone(), echo_string].join("");
+        responder.send(&resp).context("error sending response")?;
+        println!("Response sent successfully");
+    }
+    Ok(())
 }

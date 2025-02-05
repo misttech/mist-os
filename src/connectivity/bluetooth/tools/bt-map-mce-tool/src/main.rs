@@ -8,8 +8,9 @@ use fidl_fuchsia_bluetooth_map::{MessagingClientMarker, MessagingClientProxy};
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use futures::{pin_mut, FutureExt, TryStreamExt};
+use log::{info, warn};
+use simplelog::{Config, LevelFilter, WriteLogger};
 use std::io;
-use tracing::{info, warn};
 
 mod accessor;
 mod commands;
@@ -20,11 +21,7 @@ use crate::repl::start_accessor_loop;
 
 #[fasync::run_singlethreaded]
 async fn main() -> Result<(), Error> {
-    tracing_subscriber::fmt()
-        .compact()
-        .with_max_level(tracing::Level::INFO)
-        .with_writer(io::stderr)
-        .init();
+    let () = WriteLogger::init(LevelFilter::Info, Config::default(), io::stderr()).unwrap();
 
     // Connect to message client service.
     let svc = connect_to_protocol::<MessagingClientMarker>()
@@ -42,11 +39,11 @@ async fn main() -> Result<(), Error> {
                 let accessor_loop = start_accessor_loop(client.clone()).fuse();
                 pin_mut!(accessor_loop);
                 if let Err(e) = accessor_loop.await {
-                    warn!(?e, "MESSAGE_ACCESSOR REPL for peer {:?} closed", client.peer_id());
+                    warn!(e:?; "MESSAGE_ACCESSOR REPL for peer {:?} closed", client.peer_id());
                 }
             }
             Err(e) => {
-                warn!(?e, "Error while getting an Accessor FIDL");
+                warn!(e:?; "Error while getting an Accessor FIDL");
                 return Err(format_err!("{e:?}"));
             }
         }

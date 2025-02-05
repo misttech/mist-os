@@ -10,12 +10,12 @@ use fuchsia_sync::Mutex;
 use futures::future::{BoxFuture, FutureExt};
 use inspect_format::constants::MINIMUM_VMO_SIZE_BYTES;
 use itertools::Itertools;
+use log::warn;
 use std::collections::vec_deque::{Iter as VecDequeIter, VecDeque};
 use std::collections::HashMap;
 use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::warn;
 
 use crate::bounded_queue::BoundedQueue;
 use crate::snooper::SnoopPacket;

@@ -1524,7 +1524,7 @@ mod test {
 
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
         assert_eq!(events.len(), 2);
-        assert_eq!(events[0].code, uapi::KEY_SCREENSAVER as u16);
+        assert_eq!(events[0].code, uapi::KEY_VOLUMEDOWN as u16);
         assert_eq!(events[0].value, 1);
     }
 
@@ -1598,9 +1598,9 @@ mod test {
         assert_eq!(events.len(), 8);
         assert_eq!(events[0].code, uapi::KEY_POWER as u16);
         assert_eq!(events[0].value, 1);
-        assert_eq!(events[2].code, uapi::KEY_SCREENSAVER as u16);
+        assert_eq!(events[2].code, uapi::KEY_VOLUMEDOWN as u16);
         assert_eq!(events[2].value, 1);
-        assert_eq!(events[4].code, uapi::KEY_SCREENSAVER as u16);
+        assert_eq!(events[4].code, uapi::KEY_VOLUMEDOWN as u16);
         assert_eq!(events[4].value, 0);
         assert_eq!(events[6].code, uapi::KEY_POWER as u16);
         assert_eq!(events[6].value, 0);
@@ -1643,7 +1643,7 @@ mod test {
         assert_eq!(events.len(), 4);
         assert_eq!(events[0].code, uapi::KEY_POWER as u16);
         assert_eq!(events[0].value, 1);
-        assert_eq!(events[2].code, uapi::KEY_SCREENSAVER as u16);
+        assert_eq!(events[2].code, uapi::KEY_VOLUMEDOWN as u16);
         assert_eq!(events[2].value, 1);
     }
 

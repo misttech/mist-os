@@ -15,12 +15,13 @@ async fn test_get_iface_counter_stats() {
     let telemetry_proxy = sme_helpers::get_telemetry(&fullmac_driver.generic_sme_proxy).await;
     let telemetry_fut = telemetry_proxy.get_counter_stats();
 
-    let driver_counter_stats = fidl_fullmac::WlanFullmacIfaceCounterStats {
-        rx_unicast_total: rand::thread_rng().gen(),
-        rx_unicast_drop: rand::thread_rng().gen(),
-        rx_multicast: rand::thread_rng().gen(),
-        tx_total: rand::thread_rng().gen(),
-        tx_drop: rand::thread_rng().gen(),
+    let driver_counter_stats = fidl_stats::IfaceCounterStats {
+        rx_unicast_total: Some(rand::thread_rng().gen()),
+        rx_unicast_drop: Some(rand::thread_rng().gen()),
+        rx_multicast: Some(rand::thread_rng().gen()),
+        tx_total: Some(rand::thread_rng().gen()),
+        tx_drop: Some(rand::thread_rng().gen()),
+        ..Default::default()
     };
 
     let driver_fut = async {
@@ -43,6 +44,7 @@ async fn test_get_iface_counter_stats() {
             rx_multicast: driver_counter_stats.rx_multicast,
             tx_total: driver_counter_stats.tx_total,
             tx_drop: driver_counter_stats.tx_drop,
+            ..Default::default()
         }
     );
 }
@@ -56,50 +58,44 @@ async fn test_get_iface_histogram_stats() {
 
     // This contains every combination of hist scope and antenna frequency.
     // E.g., (per antenna, 2g), (station, 2g), (per antenna, 5g), (station, 5g)
-    let driver_iface_histogram_stats = fidl_fullmac::WlanFullmacIfaceHistogramStats {
-        noise_floor_histograms: Some(vec![fidl_fullmac::WlanFullmacNoiseFloorHistogram {
-            hist_scope: fidl_fullmac::WlanFullmacHistScope::PerAntenna,
-            antenna_id: fidl_fullmac::WlanFullmacAntennaId {
-                freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna2G,
+    let driver_iface_histogram_stats = fidl_stats::IfaceHistogramStats {
+        noise_floor_histograms: Some(vec![fidl_stats::NoiseFloorHistogram {
+            hist_scope: fidl_stats::HistScope::PerAntenna,
+            antenna_id: Some(Box::new(fidl_stats::AntennaId {
+                freq: fidl_stats::AntennaFreq::Antenna2G,
                 index: rand::thread_rng().gen(),
-            },
-            noise_floor_samples: vec![fidl_fullmac::WlanFullmacHistBucket {
+            })),
+            noise_floor_samples: vec![fidl_stats::HistBucket {
                 bucket_index: rand::thread_rng().gen(),
                 num_samples: rand::thread_rng().gen(),
             }],
             invalid_samples: rand::thread_rng().gen(),
         }]),
-        rssi_histograms: Some(vec![fidl_fullmac::WlanFullmacRssiHistogram {
-            hist_scope: fidl_fullmac::WlanFullmacHistScope::Station,
-            antenna_id: fidl_fullmac::WlanFullmacAntennaId {
-                freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna2G,
-                index: rand::thread_rng().gen(),
-            },
-            rssi_samples: vec![fidl_fullmac::WlanFullmacHistBucket {
+        rssi_histograms: Some(vec![fidl_stats::RssiHistogram {
+            hist_scope: fidl_stats::HistScope::Station,
+            antenna_id: None,
+            rssi_samples: vec![fidl_stats::HistBucket {
                 bucket_index: rand::thread_rng().gen(),
                 num_samples: rand::thread_rng().gen(),
             }],
             invalid_samples: rand::thread_rng().gen(),
         }]),
-        rx_rate_index_histograms: Some(vec![fidl_fullmac::WlanFullmacRxRateIndexHistogram {
-            hist_scope: fidl_fullmac::WlanFullmacHistScope::PerAntenna,
-            antenna_id: fidl_fullmac::WlanFullmacAntennaId {
-                freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna5G,
+        rx_rate_index_histograms: Some(vec![fidl_stats::RxRateIndexHistogram {
+            hist_scope: fidl_stats::HistScope::PerAntenna,
+            antenna_id: Some(Box::new(fidl_stats::AntennaId {
+                freq: fidl_stats::AntennaFreq::Antenna5G,
                 index: rand::thread_rng().gen(),
-            },
-            rx_rate_index_samples: vec![fidl_fullmac::WlanFullmacHistBucket {
+            })),
+            rx_rate_index_samples: vec![fidl_stats::HistBucket {
                 bucket_index: rand::thread_rng().gen(),
                 num_samples: rand::thread_rng().gen(),
             }],
             invalid_samples: rand::thread_rng().gen(),
         }]),
-        snr_histograms: Some(vec![fidl_fullmac::WlanFullmacSnrHistogram {
-            hist_scope: fidl_fullmac::WlanFullmacHistScope::Station,
-            antenna_id: fidl_fullmac::WlanFullmacAntennaId {
-                freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna5G,
-                index: rand::thread_rng().gen(),
-            },
-            snr_samples: vec![fidl_fullmac::WlanFullmacHistBucket {
+        snr_histograms: Some(vec![fidl_stats::SnrHistogram {
+            hist_scope: fidl_stats::HistScope::Station,
+            antenna_id: None,
+            snr_samples: vec![fidl_stats::HistBucket {
                 bucket_index: rand::thread_rng().gen(),
                 num_samples: rand::thread_rng().gen(),
             }],
@@ -120,161 +116,5 @@ async fn test_get_iface_histogram_stats() {
     let sme_histogram_stats =
         sme_histogram_stats_result.expect("SME error when getting histogram stats").unwrap();
 
-    // noise floor histograms
-    let driver_noise_floor_histogram_vec =
-        driver_iface_histogram_stats.noise_floor_histograms.unwrap();
-
-    // Note: wlanif asserts that histogram vector only has one element
-    assert_eq!(sme_histogram_stats.noise_floor_histograms.len(), 1);
-    assert_eq!(
-        sme_histogram_stats.noise_floor_histograms.len(),
-        driver_noise_floor_histogram_vec.len()
-    );
-
-    let driver_noise_floor_histogram = &driver_noise_floor_histogram_vec[0];
-    let sme_noise_floor_histogram = &sme_histogram_stats.noise_floor_histograms[0];
-    assert!(check_hist_scope_and_antenna_id(
-        sme_noise_floor_histogram.hist_scope,
-        &sme_noise_floor_histogram.antenna_id,
-        driver_noise_floor_histogram.hist_scope,
-        &driver_noise_floor_histogram.antenna_id
-    ));
-    assert_eq!(
-        sme_noise_floor_histogram.noise_floor_samples.len(),
-        driver_noise_floor_histogram.noise_floor_samples.len()
-    );
-    assert!(hist_bucket_eq(
-        &sme_noise_floor_histogram.noise_floor_samples[0],
-        &driver_noise_floor_histogram.noise_floor_samples[0]
-    ));
-    assert_eq!(
-        sme_noise_floor_histogram.invalid_samples,
-        driver_noise_floor_histogram.invalid_samples
-    );
-
-    // rssi histograms
-    let driver_rssi_histogram_vec = driver_iface_histogram_stats.rssi_histograms.unwrap();
-
-    // Note: wlanif asserts that histogram vector only has one element
-    assert_eq!(sme_histogram_stats.rssi_histograms.len(), 1);
-    assert_eq!(sme_histogram_stats.rssi_histograms.len(), driver_rssi_histogram_vec.len());
-
-    let driver_rssi_histogram = &driver_rssi_histogram_vec[0];
-    let sme_rssi_histogram = &sme_histogram_stats.rssi_histograms[0];
-    assert!(check_hist_scope_and_antenna_id(
-        sme_rssi_histogram.hist_scope,
-        &sme_rssi_histogram.antenna_id,
-        driver_rssi_histogram.hist_scope,
-        &driver_rssi_histogram.antenna_id
-    ));
-    assert_eq!(sme_rssi_histogram.rssi_samples.len(), driver_rssi_histogram.rssi_samples.len());
-    assert!(hist_bucket_eq(
-        &sme_rssi_histogram.rssi_samples[0],
-        &driver_rssi_histogram.rssi_samples[0]
-    ));
-    assert_eq!(sme_rssi_histogram.invalid_samples, driver_rssi_histogram.invalid_samples);
-
-    // rx_rate_index histograms
-    let driver_rx_rate_index_histogram_vec =
-        driver_iface_histogram_stats.rx_rate_index_histograms.unwrap();
-
-    // Note: wlanif asserts that histogram vector only has one element
-    assert_eq!(sme_histogram_stats.rx_rate_index_histograms.len(), 1);
-    assert_eq!(
-        sme_histogram_stats.rx_rate_index_histograms.len(),
-        driver_rx_rate_index_histogram_vec.len()
-    );
-
-    let driver_rx_rate_index_histogram = &driver_rx_rate_index_histogram_vec[0];
-    let sme_rx_rate_index_histogram = &sme_histogram_stats.rx_rate_index_histograms[0];
-    assert!(check_hist_scope_and_antenna_id(
-        sme_rx_rate_index_histogram.hist_scope,
-        &sme_rx_rate_index_histogram.antenna_id,
-        driver_rx_rate_index_histogram.hist_scope,
-        &driver_rx_rate_index_histogram.antenna_id
-    ));
-    assert_eq!(
-        sme_rx_rate_index_histogram.rx_rate_index_samples.len(),
-        driver_rx_rate_index_histogram.rx_rate_index_samples.len()
-    );
-    assert!(hist_bucket_eq(
-        &sme_rx_rate_index_histogram.rx_rate_index_samples[0],
-        &driver_rx_rate_index_histogram.rx_rate_index_samples[0]
-    ));
-    assert_eq!(
-        sme_rx_rate_index_histogram.invalid_samples,
-        driver_rx_rate_index_histogram.invalid_samples
-    );
-
-    // snr histograms
-    let driver_snr_histogram_vec = driver_iface_histogram_stats.snr_histograms.unwrap();
-
-    // Note: wlanif asserts that histogram vector only has one element
-    assert_eq!(sme_histogram_stats.snr_histograms.len(), 1);
-    assert_eq!(sme_histogram_stats.snr_histograms.len(), driver_snr_histogram_vec.len());
-
-    let driver_snr_histogram = &driver_snr_histogram_vec[0];
-    let sme_snr_histogram = &sme_histogram_stats.snr_histograms[0];
-    assert!(check_hist_scope_and_antenna_id(
-        sme_snr_histogram.hist_scope,
-        &sme_snr_histogram.antenna_id,
-        driver_snr_histogram.hist_scope,
-        &driver_snr_histogram.antenna_id
-    ));
-    assert_eq!(sme_snr_histogram.snr_samples.len(), driver_snr_histogram.snr_samples.len());
-    assert!(hist_bucket_eq(
-        &sme_snr_histogram.snr_samples[0],
-        &driver_snr_histogram.snr_samples[0]
-    ));
-    assert_eq!(sme_snr_histogram.invalid_samples, driver_snr_histogram.invalid_samples);
-}
-
-fn check_hist_scope_and_antenna_id(
-    sme_hist_scope: fidl_stats::HistScope,
-    sme_antenna_id: &Option<Box<fidl_stats::AntennaId>>,
-    fullmac_hist_scope: fidl_fullmac::WlanFullmacHistScope,
-    fullmac_antenna_id: &fidl_fullmac::WlanFullmacAntennaId,
-) -> bool {
-    if !hist_scope_eq(sme_hist_scope, fullmac_hist_scope) {
-        return false;
-    }
-
-    if sme_hist_scope == fidl_stats::HistScope::Station {
-        // For station histograms, the antenna id should not be present in SME.
-        return sme_antenna_id.is_none();
-    }
-
-    antenna_id_eq(sme_antenna_id.as_ref().unwrap(), fullmac_antenna_id)
-}
-
-fn hist_bucket_eq(
-    sme_hist_bucket: &fidl_stats::HistBucket,
-    fullmac_hist_bucket: &fidl_fullmac::WlanFullmacHistBucket,
-) -> bool {
-    sme_hist_bucket.bucket_index == fullmac_hist_bucket.bucket_index
-        && sme_hist_bucket.num_samples == fullmac_hist_bucket.num_samples
-}
-
-fn antenna_id_eq(
-    sme_antenna_id: &fidl_stats::AntennaId,
-    fullmac_antenna_id: &fidl_fullmac::WlanFullmacAntennaId,
-) -> bool {
-    let sme_freq_as_fullmac = match sme_antenna_id.freq {
-        fidl_stats::AntennaFreq::Antenna2G => fidl_fullmac::WlanFullmacAntennaFreq::Antenna2G,
-        fidl_stats::AntennaFreq::Antenna5G => fidl_fullmac::WlanFullmacAntennaFreq::Antenna5G,
-    };
-
-    fullmac_antenna_id.freq == sme_freq_as_fullmac
-        && sme_antenna_id.index == fullmac_antenna_id.index
-}
-
-fn hist_scope_eq(
-    sme_hist_scope: fidl_stats::HistScope,
-    fullmac_hist_scope: fidl_fullmac::WlanFullmacHistScope,
-) -> bool {
-    let sme_hist_scope_as_fullmac = match sme_hist_scope {
-        fidl_stats::HistScope::Station => fidl_fullmac::WlanFullmacHistScope::Station,
-        fidl_stats::HistScope::PerAntenna => fidl_fullmac::WlanFullmacHistScope::PerAntenna,
-    };
-    fullmac_hist_scope == sme_hist_scope_as_fullmac
+    assert_eq!(driver_iface_histogram_stats, sme_histogram_stats);
 }

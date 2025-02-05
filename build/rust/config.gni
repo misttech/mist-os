@@ -19,6 +19,9 @@ declare_args() {
   # Sets a custom base directory for `rustc` and `cargo`.
   # This can be used to test custom Rust toolchains.
   rustc_prefix = default_rustc_prefix
+
+  # Enable debug assertions, e.g. for overflow checking.
+  rust_debug_assertions = compilation_mode != "release"
 }
 
 if (rustc_prefix == default_rustc_prefix) {

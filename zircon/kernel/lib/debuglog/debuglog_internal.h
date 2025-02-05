@@ -29,8 +29,8 @@ static constexpr size_t kDLogHeaderFifoAlignment = 4;
 #define DLOG_ALIGN_TRUNC(n) ((n) & (~3))
 #define DLOG_ALIGN(n) DLOG_ALIGN_TRUNC(((n) + 3))
 
-#define DLOG_HDR_SET(fifosize, readsize) ((((readsize)&0xFFF) << 12) | ((fifosize)&0xFFF))
-#define DLOG_HDR_GET_FIFOLEN(n) ((n)&0xFFF)
+#define DLOG_HDR_SET(fifosize, readsize) ((((readsize) & 0xFFF) << 12) | ((fifosize) & 0xFFF))
+#define DLOG_HDR_GET_FIFOLEN(n) ((n) & 0xFFF)
 #define DLOG_HDR_GET_READLEN(n) (((n) >> 12) & 0xFFF)
 
 class DlogReader;
@@ -49,7 +49,7 @@ class DLog {
 
   // Mark this DLog as shutting down, then shutdown all threads.  Once called, subsequent |write|
   // operations will fail, but already-queued messages will continue to be processed/emitted.
-  zx_status_t Shutdown(zx_time_t deadline) TA_EXCL(lock_);
+  zx_status_t Shutdown(zx_instant_mono_t deadline) TA_EXCL(lock_);
 
   // Returns true iff we have finished shutting down this instance.
   bool ShutdownFinished() const {
@@ -223,7 +223,7 @@ class DLog {
   int NotifierThread();
   int DumperThread();
 
-  static void DeferredSignal(Timer* timer, zx_time_t now, void* arg) {
+  static void DeferredSignal(Timer* timer, zx_instant_mono_t now, void* arg) {
     reinterpret_cast<DLog*>(arg)->DeferredSignal();
   }
   void DeferredSignal();

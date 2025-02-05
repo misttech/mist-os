@@ -146,10 +146,10 @@ if (is_mistos) {
       "//src/devices/bin/driver_manager:driver_manager_config_default",
 
       ## Drivers
-      "//src/connectivity/network/drivers/network-device",
+      #"//src/connectivity/network/drivers/network-device",
       "//src/devices/board/drivers/x86:platform-bus-x86",
       "//src/devices/bus/drivers/pci:bus-pci",
-      "//src/devices/bus/drivers/platform:platform-bus",
+      #"//src/devices/bus/drivers/platform:platform-bus",
 
       # TODO: Move this to bootstrap after fixing pci to not depend on it.
       #"//src/devices/sysmem/drivers/sysmem",
@@ -184,7 +184,7 @@ if (is_mistos) {
       "//src/connectivity/network/dhcpv4/client/bindings:component",
       "//src/connectivity/network/dhcpv6/client:component",
       "//src/connectivity/network/dns:component",
-      "//src/connectivity/network/netstack3:component",
+      #"//src/connectivity/network/netstack3:component",
 
       #"//src/connectivity/network/netstack3:config_for_tests",
       "//src/connectivity/policy/http-client:component",
@@ -217,7 +217,7 @@ if (is_mistos) {
       "//src/starnix/containers/mistos:mistos_container_resources",
 
       ## Nolibc-test Container
-      "//src/starnix/containers/nolibc-test_container:nolibc_container_component",
+      #"//src/starnix/containers/nolibc-test_container:nolibc_container_component",
 
       ## Alpine Container
       #"//src/starnix/containers/alpine:alpine_container",

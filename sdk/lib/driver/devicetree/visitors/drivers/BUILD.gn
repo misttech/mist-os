@@ -19,6 +19,7 @@ group("tests") {
     "mailbox-controllers:tests",
     "mali-gpu:tests",
     "mmc:tests",
+    "pci:tests",
     "power:tests",
     "pwm-controllers:tests",
     "registers:tests",

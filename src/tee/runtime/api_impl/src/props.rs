@@ -4,24 +4,17 @@
 
 // Implementation of TEE Internal Core API Specification 4.4 Property Access Functions
 // Functions return specific error codes where applicable and panic on all other errors.
-use fuchsia_sync::RwLock;
 use std::cmp::min;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 use tee_internal::{
     Error, Identity, PropSetHandle, Result as TeeResult, Uuid, TEE_PROPSET_CURRENT_CLIENT,
     TEE_PROPSET_CURRENT_TA, TEE_PROPSET_TEE_IMPLEMENTATION,
 };
 use tee_properties::{PropEnumerator, PropSet, PropertyError};
-
-static PROP_SETS: OnceLock<Arc<RwLock<PropSets>>> = OnceLock::new();
-
-fn prop_sets() -> Arc<RwLock<PropSets>> {
-    PROP_SETS.get_or_init(|| Arc::new(RwLock::new(PropSets::load_prop_sets()))).clone()
-}
 
 fn write_c_string_to_buffer<'a>(string_val: &str, buffer: &'a mut [u8]) -> &'a str {
     if buffer.len() == 0 {
@@ -59,113 +52,130 @@ pub struct GetBinaryBlockError<'a> {
     pub actual_length: usize,
 }
 
-pub fn get_property_as_string<'a>(
-    handle: PropSetHandle,
-    name: &str,
-    buffer: &'a mut [u8],
-) -> Result<&'a str, GetStringError<'a>> {
-    let string_val = prop_sets()
-        .read()
-        .get_string_property(handle, name)
-        .map_err(|error| GetStringError { error, written: "", actual_length: 0 })?;
-    let buffer_len = buffer.len();
-    let string_written = write_c_string_to_buffer(string_val.as_str(), buffer);
-    // We're writing a NUL byte to the buffer which is not captured in string_val.len().
-    if buffer_len < string_val.len() + 1 {
-        return Err(GetStringError {
-            error: Error::ShortBuffer,
-            written: string_written,
-            actual_length: string_val.len(),
-        });
+pub struct Properties {
+    prop_sets: PropSets,
+}
+
+impl Properties {
+    pub fn new() -> Self {
+        Self { prop_sets: PropSets::load_prop_sets() }
     }
-    Ok(string_written)
-}
 
-pub fn get_property_as_bool(handle: PropSetHandle, name: &str) -> TeeResult<bool> {
-    prop_sets().read().get_bool_property(handle, name)
-}
-
-pub fn get_property_as_u32(handle: PropSetHandle, name: &str) -> TeeResult<u32> {
-    prop_sets().read().get_uint32_property(handle, name)
-}
-
-pub fn get_property_as_u64(handle: PropSetHandle, name: &str) -> TeeResult<u64> {
-    prop_sets().read().get_uint64_property(handle, name)
-}
-
-pub fn get_property_as_binary_block<'a>(
-    handle: PropSetHandle,
-    name: &str,
-    buffer: &'a mut [u8],
-) -> Result<&'a [u8], GetBinaryBlockError<'a>> {
-    let bytes = prop_sets()
-        .read()
-        .get_binary_block_property(handle, name)
-        .map_err(|error| GetBinaryBlockError { error, written: &[], actual_length: 0 })?;
-
-    let buffer_len = buffer.len();
-    let bytes_to_write = min(buffer.len(), bytes.len());
-    let written = &mut buffer[..bytes_to_write];
-    written.clone_from_slice(&bytes[..bytes_to_write]);
-
-    if buffer_len < bytes.len() {
-        return Err(GetBinaryBlockError {
-            error: Error::ShortBuffer,
-            written,
-            actual_length: bytes.len(),
-        });
+    pub fn get_property_as_string<'a>(
+        &self,
+        handle: PropSetHandle,
+        name: &str,
+        buffer: &'a mut [u8],
+    ) -> Result<&'a str, GetStringError<'a>> {
+        let string_val = self
+            .prop_sets
+            .get_string_property(handle, name)
+            .map_err(|error| GetStringError { error, written: "", actual_length: 0 })?;
+        let buffer_len = buffer.len();
+        let string_written = write_c_string_to_buffer(string_val.as_str(), buffer);
+        // We're writing a NUL byte to the buffer which is not captured in string_val.len().
+        if buffer_len < string_val.len() + 1 {
+            return Err(GetStringError {
+                error: Error::ShortBuffer,
+                written: string_written,
+                actual_length: string_val.len(),
+            });
+        }
+        Ok(string_written)
     }
-    Ok(written)
-}
 
-pub fn get_property_as_uuid(handle: PropSetHandle, name: &str) -> TeeResult<Uuid> {
-    prop_sets().read().get_uuid_property(handle, name)
-}
-
-pub fn get_property_as_identity(handle: PropSetHandle, name: &str) -> TeeResult<Identity> {
-    prop_sets().read().get_identity_property(handle, name)
-}
-
-pub fn allocate_property_enumerator() -> PropSetHandle {
-    prop_sets().write().allocate_property_enumerator()
-}
-
-pub fn free_property_enumerator(handle: PropSetHandle) {
-    prop_sets().write().free_property_enumerator(handle);
-}
-
-pub fn start_property_enumerator(handle: PropSetHandle, prop_set: PropSetHandle) {
-    prop_sets().write().start_property_enumerator(handle, prop_set);
-}
-
-pub fn reset_property_enumerator(handle: PropSetHandle) {
-    prop_sets().write().reset_property_enumerator(handle);
-}
-
-pub fn get_property_name<'a>(
-    handle: PropSetHandle,
-    buffer: &'a mut [u8],
-) -> Result<&'a str, GetStringError<'a>> {
-    let string_val = prop_sets()
-        .read()
-        .get_property_name(handle)
-        .map_err(|error| GetStringError { error, written: "", actual_length: 0 })?;
-
-    let buffer_len = buffer.len();
-    let string_written = write_c_string_to_buffer(string_val.as_str(), buffer);
-    // We're writing a NUL byte to the buffer which is not captured in string_val.len().
-    if buffer_len < string_val.len() + 1 {
-        return Err(GetStringError {
-            error: Error::ShortBuffer,
-            written: string_written,
-            actual_length: string_val.len(),
-        });
+    pub fn get_property_as_bool(&self, handle: PropSetHandle, name: &str) -> TeeResult<bool> {
+        self.prop_sets.get_bool_property(handle, name)
     }
-    Ok(string_written)
-}
 
-pub fn get_next_property(handle: PropSetHandle) -> TeeResult<()> {
-    prop_sets().write().get_next_property(handle)
+    pub fn get_property_as_u32(&self, handle: PropSetHandle, name: &str) -> TeeResult<u32> {
+        self.prop_sets.get_uint32_property(handle, name)
+    }
+
+    pub fn get_property_as_u64(&self, handle: PropSetHandle, name: &str) -> TeeResult<u64> {
+        self.prop_sets.get_uint64_property(handle, name)
+    }
+
+    pub fn get_property_as_binary_block<'a>(
+        &self,
+        handle: PropSetHandle,
+        name: &str,
+        buffer: &'a mut [u8],
+    ) -> Result<&'a [u8], GetBinaryBlockError<'a>> {
+        let bytes = self
+            .prop_sets
+            .get_binary_block_property(handle, name)
+            .map_err(|error| GetBinaryBlockError { error, written: &[], actual_length: 0 })?;
+
+        let buffer_len = buffer.len();
+        let bytes_to_write = min(buffer.len(), bytes.len());
+        let written = &mut buffer[..bytes_to_write];
+        written.clone_from_slice(&bytes[..bytes_to_write]);
+
+        if buffer_len < bytes.len() {
+            return Err(GetBinaryBlockError {
+                error: Error::ShortBuffer,
+                written,
+                actual_length: bytes.len(),
+            });
+        }
+        Ok(written)
+    }
+
+    pub fn get_property_as_uuid(&self, handle: PropSetHandle, name: &str) -> TeeResult<Uuid> {
+        self.prop_sets.get_uuid_property(handle, name)
+    }
+
+    pub fn get_property_as_identity(
+        &self,
+        handle: PropSetHandle,
+        name: &str,
+    ) -> TeeResult<Identity> {
+        self.prop_sets.get_identity_property(handle, name)
+    }
+
+    pub fn allocate_property_enumerator(&mut self) -> PropSetHandle {
+        self.prop_sets.allocate_property_enumerator()
+    }
+
+    pub fn free_property_enumerator(&mut self, handle: PropSetHandle) {
+        self.prop_sets.free_property_enumerator(handle);
+    }
+
+    pub fn start_property_enumerator(&mut self, handle: PropSetHandle, prop_set: PropSetHandle) {
+        self.prop_sets.start_property_enumerator(handle, prop_set);
+    }
+
+    pub fn reset_property_enumerator(&mut self, handle: PropSetHandle) {
+        self.prop_sets.reset_property_enumerator(handle);
+    }
+
+    pub fn get_property_name<'a>(
+        &self,
+        handle: PropSetHandle,
+        buffer: &'a mut [u8],
+    ) -> Result<&'a str, GetStringError<'a>> {
+        let string_val = self
+            .prop_sets
+            .get_property_name(handle)
+            .map_err(|error| GetStringError { error, written: "", actual_length: 0 })?;
+
+        let buffer_len = buffer.len();
+        let string_written = write_c_string_to_buffer(string_val.as_str(), buffer);
+        // We're writing a NUL byte to the buffer which is not captured in string_val.len().
+        if buffer_len < string_val.len() + 1 {
+            return Err(GetStringError {
+                error: Error::ShortBuffer,
+                written: string_written,
+                actual_length: string_val.len(),
+            });
+        }
+        Ok(string_written)
+    }
+
+    pub fn get_next_property(&mut self, handle: PropSetHandle) -> TeeResult<()> {
+        self.prop_sets.get_next_property(handle)
+    }
 }
 
 struct PropSets {
@@ -539,7 +549,7 @@ pub mod tests {
     ]
     "#;
 
-    fn init_test_tee_impl_props() {
+    fn init_test_tee_impl_props() -> PropSets {
         let test_props = PropSet::from_config_string(TEST_TEE_IMPL_PROPS_STR)
             .expect("load fake tee props successfully");
         let ta_props = PropSet::from_config_string(TEST_TA_PROPS_STR)
@@ -547,22 +557,19 @@ pub mod tests {
         let client_props = PropSet::from_config_string(TEST_CLIENT_PROPS_STR)
             .expect("load fake client props successfully");
 
-        let prop_sets = PropSets {
+        PropSets {
             tee_implementation_props: Arc::new(test_props),
             ta_props: Arc::new(ta_props),
             client_props: Arc::new(client_props),
             prop_enums: HashMap::new(),
             enumerator_handle_id_counter: AtomicU64::new(1),
-        };
-        let _ = PROP_SETS.set(Arc::new(RwLock::new(prop_sets)));
+        }
     }
 
     #[fuchsia::test]
     pub fn test_get_string_property() {
-        init_test_tee_impl_props();
-        let prop_sets = prop_sets();
+        let prop_sets = init_test_tee_impl_props();
         let value = prop_sets
-            .read()
             .get_string_property(TEE_PROPSET_TEE_IMPLEMENTATION, "gpd.tee.test.string")
             .unwrap();
         assert_eq!("asdf".to_string(), value);
@@ -570,19 +577,16 @@ pub mod tests {
 
     #[fuchsia::test]
     pub fn test_get_string_property_not_found() {
-        init_test_tee_impl_props();
-        let prop_sets = prop_sets();
+        let prop_sets = init_test_tee_impl_props();
         let value =
-            prop_sets.read().get_string_property(TEE_PROPSET_TEE_IMPLEMENTATION, "name_not_in_set");
+            prop_sets.get_string_property(TEE_PROPSET_TEE_IMPLEMENTATION, "name_not_in_set");
         assert_eq!(tee_internal::Error::ItemNotFound, value.err().unwrap());
     }
 
     #[fuchsia::test]
     pub fn test_get_bool_property() {
-        init_test_tee_impl_props();
-        let prop_sets = prop_sets();
+        let prop_sets = init_test_tee_impl_props();
         let value = prop_sets
-            .read()
             .get_bool_property(TEE_PROPSET_TEE_IMPLEMENTATION, "gpd.tee.test.bool")
             .unwrap();
         assert!(value);
@@ -590,19 +594,15 @@ pub mod tests {
 
     #[fuchsia::test]
     pub fn test_get_bool_property_not_found() {
-        init_test_tee_impl_props();
-        let prop_sets = prop_sets();
-        let value =
-            prop_sets.read().get_bool_property(TEE_PROPSET_TEE_IMPLEMENTATION, "name_not_in_set");
+        let prop_sets = init_test_tee_impl_props();
+        let value = prop_sets.get_bool_property(TEE_PROPSET_TEE_IMPLEMENTATION, "name_not_in_set");
         assert_eq!(tee_internal::Error::ItemNotFound, value.err().unwrap());
     }
 
     #[fuchsia::test]
     pub fn test_get_u32_property() {
-        init_test_tee_impl_props();
-        let prop_sets = prop_sets();
+        let prop_sets = init_test_tee_impl_props();
         let value = prop_sets
-            .read()
             .get_uint32_property(TEE_PROPSET_TEE_IMPLEMENTATION, "gpd.tee.test.u32")
             .unwrap();
         assert_eq!(57, value);
@@ -610,19 +610,16 @@ pub mod tests {
 
     #[fuchsia::test]
     pub fn test_get_u32_property_not_found() {
-        init_test_tee_impl_props();
-        let prop_sets = prop_sets();
+        let prop_sets = init_test_tee_impl_props();
         let value =
-            prop_sets.read().get_uint32_property(TEE_PROPSET_TEE_IMPLEMENTATION, "name_not_in_set");
+            prop_sets.get_uint32_property(TEE_PROPSET_TEE_IMPLEMENTATION, "name_not_in_set");
         assert_eq!(tee_internal::Error::ItemNotFound, value.err().unwrap());
     }
 
     #[fuchsia::test]
     pub fn test_get_u64_property() {
-        init_test_tee_impl_props();
-        let prop_sets = prop_sets();
+        let prop_sets = init_test_tee_impl_props();
         let value = prop_sets
-            .read()
             .get_uint64_property(TEE_PROPSET_TEE_IMPLEMENTATION, "gpd.tee.test.u64")
             .unwrap();
         assert_eq!(4294967296, value);
@@ -630,19 +627,16 @@ pub mod tests {
 
     #[fuchsia::test]
     pub fn test_get_u64_property_not_found() {
-        init_test_tee_impl_props();
-        let prop_sets = prop_sets();
+        let prop_sets = init_test_tee_impl_props();
         let value =
-            prop_sets.read().get_uint64_property(TEE_PROPSET_TEE_IMPLEMENTATION, "name_not_in_set");
+            prop_sets.get_uint64_property(TEE_PROPSET_TEE_IMPLEMENTATION, "name_not_in_set");
         assert_eq!(tee_internal::Error::ItemNotFound, value.err().unwrap());
     }
 
     #[fuchsia::test]
     pub fn test_get_binary_block_property() {
-        init_test_tee_impl_props();
-        let prop_sets = prop_sets();
+        let prop_sets = init_test_tee_impl_props();
         let value = prop_sets
-            .read()
             .get_binary_block_property(TEE_PROPSET_TEE_IMPLEMENTATION, "gpd.tee.test.binaryBlock")
             .unwrap();
 
@@ -655,30 +649,24 @@ pub mod tests {
 
     #[fuchsia::test]
     pub fn test_get_binary_block_property_not_found() {
-        init_test_tee_impl_props();
-        let prop_sets = prop_sets();
-        let value = prop_sets
-            .read()
-            .get_binary_block_property(TEE_PROPSET_TEE_IMPLEMENTATION, "name_not_in_set");
+        let prop_sets = init_test_tee_impl_props();
+        let value =
+            prop_sets.get_binary_block_property(TEE_PROPSET_TEE_IMPLEMENTATION, "name_not_in_set");
         assert_eq!(tee_internal::Error::ItemNotFound, value.err().unwrap());
     }
 
     #[fuchsia::test]
     pub fn test_get_binary_block_property_bad_format() {
-        init_test_tee_impl_props();
-        let prop_sets = prop_sets();
-        let value = prop_sets
-            .read()
-            .get_binary_block_property(TEE_PROPSET_TEE_IMPLEMENTATION, "gpd.tee.test.u32");
+        let prop_sets = init_test_tee_impl_props();
+        let value =
+            prop_sets.get_binary_block_property(TEE_PROPSET_TEE_IMPLEMENTATION, "gpd.tee.test.u32");
         assert_eq!(tee_internal::Error::BadFormat, value.err().unwrap());
     }
 
     #[fuchsia::test]
     pub fn test_get_uuid_property() {
-        init_test_tee_impl_props();
-        let prop_sets = prop_sets();
+        let prop_sets = init_test_tee_impl_props();
         let value = prop_sets
-            .read()
             .get_uuid_property(TEE_PROPSET_TEE_IMPLEMENTATION, "gpd.tee.test.uuid")
             .unwrap();
 
@@ -690,28 +678,22 @@ pub mod tests {
 
     #[fuchsia::test]
     pub fn test_get_uuid_property_not_found() {
-        init_test_tee_impl_props();
-        let prop_sets = prop_sets();
-        let value =
-            prop_sets.read().get_uuid_property(TEE_PROPSET_TEE_IMPLEMENTATION, "name_not_in_set");
+        let prop_sets = init_test_tee_impl_props();
+        let value = prop_sets.get_uuid_property(TEE_PROPSET_TEE_IMPLEMENTATION, "name_not_in_set");
         assert_eq!(tee_internal::Error::ItemNotFound, value.err().unwrap());
     }
 
     #[fuchsia::test]
     pub fn test_get_uuid_property_bad_format() {
-        init_test_tee_impl_props();
-        let prop_sets = prop_sets();
-        let value =
-            prop_sets.read().get_uuid_property(TEE_PROPSET_TEE_IMPLEMENTATION, "gpd.tee.test.u32");
+        let prop_sets = init_test_tee_impl_props();
+        let value = prop_sets.get_uuid_property(TEE_PROPSET_TEE_IMPLEMENTATION, "gpd.tee.test.u32");
         assert_eq!(tee_internal::Error::BadFormat, value.err().unwrap());
     }
 
     #[fuchsia::test]
     pub fn test_get_identity_property() {
-        init_test_tee_impl_props();
-        let prop_sets = prop_sets();
+        let prop_sets = init_test_tee_impl_props();
         let value = prop_sets
-            .read()
             .get_identity_property(TEE_PROPSET_TEE_IMPLEMENTATION, "gpd.tee.test.identity")
             .unwrap();
 
@@ -726,29 +708,23 @@ pub mod tests {
 
     #[fuchsia::test]
     pub fn test_get_identity_property_not_found() {
-        init_test_tee_impl_props();
-        let prop_sets = prop_sets();
-        let value = prop_sets
-            .read()
-            .get_identity_property(TEE_PROPSET_TEE_IMPLEMENTATION, "name_not_in_set");
+        let prop_sets = init_test_tee_impl_props();
+        let value =
+            prop_sets.get_identity_property(TEE_PROPSET_TEE_IMPLEMENTATION, "name_not_in_set");
         assert_eq!(tee_internal::Error::ItemNotFound, value.err().unwrap());
     }
 
     #[fuchsia::test]
     pub fn test_get_identity_property_bad_format() {
-        init_test_tee_impl_props();
-        let prop_sets = prop_sets();
-        let value = prop_sets
-            .read()
-            .get_identity_property(TEE_PROPSET_TEE_IMPLEMENTATION, "gpd.tee.test.uuid");
+        let prop_sets = init_test_tee_impl_props();
+        let value =
+            prop_sets.get_identity_property(TEE_PROPSET_TEE_IMPLEMENTATION, "gpd.tee.test.uuid");
         assert_eq!(tee_internal::Error::BadFormat, value.err().unwrap());
     }
 
     #[fuchsia::test]
     pub fn test_enumerator_allocate() {
-        init_test_tee_impl_props();
-        let binding = prop_sets();
-        let mut prop_sets = binding.write();
+        let mut prop_sets = init_test_tee_impl_props();
         assert_eq!(0, prop_sets.prop_enums.len());
         let handle = prop_sets.allocate_property_enumerator();
         assert!(prop_sets.prop_enums.get(&handle).is_some());
@@ -756,9 +732,7 @@ pub mod tests {
 
     #[fuchsia::test]
     pub fn test_enumerator_free() {
-        init_test_tee_impl_props();
-        let binding = prop_sets();
-        let mut prop_sets = binding.write();
+        let mut prop_sets = init_test_tee_impl_props();
         assert_eq!(0, prop_sets.prop_enums.len());
         let handle = prop_sets.allocate_property_enumerator();
         assert!(prop_sets.prop_enums.get(&handle).is_some());
@@ -768,9 +742,7 @@ pub mod tests {
 
     #[fuchsia::test]
     pub fn test_enumerator_start() {
-        init_test_tee_impl_props();
-        let binding = prop_sets();
-        let mut prop_sets = binding.write();
+        let mut prop_sets = init_test_tee_impl_props();
         let handle = prop_sets.allocate_property_enumerator();
         // We can't inspect the internal state of the enumerator, so this tests not panicking.
         prop_sets.start_property_enumerator(handle, TEE_PROPSET_TEE_IMPLEMENTATION);
@@ -779,9 +751,7 @@ pub mod tests {
     #[fuchsia::test]
     #[should_panic]
     pub fn test_enumerator_start_bad_handle() {
-        init_test_tee_impl_props();
-        let binding = prop_sets();
-        let mut prop_sets = binding.write();
+        let mut prop_sets = init_test_tee_impl_props();
         let _handle = prop_sets.allocate_property_enumerator();
         // Handle value of 0 corresponds to TEE_HANDLE_NULL, which is not valid for this API.
         let bad_handle = PropSetHandle::from_value(0);
@@ -791,9 +761,7 @@ pub mod tests {
     #[fuchsia::test]
     #[should_panic(expected = "Invalid TEE_PropSetHandle pseudo-handle provided")]
     pub fn test_enumerator_start_bad_prop_set_pseudo_handle() {
-        init_test_tee_impl_props();
-        let binding = prop_sets();
-        let mut prop_sets = binding.write();
+        let mut prop_sets = init_test_tee_impl_props();
         let handle = prop_sets.allocate_property_enumerator();
         // Pseudo handle is not one of the 3 reserved values.
         prop_sets.start_property_enumerator(handle, PropSetHandle::from_value(0));
@@ -801,9 +769,7 @@ pub mod tests {
 
     #[fuchsia::test]
     pub fn test_enumerator_get_name() {
-        init_test_tee_impl_props();
-        let binding = prop_sets();
-        let mut prop_sets = binding.write();
+        let mut prop_sets = init_test_tee_impl_props();
         let handle = prop_sets.allocate_property_enumerator();
 
         prop_sets.start_property_enumerator(handle, TEE_PROPSET_TEE_IMPLEMENTATION);
@@ -813,9 +779,7 @@ pub mod tests {
 
     #[fuchsia::test]
     pub fn test_enumerator_next_property() {
-        init_test_tee_impl_props();
-        let binding = prop_sets();
-        let mut prop_sets = binding.write();
+        let mut prop_sets = init_test_tee_impl_props();
         let handle = prop_sets.allocate_property_enumerator();
 
         prop_sets.start_property_enumerator(handle, TEE_PROPSET_TEE_IMPLEMENTATION);
@@ -829,9 +793,7 @@ pub mod tests {
 
     #[fuchsia::test]
     pub fn test_enumerator_reset() {
-        init_test_tee_impl_props();
-        let binding = prop_sets();
-        let mut prop_sets = binding.write();
+        let mut prop_sets = init_test_tee_impl_props();
         let handle = prop_sets.allocate_property_enumerator();
 
         prop_sets.start_property_enumerator(handle, TEE_PROPSET_TEE_IMPLEMENTATION);
@@ -849,9 +811,7 @@ pub mod tests {
 
     #[fuchsia::test]
     pub fn test_enumerator_get_name_ta_prop_set() {
-        init_test_tee_impl_props();
-        let binding = prop_sets();
-        let mut prop_sets = binding.write();
+        let mut prop_sets = init_test_tee_impl_props();
         let handle = prop_sets.allocate_property_enumerator();
 
         prop_sets.start_property_enumerator(handle, TEE_PROPSET_CURRENT_TA);
@@ -861,9 +821,7 @@ pub mod tests {
 
     #[fuchsia::test]
     pub fn test_enumerator_get_name_client_prop_set() {
-        init_test_tee_impl_props();
-        let binding = prop_sets();
-        let mut prop_sets = binding.write();
+        let mut prop_sets = init_test_tee_impl_props();
         let handle = prop_sets.allocate_property_enumerator();
 
         prop_sets.start_property_enumerator(handle, TEE_PROPSET_CURRENT_CLIENT);
@@ -875,9 +833,7 @@ pub mod tests {
     pub fn test_enumerator_all_prop_types() {
         // This test uses the enumerator to run through all the test types in the following order:
         // string -> bool -> u32 -> u64 -> binary block -> uuid -> identity
-        init_test_tee_impl_props();
-        let binding = prop_sets();
-        let mut prop_sets = binding.write();
+        let mut prop_sets = init_test_tee_impl_props();
         let handle = prop_sets.allocate_property_enumerator();
 
         prop_sets.start_property_enumerator(handle, TEE_PROPSET_TEE_IMPLEMENTATION);

@@ -21,7 +21,7 @@ async fn main() -> Result<(), Error> {
     );
     fuchsia_trace_provider::trace_provider_create_with_fdio();
 
-    tracing::info!("Starting up");
+    log::info!("Starting up");
     StorageHostService::new()
         .run(
             fuchsia_runtime::take_startup_handle(HandleType::DirectoryRequest.into())
@@ -30,6 +30,6 @@ async fn main() -> Result<(), Error> {
             fuchsia_runtime::take_startup_handle(HandleType::Lifecycle.into()).map(|h| h.into()),
         )
         .await?;
-    tracing::info!("Shutting down!");
+    log::info!("Shutting down!");
     Ok(())
 }

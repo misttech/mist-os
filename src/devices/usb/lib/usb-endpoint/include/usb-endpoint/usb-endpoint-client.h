@@ -14,7 +14,6 @@
 #endif
 
 #include <mutex>
-#include <queue>
 
 #include <usb/request-fidl.h>
 
@@ -53,17 +52,20 @@ class EndpointClientBase {
   // destructed.
   zx_status_t DeleteRequest(usb::FidlRequest&& request) __TA_REQUIRES(mutex_);
 
-  std::mutex mutex_;
-  const std::function<zx::result<std::optional<usb::MappedVmo>>(
-      const fuchsia_hardware_usb_request::Buffer& buffer)>
-      GetMapped = [&](const fuchsia_hardware_usb_request::Buffer& buffer) {
-        std::lock_guard<std::mutex> _(mutex_);
-        return get_mapped(buffer);
-      };
-  const std::function<zx::result<std::optional<usb::MappedVmo>>(
-      const fuchsia_hardware_usb_request::Buffer& buffer)>
-      GetMappedLocked = [&](const fuchsia_hardware_usb_request::Buffer& buffer)
-                            __TA_REQUIRES(mutex_) { return get_mapped(buffer); };
+  std::mutex& mutex() __TA_RETURN_CAPABILITY(mutex_) { return mutex_; }
+
+  constexpr auto GetMapped() {
+    return [this](const fuchsia_hardware_usb_request::Buffer& buffer) {
+      std::lock_guard<std::mutex> _(mutex_);
+      return get_mapped(buffer);
+    };
+  }
+
+  constexpr auto GetMappedLocked() {
+    return [this](const fuchsia_hardware_usb_request::Buffer& buffer)
+               __TA_REQUIRES(mutex_) { return get_mapped(buffer); };
+  }
+
   std::optional<zx_vaddr_t> GetMappedAddr(const fuchsia_hardware_usb_request::Request& request,
                                           size_t idx) {
     std::lock_guard<std::mutex> _(mutex_);
@@ -84,6 +86,8 @@ class EndpointClientBase {
   // into the free_reqs_ pool. Returns the number of VMOs successfully registered. Called by
   // AddRequests.
   size_t RegisterVmos(size_t vmo_count, size_t vmo_size);
+
+  std::mutex mutex_;
 
   // Unmaps a buffer region.
   zx_status_t Unmap(const fuchsia_hardware_usb_request::BufferRegion& buffer) __TA_REQUIRES(mutex_);

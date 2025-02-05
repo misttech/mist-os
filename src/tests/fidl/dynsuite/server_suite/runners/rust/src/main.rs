@@ -20,7 +20,7 @@ use fuchsia_component::server::ServiceFs;
 use futures::future::{BoxFuture, Fuse};
 use futures::prelude::*;
 use futures::select;
-use tracing::info;
+use log::info;
 
 const DISABLED_TESTS: &[Test] = &[
     // This is for testing the test disabling functionality itself.

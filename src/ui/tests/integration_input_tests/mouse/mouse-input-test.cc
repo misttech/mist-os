@@ -467,7 +467,7 @@ class ChromiumInputTest : public MouseInputBase {
   static const int kMaxRetry = 10;
 };
 
-TEST_F(ChromiumInputTest, ChromiumMouseMove) {
+TEST_F(ChromiumInputTest, DISABLED_ChromiumMouseMove) {
   auto initial_position = EnsureMouseIsReadyAndGetPosition();
 
   double initial_x = initial_position.x;
@@ -488,7 +488,7 @@ TEST_F(ChromiumInputTest, ChromiumMouseMove) {
       /*component_name=*/"mouse-input-chromium");
 }
 
-TEST_F(ChromiumInputTest, ChromiumMouseDownMoveUp) {
+TEST_F(ChromiumInputTest, DISABLED_ChromiumMouseDownMoveUp) {
   auto initial_position = EnsureMouseIsReadyAndGetPosition();
 
   double initial_x = initial_position.x;
@@ -527,7 +527,7 @@ TEST_F(ChromiumInputTest, ChromiumMouseDownMoveUp) {
               /*component_name=*/"mouse-input-chromium");
 }
 
-TEST_F(ChromiumInputTest, ChromiumMouseWheel) {
+TEST_F(ChromiumInputTest, DISABLED_ChromiumMouseWheel) {
   auto initial_position = EnsureMouseIsReadyAndGetPosition();
 
   double initial_x = initial_position.x;

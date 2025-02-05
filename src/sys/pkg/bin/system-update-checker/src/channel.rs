@@ -9,12 +9,12 @@ use fidl_fuchsia_pkg::RepositoryManagerMarker;
 use fidl_fuchsia_pkg_ext::RepositoryConfig;
 use fuchsia_sync::Mutex;
 use fuchsia_url::AbsolutePackageUrl;
+use log::{error, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 use thiserror::Error;
-use tracing::{error, warn};
 
 static CHANNEL_PACKAGE_MAP: &str = "channel_package_map.json";
 

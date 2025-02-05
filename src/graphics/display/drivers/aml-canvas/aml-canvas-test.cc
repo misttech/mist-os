@@ -6,7 +6,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/driver/logging/cpp/logger.h>
-#include <lib/driver/mock-mmio-range/cpp/mock-mmio-range.h>
+#include <lib/driver/mock-mmio/cpp/mock-mmio-range.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fake-bti/bti.h>

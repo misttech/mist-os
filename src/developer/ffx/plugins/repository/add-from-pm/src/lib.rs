@@ -7,8 +7,8 @@ use errors::ffx_error;
 use ffx::RepositoryIteratorMarker;
 use ffx_repository_add_from_pm_args::AddFromPmCommand;
 use fho::{
-    bug, daemon_protocol, return_user_error, user_error, Error, FfxContext, FfxMain, FfxTool,
-    Result, VerifiedMachineWriter,
+    bug, return_user_error, user_error, Error, FfxContext, FfxMain, FfxTool, Result,
+    VerifiedMachineWriter,
 };
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx_ext::{RepositoryError, RepositorySpec};
@@ -17,6 +17,7 @@ use pkg::config as pkg_config;
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::collections::BTreeSet;
+use target_holders::daemon_protocol;
 
 enum RepoRegState {
     New,
@@ -168,6 +169,7 @@ mod test {
     };
     use futures::{SinkExt, StreamExt, TryStreamExt};
     use serde_json::json;
+    use target_holders::fake_proxy;
 
     struct FakeRepositoryRegistry;
 
@@ -258,9 +260,8 @@ mod test {
         let _test_env = ffx_config::test_init().await.expect("test env init");
         let tmp = tempfile::tempdir().unwrap();
 
-        let repos: ffx::RepositoryRegistryProxy = fho::testing::fake_proxy(move |req| {
-            panic!("should not receive any requests: {:?}", req)
-        });
+        let repos: ffx::RepositoryRegistryProxy =
+            fake_proxy(move |req| panic!("should not receive any requests: {:?}", req));
 
         for (name, want_msg) in [
             ("", "invalid repository name for \"\": url parse error"),
@@ -335,9 +336,8 @@ mod test {
         let _test_env = ffx_config::test_init().await.expect("test env init");
         let tmp = tempfile::tempdir().unwrap();
 
-        let repos: ffx::RepositoryRegistryProxy = fho::testing::fake_proxy(move |req| {
-            panic!("should not receive any requests: {:?}", req)
-        });
+        let repos: ffx::RepositoryRegistryProxy =
+            fake_proxy(move |req| panic!("should not receive any requests: {:?}", req));
 
         for (name, want_msg) in [
             ("", "invalid repository name for \"\": url parse error"),

@@ -24,5 +24,5 @@ Once it starts waiting for the device, open another terminal:
 fx ffx --isolate-dir /tmp/fctemp.* emu start -H --console out/default/obj/vendor/google/products/begonia/begonia_eng.x64/product_bundle
 ```
 
-Quit this one with `ctrl-a`, `ctrl-x`
+Quit this one with `ctrl-a`, `x`
 All outputs can be found in `/tmp/test`.

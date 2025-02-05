@@ -8,7 +8,7 @@ use core::future::Future;
 use core::mem::replace;
 use core::pin::Pin;
 use core::slice::from_raw_parts_mut;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use core::task::{Context, Poll};
 use std::sync::Arc;
 
@@ -27,6 +27,7 @@ use crate::{Chunk, DecodeError, Decoder, Encoder, CHUNK_SIZE};
 
 struct Shared {
     is_closed: AtomicBool,
+    sender_count: AtomicUsize,
     closed_waker: AtomicWaker,
     channel: RWHandle<Channel>,
     // TODO: recycle send/recv buffers to reduce allocations
@@ -36,16 +37,37 @@ impl Shared {
     fn new(channel: Channel) -> Self {
         Self {
             is_closed: AtomicBool::new(false),
+            sender_count: AtomicUsize::new(1),
             closed_waker: AtomicWaker::new(),
             channel: RWHandle::new(channel),
         }
     }
+
+    fn close(&self) {
+        self.is_closed.store(true, Ordering::Relaxed);
+        self.closed_waker.wake();
+    }
 }
 
 /// A channel sender.
-#[derive(Clone)]
 pub struct Sender {
     shared: Arc<Shared>,
+}
+
+impl Drop for Sender {
+    fn drop(&mut self) {
+        let senders = self.shared.sender_count.fetch_sub(1, Ordering::Relaxed);
+        if senders == 1 {
+            self.shared.close();
+        }
+    }
+}
+
+impl Clone for Sender {
+    fn clone(&self) -> Self {
+        self.shared.sender_count.fetch_add(1, Ordering::Relaxed);
+        Self { shared: self.shared.clone() }
+    }
 }
 
 /// A channel buffer.
@@ -304,8 +326,7 @@ impl Transport for Channel {
     }
 
     fn close(sender: &Self::Sender) {
-        sender.shared.is_closed.store(true, Ordering::Relaxed);
-        sender.shared.closed_waker.wake();
+        sender.shared.close();
     }
 
     type Receiver = Receiver;

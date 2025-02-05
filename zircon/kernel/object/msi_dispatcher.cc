@@ -110,11 +110,12 @@ MsiAllocation::~MsiAllocation() {
   kcounter_add(msi_destroy_count, 1);
 }
 
-void MsiAllocation::GetInfo(zx_info_msi* info) const TA_EXCL(lock_) {
-  DEBUG_ASSERT(info);
-  info->target_addr = block_.tgt_addr;
-  info->target_data = block_.tgt_data;
-  info->base_irq_id = block_.base_irq_id;
-  info->num_irq = block_.num_irq;
-  info->interrupt_count = ktl::popcount(ids_in_use_.load());
+zx_info_msi MsiAllocation::GetInfo() const TA_EXCL(lock_) {
+  return {
+      .target_addr = block_.tgt_addr,
+      .target_data = block_.tgt_data,
+      .base_irq_id = block_.base_irq_id,
+      .num_irq = block_.num_irq,
+      .interrupt_count = static_cast<uint32_t>(ktl::popcount(ids_in_use_.load())),
+  };
 }

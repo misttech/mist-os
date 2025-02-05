@@ -144,7 +144,7 @@ void AudioCoreHardwareTest::ConnectToAudioCapturer() {
   audio()->CreateAudioCapturer(audio_capturer().NewRequest(), false /* NOT loopback */);
   AddErrorHandler(audio_capturer(), "AudioCapturer");
 
-  audio_capturer()->SetUsage(kUsage);
+  audio_capturer()->SetUsage2(kUsage);
 }
 
 // Capture in a specific format, to minimize rate-conversion or rechannelization effects.

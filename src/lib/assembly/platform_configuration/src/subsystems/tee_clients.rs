@@ -153,11 +153,7 @@ fn create_tee_clients(
 
     let mut offer = vec![
         cml::Offer {
-            protocol: Some(create_name("fuchsia.inspect.InspectSink")?.into()),
-            ..cml::Offer::empty(cml::OfferFromRef::Parent.into(), cml::OfferToRef::All.into())
-        },
-        cml::Offer {
-            protocol: Some(create_name("fuchsia.logger.LogSink")?.into()),
+            dictionary: Some(create_name("diagnostics")?.into()),
             ..cml::Offer::empty(cml::OfferFromRef::Parent.into(), cml::OfferToRef::All.into())
         },
         cml::Offer {
@@ -173,7 +169,7 @@ fn create_tee_clients(
             component_url
                 .resource()
                 .split('/')
-                .last()
+                .next_back()
                 .ok_or_else(|| anyhow!("no resource name: {}", component_url.resource()))?
                 .split('.')
                 .next()
@@ -235,7 +231,10 @@ fn create_tee_clients(
             for (key, value) in config_data {
                 builder
                     .package(package_name.as_ref())
-                    .config_data(FileEntry { source: value.into(), destination: key.into() })
+                    .config_data(FileEntry {
+                        source: value.as_utf8_pathbuf().clone(),
+                        destination: key.into(),
+                    })
                     .context(format!(
                         "Adding config data file {} to package {}",
                         key, package_name
@@ -401,12 +400,7 @@ mod tests {
         ],
         "offer": [
           {
-            "protocol": "fuchsia.inspect.InspectSink",
-            "from": "parent",
-            "to": "all"
-          },
-          {
-            "protocol": "fuchsia.logger.LogSink",
+            "dictionary": "diagnostics",
             "from": "parent",
             "to": "all"
           },
@@ -592,8 +586,8 @@ mod tests {
             additional_required_protocols: vec!["fuchsia.foo.bar".to_string()],
             capabilities: vec!["fuchsia.baz.bang".to_string()],
             config_data: Some(BTreeMap::from([
-                ("foo".to_string(), "bar".to_string()),
-                ("baz".to_string(), "qux".to_string()),
+                ("foo".to_string(), FileRelativePathBuf::FileRelative("bar".into())),
+                ("baz".to_string(), FileRelativePathBuf::FileRelative("qux".into())),
             ])),
             additional_required_features: TeeClientFeatures {
                 tmp_storage: true,

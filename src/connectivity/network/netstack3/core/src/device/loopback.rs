@@ -39,7 +39,7 @@ impl<BT: BindingsTypes, L> DeviceIdContext<LoopbackDevice> for CoreCtx<'_, BT, L
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
     ReceiveQueueTypes<LoopbackDevice, BC> for CoreCtx<'_, BC, L>
 {
-    type Meta = LoopbackRxQueueMeta<WeakDeviceId<BC>>;
+    type Meta = LoopbackRxQueueMeta<WeakDeviceId<BC>, BC>;
     type Buffer = Buf<Vec<u8>>;
 }
 
@@ -84,7 +84,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackRxDequeue>
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
     TransmitQueueCommon<LoopbackDevice, BC> for CoreCtx<'_, BC, L>
 {
-    type Meta = LoopbackTxQueueMeta<WeakDeviceId<BC>>;
+    type Meta = LoopbackTxQueueMeta<WeakDeviceId<BC>, BC>;
     type Allocator = BufVecU8Allocator;
     type Buffer = Buf<Vec<u8>>;
     type DequeueContext = Never;
@@ -193,24 +193,27 @@ impl<BT: DeviceLayerTypes> UnlockedAccessMarkerFor<IpLinkDeviceState<LoopbackDev
 impl<BT: DeviceLayerTypes> LockLevelFor<IpLinkDeviceState<LoopbackDevice, BT>>
     for crate::lock_ordering::LoopbackRxQueue
 {
-    type Data = ReceiveQueueState<LoopbackRxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>>;
+    type Data = ReceiveQueueState<LoopbackRxQueueMeta<WeakDeviceId<BT>, BT>, Buf<Vec<u8>>>;
 }
 
 impl<BT: DeviceLayerTypes> LockLevelFor<IpLinkDeviceState<LoopbackDevice, BT>>
     for crate::lock_ordering::LoopbackRxDequeue
 {
-    type Data = DequeueState<LoopbackRxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>>;
+    type Data = DequeueState<LoopbackRxQueueMeta<WeakDeviceId<BT>, BT>, Buf<Vec<u8>>>;
 }
 
 impl<BT: DeviceLayerTypes> LockLevelFor<IpLinkDeviceState<LoopbackDevice, BT>>
     for crate::lock_ordering::LoopbackTxQueue
 {
-    type Data =
-        TransmitQueueState<LoopbackTxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>, BufVecU8Allocator>;
+    type Data = TransmitQueueState<
+        LoopbackTxQueueMeta<WeakDeviceId<BT>, BT>,
+        Buf<Vec<u8>>,
+        BufVecU8Allocator,
+    >;
 }
 
 impl<BT: DeviceLayerTypes> LockLevelFor<IpLinkDeviceState<LoopbackDevice, BT>>
     for crate::lock_ordering::LoopbackTxDequeue
 {
-    type Data = DequeueState<LoopbackTxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>>;
+    type Data = DequeueState<LoopbackTxQueueMeta<WeakDeviceId<BT>, BT>, Buf<Vec<u8>>>;
 }

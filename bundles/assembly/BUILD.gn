@@ -7,14 +7,12 @@ import("//build/assembly/assembly_resources_directory.gni")
 import("//build/assembly/kernel_aib.gni")
 import("//build/assembly/platform_artifacts.gni")
 import("//build/bazel/bazel_inputs.gni")
-import("//build/config/clang/clang.gni")
+import("//build/components.gni")
 import("//build/icu/icu_assembly_input_bundle.gni")
 import("//bundles/assembly/platform_aibs.gni")
-import("//bundles/assembly/rust_libstd.gni")
 import("//src/lib/icu/tzdata/icu_tzres_source.gni")
 import("//third_party/sbase/binaries.gni")
 import("//zircon/kernel/phys/qemu.gni")
-import("//zircon/system/ulib/c/libc_toolchain.gni")
 
 ########
 # Guaranteed Invariants
@@ -64,9 +62,10 @@ group("assembly") {
   testonly = true
   deps = [ ":eng" ]
 
-  # Coverage and sanitizer builders rename the shared libs, therefore ignore them.
+  # Coverage, profile and sanitizer builders rename the shared libs, therefore ignore them.
   # RISCV skips some artifacts, therefore we also ignore that.
-  if (!is_coverage && !is_asan && !is_hwasan && current_cpu != "riscv64") {
+  if (!is_coverage && !is_profile && !is_asan && !is_hwasan &&
+      current_cpu != "riscv64") {
     deps += [ "//bundles/assembly/scrutiny" ]
   }
 }
@@ -307,10 +306,6 @@ assembly_input_bundle("bootstrap") {
       driver_components = [ "meta/ftdi.cm" ]
     },
     {
-      package_target = "//src/devices/serial/drivers/serial:package"
-      driver_components = [ "meta/serial.cm" ]
-    },
-    {
       package_target = "//src/devices/serial/drivers/usb-cdc-acm:package"
       driver_components = [ "meta/usb-cdc-acm.cm" ]
     },
@@ -540,6 +535,22 @@ assembly_input_bundle("fake_battery_driver") {
     {
       package_target = "//src/power/fake-powersource:fake-battery"
       driver_components = [ "meta/fake_battery.cm" ]
+    },
+  ]
+}
+
+# AIB for the fake-powersensor driver
+assembly_input_bundle("fake_power_sensor") {
+  base_packages = [ "//src/power/fake-powersensor:fake_power_sensor_package" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/power/fake-powersensor/meta/fake-power-sensor.core_shard.cml" ]
+        },
+      ]
     },
   ]
 }
@@ -906,6 +917,14 @@ assembly_input_bundle("core_realm") {
 
     # Developer.
     "//src/developer/forensics:pkg",
+  ]
+
+  base_driver_packages = [
+    {
+      # Fallback driver for uart nodes.
+      package_target = "//src/devices/serial/drivers/serial:package"
+      driver_components = [ "meta/serial.cm" ]
+    },
   ]
 
   compiled_packages = [
@@ -1968,7 +1987,6 @@ assembly_input_bundle("common_standard") {
             "//src/diagnostics/sampler/meta/sampler.core_shard.cml",
             "//src/connectivity/network/meta/persistence.core_shard.cml",
             "//src/intl/tzdata_provider/meta/tzdata_provider.core_shard.cml",
-            "//src/sys/cache_manager/meta/cache_manager.core_shard.cml",
             "//src/sys/pkg/bin/system-updater/meta/system_updater.core_shard.cml",
             "//src/developer/memory/pressure_signaler/meta/memory_pressure_signaler.core_shard.cml",
           ]
@@ -2658,6 +2676,16 @@ assembly_input_bundle("testing_support") {
   ]
   compiled_packages = [
     {
+      bootfs_package = true
+      name = "root"
+      components = [
+        {
+          component_name = "root"
+          shards = [ "//src/sys/testing/meta/test_realm.root_shard.cml" ]
+        },
+      ]
+    },
+    {
       name = "core"
       components = [
         {
@@ -2744,6 +2772,7 @@ assembly_input_bundle("fshost_common") {
     {
       bootfs_package = true
       name = "fshost"
+      packages = [ "//src/storage/fshost:pkg" ]
       components = [
         {
           component_name = "fshost"
@@ -2752,74 +2781,6 @@ assembly_input_bundle("fshost_common") {
             "//src/storage/lib/fs_management/client.shard.cml",
             "//src/storage/fshost/meta/config.cml",
           ]
-        },
-      ]
-      contents = [
-        {
-          label = "//src/storage/fshost"
-          source = "${root_out_dir}/fshost"
-          destination = "bin/fshost"
-        },
-        {
-          label = "//src/storage/lib/fs_management/cpp:fs-management($shlib_toolchain)"
-          source = "${root_out_dir}/${target_cpu}-shared/libfs-management.so"
-          destination = "lib/libfs-management.so"
-        },
-        {
-          label = "//sdk/lib/fdio($shlib_toolchain)"
-          source = "${root_out_dir}/${target_cpu}-shared/libfdio.so"
-          destination = "lib/libfdio.so"
-        },
-        {
-          label = "//third_party/boringssl:crypto-shared($shlib_toolchain)"
-          source = "${root_out_dir}/${target_cpu}-shared/libcrypto.so"
-          destination = "lib/libcrypto.so"
-        },
-        {
-          label = "//third_party/boringssl:ssl-shared($shlib_toolchain)"
-          source = "${root_out_dir}/${target_cpu}-shared/libssl.so"
-          destination = "lib/libssl.so"
-        },
-        {
-          label = "//zircon/system/ulib/trace-engine($shlib_toolchain)"
-          source = "${root_out_dir}/${target_cpu}-shared/libtrace-engine.so"
-          destination = "lib/libtrace-engine.so"
-        },
-        {
-          label = "//src/security/lib/tee/tee-client-api($shlib_toolchain)"
-          source = "${root_out_dir}/${target_cpu}-shared/libtee-client-api.so"
-          destination = "lib/libtee-client-api.so"
-        },
-        {
-          label = "//zircon/system/ulib/c:libc_fshost"
-          source = system_libc_stripped
-          destination = "lib/ld.so.1"
-        },
-        {
-          label = "//build/toolchain/runtime:shared-libc++-deps"
-          source =
-              "${clang_prefix}/../lib/${clang_cpu}-unknown-fuchsia/libc++.so.2"
-          destination = "lib/libc++.so.2"
-        },
-        {
-          label = "//build/toolchain/runtime:shared-libc++-deps"
-          source = "${clang_prefix}/../lib/${clang_cpu}-unknown-fuchsia/libc++abi.so.1"
-          destination = "lib/libc++abi.so.1"
-        },
-        {
-          label = "//build/toolchain/runtime:shared-libc++-deps"
-          source = "${clang_prefix}/../lib/${clang_cpu}-unknown-fuchsia/libunwind.so.1"
-          destination = "lib/libunwind.so.1"
-        },
-        {
-          label = "//sdk/lib/svc($shlib_toolchain)"
-          source = "${root_out_dir}/${target_cpu}-shared/libsvc.so"
-          destination = "lib/libsvc.so"
-        },
-        {
-          label = "//build/toolchain/runtime:shared-rust-libstd-deps"
-          source = "${rust_libstd_path}"
-          destination = "lib/${rust_libstd_so_name}"
         },
       ]
       component_includes = [
@@ -2971,13 +2932,13 @@ assembly_input_bundle("fshost_storage_host_gpt_fvm_minfs") {
           ]
         },
       ]
-      bootfs_packages = [
-        "//src/storage/gpt/component:package",
-        "//src/storage/blobfs/bin:package",
-        "//src/storage/minfs/bin:package",
-        "//src/storage/fvm:package",
-      ]
     },
+  ]
+  bootfs_packages = [
+    "//src/storage/gpt/component:package",
+    "//src/storage/blobfs/bin:package",
+    "//src/storage/minfs/bin:package",
+    "//src/storage/fvm:package",
   ]
 }
 
@@ -3005,12 +2966,12 @@ assembly_input_bundle("fshost_storage_host_fvm_minfs") {
           ]
         },
       ]
-      bootfs_packages = [
-        "//src/storage/blobfs/bin:package",
-        "//src/storage/minfs/bin:package",
-        "//src/storage/fvm:package",
-      ]
     },
+  ]
+  bootfs_packages = [
+    "//src/storage/blobfs/bin:package",
+    "//src/storage/minfs/bin:package",
+    "//src/storage/fvm:package",
   ]
 }
 
@@ -3201,6 +3162,18 @@ assembly_input_bundle("fshost_fvm_f2fs") {
 #
 assembly_input_bundle("storage_cache_manager") {
   base_packages = [ "//src/sys/cache_manager" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards =
+              [ "//src/sys/cache_manager/meta/cache_manager.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
 }
 
 assembly_input_bundle("system_update_checker") {
@@ -4366,8 +4339,20 @@ assembly_input_bundle("power_framework_broker") {
 assembly_input_bundle("power_framework_testing_sag") {
   bootfs_packages = [
     "//src/power/system-activity-governor:config-use-suspender",
+    "//src/power/system-activity-governor:config-wait-for-token",
     "//src/power/system-activity-governor/fake:package",
     "//src/power/testing/fake-suspend:fake-suspend-pkg",
+  ]
+}
+
+# An AIB for our power test related platform drivers.
+assembly_input_bundle("power_test_platform_drivers") {
+  boot_driver_packages = [
+    {
+      package_target = "//src/power/testing/system-integration/example/test-driver:power-system-integration-example-test-driver"
+      driver_components =
+          [ "meta/power-system-integration-example-test-driver.cm" ]
+    },
   ]
 }
 
@@ -4621,56 +4606,13 @@ assembly_input_bundle("tee_manager") {
     },
     {
       name = "tee_manager"
+      packages = [ "//src/security/bin/tee_manager:pkg" ]
       components = [
         {
           component_name = "tee_manager"
           shards = []
         },
       ]
-      contents = [
-        {
-          label = "//src/security/bin/tee_manager:bin"
-          source = "${root_out_dir}/tee_manager"
-          destination = "bin/tee_manager"
-        },
-        {
-          label = "//zircon/system/ulib/c:libc_fshost"
-          source = system_libc_stripped
-          destination = "lib/ld.so.1"
-        },
-        {
-          label = "//build/toolchain/runtime:shared-libc++-deps"
-          source =
-              "${clang_prefix}/../lib/${clang_cpu}-unknown-fuchsia/libc++.so.2"
-          destination = "lib/libc++.so.2"
-        },
-        {
-          label = "//build/toolchain/runtime:shared-libc++-deps"
-          source = "${clang_prefix}/../lib/${clang_cpu}-unknown-fuchsia/libc++abi.so.1"
-          destination = "lib/libc++abi.so.1"
-        },
-        {
-          label = "//sdk/lib/fdio($shlib_toolchain)"
-          source = "${root_out_dir}/${target_cpu}-shared/libfdio.so"
-          destination = "lib/libfdio.so"
-        },
-        {
-          label = "//build/toolchain/runtime:shared-rust-libstd-deps"
-          source = "${rust_libstd_path}"
-          destination = "lib/${rust_libstd_so_name}"
-        },
-        {
-          label = "//build/toolchain/runtime:shared-libc++-deps"
-          source = "${clang_prefix}/../lib/${clang_cpu}-unknown-fuchsia/libunwind.so.1"
-          destination = "lib/libunwind.so.1"
-        },
-        {
-          label = "//zircon/system/ulib/trace-engine($shlib_toolchain)"
-          source = "${root_out_dir}/${target_cpu}-shared/libtrace-engine.so"
-          destination = "lib/libtrace-engine.so"
-        },
-      ]
-
       component_includes = [
         {
           source = "//sdk/lib/syslog/client.shard.cml"

@@ -74,7 +74,7 @@ test("goldfish-sync-device-test") {
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/mock-ddk",
     "//zircon/system/ulib/fzl",
-    "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
+    "//zircon/system/ulib/mmio-ptr",
     "//zircon/system/ulib/mock-function",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zircon-internal",

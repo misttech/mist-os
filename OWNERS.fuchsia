@@ -21,6 +21,9 @@
 # Build system files throughout the tree
 per-file **.gn,**.gni,**.bazel,**.bzl,fuchsia.code-workspace = file:/build/OWNERS
 
+# C++ language support files
+per-file .clang-format,.clang-tidy = file:/build/toolchain/OWNERS
+
 # Go-language support files
 per-file go.mod,go.sum,fuchsia.code-workspace = file:/build/go/OWNERS
 

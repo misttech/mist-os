@@ -29,7 +29,7 @@ rustc_binary("dict_trigger_bin") {
     "//src/lib/fuchsia-component",
     "//src/sys/component_manager/tests/fidl:components_rust",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
   source_root = "src/trigger.rs"
   sources = [ "src/trigger.rs" ]

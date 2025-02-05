@@ -4,7 +4,11 @@
 library fuchsia.hardware.power.statecontrol;
 
 /// Why the system reboots.
-// Contact OWNERS before adding a new value.
+///
+/// Replaced by `RebootReason2`.
+// TODO(https://fxbug.dev/385742868): Delete this once "deprecated" propagates
+// to the SDK.
+@available(deprecated=26, removed=NEXT)
 type RebootReason = strict enum {
     USER_REQUEST = 1;
 
@@ -31,4 +35,42 @@ type RebootReason = strict enum {
 
     /// The system hit a critical low threshold of available memory.
     OUT_OF_MEMORY = 10;
+};
+
+/// Why the system reboots.
+// Contact OWNERS before adding a new value.
+@available(added=26)
+// TODO(https://fxbug.dev/385742868): Rename this to `RebootReason` once the
+// original `RebootReason` is removed.
+type RebootReason2 = flexible enum {
+    USER_REQUEST = 1;
+
+    /// A new system update has been downloaded.
+    SYSTEM_UPDATE = 2;
+
+    /// Applying the system update has failed.
+    RETRY_SYSTEM_UPDATE = 8;
+
+    HIGH_TEMPERATURE = 3;
+    FACTORY_DATA_RESET = 6;
+
+    /// Sessionmgr has failed.
+    SESSION_FAILURE = 4;
+
+    /// sysmgr crashed.
+    SYSMGR_FAILURE = 5;
+
+    /// A critical system component has failed.
+    CRITICAL_COMPONENT_FAILURE = 7;
+
+    /// A boot partition change was effected.
+    ZBI_SWAP = 9;
+
+    /// The system hit a critical low threshold of available memory.
+    OUT_OF_MEMORY = 10;
+
+    /// The Netstack component is changing versions.
+    // TODO(https://fxbug.dev/42081574): Remove this reason once Netstack2 is
+    // fully migrated to Netstack3.
+    NETSTACK_MIGRATION = 11;
 };

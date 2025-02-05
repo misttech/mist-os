@@ -53,49 +53,10 @@ FUNCTION_LABEL(_start)
     lea _kstack_end(%rip), %rsp
 
     // Save off the handoff pointer in a register that won't get clobbered.
-    // When ELF-loaded, it will be passed in %rdi per the calling convention;
-    // when ZBI-loaded, it will be passed in %rsi per the protocol.
-#ifdef ELF_KERNEL
     mov %rdi, %r14
-#else
-    mov %rsi, %r14
 
-    // The fixup code in image.S runs in 64-bit mode with paging enabled,
-    // so we can't run it too early.  But it overlaps the bss, so we move
-    // it before zeroing the bss.  We can't delay zeroing the bss because
-    // the page tables we're about to set up are themselves in bss.
-
-    // The first word after the kernel image (at __data_end in our view)
-    // gives the size of the following code.  Copy it to _end.
-    mov __data_end(%rip), %ecx
-    lea (__data_end + 4)(%rip), %esi
-    lea _end(%rip), %edi
-
-    // We are copying the relocation code right after the bss.
-    // It is possible that the code is larger than the bss, so we have to
-    // take into account the possibility of src and dst overlapping.
-    mov %edi, %eax
-    sub %esi, %eax
-    cmp %ecx, %eax
-    jnb .Lcopy
-    // There's an overlap. Reverse the copy direction.
-    lea -1(%edi, %ecx), %edi // edi = edi + ecx - 1;
-    lea -1(%esi, %ecx), %esi // esi = esi + ecx - 1;
-    std
-.Lcopy:
-    rep movsb
-    cld
-
-    // Now it's safe to zero the bss.
-    lea __bss_start(%rip), %edi
-    lea _end(%rip), %ecx
-    sub %edi, %ecx              // Compute the length of the bss in bytes.
-    xor %eax, %eax
-    rep stosb // while (ecx-- > 0) *edi++ = al;
-#endif
-
-    // These variables are in the .bss, so now it's safe to set them.
     mov %r15, kernel_entry_ticks(%rip)
+
     lea __executable_start(%rip), %rax
     mov %rax, kernel_base_phys(%rip)
 
@@ -183,31 +144,17 @@ FUNCTION_LABEL(_start)
 #endif  // __has_feature(address_sanitizer)
 
     // Long jump to our code selector and the high address relocated.
-#ifdef ELF_KERNEL
     jmp *.Lhigh_entry_addr(%rip)
 
 .pushsection .data.rel.ro, "aw", %progbits
 .Lhigh_entry_addr:
     .quad .Lhigh_entry
 .popsection
-#else
-    lea .Lhigh_entry(%rip), %rax
-    addq kernel_relocated_base(%rip), %rax
-    jmp *%rax
-#endif
 
 // This code runs at the final virtual address, so it should be pure PIC.
 .Lhigh_entry:
     // load the high kernel stack
     lea _kstack_end(%rip), %rsp
-
-#ifndef ELF_KERNEL
-    // move_fixups_and_zero_bss copied the fixup code to _end.
-    // It expects %rdi to contain the actual runtime address of __executable_start.
-    lea __executable_start(%rip), %rdi
-    call _end
-    // The fixup code won't be used again, so the memory can be reused now.
-#endif
 
     // Load our new GDT before touching the segment registers, as the latter
     // will cause the CPU to verify the GDTR points to valid memory for the
@@ -282,10 +229,6 @@ DATA(_kstack)
     .skip 8192
 DATA(_kstack_end)
 
-// These symbols are used by image.S
-.global IMAGE_ELF_ENTRY
-IMAGE_ELF_ENTRY = _start
-
 // This symbol is used by gdb python to know the base of the kernel module
 .global KERNEL_BASE_ADDRESS
-KERNEL_BASE_ADDRESS = KERNEL_BASE - KERNEL_LOAD_OFFSET
+KERNEL_BASE_ADDRESS = KERNEL_BASE

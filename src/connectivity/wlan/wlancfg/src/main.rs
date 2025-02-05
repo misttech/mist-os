@@ -5,6 +5,17 @@
 // The complexity of a separate struct doesn't seem universally better than having many arguments
 #![allow(clippy::too_many_arguments)]
 #![recursion_limit = "1024"]
+// Turn on additional lints that could lead to unexpected crashes in production code
+#![warn(clippy::indexing_slicing)]
+#![cfg_attr(test, allow(clippy::indexing_slicing))]
+#![warn(clippy::unwrap_used)]
+#![cfg_attr(test, allow(clippy::unwrap_used))]
+#![warn(clippy::expect_used)]
+#![cfg_attr(test, allow(clippy::expect_used))]
+#![warn(clippy::unreachable)]
+#![cfg_attr(test, allow(clippy::unreachable))]
+#![warn(clippy::unimplemented)]
+#![cfg_attr(test, allow(clippy::unimplemented))]
 
 use anyhow::{format_err, Context as _, Error};
 use diagnostics_log::PublishOptions;
@@ -18,11 +29,11 @@ use futures::future::OptionFuture;
 use futures::lock::Mutex;
 use futures::prelude::*;
 use futures::{select, TryFutureExt};
+use log::{error, info, warn};
 use std::convert::Infallible;
 use std::pin::pin;
 use std::rc::Rc;
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use wlancfg_lib::access_point::AccessPoint;
 use wlancfg_lib::client::connection_selection::{
     serve_connection_selection_request_loop, ConnectionSelectionRequester, ConnectionSelector,
@@ -428,12 +439,13 @@ async fn run_all_futures() -> Result<(), Error> {
 async fn main() {
     let options =
         PublishOptions::default().tags(&["wlan"]).enable_metatag(diagnostics_log::Metatag::Target);
-    diagnostics_log::initialize(options).unwrap();
+    // Crash instead of proceeded without logging
+    #[expect(clippy::expect_used)]
+    diagnostics_log::initialize(options).expect("Failed to initialize diagnostics log");
     fuchsia_trace_provider::trace_provider_create_with_fdio();
     ftrace_provider::trace_provider_create_with_fdio();
     wtrace::instant_wlancfg_start();
 
-    #[allow(clippy::large_futures)]
     run_all_futures().await.unwrap_or_else(|e| {
         error!("{e:?}");
         // The wlancfg component is `on_terminate: "reboot"`, so this will reboot the device.

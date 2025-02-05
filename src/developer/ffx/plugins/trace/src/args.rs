@@ -3,11 +3,9 @@
 // found in the LICENSE file.
 
 use argh::{ArgsInfo, FromArgs};
-use ffx_core::ffx_command;
 use fidl_fuchsia_developer_ffx::{Action, Trigger};
 use fidl_fuchsia_tracing::BufferingMode;
 
-#[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
@@ -116,6 +114,11 @@ pub struct Stop {
     /// kernel IPC traces, leaving only the ordinals in the trace.
     #[argh(switch)]
     pub no_symbolize: bool,
+
+    /// prevent checking the trace data when stopping tracing. Defaults to false.
+    /// If this flag is enabled, trace result analysis will not be triggered.
+    #[argh(switch)]
+    pub no_verify_trace: bool,
 }
 
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
@@ -250,6 +253,11 @@ pub struct Start {
     /// This flag is only used if tracing is manually stopped.
     #[argh(switch)]
     pub no_symbolize: bool,
+
+    /// prevent checking the trace data when stopping tracing. Defaults to false.
+    /// If this flag is enabled, trace result analysis will not be triggered.
+    #[argh(switch)]
+    pub no_verify_trace: bool,
 }
 
 fn try_string_to_action(s: &str) -> Result<Action, String> {

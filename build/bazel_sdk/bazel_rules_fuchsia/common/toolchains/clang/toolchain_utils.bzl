@@ -401,7 +401,7 @@ def _prebuilt_clang_cc_toolchain_config_impl(ctx):
     tool_paths = [
         tool_path(name = "ar", path = "bin/llvm-ar"),
         tool_path(name = "cpp", path = "bin/cpp"),
-        tool_path(name = "gcc", path = "bin/clang"),
+        tool_path(name = "gcc", path = "bin/clang++"),
         tool_path(name = "gcov", path = "/usr/bin/false"),
         tool_path(name = "gcov-tool", path = "/usr/bin/false"),
         tool_path(name = "ld", path = "bin/llvm-ld"),
@@ -513,12 +513,12 @@ def generate_clang_cc_toolchain(
     )
 
     common_compiler_files = [
-        ":clang_compiler_binaries",
+        ":cc-compiler-prebuilts",
         ":libcxx_headers",
     ]
 
     common_linker_files = [
-        ":clang_linker_binaries",
+        ":cc-linker-prebuilts",
         ":libcxx_runtime_libs",
     ]
 
@@ -551,13 +551,13 @@ def generate_clang_cc_toolchain(
     native.cc_toolchain(
         name = name,
         all_files = ":" + all_files,
-        ar_files = ":clang_ar_binaries",
-        as_files = ":clang_empty",
+        ar_files = ":ar",
+        as_files = ":empty",
         compiler_files = ":" + compiler_files,
-        dwp_files = ":clang_empty",
+        dwp_files = ":empty",
         linker_files = ":" + linker_files,
-        objcopy_files = ":clang_objcopy_binaries",
-        strip_files = ":clang_strip_binaries",
+        objcopy_files = ":objcopy",
+        strip_files = ":strip",
         # `supports_param_files = 1` means that the toolchain supports
         # reading arguments from a response file (e.g. `@arguments.rsp`)
         # but this is set here to 0 to help debug toolchain-related issues.

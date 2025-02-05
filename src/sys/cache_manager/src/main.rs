@@ -5,8 +5,8 @@
 use anyhow::{format_err, Context, Error};
 use cache_manager_config_lib::Config;
 use fuchsia_component::{self, client as fclient};
+use log::*;
 use std::process;
-use tracing::*;
 use {
     component_framework_cache_metrics_registry as metrics, fidl_fuchsia_metrics,
     fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,

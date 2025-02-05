@@ -22,25 +22,23 @@
     ],
     offer: [
         {
+            config: [ "fuchsia.power.SuspendEnabled" ],
             from: "parent",
             to: "#full-drivers",
-            config: [ "fuchsia.power.SuspendEnabled" ],
+        },
+        {
+            dictionary: "diagnostics",
+            from: "self",
+            to: [
+                "#full-drivers",
+                "#full_resolver",
+            ],
         },
 
         // Full resolver dependencies
         {
             protocol: "fuchsia.pkg.PackageResolver",
             from: "parent",
-            to: "#full_resolver",
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "#archivist",
-            to: "#full_resolver",
-        },
-        {
-            protocol: "fuchsia.inspect.InspectSink",
-            from: "#archivist",
             to: "#full_resolver",
         },
         {
@@ -89,6 +87,9 @@
             to: "#full-drivers",
             source_availability: "unknown",
         },
+
+        // TODO(https://fxbug.dev/345827642): remove once OOT drivers are using these protocols from
+        // the diagnostics dictionary themselves.
         {
             protocol: [
                 "fuchsia.inspect.InspectSink",
@@ -97,22 +98,25 @@
             from: "#archivist",
             to: "#full-drivers",
         },
-        {
-            protocol: [ "fuchsia.power.system.ActivityGovernor" ],
-            from: "#system-activity-governor",
-            to: "#full-drivers",
 
-            // system-activity-governor depends on the suspend HAL but not all
-            // drivers depend on system-activity-governor.
-            // Weak to resolve dependency cycles.
-            dependency: "weak",
-            source_availability: "unknown",
-        },
-        {
-            protocol: [ "fuchsia.power.broker.Topology" ],
-            from: "#power-broker",
-            to: "#full-drivers",
-        },
+        // TODO(https://fxbug.dev/369189827): Route these statically again when the dictionary
+        // can override them.
+        // {
+        //     protocol: [ "fuchsia.power.system.ActivityGovernor" ],
+        //     from: "#system-activity-governor",
+        //     to: "#full-drivers",
+
+        //     // system-activity-governor depends on the suspend HAL but not all
+        //     // drivers depend on system-activity-governor.
+        //     // Weak to resolve dependency cycles.
+        //     dependency: "weak",
+        //     source_availability: "unknown",
+        // },
+        // {
+        //     protocol: [ "fuchsia.power.broker.Topology" ],
+        //     from: "#power-broker",
+        //     to: "#full-drivers",
+        // },
     ],
     expose: [
         {

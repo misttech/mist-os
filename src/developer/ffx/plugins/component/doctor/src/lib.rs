@@ -9,13 +9,13 @@ use errors::FfxError;
 use ffx_component::rcs::{connect_to_realm_query, connect_to_route_validator};
 use ffx_component_doctor_args::DoctorCommand;
 use fho::{FfxMain, FfxTool, MachineWriter, ToolIO};
-use fidl_fuchsia_developer_remotecontrol as rc;
+use target_holders::RemoteControlProxyHolder;
 
 #[derive(FfxTool)]
 pub struct DoctorTool {
     #[command]
     cmd: DoctorCommand,
-    rcs: rc::RemoteControlProxy,
+    rcs: RemoteControlProxyHolder,
 }
 
 fho::embedded_plugin!(DoctorTool);

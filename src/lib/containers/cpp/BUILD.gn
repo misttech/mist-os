@@ -8,6 +8,7 @@ import("//build/test.gni")
 source_set("cpp") {
   public = [
     "circular_deque.h",
+    "mpsc_queue.h",
     "vector_buffer.h",
   ]
 
@@ -23,6 +24,7 @@ test("containers_cpp_unittests") {
 
   sources = [
     "circular_deque_unittest.cc",
+    "mpsc_queue_unittest.cc",
     "vector_buffer_unittest.cc",
   ]
 

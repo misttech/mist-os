@@ -5,8 +5,8 @@
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_component::{client, server};
 use futures::StreamExt;
+use log::*;
 use test_util::assert_geq;
-use tracing::*;
 use zx::{ClockUpdate, MonotonicDuration, MonotonicInstant, Signals, Status, SyntheticDuration};
 use {fidl_componentmanager_test as ftest, fidl_fuchsia_time as ftime};
 

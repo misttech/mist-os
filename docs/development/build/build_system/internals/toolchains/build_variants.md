@@ -37,10 +37,6 @@ The Fuchsia build defines several types of build variants, for example:
   to weed out subtle machine code generation issues that can affect
   the kernel in very important ways).
 
-- The `release` and `debug` variants, which are provided to override
-  the default compilation mode, which is determined by the value of
-  the `is_debug` build configuration variable in `args.gn`.
-
 - A few other variants for specialized needs, which are all defined
   in the `//build/config/BUILDCONFIG.gn` file, using conventions
   described in the rest of this document.
@@ -294,45 +290,18 @@ to be applied to any kernel machine code.
 
 ```
 {
-  name = "release"
+  name = "fully_optimized"
   toolchain_args = {
-    is_debug = false
+    optimize = "speed"
   }
 }
 ```
 
 This variant descriptor is named explicitly, and does not
 add any configs or dependencies. On the other hand, it ensures
-that the global build configuration variable `is_debug` will
-be set to false, which change how many default configs are
+that the global build configuration variable `optimize` will
+be set to "speed", which change how many default configs are
 defined in a corresponding variant toolchain context.
-
-
-### Universal variants  {: #universal-variants }
-
-A lesser known feature of the build system is called "universal variants". These
-are additional variant descriptors that _combine_ with other known variants,
-they work as follows:
-
-- If `is_debug=false` is set in `args.gn`, meaning that all binaries should
-  be built with maximal optimizations, then the `"debug"`  variant descriptor
-  is defined by the build. This allows building specific targets in debug mode if
-  necessary.
-
-- Similarly, if `is_debug=true` (the default), then the `"release"` variant
-  descriptor is defined by the build. This allows building specific targets with
-  full optimizations if necessary.
-
-- Additionally, the universal variants above are combined with all other known
-  variant descriptors automatically by the build. E.g. if `is_debug=false`,
-  then the build will also create `"asan-debug"`, `"ubsan-debug"`,
-  `"thinlto-debug"`, etc. If `is_debug=true`, then it will define `"asan-release"`,
-  `"ubsan-release"`, `"thinlto-release"` and so on instead.
-
-Note that these variant descriptors are _conditionally_  defined by the build,
-based on the value of `is_debug`. I.e. there is no `"release"` variant and its
-combinations when `is_debug=false`, and there is no `"debug"` variant and its
-combinations when `is_debug=true`!
 
 
 ## The `toolchain_variant` global variable  {: #toolchain_variant }
@@ -479,7 +448,7 @@ build configuration file (`args.gn`). Consider the following example:
 select_variant = [
   {
     label = [ "//src/sys/component_manager:bin" ]
-    variant = "release"
+    variant = "lto"
   },
   "host_asan",
   "thinlto/blobfs",
@@ -501,10 +470,7 @@ in order, and the first one that matches the current target is selected.
 As such, the example above means that:
 
 - The `//src/sys/component/manager:bin` program binary, and its dependencies
-  should always be built with the `release` variant (NOTE: This example
-  will result in an error at `gn gen` time is `is_debug=false` is in
-  the `args.gn` file, because the `"release"` variant will not exist
-  in this case, see [universal variants](#universal-variants) to see why).
+  should always be built with the `lto` variant.
 
 - Host binaries should be built in the `"asan"` variant.
   Note that `"host_asan"` is not a variant descriptor name, but a
@@ -631,43 +597,6 @@ a few hard-coded ones, and creates others from the list of known variants:
       "ubsan",
     ]
     ```
-
-- Similarly, a shortcut is defined for every universal variant and its
-  cobinations, which again only apply them to device binaries.
-
-  This means, that assuming that `is_debug=true` in `args.gn`, the
-  following would force all device binaries to be built in release
-  mode, while the host ones would still be built in debug mode.
-
-  ```
-  is_debug = true
-  select_variant = [ "release" ]
-  ```
-  Which is equivalent to:
-
-  ```
-  is_debug = true
-  select_variant = [
-    {
-      variant = "release"
-      host = false
-    }
-  ]
-  ```
-
-  A way to force host binaries to be compiled in release mode would
-  be to use an explicit scope value, since there is no shortcut for
-  this use case, as in:
-
-  ```
-  is_debug = true
-  select_variant = [
-    {
-      variant = "release"
-      host = true
-    }
-  ]
-  ```
 
 ## Variant target redirection
 

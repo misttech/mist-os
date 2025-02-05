@@ -1077,6 +1077,76 @@ TEST(VmoTestCase, SetStreamSizePinnedPages) {
   pmt.unpin();
 }
 
+TEST(VmoTestCase, StreamSizeSlicesAndReferences) {
+  uint64_t stream_size = 0;
+  uint64_t vmo_size = 0;
+
+  // 4 page stream, unbounded VMO.
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(4 * zx_system_get_page_size(), ZX_VMO_UNBOUNDED, &vmo));
+
+  EXPECT_OK(vmo.get_stream_size(&stream_size));
+  EXPECT_EQ(stream_size, zx_system_get_page_size() * 4);
+
+  // 3 page slice (smaller than parent stream).
+  zx::vmo smaller_slice;
+  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SLICE, 0, 3 * zx_system_get_page_size(), &smaller_slice));
+
+  // VMO size and stream size are 3 pages.
+  EXPECT_OK(smaller_slice.get_size(&vmo_size));
+  EXPECT_EQ(vmo_size, zx_system_get_page_size() * 3);
+  EXPECT_OK(smaller_slice.get_stream_size(&stream_size));
+  ASSERT_EQ(stream_size, zx_system_get_page_size() * 3);
+
+  // Reduce smaller-slice stream size to 2 pages.
+  smaller_slice.set_stream_size(zx_system_get_page_size() * 2);
+
+  EXPECT_OK(smaller_slice.get_size(&vmo_size));
+  EXPECT_EQ(vmo_size, zx_system_get_page_size() * 3);
+  EXPECT_OK(smaller_slice.get_stream_size(&stream_size));
+  ASSERT_EQ(stream_size, zx_system_get_page_size() * 2);
+
+  // 5 page slice.
+  zx::vmo larger_slice;
+  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SLICE, 0, 5 * zx_system_get_page_size(), &larger_slice));
+
+  // VMO size and stream size are 5 pages.
+  EXPECT_OK(larger_slice.get_size(&vmo_size));
+  EXPECT_EQ(vmo_size, zx_system_get_page_size() * 5);
+  EXPECT_OK(larger_slice.get_stream_size(&stream_size));
+  ASSERT_EQ(stream_size, zx_system_get_page_size() * 5);
+
+  // Parent stream size is unchanged.
+  EXPECT_OK(vmo.get_stream_size(&stream_size));
+  EXPECT_EQ(stream_size, zx_system_get_page_size() * 4);
+
+  // Reference.
+  zx::vmo ref;
+  EXPECT_OK(vmo.create_child(ZX_VMO_CHILD_REFERENCE, 0, 0, &ref));
+
+  // Will have same stream size as parent.
+  EXPECT_OK(ref.get_stream_size(&stream_size));
+  ASSERT_EQ(stream_size, zx_system_get_page_size() * 4);
+
+  // Call set_stream_size on reference, increase to 8 pages.
+  EXPECT_OK(ref.set_stream_size(_zx_system_get_page_size() * 8));
+
+  // Reference & VMO have 8 page stream.
+  EXPECT_OK(ref.get_stream_size(&stream_size));
+  ASSERT_EQ(stream_size, zx_system_get_page_size() * 8);
+  EXPECT_OK(vmo.get_stream_size(&stream_size));
+  ASSERT_EQ(stream_size, zx_system_get_page_size() * 8);
+
+  // Call set_stream_size on vmo, increase to 10 pages.
+  EXPECT_OK(vmo.set_stream_size(_zx_system_get_page_size() * 10));
+
+  // Reference & VMO have 10 page stream.
+  EXPECT_OK(ref.get_stream_size(&stream_size));
+  ASSERT_EQ(stream_size, zx_system_get_page_size() * 10);
+  EXPECT_OK(vmo.get_stream_size(&stream_size));
+  ASSERT_EQ(stream_size, zx_system_get_page_size() * 10);
+}
+
 void RightsTestMapHelper(zx_handle_t vmo, size_t len, uint32_t flags, bool expect_success,
                          zx_status_t fail_err_code) {
   uintptr_t ptr;

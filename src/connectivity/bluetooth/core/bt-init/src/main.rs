@@ -18,7 +18,7 @@ use fuchsia_bluetooth::constants::{
 };
 use fuchsia_component::{client, server};
 use futures::{future, StreamExt, TryStreamExt};
-use tracing::{error, info, warn};
+use log::{error, info, warn};
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 const BT_GAP_CHILD_NAME: &str = "bt-gap";

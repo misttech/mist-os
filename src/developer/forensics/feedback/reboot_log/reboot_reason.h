@@ -23,6 +23,7 @@ enum class RebootReason {
   // We could not make a reboot reason out of the reboot log.
   kNotParseable,
   kGenericGraceful,
+  kUnexpectedReasonGraceful,
   kCold,
   // The device spontaneously rebooted, e.g., brief loss of power.
   kSpontaneous,
@@ -41,6 +42,9 @@ enum class RebootReason {
   kSysmgrFailure,
   kCriticalComponentFailure,
   kFdr,
+  // TODO(https://fxbug.dev/42081574): Remove this reason once Netstack2 is
+  // fully migrated to Netstack3.
+  kNetstackMigration,
 };
 
 std::string ToString(RebootReason reason);
@@ -53,6 +57,9 @@ bool IsFatal(RebootReason reason);
 
 // Whether the reboot is graceful, ungraceful or undetermined.
 std::optional<bool> OptionallyGraceful(RebootReason reason);
+
+// Whether the reboot is planned, unplanned or undetermined.
+std::optional<bool> OptionallyPlanned(RebootReason reason);
 
 cobalt::LastRebootReason ToCobaltLastRebootReason(RebootReason reason);
 std::string ToCrashProgramName(RebootReason reason);

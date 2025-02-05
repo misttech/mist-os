@@ -233,11 +233,45 @@ impl<D, M, I: Ip> RecvIpFrameMeta<D, M, I> {
     }
 }
 
+/// A trait abstracting TX frame metadata when traversing the stack.
+///
+/// This trait allows for stack integration crate to define a single concrete
+/// enumeration for all the types of transport metadata that a socket can
+/// generate. Metadata is carried with all TX frames until they hit the device
+/// layer.
+///
+/// NOTE: This trait is implemented by *bindings*. Although the tx metadata
+/// never really leaves core, abstraction over bindings types are substantially
+/// more common so delegating this implementation to bindings avoids type
+/// parameter explosion.
+pub trait TxMetadataBindingsTypes {
+    /// The metadata associated with a TX frame.
+    ///
+    /// The `Default` impl yields the default, i.e. unspecified, metadata
+    /// instance.
+    type TxMetadata: Default + Debug + Send + Sync + 'static;
+}
+
+/// A core context providing tx metadata type conversion.
+///
+/// This trait is used to convert from a core-internal tx metadata type `T` to
+/// the metadata supported by bindings in `BT::TxMetadata`.
+pub trait CoreTxMetadataContext<T, BT: TxMetadataBindingsTypes> {
+    /// Converts the tx metadata `T` into the type set by bindings.
+    ///
+    /// Note that this method takes a `self` receiver so it's easily
+    /// implementable with uninstantiable types. The conversion is expected to
+    /// be stateless otherwise in all implementers.
+    fn convert_tx_meta(&self, tx_meta: T) -> BT::TxMetadata;
+}
+
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
     use super::*;
     use alloc::boxed::Box;
     use alloc::vec::Vec;
+
+    use crate::testutil::FakeBindingsCtx;
 
     /// A fake [`FrameContext`].
     pub struct FakeFrameCtx<Meta> {
@@ -322,6 +356,16 @@ pub(crate) mod testutil {
             f(self)
         }
     }
+
+    impl<TimerId, Event: Debug, State, FrameMeta> TxMetadataBindingsTypes
+        for FakeBindingsCtx<TimerId, Event, State, FrameMeta>
+    {
+        type TxMetadata = FakeTxMetadata;
+    }
+
+    /// The fake metadata supported by [`FakeBindingsCtx`].
+    #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+    pub struct FakeTxMetadata;
 }
 
 #[cfg(test)]

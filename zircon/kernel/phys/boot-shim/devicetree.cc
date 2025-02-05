@@ -124,7 +124,7 @@ void InitMemory(void* dtb, AddressSpace* aspace) {
   // If the chosen matcher did not find a serial console setting, keep whatever
   // current setting was in place before calling InitMemory. That's often the
   // null driver, but could be something else.
-  boot_options.serial = chosen.uart().value_or(GetUartDriver().uart());
+  boot_options.serial = chosen.TakeUart().value_or(ktl::move(GetUartDriver()).TakeUart());
   SetBootOptionsWithoutEntropy(boot_options, {}, chosen.cmdline().value_or(""));
   SetUartConsole(boot_options.serial);
 

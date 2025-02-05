@@ -93,6 +93,17 @@ impl FileOptions {
     }
 }
 
+impl From<&FileOptions> for fio::Flags {
+    fn from(options: &FileOptions) -> Self {
+        // There is 1:1 mapping between `fio::Operations` and `fio::Flags`.
+        let mut flags = fio::Flags::from_bits_truncate(options.rights.bits());
+        if options.is_append {
+            flags |= fio::Flags::FILE_APPEND;
+        }
+        flags | fio::Flags::PROTOCOL_FILE
+    }
+}
+
 #[derive(Default, PartialEq)]
 pub enum SyncMode {
     /// Used when the Sync fuchsia.io method is used.
@@ -296,8 +307,7 @@ pub trait RawFileIoConnection: Send + Sync {
     ) -> impl Future<Output = Result<u64, Status>> + Send;
 
     /// Notifies the `IoOpHandler` that the flags of the connection have changed.
-    /// TODO(https://fxbug.dev/376509077): Migrate this to fio::Flags.
-    fn update_flags(&self, flags: fio::OpenFlags) -> Status;
+    fn set_flags(&self, flags: fio::Flags) -> Result<(), Status>;
 }
 
 pub trait FileLike: Node {

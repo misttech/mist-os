@@ -84,11 +84,10 @@ impl Key {
 
     /// Generate the AVB key header to be written directly into the VBMeta blob.
     pub fn generate_key_header(&self) -> Vec<u8> {
-        let num_bits: u32 = (self.rsa.public_modulus_len() * 8usize) as u32;
+        let num_bits: u32 = (self.rsa.public().modulus_len() * 8usize) as u32;
         let num_bits_big_endian = U32::new(num_bits);
-        let modulus = BigUint::from_bytes_be(
-            self.rsa.public_key().modulus().big_endian_without_leading_zero(),
-        );
+        let components = ring::rsa::PublicKeyComponents::<Vec<u8>>::from(self.rsa.public_key());
+        let modulus = BigUint::from_bytes_be(&components.n);
 
         let rr = calculate_rr(&modulus, num_bits);
         let n0inv = calculate_n0inv(&modulus);
@@ -103,7 +102,7 @@ impl Key {
     }
 
     /// Returns a reference to the public portion of the key.
-    pub fn public_key(&self) -> &ring::signature::RsaSubjectPublicKey {
+    pub fn public_key(&self) -> &ring::rsa::PublicKey {
         self.rsa.public_key()
     }
 }

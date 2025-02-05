@@ -7,7 +7,6 @@ mod error;
 mod message;
 mod node;
 mod power_manager;
-mod shutdown_request;
 mod timer;
 mod utils;
 
@@ -21,9 +20,7 @@ mod activity_handler;
 mod crash_report_handler;
 mod debug_service;
 mod input_settings_handler;
-mod lid_shutdown;
 mod platform_metrics;
-mod shutdown_watcher;
 mod system_power_mode_handler;
 mod system_profile_handler;
 mod system_shutdown_handler;

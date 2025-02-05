@@ -17,7 +17,9 @@ group("storage_drivers") {
     "//src/devices/block/drivers/ramdisk:ramdisk",
     "//src/devices/block/drivers/zxcrypt",
     "//src/devices/nand/drivers/ram-nand",
+    "//src/storage/fvm:fvm-component",
     "//src/storage/fvm/driver",
+    "//src/storage/gpt/component",
   ]
 }
 

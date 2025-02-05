@@ -289,8 +289,8 @@ class WaitQueueCollection {
   SchedDuration MinInheritableRelativeDeadline() const;
 
   // Peek at the first Thread in the collection.
-  Thread* Peek(zx_time_t now);
-  const Thread* Peek(zx_time_t now) const {
+  Thread* Peek(zx_instant_mono_t now);
+  const Thread* Peek(zx_instant_mono_t now) const {
     return const_cast<WaitQueueCollection*>(this)->Peek(now);
   }
 
@@ -393,10 +393,10 @@ class WaitQueue : public ChainLockable {
     return BlockEtc(current_thread, deadline, 0, ResourceOwnership::Normal, interruptible);
   }
 
-  // Block on a wait queue with a zx_time_t-typed deadline.
-  zx_status_t Block(Thread* const current_thread, zx_time_t deadline, Interruptible interruptible)
-      TA_REL(get_lock())
-          TA_REQ(chainlock_transaction_token, ChainLockable::GetLock(*current_thread)) {
+  // Block on a wait queue with a zx_instant_mono_t-typed deadline.
+  zx_status_t Block(Thread* const current_thread, zx_instant_mono_t deadline,
+                    Interruptible interruptible) TA_REL(get_lock())
+      TA_REQ(chainlock_transaction_token, ChainLockable::GetLock(*current_thread)) {
     return BlockEtc(current_thread, Deadline::no_slack(deadline), 0, ResourceOwnership::Normal,
                     interruptible);
   }
@@ -411,8 +411,10 @@ class WaitQueue : public ChainLockable {
 
   // Returns the current highest priority blocked thread on this wait queue, or
   // nullptr if no threads are blocked.
-  Thread* Peek(zx_time_t now) TA_REQ(get_lock()) { return collection_.Peek(now); }
-  const Thread* Peek(zx_time_t now) const TA_REQ(get_lock()) { return collection_.Peek(now); }
+  Thread* Peek(zx_instant_mono_t now) TA_REQ(get_lock()) { return collection_.Peek(now); }
+  const Thread* Peek(zx_instant_mono_t now) const TA_REQ(get_lock()) {
+    return collection_.Peek(now);
+  }
 
   // Release one or more threads from the wait queue.
   // wait_queue_error = what WaitQueue::Block() should return for the blocking thread.
@@ -502,7 +504,7 @@ class WaitQueue : public ChainLockable {
   friend struct BrwLockOps;
   friend struct WaitQueueLockOps;
 
-  static void TimeoutHandler(Timer* timer, zx_time_t now, void* arg);
+  static void TimeoutHandler(Timer* timer, zx_instant_mono_t now, void* arg);
 
   // Internal helper for dequeueing a single Thread.
   void Dequeue(Thread* t, zx_status_t wait_queue_error)
@@ -822,7 +824,7 @@ class PreemptionState {
   // non-zero and a timeslice extension is in place, the extension will be
   // activated, but preemption will not occur until the count has dropped to
   // zero and the extension has expired or has been clear.
-  bool SetTimesliceExtension(zx_duration_t extension_duration) {
+  bool SetTimesliceExtension(zx_duration_mono_t extension_duration) {
     if (extension_duration <= 0) {
       return false;
     }
@@ -904,13 +906,14 @@ class PreemptionState {
     //
     // See comment at |timeslice_extension_| for why the signal fence is needed.
     ktl::atomic_signal_fence(ktl::memory_order_acquire);
-    const zx_duration_t extension_duration = timeslice_extension_.load();
+    const zx_duration_mono_t extension_duration = timeslice_extension_.load();
     if (extension_duration <= 0) {
       // Already expired.
       state_.fetch_and(~kTimesliceExtensionFlagsMask);
       return (old_state & ~kTimesliceExtensionFlagsMask) == 0;
     }
-    const zx_time_t deadline = zx_time_add_duration(current_time(), extension_duration);
+    const zx_instant_mono_t deadline =
+        zx_time_add_duration(current_mono_time(), extension_duration);
     timeslice_extension_deadline_.store(deadline);
     // See comment at |timeslice_extension_deadline_| for why the signal fence
     // is needed.
@@ -953,7 +956,7 @@ class PreemptionState {
   // A non-inlined helper method to set the preemption timer when a timeslice
   // has been extended.  This must be non-inline to avoid an #include cycle with
   // percpu.h and thread.h.
-  static void SetPreemptionTimerForExtension(zx_time_t deadline);
+  static void SetPreemptionTimerForExtension(zx_instant_mono_t deadline);
 
   // Checks whether the active timeslice extension has expired and if so, clears
   // it and returns true.
@@ -964,7 +967,7 @@ class PreemptionState {
     //
     // See comment at |timeslice_extension_deadline_| for why the signal fence is needed.
     ktl::atomic_signal_fence(ktl::memory_order_acquire);
-    if (current_time() >= timeslice_extension_deadline_.load()) {
+    if (current_mono_time() >= timeslice_extension_deadline_.load()) {
       state_.fetch_and(~kTimesliceExtensionFlagsMask);
       return true;
     }
@@ -1026,7 +1029,7 @@ class PreemptionState {
   // atomic_signal_fence with release semantics prior to setting the Present
   // flag.  By using these fences, we ensure the flag and field value remain in
   // sync.
-  RelaxedAtomic<zx_duration_t> timeslice_extension_{};
+  RelaxedAtomic<zx_duration_mono_t> timeslice_extension_{};
 
   // The deadline at which the thread timeslice extension expires.
   //
@@ -1040,7 +1043,7 @@ class PreemptionState {
   // atomic_signal_fence with release semantics prior to setting the Active
   // flag.  By using these fences, we ensure the flag and field value remain in
   // sync.
-  RelaxedAtomic<zx_time_t> timeslice_extension_deadline_{};
+  RelaxedAtomic<zx_instant_mono_t> timeslice_extension_deadline_{};
 };
 
 // TaskState is responsible for running the task defined by
@@ -1053,7 +1056,7 @@ class TaskState {
 
   void Init(thread_start_routine entry, void* arg);
 
-  zx_status_t Join(Thread* current_thread, zx_time_t deadline) TA_REL(get_lock())
+  zx_status_t Join(Thread* current_thread, zx_instant_mono_t deadline) TA_REL(get_lock())
       TA_REQ(chainlock_transaction_token, ChainLockable::GetLock(*current_thread));
 
   // Attempt to wake all of our joiners.  This operation might fail because of a
@@ -1237,7 +1240,7 @@ struct Thread : public ChainLockable {
   zx_status_t Detach();
   zx_status_t DetachAndResume();
   // Waits |deadline| time for a thread to complete execution then releases its memory.
-  zx_status_t Join(int* retcode, zx_time_t deadline);
+  zx_status_t Join(int* retcode, zx_instant_mono_t deadline);
   // Deliver a kill signal to a thread.
   void Kill() { SuspendOrKillInternal(SuspendOrKillOp::Kill); }
 
@@ -1344,7 +1347,7 @@ struct Thread : public ChainLockable {
 
   void OwnerName(char (&out_name)[ZX_MAX_NAME_LEN]) const;
   // Return the number of nanoseconds a thread has been running for.
-  zx_duration_t Runtime() const TA_EXCL(get_lock());
+  zx_duration_mono_t Runtime() const TA_EXCL(get_lock());
 
   // Last cpu this thread was running on, or INVALID_CPU if it has never run.
   cpu_num_t LastCpu() const TA_EXCL(get_lock());
@@ -1360,12 +1363,12 @@ struct Thread : public ChainLockable {
   bool IsUserStateSavedLocked() const TA_REQ(get_lock()) { return user_state_saved_; }
 
   // Callback for the Timer used for SleepEtc.
-  static void SleepHandler(Timer* timer, zx_time_t now, void* arg);
-  void HandleSleep(Timer* timer, zx_time_t now);
+  static void SleepHandler(Timer* timer, zx_instant_mono_t now, void* arg);
+  void HandleSleep(Timer* timer, zx_instant_mono_t now);
 
   // Request a thread to check if it should sample its backtrace. When the thread returns to
   // usermode, it will take a sample of its userstack if sampling is enabled.
-  static void SignalSampleStack(Timer* t, zx_time_t, void* per_cpu_state);
+  static void SignalSampleStack(Timer* t, zx_instant_mono_t, void* per_cpu_state);
 
   // All of these operations implicitly operate on the current thread.
   struct Current {
@@ -1385,13 +1388,13 @@ struct Thread : public ChainLockable {
     // If interruptible, may return early with ZX_ERR_INTERNAL_INTR_KILLED if
     // thread is signaled for kill.
     static zx_status_t SleepEtc(const Deadline& deadline, Interruptible interruptible,
-                                zx_time_t now) TA_EXCL(chainlock_transaction_token);
+                                zx_instant_mono_t now) TA_EXCL(chainlock_transaction_token);
     // Non-interruptible version of SleepEtc.
-    static zx_status_t Sleep(zx_time_t deadline);
+    static zx_status_t Sleep(zx_instant_mono_t deadline);
     // Non-interruptible relative delay version of Sleep.
-    static zx_status_t SleepRelative(zx_duration_t delay);
+    static zx_status_t SleepRelative(zx_duration_mono_t delay);
     // Interruptible version of Sleep.
-    static zx_status_t SleepInterruptible(zx_time_t deadline);
+    static zx_status_t SleepInterruptible(zx_instant_mono_t deadline);
 
     // Transition the current thread to the THREAD_SUSPENDED state.
     static void DoSuspend();
@@ -2178,7 +2181,7 @@ struct BrwLockOps {
     uint32_t count{0};
   };
 
-  static ktl::optional<LockForWakeResult> LockForWake(WaitQueue& queue, zx_time_t now)
+  static ktl::optional<LockForWakeResult> LockForWake(WaitQueue& queue, zx_instant_mono_t now)
       TA_REQ(chainlock_transaction_token, queue.get_lock());
 };
 
@@ -2200,6 +2203,9 @@ struct WaitQueueLockOps {
 };
 
 // RAII class to mark sections of code as memory stalls.
+//
+// Nesting is not allowed. It is a programming error to instantiate this class
+// if there exists another instance on the call stack.
 class ScopedMemoryStall {
  public:
   ScopedMemoryStall();

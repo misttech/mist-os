@@ -31,7 +31,7 @@
             "end_offset": 246
           },
           "type": {
-            "kind": "request"
+            "kind": "endpoint"
           }
         }
       ]
@@ -50,7 +50,7 @@
             "end_offset": 119
           },
           "type": {
-            "kind": "request"
+            "kind": "endpoint"
           }
         }
       ]

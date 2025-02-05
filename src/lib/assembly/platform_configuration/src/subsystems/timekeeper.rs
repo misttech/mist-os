@@ -60,8 +60,11 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
             builder.platform_bundle("timekeeper_wake_alarms_aml_hrtimer");
         }
 
+        let has_always_on_counter =
+            context.board_info.provides_feature("fuchsia::always_on_counter");
         // Allows Timekeeper to short-circuit RTC driver detection at startup.
-        let has_real_time_clock = context.board_info.provides_feature("fuchsia::real_time_clock");
+        let has_real_time_clock = context.board_info.provides_feature("fuchsia::real_time_clock")
+            || has_always_on_counter;
 
         let mut config_builder = builder
             .package("timekeeper")
@@ -91,6 +94,7 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
             .field("power_topology_integration_enabled", false)?
             .field("serve_test_protocols", serve_test_protocols)?
             .field("has_real_time_clock", has_real_time_clock)?
+            .field("has_always_on_counter", has_always_on_counter)?
             .field("utc_start_at_startup_when_invalid_rtc", config.utc_start_at_startup_when_invalid_rtc)?
             .field("serve_fuchsia_time_alarms", serve_fuchsia_time_alarms)?;
 

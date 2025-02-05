@@ -75,6 +75,15 @@
                     "See b/382185999 for more info."
                 ],
                 "paths": [
+                    "build/secondary/third_party/glslang",
+                    "build/secondary/third_party/shaderc",
+                    "build/secondary/third_party/spirv-cross",
+                    "build/secondary/third_party/spirv-headers",
+                    "build/secondary/third_party/spirv-tools",
+                    "build/secondary/third_party/Vulkan-Headers",
+                    "build/secondary/third_party/Vulkan-Loader",
+                    "build/secondary/third_party/Vulkan-Tools",
+                    "build/secondary/third_party/Vulkan-ValidationLayers",
                     "third_party/glslang",
                     "third_party/shaderc",
                     "third_party/spirv-cross",
@@ -326,7 +335,8 @@
             {
                 "paths": [
                     "third_party/rust_crates/compat/brotli",
-                    "third_party/rust_crates/compat/ring"
+                    "third_party/rust_crates/compat/ring-0.16.20",
+                    "third_party/rust_crates/compat/ring-0.17.8"
                 ],
                 "notes": [
                     "3p rust crates with no sources or license files."

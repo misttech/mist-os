@@ -110,6 +110,10 @@ if (allowed_device_types == []) {
     allowed_device_types = [ "Atlas" ]
   } else if (board_name == "kola") {
     allowed_device_types = [ "Kola" ]
+  } else if (board_name == "lilac") {
+    allowed_device_types = [ "Lilac" ]
+  } else if (board_name == "maple") {
+    allowed_device_types = [ "Maple" ]
   } else if (board_name == "sorrel") {
     allowed_device_types = [ "Sorrel" ]
   }
@@ -180,16 +184,6 @@ if (allowed_device_types == []) {
 #         [scope] Dimensions of bots to target. Valid dimensions are
 #         element-wise subsets of the test platform entries defined in
 #         //build/testing/platforms.gni.
-#
-#       emu_dimensions (optional)
-#         [scope] Dimensions to configure emulator with. This only applies if
-#         dimensions specify an emulator device type.
-#         TODO(https://fxbug.dev/326129848): Remove once we've switched to
-#         using the virtual_device_spec instead.
-#         Valid dimensions are:
-#
-#           cores (optional)
-#             [int] The number of cores to configure the emulator with.
 #
 #       virtual_device_spec (optional)
 #         [scope] Info about the virtual device spec to run the emulator with.

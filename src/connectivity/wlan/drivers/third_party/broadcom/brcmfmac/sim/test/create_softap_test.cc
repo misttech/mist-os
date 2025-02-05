@@ -31,7 +31,6 @@ constexpr uint16_t kDefaultCh = 149;
 constexpr wlan_common::WlanChannel kDefaultChannel = {
     .primary = kDefaultCh, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
 const common::MacAddr kFakeMac({0xde, 0xad, 0xbe, 0xef, 0x00, 0x02});
-constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 6, .data = {.data_ = "Sim_AP"}};
 
 class CreateSoftAPTest;
 
@@ -260,7 +259,7 @@ uint16_t CreateSoftAPTest::CreateRsneIe(uint8_t* buffer) {
 }
 
 zx_status_t CreateSoftAPTest::StartSoftAP() {
-  fuchsia_wlan_ieee80211::wire::CSsid ssid = {.len = 6, .data = {.data_ = "Sim_AP"}};
+  const fuchsia_wlan_ieee80211::Ssid ssid = {'S', 'i', 'm', '_', 'A', 'P'};
   auto builder = wlan_fullmac_wire::WlanFullmacImplStartBssRequest::Builder(test_arena_)
                      .bss_type(fuchsia_wlan_common_wire::BssType::kInfrastructure)
                      .beacon_period(100)
@@ -327,7 +326,7 @@ void CreateSoftAPTest::SetExpectMacForInds(common::MacAddr set_mac) { ind_expect
 
 zx_status_t CreateSoftAPTest::StopSoftAP() {
   auto builder = wlan_fullmac_wire::WlanFullmacImplStopBssRequest::Builder(test_arena_);
-  fuchsia_wlan_ieee80211::wire::CSsid ssid = {.len = 6, .data = {.data_ = "Sim_AP"}};
+  const fuchsia_wlan_ieee80211::Ssid ssid = {'S', 'i', 'm', '_', 'A', 'P'};
   builder.ssid(ssid);
   auto result = softap_ifc_.client_.buffer(softap_ifc_.test_arena_)->StopBss(builder.Build());
   EXPECT_TRUE(result.ok());
@@ -361,11 +360,9 @@ void CreateSoftAPTest::OnDisassocConf(
   ASSERT_TRUE(resp->status().has_value());
   disassoc_conf_recv_ = true;
 }
-
 void CreateSoftAPTest::OnDisassocInd(
     const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocIndRequest* ind) {
-  ASSERT_TRUE(ind->peer_sta_address().has_value());
-  EXPECT_BYTES_EQ(ind->peer_sta_address()->data(), ind_expect_mac_.byte, ETH_ALEN);
+  ASSERT_EQ(std::memcmp(ind->peer_sta_address()->data(), ind_expect_mac_.byte, ETH_ALEN), 0);
   disassoc_ind_recv_ = true;
 }
 

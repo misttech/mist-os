@@ -14,7 +14,7 @@ const MAX_COUNT_PROCESSING_ELEMENTS uint32 = 64;
 const MAX_COUNT_TOPOLOGIES uint32 = 64;
 const MAX_COUNT_PROCESSING_ELEMENTS_EDGE_PAIRS uint32 = 64;
 const MAX_STRING_SIZE uint32 = 256;
-@available(added=HEAD)
+@available(added=NEXT)
 const MAX_BYTES_ELEMENT_VENDOR_SPECIFIC uint32 = 4096;
 
 type ElementType = flexible enum {
@@ -211,7 +211,7 @@ type ElementState = table {
     /// If included, an opaque object of octets for exchanging vendor specific information.
     ///
     /// Optional.
-    @available(added=HEAD)
+    @available(added=NEXT)
     4: vendor_specific_data vector<uint8>:MAX_BYTES_ELEMENT_VENDOR_SPECIFIC;
 
     /// The started/stopped state for this processing element.
@@ -320,7 +320,7 @@ type SettableElementState = table {
     /// This can send vendor-specific data to any element, not just the VendorSpecific type.
     ///
     /// Optional.
-    @available(added=HEAD)
+    @available(added=NEXT)
     2: vendor_specific_data vector<uint8>:MAX_BYTES_ELEMENT_VENDOR_SPECIFIC;
 
     /// Whether to start this processing element (or to stop it, if false).
@@ -475,7 +475,7 @@ closed(removed=24) open(added=24) protocol Reader {
     /// signal-processing topology changes, which occurs as a result of a `SetTopology` call.
     /// The driver will close the protocol channel with an error of `ZX_ERR_BAD_STATE`, if this
     /// method is called again while there is already a pending `WatchTopology` for this client.
-    @available(added=HEAD)
+    @available(added=NEXT)
     flexible WatchTopology() -> (struct {
         topology_id TopologyId;
     });

@@ -89,7 +89,7 @@ impl NestedTimekeeper {
             builder.add_child("fake_cobalt", COBALT_URL, ChildOptions::new()).await.unwrap();
 
         let timekeeper_url = if use_fake_clock { TIMEKEEPER_FAKE_TIME_URL } else { TIMEKEEPER_URL };
-        tracing::trace!("using timekeeper_url: {}", timekeeper_url);
+        log::trace!("using timekeeper_url: {}", timekeeper_url);
         let timekeeper = builder
             .add_child("timekeeper_test", timekeeper_url, ChildOptions::new().eager())
             .await
@@ -300,7 +300,7 @@ impl PushSourcePuppet {
 
     /// Serve the `PushSource` service to a client.
     fn serve_client(&self, server_end: ServerEnd<PushSourceMarker>) {
-        tracing::debug!("serve_client entry");
+        log::debug!("serve_client entry");
         let mut inner = self.inner.lock();
         // Timekeeper should only need to connect to a push source once, except when it is
         // restarting a time source. This case appears to the test as a second connection to the
@@ -517,7 +517,7 @@ async fn setup_rtc(
 
     let rtc_dir = match rtc_options {
         RtcOptions::InitialRtcTime(initial_time) => {
-            tracing::debug!("using fake /dev/class/rtc/000");
+            log::debug!("using fake /dev/class/rtc/000");
             pseudo_directory! {
                 "class" => pseudo_directory! {
                     "rtc" => pseudo_directory! {
@@ -532,7 +532,7 @@ async fn setup_rtc(
             }
         }
         RtcOptions::None => {
-            tracing::debug!("using an empty /dev/class/rtc directory");
+            log::debug!("using an empty /dev/class/rtc directory");
             pseudo_directory! {
                 "class" => pseudo_directory! {
                     "rtc" => pseudo_directory! {
@@ -541,7 +541,7 @@ async fn setup_rtc(
             }
         }
         RtcOptions::InjectedRtc(h) => {
-            tracing::debug!("using /dev/class/rtc provided by client");
+            log::debug!("using /dev/class/rtc provided by client");
             pseudo_directory! {
                 "class" => pseudo_directory! {
                     "rtc" => vfs::remote::remote_dir(h)
@@ -588,7 +588,9 @@ async fn setup_rtc(
         .add_route(
             Route::new()
                 .capability(
-                    Capability::directory("dev-topological").path("/dev").rights(fio::RW_STAR_DIR),
+                    Capability::directory("dev-rtc")
+                        .path("/dev/class/rtc")
+                        .rights(fio::RW_STAR_DIR),
                 )
                 .from(&fake_rtc_server)
                 .to(&*timekeeper),
@@ -607,13 +609,13 @@ async fn serve_fake_rtc(
     while let Some(req) = stream.try_next().await.unwrap() {
         match req {
             DeviceRequest::Get { responder } => {
-                tracing::debug!("serve_fake_rtc: DeviceRequest::Get");
+                log::debug!("serve_fake_rtc: DeviceRequest::Get");
                 // Since timekeeper only pulls a time off of the RTC device once on startup, we
                 // don't attempt to update the sent time.
                 responder.send(Ok(&zx_time_to_rtc_time(initial_time))).unwrap();
             }
             DeviceRequest::Set { rtc, responder } => {
-                tracing::debug!("serve_fake_rtc: DeviceRequest::Set");
+                log::debug!("serve_fake_rtc: DeviceRequest::Set");
                 rtc_updates.0.lock().push(rtc);
                 responder.send(zx::Status::OK.into_raw()).unwrap();
             }
@@ -774,7 +776,7 @@ macro_rules! poll_until_some {
 macro_rules! poll_until_some_async {
     ($condition:expr) => {{
         let loc = $crate::SourceLocation::new(file!(), line!(), column!());
-        tracing::info!("=> poll_until_some_async() for {}", &loc);
+        log::info!("=> poll_until_some_async() for {}", &loc);
         let mut result = None;
         loop {
             result = $condition.await;
@@ -783,7 +785,7 @@ macro_rules! poll_until_some_async {
             }
             fasync::Timer::new(fasync::MonotonicInstant::after($crate::RETRY_WAIT_DURATION)).await;
         }
-        tracing::info!("=> poll_until_some_async() done for {}", &loc);
+        log::info!("=> poll_until_some_async() done for {}", &loc);
         result.expect("we loop around while result is None")
     }};
 }
@@ -805,7 +807,7 @@ macro_rules! poll_until_async {
 macro_rules! poll_until_async_2 {
     ($condition:expr) => {{
         let loc = $crate::SourceLocation::new(file!(), line!(), column!());
-        tracing::info!("=> poll_until_async() for {}", &loc);
+        log::info!("=> poll_until_async() for {}", &loc);
         let mut result = true;
         loop {
             result = $condition.await;
@@ -814,7 +816,7 @@ macro_rules! poll_until_async_2 {
             }
             fasync::Timer::new(fasync::MonotonicInstant::after($crate::RETRY_WAIT_DURATION)).await;
         }
-        tracing::info!("=> poll_until_async_2() done for {}", &loc);
+        log::info!("=> poll_until_async_2() done for {}", &loc);
         result
     }};
 }
@@ -856,11 +858,11 @@ pub async fn poll_until_some_impl<T, F>(poll_fn: F, loc: &SourceLocation) -> T
 where
     F: Fn() -> Option<T>,
 {
-    tracing::info!("=> poll_until_some() for {}", loc);
+    log::info!("=> poll_until_some() for {}", loc);
     loop {
         match poll_fn() {
             Some(value) => {
-                tracing::info!("<= poll_until_some() for {}", loc);
+                log::info!("<= poll_until_some() for {}", loc);
                 return value;
             }
             None => fasync::Timer::new(fasync::MonotonicInstant::after(RETRY_WAIT_DURATION)).await,
@@ -874,18 +876,18 @@ where
     F: Fn() -> Fut,
     Fut: Future<Output = bool>,
 {
-    tracing::info!("=> poll_until_async() for {}", loc);
+    log::info!("=> poll_until_async() for {}", loc);
     while !poll_fn().await {
         fasync::Timer::new(fasync::MonotonicInstant::after(RETRY_WAIT_DURATION)).await
     }
-    tracing::info!("<= poll_until_async() for {}", loc);
+    log::info!("<= poll_until_async() for {}", loc);
 }
 
 /// Use `poll_until!()` instead.
 pub async fn poll_until_impl<F: Fn() -> bool>(poll_fn: F, loc: &SourceLocation) {
-    tracing::info!("=> poll_until() for {}", loc);
+    log::info!("=> poll_until() for {}", loc);
     while !poll_fn() {
         fasync::Timer::new(fasync::MonotonicInstant::after(RETRY_WAIT_DURATION)).await
     }
-    tracing::info!("<= poll_until() for {}", loc);
+    log::info!("<= poll_until() for {}", loc);
 }

@@ -5,6 +5,8 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.display") {
+  sdk_area = "Graphics"
+
   sources = [
     "buffer-collection.fidl",
     "coordinator.fidl",
@@ -24,6 +26,4 @@ fidl("fuchsia.hardware.display") {
     "//sdk/fidl/fuchsia.math",
     "//sdk/fidl/fuchsia.sysmem2",
   ]
-
-  enable_hlcpp = true
 }

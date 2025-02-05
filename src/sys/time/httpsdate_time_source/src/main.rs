@@ -23,10 +23,10 @@ use fuchsia_component::server::{ServiceFs, ServiceObj};
 
 use futures::future::{join, Future};
 use futures::{FutureExt, StreamExt};
+use log::warn;
 use pull_source::PullSource;
 use push_source::PushSource;
 use std::collections::HashMap;
-use tracing::warn;
 
 /// Retry strategy used while polling for time.
 const RETRY_STRATEGY: RetryStrategy = RetryStrategy {

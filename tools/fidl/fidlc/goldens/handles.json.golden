@@ -253,7 +253,6 @@
       "members": [
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 4,
             "subtype": "channel",
@@ -285,13 +284,11 @@
         },
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "endpoint",
             "role": "client",
             "protocol": "test.handles/DriverProtocol",
             "nullable": false,
             "protocol_transport": "Driver",
-            "identifier": "test.handles/DriverProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -317,13 +314,11 @@
         },
         {
           "type": {
-            "kind": "request",
             "kind_v2": "endpoint",
             "role": "server",
             "protocol": "test.handles/DriverProtocol",
             "nullable": false,
             "protocol_transport": "Driver",
-            "subtype": "test.handles/DriverProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -375,7 +370,6 @@
       "members": [
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 0,
             "subtype": "handle",
@@ -407,7 +401,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 24,
             "subtype": "bti",
@@ -439,7 +432,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 4,
             "subtype": "channel",
@@ -471,7 +463,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 30,
             "subtype": "clock",
@@ -503,7 +494,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 12,
             "subtype": "debuglog",
@@ -535,7 +525,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 5,
             "subtype": "event",
@@ -567,7 +556,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 16,
             "subtype": "eventpair",
@@ -599,7 +587,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 29,
             "subtype": "exception",
@@ -631,7 +618,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 19,
             "subtype": "fifo",
@@ -663,7 +649,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 20,
             "subtype": "guest",
@@ -695,7 +680,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 9,
             "subtype": "interrupt",
@@ -727,7 +711,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 23,
             "subtype": "iommu",
@@ -759,7 +742,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 17,
             "subtype": "job",
@@ -791,7 +773,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 32,
             "subtype": "msi",
@@ -823,7 +804,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 28,
             "subtype": "pager",
@@ -855,7 +835,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 26,
             "subtype": "pmt",
@@ -887,7 +866,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 6,
             "subtype": "port",
@@ -919,7 +897,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 1,
             "subtype": "process",
@@ -951,7 +928,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 25,
             "subtype": "profile",
@@ -983,7 +959,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 15,
             "subtype": "resource",
@@ -1015,7 +990,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 14,
             "subtype": "socket",
@@ -1047,7 +1021,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 31,
             "subtype": "stream",
@@ -1079,7 +1052,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 27,
             "subtype": "suspendtoken",
@@ -1111,7 +1083,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 2,
             "subtype": "thread",
@@ -1143,7 +1114,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 22,
             "subtype": "timer",
@@ -1175,7 +1145,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 21,
             "subtype": "vcpu",
@@ -1207,7 +1176,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 18,
             "subtype": "vmar",
@@ -1239,7 +1207,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 3,
             "subtype": "vmo",
@@ -1271,7 +1238,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 3,
             "subtype": "vmo",
@@ -1303,7 +1269,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 0,
             "subtype": "handle",
@@ -1340,7 +1305,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 3,
             "subtype": "vmo",
@@ -1377,7 +1341,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 3,
             "subtype": "vmo",
@@ -1414,13 +1377,11 @@
         },
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "endpoint",
             "role": "client",
             "protocol": "test.handles/SomeProtocol",
             "nullable": false,
             "protocol_transport": "Channel",
-            "identifier": "test.handles/SomeProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -1446,13 +1407,11 @@
         },
         {
           "type": {
-            "kind": "request",
             "kind_v2": "endpoint",
             "role": "server",
             "protocol": "test.handles/SomeProtocol",
             "nullable": false,
             "protocol_transport": "Channel",
-            "subtype": "test.handles/SomeProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -1509,7 +1468,6 @@
         "nullable": false
       },
       "type": {
-        "kind": "handle",
         "kind_v2": "handle",
         "obj_type": 0,
         "subtype": "handle",
@@ -1548,7 +1506,6 @@
         }
       },
       "type": {
-        "kind": "handle",
         "kind_v2": "handle",
         "obj_type": 3,
         "subtype": "vmo",
@@ -1581,7 +1538,6 @@
         "nullable": false
       },
       "type": {
-        "kind": "handle",
         "kind_v2": "handle",
         "obj_type": 3,
         "subtype": "vmo",

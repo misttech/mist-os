@@ -20,10 +20,7 @@ rustc_binary("encoding-bin") {
     "//src/lib/diagnostics/log/encoding/rust",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fuchsia-runtime",
-    "//third_party/rust_crates:paste",
-    "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:tracing-core",
-    "//third_party/rust_crates:tracing-subscriber",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [
@@ -42,15 +39,12 @@ rustc_binary("core-bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
-    "//sdk/rust/zx",
     "//src/developer/fuchsia-criterion",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
-    "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:tracing-log",
   ]
 
   sources = [ "src/core.rs" ]
@@ -73,9 +67,7 @@ rustc_binary("decoding-bin") {
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fuchsia-runtime",
     "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:tracing-core",
-    "//third_party/rust_crates:tracing-subscriber",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [

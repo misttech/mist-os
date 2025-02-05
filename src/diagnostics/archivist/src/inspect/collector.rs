@@ -9,9 +9,9 @@ use fidl_fuchsia_inspect::{TreeMarker, TreeProxy};
 use fidl_fuchsia_inspect_deprecated::{InspectMarker, InspectProxy};
 use fidl_fuchsia_io as fio;
 use futures::stream::StreamExt;
+use log::error;
 use std::pin::pin;
 use std::sync::{Arc, Weak};
-use tracing::error;
 
 /// Pairs a diagnostics data-object's name to the underlying encoding of that data.
 pub type InspectHandleDeque = std::collections::VecDeque<(Option<InspectHandleName>, InspectData)>;
@@ -151,7 +151,7 @@ async fn populate_data_map_from_dir(inspect_proxy: &fio::DirectoryProxy) -> Insp
                     zx::Status::NOT_SUPPORTED => {}
                     err => {
                         error!(
-                            file = %entry.name, ?err,
+                            file:% = entry.name, err:?;
                             "unexpected error from GetBackingMemory",
                         )
                     }

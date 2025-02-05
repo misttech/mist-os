@@ -47,7 +47,7 @@ async fn run_virtio_gpu(mut virtio_gpu_fidl: VirtioGpuRequestStream) -> Result<(
     // Zircon doesn't configure the cursor queue, so we continue if that queue doesn't exist.
     let cursor_stream = device.take_stream(wire::CURSORQ);
     if cursor_stream.is_err() {
-        tracing::warn!("Guest did not configure cursor queue; cursor support will be unavailable");
+        log::warn!("Guest did not configure cursor queue; cursor support will be unavailable");
     }
     ready_responder.send()?;
 
@@ -67,7 +67,7 @@ async fn run_virtio_gpu(mut virtio_gpu_fidl: VirtioGpuRequestStream) -> Result<(
         _ = gpu_device.process_gpu_commands().fuse() => {},
         result = FlatlandScanout::attach(command_sender, keyboard_listener, mouse_source).fuse() => {
             if let Err(e) = result {
-                tracing::warn!("Failed to create scanout: {}", e);
+                log::warn!("Failed to create scanout: {}", e);
             }
         },
     }
@@ -88,7 +88,7 @@ async fn main() -> Result<(), anyhow::Error> {
     fs.take_and_serve_directory_handle().context("Error starting server")?;
     fs.for_each_concurrent(None, |stream| async {
         if let Err(e) = run_virtio_gpu(stream).await {
-            tracing::error!("Error running virtio_gpu service: {}", e);
+            log::error!("Error running virtio_gpu service: {}", e);
         }
     })
     .await;

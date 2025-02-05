@@ -16,6 +16,16 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
         config: &PowerConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
+        if let Some(path) = &config.metrics_logging_config {
+            builder
+                .package("metrics-logger")
+                .config_data(FileEntry {
+                    source: path.as_utf8_pathbuf().into(),
+                    destination: "config.json".into(),
+                })
+                .context("Setting metrics-logger config data path")?;
+        }
+
         if let Some(energy_model_config) = &context.board_info.configuration.energy_model {
             builder
                 .bootfs()
@@ -63,7 +73,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
 
         if config.enable_non_hermetic_testing {
             context.ensure_build_type_and_feature_set_level(
-                &[BuildType::Eng, BuildType::UserDebug],
+                &[BuildType::Eng],
                 &[
                     FeatureSupportLevel::Bootstrap,
                     FeatureSupportLevel::Utility,
@@ -74,6 +84,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
 
             builder.platform_bundle("power_framework_broker");
             builder.platform_bundle("power_framework_testing_sag");
+            builder.platform_bundle("power_test_platform_drivers");
         }
 
         if config.suspend_enabled {
@@ -151,6 +162,11 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
             Config::new(ConfigValueType::Bool, config.suspend_enabled.into()),
         )?;
 
+        builder.set_config_capability(
+            "fuchsia.power.StoragePowerManagementEnabled",
+            Config::new(ConfigValueType::Bool, config.storage_power_management_enabled.into()),
+        )?;
+
         if let (Some(config), FeatureSupportLevel::Standard) =
             (&context.board_info.configuration.power_metrics_recorder, &context.feature_set_level)
         {
@@ -169,6 +185,14 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
             {
                 builder.platform_bundle("fake_battery_driver");
             }
+        }
+
+        // Include fake-power-sensor through a platform AIB.
+        if context.board_info.provides_feature("fuchsia::fake_power_sensor")
+            && *context.feature_set_level == FeatureSupportLevel::Standard
+            && *context.build_type == BuildType::Eng
+        {
+            builder.platform_bundle("fake_power_sensor");
         }
 
         Ok(())

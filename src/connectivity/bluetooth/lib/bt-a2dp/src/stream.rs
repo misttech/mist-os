@@ -12,11 +12,11 @@ use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use futures::future::BoxFuture;
 use futures::{FutureExt, TryFutureExt};
+use log::{info, warn};
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{info, warn};
 
 use crate::codec::{CodecNegotiation, MediaCodecConfig};
 use crate::media_task::{MediaTask, MediaTaskBuilder, MediaTaskError, MediaTaskRunner};
@@ -336,7 +336,7 @@ impl StreamsBuilder {
             let endpoint_type = builder.direction();
             let supported_res = builder.supported_configs(peer_id, offload.clone()).await;
             let Ok(supported) = supported_res else {
-                info!(e = ?supported_res.err().unwrap(), "Failed to get supported configs from builder, skipping");
+                info!(e:? = supported_res.err().unwrap(); "Failed to get supported configs from builder, skipping");
                 continue;
             };
             let codec_caps = supported.iter().map(ServiceCapability::from);

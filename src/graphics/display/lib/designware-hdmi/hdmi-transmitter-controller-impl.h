@@ -5,12 +5,17 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_HDMI_HDMI_TRANSMITTER_CONTROLLER_IMPL_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_HDMI_HDMI_TRANSMITTER_CONTROLLER_IMPL_H_
 
-#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <lib/zx/result.h>
+
+#include <cstdint>
+
+#include <fbl/vector.h>
 
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/designware-hdmi/color-param.h"
 #include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller.h"
+#include "src/graphics/display/lib/edid/edid.h"
 
 namespace designware_hdmi {
 
@@ -27,7 +32,8 @@ class HdmiTransmitterControllerImpl : public HdmiTransmitterController {
   ~HdmiTransmitterControllerImpl() override = default;
 
   zx_status_t InitHw() override;
-  zx_status_t EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count) override;
+
+  zx::result<fbl::Vector<uint8_t>> ReadExtendedEdid() override;
 
   void ConfigHdmitx(const ColorParam& color_param, const display::DisplayTiming& mode,
                     const hdmi_param_tx& p) override;
@@ -40,13 +46,22 @@ class HdmiTransmitterControllerImpl : public HdmiTransmitterController {
   void PrintRegisters() override;
 
  private:
+  static constexpr int kMaxAttemptCountForPollForDdcCommandDone = 5;
+
   void WriteReg(uint32_t addr, uint8_t data) { controller_mmio_.Write8(data, addr); }
   uint8_t ReadReg(uint32_t addr) { return controller_mmio_.Read8(addr); }
 
   void PrintReg(const char* name, uint32_t address);
 
   void ScdcWrite(uint8_t addr, uint8_t val);
-  void ScdcRead(uint8_t addr, uint8_t* val);
+  uint8_t ScdcRead(uint8_t addr);
+
+  // `index` must be non-negative and less than `edid::kMaxEdidBlockCount`.
+  zx::result<> ReadEdidBlock(int index, std::span<uint8_t, edid::kBlockSize> edid_block);
+
+  // Returns true and clears the DDC controller interrupt iff the DDC command
+  // is done within the `kMaxAttemptCountForPollForDdcCommandDone` polls.
+  bool PollForDdcCommandDone();
 
   void ConfigCsc(const ColorParam& color_param);
 

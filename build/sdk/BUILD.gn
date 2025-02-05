@@ -47,6 +47,8 @@ _partner_idk_source_sets_list = [
   "//sdk/lib/driver/component/cpp",
   "//sdk/lib/driver/node/cpp",
   "//sdk/lib/driver/devfs/cpp",
+  "//sdk/lib/driver/fake-object/cpp",
+  "//sdk/lib/driver/fake-mmio-reg/cpp:cpp",
   "//sdk/lib/driver/incoming/cpp",
   "//sdk/lib/driver/logging/cpp",
   "//sdk/lib/driver/outgoing/cpp",
@@ -58,6 +60,8 @@ _partner_idk_source_sets_list = [
   "//sdk/lib/driver/runtime/testing/cpp",
   "//sdk/lib/driver/symbols",
   "//sdk/lib/driver/testing/cpp",
+  "//sdk/lib/driver/fake-bti/cpp",
+  "//sdk/lib/driver/fake-object/cpp",
   "//sdk/lib/driver/testing/cpp:scoped_global_logger",
   "//sdk/lib/fidl_base",
   "//sdk/lib/fidl_driver:fidl_driver_natural",
@@ -115,8 +119,6 @@ _partner_idk_source_sets_list = [
 _partner_idk_unstable_source_sets_list = [
   # keep-sorted: begin
   "//src/lib/memory_barriers:memory_barriers",
-  "//sdk/lib/driver/fake-bti/cpp",
-  "//sdk/lib/driver/fake-object/cpp",
   "//sdk/lib/driver/fake-platform-device/cpp",
   "//sdk/lib/driver/fake-resource/cpp",
   "//sdk/lib/driver/metadata/cpp",
@@ -137,13 +139,13 @@ _partner_idk_unstable_source_sets_list_testonly = [
 # All targets must be in the dependency tree of `//sdk/bazel_internal_only_libs`
 # or `//sdk/firmware`.
 # TODO(https://fxbug.dev/372986936): Eliminate all such uses and remove.
-_internal_source_sets_list_testonly = [
+_internal_source_sets_list = [
   # DO NOT ADD TO THIS LIST.
 
   # TODO(https://fxbug.dev/343059325): Promote devicetree to "partner".
   "//sdk/lib/device-watcher/cpp:cpp",
   "//sdk/lib/driver/devicetree/manager:headers",
-  "//sdk/lib/driver/mock-mmio-reg/cpp",
+  "//sdk/lib/driver/mock-mmio/cpp",
   "//sdk/lib/driver/devicetree/manager:manager",
   "//sdk/lib/driver/devicetree/testing:board-test-helper",
   "//sdk/lib/driver/devicetree/visitors:common-types",
@@ -160,9 +162,6 @@ _internal_source_sets_list_testonly = [
   "//sdk/lib/driver/devicetree/visitors:registration",
   "//sdk/lib/driver/devicetree/visitors:registry",
   "//sdk/lib/driver_test_realm/realm_builder/cpp:cpp",
-
-  # TODO(https://fxbug.dev/349834645): Promote fake-mmio-reg to "partner".
-  "//sdk/lib/driver/fake-mmio-reg/cpp:cpp",
 
   # TODO(https://fxbug.dev/373899421): Promote mock-mmio-range to "partner".
   "//sdk/lib/driver/mock-mmio-range/cpp:cpp",
@@ -213,8 +212,8 @@ assert(
         _partner_idk_unstable_source_sets_list,
     "An unstable source set appears in both normal and testonly lists. Remove it from one of the lists.")
 assert(
-    _all_partner_idk_source_sets + _internal_source_sets_list_testonly -
-        _internal_source_sets_list_testonly == _all_partner_idk_source_sets,
+    _all_partner_idk_source_sets + _internal_source_sets_list -
+        _internal_source_sets_list == _all_partner_idk_source_sets,
     "A source set appears in both partner and internal lists. If promoting an internal source set, remove it from the internal list.")
 
 # Ensure no testonly atoms are in the non-test lists.
@@ -254,7 +253,7 @@ group("partner_idk_unstable_source_sets_allowlist") {
                _partner_idk_unstable_source_sets_list_testonly
 }
 group("internal_source_sets_allowlist") {
-  visibility = _internal_source_sets_list_testonly
+  visibility = _internal_source_sets_list
 }
 
 # Contains all shared libraries distributed with the partner IDK. None are

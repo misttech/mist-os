@@ -197,8 +197,7 @@ bool MsdIntelDevice::BaseInit(void* device_handle) {
     return false;
   }
 
-  std::unique_ptr<magma::PlatformMmio> mmio(
-      platform_device_->CpuMapPciMmio(0, magma::PlatformMmio::CACHE_POLICY_UNCACHED_DEVICE));
+  std::unique_ptr<magma::PlatformMmio> mmio(platform_device_->CpuMapPciMmio(0));
   if (!mmio)
     return DRETF(false, "failed to map pci bar 0");
 

@@ -6,7 +6,7 @@ use crate::client::config_management::Credential;
 use crate::client::types;
 use crate::util::historical_list::{HistoricalList, Timestamped};
 use crate::util::pseudo_energy::{EwmaSignalData, RssiVelocity};
-use tracing::error;
+use log::error;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
     fuchsia_async as fasync,

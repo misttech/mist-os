@@ -74,6 +74,8 @@ type stringInLogCheck struct {
 	testName       string
 	outputFile     string
 	isFlake        bool
+	// line that contains the string being searched for. Can be empty.
+	line string
 }
 
 func (c *stringInLogCheck) Check(to *TestingOutputs) bool {
@@ -117,6 +119,7 @@ func (c *stringInLogCheck) Check(to *TestingOutputs) bool {
 			outputFile string
 			isFlake    bool
 			index      int
+			line       string
 		}
 		failedTestsMap := make(map[string]testdata)
 		for i, testLog := range to.SwarmingOutputPerTest {
@@ -133,8 +136,9 @@ func (c *stringInLogCheck) Check(to *TestingOutputs) bool {
 				}
 				continue
 			}
-			if c.checkBytes(to.SwarmingOutput, testLog.Index, testLog.Index+len(testLog.Bytes)) {
-				failedTestsMap[testLog.TestName] = testdata{testLog.TestName, testLog.FilePath, c.AlwaysFlake, i}
+			found, line := c.checkBytes(to.SwarmingOutput, testLog.Index, testLog.Index+len(testLog.Bytes))
+			if found {
+				failedTestsMap[testLog.TestName] = testdata{testLog.TestName, testLog.FilePath, c.AlwaysFlake, i, string(line)}
 			}
 		}
 		var failedTests []testdata
@@ -155,6 +159,7 @@ func (c *stringInLogCheck) Check(to *TestingOutputs) bool {
 			if c.AttributeToTest {
 				c.testName = failedTests[0].name
 				c.outputFile = failedTests[0].outputFile
+				c.line = failedTests[0].line
 			}
 			return true
 		}
@@ -165,6 +170,7 @@ func (c *stringInLogCheck) Check(to *TestingOutputs) bool {
 			if c.AttributeToTest {
 				c.testName = flakedTests[0].name
 				c.outputFile = flakedTests[0].outputFile
+				c.line = flakedTests[0].line
 			}
 			c.isFlake = true
 			return true
@@ -185,26 +191,33 @@ func (c *stringInLogCheck) Check(to *TestingOutputs) bool {
 	}
 
 	for _, file := range toCheck {
-		if c.checkBytes(file, 0, len(file)) {
+		found, line := c.checkBytes(file, 0, len(file))
+		if found {
 			if c.AlwaysFlake {
 				c.isFlake = true
 			}
+			c.line = string(line)
 			return true
 		}
 	}
 	return false
 }
 
-func (c *stringInLogCheck) checkBytes(toCheck []byte, start int, end int) bool {
+func (c *stringInLogCheck) checkBytes(toCheck []byte, start int, end int) (bool, []byte) {
 	toCheckBlock := toCheck[start:end]
 	for _, s := range c.ExceptStrings {
 		if bytes.Contains(toCheckBlock, []byte(s)) {
-			return false
+			return false, nil
 		}
 	}
 	stringBytes := []byte(c.String)
 	if len(c.ExceptBlocks) == 0 {
-		return bytes.Contains(toCheckBlock, stringBytes)
+		if idx := bytes.Index(toCheckBlock, stringBytes); idx != -1 {
+			line := getLine(toCheck, idx)
+			return true, line
+		} else {
+			return false, nil
+		}
 	}
 	index := bytes.Index(toCheckBlock, stringBytes) + start
 	for index >= start && index < end {
@@ -234,19 +247,34 @@ func (c *stringInLogCheck) checkBytes(toCheck []byte, start int, end int) bool {
 					// assume every occurrence of the string to check between the
 					// start string and the end of the block are included in the
 					// exceptBlock.
-					return false
+					return false, nil
 				}
 			}
 		}
 		if foundString {
-			return true
+			line := getLine(toCheck, index)
+			return true, line
 		}
 		index = bytes.Index(afterBlock, stringBytes)
 		if index >= 0 {
 			index += nextStartIndex
 		}
 	}
-	return false
+	return false, nil
+}
+
+func getLine(toCheck []byte, index int) []byte {
+	if index >= len(toCheck) {
+		return nil
+	}
+	lineStart := bytes.LastIndexByte(toCheck[:index], '\n') + 1
+	lineEnd := bytes.IndexByte(toCheck[index:], '\n')
+	if lineEnd == -1 {
+		lineEnd = len(toCheck)
+	} else {
+		lineEnd += index
+	}
+	return toCheck[lineStart:lineEnd]
 }
 
 func (c *stringInLogCheck) Name() string {
@@ -296,6 +324,10 @@ func (c *stringInLogCheck) Tags() []build.TestTag {
 
 func (c *stringInLogCheck) IsInfraFailure() bool {
 	return c.InfraFailure
+}
+
+func (c *stringInLogCheck) FailureReason() string {
+	return c.line
 }
 
 // StringInLogsChecks returns checks to detect bad strings in certain logs.
@@ -605,11 +637,6 @@ func infraToolLogChecks() []FailureModeCheck {
 		// For https://fxbug.dev/42147800.
 		&stringInLogCheck{
 			String: botanistconstants.FailedToCopyImageMsg,
-			Type:   swarmingOutputType,
-		},
-		// For https://fxbug.dev/42163022.
-		&stringInLogCheck{
-			String: botanistconstants.FailedToExtendFVMMsg,
 			Type:   swarmingOutputType,
 		},
 		// Error is being logged at https://fuchsia.googlesource.com/fuchsia/+/559948a1a4cbd995d765e26c32923ed862589a61/src/storage/lib/paver/paver.cc#175

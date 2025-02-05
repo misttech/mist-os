@@ -11,9 +11,9 @@
 namespace media::audio {
 namespace {
 
-using fuchsia::media::AudioCaptureUsage;
-using fuchsia::media::AudioRenderUsage;
-using fuchsia::media::Usage;
+using fuchsia::media::AudioCaptureUsage2;
+using fuchsia::media::AudioRenderUsage2;
+using fuchsia::media::Usage2;
 
 const auto kRendererVolumeRamp = Ramp{
     .duration = zx::msec(5),
@@ -22,7 +22,7 @@ const auto kRendererVolumeRamp = Ramp{
 
 }  // namespace
 
-StreamVolumeManager::VolumeSettingImpl::VolumeSettingImpl(Usage usage, StreamVolumeManager* owner)
+StreamVolumeManager::VolumeSettingImpl::VolumeSettingImpl(Usage2 usage, StreamVolumeManager* owner)
     : usage_(std::move(usage)), owner_(owner) {}
 
 void StreamVolumeManager::VolumeSettingImpl::SetVolume(float volume) {
@@ -30,82 +30,84 @@ void StreamVolumeManager::VolumeSettingImpl::SetVolume(float volume) {
 }
 
 StreamVolumeManager::StreamVolumeManager(async_dispatcher_t* fidl_dispatcher)
-    :  // These must be listed in the order of the fuchsia::media::AudioRenderUsage enum.
+    :  // These must be listed in the order of the fuchsia::media::AudioRenderUsage2 enum.
       render_usage_volume_setting_impls_{
-          VolumeSettingImpl(Usage::WithRenderUsage(AudioRenderUsage::BACKGROUND), this),
-          VolumeSettingImpl(Usage::WithRenderUsage(AudioRenderUsage::MEDIA), this),
-          VolumeSettingImpl(Usage::WithRenderUsage(AudioRenderUsage::INTERRUPTION), this),
-          VolumeSettingImpl(Usage::WithRenderUsage(AudioRenderUsage::SYSTEM_AGENT), this),
-          VolumeSettingImpl(Usage::WithRenderUsage(AudioRenderUsage::COMMUNICATION), this),
+          VolumeSettingImpl(ToFidlUsage2(RenderUsage::BACKGROUND), this),
+          VolumeSettingImpl(ToFidlUsage2(RenderUsage::MEDIA), this),
+          VolumeSettingImpl(ToFidlUsage2(RenderUsage::INTERRUPTION), this),
+          VolumeSettingImpl(ToFidlUsage2(RenderUsage::SYSTEM_AGENT), this),
+          VolumeSettingImpl(ToFidlUsage2(RenderUsage::COMMUNICATION), this),
+          VolumeSettingImpl(ToFidlUsage2(RenderUsage::ACCESSIBILITY), this),
       },
-      // These must be listed in the order of the fuchsia::media::AudioCaptureUsage enum.
+      // These must be listed in the order of the fuchsia::media::AudioCaptureUsage2 enum.
       capture_usage_volume_setting_impls_{
-          VolumeSettingImpl(Usage::WithCaptureUsage(AudioCaptureUsage::BACKGROUND), this),
-          VolumeSettingImpl(Usage::WithCaptureUsage(AudioCaptureUsage::FOREGROUND), this),
-          VolumeSettingImpl(Usage::WithCaptureUsage(AudioCaptureUsage::SYSTEM_AGENT), this),
-          VolumeSettingImpl(Usage::WithCaptureUsage(AudioCaptureUsage::COMMUNICATION), this),
+          VolumeSettingImpl(ToFidlUsage2(CaptureUsage::BACKGROUND), this),
+          VolumeSettingImpl(ToFidlUsage2(CaptureUsage::FOREGROUND), this),
+          VolumeSettingImpl(ToFidlUsage2(CaptureUsage::SYSTEM_AGENT), this),
+          VolumeSettingImpl(ToFidlUsage2(CaptureUsage::COMMUNICATION), this),
       },
-      // These must be listed in the order of the fuchsia::media::AudioRenderUsage enum.
+      // These must be listed in the order of the fuchsia::media::AudioRenderUsage2 enum.
       render_usage_volume_controls_{
+          VolumeControl(&render_usage_volume_setting_impls_[ToIndex(AudioRenderUsage2::BACKGROUND)],
+                        fidl_dispatcher),
+          VolumeControl(&render_usage_volume_setting_impls_[ToIndex(AudioRenderUsage2::MEDIA)],
+                        fidl_dispatcher),
           VolumeControl(
-              &render_usage_volume_setting_impls_[fidl::ToUnderlying(AudioRenderUsage::BACKGROUND)],
+              &render_usage_volume_setting_impls_[ToIndex(AudioRenderUsage2::INTERRUPTION)],
               fidl_dispatcher),
           VolumeControl(
-              &render_usage_volume_setting_impls_[fidl::ToUnderlying(AudioRenderUsage::MEDIA)],
+              &render_usage_volume_setting_impls_[ToIndex(AudioRenderUsage2::SYSTEM_AGENT)],
               fidl_dispatcher),
-          VolumeControl(&render_usage_volume_setting_impls_[fidl::ToUnderlying(
-                            AudioRenderUsage::INTERRUPTION)],
-                        fidl_dispatcher),
-          VolumeControl(&render_usage_volume_setting_impls_[fidl::ToUnderlying(
-                            AudioRenderUsage::SYSTEM_AGENT)],
-                        fidl_dispatcher),
-          VolumeControl(&render_usage_volume_setting_impls_[fidl::ToUnderlying(
-                            AudioRenderUsage::COMMUNICATION)],
-                        fidl_dispatcher),
+          VolumeControl(
+              &render_usage_volume_setting_impls_[ToIndex(AudioRenderUsage2::COMMUNICATION)],
+              fidl_dispatcher),
+          VolumeControl(
+              &render_usage_volume_setting_impls_[ToIndex(AudioRenderUsage2::ACCESSIBILITY)],
+              fidl_dispatcher),
       },
-      // These must be listed in the order of the fuchsia::media::AudioCaptureUsage enum.
+      // These must be listed in the order of the fuchsia::media::AudioCaptureUsage2 enum.
       capture_usage_volume_controls_{
-          VolumeControl(&capture_usage_volume_setting_impls_[fidl::ToUnderlying(
-                            AudioCaptureUsage::BACKGROUND)],
-                        fidl_dispatcher),
-          VolumeControl(&capture_usage_volume_setting_impls_[fidl::ToUnderlying(
-                            AudioCaptureUsage::FOREGROUND)],
-                        fidl_dispatcher),
-          VolumeControl(&capture_usage_volume_setting_impls_[fidl::ToUnderlying(
-                            AudioCaptureUsage::SYSTEM_AGENT)],
-                        fidl_dispatcher),
-          VolumeControl(&capture_usage_volume_setting_impls_[fidl::ToUnderlying(
-                            AudioCaptureUsage::COMMUNICATION)],
-                        fidl_dispatcher),
+          VolumeControl(
+              &capture_usage_volume_setting_impls_[ToIndex(AudioCaptureUsage2::BACKGROUND)],
+              fidl_dispatcher),
+          VolumeControl(
+              &capture_usage_volume_setting_impls_[ToIndex(AudioCaptureUsage2::FOREGROUND)],
+              fidl_dispatcher),
+          VolumeControl(
+              &capture_usage_volume_setting_impls_[ToIndex(AudioCaptureUsage2::SYSTEM_AGENT)],
+              fidl_dispatcher),
+          VolumeControl(
+              &capture_usage_volume_setting_impls_[ToIndex(AudioCaptureUsage2::COMMUNICATION)],
+              fidl_dispatcher),
       } {
   FX_DCHECK(fidl_dispatcher);
 
-  static_assert(fidl::ToUnderlying(AudioRenderUsage::BACKGROUND) == 0);
-  static_assert(fidl::ToUnderlying(AudioRenderUsage::MEDIA) == 1);
-  static_assert(fidl::ToUnderlying(AudioRenderUsage::INTERRUPTION) == 2);
-  static_assert(fidl::ToUnderlying(AudioRenderUsage::SYSTEM_AGENT) == 3);
-  static_assert(fidl::ToUnderlying(AudioRenderUsage::COMMUNICATION) == 4);
+  static_assert(ToIndex(AudioRenderUsage2::BACKGROUND) == 0);
+  static_assert(ToIndex(AudioRenderUsage2::MEDIA) == 1);
+  static_assert(ToIndex(AudioRenderUsage2::INTERRUPTION) == 2);
+  static_assert(ToIndex(AudioRenderUsage2::SYSTEM_AGENT) == 3);
+  static_assert(ToIndex(AudioRenderUsage2::COMMUNICATION) == 4);
+  static_assert(ToIndex(AudioRenderUsage2::ACCESSIBILITY) == 5);
 
-  static_assert(fidl::ToUnderlying(AudioCaptureUsage::BACKGROUND) == 0);
-  static_assert(fidl::ToUnderlying(AudioCaptureUsage::FOREGROUND) == 1);
-  static_assert(fidl::ToUnderlying(AudioCaptureUsage::SYSTEM_AGENT) == 2);
-  static_assert(fidl::ToUnderlying(AudioCaptureUsage::COMMUNICATION) == 3);
+  static_assert(ToIndex(AudioCaptureUsage2::BACKGROUND) == 0);
+  static_assert(ToIndex(AudioCaptureUsage2::FOREGROUND) == 1);
+  static_assert(ToIndex(AudioCaptureUsage2::SYSTEM_AGENT) == 2);
+  static_assert(ToIndex(AudioCaptureUsage2::COMMUNICATION) == 3);
 }
 
 const UsageGainSettings& StreamVolumeManager::GetUsageGainSettings() const {
   return usage_gain_settings_;
 }
 
-void StreamVolumeManager::SetUsageGain(Usage usage, float gain_db) {
+void StreamVolumeManager::SetUsageGain(Usage2 usage, float gain_db) {
   if (gain_db != usage_gain_settings_.GetUnadjustedUsageGain(usage)) {
-    FX_LOGS(INFO) << "SetUsageGain(" << StreamUsageFromFidlUsage(usage).ToString() << ", "
-                  << gain_db << "db)";
+    FX_LOGS(INFO) << "SetUsageGain(" << ToStreamUsage(usage).ToString() << ", " << gain_db << "db)";
     usage_gain_settings_.SetUsageGain(fidl::Clone(usage), gain_db);
     UpdateStreamsWithUsage(std::move(usage));
   }
 }
 
-void StreamVolumeManager::SetUsageGainAdjustment(Usage usage, float gain_db) {
+void StreamVolumeManager::SetUsageGainAdjustment(Usage2 usage, float gain_db) {
   float gain_adjustment = usage_gain_settings_.GetUsageGainAdjustment(usage);
   if (gain_db != gain_adjustment) {
     usage_gain_settings_.SetUsageGainAdjustment(fidl::Clone(usage), gain_db);
@@ -114,13 +116,13 @@ void StreamVolumeManager::SetUsageGainAdjustment(Usage usage, float gain_db) {
 }
 
 void StreamVolumeManager::BindUsageVolumeClient(
-    Usage usage, fidl::InterfaceRequest<fuchsia::media::audio::VolumeControl> request) {
+    Usage2 usage, fidl::InterfaceRequest<fuchsia::media::audio::VolumeControl> request) {
   if (usage.is_render_usage()) {
-    render_usage_volume_controls_[fidl::ToUnderlying(usage.render_usage())].AddBinding(
-        std::move(request), StreamUsageFromFidlUsage(usage).ToString());
+    render_usage_volume_controls_[ToIndex(usage.render_usage())].AddBinding(
+        std::move(request), ToStreamUsage(usage).ToString());
   } else {
-    capture_usage_volume_controls_[fidl::ToUnderlying(usage.capture_usage())].AddBinding(
-        std::move(request), StreamUsageFromFidlUsage(usage).ToString());
+    capture_usage_volume_controls_[ToIndex(usage.capture_usage())].AddBinding(
+        std::move(request), ToStreamUsage(usage).ToString());
   }
 }
 
@@ -141,14 +143,14 @@ void StreamVolumeManager::RemoveStream(StreamVolume* stream_volume) {
   stream_volumes_.erase(stream_volume);
 }
 
-void StreamVolumeManager::SetUsageVolume(Usage usage, float volume) {
+void StreamVolumeManager::SetUsageVolume(Usage2 usage, float volume) {
   if (volume != usage_volume_settings_.GetUsageVolume(std::move(usage))) {
     usage_volume_settings_.SetUsageVolume(fidl::Clone(usage), volume);
     UpdateStreamsWithUsage(std::move(usage));
   }
 }
 
-void StreamVolumeManager::UpdateStreamsWithUsage(Usage usage) {
+void StreamVolumeManager::UpdateStreamsWithUsage(Usage2 usage) {
   for (auto& stream : stream_volumes_) {
     if (fidl::Equals(stream->GetStreamUsage(), usage)) {
       if (usage.is_render_usage()) {

@@ -230,6 +230,7 @@ impl vfs::node::Node for FatFile {
                     | fio::Operations::WRITE_BYTES,
                 content_size: content_size,
                 storage_size: storage_size,
+                link_count: 1, // FAT does not support hard links, so there is always 1 "link".
             }
         ))
     }

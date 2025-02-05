@@ -53,6 +53,7 @@ zx_library("vm") {
     "//zircon/kernel/lib/boot-options",
     "//zircon/kernel/lib/console",
     "//zircon/kernel/lib/counters",
+    "//zircon/kernel/lib/dump",
     "//zircon/kernel/lib/fbl",
     "//zircon/kernel/lib/heap/cmpctmalloc:headers",
     "//zircon/kernel/lib/init",

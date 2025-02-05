@@ -567,12 +567,6 @@ type Type struct {
 	TypeShapeV2        TypeShape
 	PointeeType        *Type
 	MaybeFromAlias     *PartialTypeConstructor
-
-	// TODO(https://fxbug.dev/42149402): These are fields that are no longer
-	// used in fidlgen, but still must appear in the IR. We just pass them
-	// through without interpreting them, but will delete them soon.
-	LegacyKind     *json.RawMessage
-	RequestSubtype *json.RawMessage
 }
 
 // UnmarshalJSON customizes the JSON unmarshalling for Type.
@@ -588,12 +582,6 @@ func (t *Type) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	if f := obj["kind"]; f != nil {
-		err = json.Unmarshal(*obj["kind"], &t.LegacyKind)
-		if err != nil {
-			return err
-		}
-	}
 	err = json.Unmarshal(*obj["type_shape_v2"], &t.TypeShapeV2)
 	if err != nil {
 		return err
@@ -681,22 +669,6 @@ func (t *Type) UnmarshalJSON(b []byte) error {
 		if err != nil {
 			return err
 		}
-
-		// TODO(https://fxbug.dev/42149402): Remove "identifier" and "subtype"
-		// from endpoints.
-		if f := obj["identifier"]; f != nil {
-			err = json.Unmarshal(*f, &t.Identifier)
-			if err != nil {
-				return err
-			}
-		}
-		if f := obj["subtype"]; f != nil {
-			t.RequestSubtype = &json.RawMessage{}
-			err = json.Unmarshal(*f, t.RequestSubtype)
-			if err != nil {
-				return err
-			}
-		}
 		err = json.Unmarshal(*obj["nullable"], &t.Nullable)
 		if err != nil {
 			return err
@@ -744,13 +716,6 @@ func (t *Type) MarshalJSON() ([]byte, error) {
 		"type_shape_v2": t.TypeShapeV2,
 	}
 
-	if f := t.LegacyKind; f != nil {
-		obj["kind"] = f
-	}
-	if f := t.RequestSubtype; f != nil {
-		obj["subtype"] = f
-	}
-
 	if f := t.MaybeFromAlias; f != nil {
 		obj["experimental_maybe_from_alias"] = f
 	}
@@ -783,12 +748,6 @@ func (t *Type) MarshalJSON() ([]byte, error) {
 		obj["protocol"] = t.Protocol
 		obj["nullable"] = t.Nullable
 		obj["protocol_transport"] = t.ProtocolTransport
-
-		// TODO(https://fxbug.dev/42149402): Remove "identifier" from
-		// client_ends.
-		if t.Identifier != "" {
-			obj["identifier"] = t.Identifier
-		}
 	case PrimitiveType:
 		obj["subtype"] = t.PrimitiveSubtype
 	case IdentifierType:

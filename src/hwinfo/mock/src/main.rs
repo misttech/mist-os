@@ -48,7 +48,7 @@ async fn main() -> Result<()> {
     service_fs.take_and_serve_directory_handle().context("failed to serve outgoing namespace")?;
 
     component::health().set_ok();
-    tracing::debug!("Initialized.");
+    log::debug!("Initialized.");
 
     let _inspect_server_task = inspect_runtime::publish(
         component::inspector(),
@@ -60,19 +60,19 @@ async fn main() -> Result<()> {
             match request {
                 IncomingRequest::Product(stream) => fasync::Task::spawn(async move {
                     if let Err(e) = handle_product(stream).await {
-                        tracing::error!("Product handling failed: {:?}", e);
+                        log::error!("Product handling failed: {:?}", e);
                     }
                 })
                 .detach(),
                 IncomingRequest::Board(stream) => fasync::Task::spawn(async move {
                     if let Err(e) = handle_board(stream).await {
-                        tracing::error!("Board handling failed: {:?}", e);
+                        log::error!("Board handling failed: {:?}", e);
                     }
                 })
                 .detach(),
                 IncomingRequest::Device(stream) => fasync::Task::spawn(async move {
                     if let Err(e) = handle_device(stream).await {
-                        tracing::error!("Device handling failed: {:?}", e);
+                        log::error!("Device handling failed: {:?}", e);
                     }
                 })
                 .detach(),

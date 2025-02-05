@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use log::error;
 use std::fmt::Display;
-use tracing::error;
 
 #[derive(Debug)]
 pub(super) enum Error {

@@ -678,7 +678,7 @@ bool test_unmap_beginning() {
 
     auto& [range, mapping] = pair.value();
     ASSERT_EQ(range.start.ptr(), addr.ptr());
-    ASSERT_EQ(range.end.ptr(), (addr + (PAGE_SIZE * 2u)).ptr());
+    ASSERT_EQ(range.end.ptr(), (addr + static_cast<size_t>(PAGE_SIZE * 2u)).ptr());
 
 #if STARNIX_ANON_ALLOCS
 // #[cfg(feature = "alternate_anon_allocs")]
@@ -715,7 +715,7 @@ bool test_unmap_beginning() {
     ASSERT_TRUE(pair.has_value(), "second page");
     auto& [range, mapping] = pair.value();
     ASSERT_EQ(range.start.ptr(), (addr + static_cast<size_t>(PAGE_SIZE)).ptr());
-    ASSERT_EQ(range.end.ptr(), (addr + (PAGE_SIZE * 2u)).ptr());
+    ASSERT_EQ(range.end.ptr(), (addr + static_cast<size_t>(PAGE_SIZE * 2u)).ptr());
 
 #if STARNIX_ANON_ALLOCS
 #else
@@ -758,7 +758,7 @@ bool test_unmap_end() {
 
     auto& [range, mapping] = pair.value();
     ASSERT_EQ(range.start.ptr(), addr.ptr());
-    ASSERT_EQ(range.end.ptr(), (addr + (PAGE_SIZE * 2u)).ptr());
+    ASSERT_EQ(range.end.ptr(), (addr + static_cast<size_t>(PAGE_SIZE * 2u)).ptr());
 
 #if STARNIX_ANON_ALLOCS
 // #[cfg(feature = "alternate_anon_allocs")]
@@ -838,7 +838,7 @@ bool test_unmap_middle() {
     ASSERT_TRUE(pair.has_value(), "mapping");
     auto& [range, mapping] = pair.value();
     ASSERT_EQ(range.start.ptr(), addr.ptr());
-    ASSERT_EQ(range.end.ptr(), (addr + (PAGE_SIZE * 3u)).ptr());
+    ASSERT_EQ(range.end.ptr(), (addr + static_cast<size_t>(PAGE_SIZE * 3u)).ptr());
 
 #if STARNIX_ANON_ALLOCS
     // #[cfg(feature = "alternate_anon_allocs")]
@@ -902,11 +902,11 @@ bool test_unmap_middle() {
     }
 
     {
-      auto pair = state->mappings.get(addr + PAGE_SIZE * 2u);
+      auto pair = state->mappings.get(addr + static_cast<size_t>(PAGE_SIZE * 2u));
       ASSERT_TRUE(pair.has_value(), "last page");
       auto& [range, mapping] = pair.value();
-      ASSERT_EQ(range.start.ptr(), (addr + (PAGE_SIZE * 2u)).ptr());
-      ASSERT_EQ(range.end.ptr(), (addr + (PAGE_SIZE * 3u)).ptr());
+      ASSERT_EQ(range.start.ptr(), (addr + static_cast<size_t>(PAGE_SIZE * 2u)).ptr());
+      ASSERT_EQ(range.end.ptr(), (addr + static_cast<size_t>(PAGE_SIZE * 3u)).ptr());
 
 #if STARNIX_ANON_ALLOCS
 #[cfg(feature = "alternate_anon_allocs")]
@@ -920,7 +920,8 @@ bool test_unmap_middle() {
                      },
                      [&](MappingBackingMemory& backing) {
                        BEGIN_TEST;
-                       EXPECT_EQ((addr + PAGE_SIZE * 2u).ptr(), backing.base_.ptr());
+                       EXPECT_EQ((addr + static_cast<size_t>(PAGE_SIZE * 2u)).ptr(),
+                                 backing.base_.ptr());
                        EXPECT_EQ(0u, backing.memory_offset_);
                        EXPECT_EQ(static_cast<size_t>(PAGE_SIZE), backing.memory_->get_size());
                        EXPECT_NE(original_memory->get_koid(), backing.memory_->get_koid());

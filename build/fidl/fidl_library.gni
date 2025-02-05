@@ -97,7 +97,12 @@ template("fidl_library") {
           invoker.sdk_category == "partner",
       "In vendor repos, only libraries in the vendor SDK should have `sdk_category` set.")
 
+  # All libraries in an SDK category (supported by this template) require
+  # compatibility tests.
+  requires_compatibility_tests = defined(invoker.sdk_category)
+
   is_unversioned_vendor_sdk = false
+  is_in_internal_only_idk = false
 
   # Validate `sdk_category` while determining `category_allowlist_deps`, which
   # will be used later.
@@ -114,11 +119,13 @@ template("fidl_library") {
     # libraries in that list should be deps of an SDK molecule in
     # //sdk/fidl/BUILD.gn to ensure there are no category violations.
     if (category == "internal_only_idk") {
-      # TODO(https://fxbug.dev/333907192): Remove this branch entirely once the
-      # allowlist is empty.
-      # Libraries in this category are not included in an IDK and has no
-      # compatibility requirements, but use the allowlist to prevent addition of
+      # Libraries in this category are not included in an IDK and have no
+      # compatibility requirements. Uuse the allowlist to prevent addition of
       # more libraries to this category.
+      # TODO(https://fxbug.dev/333907192): Remove `is_in_internal_only_idk` and
+      # this branch entirely once the allowlist is empty.
+      is_in_internal_only_idk = true
+      requires_compatibility_tests = false
       category_allowlist_deps =
           [ "//sdk/fidl:internal_only_idk_libs_allowlist" ]
     } else if (category == "cts") {
@@ -158,16 +165,7 @@ template("fidl_library") {
   } else {
     category_allowlist_deps = []
     sdk_category_string_for_assert = "not specified"
-  }
-
-  # All libraries in an SDK category (supported by this template) require
-  # compatibility tests.
-  requires_compatibility_tests = defined(invoker.sdk_category)
-
-  # TODO(https://fxbug.dev/333907192): Remove when the allowlist is removed.
-  if (requires_compatibility_tests &&
-      invoker.sdk_category == "internal_only_idk") {
-    requires_compatibility_tests = false
+    not_needed([ "is_in_internal_only_idk" ])
   }
 
   # All publishable libraries must have compatibility tests.
@@ -187,10 +185,7 @@ template("fidl_library") {
   assert(
       (requires_compatibility_tests ||
            (is_sdk_included_publishable && !is_vendor_library) ||
-           # TODO(https://fxbug.dev/333907192): Remove when the allowlist is removed.
-           (defined(invoker.sdk_category) &&
-                invoker.sdk_category == "internal_only_idk")) ==
-          (category_allowlist_deps != []),
+           is_in_internal_only_idk) == (category_allowlist_deps != []),
       "Libraries that require compatibility tests or are publishable in an IDK must be in an allowlist to ensure they are compatibility tested and included in the IDK.")
 
   assert(
@@ -205,20 +200,25 @@ template("fidl_library") {
   # the build targets are created, the resulting API summery file will be empty.
   assert(!is_stable || requires_compatibility_tests)
 
-  # TODO(https://fxbug.dev/364727245): Make these stable or remove them from partner_internal.
   _unstable_partner_internal_libraries = [
+    # Do not add to this list.
+    # If the ffx tool or plugin is not included in an IDK, try removing the
+    # category from its build rule. If you really must use an unstable API from
+    # an ffx tool or plugin in the IDK, add the library to
+    # `//src/developer/ffx/build/ffx_subtool_allowlist.gni` instead.
+
+    # TODO(https://fxbug.dev/364727245): Make these stable or remove them from partner_internal.
     "fuchsia.audio",
     "fuchsia.audio.controller",
     "fuchsia.audio.device",
     "fuchsia.bluetooth.pandora",
     "fuchsia.drm",
-
-    # TODO(https://fxbug.dev/377756547): Remove this when FDomain passes API review.
-    "fuchsia.fdomain",
     "fuchsia.media2",
     "fuchsia.memory.attribution.plugin",
     "fuchsia.session.power",
-    "fuchsia.starnix.runner",
+
+    # TODO(https://fxbug.dev/377756547): Remove this when FDomain passes API review.
+    "fuchsia.fdomain",
   ]
   _is_unstable_partner_internal =
       _unstable_partner_internal_libraries + [ library_name ] -
@@ -227,8 +227,7 @@ template("fidl_library") {
              (invoker.sdk_category == "partner_internal" && is_stable == false),
          "Do you need to remove this library from the allowlist?")
   assert(
-      is_stable || !defined(invoker.sdk_category) ||
-          invoker.sdk_category == "internal_only_idk" ||
+      is_stable || !defined(invoker.sdk_category) || is_in_internal_only_idk ||
           invoker.sdk_category == "partner" || _is_unstable_partner_internal,
       "Libraries in category '${sdk_category_string_for_assert}' must specify `stable=true`.")
 
@@ -303,14 +302,30 @@ template("fidl_library") {
              "fuchsia." + string_replace(library_name, "fuchsia.", "", 1)) {
     # It is a non-test library in the "fuchsia" namespace. Set `versioned` to appropriate default.
     if (is_stable) {
+      assert(defined(invoker.sdk_category),
+             "Libraries cannot be stable but not in an SDK category.")
+
+      # Stable "fuchsia.*" library in an SDK category - must compile for all Supported API levels.
       fidlc_versioned_arg = "fuchsia"
     } else if (requires_compatibility_tests) {
+      assert(
+          defined(invoker.sdk_category),
+          "Libraries cannot require compatibility tests unless they are in an SDK category.")
+
+      # Unstable "fuchsia.*" library in an SDK category - can only be used at HEAD.
       fidlc_versioned_arg = "fuchsia:HEAD"
     } else {
+      assert(
+          !defined(invoker.sdk_category) || is_in_internal_only_idk,
+          "Libraries with an SDK category should be stable or at least require compatibility tests.")
+
       # All libraries in the "fuchsia" namespace must be versioned. For unstable
-      # or internal libraries, that means specifying `@available(added=HEAD)`.
+      # and/or internal libraries, that means specifying `@available(added=HEAD)`.
       fidlc_versioned_arg = "fuchsia:HEAD"
 
+      # Temporary exceptions to the above rule. See the TODOs where each
+      # variable is declared. Update the comment about "temporary exceptions" in
+      # fidl.gni when removing the last one.
       if (_is_unversioned_libraries_used_by_sdk_prebuilts_or_ctf) {
         fidlc_versioned_arg = "unversioned"
       } else if (_is_banjo_sysmem) {
@@ -318,6 +333,9 @@ template("fidl_library") {
       }
     }
   } else {
+    assert(
+        !is_stable && !defined(invoker.sdk_category),
+        "Libraries that are stable and/or have an SDK category must be versioned. This is handled automatically for fuchsia.* libraries but must be displayed for other libraries.")
     fidlc_versioned_arg = "unversioned"
   }
 
@@ -349,8 +367,7 @@ template("fidl_library") {
                !requires_compatibility_tests && !is_sdk_included_publishable) ||
           (fidlc_versioned_arg == "fuchsia:HEAD" && !is_stable &&
                (requires_compatibility_tests == defined(invoker.sdk_category) ||
-                    (defined(invoker.sdk_category) &&
-                         invoker.sdk_category == "internal_only_idk" &&
+                    (is_in_internal_only_idk &&
                          !requires_compatibility_tests))) ||
           (fidlc_versioned_arg == "unversioned" &&
                _is_unversioned_libraries_used_by_sdk_prebuilts_or_ctf) ||
@@ -604,7 +621,7 @@ template("fidl_library") {
           current = json_summary_file
           golden = "${goldens_dir}/${level}/${library_name}.api_summary.json"
 
-          if (update_goldens || bump_api_level) {
+          if (update_goldens) {
             # Using this policy for every level allows generating all goldens
             # from scratch. See https://fxbug.dev/324481114#comment5.
             policy = "update_golden"
@@ -731,7 +748,7 @@ template("fidl_library") {
       category = invoker.sdk_category
 
       # TODO(https://fxbug.dev/333907192): Remove when the allowlist is removed.
-      if (category == "internal_only_idk") {
+      if (is_in_internal_only_idk) {
         category = "internal"
       }
 

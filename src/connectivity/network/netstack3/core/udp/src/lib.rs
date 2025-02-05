@@ -10,7 +10,6 @@
 #![warn(missing_docs, unreachable_patterns, clippy::useless_conversion, clippy::redundant_clone)]
 
 extern crate fakealloc as alloc;
-extern crate fakestd as std;
 
 #[path = "."]
 mod internal {
@@ -21,6 +20,6 @@ pub use internal::base::{
     BoundSockets, BoundStateContext, DualStackBoundStateContext, NonDualStackBoundStateContext,
     SendError, SendToError, Sockets, StateContext, UdpApi, UdpBindingsContext, UdpBindingsTypes,
     UdpCounters, UdpCountersInner, UdpIpTransportContext, UdpPacketMeta, UdpReceiveBindingsContext,
-    UdpRemotePort, UdpSocketId, UdpSocketSet, UdpSocketState, UdpState, UdpStateBuilder,
-    UdpStateContext, UseUdpIpTransportContextBlanket,
+    UdpRemotePort, UdpSocketId, UdpSocketSet, UdpSocketState, UdpSocketTxMetadata, UdpState,
+    UdpStateBuilder, UdpStateContext, UseUdpIpTransportContextBlanket,
 };

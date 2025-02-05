@@ -9,7 +9,7 @@ use core::future::Future;
 use core::mem::take;
 use core::pin::Pin;
 use core::slice::from_raw_parts_mut;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use core::task::{Context, Poll};
 use std::sync::{mpsc, Arc};
 
@@ -19,17 +19,22 @@ use crate::decoder::InternalHandleDecoder;
 use crate::protocol::Transport;
 use crate::{Chunk, DecodeError, Decoder, CHUNK_SIZE};
 
+struct SharedEnd {
+    sender_count: AtomicUsize,
+    send_waker: AtomicWaker,
+}
+
 struct Shared {
     is_closed: AtomicBool,
-    send_wakers: [AtomicWaker; 2],
+    ends: [SharedEnd; 2],
 }
 
 impl Shared {
     fn close(&self) {
         let was_closed = self.is_closed.swap(true, Ordering::Relaxed);
         if !was_closed {
-            for send_waker in &self.send_wakers {
-                send_waker.wake();
+            for end in &self.ends {
+                end.send_waker.wake();
             }
         }
     }
@@ -37,24 +42,28 @@ impl Shared {
 
 /// A paired mpsc transport.
 pub struct Mpsc {
-    shared: Arc<Shared>,
-    end: usize,
-    sender: mpsc::Sender<Vec<Chunk>>,
+    sender: Sender,
     receiver: mpsc::Receiver<Vec<Chunk>>,
 }
 
 impl Mpsc {
     /// Creates two mpscs which can communicate with each other.
-    pub fn new() -> (Mpsc, Mpsc) {
+    pub fn new() -> (Self, Self) {
         let shared = Arc::new(Shared {
             is_closed: AtomicBool::new(false),
-            send_wakers: [AtomicWaker::new(), AtomicWaker::new()],
+            ends: [
+                SharedEnd { sender_count: AtomicUsize::new(1), send_waker: AtomicWaker::new() },
+                SharedEnd { sender_count: AtomicUsize::new(1), send_waker: AtomicWaker::new() },
+            ],
         });
         let (a_send, a_recv) = mpsc::channel();
         let (b_send, b_recv) = mpsc::channel();
         (
-            Mpsc { shared: shared.clone(), end: 0, sender: a_send, receiver: b_recv },
-            Mpsc { shared, end: 1, sender: b_send, receiver: a_recv },
+            Mpsc {
+                sender: Sender { shared: shared.clone(), end: 0, sender: a_send },
+                receiver: b_recv,
+            },
+            Mpsc { sender: Sender { shared, end: 1, sender: b_send }, receiver: a_recv },
         )
     }
 }
@@ -77,11 +86,26 @@ impl fmt::Display for Error {
 impl core::error::Error for Error {}
 
 /// The send end of a paired mpsc transport.
-#[derive(Clone)]
 pub struct Sender {
     shared: Arc<Shared>,
     end: usize,
     sender: mpsc::Sender<Vec<Chunk>>,
+}
+
+impl Clone for Sender {
+    fn clone(&self) -> Self {
+        self.shared.ends[self.end].sender_count.fetch_add(1, Ordering::Relaxed);
+        Self { shared: self.shared.clone(), end: self.end, sender: self.sender.clone() }
+    }
+}
+
+impl Drop for Sender {
+    fn drop(&mut self) {
+        let senders = self.shared.ends[self.end].sender_count.fetch_sub(1, Ordering::Relaxed);
+        if senders == 1 {
+            self.shared.close();
+        }
+    }
 }
 
 /// The send future for a paired mpsc transport.
@@ -101,7 +125,7 @@ impl Future for SendFuture<'_> {
         let chunks = take(&mut self.buffer);
         match self.sender.sender.send(chunks) {
             Ok(()) => {
-                self.sender.shared.send_wakers[self.sender.end].wake();
+                self.sender.shared.ends[self.sender.end].send_waker.wake();
                 Poll::Ready(Ok(()))
             }
             Err(_) => Poll::Ready(Err(Error::Closed)),
@@ -129,7 +153,7 @@ impl Future for RecvFuture<'_> {
             return Poll::Ready(Ok(None));
         }
 
-        self.receiver.shared.send_wakers[1 - self.receiver.end].register(cx.waker());
+        self.receiver.shared.ends[1 - self.receiver.end].send_waker.register(cx.waker());
         match self.receiver.receiver.try_recv() {
             Ok(chunks) => Poll::Ready(Ok(Some(RecvBuffer { chunks, chunks_taken: 0 }))),
             Err(mpsc::TryRecvError::Empty) => Poll::Pending,
@@ -182,10 +206,12 @@ impl Transport for Mpsc {
     type Error = Error;
 
     fn split(self) -> (Self::Sender, Self::Receiver) {
-        (
-            Sender { shared: self.shared.clone(), end: self.end, sender: self.sender },
-            Receiver { shared: self.shared, end: self.end, receiver: self.receiver },
-        )
+        let receiver = Receiver {
+            shared: self.sender.shared.clone(),
+            end: self.sender.end,
+            receiver: self.receiver,
+        };
+        (self.sender, receiver)
     }
 
     type Sender = Sender;

@@ -28,7 +28,7 @@
 #include "src/storage/lib/paver/moonflower.h"
 #include "src/storage/lib/paver/sherlock.h"
 #include "src/storage/lib/paver/test/test-utils.h"
-#include "src/storage/lib/paver/x64.h"
+#include "src/storage/lib/paver/uefi.h"
 
 namespace abr {
 
@@ -116,8 +116,8 @@ TEST(X64AbrTests, CreateFails) {
   zx::result devices = paver::BlockDevices::CreateDevfs(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
   std::shared_ptr<paver::Context> context;
-  zx::result partitioner = paver::X64PartitionerFactory().New(*devices, devmgr.RealmExposedDir(),
-                                                              paver::Arch::kX64, context, {});
+  zx::result partitioner = paver::UefiPartitionerFactory().New(*devices, devmgr.RealmExposedDir(),
+                                                               paver::Arch::kX64, context, {});
   ASSERT_NOT_OK(partitioner);
 }
 

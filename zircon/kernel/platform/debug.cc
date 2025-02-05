@@ -125,13 +125,13 @@ constexpr size_t kRxQueueSize = 1024;
 // When Polling is enabled, this will fire the polling callback for draining UART's RX Queue.
 Timer gUartPollTimer;
 
-constexpr zx_duration_t kPollingPeriod = ZX_MSEC(10);
+constexpr zx_duration_mono_t kPollingPeriod = ZX_MSEC(10);
 constexpr TimerSlack kPollingSlack = {ZX_MSEC(10), TIMER_SLACK_CENTER};
 
 // Callback used by |gUartPollTimer| when deadline is met. See |Timer| interface for more
 // information.
 template <bool DrainUart>
-void UartPoll(Timer* uart_timer, zx_time_t now, void* arg) {
+void UartPoll(Timer* uart_timer, zx_instant_mono_t now, void* arg) {
   uart_timer->Set(Deadline(zx_time_add_duration(now, kPollingPeriod), kPollingSlack),
                   &UartPoll<true>, nullptr);
   if constexpr (DrainUart) {
@@ -201,14 +201,14 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
   // Check for interrupt support or explicitly polling uart.
   ktl::optional<uint32_t> uart_irq;
   bool polling_mode = false;
-  gUart.Visit([&](auto& driver) {
-    using cfg_type = ktl::decay_t<decltype(driver.uart().config())>;
+  gUart.Visit([&]<typename DriverType>(DriverType& driver) {
+    using uart_type = typename DriverType::uart_type;
+    using cfg_type = typename uart_type::config_type;
     if constexpr (ktl::is_same_v<cfg_type, zbi_dcfg_simple_pio_t> ||
                   ktl::is_same_v<cfg_type, zbi_dcfg_simple_t>) {
-      uart_irq = PlatformUartGetIrqNumber(driver.uart().config().irq);
+      uart_irq = PlatformUartGetIrqNumber(driver.config().irq);
     } else {  // Only |uart::null::Driver| is expected to have a different configuration type.
-      using driver_type = ktl::decay_t<decltype(driver.uart())>;
-      constexpr auto kIsNullDriver = ktl::is_same_v<driver_type, uart::null::Driver>;
+      constexpr auto kIsNullDriver = ktl::is_same_v<uart_type, uart::null::Driver>;
       ZX_ASSERT_MSG(kIsNullDriver, "Unexpected UART Configuration.");
       // No IRQ Handler for null driver.
       return;
@@ -217,14 +217,13 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
     // Check for polling mode.
     if (!uart_irq || gBootOptions->debug_uart_poll) {
       // Start the polling without performing any drain.
-      UartPoll</*DrainUart=*/false>(&gUartPollTimer, current_time(), nullptr);
+      UartPoll</*DrainUart=*/false>(&gUartPollTimer, current_mono_time(), nullptr);
       printf("UART: POLLING mode enabled.\n");
       polling_mode = true;
       return;
     }
 
-    static constexpr auto rx_irq_handler = [](auto& spinlock, auto&& read_char,
-                                              auto&& mask_rx_interrupt) {
+    static constexpr auto rx_irq_handler = [](auto& rx_interrupt) {
       // This check needs to be performed under a lock, such that we prevent operation
       // interleaving that would leave us in a blocked state.
       //
@@ -242,30 +241,31 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
       //  masking RX interrupts. By pairing this with the acquisition of the
       //  same lock around unmasking RX interrupts, we prevent the writer above
       //  from being interrupted by a read-and-unmask.
+      char c;
       {
-        Guard<MonitoredSpinLock, NoIrqSave> lock(&spinlock, SOURCE_TAG);
+        Guard<MonitoredSpinLock, NoIrqSave> lock(&rx_interrupt.lock(), SOURCE_TAG);
         if (rx_queue.Full()) {
           // disables RX interrupts.
-          mask_rx_interrupt();
+          rx_interrupt.DisableInterrupt();
           return;
         }
+        c = static_cast<char>(rx_interrupt.ReadChar());
       }
-      rx_queue.WriteChar(static_cast<char>(read_char()));
+      rx_queue.WriteChar(c);
     };
 
-    static constexpr auto tx_irq_handler = [](auto& spinlock, auto& waiter,
-                                              auto&& mask_tx_interrupts) {
+    static constexpr auto tx_irq_handler = [](auto& tx_interrupt) {
       // Mask the TX interrupt before signalling any blocked thread as there may
       // be a race between masking TX here below and unmasking by the blocked
       // thread.
       {
-        Guard<MonitoredSpinLock, NoIrqSave> lock(&spinlock, SOURCE_TAG);
-        mask_tx_interrupts();
+        Guard<MonitoredSpinLock, NoIrqSave> lock(&tx_interrupt.lock(), SOURCE_TAG);
+        tx_interrupt.DisableInterrupt();
       }
 
       // Do not signal the event while holding the sync capability, this could lead
       // to invalid lock dependencies.
-      waiter.Wake();
+      tx_interrupt.Notify();
     };
 
     constexpr auto irq_handler = [](void* driver_ptr) {
@@ -275,7 +275,7 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
 
     if constexpr (ktl::is_same_v<cfg_type, zbi_dcfg_simple_t>) {
       // Configure the interrupt if available.
-      auto irq_config = GetIrqConfigFromFlags(driver.uart().config().flags);
+      auto irq_config = GetIrqConfigFromFlags(driver.config().flags);
       if (irq_config) {
         zx_status_t irq_config_result =
             configure_interrupt(*uart_irq, irq_config->trigger, irq_config->polarity);

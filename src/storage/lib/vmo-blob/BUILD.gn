@@ -12,7 +12,7 @@ rustc_library("vmo-blob") {
     "//sdk/rust/zx",
     "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/lib.rs" ]

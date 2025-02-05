@@ -7,10 +7,10 @@ use crate::events::{handle_run_events, handle_suite_events};
 use anyhow::{Context as _, Result};
 use futures::channel::{mpsc, oneshot};
 use futures::{pin_mut, select, FutureExt, SinkExt};
+use log::warn;
 use std::cell::RefCell;
 use std::rc::Rc;
 use test_manager::{Artifact, LaunchError, RunControllerProxy, SuiteControllerProxy};
-use tracing::warn;
 use {
     fidl_fuchsia_fuzzer as fuzz, fidl_fuchsia_test_manager as test_manager, fuchsia_async as fasync,
 };

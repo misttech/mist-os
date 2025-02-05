@@ -1,6 +1,0 @@
-# Copyright 2020 The Fuchsia Authors. All rights reserved.
-# Use of this source code is governed by a BSD-style license that can be
-# found in the LICENSE file.
-
-cpp_sysroot_label = "//zircon/public/sysroot/cpp"
-cpp_sysroot_dir = get_label_info(cpp_sysroot_label, "target_gen_dir")

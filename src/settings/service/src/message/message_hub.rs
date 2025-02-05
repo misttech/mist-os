@@ -444,7 +444,7 @@ impl MessageHub {
                     messenger_tx
                         .unbounded_send(MessengerAction::DeleteBySignature(signature))
                         .unwrap_or_else(|_| {
-                            tracing::warn!(
+                            log::warn!(
                                 "messenger_tx failed to send delete action for signature: {:?}",
                                 signature
                             )
@@ -476,7 +476,7 @@ impl MessageHub {
                     responder.send(Ok((MessengerClient::new(messenger, fuse), receptor)));
                 #[allow(clippy::redundant_pattern_matching)]
                 if let Err(_) = response_result {
-                    tracing::warn!(
+                    log::warn!(
                         "Receiving end of oneshot closed while trying to create messenger client \
                             for client with id: {}",
                         id,

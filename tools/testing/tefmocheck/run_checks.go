@@ -41,10 +41,11 @@ func RunChecks(checks []FailureModeCheck, to *TestingOutputs, outputsDir string)
 			IsTestingFailureMode: true,
 			// Specify an empty slice so it gets serialized to an empty JSON
 			// array instead of null.
-			Cases:     []runtests.TestCaseResult{},
-			Result:    runtests.TestFailure,
-			StartTime: time.Now(), // needed by ResultDB
-			Tags:      check.Tags(),
+			Cases:         []runtests.TestCaseResult{},
+			Result:        runtests.TestFailure,
+			StartTime:     time.Now(), // needed by ResultDB
+			Tags:          check.Tags(),
+			FailureReason: check.FailureReason(),
 		}
 		// Check if failure is an infrastructure failure.
 		if check.IsInfraFailure() {

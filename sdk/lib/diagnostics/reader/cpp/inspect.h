@@ -53,7 +53,7 @@ class InspectData {
   uint64_t version() const { return version_; }
 
   // Return the metadata of the component that created this data.
-  InspectData::InspectMetadata metadata() const { return metadata_; }
+  const InspectData::InspectMetadata& metadata() const { return metadata_; }
 
   // Return the payload of the component that created this data, if defined.
   cpp17::optional<const inspect::Hierarchy*> payload() const {

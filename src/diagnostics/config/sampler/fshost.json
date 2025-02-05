@@ -112,7 +112,7 @@
             ],
             "metric_id": 61,
             "metric_type": "String",
-            "selector": "bootstrap/fshost/fxfs:root/fs.info:current_version",
+            "selector": "bootstrap/fshost/fxfs:root/fs.info:oldest_version",
             "upload_once": true
         },
         {

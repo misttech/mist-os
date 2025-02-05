@@ -16,3 +16,7 @@ toc:
 - title: "Advanced"
   section:
   - include: /docs/development/tracing/advanced/_toc.yaml
+- title: "Reference"
+  section:
+  - title: "Fuchsia trace format"
+    path: /docs/reference/tracing/trace-format.md

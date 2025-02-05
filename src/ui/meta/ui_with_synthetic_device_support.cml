@@ -25,9 +25,9 @@
             to: [ "#input-helper" ],
         },
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            dictionary: "diagnostics",
             from: "parent",
-            to: [ "#input-helper" ],
+            to: "#input-helper",
         },
     ],
     expose: [

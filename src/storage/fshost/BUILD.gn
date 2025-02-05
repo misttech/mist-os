@@ -69,8 +69,8 @@ rustc_binary("fshost") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:scopeguard",
-    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:uuid",
     "//third_party/rust_crates:zerocopy",
     "//third_party/rust_crates:zstd",
@@ -117,6 +117,11 @@ rustc_binary("fshost") {
   forward_variables_from(_concurrent_jobs.vars, "*")
 
   exclude_toolchain_tags = [ "instrumented" ]
+}
+
+fuchsia_package("pkg") {
+  package_name = "fshost"
+  deps = [ ":fshost" ]
 }
 
 fuchsia_unittest_component("fshost_tests_component") {

@@ -43,8 +43,10 @@ zx_status_t zxio_default_writev_at(zxio_t* io, zx_off_t offset, const zx_iovec_t
 zx_status_t zxio_default_seek(zxio_t* io, zxio_seek_origin_t start, int64_t offset,
                               size_t* out_offset);
 zx_status_t zxio_default_truncate(zxio_t* io, uint64_t length);
-zx_status_t zxio_default_flags_get(zxio_t* io, uint32_t* out_flags);
-zx_status_t zxio_default_flags_set(zxio_t* io, uint32_t flags);
+zx_status_t zxio_default_flags_get_deprecated(zxio_t* io, uint32_t* out_flags);
+zx_status_t zxio_default_flags_set_deprecated(zxio_t* io, uint32_t flags);
+zx_status_t zxio_default_flags_get(zxio_t* io, uint64_t* out_flags);
+zx_status_t zxio_default_flags_set(zxio_t* io, uint64_t flags);
 zx_status_t zxio_default_vmo_get(zxio_t* io, zxio_vmo_flags_t flags, zx_handle_t* out_vmo);
 zx_status_t zxio_default_on_mapped(zxio_t* io, void* ptr);
 zx_status_t zxio_default_get_read_buffer_available(zxio_t* io, size_t* out_available);
@@ -131,6 +133,8 @@ static __CONSTEXPR const zxio_ops_t zxio_default_ops = {
     .writev_at = zxio_default_writev_at,
     .seek = zxio_default_seek,
     .truncate = zxio_default_truncate,
+    .flags_get_deprecated = zxio_default_flags_get_deprecated,
+    .flags_set_deprecated = zxio_default_flags_set_deprecated,
     .flags_get = zxio_default_flags_get,
     .flags_set = zxio_default_flags_set,
     .vmo_get = zxio_default_vmo_get,

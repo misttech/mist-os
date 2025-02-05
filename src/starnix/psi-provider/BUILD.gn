@@ -1,0 +1,45 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+group("tests") {
+  testonly = true
+  deps = [ ":psi-provider-tests" ]
+}
+
+rustc_binary("psi-provider-bin") {
+  edition = "2021"
+  version = "0.1.0"
+  with_unit_tests = true
+
+  deps = [
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
+    "//sdk/fidl/fuchsia.starnix.psi:fuchsia.starnix.psi_rust",
+    "//sdk/rust/zx",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
+  ]
+
+  sources = [
+    "src/history.rs",
+    "src/main.rs",
+  ]
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+}
+
+fuchsia_component("psi-provider") {
+  manifest = "meta/psi-provider.cml"
+  deps = [ ":psi-provider-bin" ]
+}
+
+fuchsia_unittest_package("psi-provider-tests") {
+  deps = [ ":psi-provider-bin_test" ]
+}

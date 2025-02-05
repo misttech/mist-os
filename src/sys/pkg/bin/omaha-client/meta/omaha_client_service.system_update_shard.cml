@@ -19,6 +19,11 @@
             availability: "optional",
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#omaha-client-service",
+        },
+        {
             protocol: "fuchsia.update.installer.Installer",
             from: "#system-updater",
             to: "#omaha-client-service",
@@ -31,8 +36,15 @@
             from: "parent",
             to: "#omaha-client-service",
         },
+
+        // TODO(https://fxbug.dev/389134835): Remove the initiator capability.
         {
-            protocol: "fuchsia.hardware.power.statecontrol.Admin",
+            protocol: "fuchsia.power.CollaborativeRebootInitiator",
+            from: "parent",
+            to: "#omaha-client-service",
+        },
+        {
+            protocol: "fuchsia.power.internal.CollaborativeRebootScheduler",
             from: "parent",
             to: "#omaha-client-service",
         },

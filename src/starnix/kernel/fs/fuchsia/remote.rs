@@ -7,6 +7,7 @@ use crate::fs::fuchsia::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline};
 use crate::fs::fuchsia::RemoteUnixDomainSocket;
 use crate::mm::memory::MemoryObject;
 use crate::mm::{ProtectionFlags, VMEX_RESOURCE};
+use crate::security;
 use crate::task::{CurrentTask, EncryptionKeyId, Kernel};
 use crate::vfs::buffers::{with_iovec_segments, InputBuffer, OutputBuffer};
 use crate::vfs::fsverity::FsVerityState;
@@ -19,7 +20,7 @@ use crate::vfs::{
     FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget, XattrOp, XattrStorage,
     DEFAULT_BYTES_PER_BLOCK,
 };
-use bstr::ByteSlice;
+use bstr::{BString, ByteSlice};
 use fidl::AsHandleRef;
 #[cfg(feature = "starnix_lite")]
 use fidl_fuchsia_io as fio;
@@ -41,6 +42,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{
     __kernel_fsid_t, errno, error, from_status_like_fdio, fsverity_descriptor, ino_t, off_t, statfs,
 };
+use std::mem::MaybeUninit;
 use std::sync::Arc;
 use syncio::zxio::{
     zxio_get_posix_mode, zxio_node_attr, ZXIO_NODE_PROTOCOL_FILE, ZXIO_NODE_PROTOCOL_SYMLINK,
@@ -49,8 +51,9 @@ use syncio::zxio::{
     ZXIO_OBJECT_TYPE_STREAM_SOCKET, ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET,
 };
 use syncio::{
-    zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, DirentIterator,
-    XattrSetMode, Zxio, ZxioDirent, ZxioOpenOptions, ZXIO_ROOT_HASH_LENGTH,
+    zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, AllocateMode,
+    DirentIterator, SelinuxContextAttr, XattrSetMode, Zxio, ZxioDirent, ZxioOpenOptions,
+    ZXIO_ROOT_HASH_LENGTH,
 };
 use zx::{HandleBased, Status};
 #[cfg(not(feature = "starnix_lite"))]
@@ -65,12 +68,21 @@ pub fn new_remote_fs(
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
     let kernel = current_task.kernel();
-    let data_dir = kernel
-        .container_data_dir
-        .as_ref()
-        .ok_or_else(|| errno!(EPERM, "Missing container data directory"))?;
-    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
-    return create_remotefs_filesystem(kernel, data_dir, options, rights);
+    // TODO(379929394): After soft transition of fstab is complete, we should
+    // validate the requested_path is a non-empty, non-root path.
+    let requested_path = std::str::from_utf8(&options.source)
+        .map_err(|_| errno!(EINVAL, "source path is not utf8"))?;
+    let create_flags = fio::PERM_READABLE
+        | fio::PERM_WRITABLE
+        | fio::Flags::FLAG_MAYBE_CREATE
+        | fio::Flags::PROTOCOL_DIRECTORY;
+    let (root_proxy, subdir) = kernel.open_ns_dir(requested_path, create_flags)?;
+
+    let subdir = if subdir.is_empty() { ".".to_string() } else { subdir };
+    let open_rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
+    let mut subdir_options = options;
+    subdir_options.source = BString::from(subdir);
+    create_remotefs_filesystem(kernel, &root_proxy, subdir_options, open_rights)
 }
 
 /// Create a filesystem to access the content of the fuchsia directory available at `fs_src` inside
@@ -526,9 +538,11 @@ impl FsNodeOps for RemoteNode {
             let node_info = node.fetch_and_refresh_info(locked, current_task)?;
             if node_info.mode.is_dir() {
                 if let Some(wrapping_key_id) = node_info.wrapping_key_id {
-                    let encryption_keys = current_task.kernel().encryption_keys.read();
                     // Locked encrypted directories cannot be opened with write access.
-                    if !encryption_keys.contains_key(&EncryptionKeyId::from(wrapping_key_id))
+                    if !current_task
+                        .kernel()
+                        .crypt_service
+                        .contains_key(EncryptionKeyId::from(wrapping_key_id))
                         && flags.can_write()
                     {
                         return error!(ENOKEY);
@@ -725,9 +739,17 @@ impl FsNodeOps for RemoteNode {
             },
             ..Default::default()
         };
+        let mut options = ZxioOpenOptions::new(Some(&mut attrs), None);
+        let mut selinux_context_buffer =
+            MaybeUninit::<[u8; fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize]>::uninit();
+        let mut cached_context = security::fs_is_xattr_labeled(node.fs())
+            .then(|| SelinuxContextAttr::new(&mut selinux_context_buffer));
+        if let Some(buffer) = &mut cached_context {
+            options = options.with_selinux_context_read(buffer).unwrap();
+        }
         zxio = Arc::new(
             self.zxio
-                .open(name, self.rights, ZxioOpenOptions::new(Some(&mut attrs), None))
+                .open(name, self.rights, options)
                 .map_err(|status| from_status_like_fdio!(status, name))?,
         );
         mode = get_mode(&attrs);
@@ -741,7 +763,7 @@ impl FsNodeOps for RemoteNode {
         }
         let casefold = attrs.casefold;
 
-        fs.get_or_create_node(
+        let node = fs.get_or_create_node(
             current_task,
             if fs_ops.use_remote_ids {
                 if node_id == fio::INO_UNKNOWN {
@@ -769,9 +791,19 @@ impl FsNodeOps for RemoteNode {
                 if fsverity_enabled {
                     *child.fsverity.lock() = FsVerityState::FsVerity;
                 }
+                if let Some(buffer) = cached_context.as_ref().and_then(|buffer| buffer.get()) {
+                    // This is valid to fail if we're using mount point labelling or the
+                    // provided context string is invalid.
+                    let _ = security::fs_node_notify_security_context(
+                        current_task,
+                        &child,
+                        FsStr::new(buffer),
+                    );
+                }
                 Ok(child)
             },
-        )
+        )?;
+        Ok(node)
     }
 
     fn truncate(
@@ -789,7 +821,7 @@ impl FsNodeOps for RemoteNode {
     fn allocate(
         &self,
         locked: &mut Locked<'_, FileOpsCore>,
-        guard: &AppendLockGuard<'_>,
+        _guard: &AppendLockGuard<'_>,
         node: &FsNode,
         current_task: &CurrentTask,
         mode: FallocMode,
@@ -799,14 +831,9 @@ impl FsNodeOps for RemoteNode {
         match mode {
             FallocMode::Allocate { keep_size: false } => {
                 node.fail_if_locked(locked, current_task)?;
-                let allocate_size = offset.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
-                let info_size = {
-                    let info = node.fetch_and_refresh_info(locked, current_task)?;
-                    info.size as u64
-                };
-                if info_size < allocate_size {
-                    self.truncate(locked, guard, node, current_task, allocate_size)?;
-                }
+                self.zxio
+                    .allocate(offset, length, AllocateMode::empty())
+                    .map_err(|status| from_status_like_fdio!(status))?;
                 Ok(())
             }
             _ => error!(EINVAL),
@@ -936,7 +963,11 @@ impl FsNodeOps for RemoteNode {
         }
         let name = get_name_str(name)?;
         let link_into = |zxio: &syncio::Zxio| {
-            zxio.link_into(&self.zxio, name).map_err(|status| from_status_like_fdio!(status))
+            zxio.link_into(&self.zxio, name).map_err(|status| match status {
+                zx::Status::BAD_STATE => errno!(EXDEV),
+                zx::Status::ACCESS_DENIED => errno!(ENOKEY),
+                s => from_status_like_fdio!(s),
+            })
         };
         if let Some(child) = child.downcast_ops::<RemoteNode>() {
             link_into(&child.zxio)
@@ -2398,7 +2429,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    async fn test_allocate_workaround() {
+    async fn test_allocate() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
         fixture.root().clone(server.into()).expect("clone failed");

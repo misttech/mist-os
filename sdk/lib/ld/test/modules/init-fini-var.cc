@@ -5,6 +5,6 @@
 #include "startup-symbols.h"
 
 // This is a startup module that initializes this global variable, which will be
-// accessed and modified by init/fini functions of dlopen-ed modules and are
-// checked for correctness in libdl tests.
-int gInitFiniState = -1;
+// accessed by init/fini functions of test modules and are checked for
+// correctness in libdl tests.
+TestCallback* gTestCallback;

@@ -76,7 +76,7 @@ void MediaApp::Run(sys::ComponentContext* app_context) {
 
   ConfigureRenderer();
   // Set loudness levels. We include app_context so we can interact with AudioCore interface if
-  // needed (SetRenderUsageGain, BindVolumeControl)
+  // needed (SetRenderUsageGain2, BindVolumeControl2)
   SetLoudnessLevels(app_context);
 
   // Show a summary of all our settings: exactly what we are about to do.
@@ -173,66 +173,66 @@ void MediaApp::ParameterRangeChecks() {
 
   if (num_channels_ < fuchsia::media::MIN_PCM_CHANNEL_COUNT) {
     std::cerr << "Number of channels must be at least " << fuchsia::media::MIN_PCM_CHANNEL_COUNT
-              << std::endl;
+              << '\n';
     success = false;
   }
   if (num_channels_ > fuchsia::media::MAX_PCM_CHANNEL_COUNT) {
     std::cerr << "Number of channels must be no greater than "
-              << fuchsia::media::MAX_PCM_CHANNEL_COUNT << std::endl;
+              << fuchsia::media::MAX_PCM_CHANNEL_COUNT << '\n';
     success = false;
   }
 
   if (frame_rate_ < fuchsia::media::MIN_PCM_FRAMES_PER_SECOND) {
     std::cerr << "Frame rate must be at least " << fuchsia::media::MIN_PCM_FRAMES_PER_SECOND
-              << std::endl;
+              << '\n';
     success = false;
   }
   if (frame_rate_ > fuchsia::media::MAX_PCM_FRAMES_PER_SECOND) {
     std::cerr << "Frame rate must be no greater than " << fuchsia::media::MAX_PCM_FRAMES_PER_SECOND
-              << std::endl;
+              << '\n';
     success = false;
   }
 
   if (frequency_ < 0.0) {
-    std::cerr << "Frequency cannot be negative" << std::endl;
+    std::cerr << "Frequency cannot be negative" << '\n';
     success = false;
   }
 
   if (amplitude_ > 1.0) {
-    std::cerr << "Amplitude must be no greater than 1.0" << std::endl;
+    std::cerr << "Amplitude must be no greater than 1.0" << '\n';
     success = false;
   }
   if (amplitude_ < -1.0) {
-    std::cerr << "Amplitude must be no less than -1.0" << std::endl;
+    std::cerr << "Amplitude must be no less than -1.0" << '\n';
     success = false;
   }
 
   if (duty_cycle_percent_ >= 100.0f) {
-    std::cerr << "Duty cycle must be smaller than 100.0%" << std::endl;
+    std::cerr << "Duty cycle must be smaller than 100.0%" << '\n';
     success = false;
   }
   if (duty_cycle_percent_ <= 0.0f) {
-    std::cerr << "Duty cycle must be greater than 0.0%" << std::endl;
+    std::cerr << "Duty cycle must be greater than 0.0%" << '\n';
     success = false;
   }
 
   if (duration_secs_ < 0.0) {
-    std::cerr << "Duration cannot be negative" << std::endl;
+    std::cerr << "Duration cannot be negative" << '\n';
     success = false;
   }
   if (duration_secs_ > kMaxDurationSecs) {
     std::cerr << "Duration must not exceed " << kMaxDurationSecs << " seconds ("
-              << (kMaxDurationSecs / 86400.0 / 365.25) << " years)" << std::endl;
+              << (kMaxDurationSecs / 86400.0 / 365.25) << " years)" << '\n';
     success = false;
   }
 
   if (frames_per_packet_ > (num_payload_buffers_ * frames_per_payload_buffer_ / 2) &&
       frames_per_packet_ < num_payload_buffers_ * frames_per_payload_buffer_) {
-    std::cerr << "Packet size cannot be larger than half the total payload space" << std::endl;
+    std::cerr << "Packet size cannot be larger than half the total payload space" << '\n';
     success = false;
   }
   if (frames_per_packet_ < frame_rate_ / 1000) {
-    std::cerr << "Packet size must be 1 millisecond or more" << std::endl;
+    std::cerr << "Packet size must be 1 millisecond or more" << '\n';
     success = false;
   }
 
@@ -240,7 +240,7 @@ void MediaApp::ParameterRangeChecks() {
       std::numeric_limits<uint32_t>::max()) {
     std::cerr << "Payload buffer cannot exceed " << std::numeric_limits<uint32_t>::max()
               << " bytes (" << (std::numeric_limits<uint32_t>::max() / frame_size_)
-              << " frames, for this frame_size)" << std::endl;
+              << " frames, for this frame_size)" << '\n';
     success = false;
   }
 
@@ -251,12 +251,12 @@ void MediaApp::ParameterRangeChecks() {
 
     if (clock_rate_adjustment_.value() > ZX_CLOCK_UPDATE_MAX_RATE_ADJUST) {
       std::cerr << "Clock adjustment must be " << ZX_CLOCK_UPDATE_MAX_RATE_ADJUST
-                << " parts-per-million or less" << std::endl;
+                << " parts-per-million or less" << '\n';
       success = false;
     }
     if (clock_rate_adjustment_.value() < ZX_CLOCK_UPDATE_MIN_RATE_ADJUST) {
       std::cerr << "Clock rate adjustment must be " << ZX_CLOCK_UPDATE_MIN_RATE_ADJUST
-                << " parts-per-million or more" << std::endl;
+                << " parts-per-million or more" << '\n';
       success = false;
     }
   }
@@ -278,7 +278,7 @@ void MediaApp::ParameterRangeChecks() {
 
   if (initial_delay_.has_value()) {
     if (initial_delay_.value() < zx::nsec(0)) {
-      std::cerr << "Initial delay cannot be negative" << std::endl;
+      std::cerr << "Initial delay cannot be negative" << '\n';
       success = false;
     } else {
       initial_delay_frames_ = frame_rate_ * initial_delay_->to_nsecs() / 1'000'000'000;
@@ -367,7 +367,7 @@ void MediaApp::InitializeAudibleRenderer() {
     audio_renderer_->SetReferenceClock(std::move(reference_clock_to_set));
   }
 
-  audio_renderer_->SetUsage(usage_);
+  audio_renderer_->SetUsage2(usage_);
 
   audio_renderer_->SetPcmStreamType(format);
 }
@@ -415,12 +415,12 @@ void MediaApp::SetLoudnessLevels(sys::ComponentContext* app_context) {
     app_context->svc()->Connect(audio_core.NewRequest());
 
     if (usage_gain_db_.has_value()) {
-      audio_core->SetRenderUsageGain(usage_, usage_gain_db_.value());
+      audio_core->SetRenderUsageGain2(usage_, usage_gain_db_.value());
     }
 
     if (usage_volume_.has_value()) {
-      audio_core->BindUsageVolumeControl(
-          fuchsia::media::Usage::WithRenderUsage(fidl::Clone(usage_)),
+      audio_core->BindUsageVolumeControl2(
+          fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(usage_)),
           usage_volume_control_.NewRequest());
 
       usage_volume_control_.set_error_handler([this](zx_status_t status) {
@@ -761,7 +761,7 @@ MediaApp::AudioPacket MediaApp::CreateAudioPacket(uint64_t packet_num) {
 
   // By default, the packet.pts (media time) field is NO_TIMESTAMP if we do not override it.
   if (timestamp_packets_) {
-    packet.pts = static_cast<uint64_t>(packet_num_to_pts_->Apply(packet_num));
+    packet.pts = packet_num_to_pts_->Apply(packet_num);
   }
 
   return {

@@ -6,9 +6,7 @@
 {% let wire_subtype = context.wire_prim(subtype) %}
 
 ::fidl_next::bitflags! {
-    {% if let Some(doc) = bits.attributes.doc_string() %}
-        #[doc = "{{ doc.escape_default() }}"]
-    {% endif %}
+    {{ self::doc_string(bits.attributes) -}}
     #[derive(
         Clone,
         Copy,
@@ -21,9 +19,7 @@
     )]
     pub struct {{ name }}: {{ natural_subtype }} {
         {% for member in bits.members -%}
-            {%- if let Some(doc) = member.attributes.doc_string() -%}
-                #[doc = "{{ doc.escape_default() }}"]
-            {%- endif -%}
+            {{ self::doc_string(member.attributes) -}}
             const {{ member.name.screaming_snake()|ident }} = {{ member.value.value }};
         {% endfor %}
         {%- if !bits.is_strict -%}

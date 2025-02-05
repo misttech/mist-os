@@ -8,7 +8,7 @@ use fidl_fuchsia_bluetooth_gatt2 as gatt;
 use fuchsia_bluetooth::types::Uuid;
 use futures::channel::mpsc;
 use futures::{SinkExt, StreamExt};
-use tracing::{info, warn};
+use log::{info, warn};
 
 use crate::host_dispatcher::HostDispatcher;
 

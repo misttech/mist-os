@@ -35,7 +35,8 @@ pub trait Transport: 'static {
     /// Splits the transport into a sender and receiver.
     fn split(self) -> (Self::Sender, Self::Receiver);
 
-    /// The sender half of the transport.
+    /// The sender half of the transport. Dropping all of the senders for a transport should close
+    /// the transport.
     type Sender: Send + Clone;
     /// The buffer type for senders.
     type SendBuffer: Send;

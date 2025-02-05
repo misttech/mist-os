@@ -182,20 +182,20 @@ func (*Service) RemoveExtendedAttribute(fidl.Context, []uint8) (io.NodeRemoveExt
 	return io.NodeRemoveExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (*Service) GetFlags(fidl.Context) (int32, io.OpenFlags, error) {
+func (*Service) DeprecatedGetFlags(fidl.Context) (int32, io.OpenFlags, error) {
 	return int32(zx.ErrNotSupported), 0, nil
 }
 
-func (*Service) SetFlags(fidl.Context, io.OpenFlags) (int32, error) {
+func (*Service) DeprecatedSetFlags(fidl.Context, io.OpenFlags) (int32, error) {
 	return int32(zx.ErrNotSupported), nil
 }
 
-func (*Service) GetFlags2(fidl.Context) (io.NodeGetFlags2Result, error) {
-	return io.NodeGetFlags2ResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*Service) GetFlags(fidl.Context) (io.NodeGetFlagsResult, error) {
+	return io.NodeGetFlagsResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (*Service) SetFlags2(fidl.Context) (io.NodeSetFlags2Result, error) {
-	return io.NodeSetFlags2ResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*Service) SetFlags(fidl.Context) (io.NodeSetFlagsResult, error) {
+	return io.NodeSetFlagsResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (*Service) QueryFilesystem(fidl.Context) (int32, *io.FilesystemInfo, error) {
@@ -525,20 +525,20 @@ func (*directoryState) Watch(_ fidl.Context, _ io.WatchMask, _ uint32, watcher i
 	return int32(zx.ErrNotSupported), nil
 }
 
-func (*directoryState) GetFlags(fidl.Context) (int32, io.OpenFlags, error) {
+func (*directoryState) DeprecatedGetFlags(fidl.Context) (int32, io.OpenFlags, error) {
 	return int32(zx.ErrNotSupported), 0, nil
 }
 
-func (*directoryState) SetFlags(fidl.Context, io.OpenFlags) (int32, error) {
+func (*directoryState) DeprecatedSetFlags(fidl.Context, io.OpenFlags) (int32, error) {
 	return int32(zx.ErrNotSupported), nil
 }
 
-func (*directoryState) GetFlags2(fidl.Context) (io.NodeGetFlags2Result, error) {
-	return io.NodeGetFlags2ResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*directoryState) GetFlags(fidl.Context) (io.NodeGetFlagsResult, error) {
+	return io.NodeGetFlagsResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (*directoryState) SetFlags2(fidl.Context) (io.NodeSetFlags2Result, error) {
-	return io.NodeSetFlags2ResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*directoryState) SetFlags(fidl.Context) (io.NodeSetFlagsResult, error) {
+	return io.NodeSetFlagsResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (dirState *directoryState) AdvisoryLock(fidl.Context, io.AdvisoryLockRequest) (io.AdvisoryLockingAdvisoryLockResult, error) {
@@ -847,20 +847,20 @@ func (*fileState) Resize(fidl.Context, uint64) (io.FileResizeResult, error) {
 	return io.FileResizeResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (*fileState) GetFlags(fidl.Context) (int32, io.OpenFlags, error) {
+func (*fileState) DeprecatedGetFlags(fidl.Context) (int32, io.OpenFlags, error) {
 	return int32(zx.ErrNotSupported), 0, nil
 }
 
-func (*fileState) SetFlags(fidl.Context, io.OpenFlags) (int32, error) {
+func (*fileState) DeprecatedSetFlags(fidl.Context, io.OpenFlags) (int32, error) {
 	return int32(zx.ErrNotSupported), nil
 }
 
-func (*fileState) GetFlags2(fidl.Context) (io.NodeGetFlags2Result, error) {
-	return io.NodeGetFlags2ResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*fileState) GetFlags(fidl.Context) (io.NodeGetFlagsResult, error) {
+	return io.NodeGetFlagsResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (*fileState) SetFlags2(fidl.Context) (io.NodeSetFlags2Result, error) {
-	return io.NodeSetFlags2ResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*fileState) SetFlags(fidl.Context) (io.NodeSetFlagsResult, error) {
+	return io.NodeSetFlagsResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (*fileState) QueryFilesystem(fidl.Context) (int32, *io.FilesystemInfo, error) {

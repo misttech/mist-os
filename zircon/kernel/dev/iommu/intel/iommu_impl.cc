@@ -425,7 +425,7 @@ zx_status_t IommuImpl::Initialize() {
     return status;
   }
 
-  status = SetTranslationEnableLocked(true, zx_time_add_duration(current_time(), ZX_SEC(1)));
+  status = SetTranslationEnableLocked(true, zx_time_add_duration(current_mono_time(), ZX_SEC(1)));
   if (status != ZX_OK) {
     LTRACEF("set translation enable failed\n");
     return status;
@@ -495,7 +495,7 @@ zx_status_t IommuImpl::SetRootTablePointerLocked(paddr_t pa) {
   global_ctl.set_root_table_ptr(1);
   global_ctl.WriteTo(&mmio_);
   zx_status_t status = WaitForValueLocked(&global_ctl, &decltype(global_ctl)::root_table_ptr, 1,
-                                          zx_time_add_duration(current_time(), ZX_SEC(1)));
+                                          zx_time_add_duration(current_mono_time(), ZX_SEC(1)));
   if (status != ZX_OK) {
     LTRACEF("Timed out waiting for root_table_ptr bit to take\n");
     return status;
@@ -507,7 +507,7 @@ zx_status_t IommuImpl::SetRootTablePointerLocked(paddr_t pa) {
   return ZX_OK;
 }
 
-zx_status_t IommuImpl::SetTranslationEnableLocked(bool enabled, zx_time_t deadline) {
+zx_status_t IommuImpl::SetTranslationEnableLocked(bool enabled, zx_instant_mono_t deadline) {
   auto global_ctl = reg::GlobalControl::Get().ReadFrom(&mmio_);
   global_ctl.set_translation_enable(enabled);
   global_ctl.WriteTo(&mmio_);
@@ -614,10 +614,11 @@ void IommuImpl::InvalidateIotlbDomainAll(uint32_t domain_id) {
 template <class RegType>
 zx_status_t IommuImpl::WaitForValueLocked(RegType* reg,
                                           typename RegType::ValueType (RegType::*getter)() const,
-                                          typename RegType::ValueType value, zx_time_t deadline) {
+                                          typename RegType::ValueType value,
+                                          zx_instant_mono_t deadline) {
   DEBUG_ASSERT(lock_.lock().IsHeld());
 
-  const zx_time_t kMaxSleepDuration = ZX_USEC(10);
+  const zx_duration_mono_t kMaxSleepDuration = ZX_USEC(10);
 
   while (true) {
     // Read the register and check if it matches the expected value.  If
@@ -627,12 +628,13 @@ zx_status_t IommuImpl::WaitForValueLocked(RegType* reg,
       return ZX_OK;
     }
 
-    const zx_time_t now = current_time();
+    const zx_instant_mono_t now = current_mono_time();
     if (now > deadline) {
       break;
     }
 
-    zx_time_t sleep_deadline = ktl::min(zx_time_add_duration(now, kMaxSleepDuration), deadline);
+    zx_instant_mono_t sleep_deadline =
+        ktl::min(zx_time_add_duration(now, kMaxSleepDuration), deadline);
     Thread::Current::Sleep(sleep_deadline);
   }
   return ZX_ERR_TIMED_OUT;

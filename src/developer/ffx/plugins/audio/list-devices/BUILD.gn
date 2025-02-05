@@ -6,12 +6,17 @@ import("//src/developer/ffx/build/ffx_plugin.gni")
 import("//src/developer/ffx/build/ffx_tool.gni")
 
 ffx_plugin("ffx_audio_listdevices") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
   args_with_unit_tests = true
 
   args_sources = [ "src/args.rs" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
 
   deps = [
     "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device_rust",

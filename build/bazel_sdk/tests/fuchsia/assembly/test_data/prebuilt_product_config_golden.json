@@ -16,36 +16,21 @@
                 "/core/session-manager/session:session"
             ]
         },
-        "identity": {
-            "password_pinweaver": "required"
-        },
         "ui": {
             "supported_input_devices": [
                 "button",
                 "keyboard"
             ]
-        },
-        "some": {
-            "random": {
-                "path1": true,
-                "int1": 3234234324231434134141234,
-                "string1": "I have a string"
-            }
-        },
-        "another": {
-            "random": {
-                "path1": false,
-                "int": 0,
-                "string2": "false"
-            }
         }
     },
     "product": {
-        "cache": [
-            {
-                "manifest": "prebuilt_ams_light_fuchsia_package_expanded/rebased_package_manifest.json"
-            }
-        ],
+        "packages": {
+            "cache": [
+                {
+                    "manifest": "prebuilt_ams_light_fuchsia_package_expanded/rebased_package_manifest.json"
+                }
+            ]
+        },
         "session": {
             "url": "fuchsia-pkg://fuchsia.com/test_session#meta/test_session.cm"
         }

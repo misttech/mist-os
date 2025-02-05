@@ -10,6 +10,7 @@ use log::{error, info, warn};
 use networking_metrics_registry::networking_metrics_registry as metrics_registry;
 use {
     fidl_fuchsia_metrics as fmetrics, fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration,
+    fidl_fuchsia_power_internal as fpower,
 };
 
 const DEFAULT_NETSTACK: NetstackVersion = NetstackVersion::Netstack2;
@@ -77,6 +78,16 @@ impl Persisted {
             error!("error persisting configuration {self:?}: {e:?}")
         })
     }
+
+    // Determine the desired NetstackVersion based on the persisted values
+    fn desired_netstack_version(&self) -> NetstackVersion {
+        match self {
+            Persisted { user: Some(user), automated: _ } => *user,
+            Persisted { user: None, automated: Some(automated) } => *automated,
+            // Use the default version if nothing is set.
+            Persisted { user: None, automated: None } => DEFAULT_NETSTACK,
+        }
+    }
 }
 
 enum ServiceRequest {
@@ -84,10 +95,11 @@ enum ServiceRequest {
     State(fnet_migration::StateRequest),
 }
 
-struct Migration<P> {
+struct Migration<P, CR> {
     current_boot: NetstackVersion,
     persisted: Persisted,
     persistence: P,
+    collaborative_reboot: CollaborativeReboot<CR>,
 }
 
 trait PersistenceProvider {
@@ -115,24 +127,100 @@ impl PersistenceProvider for DataPersistenceProvider {
     }
 }
 
-impl<P: PersistenceProvider> Migration<P> {
-    fn new(persistence: P) -> Self {
+struct CollaborativeReboot<CR> {
+    scheduler: CR,
+    /// `Some(<cancellation_token>)` if there's an outstanding collaborative
+    /// reboot scheduled.
+    scheduled_req: Option<zx::EventPair>,
+}
+
+impl<CR: CollaborativeRebootScheduler> CollaborativeReboot<CR> {
+    /// Schedules a collaborative reboot.
+    ///
+    /// No-Op if there's already a reboot scheduled.
+    async fn schedule(&mut self) {
+        let Self { scheduler, scheduled_req } = self;
+        if scheduled_req.is_some() {
+            // We already have an outstanding request.
+            return;
+        }
+
+        info!("Scheduling collaborative reboot");
+        let (mine, theirs) = zx::EventPair::create();
+        *scheduled_req = Some(mine);
+        scheduler
+            .schedule(fpower::CollaborativeRebootReason::NetstackMigration, Some(theirs))
+            .await;
+    }
+
+    /// Cancels the currently scheduled collaborative Reboot.
+    ///
+    /// No-Op if there's none scheduled.
+    fn cancel(&mut self) {
+        if let Some(cancel) = self.scheduled_req.take() {
+            info!("Canceling collaborative reboot request. It's no longer necessary.");
+            // Dropping the eventpair cancels the request.
+            std::mem::drop(cancel);
+        }
+    }
+}
+
+/// An abstraction over the `fpower::CollaborativeRebootScheduler` FIDL API.
+trait CollaborativeRebootScheduler {
+    async fn schedule(
+        &mut self,
+        reason: fpower::CollaborativeRebootReason,
+        cancel: Option<zx::EventPair>,
+    );
+}
+
+/// An implementation of `CollaborativeRebootScheduler` that connects to the
+/// API over FIDL.
+struct Scheduler {}
+
+impl CollaborativeRebootScheduler for Scheduler {
+    async fn schedule(
+        &mut self,
+        reason: fpower::CollaborativeRebootReason,
+        cancel: Option<zx::EventPair>,
+    ) {
+        let proxy = match fuchsia_component::client::connect_to_protocol::<
+            fpower::CollaborativeRebootSchedulerMarker,
+        >() {
+            Ok(proxy) => proxy,
+            Err(e) => {
+                error!("Failed to connect to collaborative reboot scheduler: {e:?}");
+                return;
+            }
+        };
+        match proxy.schedule_reboot(reason, cancel).await {
+            Ok(()) => {}
+            Err(e) => error!("Failed to schedule collaborative reboot: {e:?}"),
+        }
+    }
+}
+
+impl<P: PersistenceProvider, CR: CollaborativeRebootScheduler> Migration<P, CR> {
+    fn new(persistence: P, cr_scheduler: CR) -> Self {
         let persisted = persistence.open_reader().map(Persisted::load).unwrap_or_else(|e| {
             warn!("could not open persistence reader: {e:?}. using defaults");
             Persisted::default()
         });
-        let current_boot = match &persisted {
-            Persisted { user: Some(user), automated: _ } => *user,
-            Persisted { user: None, automated: Some(automated) } => *automated,
-            // Use the default version if nothing is set.
-            Persisted { user: None, automated: None } => DEFAULT_NETSTACK,
-        };
+        let current_boot = persisted.desired_netstack_version();
 
-        Self { current_boot, persisted, persistence }
+        Self {
+            current_boot,
+            persisted,
+            persistence,
+            collaborative_reboot: CollaborativeReboot {
+                scheduler: cr_scheduler,
+                scheduled_req: None,
+            },
+        }
     }
 
     fn persist(&mut self) {
-        let Self { current_boot: _, persisted, persistence } = self;
+        let Self { current_boot: _, persisted, persistence, collaborative_reboot: _ } = self;
         let w = match persistence.open_writer() {
             Ok(w) => w,
             Err(e) => {
@@ -152,7 +240,20 @@ impl<P: PersistenceProvider> Migration<P> {
         })
     }
 
-    fn handle_control_request(
+    async fn update_collaborative_reboot(&mut self) {
+        let Self { current_boot, persisted, persistence: _, collaborative_reboot } = self;
+        if persisted.desired_netstack_version() != *current_boot {
+            // When the current boot differs from our desired version, schedule
+            // a reboot (if there's not already one).
+            collaborative_reboot.schedule().await
+        } else {
+            // When the current_boot matches our desired version, we no longer
+            // need reboot. Cancel the outstanding request (if any)
+            collaborative_reboot.cancel()
+        }
+    }
+
+    async fn handle_control_request(
         &mut self,
         req: fnet_migration::ControlRequest,
     ) -> Result<(), fidl::Error> {
@@ -163,11 +264,13 @@ impl<P: PersistenceProvider> Migration<P> {
                     current_boot: _,
                     persisted: Persisted { automated, user: _ },
                     persistence: _,
+                    collaborative_reboot: _,
                 } = self;
                 if version != *automated {
                     info!("automated netstack version switched to {version:?}");
                     *automated = version;
                     self.persist();
+                    self.update_collaborative_reboot().await;
                 }
                 responder.send()
             }
@@ -177,11 +280,13 @@ impl<P: PersistenceProvider> Migration<P> {
                     current_boot: _,
                     persisted: Persisted { automated: _, user },
                     persistence: _,
+                    collaborative_reboot: _,
                 } = self;
                 if version != *user {
                     info!("user netstack version switched to {version:?}");
                     *user = version;
                     self.persist();
+                    self.update_collaborative_reboot().await;
                 }
                 responder.send()
             }
@@ -189,8 +294,12 @@ impl<P: PersistenceProvider> Migration<P> {
     }
 
     fn handle_state_request(&self, req: fnet_migration::StateRequest) -> Result<(), fidl::Error> {
-        let Migration { current_boot, persisted: Persisted { user, automated }, persistence: _ } =
-            self;
+        let Migration {
+            current_boot,
+            persisted: Persisted { user, automated },
+            persistence: _,
+            collaborative_reboot: _,
+        } = self;
         match req {
             fnet_migration::StateRequest::GetNetstackVersion { responder } => {
                 responder.send(&fnet_migration::InEffectVersion {
@@ -202,9 +311,9 @@ impl<P: PersistenceProvider> Migration<P> {
         }
     }
 
-    fn handle_request(&mut self, req: ServiceRequest) -> Result<(), fidl::Error> {
+    async fn handle_request(&mut self, req: ServiceRequest) -> Result<(), fidl::Error> {
         match req {
-            ServiceRequest::Control(r) => self.handle_control_request(r),
+            ServiceRequest::Control(r) => self.handle_control_request(r).await,
             ServiceRequest::State(r) => self.handle_state_request(r),
         }
     }
@@ -216,7 +325,7 @@ struct InspectNodes {
 }
 
 impl InspectNodes {
-    fn new<P>(inspector: &fuchsia_inspect::Inspector, m: &Migration<P>) -> Self {
+    fn new<P, CR>(inspector: &fuchsia_inspect::Inspector, m: &Migration<P, CR>) -> Self {
         let root = inspector.root();
         let Migration { current_boot, persisted: Persisted { automated, user }, .. } = m;
         let automated_setting = root.create_uint(
@@ -232,7 +341,7 @@ impl InspectNodes {
         Self { automated_setting, user_setting }
     }
 
-    fn update<P>(&self, m: &Migration<P>) {
+    fn update<P, CR>(&self, m: &Migration<P, CR>) {
         let Migration { persisted: Persisted { automated, user }, .. } = m;
         let Self { automated_setting, user_setting } = self;
         automated_setting.set(NetstackVersion::optional_inspect_uint_value(automated));
@@ -284,7 +393,7 @@ impl MetricsLogger {
     }
 
     /// Logs metrics from `migration` to the metrics server.
-    async fn log_metrics<P>(&self, migration: &Migration<P>) {
+    async fn log_metrics<P, CR>(&self, migration: &Migration<P, CR>) {
         let logger = if let Some(logger) = self.logger.as_ref() {
             logger
         } else {
@@ -349,7 +458,7 @@ pub async fn main() {
     let _: &mut ServiceFs<_> =
         fs.take_and_serve_directory_handle().expect("failed to take out directory handle");
 
-    let mut migration = Migration::new(DataPersistenceProvider {});
+    let mut migration = Migration::new(DataPersistenceProvider {}, Scheduler {});
 
     let inspector = fuchsia_inspect::component::inspector();
     let _inspect_server =
@@ -378,7 +487,10 @@ pub async fn main() {
     while let Some(action) = stream.next().await {
         match action {
             Action::ServiceRequest(req) => {
-                let result = req.and_then(|req| migration.handle_request(req));
+                let result = match req {
+                    Ok(req) => migration.handle_request(req).await,
+                    Err(e) => Err(e),
+                };
                 // Always update inspector state after handling a request.
                 inspect_nodes.update(&migration);
                 match result {
@@ -401,6 +513,7 @@ pub async fn main() {
 mod tests {
     use super::*;
     use diagnostics_assertions::assert_data_tree;
+    use fidl::Peered as _;
     use std::cell::RefCell;
     use std::rc::Rc;
     use test_case::test_case;
@@ -447,10 +560,39 @@ mod tests {
         }
     }
 
-    fn serve_migration<P: PersistenceProvider>(
-        migration: Migration<P>,
+    struct NoCollaborativeReboot;
+
+    impl CollaborativeRebootScheduler for NoCollaborativeReboot {
+        async fn schedule(
+            &mut self,
+            _reason: fpower::CollaborativeRebootReason,
+            _cancel: Option<zx::EventPair>,
+        ) {
+            panic!("unexpectedly attempted to schedule a collaborative reboot");
+        }
+    }
+
+    #[derive(Default)]
+    struct FakeCollaborativeReboot {
+        req: Option<zx::EventPair>,
+    }
+
+    impl CollaborativeRebootScheduler for FakeCollaborativeReboot {
+        async fn schedule(
+            &mut self,
+            reason: fpower::CollaborativeRebootReason,
+            cancel: Option<zx::EventPair>,
+        ) {
+            assert_eq!(reason, fpower::CollaborativeRebootReason::NetstackMigration);
+            let cancel = cancel.expect("cancellation signal must be provided");
+            assert_eq!(self.req.replace(cancel), None, "attempted to schedule multiple reboots");
+        }
+    }
+
+    fn serve_migration<P: PersistenceProvider, CR: CollaborativeRebootScheduler>(
+        migration: Migration<P, CR>,
     ) -> (
-        impl futures::Future<Output = Migration<P>>,
+        impl futures::Future<Output = Migration<P, CR>>,
         fnet_migration::ControlProxy,
         fnet_migration::StateProxy,
     ) {
@@ -463,9 +605,9 @@ mod tests {
             let control =
                 control_server.map(|req| ServiceRequest::Control(req.expect("control error")));
             let state = state_server.map(|req| ServiceRequest::State(req.expect("state error")));
-            futures::stream::select(control, state).fold(migration, |mut migration, req| {
-                migration.handle_request(req).expect("handling request");
-                futures::future::ready(migration)
+            futures::stream::select(control, state).fold(migration, |mut migration, req| async {
+                migration.handle_request(req).await.expect("handling request");
+                migration
             })
         };
         (fut, control, state)
@@ -504,9 +646,13 @@ mod tests {
 
     #[fuchsia::test]
     fn uses_defaults_if_no_persistence() {
-        let m = Migration::new(InMemory::default());
-        let Migration { current_boot, persisted: Persisted { user, automated }, persistence: _ } =
-            m;
+        let m = Migration::new(InMemory::default(), NoCollaborativeReboot);
+        let Migration {
+            current_boot,
+            persisted: Persisted { user, automated },
+            persistence: _,
+            collaborative_reboot: _,
+        } = m;
         assert_eq!(current_boot, DEFAULT_NETSTACK);
         assert_eq!(user, None);
         assert_eq!(automated, None);
@@ -537,12 +683,16 @@ mod tests {
         p_automated: Option<NetstackVersion>,
         expect: NetstackVersion,
     ) {
-        let m = Migration::new(InMemory::with_persisted(Persisted {
-            user: p_user,
-            automated: p_automated,
-        }));
-        let Migration { current_boot, persisted: Persisted { user, automated }, persistence: _ } =
-            &m;
+        let m = Migration::new(
+            InMemory::with_persisted(Persisted { user: p_user, automated: p_automated }),
+            NoCollaborativeReboot,
+        );
+        let Migration {
+            current_boot,
+            persisted: Persisted { user, automated },
+            persistence: _,
+            collaborative_reboot: _,
+        } = &m;
         assert_eq!(*current_boot, expect);
         assert_eq!(*user, p_user);
         assert_eq!(*automated, p_automated);
@@ -558,7 +708,7 @@ mod tests {
             assert_eq!(user, p_user);
             assert_eq!(automated, p_automated);
         };
-        let (_, ()): (Migration<_>, _) = futures::future::join(serve, fut).await;
+        let (_, ()): (Migration<_, _>, _) = futures::future::join(serve, fut).await;
     }
 
     #[derive(Debug, Copy, Clone)]
@@ -573,7 +723,10 @@ mod tests {
     #[test_case(SetMechanism::Automated, NetstackVersion::Netstack3; "set_automated_ns3")]
     #[fuchsia::test]
     async fn set_netstack_version(mechanism: SetMechanism, set_version: NetstackVersion) {
-        let m = Migration::new(InMemory::with_persisted(Default::default()));
+        let m = Migration::new(
+            InMemory::with_persisted(Default::default()),
+            FakeCollaborativeReboot::default(),
+        );
         let (serve, control, _) = serve_migration(m);
         let fut = async move {
             let setting = fnet_migration::VersionSetting { version: set_version.into() };
@@ -590,11 +743,12 @@ mod tests {
         };
         let (migration, ()) = futures::future::join(serve, fut).await;
 
-        let validate_versions = |m: &Migration<_>, current| {
+        let validate_versions = |m: &Migration<_, _>, current| {
             let Migration {
                 current_boot,
                 persisted: Persisted { user, automated },
                 persistence: _,
+                collaborative_reboot: _,
             } = m;
             assert_eq!(*current_boot, current);
             match mechanism {
@@ -610,9 +764,84 @@ mod tests {
         };
 
         validate_versions(&migration, DEFAULT_NETSTACK);
+        let cr_req = &migration.collaborative_reboot.scheduler.req;
+        match (mechanism, set_version) {
+            (_, NetstackVersion::Netstack3) => {
+                assert_eq!(
+                    Ok(false),
+                    cr_req.as_ref().expect("there should be a request").is_closed()
+                )
+            }
+            _ => assert_eq!(cr_req, &None),
+        }
+
         // Check that the setting was properly persisted.
-        let migration = Migration::new(migration.persistence);
+        let migration =
+            Migration::new(migration.persistence, migration.collaborative_reboot.scheduler);
         validate_versions(&migration, set_version);
+    }
+
+    #[test_case(SetMechanism::User, Some(NetstackVersion::Netstack2), true)]
+    #[test_case(SetMechanism::User, Some(NetstackVersion::Netstack3), false)]
+    #[test_case(SetMechanism::User, None, false)]
+    #[test_case(SetMechanism::Automated, Some(NetstackVersion::Netstack2), true)]
+    #[test_case(SetMechanism::Automated, Some(NetstackVersion::Netstack3), false)]
+    #[test_case(SetMechanism::Automated, None, true)]
+    #[fuchsia::test]
+    async fn cancel_collaborative_reboot(
+        mechanism: SetMechanism,
+        version: Option<NetstackVersion>,
+        expect_canceled: bool,
+    ) {
+        let migration = Migration::new(
+            InMemory::with_persisted(Persisted { user: None, automated: None }),
+            FakeCollaborativeReboot::default(),
+        );
+
+        // Start of by updating the automated setting to Netstack3; this ensures
+        // their is a pending request to cancel.
+        let (serve, control, _) = serve_migration(migration);
+        let fut = async move {
+            control
+                .set_automated_netstack_version(Some(&fnet_migration::VersionSetting {
+                    version: fnet_migration::NetstackVersion::Netstack3,
+                }))
+                .await
+                .expect("set automated netstack version");
+        };
+        let (migration, ()) = futures::future::join(serve, fut).await;
+        let cancel = migration
+            .collaborative_reboot
+            .scheduler
+            .req
+            .as_ref()
+            .expect("there should be a request");
+        assert_eq!(Ok(false), cancel.is_closed());
+
+        // Update the setting based on the test parameters
+        let (serve, control, _) = serve_migration(migration);
+        let fut = async move {
+            let setting = version.map(|v| fnet_migration::VersionSetting { version: v.into() });
+            match mechanism {
+                SetMechanism::User => control
+                    .set_user_netstack_version(setting.as_ref())
+                    .await
+                    .expect("set user netstack version"),
+                SetMechanism::Automated => control
+                    .set_automated_netstack_version(setting.as_ref())
+                    .await
+                    .expect("set automated netstack version"),
+            }
+        };
+        let (migration, ()) = futures::future::join(serve, fut).await;
+
+        let cancel = migration
+            .collaborative_reboot
+            .scheduler
+            .req
+            .as_ref()
+            .expect("there should be a request");
+        assert_eq!(Ok(expect_canceled), cancel.is_closed());
     }
 
     #[test_case(SetMechanism::User)]
@@ -620,10 +849,13 @@ mod tests {
     #[fuchsia::test]
     async fn clear_netstack_version(mechanism: SetMechanism) {
         const PREVIOUS_VERSION: NetstackVersion = NetstackVersion::Netstack2;
-        let m = Migration::new(InMemory::with_persisted(Persisted {
-            user: Some(PREVIOUS_VERSION),
-            automated: Some(PREVIOUS_VERSION),
-        }));
+        let m = Migration::new(
+            InMemory::with_persisted(Persisted {
+                user: Some(PREVIOUS_VERSION),
+                automated: Some(PREVIOUS_VERSION),
+            }),
+            NoCollaborativeReboot,
+        );
         let (serve, control, _) = serve_migration(m);
         let fut = async move {
             match mechanism {
@@ -639,11 +871,12 @@ mod tests {
         };
         let (migration, ()) = futures::future::join(serve, fut).await;
 
-        let validate_versions = |m: &Migration<_>| {
+        let validate_versions = |m: &Migration<_, _>| {
             let Migration {
                 current_boot,
                 persisted: Persisted { user, automated },
                 persistence: _,
+                collaborative_reboot: _,
             } = m;
             assert_eq!(*current_boot, PREVIOUS_VERSION);
             match mechanism {
@@ -660,16 +893,20 @@ mod tests {
 
         validate_versions(&migration);
         // Check that the setting was properly persisted.
-        let migration = Migration::new(migration.persistence);
+        let migration =
+            Migration::new(migration.persistence, migration.collaborative_reboot.scheduler);
         validate_versions(&migration);
     }
 
     #[fuchsia::test]
     fn inspect() {
-        let mut m = Migration::new(InMemory::with_persisted(Persisted {
-            user: Some(NetstackVersion::Netstack2),
-            automated: Some(NetstackVersion::Netstack3),
-        }));
+        let mut m = Migration::new(
+            InMemory::with_persisted(Persisted {
+                user: Some(NetstackVersion::Netstack2),
+                automated: Some(NetstackVersion::Netstack3),
+            }),
+            NoCollaborativeReboot,
+        );
         let inspector = fuchsia_inspect::component::inspector();
         let nodes = InspectNodes::new(inspector, &m);
         assert_data_tree!(inspector,
@@ -725,7 +962,10 @@ mod tests {
         let (current_boot, current_boot_expect) = current_boot;
         let (user, user_expect) = user;
         let (automated, automated_expect) = automated;
-        let mut m = Migration::new(InMemory::with_persisted(Persisted { user, automated }));
+        let mut m = Migration::new(
+            InMemory::with_persisted(Persisted { user, automated }),
+            NoCollaborativeReboot,
+        );
         m.current_boot = current_boot;
         let (logger, mut logger_stream) =
             fidl::endpoints::create_proxy_and_stream::<fmetrics::MetricEventLoggerMarker>();

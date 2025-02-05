@@ -35,6 +35,7 @@ group("driver_test_realm") {
   deps = [
     ":driver_manager_test",
     ":driver_test_realm_component",
+    ":dtr_support_component",
     ":fake_resolver",
     ":test_realm_manifest",
     "//src/devices/bin/devfs:component-for-test",
@@ -95,13 +96,57 @@ executable("bin") {
   ]
 }
 
+executable("dtr_support_bin") {
+  output_name = "dtr_support"
+  sources = [
+    "src/boot_items.cc",
+    "src/boot_items.h",
+    "src/dtr_support_main.cc",
+    "src/root_job.cc",
+    "src/root_job.h",
+    "src/system_state.h",
+  ]
+  deps = [
+    ":dtr_support_config",
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
+    "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_cpp",
+    "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp",
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_cpp",
+    "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_cpp",
+    "//sdk/fidl/fuchsia.system.state:fuchsia.system.state_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/syslog/cpp",
+    "//sdk/lib/zbi-format",
+    "//src/lib/ddk",
+    "//src/lib/ddk:ddk-metadata-headers",
+    "//src/lib/files",
+    "//third_party/rapidjson",
+  ]
+}
+
 fuchsia_component_manifest("manifest") {
   component_name = "driver_test_realm"
   manifest = "meta/driver_test_realm.cml"
 }
 
+fuchsia_component_manifest("dtr_support_manifest") {
+  component_name = "dtr_support"
+  manifest = "meta/dtr_support.cml"
+}
+
 fuchsia_structured_config_cpp_elf_lib("driver_test_realm_config") {
   cm_label = ":manifest"
+}
+
+fuchsia_structured_config_cpp_elf_lib("dtr_support_config") {
+  cm_label = ":dtr_support_manifest"
 }
 
 fuchsia_structured_config_values("driver_test_realm_config_default") {
@@ -117,6 +162,11 @@ fuchsia_component("driver_test_realm_component") {
     ":bin",
     ":driver_test_realm_config_default",
   ]
+}
+
+fuchsia_component("dtr_support_component") {
+  cm_label = ":dtr_support_manifest"
+  deps = [ ":dtr_support_bin" ]
 }
 
 executable("fake_resolver_bin") {
@@ -158,6 +208,8 @@ fuchsia_structured_config_values("test_config") {
     verbose = false
     root_driver = "fuchsia-boot:///dtr#meta/test-parent-sys.cm"
     enable_test_shutdown_delays = false
+    power_inject_offer = false
+    power_suspend_enabled = false
   }
 }
 

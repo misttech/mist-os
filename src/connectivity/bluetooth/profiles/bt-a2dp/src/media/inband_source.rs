@@ -15,8 +15,8 @@ use fuchsia_inspect_derive::{AttachError, Inspect};
 use futures::channel::oneshot;
 use futures::future::{BoxFuture, Shared, WeakShared};
 use futures::{AsyncWriteExt, FutureExt, TryFutureExt, TryStreamExt};
+use log::{info, trace, warn};
 use std::time::Duration;
-use tracing::{info, trace, warn};
 use {fuchsia_async as fasync, fuchsia_trace as trace};
 
 use super::sources;

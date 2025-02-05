@@ -10,10 +10,12 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.process.Launcher",
-            ],
+            dictionary: "diagnostics",
+            from: "parent",
+            to: [ "#netemul_test_runner" ],
+        },
+        {
+            protocol: [ "fuchsia.process.Launcher" ],
             from: "parent",
             to: [ "#netemul_test_runner" ],
         },

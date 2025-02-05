@@ -11,9 +11,9 @@ use fuchsia_sync::Mutex;
 use futures::stream::BoxStream;
 use futures::task::Context;
 use futures::{AsyncWriteExt, FutureExt, StreamExt};
+use log::{error, info, warn};
 use media::AudioDeviceEnumeratorProxy;
 use std::pin::pin;
-use tracing::{error, info, warn};
 use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_media as media, fuchsia_async as fasync};
 
 use crate::audio::{AudioControl, AudioControlEvent, AudioError, HF_INPUT_UUID, HF_OUTPUT_UUID};
@@ -251,10 +251,10 @@ impl AudioSession {
             AudioSession::sco_to_decoder(self.sco.proxy.clone(), self.decoder, self.codec);
         let sco_read = pin!(sco_read);
         let e = futures::select! {
-            e = audio_to_encoder.fuse() => { warn!(?e, "PCM to encoder write"); e},
-            e = sco_write.fuse() => { warn!(?e, "Write encoded to SCO"); e},
-            e = sco_read.fuse() => { warn!(?e, "SCO read to decoder"); e},
-            e = decoder_to_sink.fuse() => { warn!(?e, "SCO decoder to PCM"); e},
+            e = audio_to_encoder.fuse() => { warn!(e:?; "PCM to encoder write"); e},
+            e = sco_write.fuse() => { warn!(e:?; "Write encoded to SCO"); e},
+            e = sco_read.fuse() => { warn!(e:?; "SCO read to decoder"); e},
+            e = decoder_to_sink.fuse() => { warn!(e:?; "SCO decoder to PCM"); e},
         };
         let _ =
             self.event_sender.try_send(AudioControlEvent::Stopped { id: peer_id, error: Some(e) });

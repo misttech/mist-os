@@ -16,7 +16,7 @@
 
 use crate::error::Error;
 use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
-use tracing::error;
+use log::error;
 use wlan_common::append::Append;
 use wlan_common::buffer_reader::BufferReader;
 use wlan_common::buffer_writer::BufferWriter;

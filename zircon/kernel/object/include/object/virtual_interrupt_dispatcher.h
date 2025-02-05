@@ -31,7 +31,7 @@ class VirtualInterruptDispatcher final : public InterruptDispatcher {
   void UnregisterInterruptHandler() final;
 
  private:
-  VirtualInterruptDispatcher();
+  explicit VirtualInterruptDispatcher(Flags flags, uint32_t options);
 };
 
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_VIRTUAL_INTERRUPT_DISPATCHER_H_

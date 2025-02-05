@@ -20,12 +20,13 @@ set -o errexit
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh
 fx-config-read
 
-readonly CIPD_LOCAL_BASE="/tmp/CIPD_LOCAL/fuchsia/packages"
+readonly CIPD_LOCAL_BASE_PACKAGES="/tmp/CIPD_LOCAL/fuchsia/packages"
+readonly CIPD_LOCAL_BASE_FILES="/tmp/CIPD_LOCAL/fuchsia"
 
 create_build_bazel_file() {
-    local platform_aibs_path=$1
+    local dir=$1
 
-    cat << "EOF" > "${platform_aibs_path}/BUILD.bazel"
+    cat << "EOF" > "${dir}/BUILD.bazel"
 
 package(default_visibility = ["//visibility:public"])
 
@@ -48,37 +49,33 @@ EOF
 
 print_usage_message() {
     local bazel_sdk_path=$1
-    local platform_aibs_path=$2
+    local rules_fuchsia_path=$2
+    local platform_aibs_path=$3
 
     cat << EOF
 Local Platform Artifacts are ready to use. Use "--repo_env" to point to the local
 platform artifacts and Bazel SDK.
 
-Note: To make sure the versions align between platform AIBs, in-tree released
-driver, and Bazel SDK, you have to overwrite them atomically.
+Note: To make sure the versions align between Bazel SDK, platform AIBs, in-tree released
+driver, and other platform artifacts, you have to overwrite them atomically.
 
 Sample usage:
 
     bazel build \\
         --repo_env=fuchsia_sdk=${bazel_sdk_path} \\
+        --repo_env=rules_fuchsia=${rules_fuchsia_path} \\
         --repo_env=fuchsia_platform=${platform_aibs_path} \\
-        --repo_env=emac=${CIPD_LOCAL_BASE} \\
+        --repo_env=platform_artifacts=${CIPD_LOCAL_BASE_FILES} \\
+        --repo_env=drivers=${CIPD_LOCAL_BASE_PACKAGES} \\
         <your_build_target>
 
 EOF
 }
 
 main() {
-    local bazel_sdk_info_path="${FUCHSIA_BUILD_DIR}/bazel_sdk_info.json"
-    local bazel_sdk_path="$(fx-command-run jq ".[0].location" "${bazel_sdk_info_path}")"
-    local bazel_sdk_path="${FUCHSIA_BUILD_DIR}/${bazel_sdk_path//\"}"
-
-    local platform_artifacts_path="${FUCHSIA_BUILD_DIR}/platform_artifacts.json"
-    local platform_aibs_path="$(fx-command-run jq ".[0].path" "${platform_artifacts_path}")"
-    local platform_aibs_path="${FUCHSIA_BUILD_DIR}/${platform_aibs_path//\"}"
-
-    # Create a BUILD.bazel file for platform AIBs directory
-    create_build_bazel_file "${platform_aibs_path}"
+    local bazel_sdk_path="${FUCHSIA_BUILD_DIR}/$(build/api/client print bazel_sdk_info | fx-command-run jq -r ".[0].location")"
+    local rules_fuchsia_path="${FUCHSIA_BUILD_DIR}/$(build/api/client print rules_fuchsia_info | fx-command-run jq -r ".[0].location")"
+    local platform_aibs_path="${FUCHSIA_BUILD_DIR}/$(build/api/client print platform_artifacts| fx-command-run jq -r ".[0].path")"
 
     # Remove previous `exported_package_labels` from the file before appending
     # new ones to the end.
@@ -102,25 +99,39 @@ main() {
         done
         echo "]"
     ) >> "${FUCHSIA_BUILD_DIR}/args.gn"
-    fx-command-run build final_fuchsia_sdk platform_artifacts package_archives
+    fx-command-run build
+    fx-command-run build package_archives final_fuchsia_sdk
+
+    # Create a BUILD.bazel file for platform AIBs directory and CIPD_LOCAL_BASE_FILES
+    create_build_bazel_file "${platform_aibs_path}"
+    create_build_bazel_file "${CIPD_LOCAL_BASE_FILES}"
+
+    mkdir -p "${CIPD_LOCAL_BASE_FILES}"
+    # Parse the exported_files.json
+    local exported_files="$(build/api/client print exported_files | fx-command-run jq -c ".[]")"
+    local exported_files=($(echo "${exported_files}" | tr ' ' '\n'))
+    for exported_file in "${exported_files[@]}"; do
+        filepath="$(echo ${exported_file} | jq .path)"
+        filename="$(basename ${filepath})"
+        cp "${FUCHSIA_BUILD_DIR}/${filepath//\"}" "${CIPD_LOCAL_BASE_FILES}"
+    done
 
     # Parse the package_archives.json
-    local package_archives_path="${FUCHSIA_BUILD_DIR}/package_archives.json"
-    local package_archives="$(fx-command-run jq ".[]" "${package_archives_path}")"
+    local package_archives="$(build/api/client print package_archives | fx-command-run jq -c ".[]")"
     local package_archives_array=($(echo "${package_archives}" | tr ' ' '\n'))
     for package_archive in "${package_archives_array[@]}"; do
-        # Parse packagee archieve metadata
+        # Parse packagee archive metadata
         package_archive_path="${FUCHSIA_BUILD_DIR}/${package_archive//\"}"
         package_name="$(jq .name ${package_archive_path})"
         package_path="$(jq .path ${package_archive_path})"
 
-        local local_cipd_path="${CIPD_LOCAL_BASE}/${package_name//\"}"
+        local local_cipd_path="${CIPD_LOCAL_BASE_PACKAGES}/${package_name//\"}"
         mkdir -p "${local_cipd_path}"
 
         cp "${FUCHSIA_BUILD_DIR}/${package_path//\"}" "${local_cipd_path}"
     done
 
-    print_usage_message "${bazel_sdk_path}" "${platform_aibs_path}"
+    print_usage_message "${bazel_sdk_path}" "${rules_fuchsia_path}""${platform_aibs_path}"
 }
 
 main "$@"

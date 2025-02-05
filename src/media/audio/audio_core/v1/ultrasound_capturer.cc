@@ -67,6 +67,10 @@ void UltrasoundCapturer::SetUsage(fuchsia::media::AudioCaptureUsage usage) {
   FX_LOGS(ERROR) << "Unsupported method SetUsage on ultrasound capturer";
   binding().Close(ZX_ERR_NOT_SUPPORTED);
 }
+void UltrasoundCapturer::SetUsage2(fuchsia::media::AudioCaptureUsage2 usage) {
+  FX_LOGS(ERROR) << "Unsupported method SetUsage2 on ultrasound capturer";
+  binding().Close(ZX_ERR_NOT_SUPPORTED);
+}
 void UltrasoundCapturer::SetPcmStreamType(fuchsia::media::AudioStreamType stream_type) {
   FX_LOGS(ERROR) << "Unsupported method SetPcmStreamType on ultrasound capturer";
   binding().Close(ZX_ERR_NOT_SUPPORTED);

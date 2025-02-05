@@ -40,7 +40,7 @@ def _codegen_impl(ctx):
 # Runs bindc to produce the header file with the constants for the bind_library.
 _codegen = rule(
     implementation = _codegen_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     # Files must be generated in genfiles in order for the header to be included
     # anywhere.
     output_to_genfiles = True,

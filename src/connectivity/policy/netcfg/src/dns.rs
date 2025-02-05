@@ -9,7 +9,7 @@ use fidl_fuchsia_net_name as fnet_name;
 use async_utils::stream::{Tagged, WithTag as _};
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource};
 use fidl::endpoints::{ControlHandle as _, Responder as _};
-use tracing::{error, trace, warn};
+use log::{error, trace, warn};
 
 /// Updates the DNS servers used by the DNS resolver.
 pub(super) async fn update_servers(

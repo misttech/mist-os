@@ -5,10 +5,10 @@
 mod tee_client_api;
 
 use self::tee_client_api::*;
+use log::debug;
 use std::fmt::Debug;
 use std::{fmt, mem, ptr};
 use thiserror::Error;
-use tracing::debug;
 
 use self::tee_client_api::{TEEC_Operation as TeecOperation, TEEC_Value as TeecValue};
 

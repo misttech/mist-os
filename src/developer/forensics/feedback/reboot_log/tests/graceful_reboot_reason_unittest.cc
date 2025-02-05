@@ -36,11 +36,40 @@ TEST(GracefulRebootReasonTest, VerifyContentConversion) {
       GracefulRebootReason::kFdr,
       GracefulRebootReason::kZbiSwap,
       GracefulRebootReason::kNotSupported,
+      GracefulRebootReason::kNetstackMigration,
   };
 
   for (const auto reason : reasons) {
-    EXPECT_EQ((int)reason, (int)FromFileContent(ToFileContent(reason)));
+    EXPECT_THAT(FromFileContent(ToFileContent({reason})), testing::ElementsAre(reason));
   }
+}
+
+TEST(GracefulRebootReasonTest, VerifyContentConversionWithMultipleReasons) {
+  // ToFileContent() & FromFileContent() for reboot reasons from |power::statecontrol::RebootReason|
+  // should be reversible when there are multiple reasons.
+
+  const std::vector<GracefulRebootReason> reasons = {
+      GracefulRebootReason::kUserRequest,
+      GracefulRebootReason::kSystemUpdate,
+      GracefulRebootReason::kRetrySystemUpdate,
+      GracefulRebootReason::kHighTemperature,
+      GracefulRebootReason::kSessionFailure,
+      GracefulRebootReason::kSysmgrFailure,
+      GracefulRebootReason::kCriticalComponentFailure,
+      GracefulRebootReason::kFdr,
+      GracefulRebootReason::kZbiSwap,
+      GracefulRebootReason::kNotSupported,
+      GracefulRebootReason::kNetstackMigration,
+  };
+
+  // Verify all reasons at once.
+  EXPECT_THAT(FromFileContent(ToFileContent(reasons)), testing::ElementsAreArray(reasons));
+}
+
+TEST(GracefulRebootReasonTest, VerifyContentConversionWithNoReasons) {
+  // ToFileContent() & FromFileContent() for reboot reasons from |power::statecontrol::RebootReason|
+  // should be reversible when there are no reasons.
+  EXPECT_TRUE(FromFileContent(ToFileContent({})).empty());
 }
 
 constexpr char kFilename[] = "graceful_reboot_reason.txt";
@@ -119,6 +148,11 @@ INSTANTIATE_TEST_SUITE_P(WithVariousRebootReasons, WriteGracefulRebootReasonTest
                                  "OUT OF MEMORY",
                              },
                              {
+                                 "NetstackMigration",
+                                 GracefulRebootReason::kNetstackMigration,
+                                 "NETSTACK MIGRATION",
+                             },
+                             {
                                  "NotSupported",
                                  static_cast<GracefulRebootReason>(100u),
                                  "NOT SUPPORTED",
@@ -133,7 +167,7 @@ TEST_P(WriteGracefulRebootReasonTest, Succeed) {
 
   SetUpCobaltServer(std::make_unique<stubs::CobaltLoggerFactory>());
 
-  WriteGracefulRebootReason(param.input_reboot_reason, &cobalt_, Path());
+  WriteGracefulRebootReasons({param.input_reboot_reason}, &cobalt_, Path());
 
   std::string contents;
   ASSERT_TRUE(files::ReadFileToString(Path(), &contents));

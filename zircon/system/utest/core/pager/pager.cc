@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/arch/intrin.h>
 #include <lib/fit/defer.h>
 #include <lib/fzl/memory-probe.h>
 #include <lib/maybe-standalone-test/maybe-standalone.h>
@@ -3511,15 +3512,17 @@ TEST(Pager, RacyPortDequeue) {
 
     std::atomic<bool> ready = false;
     TestThread t1([pager, &ready]() -> bool {
-      while (!ready)
-        ;
+      while (!ready) {
+        arch::Yield();
+      }
       // Destroy the pager.
       return zx_handle_close(pager) == ZX_OK;
     });
 
     TestThread t2([port, &ready]() -> bool {
-      while (!ready)
-        ;
+      while (!ready) {
+        arch::Yield();
+      }
       // Dequeue the complete packet from the port.
       zx_port_packet_t packet;
       zx_status_t status = zx_port_wait(port, 0u, &packet);

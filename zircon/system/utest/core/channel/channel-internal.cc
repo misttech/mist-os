@@ -32,7 +32,7 @@
 namespace channel {
 namespace {
 
-zx_status_t zx_channel_call_finish(zx_time_t deadline, const zx_channel_call_args_t* args,
+zx_status_t zx_channel_call_finish(zx_instant_mono_t deadline, const zx_channel_call_args_t* args,
                                    uint32_t* actual_bytes, uint32_t* actual_handles) {
   uintptr_t vdso_base = (uintptr_t)&zx_handle_close - VDSO_SYSCALL_zx_handle_close;
   uintptr_t fnptr = vdso_base + VDSO_SYSCALL_zx_channel_call_finish;

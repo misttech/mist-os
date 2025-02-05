@@ -33,7 +33,9 @@ namespace internal {
 StreamFileConnection::StreamFileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
                                            fuchsia_io::Rights rights, bool append,
                                            zx::stream stream, zx_koid_t koid)
-    : FileConnection(vfs, std::move(vnode), rights, append, koid), stream_(std::move(stream)) {}
+    : FileConnection(vfs, std::move(vnode), rights, koid),
+      stream_(std::move(stream)),
+      append_(append) {}
 
 zx_status_t StreamFileConnection::ReadInternal(void* data, size_t len, size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileRead] rights: ", rights());
@@ -162,32 +164,28 @@ void StreamFileConnection::Seek(SeekRequestView request, SeekCompleter::Sync& co
   }
 }
 
-void StreamFileConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
+bool StreamFileConnection::GetAppend() const {
   if constexpr (ZX_DEBUG_ASSERT_IMPLEMENTED) {
     // Validate that the connection's append mode and the stream's append mode match.
     uint8_t mode_append;
     if (zx_status_t status = stream_.get_prop_mode_append(&mode_append); status != ZX_OK) {
-      completer.Reply(status, {});
-      return;
+      ZX_PANIC("failed to query stream property for append mode: %s", zx_status_get_string(status));
     }
     bool stream_append = static_cast<bool>(mode_append);
-    ZX_ASSERT_MSG(stream_append == append(), "stream append: %d flags append: %d", stream_append,
-                  append());
+    ZX_ASSERT_MSG(stream_append == append_, "stream append: %d flags append: %d", stream_append,
+                  append_);
   }
-  FileConnection::GetFlags(completer);
+  return append_;
 }
 
-void StreamFileConnection::SetFlags(SetFlagsRequestView request,
-                                    SetFlagsCompleter::Sync& completer) {
-  bool set_append = static_cast<bool>(request->flags & fio::OpenFlags::kAppend);
-  if (set_append != append()) {
-    if (zx_status_t status = stream_.set_prop_mode_append(set_append); status != ZX_OK) {
-      completer.Reply(status);
-      return;
+zx::result<> StreamFileConnection::SetAppend(bool append) {
+  if (append != append_) {
+    if (zx_status_t status = stream_.set_prop_mode_append(append); status != ZX_OK) {
+      return zx::error(status);
     }
-    append() = set_append;
+    append_ = append;
   }
-  completer.Reply(ZX_OK);
+  return zx::ok();
 }
 
 }  // namespace internal

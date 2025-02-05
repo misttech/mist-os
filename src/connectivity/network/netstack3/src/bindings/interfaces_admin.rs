@@ -48,8 +48,8 @@ use log::{debug, error, info, warn};
 use net_types::ip::{AddrSubnetEither, IpAddr, Ipv4, Ipv6};
 use net_types::{SpecifiedAddr, Witness};
 use netstack3_core::device::{
-    DeviceConfiguration, DeviceConfigurationUpdate, DeviceConfigurationUpdateError, DeviceId,
-    NdpConfiguration, NdpConfigurationUpdate,
+    BlackholeDevice, DeviceConfiguration, DeviceConfigurationUpdate,
+    DeviceConfigurationUpdateError, DeviceId, NdpConfiguration, NdpConfigurationUpdate,
 };
 use netstack3_core::ip::{
     AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, CommonAddressProperties, IgmpConfigMode,
@@ -69,8 +69,8 @@ use {
 };
 
 use crate::bindings::devices::{
-    self, EthernetInfo, LoopbackInfo, OwnedDeviceSpecificInfo, PureIpDeviceInfo, StaticCommonInfo,
-    TxTask, TxTaskError,
+    self, BlackholeDeviceInfo, DynamicCommonInfo, EthernetInfo, LoopbackInfo,
+    OwnedDeviceSpecificInfo, PureIpDeviceInfo, StaticCommonInfo, TxTask, TxTaskError,
 };
 use crate::bindings::routes::admin::RouteSet;
 use crate::bindings::routes::{self};
@@ -80,7 +80,8 @@ use crate::bindings::util::{
     TryIntoCore,
 };
 use crate::bindings::{
-    netdevice_worker, BindingId, Ctx, DeviceIdExt as _, LifetimeExt as _, Netstack,
+    netdevice_worker, BindingId, CoreRwLock, Ctx, DeviceIdExt as _, InterfaceProperties,
+    LifetimeExt as _, Netstack,
 };
 
 pub(crate) async fn serve(ns: Netstack, req: fnet_interfaces_admin::InstallerRequestStream) {
@@ -98,6 +99,15 @@ pub(crate) async fn serve(ns: Netstack, req: fnet_interfaces_admin::InstallerReq
             }
         };
         match req {
+            fnet_interfaces_admin::InstallerRequest::InstallBlackholeInterface {
+                interface,
+                options,
+                control_handle: _,
+            } => futures::future::ready(Some(fasync::Task::spawn(run_blackhole_interface(
+                ns.clone(),
+                interface,
+                options,
+            )))),
             fnet_interfaces_admin::InstallerRequest::InstallDevice {
                 device,
                 device_control,
@@ -112,6 +122,118 @@ pub(crate) async fn serve(ns: Netstack, req: fnet_interfaces_admin::InstallerReq
         // Wait for all created devices on this installer to finish.
         task
     })
+    .await;
+}
+
+async fn run_blackhole_interface(
+    mut ns: Netstack,
+    control_server_end: ServerEnd<fnet_interfaces_admin::ControlMarker>,
+    options: fnet_interfaces_admin::Options,
+) {
+    let fnet_interfaces_admin::Options { name, metric, __source_breaking: _ } = options;
+
+    let (binding_id, binding_id_alloc, name) = match name {
+        Some(name) => {
+            match ns.ctx.bindings_ctx().devices.try_reserve_name_and_alloc_new_id(name.clone()) {
+                Ok((id, alloc)) => (id, alloc, name),
+                Err(devices::NameNotAvailableError) => {
+                    let (_stream, control_handle) =
+                        control_server_end.into_stream_and_control_handle();
+                    control_handle
+                        .send_on_interface_removed(
+                            fnet_interfaces_admin::InterfaceRemovedReason::DuplicateName,
+                        )
+                        .unwrap_or_else(|e| {
+                            warn!("failed to send removed reason: {:?}", e);
+                        });
+                    return;
+                }
+            }
+        }
+        None => {
+            ns.ctx.bindings_ctx().devices.generate_and_reserve_name_and_alloc_new_id("blackhole")
+        }
+    };
+
+    let (control_sender, control_receiver) =
+        OwnedControlHandle::new_channel_with_owned_handle(control_server_end).await;
+    let (_interface_control_stop_sender, interface_control_stop_receiver) =
+        futures::channel::oneshot::channel();
+
+    let events = ns.create_interface_event_producer(
+        binding_id,
+        InterfaceProperties {
+            name: name.clone(),
+            port_class: fidl_fuchsia_net_interfaces_ext::PortClass::Blackhole,
+        },
+    );
+    let info = BlackholeDeviceInfo {
+        common_info: StaticCommonInfo { authorization_token: zx::Event::create() },
+        dynamic_common_info: CoreRwLock::new(DynamicCommonInfo::new(
+            net_types::ip::Mtu::no_limit(),
+            events,
+            control_sender,
+        )),
+    };
+    let core_id = ns.ctx.api().device::<BlackholeDevice>().add_device(
+        crate::bindings::DeviceIdAndName { id: binding_id, name },
+        (),
+        netstack3_core::routes::RawMetric(
+            metric.unwrap_or(crate::bindings::DEFAULT_INTERFACE_METRIC),
+        ),
+        info,
+    );
+    let core_id = netstack3_core::device::DeviceId::Blackhole(core_id);
+
+    // Don't need DAD and IGMP/MLD on blackhole.
+    let ip_config = IpDeviceConfigurationUpdate {
+        ip_enabled: Some(false),
+        unicast_forwarding_enabled: Some(false),
+        multicast_forwarding_enabled: Some(false),
+        gmp_enabled: Some(false),
+    };
+    let _: Ipv4DeviceConfigurationUpdate = ns
+        .ctx
+        .api()
+        .device_ip::<Ipv4>()
+        .update_configuration(
+            &core_id,
+            Ipv4DeviceConfigurationUpdate { ip_config, igmp_mode: None },
+        )
+        .unwrap();
+    let _: Ipv6DeviceConfigurationUpdate = ns
+        .ctx
+        .api()
+        .device_ip::<Ipv6>()
+        .update_configuration(
+            &core_id,
+            // Don't need DAD, MLD, router solicitations, or temporary addresses on blackhole
+            // interfaces.
+            Ipv6DeviceConfigurationUpdate {
+                dad_transmits: Some(None),
+                max_router_solicitations: Some(None),
+                slaac_config: SlaacConfigurationUpdate {
+                    enable_stable_addresses: Some(true),
+                    temporary_address_configuration: None,
+                },
+                ip_config,
+                mld_mode: None,
+            },
+        )
+        .unwrap();
+
+    info!("created interface {:?}", core_id);
+    ns.ctx.bindings_ctx().devices.add_device(binding_id_alloc, core_id);
+
+    run_interface_control(
+        ns.ctx.clone(),
+        binding_id,
+        interface_control_stop_receiver,
+        control_receiver,
+        true, /* removable */
+        futures::stream::pending(),
+        || (),
+    )
     .await;
 }
 
@@ -252,12 +374,10 @@ impl OwnedControlHandle {
     }
 }
 
-/// Operates a fuchsia.net.interfaces.admin/DeviceControl.CreateInterface
-/// request.
+/// Operates a fuchsia.net.interfaces.admin/DeviceControl.CreateInterface request.
 ///
-/// Returns `Some([fuchsia_async::Task;2])` if an interface was created
-/// successfully. The returned `Task`s must be polled to completion and are tied
-/// to the created interface's lifetime.
+/// Returns `Some(fuchsia_async::Task)` if an interface was created successfully. The returned
+/// `Task` must be polled to completion and is tied to the created interface's lifetime.
 async fn create_interface(
     port: fhardware_network::PortId,
     control: fidl::endpoints::ServerEnd<fnet_interfaces_admin::ControlMarker>,
@@ -757,6 +877,12 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
                 // Allow the loopback interface to be removed as part of clean
                 // shutdown, but emit a warning about it.
                 warn!("loopback interface was removed");
+                return;
+            }
+            OwnedDeviceSpecificInfo::Blackhole(BlackholeDeviceInfo {
+                common_info: _,
+                dynamic_common_info: _,
+            }) => {
                 return;
             }
             OwnedDeviceSpecificInfo::Ethernet(EthernetInfo { netdevice, .. })
@@ -1931,10 +2057,11 @@ mod enabled {
         pub(super) async fn set_admin_enabled(&self, enabled: bool) -> bool {
             let Self { id, ctx } = self;
             let mut ctx = ctx.lock().await;
-            enum Info<A, B, C> {
+            enum Info<A, B, C, D> {
                 Loopback(A),
                 Ethernet(B),
                 PureIp(C),
+                Blackhole(D),
             }
 
             let core_id = ctx.bindings_ctx().devices.get_core_id(*id).expect("device not present");
@@ -1957,9 +2084,14 @@ mod enabled {
                         common_info: _,
                         dynamic_info,
                     }) => (Info::PureIp(dynamic_info.write()), Some(&netdevice.handler)),
+                    devices::DeviceSpecificInfo::Blackhole(devices::BlackholeDeviceInfo {
+                        common_info: _,
+                        dynamic_common_info,
+                    }) => (Info::Blackhole(dynamic_common_info.write()), None),
                 };
                 let common_info = match info {
                     Info::Loopback(ref mut common_info) => common_info.deref_mut(),
+                    Info::Blackhole(ref mut common_info) => common_info.deref_mut(),
                     Info::Ethernet(ref mut dynamic) => &mut dynamic.netdevice.common_info,
                     Info::PureIp(ref mut dynamic) => &mut dynamic.common_info,
                 };
@@ -2009,7 +2141,8 @@ mod enabled {
                 devices::DeviceSpecificInfo::Ethernet(i) => {
                     i.with_dynamic_info_mut(|i| std::mem::replace(&mut i.netdevice.phy_up, online))
                 }
-                i @ devices::DeviceSpecificInfo::Loopback(_) => {
+                i @ (devices::DeviceSpecificInfo::Loopback(_)
+                | devices::DeviceSpecificInfo::Blackhole(_)) => {
                     unreachable!("unexpected device info {:?} for interface {}", i, *id)
                 }
                 devices::DeviceSpecificInfo::PureIp(i) => {
@@ -2061,6 +2194,9 @@ mod enabled {
                      }| *phy_up && common_info.admin_enabled,
                 ),
                 DeviceSpecificInfo::Loopback(i) => {
+                    i.with_dynamic_info(|common_info| common_info.admin_enabled)
+                }
+                DeviceSpecificInfo::Blackhole(i) => {
                     i.with_dynamic_info(|common_info| common_info.admin_enabled)
                 }
                 DeviceSpecificInfo::PureIp(i) => {

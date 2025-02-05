@@ -252,7 +252,6 @@ static_library("ddk") {
     "//src/devices/tests/driver-transport:*",
     "//src/devices/tests/fidl-service:*",
     "//src/devices/tests/isolateddevmgr:*",
-    "//src/devices/tests/mock-device:*",
     "//src/devices/tests/sysdev:*",
     "//src/devices/tests/v2/compat:*",
     "//src/devices/tests/v2/compat-globals:*",
@@ -435,6 +434,7 @@ library_headers("ddk-deprecated-binding-headers") {
     "//src/devices/board/drivers/sherlock:*",
     "//src/devices/board/drivers/vim3:*",
     "//src/devices/board/drivers/x86/*",
+    "//src/devices/board/lib/acpi/*",
     "//src/devices/bus/drivers/platform/test:*",
     "//src/lib/ddk/tests:*",
   ]
@@ -458,6 +458,7 @@ library_headers("ddk-deprecated-mmio-headers") {
 # library.
 library_headers("ddk_metadata_only") {
   headers = [ "lib/ddk/metadata.h" ]
+  public_deps = [ "//sdk/lib/zbi-format" ]
 }
 
 # Exports the metadata.h file to the SDK to support the transition

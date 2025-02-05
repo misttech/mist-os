@@ -16,6 +16,11 @@
             to: "#detect",
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#detect",
+        },
+        {
             protocol: [ "fuchsia.diagnostics.ArchiveAccessor.feedback" ],
             from: "parent/diagnostics-accessors",
             to: [ "#detect" ],

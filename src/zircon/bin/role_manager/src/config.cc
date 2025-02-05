@@ -86,6 +86,8 @@ std::string ToString(ProfileScope scope) {
   switch (scope) {
     case ProfileScope::Bringup:
       return "bringup";
+    case ProfileScope::Board:
+      return "board";
     case ProfileScope::Core:
       return "core";
     case ProfileScope::Product:
@@ -446,6 +448,8 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
     if (result.is_ok()) {
       if (!strcmp(*result, "bringup")) {
         scope = ProfileScope::Bringup;
+      } else if (!strcmp(*result, "board")) {
+        scope = ProfileScope::Board;
       } else if (!strcmp(*result, "core")) {
         scope = ProfileScope::Core;
       } else if (!strcmp(*result, "product")) {

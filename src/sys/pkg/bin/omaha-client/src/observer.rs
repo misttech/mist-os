@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fidl::{FidlServer, StateMachineController};
+use crate::fidl::{CollaborativeRebootFromSvcDir, FidlServer, StateMachineController};
 use crate::inspect::{LastResultsNode, ProtocolStateNode, ScheduleNode};
 use crate::installer::{is_update_urgent, FuchsiaInstallError};
 use anyhow::anyhow;
@@ -10,6 +10,7 @@ use fidl_fuchsia_feedback::{CrashReporterMarker, CrashReporterProxy};
 use fuchsia_inspect::Node;
 use futures::future::LocalBoxFuture;
 use futures::prelude::*;
+use log::{error, warn};
 use omaha_client::clock;
 use omaha_client::common::{ProtocolState, UpdateCheckSchedule};
 use omaha_client::protocol::response::Response;
@@ -21,7 +22,6 @@ use omaha_client::time::{StandardTimeSource, TimeSource};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::SystemTime;
-use tracing::{error, warn};
 
 mod crash_report;
 mod platform;
@@ -166,7 +166,12 @@ where
                 });
             }
         }
-        FidlServer::on_state_change(Rc::clone(&self.fidl_server), state).await
+        FidlServer::on_state_change(
+            Rc::clone(&self.fidl_server),
+            state,
+            &mut CollaborativeRebootFromSvcDir {},
+        )
+        .await
     }
 
     fn on_schedule_change(&mut self, schedule: &UpdateCheckSchedule) {

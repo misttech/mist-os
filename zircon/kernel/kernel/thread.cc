@@ -195,7 +195,7 @@ void TaskState::Init(thread_start_routine entry, void* arg) {
   arg_ = arg;
 }
 
-zx_status_t TaskState::Join(Thread* const current_thread, zx_time_t deadline) {
+zx_status_t TaskState::Join(Thread* const current_thread, zx_instant_mono_t deadline) {
   return retcode_wait_queue_.Block(current_thread, deadline, Interruptible::No);
 }
 
@@ -715,7 +715,7 @@ void Thread::EraseFromListsLocked() {
   }
 }
 
-zx_status_t Thread::Join(int* out_retcode, zx_time_t deadline) {
+zx_status_t Thread::Join(int* out_retcode, zx_instant_mono_t deadline) {
   canary_.Assert();
 
   // No thread should be attempting to join itself.
@@ -1637,7 +1637,7 @@ void Thread::Current::Reschedule() {
   Scheduler::Reschedule(current_thread);
 }
 
-void PreemptionState::SetPreemptionTimerForExtension(zx_time_t deadline) {
+void PreemptionState::SetPreemptionTimerForExtension(zx_instant_mono_t deadline) {
   // Interrupts must be disabled when calling PreemptReset.
   InterruptDisableGuard interrupt_disable;
   percpu::Get(arch_curr_cpu_num()).timer_queue.PreemptReset(deadline);
@@ -1676,13 +1676,13 @@ void PreemptionState::FlushPendingContinued(Flush flush) {
 }
 
 // timer callback to wake up a sleeping thread
-void Thread::SleepHandler(Timer* timer, zx_time_t now, void* arg) {
+void Thread::SleepHandler(Timer* timer, zx_instant_mono_t now, void* arg) {
   Thread* t = static_cast<Thread*>(arg);
   t->canary_.Assert();
   t->HandleSleep(timer, now);
 }
 
-void Thread::HandleSleep(Timer* timer, zx_time_t now) {
+void Thread::HandleSleep(Timer* timer, zx_instant_mono_t now) {
   // spin trylocking on the thread lock since the routine that set up the
   // callback, thread_sleep_etc, may be trying to simultaneously cancel this
   // timer while holding the thread_lock.
@@ -1716,11 +1716,11 @@ void Thread::HandleSleep(Timer* timer, zx_time_t now) {
 #define DIV_SLEEP_SLACK 10u
 
 // computes the amount of slack the thread_sleep timer will use
-static zx_duration_t sleep_slack(zx_time_t deadline, zx_time_t now) {
+static zx_duration_mono_t sleep_slack(zx_instant_mono_t deadline, zx_instant_mono_t now) {
   if (deadline < now) {
     return MIN_SLEEP_SLACK;
   }
-  zx_duration_t slack = zx_time_sub_time(deadline, now) / DIV_SLEEP_SLACK;
+  zx_duration_mono_t slack = zx_time_sub_time(deadline, now) / DIV_SLEEP_SLACK;
   return ktl::max(MIN_SLEEP_SLACK, ktl::min(slack, MAX_SLEEP_SLACK));
 }
 
@@ -1738,7 +1738,7 @@ static zx_duration_t sleep_slack(zx_time_t deadline, zx_time_t now) {
  * for something.
  */
 zx_status_t Thread::Current::SleepEtc(const Deadline& deadline, Interruptible interruptible,
-                                      zx_time_t now) {
+                                      zx_instant_mono_t now) {
   Thread* current_thread = Thread::Current::Get();
 
   current_thread->canary_.Assert();
@@ -1792,19 +1792,19 @@ zx_status_t Thread::Current::SleepEtc(const Deadline& deadline, Interruptible in
   return final_blocked_status;
 }
 
-zx_status_t Thread::Current::Sleep(zx_time_t deadline) {
-  const zx_time_t now = current_time();
+zx_status_t Thread::Current::Sleep(zx_instant_mono_t deadline) {
+  const zx_instant_mono_t now = current_mono_time();
   return SleepEtc(Deadline::no_slack(deadline), Interruptible::No, now);
 }
 
-zx_status_t Thread::Current::SleepRelative(zx_duration_t delay) {
-  const zx_time_t now = current_time();
+zx_status_t Thread::Current::SleepRelative(zx_duration_mono_t delay) {
+  const zx_instant_mono_t now = current_mono_time();
   const Deadline deadline = Deadline::no_slack(zx_time_add_duration(now, delay));
   return SleepEtc(deadline, Interruptible::No, now);
 }
 
-zx_status_t Thread::Current::SleepInterruptible(zx_time_t deadline) {
-  const zx_time_t now = current_time();
+zx_status_t Thread::Current::SleepInterruptible(zx_instant_mono_t deadline) {
+  const zx_instant_mono_t now = current_mono_time();
   const TimerSlack slack(sleep_slack(deadline, now), TIMER_SLACK_LATE);
   const Deadline slackDeadline(deadline, slack);
   return SleepEtc(slackDeadline, Interruptible::Yes, now);
@@ -1816,13 +1816,13 @@ zx_status_t Thread::Current::SleepInterruptible(zx_time_t deadline) {
  * This takes the thread's lock to ensure there are no races while calculating
  * the runtime of the thread.
  */
-zx_duration_t Thread::Runtime() const {
+zx_duration_mono_t Thread::Runtime() const {
   SingleChainLockGuard guard{IrqSaveOption, get_lock(), CLT_TAG("Thread::Runtime")};
 
-  zx_duration_t runtime = scheduler_state_.runtime_ns();
+  zx_duration_mono_t runtime = scheduler_state_.runtime_ns();
   if (state() == THREAD_RUNNING) {
-    zx_duration_t recent =
-        zx_time_sub_time(current_time(), scheduler_state_.last_started_running());
+    zx_duration_mono_t recent =
+        zx_time_sub_time(current_mono_time(), scheduler_state_.last_started_running());
     runtime = zx_duration_add_duration(runtime, recent);
   }
 
@@ -1993,10 +1993,8 @@ void Thread::Current::BecomeIdle() {
     arch_set_blocking_disallowed(false);
   }
 
-  // Signal that our current CPU is now ready before we re-enable interrupts,
-  // re-enable preemption, and finally drop into our idle routine, and never
-  // return.
-  mp_signal_curr_cpu_ready();
+  // Re-enable interrupts, re-enable preemption, drop into our idle routine, and
+  // never return.
   arch_enable_ints();
   t->preemption_state().PreemptReenable();
   DEBUG_ASSERT(t->preemption_state().PreemptIsEnabled());
@@ -2159,10 +2157,10 @@ void ThreadDumper::DumpLocked(const Thread* t, bool full_dump) {
     dprintf(INFO, "dump_thread WARNING: thread at %p has bad magic\n", t);
   }
 
-  zx_duration_t runtime = t->scheduler_state().runtime_ns();
+  zx_duration_mono_t runtime = t->scheduler_state().runtime_ns();
   if (t->state() == THREAD_RUNNING) {
-    zx_duration_t recent =
-        zx_time_sub_time(current_time(), t->scheduler_state().last_started_running());
+    zx_duration_mono_t recent =
+        zx_time_sub_time(current_mono_time(), t->scheduler_state().last_started_running());
     runtime = zx_duration_add_duration(runtime, recent);
   }
 

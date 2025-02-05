@@ -159,7 +159,7 @@ test("controller_test") {
     "//src/devices/testing/mock-ddk",
     "//src/media/audio/drivers/lib/intel-hda",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
+    "//zircon/system/ulib/mmio-ptr",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

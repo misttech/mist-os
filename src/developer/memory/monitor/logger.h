@@ -10,6 +10,7 @@
 
 #include "src/developer/memory/metrics/capture.h"
 #include "src/developer/memory/metrics/digest.h"
+#include "src/developer/memory/monitor/high_water.h"
 #include "src/developer/memory/monitor/memory_monitor_config.h"
 #include "src/developer/memory/pressure_signaler/pressure_observer.h"
 #include "src/lib/fxl/macros.h"
@@ -21,9 +22,10 @@ class Logger {
   using CaptureCb = fit::function<zx_status_t(memory::Capture*)>;
   using DigestCb = fit::function<void(const memory::Capture&, memory::Digest*)>;
 
-  Logger(async_dispatcher_t* dispatcher, CaptureCb capture_cb, DigestCb digest_cb,
-         memory_monitor_config::Config* config)
+  Logger(async_dispatcher_t* dispatcher, HighWater* high_water, CaptureCb capture_cb,
+         DigestCb digest_cb, memory_monitor_config::Config* config)
       : dispatcher_(dispatcher),
+        high_water_(high_water),
         capture_cb_(std::move(capture_cb)),
         digest_cb_(std::move(digest_cb)),
         config_(config) {}
@@ -34,9 +36,11 @@ class Logger {
  private:
   void Log();
   async_dispatcher_t* dispatcher_;
+  HighWater* high_water_;
   CaptureCb capture_cb_;
   DigestCb digest_cb_;
   memory_monitor_config::Config* config_;
+  bool capture_high_water_ = false;
   zx::duration duration_;
   async::TaskClosureMethod<Logger, &Logger::Log> task_{this};
 

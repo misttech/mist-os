@@ -21,7 +21,7 @@
             to: "#dns_resolver",
         },
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            dictionary: "daignostics",
             from: "parent",
             to: [ "#dns_resolver" ],
         },

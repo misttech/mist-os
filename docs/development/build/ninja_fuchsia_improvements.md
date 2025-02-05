@@ -57,6 +57,32 @@ change the refresh period by setting `NINJA_STATUS_REFRESH_MILLIS` to a decimal
 value in milliseconds (not that anything lower than 100 will be ignored since
 elapsed times are only printed up to a single decimal fractional digit).
 
+## Feature: GNU Make Jobserver support
+
+The [GNU Make Jobserver protocol][gnu-jobserver] allows a build system to limit
+the total number of concurrent jobs (i.e. threads or processes) at any point in
+time, even in the presence of recursive build tool invocations.
+
+It requires a top-level **server** to setup a pool of **job slots** that are
+shared by participating clients (e.g. compiler, linkers, or even build tools).
+
+The Fuchsia-specific Ninja binary can act both as a client or a server for the
+protocol.
+
+You can enable server mode through the `--jobserver` command-line flag, or
+setting `NINJA_JOBSERVER=1` in the environment, when starting Ninja.
+
+When Ninja starts, client mode is enabled automatically by looking at the
+value of the `MAKEFLAGS` environment variable. This is useful when Ninja is
+called from a different build that acts as a server.
+
+In the Fuchsia build, setting `enable_jobserver = true` in `args.gn` allows the
+top-level Ninja invocation to start in server mode.
+
+As an example, it is set for the core IDK and core SDK builder configurations,
+saving between 6 and 12 minutes of build time. Because these require launching
+24+ Ninja sub-builds from the top-level build, which can leverage the protocol
+to better coordinate how they each spawn multiple parallel commands.
 
 ## Feature: Persistent mode for faster startup times
 
@@ -127,3 +153,4 @@ Known bugs / caveats, that will be worked out:
 [rfc-0153]: /docs/contribute/governance/rfcs/0153_ninja_customization.md
 [rfc-strategy]: /docs/contribute/governance/rfcs/0153_ninja_customization.md#branch-strategy
 [fuchsia-mirror]: https://fuchsia.googlesource.com/third_party/github.com/ninja-build/ninja/
+[gnu-jobserver]: https://www.gnu.org/software/make/manual/html_node/Job-Slots.html

@@ -73,7 +73,7 @@ void Consumer::Bind(fidl::ServerEnd<fuchsia_media::AudioConsumer> server_end) {
 
   renderer_ = fidl::Client(std::move(endpoints->client), dispatcher_, this);
 
-  result = renderer_->SetUsage({{.usage = fuchsia_media::AudioRenderUsage::kMedia}});
+  result = renderer_->SetUsage2({{.usage2 = fuchsia_media::AudioRenderUsage2::kMedia}});
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Failed to set usage: " << result.error_value().status_string();
     return;
@@ -357,8 +357,8 @@ void Consumer::SetVolume(SetVolumeRequest& request, SetVolumeCompleter::Sync& co
   }
 
   audio_core_
-      ->GetDbFromVolume({{
-          .usage = fuchsia_media::Usage::WithRenderUsage(fuchsia_media::AudioRenderUsage::kMedia),
+      ->GetDbFromVolume2({{
+          .usage = fuchsia_media::Usage2::WithRenderUsage(fuchsia_media::AudioRenderUsage2::kMedia),
           .volume = request.volume(),
       }})
       .Then([this](auto& result) {

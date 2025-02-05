@@ -2,9 +2,5 @@
 # style), which is documented here:
 # https://android-review.googlesource.com/plugins/code-owners/Documentation/path-expressions.html#findOwnersCaveat
 
-per-file bluetooth/** = jnchang@google.com
 per-file ui/** = chaopeng@google.com
-per-file ui/screenshot.py = yaar@google.com
-per-file tracing.py = maheshsr@google.com
-per-file session.py = chaopeng@google.com
 per-file rtc.py = hansens@google.com

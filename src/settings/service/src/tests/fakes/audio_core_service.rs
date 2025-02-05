@@ -7,7 +7,7 @@ use crate::tests::fakes::base::Service;
 use anyhow::{format_err, Error};
 use fidl::endpoints::ServerEnd;
 use fidl::prelude::*;
-use fidl_fuchsia_media::{AudioRenderUsage, Usage};
+use fidl_fuchsia_media::{AudioRenderUsage2, Usage2};
 use fuchsia_async as fasync;
 use fuchsia_sync::RwLock;
 use futures::channel::oneshot;
@@ -45,7 +45,7 @@ impl Builder {
 /// usages.
 pub(crate) struct AudioCoreService {
     suppress_client_errors: bool,
-    audio_streams: Rc<RwLock<HashMap<AudioRenderUsage, (f32, bool)>>>,
+    audio_streams: Rc<RwLock<HashMap<AudioRenderUsage2, (f32, bool)>>>,
     exit_tx: Option<oneshot::Sender<()>>,
 }
 
@@ -54,14 +54,14 @@ impl AudioCoreService {
         let mut streams = HashMap::new();
         for stream in default_settings.streams.iter() {
             let _ = streams.insert(
-                AudioRenderUsage::from(stream.stream_type),
+                AudioRenderUsage2::from(stream.stream_type),
                 (stream.user_volume_level, stream.user_volume_muted),
             );
         }
         Self { audio_streams: Rc::new(RwLock::new(streams)), suppress_client_errors, exit_tx: None }
     }
 
-    pub(crate) fn get_level_and_mute(&self, usage: AudioRenderUsage) -> Option<(f32, bool)> {
+    pub(crate) fn get_level_and_mute(&self, usage: AudioRenderUsage2) -> Option<(f32, bool)> {
         get_level_and_mute(usage, &self.audio_streams)
     }
 
@@ -107,8 +107,8 @@ impl Service for AudioCoreService {
                         if request.is_none() {
                             return;
                         }
-                        if let fidl_fuchsia_media::AudioCoreRequest::BindUsageVolumeControl {
-                            usage: Usage::RenderUsage(render_usage),
+                        if let fidl_fuchsia_media::AudioCoreRequest::BindUsageVolumeControl2 {
+                            usage: Usage2::RenderUsage(render_usage),
                             volume_control,
                             control_handle: _,
                         } = request.expect("request should be present") {
@@ -130,8 +130,8 @@ impl Service for AudioCoreService {
 }
 
 fn get_level_and_mute(
-    usage: AudioRenderUsage,
-    streams: &RwLock<HashMap<AudioRenderUsage, (f32, bool)>>,
+    usage: AudioRenderUsage2,
+    streams: &RwLock<HashMap<AudioRenderUsage2, (f32, bool)>>,
 ) -> Option<(f32, bool)> {
     if let Some((level, muted)) = (*streams.read()).get(&usage) {
         return Some((*level, *muted));
@@ -141,8 +141,8 @@ fn get_level_and_mute(
 
 fn process_volume_control_stream(
     volume_control: ServerEnd<fidl_fuchsia_media_audio::VolumeControlMarker>,
-    render_usage: AudioRenderUsage,
-    streams: Rc<RwLock<HashMap<AudioRenderUsage, (f32, bool)>>>,
+    render_usage: AudioRenderUsage2,
+    streams: Rc<RwLock<HashMap<AudioRenderUsage2, (f32, bool)>>>,
     suppress_client_errors: bool,
 ) {
     let mut stream = volume_control.into_stream();

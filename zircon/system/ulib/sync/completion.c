@@ -13,13 +13,14 @@ enum {
   SIGNALED = 2,
 };
 
-zx_status_t sync_completion_wait(sync_completion_t* completion, zx_duration_t timeout) {
-  zx_time_t deadline =
+zx_status_t sync_completion_wait(sync_completion_t* completion, zx_duration_mono_t timeout) {
+  zx_instant_mono_t deadline =
       (timeout == ZX_TIME_INFINITE) ? ZX_TIME_INFINITE : zx_deadline_after(timeout);
   return sync_completion_wait_deadline(completion, deadline);
 }
 
-zx_status_t sync_completion_wait_deadline(sync_completion_t* completion, zx_time_t deadline) {
+zx_status_t sync_completion_wait_deadline(sync_completion_t* completion,
+                                          zx_instant_mono_t deadline) {
   // TODO(kulakowski): With a little more state (a waiters count),
   // this could optimistically spin before entering the kernel.
 

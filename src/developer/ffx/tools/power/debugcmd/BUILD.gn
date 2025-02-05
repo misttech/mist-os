@@ -14,12 +14,15 @@ ffx_plugin("ffx_power_debugcmd") {
     "//sdk/fidl/fuchsia.power.manager.debug:fuchsia.power.manager.debug_rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//third_party/rust_crates:async-trait",
   ]
 
   test_deps = [ "//src/lib/fuchsia-async" ]
 
   args_sources = [ "src/args.rs" ]
-
-  sdk_category = "internal"
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
 }

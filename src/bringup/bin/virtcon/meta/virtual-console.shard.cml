@@ -10,8 +10,6 @@
     ],
     offer: [
         {
-            from: "parent",
-            to: "#virtual_console",
             config: [
                 "fuchsia.virtcon.BootAnimation",
                 "fuchsia.virtcon.BufferCount",
@@ -26,7 +24,14 @@
                 "fuchsia.virtcon.RoundedCorners",
                 "fuchsia.virtcon.ScrollbackRows",
             ],
+            from: "parent",
+            to: "#virtual_console",
             availability: "optional",
+        },
+        {
+            dictionary: "diagnostics",
+            from: "self",
+            to: "#virtual_console",
         },
         {
             protocol: [
@@ -81,14 +86,6 @@
         {
             protocol: "fuchsia.hardware.power.statecontrol.Admin",
             from: "#shutdown_shim",
-            to: "#virtual_console",
-        },
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
             to: "#virtual_console",
         },
     ],

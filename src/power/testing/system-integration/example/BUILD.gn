@@ -15,16 +15,26 @@ cc_test_executable("test") {
   output_name = "power-system-integration-example-test"
   sources = [ "test.cc" ]
   deps = [
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_cpp",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp",
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async_patterns/cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/lib/fxl/test:gtest_main_no_testonly",
+    "//src/power/testing/system-integration/util",
+    "//zircon/system/ulib/sync:sync-cpp",
   ]
 }
 
 fuchsia_test_component("component") {
   component_name = "power_system_integration_example_test"
   manifest = "meta/test.cml"
-  deps = [ ":test" ]
+  deps = [
+    ":test",
+    "test-driver:component",
+  ]
   test_type = "driver_system"
 }
 
@@ -36,7 +46,10 @@ fuchsia_test_package("pkg") {
 fuchsia_test_component("bootstrap_component") {
   component_name = "bootstrap_power_system_integration_example_test"
   manifest = "meta/test.cml"
-  deps = [ ":test" ]
+  deps = [
+    ":test",
+    "test-driver:component",
+  ]
   test_type = "bootstrap_driver_system"
 }
 

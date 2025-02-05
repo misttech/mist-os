@@ -418,17 +418,22 @@ TEST_F(LeakSanitizerTest, TlsReference) {
   }
 }
 
-// This is the regression test for ensuring the issue described in https://fxbug.dev/42145668 is fixed. The
-// issue was that lsan would report leaks in libc++'s std::thread that weren't actual leaks. This
-// was because it was possible for the newly spawned thread to be suspended before actually
-// running any user code, meaning the memory snapshot would occur while the std::thread
+// This is the regression test for ensuring the issue described in https://fxbug.dev/42145668 is
+// fixed. The issue was that lsan would report leaks in libc++'s std::thread that weren't actual
+// leaks. This was because it was possible for the newly spawned thread to be suspended before
+// actually running any user code, meaning the memory snapshot would occur while the std::thread
 // allocations were accessible via the new thread's pthread arguments, but not through the thread
 // register. The fix ensures that the start_arg of all pthread structs are checked, so this should
 // no longer leak.
 //
 // Below is a minimal reproducer for this issue. As a final test, to ensure this is fixed, we'll
 // rerun the test a large number of times such that we have enough confidence the bug is fixed.
-TEST_F(LeakSanitizerTest, LeakedThreadFix) {
+//
+// TODO(https://fxbug.dev/368713672): This test occasionally flakes in CI due to
+// `lsan-thread-race-test` occasionally hitting a page fault when scanning over TCB data in
+// __sanitizer_memory_snapshot. Until we're able to reproduce it locally, let's temporarily disable
+// this test so we don't keep getting flakes.
+TEST_F(LeakSanitizerTest, DISABLED_LeakedThreadFix) {
   const char* root_dir = getenv("TEST_ROOT_DIR");
   if (!root_dir) {
     root_dir = "";

@@ -11,8 +11,8 @@ use crate::telemetry::{TelemetryEvent, TelemetrySender};
 use crate::util::pseudo_energy::EwmaSignalData;
 use async_trait::async_trait;
 use futures::lock::Mutex;
+use log::{error, info};
 use std::sync::Arc;
-use tracing::{error, info};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
     fuchsia_async as fasync,
@@ -20,12 +20,14 @@ use {
 
 /// Minimum wait time between roam scans if there are no new roam reasons. The time between roam
 /// scans increases with a backoff, since subsequent scans are unlikely to have a different result.
-const TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE_MIN: zx::MonotonicDuration =
+pub const TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE_MIN: zx::MonotonicDuration =
     zx::MonotonicDuration::from_minutes(5);
 const TIME_BETWEEN_ROAM_SCANS_BACKOFF: zx::MonotonicDuration =
     zx::MonotonicDuration::from_minutes(10);
-const TIME_BETWEEN_ROAM_SCANS_MAX: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(35);
-const MIN_TIME_BETWEEN_ROAM_SCANS: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(1);
+pub const TIME_BETWEEN_ROAM_SCANS_MAX: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_minutes(35);
+pub const MIN_TIME_BETWEEN_ROAM_SCANS: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_minutes(1);
 
 const LOCAL_ROAM_THRESHOLD_RSSI_2G: f64 = -72.0;
 const LOCAL_ROAM_THRESHOLD_RSSI_5G: f64 = -75.0;

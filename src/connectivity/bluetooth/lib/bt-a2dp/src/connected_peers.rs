@@ -15,11 +15,11 @@ use futures::channel::{mpsc, oneshot};
 use futures::stream::{Stream, StreamExt};
 use futures::task::{Context, Poll};
 use futures::{Future, FutureExt, TryFutureExt};
+use log::{info, warn};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
 use std::sync::Arc;
-use tracing::{info, warn};
 use {bt_avdtp as avdtp, fuchsia_async as fasync};
 
 use crate::codec::CodecNegotiation;
@@ -137,7 +137,7 @@ async fn connect_peer(
     id: PeerId,
     channel_params: ChannelParameters,
 ) -> Result<Channel, Error> {
-    info!(%id, "Connecting to peer");
+    info!(id:%; "Connecting to peer");
     let connect_fut = proxy.connect(
         &id.into(),
         &bredr::ConnectParameters::L2cap(bredr::L2capParameters {
@@ -148,7 +148,7 @@ async fn connect_peer(
     );
     let channel = match connect_fut.await {
         Err(e) => {
-            warn!(%id, ?e, "FIDL error on connect");
+            warn!(id:%, e:?; "FIDL error on connect");
             return Err(e.into());
         }
         Ok(Err(e)) => return Err(format_err!("Bluetooth connect error: {e:?}")),
@@ -252,7 +252,7 @@ impl ConnectedPeers {
         let strong = peer.upgrade().ok_or_else(|| format_err!("Disconnected"))?;
         if strong.streaming_active() {
             let peer_id = peer.key();
-            info!(%peer_id, "Not starting streaming, it's already started");
+            info!(peer_id:%; "Not starting streaming, it's already started");
             return Ok(());
         }
         strong.stream_start(remote_seid, negotiated).await.map_err(Into::into)
@@ -291,7 +291,7 @@ impl ConnectedPeers {
             recv.map_ok_or_else(|_e| Err(format_err!("Connection task canceled")), Into::into);
         if connected {
             if let Err(e) = sender.send(Ok(None)) {
-                warn!(%id, ?e, "Failed to notify already-connected");
+                warn!(id:%, e:?; "Failed to notify already-connected");
             }
             return recv;
         }
@@ -299,12 +299,12 @@ impl ConnectedPeers {
         if let Some(previous_connect_task) = attempts.remove(&id) {
             // We are the only place that can poll the connect task, check if it finished.
             if previous_connect_task.now_or_never().is_none() {
-                warn!(%id, "Cancelling previous connect attempt");
+                warn!(id:%; "Cancelling previous connect attempt");
             }
         }
         let connect_task = fasync::Task::spawn(async move {
             if let Err(e) = sender.send(connect_peer(proxy, id, channel_params).await.map(Some)) {
-                warn!(%id, ?e, "Failed to send channel connect result");
+                warn!(id:%, e:?; "Failed to send channel connect result");
             }
         });
         let _ = attempts.insert(id, connect_task);
@@ -325,7 +325,7 @@ impl ConnectedPeers {
             let peer =
                 weak.upgrade().ok_or_else(|| format_err!("Disconnected connecting transport"))?;
             if let Err(e) = peer.receive_channel(channel) {
-                warn!(%id, %e, "failed to connect channel");
+                warn!(id:%, e:%; "failed to connect channel");
                 return Err(e.into());
             }
             return Ok(weak);
@@ -333,7 +333,7 @@ impl ConnectedPeers {
 
         let entry = self.connected.lazy_entry(&id);
 
-        info!(%id, "peer connected");
+        info!(id:%; "peer connected");
         let avdtp_peer = avdtp::Peer::new(channel);
 
         let mut peer = Peer::create(
@@ -355,13 +355,13 @@ impl ConnectedPeers {
         };
 
         if let Err(e) = peer.iattach(&self.inspect, inspect::unique_name("peer_")) {
-            warn!(%id, ?e, "Couldn't attach inspect");
+            warn!(id:%, e:?; "Couldn't attach inspect");
         }
 
         let closed_fut = peer.closed();
         let peer = match entry.try_insert(peer) {
             Err(_peer) => {
-                warn!(%id, "Peer connected while we were setting up");
+                warn!(id:%; "Peer connected while we were setting up");
                 return self.get_weak(&id).ok_or_else(|| format_err!("Peer missing"));
             }
             Ok(weak_peer) => weak_peer,
@@ -382,16 +382,16 @@ impl ConnectedPeers {
                 .await?;
             let start_stream_task = fuchsia_async::Task::local(async move {
                 let delay_sec = delay.into_millis() as f64 / 1000.0;
-                info!(id = %peer.key(), "dwelling {delay_sec}s for peer initiation");
+                info!(id:% = peer.key(); "dwelling {delay_sec}s for peer initiation");
                 fasync::Timer::new(fasync::MonotonicInstant::after(delay)).await;
 
                 if let Err(e) = ConnectedPeers::start_streaming(&peer, negotiation).await {
-                    info!(id = %peer.key(), ?e, "Peer start streaming failed");
+                    info!(id:% = peer.key(), e:?; "Peer start streaming failed");
                     peer.detach();
                 }
             });
             if self.start_stream_tasks.lock().insert(peer_id, start_stream_task).is_some() {
-                info!(%peer_id, "Replacing previous start stream dwell");
+                info!(peer_id:%; "Replacing previous start stream dwell");
             }
         }
 

@@ -47,7 +47,7 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
         assertContainsRegex(r"(?m)^Total memory: \d+\.\d+ MiB$", profile)
         assertContainsRegex(r"(?m)^Kernel: +\d+\.\d+ MiB$", profile)
         assertContainsRegex(
-            r"(?m)^Processes: memory_monitor2\.cm \(\d+\)$", profile
+            r"(?m)^\s*Processes:\s*memory_monitor2\.cm \(\d+\)\s*$", profile
         )
 
     def test_memory_monitor2_inspect(self) -> None:
@@ -85,6 +85,22 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
         asserts.assert_greater(
             root["kmem_stats_compression"]["pages_decompressed_unit_ns"], 0
         )
+
+    def test_memory_monitor2_inspect_current(self) -> None:
+        inspect_col = self.dut.inspect.get_data(
+            monikers=["core/memory_monitor2"]
+        )
+        (only_entry,) = inspect_col.data
+
+        # Verify that a current memory capture is present, with 6 fields.
+        asserts.assert_equal(only_entry.moniker, "core/memory_monitor2")
+        if only_entry.payload is None:
+            raise AssertionError("Payload should not be none")
+        root = only_entry.payload["root"]
+        for i in range(6):
+            asserts.assert_greater(
+                root["current"]["core/memory_monitor2"][i], 0
+            )
 
     def test_memory_monitor2_traces_provider(self) -> None:
         json_text = self.dut.ffx.run(

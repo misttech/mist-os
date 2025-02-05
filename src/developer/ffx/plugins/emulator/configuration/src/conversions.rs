@@ -6,16 +6,13 @@
 //! interface types. We perform the conversion here to keep dependencies on the sdk_metadata
 //! to a minimum, while improving our ability to fully test the conversion code.
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, Result};
 use assembly_manifest::Image;
-use camino::Utf8PathBuf;
 use emulator_instance::{
     DeviceConfig, DiskImage, EmulatorConfiguration, GuestConfig, PortMapping, VirtualCpu,
 };
 
-use sdk_metadata::{
-    ProductBundle, ProductBundleV2, VirtualDevice, VirtualDeviceManifest, VirtualDeviceV1,
-};
+use sdk_metadata::{ProductBundle, ProductBundleV2, VirtualDeviceV1};
 use std::path::PathBuf;
 
 pub async fn convert_bundle_to_configs(
@@ -23,78 +20,13 @@ pub async fn convert_bundle_to_configs(
     device_name: Option<String>,
     uefi: bool,
 ) -> Result<EmulatorConfiguration> {
+    let virtual_device = product_bundle.get_device(&device_name)?;
+    tracing::debug!("Found PBM: {:#?}\nVirtual Device: {:#?}", &product_bundle, &virtual_device);
     match &product_bundle {
         ProductBundle::V2(product_bundle) => {
-            let virtual_device = if let Some(device) = parse_device_name_as_path(&device_name) {
-                device
-            } else {
-                // Determine the correct device name from the user, or default to the "recommended"
-                // device, if one is provided in the product bundle.
-                let path = product_bundle.get_virtual_devices_path();
-                let manifest =
-                    VirtualDeviceManifest::from_path(&path).context("manifest from_path")?;
-                let result = match device_name.as_deref() {
-                    // If no device_name is given, return the default specified in the manifest.
-                    None | Some("") => manifest.default_device(),
-
-                    // Otherwise, find the virtual device by name in the product bundle.
-                    Some(device_name) => manifest.device(device_name).map(|d| Some(d)),
-                }?;
-                match result {
-                    Some(virtual_device) => virtual_device,
-                    None if device_name.is_some() => bail!(
-                        "No virtual device matches '{}'.",
-                        device_name.unwrap_or_else(|| "<empty>".to_string())
-                    ),
-                    None => {
-                        bail!("No default virtual device is available, please specify one by name.")
-                    }
-                }
-            };
-            let virtual_device = match virtual_device {
-                VirtualDevice::V1(v) => v,
-            };
-            tracing::debug!(
-                "Found PBM: {:#?}\nVirtual Device: {:#?}",
-                &product_bundle,
-                &virtual_device
-            );
             convert_v2_bundle_to_configs(&product_bundle, &virtual_device, uefi)
         }
     }
-}
-
-/// If the user passes in a --device flag with a path to a virtual device file
-/// instead of a device name, we want to use the custom device. If it's not a
-/// file, that's ok, we'll still try it as a device name; so this function
-/// doesn't return an Error, just None.
-fn parse_device_name_as_path(path: &Option<String>) -> Option<VirtualDevice> {
-    let cwd = std::env::current_dir().ok()?;
-    path.as_ref().and_then(|name| {
-        if name.is_empty() {
-            return None;
-        }
-        // See if the "name" is actually a path to a virtual device file.
-        let path =
-            Utf8PathBuf::from_path_buf(cwd).expect("Current directory is not utf8").join(name);
-        if !path.is_file() {
-            tracing::debug!("Value '{}' doesn't appear to be a valid file.", name);
-            return None;
-        }
-        match VirtualDevice::try_load_from(&path) {
-            Ok(VirtualDevice::V1(vd)) => Some(VirtualDevice::V1(vd)),
-            Err(_) => {
-                eprintln!(
-                    "Attempted to use the file at '{}' to configure the device, but the contents \
-                    of that file are not a valid Virtual Device specification. \nChecking the \
-                    Product Bundle for a device with that name...",
-                    path
-                );
-                tracing::warn!("Path '{}' doesn't contain a valid virtual device.", path);
-                None
-            }
-        }
-    })
 }
 
 fn convert_v2_bundle_to_configs(
@@ -173,17 +105,13 @@ mod tests {
     use super::*;
     use assembly_manifest::BlobfsContents;
     use assembly_partitions_config::{BootloaderPartition, PartitionsConfig};
+    use camino::Utf8PathBuf;
     use sdk_metadata::virtual_device::{Cpu, Hardware};
     use sdk_metadata::{
         AudioDevice, AudioModel, CpuArchitecture, DataAmount, DataUnits, ElementType, InputDevice,
         PointingDevice, Screen, ScreenUnits, VsockDevice,
     };
     use std::collections::HashMap;
-    use std::fs::File;
-    use std::io::Write;
-
-    const VIRTUAL_DEVICE_VALID: &str =
-        include_str!("../../../../../../../build/sdk/meta/test_data/virtual_device.json");
 
     #[test]
     fn test_convert_v2_bundle_to_configs() {
@@ -406,41 +334,6 @@ mod tests {
             config.host.port_map.remove("debug").unwrap(),
             PortMapping { host: None, guest: 2345 }
         );
-    }
-
-    #[test]
-    fn test_parse_device_name_as_path_none() {
-        assert_eq!(parse_device_name_as_path(&None), None);
-    }
-
-    #[test]
-    fn test_parse_device_name_as_path_empty() {
-        assert_eq!(parse_device_name_as_path(&Some(String::new())), None);
-    }
-
-    #[test]
-    fn test_parse_device_name_as_path_no_file() {
-        assert_eq!(parse_device_name_as_path(&Some("SomeNameThatsNotAFile".to_string())), None);
-    }
-
-    #[test]
-    fn test_parse_device_name_as_path_other_file() -> Result<()> {
-        let temp_dir = tempfile::TempDir::new().expect("creating temp dir");
-        let path = temp_dir.path().join("other_file.json");
-        File::create(&path)?;
-        assert_eq!(parse_device_name_as_path(&Some(path.to_string_lossy().into_owned())), None);
-        Ok(())
-    }
-
-    #[test]
-    fn test_parse_device_name_as_path_ok() -> Result<()> {
-        let temp_dir = tempfile::TempDir::new().expect("creating temp dir");
-        let path = temp_dir.path().join("device.json");
-        let mut file = File::create(&path).unwrap();
-        file.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
-        let result = parse_device_name_as_path(&Some(path.to_string_lossy().into_owned()));
-        assert!(matches!(result, Some(VirtualDevice::V1(_))));
-        Ok(())
     }
 
     #[test]

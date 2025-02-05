@@ -129,7 +129,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.middle/MiddleGetFooResponse",
             "nullable": false,
@@ -169,7 +168,6 @@
       "members": [
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.bottom/Foo",
             "nullable": false,

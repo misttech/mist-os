@@ -600,6 +600,37 @@ pub mod options {
         pub fn iter_addresses(&self) -> &'a [Ipv6Addr] {
             self.addresses
         }
+
+        /// Parses a Recursive DNS Server option from raw bytes (starting immediately
+        /// after the kind and length bytes).
+        pub fn parse(data: &'a [u8]) -> Result<Self, OptionParseErr> {
+            if data.len() < MIN_RECURSIVE_DNS_SERVER_OPTION_LENGTH {
+                return Err(OptionParseErr);
+            }
+
+            // Skip the reserved bytes which immediately follow the kind and length
+            // bytes.
+            let (_, data) = data.split_at(RECURSIVE_DNS_SERVER_OPTION_RESERVED_BYTES_LENGTH);
+
+            // As per RFC 8106 section 5.1, the 32 bit lifetime field immediately
+            // follows the reserved field.
+            let (lifetime, data) = Ref::<_, U32>::from_prefix(data).map_err(|_| OptionParseErr)?;
+
+            // As per RFC 8106 section 5.1, the list of addresses immediately
+            // follows the lifetime field.
+            let addresses = Ref::into_ref(
+                Ref::<_, [Ipv6Addr]>::from_bytes(data)
+                    .map_err(Into::into)
+                    .map_err(|_: zerocopy::SizeError<_, _>| OptionParseErr)?,
+            );
+
+            // As per RFC 8106 section 5.3.1, the addresses should all be unicast.
+            if !addresses.iter().all(UnicastAddress::is_unicast) {
+                return Err(OptionParseErr);
+            }
+
+            Ok(Self::new(lifetime.get(), addresses))
+        }
     }
 
     /// The first 6 bytes of the Route Information option following the Type and
@@ -1043,37 +1074,7 @@ pub mod options {
                     NdpNonce::new(data).map_err(|_: InvalidNonceError| OptionParseErr)?,
                 ),
                 NdpOptionType::RecursiveDnsServer => {
-                    if data.len() < MIN_RECURSIVE_DNS_SERVER_OPTION_LENGTH {
-                        return Err(OptionParseErr);
-                    }
-
-                    // Skip the reserved bytes which immediately follow the kind and length
-                    // bytes.
-                    let (_, data) =
-                        data.split_at(RECURSIVE_DNS_SERVER_OPTION_RESERVED_BYTES_LENGTH);
-
-                    // As per RFC 8106 section 5.1, the 32 bit lifetime field immediately
-                    // follows the reserved field.
-                    let (lifetime, data) =
-                        Ref::<_, U32>::from_prefix(data).map_err(|_| OptionParseErr)?;
-
-                    // As per RFC 8106 section 5.1, the list of addresses immediately
-                    // follows the lifetime field.
-                    let addresses = Ref::into_ref(
-                        Ref::<_, [Ipv6Addr]>::from_bytes(data)
-                            .map_err(Into::into)
-                            .map_err(|_: zerocopy::SizeError<_, _>| OptionParseErr)?,
-                    );
-
-                    // As per RFC 8106 section 5.3.1, the addresses should all be unicast.
-                    if !addresses.iter().all(UnicastAddress::is_unicast) {
-                        return Err(OptionParseErr);
-                    }
-
-                    NdpOption::RecursiveDnsServer(RecursiveDnsServer::new(
-                        lifetime.get(),
-                        addresses,
-                    ))
+                    NdpOption::RecursiveDnsServer(RecursiveDnsServer::parse(data)?)
                 }
                 NdpOptionType::RouteInformation => {
                     // RouteInfoFixed represents the part of the RouteInformation option
@@ -1427,6 +1428,13 @@ mod tests {
                 .expect("should have parsed a valid recursive dns erver option");
             let parsed = parsed.iter().collect::<Vec<options::NdpOption<'_>>>();
             assert_eq!(parsed.len(), 1);
+
+            // Also check that parsing RDNSS alone works as expected.
+            assert_eq!(
+                options::RecursiveDnsServer::parse(&expected[2..]).expect("parsing should succeed"),
+                expected_rdnss
+            );
+
             assert_eq!(options::NdpOption::RecursiveDnsServer(expected_rdnss), parsed[0]);
         };
         test(&[Ipv6Addr::from([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])]);

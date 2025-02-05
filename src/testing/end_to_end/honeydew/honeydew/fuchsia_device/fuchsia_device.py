@@ -22,6 +22,15 @@ import fidl.fuchsia_io as f_io
 import fuchsia_controller_py as fcp
 
 from honeydew import errors
+from honeydew.affordances.connectivity.bluetooth.avrcp import (
+    avrcp,
+    avrcp_using_sl4f,
+)
+from honeydew.affordances.connectivity.bluetooth.gap import gap, gap_using_fc
+from honeydew.affordances.connectivity.bluetooth.le import le, le_using_fc
+from honeydew.affordances.connectivity.bluetooth.utils import (
+    types as bluetooth_types,
+)
 from honeydew.affordances.connectivity.wlan.utils import types as wlan_types
 from honeydew.affordances.connectivity.wlan.wlan import wlan, wlan_using_fc
 from honeydew.affordances.connectivity.wlan.wlan_policy import (
@@ -33,18 +42,11 @@ from honeydew.affordances.connectivity.wlan.wlan_policy_ap import (
     wlan_policy_ap_using_fc,
 )
 from honeydew.affordances.ffx import inspect as inspect_ffx
-from honeydew.affordances.ffx import session as session_ffx
 from honeydew.affordances.ffx.ui import screenshot as screenshot_ffx
 from honeydew.affordances.fuchsia_controller import location as location_fc
 from honeydew.affordances.fuchsia_controller import netstack as netstack_fc
 from honeydew.affordances.fuchsia_controller import rtc as rtc_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
-from honeydew.affordances.fuchsia_controller.bluetooth.profiles import (
-    bluetooth_gap as gap_fc,
-)
-from honeydew.affordances.fuchsia_controller.bluetooth.profiles import (
-    bluetooth_le as le_fc,
-)
 from honeydew.affordances.fuchsia_controller.ui import (
     user_input as user_input_fc,
 )
@@ -54,23 +56,9 @@ from honeydew.affordances.power.system_power_state_controller import (
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller_using_starnix,
 )
-from honeydew.affordances.sl4f.bluetooth.profiles import (
-    bluetooth_avrcp as bluetooth_avrcp_sl4f,
-)
-from honeydew.affordances.sl4f.bluetooth.profiles import (
-    bluetooth_gap as bluetooth_gap_sl4f,
-)
+from honeydew.affordances.session import session, session_using_ffx
 from honeydew.interfaces.affordances import inspect as inspect_interface
-from honeydew.interfaces.affordances import rtc, session, tracing
-from honeydew.interfaces.affordances.bluetooth.profiles import (
-    bluetooth_avrcp as bluetooth_avrcp_interface,
-)
-from honeydew.interfaces.affordances.bluetooth.profiles import (
-    bluetooth_gap as bluetooth_gap_interface,
-)
-from honeydew.interfaces.affordances.bluetooth.profiles import (
-    bluetooth_le as bluetooth_le_interface,
-)
+from honeydew.interfaces.affordances import rtc, tracing
 from honeydew.interfaces.affordances.ui import screenshot, user_input
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
@@ -95,7 +83,6 @@ from honeydew.transports import (
 )
 from honeydew.transports import serial_using_unix_socket
 from honeydew.transports import sl4f as sl4f_transport
-from honeydew.typing import bluetooth as bluetooth_types
 from honeydew.typing import custom_types
 from honeydew.utils import common, properties
 
@@ -399,7 +386,9 @@ class FuchsiaDevice(
         Returns:
             session.Session object
         """
-        return session_ffx.Session(device_name=self.device_name, ffx=self.ffx)
+        return session_using_ffx.SessionUsingFfx(
+            device_name=self.device_name, ffx=self.ffx
+        )
 
     @properties.Affordance
     def screenshot(self) -> screenshot.Screenshot:
@@ -468,17 +457,17 @@ class FuchsiaDevice(
         )
 
     @properties.Affordance
-    def bluetooth_avrcp(self) -> bluetooth_avrcp_interface.BluetoothAvrcp:
-        """Returns a BluetoothAvrcp affordance object.
+    def bluetooth_avrcp(self) -> avrcp.Avrcp:
+        """Returns a Bluetooth Avrcp affordance object.
 
         Returns:
-            bluetooth_avrcp.BluetoothAvrcp object
+            Bluetooth Avrcp object
         """
         if (
             self._get_bluetooth_affordances_implementation()
             == bluetooth_types.Implementation.SL4F
         ):
-            return bluetooth_avrcp_sl4f.BluetoothAvrcp(
+            return avrcp_using_sl4f.AvrcpUsingSl4f(
                 device_name=self.device_name,
                 sl4f=self.sl4f,
                 reboot_affordance=self,
@@ -486,40 +475,30 @@ class FuchsiaDevice(
         raise NotImplementedError
 
     @properties.Affordance
-    def bluetooth_le(self) -> bluetooth_le_interface.BluetoothLE:
-        """Returns a BluetoothGap affordance object.
+    def bluetooth_le(self) -> le.LE:
+        """Returns a Bluetooth LE affordance object.
 
         Returns:
-            bluetooth_gap.BluetoothGap object
+            Bluetooth LE object
         """
-        return le_fc.BluetoothLE(
+        return le_using_fc.LEUsingFc(
             device_name=self.device_name,
             fuchsia_controller=self.fuchsia_controller,
             reboot_affordance=self,
         )
 
     @properties.Affordance
-    def bluetooth_gap(self) -> bluetooth_gap_interface.BluetoothGap:
-        """Returns a BluetoothGap affordance object.
+    def bluetooth_gap(self) -> gap.Gap:
+        """Returns a Bluetooth Gap affordance object.
 
         Returns:
-            bluetooth_gap.BluetoothGap object
+            Bluetooth Gap object
         """
-        if (
-            self._get_bluetooth_affordances_implementation()
-            == bluetooth_types.Implementation.SL4F
-        ):
-            return bluetooth_gap_sl4f.BluetoothGap(
-                device_name=self.device_name,
-                sl4f=self.sl4f,
-                reboot_affordance=self,
-            )
-        else:
-            return gap_fc.BluetoothGap(
-                device_name=self.device_name,
-                fuchsia_controller=self.fuchsia_controller,
-                reboot_affordance=self,
-            )
+        return gap_using_fc.GapUsingFc(
+            device_name=self.device_name,
+            fuchsia_controller=self.fuchsia_controller,
+            reboot_affordance=self,
+        )
 
     @properties.Affordance
     def wlan_policy(self) -> wlan_policy.WlanPolicy:
@@ -617,14 +596,38 @@ class FuchsiaDevice(
         """Ensure device is healthy.
 
         Raises:
-            errors.FfxConnectionError
-            errors.FuchsiaControllerConnectionError
+            errors.HealthCheckError
         """
-        # Note - FFX need to be invoked first before FC as FC depends on the daemon that will be created by FFX
-        self.ffx.check_connection()
-        self.fuchsia_controller.check_connection()
-        if self._is_sl4f_needed:
-            self.sl4f.check_connection()
+        try:
+            with common.time_limit(
+                timeout=60,
+                exception_message=f"Timeout occurred during the health check of '{self._device_info.name}'",
+            ):
+                _LOGGER.info(
+                    "Starting the health check on %s...",
+                    self.device_name,
+                )
+
+                # Note - FFX need to be invoked first before FC as FC depends on the daemon that
+                # will be created by FFX
+                self.ffx.check_connection()
+
+                self.fuchsia_controller.check_connection()
+
+                if self._is_sl4f_needed:
+                    self.sl4f.check_connection()
+
+                _LOGGER.info(
+                    "Completed the health check successfully on %s...",
+                    self.device_name,
+                )
+        except (
+            errors.HoneydewTimeoutError,
+            errors.TransportConnectionError,
+        ) as err:
+            raise errors.HealthCheckError(
+                f"health check failed on '{self._device_info.name}'"
+            ) from err
 
     def log_message_to_device(
         self, message: str, level: custom_types.LEVEL

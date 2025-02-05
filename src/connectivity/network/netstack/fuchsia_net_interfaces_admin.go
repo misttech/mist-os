@@ -1171,6 +1171,12 @@ func (i *interfacesAdminInstallerImpl) InstallDevice(_ fidl.Context, device netw
 	return nil
 }
 
+func (i *interfacesAdminInstallerImpl) InstallBlackholeInterface(_ fidl.Context, control admin.ControlWithCtxInterfaceRequest, _ admin.Options) error {
+	_ = syslog.ErrorTf(admin.InstallerName, "InstallBlackholeInterface is not supported")
+	component.CloseWithEpitaph(control.Channel, zx.ErrNotSupported)
+	return nil
+}
+
 var _ admin.DeviceControlWithCtx = (*interfacesAdminDeviceControlImpl)(nil)
 
 type interfacesAdminDeviceControlImpl struct {

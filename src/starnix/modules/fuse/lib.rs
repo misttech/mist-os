@@ -28,7 +28,7 @@ use starnix_sync::{
     RwLock, RwLockReadGuard, RwLockWriteGuard, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
-use starnix_types::time::{duration_from_timespec, time_from_timespec};
+use starnix_types::time::{duration_from_timespec, time_from_timespec, NANOS_PER_SECOND};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
@@ -43,6 +43,7 @@ use std::collections::{HashMap, VecDeque};
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
+use syncio::zxio_node_attr_has_t;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 const FUSE_ROOT_ID_U64: u64 = uapi::FUSE_ROOT_ID as u64;
@@ -551,10 +552,11 @@ impl FuseNode {
         node: &FsNode,
         current_task: &CurrentTask,
         access: Access,
+        reason: CheckAccessReason,
         info: &RwLock<FsNodeInfo>,
     ) -> Result<(), Errno> {
         let info = self.refresh_expired_node_attributes(locked, current_task, info)?;
-        node.default_check_access_impl(current_task, access, info)
+        node.default_check_access_impl(current_task, access, reason, info)
     }
 
     fn refresh_expired_node_attributes<'a>(
@@ -610,7 +612,7 @@ impl FuseNode {
                 return error!(EINVAL);
             };
         let mut info = info.write();
-        FuseNode::set_node_info(
+        FuseNode::update_node_info_from_attr(
             &mut info,
             attr,
             attr_valid_to_duration(attr_valid, attr_valid_nsec)?,
@@ -619,7 +621,7 @@ impl FuseNode {
         Ok(RwLockWriteGuard::downgrade(info))
     }
 
-    fn set_node_info(
+    fn update_node_info_from_attr(
         info: &mut FsNodeInfo,
         attributes: uapi::fuse_attr,
         attr_valid_duration: zx::MonotonicDuration,
@@ -674,7 +676,7 @@ impl FuseNode {
                 let fuse_node =
                     FuseNode::new(self.connection.clone(), entry.nodeid, entry.generation);
                 let mut info = FsNodeInfo::default();
-                FuseNode::set_node_info(
+                FuseNode::update_node_info_from_attr(
                     &mut info,
                     entry.attr,
                     attr_valid_to_duration(entry.attr_valid, entry.attr_valid_nsec)?,
@@ -1105,7 +1107,7 @@ impl DirEntryOps for FuseDirEntry {
         }
 
         dir_entry.node.update_info(|info| {
-            FuseNode::set_node_info(
+            FuseNode::update_node_info_from_attr(
                 info,
                 attr,
                 attr_valid_to_duration(attr_valid, attr_valid_nsec)?,
@@ -1144,6 +1146,7 @@ impl FsNodeOps for FuseNode {
                 node,
                 current_task,
                 access,
+                reason,
                 info,
             );
         }
@@ -1167,7 +1170,8 @@ impl FsNodeOps for FuseNode {
                     error!(EINVAL)
                 }
             }
-            CheckAccessReason::InternalPermissionChecks => {
+            CheckAccessReason::ChangeTimestamps { .. }
+            | CheckAccessReason::InternalPermissionChecks => {
                 // Per FUSE's mount options, the kernel does not check file access
                 // permissions unless the default permissions mount option is set.
                 //
@@ -1475,7 +1479,7 @@ impl FsNodeOps for FuseNode {
                 } else {
                     return error!(EINVAL);
                 };
-            FuseNode::set_node_info(
+            FuseNode::update_node_info_from_attr(
                 info,
                 attr,
                 attr_valid_to_duration(attr_valid, attr_valid_nsec)?,
@@ -1510,6 +1514,58 @@ impl FsNodeOps for FuseNode {
         // that rely on this only updating attributes if they have expired, and this matches what
         // Linux appears to do.
         self.refresh_expired_node_attributes(locked, current_task, info)
+    }
+
+    fn update_attributes(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        current_task: &CurrentTask,
+        info: &FsNodeInfo,
+        has: zxio_node_attr_has_t,
+    ) -> Result<(), Errno> {
+        let mut valid = 0u32;
+        // Nb: We don't have a mechanism for 'FATTR_*TIME_NOW'.
+        if has.modification_time {
+            valid |= uapi::FATTR_MTIME;
+        }
+        if has.access_time {
+            valid |= uapi::FATTR_ATIME;
+        }
+        if has.mode {
+            valid |= uapi::FATTR_MODE;
+        }
+        if has.uid {
+            valid |= uapi::FATTR_UID;
+        }
+        if has.gid {
+            valid |= uapi::FATTR_GID;
+        }
+
+        let attributes = uapi::fuse_setattr_in {
+            valid,
+            atime: (info.time_access.into_nanos() / NANOS_PER_SECOND) as u64,
+            mtime: (info.time_modify.into_nanos() / NANOS_PER_SECOND) as u64,
+            ctime: (info.time_status_change.into_nanos() / NANOS_PER_SECOND) as u64,
+            atimensec: (info.time_access.into_nanos() % NANOS_PER_SECOND) as u32,
+            mtimensec: (info.time_modify.into_nanos() % NANOS_PER_SECOND) as u32,
+            ctimensec: (info.time_status_change.into_nanos() % NANOS_PER_SECOND) as u32,
+            mode: info.mode.bits(),
+            uid: info.uid,
+            gid: info.gid,
+            ..Default::default()
+        };
+
+        let response = self.connection.lock().execute_operation(
+            locked,
+            current_task,
+            self,
+            FuseOperation::SetAttr(attributes),
+        )?;
+        if let FuseResponse::Attr(_attr) = response {
+            Ok(())
+        } else {
+            error!(EINVAL)
+        }
     }
 
     fn get_xattr(

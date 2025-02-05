@@ -236,6 +236,7 @@ impl ConnectionInfo {
 pub type DeviceMap = HashMap<magma_device_t, MagmaDevice>;
 
 pub struct MagmaFile {
+    supported_vendors: Vec<u16>,
     devices: Arc<Mutex<DeviceMap>>,
     connections: Arc<Mutex<ConnectionMap>>,
     buffers: Arc<Mutex<HashMap<magma_buffer_t, Arc<MagmaBuffer>>>>,
@@ -264,6 +265,7 @@ impl MagmaFile {
         _dev: DeviceType,
         _node: &FsNode,
         _flags: OpenFlags,
+        supported_vendors: Vec<u16>,
     ) -> Result<Box<dyn FileOps>, Errno> {
         static INIT: Once = Once::new();
         INIT.call_once(|| {
@@ -271,6 +273,7 @@ impl MagmaFile {
         });
 
         Ok(Box::new(Self {
+            supported_vendors,
             devices: Arc::new(Mutex::new(HashMap::new())),
             connections: Arc::new(Mutex::new(HashMap::new())),
             buffers: Arc::new(Mutex::new(HashMap::new())),
@@ -471,7 +474,7 @@ impl FileOps for MagmaFile {
         match command_type {
             virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_DEVICE_IMPORT => {
                 let (control, mut response) = read_control_and_response(current_task, &command)?;
-                let device = device_import(control, &mut response)?;
+                let device = device_import(&self.supported_vendors, control, &mut response)?;
                 (*self.devices.lock()).insert(device.handle, device);
 
                 current_task.write_object(UserRef::new(response_address), &response)

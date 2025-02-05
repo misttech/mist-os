@@ -4,10 +4,11 @@
 
 use async_trait::async_trait;
 use ffx_echo_args::EchoCommand;
-use fho::{daemon_protocol, return_bug, FfxMain, FfxTool, Result, VerifiedMachineWriter};
+use fho::{return_bug, FfxMain, FfxTool, Result, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx::EchoProxy;
 use schemars::JsonSchema;
 use serde::Serialize;
+use target_holders::daemon_protocol;
 
 #[derive(Debug, Serialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]

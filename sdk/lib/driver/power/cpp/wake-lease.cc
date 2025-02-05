@@ -42,6 +42,8 @@ WakeLease::WakeLease(async_dispatcher_t* dispatcher, std::string_view lease_name
     total_lease_acquisitions_ = parent_node->CreateUint("Total Lease Acquisitions", 0);
     wake_lease_held_ = parent_node->CreateBool("Wake Lease Held", false);
     wake_lease_grabbable_ = parent_node->CreateBool("Wake Lease Grabbable", sag_client_.is_valid());
+    wake_lease_last_attempted_acquisition_timestamp_ =
+        parent_node->CreateUint("Wake Lease Last Attempted Acquisition Timestamp (ns)", 0);
     wake_lease_last_acquired_timestamp_ =
         parent_node->CreateUint("Wake Lease Last Acquired Timestamp (ns)", 0);
     wake_lease_last_refreshed_timestamp_ =
@@ -75,6 +77,7 @@ bool WakeLease::AcquireWakeLease(zx::duration timeout) {
     lease_task_.Cancel();
     wake_lease_last_refreshed_timestamp_.Set(zx::clock::get_monotonic().get());
   } else {
+    wake_lease_last_attempted_acquisition_timestamp_.Set(zx::clock::get_monotonic().get());
     // If not holding a lease, take one.
     auto result_lease = sag_client_->TakeWakeLease(fidl::StringView::FromExternal(lease_name_));
     if (!result_lease.ok()) {
@@ -86,6 +89,13 @@ bool WakeLease::AcquireWakeLease(zx::duration timeout) {
       ResetSagClient();
       return false;
     }
+
+    // If we acquired a wake lease, the system is not suspended. This bit is
+    // useful to flip because when this WakeLease instance was created the
+    // system might have been resumed and it hasn't gotten any callbacks to let
+    // it know the system state. By flipping the flag here after lease
+    // acquisition the object might avoid future, unnecessary acquisitions.
+    system_suspended_ = false;
 
     lease_ = std::move(result_lease->token);
     if (log_) {
@@ -155,11 +165,6 @@ void WakeLease::OnSuspendStarted(OnSuspendStartedCompleter::Sync& completer) {
   }
 
   system_suspended_ = true;
-  completer.Reply();
-}
-
-void WakeLease::OnSuspendFail(OnSuspendFailCompleter::Sync& completer) {
-  system_suspended_ = false;
   completer.Reply();
 }
 

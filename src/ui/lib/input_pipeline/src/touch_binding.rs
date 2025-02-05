@@ -430,7 +430,7 @@ impl TouchBinding {
                 match self.device_proxy.set_feature_report(&report).await? {
                     Ok(()) => {
                         // TODO(https://fxbug.dev/42056283): Remove log message.
-                        tracing::info!("touchpad: set touchpad_enabled to {}", enable);
+                        log::info!("touchpad: set touchpad_enabled to {}", enable);
                         Ok(())
                     }
                     Err(e) => Err(format_err!("set_feature_report failed: {}", e)),

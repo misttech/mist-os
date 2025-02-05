@@ -39,7 +39,10 @@ enum class PropertyBlockFormat : uint8_t {
   kUtf8 = 0,
 
   // The property is a binary string of uint8_t.
-  kBinary = 1
+  kBinary = 1,
+
+  // The property is a string reference.
+  kStringReference = 2,
 };
 
 enum class ArrayBlockFormat : uint8_t {
@@ -240,8 +243,10 @@ template <typename T, typename B,
           // check that B is a Block* of some kind
           typename = std::enable_if_t<std::is_same<typename std::decay_t<B>, Block>::value>,
           // check that the return pointer is at least as const as the input block
-          typename = std::enable_if_t<std::is_const<B>::value ? std::is_const<T>::value : true>>
-constexpr T* GetArraySlot(B* block, size_t index) {
+          typename = std::enable_if_t < std::is_const<B>::value ? std::is_const<T>::value
+                                                                : true >>
+                                                                      constexpr T* GetArraySlot(
+                                                                          B* block, size_t index) {
   if (GetType(block) != BlockType::kArrayValue) {
     return nullptr;
   }

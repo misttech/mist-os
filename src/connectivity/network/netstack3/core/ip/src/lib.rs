@@ -10,7 +10,6 @@
 #![warn(missing_docs, unreachable_patterns, clippy::useless_conversion, clippy::redundant_clone)]
 
 extern crate fakealloc as alloc;
-extern crate fakestd as std;
 
 #[path = "."]
 mod internal {
@@ -60,7 +59,7 @@ pub mod device {
     };
     pub use crate::internal::device::slaac::{
         InnerSlaacTimerId, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses,
-        SlaacAddrsMutAndConfig, SlaacBindingsContext, SlaacConfiguration, SlaacConfigurationUpdate,
+        SlaacBindingsContext, SlaacConfigAndState, SlaacConfiguration, SlaacConfigurationUpdate,
         SlaacContext, SlaacCounters, SlaacState, SlaacTimerId, TemporarySlaacAddressConfiguration,
         SLAAC_MIN_REGEN_ADVANCE,
     };
@@ -233,9 +232,10 @@ pub use internal::base::{
     IpRouteTableContext, IpRouteTablesContext, IpSendFrameError, IpSendFrameErrorReason,
     IpStateContext, IpStateInner, IpTransportContext, IpTransportDispatchContext,
     Ipv4PresentAddressStatus, Ipv4State, Ipv4StateBuilder, Ipv6PresentAddressStatus, Ipv6State,
-    Ipv6StateBuilder, MulticastMembershipHandler, ReceivePacketAction, ResolveRouteError,
-    RoutingTableId, SendIpPacketMeta, TransportIpContext, TransportReceiveError,
-    DEFAULT_HOP_LIMITS, DEFAULT_TTL, IPV6_DEFAULT_SUBNET,
+    Ipv6StateBuilder, MulticastMembershipHandler, NdpBindingsContext, ReceivePacketAction,
+    ResolveRouteError, RouterAdvertisementEvent, RoutingTableId, SendIpPacketMeta,
+    TransportIpContext, TransportReceiveError, DEFAULT_HOP_LIMITS, DEFAULT_TTL,
+    IPV6_DEFAULT_SUBNET,
 };
 pub use internal::fragmentation::FragmentationCounters;
 pub use internal::local_delivery::{

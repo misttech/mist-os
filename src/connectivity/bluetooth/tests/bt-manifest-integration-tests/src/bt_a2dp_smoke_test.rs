@@ -25,9 +25,9 @@ use fuchsia_component_test::{
 };
 use futures::channel::mpsc;
 use futures::{SinkExt, StreamExt};
+use log::info;
 use realmbuilder_mock_helpers::add_fidl_service_handler;
 use std::collections::HashSet;
-use tracing::info;
 use {
     fidl_fuchsia_bluetooth_a2dp as fidl_a2dp, fidl_fuchsia_bluetooth_avdtp_test as fidl_avdtp,
     fidl_fuchsia_bluetooth_avrcp as fidl_avrcp,

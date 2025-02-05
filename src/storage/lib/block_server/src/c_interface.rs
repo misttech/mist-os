@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{GroupOrRequest, IntoSessionManager, Operation, RequestId, SessionHelper};
+use super::{IntoSessionManager, Operation, RequestId, RequestTracking, SessionHelper};
 use anyhow::Error;
 use block_protocol::{BlockFifoRequest, BlockFifoResponse};
 use fidl::endpoints::RequestStream;
@@ -13,6 +13,7 @@ use std::borrow::Cow;
 use std::collections::{HashMap, VecDeque};
 use std::ffi::{c_char, c_void, CStr};
 use std::mem::MaybeUninit;
+use std::num::NonZero;
 use std::sync::{Arc, Condvar, Mutex, Weak};
 use zx::{self as zx, AsHandleRef as _};
 use {fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume};
@@ -144,6 +145,7 @@ pub struct UnownedVmo(zx::sys::zx_handle_t);
 pub struct Request {
     pub request_id: RequestId,
     pub operation: Operation,
+    pub trace_flow_id: Option<NonZero<u64>>,
     pub vmo: UnownedVmo,
 }
 
@@ -231,16 +233,17 @@ impl Session {
             if let Some(r) = self.helper.decode_fifo_request(request) {
                 let operation = match r.operation {
                     Ok(Operation::CloseVmo) => {
-                        self.send_reply(r.group_or_request, zx::Status::OK);
+                        self.send_reply(r.request_tracking, zx::Status::OK);
                         continue;
                     }
                     Ok(operation) => operation,
                     Err(status) => {
-                        self.send_reply(r.group_or_request, status);
+                        self.send_reply(r.request_tracking, status);
                         continue;
                     }
                 };
-                let mut request_id = r.group_or_request.into();
+                let RequestTracking { group_or_request, trace_flow_id } = r.request_tracking;
+                let mut request_id = group_or_request.into();
                 let vmo = if let Some(vmo) = r.vmo {
                     let raw_handle = vmo.raw_handle();
                     self.vmos.lock().unwrap().insert(request_id, vmo);
@@ -249,7 +252,12 @@ impl Session {
                 } else {
                     UnownedVmo(zx::sys::ZX_HANDLE_INVALID)
                 };
-                decoded_requests[count].write(Request { request_id, operation, vmo });
+                decoded_requests[count].write(Request {
+                    request_id,
+                    operation,
+                    trace_flow_id,
+                    vmo,
+                });
                 count += 1;
             }
         }
@@ -265,17 +273,10 @@ impl Session {
         }
     }
 
-    fn send_reply(&self, id: GroupOrRequest, status: zx::Status) {
-        let response = match id {
-            GroupOrRequest::Group(group_id) => {
-                let Some(response) = self.helper.message_groups.complete(group_id, status) else {
-                    return;
-                };
-                response
-            }
-            GroupOrRequest::Request(reqid) => {
-                BlockFifoResponse { status: status.into_raw(), reqid, ..Default::default() }
-            }
+    fn send_reply(&self, tracking: RequestTracking, status: zx::Status) {
+        let response = match self.helper.finish_fifo_request(tracking, status) {
+            Some(response) => response,
+            None => return,
         };
         let mut queue = self.queue.lock().unwrap();
         if queue.responses.is_empty() {
@@ -534,10 +535,14 @@ pub unsafe extern "C" fn block_server_session_release(session: &Session) {
 pub unsafe extern "C" fn block_server_send_reply(
     session: &Session,
     request_id: RequestId,
+    trace_flow_id: Option<NonZero<u64>>,
     status: zx_status_t,
 ) {
     if request_id.did_have_vmo() {
         session.vmos.lock().unwrap().remove(&request_id);
     }
-    session.send_reply(request_id.into(), zx::Status::from_raw(status));
+    session.send_reply(
+        RequestTracking { group_or_request: request_id.into(), trace_flow_id },
+        zx::Status::from_raw(status),
+    );
 }

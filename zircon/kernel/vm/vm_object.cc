@@ -70,18 +70,14 @@ zx_status_t VmObject::set_name(const char* name, size_t len) {
 
 void VmObject::set_user_id(uint64_t user_id) {
   canary_.Assert();
-  Guard<CriticalMutex> guard{lock()};
   DEBUG_ASSERT(user_id_ == 0);
   user_id_ = user_id;
 }
 
 uint64_t VmObject::user_id() const {
   canary_.Assert();
-  Guard<CriticalMutex> guard{lock()};
   return user_id_;
 }
-
-uint64_t VmObject::user_id_locked() const { return user_id_; }
 
 void VmObject::AddMappingLocked(VmMapping* r) {
   canary_.Assert();
@@ -250,16 +246,15 @@ void VmObject::DropChildLocked(VmObject* c) {
   --children_list_len_;
 }
 
-void VmObject::RemoveChild(VmObject* o, Guard<CriticalMutex>&& adopt) {
+void VmObject::RemoveChild(VmObject* o, Guard<CriticalMutex>::Adoptable adopt) {
   canary_.Assert();
-  DEBUG_ASSERT(adopt.wraps_lock(lock_ref().lock()));
 
   // The observer may call back into this object so we must release the shared lock to prevent any
   // self-deadlock. We explicitly release the lock prior to acquiring the child_observer_lock as
   // otherwise we have lock ordering issue, since we already allow the shared lock to be acquired
   // whilst holding the child_observer_lock.
   {
-    Guard<CriticalMutex> guard{AdoptLock, ktl::move(adopt)};
+    Guard<CriticalMutex> guard{AdoptLock, lock(), ktl::move(adopt)};
     DropChildLocked(o);
 
     if (children_list_len_ != 0) {
@@ -326,31 +321,30 @@ zx_status_t VmObject::GetPageBlocking(uint64_t offset, uint pf_flags, list_node*
   return status;
 }
 
-VmHierarchyBase::VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state)
-    : hierarchy_state_ptr_(ktl::move(state)) {}
+void VmObject::RangeChangeUpdateMappingsLocked(uint64_t offset, uint64_t len, RangeChangeOp op) {
+  canary_.Assert();
+  DEBUG_ASSERT(len != 0);
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
 
-void VmHierarchyState::DoDeferredDelete(fbl::RefPtr<VmHierarchyBase> vmo) {
-  Guard<CriticalMutex> guard{&lock_};
-  // If a parent has multiple children then it's possible for a given object to already be
-  // queued for deletion.
-  if (!vmo->deferred_delete_state_.InContainer()) {
-    delete_list_.push_front(ktl::move(vmo));
-  } else {
-    // We know a refptr is being held by the container (which we are holding the lock to), so can
-    // safely drop the vmo ref.
-    vmo.reset();
-  }
-  if (!running_delete_) {
-    running_delete_ = true;
-    while (!delete_list_.is_empty()) {
-      guard.CallUnlocked([ptr = delete_list_.pop_front()]() mutable {
-        ptr->MaybeDeadTransition();
-        ptr.reset();
-      });
+  for (auto& m : mapping_list_) {
+    m.assert_object_lock();
+    if (op == RangeChangeOp::Unmap) {
+      m.AspaceUnmapLockedObject(offset, len, false);
+    } else if (op == RangeChangeOp::UnmapZeroPage) {
+      m.AspaceUnmapLockedObject(offset, len, true);
+    } else if (op == RangeChangeOp::RemoveWrite) {
+      m.AspaceRemoveWriteLockedObject(offset, len);
+    } else if (op == RangeChangeOp::DebugUnpin) {
+      m.AspaceDebugUnpinLockedObject(offset, len);
+    } else {
+      panic("Unknown RangeChangeOp %d\n", static_cast<int>(op));
     }
-    running_delete_ = false;
   }
 }
+
+VmHierarchyBase::VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state)
+    : hierarchy_state_ptr_(ktl::move(state)) {}
 
 static int cmd_vm_object(int argc, const cmd_args* argv, uint32_t flags) {
   if (argc < 2) {

@@ -16,7 +16,7 @@ use core::time::Duration;
 
 use assert_matches::assert_matches;
 use log::{debug, error, trace};
-use net_types::ip::{AddrSubnet, IpAddress, Ipv6, Ipv6Addr, Subnet};
+use net_types::ip::{AddrSubnet, Ip as _, IpAddress, Ipv6, Ipv6Addr, Subnet};
 use net_types::Witness as _;
 use netstack3_base::{
     AnyDevice, CoreTimerContext, Counter, CounterContext, DeviceIdContext, DeviceIdentifier,
@@ -157,12 +157,10 @@ pub trait SlaacAddresses<BT: SlaacBindingsTypes> {
     ) -> Result<(AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>, SlaacConfig<BT::Instant>), NotFoundError>;
 }
 
-/// Supports [`SlaacContext::with_slaac_addrs_mut_and_config`].
+/// Supports [`SlaacContext::with_slaac_addrs_mut_and_configs`].
 ///
 /// Contains the fields necessary for the SLAAC state machine.
-pub struct SlaacAddrsMutAndConfig<'a, BT: SlaacBindingsTypes, A: SlaacAddresses<BT>> {
-    /// The device's SLAAC address.
-    pub addrs: &'a mut A,
+pub struct SlaacConfigAndState<BT: SlaacBindingsTypes> {
     /// The current config for the device.
     pub config: SlaacConfiguration,
     /// The configured number of DAD transmits.
@@ -188,7 +186,7 @@ pub trait SlaacContext<BC: SlaacBindingsContext<Self::DeviceId>>:
     /// `device_id`.
     fn with_slaac_addrs_mut_and_configs<
         O,
-        F: FnOnce(SlaacAddrsMutAndConfig<'_, BC, Self::SlaacAddrs<'_>>, &mut SlaacState<BC>) -> O,
+        F: FnOnce(&mut Self::SlaacAddrs<'_>, SlaacConfigAndState<BC>, &mut SlaacState<BC>) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,
@@ -201,19 +199,7 @@ pub trait SlaacContext<BC: SlaacBindingsContext<Self::DeviceId>>:
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        self.with_slaac_addrs_mut_and_configs(
-            device_id,
-            |SlaacAddrsMutAndConfig {
-                 addrs,
-                 config: _,
-                 dad_transmits: _,
-                 retrans_timer: _,
-                 interface_identifier: _,
-                 temp_secret_key: _,
-                 _marker,
-             },
-             state| cb(addrs, state),
-        )
+        self.with_slaac_addrs_mut_and_configs(device_id, |addrs, _config, state| cb(addrs, state))
     }
 }
 
@@ -239,7 +225,7 @@ fn update_slaac_addr_valid_until<I: Instant>(
     valid_until: Lifetime<I>,
 ) {
     match slaac_config {
-        SlaacConfig::Static { valid_until: v } => *v = valid_until,
+        SlaacConfig::Stable { valid_until: v } => *v = valid_until,
         SlaacConfig::Temporary(TemporarySlaacConfig {
             valid_until: v,
             desync_factor: _,
@@ -277,7 +263,7 @@ pub trait SlaacHandler<BC: InstantContext>: DeviceIdContext<AnyDevice> {
     /// from [RFC 8981 Section 3.4] for temporary addresses, for a given prefix
     /// advertised by a router.
     ///
-    /// This function updates all static and temporary SLAAC addresses for the
+    /// This function updates all stable and temporary SLAAC addresses for the
     /// given prefix and adds new ones if necessary.
     ///
     /// [RFC 4862 Section 5.5.3]: http://tools.ietf.org/html/rfc4862#section-5.5.3
@@ -290,6 +276,9 @@ pub trait SlaacHandler<BC: InstantContext>: DeviceIdContext<AnyDevice> {
         preferred_lifetime: Option<NonZeroNdpLifetime>,
         valid_lifetime: Option<NonZeroNdpLifetime>,
     );
+
+    /// Generates a link-local SLAAC address for the given interface.
+    fn generate_link_local_address(&mut self, bindings_ctx: &mut BC, device_id: &Self::DeviceId);
 
     /// Handles SLAAC specific aspects of address removal.
     ///
@@ -324,21 +313,14 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<
             return;
         }
 
-        let mut seen_static = false;
+        let mut seen_stable = false;
         let mut seen_temporary = false;
 
         let now = bindings_ctx.now();
-        self.with_slaac_addrs_mut_and_configs(device_id, |addrs_config, slaac_state| {
-            let SlaacAddrsMutAndConfig {
-                addrs: slaac_addrs,
-                config,
-                dad_transmits,
-                retrans_timer,
-                interface_identifier: iid,
-                temp_secret_key,
-                _marker,
-            } = addrs_config;
-            // Apply the update to each existing address, static or temporary, for the
+        self.with_slaac_addrs_mut_and_configs(device_id, |slaac_addrs, config, slaac_state| {
+            let SlaacConfigAndState { config: device_config, dad_transmits, retrans_timer, .. } =
+                config;
+            // Apply the update to each existing address, stable or temporary, for the
             // prefix.
             slaac_addrs.for_each_addr_mut(|address_entry| {
                 let slaac_type = match apply_slaac_update_to_addr(
@@ -348,7 +330,7 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<
                     device_id,
                     valid_lifetime,
                     preferred_lifetime,
-                    &config,
+                    &device_config,
                     now,
                     retrans_timer,
                     dad_transmits,
@@ -364,7 +346,7 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<
                 // in response to a prefix update and addresses types never
                 // change after the address is added.
                 match slaac_type {
-                    SlaacType::Static => seen_static = true,
+                    SlaacType::Stable => seen_stable = true,
                     SlaacType::Temporary => seen_temporary = true,
                 }
             });
@@ -391,7 +373,7 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<
                 }
             };
 
-            let address_types_to_add = (!seen_static)
+            let address_types_to_add = (!seen_stable)
                 .then(|| {
                     // As per RFC 4862 Section 5.5.3.d,
                     //
@@ -403,7 +385,7 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<
                     //   and the first prefix- length bits of the prefixes are
                     //   identical), and if the Valid Lifetime is not 0, form an
                     //   address [...].
-                    SlaacType::Static
+                    SlaacType::Stable
                 })
                 .into_iter()
                 .chain((!seen_temporary).then(|| {
@@ -418,22 +400,45 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<
 
             for slaac_type in address_types_to_add {
                 add_slaac_addr_sub::<_, CC>(
-                    slaac_addrs,
-                    slaac_state,
                     bindings_ctx,
                     device_id,
+                    slaac_addrs,
+                    &config,
+                    slaac_state,
                     now,
                     SlaacInitConfig::new(slaac_type),
                     valid_lifetime,
                     preferred_lifetime,
                     &subnet,
-                    config,
-                    dad_transmits,
-                    retrans_timer,
-                    iid,
-                    temp_secret_key,
                 );
             }
+        });
+    }
+
+    fn generate_link_local_address(&mut self, bindings_ctx: &mut BC, device_id: &Self::DeviceId) {
+        let now = bindings_ctx.now();
+        self.with_slaac_addrs_mut_and_configs(device_id, |addrs, config, slaac_state| {
+            // Configure a link-local address via SLAAC.
+            //
+            // Per [RFC 4862 Section 5.3]: "A link-local address has an infinite preferred
+            // and valid lifetime; it is never timed out."
+            //
+            // [RFC 4862 Section 5.3]: https://tools.ietf.org/html/rfc4862#section-5.3
+            let link_local_subnet =
+                Subnet::new(Ipv6::LINK_LOCAL_UNICAST_SUBNET.network(), REQUIRED_PREFIX_BITS)
+                    .expect("link local subnet should be valid");
+            add_slaac_addr_sub::<_, CC>(
+                bindings_ctx,
+                device_id,
+                addrs,
+                &config,
+                slaac_state,
+                now,
+                SlaacInitConfig::new(SlaacType::Stable),
+                NonZeroNdpLifetime::Infinite,       /* valid_lifetime */
+                Some(NonZeroNdpLifetime::Infinite), /* preferred_lifetime */
+                &link_local_subnet,
+            );
         });
     }
 
@@ -445,12 +450,13 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<
         state: SlaacConfig<BC::Instant>,
         reason: AddressRemovedReason,
     ) {
-        self.with_slaac_addrs_mut_and_configs(device_id, |addrs_config, slaac_state| {
+        self.with_slaac_addrs_mut_and_configs(device_id, |addrs, config, slaac_state| {
             on_address_removed_inner::<_, CC>(
                 bindings_ctx,
                 addr_sub,
                 device_id,
-                addrs_config,
+                addrs,
+                config,
                 slaac_state,
                 state,
                 reason,
@@ -493,7 +499,8 @@ fn on_address_removed_inner<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacCon
     bindings_ctx: &mut BC,
     addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
     device_id: &CC::DeviceId,
-    addrs_config: SlaacAddrsMutAndConfig<'_, BC, CC::SlaacAddrs<'_>>,
+    slaac_addrs: &mut CC::SlaacAddrs<'_>,
+    config: SlaacConfigAndState<BC>,
     slaac_state: &mut SlaacState<BC>,
     state: SlaacConfig<BC::Instant>,
     reason: AddressRemovedReason,
@@ -514,8 +521,8 @@ fn on_address_removed_inner<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacCon
                 );
                 temporary_config
             }
-            SlaacConfig::Static { .. } => {
-                // TODO(https://fxbug.dev/42148800): Re-generate static
+            SlaacConfig::Stable { .. } => {
+                // TODO(https://fxbug.dev/42148800): Re-generate stable
                 // addresses if we're not using hardware-derived IIDs.
                 return;
             }
@@ -528,17 +535,7 @@ fn on_address_removed_inner<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacCon
         }
     }
 
-    let SlaacAddrsMutAndConfig {
-        addrs: slaac_addrs,
-        config,
-        dad_transmits,
-        retrans_timer,
-        interface_identifier: iid,
-        temp_secret_key,
-        _marker,
-    } = addrs_config;
-    let SlaacConfiguration { enable_stable_addresses: _, temporary_address_configuration } = config;
-    let temp_valid_lifetime = match temporary_address_configuration {
+    let temp_valid_lifetime = match config.config.temporary_address_configuration {
         TemporarySlaacAddressConfiguration::Enabled {
             temp_idgen_retries,
             temp_valid_lifetime,
@@ -577,20 +574,16 @@ fn on_address_removed_inner<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacCon
         .unwrap_or(temp_valid_lifetime);
 
     add_slaac_addr_sub::<_, CC>(
-        slaac_addrs,
-        slaac_state,
         bindings_ctx,
         device_id,
+        slaac_addrs,
+        &config,
+        slaac_state,
         now,
         SlaacInitConfig::Temporary { dad_count: dad_counter + 1 },
         NonZeroNdpLifetime::Finite(valid_for),
         NonZeroDuration::new(preferred_for).map(NonZeroNdpLifetime::Finite),
         &addr_sub.subnet(),
-        config,
-        dad_transmits,
-        retrans_timer,
-        iid,
-        temp_secret_key,
     )
 }
 
@@ -640,7 +633,7 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext<D>>(
         }
     }
     let (valid_for, entry_valid_until, preferred_for_and_regen_at) = match slaac_config {
-        SlaacConfig::Static { valid_until: entry_valid_until } => (
+        SlaacConfig::Stable { valid_until: entry_valid_until } => (
             ValidLifetimeBound::FromPrefix(valid_lifetime),
             *entry_valid_until,
             addr_preferred_lifetime.map(|p| (p, None)),
@@ -929,14 +922,13 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> HandleableTim
         let Some(device_id) = device_id.upgrade() else {
             return;
         };
-        core_ctx.with_slaac_addrs_mut_and_configs(&device_id, |slaac_addrs_config, slaac_state| {
+        core_ctx.with_slaac_addrs_mut_and_configs(&device_id, |addrs, config, slaac_state| {
             let Some((timer_id, ())) = slaac_state.timers.pop(bindings_ctx) else {
                 return;
             };
             match timer_id {
-                InnerSlaacTimerId::DeprecateSlaacAddress { addr } => slaac_addrs_config
-                    .addrs
-                    .for_each_addr_mut(|SlaacAddressEntryMut { addr_sub, config }| {
+                InnerSlaacTimerId::DeprecateSlaacAddress { addr } => {
+                    addrs.for_each_addr_mut(|SlaacAddressEntryMut { addr_sub, config }| {
                         if addr_sub.addr() == addr {
                             config.preferred_lifetime = PreferredLifetime::Deprecated;
 
@@ -947,45 +939,47 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> HandleableTim
                                 preferred_lifetime: config.preferred_lifetime,
                             });
                         }
-                    }),
+                    })
+                }
                 InnerSlaacTimerId::InvalidateSlaacAddress { addr } => {
-                    let (addr, config) =
-                        match slaac_addrs_config.addrs.remove_addr(bindings_ctx, &addr) {
-                            Ok(addr_config) => addr_config,
-                            Err(NotFoundError) => {
-                                // Even though when a user removes an address we
-                                // get notified, we could still race with our
-                                // own timer here. This is a tight enough race
-                                // that we can log at warn to call out in case
-                                // something else is wrong. It should certainly
-                                // not happen in tests, however.
-                                #[cfg(test)]
-                                panic!("Failed to remove address {addr} on invalidation");
-                                #[cfg(not(test))]
-                                {
-                                    log::warn!(
-                                        "failed to remove SLAAC address {addr}, assuming raced \
+                    let (addr, slaac_config) = match addrs.remove_addr(bindings_ctx, &addr) {
+                        Ok(addr_config) => addr_config,
+                        Err(NotFoundError) => {
+                            // Even though when a user removes an address we
+                            // get notified, we could still race with our
+                            // own timer here. This is a tight enough race
+                            // that we can log at warn to call out in case
+                            // something else is wrong. It should certainly
+                            // not happen in tests, however.
+                            #[cfg(test)]
+                            panic!("Failed to remove address {addr} on invalidation");
+                            #[cfg(not(test))]
+                            {
+                                log::warn!(
+                                    "failed to remove SLAAC address {addr}, assuming raced \
                                         with user removal"
-                                    );
-                                    return;
-                                }
+                                );
+                                return;
                             }
-                        };
+                        }
+                    };
 
                     on_address_removed_inner::<_, CC>(
                         bindings_ctx,
                         addr,
                         &device_id,
-                        slaac_addrs_config,
-                        slaac_state,
+                        addrs,
                         config,
+                        slaac_state,
+                        slaac_config,
                         AddressRemovedReason::Manual,
                     );
                 }
                 InnerSlaacTimerId::RegenerateTemporaryAddress { addr_subnet } => {
                     regenerate_temporary_slaac_addr::<_, CC>(
                         bindings_ctx,
-                        slaac_addrs_config,
+                        addrs,
+                        config,
                         slaac_state,
                         &device_id,
                         &addr_subnet,
@@ -1128,14 +1122,14 @@ pub struct SlaacConfigurationUpdate {
 
 #[derive(PartialEq, Eq)]
 enum SlaacType {
-    Static,
+    Stable,
     Temporary,
 }
 
 impl core::fmt::Debug for SlaacType {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            SlaacType::Static => f.write_str("static"),
+            SlaacType::Stable => f.write_str("stable"),
             SlaacType::Temporary => f.write_str("temporary"),
         }
     }
@@ -1144,7 +1138,7 @@ impl core::fmt::Debug for SlaacType {
 impl<'a, Instant> From<&'a SlaacConfig<Instant>> for SlaacType {
     fn from(slaac_config: &'a SlaacConfig<Instant>) -> Self {
         match slaac_config {
-            SlaacConfig::Static { .. } => SlaacType::Static,
+            SlaacConfig::Stable { .. } => SlaacType::Stable,
             SlaacConfig::Temporary { .. } => SlaacType::Temporary,
         }
     }
@@ -1226,20 +1220,13 @@ fn desync_factor<R: Rng>(
 
 fn regenerate_temporary_slaac_addr<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>>(
     bindings_ctx: &mut BC,
-    addrs_config: SlaacAddrsMutAndConfig<'_, BC, CC::SlaacAddrs<'_>>,
+    slaac_addrs: &mut CC::SlaacAddrs<'_>,
+    config_and_state: SlaacConfigAndState<BC>,
     slaac_state: &mut SlaacState<BC>,
     device_id: &CC::DeviceId,
     addr_subnet: &AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
 ) {
-    let SlaacAddrsMutAndConfig {
-        addrs: slaac_addrs,
-        config,
-        dad_transmits,
-        retrans_timer,
-        interface_identifier: iid,
-        temp_secret_key,
-        _marker,
-    } = addrs_config;
+    let SlaacConfigAndState { config, .. } = config_and_state;
     let SlaacState { timers } = slaac_state;
     let now = bindings_ctx.now();
 
@@ -1306,8 +1293,8 @@ fn regenerate_temporary_slaac_addr<BC: SlaacBindingsContext<CC::DeviceId>, CC: S
         let TemporarySlaacConfig { creation_time, desync_factor, valid_until, dad_counter: _ } =
             match entry.config.inner {
                 SlaacConfig::Temporary(temporary_config) => temporary_config,
-                SlaacConfig::Static { valid_until: _ } => unreachable!(
-                    "can't regenerate a temporary address for {:?}, which is static",
+                SlaacConfig::Stable { valid_until: _ } => unreachable!(
+                    "can't regenerate a temporary address for {:?}, which is stable",
                     addr_subnet
                 ),
             };
@@ -1349,34 +1336,30 @@ fn regenerate_temporary_slaac_addr<BC: SlaacBindingsContext<CC::DeviceId>, CC: S
     match action {
         Action::SkipRegen => {}
         Action::Regen { valid_for, preferred_for } => add_slaac_addr_sub::<_, CC>(
-            slaac_addrs,
-            slaac_state,
             bindings_ctx,
             device_id,
+            slaac_addrs,
+            &config_and_state,
+            slaac_state,
             now,
             SlaacInitConfig::Temporary { dad_count: 0 },
             NonZeroNdpLifetime::Finite(valid_for),
             NonZeroDuration::new(preferred_for).map(NonZeroNdpLifetime::Finite),
             &addr_subnet.subnet(),
-            config,
-            dad_transmits,
-            retrans_timer,
-            iid,
-            temp_secret_key,
         ),
     }
 }
 
 #[derive(Copy, Clone, Debug)]
 enum SlaacInitConfig {
-    Static,
+    Stable,
     Temporary { dad_count: u8 },
 }
 
 impl SlaacInitConfig {
     fn new(slaac_type: SlaacType) -> Self {
         match slaac_type {
-            SlaacType::Static => Self::Static,
+            SlaacType::Stable => Self::Stable,
             SlaacType::Temporary => Self::Temporary { dad_count: 0 },
         }
     }
@@ -1408,7 +1391,7 @@ fn has_iana_allowed_iid(address: Ipv6Addr) -> bool {
     }
 }
 
-/// Generate an IPv6 Global Address as defined by RFC 4862 section 5.5.3.d.
+/// Generate a stable IPv6 Address as defined by RFC 4862 section 5.5.3.d.
 ///
 /// The generated address will be of the format:
 ///
@@ -1422,12 +1405,15 @@ fn has_iana_allowed_iid(address: Ipv6Addr) -> bool {
 /// Panics if a valid IPv6 unicast address cannot be formed with the provided
 /// prefix and interface identifier, or if the prefix length is not a multiple
 /// of 8 bits.
-fn generate_global_static_address(
+fn generate_stable_address(
     prefix: &Subnet<Ipv6Addr>,
     iid: &[u8],
 ) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
     if prefix.prefix() % 8 != 0 {
-        unimplemented!("generate_global_address: not implemented for when prefix length is not a multiple of 8 bits");
+        unimplemented!(
+            "generate_stable_address: not implemented for when prefix length is not a multiple of \
+            8 bits"
+        );
     }
 
     let prefix_len = prefix.prefix() / u8::try_from(u8::BITS).unwrap();
@@ -1435,6 +1421,8 @@ fn generate_global_static_address(
     assert_eq!(usize::from(Ipv6Addr::BYTES - prefix_len), iid.len());
 
     let mut address = prefix.network().ipv6_bytes();
+
+    // TODO(https://fxbug.dev/42148800): Generate stable addresses with opaque IIDs.
     address[prefix_len.into()..].copy_from_slice(&iid);
 
     let address = AddrSubnet::new(Ipv6Addr::from(address), prefix.prefix()).unwrap();
@@ -1472,7 +1460,7 @@ fn generate_global_temporary_address(
     let interface_identifier = OpaqueIid::new(
         /* prefix */ *prefix,
         /* net_iface */ iid,
-        /* net_id */ [],
+        /* net_id */ None::<[_; 0]>,
         /* nonce */ OpaqueIidNonce::Random(seed),
         /* secret_key */ secret_key,
     );
@@ -1486,20 +1474,16 @@ fn generate_global_temporary_address(
 }
 
 fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>>(
-    slaac_addrs: &mut CC::SlaacAddrs<'_>,
-    slaac_state: &mut SlaacState<BC>,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
+    slaac_addrs: &mut CC::SlaacAddrs<'_>,
+    config: &SlaacConfigAndState<BC>,
+    slaac_state: &mut SlaacState<BC>,
     now: BC::Instant,
     slaac_config: SlaacInitConfig,
     prefix_valid_for: NonZeroNdpLifetime,
     prefix_preferred_for: Option<NonZeroNdpLifetime>,
     subnet: &Subnet<Ipv6Addr>,
-    config: SlaacConfiguration,
-    dad_transmits: Option<NonZeroU16>,
-    retrans_timer: Duration,
-    iid: [u8; 8],
-    temp_secret_key: IidSecret,
 ) {
     if subnet.prefix() != REQUIRED_PREFIX_BITS {
         // If the sum of the prefix length and interface identifier length does
@@ -1515,11 +1499,20 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
 
     struct PreferredForAndRegenAt<Instant>(NonZeroNdpLifetime, Option<Instant>);
 
+    let SlaacConfigAndState {
+        config,
+        dad_transmits,
+        retrans_timer,
+        interface_identifier: iid,
+        temp_secret_key,
+        _marker,
+    } = config;
+
     let SlaacConfiguration { enable_stable_addresses, temporary_address_configuration } = config;
     let SlaacState { timers } = slaac_state;
 
     let (valid_until, preferred_and_regen, slaac_config, mut addresses) = match slaac_config {
-        SlaacInitConfig::Static => {
+        SlaacInitConfig::Stable => {
             if !enable_stable_addresses {
                 trace!("stable SLAAC addresses are disabled on device {:?}", device_id);
                 return;
@@ -1529,14 +1522,11 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
             (
                 valid_until,
                 prefix_preferred_for.map(|p| PreferredForAndRegenAt(p, None)),
-                SlaacConfig::Static { valid_until },
+                SlaacConfig::Stable { valid_until },
                 // Generate the global address as defined by RFC 4862 section 5.5.3.d.
                 //
                 // TODO(https://fxbug.dev/42148800): Support regenerating address.
-                either::Either::Left(core::iter::once(generate_global_static_address(
-                    &subnet,
-                    &iid[..],
-                ))),
+                either::Either::Left(core::iter::once(generate_stable_address(&subnet, &iid[..]))),
             )
         }
         SlaacInitConfig::Temporary { dad_count } => {
@@ -1561,14 +1551,14 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
                     //       of the prefix and TEMP_PREFERRED_LIFETIME - DESYNC_FACTOR.
                     let valid_for = match prefix_valid_for {
                         NonZeroNdpLifetime::Finite(prefix_valid_for) => {
-                            core::cmp::min(prefix_valid_for, temp_valid_lifetime)
+                            core::cmp::min(prefix_valid_for, *temp_valid_lifetime)
                         }
-                        NonZeroNdpLifetime::Infinite => temp_valid_lifetime,
+                        NonZeroNdpLifetime::Infinite => *temp_valid_lifetime,
                     };
 
                     let regen_advance = regen_advance(
-                        temp_idgen_retries,
-                        retrans_timer,
+                        *temp_idgen_retries,
+                        *retrans_timer,
                         dad_transmits.map_or(0, NonZeroU16::get),
                     );
 
@@ -1601,7 +1591,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
 
                     let desync_factor = if let Some(d) = desync_factor(
                         &mut bindings_ctx.rng(),
-                        temp_preferred_lifetime,
+                        *temp_preferred_lifetime,
                         regen_advance,
                     ) {
                         d
@@ -1942,7 +1932,8 @@ mod tests {
         fn with_slaac_addrs_mut_and_configs<
             O,
             F: FnOnce(
-                SlaacAddrsMutAndConfig<'_, FakeBindingsCtxImpl, &'_ mut FakeSlaacAddrs>,
+                &mut Self::SlaacAddrs<'_>,
+                SlaacConfigAndState<FakeBindingsCtxImpl>,
                 &mut SlaacState<FakeBindingsCtxImpl>,
             ) -> O,
         >(
@@ -1961,8 +1952,8 @@ mod tests {
             } = &mut self.state;
             let mut slaac_addrs = slaac_addrs;
             cb(
-                SlaacAddrsMutAndConfig {
-                    addrs: &mut slaac_addrs,
+                &mut slaac_addrs,
+                SlaacConfigAndState {
                     config: *config,
                     dad_transmits: *dad_transmits,
                     retrans_timer: *retrans_timer,
@@ -2092,7 +2083,7 @@ mod tests {
             0 => PreferredLifetime::Deprecated,
             secs => PreferredLifetime::preferred_until(now + Duration::from_secs(secs.into())),
         };
-        let inner = SlaacConfig::Static { valid_until: Lifetime::Finite(valid_until) };
+        let inner = SlaacConfig::Stable { valid_until: Lifetime::Finite(valid_until) };
         let entry = SlaacAddressEntry {
             addr_sub,
             config: Ipv6AddrSlaacConfig { inner, preferred_lifetime },
@@ -2158,6 +2149,69 @@ mod tests {
         bindings_ctx.timers.assert_no_timers_installed();
     }
 
+    #[test]
+    fn temporary_address_conflict() {
+        const ONE_HOUR: NonZeroDuration = NonZeroDuration::from_secs(60 * 60).unwrap();
+        const TEMP_IDGEN_RETRIES: u8 = 0;
+
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
+            SlaacConfiguration {
+                temporary_address_configuration: TemporarySlaacAddressConfiguration::Enabled {
+                    temp_valid_lifetime: ONE_HOUR,
+                    temp_preferred_lifetime: ONE_HOUR,
+                    temp_idgen_retries: TEMP_IDGEN_RETRIES,
+                },
+                ..Default::default()
+            },
+            FakeSlaacAddrs::default(),
+            None,
+            DEFAULT_RETRANS_TIMER,
+        );
+
+        // Consider the address we will generate as already assigned without
+        // SLAAC.
+        let mut dup_rng = bindings_ctx.rng().deep_clone();
+        let seed = dup_rng.gen();
+        let first_attempt = generate_global_temporary_address(&SUBNET, &IID, seed, &SECRET_KEY);
+        core_ctx.state.slaac_addrs.non_slaac_addr = Some(first_attempt.addr());
+
+        // Generate a new temporary SLAAC address.
+        SlaacHandler::apply_slaac_update(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            &FakeDeviceId,
+            SUBNET,
+            Some(NonZeroNdpLifetime::Finite(ONE_HOUR)),
+            Some(NonZeroNdpLifetime::Finite(ONE_HOUR)),
+        );
+
+        // The new address will be regenerated so that it has a unique IID by
+        // incrementing the RNG seed.
+        let seed = seed.wrapping_add(1);
+        let addr_sub = generate_global_temporary_address(&SUBNET, &IID, seed, &SECRET_KEY);
+        assert_ne!(addr_sub, first_attempt);
+        let regen_advance =
+            regen_advance(TEMP_IDGEN_RETRIES, DEFAULT_RETRANS_TIMER, /* dad_transmits */ 0);
+        let desync_factor = desync_factor(&mut dup_rng, ONE_HOUR, regen_advance).unwrap();
+        let preferred_until = {
+            let d = bindings_ctx.now() + ONE_HOUR.into();
+            d - desync_factor
+        };
+        let entry = SlaacAddressEntry {
+            addr_sub,
+            config: Ipv6AddrSlaacConfig {
+                inner: SlaacConfig::Temporary(TemporarySlaacConfig {
+                    valid_until: bindings_ctx.now() + ONE_HOUR.into(),
+                    desync_factor,
+                    creation_time: bindings_ctx.now(),
+                    dad_counter: 0,
+                }),
+                preferred_lifetime: PreferredLifetime::preferred_until(preferred_until),
+            },
+        };
+        assert_eq!(core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
+    }
+
     #[test_case(AddressRemovedReason::Manual; "manual")]
     #[test_case(AddressRemovedReason::DadFailed; "dad failed")]
     fn remove_stable_address(reason: AddressRemovedReason) {
@@ -2186,7 +2240,7 @@ mod tests {
         let entry = SlaacAddressEntry {
             addr_sub,
             config: Ipv6AddrSlaacConfig {
-                inner: SlaacConfig::Static { valid_until: Lifetime::Finite(valid_until) },
+                inner: SlaacConfig::Stable { valid_until: Lifetime::Finite(valid_until) },
                 preferred_lifetime: PreferredLifetime::preferred_until(valid_until),
             },
         };
@@ -2379,7 +2433,7 @@ mod tests {
         let entry = SlaacAddressEntry {
             addr_sub,
             config: Ipv6AddrSlaacConfig {
-                inner: SlaacConfig::Static { valid_until },
+                inner: SlaacConfig::Stable { valid_until },
                 preferred_lifetime: PreferredLifetime::maybe_preferred_for(now, ndp_pl),
             },
         };
@@ -2415,7 +2469,7 @@ mod tests {
         }
         let entry = SlaacAddressEntry {
             config: Ipv6AddrSlaacConfig {
-                inner: SlaacConfig::Static { valid_until },
+                inner: SlaacConfig::Stable { valid_until },
                 preferred_lifetime: PreferredLifetime::maybe_preferred_for(now, ndp_pl),
             },
             ..entry

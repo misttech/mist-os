@@ -4,12 +4,12 @@
 
 #![cfg(test)]
 
-use crate::security::selinux_hooks::XATTR_NAME_SELINUX;
+use super::scoped_fs_create;
 use crate::security::SecurityServer;
 use crate::task::CurrentTask;
 use crate::testing::spawn_kernel_with_selinux_and_run;
-use crate::vfs::{FsStr, NamespaceNode, XattrOp};
-use starnix_sync::{FileOpsCore, Locked, Unlocked};
+use crate::vfs::{FsStr, NamespaceNode};
+use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::file_mode::FileMode;
 use std::sync::Arc;
@@ -84,22 +84,37 @@ pub fn create_test_executable(
     current_task: &CurrentTask,
     security_context: &[u8],
 ) -> NamespaceNode {
+    let security_server = &current_task.kernel().security_state.state.as_ref().unwrap().server;
+    let fscreate_sid = security_server.security_context_to_sid(security_context.into()).unwrap();
+    let scoped_fs_create = scoped_fs_create(current_task, fscreate_sid);
     let namespace_node = current_task
         .fs()
         .root()
         .create_node(locked, &current_task, "executable".into(), FileMode::IFREG, DeviceType::NONE)
         .expect("create_node(file)");
-    let fs_node = &namespace_node.entry.node;
-    fs_node
-        .ops()
-        .set_xattr(
-            &mut locked.cast_locked::<FileOpsCore>(),
-            fs_node,
-            current_task,
-            XATTR_NAME_SELINUX.to_bytes().into(),
-            security_context.into(),
-            XattrOp::Set,
-        )
-        .expect("set security.selinux xattr");
+    std::mem::drop(scoped_fs_create);
     namespace_node
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::security::selinux_hooks::fs_node_effective_sid_and_class;
+
+    const VALID_SECURITY_CONTEXT: &[u8] = b"u:object_r:test_valid_t:s0";
+
+    #[fuchsia::test]
+    async fn create_test_executable_sets_context() {
+        spawn_kernel_with_selinux_hooks_test_policy_and_run(
+            |locked, current_task, security_server| {
+                let dir_entry =
+                    &create_test_executable(locked, current_task, VALID_SECURITY_CONTEXT).entry;
+
+                let effective_sid = fs_node_effective_sid_and_class(&dir_entry.node).sid;
+                let effective_context =
+                    security_server.sid_to_security_context(effective_sid).unwrap();
+                assert_eq!(effective_context, VALID_SECURITY_CONTEXT);
+            },
+        );
+    }
 }

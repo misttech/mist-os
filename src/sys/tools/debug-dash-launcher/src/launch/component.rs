@@ -6,8 +6,8 @@ use crate::{layout, socket};
 use fidl::endpoints::{create_proxy, ClientEnd};
 use fidl_fuchsia_dash::LauncherError;
 use fuchsia_component::client::connect_to_protocol;
+use log::warn;
 use moniker::Moniker;
-use tracing::warn;
 use {
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_dash as fdash,
     fidl_fuchsia_hardware_pty as pty, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
@@ -96,7 +96,7 @@ async fn open_outgoing_dir(
         .open_directory(&moniker, fsys::OpenDirType::OutgoingDir, server_end)
         .await
         .map_err(|error| {
-        warn!(%moniker, %error, "FIDL call failed to open outgoing dir");
+        warn!(moniker:%, error:%; "FIDL call failed to open outgoing dir");
         LauncherError::RealmQuery
     })?;
     match result {
@@ -106,7 +106,7 @@ async fn open_outgoing_dir(
         Err(fsys::OpenError::InstanceNotResolved) => Err(LauncherError::InstanceNotResolved),
         Err(fsys::OpenError::InstanceNotFound) => Err(LauncherError::InstanceNotFound),
         Err(error) => {
-            warn!(%moniker, ?error, "RealmQuery returned error opening outgoing dir");
+            warn!(moniker:%, error:?; "RealmQuery returned error opening outgoing dir");
             Err(LauncherError::RealmQuery)
         }
     }
@@ -121,7 +121,7 @@ async fn open_runtime_dir(
         .open_directory(&moniker, fsys::OpenDirType::RuntimeDir, server_end)
         .await
         .map_err(|error| {
-            warn!(%moniker, %error, "FIDL call failed to open runtime dir");
+            warn!(moniker:%, error:%; "FIDL call failed to open runtime dir");
             LauncherError::RealmQuery
         })?;
     match result {
@@ -131,7 +131,7 @@ async fn open_runtime_dir(
         Err(fsys::OpenError::InstanceNotResolved) => Err(LauncherError::InstanceNotResolved),
         Err(fsys::OpenError::InstanceNotFound) => Err(LauncherError::InstanceNotFound),
         Err(error) => {
-            warn!(%moniker, ?error, "RealmQuery returned error opening runtime dir");
+            warn!(moniker:%, error:?; "RealmQuery returned error opening runtime dir");
             Err(LauncherError::RealmQuery)
         }
     }
@@ -146,7 +146,7 @@ async fn open_exposed_dir(
         .open_directory(&moniker, fsys::OpenDirType::ExposedDir, server_end)
         .await
         .map_err(|error| {
-            warn!(%moniker, %error, "FIDL call failed to open exposed dir");
+            warn!(moniker:%, error:%; "FIDL call failed to open exposed dir");
             LauncherError::RealmQuery
         })?;
     match result {
@@ -155,7 +155,7 @@ async fn open_exposed_dir(
         Err(fsys::OpenError::InstanceNotResolved) => Err(LauncherError::InstanceNotResolved),
         Err(fsys::OpenError::InstanceNotFound) => Err(LauncherError::InstanceNotFound),
         Err(error) => {
-            warn!(%moniker, ?error, "RealmQuery returned error opening exposed dir");
+            warn!(moniker:%, error:?; "RealmQuery returned error opening exposed dir");
             Err(LauncherError::RealmQuery)
         }
     }

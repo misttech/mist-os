@@ -69,7 +69,7 @@ class CpuContextExchange {
   // with ZX_ERR_TIMED_OUT.
   //
   // Must be called with interrupts disabled.
-  zx_status_t RequestContext(cpu_num_t target_cpu, zx_duration_t timeout, CpuContext& context);
+  zx_status_t RequestContext(cpu_num_t target_cpu, zx_duration_mono_t timeout, CpuContext& context);
 
   // Synchronously reply to a request.  This method is a no-op if there is no
   // active request for this CPU's context.
@@ -103,7 +103,7 @@ class CpuContextExchange {
 
 template <typename NotifyFn>
 zx_status_t CpuContextExchange<NotifyFn>::RequestContext(cpu_num_t target_cpu,
-                                                         zx_duration_t timeout,
+                                                         zx_duration_mono_t timeout,
                                                          CpuContext& context) {
   DEBUG_ASSERT(arch_ints_disabled());
 

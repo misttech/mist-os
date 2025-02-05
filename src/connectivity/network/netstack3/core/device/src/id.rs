@@ -16,6 +16,7 @@ use netstack3_base::{
 };
 use netstack3_filter as filter;
 
+use crate::blackhole::{BlackholeDevice, BlackholeDeviceId, BlackholeWeakDeviceId};
 use crate::internal::base::{
     DeviceClassMatcher as _, DeviceIdAndNameMatcher as _, DeviceLayerTypes, OriginTracker,
 };
@@ -36,6 +37,7 @@ pub enum WeakDeviceId<BT: DeviceLayerTypes> {
     Ethernet(EthernetWeakDeviceId<BT>),
     Loopback(LoopbackWeakDeviceId<BT>),
     PureIp(PureIpWeakDeviceId<BT>),
+    Blackhole(BlackholeWeakDeviceId<BT>),
 }
 
 impl<BT: DeviceLayerTypes> PartialEq<DeviceId<BT>> for WeakDeviceId<BT> {
@@ -59,6 +61,12 @@ impl<BT: DeviceLayerTypes> From<LoopbackWeakDeviceId<BT>> for WeakDeviceId<BT> {
 impl<BT: DeviceLayerTypes> From<PureIpWeakDeviceId<BT>> for WeakDeviceId<BT> {
     fn from(id: PureIpWeakDeviceId<BT>) -> WeakDeviceId<BT> {
         WeakDeviceId::PureIp(id)
+    }
+}
+
+impl<BT: DeviceLayerTypes> From<BlackholeWeakDeviceId<BT>> for WeakDeviceId<BT> {
+    fn from(id: BlackholeWeakDeviceId<BT>) -> WeakDeviceId<BT> {
+        WeakDeviceId::Blackhole(id)
     }
 }
 
@@ -87,7 +95,9 @@ impl<BT: DeviceLayerTypes> DeviceIdentifier for WeakDeviceId<BT> {
     fn is_loopback(&self) -> bool {
         match self {
             WeakDeviceId::Loopback(_) => true,
-            WeakDeviceId::Ethernet(_) | WeakDeviceId::PureIp(_) => false,
+            WeakDeviceId::Ethernet(_) | WeakDeviceId::PureIp(_) | WeakDeviceId::Blackhole(_) => {
+                false
+            }
         }
     }
 }
@@ -119,6 +129,7 @@ pub enum DeviceId<BT: DeviceLayerTypes> {
     Ethernet(EthernetDeviceId<BT>),
     Loopback(LoopbackDeviceId<BT>),
     PureIp(PureIpDeviceId<BT>),
+    Blackhole(BlackholeDeviceId<BT>),
 }
 
 /// Evaluates the expression for the given device_id, regardless of its variant.
@@ -162,6 +173,7 @@ macro_rules! for_any_device_id {
             $device_id_enum_type::Loopback($variable) => $expression,
             $device_id_enum_type::Ethernet($variable) => $expression,
             $device_id_enum_type::PureIp($variable) => $expression,
+            $device_id_enum_type::Blackhole($variable) => $expression,
         }
     };
     // Form #2
@@ -183,6 +195,10 @@ macro_rules! for_any_device_id {
                 type $type_param = <() as $provider_trait>::PureIp;
                 $expression
             }
+            $device_id_enum_type::Blackhole($variable) => {
+                type $type_param = <() as $provider_trait>::Blackhole;
+                $expression
+            }
         }
     };
 }
@@ -196,6 +212,8 @@ pub trait DeviceProvider {
     type Loopback: Device;
     /// The [`Device`] type for pure IP devices.
     type PureIp: Device;
+    /// The [`Device`] type for Blackhole devices.
+    type Blackhole: Device;
 }
 
 /// This implementation is used in the `for_any_device_id` macro.
@@ -203,6 +221,7 @@ impl DeviceProvider for () {
     type Ethernet = EthernetLinkDevice;
     type Loopback = LoopbackDevice;
     type PureIp = PureIpDevice;
+    type Blackhole = BlackholeDevice;
 }
 
 impl<BT: DeviceLayerTypes> Clone for DeviceId<BT> {
@@ -218,9 +237,11 @@ impl<BT: DeviceLayerTypes> PartialEq<WeakDeviceId<BT>> for DeviceId<BT> {
             (DeviceId::Ethernet(strong), WeakDeviceId::Ethernet(weak)) => strong == weak,
             (DeviceId::Loopback(strong), WeakDeviceId::Loopback(weak)) => strong == weak,
             (DeviceId::PureIp(strong), WeakDeviceId::PureIp(weak)) => strong == weak,
-            (DeviceId::Ethernet(_), _) | (DeviceId::Loopback(_), _) | (DeviceId::PureIp(_), _) => {
-                false
-            }
+            (DeviceId::Blackhole(strong), WeakDeviceId::Blackhole(weak)) => strong == weak,
+            (DeviceId::Ethernet(_), _)
+            | (DeviceId::Loopback(_), _)
+            | (DeviceId::PureIp(_), _)
+            | (DeviceId::Blackhole(_), _) => false,
         }
     }
 }
@@ -241,15 +262,18 @@ impl<BT: DeviceLayerTypes> Ord for DeviceId<BT> {
                 DeviceId::Ethernet(_) => 0,
                 DeviceId::Loopback(_) => 1,
                 DeviceId::PureIp(_) => 2,
+                DeviceId::Blackhole(_) => 3,
             }
         }
         match (self, other) {
             (DeviceId::Ethernet(me), DeviceId::Ethernet(other)) => me.cmp(other),
             (DeviceId::Loopback(me), DeviceId::Loopback(other)) => me.cmp(other),
             (DeviceId::PureIp(me), DeviceId::PureIp(other)) => me.cmp(other),
+            (DeviceId::Blackhole(me), DeviceId::Blackhole(other)) => me.cmp(other),
             (me @ DeviceId::Ethernet(_), other)
             | (me @ DeviceId::Loopback(_), other)
-            | (me @ DeviceId::PureIp(_), other) => discriminant(me).cmp(&discriminant(other)),
+            | (me @ DeviceId::PureIp(_), other)
+            | (me @ DeviceId::Blackhole(_), other) => discriminant(me).cmp(&discriminant(other)),
         }
     }
 }
@@ -272,6 +296,12 @@ impl<BT: DeviceLayerTypes> From<PureIpDeviceId<BT>> for DeviceId<BT> {
     }
 }
 
+impl<BT: DeviceLayerTypes> From<BlackholeDeviceId<BT>> for DeviceId<BT> {
+    fn from(id: BlackholeDeviceId<BT>) -> DeviceId<BT> {
+        DeviceId::Blackhole(id)
+    }
+}
+
 impl<BT: DeviceLayerTypes> DeviceId<BT> {
     /// Downgrade to a [`WeakDeviceId`].
     pub fn downgrade(&self) -> WeakDeviceId<BT> {
@@ -288,7 +318,7 @@ impl<BT: DeviceLayerTypes> DeviceIdentifier for DeviceId<BT> {
     fn is_loopback(&self) -> bool {
         match self {
             DeviceId::Loopback(_) => true,
-            DeviceId::Ethernet(_) | DeviceId::PureIp(_) => false,
+            DeviceId::Ethernet(_) | DeviceId::PureIp(_) | DeviceId::Blackhole(_) => false,
         }
     }
 }
@@ -556,7 +586,7 @@ mod testutil {
         fn try_from(id: DeviceId<BT>) -> Result<EthernetDeviceId<BT>, DeviceId<BT>> {
             match id {
                 DeviceId::Ethernet(id) => Ok(id),
-                DeviceId::Loopback(_) | DeviceId::PureIp(_) => Err(id),
+                DeviceId::Loopback(_) | DeviceId::PureIp(_) | DeviceId::Blackhole(_) => Err(id),
             }
         }
     }

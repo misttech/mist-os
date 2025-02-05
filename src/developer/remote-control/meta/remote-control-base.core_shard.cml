@@ -9,6 +9,11 @@
             to: "#remote-control",
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#remote-control",
+        },
+        {
             protocol: [ "fuchsia.fuzzer.Manager" ],
             from: "#fuzz-manager",
             to: "#remote-control",

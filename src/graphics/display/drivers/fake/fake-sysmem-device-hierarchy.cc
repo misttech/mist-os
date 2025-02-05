@@ -5,22 +5,25 @@
 #include "src/graphics/display/drivers/fake/fake-sysmem-device-hierarchy.h"
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
-#include <fidl/fuchsia.io/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async/cpp/task.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/ddk/platform-defs.h>
-#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
 #include <zircon/status.h>
+#include <zircon/types.h>
 
-#include <fbl/alloc_checker.h>
+#include <memory>
+#include <utility>
 
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/sysmem/server/allocator.h"
 #include "src/sysmem/server/sysmem.h"
 
-namespace display {
+namespace fake_display {
 
 zx::result<std::unique_ptr<FakeSysmemDeviceHierarchy>> FakeSysmemDeviceHierarchy::Create() {
   return zx::ok(std::make_unique<FakeSysmemDeviceHierarchy>());
@@ -35,7 +38,8 @@ FakeSysmemDeviceHierarchy::FakeSysmemDeviceHierarchy()
   libsync::Completion done;
   zx_status_t post_status = async::PostTask(loop_.dispatcher(), [this, &done] {
     sysmem_service::Sysmem::CreateArgs create_args;
-    auto create_result = sysmem_service::Sysmem::Create(loop_.dispatcher(), create_args);
+    zx::result<std::unique_ptr<sysmem_service::Sysmem>> create_result =
+        sysmem_service::Sysmem::Create(loop_.dispatcher(), create_args);
     ZX_ASSERT_MSG(create_result.is_ok(), "sysmem_service::Sysmem::Create() failed: %s",
                   create_result.status_string());
     sysmem_service_ = std::move(create_result.value());
@@ -43,16 +47,6 @@ FakeSysmemDeviceHierarchy::FakeSysmemDeviceHierarchy()
   });
   ZX_ASSERT(post_status == ZX_OK);
   done.Wait();
-}
-
-zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>>
-FakeSysmemDeviceHierarchy::ConnectAllocator() {
-  auto [client, server] = fidl::Endpoints<fuchsia_sysmem::Allocator>::Create();
-  sysmem_service_->SyncCall([this, request = std::move(server)]() mutable {
-    sysmem_service::Allocator::CreateOwnedV1(std::move(request), sysmem_service_.get(),
-                                             sysmem_service_->v1_allocators());
-  });
-  return zx::ok(std::move(client));
 }
 
 zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>>
@@ -87,4 +81,4 @@ FakeSysmemDeviceHierarchy::~FakeSysmemDeviceHierarchy() {
   done.Wait();
 }
 
-}  // namespace display
+}  // namespace fake_display

@@ -11,11 +11,11 @@ use ffx_profile_heapdump_list_args::ListCommand;
 use ffx_writer::ToolIO;
 use fho::{AvailabilityFlag, FfxMain, FfxTool, MachineWriter};
 use fidl::endpoints::create_proxy;
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
 use prettytable::format::FormatBuilder;
 use prettytable::{cell, row, Table};
 use serde::Serialize;
+use target_holders::RemoteControlProxyHolder;
 
 /// Representation of the [fheapdump_client::StoredSnapshot] FIDL type for machine output.
 #[derive(Serialize)]
@@ -56,7 +56,7 @@ async fn receive_list_of_stored_snapshots(
 pub struct ListTool {
     #[command]
     cmd: ListCommand,
-    remote_control: RemoteControlProxy,
+    remote_control: RemoteControlProxyHolder,
 }
 
 fho::embedded_plugin!(ListTool);
@@ -72,7 +72,7 @@ impl FfxMain for ListTool {
 }
 
 async fn list(
-    remote_control: RemoteControlProxy,
+    remote_control: RemoteControlProxyHolder,
     cmd: ListCommand,
     writer: &mut MachineWriter<Vec<StoredSnapshot>>,
 ) -> Result<()> {

@@ -42,7 +42,11 @@ fuchsia_cc_driver("gpio-driver") {
 }
 
 fuchsia_driver_component("gpio") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/devices/bus/drivers/platform/test:*",
+    "//src/devices/gpio:drivers",
+  ]
   component_name = "gpio"
   deps = [ ":gpio-driver" ]
   info = "meta/gpio-info.json"

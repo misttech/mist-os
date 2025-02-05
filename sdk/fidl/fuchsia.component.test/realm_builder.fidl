@@ -598,7 +598,7 @@ closed protocol Realm {
     /// Adds a child realm which can be built with the client end of
     /// `child_realm`, and whose contents are initialized from `relative_url`.
     /// `relative_url` must be a fragment-only URL.
-    @available(added=NEXT)
+    @available(added=26)
     strict AddChildRealmFromRelativeUrl(resource struct {
         /// The name of the child realm that is being added.
         name fuchsia.component.name;
@@ -616,7 +616,7 @@ closed protocol Realm {
 
     /// Adds a child realm which can be built with the client end of
     /// `child_realm`, and whose contents are initialized from `decl`.
-    @available(added=NEXT)
+    @available(added=26)
     strict AddChildRealmFromDecl(resource struct {
         /// The name of the child realm that is being added.
         name fuchsia.component.name;
@@ -716,7 +716,7 @@ closed protocol Realm {
     /// passthrough component manager declaration, with the exception of the root url.
     /// This method will arrange for [Builder.Build] to install the realm's generated url as the
     /// root url in this component manager.
-    @available(added=NEXT)
+    @available(added=26)
     strict UseNestedComponentManager(struct {
         component_manager_relative_url fuchsia.url.Url;
     }) -> () error RealmBuilderError;

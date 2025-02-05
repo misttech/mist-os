@@ -2139,7 +2139,7 @@ impl UnknownInteractionsAjarDriverProtocolStrictTwoWayResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -2176,7 +2176,7 @@ impl UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -2213,7 +2213,7 @@ impl UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -2250,7 +2250,7 @@ impl UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -2287,7 +2287,7 @@ impl UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -2327,7 +2327,7 @@ impl UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -2367,7 +2367,7 @@ impl UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -2407,7 +2407,7 @@ impl UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -4913,7 +4913,7 @@ impl UnknownInteractionsClosedDriverProtocolStrictTwoWayResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -4950,7 +4950,7 @@ impl UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -4987,7 +4987,7 @@ impl UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -5024,7 +5024,7 @@ impl UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -5061,7 +5061,7 @@ impl UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -5101,7 +5101,7 @@ impl UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -5144,7 +5144,7 @@ impl UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -5187,7 +5187,7 @@ impl UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -8044,7 +8044,7 @@ impl UnknownInteractionsDriverProtocolStrictTwoWayResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -8081,7 +8081,7 @@ impl UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -8118,7 +8118,7 @@ impl UnknownInteractionsDriverProtocolStrictTwoWayUnionResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -8155,7 +8155,7 @@ impl UnknownInteractionsDriverProtocolStrictTwoWayTableResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -8192,7 +8192,7 @@ impl UnknownInteractionsDriverProtocolStrictTwoWayErrResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -8232,7 +8232,7 @@ impl UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -8272,7 +8272,7 @@ impl UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -8312,7 +8312,7 @@ impl UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -8345,7 +8345,7 @@ impl UnknownInteractionsDriverProtocolFlexibleTwoWayResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -8384,7 +8384,7 @@ impl UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -8423,7 +8423,7 @@ impl UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -8462,7 +8462,7 @@ impl UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -8499,7 +8499,7 @@ impl UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -8539,7 +8539,7 @@ impl UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -8579,7 +8579,7 @@ impl UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })
@@ -8619,7 +8619,7 @@ impl UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponder {
             (),
         >(msg, |body, _handles| {
             server_handle
-                .write_with_data(fdf::Arena::new().unwrap(), |arena| arena.insert_slice(&body))
+                .write_with_data(fdf::Arena::new(), |arena| arena.insert_slice(&body))
                 .unwrap();
             Ok(())
         })

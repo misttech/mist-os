@@ -78,13 +78,67 @@ enum class SupplyOptions : uint8_t {
 namespace internal {
 struct ChildListTag {};
 struct GlobalListTag {};
-// This needs to be a manual traits definition and not a tag to avoid a class definition ordering
-// issue.
-struct DeferredDeleteTraits {
-  static fbl::SinglyLinkedListNodeState<fbl::RefPtr<VmHierarchyBase>>& node_state(
-      VmHierarchyBase& vm);
-};
 }  // namespace internal
+
+// Base for opting an object into a deferred deletion strategy that allows for object chains to be
+// deleted without causing unbounded recursion due to dropping refptrs in destructors.
+template <typename T>
+class VmDeferredDeleter {
+ public:
+  // Calls MaybeDeadTransition and then drops the refptr to the given object by either placing it on
+  // the deferred delete list for another thread already running deferred delete to drop, or drops
+  // itself.
+  // This can be used to avoid unbounded recursion when dropping chained refptrs, as found in
+  // vmo parent_ refs.
+  static void DoDeferredDelete(fbl::RefPtr<T> object) {
+    Guard<CriticalMutex> guard{DeferredDeleteLock::Get()};
+    // If a parent has multiple children then it's possible for a given object to already be
+    // queued for deletion.
+    if (!object->deferred_delete_state_.InContainer()) {
+      delete_list_.push_front(ktl::move(object));
+    } else {
+      // We know a refptr is being held by the container (which we are holding the lock to), so can
+      // safely drop the vmo ref.
+      object.reset();
+    }
+    if (!running_delete_) {
+      running_delete_ = true;
+      while (!delete_list_.is_empty()) {
+        guard.CallUnlocked([ptr = delete_list_.pop_front()]() mutable {
+          ptr->MaybeDeadTransition();
+          ptr.reset();
+        });
+      }
+      running_delete_ = false;
+    }
+  }
+
+ private:
+  struct ListTraits {
+    static fbl::SinglyLinkedListNodeState<fbl::RefPtr<T>>& node_state(VmDeferredDeleter<T>& node) {
+      return node.deferred_delete_state_;
+    }
+  };
+
+  // Mutex that protects the global delete list. As this class is templated we actually end up with
+  // a single mutex and a global list for each unique object type.
+  DECLARE_SINGLETON_CRITICAL_MUTEX(DeferredDeleteLock);
+
+  static fbl::SinglyLinkedListCustomTraits<fbl::RefPtr<T>, ListTraits> delete_list_
+      TA_GUARDED(DeferredDeleteLock::Get());
+
+  static bool running_delete_ TA_GUARDED(DeferredDeleteLock::Get());
+
+  using DeferredDeleteState = fbl::SinglyLinkedListNodeState<fbl::RefPtr<T>>;
+  DeferredDeleteState deferred_delete_state_ TA_GUARDED(DeferredDeleteLock::Get());
+};
+
+template <typename T>
+bool VmDeferredDeleter<T>::running_delete_ = false;
+
+template <typename T>
+fbl::SinglyLinkedListCustomTraits<fbl::RefPtr<T>, typename VmDeferredDeleter<T>::ListTraits>
+    VmDeferredDeleter<T>::delete_list_;
 
 class VmHierarchyState : public fbl::RefCounted<VmHierarchyState> {
  public:
@@ -94,44 +148,8 @@ class VmHierarchyState : public fbl::RefCounted<VmHierarchyState> {
   Lock<CriticalMutex>* lock() const TA_RET_CAP(lock_) { return &lock_; }
   Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(lock_) { return lock_; }
 
-  // Calls MaybeDeadTransition and then drops the refptr to the given object by either placing it on
-  // the deferred delete list for another thread already running deferred delete to drop, or drops
-  // itself.
-  // This can be used to avoid unbounded recursion when dropping chained refptrs, as found in
-  // vmo parent_ refs.
-  void DoDeferredDelete(fbl::RefPtr<VmHierarchyBase> vmo) TA_EXCL(lock());
-
-  // This should be called whenever a change is made to the VMO tree or the VMO's page list, that
-  // could result in memory attribution counts to change for any VMO in this tree.
-  void IncrementHierarchyGenerationCountLocked() TA_REQ(lock()) {
-    DEBUG_ASSERT(hierarchy_generation_count_ != 0);
-    hierarchy_generation_count_++;
-  }
-
-  // Get the current generation count.
-  uint64_t GetHierarchyGenerationCountLocked() const TA_REQ(lock()) {
-    DEBUG_ASSERT(hierarchy_generation_count_ != 0);
-    return hierarchy_generation_count_;
-  }
-
  private:
-  bool running_delete_ TA_GUARDED(lock_) = false;
   mutable DECLARE_CRITICAL_MUTEX(VmHierarchyState) lock_;
-  fbl::SinglyLinkedListCustomTraits<fbl::RefPtr<VmHierarchyBase>, internal::DeferredDeleteTraits>
-      delete_list_ TA_GUARDED(lock_);
-
-  // Each VMO hierarchy has a generation count, which is incremented on any change to the hierarchy
-  // - either in the VMO tree, or the page lists of VMO's.
-  //
-  // The generation count is used to implement caching for memory attribution counts, which get
-  // periodically track memory usage on the system. Attributing memory to a VMO is an expensive
-  // operation and involves walking the VMO tree, quite often multiple times. If the generation
-  // counts for the vmo *and* the mapping do not change between two successive queries, we can avoid
-  // re-counting attributed memory, and simply return the previously cached value.
-  //
-  // The generation count starts at 1 to ensure that there can be no cached values initially; the
-  // cached generation count starts at 0.
-  uint64_t hierarchy_generation_count_ TA_GUARDED(lock_) = 1;
 };
 
 // Base class for any objects that want to be part of the VMO hierarchy and share some state,
@@ -152,43 +170,16 @@ class VmHierarchyBase : public fbl::RefCountedUpgradeable<VmHierarchyBase> {
   // private destructor, only called from refptr
   virtual ~VmHierarchyBase() = default;
   friend fbl::RefPtr<VmHierarchyBase>;
-  // Objects in the deferred delete queue will have MaybeDeadTransition called on them first, prior
-  // to dropping the RefPtr, allowing them to perform cleanup that they would rather happen before
-  // the destructor executes.
-  virtual void MaybeDeadTransition() {}
   friend class fbl::Recyclable<VmHierarchyBase>;
 
   // Pointer to state shared across all objects in a hierarchy.
   fbl::RefPtr<VmHierarchyState> const hierarchy_state_ptr_;
 
-  // Convenience helpers that forward operations to the referenced hierarchy state.
-  void IncrementHierarchyGenerationCountLocked() TA_REQ(lock());
-  uint64_t GetHierarchyGenerationCountLocked() const TA_REQ(lock());
-
  private:
-  using DeferredDeleteState = fbl::SinglyLinkedListNodeState<fbl::RefPtr<VmHierarchyBase>>;
-
-  friend internal::DeferredDeleteTraits;
   friend VmHierarchyState;
-  DeferredDeleteState deferred_delete_state_;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(VmHierarchyBase);
 };
-
-inline fbl::SinglyLinkedListNodeState<fbl::RefPtr<VmHierarchyBase>>&
-internal::DeferredDeleteTraits::node_state(VmHierarchyBase& vm) {
-  return vm.deferred_delete_state_;
-}
-
-inline void VmHierarchyBase::IncrementHierarchyGenerationCountLocked() {
-  AssertHeld(hierarchy_state_ptr_->lock_ref());
-  hierarchy_state_ptr_->IncrementHierarchyGenerationCountLocked();
-}
-
-inline uint64_t VmHierarchyBase::GetHierarchyGenerationCountLocked() const {
-  AssertHeld(hierarchy_state_ptr_->lock_ref());
-  return hierarchy_state_ptr_->GetHierarchyGenerationCountLocked();
-}
 
 // Cursor to allow for walking global vmo lists without needing to hold the lock protecting them all
 // the time. This can be required to enforce order of acquisition with another lock (as in the case
@@ -320,7 +311,7 @@ class VmObject : public VmHierarchyBase,
   // Returns true if the VMO was created via CreatePagerVmo().
   virtual bool is_user_pager_backed() const { return false; }
   // Returns true if the VMO's pages require dirty bit tracking.
-  virtual bool is_dirty_tracked_locked() const TA_REQ(lock()) { return false; }
+  virtual bool is_dirty_tracked() const { return false; }
   // Marks the VMO as modified if the VMO tracks modified state (only supported for pager-backed
   // VMOs).
   virtual void mark_modified_locked() TA_REQ(lock()) {}
@@ -568,9 +559,8 @@ class VmObject : public VmHierarchyBase,
   zx_status_t set_name(const char* name, size_t len);
 
   // Returns a user ID associated with this VMO, or zero.
-  // Typically used to hold a zircon koid for Dispatcher-wrapped VMOs.
+  // Used to hold a zircon koid for Dispatcher-wrapped VMOs.
   uint64_t user_id() const;
-  uint64_t user_id_locked() const TA_REQ(lock());
 
   // Returns the parent's user_id() if this VMO has a parent,
   // otherwise returns zero.
@@ -679,7 +669,7 @@ class VmObject : public VmHierarchyBase,
 
   // Removes the child |child| from this VMO and notifies the child observer if the new child count
   // is zero. The |guard| must be this VMO's lock.
-  void RemoveChild(VmObject* child, Guard<CriticalMutex>&& guard) TA_REQ(lock());
+  void RemoveChild(VmObject* child, Guard<CriticalMutex>::Adoptable adopt);
 
   // Drops |c| from the child list without going through the full removal
   // process. ::RemoveChild is probably what you want here.
@@ -713,6 +703,23 @@ class VmObject : public VmHierarchyBase,
 
   // Detaches the underlying page source, if present. Can be called multiple times.
   virtual void DetachSource() {}
+
+  // Different operations that RangeChangeUpdate* can perform against any VmMappings that are found.
+  enum class RangeChangeOp {
+    Unmap,
+    // Specialized case of Unmap where the caller is stating that it knows that any pages that might
+    // need to be unmapped are all read instances of the shared zero page.
+    UnmapZeroPage,
+    RemoveWrite,
+    // Unpin is not a 'real' operation in that it does not cause any actions, and is simply used as
+    // a mechanism to allow the VmCowPages to trigger a search for any kernel mappings that are
+    // still referencing an unpinned page.
+    DebugUnpin,
+  };
+  // Apply the specified operation to all mappings in the given range. The provided offset and len
+  // must both be page aligned.
+  void RangeChangeUpdateMappingsLocked(uint64_t offset, uint64_t len, RangeChangeOp op)
+      TA_REQ(lock());
 
  protected:
   enum class VMOType : bool {
@@ -748,7 +755,13 @@ class VmObject : public VmHierarchyBase,
   // list of every child
   fbl::TaggedDoublyLinkedList<VmObject*, internal::ChildListTag> children_list_ TA_GUARDED(lock());
 
-  uint64_t user_id_ TA_GUARDED(lock()) = 0;
+  // The user_id_ is semi-const in that it is set once, before the VMO becomes publicly visible, by
+  // the dispatcher layer. While the dispatcher setting the ID and querying it is trivially
+  // synchronized by the dispatcher, other parts of the VMO code (mostly debug related) may racily
+  // inspect this ID before it gets set and so to avoid technical undefined behavior use a relaxed
+  // atomic.
+  RelaxedAtomic<uint64_t> user_id_ = 0;
+
   uint32_t mapping_list_len_ TA_GUARDED(lock()) = 0;
   uint32_t children_list_len_ TA_GUARDED(lock()) = 0;
 

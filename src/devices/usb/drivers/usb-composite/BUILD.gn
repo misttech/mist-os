@@ -53,7 +53,17 @@ fuchsia_cc_driver("usb-composite-driver") {
 }
 
 fuchsia_driver_component("usb-composite") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/connectivity/ethernet/drivers/asix-88179:*",
+    "//src/connectivity/ethernet/drivers/usb-cdc-ecm:*",
+    "//src/devices/block/drivers/usb-mass-storage:*",
+    "//src/devices/serial/drivers/ftdi/test:*",
+    "//src/devices/serial/drivers/usb-cdc-acm:*",
+    "//src/devices/usb:drivers",
+    "//src/devices/usb/drivers/usb-virtual-bus:*",
+    "//src/ui/input/drivers/usb-hid:*",
+  ]
   info = "meta/usb-composite-info.json"
   component_name = "usb-composite"
   deps = [ ":usb-composite-driver" ]

@@ -27,7 +27,12 @@ pub fn set_logger_for_test() {
         }
 
         fn log(&self, record: &log::Record<'_>) {
-            std::println_for_test!("[{}] ({}) {}", record.level(), record.target(), record.args())
+            fakestd::println_for_test!(
+                "[{}] ({}) {}",
+                record.level(),
+                record.target(),
+                record.args()
+            )
         }
 
         fn flush(&self) {}

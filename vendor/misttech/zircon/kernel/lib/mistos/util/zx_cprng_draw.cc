@@ -12,12 +12,11 @@
 extern zx_status_t sys_cprng_draw_once(user_out_ptr<void> buffer, size_t len);
 
 void _zx_cprng_draw(user_out_ptr<void> buffer, size_t len) {
-  auto ptr = buffer.reinterpret<uint8_t>();
   while (len != 0) {
     size_t chunk = len;
     if (chunk > ZX_CPRNG_DRAW_MAX_LEN)
       chunk = ZX_CPRNG_DRAW_MAX_LEN;
-    zx_status_t status = sys_cprng_draw_once(ptr.reinterpret<void>(), chunk);
+    zx_status_t status = sys_cprng_draw_once(buffer, chunk);
     //  zx_cprng_draw_once shouldn't fail unless given bogus arguments.
     if (unlikely(status != ZX_OK)) {
       // We loop around __builtin_trap in case __builtin_trap doesn't
@@ -26,7 +25,7 @@ void _zx_cprng_draw(user_out_ptr<void> buffer, size_t len) {
         __builtin_trap();
       }
     }
-    ptr = ptr.byte_offset(chunk);
+    buffer = buffer.byte_offset(chunk);
     len -= chunk;
   }
 }

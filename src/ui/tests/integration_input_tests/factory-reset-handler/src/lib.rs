@@ -219,7 +219,7 @@ async fn sound_is_played_during_factory_reset() {
     );
     assert_eq!(
         sound_request_relay_read_end.next().await.unwrap(),
-        SoundPlayerRequestName::PlaySound
+        SoundPlayerRequestName::PlaySound2
     );
 
     // Shut down input pipeline before dropping mocks, so that input pipeline doesn't

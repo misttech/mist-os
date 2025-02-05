@@ -132,7 +132,7 @@ void AmlSpi::Exchange8(const uint8_t* txdata, uint8_t* out_rxdata, size_t size) 
 
   while (size > 0) {
     // Burst size in words (with one byte per word).
-    const uint32_t burst_size = std::min(kFifoSizeWords, size);
+    const uint32_t burst_size = static_cast<uint32_t>(std::min(kFifoSizeWords, size));
 
     // fill fifo
     if (txdata) {
@@ -183,7 +183,8 @@ void AmlSpi::Exchange64(const uint8_t* txdata, uint8_t* out_rxdata, size_t size)
 
   while (size >= kBytesPerWord) {
     // Burst size in 64-bit words.
-    const uint32_t burst_size_words = std::min(kMaxBytesPerBurst, size) / kBytesPerWord;
+    const uint32_t burst_size_words =
+        static_cast<uint32_t>(std::min(kMaxBytesPerBurst, size) / kBytesPerWord);
 
     if (txdata) {
       const uint64_t* tx = reinterpret_cast<const uint64_t*>(txdata);
@@ -702,8 +703,8 @@ zx_status_t AmlSpi::ExchangeDma(const uint8_t* txdata, uint8_t* out_rxdata, uint
   const fzl::PinnedVmo::Region tx_region = tx_buffer_.pinned.region(0);
   const fzl::PinnedVmo::Region rx_region = rx_buffer_.pinned.region(0);
 
-  mmio_.Write32(tx_region.phys_addr, AML_SPI_DRADDR);
-  mmio_.Write32(rx_region.phys_addr, AML_SPI_DWADDR);
+  mmio_.Write32(static_cast<uint32_t>(tx_region.phys_addr), AML_SPI_DRADDR);
+  mmio_.Write32(static_cast<uint32_t>(rx_region.phys_addr), AML_SPI_DWADDR);
   mmio_.Write32(0, AML_SPI_PERIODREG);
 
   DmaReg::Get().FromValue(0).WriteTo(&mmio_);
@@ -769,8 +770,8 @@ size_t AmlSpi::DoDmaTransfer(size_t words_remaining) {
       &mmio_);
   LdCntl1::Get()
       .FromValue(0)
-      .set_dma_read_counter(request_count)
-      .set_dma_write_counter(request_count)
+      .set_dma_read_counter(static_cast<uint32_t>(request_count))
+      .set_dma_write_counter(static_cast<uint32_t>(request_count))
       .WriteTo(&mmio_);
 
   DmaReg::Get()
@@ -778,10 +779,10 @@ size_t AmlSpi::DoDmaTransfer(size_t words_remaining) {
       .set_enable(1)
       // No explanation for these -- see the reference driver.
       .set_urgent(1)
-      .set_txfifo_threshold(kFifoSizeWords + 1 - request_size)
-      .set_read_request_burst_size(request_size - 1)
-      .set_rxfifo_threshold(request_size - 1)
-      .set_write_request_burst_size(request_size - 1)
+      .set_txfifo_threshold(static_cast<uint32_t>(kFifoSizeWords + 1 - request_size))
+      .set_read_request_burst_size(static_cast<uint32_t>(request_size - 1))
+      .set_rxfifo_threshold(static_cast<uint32_t>(request_size - 1))
+      .set_write_request_burst_size(static_cast<uint32_t>(request_size - 1))
       .WriteTo(&mmio_);
 
   return request_size * request_count;
@@ -852,7 +853,7 @@ void AmlSpiDriver::Start(fdf::StartCompleter completer) {
       fdf::Dispatcher::GetCurrent()->async_dispatcher(), incoming(),
       DEVICE_METADATA_SCHEDULER_ROLE_NAME,
       [this, start_completer = std::move(completer), completer = std::move(bridge.completer)](
-          zx::result<fuchsia_scheduler::RoleName> result) mutable {
+          const zx::result<fuchsia_scheduler::RoleName>& result) mutable {
         OnGetSchedulerRoleName(std::move(start_completer), result);
         completer.complete_ok();
       },
@@ -864,7 +865,8 @@ void AmlSpiDriver::Start(fdf::StartCompleter completer) {
 }
 
 void AmlSpiDriver::OnGetSchedulerRoleName(
-    fdf::StartCompleter completer, zx::result<fuchsia_scheduler::RoleName> scheduler_role_name) {
+    fdf::StartCompleter completer,
+    const zx::result<fuchsia_scheduler::RoleName>& scheduler_role_name) {
   std::unordered_set<compat::MetadataKey> forward_metadata({DEVICE_METADATA_SPI_CHANNELS});
 
   std::vector<uint8_t> role_name;
@@ -976,11 +978,12 @@ void AmlSpiDriver::AddNode(fdf::MmioBuffer mmio, const amlogic_spi::amlspi_confi
     // DMA was stopped above, so it's safe to release any quarantined pages.
     bti.release_quarantine();
 
-    zx_status_t status;
-    if ((status = AmlSpi::DmaBuffer::Create(bti, kDmaBufferSize, &tx_buffer)) != ZX_OK) {
+    zx_status_t status = AmlSpi::DmaBuffer::Create(bti, kDmaBufferSize, &tx_buffer);
+    if (status != ZX_OK) {
       return completer(zx::error(status));
     }
-    if ((status = AmlSpi::DmaBuffer::Create(bti, kDmaBufferSize, &rx_buffer)) != ZX_OK) {
+    status = AmlSpi::DmaBuffer::Create(bti, kDmaBufferSize, &rx_buffer);
+    if (status != ZX_OK) {
       return completer(zx::error(status));
     }
     FDF_LOG(DEBUG, "Got BTI and contiguous buffers, DMA may be used");
@@ -990,7 +993,7 @@ void AmlSpiDriver::AddNode(fdf::MmioBuffer mmio, const amlogic_spi::amlspi_confi
   if (!chips) {
     return completer(zx::error(ZX_ERR_NO_RESOURCES));
   }
-  if (chips.size() == 0) {
+  if (chips.empty()) {
     return completer(zx::ok());
   }
 
@@ -1120,8 +1123,8 @@ fpromise::promise<zx::bti, zx_status_t> AmlSpiDriver::GetBti() {
 }
 
 zx_status_t AmlSpi::DmaBuffer::Create(const zx::bti& bti, size_t size, DmaBuffer* out_dma_buffer) {
-  zx_status_t status;
-  if ((status = zx::vmo::create_contiguous(bti, size, 0, &out_dma_buffer->vmo)) != ZX_OK) {
+  zx_status_t status = zx::vmo::create_contiguous(bti, size, 0, &out_dma_buffer->vmo);
+  if (status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to create DMA VMO: %s", zx_status_get_string(status));
     return status;
   }
@@ -1138,7 +1141,8 @@ zx_status_t AmlSpi::DmaBuffer::Create(const zx::bti& bti, size_t size, DmaBuffer
     return status;
   }
 
-  if ((status = out_dma_buffer->mapped.Map(out_dma_buffer->vmo)) != ZX_OK) {
+  status = out_dma_buffer->mapped.Map(out_dma_buffer->vmo);
+  if (status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to map DMA VMO: %s", zx_status_get_string(status));
     return status;
   }

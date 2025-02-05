@@ -57,7 +57,7 @@ UsbAudioStream::UsbAudioStream(UsbAudioDevice* parent, std::unique_ptr<UsbAudioS
   frames_requested_ = root_.CreateUint("frames_requested", 0);
   ring_buffer_size2_ = root_.CreateUint("ring_buffer_size", 0);
   usb_requests_sent_ = root_.CreateUint("usb_requests_sent", 0);
-  usb_requests_outstanding_ = root_.CreateInt("usb_requests_outstanding", 0);
+  usb_requests_outstanding_ = root_.CreateUint("usb_requests_outstanding", 0);
 
   frame_rate_ = root_.CreateUint("frame_rate", 0);
   bits_per_slot_ = root_.CreateUint("bits_per_slot", 0);
@@ -353,13 +353,13 @@ void UsbAudioStream::GetSupportedFormats(
     fidl::VectorView<audio_fidl::wire::ChannelSet> channel_sets(allocator,
                                                                 src.number_of_channels.size());
 
-    for (uint8_t j = 0; j < src.number_of_channels.size(); ++j) {
+    for (size_t j = 0; j < src.number_of_channels.size(); ++j) {
       fidl::VectorView<audio_fidl::wire::ChannelAttributes> attributes(allocator,
                                                                        src.number_of_channels[j]);
       channel_sets[j].Allocate(allocator);
-      channel_sets[j].set_attributes(allocator, std::move(attributes));
+      channel_sets[j].set_attributes(allocator, attributes);
     }
-    formats.set_channel_sets(allocator, std::move(channel_sets));
+    formats.set_channel_sets(allocator, channel_sets);
     formats.set_sample_formats(allocator,
                                ::fidl::VectorView<audio_fidl::wire::SampleFormat>::FromExternal(
                                    src.sample_formats.data(), src.sample_formats.size()));
@@ -373,10 +373,10 @@ void UsbAudioStream::GetSupportedFormats(
                                                              src.valid_bits_per_sample.size()));
 
     dst.Allocate(allocator);
-    dst.set_pcm_supported_formats(allocator, std::move(formats));
+    dst.set_pcm_supported_formats(allocator, formats);
   }
 
-  completer.Reply(std::move(fidl_formats));
+  completer.Reply(fidl_formats);
 }
 
 void UsbAudioStream::CreateRingBuffer(StreamChannel* channel, audio_fidl::wire::Format format,
@@ -612,7 +612,7 @@ void UsbAudioStream::WatchGainState(StreamChannel* channel,
     }
     gain_state.set_gain_db(cur_gain_state.cur_gain);
     channel->last_reported_gain_state_ = cur_gain_state;
-    channel->gain_completer_->Reply(std::move(gain_state));
+    channel->gain_completer_->Reply(gain_state);
     channel->gain_completer_.reset();
   }
 }
@@ -679,7 +679,7 @@ void UsbAudioStream::SetGain(audio_fidl::wire::GainState state,
     fbl::AutoLock channel_lock(&lock_);
     for (auto& channel : stream_channels_) {
       if (channel.gain_completer_) {
-        channel.gain_completer_->Reply(std::move(state));
+        channel.gain_completer_->Reply(state);
         channel.gain_completer_.reset();
       }
     }
@@ -705,7 +705,7 @@ void UsbAudioStream::WatchPlugState(StreamChannel* channel,
     audio_fidl::wire::PlugState plug_state(allocator);
     plug_state.set_plugged(true).set_plug_state_time(allocator, create_time_);
     channel->last_reported_plugged_state_ = StreamChannel::Plugged::kPlugged;
-    channel->plug_completer_->Reply(std::move(plug_state));
+    channel->plug_completer_->Reply(plug_state);
     channel->plug_completer_.reset();
   }
 }
@@ -731,12 +731,12 @@ void UsbAudioStream::GetProperties(StreamChannel::GetPropertiesCompleter::Sync& 
       .set_min_gain_db(path.min_gain())
       .set_max_gain_db(path.max_gain())
       .set_gain_step_db(path.gain_res())
-      .set_product(allocator, std::move(product))
-      .set_manufacturer(allocator, std::move(manufacturer))
+      .set_product(allocator, product)
+      .set_manufacturer(allocator, manufacturer)
       .set_clock_domain(clock_domain_)
       .set_plug_detect_capabilities(audio_fidl::wire::PlugDetectCapabilities::kHardwired);
 
-  completer.Reply(std::move(stream_properties));
+  completer.Reply(stream_properties);
 }
 
 void UsbAudioStream::GetProperties(GetPropertiesCompleter::Sync& completer) {
@@ -744,7 +744,7 @@ void UsbAudioStream::GetProperties(GetPropertiesCompleter::Sync& completer) {
   audio_fidl::wire::RingBufferProperties ring_buffer_properties(allocator);
   ring_buffer_properties.set_driver_transfer_bytes(fifo_bytes_)
       .set_needs_cache_flush_or_invalidate(true);
-  completer.Reply(std::move(ring_buffer_properties));
+  completer.Reply(ring_buffer_properties);
 }
 
 void UsbAudioStream::GetVmo(GetVmoRequestView request, GetVmoCompleter::Sync& completer) {
@@ -914,7 +914,7 @@ void UsbAudioStream::Stop(StopCompleter::Sync& completer) {
 }
 
 void UsbAudioStream::RequestComplete(fuchsia_hardware_usb_endpoint::Completion completion) {
-  enum class Action {
+  enum class Action : uint8_t {
     NONE,
     SIGNAL_STARTED,
     SIGNAL_STOPPED,
@@ -1126,10 +1126,10 @@ zx_status_t UsbAudioStream::QueueRequestLocked() {
       RingBufferCopy(*req, true, todo);
       ring_buffer_offset_ = (ring_buffer_offset_ + todo) % ring_buffer_size_;
 
-      req->CacheFlush(ep_.GetMapped);
+      req->CacheFlush(ep_.GetMapped());
     } else {
-      req->reset_buffers(ep_.GetMapped);
-      req->CacheFlushInvalidate(ep_.GetMapped);
+      req->reset_buffers(ep_.GetMapped());
+      req->CacheFlushInvalidate(ep_.GetMapped());
     }
 
     // Schedule this packet to be sent out on the next frame.
@@ -1263,8 +1263,8 @@ void UsbAudioStream::RingBufferCopy(::usb::FidlRequest& req, bool copy_to, uint3
 
   uint64_t vmo_size = ifc_->max_req_size();
   size_t cp_size = std::min(vmo_size, static_cast<uint64_t>(amt));
-  auto actual = copy_to ? req.CopyTo(0, ptr, cp_size, ep_.GetMapped)
-                        : req.CopyFrom(0, ptr, cp_size, ep_.GetMapped);
+  auto actual = copy_to ? req.CopyTo(0, ptr, cp_size, ep_.GetMapped())
+                        : req.CopyFrom(0, ptr, cp_size, ep_.GetMapped());
   size_t total = 0;
   for (uint32_t i = 0; i < actual.size(); i++) {
     total += actual[i];
@@ -1277,8 +1277,8 @@ void UsbAudioStream::RingBufferCopy(::usb::FidlRequest& req, bool copy_to, uint3
   }
   if (amt < todo) {
     cp_size = std::min(vmo_size - amt, static_cast<uint64_t>(todo - amt));
-    actual = copy_to ? req.CopyTo(amt, ring_buffer_virt_, cp_size, ep_.GetMapped)
-                     : req.CopyFrom(amt, ring_buffer_virt_, cp_size, ep_.GetMapped);
+    actual = copy_to ? req.CopyTo(amt, ring_buffer_virt_, cp_size, ep_.GetMapped())
+                     : req.CopyFrom(amt, ring_buffer_virt_, cp_size, ep_.GetMapped());
     total = 0;
     for (uint32_t i = 0; i < actual.size(); i++) {
       total += actual[i];

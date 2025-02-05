@@ -33,16 +33,21 @@ ignore_policy = struct(
     ]),
 
     # Anything within these workspaces will be ignored:
-    # NOTE: with Bzlmod enabled, these check against canonical repo names, which might not be
-    # intended. However, we can't just pass these through `Label()` as some of these repo names
-    # are not actually known to `rules_fuchsia` (this module).
     workspaces = bool_dict([
-        "bazel_tools",
-        "fuchsia_clang",  # TODO(https://fxbug.dev/42177702): clang bazel defs should provide licenses.
-        "fuchsia_sdk",  # TODO(https://fxbug.dev/42081016): sdk atoms should provide licenses.
+        Label(label).repo_name
+        for label in [
+            "@bazel_tools",
+            "@fuchsia_clang",  # TODO(https://fxbug.dev/42177702): clang bazel defs should provide licenses.
+            "@fuchsia_sdk",  # TODO(https://fxbug.dev/42081016): sdk atoms should provide licenses.
+            "@rules_fuchsia",  # TODO(https://fxbug.dev/42081016): sdk rules should provide licenses.
+        ]
+    ]) | bool_dict([
+        # NOTE: with Bzlmod enabled, these check against canonical repo names,
+        # which might not be intended. However, we can't just pass these
+        # through `Label()` as these repo names are not actually known to
+        # `rules_fuchsia` (this module).
         "internal_sdk",  # TODO(https://fxbug.dev/42081016): sdk atoms should provide licenses.
         "assembly_developer_overrides",  # Local development overrides don't provide licenses.
-        "rules_fuchsia",  # TODO(https://fxbug.dev/42081016): sdk rules should provide licenses.
     ]),
 
     # Anything within these packages will be ignored:

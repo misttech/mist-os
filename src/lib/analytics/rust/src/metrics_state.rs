@@ -238,7 +238,7 @@ impl MetricsState {
     fn init_status_for_googler(&mut self) {
         match read_analytics_status_internal(&self.metrics_dir) {
             Ok(status) => {
-                tracing::trace!("Found status in analytics-status-internal");
+                log::trace!("Found status in analytics-status-internal");
                 match status {
                     MetricsStatus::OptedIn
                     | MetricsStatus::OptedInEnhanced
@@ -246,7 +246,7 @@ impl MetricsState {
                         self.status = status;
                     }
                     _ => {
-                        tracing::trace!("Empty value found in analytics-status-internal");
+                        log::trace!("Empty value found in analytics-status-internal");
                         self.status = MetricsStatus::GooglerNeedsNotice;
                     }
                 }
@@ -254,7 +254,7 @@ impl MetricsState {
                 return;
             }
             Err(_) => {
-                tracing::trace!("No value found in analytics-status-internal.");
+                log::trace!("No value found in analytics-status-internal.");
                 self.status = MetricsStatus::GooglerNeedsNotice;
             }
         }

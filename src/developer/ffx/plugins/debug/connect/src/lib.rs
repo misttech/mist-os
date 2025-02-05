@@ -8,13 +8,14 @@ use errors::{ffx_bail, ffx_error};
 use ffx_debug_connect_args::ConnectCommand;
 use ffx_zxdb::util::{self, Agent};
 use ffx_zxdb::{forward_to_agent, Debugger};
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_debugger as fdebugger;
 use signal_hook::consts::signal::SIGINT;
 use std::io::{BufRead, Write};
 use std::process::Command;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use target_holders::moniker;
 
 pub use ffx_zxdb::debug_agent::{DebugAgentSocket, DebuggerProxy};
 
@@ -106,8 +107,7 @@ async fn connect_tool_impl(
         Some(debugger_debugger) => {
             let sdk = ffx_config::global_env_context()
                 .context("loading global environment context")?
-                .get_sdk()
-                .await?;
+                .get_sdk()?;
             if *sdk.get_version() != sdk::SdkVersion::InTree {
                 // OOT doesn't provide symbols for zxdb.
                 ffx_bail!("--debugger only works in-tree.");

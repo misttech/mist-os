@@ -86,7 +86,7 @@ where
                 }
             },
             _ => {
-                tracing::warn!(
+                log::warn!(
                     "An error occurred while independent job was executing for request:{:?}",
                     self.request.clone()
                 );

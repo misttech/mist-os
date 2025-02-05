@@ -168,7 +168,7 @@ class VfsTestSetup : public testing::Test {
 
 using ConnectionTest = VfsTestSetup;
 
-TEST_F(ConnectionTest, NodeGetSetFlagsOnFile) {
+TEST_F(ConnectionTest, NodeGetDeprecatedSetFlagsOnFile) {
   // Create connection to vfs
   auto root = fidl::Endpoints<fio::Directory>::Create();
   ASSERT_EQ(ConnectClient(std::move(root.server)), ZX_OK);
@@ -181,25 +181,25 @@ TEST_F(ConnectionTest, NodeGetSetFlagsOnFile) {
                     fc->server.TakeChannel().release()),
       ZX_OK);
 
-  // Use GetFlags to get current flags and rights
-  auto file_get_result = fidl::WireCall(fc->client)->GetFlags();
+  // Use DeprecatedGetFlags to get current flags and rights
+  auto file_get_result = fidl::WireCall(fc->client)->DeprecatedGetFlags();
   EXPECT_EQ(file_get_result.status(), ZX_OK);
   EXPECT_EQ(fio::OpenFlags::kRightReadable, file_get_result->flags);
   {
-    // Make modifications to flags with SetFlags: Note this only works for fio::OpenFlags::kAppend
-    // based on posix standard
-    auto file_set_result = fidl::WireCall(fc->client)->SetFlags(fio::OpenFlags::kAppend);
+    // Make modifications to flags with DeprecatedSetFlags: Note this only works for
+    // fio::OpenFlags::kAppend based on posix standard
+    auto file_set_result = fidl::WireCall(fc->client)->DeprecatedSetFlags(fio::OpenFlags::kAppend);
     EXPECT_EQ(file_set_result->s, ZX_OK);
   }
   {
     // Check that the new flag is saved
-    auto file_get_result = fidl::WireCall(fc->client)->GetFlags();
+    auto file_get_result = fidl::WireCall(fc->client)->DeprecatedGetFlags();
     EXPECT_EQ(file_get_result->s, ZX_OK);
     EXPECT_EQ(fio::OpenFlags::kRightReadable | fio::OpenFlags::kAppend, file_get_result->flags);
   }
 }
 
-TEST_F(ConnectionTest, NodeGetSetFlagsOnDirectory) {
+TEST_F(ConnectionTest, NodeGetDeprecatedSetFlagsOnDirectory) {
   // Create connection to vfs
   auto root = fidl::Endpoints<fio::Directory>::Create();
   ASSERT_EQ(ConnectClient(std::move(root.server)), ZX_OK);
@@ -213,12 +213,12 @@ TEST_F(ConnectionTest, NodeGetSetFlagsOnDirectory) {
             ZX_OK);
 
   // Directories don't have settable flags, only report RIGHT_* flags.
-  auto dir_get_result = fidl::WireCall(dc->client)->GetFlags();
+  auto dir_get_result = fidl::WireCall(dc->client)->DeprecatedGetFlags();
   EXPECT_EQ(dir_get_result->s, ZX_OK);
   EXPECT_EQ(fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable, dir_get_result->flags);
 
   // Directories do not support setting flags.
-  auto dir_set_result = fidl::WireCall(dc->client)->SetFlags(fio::OpenFlags::kAppend);
+  auto dir_set_result = fidl::WireCall(dc->client)->DeprecatedSetFlags(fio::OpenFlags::kAppend);
   EXPECT_EQ(dir_set_result->s, ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -242,7 +242,7 @@ TEST_F(ConnectionTest, InheritPermissionFlagDirectoryRightExpansion) {
               ZX_OK);
 
     // Ensure flags match those which we expect.
-    auto dir_get_result = fidl::WireCall(dc->client)->GetFlags();
+    auto dir_get_result = fidl::WireCall(dc->client)->DeprecatedGetFlags();
     EXPECT_EQ(dir_get_result->s, ZX_OK);
     auto dir_flags = dir_get_result->flags;
     EXPECT_TRUE(fio::OpenFlags::kRightReadable & dir_flags);
@@ -258,13 +258,13 @@ TEST_F(ConnectionTest, InheritPermissionFlagDirectoryRightExpansion) {
                             static_cast<uint64_t>(fio::kPermReadable | kOpenFlags),
                             fc.server.TakeChannel().release()),
               ZX_OK);
-    auto file_get_result = fidl::WireCall(fc.client)->GetFlags();
+    auto file_get_result = fidl::WireCall(fc.client)->DeprecatedGetFlags();
     EXPECT_EQ(file_get_result.status(), ZX_OK);
     EXPECT_EQ(fio::OpenFlags::kRightReadable, file_get_result->flags);
   }
 }
 
-TEST_F(ConnectionTest, FileGetSetFlagsOnFile) {
+TEST_F(ConnectionTest, FileGetDeprecatedSetFlagsOnFile) {
   // Create connection to vfs
   auto root = fidl::Endpoints<fio::Directory>::Create();
   ASSERT_EQ(ConnectClient(std::move(root.server)), ZX_OK);
@@ -278,20 +278,20 @@ TEST_F(ConnectionTest, FileGetSetFlagsOnFile) {
       ZX_OK);
 
   {
-    // Use GetFlags to get current flags and rights
-    auto file_get_result = fidl::WireCall(fc->client)->GetFlags();
+    // Use DeprecatedGetFlags to get current flags and rights
+    auto file_get_result = fidl::WireCall(fc->client)->DeprecatedGetFlags();
     EXPECT_EQ(file_get_result.status(), ZX_OK);
     EXPECT_EQ(fio::OpenFlags::kRightReadable, file_get_result->flags);
   }
   {
-    // Make modifications to flags with SetFlags: Note this only works for kOpenFlagAppend
+    // Make modifications to flags with DeprecatedSetFlags: Note this only works for kOpenFlagAppend
     // based on posix standard
-    auto file_set_result = fidl::WireCall(fc->client)->SetFlags(fio::OpenFlags::kAppend);
+    auto file_set_result = fidl::WireCall(fc->client)->DeprecatedSetFlags(fio::OpenFlags::kAppend);
     EXPECT_EQ(file_set_result->s, ZX_OK);
   }
   {
     // Check that the new flag is saved
-    auto file_get_result = fidl::WireCall(fc->client)->GetFlags();
+    auto file_get_result = fidl::WireCall(fc->client)->DeprecatedGetFlags();
     EXPECT_EQ(file_get_result->s, ZX_OK);
     EXPECT_EQ(fio::OpenFlags::kRightReadable | fio::OpenFlags::kAppend, file_get_result->flags);
   }

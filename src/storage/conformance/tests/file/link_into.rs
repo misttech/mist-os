@@ -168,3 +168,74 @@ async fn file_link_into_target_unlinked_dir() {
         zx::Status::ACCESS_DENIED.into_raw()
     );
 }
+
+#[fuchsia::test]
+async fn unnamed_temporary_file_can_link_into_named_file() {
+    let harness = TestHarness::new().await;
+    if !harness.config.supports_unnamed_temporary_file {
+        return;
+    }
+
+    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
+
+    let temporary_file = dir
+        .open3_node::<fio::FileMarker>(
+            ".",
+            fio::Flags::PROTOCOL_FILE
+                | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE,
+            None,
+        )
+        .await
+        .expect("open3 failed to open unnamed temporary file");
+    temporary_file
+        .write(CONTENTS)
+        .await
+        .expect("write (FIDL) failed")
+        .expect("write to file failed");
+
+    let token = get_token(&dir).await.into();
+
+    temporary_file
+        .link_into(token, "foo")
+        .await
+        .expect("link_into (FIDL) failed")
+        .expect("link_into failed");
+
+    assert_eq!(read_file(&dir, "foo").await, CONTENTS);
+}
+
+#[fuchsia::test]
+async fn unlinkable_unnamed_temporary_should_fail_link_into() {
+    let harness = TestHarness::new().await;
+    if !harness.config.supports_unnamed_temporary_file {
+        return;
+    }
+
+    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
+
+    let temporary_file = dir
+        .open3_node::<fio::FileMarker>(
+            ".",
+            fio::Flags::PROTOCOL_FILE
+                | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
+                | fio::FLAG_TEMPORARY_AS_NOT_LINKABLE
+                | fio::PERM_WRITABLE,
+            None,
+        )
+        .await
+        .expect("open3 failed to open unnamed temporary file");
+
+    let token = get_token(&dir).await.into();
+
+    assert_eq!(
+        temporary_file
+            .link_into(token, "foo")
+            .await
+            .expect("link_into (FIDL) failed")
+            .map_err(zx::Status::from_raw)
+            .expect_err("link_into passed unexpectedly for unlinkable file"),
+        zx::Status::NOT_FOUND
+    );
+}

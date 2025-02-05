@@ -64,7 +64,7 @@ async fn test_fn_attr_async_with_no_return_type() {
 
 #[fuchsia::test]
 fn test_fn_attr_with_name() {
-    #[fxfs_trace::trace(name = "trace-name")]
+    #[fxfs_trace::trace(name = trace_name)]
     fn test_fn() -> u64 {
         5
     }
@@ -91,7 +91,7 @@ fn test_fn_attr_sync_with_args() {
 
 #[fuchsia::test]
 fn test_fn_attr_with_name_and_args() {
-    #[fxfs_trace::trace(name = "trace-name", "start" => range.start, "end" => range.end)]
+    #[fxfs_trace::trace(name = trace_name, "start" => range.start, "end" => range.end)]
     fn test_fn(range: Range<u64>) -> u64 {
         range.start
     }
@@ -127,7 +127,7 @@ async fn test_impl_attr_with_trace_method_async() {
 #[fuchsia::test]
 fn test_impl_attr_with_prefix() {
     struct Foo;
-    #[fxfs_trace::trace(prefix = "Bar")]
+    #[fxfs_trace::trace(prefix = Bar)]
     impl Foo {
         #[trace]
         fn test_fn(&self) -> u64 {
@@ -142,7 +142,7 @@ fn test_impl_attr_with_name() {
     struct Foo;
     #[fxfs_trace::trace]
     impl Foo {
-        #[trace(name = "name-override")]
+        #[trace(name = name_override)]
         fn test_fn(&self) -> u64 {
             5
         }
@@ -153,9 +153,22 @@ fn test_impl_attr_with_name() {
 #[fuchsia::test]
 fn test_impl_attr_with_prefix_and_name() {
     struct Foo;
-    #[fxfs_trace::trace(prefix = "Bar")]
+    #[fxfs_trace::trace(prefix = Bar)]
     impl Foo {
-        #[trace(name = "name-override")]
+        #[trace(name = name_override)]
+        fn test_fn(&self) -> u64 {
+            5
+        }
+    }
+    assert_eq!(Foo.test_fn(), 5);
+}
+
+#[fuchsia::test]
+fn test_impl_attr_with_complex_prefix_and_name_overrides() {
+    struct Foo;
+    #[fxfs_trace::trace(prefix = ::other_crate::Bar<Foo>)]
+    impl Foo {
+        #[trace(name = ThisFoo::<bool>)]
         fn test_fn(&self) -> u64 {
             5
         }
@@ -178,7 +191,7 @@ fn test_impl_attr_with_trace_all_methods() {
 #[fuchsia::test]
 fn test_impl_attr_with_trace_all_methods_and_prefix() {
     struct Foo;
-    #[fxfs_trace::trace(trace_all_methods, prefix = "Bar")]
+    #[fxfs_trace::trace(trace_all_methods, prefix = Bar)]
     impl Foo {
         fn test_fn(&self) -> u64 {
             5
@@ -192,7 +205,7 @@ fn test_impl_attr_with_trace_all_methods_and_name() {
     struct Foo;
     #[fxfs_trace::trace(trace_all_methods)]
     impl Foo {
-        #[trace(name = "name-override")]
+        #[trace(name = name_override)]
         fn test_fn(&self) -> u64 {
             5
         }

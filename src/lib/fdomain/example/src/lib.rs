@@ -48,8 +48,7 @@ async fn run_echo_launcher_server(
                 // communication channel ourselves
                 echo::EchoLauncherRequest::GetEcho { echo_prefix, responder } => {
                     println!("Got non pipelined request");
-                    let (client_end, server_end) =
-                        client.create_endpoints::<echo::EchoMarker>().await?;
+                    let (client_end, server_end) = client.create_endpoints::<echo::EchoMarker>();
                     responder.send(client_end)?;
                     (echo_prefix, server_end)
                 }
@@ -66,7 +65,7 @@ async fn run_echo_launcher_server(
                 }
             };
             // Run the Echo server with the specified prefix
-            run_echo_server(server_end.into_stream()?, &echo_prefix).await
+            run_echo_server(server_end.into_stream(), &echo_prefix).await
         })
         .await
 }
@@ -75,7 +74,7 @@ async fn run_server(
     client: &Arc<Client>,
     server_end: fdomain_client::fidl::ServerEnd<echo::EchoLauncherMarker>,
 ) -> anyhow::Result<()> {
-    let stream = server_end.into_stream()?;
+    let stream = server_end.into_stream();
     let fut = run_echo_launcher_server(client, stream);
 
     println!("Running echo launcher server");
@@ -93,14 +92,14 @@ async fn test_clients_with_server(client: &Arc<Client>, server: Channel) -> anyh
         println!("Got echo from launcher proxy");
         // "Upgrade" the client end in the response into an Echo proxy, and
         // make an EchoString request on it
-        let proxy = client_end.into_proxy()?;
+        let proxy = client_end.into_proxy();
         proxy.echo_string("hello").map_ok(|val| println!("Got echo response {}", val)).await?;
         anyhow::Result::Ok(())
     };
 
     // Create a future that obtains an Echo protocol using the pipelined GetEcho
     // method
-    let (proxy, server_end) = client.create_proxy::<echo::EchoMarker>().await?;
+    let (proxy, server_end) = client.create_proxy::<echo::EchoMarker>();
     echo_launcher.get_echo_pipelined("pipelined", server_end)?;
     // We can make a request to the server right after sending the pipelined request
     let pipelined_fut =
@@ -122,8 +121,7 @@ async fn server_is_fdomain() {
 
     fuchsia_async::Task::spawn(fut).detach();
 
-    let (client_end, server_end) =
-        client.create_endpoints::<echo::EchoLauncherMarker>().await.unwrap();
+    let (client_end, server_end) = client.create_endpoints::<echo::EchoLauncherMarker>();
     let server_fut = run_server(&client, server_end);
     let client_fut = test_clients_with_server(&client, client_end.into_channel());
     match futures::future::select(pin!(server_fut), pin!(client_fut)).await {
@@ -151,10 +149,9 @@ async fn server_is_fidl_in_ns() {
     fuchsia_async::Task::spawn(fut).detach();
 
     let namespace = client.namespace().await.unwrap();
-    let namespace = fdomain_client::fidl::ClientEnd::<fio::DirectoryMarker>::new(namespace)
-        .into_proxy()
-        .unwrap();
-    let (echo_client, echo_server) = client.create_channel().await.unwrap();
+    let namespace =
+        fdomain_client::fidl::ClientEnd::<fio::DirectoryMarker>::new(namespace).into_proxy();
+    let (echo_client, echo_server) = client.create_channel();
     namespace
         .open3("echo", fio::Flags::PROTOCOL_SERVICE, &fio::Options::default(), echo_server)
         .unwrap();

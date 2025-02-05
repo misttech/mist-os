@@ -24,7 +24,7 @@ async fn main() -> Result<(), Error> {
 
     fuchsia_trace_provider::trace_provider_create_with_fdio();
 
-    info!(version = %LATEST_VERSION, "Started");
+    info!(version:% = LATEST_VERSION; "Started");
 
     Component::new()
         .run(

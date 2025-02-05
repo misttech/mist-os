@@ -18,7 +18,6 @@ mod inspect;
 pub mod logs;
 mod pipeline;
 pub mod severity_filter;
-mod utils;
 
 #[cfg(test)]
 mod testing;

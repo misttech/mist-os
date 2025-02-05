@@ -17,8 +17,8 @@ use fuchsia_component_test::{
 };
 use futures::channel::mpsc;
 use futures::{SinkExt, StreamExt};
+use log::info;
 use realmbuilder_mock_helpers::provide_bt_gap_uses;
-use tracing::info;
 use {
     fidl_fuchsia_bluetooth_gatt as fbgatt, fidl_fuchsia_bluetooth_gatt2 as fbgatt2,
     fidl_fuchsia_bluetooth_le as fble,

@@ -90,6 +90,7 @@ bool TransformGraph::ReplaceChildren(TransformHandle parent,
   FX_DCHECK(is_valid_);
   FX_DCHECK(working_set_.count(parent));
 
+  // Use unordered_set to verify uniqueness of child TransformHandles.
   std::unordered_set<TransformHandle> unique_children;
   unique_children.reserve(new_children.size());
   for (auto child : new_children) {
@@ -100,7 +101,7 @@ bool TransformGraph::ReplaceChildren(TransformHandle parent,
     }
   }
   ClearChildren(parent);
-  for (auto child : unique_children) {
+  for (auto child : new_children) {
     children_.insert({{parent, NORMAL}, child});
     FLATLAND_VERBOSE_LOG << "TransformGraph::ReplaceChildren(" << parent << ", [.., " << child
                          << ", ..]): success!";

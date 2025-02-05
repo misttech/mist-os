@@ -25,7 +25,6 @@ namespace wlan_ieee80211 = wlan_ieee80211;
 // Some default AP and association request values
 constexpr wlan_common::WlanChannel kDefaultChannel = {
     .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
-constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 constexpr uint8_t kIes[] = {
     // SSID
     0x00, 0x0f, 'F', 'u', 'c', 'h', 's', 'i', 'a', ' ', 'F', 'a', 'k', 'e', ' ', 'A', 'P',
@@ -134,8 +133,8 @@ class ConnectTest : public SimTest {
   void ConnectErrorEventInject(brcmf_fweh_event_status_t ret_status,
                                wlan_ieee80211::StatusCode ret_reason);
 
-  void GetIfaceCounterStats(wlan_fullmac_wire::WlanFullmacIfaceCounterStats* out_stats);
-  void GetIfaceHistogramStats(wlan_fullmac_wire::WlanFullmacIfaceHistogramStats* out_stats);
+  void GetIfaceCounterStats(fuchsia_wlan_stats::wire::IfaceCounterStats* out_stats);
+  void GetIfaceHistogramStats(fuchsia_wlan_stats::wire::IfaceHistogramStats* out_stats);
   void DetailedHistogramErrorInject();
 
   // Event handlers
@@ -152,7 +151,7 @@ class ConnectTest : public SimTest {
     // appropriate MLME calls (Join => Auth => Assoc).
     simulation::WlanTxInfo tx_info = {.channel = kDefaultChannel};
     common::MacAddr bssid = kDefaultBssid;
-    wlan_ieee80211::CSsid ssid = kDefaultSsid;
+    fuchsia_wlan_ieee80211::Ssid ssid = kDefaultSsid;
     std::vector<uint8_t> ies = std::vector<uint8_t>(kIes, kIes + sizeof(kIes));
 
     // There should be one result for each association response received
@@ -477,7 +476,7 @@ TEST_F(ConnectTest, SignalReportTest) {
   EXPECT_EQ(context_.signal_ind_rssi, kDefaultSimFwRssi);
 }
 
-void ConnectTest::GetIfaceCounterStats(wlan_fullmac_wire::WlanFullmacIfaceCounterStats* out_stats) {
+void ConnectTest::GetIfaceCounterStats(fuchsia_wlan_stats::wire::IfaceCounterStats* out_stats) {
   auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->GetIfaceCounterStats();
   EXPECT_TRUE(result.ok());
   if (!result->is_error()) {
@@ -485,8 +484,7 @@ void ConnectTest::GetIfaceCounterStats(wlan_fullmac_wire::WlanFullmacIfaceCounte
   }
 }
 
-void ConnectTest::GetIfaceHistogramStats(
-    wlan_fullmac_wire::WlanFullmacIfaceHistogramStats* out_stats) {
+void ConnectTest::GetIfaceHistogramStats(fuchsia_wlan_stats::wire::IfaceHistogramStats* out_stats) {
   auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->GetIfaceHistogramStats();
   EXPECT_TRUE(result.ok());
   // Copy the pointers out, the data still exist in client_ifc_.test_arena_.
@@ -504,7 +502,7 @@ TEST_F(ConnectTest, GetIfaceCounterStatsTest) {
   ap.EnableBeacon(zx::msec(100));
 
   context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
-  wlan_fullmac_wire::WlanFullmacIfaceCounterStats stats = {};
+  fuchsia_wlan_stats::wire::IfaceCounterStats stats = {};
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
   env_->ScheduleNotification(std::bind(&ConnectTest::GetIfaceCounterStats, this, &stats),
@@ -518,11 +516,16 @@ TEST_F(ConnectTest, GetIfaceCounterStatsTest) {
   const uint64_t fw_rx_multicast = 1;
   const uint64_t fw_tx_good = 3;
   const uint64_t fw_tx_bad = 2;
-  EXPECT_EQ(stats.rx_unicast_total, fw_rx_good + fw_rx_bad);
-  EXPECT_EQ(stats.rx_unicast_drop, fw_rx_bad);
-  EXPECT_EQ(stats.rx_multicast, fw_rx_multicast);
-  EXPECT_EQ(stats.tx_total, fw_tx_good + fw_tx_bad);
-  EXPECT_EQ(stats.tx_drop, fw_tx_bad);
+  ASSERT_TRUE(stats.has_rx_unicast_total());
+  EXPECT_EQ(stats.rx_unicast_total(), fw_rx_good + fw_rx_bad);
+  ASSERT_TRUE(stats.has_rx_unicast_drop());
+  EXPECT_EQ(stats.rx_unicast_drop(), fw_rx_bad);
+  ASSERT_TRUE(stats.has_rx_multicast());
+  EXPECT_EQ(stats.rx_multicast(), fw_rx_multicast);
+  ASSERT_TRUE(stats.has_tx_total());
+  EXPECT_EQ(stats.tx_total(), fw_tx_good + fw_tx_bad);
+  ASSERT_TRUE(stats.has_tx_drop());
+  EXPECT_EQ(stats.tx_drop(), fw_tx_bad);
 }
 
 TEST_F(ConnectTest, GetIfaceHistogramStatsTest) {
@@ -534,7 +537,7 @@ TEST_F(ConnectTest, GetIfaceHistogramStatsTest) {
   ap.EnableBeacon(zx::msec(100));
 
   context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
-  wlan_fullmac_wire::WlanFullmacIfaceHistogramStats stats;
+  fuchsia_wlan_stats::wire::IfaceHistogramStats stats;
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
   env_->ScheduleNotification(std::bind(&ConnectTest::GetIfaceHistogramStats, this, &stats),
@@ -543,8 +546,8 @@ TEST_F(ConnectTest, GetIfaceHistogramStatsTest) {
   env_->Run(kTestDuration);
 
   // Sim firmware returns these fake values for per-antenna histograms.
-  const auto& expected_hist_scope = wlan_fullmac_wire::WlanFullmacHistScope::kPerAntenna;
-  const auto& expected_antenna_freq = wlan_fullmac_wire::WlanFullmacAntennaFreq::kAntenna2G;
+  const auto& expected_hist_scope = fuchsia_wlan_stats::wire::HistScope::kPerAntenna;
+  const auto& expected_antenna_freq = fuchsia_wlan_stats::wire::AntennaFreq::kAntenna2G;
   const uint8_t expected_antenna_index = 0;
   const uint8_t expected_snr_index = 60;
   const uint8_t expected_snr_num_frames = 50;
@@ -556,23 +559,23 @@ TEST_F(ConnectTest, GetIfaceHistogramStatsTest) {
 
   ASSERT_EQ(stats.noise_floor_histograms().count(), 1U);
   EXPECT_EQ(stats.noise_floor_histograms().data()[0].hist_scope, expected_hist_scope);
-  EXPECT_EQ(stats.noise_floor_histograms().data()[0].antenna_id.freq, expected_antenna_freq);
-  EXPECT_EQ(stats.noise_floor_histograms().data()[0].antenna_id.index, expected_antenna_index);
+  EXPECT_EQ(stats.noise_floor_histograms().data()[0].antenna_id->freq, expected_antenna_freq);
+  EXPECT_EQ(stats.noise_floor_histograms().data()[0].antenna_id->index, expected_antenna_index);
 
   ASSERT_EQ(stats.rssi_histograms().count(), 1U);
   EXPECT_EQ(stats.rssi_histograms().data()[0].hist_scope, expected_hist_scope);
-  EXPECT_EQ(stats.rssi_histograms().data()[0].antenna_id.freq, expected_antenna_freq);
-  EXPECT_EQ(stats.rssi_histograms().data()[0].antenna_id.index, expected_antenna_index);
+  EXPECT_EQ(stats.rssi_histograms().data()[0].antenna_id->freq, expected_antenna_freq);
+  EXPECT_EQ(stats.rssi_histograms().data()[0].antenna_id->index, expected_antenna_index);
 
   ASSERT_EQ(stats.rx_rate_index_histograms().count(), 1U);
   EXPECT_EQ(stats.rx_rate_index_histograms().data()[0].hist_scope, expected_hist_scope);
-  EXPECT_EQ(stats.rx_rate_index_histograms().data()[0].antenna_id.freq, expected_antenna_freq);
-  EXPECT_EQ(stats.rx_rate_index_histograms().data()[0].antenna_id.index, expected_antenna_index);
+  EXPECT_EQ(stats.rx_rate_index_histograms().data()[0].antenna_id->freq, expected_antenna_freq);
+  EXPECT_EQ(stats.rx_rate_index_histograms().data()[0].antenna_id->index, expected_antenna_index);
 
   ASSERT_EQ(stats.snr_histograms().count(), 1U);
   EXPECT_EQ(stats.snr_histograms().data()[0].hist_scope, expected_hist_scope);
-  EXPECT_EQ(stats.snr_histograms().data()[0].antenna_id.freq, expected_antenna_freq);
-  EXPECT_EQ(stats.snr_histograms().data()[0].antenna_id.index, expected_antenna_index);
+  EXPECT_EQ(stats.snr_histograms().data()[0].antenna_id->freq, expected_antenna_freq);
+  EXPECT_EQ(stats.snr_histograms().data()[0].antenna_id->index, expected_antenna_index);
   uint64_t snr_samples_count = 0;
   uint64_t snr_bucket_index = 0;
   uint64_t snr_bucket_num_samples = 0;
@@ -598,7 +601,7 @@ TEST_F(ConnectTest, GetIfaceHistogramStatsNotSupportedTest) {
   ap.EnableBeacon(zx::msec(100));
 
   context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
-  wlan_fullmac_wire::WlanFullmacIfaceHistogramStats stats = {};
+  fuchsia_wlan_stats::wire::IfaceHistogramStats stats = {};
 
   DetailedHistogramErrorInject();
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
@@ -729,7 +732,7 @@ TEST_F(ConnectTest, NoAps) {
   const common::MacAddr kBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
   context_.bssid = kBssid;
   context_.expected_results.push_front(wlan_ieee80211::StatusCode::kRejectedSequenceTimeout);
-  context_.ssid = {.len = 6, .data = {.data_ = "TestAP"}};
+  context_.ssid = {'T', 'e', 's', 't', 'A', 'P'};
   context_.tx_info.channel = {
       .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
 
@@ -809,8 +812,9 @@ TEST_F(ConnectTest, WrongIds) {
   constexpr wlan_common::WlanChannel kWrongChannel = {
       .primary = 8, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
   ASSERT_NE(kDefaultChannel.primary, kWrongChannel.primary);
-  constexpr wlan_ieee80211::CSsid kWrongSsid = {.len = 14, .data = {.data_ = "Fuchsia Fake AP"}};
-  ASSERT_NE(kDefaultSsid.len, kWrongSsid.len);
+  const fuchsia_wlan_ieee80211::Ssid kWrongSsid = {'F', 'u', 'c', 'h', 's', 'i', 'a',
+                                                   ' ', 'F', 'a', 'k', 'e', ' ', 'A'};
+  ASSERT_NE(kDefaultSsid.size(), kWrongSsid.size());
   const common::MacAddr kWrongBssid({0x12, 0x34, 0x56, 0x78, 0x9b, 0xbc});
   ASSERT_NE(kDefaultBssid, kWrongBssid);
 

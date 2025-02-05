@@ -17,8 +17,8 @@ use fuchsia_scenic::ViewRefPair;
 use futures::channel::mpsc::{unbounded, UnboundedSender};
 use futures::prelude::*;
 use internal_message::InternalMessage;
+use log::{error, warn};
 use std::env;
-use tracing::{error, warn};
 use {
     fidl_fuchsia_math as fmath, fidl_fuchsia_ui_app as fapp, fidl_fuchsia_ui_composition as fland,
     fidl_fuchsia_ui_pointer as fptr, fidl_fuchsia_ui_views as fviews, fuchsia_async as fasync,

@@ -9,8 +9,8 @@ use fuchsia_async::{self as fasync};
 use fuchsia_runtime::{self as fruntime, HandleInfo, HandleType};
 
 use futures_util::stream::TryStreamExt;
+use log::{error, info};
 use std::process;
-use tracing::{error, info};
 
 #[fuchsia::main]
 async fn main() {

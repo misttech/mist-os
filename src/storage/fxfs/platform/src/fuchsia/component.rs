@@ -86,7 +86,7 @@ impl FsInspect for InspectedFxFilesystem {
             version_minor: LATEST_VERSION.minor.into(),
             block_size: self.0.block_size() as u64,
             max_filename_length: fio::MAX_FILENAME,
-            oldest_version: Some((earliest_version.major.into(), earliest_version.minor.into())),
+            oldest_version: Some(format!("{}.{}", earliest_version.major, earliest_version.minor)),
         }
     }
 
@@ -214,7 +214,7 @@ impl Component {
             let me = self.clone();
             self.scope.spawn(async move {
                 if let Err(error) = me.handle_lifecycle_requests(channel).await {
-                    warn!(?error, "handle_lifecycle_requests");
+                    warn!(error:?; "handle_lifecycle_requests");
                 }
             });
         }
@@ -229,19 +229,19 @@ impl Component {
             match request {
                 StartupRequest::Start { responder, device, options } => {
                     responder.send(self.handle_start(device, options).await.map_err(|error| {
-                        error!(?error, "handle_start failed");
+                        error!(error:?; "handle_start failed");
                         map_to_raw_status(error)
                     }))?
                 }
                 StartupRequest::Format { responder, device, .. } => {
                     responder.send(self.handle_format(device).await.map_err(|error| {
-                        error!(?error, "handle_format failed");
+                        error!(error:?; "handle_format failed");
                         map_to_raw_status(error)
                     }))?
                 }
                 StartupRequest::Check { responder, device, options } => {
                     responder.send(self.handle_check(device, options).await.map_err(|error| {
-                        error!(?error, "handle_check failed");
+                        error!(error:?; "handle_check failed");
                         map_to_raw_status(error)
                     }))?
                 }
@@ -255,7 +255,7 @@ impl Component {
         device: ClientEnd<BlockMarker>,
         options: StartOptions,
     ) -> Result<(), Error> {
-        info!(?options, "Received start request");
+        info!(options:?; "Received start request");
         let mut state = self.state.lock().await;
         // TODO(https://fxbug.dev/42174810): This is not very graceful.  It would be better for the client to
         // explicitly shut down all volumes first, and make this fail if there are remaining active
@@ -281,7 +281,7 @@ impl Component {
             Ok(v) => Some(v),
             Err(error) => {
                 warn!(
-                    ?error,
+                    error:?;
                     "Failed to connect to memory pressure monitor. Running \
                      without pressure awareness."
                 );
@@ -310,7 +310,7 @@ impl Component {
         info!(
             device_size = info.total_bytes,
             used = info.used_bytes,
-            free = info.total_bytes - info.used_bytes,
+            free = info.total_bytes - info.used_bytes;
             "Mounted"
         );
 
@@ -392,7 +392,7 @@ impl Component {
                 self.shutdown().await;
                 responder
                     .send()
-                    .unwrap_or_else(|error| warn!(?error, "Failed to send shutdown response"));
+                    .unwrap_or_else(|error| warn!(error:?; "Failed to send shutdown response"));
                 return Ok(true);
             }
         }
@@ -440,7 +440,7 @@ impl Component {
                     responder,
                 } => {
                     info!(
-                        name = name.as_str(),
+                        name = name.as_str();
                         "Create {}volume",
                         if mount_options.crypt.is_some() { "encrypted " } else { "" }
                     );
@@ -455,17 +455,17 @@ impl Component {
                                 .await
                                 .map_err(map_to_raw_status),
                         )
-                        .unwrap_or_else(|error| {
-                            warn!(?error, "Failed to send volume creation response")
-                        });
+                        .unwrap_or_else(
+                            |error| warn!(error:?; "Failed to send volume creation response"),
+                        );
                 }
                 VolumesRequest::Remove { name, responder } => {
-                    info!(name = name.as_str(), "Remove volume");
+                    info!(name = name.as_str(); "Remove volume");
                     responder
                         .send(volumes.remove_volume(&name).await.map_err(map_to_raw_status))
-                        .unwrap_or_else(|error| {
-                            warn!(?error, "Failed to send volume removal response")
-                        });
+                        .unwrap_or_else(
+                            |error| warn!(error:?; "Failed to send volume removal response"),
+                        );
                 }
             }
         }

@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-display/intel-display-driver.h"
 
+#include <fidl/fuchsia.boot/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.pci/cpp/fidl.h>
 #include <fidl/fuchsia.kernel/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
@@ -13,6 +14,7 @@
 #include <lib/driver/component/cpp/prepare_stop_completer.h>
 #include <lib/driver/component/cpp/start_completer.h>
 #include <lib/driver/logging/cpp/logger.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
@@ -69,6 +71,35 @@ zx::result<zx::resource> GetKernelResource(fdf::Namespace& incoming, const char*
   return zx::ok(std::move(std::move(get_result).value()).resource);
 }
 
+zx::result<zbi_swfb_t> GetFramebufferInfo(fdf::Namespace& incoming) {
+  zx::result client = incoming.Connect<fuchsia_boot::Items>();
+  if (client.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to fuchsia.boot/Items: %s", client.status_string());
+    return client.take_error();
+  }
+  fidl::WireResult result = fidl::WireCall(*client)->Get2(ZBI_TYPE_FRAMEBUFFER, {});
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Failed to get framebuffer boot item: %s", result.status_string());
+    return zx::error(result.status());
+  }
+  if (result->is_error()) {
+    return zx::error(result->error_value());
+  }
+  fidl::VectorView items = result->value()->retrieved_items;
+  if (items.count() == 0) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+  if (items[0].length < sizeof(zbi_swfb_t)) {
+    return zx::error(ZX_ERR_BUFFER_TOO_SMALL);
+  }
+  zbi_swfb_t framebuffer_info;
+  zx_status_t status = items[0].payload.read(&framebuffer_info, 0, sizeof(framebuffer_info));
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(framebuffer_info);
+}
+
 }  // namespace
 
 IntelDisplayDriver::IntelDisplayDriver(fdf::DriverStartArgs start_args,
@@ -94,12 +125,10 @@ zx::result<> IntelDisplayDriver::InitController() {
   }
   fidl::ClientEnd<fuchsia_hardware_pci::Device> pci = std::move(pci_result).value();
 
-  zx::result<zx::resource> framebuffer_resource_result =
-      GetKernelResource<fuchsia_kernel::FramebufferResource>(*incoming(), "framebuffer");
-  if (framebuffer_resource_result.is_error()) {
-    return framebuffer_resource_result.take_error();
+  zx::result<zbi_swfb_t> framebuffer_info = GetFramebufferInfo(*incoming());
+  if (framebuffer_info.is_ok()) {
+    framebuffer_info_ = framebuffer_info.value();
   }
-  framebuffer_resource_ = std::move(framebuffer_resource_result).value();
 
   zx::result<zx::resource> mmio_resource_result =
       GetKernelResource<fuchsia_kernel::MmioResource>(*incoming(), "mmio");
@@ -116,13 +145,13 @@ zx::result<> IntelDisplayDriver::InitController() {
   ioport_resource_ = std::move(ioport_resource_result).value();
 
   ControllerResources resources = {
-      .framebuffer = framebuffer_resource_.borrow(),
       .mmio = mmio_resource_.borrow(),
       .ioport = ioport_resource_.borrow(),
   };
 
-  zx::result<std::unique_ptr<Controller>> controller_result = Controller::Create(
-      std::move(sysmem), std::move(pci), std::move(resources), inspector().inspector());
+  zx::result<std::unique_ptr<Controller>> controller_result =
+      Controller::Create(std::move(sysmem), std::move(pci), std::move(resources), framebuffer_info_,
+                         inspector().inspector());
   if (controller_result.is_error()) {
     return controller_result.take_error();
   }

@@ -5,8 +5,9 @@
 use anyhow::{format_err, Result};
 use async_trait::async_trait;
 use ffx_session_remove_args::SessionRemoveCommand;
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_element::ManagerProxy;
+use target_holders::moniker;
 
 #[derive(FfxTool)]
 pub struct RemoveTool {
@@ -43,10 +44,11 @@ pub async fn remove_impl<W: std::io::Write>(
 mod test {
     use super::*;
     use fidl_fuchsia_element::ManagerRequest;
+    use target_holders::fake_proxy;
 
     #[fuchsia::test]
     async fn test_remove_element() {
-        let proxy = fho::testing::fake_proxy(|req| match req {
+        let proxy = fake_proxy(|req| match req {
             ManagerRequest::ProposeElement { .. } => unreachable!(),
             ManagerRequest::RemoveElement { name, responder } => {
                 assert_eq!(name, "foo");

@@ -76,21 +76,30 @@ test("overnet-usb-test-bin") {
   sources = [ "overnet_usb_test.cc" ]
   deps = [
     ":overnet-usb-lib",
-    "//sdk/banjo/fuchsia.hardware.usb.function:fuchsia.hardware.usb.function_banjo_cpp",
-    "//src/devices/testing/mock-ddk",
+    "//sdk/banjo/fuchsia.hardware.usb.function:fuchsia.hardware.usb.function_banjo_cpp_mock",
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/driver/testing/cpp",
+    "//src/devices/usb/lib/usb-endpoint:fake-usb-endpoint-server",
     "//zircon/system/ulib/zxtest",
   ]
 }
 
 fuchsia_unittest_package("overnet-usb-test") {
   deps = [ ":overnet-usb-test-bin" ]
+  test_specs = {
+    environments = basic_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 group("tests") {
   testonly = true
   deps = [
-    # TODO(b/294898076): Diagnose flakes and re-enable
-    #":overnet-usb-test",
+    ":overnet-usb-test",
     ":overnet_usb_bind_test",
   ]
 }

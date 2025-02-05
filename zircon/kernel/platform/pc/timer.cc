@@ -77,7 +77,7 @@ KCOUNTER(platform_timer_cancel_counter, "platform.timer.cancel")
 // sent from the scheduler.
 
 enum clock_source {
-  // Used before wall_clock is selected. current_ticks() returns 0.
+  // Used before wall_clock is selected. current_mono_ticks() returns 0.
   CLOCK_UNSELECTED = 0,
 
   CLOCK_TSC,
@@ -254,7 +254,7 @@ zx_duration_t convert_raw_tsc_duration_to_nanoseconds(int64_t duration) {
   return rdtsc_ticks_to_clock_monotonic.Scale(duration);
 }
 
-zx_time_t convert_raw_tsc_timestamp_to_clock_monotonic(int64_t ts) {
+zx_instant_mono_t convert_raw_tsc_timestamp_to_clock_monotonic(int64_t ts) {
   if (wall_clock == CLOCK_TSC) {
     // If TSC is being used as our clock monotonic reference, then conversion is
     // simple.  We just need to convert from the raw TSC timestamps to a ticks
@@ -274,7 +274,7 @@ zx_time_t convert_raw_tsc_timestamp_to_clock_monotonic(int64_t ts) {
     // and use the average of those two values to create the ticks half of the
     // correspondence pair.
     uint64_t before_tsc = current_ticks_rdtsc();
-    zx_time_t now_mono = current_time();
+    zx_instant_mono_t now_mono = current_mono_time();
     uint64_t after_tsc = current_ticks_rdtsc();
     uint64_t now_tsc = (before_tsc >> 1) + (after_tsc >> 1) + (before_tsc & after_tsc & 1);
     int64_t time_till_tsc_timestamp = zx_time_sub_time(ts, now_tsc);
@@ -850,7 +850,7 @@ void platform_shutdown_timer(void) {
   }
 }
 
-zx_ticks_t platform_convert_early_ticks(arch::EarlyTicks sample) {
+zx_instant_mono_ticks_t platform_convert_early_ticks(arch::EarlyTicks sample) {
   return early_ticks_to_ticks.Apply(sample.tsc);
 }
 

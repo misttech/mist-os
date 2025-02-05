@@ -194,7 +194,7 @@ impl LightSensorBinding {
                                         std::mem::replace(&mut clear_value, Some(i))
                                     }
                                     type_ => {
-                                        tracing::warn!(
+                                        log::warn!(
                                             "unexpected sensor type {type_:?} found on light \
                                                 sensor device"
                                         );
@@ -202,7 +202,7 @@ impl LightSensorBinding {
                                     }
                                 };
                                 if old.is_some() {
-                                    tracing::warn!(
+                                    log::warn!(
                                         "existing index for light sensor {:?} replaced",
                                         value.type_
                                     );

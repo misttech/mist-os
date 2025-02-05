@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 use crate::{ap as ap_sme, MlmeEventStream, MlmeSink, MlmeStream};
+use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
 use futures::prelude::*;
 use futures::select;
 use ieee80211::Ssid;
+use log::error;
 use std::pin::pin;
-use std::sync::{Arc, Mutex};
-use tracing::error;
+use std::sync::Arc;
 use wlan_common::RadioConfig;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
@@ -77,7 +78,7 @@ async fn start(sme: &Mutex<Sme>, config: fidl_sme::ApConfig) -> fidl_sme::StartA
         radio_cfg,
     };
 
-    let receiver = sme.lock().unwrap().on_start_command(sme_config);
+    let receiver = sme.lock().on_start_command(sme_config);
     let r = receiver.await.unwrap_or_else(|_| {
         error!("Responder for AP Start command was dropped without sending a response");
         ap_sme::StartResult::InternalError
@@ -100,7 +101,7 @@ async fn start(sme: &Mutex<Sme>, config: fidl_sme::ApConfig) -> fidl_sme::StartA
 }
 
 async fn stop(sme: &Mutex<Sme>) -> fidl_sme::StopApResultCode {
-    let receiver = sme.lock().unwrap().on_stop_command();
+    let receiver = sme.lock().on_stop_command();
     receiver.await.unwrap_or_else(|_| {
         error!("Responder for AP Stop command was dropped without sending a response");
         fidl_sme::StopApResultCode::InternalError
@@ -108,5 +109,5 @@ async fn stop(sme: &Mutex<Sme>) -> fidl_sme::StopApResultCode {
 }
 
 fn status(sme: &Mutex<Sme>) -> fidl_sme::ApStatusResponse {
-    fidl_sme::ApStatusResponse { running_ap: sme.lock().unwrap().get_running_ap().map(Box::new) }
+    fidl_sme::ApStatusResponse { running_ap: sme.lock().get_running_ap().map(Box::new) }
 }

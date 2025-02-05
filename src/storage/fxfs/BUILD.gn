@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/components/fuchsia_unittest_component.gni")
 import("//build/fuzz.gni")
+import("//build/rust/config.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_fuzzer.gni")
 import("//build/rust/rustc_library.gni")
@@ -38,6 +39,7 @@ fxfs_deps = [
   "//third_party/rust_crates:event-listener",
   "//third_party/rust_crates:futures",
   "//third_party/rust_crates:linked-hash-map",
+  "//third_party/rust_crates:log",
   "//third_party/rust_crates:num-traits",
   "//third_party/rust_crates:once_cell",
   "//third_party/rust_crates:rand",
@@ -46,7 +48,6 @@ fxfs_deps = [
   "//third_party/rust_crates:serde",
   "//third_party/rust_crates:static_assertions",
   "//third_party/rust_crates:thiserror",
-  "//third_party/rust_crates:tracing",
   "//third_party/rust_crates:uuid",
   "//third_party/rust_crates:zerocopy",
 ]
@@ -121,7 +122,7 @@ if (is_fuchsia || is_mistos) {
     "//sdk/rust/zx",
     "//third_party/rust_crates:scopeguard",
   ]
-  if (is_debug) {
+  if (rust_debug_assertions) {
     fxfs_deps += [ "//src/lib/debug/rust" ]
   }
   fxfs_test_deps += [

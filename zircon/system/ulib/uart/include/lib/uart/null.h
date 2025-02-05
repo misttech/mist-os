@@ -27,8 +27,10 @@ struct Driver {
   struct config_type {};
 
   static constexpr std::array<std::string_view, 0> kDevicetreeBindings = {};
-  static constexpr std::string_view config_name() { return "none"; }
-  static constexpr IoRegisterType kIoType = IoRegisterType::kMmio8;
+  static constexpr std::string_view kConfigName = "none";
+  static constexpr IoRegisterType kIoType = IoRegisterType::kNone;
+  static constexpr uint32_t kType = 0;
+  static constexpr uint32_t kExtra = 0;
 
   Driver() = default;
 
@@ -37,10 +39,6 @@ struct Driver {
   constexpr bool operator==(const Driver& other) const { return true; }
   constexpr bool operator!=(const Driver& other) const { return false; }
 
-  // API to (not) fill a ZBI item describing this UART.
-  constexpr uint32_t type() const { return 0; }
-  constexpr uint32_t extra() const { return 0; }
-  constexpr size_t size() const { return 0; }
   void FillItem(void*) const { ZX_PANIC("should never be called"); }
 
   // API to (not) match a ZBI item describing this UART.
@@ -48,7 +46,7 @@ struct Driver {
 
   // API to match and reproduce configuration strings.
   static std::optional<Driver> MaybeCreate(std::string_view string) {
-    if (string == "none") {
+    if (string == kConfigName) {
       return Driver{};
     }
     return {};
@@ -61,7 +59,9 @@ struct Driver {
   // API to match devicetree node compatible list.
   static bool MatchDevicetree(const devicetree::PropertyDecoder&) { return false; }
 
-  void Unparse(FILE* out) const { fprintf(out, "none"); }
+  void Unparse(FILE* out) const {
+    fprintf(out, "%.*s", static_cast<int>(kConfigName.size()), kConfigName.data());
+  }
 
   // uart::KernelDriver UartDriver API
   //
@@ -118,18 +118,6 @@ struct Driver {
 };
 
 }  // namespace null
-
-// Provide a specialization to do nothing with the lack of configuration info
-// and provide no access to the lack of hardware.
-template <>
-class BasicIoProvider<null::Driver::config_type, IoRegisterType::kMmio8> {
- public:
-  BasicIoProvider(const null::Driver::config_type&, size_t) {}
-
- private:
-  // Nothing should call this.  The visibility will cause a compilation error.
-  auto io() { return nullptr; }
-};
 
 }  // namespace uart
 

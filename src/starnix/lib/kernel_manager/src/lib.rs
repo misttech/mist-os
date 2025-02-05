@@ -11,7 +11,7 @@ use fuchsia_component::client as fclient;
 use fuchsia_sync::Mutex;
 use futures::{FutureExt, TryStreamExt};
 use kernels::Kernels;
-use log::warn;
+use log::{debug, warn};
 use rand::Rng;
 use std::cell::RefCell;
 use std::future::Future;
@@ -257,6 +257,7 @@ async fn suspend_container(
 
     // These handles need to kept alive until the end of the block, as they will
     // resume the kernel when dropped.
+    log::info!("Suspending all container processes.");
     let _suspend_handles = match suspend_kernel(&container_job).await {
         Ok(handles) => handles,
         Err(e) => {
@@ -269,6 +270,7 @@ async fn suspend_container(
             return Ok(Err(fstarnixrunner::SuspendError::SuspendFailure));
         }
     };
+    log::info!("Finished suspending all container processes.");
 
     let suspend_start = zx::BootInstant::get();
 
@@ -290,6 +292,7 @@ async fn suspend_container(
     }
 
     {
+        log::info!("Notifying wake watchers of container suspend.");
         let watchers = suspend_context.wake_watchers.lock();
         for event in watchers.iter() {
             let (clear_mask, set_mask) = (AWAKE_SIGNAL, ASLEEP_SIGNAL);
@@ -315,6 +318,7 @@ async fn suspend_container(
     {
         fuchsia_trace::duration!(c"power", c"starnix-runner:waiting-on-container-wake");
         if wait_items.len() > 0 {
+            log::info!("Waiting on container to receive incoming message on wake proxies");
             match zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE) {
                 Ok(_) => (),
                 Err(e) => {
@@ -323,24 +327,27 @@ async fn suspend_container(
             };
         }
     }
+    log::info!("Finished waiting on container wake proxies.");
 
     for wait_item in &wait_items {
         if wait_item.pending.contains(RUNNER_SIGNAL) {
             let koid = wait_item.handle.get_koid().unwrap();
             if let Some(event) = resume_events.events.get(&koid) {
-                log::info!("Woke from sleep for: {}", event.name);
+                log::info!("Woke container from sleep for: {}", event.name);
             }
         }
     }
 
     kernels.acquire_wake_lease(&container_job).await?;
 
+    log::info!("Notifying wake watchers of container wakeup.");
     let watchers = suspend_context.wake_watchers.lock();
     for event in watchers.iter() {
         let (clear_mask, set_mask) = (ASLEEP_SIGNAL, AWAKE_SIGNAL);
         event.signal_peer(clear_mask, set_mask)?;
     }
 
+    log::info!("Returning successfully from suspend container");
     Ok(Ok(fstarnixrunner::ManagerSuspendContainerResponse {
         suspend_time: Some((zx::BootInstant::get() - suspend_start).into_nanos()),
         ..Default::default()
@@ -500,6 +507,7 @@ async fn start_proxy(
         // should signal `proxy.resume_event`, since those are the only messages that should
         // wake the container if it's suspended.
         fuchsia_trace::duration!(c"power", c"starnix-runner:proxy-forwarding-messages", "name" => proxy.name.as_str());
+        let name = proxy.name.as_str();
         let result = match finished_wait {
             WaitReturn::Container => forward_message(
                 &signals,
@@ -508,6 +516,7 @@ async fn start_proxy(
                 None,
                 &mut bounce_bytes.borrow_mut(),
                 &mut bounce_handles.borrow_mut(),
+                name,
             ),
             WaitReturn::Remote => forward_message(
                 &signals,
@@ -516,16 +525,19 @@ async fn start_proxy(
                 Some(&proxy.resume_event),
                 &mut bounce_bytes.borrow_mut(),
                 &mut bounce_handles.borrow_mut(),
+                name,
             ),
         };
 
         if result.is_err() {
             log::warn!(
-                "Proxy failed to forward message {} kernel",
+                "Proxy failed to forward message {} kernel: {}; {:?}",
                 match finished_wait {
                     WaitReturn::Container => "from",
                     WaitReturn::Remote => "to",
-                }
+                },
+                name,
+                result,
             );
             break 'outer;
         }
@@ -548,8 +560,10 @@ fn forward_message(
     event: Option<&zx::EventPair>,
     bytes: &mut [MaybeUninit<u8>; zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize],
     handles: &mut [MaybeUninit<zx::Handle>; zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize],
+    name: &str,
 ) -> Result<(), Error> {
     if signals.contains(zx::Signals::CHANNEL_READABLE) {
+        debug!("runner_proxy: {}: 1: entry, event={:?}", name, event);
         let (actual_bytes, actual_handles) = match read_channel.read_uninit(bytes, handles) {
             zx::ChannelReadResult::Ok(r) => r,
             _ => return Err(anyhow!("Failed to read from channel")),
@@ -560,11 +574,13 @@ fn forward_message(
             // the kernel.
             let (clear_mask, set_mask) = (KERNEL_SIGNAL, RUNNER_SIGNAL);
             event.signal_handle(clear_mask, set_mask)?;
+            debug!("runner_proxy: {}: 4: K=0, R=1", name);
         }
 
         write_channel.write(actual_bytes, actual_handles)?;
 
         if let Some(event) = event {
+            debug!("{}: 5: wait for K=1", name);
             // Wait for the kernel endpoint to signal that the event has been handled, and
             // that it is now safe to suspend the container again.
             match event.wait_handle(
@@ -581,11 +597,14 @@ fn forward_message(
                     return Err(anyhow!("Failed to wait on signal from kernel"));
                 }
             };
-
+            debug!("runner_proxy: {} 6: K=1, R=0", name);
             // Clear the kernel signal for this message before continuing.
             let (clear_mask, set_mask) = (KERNEL_SIGNAL, zx::Signals::NONE);
             event.signal_handle(clear_mask, set_mask)?;
+
+            debug!("runner_proxy: {}: 7: K=0, R=0", name);
         }
+        debug!("runner_proxy: {}: 9: loop done: event={:?}", name, event);
     }
     if signals.contains(zx::Signals::CHANNEL_PEER_CLOSED) {
         Err(anyhow!("Proxy peer was closed"))

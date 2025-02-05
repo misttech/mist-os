@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use tracing::trace;
+use log::trace;
 
 use crate::client::SrmOperation;
 use crate::error::Error;
@@ -185,7 +185,7 @@ impl<'a> PutOperation<'a> {
             return Err(Error::operation(opcode, "can't abort PUT that hasn't started"));
         }
         let request = RequestPacket::new_abort(headers);
-        trace!(?request, "Making outgoing {opcode:?} request");
+        trace!(request:?; "Making outgoing {opcode:?} request");
         self.transport.send(request)?;
         trace!("Successfully made {opcode:?} request");
         let response = self.transport.receive_response(opcode).await?;

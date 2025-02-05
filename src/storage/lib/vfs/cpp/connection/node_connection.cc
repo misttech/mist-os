@@ -43,7 +43,7 @@ void NodeConnection::Unbind() {
     binding_->Unbind();
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
 void NodeConnection::DeprecatedClone(DeprecatedCloneRequestView request,
                                      DeprecatedCloneCompleter::Sync& completer) {
 #else
@@ -52,7 +52,7 @@ void NodeConnection::Clone(CloneRequestView request, CloneCompleter::Sync& compl
   Connection::NodeCloneDeprecated(request->flags, VnodeProtocol::kNode, std::move(request->object));
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
 void NodeConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
 #else
 void NodeConnection::Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) {
@@ -97,9 +97,9 @@ void NodeConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync&
 
 void NodeConnection::GetAttributes(fio::wire::NodeGetAttributesRequest* request,
                                    GetAttributesCompleter::Sync& completer) {
-  internal::NodeAttributeBuilder builder;
-  zx::result attrs = builder.Build(*vnode(), request->query);
-  completer.Reply(zx::make_result(attrs.status_value(), attrs.is_ok() ? &*attrs : nullptr));
+  // TODO(https://fxbug.dev/346585458): This operation should require the GET_ATTRIBUTES right.
+  internal::NodeAttributeBuilder builder(vnode());
+  completer.Reply(builder.Build(request->query));
 }
 
 void NodeConnection::UpdateAttributes(fio::wire::MutableNodeAttributes* request,
@@ -107,11 +107,29 @@ void NodeConnection::UpdateAttributes(fio::wire::MutableNodeAttributes* request,
   completer.ReplyError(ZX_ERR_BAD_HANDLE);
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
 void NodeConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
+  completer.ReplySuccess(fio::Flags::kProtocolNode | RightsToFlags(rights()));
+}
+void NodeConnection::SetFlags(SetFlagsRequestView, SetFlagsCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+#endif
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void NodeConnection::DeprecatedGetFlags(DeprecatedGetFlagsCompleter::Sync& completer) {
+#else
+void NodeConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
+#endif
   completer.Reply(ZX_OK, fio::OpenFlags::kNodeReference);
 }
 
-void NodeConnection::SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void NodeConnection::DeprecatedSetFlags(DeprecatedSetFlagsRequestView,
+                                        DeprecatedSetFlagsCompleter::Sync& completer) {
+#else
+void NodeConnection::SetFlags(SetFlagsRequestView, SetFlagsCompleter::Sync& completer) {
+#endif
   completer.Reply(ZX_ERR_BAD_HANDLE);
 }
 
@@ -132,14 +150,14 @@ zx::result<> NodeConnection::WithRepresentation(
       fidl::ObjectView<fidl::WireTableFrame<NodeRepresentation>>::FromExternal(
           &representation_frame));
 #if FUCHSIA_API_LEVEL_AT_LEAST(18)
-  NodeAttributeBuilder attributes_builder;
-  zx::result<fio::wire::NodeAttributes2> attributes;
+  std::optional<NodeAttributeBuilder> attributes_builder;
   if (query) {
-    attributes = attributes_builder.Build(*vnode(), *query);
+    attributes_builder.emplace(vnode());
+    zx::result<fio::wire::NodeAttributes2*> attributes = attributes_builder->Build(*query);
     if (attributes.is_error()) {
       return attributes.take_error();
     }
-    builder.attributes(fidl::ObjectView<fio::wire::NodeAttributes2>::FromExternal(&(*attributes)));
+    builder.attributes(fidl::ObjectView<fio::wire::NodeAttributes2>::FromExternal(*attributes));
   }
 #endif
   auto representation = builder.Build();

@@ -6,6 +6,7 @@ use component_debug::capability;
 use ffx_driver_args::DriverCommand;
 use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
+use target_holders::RemoteControlProxyHolder;
 use {
     fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_driver_development as fdd,
     fidl_fuchsia_driver_playground as fdp, fidl_fuchsia_driver_registrar as fdr,
@@ -13,7 +14,7 @@ use {
 };
 
 struct DriverConnector {
-    remote_control: Option<rc::RemoteControlProxy>,
+    remote_control: Option<RemoteControlProxyHolder>,
 }
 
 struct CapabilityOptions {
@@ -42,7 +43,7 @@ impl<P: DiscoverableProtocolMarker> Into<CapabilityOptions> for DiscoverableCapa
 }
 
 impl DriverConnector {
-    fn new(remote_control: Option<rc::RemoteControlProxy>) -> Self {
+    fn new(remote_control: Option<RemoteControlProxyHolder>) -> Self {
         Self { remote_control }
     }
 
@@ -114,7 +115,7 @@ impl DriverConnector {
                 println!("    {}: {}", i, component)
             }
 
-            let mut line_editor = rustyline::Editor::<()>::new();
+            let mut line_editor = rustyline::Editor::<(), _>::new()?;
             loop {
                 let line = line_editor.readline("$ ")?;
                 let choice = line.trim().parse::<usize>();
@@ -208,7 +209,7 @@ impl driver_connector::DriverConnector for DriverConnector {
 
 #[derive(FfxTool)]
 pub struct DriverTool {
-    remote_control: fho::Result<rc::RemoteControlProxy>,
+    remote_control: fho::Result<RemoteControlProxyHolder>,
     #[command]
     cmd: DriverCommand,
 }

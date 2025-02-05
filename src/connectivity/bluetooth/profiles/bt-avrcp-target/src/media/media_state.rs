@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_media_sessions2::{self as fidl_media, SessionControlProxy, SessionInfoDelta};
+use log::{info, trace, warn};
 use std::fmt::Debug;
-use tracing::{info, trace, warn};
 use {fidl_fuchsia_bluetooth_avrcp as fidl_avrcp, fidl_fuchsia_media as fidl_media_types};
 
 use crate::media::media_types::{
@@ -95,7 +95,7 @@ impl MediaState {
         command: fidl_avrcp::AvcPanelCommand,
         pressed: bool,
     ) -> Result<(), fidl_avrcp::TargetPassthroughError> {
-        trace!(?command, %pressed, "Handling AVC passthrough command");
+        trace!(command:?, pressed:%; "Handling AVC passthrough command");
         if pressed {
             return self.is_supported_passthrough_command(command);
         }
@@ -252,7 +252,7 @@ impl SessionInfo {
         &self,
         event_id: &fidl_avrcp::NotificationEvent,
     ) -> Result<Notification, fidl_avrcp::TargetAvcError> {
-        trace!(?event_id, "Getting notification value");
+        trace!(event_id:?; "Getting notification value");
         let mut notification = Notification::default();
         match event_id {
             fidl_avrcp::NotificationEvent::PlaybackStatusChanged => {
@@ -277,7 +277,7 @@ impl SessionInfo {
                 notification.battery_status = Some(self.battery_status);
             }
             _ => {
-                warn!(?event_id, "Unsupported notification request type");
+                warn!(event_id:?; "Unsupported notification request type");
                 return Err(fidl_avrcp::TargetAvcError::RejectedInvalidParameter);
             }
         }

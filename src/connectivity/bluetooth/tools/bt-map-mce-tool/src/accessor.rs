@@ -12,8 +12,8 @@ use fidl_fuchsia_bluetooth_map::{
 use fuchsia_async::Task;
 use fuchsia_sync::Mutex;
 use futures::stream::StreamExt;
+use log::{info, warn};
 use std::sync::Arc;
-use tracing::{info, warn};
 
 use crate::commands::Cmd;
 
@@ -43,7 +43,7 @@ pub async fn list_all_mas_instances(client: AccessorClient) -> Result<(), Error>
                 info!("\t{r:?}");
             }
         }
-        Ok(Err(e)) => warn!(?e, "Command failed"),
+        Ok(Err(e)) => warn!(e:?; "Command failed"),
         Err(e) => return Err(format_err!("{e:?}")),
     }
     Ok(())
@@ -54,7 +54,7 @@ async fn print_notifications(relayer_server: ServerEnd<NotificationRegistrationM
     let mut notification_stream = relayer_server.into_stream().fuse();
     while let Some(res) = notification_stream.next().await {
         if let Err(e) = res {
-            warn!(?e, "Error with FIDL stream");
+            warn!(e:?; "Error with FIDL stream");
             break;
         }
         match res.unwrap() {
@@ -101,7 +101,7 @@ pub async fn register_for_notifications<'a>(
             info!("Successfully registered for notifications");
         }
         Ok(Err(e)) => {
-            warn!(?e, "Command failed");
+            warn!(e:?; "Command failed");
             return Ok(());
         }
         Err(e) => return Err(format_err!("{e:?}")),

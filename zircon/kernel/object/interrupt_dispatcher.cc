@@ -7,6 +7,7 @@
 #include "object/interrupt_dispatcher.h"
 
 #include <platform.h>
+#include <zircon/syscalls/object.h>
 #include <zircon/syscalls/port.h>
 
 #include <dev/interrupt.h>
@@ -15,17 +16,20 @@
 #include <object/port_dispatcher.h>
 #include <object/process_dispatcher.h>
 
-InterruptDispatcher::InterruptDispatcher(Flags flags)
+InterruptDispatcher::InterruptDispatcher(Flags flags, uint32_t options)
     : WakeVector(&InterruptDispatcher::wake_event_),
       timestamp_(0),
       flags_(flags),
+      options_(options),
       state_(InterruptState::IDLE),
       wake_event_(*this) {
   DEBUG_ASSERT((flags & INTERRUPT_UNMASK_PREWAIT) == 0 ||
                (flags & INTERRUPT_UNMASK_PREWAIT_UNLOCKED) == 0);
 }
 
-zx_status_t InterruptDispatcher::WaitForInterrupt(zx_instant_boot_t* out_timestamp) {
+zx_info_interrupt_t InterruptDispatcher::GetInfo() const { return {.options = options_}; }
+
+zx_status_t InterruptDispatcher::WaitForInterrupt(zx_time_t* out_timestamp) {
   bool defer_unmask = false;
   while (true) {
     {
@@ -80,7 +84,7 @@ zx_status_t InterruptDispatcher::WaitForInterrupt(zx_instant_boot_t* out_timesta
   }
 }
 
-bool InterruptDispatcher::SendPacketLocked(zx_instant_boot_t timestamp) {
+bool InterruptDispatcher::SendPacketLocked(zx_time_t timestamp) {
   bool status = port_dispatcher_->QueueInterruptPacket(&port_packet_, timestamp);
   if (flags_ & INTERRUPT_MASK_POSTWAIT) {
     MaskInterrupt();
@@ -89,7 +93,7 @@ bool InterruptDispatcher::SendPacketLocked(zx_instant_boot_t timestamp) {
   return status;
 }
 
-zx_status_t InterruptDispatcher::Trigger(zx_instant_boot_t timestamp) {
+zx_status_t InterruptDispatcher::Trigger(zx_time_t timestamp) {
   if (!(flags_ & INTERRUPT_VIRTUAL))
     return ZX_ERR_BAD_STATE;
 
@@ -130,7 +134,11 @@ void InterruptDispatcher::InterruptHandler() {
 
   // only record timestamp if this is the first IRQ since we started waiting
   if (!timestamp_) {
-    timestamp_ = current_boot_time();
+    if (flags_ & INTERRUPT_TIMESTAMP_MONO) {
+      timestamp_ = current_mono_time();
+    } else {
+      timestamp_ = current_boot_time();
+    }
   }
   if (state_ == InterruptState::NEEDACK && port_dispatcher_) {
     return;

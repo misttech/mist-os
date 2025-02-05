@@ -63,7 +63,7 @@ impl<I: IpExt> RawIpSocketsBindingsContext<I, DeviceId> for BindingsCtx {
 #[derive(Debug)]
 pub struct SocketState<I: Ip> {
     /// The received IP packets for the socket.
-    rx_queue: Mutex<MessageQueue<ReceivedIpPacket<I>>>,
+    rx_queue: Mutex<MessageQueue<ReceivedIpPacket<I>, zx::EventPair>>,
 }
 
 impl<I: IpExt> SocketState<I> {
@@ -152,9 +152,25 @@ impl<I: IpExt + IpSockAddrExt> SocketWorkerHandler for SocketWorkerState<I> {
 
     type CloseResponder = fpraw::SocketCloseResponder;
 
-    type SetupArgs = ();
+    type SetupArgs = fposix_socket::SocketCreationOptions;
 
     type Spawner = ();
+
+    fn setup(
+        &mut self,
+        ctx: &mut Ctx,
+        options: fposix_socket::SocketCreationOptions,
+        _spawners: &worker::TaskSpawnerCollection<()>,
+    ) {
+        let fposix_socket::SocketCreationOptions { marks, __source_breaking } = options;
+        for fposix_socket::Marks { domain, mark } in marks.iter().flatten() {
+            ctx.api().raw_ip_socket().set_mark(
+                &self.id,
+                (*domain).into_core(),
+                (*mark).into_core(),
+            );
+        }
+    }
 
     async fn handle_request(
         &mut self,
@@ -558,10 +574,24 @@ pub(crate) async fn serve(
             match req {
                 fpraw::ProviderRequest::Socket { responder, domain, proto } => responder
                     .send(
-                        handle_create_socket(ctx.clone(), domain, proto, &spawner)
-                            .log_error("raw::create"),
+                        handle_create_socket(
+                            ctx.clone(),
+                            domain,
+                            proto,
+                            &spawner,
+                            Default::default(),
+                        )
+                        .log_error("raw::create"),
                     )
                     .unwrap_or_log("failed to respond"),
+                fpraw::ProviderRequest::SocketWithOptions { responder, domain, proto, opts } => {
+                    responder
+                        .send(
+                            handle_create_socket(ctx.clone(), domain, proto, &spawner, opts)
+                                .log_error("raw::create"),
+                        )
+                        .unwrap_or_log("failed to respond")
+                }
             }
         })
         .collect::<()>()
@@ -575,6 +605,7 @@ fn handle_create_socket(
     domain: fposix_socket::Domain,
     protocol: fpraw::ProtocolAssociation,
     spawner: &worker::ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
+    creation_opts: fposix_socket::SocketCreationOptions,
 ) -> Result<fidl::endpoints::ClientEnd<fpraw::SocketMarker>, fposix::Errno> {
     let (client, request_stream) = fidl::endpoints::create_request_stream();
     match domain {
@@ -585,7 +616,7 @@ fn handle_create_socket(
                 move |ctx, properties| SocketWorkerState::new(ctx, protocol, properties),
                 SocketWorkerProperties {},
                 request_stream,
-                (),
+                creation_opts,
                 spawner.clone(),
             ))
         }
@@ -596,7 +627,7 @@ fn handle_create_socket(
                 move |ctx, properties| SocketWorkerState::new(ctx, protocol, properties),
                 SocketWorkerProperties {},
                 request_stream,
-                (),
+                creation_opts,
                 spawner.clone(),
             ))
         }

@@ -13,7 +13,7 @@
 // and it's pretty straightforward to read the disassembly and be convinced the
 // code came out as intended.
 
-#include <lib/arch/arm64/sysreg-asm.h>
+#include <lib/arch/arm64/system-asm.h>
 #include <lib/arch/asm.h>
 
 // The AArch64 exception vector is 2048 bytes naturally aligned in physical

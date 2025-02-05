@@ -12,10 +12,10 @@ use fidl::{AsHandleRef, HandleBased};
 use fidl_fuchsia_diagnostics::Selector;
 use flyweights::FlyStr;
 use fuchsia_sync::{RwLock, RwLockWriteGuard};
+use log::{debug, warn};
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Weak};
-use tracing::{debug, warn};
 use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync};
 
 static INSPECT_ESCROW_NAME: zx::Name = zx::Name::new_lossy("InspectEscrowedVmo");
@@ -77,7 +77,7 @@ impl InspectRepository {
         for pipeline_weak in self.pipelines.iter() {
             if let Some(pipeline) = pipeline_weak.upgrade() {
                 pipeline.add_component(&identity.moniker).unwrap_or_else(|err| {
-                    warn!(%identity, ?err,
+                    warn!(identity:%, err:?;
                                 "Failed to add inspect artifacts to pipeline wrapper");
                 });
             }
@@ -92,9 +92,9 @@ impl InspectRepository {
         name: Option<T>,
         tree: Option<zx::Koid>,
     ) {
-        debug!(identity = %component, "Escrow inspect handle.");
+        debug!(identity:% = component; "Escrow inspect handle.");
         if let Err(err) = vmo.set_name(&INSPECT_ESCROW_NAME) {
-            debug!(%err, "Failed to set escrow vmo name");
+            debug!(err:%; "Failed to set escrow vmo name");
         }
         let handle = InspectHandle::escrow(vmo, token, name);
         let guard = self.inner.write();
@@ -107,7 +107,7 @@ impl InspectRepository {
         token: finspect::EscrowToken,
         tree: Option<ClientEnd<finspect::TreeMarker>>,
     ) -> Option<zx::Vmo> {
-        debug!(identity = %component, "Fetch Escrowed inspect handle.");
+        debug!(identity:% = component; "Fetch Escrowed inspect handle.");
         let koid = token.token.as_handle_ref().get_koid().unwrap();
         let mut guard = self.inner.write();
         let container = guard.diagnostics_containers.get_mut(&component)?;
@@ -132,7 +132,7 @@ impl InspectRepository {
         component: Arc<ComponentIdentity>,
         handle: InspectHandle,
     ) {
-        debug!(identity = %component, "Added inspect handle.");
+        debug!(identity:% = component; "Added inspect handle.");
         let guard = self.inner.write();
         self.add_inspect_artifacts(guard, Arc::clone(&component), handle, None);
     }

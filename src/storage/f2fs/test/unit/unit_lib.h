@@ -48,6 +48,7 @@ class F2fsFakeDevTestFixture : public testing::Test {
 
   void SetUp() override;
   void TearDown() override;
+  void Remount();
 
   void DisableFsck() { run_fsck_ = false; }
 

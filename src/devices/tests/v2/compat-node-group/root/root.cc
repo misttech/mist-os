@@ -40,7 +40,7 @@ zx_status_t Root::Bind(void* ctx, zx_device_t* dev) {
   const uint32_t node_2_props_values_1[] = {88, 99};
   const ddk::BindRule node_2_bind_rules[] = {
       ddk::MakeAcceptBindRuleList(bind_fuchsia::PLATFORM_DEV_VID, node_2_props_values_1),
-      ddk::MakeRejectBindRule(20, 10),
+      ddk::MakeRejectBindRule(bind_fuchsia::PLATFORM_DEV_DID, 10u),
   };
 
   const device_bind_prop_t node_2_properties[] = {

@@ -46,8 +46,6 @@ class Driver : public fdf::DriverBase {
 
   zx_handle_t GetIommuResource();
 
-  zx_handle_t GetFramebufferResource();
-
   zx_handle_t GetMmioResource();
 
   zx_handle_t GetMsiResource();
@@ -107,7 +105,7 @@ class Driver : public fdf::DriverBase {
   zx_status_t RunOnDispatcher(fit::callback<zx_status_t()> task);
 
   // Loads the driver using the provided `vmos`.
-  zx::result<> LoadDriver(zx::vmo loader_vmo, zx::vmo driver_vmo);
+  zx::result<> LoadDriver(std::string_view module_name, zx::vmo driver_vmo);
   // Starts the DFv1 driver.
   zx::result<> StartDriver();
 
@@ -177,6 +175,7 @@ class GlobalLoggerList {
   class LoggerInstances {
    public:
     explicit LoggerInstances(bool log_node_names) : log_node_names_(log_node_names) {}
+    bool IsSeverityEnabled(FuchsiaLogSeverity severity) const;
     // Logs a message for the DFv1 driver.
     void Log(FuchsiaLogSeverity severity, const char* tag, const char* file, int line,
              const char* msg, va_list args);

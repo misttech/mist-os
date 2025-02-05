@@ -8,7 +8,12 @@ group("time") {
   deps = [
     ":recovery",
     ":tests",
+    "httpsdate_time_source",
     "testing",
+    "testing",
+    "time_test_client",
+    "timekeeper",
+    "timekeeper_integration",
   ]
 }
 

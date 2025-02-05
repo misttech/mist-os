@@ -57,7 +57,7 @@ async fn run_remove(realm: &netemul::TestRealm<'_>, args: &[&'static str]) -> Re
     run_command(realm, &[&["remove"], args].concat()).await
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn filter_create() {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let netstack = sandbox
@@ -168,7 +168,7 @@ async fn filter_create() {
     );
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn filter_create_remove_idempotent() {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let netstack = sandbox
@@ -204,7 +204,7 @@ async fn filter_create_remove_idempotent() {
 #[test_case(&["--type", "ip", "--priority", "10"]; "IP routine with priority but no hook")]
 #[test_case(&["--type", "nat", "--priority", "10"]; "NAT routine with priority but no hook")]
 #[test_case(&["--type", "nat", "--hook", "forwarding"]; "NAT routine in FORWARDING hook")]
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn filter_create_routine_error(args: &[&'static str]) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let netstack = sandbox
@@ -240,7 +240,7 @@ async fn filter_create_routine_error(args: &[&'static str]) {
 )]
 #[test_case(&["tproxy"]; "transparent proxy with neither address nor port")]
 #[test_case(&["tproxy", "--addr", "not-an-ip"]; "transparent proxy with invalid IP address")]
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn filter_create_rule_error(args: &[&'static str]) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let netstack = sandbox

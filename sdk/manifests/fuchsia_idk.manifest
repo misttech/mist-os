@@ -63,8 +63,8 @@ cc_source_library://pkg/component_incoming_cpp
 cc_source_library://pkg/component_outgoing_cpp
 cc_source_library://pkg/driver_component_cpp
 cc_source_library://pkg/driver_devfs_cpp
-cc_source_library://pkg/driver_fake_bti_cpp (unstable)
-cc_source_library://pkg/driver_fake_object_cpp (unstable)
+cc_source_library://pkg/driver_fake_bti_cpp
+cc_source_library://pkg/driver_fake_object_cpp
 cc_source_library://pkg/driver_fake_platform_device_cpp (unstable)
 cc_source_library://pkg/driver_fake_resource_cpp (unstable)
 cc_source_library://pkg/driver_incoming_cpp
@@ -83,6 +83,7 @@ cc_source_library://pkg/driver_runtime_testing_cpp
 cc_source_library://pkg/driver_symbols
 cc_source_library://pkg/driver_testing_cpp
 cc_source_library://pkg/driver_testing_scoped_global_logger_cpp
+cc_source_library://pkg/fake_mmio_reg_cpp
 cc_source_library://pkg/fidl
 cc_source_library://pkg/fidl_base
 cc_source_library://pkg/fidl_cpp
@@ -128,10 +129,11 @@ cc_source_library://pkg/vfs_cpp
 cc_source_library://pkg/virtgralloc_headers
 cc_source_library://pkg/zbi-format
 cc_source_library://pkg/zx
+companion_host_tool://tools/qemu_uefi_internal/arm64
+companion_host_tool://tools/qemu_uefi_internal/x64
 companion_host_tool://tools/x64/aemu_internal
 companion_host_tool://tools/x64/crosvm_internal
 companion_host_tool://tools/x64/qemu_internal
-companion_host_tool://tools/x64/qemu_uefi_internal
 dart_library://dart/sl4f
 data://data/config/symbol_index
 data://pkg/driver_component/driver_component.json
@@ -213,6 +215,7 @@ fidl_library://fidl/fuchsia.bluetooth.hfp
 fidl_library://fidl/fuchsia.bluetooth.host
 fidl_library://fidl/fuchsia.bluetooth.le
 fidl_library://fidl/fuchsia.bluetooth.sys
+fidl_library://fidl/fuchsia.boot.metadata (unstable)
 fidl_library://fidl/fuchsia.buildinfo
 fidl_library://fidl/fuchsia.buildinfo.test
 fidl_library://fidl/fuchsia.buttons (unstable)
@@ -258,6 +261,7 @@ fidl_library://fidl/fuchsia.hardware.audio.signalprocessing
 fidl_library://fidl/fuchsia.hardware.bluetooth
 fidl_library://fidl/fuchsia.hardware.clock
 fidl_library://fidl/fuchsia.hardware.clockimpl
+fidl_library://fidl/fuchsia.hardware.cpu.ctrl (unstable)
 fidl_library://fidl/fuchsia.hardware.gpio
 fidl_library://fidl/fuchsia.hardware.i2c
 fidl_library://fidl/fuchsia.hardware.i2c.businfo (unstable)
@@ -266,6 +270,7 @@ fidl_library://fidl/fuchsia.hardware.light
 fidl_library://fidl/fuchsia.hardware.mailbox (unstable)
 fidl_library://fidl/fuchsia.hardware.network
 fidl_library://fidl/fuchsia.hardware.network.driver (unstable)
+fidl_library://fidl/fuchsia.hardware.nfc (unstable)
 fidl_library://fidl/fuchsia.hardware.pci
 fidl_library://fidl/fuchsia.hardware.pin
 fidl_library://fidl/fuchsia.hardware.pinimpl
@@ -336,6 +341,7 @@ fidl_library://fidl/fuchsia.net.mdns
 fidl_library://fidl/fuchsia.net.reachability
 fidl_library://fidl/fuchsia.net.routes
 fidl_library://fidl/fuchsia.net.stackmigrationdeprecated
+fidl_library://fidl/fuchsia.power
 fidl_library://fidl/fuchsia.power.broker (unstable)
 fidl_library://fidl/fuchsia.power.clientlevel
 fidl_library://fidl/fuchsia.power.profile
@@ -350,6 +356,7 @@ fidl_library://fidl/fuchsia.scheduler
 fidl_library://fidl/fuchsia.session
 fidl_library://fidl/fuchsia.settings
 fidl_library://fidl/fuchsia.settings.policy
+fidl_library://fidl/fuchsia.storage.ftl
 fidl_library://fidl/fuchsia.sysinfo
 fidl_library://fidl/fuchsia.sysmem
 fidl_library://fidl/fuchsia.sysmem2
@@ -396,7 +403,9 @@ fidl_library://fidl/fuchsia.wlan.policy
 fidl_library://fidl/fuchsia.wlan.product.deprecatedclient
 fidl_library://fidl/fuchsia.wlan.product.deprecatedconfiguration
 fidl_library://fidl/fuchsia.wlan.softmac
+fidl_library://fidl/fuchsia.wlan.stats (unstable)
 fidl_library://fidl/zx
+host_tool://tools/arm64/assembly_generate_config
 host_tool://tools/arm64/bindc
 host_tool://tools/arm64/blobfs-compression
 host_tool://tools/arm64/blobfs_do_not_depend
@@ -424,6 +433,7 @@ host_tool://tools/arm64/symbolizer
 host_tool://tools/arm64/trace2json
 host_tool://tools/arm64/zbi
 host_tool://tools/arm64/zxdb
+host_tool://tools/x64/assembly_generate_config
 host_tool://tools/x64/bindc
 host_tool://tools/x64/blobfs-compression
 host_tool://tools/x64/blobfs_do_not_depend
@@ -453,7 +463,9 @@ host_tool://tools/x64/zbi
 host_tool://tools/x64/zxdb
 loadable_module://pkg/vulkan_layers
 package://packages/cmd-buf-benchmark-test
+package://packages/fake-build-info
 package://packages/heapdump-collector
+package://packages/intl_property_manager
 package://packages/magma_conformance_tests
 package://packages/realm_builder_server
 package://packages/vkcopy-test

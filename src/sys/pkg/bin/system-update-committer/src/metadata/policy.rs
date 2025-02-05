@@ -8,7 +8,7 @@ use super::errors::{
 };
 use crate::config::{Config as ComponentConfig, Mode};
 use fidl_fuchsia_paver as paver;
-use tracing::{info, warn};
+use log::{info, warn};
 use zx::Status;
 
 /// After gathering state from the BootManager, the PolicyEngine can answer whether we
@@ -279,7 +279,7 @@ mod tests {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .insert_hook(mphooks::return_error(|e| match e {
-                    PaverEvent::QueryCurrentConfiguration { .. } => Status::OUT_OF_RANGE,
+                    PaverEvent::QueryCurrentConfiguration => Status::OUT_OF_RANGE,
                     _ => Status::OK,
                 }))
                 .build(),

@@ -4,7 +4,7 @@
 
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_component_runner as fcrunner;
-use tracing::warn;
+use log::warn;
 
 /// A runner provided by a FIDL protocol.
 pub struct RemoteRunner {
@@ -23,7 +23,7 @@ impl RemoteRunner {
     ) {
         let resolved_url = start_info.resolved_url.clone().unwrap_or(String::new());
         if let Err(e) = self.client.start(start_info, server_end) {
-            warn!(url=%resolved_url, error=%e, "Failed to call runner to start component");
+            warn!(url:% = resolved_url, error:% = e; "Failed to call runner to start component");
         }
     }
 }

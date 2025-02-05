@@ -8,15 +8,16 @@ pub mod client;
 use crate::{MlmeEventStream, MlmeStream, Station};
 use anyhow::format_err;
 use fidl::endpoints::ServerEnd;
+use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
 use futures::future::FutureObj;
 use futures::prelude::*;
 use futures::select;
 use futures::stream::FuturesUnordered;
+use log::{error, info, warn};
 use std::convert::Infallible;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
-use tracing::{error, info, warn};
+use std::sync::Arc;
 use wlan_common::timer::{self, ScheduledEvent};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
@@ -256,11 +257,11 @@ where
             // bailing immediately, so we don't need to track if we've seen a
             // `None` or not and can `fuse` directly in the `select` call.
             mlme_event = event_stream.next() => match mlme_event {
-                Some(mlme_event) => station.lock().unwrap().on_mlme_event(mlme_event),
+                Some(mlme_event) => station.lock().on_mlme_event(mlme_event),
                 None => return Ok(()),
             },
             timeout = timeout_stream.next() => match timeout {
-                Some(timed_event) => station.lock().unwrap().on_timeout(timed_event),
+                Some(timed_event) => station.lock().on_timeout(timed_event),
                 None => return Err(format_err!("SME timer stream has ended unexpectedly")),
             },
         }

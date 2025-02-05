@@ -16,7 +16,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-component",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
   test_deps = [
     "//src/lib/fidl/rust/fidl",
@@ -33,9 +33,9 @@ rustc_library("lib") {
   name = "regulatory_region_lib"
   edition = "2021"
   deps = [
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:tracing",
   ]
   test_deps = [
     "//src/lib/fuchsia-async",
@@ -60,9 +60,14 @@ group("tests") {
   ]
 }
 
-fuchsia_package_with_single_component("regulatory_region") {
+fuchsia_component("regulatory_region_component") {
   deps = [ ":bin" ]
+  component_name = "regulatory_region"
   manifest = "meta/regulatory_region.cml"
+}
+
+fuchsia_package("regulatory_region") {
+  deps = [ ":regulatory_region_component" ]
 }
 
 fuchsia_unittest_component("regulatory-region-test") {

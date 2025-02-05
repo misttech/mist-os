@@ -35,6 +35,11 @@
             to: [ "#netstack-migration" ],
         },
         {
+            protocol: [ "fuchsia.power.internal.CollaborativeRebootScheduler" ],
+            from: "parent",
+            to: [ "#netstack-migration" ],
+        },
+        {
             protocol: "fuchsia.net.filter.deprecated.Filter",
 
             // NS3 will not implement fuchsia.net.filter.deprecated, mark as optional.

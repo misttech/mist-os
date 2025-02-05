@@ -70,9 +70,11 @@ class MockLoaderService {
 
   std::unique_ptr<::testing::StrictMock<MockServer>> mock_server_;
   fidl::ClientEnd<fuchsia_ldsvc::Loader> mock_client_;
-  // The sequence guard enforces the fuchsia.ldsvc.Loader requests are made in
-  // the order that Expect* functions are called.
-  ::testing::InSequence sequence_guard_;
+  // Passing this same object in `.InSequence(sequence_)` on every
+  // `EXPECT_CALL(...)` enforces that the fuchsia.ldsvc.Loader requests are
+  // made in the order that Expect* functions are called, without interfering
+  // with other mock objects as ::testing::InSequence would.
+  ::testing::Sequence sequence_;
 };
 
 // MockLoaderForTest is used by tests to manage an instance of the

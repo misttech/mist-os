@@ -8,7 +8,7 @@ use fidl_fuchsia_intl::{
     LocaleId, Profile, PropertyProviderControlHandle, PropertyProviderRequest,
     PropertyProviderRequestStream, TimeZoneId,
 };
-use fidl_fuchsia_test_intl_manager::{PropertyManagerRequest, PropertyManagerRequestStream};
+
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use futures::lock::Mutex;
 use futures::prelude::*;
@@ -18,6 +18,13 @@ use std::fmt::{self, Debug};
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 use structopt::StructOpt;
+
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+use fidl_fuchsia_test_intl_manager::{PropertyManagerRequest, PropertyManagerRequestStream};
+
+// If our API level is less than head, avoid an "unused crate" error.
+#[cfg(fuchsia_api_level_less_than = "HEAD")]
+use fidl_fuchsia_test_intl_manager as _;
 
 #[derive(Clone)]
 struct Server(Arc<ServerState>);
@@ -53,6 +60,7 @@ impl PropertyProviderListeners {
         self.collection.remove(&key);
     }
 
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn notify(&mut self) {
         // Prune any listeners for which sending the event fails. This means they have
         // disconnected.
@@ -71,6 +79,7 @@ impl Server {
         }))
     }
 
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     /// Atomically set the profile being served. Returns `true` if the value is changed.
     fn set_profile(&mut self, new_profile: Profile) -> bool {
         let mut p = self.0.profile.write().unwrap();
@@ -106,6 +115,7 @@ impl Server {
         fut.await
     }
 
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     /// Send `OnChange` event to registered listeners of `PropertyProvider`.
     async fn notify_listeners(&mut self) {
         debug!("Notifying listeners");
@@ -128,6 +138,7 @@ impl Server {
         let mut self_ = self.as_ref().clone();
         match service {
             Service::Provider(stream) => self_.run_provider(stream).await.unwrap_or_default(),
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Service::Manager(stream) => self_.run_manager(stream).await.unwrap_or_default(),
         }
     }
@@ -172,6 +183,7 @@ impl Server {
         Ok(())
     }
 
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     /// Handle `PropertyManager` requests as an infinite stream.
     async fn run_manager(&mut self, mut stream: PropertyManagerRequestStream) -> Result<(), Error> {
         while let Some(PropertyManagerRequest::SetProfile { intl_profile, responder }) =
@@ -191,6 +203,7 @@ impl Server {
 
 enum Service {
     Provider(PropertyProviderRequestStream),
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     Manager(PropertyManagerRequestStream),
 }
 
@@ -202,6 +215,7 @@ impl Debug for Service {
             "{}",
             match self {
                 Service::Provider(_) => "Provider",
+                #[cfg(fuchsia_api_level_at_least = "HEAD")]
                 Service::Manager(_) => "Manager",
             }
         )
@@ -269,7 +283,13 @@ async fn main() -> Result<(), Error> {
     info!("Launched component");
 
     let mut fs = ServiceFs::new_local();
-    fs.dir("svc").add_fidl_service(Service::Provider).add_fidl_service(Service::Manager);
+    fs.dir("svc").add_fidl_service(Service::Provider);
+
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    {
+        fs.dir("svc").add_fidl_service(Service::Manager);
+    }
+
     fs.take_and_serve_directory_handle()?;
     let fs = fs;
 

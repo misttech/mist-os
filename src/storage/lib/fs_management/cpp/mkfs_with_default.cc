@@ -4,20 +4,21 @@
 
 #include "src/storage/lib/fs_management/cpp/mkfs_with_default.h"
 
+#include <fidl/fuchsia.fxfs/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 
 #include <iostream>
 
 #include <fbl/unique_fd.h>
 
-#include "fidl/fuchsia.fxfs/cpp/wire_types.h"
 #include "src/storage/lib/fs_management/cpp/admin.h"
 #include "src/storage/lib/fs_management/cpp/mount.h"
 
 namespace fs_management {
 
 zx::result<> MkfsWithDefault(const char* device_path, FsComponent& component,
-                             const MkfsOptions& options, zx::channel crypt_client) {
+                             const MkfsOptions& options,
+                             fidl::ClientEnd<fuchsia_fxfs::Crypt> crypt_client) {
   auto status = zx::make_result(Mkfs(device_path, component, options));
   if (status.is_error())
     return status.take_error();
@@ -31,9 +32,8 @@ zx::result<> MkfsWithDefault(const char* device_path, FsComponent& component,
     return fs.take_error();
   }
   fidl::Arena arena;
-  auto mount_options = fuchsia_fs_startup::wire::MountOptions::Builder(arena)
-                           .crypt(fidl::ClientEnd<fuchsia_fxfs::Crypt>(std::move(crypt_client)))
-                           .Build();
+  auto mount_options =
+      fuchsia_fs_startup::wire::MountOptions::Builder(arena).crypt(std::move(crypt_client)).Build();
   auto volume =
       fs->CreateVolume("default", fuchsia_fs_startup::wire::CreateOptions(), mount_options);
   if (volume.is_error()) {

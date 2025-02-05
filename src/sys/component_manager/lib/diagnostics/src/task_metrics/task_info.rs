@@ -11,10 +11,10 @@ use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use futures::FutureExt;
 use injectable_time::TimeSource;
+use log::debug;
 use moniker::ExtendedMoniker;
 use std::fmt::Debug;
 use std::sync::{Arc, Weak};
-use tracing::debug;
 use zx::sys::{self as zx_sys, zx_system_get_num_cpus};
 
 pub(crate) fn create_cpu_histogram(
@@ -101,7 +101,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> TaskInfo<T> {
                 fasync::OnSignals::new(&handle, zx::Signals::TASK_TERMINATED)
                     .await
                     .map(|_: fidl::Signals| ()) // Discard.
-                    .unwrap_or_else(|error| debug!(%error, "error creating signal handler"));
+                    .unwrap_or_else(|error| debug!(error:%; "error creating signal handler"));
             }
 
             // If we failed to duplicate the handle then still mark this task as terminated to

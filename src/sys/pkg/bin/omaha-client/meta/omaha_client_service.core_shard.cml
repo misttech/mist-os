@@ -11,8 +11,15 @@
             from: "#cobalt",
             to: "#system-update",
         },
+
+        // TODO(https://fxbug.dev/389134835): Remove the initiator capability.
         {
-            protocol: "fuchsia.hardware.power.statecontrol.Admin",
+            protocol: "fuchsia.power.CollaborativeRebootInitiator",
+            from: "parent",
+            to: "#system-update",
+        },
+        {
+            protocol: "fuchsia.power.internal.CollaborativeRebootScheduler",
             from: "parent",
             to: "#system-update",
         },

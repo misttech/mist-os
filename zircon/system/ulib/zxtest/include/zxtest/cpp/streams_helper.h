@@ -5,19 +5,23 @@
 #ifndef ZXTEST_CPP_STREAMS_HELPER_H_
 #define ZXTEST_CPP_STREAMS_HELPER_H_
 
-#include <iostream>
 #include <optional>
 #include <sstream>
 
 #include <zxtest/base/assertion.h>
 #include <zxtest/base/types.h>
+#include <zxtest/cpp/internal.h>
 
 DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_status_value, status_value, zx_status_t (C::*)() const);
 DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_status, status, zx_status_t (C::*)() const);
 
-#define LIB_ZXTEST_RETURN_TAG_true return Tag()&
+#define LIB_ZXTEST_RETURN_TAG_true return zxtest::internal::Tag{}&
+
 #define LIB_ZXTEST_RETURN_TAG_false
+
 #define LIB_ZXTEST_RETURN_TAG(val) LIB_ZXTEST_RETURN_TAG_##val
+
+namespace zxtest::internal {
 
 template <typename T>
 zx_status_t GetStatus(const T& status) {
@@ -35,7 +39,9 @@ struct Tag {};
 class StreamableBase {
  public:
   StreamableBase(const zxtest::SourceLocation location)
-      : stream_(std::stringstream("")), location_(location) {}
+      : stream_(std::stringstream("")), location_(location) {
+    LIB_ZXTEST_CHECK_RUNNING();
+  }
 
   // Lower precedence operator that returns void, such that the following
   // expressions are valid in functions that return void:
@@ -86,9 +92,11 @@ class StreamableAssertion : public StreamableBase {
         expected_symbol_(expected_symbol),
         is_fatal_(is_fatal),
         traces_(traces) {
-    actual_value_ = print_actual(actual);
-    expected_value_ = print_expected(expected);
     is_triggered_ = !compare(actual, expected);
+    if (is_triggered_) {
+      actual_value_ = print_actual(actual);
+      expected_value_ = print_expected(expected);
+    }
   }
 
   ~StreamableAssertion() {
@@ -120,5 +128,7 @@ class StreamableSkip : public StreamableBase {
     zxtest::Runner::GetInstance()->SkipCurrent(message);
   }
 };
+
+}  // namespace zxtest::internal
 
 #endif  // ZXTEST_CPP_STREAMS_HELPER_H_

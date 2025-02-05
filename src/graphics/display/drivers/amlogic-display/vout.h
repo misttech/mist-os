@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
-#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/result.h>
@@ -31,7 +30,8 @@ enum class VoutType : uint8_t {
   kHdmi,
 };
 
-class Vout : public ddk::I2cImplProtocol<Vout> {
+// Represents the Video Output (VOUT) module and the connected display device.
+class Vout {
  public:
   // Returns a non-null pointer to the Vout instance outputting DSI signal on
   // success.
@@ -72,7 +72,7 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   VoutType type() { return type_; }
   bool supports_hpd() const { return supports_hpd_; }
 
-  void DisplayConnected();
+  zx::result<> UpdateStateOnDisplayConnected();
   void DisplayDisconnected();
 
   // Vout must be of `kHdmi` type.
@@ -80,14 +80,6 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
 
   // Vout must be of `kHdmi` type.
   zx::result<> ApplyConfiguration(const display::DisplayTiming& timing);
-
-  // Required functions for I2cImpl
-  zx_status_t I2cImplGetMaxTransferSize(size_t* out_size) {
-    *out_size = UINT32_MAX;
-    return ZX_OK;
-  }
-  zx_status_t I2cImplSetBitrate(uint32_t bitrate) { return ZX_OK; }  // no-op
-  zx_status_t I2cImplTransact(const i2c_impl_op_t* op_list, size_t op_count);
 
   // Attempt to turn off all connected displays, and disable clocks. This will
   // also stop vsync interrupts. This is aligned with the interface for
@@ -142,6 +134,8 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
 
   struct hdmi_t {
     std::unique_ptr<HdmiHost> hdmi_host;
+
+    fbl::Vector<uint8_t> current_display_edid;
 
     display::DisplayTiming current_display_timing_;
   } hdmi_;

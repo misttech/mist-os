@@ -20,6 +20,7 @@ use netstack3_fuchsia::{FuchsiaInspector, InspectorDeviceIdProvider};
 use crate::bindings::devices::{
     DeviceIdAndName, DeviceSpecificInfo, DynamicCommonInfo, DynamicNetdeviceInfo, EthernetInfo,
 };
+use crate::bindings::routes::main_table_id;
 use crate::bindings::{BindingsCtx, Ctx, DeviceIdExt as _};
 
 /// An opaque struct that encapsulates the process of starting the Inspect
@@ -85,8 +86,13 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
 pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
     let inspector = fuchsia_inspect::Inspector::new(Default::default());
     let mut bindings_inspector = FuchsiaInspector::<BindingsCtx>::new(inspector.root());
-    ctx.api().routes::<Ipv4>().inspect(&mut bindings_inspector);
-    ctx.api().routes::<Ipv6>().inspect(&mut bindings_inspector);
+    // Group inspect data according to the IP version so that it's easier to decode.
+    bindings_inspector.record_child("Ipv4", |inspector| {
+        ctx.api().routes::<Ipv4>().inspect(inspector, main_table_id::<Ipv4>().into());
+    });
+    bindings_inspector.record_child("Ipv6", |inspector| {
+        ctx.api().routes::<Ipv6>().inspect(inspector, main_table_id::<Ipv6>().into());
+    });
     inspector
 }
 
@@ -114,7 +120,7 @@ pub(crate) fn devices(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
         let external_state = device_id.external_state();
         let DeviceIdAndName { id: binding_id, name } = device_id.bindings_id();
         node.record_child(format!("{binding_id}"), |node| {
-            node.record_string("Name", &name);
+            node.record_string("Name", name);
             node.record_uint("InterfaceId", (*binding_id).into());
             node.record_child("IPv4", |node| {
                 ctx.api()
@@ -144,6 +150,10 @@ pub(crate) fn devices(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
                     info.with_dynamic_info(|dynamic| {
                         record_network_device(node, &dynamic.netdevice, Some(mac))
                     });
+                }
+                DeviceSpecificInfo::Blackhole(_info) => {
+                    node.record_bool("Loopback", false);
+                    node.record_child("Blackhole", |_node| {});
                 }
                 DeviceSpecificInfo::Loopback(_info) => {
                     node.record_bool("Loopback", true);
@@ -185,7 +195,7 @@ pub(crate) fn neighbors(mut ctx: Ctx) -> fuchsia_inspect::Inspector {
             .filter_map(|d| match d {
                 DeviceId::Ethernet(d) => Some(d.clone()),
                 // NUD is not supported on Loopback or pure IP devices.
-                DeviceId::Loopback(_) | DeviceId::PureIp(_) => None,
+                DeviceId::Loopback(_) | DeviceId::PureIp(_) | DeviceId::Blackhole(_) => None,
             })
             .collect::<Vec<_>>()
     });

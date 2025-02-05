@@ -33,13 +33,13 @@ class ImageTest : public TestBase, public FenceCallback {
 
   fbl::RefPtr<Image> ImportImage(zx::vmo vmo, const display::ImageMetadata& image_metadata) {
     zx::result<display::DriverImageId> import_result =
-        display()->ImportVmoImageForTesting(std::move(vmo), /*offset=*/0);
+        FakeDisplayEngine().ImportVmoImageForTesting(std::move(vmo), /*offset=*/0);
     if (!import_result.is_ok()) {
       return nullptr;
     }
 
-    fbl::RefPtr<Image> image = fbl::AdoptRef(
-        new Image(controller(), image_metadata, import_result.value(), nullptr, ClientId(1)));
+    fbl::RefPtr<Image> image = fbl::AdoptRef(new Image(
+        CoordinatorController(), image_metadata, import_result.value(), nullptr, ClientId(1)));
     image->id = next_image_id_++;
     return image;
   }
@@ -47,21 +47,5 @@ class ImageTest : public TestBase, public FenceCallback {
  private:
   display::ImageId next_image_id_ = display::ImageId(1);
 };
-
-TEST_F(ImageTest, MultipleAcquiresAllowed) {
-  zx::vmo vmo;
-  ASSERT_OK(zx::vmo::create(1024 * 600 * 4, 0u, &vmo));
-  static constexpr display::ImageMetadata image_metadata({
-      .width = 1024,
-      .height = 600,
-      .tiling_type = display::ImageTilingType::kLinear,
-  });
-  fbl::RefPtr<Image> image = ImportImage(std::move(vmo), image_metadata);
-
-  EXPECT_TRUE(image->Acquire());
-  image->DiscardAcquire();
-  EXPECT_TRUE(image->Acquire());
-  image->EarlyRetire();
-}
 
 }  // namespace display_coordinator

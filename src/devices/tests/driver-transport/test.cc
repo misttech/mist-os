@@ -34,24 +34,18 @@ class RuntimeTest : public gtest::TestLoopFixture {
     ASSERT_EQ(ZX_OK, driver_test_realm->Start(fuchsia::driver::test::RealmArgs(), &realm_result));
     ASSERT_FALSE(realm_result.is_err());
 
-    // Connect to dev.
-    fidl::InterfaceHandle<fuchsia::io::Node> dev;
-    zx_status_t status =
-        realm_->component().Connect("dev-topological", dev.NewRequest().TakeChannel());
-    ASSERT_EQ(status, ZX_OK);
-
-    fbl::unique_fd root_fd;
-    status = fdio_fd_create(dev.TakeChannel().release(), root_fd.reset_and_get_address());
-    ASSERT_EQ(status, ZX_OK);
-
+    fbl::unique_fd fd;
+    auto exposed = realm_->component().CloneExposedDir();
+    ASSERT_EQ(fdio_fd_create(exposed.TakeChannel().release(), fd.reset_and_get_address()), ZX_OK);
+    // Wait for parent device.
     zx::result parent_channel =
-        device_watcher::RecursiveWaitForFile(root_fd.get(), "sys/test/parent");
+        device_watcher::RecursiveWaitForFile(fd.get(), "dev-topological/sys/test/parent");
     ASSERT_EQ(parent_channel.status_value(), ZX_OK);
     parent_client = fidl::ClientEnd<TestDevice>(std::move(parent_channel.value()));
     ASSERT_TRUE(parent_client.is_valid());
-
+    // Wait for child device.
     zx::result child_channel =
-        device_watcher::RecursiveWaitForFile(root_fd.get(), "sys/test/parent/child");
+        device_watcher::RecursiveWaitForFile(fd.get(), "dev-topological/sys/test/parent/child");
     ASSERT_EQ(child_channel.status_value(), ZX_OK);
     child_client = fidl::ClientEnd<TestDeviceChild>(std::move(child_channel.value()));
     ASSERT_TRUE(child_client.is_valid());

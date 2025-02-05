@@ -138,7 +138,23 @@ void platform_halt_cpu(void) {
 }
 
 zx_status_t platform_start_cpu(cpu_num_t cpu_id, uint64_t mpid) {
-  // Issue memory barrier before starting to ensure previous stores will be visible to new CPU.
+  auto clean_data_object = [](auto& mem) {
+    ZX_ASSERT(sizeof(mem) < arm64_dcache_size);
+    __asm__ volatile("dc cvac, %0" ::"r"(&mem), "m"(mem));
+  };
+
+  // We must ensure that the memory the secondary CPUs will touch before
+  // enabling its caches (i.e., at .Lmmu_enable in start.S) is coherent with
+  // the boot CPU. Beyond the instruction memory itself, this is comprised of
+  // the variables modified by the boot CPU and read by the secondaries in
+  // this stage, which are those holding the root bootstrap and kernel page
+  // tables. We explicitly clean that memory to the point of coherency and
+  // issue a memory barrier to commit them.
+  //
+  // TODO(https://fxbug.dev/42164859): Explicitly clean the pre-caches-on
+  // instruction memory as well.
+  clean_data_object(root_lower_page_table_phys);
+  clean_data_object(root_kernel_page_table_phys);
   arch::ThreadMemoryBarrier();
 
   uint32_t ret = power_cpu_on(mpid, kernel_entry_paddr, 0);
@@ -330,8 +346,6 @@ void platform_early_init(void) {
 
   // is the cmdline option to bypass dlog set ?
   dlog_bypass_init();
-
-  // Serial port should be active now
 
   // Initialize the PmmChecker now that the cmdline has been parsed.
   pmm_checker_init_from_cmdline();

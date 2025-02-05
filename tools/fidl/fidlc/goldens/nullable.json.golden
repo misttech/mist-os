@@ -149,7 +149,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.nullable/SimpleProtocolAddRequest",
             "nullable": false,
@@ -165,7 +164,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.nullable/SimpleProtocolAddResponse",
             "nullable": false,
@@ -202,7 +200,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -258,7 +255,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -286,7 +282,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -342,7 +337,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -396,7 +390,6 @@
       "members": [
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 3,
             "subtype": "vmo",
@@ -454,13 +447,11 @@
       "members": [
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "endpoint",
             "role": "client",
             "protocol": "test.nullable/SimpleProtocol",
             "nullable": true,
             "protocol_transport": "Channel",
-            "identifier": "test.nullable/SimpleProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -512,13 +503,11 @@
       "members": [
         {
           "type": {
-            "kind": "request",
             "kind_v2": "endpoint",
             "role": "server",
             "protocol": "test.nullable/SimpleProtocol",
             "nullable": true,
             "protocol_transport": "Channel",
-            "subtype": "test.nullable/SimpleProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -570,7 +559,6 @@
       "members": [
         {
           "type": {
-            "kind": "string",
             "kind_v2": "string",
             "nullable": true,
             "type_shape_v2": {
@@ -624,7 +612,6 @@
       "members": [
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.nullable/Int32Wrapper",
             "nullable": true,
@@ -679,7 +666,6 @@
       "members": [
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.nullable/SimpleUnion",
             "nullable": true,
@@ -734,10 +720,8 @@
       "members": [
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "int32",
               "type_shape_v2": {
@@ -808,7 +792,6 @@
           "ordinal": 1,
           "name": "a",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -833,7 +816,6 @@
           "ordinal": 2,
           "name": "b",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "float32",
             "type_shape_v2": {

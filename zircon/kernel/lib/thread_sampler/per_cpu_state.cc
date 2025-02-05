@@ -148,7 +148,7 @@ void PerCpuState::SetTimer() {
 
   // We got it, we're safe to schedule the timer -- clean up will wait until we reset the
   // kPendingTimer bit.
-  Deadline deadline = Deadline::after(period_);
+  Deadline deadline = Deadline::after_mono(period_);
   timer.Set(deadline, Thread::SignalSampleStack, this);
 }
 

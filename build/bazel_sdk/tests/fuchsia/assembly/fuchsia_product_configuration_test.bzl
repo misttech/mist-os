@@ -7,19 +7,29 @@ load("@fuchsia_sdk//fuchsia:private_defs.bzl", "FuchsiaProductConfigInfo")
 load("//test_utils:json_validator.bzl", "CREATE_VALIDATION_SCRIPT_ATTRS", "create_validation_script_provider")
 
 def _fuchsia_product_configuration_test_impl(ctx):
-    product_config_files = ctx.attr.product_config[DefaultInfo].files.to_list()
-    product_config_file = (
-        ([file for file in product_config_files if file.path.endswith("_product_config.json")] + [None])[0]
-    )
-
-    # if it's a directory
-    relative_path = None
-    if product_config_file == None:
-        product_config_file = product_config_files[0]
-        relative_path = ctx.attr.product_config[FuchsiaProductConfigInfo].config.removeprefix(product_config_file.path)
-
     golden_file = ctx.file.golden_file
-    return [create_validation_script_provider(ctx, product_config_file, golden_file, relative_path = relative_path)]
+    product_config = ctx.attr.product_config[FuchsiaProductConfigInfo]
+
+    if len(ctx.files.product_config) == 1:
+        # This is a newly constructed product config with the only file being
+        # the directory.
+        config_dir = ctx.files.product_config[0]
+    else:
+        # This is a prebuilt product config.
+        config_dir = product_config.directory
+
+    relative_path = "product_configuration.json"
+    if product_config.config_path:
+        relative_path = product_config.config_path
+
+    return [create_validation_script_provider(
+        ctx,
+        config_dir,
+        golden_file,
+        relative_path,
+        runfiles = ctx.runfiles(files = ctx.files.product_config),
+        is_subset = True,
+    )]
 
 fuchsia_product_configuration_test = rule(
     doc = """Validate the generated product configuration file.""",
@@ -41,21 +51,24 @@ fuchsia_product_configuration_test = rule(
 
 def _fuchsia_product_ota_config_test_impl(ctx):
     golden_file = ctx.file.golden_file
+    product_config = ctx.attr.product_config[FuchsiaProductConfigInfo]
 
-    file_to_test = None
-    for generated_file in ctx.files.product_config:
-        if generated_file.basename == golden_file.basename:
-            if file_to_test:
-                fail("Found multiple files with the name: %s" % golden_file.basename)
-            file_to_test = generated_file
-    if not file_to_test:
-        fail("Unable to location a file named: %s" % golden_file.basename)
+    if len(ctx.files.product_config) == 1:
+        # This is a newly constructed product config with the only file being
+        # the directory.
+        config_dir = ctx.files.product_config[0]
+    else:
+        # This is a prebuilt product config.
+        config_dir = product_config.directory
 
+    relative_path = ctx.attr.path_in_config
     return [create_validation_script_provider(
         ctx,
-        file_to_test,
+        config_dir,
         golden_file,
+        relative_path,
         runfiles = ctx.runfiles(files = ctx.files.product_config),
+        is_subset = True,
     )]
 
 fuchsia_product_ota_config_test = rule(
@@ -71,6 +84,10 @@ fuchsia_product_ota_config_test = rule(
         "golden_file": attr.label(
             doc = "Validate that the file with the same name is produced by the product config rule, and matches in contents.",
             allow_single_file = True,
+            mandatory = True,
+        ),
+        "path_in_config": attr.string(
+            doc = "The path of the file to validate inside the config",
             mandatory = True,
         ),
     } | CREATE_VALIDATION_SCRIPT_ATTRS,

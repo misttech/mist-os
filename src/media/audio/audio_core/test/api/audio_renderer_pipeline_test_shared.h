@@ -45,6 +45,7 @@ class AudioRendererPipelineTest : public HermeticAudioTest {
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
+                  "render:accessibility",
                   "render:background",
                   "render:communication",
                   "render:interruption",
@@ -54,6 +55,7 @@ class AudioRendererPipelineTest : public HermeticAudioTest {
                 "pipeline": {
                   "name": "default",
                   "streams": [
+                    "render:accessibility",
                     "render:background",
                     "render:communication",
                     "render:interruption",
@@ -105,7 +107,7 @@ class AudioRendererPipelineTest : public HermeticAudioTest {
 
   std::pair<AudioRendererShim<SampleType>*, TypedFormat<SampleType>> CreateRenderer(
       int32_t frame_rate,
-      fuchsia::media::AudioRenderUsage usage = fuchsia::media::AudioRenderUsage::MEDIA) {
+      fuchsia::media::AudioRenderUsage2 usage = fuchsia::media::AudioRenderUsage2::MEDIA) {
     auto format = Format::Create<SampleType>(2, frame_rate).take_value();
     return std::make_pair(
         CreateAudioRenderer(format, PacketsToFrames(kNumPacketsInPayload, frame_rate), usage),
@@ -149,6 +151,7 @@ class AudioRendererGainLimitsTest
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
+                  "render:accessibility",
                   "render:background",
                   "render:communication",
                   "render:interruption",
@@ -158,6 +161,7 @@ class AudioRendererGainLimitsTest
                 "pipeline": {
                   "name": "default",
                   "streams": [
+                    "render:accessibility",
                     "render:background",
                     "render:communication",
                     "render:interruption",
@@ -204,12 +208,12 @@ class AudioRendererGainLimitsTest
     // Set usage gain/mute.
     if (tc.media_mute) {
       fuchsia::media::audio::VolumeControlPtr volume_control;
-      audio_core_->BindUsageVolumeControl(
-          fuchsia::media::Usage::WithRenderUsage(fuchsia::media::AudioRenderUsage::MEDIA),
-          volume_control.NewRequest());
+      audio_core_->BindUsageVolumeControl2(fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(
+                                               fuchsia::media::AudioRenderUsage2::MEDIA)),
+                                           volume_control.NewRequest());
       volume_control->SetMute(true);
     } else {
-      audio_core_->SetRenderUsageGain(fuchsia::media::AudioRenderUsage::MEDIA, tc.media_gain_db);
+      audio_core_->SetRenderUsageGain2(fuchsia::media::AudioRenderUsage2::MEDIA, tc.media_gain_db);
     }
 
     // Render.
@@ -264,6 +268,7 @@ class AudioRendererPipelineUnderflowTest : public HermeticAudioTest {
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
+                  "render:accessibility",
                   "render:background",
                   "render:communication",
                   "render:interruption",
@@ -273,6 +278,7 @@ class AudioRendererPipelineUnderflowTest : public HermeticAudioTest {
                 "pipeline": {
                   "name": "default",
                   "streams": [
+                    "render:accessibility",
                     "render:background",
                     "render:communication",
                     "render:interruption",
@@ -330,6 +336,7 @@ class AudioRendererEffectsV1Test
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
+                  "render:accessibility",
                   "render:background",
                   "render:communication",
                   "render:interruption",
@@ -339,6 +346,7 @@ class AudioRendererEffectsV1Test
                 "pipeline": {
                   "name": "default",
                   "streams": [
+                    "render:accessibility",
                     "render:background",
                     "render:communication",
                     "render:interruption",
@@ -390,6 +398,7 @@ class AudioRendererEffectsV2Test
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
+                  "render:accessibility",
                   "render:background",
                   "render:communication",
                   "render:interruption",
@@ -399,6 +408,7 @@ class AudioRendererEffectsV2Test
                 "pipeline": {
                   "name": "default",
                   "streams": [
+                    "render:accessibility",
                     "render:background",
                     "render:communication",
                     "render:interruption",
@@ -449,6 +459,7 @@ class AudioRendererPipelineTuningTest
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
+                  "render:accessibility",
                   "render:background",
                   "render:communication",
                   "render:interruption",
@@ -458,6 +469,7 @@ class AudioRendererPipelineTuningTest
                 "pipeline": {
                   "name": "default",
                   "streams": [
+                    "render:accessibility",
                     "render:background",
                     "render:communication",
                     "render:interruption",

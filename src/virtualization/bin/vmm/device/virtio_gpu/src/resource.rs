@@ -249,11 +249,7 @@ impl<'a> Resource2D<'a> {
         // rect and all current drivers follow this convention.
         let expected_offset = self.compute_expected_offset(rect)?;
         if offset != expected_offset {
-            tracing::warn!(
-                "Invalid resource offset received, offset: {}, rect: {:?}",
-                offset,
-                rect
-            );
+            log::warn!("Invalid resource offset received, offset: {}, rect: {:?}", offset, rect);
             return Err(wire::VirtioGpuError::InvalidParameter);
         }
 
@@ -265,7 +261,7 @@ impl<'a> Resource2D<'a> {
         let backing_slices = match self.backing.as_ref() {
             Some(regions) => regions,
             None => {
-                tracing::warn!("transfer_to_host_2d without backing attached");
+                log::warn!("transfer_to_host_2d without backing attached");
                 return Err(wire::VirtioGpuError::Unspecified);
             }
         };

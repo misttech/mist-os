@@ -710,6 +710,14 @@ impl Use {
                 };
                 Ok(UseResult::ExposeFromChild(use_, child_component))
             }
+            UseSource::Collection(name) => Ok(UseResult::Source(
+                CapabilitySource::AnonymizedAggregate(AnonymizedAggregateSource {
+                    capability: AggregateCapability::Service(use_.source_name().clone()),
+                    moniker: target.moniker().clone(),
+                    sources: sources.clone(),
+                    members: vec![AggregateMember::Collection(name.clone())],
+                }),
+            )),
             UseSource::Debug => {
                 // This is not supported today. It might be worthwhile to support this if
                 // more than just protocol has a debug capability.

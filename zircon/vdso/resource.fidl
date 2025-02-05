@@ -48,8 +48,9 @@ closed protocol Resource {
     /// `ZX_RSRC_SYSTEM_INFO_BASE`, `ZX_RSRC_SYSTEM_CPU_BASE`,
     /// `ZX_RSRC_SYSTEM_POWER_BASE`, `ZX_RSRC_SYSTEM_MEXEC_BASE`,
     /// `ZX_RSRC_SYSTEM_ENERGY_INFO_BASE`, `ZX_RSRC_SYSTEM_IOMMU_BASE`,
-    /// `ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE`, `ZX_RSRC_SYSTEM_PROFILE_BASE` and
-    /// `ZX_RSRC_SYSTEM_MSI_BASE`. These all have *size* 1.
+    /// `ZX_RSRC_SYSTEM_PROFILE_BASE`, / `ZX_RSRC_SYSTEM_MSI_BASE`,
+    /// `ZX_RSRC_SYSTEM_DEBUGLOG_BASE` and `ZX_RSRC_SYSTEM_STALL_BASE`. These all have
+    /// *size* 1.
     /// `ZX_RSRC_KIND_ROOT` must be paired with zero values for *base* and *size*, as
     /// it does not use an address space range.
     ///
@@ -91,6 +92,11 @@ closed protocol Resource {
     /// `ZX_ERR_INVALID_ARGS` *options* contains an invalid kind or flag combination,
     /// *name* is an invalid pointer, or the *kind* specified is `ZX_RSRC_KIND_ROOT`
     /// but *base* and *size* are not 0.
+    ///
+    /// `ZX_ERR_NOT_FOUND` A suitable resource allocation was not found. This happens
+    /// if the address range is not valid, if the range is already owned by an exclusive
+    /// resource, or if a regular resource exists and the caller is trying to create
+    /// an exclusive resource in the same range.
     ///
     /// `ZX_ERR_NO_MEMORY` Failure due to lack of memory. There is no good way for
     /// userspace to handle this (unlikely) error. In a future build this error will no

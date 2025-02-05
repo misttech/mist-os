@@ -191,10 +191,12 @@
 #define LIB_ZXTEST_COMPARE_FN(op) \
   [](const auto& expected_, const auto& actual_) { return op(expected_, actual_); }
 
-#define LIB_ZXTEST_COMPARE_3_FN(op, third_param)              \
-  [third_param](const auto& expected_, const auto& actual_) { \
-    return op(expected_, actual_, third_param);               \
-  }
+#define LIB_ZXTEST_COMPARE_3_FN(op, third_param)                 \
+  [](auto param) {                                               \
+    return [param](const auto& expected_, const auto& actual_) { \
+      return op(expected_, actual_, param);                      \
+    };                                                           \
+  }(third_param)
 
 // Printers for converting values into readable strings.
 #define LIB_ZXTEST_DEFAULT_PRINTER [](const auto& val) { return zxtest::PrintValue(val); }
@@ -206,7 +208,7 @@
 #endif
 
 #define LIB_ZXTEST_HEXDUMP_PRINTER(size)                                       \
-  [size](const auto& val) {                                                    \
+  [byte_count = (size)](const auto& val) {                                     \
     return zxtest::internal::ToHex(static_cast<const void*>(val), byte_count); \
   }
 

@@ -12,8 +12,8 @@ use crate::neighbor_cache::NeighborHealth;
 use crate::{Id as InterfaceId, InterfaceView};
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use itertools::Itertools as _;
+use log::{debug, error, info, warn};
 use std::collections::HashMap;
-use tracing::{debug, error, info, warn};
 
 /// The minimum amount of time for a device counter to be stuck in the same
 /// value for the device to be considered unhealthy.
@@ -189,8 +189,8 @@ where
             Ok(d) => d,
             Err(e) => {
                 warn!(
-                    err = ?e,
-                    iface = interface,
+                    err:? = e,
+                    iface = interface;
                     "failed to read diagnostics state, assuming unsupported interface"
                 );
                 return None;
@@ -200,8 +200,8 @@ where
             Ok(c) => c,
             Err(e) => {
                 warn!(
-                    err = ?e,
-                    iface = interface,
+                    err:? = e,
+                    iface = interface;
                     "failed to read device counters, assuming unsupported interface"
                 );
                 return None;
@@ -222,7 +222,7 @@ where
         sys: &S,
         view: InterfaceView<'_>,
     ) {
-        debug!(view = ?view, "poll interface state");
+        debug!(view:? = view; "poll interface state");
         let Self { interfaces, system_health_status, _marker: _ } = self;
 
         let interface = view.properties.id;
@@ -245,20 +245,20 @@ where
 
         if let Some(action) = Self::evaluate_interface_state(now, diagnostics_state, view).await {
             info!(
-                action = ?action,
-                iface = interface,
+                action:? = action,
+                iface = interface;
                 "bad state detected, action requested"
             );
             let Action { trigger_stack_diagnosis, trigger_device_diagnosis, reason: _ } = action;
             if trigger_device_diagnosis {
                 diagnostics_state.diagnostics.log_debug_info().await.unwrap_or_else(
-                    |e| error!(err = ?e, iface = interface, "failed to request device debug info"),
+                    |e| error!(err:? = e, iface = interface; "failed to request device debug info"),
                 );
             }
             if trigger_stack_diagnosis {
                 if system_health_status.set_unhealthy_and_check_for_debug_info_cooldown(now) {
                     sys.log_debug_info().await.unwrap_or_else(
-                        |e| error!(err = ?e, "failed to request system debug info"),
+                        |e| error!(err:? = e; "failed to request system debug info"),
                     );
                 }
             }
@@ -287,7 +287,7 @@ where
         let InterfaceDiagnosticsState { diagnostics, rx, tx, updated_at, health } = diag_state;
         let interface = *interface;
 
-        debug!(iface = interface, "evaluate interface state");
+        debug!(iface = interface; "evaluate interface state");
 
         let mut neighbors = neighbors.as_ref()?.iter_health();
         let found_healthy_gateway = neighbors
@@ -303,8 +303,8 @@ where
                 let gateway_health = GatewayHealth::from_neighbor_health(health, now);
                 debug!(
                     iface = interface,
-                    neighbor = ?fidl_fuchsia_net_ext::IpAddress::from(neighbor.clone()),
-                    health = ?gateway_health,
+                    neighbor:? = fidl_fuchsia_net_ext::IpAddress::from(neighbor.clone()),
+                    health:? = gateway_health;
                     "router check"
                 );
                 match gateway_health {
@@ -336,13 +336,13 @@ where
             // either the interface is not configured for upstream connectivity
             // or we're going through a link flap event.
             None => {
-                debug!(iface = interface, "no gateway in neighbors");
+                debug!(iface = interface; "no gateway in neighbors");
                 return None;
             }
             // If there's at least one healthy gateway, there's no action to be
             // taken, but we can mark the interface as healthy.
             Some(true) => {
-                debug!(iface = interface, "neighbors are healthy");
+                debug!(iface = interface; "neighbors are healthy");
                 health.set_healthy();
                 return None;
             }
@@ -363,8 +363,8 @@ where
             Err(Error::Fidl(e)) => {
                 if !e.is_closed() {
                     error!(
-                        e = ?e,
-                        iface = interface,
+                        e:? = e,
+                        iface = interface;
                         "failed to read counters for interface, no action will be taken"
                     );
                 }
@@ -372,7 +372,7 @@ where
             }
             Err(Error::NotSupported) => {
                 error!(
-                    iface = interface,
+                    iface = interface;
                     "failed to read counters for interface, no action will be taken"
                 );
                 return None;
@@ -381,17 +381,17 @@ where
         let DeviceCounters { rx_frames, tx_frames } = counters;
         if !rx.update(rx_frames, now) {
             warn!(
-                rx = ?rx,
+                rx:? = rx,
                 now = now.into_nanos(),
-                iface = interface,
+                iface = interface;
                 "failed to observe rx traffic since last check"
             );
         }
         if !tx.update(tx_frames, now) {
             warn!(
-                tx = ?tx,
+                tx:? = tx,
                 now = now.into_nanos(),
-                iface = interface,
+                iface = interface;
                 "failed to observe tx traffic since last check"
             );
         }
@@ -412,7 +412,7 @@ where
         info!(
             iface = interface,
             rx = rx_frames,
-            tx = tx_frames,
+            tx = tx_frames;
             "gateways are unhealthy, but counters are healthy."
         );
 
@@ -426,7 +426,7 @@ where
         let Self { interfaces, system_health_status: _, _marker: _ } = self;
         match interfaces.remove(&interface) {
             Some(InterfaceState { .. }) => (),
-            None => error!(iface = interface, "attempted to remove unknown interface"),
+            None => error!(iface = interface; "attempted to remove unknown interface"),
         }
     }
 }

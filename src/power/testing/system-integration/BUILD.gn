@@ -6,12 +6,6 @@
 group("e2e_tests") {
   testonly = true
   deps = []
-  if (current_cpu == "arm64") {
-    deps += [
-      "msd-arm-mali:e2e_tests",
-      "storage:e2e_tests",
-    ]
-  }
 }
 
 group("tests") {

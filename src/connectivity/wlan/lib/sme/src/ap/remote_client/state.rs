@@ -9,8 +9,8 @@ use crate::ap::{aid, Context, RsnCfg};
 use anyhow::{ensure, format_err};
 
 use ieee80211::MacAddr;
+use log::error;
 use std::sync::{Arc, Mutex};
-use tracing::error;
 use wlan_common::ie::rsn::rsne;
 use wlan_common::ie::{intersect, SupportedRate};
 use wlan_common::mac::{Aid, CapabilityInfo};

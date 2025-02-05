@@ -39,13 +39,13 @@ impl Control {
         leds: &mut impl LedControl,
     ) -> Result<(), Error> {
         let num_leds = leds.get_num_lights().await.context("error received get num lights")?;
-        tracing::info!("There is/are {} led(s)", num_leds);
+        log::info!("There is/are {} led(s)", num_leds);
         for i in 0..num_leds {
             let info = match leds.get_info(i).await {
                 Ok(Ok(info)) => info,
                 _ => continue,
             };
-            tracing::info!("LED {} is {:?}", i + 1, info);
+            log::info!("LED {} is {:?}", i + 1, info);
         }
         loop {
             let sleep_time =
@@ -104,7 +104,7 @@ impl Control {
 
 #[fuchsia::main(logging_tags = ["auto-brightness"])]
 async fn main() -> Result<(), Error> {
-    tracing::info!("Started");
+    log::info!("Started");
 
     let backlight = Backlight::without_display_power()?;
     let mut leds = Led::new().await?;

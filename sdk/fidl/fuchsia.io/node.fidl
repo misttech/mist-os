@@ -308,14 +308,18 @@ open protocol Node {
     /// Alternatively, pass `OpenFlags.CLONE_SAME_RIGHTS` to inherit the rights on the source connection.
     /// It is invalid to pass any of the `OpenFlags.RIGHT_*` flags together with
     /// `OpenFlags.CLONE_SAME_RIGHTS`.
-    @available(replaced=NEXT, renamed="DeprecatedClone")
+    @available(replaced=26, renamed="DeprecatedClone")
     @selector("fuchsia.io1/Node.Clone")
     strict Clone(resource struct {
         flags OpenFlags;
         object server_end:Node;
     });
 
-    @available(added=NEXT, deprecated=HEAD, note="Use fuchsia.unknown/Cloneable.Clone2 instead.")
+    /// DEPRECATED - Use `fuchsia.unknown/Cloneable.Clone` instead.
+    // TODO(https://fxbug.dev/324081103): Mark this as removed=NEXT once we ship API level 26.
+    // We can't remove a method at the same API level it was added, and although this is only
+    // a semantic rename with the same ordinal, it still counts as "adding" a new method.
+    @available(added=26, removed=HEAD)
     @selector("fuchsia.io1/Node.Clone")
     flexible DeprecatedClone(resource struct {
         flags OpenFlags;
@@ -388,8 +392,20 @@ open protocol Node {
     /// Acquires the `Directory.Open` rights and flags used to access this file.
     ///
     /// This method does not require any rights.
+    @available(replaced=NEXT, renamed="DeprecatedGetFlags")
     @selector("fuchsia.io1/Node.NodeGetFlags")
     strict GetFlags() -> (struct {
+        s zx.Status;
+        flags OpenFlags;
+    });
+
+    /// [DEPRECATED - Use new GetFlags method instead.]
+    // TODO(https://fxbug.dev/376509077): Remove this when all out-of-tree servers support the new
+    // GetFlags method. We can't gracefully remove this method since changing it to flexible breaks
+    // wire compatibility with older clients.
+    @available(added=NEXT, deprecated=HEAD)
+    @selector("fuchsia.io1/Node.NodeGetFlags")
+    strict DeprecatedGetFlags() -> (struct {
         s zx.Status;
         flags OpenFlags;
     });
@@ -399,8 +415,21 @@ open protocol Node {
     /// - `OpenFlags.APPEND`
     ///
     /// This method does not require any rights.
+    @available(replaced=NEXT, renamed="DeprecatedSetFlags")
     @selector("fuchsia.io1/Node.NodeSetFlags")
     strict SetFlags(struct {
+        flags OpenFlags;
+    }) -> (struct {
+        s zx.Status;
+    });
+
+    /// [DEPRECATED - Use new SetFlags method instead.]
+    // TODO(https://fxbug.dev/376509077): Remove this when all out-of-tree servers support the new
+    // GetFlags method. We can't gracefully remove this method since changing it to flexible breaks
+    // wire compatibility with older clients.
+    @available(added=NEXT, deprecated=HEAD)
+    @selector("fuchsia.io1/Node.NodeSetFlags")
+    strict DeprecatedSetFlags(struct {
         flags OpenFlags;
     }) -> (struct {
         s zx.Status;
@@ -414,9 +443,9 @@ open protocol Node {
     ///  - `Flags.PERM_INHERIT_*`: Only applies when determining connection rights.
     ///  - `Flags.PROTOCOL_*`: Only the protocol of the connection will be present.
     ///  - `Flags.FLAG_*`: Only applies when opening the resource, not part of the connection.
-    @available(added=HEAD)
+    @available(added=NEXT)
     @selector("fuchsia.io/Node.GetFlags")
-    flexible GetFlags2() -> (struct {
+    flexible GetFlags() -> (struct {
         flags Flags;
     }) error zx.Status;
 
@@ -429,9 +458,9 @@ open protocol Node {
     /// Errors:
     ///  - `ZX_ERR_NOT_SUPPORTED`: The object does not support this feature or the specified flags.
     ///  - `ZX_ERR_INVALID_ARGS`: `flags` other than `Flags.FILE_APPEND` were specified.
-    @available(added=HEAD)
+    @available(added=NEXT)
     @selector("fuchsia.io/Node.SetFlags")
-    flexible SetFlags2(struct {
+    flexible SetFlags(struct {
         flags Flags;
     }) -> () error zx.Status;
 
@@ -696,7 +725,12 @@ closed protocol Linkable {
     /// support the [`Rights.EXECUTE`] right. Insufficient rights will result in
     /// `ZX_ERR_ACCESS_DENIED`.
     ///
-    /// If this object has no links, it will fail with `ZX_ERR_NOT_FOUND`.
+    /// If this object has no links and is *NOT* an unnamed temporary object (objects opened with
+    /// `Flags.FLAG_CREATE_AS_UNNAMED_TEMPORARY`), it will fail with `ZX_ERR_NOT_FOUND`.
+    ///
+    /// For unnamed temporary objects, use LinkInto to give it a name. Upon successful completion,
+    /// the object will be permanently linked to the filesystem. Requires that the unnamed temporary
+    /// object is linkable, if not, it will fail with `ZX_ERR_NOT_FOUND`.
     ///
     /// This method does not have the same atomicity properties has the `Directory::Link` method,
     /// which means that calling `Open` then `LinkInto` is not equivalent to `Directory::Link`

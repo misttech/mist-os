@@ -20,7 +20,7 @@ use derivative::Derivative;
 use explicit::ResultExt as _;
 use fidl::endpoints::{DiscoverableProtocolMarker as _, RequestStream as _};
 use fuchsia_async as fasync;
-use log::{debug, error, trace, warn};
+use log::{debug, trace, warn};
 use net_types::ip::{GenericOverIp, Ip, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6};
 use net_types::{MulticastAddr, SpecifiedAddr, ZonedAddr};
 use netstack3_core::device::{DeviceId, WeakDeviceId};
@@ -38,9 +38,9 @@ use netstack3_core::{icmp, udp, IpExt};
 use packet::{Buf, BufferMut};
 use packet_formats::ip::DscpAndEcn;
 use zx::prelude::HandleBased as _;
-use zx::{self as zx, Peered as _};
 
-use crate::bindings::socket::queue::{BodyLen, MessageQueue};
+use crate::bindings::socket::event_pair::SocketEventPair;
+use crate::bindings::socket::queue::{BodyLen, MessageQueue, QueueReadableListener as _};
 use crate::bindings::socket::worker::{self, SocketWorker};
 use crate::bindings::util::{
     DeviceNotFoundError, IntoCore as _, IntoFidl, RemoveResourceResultExt as _, ResultExt as _,
@@ -49,10 +49,7 @@ use crate::bindings::util::{
 };
 use crate::bindings::{trace_duration, BindingId, BindingsCtx, Ctx};
 
-use super::{
-    IntoErrno, IpSockAddrExt, SockAddr, SocketWorkerProperties, ZXSIO_SIGNAL_INCOMING,
-    ZXSIO_SIGNAL_OUTGOING,
-};
+use super::{IntoErrno, IpSockAddrExt, SockAddr, SocketWorkerProperties};
 
 /// The types of supported datagram protocols.
 #[derive(Debug)]
@@ -93,7 +90,7 @@ pub(crate) trait Transport<I: Ip>: Debug + Sized + Send + Sync + 'static {
 /// Bindings data held by datagram sockets.
 #[derive(Debug)]
 pub(crate) struct DatagramSocketExternalData<I: Ip> {
-    message_queue: CoreMutex<MessageQueue<AvailableMessage<I>>>,
+    message_queue: CoreMutex<MessageQueue<AvailableMessage<I>, SocketEventPair>>,
 }
 
 /// A special case of TryFrom that avoids the associated error type in generic contexts.
@@ -135,6 +132,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
     fn create_unbound(
         ctx: &mut Ctx,
         external_data: DatagramSocketExternalData<I>,
+        writable_listener: SocketEventPair,
     ) -> Self::SocketId;
 
     fn connect(
@@ -317,6 +315,9 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         id: &Self::SocketId,
         domain: netstack3_core::routes::MarkDomain,
     ) -> netstack3_core::routes::Mark;
+
+    fn set_send_buffer(ctx: &mut Ctx, id: &Self::SocketId, send_buffer: usize);
+    fn get_send_buffer(ctx: &mut Ctx, id: &Self::SocketId) -> usize;
 }
 
 #[derive(Debug)]
@@ -375,8 +376,9 @@ where
     fn create_unbound(
         ctx: &mut Ctx,
         external_data: DatagramSocketExternalData<I>,
+        writable_listener: SocketEventPair,
     ) -> Self::SocketId {
-        ctx.api().udp().create_with(external_data)
+        ctx.api().udp().create_with(external_data, writable_listener)
     }
 
     fn connect(
@@ -641,6 +643,14 @@ where
     ) -> netstack3_core::routes::Mark {
         ctx.api().udp().get_mark(id, domain)
     }
+
+    fn set_send_buffer(ctx: &mut Ctx, id: &Self::SocketId, send_buffer: usize) {
+        ctx.api().udp().set_send_buffer(id, send_buffer)
+    }
+
+    fn get_send_buffer(ctx: &mut Ctx, id: &Self::SocketId) -> usize {
+        ctx.api().udp().send_buffer(id)
+    }
 }
 
 impl<I: IpExt> DatagramSocketExternalData<I> {
@@ -728,8 +738,9 @@ where
     fn create_unbound(
         ctx: &mut Ctx,
         external_data: DatagramSocketExternalData<I>,
+        writable_listener: SocketEventPair,
     ) -> Self::SocketId {
-        ctx.api().icmp_echo().create_with(external_data)
+        ctx.api().icmp_echo().create_with(external_data, writable_listener)
     }
 
     fn connect(
@@ -1047,6 +1058,14 @@ where
     ) -> netstack3_core::routes::Mark {
         ctx.api().icmp_echo().get_mark(id, domain)
     }
+
+    fn set_send_buffer(ctx: &mut Ctx, id: &Self::SocketId, send_buffer: usize) {
+        ctx.api().icmp_echo().set_send_buffer(id, send_buffer)
+    }
+
+    fn get_send_buffer(ctx: &mut Ctx, id: &Self::SocketId) -> usize {
+        ctx.api().icmp_echo().send_buffer(id)
+    }
 }
 
 impl<E> IntoErrno for core_socket::SendError<E> {
@@ -1054,6 +1073,8 @@ impl<E> IntoErrno for core_socket::SendError<E> {
         match self {
             core_socket::SendError::NotConnected => fposix::Errno::Edestaddrreq,
             core_socket::SendError::NotWriteable => fposix::Errno::Epipe,
+            core_socket::SendError::SendBufferFull => fposix::Errno::Eagain,
+            core_socket::SendError::InvalidLength => fposix::Errno::Emsgsize,
             core_socket::SendError::IpSock(err) => err.into_errno(),
             core_socket::SendError::SerializeError(_e) => fposix::Errno::Einval,
         }
@@ -1064,6 +1085,8 @@ impl<E> IntoErrno for core_socket::SendToError<E> {
     fn into_errno(self) -> fposix::Errno {
         match self {
             core_socket::SendToError::NotWriteable => fposix::Errno::Epipe,
+            core_socket::SendToError::SendBufferFull => fposix::Errno::Eagain,
+            core_socket::SendToError::InvalidLength => fposix::Errno::Emsgsize,
             core_socket::SendToError::Zone(err) => err.into_errno(),
             // NB: Mapping MTU to EMSGSIZE is different from the impl on
             // `IpSockSendError` which maps to EINVAL instead.
@@ -1218,19 +1241,11 @@ where
 {
     /// Creates a new `BindingData`.
     fn new(ctx: &mut Ctx, properties: SocketWorkerProperties) -> Self {
-        let (local_event, peer_event) = zx::EventPair::create();
-        // signal peer that OUTGOING is available.
-        // TODO(brunodalbo): We're currently not enforcing any sort of
-        // flow-control for outgoing datagrams. That'll get fixed once we
-        // limit the number of in flight datagrams per socket (i.e. application
-        // buffers).
-        if let Err(e) = local_event.signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_OUTGOING) {
-            error!("socket failed to signal peer: {:?}", e);
-        }
+        let (local_event, peer_event) = SocketEventPair::create();
         let external_data = DatagramSocketExternalData {
-            message_queue: CoreMutex::new(MessageQueue::new(local_event)),
+            message_queue: CoreMutex::new(MessageQueue::new(local_event.clone())),
         };
-        let id = T::create_unbound(ctx, external_data);
+        let id = T::create_unbound(ctx, external_data, local_event);
 
         Self {
             peer_event,
@@ -1258,6 +1273,7 @@ pub(super) fn spawn_worker(
     events: fposix_socket::SynchronousDatagramSocketRequestStream,
     properties: SocketWorkerProperties,
     spawner: &worker::ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
+    creation_opts: fposix_socket::SocketCreationOptions,
 ) -> Result<(), fposix::Errno> {
     match (domain, proto) {
         (fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::Udp) => {
@@ -1266,7 +1282,7 @@ pub(super) fn spawn_worker(
                 BindingData::<Ipv4, Udp>::new,
                 properties,
                 events,
-                (),
+                creation_opts,
                 spawner.clone(),
             ));
             Ok(())
@@ -1277,7 +1293,7 @@ pub(super) fn spawn_worker(
                 BindingData::<Ipv6, Udp>::new,
                 properties,
                 events,
-                (),
+                creation_opts,
                 spawner.clone(),
             ));
             Ok(())
@@ -1288,7 +1304,7 @@ pub(super) fn spawn_worker(
                 BindingData::<Ipv4, IcmpEcho>::new,
                 properties,
                 events,
-                (),
+                creation_opts,
                 spawner.clone(),
             ));
             Ok(())
@@ -1299,7 +1315,7 @@ pub(super) fn spawn_worker(
                 BindingData::<Ipv6, IcmpEcho>::new,
                 properties,
                 events,
-                (),
+                creation_opts,
                 spawner.clone(),
             ));
             Ok(())
@@ -1326,8 +1342,20 @@ where
     type Request = fposix_socket::SynchronousDatagramSocketRequest;
     type RequestStream = fposix_socket::SynchronousDatagramSocketRequestStream;
     type CloseResponder = fposix_socket::SynchronousDatagramSocketCloseResponder;
-    type SetupArgs = ();
+    type SetupArgs = fposix_socket::SocketCreationOptions;
     type Spawner = ();
+
+    fn setup(
+        &mut self,
+        ctx: &mut Ctx,
+        options: fposix_socket::SocketCreationOptions,
+        _spawners: &worker::TaskSpawnerCollection<()>,
+    ) {
+        let fposix_socket::SocketCreationOptions { marks, __source_breaking } = options;
+        for fposix_socket::Marks { domain, mark } in marks.iter().flat_map(|m| m.iter()) {
+            T::set_mark(ctx, &self.info.id, (*domain).into_core(), (*mark).into_core())
+        }
+    }
 
     async fn handle_request(
         &mut self,
@@ -1473,18 +1501,13 @@ where
                 // TODO(https://fxbug.dev/322214321): Actually implement SO_ERROR.
                 responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
-            Request::SetSendBuffer { value_bytes: _, responder } => {
-                // TODO(https://fxbug.dev/42074004): Actually implement SetSendBuffer.
-                //
-                // Currently, UDP sending in Netstack3 is synchronous, so it's not clear what a
-                // sensible implementation would look like.
+            Request::SetSendBuffer { value_bytes, responder } => {
+                self.set_send_buffer(value_bytes);
                 responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
             Request::GetSendBuffer { responder } => {
-                // TODO(https://fxbug.dev/42074004): Actually implement SetSendBuffer.
-                // Until then we return the default buffer size used on Linux.
-                const DEFAULT_SEND_BUFFER: u64 = 212992;
-                responder.send(Ok(DEFAULT_SEND_BUFFER)).unwrap_or_log("failed to respond");
+                let send_buffer = self.get_send_buffer();
+                responder.send(Ok(send_buffer)).unwrap_or_log("failed to respond");
             }
             Request::SetReceiveBuffer { value_bytes, responder } => {
                 responder
@@ -2217,14 +2240,11 @@ where
             ShutdownType::Receive | ShutdownType::SendAndReceive => {
                 // Make sure to signal the peer so any ongoing call to
                 // receive that is waiting for a signal will poll again.
-                if let Err(e) = <T as Transport<I>>::external_data(id)
+                <T as Transport<I>>::external_data(id)
                     .message_queue
                     .lock()
-                    .local_event()
-                    .signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_INCOMING)
-                {
-                    error!("Failed to signal peer when shutting down: {:?}", e);
-                }
+                    .listener_mut()
+                    .on_readable_changed(true)
             }
             ShutdownType::Send => (),
         }
@@ -2491,6 +2511,16 @@ where
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::get_mark(ctx, id, domain.into_core()).into_fidl()
     }
+
+    fn set_send_buffer(self, send_buffer: u64) {
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
+        T::set_send_buffer(ctx, id, usize::try_from(send_buffer).unwrap_or(usize::MAX));
+    }
+
+    fn get_send_buffer(self) -> u64 {
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
+        T::get_send_buffer(ctx, id).try_into().unwrap_or(u64::MAX)
+    }
 }
 
 impl IntoErrno for ExpectedUnboundError {
@@ -2608,6 +2638,7 @@ mod tests {
     };
     use crate::bindings::socket::queue::MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE;
     use crate::bindings::socket::testutil::TestSockAddr;
+    use crate::bindings::socket::{ZXSIO_SIGNAL_INCOMING, ZXSIO_SIGNAL_OUTGOING};
     use net_types::ip::{IpAddr, IpAddress};
     use net_types::Witness as _;
 
@@ -3683,7 +3714,7 @@ mod tests {
 
         // Wait for all packets to be delivered before changing the buffer size.
         let stack = t.get_mut(0);
-        let has_all_delivered = |messages: &MessageQueue<_>| {
+        let has_all_delivered = |messages: &MessageQueue<_, _>| {
             messages.available_messages().len() == usize::from(SENT_PACKETS)
         };
         loop {

@@ -7,6 +7,7 @@ use errors::{FfxError, IntoExitCode, SourceError};
 use fidl_fuchsia_developer_ffx::{
     DaemonError, OpenTargetError, TargetConnectionError, TunnelError,
 };
+
 /// The default target name if no target spec is given (for debugging, reporting to the user, etc).
 /// TODO(b/371222096): Use this everywhere (will require a bit of digging).
 pub const UNSPECIFIED_TARGET_NAME: &str = "[unspecified]";
@@ -37,6 +38,7 @@ pub enum FfxTargetError {
 
     #[cfg(not(target_os = "fuchsia"))]
     #[error("{}", match .err {
+            OpenTargetError::FailedDiscovery => format!("Could not resolve specification {} due to discovery failure", target_string(.target)),
             OpenTargetError::QueryAmbiguous => {
                 match target_string(.target) {
                     target if target == "\"unspecified\"" => format!("More than one device/emulator found. Use `ffx target list` to list known targets and choose a target with `ffx -t`."),

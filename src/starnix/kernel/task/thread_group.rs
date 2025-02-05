@@ -15,12 +15,12 @@ use crate::task::{
     ptrace_detach, AtomicStopState, ControllingTerminal, CurrentTask, ExitStatus, Kernel, PidTable,
     ProcessGroup, PtraceAllowedPtracers, PtraceEvent, PtraceOptions, PtraceStatus, Session,
     StopState, Task, TaskFlags, TaskMutableState, TaskPersistentInfo, TaskPersistentInfoState,
-    TimerTable, WaitQueue, ZombiePtraces,
+    TimerTable, TypedWaitQueue, ZombiePtraces,
 };
 use itertools::Itertools;
 use macro_rules_attribute::apply;
 use starnix_lifecycle::{AtomicU64Counter, DropNotifier};
-use starnix_logging::{log_error, track_stub};
+use starnix_logging::{log_debug, log_error, track_stub};
 use starnix_sync::{LockBefore, Locked, Mutex, MutexGuard, ProcessGroupState, RwLock, Unlocked};
 use starnix_types::ownership::{OwnedRef, Releasable, TempRef, WeakRef};
 use starnix_types::stats::TaskTimeStats;
@@ -29,7 +29,9 @@ use starnix_uapi::auth::{Credentials, CAP_SYS_ADMIN, CAP_SYS_RESOURCE};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::personality::PersonalityFlags;
 use starnix_uapi::resource_limits::{Resource, ResourceLimits};
-use starnix_uapi::signals::{Signal, UncheckedSignal, SIGCHLD, SIGCONT, SIGHUP, SIGKILL, SIGTTOU};
+use starnix_uapi::signals::{
+    Signal, UncheckedSignal, SIGCHLD, SIGCONT, SIGHUP, SIGKILL, SIGTERM, SIGTTOU,
+};
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
     errno, error, itimerval, pid_t, rlimit, uid_t, ITIMER_PROF, ITIMER_REAL, ITIMER_VIRTUAL,
@@ -39,6 +41,22 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use zx::AsHandleRef;
+
+/// Values used for waiting on the [ThreadGroup] lifecycle wait queue.
+#[repr(u64)]
+pub enum ThreadGroupLifecycleWaitValue {
+    /// Wait for updates to the WaitResults of tasks in the group.
+    ChildStatus,
+    /// Wait for updates to `stopped`.
+    Stopped,
+}
+
+impl Into<u64> for ThreadGroupLifecycleWaitValue {
+    fn into(self) -> u64 {
+        self as u64
+    }
+}
 
 /// The mutable state of the ThreadGroup.
 pub struct ThreadGroupMutableState {
@@ -76,8 +94,8 @@ pub struct ThreadGroupMutableState {
     // exits.
     pub deferred_zombie_ptracers: Vec<(pid_t, pid_t)>,
 
-    /// WaitQueue for updates to the WaitResults of tasks in this group.
-    pub child_status_waiters: WaitQueue,
+    /// Unified [WaitQueue] for all waited ThreadGroup events.
+    pub lifecycle_waiters: TypedWaitQueue<ThreadGroupLifecycleWaitValue>,
 
     /// Whether this thread group will inherit from children of dying processes in its descendant
     /// tree.
@@ -90,9 +108,6 @@ pub struct ThreadGroupMutableState {
     pub timers: TimerTable,
 
     pub did_exec: bool,
-
-    /// Wait queue for updates to `stopped`.
-    pub stopped_waiters: WaitQueue,
 
     /// A signal that indicates whether the process is going to become waitable
     /// via waitid and waitpid for either WSTOPPED or WCONTINUED, depending on
@@ -111,6 +126,9 @@ pub struct ThreadGroupMutableState {
 
     /// Thread groups allowed to trace tasks in this this thread group.
     pub allowed_ptracers: PtraceAllowedPtracers,
+
+    /// Channel to message when this thread group exits.
+    exit_notifier: Option<futures::channel::oneshot::Sender<()>>,
 }
 
 /// A collection of `Task` objects that roughly correspond to a "process".
@@ -196,7 +214,12 @@ pub struct ThreadGroup {
 
 impl fmt::Debug for ThreadGroup {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.leader)
+        write!(
+            f,
+            "{}({})",
+            self.process.get_name().unwrap_or(zx::Name::new_lossy("<unknown>")),
+            self.leader
+        )
     }
 }
 
@@ -450,12 +473,11 @@ impl ThreadGroup {
                     zombie_children: vec![],
                     zombie_ptracees: ZombiePtraces::new(),
                     deferred_zombie_ptracers: vec![],
-                    child_status_waiters: WaitQueue::default(),
+                    lifecycle_waiters: TypedWaitQueue::<ThreadGroupLifecycleWaitValue>::default(),
                     is_child_subreaper: false,
                     process_group: Arc::clone(&process_group),
                     timers: Default::default(),
                     did_exec: false,
-                    stopped_waiters: WaitQueue::default(),
                     last_signal: None,
                     leader_exit_info: None,
                     terminating: false,
@@ -465,6 +487,7 @@ impl ThreadGroup {
                         .map(|p| p.personality)
                         .unwrap_or(Default::default()),
                     allowed_ptracers: PtraceAllowedPtracers::None,
+                    exit_notifier: None,
                 }),
             };
 
@@ -675,7 +698,7 @@ impl ThreadGroup {
         let mut signal_info = zombie.to_wait_result().as_signal_info();
 
         state.zombie_children.push(zombie);
-        state.child_status_waiters.notify_all();
+        state.lifecycle_waiters.notify_value(ThreadGroupLifecycleWaitValue::ChildStatus);
 
         // Send signals
         if let Some(exit_signal) = exit_signal {
@@ -1449,6 +1472,55 @@ impl ThreadGroup {
 
         Ok(Some(signal))
     }
+
+    /// Drive this `ThreadGroup` to exit, allowing it time to handle SIGTERM before sending SIGKILL.
+    ///
+    /// Returns once `ThreadGroup::exit()` has completed.
+    ///
+    /// Must be called from the system task.
+    pub async fn shut_down(this: WeakRef<Self>) {
+        const SHUTDOWN_SIGNAL_HANDLING_TIMEOUT: zx::MonotonicDuration =
+            zx::MonotonicDuration::from_seconds(1);
+
+        // Prepare for shutting down the thread group.
+        let (tg_name, mut on_exited) = {
+            // Nest this upgraded access so TempRefs aren't held across await-points.
+            let Some(this) = this.upgrade() else {
+                return;
+            };
+
+            // Register a channel to be notified when exit() is complete.
+            let (on_exited_send, on_exited) = futures::channel::oneshot::channel();
+            this.write().exit_notifier = Some(on_exited_send);
+
+            // We want to be able to log about this thread group without upgrading the WeakRef.
+            let tg_name = format!("{this:?}");
+
+            (tg_name, on_exited)
+        };
+
+        log_debug!(tg:% = tg_name; "shutting down thread group, sending SIGTERM");
+        this.upgrade().map(|tg| tg.write().send_signal(SignalInfo::default(SIGTERM)));
+
+        // Give thread groups some time to handle SIGTERM, proceeding early if they exit
+        let timeout = fuchsia_async::Timer::new(SHUTDOWN_SIGNAL_HANDLING_TIMEOUT);
+        futures::pin_mut!(timeout);
+
+        // Use select_biased instead of on_timeout() so that we can await on on_exited later
+        futures::select_biased! {
+            _ = &mut on_exited => (),
+            _ = timeout => {
+                log_debug!(tg:% = tg_name; "sending SIGKILL");
+                this.upgrade().map(|tg| tg.write().send_signal(SignalInfo::default(SIGKILL)));
+            },
+        };
+
+        log_debug!(tg:% = tg_name; "waiting for exit");
+        // It doesn't matter whether ThreadGroup::exit() was called or the process exited with
+        // a return code and dropped the sender end of the channel.
+        on_exited.await.ok();
+        log_debug!(tg:% = tg_name; "thread group shutdown complete");
+    }
 }
 
 pub enum WaitableChildResult {
@@ -1492,7 +1564,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
     pub fn get_ppid(&self) -> pid_t {
         match &self.parent {
             Some(parent) => parent.upgrade().leader,
-            None => self.leader(),
+            None => 0,
         }
     }
 
@@ -1762,7 +1834,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
             }
         }
         if new_stopped == StopState::Waking || new_stopped == StopState::ForceWaking {
-            self.stopped_waiters.notify_all();
+            self.lifecycle_waiters.notify_value(ThreadGroupLifecycleWaitValue::Stopped);
         };
 
         let parent = (!new_stopped.is_in_progress()).then(|| self.parent.clone()).flatten();
@@ -1771,7 +1843,10 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
         std::mem::drop(self);
         if let Some(parent) = parent {
             let parent = parent.upgrade();
-            parent.write().child_status_waiters.notify_all();
+            parent
+                .write()
+                .lifecycle_waiters
+                .notify_value(ThreadGroupLifecycleWaitValue::ChildStatus);
         }
 
         new_stopped
@@ -1786,7 +1861,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
     }
 
     /// Sends the signal `signal_info` to this thread group.
-    #[allow(unused_mut)]
+    #[allow(unused_mut, reason = "needed for some but not all macro outputs")]
     pub fn send_signal(mut self, signal_info: SignalInfo) {
         let sigaction = self.base.signal_actions.get(signal_info.signal);
         let action = action_for_signal(&signal_info, sigaction);

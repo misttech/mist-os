@@ -19,6 +19,7 @@ pub const ENV_CUSTOM_TEST_ARGS: &str = "FUCHSIA_CUSTOM_TEST_ARGS";
 pub const ENV_TEST_FILTER: &str = "FUCHSIA_TEST_FILTER";
 pub const ENV_OUT_DIR: &str = "FUCHSIA_TEST_OUTDIR";
 pub const ENV_PATH: &str = "PATH";
+pub const ENV_DEBUG: &str = "DEBUG";
 
 const ENV_STRICT_MODE: &str = "FUCHSIA_TEST_PILOT_STRICT_MODE";
 
@@ -93,6 +94,9 @@ pub struct TestPilotArgs {
 
     /// Extra environment variables passed as it is to the test binary.
     pub extra_env_vars: Vec<(String, String)>,
+
+    /// Pass on a DEBUG environment variable to the test binary.
+    pub debug: bool,
 }
 
 // allows us to mock std::env for unit tests.
@@ -216,6 +220,7 @@ impl TestPilotArgs {
             custom_test_args: env.var(ENV_CUSTOM_TEST_ARGS).ok(),
             strict_mode: env.var(ENV_STRICT_MODE).ok().map_or(true, |m| !m.eq("0")),
             extra_env_vars: vec![],
+            debug: env.var(ENV_DEBUG).map(|_| true).unwrap_or(false),
         };
 
         // Remove known env variables so that we can store extra variables to pass them along.
@@ -575,6 +580,7 @@ mod tests {
             custom_test_args: Some("extra_args".to_string()),
             strict_mode: true,
             extra_env_vars: vec![],
+            debug: false,
         };
 
         let mut test_config = create_test_config_v1();
@@ -596,6 +602,7 @@ mod tests {
             custom_test_args: Some("extra_args".to_string()),
             strict_mode: true,
             extra_env_vars: vec![],
+            debug: false,
         };
 
         let test_config = create_test_config_v1().into();
@@ -618,6 +625,7 @@ mod tests {
             custom_test_args: Some("extra_args".to_string()),
             strict_mode: true,
             extra_env_vars: vec![],
+            debug: false,
         };
 
         let mut test_config = create_test_config_v1();
@@ -642,6 +650,7 @@ mod tests {
             custom_test_args: Some("extra_args".to_string()),
             strict_mode: true,
             extra_env_vars: vec![],
+            debug: false,
         };
 
         let mut test_config = create_test_config_v1();
@@ -666,6 +675,7 @@ mod tests {
             custom_test_args: Some("extra_args".to_string()),
             strict_mode: true,
             extra_env_vars: vec![],
+            debug: false,
         };
 
         let mut test_config = create_test_config_v1();

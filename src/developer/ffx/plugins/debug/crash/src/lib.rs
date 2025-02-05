@@ -6,9 +6,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 use ffx_debug_crash_args::CrashCommand;
 use ffx_zxdb::Debugger;
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_debugger as fdebugger;
 use fidl_fuchsia_exception::ProcessLimboProxy;
+use target_holders::moniker;
 
 #[derive(FfxTool)]
 pub struct CrashTool {

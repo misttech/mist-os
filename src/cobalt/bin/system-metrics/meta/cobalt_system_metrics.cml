@@ -15,7 +15,6 @@
         {
             protocol: [
                 "fuchsia.kernel.Stats",
-                "fuchsia.logger.LogSink",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.ui.activity.Provider",

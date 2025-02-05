@@ -6,10 +6,10 @@ use anyhow::{format_err, Error};
 use fuchsia_async as fasync;
 use futures::channel::mpsc::{channel, SendError};
 use futures::{Sink, SinkExt, Stream, StreamExt};
+use log::{info, warn};
 use rustyline::error::ReadlineError;
 use rustyline::{CompletionType, Config, EditMode, Editor};
 use std::thread;
-use tracing::{info, warn};
 
 use crate::accessor::*;
 use crate::commands::*;
@@ -57,7 +57,7 @@ fn cmd_stream() -> (impl Stream<Item = String>, impl Sink<(), Error = SendError>
                 .edit_mode(EditMode::Emacs)
                 .build();
             let c = CmdHelper::new();
-            let mut rl: Editor<CmdHelper> = Editor::with_config(config);
+            let mut rl: Editor<CmdHelper, _> = Editor::with_config(config)?;
             rl.set_helper(Some(c));
             loop {
                 let readline = rl.readline(PROMPT);

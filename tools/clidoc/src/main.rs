@@ -8,6 +8,8 @@ use argh::FromArgs;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use lazy_static::lazy_static;
+use log::{debug, info};
+use simplelog::{Config, LevelFilter, SimpleLogger};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::ffi::{OsStr, OsString};
@@ -17,7 +19,6 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Once;
 use tar::Builder;
-use tracing::{debug, info};
 
 mod ffx_doc;
 
@@ -161,12 +162,12 @@ static INIT_LOGGER: Once = Once::new();
 fn set_up_logger(opt: &Opt) {
     INIT_LOGGER.call_once(|| {
         if opt.verbose {
-            tracing_subscriber::fmt().compact().with_max_level(tracing::Level::DEBUG).init();
+            let _ = SimpleLogger::init(LevelFilter::Debug, Config::default());
             debug!("Debug logging enabled.");
         } else if opt.quiet {
-            tracing_subscriber::fmt().compact().with_max_level(tracing::Level::WARN).init();
+            let _ = SimpleLogger::init(LevelFilter::Warn, Config::default());
         } else {
-            tracing_subscriber::fmt().compact().with_max_level(tracing::Level::INFO).init();
+            let _ = SimpleLogger::init(LevelFilter::Info, Config::default());
         }
     });
 }

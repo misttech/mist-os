@@ -5,6 +5,7 @@
 #include "src/media/audio/audio_core/v2/audio_renderer_server.h"
 
 #include <lib/async-testing/test_loop.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
 
@@ -47,6 +48,11 @@ class AudioRendererEventHandler : public fidl::WireAsyncEventHandler<fuchsia_med
       : on_fidl_error_(std::move(on_fidl_error)) {}
 
   void on_fidl_error(fidl::UnbindInfo error) final { on_fidl_error_(error); }
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_media::AudioRenderer> metadata) override {
+    FX_LOGS(WARNING) << "AudioRendererEventHandler: unknown event (AudioRenderer) ordinal "
+                     << metadata.event_ordinal;
+  }
 
  private:
   fit::function<void(fidl::UnbindInfo)> on_fidl_error_;
@@ -164,8 +170,17 @@ TEST(AudioRendererServerTest, ErrorUltrasoundForbidsSetUsage) {
       .usage = RenderUsage::ULTRASOUND,
       .format = kFormat,
   });
-  std::ignore = (*h.renderer_client)
-                    ->SetUsage(static_cast<fuchsia_media::AudioRenderUsage>(RenderUsage::MEDIA));
+  std::ignore = (*h.renderer_client)->SetUsage(fuchsia_media::AudioRenderUsage::kMedia);
+  h.loop.RunUntilIdle();
+  EXPECT_EQ(h.renderer_close_status, ZX_ERR_NOT_SUPPORTED);
+}
+
+TEST(AudioRendererServerTest, ErrorUltrasoundForbidsSetUsage2) {
+  TestHarness h({
+      .usage = RenderUsage::ULTRASOUND,
+      .format = kFormat,
+  });
+  std::ignore = (*h.renderer_client)->SetUsage2(fuchsia_media::AudioRenderUsage2::kMedia);
   h.loop.RunUntilIdle();
   EXPECT_EQ(h.renderer_close_status, ZX_ERR_NOT_SUPPORTED);
 }
@@ -299,9 +314,7 @@ TEST(AudioRendererServerTest, ConfigureWithExplicitCalls) {
   ASSERT_EQ((*h.renderer_client)->SetPtsUnits(1, 2).status(), ZX_OK);
   ASSERT_EQ((*h.renderer_client)->SetPtsContinuityThreshold(0.2f).status(), ZX_OK);
   ASSERT_EQ((*h.renderer_client)->SetReferenceClock(std::move(clock)).status(), ZX_OK);
-  ASSERT_EQ((*h.renderer_client)
-                ->SetUsage(static_cast<fuchsia_media::AudioRenderUsage>(RenderUsage::BACKGROUND))
-                .status(),
+  ASSERT_EQ((*h.renderer_client)->SetUsage2(fuchsia_media::AudioRenderUsage2::kBackground).status(),
             ZX_OK);
 
   const Format kExpectedFormat =

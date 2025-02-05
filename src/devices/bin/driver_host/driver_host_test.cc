@@ -189,42 +189,47 @@ class DriverHostTest : public testing::Test {
     EXPECT_TRUE(driver_host_endpoints.is_ok());
 
     fidl::BindServer(loop().dispatcher(), std::move(driver_host_endpoints->server), &driver_host());
-    fidl::Client client(std::move(driver_host_endpoints->client), loop().dispatcher());
-    zx_status_t epitaph = ZX_ERR_BAD_STATE;
-    libsync::Completion start_callback;
+
     {
-      fdata::Dictionary dictionary = {{.entries = std::move(program_entries)}};
+      async::Loop client_loop(&kAsyncLoopConfigNeverAttachToThread);
+      client_loop.StartThread("client");
+      zx_status_t epitaph = ZX_ERR_BAD_STATE;
+      libsync::Completion start_callback;
 
-      fdf::DriverStartArgs driver_start_args = {{
-          .node = node != nullptr ? std::optional(std::move(*node)) : std::nullopt,
-          .symbols = std::move(symbols),
-          .url = "fuchsia-pkg://fuchsia.com/driver#meta/driver.cm",
-          .program = std::move(dictionary),
-          .incoming = std::move(ns_entries),
-          .outgoing_dir = std::move(std::move(outgoing_dir_endpoints.server)),
-      }};
-      client->Start({std::move(driver_start_args), std::move(driver_endpoints->server)})
-          .Then([&](auto result) {
-            if (result.is_ok()) {
-              epitaph = ZX_OK;
-              start_callback.Signal();
-              return;
-            }
-            if (result.error_value().is_framework_error()) {
-              epitaph = result.error_value().framework_error().status();
-              start_callback.Signal();
-              return;
-            }
-            epitaph = result.error_value().domain_error();
-            start_callback.Signal();
-          });
+      async::PostTask(client_loop.dispatcher(), [&]() {
+        fidl::SyncClient client(std::move(driver_host_endpoints->client));
+        fdata::Dictionary dictionary = {{.entries = std::move(program_entries)}};
+
+        fdf::DriverStartArgs driver_start_args = {{
+            .node = node != nullptr ? std::optional(std::move(*node)) : std::nullopt,
+            .symbols = std::move(symbols),
+            .url = "fuchsia-pkg://fuchsia.com/driver#meta/driver.cm",
+            .program = std::move(dictionary),
+            .incoming = std::move(ns_entries),
+            .outgoing_dir = std::move(std::move(outgoing_dir_endpoints.server)),
+        }};
+        auto result =
+            client->Start({std::move(driver_start_args), std::move(driver_endpoints->server)});
+        if (result.is_ok()) {
+          epitaph = ZX_OK;
+          start_callback.Signal();
+          return;
+        }
+        if (result.error_value().is_framework_error()) {
+          epitaph = result.error_value().framework_error().status();
+          start_callback.Signal();
+          return;
+        }
+        epitaph = result.error_value().domain_error();
+        start_callback.Signal();
+      });
+
+      while (!start_callback.signaled()) {
+        loop().RunUntilIdle();
+      }
+
+      EXPECT_EQ(expected_epitaph, epitaph);
     }
-
-    while (!start_callback.signaled()) {
-      loop().RunUntilIdle();
-    }
-
-    EXPECT_EQ(expected_epitaph, epitaph);
 
     return {
         .driver = std::move(driver_endpoints->client),

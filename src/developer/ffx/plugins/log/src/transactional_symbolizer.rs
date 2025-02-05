@@ -5,7 +5,7 @@
 use anyhow::{Context, Error};
 use ffx_config::global_env_context;
 use futures::{ready, select, Future, FutureExt, Stream, StreamExt};
-use log_command::log_formatter::{LogEntry, Symbolize};
+use log_command::{LogEntry, Symbolize};
 use pin_project::pin_project;
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
@@ -258,7 +258,7 @@ pub struct RealSymbolizerProcess {
 impl RealSymbolizerProcess {
     /// Constructs a new symbolizer.
     pub async fn new(enable_prettification: bool) -> Result<Self, LogError> {
-        let sdk = global_env_context().unwrap().get_sdk().await.map_err(|err| {
+        let sdk = global_env_context().unwrap().get_sdk().map_err(|err| {
             tracing::warn!(?err, "Failed to get SDK");
             LogError::SdkNotAvailable { msg: "not found" }
         })?;
@@ -609,7 +609,7 @@ mod tests {
     use assert_matches::assert_matches;
     use diagnostics_data::{BuilderArgs, Data, Logs, LogsDataBuilder, Severity, Timestamp};
     use fuchsia_sync::Mutex;
-    use log_command::log_formatter::LogData;
+    use log_command::LogData;
     use std::fmt::Write;
     use std::sync::Arc;
     use std::task::{Context, Wake};
@@ -686,7 +686,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn string_escape_test() {
+    fn string_escape_test() {
         // Escaped string
         let input = "TXN:0:start\nHello world!\n\n\nTest line 2\nRTXN:0:nothing\nTXN-COMMIT:0:COMMIT\nTXN:1:start";
         // Escaped view of string
@@ -714,7 +714,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn read_transacted_test() {
+    fn read_transacted_test() {
         let mut reader = TransactionReader::default();
         let stdout = "TXN:0:start\nHello world!\n\n\nTest line 2\nRTXN:0:nothing\nTXN-COMMIT:0:COMMIT\nTXN:1:start";
         let lines = stdout.lines();
@@ -941,7 +941,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn transaction_parser_test() {
+    fn transaction_parser_test() {
         // Invalid transaction
         assert_matches!(EscapedMessage::from("TXN:notaninteger:this is not valid").parse(), Err(_));
         // Valid transaction with ignored part. Messages should be on their own line,

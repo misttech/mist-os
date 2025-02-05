@@ -16,6 +16,8 @@ def _fuchsia_board_input_bundle_impl(ctx):
     fuchsia_toolchain = get_fuchsia_sdk_toolchain(ctx)
     driver_entries = []
     creation_inputs = []
+    build_id_dirs = []
+
     for dep in ctx.attr.base_driver_packages:
         driver_entries.append(
             {
@@ -25,6 +27,7 @@ def _fuchsia_board_input_bundle_impl(ctx):
             },
         )
         creation_inputs += dep[FuchsiaPackageInfo].files
+        build_id_dirs += dep[FuchsiaPackageInfo].build_id_dirs
     for dep in ctx.attr.bootfs_driver_packages:
         driver_entries.append(
             {
@@ -34,6 +37,7 @@ def _fuchsia_board_input_bundle_impl(ctx):
             },
         )
         creation_inputs += dep[FuchsiaPackageInfo].files
+        build_id_dirs += dep[FuchsiaPackageInfo].build_id_dirs
 
     # Create driver list file
     driver_list = {"drivers": driver_entries}
@@ -85,6 +89,7 @@ def _fuchsia_board_input_bundle_impl(ctx):
             ],
         )
         creation_inputs += dep[FuchsiaPackageInfo].files
+        build_id_dirs += dep[FuchsiaPackageInfo].build_id_dirs
 
     for dep in ctx.attr.bootfs_packages:
         creation_args.extend(
@@ -94,6 +99,7 @@ def _fuchsia_board_input_bundle_impl(ctx):
             ],
         )
         creation_inputs += dep[FuchsiaPackageInfo].files
+        build_id_dirs += dep[FuchsiaPackageInfo].build_id_dirs
 
     # Create Board Input Bundle
     board_input_bundle_dir = ctx.actions.declare_directory(ctx.label.name)
@@ -129,13 +135,17 @@ def _fuchsia_board_input_bundle_impl(ctx):
         FuchsiaBoardInputBundleInfo(
             config = board_input_bundle_dir,
             files = deps,
+            build_id_dirs = build_id_dirs,
+        ),
+        OutputGroupInfo(
+            build_id_dirs = depset(transitive = build_id_dirs),
         ),
     ]
 
 fuchsia_board_input_bundle = rule(
     doc = """Generates a board input bundle.""",
     implementation = _fuchsia_board_input_bundle_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "base_driver_packages": attr.label_list(
             doc = "Base-driver packages to include in board.",
@@ -201,6 +211,7 @@ def _fuchsia_prebuilt_board_input_bundle_impl(ctx):
         FuchsiaBoardInputBundleInfo(
             config = board_input_bundle,
             files = ctx.files.files,
+            build_id_dirs = [],
         ),
     ]
 

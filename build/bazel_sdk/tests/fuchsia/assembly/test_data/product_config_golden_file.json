@@ -1,0 +1,52 @@
+{
+    "platform": {
+        "build_type": "user",
+        "connectivity": {
+            "wlan": {
+                "legacy_privacy_support": true
+            }
+        },
+        "development_support": {
+            "enabled": true
+        },
+        "diagnostics": {
+            "additional_serial_log_components": [
+                "/core/session-manager",
+                "/core/session-manager/session:session"
+            ],
+            "archivist": "default"
+        },
+        "ui": {
+            "supported_input_devices": [
+                "button",
+                "keyboard"
+            ]
+        }
+    },
+    "product": {
+        "base_drivers": [
+            {
+                "components": [
+                    "meta/backlight_driver.cm"
+                ],
+                "package": "packages/backlight_driver"
+            }
+        ],
+        "packages": {
+            "base": {
+                "ams-light-test": {
+                    "config_data": [
+                        {
+                            "destination": "destination.json",
+                            "source": "product/packages/base/ams-light-test/config_data/destination.json/config_data.json"
+                        }
+                    ],
+                    "manifest": "packages/ams-light-test"
+                }
+            }
+        },
+        "session": {
+            "url": "fuchsia-pkg://fuchsia.com/test_session#meta/test_session.cm"
+        }
+    }
+}

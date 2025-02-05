@@ -72,7 +72,7 @@ void DisplayManager::BindDefaultDisplayCoordinator(
       fit::bind_member<&DisplayManager::OnClientOwnershipChange>(this));
 
   fit::result<fidl::OneWayStatus> enable_vsync_result =
-      (*default_display_coordinator_)->EnableVsync(true);
+      (*default_display_coordinator_)->SetVsyncEventDelivery(true);
   if (enable_vsync_result.is_error()) {
     FX_LOGS(ERROR) << "Failed to enable vsync, status: " << enable_vsync_result.error_value();
   }

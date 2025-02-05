@@ -10,8 +10,8 @@ use errors::{ffx_error, FfxError};
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_debug_args::ComponentDebugCommand;
 use ffx_zxdb::Debugger;
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_developer_remotecontrol as rc;
+use fho::{FfxMain, FfxTool, SimpleWriter};
+use target_holders::{moniker, RemoteControlProxyHolder};
 use zx_types::zx_koid_t;
 
 #[derive(FfxTool)]
@@ -22,7 +22,7 @@ pub struct DebugTool {
     #[with(moniker("/core/debugger"))]
     debugger_proxy: fidl_fuchsia_debugger::LauncherProxy,
 
-    rcs: rc::RemoteControlProxy,
+    rcs: RemoteControlProxyHolder,
 }
 
 fho::embedded_plugin!(DebugTool);

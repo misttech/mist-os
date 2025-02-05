@@ -2,51 +2,184 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::converter::cbpf_to_ebpf;
 use crate::executor::execute;
-use crate::verifier::{
-    verify_program, CallingContext, FunctionSignature, NullVerifierLogger, Type,
-    VerifiedEbpfProgram, VerifierLogger,
-};
+use crate::verifier::VerifiedEbpfProgram;
 use crate::{
-    DataWidth, EbpfError, EbpfInstruction, MapSchema, MemoryId, StructAccess, BPF_CALL, BPF_DW,
-    BPF_JMP, BPF_LDDW, BPF_PSEUDO_MAP_IDX, BPF_SIZE_MASK,
+    CbpfConfig, DataWidth, EbpfError, EbpfInstruction, MapSchema, MemoryId, StructAccess, Type,
+    BPF_CALL, BPF_DW, BPF_JMP, BPF_LDDW, BPF_PSEUDO_MAP_IDX, BPF_SIZE_MASK,
 };
 use derivative::Derivative;
-use linux_uapi::sock_filter;
 use std::collections::HashMap;
 use std::fmt::Formatter;
+use std::mem::size_of;
 use zerocopy::{FromBytes, Immutable, IntoBytes};
 
-/// A counter that allows to generate new ids for parameters. The namespace is the same as for id
-/// generated for types while verifying an ebpf program, but it is started a u64::MAX / 2 and so is
-/// guaranteed to never collide because the number of instruction of an ebpf program are bounded.
-static BPF_TYPE_IDENTIFIER_COUNTER: std::sync::atomic::AtomicU64 =
-    std::sync::atomic::AtomicU64::new(u64::MAX / 2);
+/// Trait that should be implemented for arguments passed to eBPF programs.
+pub trait ProgramArgument: Into<BpfValue> {
+    /// Returns eBPF type that corresponds to `Self`. Used when program argument types
+    /// are checked statically.
+    fn get_type() -> &'static Type;
 
-pub fn new_bpf_type_identifier() -> MemoryId {
-    BPF_TYPE_IDENTIFIER_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed).into()
+    /// Returns eBPF type for a specific value of `Self`. For most types this is the
+    /// same type that's returned by `get_type()`, but that's not always the case.
+    /// In particular for scalar values this will return `Type::ScalarValue` with
+    /// the actual value of the scalar and with `unknown_mask = 0`.
+    fn get_value_type(&self) -> Type {
+        Self::get_type().clone()
+    }
 }
 
-pub trait EbpfRunContext {
-    type Context<'a>;
+/// Trait that should be implemented for types that can be converted from `BpfValue`.
+/// Used to get a `Packet` when loading a value from the packet.
+pub trait FromBpfValue<C>: Sized {
+    /// # Safety
+    /// Should be called only by the eBPF interpreter when executing verified eBPF code.
+    unsafe fn from_bpf_value(context: &mut C, v: BpfValue) -> Self;
 }
 
-impl EbpfRunContext for () {
-    type Context<'a> = ();
+impl ProgramArgument for () {
+    fn get_type() -> &'static Type {
+        &Type::UNINITIALIZED
+    }
+}
+
+impl<C> FromBpfValue<C> for () {
+    unsafe fn from_bpf_value(_context: &mut C, _v: BpfValue) -> Self {
+        unreachable!();
+    }
+}
+
+impl ProgramArgument for usize {
+    fn get_type() -> &'static Type {
+        &Type::UNKNOWN_SCALAR
+    }
+
+    fn get_value_type(&self) -> Type {
+        Type::from(*self as u64)
+    }
+}
+
+impl<'a, T, C> FromBpfValue<C> for &'a mut T
+where
+    &'a mut T: ProgramArgument,
+{
+    unsafe fn from_bpf_value(_context: &mut C, v: BpfValue) -> Self {
+        &mut *v.as_ptr::<T>()
+    }
+}
+
+impl<'a, T, C> FromBpfValue<C> for &'a T
+where
+    &'a T: ProgramArgument,
+{
+    unsafe fn from_bpf_value(_context: &mut C, v: BpfValue) -> Self {
+        &*v.as_ptr::<T>()
+    }
+}
+
+/// A strong reference to an eBPF map held for the lifetime of an eBPF linked
+/// with the map. Can be converted to `BpfValue`, which is used by the program
+/// to identify the map when it calls map helpers.
+pub trait MapReference {
+    fn schema(&self) -> &MapSchema;
+    fn as_bpf_value(&self) -> BpfValue;
+}
+
+/// `MapReference` for `EbpfProgramContext` where maps are not used.
+pub enum NoMap {}
+
+impl MapReference for NoMap {
+    fn schema(&self) -> &MapSchema {
+        unreachable!()
+    }
+    fn as_bpf_value(&self) -> BpfValue {
+        unreachable!()
+    }
+}
+
+pub trait EbpfProgramContext {
+    /// Context for an invocation of an eBPF program.
+    type RunContext<'a>;
+
+    /// Packet used by the program.
+    type Packet<'a>: Packet + FromBpfValue<Self::RunContext<'a>>;
+
+    /// Arguments passed to the program
+    type Arg1<'a>: ProgramArgument;
+    type Arg2<'a>: ProgramArgument;
+    type Arg3<'a>: ProgramArgument;
+    type Arg4<'a>: ProgramArgument;
+    type Arg5<'a>: ProgramArgument;
+
+    /// Type used to reference eBPF maps for the lifetime of a program.
+    type Map: MapReference;
+}
+
+/// Trait that should be implemented by packets passed to eBPF programs.
+pub trait Packet {
+    fn load(&self, offset: i32, width: DataWidth) -> Option<BpfValue>;
+}
+
+impl Packet for () {
+    fn load(&self, _offset: i32, _width: DataWidth) -> Option<BpfValue> {
+        None
+    }
+}
+
+/// Simple `Packet` implementation for packets that can be accessed directly.
+impl<P: IntoBytes + Immutable> Packet for &P {
+    fn load(&self, offset: i32, width: DataWidth) -> Option<BpfValue> {
+        let data = (*self).as_bytes();
+        if offset < 0 || offset as usize >= data.len() {
+            return None;
+        }
+        let slice = &data[(offset as usize)..];
+        match width {
+            DataWidth::U8 => u8::read_from_prefix(slice).ok().map(|(v, _)| v.into()),
+            DataWidth::U16 => u16::read_from_prefix(slice).ok().map(|(v, _)| v.into()),
+            DataWidth::U32 => u32::read_from_prefix(slice).ok().map(|(v, _)| v.into()),
+            DataWidth::U64 => u64::read_from_prefix(slice).ok().map(|(v, _)| v.into()),
+        }
+    }
+}
+
+/// A context for a BPF program that's compatible with eBPF and cBPF.
+pub trait BpfProgramContext {
+    type RunContext<'a>;
+    type Packet<'a>: ProgramArgument + Packet + FromBpfValue<Self::RunContext<'a>>;
+    type Map: MapReference;
+    const CBPF_CONFIG: &'static CbpfConfig;
+
+    fn get_arg_types() -> Vec<Type> {
+        vec![<Self::Packet<'_> as ProgramArgument>::get_type().clone()]
+    }
+}
+
+impl<T: BpfProgramContext + ?Sized> EbpfProgramContext for T {
+    type RunContext<'a> = <T as BpfProgramContext>::RunContext<'a>;
+    type Packet<'a> = T::Packet<'a>;
+    type Arg1<'a> = T::Packet<'a>;
+    type Arg2<'a> = ();
+    type Arg3<'a> = ();
+    type Arg4<'a> = ();
+    type Arg5<'a> = ();
+    type Map = T::Map;
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct BpfValue(u64);
 
-static_assertions::const_assert_eq!(
-    std::mem::size_of::<BpfValue>(),
-    std::mem::size_of::<*const u8>()
-);
+static_assertions::const_assert_eq!(size_of::<BpfValue>(), size_of::<*const u8>());
 
 impl Default for BpfValue {
     fn default() -> Self {
         Self::from(0)
+    }
+}
+
+impl From<()> for BpfValue {
+    fn from(_v: ()) -> Self {
+        Self(0)
     }
 }
 
@@ -97,6 +230,17 @@ impl<T> From<*mut T> for BpfValue {
     }
 }
 
+impl<T> From<&'_ T> for BpfValue {
+    fn from(v: &'_ T) -> Self {
+        Self((v as *const T) as u64)
+    }
+}
+
+impl<T> From<&'_ mut T> for BpfValue {
+    fn from(v: &'_ mut T) -> Self {
+        Self((v as *const T) as u64)
+    }
+}
 impl From<BpfValue> for u8 {
     fn from(v: BpfValue) -> u8 {
         v.0 as u8
@@ -157,79 +301,17 @@ impl BpfValue {
     }
 }
 
-pub trait PacketAccessor<C: EbpfRunContext> {
-    fn load<'a>(
-        &self,
-        context: &mut C::Context<'a>,
-        packet_ptr: BpfValue,
-        offset: i32,
-        width: DataWidth,
-    ) -> Option<BpfValue>;
-    fn packet_len<'a>(&self, context: &mut C::Context<'a>, packet_ptr: BpfValue) -> usize;
-}
-
-impl<'a, C: EbpfRunContext> std::fmt::Debug for &'a dyn PacketAccessor<C> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.debug_struct("PacketAccessor").finish()
-    }
-}
-
-/// A `PacketAccessor` that reads the data from a value of type `T`.
-#[derive(Default)]
-pub struct DirectPacketAccessor<T: IntoBytes + Immutable> {
-    _phantom: std::marker::PhantomData<T>,
-}
-
-impl<C: EbpfRunContext, T: IntoBytes + Immutable> PacketAccessor<C> for DirectPacketAccessor<T> {
-    fn load<'a>(
-        &self,
-        _context: &mut C::Context<'a>,
-        packet_ptr: BpfValue,
-        offset: i32,
-        width: DataWidth,
-    ) -> Option<BpfValue> {
-        let data = unsafe { packet_ptr.as_ptr::<T>().as_ref()? }.as_bytes();
-        if offset < 0 || offset as usize >= data.len() {
-            return None;
-        }
-        let slice = &data[(offset as usize)..];
-        match width {
-            DataWidth::U8 => u8::read_from_prefix(slice).ok().map(|(v, _)| v.into()),
-            DataWidth::U16 => u16::read_from_prefix(slice).ok().map(|(v, _)| v.into()),
-            DataWidth::U32 => u32::read_from_prefix(slice).ok().map(|(v, _)| v.into()),
-            DataWidth::U64 => u64::read_from_prefix(slice).ok().map(|(v, _)| v.into()),
-        }
-    }
-
-    fn packet_len<'a>(&self, _context: &mut C::Context<'a>, _packet_ptr: BpfValue) -> usize {
-        std::mem::size_of::<T>()
-    }
-}
-
-/// A `PacketAccessor` for the case when the is no packet.
-#[derive(Default)]
-pub struct EmptyPacketAccessor {}
-
-impl<C: EbpfRunContext> PacketAccessor<C> for EmptyPacketAccessor {
-    fn load<'a>(
-        &self,
-        _context: &mut C::Context<'a>,
-        _packet_ptr: BpfValue,
-        _offset: i32,
-        _width: DataWidth,
-    ) -> Option<BpfValue> {
-        None
-    }
-    fn packet_len<'a>(&self, _context: &mut C::Context<'a>, _packet_ptr: BpfValue) -> usize {
-        0
+impl From<BpfValue> for () {
+    fn from(_v: BpfValue) -> Self {
+        ()
     }
 }
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
-pub struct EbpfHelperImpl<C: EbpfRunContext>(
+pub struct EbpfHelperImpl<C: EbpfProgramContext>(
     pub  for<'a> fn(
-        &mut C::Context<'a>,
+        &mut C::RunContext<'a>,
         BpfValue,
         BpfValue,
         BpfValue,
@@ -259,20 +341,181 @@ pub struct StructMapping {
     pub fields: Vec<FieldMapping>,
 }
 
-#[derive(Clone, Debug)]
-pub struct MapDescriptor {
-    pub schema: MapSchema,
-    pub ptr: BpfValue,
+pub trait ArgumentTypeChecker<C: EbpfProgramContext>: Sized {
+    fn link(program: &VerifiedEbpfProgram) -> Result<Self, EbpfError>;
+    fn run_time_check<'a>(
+        &self,
+        arg1: &C::Arg1<'a>,
+        arg2: &C::Arg2<'a>,
+        arg3: &C::Arg3<'a>,
+        arg4: &C::Arg4<'a>,
+        arg5: &C::Arg5<'a>,
+    ) -> Result<(), EbpfError>;
+}
+
+pub struct StaticTypeChecker();
+
+impl<C: EbpfProgramContext> ArgumentTypeChecker<C> for StaticTypeChecker {
+    fn link(program: &VerifiedEbpfProgram) -> Result<Self, EbpfError> {
+        let arg_types = [
+            C::Arg1::get_type(),
+            C::Arg2::get_type(),
+            C::Arg3::get_type(),
+            C::Arg4::get_type(),
+            C::Arg5::get_type(),
+        ];
+        for i in 0..5 {
+            let verified_type = program.args.get(i).unwrap_or(&Type::UNINITIALIZED);
+            if !arg_types[i].is_subtype(verified_type) {
+                return Err(EbpfError::ProgramLinkError(format!(
+                    "Type of argument {} doesn't match. Verified type: {:?}. Context type: {:?}",
+                    i + 1,
+                    verified_type,
+                    arg_types[i],
+                )));
+            }
+        }
+
+        Ok(Self())
+    }
+
+    fn run_time_check<'a>(
+        &self,
+        _arg1: &C::Arg1<'a>,
+        _arg2: &C::Arg2<'a>,
+        _arg3: &C::Arg3<'a>,
+        _arg4: &C::Arg4<'a>,
+        _arg5: &C::Arg5<'a>,
+    ) -> Result<(), EbpfError> {
+        // No-op since argument types were checked in `link()`.
+        Ok(())
+    }
+}
+
+pub struct DynamicTypeChecker {
+    types: Vec<Type>,
+}
+
+impl<C: EbpfProgramContext> ArgumentTypeChecker<C> for DynamicTypeChecker {
+    fn link(program: &VerifiedEbpfProgram) -> Result<Self, EbpfError> {
+        Ok(Self { types: program.args.clone() })
+    }
+
+    fn run_time_check<'a>(
+        &self,
+        arg1: &C::Arg1<'a>,
+        arg2: &C::Arg2<'a>,
+        arg3: &C::Arg3<'a>,
+        arg4: &C::Arg4<'a>,
+        arg5: &C::Arg5<'a>,
+    ) -> Result<(), EbpfError> {
+        let arg_types = [
+            arg1.get_value_type(),
+            arg2.get_value_type(),
+            arg3.get_value_type(),
+            arg4.get_value_type(),
+            arg5.get_value_type(),
+        ];
+        for i in 0..5 {
+            let verified_type = self.types.get(i).unwrap_or(&Type::UNINITIALIZED);
+            if !&arg_types[i].is_subtype(verified_type) {
+                return Err(EbpfError::ProgramLinkError(format!(
+                    "Type of argument {} doesn't match. Verified type: {:?}. Value type: {:?}",
+                    i + 1,
+                    verified_type,
+                    arg_types[i],
+                )));
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// An abstraction over an eBPF program and its registered helper functions.
+pub struct EbpfProgram<C: EbpfProgramContext, T: ArgumentTypeChecker<C> = StaticTypeChecker> {
+    pub(crate) code: Vec<EbpfInstruction>,
+
+    /// List of references to the maps used by the program. This field is not used directly,
+    /// but it's kept here to ensure that the maps outlive the program.
+    #[allow(dead_code)]
+    pub(crate) maps: Vec<C::Map>,
+
+    pub(crate) helpers: HashMap<u32, EbpfHelperImpl<C>>,
+    type_checker: T,
+}
+
+impl<C: EbpfProgramContext, T: ArgumentTypeChecker<C>> std::fmt::Debug for EbpfProgram<C, T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.debug_struct("EbpfProgram").field("code", &self.code).finish()
+    }
+}
+
+impl<C: EbpfProgramContext, T: ArgumentTypeChecker<C>> EbpfProgram<C, T> {
+    pub fn code(&self) -> &[EbpfInstruction] {
+        &self.code[..]
+    }
+}
+
+impl<C, T: ArgumentTypeChecker<C>> EbpfProgram<C, T>
+where
+    C: for<'a> EbpfProgramContext<Arg2<'a> = (), Arg3<'a> = (), Arg4<'a> = (), Arg5<'a> = ()>,
+{
+    pub fn run_with_1_argument<'a>(
+        &self,
+        run_context: &mut C::RunContext<'a>,
+        arg1: C::Arg1<'a>,
+    ) -> u64 {
+        self.type_checker
+            .run_time_check(&arg1, &(), &(), &(), &())
+            .expect("Failed argument type check");
+        execute(&self.code[..], &self.helpers, run_context, &[arg1.into()])
+    }
+}
+
+impl<C, T: ArgumentTypeChecker<C>> EbpfProgram<C, T>
+where
+    C: for<'a> EbpfProgramContext<Arg3<'a> = (), Arg4<'a> = (), Arg5<'a> = ()>,
+{
+    pub fn run_with_2_arguments<'a>(
+        &self,
+        run_context: &mut C::RunContext<'a>,
+        arg1: C::Arg1<'a>,
+        arg2: C::Arg2<'a>,
+    ) -> u64 {
+        self.type_checker
+            .run_time_check(&arg1, &arg2, &(), &(), &())
+            .expect("Failed argument type check");
+        execute(&self.code[..], &self.helpers, run_context, &[arg1.into(), arg2.into()])
+    }
+}
+
+impl<C: BpfProgramContext, T: ArgumentTypeChecker<C>> EbpfProgram<C, T>
+where
+    for<'a> C: BpfProgramContext,
+{
+    /// Executes the current program on the specified `packet`.
+    /// The program receives a pointer to the `packet` and the size of the packet as the first
+    /// two arguments.
+    pub fn run<'a>(
+        &self,
+        run_context: &mut <C as EbpfProgramContext>::RunContext<'a>,
+        packet: C::Packet<'a>,
+    ) -> u64 {
+        self.run_with_1_argument(run_context, packet)
+    }
 }
 
 /// Rewrites the code to ensure mapped fields are correctly handled. Returns
 /// runnable `EbpfProgram<C>`.
-pub fn link_program<C: EbpfRunContext>(
+pub fn link_program_internal<C: EbpfProgramContext, T: ArgumentTypeChecker<C>>(
     program: &VerifiedEbpfProgram,
     struct_mappings: &[StructMapping],
-    maps: &[MapDescriptor],
+    maps: Vec<C::Map>,
     helpers: HashMap<u32, EbpfHelperImpl<C>>,
-) -> Result<EbpfProgram<C>, EbpfError> {
+) -> Result<EbpfProgram<C, T>, EbpfError> {
+    let type_checker = T::link(program)?;
+
     let mut code = program.code.clone();
 
     // Update offsets in the instructions that access structs.
@@ -337,13 +580,12 @@ pub fn link_program<C: EbpfRunContext>(
                 BPF_PSEUDO_MAP_IDX => {
                     let map_index = usize::try_from(instruction.imm)
                         .expect("negative map index in a verified program");
-                    let MapDescriptor { schema, ptr: map_ptr } =
-                        maps.get(map_index).ok_or_else(|| {
-                            EbpfError::ProgramLinkError(format!("Invalid map_index: {}", map_index))
-                        })?;
-                    assert!(*schema == program.maps[map_index]);
+                    let map = maps.get(map_index).ok_or_else(|| {
+                        EbpfError::ProgramLinkError(format!("Invalid map_index: {}", map_index))
+                    })?;
+                    assert!(*map.schema() == program.maps[map_index]);
 
-                    let map_ptr = map_ptr.as_u64();
+                    let map_ptr = map.as_bpf_value().as_u64();
                     let (high, low) = ((map_ptr >> 32) as i32, map_ptr as i32);
                     instruction.set_src_reg(0);
                     instruction.imm = low;
@@ -362,152 +604,28 @@ pub fn link_program<C: EbpfRunContext>(
         }
     }
 
-    Ok(EbpfProgram { code, helpers })
+    Ok(EbpfProgram { code, maps, helpers, type_checker })
 }
 
-#[derive(Derivative)]
-#[derivative(Default(bound = ""))]
-pub struct EbpfProgramBuilder<C: EbpfRunContext> {
-    calling_context: CallingContext,
-    struct_mappings: Vec<StructMapping>,
-    maps: Vec<MapDescriptor>,
-    helper_impls: HashMap<u32, EbpfHelperImpl<C>>,
+/// Rewrites the code to ensure mapped fields are correctly handled. Returns
+/// runnable `EbpfProgram<C>`.
+pub fn link_program<C: EbpfProgramContext>(
+    program: &VerifiedEbpfProgram,
+    struct_mappings: &[StructMapping],
+    maps: Vec<C::Map>,
+    helpers: HashMap<u32, EbpfHelperImpl<C>>,
+) -> Result<EbpfProgram<C>, EbpfError> {
+    link_program_internal::<C, StaticTypeChecker>(program, struct_mappings, maps, helpers)
 }
 
-impl<C: EbpfRunContext> std::fmt::Debug for EbpfProgramBuilder<C> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.debug_struct("EbpfProgramBuilder")
-            .field("calling_context", &self.calling_context)
-            .field("struct_mappings", &self.struct_mappings)
-            .field("maps", &self.maps)
-            .finish()
-    }
-}
-
-impl<C: EbpfRunContext> EbpfProgramBuilder<C> {
-    // Adds a new map to the calling context. Returns the index that should be used to reference the map.
-    pub fn register_map(&mut self, desc: MapDescriptor) -> usize {
-        let index = self.calling_context.register_map(desc.schema);
-        assert_eq!(self.maps.len(), index);
-        self.maps.push(desc);
-        index
-    }
-
-    pub fn set_args(&mut self, args: &[Type]) {
-        self.calling_context.set_args(args);
-    }
-
-    pub fn set_packet_memory_id(&mut self, packet_memory_id: MemoryId) {
-        self.calling_context.set_packet_memory_id(packet_memory_id);
-    }
-
-    pub fn register_struct_mapping(&mut self, mapping: StructMapping) {
-        self.struct_mappings.push(mapping);
-    }
-
-    pub fn set_helpers(&mut self, helpers: HashMap<u32, FunctionSignature>) {
-        self.calling_context.set_helpers(helpers);
-    }
-
-    pub fn set_helper_impls(&mut self, helper_impls: HashMap<u32, EbpfHelperImpl<C>>) {
-        self.helper_impls = helper_impls;
-    }
-
-    pub fn load(
-        self,
-        code: Vec<EbpfInstruction>,
-        logger: &mut dyn VerifierLogger,
-    ) -> Result<EbpfProgram<C>, EbpfError> {
-        let Self { calling_context, struct_mappings, maps, helper_impls } = self;
-        let verified_program = verify_program(code, calling_context, logger)?;
-        link_program(&verified_program, &struct_mappings, &maps, helper_impls)
-    }
-}
-
-/// An abstraction over an eBPF program and its registered helper functions.
-pub struct EbpfProgram<C: EbpfRunContext> {
-    pub code: Vec<EbpfInstruction>,
-    pub helpers: HashMap<u32, EbpfHelperImpl<C>>,
-}
-
-impl<C: EbpfRunContext> std::fmt::Debug for EbpfProgram<C> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.debug_struct("EbpfProgramBuilder").field("code", &self.code).finish()
-    }
-}
-
-impl<C: EbpfRunContext> EbpfProgram<C> {
-    /// Executes the current program on the specified `data`.
-    /// The program receives a pointer to the `data` and the size of the packet (provided by the
-    /// `PacketAccessor`) as the first two arguments.
-    ///
-    /// Warning: If this program was a cBPF program then the `data` must be the
-    /// packet. It's passed to the `PacketAccessor` as the packet. `packet_size`
-    /// specified the value loaded by `BPF_LD | BPF_LEN`.
-    ///
-    /// TODO(https://fxbug.dev/376284982) Currently there is nothing to ensure that the type of
-    /// the argument matches the type specified when the program was verified and that it matches
-    /// the type of the packet expected by the `packet_accessor`.
-    pub fn run<T>(
-        &self,
-        run_context: &mut C::Context<'_>,
-        packet_accessor: &dyn PacketAccessor<C>,
-        data: &mut T,
-    ) -> u64 {
-        let packet_ptr: BpfValue = (data as *mut T).into();
-        let packet_len = packet_accessor.packet_len(run_context, packet_ptr);
-        self.run_with_arguments(run_context, packet_accessor, &[packet_ptr, packet_len.into()])
-    }
-
-    /// Executes the current program on the provided data.
-    pub fn run_with_slice(
-        &self,
-        run_context: &mut C::Context<'_>,
-        packet_accessor: &dyn PacketAccessor<C>,
-        data: &mut [u8],
-    ) -> u64 {
-        self.run_with_arguments(
-            run_context,
-            packet_accessor,
-            &[data.as_mut_ptr().into(), data.len().into()],
-        )
-    }
-
-    pub fn run_with_arguments(
-        &self,
-        run_context: &mut C::Context<'_>,
-        packet_accessor: &dyn PacketAccessor<C>,
-        arguments: &[BpfValue],
-    ) -> u64 {
-        execute(self, run_context, packet_accessor, arguments)
-    }
-}
-
-impl EbpfProgram<()> {
-    pub fn from_verified_code(code: Vec<EbpfInstruction>) -> Self {
-        Self { code, helpers: Default::default() }
-    }
-
-    pub fn code(&self) -> &[EbpfInstruction] {
-        &self.code[..]
-    }
-
-    /// This method instantiates an EbpfProgram given a cbpf original.
-    pub fn from_cbpf(bpf_code: &[sock_filter]) -> Result<Self, EbpfError> {
-        let mut builder = EbpfProgramBuilder::default();
-        let packet_memory_id = new_bpf_type_identifier();
-        builder.set_args(&[
-            // Pointer to the packet (e.g. `__sk_buff`). `buffer_size` is set to 0 because the
-            // packet is supposed to be access only through the `PacketAccessor` which validates
-            // the offset in runtime.
-            Type::PtrToMemory { id: packet_memory_id.clone(), offset: 0, buffer_size: 0 },
-            // Packet size (see `BPF_LEN` in cBPF). This may be different from the size of the
-            // value pointed by the first argument.
-            Type::ScalarValueParameter,
-        ]);
-        builder.set_packet_memory_id(packet_memory_id);
-        builder.load(cbpf_to_ebpf(bpf_code)?, &mut NullVerifierLogger)
-    }
+/// Same as above, but allows to check argument types in runtime instead of in link time.
+pub fn link_program_dynamic<C: EbpfProgramContext>(
+    program: &VerifiedEbpfProgram,
+    struct_mappings: &[StructMapping],
+    maps: Vec<C::Map>,
+    helpers: HashMap<u32, EbpfHelperImpl<C>>,
+) -> Result<EbpfProgram<C, DynamicTypeChecker>, EbpfError> {
+    link_program_internal::<C, DynamicTypeChecker>(program, struct_mappings, maps, helpers)
 }
 
 #[cfg(test)]
@@ -515,218 +633,17 @@ mod test {
     use super::*;
     use crate::api::*;
     use crate::conformance::test::parse_asm;
-    use crate::{FieldDescriptor, FieldMapping, FieldType, NullVerifierLogger, StructDescriptor};
-    use linux_uapi::{
-        seccomp_data, AUDIT_ARCH_AARCH64, AUDIT_ARCH_X86_64, SECCOMP_RET_ALLOW, SECCOMP_RET_TRAP,
+    use crate::{
+        verify_program, CallingContext, FieldDescriptor, FieldMapping, FieldType,
+        NullVerifierLogger, ProgramArgument, StructDescriptor, Type,
     };
+    use std::mem::offset_of;
     use std::sync::{Arc, LazyLock};
     use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
-    const BPF_ALU_ADD_K: u16 = (BPF_ALU | BPF_ADD | BPF_K) as u16;
-    const BPF_ALU_SUB_K: u16 = (BPF_ALU | BPF_SUB | BPF_K) as u16;
-    const BPF_ALU_MUL_K: u16 = (BPF_ALU | BPF_MUL | BPF_K) as u16;
-    const BPF_ALU_DIV_K: u16 = (BPF_ALU | BPF_DIV | BPF_K) as u16;
-    const BPF_ALU_AND_K: u16 = (BPF_ALU | BPF_AND | BPF_K) as u16;
-    const BPF_ALU_OR_K: u16 = (BPF_ALU | BPF_OR | BPF_K) as u16;
-    const BPF_ALU_XOR_K: u16 = (BPF_ALU | BPF_XOR | BPF_K) as u16;
-    const BPF_ALU_LSH_K: u16 = (BPF_ALU | BPF_LSH | BPF_K) as u16;
-    const BPF_ALU_RSH_K: u16 = (BPF_ALU | BPF_RSH | BPF_K) as u16;
-
-    const BPF_ALU_OR_X: u16 = (BPF_ALU | BPF_OR | BPF_X) as u16;
-
-    const BPF_LD_W_ABS: u16 = (BPF_LD | BPF_ABS | BPF_W) as u16;
-    const BPF_LD_W_MEM: u16 = (BPF_LD | BPF_MEM | BPF_W) as u16;
-    const BPF_JEQ_K: u16 = (BPF_JMP | BPF_JEQ | BPF_K) as u16;
-    const BPF_JSET_K: u16 = (BPF_JMP | BPF_JSET | BPF_K) as u16;
-    const BPF_RET_K: u16 = (BPF_RET | BPF_K) as u16;
-    const BPF_RET_A: u16 = (BPF_RET | BPF_A) as u16;
-    const BPF_ST_REG: u16 = BPF_ST as u16;
-    const BPF_MISC_TAX: u16 = (BPF_MISC | BPF_TAX) as u16;
-
-    fn with_prg_assert_result(
-        prg: &EbpfProgram<()>,
-        mut data: seccomp_data,
-        result: u32,
-        msg: &str,
-    ) {
-        let return_value =
-            prg.run(&mut (), &DirectPacketAccessor::<seccomp_data>::default(), &mut data);
-        assert_eq!(return_value, result as u64, "{}: filter return value is {}", msg, return_value);
-    }
-
-    #[test]
-    fn test_filter_with_dw_load() {
-        let test_prg = [
-            // Check data.arch
-            sock_filter { code: BPF_LD_W_ABS, jt: 0, jf: 0, k: 4 },
-            sock_filter { code: BPF_JEQ_K, jt: 1, jf: 0, k: AUDIT_ARCH_X86_64 },
-            // Return 1 if arch is wrong
-            sock_filter { code: BPF_RET_K, jt: 0, jf: 0, k: 1 },
-            // Load data.nr (the syscall number)
-            sock_filter { code: BPF_LD_W_ABS, jt: 0, jf: 0, k: 0 },
-            // Always allow 41
-            sock_filter { code: BPF_JEQ_K, jt: 0, jf: 1, k: 41 },
-            sock_filter { code: BPF_RET_K, jt: 0, jf: 0, k: SECCOMP_RET_ALLOW },
-            // Don't allow 115
-            sock_filter { code: BPF_JEQ_K, jt: 0, jf: 1, k: 115 },
-            sock_filter { code: BPF_RET_K, jt: 0, jf: 0, k: SECCOMP_RET_TRAP },
-            // For other syscalls, check the args
-            // A common hack to deal with 64-bit numbers in BPF: deal
-            // with 32 bits at a time.
-            // First, Load arg0's most significant 32 bits in M[0]
-            sock_filter { code: BPF_LD_W_ABS, jt: 0, jf: 0, k: 16 },
-            sock_filter { code: BPF_ST_REG, jt: 0, jf: 0, k: 0 },
-            // Load arg0's least significant 32 bits into M[1]
-            sock_filter { code: BPF_LD_W_ABS, jt: 0, jf: 0, k: 20 },
-            sock_filter { code: BPF_ST_REG, jt: 0, jf: 0, k: 1 },
-            // JSET is A & k.  Check the first 32 bits.  If the test
-            // is successful, jump, otherwise, check the next 32 bits.
-            sock_filter { code: BPF_LD_W_MEM, jt: 0, jf: 0, k: 0 },
-            sock_filter { code: BPF_JSET_K, jt: 2, jf: 0, k: 4294967295 },
-            sock_filter { code: BPF_LD_W_MEM, jt: 0, jf: 0, k: 1 },
-            sock_filter { code: BPF_JSET_K, jt: 0, jf: 1, k: 4294967292 },
-            sock_filter { code: BPF_RET_K, jt: 0, jf: 0, k: SECCOMP_RET_TRAP },
-            sock_filter { code: BPF_RET_K, jt: 0, jf: 0, k: SECCOMP_RET_ALLOW },
-        ];
-
-        let prg = EbpfProgram::<()>::from_cbpf(&test_prg).expect("Error parsing program");
-
-        with_prg_assert_result(
-            &prg,
-            seccomp_data { arch: AUDIT_ARCH_AARCH64, ..Default::default() },
-            1,
-            "Did not reject incorrect arch",
-        );
-
-        with_prg_assert_result(
-            &prg,
-            seccomp_data { arch: AUDIT_ARCH_X86_64, nr: 41, ..Default::default() },
-            SECCOMP_RET_ALLOW,
-            "Did not pass simple RET_ALLOW",
-        );
-
-        with_prg_assert_result(
-            &prg,
-            seccomp_data {
-                arch: AUDIT_ARCH_X86_64,
-                nr: 100,
-                args: [0xFF00000000, 0, 0, 0, 0, 0],
-                ..Default::default()
-            },
-            SECCOMP_RET_TRAP,
-            "Did not treat load of first 32 bits correctly",
-        );
-
-        with_prg_assert_result(
-            &prg,
-            seccomp_data {
-                arch: AUDIT_ARCH_X86_64,
-                nr: 100,
-                args: [0x4, 0, 0, 0, 0, 0],
-                ..Default::default()
-            },
-            SECCOMP_RET_TRAP,
-            "Did not correctly reject load of second 32 bits",
-        );
-
-        with_prg_assert_result(
-            &prg,
-            seccomp_data {
-                arch: AUDIT_ARCH_X86_64,
-                nr: 100,
-                args: [0x0, 0, 0, 0, 0, 0],
-                ..Default::default()
-            },
-            SECCOMP_RET_ALLOW,
-            "Did not correctly accept load of second 32 bits",
-        );
-    }
-
-    #[test]
-    fn test_alu_insns() {
-        {
-            let test_prg = [
-                // Load data.nr (the syscall number)
-                sock_filter { code: BPF_LD_W_ABS, jt: 0, jf: 0, k: 0 }, // = 1, 11
-                // Do some math.
-                sock_filter { code: BPF_ALU_ADD_K, jt: 0, jf: 0, k: 3 }, // = 4, 14
-                sock_filter { code: BPF_ALU_SUB_K, jt: 0, jf: 0, k: 2 }, // = 2, 12
-                sock_filter { code: BPF_MISC_TAX, jt: 0, jf: 0, k: 0 },  // 2, 12 -> X
-                sock_filter { code: BPF_ALU_MUL_K, jt: 0, jf: 0, k: 8 }, // = 16, 96
-                sock_filter { code: BPF_ALU_DIV_K, jt: 0, jf: 0, k: 2 }, // = 8, 48
-                sock_filter { code: BPF_ALU_AND_K, jt: 0, jf: 0, k: 15 }, // = 8, 0
-                sock_filter { code: BPF_ALU_OR_K, jt: 0, jf: 0, k: 16 }, // = 24, 16
-                sock_filter { code: BPF_ALU_XOR_K, jt: 0, jf: 0, k: 7 }, // = 31, 23
-                sock_filter { code: BPF_ALU_LSH_K, jt: 0, jf: 0, k: 2 }, // = 124, 92
-                sock_filter { code: BPF_ALU_OR_X, jt: 0, jf: 0, k: 1 },  // = 127, 92
-                sock_filter { code: BPF_ALU_RSH_K, jt: 0, jf: 0, k: 1 }, // = 63, 46
-                sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
-            ];
-
-            let prg = EbpfProgram::<()>::from_cbpf(&test_prg).expect("Error parsing program");
-
-            with_prg_assert_result(
-                &prg,
-                seccomp_data { nr: 1, ..Default::default() },
-                63,
-                "BPF math does not work",
-            );
-
-            with_prg_assert_result(
-                &prg,
-                seccomp_data { nr: 11, ..Default::default() },
-                46,
-                "BPF math does not work",
-            );
-        }
-
-        {
-            // Negative numbers simple check
-            let test_prg = [
-                // Load data.nr (the syscall number)
-                sock_filter { code: BPF_LD_W_ABS, jt: 0, jf: 0, k: 0 }, // = -1
-                sock_filter { code: BPF_ALU_SUB_K, jt: 0, jf: 0, k: 2 }, // = -3
-                sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
-            ];
-
-            let prg = EbpfProgram::<()>::from_cbpf(&test_prg).expect("Error parsing program");
-
-            with_prg_assert_result(
-                &prg,
-                seccomp_data { nr: -1, ..Default::default() },
-                u32::MAX - 2,
-                "BPF math does not work",
-            );
-        }
-    }
-
-    // Test BPF_MSH cBPF instruction.
-    #[test]
-    fn test_ld_msh() {
-        let test_prg = [
-            // X <- 4 * (P[0] & 0xf)
-            sock_filter { code: (BPF_LDX | BPF_MSH | BPF_B) as u16, jt: 0, jf: 0, k: 0 },
-            // A <- X
-            sock_filter { code: (BPF_MISC | BPF_TXA) as u16, jt: 0, jf: 0, k: 0 },
-            // ret A
-            sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
-        ];
-
-        let prg = EbpfProgram::<()>::from_cbpf(&test_prg).expect("Error parsing program");
-
-        for i in [0x00, 0x01, 0x07, 0x15, 0xff].iter() {
-            with_prg_assert_result(
-                &prg,
-                seccomp_data { nr: *i, ..Default::default() },
-                4 * (*i & 0xf) as u32,
-                "BPF math does not work",
-            )
-        }
-    }
-
     #[repr(C)]
     #[derive(Debug, Copy, Clone, IntoBytes, Immutable, KnownLayout, FromBytes)]
-    struct ProgramArgument {
+    struct TestArgument {
         // A field that should not be writable by the program.
         pub read_only_field: u32,
         pub _padding1: u32,
@@ -739,15 +656,39 @@ mod test {
         pub _padding2: u32,
     }
 
-    // A version of ProgramArgument with 32-bit remapped pointers.
-    struct ProgramArgument32 {
-        pub read_only_field: u32,
-        pub data: u32,
-        pub data_end: u32,
-        pub mutable_field: u32,
-    }
+    static TEST_ARG_TYPE: LazyLock<Type> = LazyLock::new(|| {
+        let data_memory_id = MemoryId::new();
+        let descriptor = Arc::new(StructDescriptor {
+            fields: vec![
+                FieldDescriptor {
+                    offset: offset_of!(TestArgument, read_only_field),
+                    field_type: FieldType::Scalar { size: 4 },
+                },
+                FieldDescriptor {
+                    offset: offset_of!(TestArgument, data),
+                    field_type: FieldType::PtrToArray {
+                        is_32_bit: false,
+                        id: data_memory_id.clone(),
+                    },
+                },
+                FieldDescriptor {
+                    offset: offset_of!(TestArgument, data_end),
+                    field_type: FieldType::PtrToEndArray {
+                        is_32_bit: false,
+                        id: data_memory_id.clone(),
+                    },
+                },
+                FieldDescriptor {
+                    offset: offset_of!(TestArgument, mutable_field),
+                    field_type: FieldType::MutableScalar { size: 4 },
+                },
+            ],
+        });
 
-    impl Default for ProgramArgument {
+        Type::PtrToStruct { id: MemoryId::new(), offset: 0, descriptor }
+    });
+
+    impl Default for TestArgument {
         fn default() -> Self {
             Self {
                 read_only_field: 1,
@@ -760,87 +701,7 @@ mod test {
         }
     }
 
-    static ARG_MEMORY_ID: LazyLock<MemoryId> = LazyLock::new(|| new_bpf_type_identifier());
-
-    impl ProgramArgument {
-        fn get_type() -> Type {
-            let array_id = new_bpf_type_identifier();
-
-            let descriptor = Arc::new(StructDescriptor {
-                fields: vec![
-                    FieldDescriptor {
-                        offset: std::mem::offset_of!(ProgramArgument, read_only_field),
-                        field_type: FieldType::Scalar { size: 4 },
-                    },
-                    FieldDescriptor {
-                        offset: std::mem::offset_of!(ProgramArgument, data),
-                        field_type: FieldType::PtrToArray {
-                            is_32_bit: false,
-                            id: array_id.clone(),
-                        },
-                    },
-                    FieldDescriptor {
-                        offset: std::mem::offset_of!(ProgramArgument, data_end),
-                        field_type: FieldType::PtrToEndArray { is_32_bit: false, id: array_id },
-                    },
-                    FieldDescriptor {
-                        offset: std::mem::offset_of!(ProgramArgument, mutable_field),
-                        field_type: FieldType::MutableScalar { size: 4 },
-                    },
-                ],
-            });
-
-            Type::PtrToStruct { id: (*ARG_MEMORY_ID).clone(), offset: 0, descriptor }
-        }
-
-        // Returns type def for a program that takes `ProgramArgument32`, but remaps access to `ProgramArgument`.
-        fn get_type_32bit() -> Type {
-            let array_id = new_bpf_type_identifier();
-
-            let descriptor = Arc::new(StructDescriptor {
-                fields: vec![
-                    FieldDescriptor {
-                        offset: std::mem::offset_of!(ProgramArgument32, read_only_field),
-                        field_type: FieldType::Scalar { size: 4 },
-                    },
-                    FieldDescriptor {
-                        offset: std::mem::offset_of!(ProgramArgument32, data),
-                        field_type: FieldType::PtrToArray { is_32_bit: true, id: array_id.clone() },
-                    },
-                    FieldDescriptor {
-                        offset: std::mem::offset_of!(ProgramArgument32, data_end),
-                        field_type: FieldType::PtrToEndArray { is_32_bit: true, id: array_id },
-                    },
-                    FieldDescriptor {
-                        offset: std::mem::offset_of!(ProgramArgument32, mutable_field),
-                        field_type: FieldType::MutableScalar { size: 4 },
-                    },
-                ],
-            });
-
-            Type::PtrToStruct { id: (*ARG_MEMORY_ID).clone(), offset: 0, descriptor }
-        }
-
-        fn get_32bit_mapping() -> StructMapping {
-            StructMapping {
-                memory_id: ARG_MEMORY_ID.clone(),
-                fields: vec![
-                    FieldMapping {
-                        source_offset: std::mem::offset_of!(ProgramArgument32, data),
-                        target_offset: std::mem::offset_of!(ProgramArgument, data),
-                    },
-                    FieldMapping {
-                        source_offset: std::mem::offset_of!(ProgramArgument32, data_end),
-                        target_offset: std::mem::offset_of!(ProgramArgument, data_end),
-                    },
-                    FieldMapping {
-                        source_offset: std::mem::offset_of!(ProgramArgument32, mutable_field),
-                        target_offset: std::mem::offset_of!(ProgramArgument, mutable_field),
-                    },
-                ],
-            }
-        }
-
+    impl TestArgument {
         fn from_data(data: &[u64]) -> Self {
             let ptr_range = data.as_ptr_range();
             Self {
@@ -849,6 +710,143 @@ mod test {
                 ..Default::default()
             }
         }
+    }
+
+    impl ProgramArgument for &'_ mut TestArgument {
+        fn get_type() -> &'static Type {
+            &*TEST_ARG_TYPE
+        }
+    }
+
+    // A version of TestArgument with 32-bit remapped pointers. It's used to define struct layout
+    // for eBPF programs, but not used in the Rust code directly.
+    #[repr(C)]
+    struct TestArgument32 {
+        pub read_only_field: u32,
+        pub data: u32,
+        pub data_end: u32,
+        pub mutable_field: u32,
+    }
+
+    #[repr(C)]
+    struct TestArgument32BitMapped(TestArgument);
+
+    static TEST_ARG_32_BIT_MEMORY_ID: LazyLock<MemoryId> = LazyLock::new(|| MemoryId::new());
+    static TEST_ARG_32_BIT_TYPE: LazyLock<Type> = LazyLock::new(|| {
+        let data_memory_id = MemoryId::new();
+        let descriptor = Arc::new(StructDescriptor {
+            fields: vec![
+                FieldDescriptor {
+                    offset: offset_of!(TestArgument32, read_only_field),
+                    field_type: FieldType::Scalar { size: 4 },
+                },
+                FieldDescriptor {
+                    offset: offset_of!(TestArgument32, data),
+                    field_type: FieldType::PtrToArray {
+                        is_32_bit: true,
+                        id: data_memory_id.clone(),
+                    },
+                },
+                FieldDescriptor {
+                    offset: offset_of!(TestArgument32, data_end),
+                    field_type: FieldType::PtrToEndArray {
+                        is_32_bit: true,
+                        id: data_memory_id.clone(),
+                    },
+                },
+                FieldDescriptor {
+                    offset: offset_of!(TestArgument32, mutable_field),
+                    field_type: FieldType::MutableScalar { size: 4 },
+                },
+            ],
+        });
+
+        Type::PtrToStruct { id: TEST_ARG_32_BIT_MEMORY_ID.clone(), offset: 0, descriptor }
+    });
+
+    impl ProgramArgument for &'_ TestArgument32BitMapped {
+        fn get_type() -> &'static Type {
+            &*TEST_ARG_32_BIT_TYPE
+        }
+    }
+
+    impl TestArgument32BitMapped {
+        fn get_mapping() -> StructMapping {
+            StructMapping {
+                memory_id: TEST_ARG_32_BIT_MEMORY_ID.clone(),
+                fields: vec![
+                    FieldMapping {
+                        source_offset: offset_of!(TestArgument32, data),
+                        target_offset: offset_of!(TestArgument, data),
+                    },
+                    FieldMapping {
+                        source_offset: offset_of!(TestArgument32, data_end),
+                        target_offset: offset_of!(TestArgument, data_end),
+                    },
+                    FieldMapping {
+                        source_offset: offset_of!(TestArgument32, mutable_field),
+                        target_offset: offset_of!(TestArgument, mutable_field),
+                    },
+                ],
+            }
+        }
+    }
+
+    struct TestEbpfProgramContext {}
+
+    impl EbpfProgramContext for TestEbpfProgramContext {
+        type RunContext<'a> = ();
+
+        type Packet<'a> = ();
+        type Arg1<'a> = &'a mut TestArgument;
+        type Arg2<'a> = ();
+        type Arg3<'a> = ();
+        type Arg4<'a> = ();
+        type Arg5<'a> = ();
+
+        type Map = NoMap;
+    }
+
+    fn initialize_test_program(
+        code: Vec<EbpfInstruction>,
+    ) -> Result<EbpfProgram<TestEbpfProgramContext>, EbpfError> {
+        let verified_program = verify_program(
+            code,
+            CallingContext { args: vec![TEST_ARG_TYPE.clone()], ..Default::default() },
+            &mut NullVerifierLogger,
+        )?;
+        link_program(&verified_program, &[], vec![], HashMap::default())
+    }
+
+    struct TestEbpfProgramContext32BitMapped {}
+
+    impl EbpfProgramContext for TestEbpfProgramContext32BitMapped {
+        type RunContext<'a> = ();
+
+        type Packet<'a> = ();
+        type Arg1<'a> = &'a TestArgument32BitMapped;
+        type Arg2<'a> = ();
+        type Arg3<'a> = ();
+        type Arg4<'a> = ();
+        type Arg5<'a> = ();
+
+        type Map = NoMap;
+    }
+
+    fn initialize_test_program_for_32bit_arg(
+        code: Vec<EbpfInstruction>,
+    ) -> Result<EbpfProgram<TestEbpfProgramContext32BitMapped>, EbpfError> {
+        let verified_program = verify_program(
+            code,
+            CallingContext { args: vec![TEST_ARG_32_BIT_TYPE.clone()], ..Default::default() },
+            &mut NullVerifierLogger,
+        )?;
+        link_program(
+            &verified_program,
+            &[TestArgument32BitMapped::get_mapping()],
+            vec![],
+            HashMap::default(),
+        )
     }
 
     #[test]
@@ -865,15 +863,11 @@ mod test {
         ldxdw %r0, [%r1]
         exit
         "#;
-        let code = parse_asm(program);
-
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type()]);
-        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+        let program = initialize_test_program(parse_asm(program)).expect("load");
 
         let v = [42];
-        let mut data = ProgramArgument::from_data(&v[..]);
-        assert_eq!(program.run(&mut (), &EmptyPacketAccessor::default(), &mut data), v[0]);
+        let mut data = TestArgument::from_data(&v[..]);
+        assert_eq!(program.run_with_1_argument(&mut (), &mut data), v[0]);
     }
 
     #[test]
@@ -890,57 +884,42 @@ mod test {
         ldxdw %r0, [%r1]
         exit
         "#;
-        let code = parse_asm(program);
-
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type()]);
-        builder.load(code, &mut NullVerifierLogger).expect_err("incorrect program");
+        initialize_test_program(parse_asm(program)).expect_err("incorrect program");
     }
 
     #[test]
     fn test_mapping() {
         let program = r#"
-          # Return `ProgramArgument32.mutable_field`
+          # Return `TestArgument32.mutable_field`
           ldxw %r0, [%r1+12]
           exit
         "#;
-        let code = parse_asm(program);
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type_32bit()]);
-        builder.register_struct_mapping(ProgramArgument::get_32bit_mapping());
-        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+        let program = initialize_test_program_for_32bit_arg(parse_asm(program)).expect("load");
 
-        let mut data = ProgramArgument::default();
-        assert_eq!(
-            program.run(&mut (), &EmptyPacketAccessor::default(), &mut data),
-            data.mutable_field as u64
-        );
+        let mut data = TestArgument32BitMapped(TestArgument::default());
+        assert_eq!(program.run_with_1_argument(&mut (), &mut data), data.0.mutable_field as u64);
     }
 
     #[test]
     fn test_mapping_partial_load() {
         // Verify that we can access middle of a remapped scalar field.
         let program = r#"
-          # Returns two upper bytes of `ProgramArgument32.mutable_filed`
+          # Returns two upper bytes of `TestArgument32.mutable_filed`
           ldxh %r0, [%r1+14]
           exit
         "#;
-        let code = parse_asm(program);
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type_32bit()]);
-        builder.register_struct_mapping(ProgramArgument::get_32bit_mapping());
-        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+        let program = initialize_test_program_for_32bit_arg(parse_asm(program)).expect("load");
 
-        let mut data = ProgramArgument::default();
-        data.mutable_field = 0x12345678;
-        assert_eq!(program.run(&mut (), &EmptyPacketAccessor::default(), &mut data), 0x1234 as u64);
+        let mut data = TestArgument32BitMapped(TestArgument::default());
+        data.0.mutable_field = 0x12345678;
+        assert_eq!(program.run_with_1_argument(&mut (), &mut data), 0x1234 as u64);
     }
 
     #[test]
     fn test_mapping_ptr() {
         let program = r#"
         mov %r0, 0
-        # Load data and data_end as 32 bits pointers in ProgramArgument32
+        # Load data and data_end as 32 bits pointers in TestArgument32
         ldxw %r2, [%r1+8]
         ldxw %r1, [%r1+4]
         # ensure data contains at least 8 bytes
@@ -951,16 +930,11 @@ mod test {
         ldxdw %r0, [%r1]
         exit
         "#;
-        let code = parse_asm(program);
-
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type_32bit()]);
-        builder.register_struct_mapping(ProgramArgument::get_32bit_mapping());
-        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+        let program = initialize_test_program_for_32bit_arg(parse_asm(program)).expect("load");
 
         let v = [42];
-        let mut data = ProgramArgument::from_data(&v[..]);
-        assert_eq!(program.run(&mut (), &EmptyPacketAccessor::default(), &mut data), v[0]);
+        let mut data = TestArgument32BitMapped(TestArgument::from_data(&v[..]));
+        assert_eq!(program.run_with_1_argument(&mut (), &mut data), v[0]);
     }
 
     #[test]
@@ -968,7 +942,7 @@ mod test {
         let program = r#"
         mov %r0, 0
         add %r1, 0x8
-        # Load data and data_end as 32 bits pointers in ProgramArgument32
+        # Load data and data_end as 32 bits pointers in TestArgument32
         ldxw %r2, [%r1]
         ldxw %r1, [%r1-4]
         # ensure data contains at least 8 bytes
@@ -979,16 +953,11 @@ mod test {
         ldxdw %r0, [%r1]
         exit
         "#;
-        let code = parse_asm(program);
-
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type_32bit()]);
-        builder.register_struct_mapping(ProgramArgument::get_32bit_mapping());
-        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+        let program = initialize_test_program_for_32bit_arg(parse_asm(program)).expect("load");
 
         let v = [42];
-        let mut data = ProgramArgument::from_data(&v[..]);
-        assert_eq!(program.run(&mut (), &EmptyPacketAccessor::default(), &mut data), v[0]);
+        let mut data = TestArgument32BitMapped(TestArgument::from_data(&v[..]));
+        assert_eq!(program.run_with_1_argument(&mut (), &mut data), v[0]);
     }
 
     #[test]
@@ -1021,13 +990,11 @@ mod test {
         "#;
         let code = parse_asm(program);
 
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type()]);
-        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+        let program = initialize_test_program(code).expect("load");
 
         let v = [42];
-        let mut data = ProgramArgument::from_data(&v[..]);
-        assert_eq!(program.run(&mut (), &EmptyPacketAccessor::default(), &mut data), 17);
+        let mut data = TestArgument::from_data(&v[..]);
+        assert_eq!(program.run_with_1_argument(&mut (), &mut data), 17);
     }
 
     #[test]
@@ -1038,20 +1005,18 @@ mod test {
         ldpw
         exit
         "#;
-        let code = parse_asm(program);
-
-        let mut builder = EbpfProgramBuilder::<()>::default();
-
-        let packet_memory_id = new_bpf_type_identifier();
-        builder.set_packet_memory_id(packet_memory_id.clone());
-        let second_memory_id = new_bpf_type_identifier();
-        builder.set_args(&[
-            Type::PtrToMemory { id: packet_memory_id, offset: 0, buffer_size: 16 },
-            Type::PtrToMemory { id: second_memory_id, offset: 0, buffer_size: 16 },
-        ]);
+        let args = vec![
+            Type::PtrToMemory { id: MemoryId::new(), offset: 0, buffer_size: 16 },
+            Type::PtrToMemory { id: MemoryId::new(), offset: 0, buffer_size: 16 },
+        ];
+        let verify_result = verify_program(
+            parse_asm(program),
+            CallingContext { args, ..Default::default() },
+            &mut NullVerifierLogger,
+        );
 
         assert_eq!(
-            builder.load(code, &mut NullVerifierLogger).expect_err("validation should fail"),
+            verify_result.expect_err("validation should fail"),
             EbpfError::ProgramVerifyError("R6 is not a packet at pc 2".to_string())
         );
     }
@@ -1063,10 +1028,7 @@ mod test {
           ldxdw %r0, [%r1]
           exit
         "#;
-        let code = parse_asm(program);
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type()]);
-        builder.load(code, &mut NullVerifierLogger).expect_err("incorrect program");
+        initialize_test_program(parse_asm(program)).expect_err("incorrect program");
     }
 
     #[test]
@@ -1076,10 +1038,7 @@ mod test {
           ldxw %r0, [%r1 + 4]
           exit
         "#;
-        let code = parse_asm(program);
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type()]);
-        builder.load(code, &mut NullVerifierLogger).expect_err("incorrect program");
+        initialize_test_program(parse_asm(program)).expect_err("incorrect program");
     }
 
     #[test]
@@ -1089,10 +1048,7 @@ mod test {
           ldxw %r0, [%r1 + 8]
           exit
         "#;
-        let code = parse_asm(program);
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type()]);
-        builder.load(code, &mut NullVerifierLogger).expect_err("incorrect program");
+        initialize_test_program(parse_asm(program)).expect_err("incorrect program");
     }
 
     #[test]
@@ -1102,10 +1058,7 @@ mod test {
           stw [%r1], 0x42
           exit
         "#;
-        let code = parse_asm(program);
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type()]);
-        builder.load(code, &mut NullVerifierLogger).expect_err("incorrect program");
+        initialize_test_program(parse_asm(program)).expect_err("incorrect program");
     }
 
     #[test]
@@ -1116,13 +1069,10 @@ mod test {
           mov %r0, 1
           exit
         "#;
-        let code = parse_asm(program);
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type()]);
-        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+        let program = initialize_test_program(parse_asm(program)).expect("load");
 
-        let mut data = ProgramArgument::default();
-        assert_eq!(program.run(&mut (), &EmptyPacketAccessor::default(), &mut data), 1);
+        let mut data = TestArgument::default();
+        assert_eq!(program.run_with_1_argument(&mut (), &mut data), 1);
         assert_eq!(data.mutable_field, 0x42);
     }
 
@@ -1142,10 +1092,6 @@ mod test {
         ldxdw %r0, [%r1]
         exit
         "#;
-        let code = parse_asm(program);
-
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type()]);
-        builder.load(code, &mut NullVerifierLogger).expect_err("incorrect program");
+        initialize_test_program(parse_asm(program)).expect_err("incorrect program");
     }
 }

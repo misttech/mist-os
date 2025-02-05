@@ -33,7 +33,7 @@ async fn main() -> Result<(), Error> {
     fs.take_and_serve_directory_handle().context("Failed to start serving")?;
     fs.for_each_concurrent(CONCURRENCY_LIMIT, |client| {
         handle_incoming_service(&region_tracker, client)
-            .unwrap_or_else(|e| tracing::info!("Connection terminated: {:?}", e))
+            .unwrap_or_else(|e| log::info!("Connection terminated: {:?}", e))
     })
     .await;
     Ok(())

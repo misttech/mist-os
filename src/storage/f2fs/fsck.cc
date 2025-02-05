@@ -464,7 +464,8 @@ zx::result<TraverseResult> FsckWorker::TraverseInodeBlock(const Node &node_block
     return zx::error(ZX_ERR_INTERNAL);
   }
   if (ftype == FileType::kFtDir && i_links != child_count) {
-    FX_LOGS(WARNING) << "\tdir[0x" << std::hex << nid << "] i_links != link_count";
+    FX_LOGS(WARNING) << "\tdir[0x" << std::hex << nid << "] i_links " << i_links
+                     << " != link_count " << child_count;
     PrintNodeInfo(node_block);
     return zx::error(ZX_ERR_INTERNAL);
   }
@@ -576,7 +577,7 @@ zx_status_t FsckWorker::CheckDentries(uint32_t &child_count, uint32_t &child_fil
       return ret.error_value();
     }
 
-    i += (name.length() + kDentrySlotLen - 1) / kDentrySlotLen;
+    i += (LeToCpu(dentries[i].name_len) + kDentrySlotLen - 1) / kDentrySlotLen;
     ++child_files;
   }
 
@@ -760,12 +761,8 @@ zx_status_t FsckWorker::Verify() {
   zx_status_t status = ZX_OK;
   uint32_t nr_unref_nid = 0;
 
-  std::string unreachable_nodes;
   for (uint32_t i = 0; i < fsck_.nr_nat_entries; ++i) {
     if (fsck_.nat_area_bitmap.GetOne(ToMsbFirst(i))) {
-      std::ostringstream nid;
-      nid << " 0x" << std::hex << i;
-      unreachable_nodes += nid.str();
       ++nr_unref_nid;
     }
   }
@@ -789,8 +786,7 @@ zx_status_t FsckWorker::Verify() {
   if (nr_unref_nid == 0x0) {
     FX_LOGS(INFO) << str << "[OK]";
   } else {
-    FX_LOGS(INFO) << str << "[FAILED] : " << std::to_string(nr_unref_nid) << " nodes("
-                  << unreachable_nodes << ")";
+    FX_LOGS(INFO) << str << "[FAILED] : " << std::to_string(nr_unref_nid) << " nodes";
     status = ZX_ERR_INTERNAL;
   }
 

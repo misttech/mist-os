@@ -9,15 +9,15 @@ use fuchsia_component_test::LocalComponentHandles;
 use fuchsia_url::{ComponentUrl, PackageUrl};
 use futures::{StreamExt, TryStreamExt};
 use itertools::Itertools;
+use log::warn;
 use std::collections::HashSet;
 use std::sync::Arc;
-use tracing::warn;
 use {
     diagnostics_log as flog, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_logger as flogger, fidl_fuchsia_pkg as fpkg, fuchsia_async as fasync,
 };
 
-type LogSubscriber = dyn tracing::Subscriber + std::marker::Send + std::marker::Sync + 'static;
+type LogSubscriber = dyn log::Log + std::marker::Send + std::marker::Sync + 'static;
 
 // The list of non-hermetic packages allowed to resolved by a test.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -41,7 +41,7 @@ impl AllowedPackages {
 
 async fn validate_hermetic_package(
     component_url_str: &str,
-    subscriber: Arc<LogSubscriber>,
+    logger: Arc<LogSubscriber>,
     hermetic_test_package_name: &String,
     other_allowed_packages: &AllowedPackages,
 ) -> Result<(), fresolution::ResolverError> {
@@ -61,9 +61,10 @@ async fn validate_hermetic_package(
                 for more information.",
                 &component_url_str, package_name, hermetic_test_package_name, other_allowed_packages.pkgs.iter().join(", "));
                 // log in both test managers log sink and test's log sink so that it is easy to retrieve.
-                tracing::subscriber::with_default(subscriber, || {
-                    warn!("{}", s);
-                });
+
+                let mut builder = log::Record::builder();
+                builder.level(log::Level::Warn);
+                logger.log(&builder.args(format_args!("{}", s)).build());
                 warn!("{}", s);
                 return Err(fresolution::ResolverError::PackageNotFound);
             }
@@ -77,7 +78,7 @@ async fn validate_hermetic_package(
 
 async fn validate_hermetic_url(
     pkg_url_str: &str,
-    subscriber: Arc<LogSubscriber>,
+    logger: Arc<LogSubscriber>,
     hermetic_test_package_name: &String,
     other_allowed_packages: &AllowedPackages,
 ) -> Result<(), fpkg::ResolveError> {
@@ -97,9 +98,9 @@ async fn validate_hermetic_url(
                 for more information.",
                 &pkg_url_str, package_name, hermetic_test_package_name, other_allowed_packages.pkgs.iter().join(", "));
                 // log in both test managers log sink and test's log sink so that it is easy to retrieve.
-                tracing::subscriber::with_default(subscriber, || {
-                    warn!("{}", s);
-                });
+                let mut builder = log::Record::builder();
+                builder.level(log::Level::Warn);
+                logger.log(&builder.args(format_args!("{}", s)).build());
                 warn!("{}", s);
                 return Err(fpkg::ResolveError::PackageNotFound);
             }
@@ -113,7 +114,7 @@ async fn validate_hermetic_url(
 
 async fn serve_resolver(
     mut stream: fresolution::ResolverRequestStream,
-    subscriber: Arc<LogSubscriber>,
+    logger: Arc<LogSubscriber>,
     hermetic_test_package_name: Arc<String>,
     other_allowed_packages: AllowedPackages,
     full_resolver: Arc<fresolution::ResolverProxy>,
@@ -123,7 +124,7 @@ async fn serve_resolver(
             fresolution::ResolverRequest::Resolve { component_url, responder } => {
                 let result = if let Err(err) = validate_hermetic_package(
                     &component_url,
-                    subscriber.clone(),
+                    logger.clone(),
                     &hermetic_test_package_name,
                     &other_allowed_packages,
                 )
@@ -131,11 +132,18 @@ async fn serve_resolver(
                 {
                     Err(err)
                 } else {
-                    let subscriber = subscriber.clone();
+                    let logger = logger.clone();
                     full_resolver.resolve(&component_url).await.unwrap_or_else(|err| {
-                        tracing::subscriber::with_default(subscriber, || {
-                            warn!("failed to resolve component {}: {:?}", component_url, err);
-                        });
+                        let mut builder = log::Record::builder();
+                        builder.level(log::Level::Warn);
+                        logger.log(
+                            &builder
+                                .args(format_args!(
+                                    "failed to resolve component {}: {:?}",
+                                    component_url, err
+                                ))
+                                .build(),
+                        );
                         Err(fresolution::ResolverError::Internal)
                     })
                 };
@@ -152,7 +160,7 @@ async fn serve_resolver(
                 // been produced by Resolve call above.
                 let result = if let Err(err) = validate_hermetic_package(
                     &component_url,
-                    subscriber.clone(),
+                    logger.clone(),
                     &hermetic_test_package_name,
                     &other_allowed_packages,
                 )
@@ -160,17 +168,21 @@ async fn serve_resolver(
                 {
                     Err(err)
                 } else {
-                    let subscriber = subscriber.clone();
+                    let logger = logger.clone();
                     full_resolver
                         .resolve_with_context(&component_url, &context)
                         .await
                         .unwrap_or_else(|err| {
-                            tracing::subscriber::with_default(subscriber, || {
-                                warn!(
-                                    "failed to resolve component {} with context {:?}: {:?}",
-                                    component_url, context, err
-                                );
-                            });
+                            let mut builder = log::Record::builder();
+                            builder.level(log::Level::Warn);
+                            logger.log(
+                                &builder
+                                    .args(format_args!(
+                                        "failed to resolve component {} with context {:?}: {:?}",
+                                        component_url, context, err
+                                    ))
+                                    .build(),
+                            );
                             Err(fresolution::ResolverError::Internal)
                         })
                 };
@@ -179,7 +191,7 @@ async fn serve_resolver(
                 }
             }
             fresolution::ResolverRequest::_UnknownMethod { ordinal, .. } => {
-                warn!(%ordinal, "Unknown Resolver request");
+                warn!(ordinal:%; "Unknown Resolver request");
             }
         }
     }
@@ -187,7 +199,7 @@ async fn serve_resolver(
 
 async fn serve_pkg_resolver(
     mut stream: fpkg::PackageResolverRequestStream,
-    subscriber: Arc<LogSubscriber>,
+    logger: Arc<LogSubscriber>,
     hermetic_test_package_name: Arc<String>,
     other_allowed_packages: AllowedPackages,
     pkg_resolver: Arc<fpkg::PackageResolverProxy>,
@@ -197,7 +209,7 @@ async fn serve_pkg_resolver(
             fpkg::PackageResolverRequest::Resolve { package_url, dir, responder } => {
                 let result = if let Err(err) = validate_hermetic_url(
                     &package_url,
-                    subscriber.clone(),
+                    logger.clone(),
                     &hermetic_test_package_name,
                     &other_allowed_packages,
                 )
@@ -205,11 +217,18 @@ async fn serve_pkg_resolver(
                 {
                     Err(err)
                 } else {
-                    let subscriber = subscriber.clone();
+                    let logger = logger.clone();
                     pkg_resolver.resolve(&package_url, dir).await.unwrap_or_else(|err| {
-                        tracing::subscriber::with_default(subscriber, || {
-                            warn!("failed to resolve pkg {}: {:?}", package_url, err);
-                        });
+                        let mut builder = log::Record::builder();
+                        builder.level(log::Level::Warn);
+                        logger.log(
+                            &builder
+                                .args(format_args!(
+                                    "failed to resolve pkg {}: {:?}",
+                                    package_url, err
+                                ))
+                                .build(),
+                        );
                         Err(fpkg::ResolveError::Internal)
                     })
                 };
@@ -229,7 +248,7 @@ async fn serve_pkg_resolver(
                 // been produced by Resolve call above.
                 let result = if let Err(err) = validate_hermetic_url(
                     &package_url,
-                    subscriber.clone(),
+                    logger.clone(),
                     &hermetic_test_package_name,
                     &other_allowed_packages,
                 )
@@ -237,17 +256,21 @@ async fn serve_pkg_resolver(
                 {
                     Err(err)
                 } else {
-                    let subscriber = subscriber.clone();
+                    let logger = logger.clone();
                     pkg_resolver
                         .resolve_with_context(&package_url, &context, dir)
                         .await
                         .unwrap_or_else(|err| {
-                            tracing::subscriber::with_default(subscriber, || {
-                                warn!(
-                                    "failed to resolve pkg {} with context {:?}: {:?}",
-                                    package_url, context, err
-                                );
-                            });
+                            let mut builder = log::Record::builder();
+                            builder.level(log::Level::Warn);
+                            logger.log(
+                                &builder
+                                    .args(format_args!(
+                                        "failed to resolve pkg {} with context {:?}: {:?}",
+                                        package_url, context, err
+                                    ))
+                                    .build(),
+                            );
                             Err(fpkg::ResolveError::Internal)
                         })
                 };
@@ -260,7 +283,7 @@ async fn serve_pkg_resolver(
             fpkg::PackageResolverRequest::GetHash { package_url, responder } => {
                 let result = if let Err(_err) = validate_hermetic_url(
                     package_url.url.as_str(),
-                    subscriber.clone(),
+                    logger.clone(),
                     &hermetic_test_package_name,
                     &other_allowed_packages,
                 )
@@ -268,11 +291,19 @@ async fn serve_pkg_resolver(
                 {
                     Err(zx::Status::INTERNAL.into_raw())
                 } else {
-                    let subscriber = subscriber.clone();
+                    let logger = logger.clone();
                     pkg_resolver.get_hash(&package_url).await.unwrap_or_else(|err| {
-                        tracing::subscriber::with_default(subscriber, || {
-                            warn!("failed to resolve pkg {}: {:?}", package_url.url.as_str(), err);
-                        });
+                        let mut builder = log::Record::builder();
+                        builder.level(log::Level::Warn);
+                        logger.log(
+                            &builder
+                                .args(format_args!(
+                                    "failed to resolve pkg {}: {:?}",
+                                    package_url.url.as_str(),
+                                    err
+                                ))
+                                .build(),
+                        );
                         Err(zx::Status::INTERNAL.into_raw())
                     })
                 };
@@ -284,6 +315,18 @@ async fn serve_pkg_resolver(
             }
         }
     }
+}
+
+struct NoOpLogger;
+
+impl log::Log for NoOpLogger {
+    fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
+        false
+    }
+
+    fn log(&self, _record: &log::Record<'_>) {}
+
+    fn flush(&self) {}
 }
 
 pub async fn serve_hermetic_resolver(
@@ -305,7 +348,7 @@ pub async fn serve_hermetic_resolver(
         Ok(publisher) => Arc::new(publisher) as Arc<LogSubscriber>,
         Err(e) => {
             warn!("Error creating log publisher for resolver: {:?}", e);
-            Arc::new(tracing::subscriber::NoSubscriber::default()) as Arc<LogSubscriber>
+            Arc::new(NoOpLogger) as Arc<LogSubscriber>
         }
     };
 
@@ -407,11 +450,11 @@ mod tests {
     ) -> (fasync::Task<()>, fresolution::ResolverProxy) {
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>();
-        let subscriber = tracing::subscriber::NoSubscriber::default();
+        let logger = NoOpLogger;
         let task = fasync::Task::local(async move {
             serve_resolver(
                 stream,
-                Arc::new(subscriber),
+                Arc::new(logger),
                 hermetic_test_package_name,
                 other_allowed_packages,
                 mock_full_resolver,

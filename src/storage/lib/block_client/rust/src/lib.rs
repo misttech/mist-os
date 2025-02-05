@@ -19,10 +19,12 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
-use storage_trace::{self as trace, TraceFutureExt};
 use zx::sys::zx_handle_t;
 use zx::{self as zx, HandleBased as _};
-use {fidl_fuchsia_hardware_block as block, fidl_fuchsia_hardware_block_driver as block_driver};
+use {
+    fidl_fuchsia_hardware_block as block, fidl_fuchsia_hardware_block_driver as block_driver,
+    storage_trace as trace,
+};
 
 pub use cache::Cache;
 
@@ -348,11 +350,6 @@ impl Common {
 
     // Sends the request and waits for the response.
     async fn send(&self, mut request: BlockFifoRequest) -> Result<(), zx::Status> {
-        let trace_args = storage_trace::trace_future_args!(
-            c"storage",
-            c"BlockOp",
-            "op" => opcode_str(request.command.opcode)
-        );
         async move {
             let (request_id, trace_flow_id) = {
                 let mut state = self.fifo_state.lock().unwrap();
@@ -360,17 +357,23 @@ impl Common {
                     // Fifo has been closed.
                     return Err(zx::Status::CANCELED);
                 }
-                trace::duration!(c"storage", c"BlockOp::start");
+                trace::duration!(
+                    c"storage",
+                    c"block_client::send::start",
+                    "op" => opcode_str(request.command.opcode)
+                );
                 let request_id = state.next_request_id;
-                let trace_flow_id = generate_trace_flow_id(request_id);
                 state.next_request_id = state.next_request_id.overflowing_add(1).0;
                 assert!(
                     state.map.insert(request_id, RequestState::default()).is_none(),
                     "request id in use!"
                 );
                 request.reqid = request_id;
-                request.trace_flow_id = generate_trace_flow_id(request_id);
-                trace::flow_begin!(c"storage", c"BlockOp", trace_flow_id);
+                if request.trace_flow_id == 0 {
+                    request.trace_flow_id = generate_trace_flow_id(request_id);
+                }
+                let trace_flow_id = request.trace_flow_id;
+                trace::flow_begin!(c"storage", c"block_client::send", trace_flow_id);
                 state.queue.push_back(request);
                 if let Some(waker) = state.poller_waker.clone() {
                     state.poll_send_requests(&mut Context::from_waker(&waker));
@@ -378,11 +381,10 @@ impl Common {
                 (request_id, trace_flow_id)
             };
             ResponseFuture::new(self.fifo_state.clone(), request_id).await?;
-            trace::duration!(c"storage", c"BlockOp::end");
-            trace::flow_end!(c"storage", c"BlockOp", trace_flow_id);
+            trace::duration!(c"storage", c"block_client::send::end");
+            trace::flow_end!(c"storage", c"block_client::send", trace_flow_id);
             Ok(())
         }
-        .trace(trace_args)
         .await
     }
 

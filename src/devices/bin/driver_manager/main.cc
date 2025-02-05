@@ -38,6 +38,7 @@
 #include "src/devices/bin/driver_manager/driver_host_loader_service.h"
 #include "src/devices/bin/driver_manager/driver_manager_config.h"
 #include "src/devices/bin/driver_manager/driver_runner.h"
+#include "src/devices/bin/driver_manager/offer_injection.h"
 #include "src/devices/bin/driver_manager/shutdown/shutdown_manager.h"
 #include "src/devices/lib/log/log.h"
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
@@ -83,6 +84,12 @@ int main(int argc, char** argv) {
   if (realm_result.is_error()) {
     return realm_result.error_value();
   }
+
+  auto capability_store_result = component::Connect<fuchsia_component_sandbox::CapabilityStore>();
+  if (capability_store_result.is_error()) {
+    return capability_store_result.error_value();
+  }
+
   auto driver_index_result = component::Connect<fuchsia_driver_index::DriverIndex>();
   if (driver_index_result.is_error()) {
     LOGF(ERROR, "Failed to connect to driver_index: %d", driver_index_result.error_value());
@@ -104,7 +111,8 @@ int main(int argc, char** argv) {
   auto loader_service =
       driver_manager::DriverHostLoaderService::Create(loader_loop.dispatcher(), std::move(lib_fd));
   driver_manager::DriverRunner driver_runner(
-      std::move(realm_result.value()), std::move(driver_index_result.value()), inspect_manager,
+      std::move(realm_result.value()), std::move(capability_store_result.value()),
+      std::move(driver_index_result.value()), inspect_manager,
       [loader_service]() -> zx::result<fidl::ClientEnd<fuchsia_ldsvc::Loader>> {
         zx::result client = loader_service->Connect();
         if (client.is_error()) {
@@ -123,7 +131,11 @@ int main(int argc, char** argv) {
 #endif
         return client;
       },
-      loop.dispatcher(), config.enable_test_shutdown_delays());
+      loop.dispatcher(), config.enable_test_shutdown_delays(),
+      driver_manager::OfferInjector{{
+          .power_inject_offer = config.power_inject_offer(),
+          .power_suspend_enabled = config.power_suspend_enabled(),
+      }});
 
   // Setup devfs.
   std::optional<driver_manager::Devfs> devfs;

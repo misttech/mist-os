@@ -155,33 +155,33 @@ void WavPlayer::ParameterRangeChecks() {
 
   if (num_channels_ < fuchsia::media::MIN_PCM_CHANNEL_COUNT) {
     std::cerr << "Number of channels must be at least " << fuchsia::media::MIN_PCM_CHANNEL_COUNT
-              << std::endl;
+              << '\n';
     success = false;
   }
   if (num_channels_ > fuchsia::media::MAX_PCM_CHANNEL_COUNT) {
     std::cerr << "Number of channels must be no greater than "
-              << fuchsia::media::MAX_PCM_CHANNEL_COUNT << std::endl;
+              << fuchsia::media::MAX_PCM_CHANNEL_COUNT << '\n';
     success = false;
   }
 
   if (frame_rate_ < fuchsia::media::MIN_PCM_FRAMES_PER_SECOND) {
     std::cerr << "Frame rate must be at least " << fuchsia::media::MIN_PCM_FRAMES_PER_SECOND
-              << std::endl;
+              << '\n';
     success = false;
   }
   if (frame_rate_ > fuchsia::media::MAX_PCM_FRAMES_PER_SECOND) {
     std::cerr << "Frame rate must be no greater than " << fuchsia::media::MAX_PCM_FRAMES_PER_SECOND
-              << std::endl;
+              << '\n';
     success = false;
   }
 
   if (options_.frames_per_packet > (options_.frames_per_payload_buffer / 2) &&
       options_.frames_per_packet != options_.frames_per_payload_buffer) {
-    std::cerr << "Packet size cannot be larger than half the total payload space" << std::endl;
+    std::cerr << "Packet size cannot be larger than half the total payload space" << '\n';
     success = false;
   }
   if (options_.frames_per_packet < frame_rate_ / 1000) {
-    std::cerr << "Packet size must be 1 millisecond or more" << std::endl;
+    std::cerr << "Packet size must be 1 millisecond or more" << '\n';
     success = false;
   }
 
@@ -216,7 +216,7 @@ void WavPlayer::ConfigureRenderer() {
 
     // Set our render stream format
     if (options_.usage.has_value()) {
-      audio_renderer_->SetUsage(options_.usage.value());
+      audio_renderer_->SetUsage2(options_.usage.value());
     }
 
     fuchsia::media::AudioStreamType format;
@@ -237,14 +237,14 @@ void WavPlayer::SetLoudnessLevels(sys::ComponentContext* app_context) {
     app_context->svc()->Connect(audio_core.NewRequest());
 
     if (options_.usage_gain_db.has_value()) {
-      audio_core->SetRenderUsageGain(options_.usage.value_or(kDefaultUsage),
-                                     options_.usage_gain_db.value());
+      audio_core->SetRenderUsageGain2(options_.usage.value_or(kDefaultUsage),
+                                      options_.usage_gain_db.value());
     }
 
     if (options_.usage_volume.has_value()) {
-      fuchsia::media::Usage usage;
+      fuchsia::media::Usage2 usage;
       usage.set_render_usage(options_.usage.value_or(kDefaultUsage));
-      audio_core->BindUsageVolumeControl(std::move(usage), usage_volume_control_.NewRequest());
+      audio_core->BindUsageVolumeControl2(std::move(usage), usage_volume_control_.NewRequest());
 
       usage_volume_control_.set_error_handler([this](zx_status_t status) {
         CLI_CHECK(Shutdown(),
@@ -467,7 +467,7 @@ void WavPlayer::Play() {
   started_ = true;
 }
 
-bool WavPlayer::CheckPayloadSpace() {
+bool WavPlayer::CheckPayloadSpace() const {
   if (num_packets_completed_ > 0 && num_packets_sent_ <= num_packets_completed_) {
     printf("! Sending: packet %4lu; packet %4lu has already completed - did we underrun?\n",
            num_packets_sent_, num_packets_completed_);
@@ -499,7 +499,7 @@ bool WavPlayer::CheckPayloadSpace() {
 // | buffer 0  |  payload 0 |
 // |      ... etc ...       |
 //  ------------------------
-fuchsia::media::StreamPacket WavPlayer::CreateAudioPacket(uint64_t packet_num) {
+fuchsia::media::StreamPacket WavPlayer::CreateAudioPacket(uint64_t packet_num) const {
   fuchsia::media::StreamPacket packet;
   packet.payload_buffer_id = 0;
   packet.payload_offset = (packet_num % packets_per_payload_buffer_) * bytes_per_packet_;

@@ -31,6 +31,7 @@
 #include "src/devices/pci/testing/pci_protocol_fake.h"
 #include "src/graphics/display/drivers/intel-display/intel-display.h"
 #include "src/graphics/display/drivers/intel-display/pci-ids.h"
+#include "src/graphics/display/drivers/intel-display/registers.h"
 #include "src/graphics/display/drivers/intel-display/testing/fake-buffer-collection.h"
 #include "src/graphics/display/drivers/intel-display/testing/fake-framebuffer.h"
 #include "src/graphics/display/drivers/intel-display/testing/mock-allocator.h"
@@ -77,34 +78,6 @@ class FakeSystemStateTransition
  private:
   fuchsia_system_state::SystemPowerState termination_system_state_ =
       fuchsia_system_state::SystemPowerState::kFullyOn;
-};
-
-class FakeFramebufferResource
-    : public fidl::testing::TestBase<fuchsia_kernel::FramebufferResource> {
- public:
-  // `root_resource` must outlive `FakeFramebufferResource`.
-  explicit FakeFramebufferResource(zx::unowned_resource root_resource)
-      : root_resource_(root_resource->borrow()) {}
-  ~FakeFramebufferResource() override = default;
-
-  // fidl::testing::TestBase:
-  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
-    ZX_PANIC("Not implemented: %s", name.c_str());
-  }
-
-  // fuchsia_kernel::FramebufferResource:
-  void Get(GetCompleter::Sync& completer) override {
-    zx::resource framebuffer_child;
-    std::array<char, ZX_MAX_NAME_LEN> child_name = {"child"};
-    zx_status_t status = zx_resource_create(root_resource_->get(), ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE,
-                                            0, 16, child_name.data(), child_name.size(),
-                                            framebuffer_child.reset_and_get_address());
-    ZX_ASSERT(status == ZX_OK);
-    completer.Reply(std::move(framebuffer_child));
-  }
-
- private:
-  zx::unowned_resource root_resource_;
 };
 
 class FakeMmioResource : public fidl::testing::TestBase<fuchsia_kernel::MmioResource> {
@@ -178,6 +151,7 @@ class IntegrationTest : public ::testing::Test {
   }
 
   MockAllocator* sysmem() { return &sysmem_; }
+  fake_framebuffer::FakeBootItems* boot_items() { return &boot_items_; }
 
  protected:
   fdf_testing::DriverRuntime driver_runtime_;
@@ -195,9 +169,9 @@ class IntegrationTest : public ::testing::Test {
 
   pci::FakePciProtocol pci_;
   MockAllocator sysmem_{env_dispatcher_->async_dispatcher()};
+  fake_framebuffer::FakeBootItems boot_items_;
 
   zx::resource fake_root_resource_ = CreateFakeRootResource();
-  FakeFramebufferResource fake_framebuffer_resource_{fake_root_resource_.borrow()};
   FakeMmioResource fake_mmio_resource_{fake_root_resource_.borrow()};
   FakeIoportResource fake_ioport_resource_{fake_root_resource_.borrow()};
   FakeSystemStateTransition fake_system_state_transition_;
@@ -213,7 +187,7 @@ class IntegrationTest : public ::testing::Test {
   void SetUpEnvironment();
 };
 
-void IntegrationTest::SetUpFakeFramebuffer() { fake_framebuffer::SetFramebuffer({}); }
+void IntegrationTest::SetUpFakeFramebuffer() { boot_items_.SetFramebuffer({}); }
 
 void IntegrationTest::SetUpFakeSysmem() {
   sysmem_.SetNewBufferCollectionConfig({
@@ -265,6 +239,13 @@ void IntegrationTest::SetUpEnvironment() {
       });
   ASSERT_OK(add_sysmem_result);
 
+  zx::result<> add_boot_items_result =
+      test_environment_.SyncCall([&](fdf_testing::internal::TestEnvironment* env) {
+        return env->incoming_directory().component().AddUnmanagedProtocol<fuchsia_boot::Items>(
+            boot_items_.CreateHandler(env_dispatcher_->async_dispatcher()));
+      });
+  ASSERT_OK(add_boot_items_result);
+
   zx::result<> add_pci_result =
       test_environment_.SyncCall([&](fdf_testing::internal::TestEnvironment* env) {
         return env->incoming_directory().AddService<fuchsia_hardware_pci::Service>(
@@ -273,15 +254,6 @@ void IntegrationTest::SetUpEnvironment() {
             "pci");
       });
   ASSERT_OK(add_pci_result);
-
-  zx::result<> add_framebuffer_resource_result =
-      test_environment_.SyncCall([&](fdf_testing::internal::TestEnvironment* env) {
-        return env->incoming_directory()
-            .component()
-            .AddUnmanagedProtocol<fuchsia_kernel::FramebufferResource>(
-                fake_framebuffer_resource_.bind_handler(env_dispatcher_->async_dispatcher()));
-      });
-  ASSERT_OK(add_framebuffer_resource_result);
 
   zx::result<> add_mmio_resource_result =
       test_environment_.SyncCall([&](fdf_testing::internal::TestEnvironment* env) {
@@ -390,7 +362,7 @@ TEST_F(IntegrationTest, BindAndInit) {
 // Tests that the device can initialize even if bootloader framebuffer information is not available
 // and global GTT allocations start at offset 0.
 TEST_F(IntegrationTest, InitFailsIfBootloaderGetInfoFails) {
-  fake_framebuffer::SetFramebuffer({.status = ZX_ERR_INVALID_ARGS});
+  boot_items()->SetFramebuffer({.status = ZX_ERR_INVALID_ARGS});
 
   zx::result<> start_result = driver_runtime_.RunToCompletion(
       driver_.SyncCall(&fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>::Start,
@@ -428,7 +400,7 @@ TEST_F(IntegrationTest, InitFailsIfBootloaderGetInfoFails) {
 TEST_F(IntegrationTest, GttAllocationDoesNotOverlapBootloaderFramebuffer) {
   constexpr uint32_t kStride = 1920;
   constexpr uint32_t kHeight = 1080;
-  fake_framebuffer::SetFramebuffer({
+  boot_items()->SetFramebuffer({
       .format = ZBI_PIXEL_FORMAT_RGB_888,
       .width = kStride,
       .height = kHeight,

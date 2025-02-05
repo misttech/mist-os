@@ -7,7 +7,7 @@ use argh::FromArgs;
 use fuchsia_component::client;
 use fuchsia_component::server::ServiceFs;
 use futures::{StreamExt, TryStreamExt};
-use tracing::*;
+use log::*;
 use {
     fidl_fidl_test_components as ftest, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fdecl,

@@ -8,8 +8,8 @@ use crate::disconnect::LocallyInitiated;
 use crate::error::Error;
 use fdf::ArenaStaticBox;
 use ieee80211::{MacAddr, MacAddrBytes, Ssid};
+use log::warn;
 use std::collections::VecDeque;
-use tracing::warn;
 use wlan_common::append::Append;
 use wlan_common::buffer_writer::BufferWriter;
 use wlan_common::mac::{self, Aid, AuthAlgorithmNumber, FrameClass, ReasonCode};
@@ -129,14 +129,14 @@ pub enum ClientRejection {
 }
 
 impl ClientRejection {
-    pub fn log_level(&self) -> tracing::Level {
+    pub fn log_level(&self) -> log::Level {
         match self {
             Self::ParseFailed
             | Self::SmeSendError(..)
             | Self::WlanSendError(..)
-            | Self::EthSendError(..) => tracing::Level::ERROR,
-            Self::ControlledPortClosed | Self::Unsupported => tracing::Level::WARN,
-            _ => tracing::Level::TRACE,
+            | Self::EthSendError(..) => log::Level::Error,
+            Self::ControlledPortClosed | Self::Unsupported => log::Level::Warn,
+            _ => log::Level::Trace,
         }
     }
 }
@@ -329,7 +329,7 @@ impl RemoteClient {
         result_code: fidl_mlme::AuthenticateResultCode,
     ) -> Result<(), Error> {
         // TODO(https://fxbug.dev/42172646) - Added to help investigate hw-sim test. Remove later
-        tracing::info!("enter handle_mlme_auth_resp");
+        log::info!("enter handle_mlme_auth_resp");
         self.change_state(
             ctx,
             if result_code == fidl_mlme::AuthenticateResultCode::Success {
@@ -341,7 +341,7 @@ impl RemoteClient {
         .await?;
 
         // TODO(https://fxbug.dev/42172646) - Added to help investigate hw-sim test. Remove later
-        tracing::info!("creating auth frame");
+        log::info!("creating auth frame");
 
         // We only support open system auth in the SME.
         // IEEE Std 802.11-2016, 12.3.3.2.3 & Table 9-36: Sequence number 2 indicates the response
@@ -372,7 +372,7 @@ impl RemoteClient {
             },
         )?;
         // TODO(https://fxbug.dev/42172646) - Added to help investigate hw-sim test. Remove later
-        tracing::info!("Sending auth frame to driver: {} bytes", buffer.len());
+        log::info!("Sending auth frame to driver: {} bytes", buffer.len());
         self.send_wlan_frame(ctx, buffer, fidl_softmac::WlanTxInfoFlags::empty(), None)
             .map_err(|s| Error::Status(format!("error sending auth frame"), s))
     }

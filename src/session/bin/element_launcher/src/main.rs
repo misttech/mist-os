@@ -5,7 +5,7 @@
 use anyhow::{anyhow, Context, Error};
 use fidl_fuchsia_element as element;
 use fuchsia_component::client::connect_to_protocol;
-use tracing::info;
+use log::info;
 
 async fn propose_element(
     element_manager: element::ManagerProxy,

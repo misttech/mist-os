@@ -79,7 +79,7 @@ impl UnhandledInputHandler for MediaButtonsHandler {
 
                 // Report the event to the Activity Service.
                 if let Err(e) = self.report_media_buttons_activity(event_time).await {
-                    tracing::error!("report_media_buttons_activity failed: {}", e);
+                    log::error!("report_media_buttons_activity failed: {}", e);
                 }
 
                 // Consume the input event.
@@ -113,7 +113,7 @@ impl MediaButtonsHandler {
         >() {
             Ok(proxy) => Some(proxy),
             Err(e) => {
-                tracing::error!("MedaButtonsHandler failed to connect to fuchsia.input.interaction.observation.Aggregator: {}", e);
+                log::error!("MedaButtonsHandler failed to connect to fuchsia.input.interaction.observation.Aggregator: {}", e);
                 None
             }
         };
@@ -175,7 +175,7 @@ impl MediaButtonsHandler {
                             match proxy_clone.on_event(&event_to_send).await {
                                 Ok(_) => {}
                                 Err(e) => {
-                                    tracing::info!(
+                                    log::info!(
                                         "Failed to send media buttons event to listener {:?}",
                                         e
                                     )
@@ -263,7 +263,7 @@ impl MediaButtonsHandler {
                     Err(e) => {
                         if let Some(handler) = weak_handler.upgrade() {
                             handler.inner.borrow_mut().listeners.remove(&handle_clone);
-                            tracing::info!(
+                            log::info!(
                                 "Unregistering listener; unable to send MediaButtonsEvent: {:?}",
                                 e
                             )

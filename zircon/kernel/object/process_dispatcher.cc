@@ -461,7 +461,7 @@ zx_status_t ProcessDispatcher::AddInitializedThread(ThreadDispatcher* t, bool en
 
   if (initial_thread) {
     DEBUG_ASSERT_MSG(start_time_ == 0, "start_time_ %ld", start_time_);
-    start_time_ = current_time();
+    start_time_ = current_mono_time();
     SetStateLocked(State::RUNNING);
   }
 
@@ -598,11 +598,11 @@ bool ProcessDispatcher::CriticalToRootJob() const {
   return critical_to_job_ == GetRootJobDispatcher();
 }
 
-void ProcessDispatcher::GetInfo(zx_info_process_t* info) const {
+zx_info_process_t ProcessDispatcher::GetInfo() const {
   canary_.Assert();
 
   State state;
-  zx_time_t start_time;
+  zx_instant_mono_t start_time;
   int64_t return_code;
   zx_info_process_flags_t flags = 0u;
   // retcode_ depends on the state: make sure they're consistent.
@@ -630,7 +630,7 @@ void ProcessDispatcher::GetInfo(zx_info_process_t* info) const {
       break;
   }
 
-  *info = zx_info_process_t{
+  return {
       .return_code = return_code,
       .start_time = start_time,
       .flags = flags,

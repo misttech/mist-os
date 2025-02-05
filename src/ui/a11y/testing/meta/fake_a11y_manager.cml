@@ -25,7 +25,6 @@
     use: [
         {
             protocol: [
-                "fuchsia.logger.LogSink",
                 "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.observation.scope.Registry",
                 "fuchsia.ui.pointer.augment.LocalHit",

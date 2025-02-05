@@ -9,11 +9,12 @@ use errors::{ffx_bail, ffx_bail_with_code};
 use ffx_config::EnvironmentContext;
 use ffx_list_args::{AddressTypes, ListCommand};
 use ffx_target::{KnockError, TargetInfoQuery};
-use fho::{daemon_protocol, deferred, Deferred, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
+use fho::{deferred, Deferred, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::TimeoutExt;
 use futures::{StreamExt, TryStreamExt};
 use std::time::Duration;
+use target_holders::daemon_protocol;
 
 mod target_formatter;
 
@@ -110,7 +111,9 @@ async fn try_get_target_info(
     spec: String,
     context: &EnvironmentContext,
 ) -> Result<(ffx::RemoteControlState, Option<String>, Option<String>), KnockError> {
-    let mut resolution = ffx_target::resolve_target_address(&Some(spec), context).await?;
+    let mut resolution = ffx_target::resolve_target_address(&Some(spec), context)
+        .await
+        .map_err(|e| KnockError::CriticalError(e.into()))?;
     let (rcs_state, pc, bc) = match resolution.identify(context).await {
         Ok(id_result) => (
             ffx::RemoteControlState::Up,
@@ -294,6 +297,7 @@ mod test {
     use fidl_fuchsia_developer_ffx::{TargetInfo as FidlTargetInfo, TargetState};
     use regex::Regex;
     use std::net::IpAddr;
+    use target_holders::fake_proxy;
 
     fn tab_list_cmd(nodename: Option<String>) -> ListCommand {
         ListCommand { nodename, format: Format::Tabular, ..Default::default() }
@@ -316,7 +320,7 @@ mod test {
     }
 
     fn setup_fake_target_collection_server(num_tests: usize) -> ffx::TargetCollectionProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             ffx::TargetCollectionRequest::ListTargets { query, reader, .. } => {
                 let reader = reader.into_proxy();
                 let fidl_values: Vec<FidlTargetInfo> =

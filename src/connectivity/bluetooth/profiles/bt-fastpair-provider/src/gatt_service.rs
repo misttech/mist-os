@@ -17,8 +17,8 @@ use fuchsia_bluetooth::types::{PeerId, Uuid};
 use fuchsia_component::client::connect_to_protocol;
 use futures::ready;
 use futures::stream::{FusedStream, Stream, StreamExt};
+use log::{trace, warn};
 use std::str::FromStr;
-use tracing::{trace, warn};
 
 use crate::config::Config;
 use crate::types::Error;

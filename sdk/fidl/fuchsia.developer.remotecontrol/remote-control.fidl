@@ -62,7 +62,7 @@ open protocol RemoteControl {
     });
 
     // Gets the current boot time in nanoseconds.
-    @available(added=NEXT)
+    @available(added=26)
     strict GetBootTime() -> (struct {
         time zx.InstantBoot;
     });
@@ -73,7 +73,7 @@ open protocol RemoteControl {
     /// by the given moniker exposes a capability of the requested name.
     @available(
             deprecated=25,
-            replaced=NEXT,
+            replaced=26,
             renamed="DeprecatedOpenCapability",
             note="Use ConnectCapability instead.")
     flexible OpenCapability(resource struct {
@@ -89,7 +89,7 @@ open protocol RemoteControl {
     /// Connects a channel to a service, given a moniker and a channel iff the component identified
     /// by the given moniker exposes a capability of the requested name.
     // TODO(https://fxbug.dev/324081103): Mark this as removed=NEXT once we ship API level 26.
-    @available(added=NEXT, removed=HEAD)
+    @available(added=26, removed=HEAD)
     @selector("OpenCapability")
     flexible DeprecatedOpenCapability(resource struct {
         moniker string:component.MAX_MONIKER_LENGTH;

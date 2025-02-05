@@ -108,11 +108,7 @@ template("zbi_test_executable") {
 set_defaults("zbi_test_executable") {
   configs = default_executable_configs
   if ((is_fuchsia || is_mistos) && !is_kernel) {
-    if (is_fuchsia) {
-      configs -= [ "//build/config/fuchsia:fdio_config" ]
-    } else if (is_mistos) {
-      configs -= [ "//build/config/mistos:fdio_config" ]
-    }
+    configs -= [ "//build/config/fuchsia:fdio_config" ]
   }
 
   assert_no_deps = [

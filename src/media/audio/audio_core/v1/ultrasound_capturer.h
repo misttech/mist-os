@@ -48,6 +48,7 @@ class UltrasoundCapturer : public BaseCapturer {
   void ReportStop() final;
   // Unsupported by UltrasoundCapturer
   void SetUsage(fuchsia::media::AudioCaptureUsage usage) final;
+  void SetUsage2(fuchsia::media::AudioCaptureUsage2 usage) final;
   void SetPcmStreamType(fuchsia::media::AudioStreamType stream_type) final;
   void BindGainControl(fidl::InterfaceRequest<fuchsia::media::audio::GainControl> request) final;
   void SetReferenceClock(zx::clock ref_clock) final;

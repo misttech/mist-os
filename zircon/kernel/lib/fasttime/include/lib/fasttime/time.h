@@ -12,27 +12,27 @@
 
 namespace fasttime {
 
-inline zx_ticks_t compute_monotonic_ticks(zx_vaddr_t time_values_addr) {
+inline zx_instant_mono_ticks_t compute_monotonic_ticks(zx_vaddr_t time_values_addr) {
   const internal::TimeValues* time_values =
       reinterpret_cast<internal::TimeValues*>(time_values_addr);
   return internal::compute_monotonic_ticks<internal::FasttimeVerificationMode::kNormal>(
       *time_values);
 }
 
-inline zx_time_t compute_monotonic_time(zx_vaddr_t time_values_addr) {
+inline zx_instant_mono_t compute_monotonic_time(zx_vaddr_t time_values_addr) {
   const internal::TimeValues* time_values =
       reinterpret_cast<internal::TimeValues*>(time_values_addr);
   return internal::compute_monotonic_time<internal::FasttimeVerificationMode::kNormal>(
       *time_values);
 }
 
-inline zx_ticks_t compute_boot_ticks(zx_vaddr_t time_values_addr) {
+inline zx_instant_boot_ticks_t compute_boot_ticks(zx_vaddr_t time_values_addr) {
   const internal::TimeValues* time_values =
       reinterpret_cast<internal::TimeValues*>(time_values_addr);
   return internal::compute_boot_ticks<internal::FasttimeVerificationMode::kNormal>(*time_values);
 }
 
-inline zx_time_t compute_boot_time(zx_vaddr_t time_values_addr) {
+inline zx_instant_boot_t compute_boot_time(zx_vaddr_t time_values_addr) {
   const internal::TimeValues* time_values =
       reinterpret_cast<internal::TimeValues*>(time_values_addr);
   return internal::compute_boot_time<internal::FasttimeVerificationMode::kNormal>(*time_values);

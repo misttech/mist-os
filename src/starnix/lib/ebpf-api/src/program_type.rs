@@ -3,30 +3,33 @@
 // found in the LICENSE file.
 
 use ebpf::{
-    new_bpf_type_identifier, CallingContext, EbpfError, FieldDescriptor, FieldType,
+    CallingContext, CbpfConfig, CbpfLenInstruction, EbpfError, FieldDescriptor, FieldType,
     FunctionSignature, MapSchema, MemoryId, MemoryParameterSize, StructDescriptor, Type,
 };
 use linux_uapi::{
     __sk_buff, bpf_func_id_BPF_FUNC_csum_update, bpf_func_id_BPF_FUNC_get_current_uid_gid,
     bpf_func_id_BPF_FUNC_get_socket_cookie, bpf_func_id_BPF_FUNC_get_socket_uid,
-    bpf_func_id_BPF_FUNC_ktime_get_boot_ns, bpf_func_id_BPF_FUNC_ktime_get_ns,
-    bpf_func_id_BPF_FUNC_l3_csum_replace, bpf_func_id_BPF_FUNC_l4_csum_replace,
-    bpf_func_id_BPF_FUNC_map_delete_elem, bpf_func_id_BPF_FUNC_map_lookup_elem,
-    bpf_func_id_BPF_FUNC_map_update_elem, bpf_func_id_BPF_FUNC_probe_read_str,
-    bpf_func_id_BPF_FUNC_redirect, bpf_func_id_BPF_FUNC_ringbuf_discard,
-    bpf_func_id_BPF_FUNC_ringbuf_reserve, bpf_func_id_BPF_FUNC_ringbuf_submit,
-    bpf_func_id_BPF_FUNC_skb_adjust_room, bpf_func_id_BPF_FUNC_skb_change_head,
-    bpf_func_id_BPF_FUNC_skb_change_proto, bpf_func_id_BPF_FUNC_skb_load_bytes_relative,
-    bpf_func_id_BPF_FUNC_skb_pull_data, bpf_func_id_BPF_FUNC_skb_store_bytes,
-    bpf_func_id_BPF_FUNC_trace_printk, bpf_prog_type_BPF_PROG_TYPE_CGROUP_SKB,
-    bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK, bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCKOPT,
-    bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK_ADDR, bpf_prog_type_BPF_PROG_TYPE_KPROBE,
-    bpf_prog_type_BPF_PROG_TYPE_SCHED_ACT, bpf_prog_type_BPF_PROG_TYPE_SCHED_CLS,
-    bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER, bpf_prog_type_BPF_PROG_TYPE_TRACEPOINT,
-    bpf_prog_type_BPF_PROG_TYPE_XDP, bpf_sock, bpf_sock_addr, bpf_sockopt, bpf_user_pt_regs_t,
-    fuse_bpf_arg, fuse_bpf_args, fuse_entry_bpf_out, fuse_entry_out, xdp_md,
+    bpf_func_id_BPF_FUNC_ktime_get_boot_ns, bpf_func_id_BPF_FUNC_ktime_get_coarse_ns,
+    bpf_func_id_BPF_FUNC_ktime_get_ns, bpf_func_id_BPF_FUNC_l3_csum_replace,
+    bpf_func_id_BPF_FUNC_l4_csum_replace, bpf_func_id_BPF_FUNC_map_delete_elem,
+    bpf_func_id_BPF_FUNC_map_lookup_elem, bpf_func_id_BPF_FUNC_map_update_elem,
+    bpf_func_id_BPF_FUNC_probe_read_str, bpf_func_id_BPF_FUNC_probe_read_user,
+    bpf_func_id_BPF_FUNC_probe_read_user_str, bpf_func_id_BPF_FUNC_redirect,
+    bpf_func_id_BPF_FUNC_ringbuf_discard, bpf_func_id_BPF_FUNC_ringbuf_reserve,
+    bpf_func_id_BPF_FUNC_ringbuf_submit, bpf_func_id_BPF_FUNC_skb_adjust_room,
+    bpf_func_id_BPF_FUNC_skb_change_head, bpf_func_id_BPF_FUNC_skb_change_proto,
+    bpf_func_id_BPF_FUNC_skb_load_bytes_relative, bpf_func_id_BPF_FUNC_skb_pull_data,
+    bpf_func_id_BPF_FUNC_skb_store_bytes, bpf_func_id_BPF_FUNC_trace_printk,
+    bpf_prog_type_BPF_PROG_TYPE_CGROUP_SKB, bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK,
+    bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCKOPT, bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK_ADDR,
+    bpf_prog_type_BPF_PROG_TYPE_KPROBE, bpf_prog_type_BPF_PROG_TYPE_SCHED_ACT,
+    bpf_prog_type_BPF_PROG_TYPE_SCHED_CLS, bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER,
+    bpf_prog_type_BPF_PROG_TYPE_TRACEPOINT, bpf_prog_type_BPF_PROG_TYPE_XDP, bpf_sock,
+    bpf_sock_addr, bpf_sockopt, bpf_user_pt_regs_t, fuse_bpf_arg, fuse_bpf_args,
+    fuse_entry_bpf_out, fuse_entry_out, seccomp_data, xdp_md,
 };
 use std::collections::HashMap;
+use std::mem::{offset_of, size_of};
 use std::sync::{Arc, LazyLock};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
@@ -85,7 +88,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                             Type::MapValueParameter { map_ptr_index: 0 },
                             Type::ScalarValueParameter,
                         ],
-                        return_value: Type::unknown_written_scalar_value(),
+                        return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: false,
                     },
                 },
@@ -100,7 +103,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                             Type::ConstPtrToMapParameter,
                             Type::MapKeyParameter { map_ptr_index: 0 },
                         ],
-                        return_value: Type::unknown_written_scalar_value(),
+                        return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: false,
                     },
                 },
@@ -113,7 +116,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                     signature: FunctionSignature {
                         // TODO("https://fxbug.dev/287120494"): Specify arguments
                         args: vec![],
-                        return_value: Type::unknown_written_scalar_value(),
+                        return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: false,
                     },
                 },
@@ -125,7 +128,47 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                     name: "ktime_get_ns",
                     signature: FunctionSignature {
                         args: vec![],
-                        return_value: Type::unknown_written_scalar_value(),
+                        return_value: Type::UNKNOWN_SCALAR,
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelperDefinition {
+                    index: bpf_func_id_BPF_FUNC_probe_read_user,
+                    name: "probe_read_user",
+                    signature: FunctionSignature {
+                        args: vec![
+                            Type::MemoryParameter {
+                                size: MemoryParameterSize::Reference { index: 1 },
+                                input: false,
+                                output: true,
+                            },
+                            Type::ScalarValueParameter,
+                            Type::ScalarValueParameter,
+                        ],
+                        return_value: Type::UNKNOWN_SCALAR,
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelperDefinition {
+                    index: bpf_func_id_BPF_FUNC_probe_read_user_str,
+                    name: "probe_read_user_str",
+                    signature: FunctionSignature {
+                        args: vec![
+                            Type::MemoryParameter {
+                                size: MemoryParameterSize::Reference { index: 1 },
+                                input: false,
+                                output: true,
+                            },
+                            Type::ScalarValueParameter,
+                            Type::ScalarValueParameter,
+                        ],
+                        return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: false,
                     },
                 },
@@ -143,7 +186,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                     name: "get_socket_uid",
                     signature: FunctionSignature {
                         args: vec![Type::StructParameter { id: SK_BUF_ID.clone() }],
-                        return_value: Type::unknown_written_scalar_value(),
+                        return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: false,
                     },
                 },
@@ -162,7 +205,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                     name: "get_current_uid_gid",
                     signature: FunctionSignature {
                         args: vec![],
-                        return_value: Type::unknown_written_scalar_value(),
+                        return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: false,
                     },
                 },
@@ -177,7 +220,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                             Type::StructParameter { id: SK_BUF_ID.clone() },
                             Type::ScalarValueParameter,
                         ],
-                        return_value: Type::unknown_written_scalar_value(),
+                        return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: true,
                     },
                 },
@@ -246,7 +289,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                             Type::ScalarValueParameter,
                             Type::ScalarValueParameter,
                         ],
-                        return_value: Type::unknown_written_scalar_value(),
+                        return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: true,
                     },
                 },
@@ -261,20 +304,20 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                             Type::StructParameter { id: SK_BUF_ID.clone() },
                             Type::ScalarValueParameter,
                         ],
-                        return_value: Type::unknown_written_scalar_value(),
+                        return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: false,
                     },
                 },
             ),
             (
-                vec![ProgramType::KProbe].into(),
+                vec![ProgramType::KProbe, ProgramType::TracePoint].into(),
                 EbpfHelperDefinition {
                     index: bpf_func_id_BPF_FUNC_probe_read_str,
                     name: "probe_read_str",
                     signature: FunctionSignature {
                         // TODO(347257215): Implement verifier feature
                         args: vec![],
-                        return_value: Type::unknown_written_scalar_value(),
+                        return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: false,
                     },
                 },
@@ -292,7 +335,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                     name: "get_socket_cookie",
                     signature: FunctionSignature {
                         args: vec![Type::StructParameter { id: SK_BUF_ID.clone() }],
-                        return_value: Type::unknown_written_scalar_value(),
+                        return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: false,
                     },
                 },
@@ -304,7 +347,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                     name: "get_socket_cookie",
                     signature: FunctionSignature {
                         args: vec![Type::StructParameter { id: BPF_SOCK_ID.clone() }],
-                        return_value: Type::unknown_written_scalar_value(),
+                        return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: false,
                     },
                 },
@@ -316,7 +359,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                     name: "redirect",
                     signature: FunctionSignature {
                         args: vec![Type::ScalarValueParameter, Type::ScalarValueParameter],
-                        return_value: Type::unknown_written_scalar_value(),
+                        return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: false,
                     },
                 },
@@ -333,7 +376,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                             Type::ScalarValueParameter,
                             Type::ScalarValueParameter,
                         ],
-                        return_value: Type::unknown_written_scalar_value(),
+                        return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: true,
                     },
                 },
@@ -351,7 +394,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                             Type::ScalarValueParameter,
                             Type::ScalarValueParameter,
                         ],
-                        return_value: Type::unknown_written_scalar_value(),
+                        return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: true,
                     },
                 },
@@ -369,7 +412,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                             Type::ScalarValueParameter,
                             Type::ScalarValueParameter,
                         ],
-                        return_value: Type::unknown_written_scalar_value(),
+                        return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: true,
                     },
                 },
@@ -391,7 +434,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                             Type::ScalarValueParameter,
                             Type::ScalarValueParameter,
                         ],
-                        return_value: Type::unknown_written_scalar_value(),
+                        return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: true,
                     },
                 },
@@ -407,7 +450,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                             Type::ScalarValueParameter,
                             Type::ScalarValueParameter,
                         ],
-                        return_value: Type::unknown_written_scalar_value(),
+                        return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: true,
                     },
                 },
@@ -434,7 +477,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                             },
                             Type::ScalarValueParameter,
                         ],
-                        return_value: Type::unknown_written_scalar_value(),
+                        return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: false,
                     },
                 },
@@ -446,7 +489,19 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                     name: "ktime_get_boot_ns",
                     signature: FunctionSignature {
                         args: vec![],
-                        return_value: Type::unknown_written_scalar_value(),
+                        return_value: Type::UNKNOWN_SCALAR,
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelperDefinition {
+                    index: bpf_func_id_BPF_FUNC_ktime_get_coarse_ns,
+                    name: "ktime_get_coarse_ns",
+                    signature: FunctionSignature {
+                        args: vec![],
+                        return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: false,
                     },
                 },
@@ -474,94 +529,95 @@ fn array_end_32_field(offset: usize, id: MemoryId) -> FieldDescriptor {
     FieldDescriptor { offset, field_type: FieldType::PtrToArray { id, is_32_bit: true } }
 }
 
-fn ptr_to_struct_arg(id: MemoryId, fields: Vec<FieldDescriptor>) -> Vec<Type> {
-    vec![Type::PtrToStruct { id, offset: 0, descriptor: Arc::new(StructDescriptor { fields }) }]
+fn ptr_to_struct_type(id: MemoryId, fields: Vec<FieldDescriptor>) -> Type {
+    Type::PtrToStruct { id, offset: 0, descriptor: Arc::new(StructDescriptor { fields }) }
 }
 
-fn ptr_to_mem_arg<T: IntoBytes>(id: MemoryId) -> Vec<Type> {
-    vec![Type::PtrToMemory { id, offset: 0, buffer_size: std::mem::size_of::<T>() as u64 }]
+fn ptr_to_mem_type<T: IntoBytes>(id: MemoryId) -> Type {
+    Type::PtrToMemory { id, offset: 0, buffer_size: std::mem::size_of::<T>() as u64 }
 }
 
-static RING_BUFFER_RESERVATION: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
+static RING_BUFFER_RESERVATION: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 
-pub static SK_BUF_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
-static SK_BUF_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| {
-    let cb_offset = std::mem::offset_of!(__sk_buff, cb);
-    let hash_offset = std::mem::offset_of!(__sk_buff, hash);
-    let data_id = new_bpf_type_identifier();
+pub static SK_BUF_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
+pub static SK_BUF_TYPE: LazyLock<Type> = LazyLock::new(|| {
+    let cb_offset = offset_of!(__sk_buff, cb);
+    let hash_offset = offset_of!(__sk_buff, hash);
+    let data_id = MemoryId::new();
 
-    ptr_to_struct_arg(
+    ptr_to_struct_type(
         SK_BUF_ID.clone(),
         vec![
             // All fields from the start of `__sk_buff` to `cb` are read-only scalars.
             scalar_field(0, cb_offset),
             // `cb` is a mutable array.
             scalar_mut_field(cb_offset, hash_offset - cb_offset),
-            scalar_u32_field(std::mem::offset_of!(__sk_buff, hash)),
-            scalar_u32_field(std::mem::offset_of!(__sk_buff, napi_id)),
-            scalar_u32_field(std::mem::offset_of!(__sk_buff, tstamp)),
-            scalar_u32_field(std::mem::offset_of!(__sk_buff, gso_segs)),
-            scalar_u32_field(std::mem::offset_of!(__sk_buff, gso_size)),
-            array_start_32_field(std::mem::offset_of!(__sk_buff, data), data_id.clone()),
-            array_end_32_field(std::mem::offset_of!(__sk_buff, data_end), data_id),
+            scalar_u32_field(offset_of!(__sk_buff, hash)),
+            scalar_u32_field(offset_of!(__sk_buff, napi_id)),
+            scalar_u32_field(offset_of!(__sk_buff, tstamp)),
+            scalar_u32_field(offset_of!(__sk_buff, gso_segs)),
+            scalar_u32_field(offset_of!(__sk_buff, gso_size)),
+            array_start_32_field(offset_of!(__sk_buff, data), data_id.clone()),
+            array_end_32_field(offset_of!(__sk_buff, data_end), data_id),
         ],
     )
 });
+pub static SK_BUF_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| vec![SK_BUF_TYPE.clone()]);
 
-pub static XDP_MD_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
-static XDP_MD_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| {
-    let data_id = new_bpf_type_identifier();
+static XDP_MD_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
+static XDP_MD_TYPE: LazyLock<Type> = LazyLock::new(|| {
+    let data_id = MemoryId::new();
 
-    ptr_to_struct_arg(
+    ptr_to_struct_type(
         XDP_MD_ID.clone(),
         vec![
-            array_start_32_field(std::mem::offset_of!(xdp_md, data), data_id.clone()),
-            array_end_32_field(std::mem::offset_of!(xdp_md, data_end), data_id),
+            array_start_32_field(offset_of!(xdp_md, data), data_id.clone()),
+            array_end_32_field(offset_of!(xdp_md, data_end), data_id),
             // All fields starting from `data_meta` are readable.
             {
-                let data_meta_offset = std::mem::offset_of!(xdp_md, data_meta);
+                let data_meta_offset = offset_of!(xdp_md, data_meta);
                 scalar_field(data_meta_offset, std::mem::size_of::<xdp_md>() - data_meta_offset)
             },
         ],
     )
 });
+static XDP_MD_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| vec![XDP_MD_TYPE.clone()]);
 
-static BPF_USER_PT_REGS_T_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
+static BPF_USER_PT_REGS_T_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 static BPF_USER_PT_REGS_T_ARGS: LazyLock<Vec<Type>> =
-    LazyLock::new(|| ptr_to_mem_arg::<bpf_user_pt_regs_t>(BPF_USER_PT_REGS_T_ID.clone()));
+    LazyLock::new(|| vec![ptr_to_mem_type::<bpf_user_pt_regs_t>(BPF_USER_PT_REGS_T_ID.clone())]);
 
-static BPF_SOCK_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
+static BPF_SOCK_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 static BPF_SOCK_ARGS: LazyLock<Vec<Type>> =
-    LazyLock::new(|| ptr_to_mem_arg::<bpf_sock>(BPF_SOCK_ID.clone()));
+    LazyLock::new(|| vec![ptr_to_mem_type::<bpf_sock>(BPF_SOCK_ID.clone())]);
 
-static BPF_SOCKOPT_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
+static BPF_SOCKOPT_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 static BPF_SOCKOPT_ARGS: LazyLock<Vec<Type>> =
-    LazyLock::new(|| ptr_to_mem_arg::<bpf_sockopt>(BPF_SOCKOPT_ID.clone()));
+    LazyLock::new(|| vec![ptr_to_mem_type::<bpf_sockopt>(BPF_SOCKOPT_ID.clone())]);
 
-static BPF_SOCK_ADDR_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
+static BPF_SOCK_ADDR_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 static BPF_SOCK_ADDR_ARGS: LazyLock<Vec<Type>> =
-    LazyLock::new(|| ptr_to_mem_arg::<bpf_sock_addr>(BPF_SOCK_ADDR_ID.clone()));
+    LazyLock::new(|| vec![ptr_to_mem_type::<bpf_sock_addr>(BPF_SOCK_ADDR_ID.clone())]);
 
-static BPF_FUSE_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
-static BPF_FUSE_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| {
-    ptr_to_struct_arg(
+static BPF_FUSE_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
+static BPF_FUSE_TYPE: LazyLock<Type> = LazyLock::new(|| {
+    ptr_to_struct_type(
         BPF_FUSE_ID.clone(),
         vec![
             FieldDescriptor {
-                offset: (std::mem::offset_of!(fuse_bpf_args, out_args)
-                    + std::mem::offset_of!(fuse_bpf_arg, value)),
+                offset: (offset_of!(fuse_bpf_args, out_args) + offset_of!(fuse_bpf_arg, value)),
                 field_type: FieldType::PtrToMemory {
-                    id: new_bpf_type_identifier(),
+                    id: MemoryId::new(),
                     buffer_size: std::mem::size_of::<fuse_entry_out>(),
                     is_32_bit: false,
                 },
             },
             FieldDescriptor {
-                offset: (std::mem::offset_of!(fuse_bpf_args, out_args)
+                offset: (offset_of!(fuse_bpf_args, out_args)
                     + std::mem::size_of::<fuse_bpf_arg>()
-                    + std::mem::offset_of!(fuse_bpf_arg, value)),
+                    + offset_of!(fuse_bpf_arg, value)),
                 field_type: FieldType::PtrToMemory {
-                    id: new_bpf_type_identifier(),
+                    id: MemoryId::new(),
                     buffer_size: std::mem::size_of::<fuse_entry_bpf_out>(),
                     is_32_bit: false,
                 },
@@ -569,11 +625,12 @@ static BPF_FUSE_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| {
         ],
     )
 });
+static BPF_FUSE_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| vec![BPF_FUSE_TYPE.clone()]);
 
 #[repr(C)]
 #[derive(Copy, Clone, IntoBytes, Immutable, KnownLayout, FromBytes)]
 struct TraceEntry {
-    r#type: u16,
+    type_: u16,
     flags: u8,
     preemp_count: u8,
     pid: u32,
@@ -590,9 +647,9 @@ struct TraceEvent {
     args: [u64; 16],
 }
 
-static BPF_TRACEPOINT_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
+static BPF_TRACEPOINT_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 static BPF_TRACEPOINT_ARGS: LazyLock<Vec<Type>> =
-    LazyLock::new(|| ptr_to_mem_arg::<TraceEvent>(BPF_TRACEPOINT_ID.clone()));
+    LazyLock::new(|| vec![ptr_to_mem_type::<TraceEvent>(BPF_TRACEPOINT_ID.clone())]);
 
 /// The different type of BPF programs.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -674,21 +731,50 @@ impl ProgramType {
         }
     }
 
-    pub fn get_packet_memory_id(self) -> Option<MemoryId> {
-        match self {
+    pub fn create_calling_context(self, maps: Vec<MapSchema>) -> CallingContext {
+        let args = self.get_args().to_vec();
+        let packet_type = match self {
             Self::CgroupSkb | Self::SchedAct | Self::SchedCls | Self::SocketFilter => {
-                Some(SK_BUF_ID.clone())
+                Some(SK_BUF_TYPE.clone())
             }
             _ => None,
-        }
-    }
-
-    pub fn create_calling_context(self, maps: Vec<MapSchema>) -> CallingContext {
-        CallingContext {
-            maps,
-            helpers: self.get_helpers(),
-            args: self.get_args().into(),
-            packet_memory_id: self.get_packet_memory_id(),
-        }
+        };
+        CallingContext { maps, helpers: self.get_helpers(), args, packet_type }
     }
 }
+
+// Offset used to access auxiliary packet information in cBPF.
+pub const SKF_AD_OFF: i32 = linux_uapi::SKF_AD_OFF;
+pub const SKF_AD_PROTOCOL: i32 = linux_uapi::SKF_AD_PROTOCOL as i32;
+pub const SKF_AD_PKTTYPE: i32 = linux_uapi::SKF_AD_PKTTYPE as i32;
+pub const SKF_AD_IFINDEX: i32 = linux_uapi::SKF_AD_IFINDEX as i32;
+pub const SKF_AD_NLATTR: i32 = linux_uapi::SKF_AD_NLATTR as i32;
+pub const SKF_AD_NLATTR_NEST: i32 = linux_uapi::SKF_AD_NLATTR_NEST as i32;
+pub const SKF_AD_MARK: i32 = linux_uapi::SKF_AD_MARK as i32;
+pub const SKF_AD_QUEUE: i32 = linux_uapi::SKF_AD_QUEUE as i32;
+pub const SKF_AD_HATYPE: i32 = linux_uapi::SKF_AD_HATYPE as i32;
+pub const SKF_AD_RXHASH: i32 = linux_uapi::SKF_AD_RXHASH as i32;
+pub const SKF_AD_CPU: i32 = linux_uapi::SKF_AD_CPU as i32;
+pub const SKF_AD_ALU_XOR_X: i32 = linux_uapi::SKF_AD_ALU_XOR_X as i32;
+pub const SKF_AD_VLAN_TAG: i32 = linux_uapi::SKF_AD_VLAN_TAG as i32;
+pub const SKF_AD_VLAN_TAG_PRESENT: i32 = linux_uapi::SKF_AD_VLAN_TAG_PRESENT as i32;
+pub const SKF_AD_PAY_OFFSET: i32 = linux_uapi::SKF_AD_PAY_OFFSET as i32;
+pub const SKF_AD_RANDOM: i32 = linux_uapi::SKF_AD_RANDOM as i32;
+pub const SKF_AD_VLAN_TPID: i32 = linux_uapi::SKF_AD_VLAN_TPID as i32;
+pub const SKF_AD_MAX: i32 = linux_uapi::SKF_AD_MAX as i32;
+
+// Offset used to reference IP headers in cBPF.
+pub const SKF_NET_OFF: i32 = linux_uapi::SKF_NET_OFF;
+
+// Offset used to reference Ethernet headers in cBPF.
+pub const SKF_LL_OFF: i32 = linux_uapi::SKF_LL_OFF;
+
+pub const SECCOMP_CBPF_CONFIG: CbpfConfig = CbpfConfig {
+    len: CbpfLenInstruction::Static { len: size_of::<seccomp_data>() as i32 },
+    allow_msh: false,
+};
+
+pub const SOCKET_FILTER_CBPF_CONFIG: CbpfConfig = CbpfConfig {
+    len: CbpfLenInstruction::ContextField { offset: offset_of!(__sk_buff, len) as i16 },
+    allow_msh: true,
+};

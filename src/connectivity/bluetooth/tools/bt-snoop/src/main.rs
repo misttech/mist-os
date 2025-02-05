@@ -17,10 +17,10 @@ use fuchsia_fs::directory::{WatchEvent, WatchMessage, Watcher};
 use futures::future::{join, ready, Join, Ready};
 use futures::select;
 use futures::stream::{FusedStream, FuturesUnordered, Stream, StreamExt, StreamFuture};
+use log::{debug, error, info, trace, warn};
 use std::collections::HashMap;
 use std::fmt;
 use std::time::Duration;
-use tracing::{debug, error, info, trace, warn};
 use {fidl_fuchsia_io as fio, fuchsia_inspect as inspect, fuchsia_trace as trace};
 
 use crate::packet_logs::PacketLogs;
@@ -36,6 +36,9 @@ mod tests;
 
 /// Root directory of all HCI devices
 const HCI_DEVICE_CLASS_PATH: &str = "/dev/class/bt-hci";
+
+/// Maximum amount of observed bytes in a single PacketObserver::observe
+const MAX_DATA_PER_OBSERVE: usize = 50_000;
 
 /// A `DeviceId` represents the name of a host device within the HCI_DEVICE_CLASS_PATH.
 pub(crate) type DeviceId = String;
@@ -96,7 +99,7 @@ fn handle_hci_device_event(
             if filename == std::path::Path::new(".") {
                 return;
             }
-            info!(path, "Opening snoop channel");
+            info!(path; "Opening snoop channel");
             match Snooper::new(directory, &path) {
                 Ok(snooper) => {
                     snoopers.push(snooper.into_future());
@@ -175,20 +178,33 @@ async fn handle_client_request(
                 packets.extend(log.lock().iter_mut().map(|e| (&*e).to_fidl()));
             }
 
-            for (device, packets) in dev_packets.into_iter() {
-                if packets.len() == 0 {
-                    continue;
-                }
-                if let Err(e) = client
-                    .observe(&DevicePackets {
-                        host_device: Some(device),
-                        packets: Some(packets),
-                        ..Default::default()
-                    })
-                    .await
-                {
-                    warn!("Failed to send a previously observed packet to client: {e:?}");
-                    return Ok(true);
+            for (device, mut packets) in dev_packets.into_iter() {
+                info!("Dumping {} packets from {} to new client..", packets.len(), device);
+                // The FIDL protocol can only send 64KiB in a message.
+                // don't send too much data at once.  We limit to 50KB for convenience to avoid
+                // calculating wire protocol overhead for now.
+                while packets.len() > 0 {
+                    let mut send_size = 0;
+                    let idx = packets
+                        .iter()
+                        .position(|packet| {
+                            send_size += packet.data.as_ref().map_or(0, Vec::len);
+                            send_size > MAX_DATA_PER_OBSERVE
+                        })
+                        .unwrap_or(packets.len());
+                    let packets_left = packets.split_off(idx);
+                    if let Err(e) = client
+                        .observe(&DevicePackets {
+                            host_device: Some(device.clone()),
+                            packets: Some(packets),
+                            ..Default::default()
+                        })
+                        .await
+                    {
+                        warn!("Failed to send a previously observed packet to client: {e:?}");
+                        return Ok(true);
+                    }
+                    packets = packets_left;
                 }
             }
 

@@ -14,7 +14,7 @@ rustc_binary("trace_events_bin") {
 
   deps = [
     "//src/developer/fuchsia-criterion",
-    "//src/lib/cstr",
+    "//src/lib/cstringify",
     "//src/lib/trace/rust:trace",
     "//src/lib/trace/rust:trace-provider",
   ]

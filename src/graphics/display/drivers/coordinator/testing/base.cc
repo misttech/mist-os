@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/coordinator/testing/base.h"
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
+#include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <zircon/compiler.h>
@@ -24,29 +25,31 @@
 
 namespace display_coordinator {
 
-void TestBase::SetUp() {
-  loop_.StartThread("display::TestBase::loop_", &loop_thrd_);
+TestBase::TestBase() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
 
-  zx::result<std::unique_ptr<display::FakeSysmemDeviceHierarchy>> create_sysmem_provider_result =
-      display::FakeSysmemDeviceHierarchy::Create();
+TestBase::~TestBase() = default;
+
+void TestBase::SetUp() {
+  loop_.StartThread("display::TestBase::loop_");
+
+  zx::result<std::unique_ptr<fake_display::FakeSysmemDeviceHierarchy>>
+      create_sysmem_provider_result = fake_display::FakeSysmemDeviceHierarchy::Create();
   ASSERT_OK(create_sysmem_provider_result);
 
   static constexpr fake_display::FakeDisplayDeviceConfig kDeviceConfig = {
-      .manual_vsync_trigger = true,
+      .periodic_vsync = false,
       .no_buffer_access = false,
   };
-  tree_ = std::make_unique<display::FakeDisplayStack>(
+  fake_display_stack_ = std::make_unique<fake_display::FakeDisplayStack>(
       std::move(create_sysmem_provider_result).value(), kDeviceConfig);
 }
 
 void TestBase::TearDown() {
-  tree_->SyncShutdown();
+  fake_display_stack_->SyncShutdown();
   async::PostTask(loop_.dispatcher(), [this]() { loop_.Quit(); });
 
   // Wait for loop_.Quit() to execute.
   loop_.JoinThreads();
-
-  tree_.reset();
 }
 
 bool TestBase::PollUntilOnLoop(fit::function<bool()> predicate, zx::duration poll_interval) {
@@ -114,11 +117,19 @@ bool TestBase::PollUntilOnLoop(fit::function<bool()> predicate, zx::duration pol
   }
 }
 
-fidl::ClientEnd<fuchsia_sysmem2::Allocator> TestBase::ConnectToSysmemAllocatorV2() {
-  return tree_->ConnectToSysmemAllocatorV2();
+Controller* TestBase::CoordinatorController() {
+  return fake_display_stack_->coordinator_controller();
 }
-const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& TestBase::display_fidl() {
-  return tree_->display_client();
+
+fake_display::FakeDisplay& TestBase::FakeDisplayEngine() {
+  return fake_display_stack_->display_engine();
+}
+
+fidl::ClientEnd<fuchsia_sysmem2::Allocator> TestBase::ConnectToSysmemAllocatorV2() {
+  return fake_display_stack_->ConnectToSysmemAllocatorV2();
+}
+const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& TestBase::DisplayProviderClient() {
+  return fake_display_stack_->display_provider_client();
 }
 
 }  // namespace display_coordinator

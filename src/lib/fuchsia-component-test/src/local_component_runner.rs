@@ -12,10 +12,10 @@ use futures::channel::oneshot;
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use futures::{select, FutureExt, TryStreamExt};
+use log::*;
 use runner::get_value as get_dictionary_value;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::*;
 use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
@@ -378,7 +378,7 @@ impl LocalComponentRunner {
                     });
                 }
                 fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
-                    warn!(%ordinal, "Unknown ComponentController request");
+                    warn!(ordinal:%; "Unknown ComponentController request");
                 }
             }
         }

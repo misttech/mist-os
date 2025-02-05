@@ -825,6 +825,10 @@ impl<'a> Transaction<'a> {
         self.checksums.push((range, checksums, first_write));
     }
 
+    pub fn checksums(&self) -> &[(Range<u64>, Vec<Checksum>, bool)] {
+        &self.checksums
+    }
+
     pub fn take_checksums(&mut self) -> Vec<(Range<u64>, Vec<Checksum>, bool)> {
         std::mem::replace(&mut self.checksums, Vec::new())
     }
@@ -979,7 +983,7 @@ impl<'a> Transaction<'a> {
 
     /// Commits a transaction.  If successful, returns the journal offset of the transaction.
     pub async fn commit(mut self) -> Result<u64, Error> {
-        debug!(txn = ?&self, "Commit");
+        debug!(txn:? = &self; "Commit");
         self.txn_guard.fs().clone().commit_transaction(&mut self, &mut |_| {}).await
     }
 
@@ -989,7 +993,7 @@ impl<'a> Transaction<'a> {
         mut self,
         f: impl FnOnce(u64) -> R + Send,
     ) -> Result<R, Error> {
-        debug!(txn = ?&self, "Commit");
+        debug!(txn:? = &self; "Commit");
         // It's not possible to pass an FnOnce via a trait without boxing it, but we don't want to
         // do that (for performance reasons), hence the reason for the following.
         let mut f = Some(f);
@@ -1007,7 +1011,7 @@ impl<'a> Transaction<'a> {
     /// Commits the transaction, but allows the transaction to be used again.  The locks are not
     /// dropped (but transaction locks will get downgraded to read locks).
     pub async fn commit_and_continue(&mut self) -> Result<(), Error> {
-        debug!(txn = ?self, "Commit");
+        debug!(txn:? = self; "Commit");
         self.txn_guard.fs().clone().commit_transaction(self, &mut |_| {}).await?;
         assert!(self.mutations.is_empty());
         self.txn_guard.fs().lock_manager().downgrade_locks(&self.txn_locks);
@@ -1019,7 +1023,7 @@ impl Drop for Transaction<'_> {
     fn drop(&mut self) {
         // Call the filesystem implementation of drop_transaction which should, as a minimum, call
         // LockManager's drop_transaction to ensure the locks are released.
-        debug!(txn = ?&self, "Drop");
+        debug!(txn:? = &self; "Drop");
         self.txn_guard.fs().clone().drop_transaction(self);
     }
 }

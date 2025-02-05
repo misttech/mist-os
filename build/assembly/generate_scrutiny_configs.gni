@@ -16,17 +16,17 @@ import("//build/testing/golden_files.gni")
 #     [list of paths] The paths to assembly input bundle config files that
 #     will always be present in the images.
 #
-#   static_packages_golden (required)
+#   static_packages_golden (optional)
 #     [path] The static packages list source-of-truth.
 #     This lists base, cache, flexible, and base_driver packages.
 #
-#   bootfs_packages_golden (required)
+#   bootfs_packages_golden (optional)
 #     [path] The bootfs packages list source-of-truth.
 #
-#   bootfs_files_golden (required)
+#   bootfs_files_golden (optional)
 #     [path] The bootfs files list source-of-truth.
 #
-#   kernel_cmdline_golden (required)
+#   kernel_cmdline_golden (optional)
 #     [path] The kernel cmdline list source-of-truth.
 #
 #   assembly_build_type (optional)
@@ -38,14 +38,6 @@ template("generate_scrutiny_configs") {
          "Need to define assembly_input_bundles")
   assert(invoker.assembly_input_bundles != [],
          "Need to provide at least one assembly input bundle")
-  assert(defined(invoker.static_packages_golden),
-         "Need to define static_packages_golden")
-  assert(defined(invoker.bootfs_packages_golden),
-         "Need to define bootfs_packages_golden")
-  assert(defined(invoker.bootfs_files_golden),
-         "Need to define bootfs_files_golden")
-  assert(defined(invoker.kernel_cmdline_golden),
-         "Need to define kernel_cmdline_golden")
 
   _assembly_build_type = false
   if (defined(invoker.assembly_build_type)) {
@@ -169,23 +161,38 @@ template("generate_scrutiny_configs") {
     forward_variables_from(invoker, [ "visibility" ])
     testonly = true
     deps = [ ":${labels.generate}" ]
-    comparisons = [
-      {
-        golden = invoker.static_packages_golden
-        candidate = files.static_packages
-      },
-      {
-        golden = invoker.bootfs_packages_golden
-        candidate = files.bootfs_packages
-      },
-      {
-        golden = invoker.bootfs_files_golden
-        candidate = files.bootfs_files
-      },
-      {
-        golden = invoker.kernel_cmdline_golden
-        candidate = files.kernel_cmdline
-      },
-    ]
+    comparisons = []
+    if (defined(invoker.static_packages_golden)) {
+      comparisons += [
+        {
+          golden = invoker.static_packages_golden
+          candidate = files.static_packages
+        },
+      ]
+    }
+    if (defined(invoker.bootfs_packages_golden)) {
+      comparisons += [
+        {
+          golden = invoker.bootfs_packages_golden
+          candidate = files.bootfs_packages
+        },
+      ]
+    }
+    if (defined(invoker.bootfs_files_golden)) {
+      comparisons += [
+        {
+          golden = invoker.bootfs_files_golden
+          candidate = files.bootfs_files
+        },
+      ]
+    }
+    if (defined(invoker.kernel_cmdline_golden)) {
+      comparisons += [
+        {
+          golden = invoker.kernel_cmdline_golden
+          candidate = files.kernel_cmdline
+        },
+      ]
+    }
   }
 }

@@ -39,7 +39,7 @@ use starnix_types::ownership::{
 };
 use starnix_uapi::auth::{Credentials, UserAndOrGroupId, CAP_SYS_ADMIN};
 use starnix_uapi::device_type::DeviceType;
-use starnix_uapi::errors::Errno;
+use starnix_uapi::errors::{Errno, ErrnoCode};
 use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
@@ -60,6 +60,8 @@ use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
 use zx::sys::zx_thread_state_general_regs_t;
+
+use super::ThreadGroupLifecycleWaitValue;
 
 pub struct TaskBuilder {
     /// The underlying task object.
@@ -139,6 +141,9 @@ pub struct ThreadState {
     /// Copy of the current extended processor state including floating point and vector registers.
     pub extended_pstate: ExtendedPstateState,
 
+    /// The errno code (if any) that indicated this task should restart a syscall.
+    pub restart_code: Option<ErrnoCode>,
+
     /// A custom function to resume a syscall that has been interrupted by SIGSTOP.
     /// To use, call set_syscall_restart_func and return ERESTART_RESTARTBLOCK. sys_restart_syscall
     /// will eventually call it.
@@ -155,6 +160,7 @@ impl ThreadState {
         Self {
             registers: self.registers,
             extended_pstate: Default::default(),
+            restart_code: self.restart_code,
             syscall_restart_func: None,
             arch_width: self.arch_width,
         }
@@ -164,6 +170,7 @@ impl ThreadState {
         Self {
             registers: self.registers.clone(),
             extended_pstate: self.extended_pstate.clone(),
+            restart_code: self.restart_code,
             syscall_restart_func: None,
             arch_width: self.arch_width,
         }
@@ -334,7 +341,9 @@ impl CurrentTask {
         if self.thread_group.load_stopped().is_stopped() || task_stop_state.is_stopped() {
             // If we've stopped or PTRACE_LISTEN has been sent, wait for a
             // signal or instructions from the tracer.
-            group_state.stopped_waiters.wait_async(&waiter);
+            group_state
+                .lifecycle_waiters
+                .wait_async_value(&waiter, ThreadGroupLifecycleWaitValue::Stopped);
             task_state.wait_on_ptracer(&waiter);
         } else if task_state.can_accept_ptrace_commands() {
             // If we're stopped because a tracer has seen the stop and not taken
@@ -1403,7 +1412,7 @@ impl CurrentTask {
         let builder = Self::create_task(
             locked,
             kernel,
-            CString::new("[kthreadd]").unwrap(),
+            CString::new("kthreadd").unwrap(),
             fs,
             |locked, pid, process_group| {
                 let process = zx::Process::from(zx::Handle::invalid());
@@ -1917,7 +1926,11 @@ impl CurrentTask {
         if !stopped.is_in_progress() {
             let parent = self.thread_group.read().parent.clone();
             if let Some(parent) = parent {
-                parent.upgrade().write().child_status_waiters.notify_all();
+                parent
+                    .upgrade()
+                    .write()
+                    .lifecycle_waiters
+                    .notify_value(ThreadGroupLifecycleWaitValue::ChildStatus);
             }
         }
     }

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use tracing::trace;
+use log::trace;
 
 use crate::client::SrmOperation;
 use crate::error::Error;
@@ -112,7 +112,7 @@ impl<'a> GetOperation<'a> {
         let srm_active = self.is_started && self.get_srm() == SingleResponseMode::Enable;
 
         let request = RequestPacket::new_get(headers);
-        trace!(?request, "Making outgoing GET request");
+        trace!(request:?; "Making outgoing GET request");
         self.transport.send(request)?;
         trace!("Successfully made GET request");
 
@@ -145,7 +145,7 @@ impl<'a> GetOperation<'a> {
             // We always make an initial `GetFinal` request. Subsequent requests are only made if
             // SRM is disabled.
             if first_request || self.srm != SingleResponseMode::Enable {
-                trace!(?request, "Making outgoing GET final request");
+                trace!(request:?; "Making outgoing GET final request");
                 self.transport.send(request.clone())?;
                 trace!("Successfully made GET final request");
                 // All subsequent GetFinal requests will not contain any headers.
@@ -182,7 +182,7 @@ impl<'a> GetOperation<'a> {
         }
 
         let request = RequestPacket::new_abort(headers);
-        trace!(?request, "Making outgoing {opcode:?} request");
+        trace!(request:?; "Making outgoing {opcode:?} request");
         self.transport.send(request)?;
         trace!("Successfully made {opcode:?} request");
         let response = self.transport.receive_response(opcode).await?;

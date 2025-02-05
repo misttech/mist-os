@@ -168,6 +168,121 @@ class FfxTest(ffxtestcase.FfxTestCase):
         output = self.run_ffx(cmd)
         asserts.assert_equal(output, "")
 
+    def test_machine_errors(self) -> None:
+        """Test machine formattable errors."""
+        cmd = [
+            "--machine",
+            "json",
+            "-t",
+            "this-should-not-exist",
+            "target",
+            "show",
+        ]
+        (code, stdout, stderr) = self.run_ffx_unchecked(cmd)
+        output_json = json.loads(stdout)
+        asserts.assert_equal(stderr, "")
+        asserts.assert_equal(output_json["type"], "user")
+        asserts.assert_equal(
+            output_json["message"],
+            "Failed to create remote control proxy. Please check the connection to the target;`ffx doctor -v` may help diagnose the issue.",
+        )
+        asserts.assert_equal(output_json["code"], 1)
+
+    def test_machine_user_error(self) -> None:
+        """Test machine formattable errors for a user error kind."""
+        cmd = [
+            "--machine",
+            "json",
+            "repository",
+            "server",
+            "start",
+            "--background",
+            "--daemon",
+        ]
+        (code, stdout, stderr) = self.run_ffx_unchecked(cmd)
+        output_json = json.loads(stdout)
+        asserts.assert_equal(stderr, "")
+        asserts.assert_equal(output_json["type"], "user")
+        asserts.assert_equal(
+            output_json["message"],
+            "--daemon and --background are mutually exclusive",
+        )
+        asserts.assert_equal(output_json["code"], 1)
+
+    def test_machine_config_error(self) -> None:
+        """Test machine formattable errors for a user error kind."""
+        cmd = [
+            "--machine",
+            "json",
+            "-t",
+            "foo",
+            "-t",
+            "bar",
+            "target",
+            "show",
+        ]
+        (code, stdout, stderr) = self.run_ffx_unchecked(cmd)
+        output_json = json.loads(stdout)
+        asserts.assert_equal(stderr, "")
+        asserts.assert_equal(output_json["type"], "config")
+        asserts.assert_equal(
+            output_json["message"],
+            "Error parsing option '-t' with value 'bar': duplicate values provided\n",
+        )
+        asserts.assert_equal(output_json["code"], 1)
+
+    def test_arg_parse_error_formats(self) -> None:
+        """Test machine formattable errors for a user error kind."""
+        cmd = [
+            "-t",
+            "foo",
+            "-t",
+            "bar",
+            "target",
+            "show",
+        ]
+        (code, stdout, stderr) = self.run_ffx_unchecked(cmd)
+        output_json = json.loads(stdout)
+        asserts.assert_equal(stderr, "")
+        asserts.assert_equal(output_json["type"], "config")
+        asserts.assert_equal(
+            output_json["message"],
+            "Error parsing option '-t' with value 'bar': duplicate values provided\n",
+        )
+        asserts.assert_equal(output_json["code"], 1)
+
+    def test_machine_unexpected_error(self) -> None:
+        """Test machine formattable errors for a user error kind."""
+        cmd = [
+            "--machine",
+            "json",
+            "-t",
+            "foo,bar",
+            "target",
+            "show",
+        ]
+        (code, stdout, stderr) = self.run_ffx_unchecked(cmd)
+        output_json = json.loads(stdout)
+        asserts.assert_equal(stderr, "")
+        asserts.assert_equal(output_json["type"], "unexpected")
+        asserts.assert_equal(
+            output_json["message"],
+            "--config must either be a file path, /\n            a valid JSON object, or comma separated key=value pairs.",
+        )
+        asserts.assert_equal(output_json["code"], 1)
+
+    def test_machine_help(self) -> None:
+        """Test machine formattable help."""
+        cmd = [
+            "--machine",
+            "json",
+            "--help",
+        ]
+        (code, stdout, stderr) = self.run_ffx_unchecked(cmd)
+        json.loads(stdout)
+        asserts.assert_equal(stderr, "")
+        asserts.assert_equal(code, 0)
+
 
 if __name__ == "__main__":
     test_runner.main()

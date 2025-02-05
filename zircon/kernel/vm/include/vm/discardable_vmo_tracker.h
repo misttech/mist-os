@@ -134,7 +134,7 @@ class DiscardableVmoTracker final
 
   // Timestamp of the last unlock operation that changed a discardable vmo's state to
   // |kReclaimable|. Used to determine whether the vmo was accessed too recently to be discarded.
-  zx_time_t last_unlock_timestamp_ TA_GUARDED(cow_->lock()) = ZX_TIME_INFINITE;
+  zx_instant_mono_t last_unlock_timestamp_ TA_GUARDED(cow_->lock()) = ZX_TIME_INFINITE;
 
   // The current state of a discardable vmo, depending on the lock count and whether it has been
   // discarded.

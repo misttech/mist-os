@@ -15,7 +15,7 @@ rustc_library("scoped_task") {
     "//src/lib/fuchsia-runtime",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:libc",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [

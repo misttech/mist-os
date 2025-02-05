@@ -501,27 +501,6 @@ async fn unsupported_per_package_source(source: PackageSource) {
         let status = file.write_at(b"potato", 0).await.unwrap().map_err(zx::Status::from_raw);
         assert_eq!(status, Err(expected_status));
 
-        // Verify setAttr() fails.
-        assert_eq!(
-            zx::Status::from_raw(
-                file.set_attr(
-                    fio::NodeAttributeFlags::empty(),
-                    &fio::NodeAttributes {
-                        mode: 0,
-                        id: 0,
-                        content_size: 0,
-                        storage_size: 0,
-                        link_count: 0,
-                        creation_time: 0,
-                        modification_time: 0
-                    }
-                )
-                .await
-                .unwrap()
-            ),
-            expected_status
-        );
-
         // Verify resize() fails.
         assert_eq!(
             file.resize(0).await.unwrap().map_err(zx::Status::from_raw),

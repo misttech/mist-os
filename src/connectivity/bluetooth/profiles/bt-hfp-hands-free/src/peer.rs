@@ -7,7 +7,7 @@ use bt_rfcomm::profile as rfcomm;
 use fidl::endpoints::create_proxy_and_stream;
 use fuchsia_bluetooth::profile::ProtocolDescriptor;
 use fuchsia_bluetooth::types::{Channel, PeerId};
-use tracing::{info, warn};
+use log::{info, warn};
 use {
     fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
     fidl_fuchsia_bluetooth_hfp as fidl_hfp, fuchsia_async as fasync,
@@ -51,7 +51,7 @@ impl Peer {
     /// PeerHandlerProxy appropriate to it.
     pub fn handle_peer_connected(&mut self, channel: Channel) -> fidl_hfp::PeerHandlerProxy {
         if self.task.take().is_some() {
-            info!(peer = %self.peer_id, "Shutting down existing task on incoming RFCOMM channel");
+            info!(peer:% = self.peer_id; "Shutting down existing task on incoming RFCOMM channel");
         }
 
         let (peer_handler_proxy, peer_handler_request_stream) =
@@ -70,17 +70,17 @@ impl Peer {
         protocol: Option<Vec<ProtocolDescriptor>>,
     ) -> Result<Option<fidl_hfp::PeerHandlerProxy>> {
         if self.task.is_some() {
-            info!(peer=%self.peer_id, "Already connected, ignoring search result");
+            info!(peer:% = self.peer_id; "Already connected, ignoring search result");
             return Ok(None);
         }
         // If we haven't started the task, connect to the peer and do so.
-        info!(peer=%self.peer_id, "Connecting RFCOMM.");
+        info!(peer:% = self.peer_id; "Connecting RFCOMM.");
 
         let channel_result = self.connect_from_protocol(protocol).await;
         let channel = match channel_result {
             Ok(channel) => channel,
             Err(err) => {
-                warn!(peer=%self.peer_id, ?err, "Unable to connect RFCOMM to peer.");
+                warn!(peer:% = self.peer_id, err:?; "Unable to connect RFCOMM to peer.");
                 return Err(err);
             }
         };

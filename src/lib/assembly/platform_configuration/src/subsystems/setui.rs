@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::fs::File;
+
 use crate::subsystems::prelude::*;
 use anyhow::{Context, Result};
 use assembly_config_schema::platform_config::setui_config::{ICUType, SetUiConfig};
@@ -47,6 +49,54 @@ impl DefineSubsystemConfiguration<SetUiConfig> for SetUiSubsystem {
                     source: agent.clone().into(),
                     destination: "agent_configuration.json".into(),
                 })?;
+            }
+
+            if config.external_brightness_controller {
+                // if an external brightness controller is in use, write a service_flags.json
+                // file that specifies that.
+
+                let service_flags_json = serde_json::json!({
+                    "controller_flags": ["ExternalBrightnessControl"]
+                });
+
+                let service_flags_config = context
+                    .get_gendir()
+                    .context("getting gen dir for setui service_flags.json config")?
+                    .join("service_flags.json");
+                let config_file = File::create(&service_flags_config).with_context(|| {
+                    format!("Creating service_flags.json file: {}", service_flags_config)
+                })?;
+                serde_json::to_writer_pretty(config_file, &service_flags_json).with_context(
+                    || format!("Writing service_flags.json file: {}", service_flags_config),
+                )?;
+
+                builder
+                    .package("setui_service")
+                    .config_data(FileEntry {
+                        source: service_flags_config,
+                        destination: "service_flags.json".into(),
+                    })
+                    .context("Adding service_flags.json config data entry")?;
+            }
+
+            if let Some(input_device_config) = &config.input_device_config {
+                builder
+                    .package("setui_service")
+                    .config_data(FileEntry {
+                        source: input_device_config.clone().to_utf8_pathbuf(),
+                        destination: "input_device_config.json".into(),
+                    })
+                    .context("Adding input_device_config.json")?;
+            }
+
+            if let Some(light_hardware_config) = &config.light_hardware_config {
+                builder
+                    .package("setui_service")
+                    .config_data(FileEntry {
+                        source: light_hardware_config.clone().to_utf8_pathbuf(),
+                        destination: "light_hardware_config.json".into(),
+                    })
+                    .context("Adding light_hardware_config.json")?;
             }
         }
         Ok(())

@@ -4,6 +4,7 @@
 
 #![cfg(test)]
 use assert_matches::assert_matches;
+use fidl_fuchsia_hardware_power_statecontrol::{RebootOptions, RebootReason2};
 use fidl_fuchsia_paver::Configuration;
 use fidl_fuchsia_update_ext::{
     InstallationErrorData, InstallationProgress, InstallingData, State, UpdateInfo,
@@ -19,7 +20,7 @@ use mock_installer::{
     CapturedRebootControllerRequest, CapturedUpdateInstallerRequest, MockUpdateInstallerService,
 };
 use mock_paver::{MockPaverService, MockPaverServiceBuilder, PaverEvent};
-use mock_reboot::{MockRebootService, RebootReason};
+use mock_reboot::MockRebootService;
 use pretty_assertions::assert_eq;
 use std::sync::Arc;
 use std::time::Duration;
@@ -787,7 +788,7 @@ async fn revert_success() {
     #[derive(Debug, PartialEq)]
     enum Interaction {
         Paver(PaverEvent),
-        Reboot(RebootReason),
+        Reboot(RebootOptions),
     }
     let interactions = Arc::new(Mutex::new(vec![]));
     let env = TestEnv::builder()
@@ -820,7 +821,10 @@ async fn revert_success() {
                 configuration: Configuration::A
             }),
             Interaction::Paver(PaverEvent::BootManagerFlush),
-            Interaction::Reboot(RebootReason::UserRequest)
+            Interaction::Reboot(RebootOptions {
+                reasons: Some(vec![RebootReason2::UserRequest]),
+                ..Default::default()
+            }),
         ]
     );
 }

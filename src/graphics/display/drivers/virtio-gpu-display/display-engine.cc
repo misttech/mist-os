@@ -184,7 +184,8 @@ display::ConfigCheckResult DisplayEngine::CheckConfiguration(
 
   display::ConfigCheckResult result = display::ConfigCheckResult::kOk;
   if (layer.display_destination() != display_area) {
-    // TODO(costan): Doesn't seem right?
+    // TODO(https://fxbug.dev/388602122): Revise the definition of MERGE_BASE to
+    // include this case, or replace with a different opcode.
     layer_composition_operations[0] = layer_composition_operations[0].WithMergeBase();
     result = display::ConfigCheckResult::kUnsupportedConfig;
   }

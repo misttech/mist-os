@@ -5,13 +5,6 @@
 import("//build/python/python_host_test.gni")
 
 if (is_host) {
-  python_host_test("session_ffx_test") {
-    main_source = "session_test.py"
-    libraries = [ "//src/testing/end_to_end/honeydew" ]
-    main_callable = "unittest.main"
-    extra_args = [ "-v" ]
-  }
-
   python_host_test("screenshot_ffx_test") {
     main_source = "screenshot_test.py"
     libraries = [
@@ -39,6 +32,5 @@ group("tests") {
   public_deps = [
     ":inspect_ffx_test($host_toolchain)",
     ":screenshot_ffx_test($host_toolchain)",
-    ":session_ffx_test($host_toolchain)",
   ]
 }

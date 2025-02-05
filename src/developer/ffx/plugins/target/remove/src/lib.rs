@@ -5,13 +5,13 @@
 use async_trait::async_trait;
 use ffx_target_remove_args::RemoveCommand;
 use fho::{
-    bug, daemon_protocol, return_bug, return_user_error, FfxMain, FfxTool, Result, ToolIO,
-    VerifiedMachineWriter,
+    bug, return_bug, return_user_error, FfxMain, FfxTool, Result, ToolIO, VerifiedMachineWriter,
 };
 use fidl_fuchsia_developer_ffx as ffx;
 use manual_targets::{Config, ManualTargets};
 use schemars::JsonSchema;
 use serde::Serialize;
+use target_holders::daemon_protocol;
 
 #[derive(Debug, Serialize, JsonSchema)]
 pub enum CommandStatus {
@@ -129,11 +129,12 @@ mod test {
     use ffx_config::ConfigLevel;
     use fho::{Format, TestBuffers};
     use serde_json::json;
+    use target_holders::fake_proxy;
 
     fn setup_fake_target_collection_proxy<T: 'static + Fn(String) -> bool + Send>(
         test: T,
     ) -> ffx::TargetCollectionProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             ffx::TargetCollectionRequest::RemoveTarget { target_id, responder } => {
                 let result = test(target_id);
                 responder.send(result).unwrap();

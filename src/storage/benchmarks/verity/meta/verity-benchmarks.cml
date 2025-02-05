@@ -97,6 +97,30 @@
                 "#setup_verity",
             ],
         },
+        {
+            config: "fuchsia.fshost.FxfsBlob",
+            from: "parent",
+            to: "#test_fxfs",
+        },
+        {
+            config: "fuchsia.fshost.StorageHost",
+            from: "parent",
+            to: "#test_fxfs",
+        },
+        {
+            service: [ "fuchsia.storage.partitions.PartitionService" ],
+            from: "parent",
+            to: "#test_fxfs",
+            source_availability: "unknown",
+            availability: "optional",
+        },
+        {
+            protocol: [ "fuchsia.storage.partitions.PartitionsManager" ],
+            from: "parent",
+            to: "#test_fxfs",
+            source_availability: "unknown",
+            availability: "optional",
+        },
     ],
     environments: [
         {

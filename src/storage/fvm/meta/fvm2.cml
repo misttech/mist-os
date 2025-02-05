@@ -4,9 +4,8 @@
 {
     include: [
         "//src/storage/lib/fs_management/client.shard.cml",
-        "inspect/offer.shard.cml",
+        "inspect/client.shard.cml",
         "syslog/client.shard.cml",
-        "syslog/offer.shard.cml",
         "trace/client.shard.cml",
     ],
     program: {
@@ -27,6 +26,7 @@
         },
         {
             protocol: [
+                "fuchsia.fs.Admin",
                 "fuchsia.fs.startup.Startup",
                 "fuchsia.fs.startup.Volumes",
             ],
@@ -40,17 +40,7 @@
             ],
             from: "parent",
             to: "#blobfs-collection",
-        },
-        {
-            protocol: "fuchsia.tracing.provider.Registry",
-            from: "parent",
-            to: "#blobfs-collection",
             availability: "optional",
-        },
-        {
-            protocol: "fuchsia.scheduler.RoleManager",
-            from: "parent",
-            to: "#fs-collection",
         },
     ],
     expose: [
@@ -60,6 +50,7 @@
         },
         {
             protocol: [
+                "fuchsia.fs.Admin",
                 "fuchsia.fs.startup.Startup",
                 "fuchsia.fs.startup.Volumes",
             ],

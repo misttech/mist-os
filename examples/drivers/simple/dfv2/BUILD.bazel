@@ -68,7 +68,6 @@ fuchsia_package(
 
 fuchsia_cc_test(
     name = "simple-driver-test-bin",
-    size = "small",
     srcs = [
         "tests/background_test.cc",
         "tests/foreground_test.cc",

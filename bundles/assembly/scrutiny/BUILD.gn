@@ -7,6 +7,7 @@ import("//bundles/assembly/platform_aibs.gni")
 
 _goldens_dir =
     "//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/private/assembly/goldens"
+_kernel_goldens_dir = "//bundles/assembly/scrutiny/kernel_goldens"
 
 generate_scrutiny_configs("user") {
   assembly_input_bundles = user_platform_aib_files
@@ -33,10 +34,32 @@ generate_scrutiny_configs("userdebug") {
   kernel_cmdline_golden = "${_goldens_dir}/kernel_cmdline_userdebug.txt"
 }
 
+# Build goldens with only the kernel args to require owners from the kernel team.
+generate_scrutiny_configs("user_kernel_args") {
+  assembly_input_bundles = user_platform_aib_files
+  required_assembly_input_bundles = required_user_platform_aib_files
+  assembly_build_type = "user"
+  deps = user_platform_aib_labels
+
+  kernel_cmdline_golden = "${_kernel_goldens_dir}/kernel_cmdline_user.txt"
+}
+
+generate_scrutiny_configs("userdebug_kernel_args") {
+  assembly_input_bundles = userdebug_platform_aib_files +
+                           experimental_aib_files - experimental_aib_files
+  required_assembly_input_bundles = required_userdebug_platform_aib_files
+  assembly_build_type = "userdebug"
+  deps = userdebug_platform_aib_labels
+
+  kernel_cmdline_golden = "${_kernel_goldens_dir}/kernel_cmdline_userdebug.txt"
+}
+
 group("scrutiny") {
   testonly = true
   deps = [
     ":user",
+    ":user_kernel_args",
     ":userdebug",
+    ":userdebug_kernel_args",
   ]
 }

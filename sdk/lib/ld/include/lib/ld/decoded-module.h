@@ -242,9 +242,8 @@ class DecodedModule : public DecodedModuleBase {
   // SetAbiName passing the derived class's notion of primary name for the
   // module, so that the AbiModule representation always matches that name.
   constexpr void SetAbiName(const Soname& name) {
-    if (module_) {
-      module_->link_map.name = name.c_str();
-    }
+    assert(module_);
+    module_->link_map.name = name.c_str();
   }
 
   // In an instantiation with InlineModule=kYes, EmplaceModule(..) just

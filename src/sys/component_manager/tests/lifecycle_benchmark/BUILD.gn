@@ -26,8 +26,8 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-runtime",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:rand",
-    "//third_party/rust_crates:tracing",
   ]
 
   sources = [ source_root ]

@@ -35,7 +35,7 @@ the [FIDL wire format](/docs/reference/fidl/language/wire-format) which should n
 
 [Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/functions.h#30)
 
-This function should have no emitted declaration because of:
+This function should have no emitted declaration because of the  annotation.
 
 
 ## UndocumentedFunction() {:#UndocumentedFunction}

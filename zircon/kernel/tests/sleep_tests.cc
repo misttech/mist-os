@@ -13,13 +13,13 @@
 
 #include "tests.h"
 
-// Tests that thread_sleep and current_time() are consistent.
+// Tests that thread_sleep and current_mono_time() are consistent.
 static int thread_sleep_test(void) {
   int early = 0;
   for (int i = 0; i < 5; i++) {
-    zx_time_t now = current_time();
+    zx_instant_mono_t now = current_mono_time();
     Thread::Current::SleepRelative(ZX_MSEC(500));
-    zx_duration_t actual_delay = current_time() - now;
+    zx_duration_mono_t actual_delay = current_mono_time() - now;
     if (actual_delay < ZX_MSEC(500)) {
       early = 1;
       printf("Thread::Current::SleepRelative(ZX_MSEC(500)) returned after %" PRIi64 " ns\n",

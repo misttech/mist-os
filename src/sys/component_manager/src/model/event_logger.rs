@@ -5,8 +5,8 @@
 use async_trait::async_trait;
 use errors::ModelError;
 use hooks::{Event, EventType, Hook, HooksRegistration};
+use log::info;
 use std::sync::{Arc, Weak};
-use tracing::info;
 
 pub struct EventLogger;
 

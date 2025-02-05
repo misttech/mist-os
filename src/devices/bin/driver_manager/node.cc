@@ -7,6 +7,7 @@
 #include <lib/driver/component/cpp/internal/start_args.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
+#include <algorithm>
 #include <deque>
 #include <optional>
 #include <unordered_set>
@@ -395,6 +396,9 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
                                          .address(symbol.address())
                                          .Build());
   }
+
+  // Copy the dictionary from the primary parent.
+  composite->dictionary_ref_ = primary->dictionary_ref_;
 
   // Copy the offers from each parent.
   std::vector<NodeOffer> node_offers;
@@ -816,6 +820,17 @@ void Node::SynchronizePropertiesDict() {
   }
 }
 
+std::vector<fdf::BusInfo> Node::GetBusTopology() const {
+  std::vector<fdf::BusInfo> segments;
+  for (auto node = this; node != nullptr; node = node->GetPrimaryParent()) {
+    if (node->bus_info_.has_value()) {
+      segments.push_back(node->bus_info_.value());
+    }
+  }
+  std::ranges::reverse(segments);
+  return segments;
+}
+
 fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> Node::AddChildHelper(
     fuchsia_driver_framework::NodeAddArgs args,
     fidl::ServerEnd<fuchsia_driver_framework::NodeController> controller,
@@ -947,6 +962,11 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
       }
     }
   }
+
+  child->bus_info_ = std::move(args.bus_info());
+
+  // Copy the dictionary of a parent node down to the child.
+  child->dictionary_ref_ = dictionary_ref_;
 
   child->SetNonCompositeProperties(properties);
 
@@ -1325,10 +1345,22 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
   // Starting a new driver. Reset the quarantine url if we had one.
   quarantine_driver_url_.reset();
 
+  zx::event node_token;
+  if (start_info.has_component_instance()) {
+    node_token = std::move(start_info.component_instance());
+  } else {
+    LOGF(WARNING, "Component instance not provided in start request");
+    ZX_ASSERT(zx::event::create(0, &node_token) == ZX_OK);
+  }
+
+  zx::event node_token_dup;
+  ZX_ASSERT(node_token.duplicate(ZX_RIGHT_SAME_RIGHTS, &node_token_dup) == ZX_OK);
+
   driver_component_.emplace(*this, std::string(url), std::move(controller),
-                            std::move(driver_endpoints.client));
+                            std::move(driver_endpoints.client), std::move(node_token_dup));
   driver_host_.value()->Start(std::move(client_end), name_, properties_, symbols,
-                              offers_for_start_wire, start_info, std::move(driver_endpoints.server),
+                              offers_for_start_wire, start_info, std::move(node_token),
+                              std::move(driver_endpoints.server),
                               [weak_self = weak_from_this(), name = name_,
                                cb = std::move(cb)](zx::result<> result) mutable {
                                 auto node_ptr = weak_self.lock();
@@ -1361,10 +1393,18 @@ void Node::StartDriverWithDynamicLinker(
   // Starting a new driver. Reset the quarantine url if we had one.
   quarantine_driver_url_.reset();
 
+  zx::event node_token, node_token_dup;
+  if (start_args.start_info_.component_instance().has_value()) {
+    node_token = std::move(start_args.start_info_.component_instance().value());
+  } else {
+    ZX_ASSERT(zx::event::create(0, &node_token) == ZX_OK);
+  }
+  ZX_ASSERT(node_token.duplicate(ZX_RIGHT_SAME_RIGHTS, &node_token_dup) == ZX_OK);
+
   driver_component_.emplace(*this, std::string(url), std::move(controller),
-                            std::move(driver_endpoints.client));
+                            std::move(driver_endpoints.client), std::move(node_token_dup));
   driver_host_.value()->StartWithDynamicLinker(std::move(client_end), name_, std::move(load_args),
-                                               std::move(start_args),
+                                               std::move(start_args), std::move(node_token),
                                                std::move(driver_endpoints.server), std::move(cb));
 }
 
@@ -1519,7 +1559,7 @@ Node::GetDeprecatedNodeProperties(std::string_view parent_name) const {
 Node::DriverComponent::DriverComponent(
     Node& node, std::string url,
     fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
-    fidl::ClientEnd<fuchsia_driver_host::Driver> driver)
+    fidl::ClientEnd<fuchsia_driver_host::Driver> driver, zx::event component_inst)
     : component_controller_ref(
           node.dispatcher_, std::move(controller), &node,
           [](Node* node, fidl::UnbindInfo info) {
@@ -1530,7 +1570,13 @@ Node::DriverComponent::DriverComponent(
             }
           }),
       driver(std::move(driver), node.dispatcher_, &node),
-      driver_url(std::move(url)) {}
+      driver_url(std::move(url)),
+      component_instance(std::move(component_inst)) {
+  zx_info_handle_basic_t info;
+  ZX_ASSERT(component_instance.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr,
+                                        nullptr) == ZX_OK);
+  component_instance_koid = info.koid;
+}
 
 void Node::SetAndPublishInspect() {
   constexpr char kDeviceTypeString[] = "Device";

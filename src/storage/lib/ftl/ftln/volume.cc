@@ -143,6 +143,22 @@ zx_status_t VolumeImpl::GetCounters(Counters* counters) {
   return ZX_OK;
 }
 
+zx_status_t VolumeImpl::GetNewWearLeveling(bool* state) {
+  int state_ptr;
+  if (report_(vol_, FS_GET_NEW_WEAR_LEVELING, &state_ptr) != 0) {
+    return ZX_ERR_BAD_STATE;
+  }
+  *state = (state_ptr != 0);
+  return ZX_OK;
+}
+
+zx_status_t VolumeImpl::SetNewWearLeveling(bool state) {
+  if (report_(vol_, FS_SET_NEW_WEAR_LEVELING, state ? 1 : 0) != 0) {
+    return ZX_ERR_BAD_STATE;
+  }
+  return ZX_OK;
+}
+
 bool VolumeImpl::OnVolumeAdded(const XfsVol* ftl) {
   ZX_DEBUG_ASSERT(!Created());
   vol_ = ftl->vol;

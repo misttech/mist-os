@@ -353,10 +353,10 @@ impl DeadKeysHandler {
                 self.inspect_status.count_received_event(InputEvent::from(unhandled_input_event));
                 let event = StoredEvent { event, device_descriptor, event_time };
                 // Separated into two statements to ensure the logs are not truncated.
-                tracing::debug!("state: {:?}", self.state.borrow());
-                tracing::debug!("event: {}", &event);
+                log::debug!("state: {:?}", self.state.borrow());
+                log::debug!("event: {}", &event);
                 let result = self.process_keyboard_event(event);
-                tracing::debug!("result: {:?}", &result);
+                log::debug!("result: {:?}", &result);
                 result
             }
 
@@ -542,7 +542,7 @@ impl DeadKeysHandler {
                             });
                             return composed_event.into();
                         } else {
-                            tracing::debug!("compose failed for: {}\n", &event);
+                            log::debug!("compose failed for: {}\n", &event);
                             // FAIL!
                             // Composition failed, what now?  We would need to
                             // emit TWO characters - one for the now-defunct

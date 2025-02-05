@@ -272,7 +272,6 @@ impl SparseFileWriter {
         self.chunks.iter().map(|c| c.output_size()).sum()
     }
 
-    #[tracing::instrument(skip(self, reader, writer))]
     fn write<W: Write + Seek, R: Read + Seek>(&self, reader: &mut R, writer: &mut W) -> Result<()> {
         let header = SparseHeader::new(
             BLK_SIZE.try_into().unwrap(),          // Size of the blocks
@@ -345,7 +344,6 @@ fn add_sparse_chunk(r: &mut Vec<Chunk>, chunk: Chunk) -> Result<()> {
 }
 
 /// Reads a sparse image from `source` and expands it to its unsparsed representation in `dest`.
-#[tracing::instrument(skip(source, dest))]
 pub fn unsparse<W: Writer, R: Reader>(source: &mut R, dest: &mut W) -> Result<()> {
     let header: SparseHeader = deserialize_from(source).context("Failed to read header")?;
     ensure!(header.valid(), "Invalid sparse image header {:?}", header);
@@ -400,7 +398,6 @@ fn expand_chunk<R: Read + Seek, W: Write + Seek>(
 /// size will not exceed the maximum_download_size.
 ///
 /// This will return an error if max_download_size is <= BLK_SIZE
-#[tracing::instrument]
 fn resparse(
     sparse_file: SparseFileWriter,
     max_download_size: u64,
@@ -423,7 +420,7 @@ fn resparse(
     let mut chunk_pos = 0;
     let mut output_offset = 0;
     while chunk_pos < sparse_file.chunks.len() {
-        tracing::trace!("Starting a new file at chunk position: {}", chunk_pos);
+        log::trace!("Starting a new file at chunk position: {}", chunk_pos);
 
         let mut file_len = 0;
         file_len += sunk_file_length;
@@ -432,7 +429,7 @@ fn resparse(
         if chunk_pos > 0 {
             // If we already have some chunks... add a DontCare block to
             // move the pointer
-            tracing::trace!("Adding a DontCare chunk offset: {}", chunk_pos);
+            log::trace!("Adding a DontCare chunk offset: {}", chunk_pos);
             let dont_care = Chunk::DontCare { start: 0, size: output_offset };
             chunks.push(dont_care);
         }
@@ -442,7 +439,7 @@ fn resparse(
                 Some(chunk) => {
                     let curr_chunk_data_len = chunk.chunk_data_len();
                     if (file_len + curr_chunk_data_len) as u64 > max_download_size {
-                        tracing::trace!("Current file size is: {} and adding another chunk of len: {} would put us over our max: {}", file_len, curr_chunk_data_len, max_download_size);
+                        log::trace!("Current file size is: {} and adding another chunk of len: {} would put us over our max: {}", file_len, curr_chunk_data_len, max_download_size);
 
                         // Add a dont care chunk to cover everything to the end of the image.
                         // While this is not strictly speaking needed, other tools
@@ -455,20 +452,20 @@ fn resparse(
                         chunks.push(dont_care);
                         break;
                     }
-                    tracing::trace!("chunk: {} curr_chunk_data_len: {} current file size: {} max_download_size: {} diff: {}", chunk_pos, curr_chunk_data_len, file_len, max_download_size, (max_download_size as usize - file_len - curr_chunk_data_len) );
+                    log::trace!("chunk: {} curr_chunk_data_len: {} current file size: {} max_download_size: {} diff: {}", chunk_pos, curr_chunk_data_len, file_len, max_download_size, (max_download_size as usize - file_len - curr_chunk_data_len) );
                     add_sparse_chunk(&mut chunks, chunk.clone())?;
                     file_len += curr_chunk_data_len;
                     chunk_pos = chunk_pos + 1;
                     output_offset += chunk.output_size();
                 }
                 None => {
-                    tracing::trace!("Finished iterating chunks");
+                    log::trace!("Finished iterating chunks");
                     break;
                 }
             }
         }
         let resparsed = SparseFileWriter::new(chunks);
-        tracing::trace!("resparse: Adding new SparseFile: {}", resparsed);
+        log::trace!("resparse: Adding new SparseFile: {}", resparsed);
         ret.push(resparsed);
     }
 
@@ -485,7 +482,6 @@ fn resparse(
 /// * `file_to_upload` - Path to the file to translate to sparse image format.
 /// * `dir` - Path to write the Sparse file(s).
 /// * `max_download_size` - Maximum size that can be downloaded by the device.
-#[tracing::instrument()]
 pub fn build_sparse_files(
     name: &str,
     file_to_upload: &str,
@@ -499,7 +495,7 @@ pub fn build_sparse_files(
             BLK_SIZE
         );
     }
-    tracing::debug!("Building sparse files for: {}. File: {}", name, file_to_upload);
+    log::debug!("Building sparse files for: {}. File: {}", name, file_to_upload);
     let mut in_file = File::open(file_to_upload)?;
 
     let mut total_read: usize = 0;
@@ -523,18 +519,18 @@ pub fn build_sparse_files(
             let value: u32 = bincode::deserialize(&buf[0..4])?;
             // Add a fill chunk
             let fill = Chunk::Fill { start: total_read as u64, size: buf.len(), value };
-            tracing::trace!("Sparsing file: {}. Created: {}", file_to_upload, fill);
+            log::trace!("Sparsing file: {}. Created: {}", file_to_upload, fill);
             chunks.push(fill);
         } else {
             // Add a raw chunk
             let raw = Chunk::Raw { start: total_read as u64, size: buf.len() };
-            tracing::trace!("Sparsing file: {}. Created: {}", file_to_upload, raw);
+            log::trace!("Sparsing file: {}. Created: {}", file_to_upload, raw);
             chunks.push(raw);
         }
         total_read += read;
     }
 
-    tracing::trace!("Creating sparse file from: {} chunks", chunks.len());
+    log::trace!("Creating sparse file from: {} chunks", chunks.len());
 
     // At this point we are making a new sparse file fom an unoptomied set of
     // Chunks. This primarliy means that adjacent Fill chunks of same value are
@@ -546,21 +542,21 @@ pub fn build_sparse_files(
     // to multiple physical devices which may have slight differences in their
     // hardware (and therefore different `max_download_size`es)
     let sparse_file = SparseFileWriter::new(chunks);
-    tracing::trace!("Created sparse file: {}", sparse_file);
+    log::trace!("Created sparse file: {}", sparse_file);
 
     let mut ret = Vec::<TempPath>::new();
-    tracing::trace!("Resparsing sparse file");
+    log::trace!("Resparsing sparse file");
     for re_sparsed_file in resparse(sparse_file, max_download_size)? {
         let (file, temp_path) = NamedTempFile::new_in(dir)?.into_parts();
         let mut file_create = File::from(file);
 
-        tracing::trace!("Writing resparsed {} to disk", re_sparsed_file);
+        log::trace!("Writing resparsed {} to disk", re_sparsed_file);
         re_sparsed_file.write(&mut in_file, &mut file_create)?;
 
         ret.push(temp_path);
     }
 
-    tracing::debug!("Finished building sparse files");
+    log::debug!("Finished building sparse files");
 
     Ok(ret)
 }

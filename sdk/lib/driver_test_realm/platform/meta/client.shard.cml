@@ -16,7 +16,7 @@
             to: [ "#platform_driver_test_realm" ],
         },
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            dictionary: "diagnostics",
             from: "parent",
             to: [ "#platform_driver_test_realm" ],
         },

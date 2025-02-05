@@ -71,7 +71,10 @@ void PhysMain(void* fdt, arch::EarlyTicks ticks) {
     return new (ktl::align_val_t{align}, gPhysNew<memalloc::Type::kPhysScratch>, ac) uint8_t[size];
   });
   shim.set_cmdline(gDevicetreeBoot.cmdline);
-  shim.Get<boot_shim::UartItem<>>().Init(GetUartDriver().uart());
+  GetUartDriver().Visit([&shim](const auto& driver) {
+    using uart_t = typename ktl::decay_t<decltype(driver)>::uart_type;
+    shim.Get<boot_shim::UartItem<>>().Init(uart_t(driver.config()));
+  });
   shim.Get<boot_shim::DevicetreeDtbItem>().set_payload(ktl::as_bytes(gDevicetreeBoot.fdt.fdt()));
   shim.Get<boot_shim::PoolMemConfigItem>().Init(Allocation::GetPool());
   if (gDevicetreeBoot.nvram) {

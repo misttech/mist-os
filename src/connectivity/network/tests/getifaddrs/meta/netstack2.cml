@@ -9,7 +9,7 @@
     children: [
         {
             name: "netstack",
-            url: "#meta/configurable-netstack.cm",
+            url: "#meta/configurable-netstack-netstack2.cm",
         },
     ],
 }

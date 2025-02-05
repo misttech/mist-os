@@ -4,7 +4,8 @@
 
 use anyhow::{format_err, Error};
 use fidl_fuchsia_wlan_sme as fidl_sme;
-use std::sync::{Arc, Mutex};
+use fuchsia_sync::Mutex;
+use std::sync::Arc;
 
 pub mod deprecated_client;
 pub mod deprecated_configuration;
@@ -28,13 +29,13 @@ impl IfaceRef {
         IfaceRef(Arc::new(Mutex::new(None)))
     }
     pub fn set_if_empty(&self, iface: Iface) {
-        let mut c = self.0.lock().unwrap();
+        let mut c = self.0.lock();
         if c.is_none() {
             *c = Some(iface);
         }
     }
     pub fn remove_if_matching(&self, iface_id: u16) {
-        let mut c = self.0.lock().unwrap();
+        let mut c = self.0.lock();
         let same_id = match *c {
             Some(ref c) => c.iface_id == iface_id,
             None => false,
@@ -44,10 +45,6 @@ impl IfaceRef {
         }
     }
     pub fn get(&self) -> Result<Iface, Error> {
-        self.0
-            .lock()
-            .map_err(|e| format_err!("unable to lock IfaceRef: {:?}", e))?
-            .clone()
-            .ok_or_else(|| format_err!("no available client interfaces"))
+        self.0.lock().clone().ok_or_else(|| format_err!("no available client interfaces"))
     }
 }

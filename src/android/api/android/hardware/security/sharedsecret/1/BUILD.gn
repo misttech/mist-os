@@ -1,0 +1,13 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//src/lib/android/aidl/aidl.gni")
+
+aidl("1") {
+  base = "//third_party/android/platform/hardware/interfaces/security/sharedsecret/aidl/aidl_api/android.hardware.security.sharedsecret/1"
+  stability = "vintf"
+  version = "1"
+  parcelables = [ "//third_party/android/platform/hardware/interfaces/security/sharedsecret/aidl/aidl_api/android.hardware.security.sharedsecret/1/android/hardware/security/sharedsecret/SharedSecretParameters.aidl" ]
+  interfaces = [ "//third_party/android/platform/hardware/interfaces/security/sharedsecret/aidl/aidl_api/android.hardware.security.sharedsecret/1/android/hardware/security/sharedsecret/ISharedSecret.aidl" ]
+}

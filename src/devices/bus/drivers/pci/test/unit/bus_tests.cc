@@ -416,24 +416,20 @@ TEST_F(PciBusTests, Inspect) {
   ASSERT_OK(owned_bus->Initialize());
   ASSERT_NO_FATAL_FAILURE(owned_bus->ReadInspect(owned_bus->GetInspectVmo()));
 
-  [[maybe_unused]] auto bus_node =
-      owned_bus->hierarchy().GetByPath({BusInspect::kBus.Data().data()});
+  [[maybe_unused]] auto bus_node = owned_bus->hierarchy().GetByPath({BusInspect::kBus.data()});
   ASSERT_NE(bus_node, nullptr);
-  EXPECT_NE(
-      bus_node->node().get_property<inspect::StringPropertyValue>(BusInspect::kName.Data().data()),
-      nullptr);
-  EXPECT_NE(bus_node->node().get_property<inspect::StringPropertyValue>(
-                BusInspect::kBusStart.Data().data()),
-            nullptr);
-  EXPECT_NE(bus_node->node().get_property<inspect::StringPropertyValue>(
-                BusInspect::kBusEnd.Data().data()),
-            nullptr);
-  EXPECT_NE(bus_node->node().get_property<inspect::StringPropertyValue>(
-                BusInspect::kSegmentGroup.Data().data()),
+  EXPECT_NE(bus_node->node().get_property<inspect::StringPropertyValue>(BusInspect::kName.data()),
             nullptr);
   EXPECT_NE(
-      bus_node->node().get_property<inspect::StringPropertyValue>(BusInspect::kEcam.Data().data()),
+      bus_node->node().get_property<inspect::StringPropertyValue>(BusInspect::kBusStart.data()),
       nullptr);
+  EXPECT_NE(bus_node->node().get_property<inspect::StringPropertyValue>(BusInspect::kBusEnd.data()),
+            nullptr);
+  EXPECT_NE(
+      bus_node->node().get_property<inspect::StringPropertyValue>(BusInspect::kSegmentGroup.data()),
+      nullptr);
+  EXPECT_NE(bus_node->node().get_property<inspect::StringPropertyValue>(BusInspect::kEcam.data()),
+            nullptr);
   [[maybe_unused]] auto* bus = owned_bus.release();
 }
 

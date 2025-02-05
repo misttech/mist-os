@@ -7,10 +7,10 @@ use anyhow::{ensure, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_input_report::MouseInputReport;
 use fidl_fuchsia_ui_input::{KeyboardReport, Touch};
+use log::debug;
 use serde::{Deserialize, Deserializer};
 use std::thread;
 use std::time::Duration;
-use tracing::debug;
 use {fidl_fuchsia_input as input, fidl_fuchsia_ui_input3 as input3, fuchsia_async as fasync};
 
 // Abstracts over input injection services (which are provided by input device registries).
@@ -370,7 +370,7 @@ pub async fn text(
     let key_sequence = derive_key_sequence(&keymaps::US_QWERTY, &input)
         .ok_or_else(|| anyhow::format_err!("Cannot translate text to key sequence"))?;
 
-    debug!(input = %input, ?key_sequence, ?key_event_duration, "synthesizer::text");
+    debug!(input:% = input, key_sequence:?, key_event_duration:?; "synthesizer::text");
     let mut key_iter = key_sequence.into_iter().peekable();
     while let Some(keyboard) = key_iter.next() {
         input_device.key_press(keyboard, monotonic_nanos()?)?;

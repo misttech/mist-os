@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "//src/sys/component_manager/tests/meta/elf_runner_and_environment_custom_logsink.shard.cml",
-        "inspect/offer.shard.cml",
-    ],
+    include: [ "//src/sys/component_manager/tests/meta/elf_runner_and_environment_custom_logsink.shard.cml" ],
     children: [
         {
             name: "routing-tests",
@@ -30,21 +27,10 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#archivist",
-                "#elf_runner",
-                "#reader",
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
             ],
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "#archivist",
-            to: "#routing-tests",
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
             from: "#archivist",
             to: "self/diagnostics",
         },
@@ -56,11 +42,6 @@
                 "#elf_runner",
                 "#reader",
             ],
-        },
-        {
-            protocol: "fuchsia.inspect.InspectSink",
-            from: "#archivist",
-            to: "self/diagnostics",
         },
         {
             dictionary: "diagnostics",

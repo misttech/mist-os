@@ -298,7 +298,7 @@ fn process_write_definitions(
 pub fn process_with_default_source(input: TokenStream) -> TokenStream {
     let macro_args = parse_macro_input!(input as DefaultSourceMacroArgs);
     let buf_tokens = quote!(
-        let arena = wlan_frame_writer::__Arena::new()?;
+        let arena = wlan_frame_writer::__Arena::new();
         let mut buffer = arena.insert_default_slice::<u8>(frame_len);
         let mut w = BufferWriter::new(&mut buffer[..]);
     );

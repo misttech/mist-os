@@ -7,9 +7,9 @@
 
 use diagnostics_log::PublishOptions;
 use fuchsia_async::LocalExecutor;
+use log::info;
 use std::ffi::c_void;
 use std::sync::Once;
-use tracing::info;
 use wlan_ffi_transport::completers::Completer;
 use wlan_ffi_transport::{EthernetRx, FfiEthernetRx, FfiWlanTx, WlanTx};
 use wlan_mlme::device::Device;

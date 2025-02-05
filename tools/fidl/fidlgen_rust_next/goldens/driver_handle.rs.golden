@@ -113,7 +113,8 @@ where
 }
 
 /// A client handler for the DriverProtocol protocol.
-
+///
+/// See [`DriverProtocol`] for more details.
 pub trait DriverProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for DriverProtocol
@@ -146,7 +147,8 @@ where
 }
 
 /// A server handler for the DriverProtocol protocol.
-
+///
+/// See [`DriverProtocol`] for more details.
 pub trait DriverProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for DriverProtocol
@@ -519,7 +521,8 @@ where
 }
 
 /// A client handler for the HandlesInProtocol protocol.
-
+///
+/// See [`HandlesInProtocol`] for more details.
 pub trait HandlesInProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for HandlesInProtocol
@@ -552,7 +555,8 @@ where
 }
 
 /// A server handler for the HandlesInProtocol protocol.
-
+///
+/// See [`HandlesInProtocol`] for more details.
 pub trait HandlesInProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn send_handles(
         &mut self,

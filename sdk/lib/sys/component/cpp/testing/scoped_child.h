@@ -138,7 +138,7 @@ class ScopedChild final {
   // Clone the exposed directory.
   fidl::InterfaceHandle<fuchsia::io::Directory> CloneExposedDir() const {
     fidl::InterfaceHandle<fuchsia::io::Directory> clone;
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
     zx_status_t status = exposed_dir_->Clone(
         fidl::InterfaceRequest<fuchsia::unknown::Cloneable>(clone.NewRequest().TakeChannel()));
 #else
@@ -153,7 +153,7 @@ class ScopedChild final {
   // Clone the exposed directory.
   void CloneExposedDir(fidl::InterfaceRequest<fuchsia::io::Directory> directory_request) const
       ZX_AVAILABLE_SINCE(11) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
     zx_status_t status = exposed_dir_->Clone(
         fidl::InterfaceRequest<fuchsia::unknown::Cloneable>(directory_request.TakeChannel()));
 #else

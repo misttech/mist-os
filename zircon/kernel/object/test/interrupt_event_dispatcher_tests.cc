@@ -72,7 +72,7 @@ static bool TestConcurrentIntEventDispatcherTeardown() {
   // Signal the thread by setting bits in the high byte.
   state.fetch_or(0xff00, ktl::memory_order_seq_cst);
   // Shutdown the test.
-  zx_status_t status = int_thread->Join(nullptr, current_time() + ZX_SEC(5));
+  zx_status_t status = int_thread->Join(nullptr, current_mono_time() + ZX_SEC(5));
   EXPECT_EQ(status, ZX_OK);
 #endif
 
@@ -111,7 +111,7 @@ bool TestPendingWakeEventBlocksSuspend() {
   ASSERT_EQ(0u, IdlePowerThread::pending_wake_events());
 
   // Make sure suspend entry works before testing suspend abort due to pending wake events.
-  zx_time_t resume_at = current_boot_time() + ZX_SEC(5);
+  zx_instant_boot_t resume_at = current_boot_time() + ZX_SEC(5);
   zx_status_t status = IdlePowerThread::TransitionAllActiveToSuspend(resume_at);
   ASSERT_EQ(ZX_OK, status);
 
@@ -127,7 +127,7 @@ bool TestPendingWakeEventBlocksSuspend() {
   ASSERT_EQ(1u, IdlePowerThread::pending_wake_events());
 
   // Wait for the interrupt to advance the state machine from TRIGGERED to NEEDACK.
-  zx_time_t timestamp = 0;
+  zx_instant_boot_t timestamp = 0;
   status = interrupt.dispatcher()->WaitForInterrupt(&timestamp);
   ASSERT_EQ(ZX_OK, status);
   ASSERT_EQ(1u, IdlePowerThread::pending_wake_events());

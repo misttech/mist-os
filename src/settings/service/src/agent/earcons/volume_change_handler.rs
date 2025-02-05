@@ -14,6 +14,7 @@ use crate::agent::earcons::sound_ids::{VOLUME_CHANGED_SOUND_ID, VOLUME_MAX_SOUND
 use crate::agent::earcons::utils::{connect_to_sound_player, play_sound};
 use crate::audio::types::{
     AudioInfo, AudioSettingSource, AudioStream, AudioStreamType, SetAudioStream,
+    AUDIO_STREAM_TYPE_COUNT,
 };
 use crate::audio::{create_default_modified_counters, ModifiedCounters};
 use crate::base::{SettingInfo, SettingType};
@@ -111,7 +112,7 @@ impl VolumeChangeHandler {
     /// they were changed.
     fn calculate_changed_streams(
         &mut self,
-        all_streams: [AudioStream; 5],
+        all_streams: [AudioStream; AUDIO_STREAM_TYPE_COUNT],
         new_modified_counters: ModifiedCounters,
     ) -> Vec<AudioStream> {
         let mut changed_stream_types = HashSet::new();
@@ -157,7 +158,7 @@ impl VolumeChangeHandler {
         let last_user_volume = self.last_user_volumes.get(&stream_type);
 
         // Logging for debugging volume changes.
-        tracing::debug!(
+        log::debug!(
             "[earcons_agent] New {:?} user volume: {:?}, Last {:?} user volume: {:?}",
             stream_type,
             new_user_volume,
@@ -191,9 +192,7 @@ impl VolumeChangeHandler {
                     Audience::Address(service::Address::Handler(SettingType::Audio)),
                 );
                 if let Err(e) = receptor.next_payload().await {
-                    tracing::error!(
-                        "Failed to play sound after waiting for message response: {e:?}"
-                    );
+                    log::error!("Failed to play sound after waiting for message response: {e:?}");
                 } else {
                     self.play_volume_sound(new_user_volume);
                 }
@@ -278,7 +277,7 @@ impl VolumeChangeHandler {
                     Ok(())
                 };
                 if let Err(e) = play_sound_result {
-                    tracing::warn!("Failed to play sound: {:?}", e);
+                    log::warn!("Failed to play sound: {:?}", e);
                 }
             }
         })
@@ -300,10 +299,10 @@ mod tests {
     use super::*;
 
     fn fake_values() -> (
-        [AudioStream; 5], // fake_streams
-        ModifiedCounters, // old_counters
-        ModifiedCounters, // new_counters
-        Vec<AudioStream>, // expected_changed_streams
+        [AudioStream; AUDIO_STREAM_TYPE_COUNT], // fake_streams
+        ModifiedCounters,                       // old_counters
+        ModifiedCounters,                       // new_counters
+        Vec<AudioStream>,                       // expected_changed_streams
     ) {
         let config_logger =
             Rc::new(std::sync::Mutex::new(InspectConfigLogger::new(component::inspector().root())));
@@ -320,11 +319,13 @@ mod tests {
             (AudioStreamType::Interruption, 0),
             (AudioStreamType::SystemAgent, 2),
             (AudioStreamType::Communication, 3),
+            (AudioStreamType::Accessibility, 4),
         ]
         .iter()
         .cloned()
         .collect();
-        let expected_changed_streams = [fake_streams[1], fake_streams[3], fake_streams[4]].to_vec();
+        let expected_changed_streams =
+            [fake_streams[1], fake_streams[3], fake_streams[4], fake_streams[5]].to_vec();
         (fake_streams, old_timestamps, new_timestamps, expected_changed_streams)
     }
 

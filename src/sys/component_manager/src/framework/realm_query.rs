@@ -16,13 +16,13 @@ use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl::prelude::*;
 use futures::StreamExt;
 use lazy_static::lazy_static;
+use log::warn;
 use measure_tape_for_instance::Measurable;
 use moniker::Moniker;
 use router_error::Explain;
 use routing::component_instance::{ComponentInstanceInterface, ResolvedInstanceInterface};
 use routing::resolving::ComponentAddress;
 use std::sync::{Arc, Weak};
-use tracing::warn;
 use vfs::directory::entry::OpenRequest;
 use vfs::directory::entry_container::Directory;
 use vfs::ToObjectRequest;
@@ -59,7 +59,7 @@ impl RealmQuery {
             let request = match stream.next().await {
                 Some(Ok(request)) => request,
                 Some(Err(error)) => {
-                    warn!(?error, "Could not get next RealmQuery request");
+                    warn!(error:?; "Could not get next RealmQuery request");
                     break;
                 }
                 None => break,
@@ -148,7 +148,7 @@ impl RealmQuery {
                 }
             };
             if let Err(error) = result {
-                warn!(?error, "Could not respond to RealmQuery request");
+                warn!(error:?; "Could not respond to RealmQuery request");
                 break;
             }
         }
@@ -253,7 +253,7 @@ async fn get_resolved_declaration(
         .native_into_fidl();
 
     let bytes = fidl::persist(&decl).map_err(|error| {
-        warn!(%moniker, %error, "RealmQuery failed to encode manifest");
+        warn!(moniker:%, error:%; "RealmQuery failed to encode manifest");
         fsys::GetDeclarationError::EncodeFailed
     })?;
 
@@ -332,7 +332,7 @@ async fn resolve_declaration(
         .map_err(|_| fsys::GetDeclarationError::InstanceNotResolved)?;
 
     let bytes = fidl::persist(&resolved.decl.native_into_fidl()).map_err(|error| {
-        warn!(parent=%parent_moniker, %error, "RealmQuery failed to encode manifest");
+        warn!(parent:% = parent_moniker, error:%; "RealmQuery failed to encode manifest");
         fsys::GetDeclarationError::EncodeFailed
     })?;
 
@@ -630,7 +630,7 @@ async fn connect_to_storage_admin(
             storage_admin.serve(storage_decl, instance.as_weak(), server_end.into_stream()).await
         {
             warn!(
-                %moniker, %error, "StorageAdmin created by LifecycleController failed to serve",
+                moniker:%, error:%; "StorageAdmin created by LifecycleController failed to serve",
             );
         };
     });
@@ -742,7 +742,7 @@ async fn serve_instance_iterator(
         let result = responder.send(&remaining_instances[..instance_count]);
         remaining_instances = &remaining_instances[instance_count..];
         if let Err(error) = result {
-            warn!(?error, "RealmQuery encountered error sending instance batch");
+            warn!(error:?; "RealmQuery encountered error sending instance batch");
             break;
         }
 
@@ -767,7 +767,7 @@ async fn serve_manifest_bytes_iterator(
 
         let result = responder.send(&batch);
         if let Err(error) = result {
-            warn!(?error, "RealmQuery encountered error sending manifest bytes");
+            warn!(error:?; "RealmQuery encountered error sending manifest bytes");
             break;
         }
 

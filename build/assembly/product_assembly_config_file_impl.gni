@@ -102,6 +102,10 @@ template("product_assembly_config_file") {
       ]
     },
     {
+      node_path = "platform.power"
+      fields = [ "metrics_logging_config" ]
+    },
+    {
       node_path = "product.build_info"
       fields = [
         "version",

@@ -20,6 +20,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"go.fuchsia.dev/fuchsia/tools/botanist"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
 	"go.fuchsia.dev/fuchsia/tools/lib/clock"
@@ -931,7 +932,7 @@ func TestRunAndOutputTests(t *testing.T) {
 			}()
 			connectionErrorRetryBackoff = &retry.ZeroBackoff{}
 
-			err = runAndOutputTests(ctx, tc.tests, testerForTest, outputs, resultsDir, nil)
+			err = runAndOutputTests(ctx, tc.tests, testerForTest, outputs, resultsDir)
 			if tc.wantErr != (err != nil) {
 				t.Errorf("want err: %t, got %s", tc.wantErr, err)
 			}
@@ -995,17 +996,8 @@ func TestExecute(t *testing.T) {
 		useFFX           bool
 	}{
 		{
-			name:       "ssh tester",
-			sshKeyFile: "sshkey",
-		},
-		{
 			name:             "serial tester",
 			serialSocketPath: "socketpath",
-		},
-		{
-			name:       "nil ssh tester",
-			sshKeyFile: "sshkey",
-			wantErr:    true,
 		},
 		{
 			name:             "nil serial tester",
@@ -1025,21 +1017,13 @@ func TestExecute(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			// Revert fakes.
-			oldSSHTester := sshTester
 			oldSerialTester := serialTester
 			oldFFXInstance := ffxInstance
 			defer func() {
-				sshTester = oldSSHTester
 				serialTester = oldSerialTester
 				ffxInstance = oldFFXInstance
 			}()
 			fuchsiaTester := &fakeTester{}
-			sshTester = func(_ context.Context, _ net.IPAddr, _, _, _ string) (Tester, error) {
-				if c.wantErr {
-					return nil, fmt.Errorf("failed to get tester")
-				}
-				return fuchsiaTester, nil
-			}
 			serialTester = func(_ context.Context, _ string) (Tester, error) {
 				if c.wantErr {
 					return nil, fmt.Errorf("failed to get tester")
@@ -1047,7 +1031,7 @@ func TestExecute(t *testing.T) {
 				return fuchsiaTester, nil
 			}
 			ffx := &ffxutil.MockFFXInstance{}
-			ffxInstance = func(_ context.Context, _ *ffxutil.FFXInstance, _ int) (FFXInstance, error) {
+			ffxInstance = func(_ context.Context, _ *ffxutil.FFXInstance, _ botanist.Experiments) (FFXInstance, error) {
 				if c.useFFX {
 					return ffx, nil
 				}
@@ -1063,8 +1047,6 @@ func TestExecute(t *testing.T) {
 			defer o.Close()
 			testrunnerOpts := Options{SnapshotFile: "snapshot.zip"}
 			if c.useFFX {
-				// No need to set the FFX option since we will use the mock instance instead.
-				testrunnerOpts.FFXExperimentLevel = 2
 				if _, err := ffx.WriteRunResult(build.TestList{}, filepath.Join(o.OutDir, "early-boot-profiles")); err != nil {
 					t.Errorf("failed to write early-boot profiles: %s", err)
 				}
@@ -1094,6 +1076,10 @@ func TestExecute(t *testing.T) {
 				expectedCopySinksCount = 0
 			}
 			closeCount := strings.Count(funcCalls, closeFunc)
+			expectedCloseCount := 1
+			if c.useFFX {
+				expectedCloseCount = 0
+			}
 			if testCount != expectedTestCount {
 				t.Errorf("ran %d tests, want: %d", testCount, expectedTestCount)
 			}
@@ -1103,21 +1089,17 @@ func TestExecute(t *testing.T) {
 			if snapshotCount != 1 {
 				t.Errorf("ran RunSnapshot %d times, want: 1", snapshotCount)
 			}
-			if closeCount != 1 {
-				t.Errorf("ran Close %d times, want: 1", closeCount)
+			if closeCount != expectedCloseCount {
+				t.Errorf("ran Close %d times, want: %d", closeCount, expectedCloseCount)
 			}
 			// Ensure CopySinks, RunSnapshot, and Close are run after all calls to Test.
-			numLastCalls := 3
-			if c.useFFX {
-				numLastCalls = 1
-			}
-			lastCalls := fuchsiaTester.funcCalls[len(fuchsiaTester.funcCalls)-numLastCalls:]
-			expectedLastCalls := []string{runSnapshotFunc, copySinksFunc, closeFunc}
-			if c.useFFX {
-				expectedLastCalls = expectedLastCalls[2:]
-			}
-			if diff := cmp.Diff(expectedLastCalls, lastCalls); diff != "" {
-				t.Errorf("Unexpected command run (-want +got):\n%s", diff)
+			if !c.useFFX {
+				numLastCalls := 3
+				lastCalls := fuchsiaTester.funcCalls[len(fuchsiaTester.funcCalls)-numLastCalls:]
+				expectedLastCalls := []string{runSnapshotFunc, copySinksFunc, closeFunc}
+				if diff := cmp.Diff(expectedLastCalls, lastCalls); diff != "" {
+					t.Errorf("Unexpected command run (-want +got):\n%s", diff)
+				}
 			}
 		})
 	}

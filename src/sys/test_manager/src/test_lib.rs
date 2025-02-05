@@ -12,12 +12,12 @@ use fidl_fuchsia_test_manager::{
 use futures::channel::mpsc;
 use futures::prelude::*;
 use linked_hash_map::LinkedHashMap;
+use log::*;
 use moniker::ExtendedMoniker;
 use std::collections::HashMap;
 use std::sync::Arc;
 use test_diagnostics::zstd_compress::Decoder;
 use test_diagnostics::{collect_and_send_string_output, collect_string_from_socket, LogStream};
-use tracing::*;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 pub fn default_run_option() -> ftest_manager::RunOptions {

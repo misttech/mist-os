@@ -83,7 +83,7 @@
             to: "#netemul",
         },
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            dictionary: "diagnostics",
             from: "parent",
             to: [
                 "#netemul",

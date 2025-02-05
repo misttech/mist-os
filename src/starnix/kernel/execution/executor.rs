@@ -32,7 +32,7 @@ use starnix_syscalls::SyscallResult;
 use starnix_types::ownership::{OwnedRef, Releasable, ReleaseGuard, WeakRef};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::SIGKILL;
-use starnix_uapi::{errno, from_status_like_fdio, pid_t};
+use starnix_uapi::{errno, error, from_status_like_fdio, pid_t};
 use std::os::unix::thread::JoinHandleExt;
 use std::sync::mpsc::sync_channel;
 use std::sync::Arc;
@@ -236,7 +236,7 @@ fn run_task(
         state,
         profiling_guard,
         error_context,
-        exit_status: Ok(ExitStatus::Exit(0)),
+        exit_status: Err(errno!(ENOEXEC).into()),
     };
 
     unsafe {
@@ -277,7 +277,12 @@ fn restricted_exit_callback(
     error_context: &mut Option<ErrorContext>,
     exit_status: &mut Result<ExitStatus, Error>,
 ) -> bool {
-    match process_restricted_exit(
+    debug_assert_eq!(
+        current_task.thread_state.restart_code, None,
+        "restart_code should only ever be Some() in normal mode",
+    );
+
+    let ret = match process_restricted_exit(
         reason_code,
         current_task,
         restricted_state,
@@ -297,7 +302,14 @@ fn restricted_exit_callback(
             *exit_status = Err(error);
             false
         }
-    }
+    };
+
+    debug_assert_eq!(
+        current_task.thread_state.restart_code, None,
+        "restart_code should only ever be Some() in normal mode",
+    );
+
+    ret
 }
 
 fn process_restricted_exit(
@@ -397,6 +409,10 @@ pub fn create_zircon_process<L>(
 where
     L: LockBefore<ProcessGroupState>,
 {
+    // Don't allow new processes to be created once the kernel has started shutting down.
+    if kernel.is_shutting_down() {
+        return error!(EBUSY);
+    }
     let (process, root_vmar) =
         create_shared(&kernel.kthreads.starnix_process, zx::ProcessOptions::empty(), name)
             .map_err(|status| from_status_like_fdio!(status))?;
@@ -811,6 +827,9 @@ pub fn execute_syscall(
         }
         Err(errno) => {
             log_trace!("!-> {:?}", errno);
+            if errno.is_restartable() {
+                current_task.thread_state.restart_code = Some(errno.code);
+            }
             current_task.thread_state.registers.set_return_register(errno.return_value());
             Some(ErrorContext { error: errno, syscall })
         }
@@ -841,11 +860,7 @@ pub fn process_completed_restricted_exit(
                 }
                 // The syscall may need to restart for a non-signal-related
                 // reason. This call does nothing if we aren't restarting.
-                prepare_to_restart_syscall(
-                    &mut current_task.thread_state.registers,
-                    None,
-                    current_task.thread_state.arch_width,
-                );
+                prepare_to_restart_syscall(&mut current_task.thread_state, None);
             }
         }
 

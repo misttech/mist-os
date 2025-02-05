@@ -48,6 +48,7 @@
 //!
 
 use anyhow::{anyhow, Result};
+use assembly_container::{FileType, WalkPaths, WalkPathsFn};
 use camino::{Utf8Path, Utf8PathBuf};
 use pathdiff::diff_utf8_paths;
 use schemars::JsonSchema;
@@ -104,6 +105,23 @@ pub enum FileRelativePathBuf {
     /// that will contain this path as a file-relative path.
     #[schemars(schema_with = "path_schema")]
     Resolved(Utf8PathBuf),
+}
+
+impl WalkPaths for FileRelativePathBuf {
+    fn walk_paths_with_dest<F: WalkPathsFn>(
+        &mut self,
+        found: &mut F,
+        dest: Utf8PathBuf,
+    ) -> Result<()> {
+        match self {
+            FileRelativePathBuf::FileRelative(path_in_file) => {
+                found(path_in_file, dest, FileType::Unknown)
+            }
+            FileRelativePathBuf::Resolved(resolved_path) => {
+                found(resolved_path, dest, FileType::Unknown)
+            }
+        }
+    }
 }
 
 fn path_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
@@ -187,6 +205,14 @@ impl FileRelativePathBuf {
 
     /// Use this FileRelativePathBuf as a simple Utf8PathBuf
     pub fn as_utf8_pathbuf(&self) -> &Utf8PathBuf {
+        match self {
+            FileRelativePathBuf::FileRelative(path_in_file) => path_in_file,
+            FileRelativePathBuf::Resolved(resolved_path) => resolved_path,
+        }
+    }
+
+    /// Use this FileRelativePathBuf as a simple mutable Utf8PathBuf
+    pub fn as_mut_utf8_pathbuf(&mut self) -> &mut Utf8PathBuf {
         match self {
             FileRelativePathBuf::FileRelative(path_in_file) => path_in_file,
             FileRelativePathBuf::Resolved(resolved_path) => resolved_path,

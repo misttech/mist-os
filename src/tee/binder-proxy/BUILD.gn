@@ -46,9 +46,12 @@ rustc_binary("bin") {
     "//src/tee/lib/dev_urandom_compat",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:libc",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
   test_deps = [ "//third_party/rust_crates:test-case" ]
+
+  # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
+  exclude_toolchain_tags = [ "profile" ]
 }
 
 trusted_app_aidl_interface_files = [

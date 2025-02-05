@@ -8,8 +8,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use errors::ffx_error;
 use ffx_profile_memory_signal_args::SignalCommand;
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_memory_debug::MemoryPressureProxy;
+use target_holders::moniker;
 
 #[derive(FfxTool)]
 pub struct MemorySignalTool {

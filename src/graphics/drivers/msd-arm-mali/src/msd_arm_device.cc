@@ -220,8 +220,7 @@ bool MsdArmDevice::Init(ParentDevice* platform_device,
   bus_mapper_ = std::move(bus_mapper);
   InitInspect();
 
-  std::unique_ptr<magma::PlatformMmio> mmio = parent_device_->CpuMapMmio(
-      kMmioIndexRegisters, magma::PlatformMmio::CACHE_POLICY_UNCACHED_DEVICE);
+  std::unique_ptr<magma::PlatformMmio> mmio = parent_device_->CpuMapMmio(kMmioIndexRegisters);
   if (!mmio)
     return DRETF(false, "failed to map registers");
 

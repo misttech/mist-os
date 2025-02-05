@@ -205,14 +205,14 @@ zx_status_t KTraceState::Stop() {
   // should never take any significant amount of time.  If it does, we are
   // probably operating in a virtual environment with a host who is being
   // mean to us.
-  zx_time_t absolute_timeout = current_time() + ZX_SEC(1);
+  zx_instant_mono_t absolute_timeout = current_mono_time() + ZX_SEC(1);
   bool stop_synced;
   do {
     stop_synced = inflight_writes() == 0;
     if (!stop_synced) {
       Thread::Current::SleepRelative(ZX_MSEC(1));
     }
-  } while (!stop_synced && (current_time() < absolute_timeout));
+  } while (!stop_synced && (current_mono_time() < absolute_timeout));
 
   if (!stop_synced) {
     return ZX_ERR_TIMED_OUT;

@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use crate::logs::error::LogsError;
-use crate::logs::repository::LogsRepository;
+use crate::logs::repository::{LogsRepository, STATIC_CONNECTION_ID};
 use fidl::endpoints::{ControlHandle, DiscoverableProtocolMarker};
 use futures::StreamExt;
+use log::warn;
 use std::sync::Arc;
-use tracing::warn;
 use {fidl_fuchsia_diagnostics as fdiagnostics, fuchsia_async as fasync};
 
 pub struct LogSettingsServer {
@@ -50,6 +50,20 @@ impl LogSettingsServer {
                 }
                 fdiagnostics::LogSettingsRequest::SetInterest { selectors, responder } => {
                     logs_repo.update_logs_interest(connection_id, selectors);
+                    responder.send().ok();
+                }
+                fidl_fuchsia_diagnostics::LogSettingsRequest::SetComponentInterest {
+                    payload,
+                    responder,
+                } => {
+                    if let Some(selectors) = payload.selectors {
+                        let connection_id = if payload.persist.unwrap_or(false) {
+                            STATIC_CONNECTION_ID
+                        } else {
+                            connection_id
+                        };
+                        logs_repo.update_logs_interest(connection_id, selectors);
+                    }
                     responder.send().ok();
                 }
             }

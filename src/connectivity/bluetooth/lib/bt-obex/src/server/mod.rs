@@ -5,8 +5,8 @@
 use fuchsia_bluetooth::types::Channel;
 use futures::future::Future;
 use futures::stream::StreamExt;
+use log::{info, trace, warn};
 use packet_encoding::{Decodable, Encodable};
-use tracing::{info, trace, warn};
 
 use crate::error::{Error, PacketError};
 use crate::header::{
@@ -231,7 +231,7 @@ impl ObexServer {
         let version = data[0];
         let flags = data[1];
         let peer_max_packet_size = u16::from_be_bytes(data[2..4].try_into().unwrap());
-        trace!(version, flags, peer_max_packet_size, "Additional data in CONNECT request");
+        trace!(version, flags, peer_max_packet_size; "Additional data in CONNECT request");
         self.set_max_packet_size(peer_max_packet_size);
 
         let headers = HeaderSet::from(request);
@@ -367,7 +367,7 @@ impl ObexServer {
     /// was invalid or couldn't be handled.
     async fn receive_packet(&mut self, packet: Vec<u8>) -> Result<Vec<ResponsePacket>, Error> {
         let decoded = RequestPacket::decode(&packet[..])?;
-        trace!(packet = ?decoded, "Received request from OBEX client");
+        trace!(packet:? = decoded; "Received request from OBEX client");
         let response = match decoded.code() {
             OpCode::Connect => self.connect_request(decoded).await?,
             OpCode::Disconnect => self.disconnect_request(decoded).await?,

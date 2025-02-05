@@ -15,8 +15,8 @@ use core::marker::PhantomData;
 use explicit::UnreachableExt as _;
 
 use crate::{
-    BidirectionalConverter, CoreTimerContext, CounterContext, Device, DeviceIdContext,
-    TimerBindingsTypes,
+    BidirectionalConverter, CoreTimerContext, CoreTxMetadataContext, CounterContext, Device,
+    DeviceIdContext, TimerBindingsTypes, TxMetadataBindingsTypes,
 };
 
 /// An uninstantiable type.
@@ -66,6 +66,15 @@ where
 
 impl<P, C> CounterContext<C> for UninstantiableWrapper<P> {
     fn with_counters<O, F: FnOnce(&C) -> O>(&self, _cb: F) -> O {
+        self.uninstantiable_unreachable()
+    }
+}
+
+impl<T, BT, C> CoreTxMetadataContext<T, BT> for UninstantiableWrapper<C>
+where
+    BT: TxMetadataBindingsTypes,
+{
+    fn convert_tx_meta(&self, _tx_meta: T) -> BT::TxMetadata {
         self.uninstantiable_unreachable()
     }
 }

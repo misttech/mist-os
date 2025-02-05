@@ -215,4 +215,15 @@ TEST(StartupShutdownTest, DroppingGenericSmeChannelCausesDroppedNode) {
   ASSERT_TRUE(driver_test.StopDriver().is_ok());
 }
 
+TEST(StartupShutdownTest, SimultaneousIfcChannelClosureWithDriverStop) {
+  DriverTestType<BaseWlanFullmacServerForStartup> driver_test;
+  ASSERT_TRUE(driver_test.StartDriver().is_ok());
+
+  driver_test.RunInEnvironmentTypeContext([](auto& env) {
+    BaseWlanFullmacServerForStartup& server = env.wlan_fullmac_server_.value();
+    server.fullmac_ifc_client_endpoint_.reset();
+  });
+  ASSERT_TRUE(driver_test.StopDriver().is_ok());
+}
+
 }  // namespace

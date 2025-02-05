@@ -9,7 +9,7 @@ use anyhow::{anyhow, Context as _, Error};
 use async_trait::async_trait;
 use async_utils::hanging_get::server::HangingGet;
 use fidl::endpoints::DiscoverableProtocolMarker as _;
-use fidl_fuchsia_media::AudioRenderUsage;
+use fidl_fuchsia_media::AudioRenderUsage2;
 use fidl_fuchsia_media_sounds::{PlaySoundError, PlayerMarker};
 use fidl_fuchsia_recovery::FactoryResetMarker;
 use fidl_fuchsia_recovery_policy::{DeviceRequest, DeviceRequestStream};
@@ -308,7 +308,7 @@ impl FactoryResetHandler {
                 self.start_reset_countdown().await?;
             }
             _ => {
-                tracing::info!("Factory reset request cancelled");
+                log::info!("Factory reset request cancelled");
             }
         }
 
@@ -333,7 +333,7 @@ impl FactoryResetHandler {
                 self.reset().await?;
             }
             _ => {
-                tracing::info!("Factory reset request cancelled");
+                log::info!("Factory reset request cancelled");
             }
         }
 
@@ -342,7 +342,7 @@ impl FactoryResetHandler {
 
     /// Retrieves and plays the sound associated with factory resetting the device.
     async fn play_reset_sound(self: &Rc<Self>) -> Result<(), Error> {
-        tracing::debug!("Getting sound");
+        log::debug!("Getting sound");
         // Get sound
         let (sound_endpoint, server_end) = fidl::endpoints::create_endpoints::<fio::FileMarker>();
         let () = fuchsia_fs::file::open_channel_in_namespace(
@@ -352,12 +352,12 @@ impl FactoryResetHandler {
         )
         .context("Failed to open factory reset sound file")?;
 
-        tracing::debug!("Playing sound");
+        log::debug!("Playing sound");
         // Play sound
         let sound_player = fuchsia_component::client::connect_to_protocol::<PlayerMarker>()
             .with_context(|| format!("failed to connect to {}", PlayerMarker::PROTOCOL_NAME))?;
 
-        tracing::debug!("Connected to player");
+        log::debug!("Connected to player");
         let sound_id = 0;
         let _duration: i64 = sound_player
             .add_sound_from_file(sound_id, sound_endpoint)
@@ -365,33 +365,33 @@ impl FactoryResetHandler {
             .context("AddSoundFromFile error")?
             .map_err(zx::Status::from_raw)
             .context("AddSoundFromFile failed")?;
-        tracing::debug!("Added sound from file");
+        log::debug!("Added sound from file");
 
         sound_player
-            .play_sound(sound_id, AudioRenderUsage::Media)
+            .play_sound2(sound_id, AudioRenderUsage2::Media)
             .await
-            .context("PlaySound error")?
-            .map_err(|err: PlaySoundError| anyhow!("PlaySound failed: {:?}", err))?;
+            .context("PlaySound2 error")?
+            .map_err(|err: PlaySoundError| anyhow!("PlaySound2 failed: {:?}", err))?;
 
-        tracing::debug!("Played sound");
+        log::debug!("Played sound");
 
         Ok(())
     }
 
     /// Performs the actual factory reset.
     async fn reset(self: &Rc<Self>) -> Result<(), Error> {
-        tracing::info!("Beginning reset sequence");
+        log::info!("Beginning reset sequence");
         if let Err(error) = self
             .play_reset_sound()
             .on_timeout(EARCON_TIMEOUT, || Err(anyhow!("play_reset_sound took too long")))
             .await
         {
-            tracing::warn!("Failed to play reset sound: {:?}", error);
+            log::warn!("Failed to play reset sound: {:?}", error);
         }
 
         // Trigger reset
         self.set_factory_reset_state(FactoryResetState::Resetting);
-        tracing::info!("Calling {}.Reset", FactoryResetMarker::PROTOCOL_NAME);
+        log::info!("Calling {}.Reset", FactoryResetMarker::PROTOCOL_NAME);
         let factory_reset = fuchsia_component::client::connect_to_protocol::<FactoryResetMarker>()
             .with_context(|| {
                 format!("failed to connect to {}", FactoryResetMarker::PROTOCOL_NAME)
@@ -434,7 +434,7 @@ impl UnhandledInputHandler for FactoryResetHandler {
                         self.handle_reset_countdown_event(event)
                     }
                     FactoryResetState::Resetting => {
-                        tracing::warn!("Recieved an input event while factory resetting the device")
+                        log::warn!("Recieved an input event while factory resetting the device")
                     }
                 };
             }
@@ -478,7 +478,7 @@ mod tests {
 
         Task::local(async move {
             if stream_fut.await.is_err() {
-                tracing::warn!("Failed to handle factory reset countdown request stream");
+                log::warn!("Failed to handle factory reset countdown request stream");
             }
         })
         .detach();
@@ -495,7 +495,7 @@ mod tests {
                 .await
                 .is_err()
             {
-                tracing::warn!("Failed to handle recovery policy device request stream");
+                log::warn!("Failed to handle recovery policy device request stream");
             }
         })
         .detach();

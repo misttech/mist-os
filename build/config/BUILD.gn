@@ -16,6 +16,7 @@ import("//build/toolchain/ccache.gni")
 import("//build/toolchain/concurrent_jobs.gni")
 import("//build/toolchain/ifs_shared_library.gni")
 import("//build/toolchain/rbe.gni")
+import("//build/toolchain/rbe_modes.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/variant.gni")
 
@@ -125,6 +126,11 @@ config("compiler") {
     ":stack-size-section",
   ]
 
+  # TODO(https://fxbug.dev/322984857): Only add this config for is_gcc configs
+  # after we roll a toolchain with default TLSDESC for Fuchsia targets, at
+  # which point it can be moved into clang_defaults.
+  configs += [ ":default-tls-dialect" ]
+
   if (!is_gcc) {
     configs += [
       ":clang_defaults",
@@ -133,10 +139,8 @@ config("compiler") {
     ]
   }
 
-  if (current_os == "fuchsia") {
+  if (current_os == "fuchsia" || current_os == "mistos") {
     configs += [ "//build/config/fuchsia:compiler" ]
-  } else if (current_os == "mistos") {
-    configs += [ "//build/config/mistos:compiler" ]
   } else {
     if (current_os == "linux") {
       configs += [ "//build/config/linux:compiler" ]
@@ -670,7 +674,7 @@ config("default_frame_pointers") {
   }
 }
 
-config("frame_pointers") {
+variant("frame_pointers") {
   cflags = [
     "-fno-omit-frame-pointer",
     "-momit-leaf-frame-pointer",
@@ -682,13 +686,7 @@ config("frame_pointers") {
   }
 }
 
-# Implicit dependencies for frame_pointers config
-group("frame_pointers_deps") {
-}
-group("frame_pointers_executable_deps") {
-}
-
-config("no_frame_pointers") {
+variant("no_frame_pointers") {
   cflags = [ "-fomit-frame-pointer" ]
   ldflags = cflags
 
@@ -697,10 +695,6 @@ config("no_frame_pointers") {
   if (zircon_toolchain != false) {
     defines = [ "WITH_FRAME_POINTERS=0" ]
   }
-}
-
-group("no_frame_pointers_deps") {
-  # Implicit dependencies for no_frame_pointers config
 }
 
 config("suppress_iterator_warnings") {
@@ -904,7 +898,6 @@ config("Wno-vla-cxx-extension") {
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:*",
     "//src/developer/adb/bin/adb-file-sync:*",
     "//src/developer/debug/debug_agent/test_data:*",
-    "//src/developer/ffx/lib/fuchsia-controller:*",
     "//src/developer/memory/metrics/tests:*",
     "//src/devices/block/bin/gpt:*",
     "//src/devices/block/bin/iochk:*",
@@ -1293,10 +1286,8 @@ config("symbol_no_undefined") {
 }
 
 config("shared_library_config") {
-  if (current_os == "fuchsia") {
+  if (current_os == "fuchsia" || current_os == "mistos") {
     configs = [ "//build/config/fuchsia:shared_library_config" ]
-  } else if (current_os == "mistos") {
-    configs = [ "//build/config/mistos:shared_library_config" ]
   } else if (current_os == "linux") {
     cflags = [ "-fPIC" ]
   } else if (current_os == "mac") {
@@ -1307,10 +1298,8 @@ config("shared_library_config") {
 config("executable_config") {
   configs = []
 
-  if (current_os == "fuchsia") {
+  if (current_os == "fuchsia" || current_os == "mistos") {
     configs += [ "//build/config/fuchsia:executable_config" ]
-  } else if (current_os == "mistos") {
-    configs += [ "//build/config/mistos:executable_config" ]
   } else if (current_os == "mac") {
     configs += [
       "//build/config/mac:mac_dynamic_flags",
@@ -1370,6 +1359,12 @@ config("werror") {
 
   if (deny_warnings) {
     rustflags += [ "-Dwarnings" ]
+  } else if (rust_rbe_exec_strategy == "local") {
+    # The local exec strategy tries to see if there's an RBE cache hit before running the command
+    # locally. The RBE cache is often populated by infra builders which never have this flag, so we
+    # want to include it *only* when checking for a cache hit. This flag doesn't affect the output
+    # of the artifact, so it's safe to reuse it.
+    rustflags += [ "--remote-only=-Dwarnings" ]
   }
 }
 
@@ -1506,6 +1501,7 @@ tlsdesc = {
     # On arm64 TLSDESC is opt-in or opt-out via -mtls-dialect=... under GCC, but is always enabled for Clang.
     can_enable = is_gcc
     can_disable = is_gcc
+    compiler_default = !is_gcc
   } else if (current_cpu == "riscv64") {
     enable_dialect = "desc"
     disable_dialect = "trad"
@@ -1514,6 +1510,7 @@ tlsdesc = {
     # On riscv64 TLSDESC is opt-in or opt-out via -mtls-dialect=... under Clang, but is not currently supported in GCC.
     can_enable = !is_gcc
     can_disable = !is_gcc
+    compiler_default = false
   } else if (current_cpu == "x64") {
     enable_dialect = "gnu2"
     disable_dialect = "gnu"
@@ -1521,6 +1518,7 @@ tlsdesc = {
 
     can_enable = true
     can_disable = true
+    compiler_default = false
   } else if (current_cpu == "arm") {
     enable_dialect = "gnu2"
     disable_dialect = "gnu"
@@ -1529,6 +1527,15 @@ tlsdesc = {
     # On arm64 TLSDESC is opt-in or opt-out via -mtls-dialect=... under GCC, but is always enabled for Clang.
     can_enable = is_gcc
     can_disable = is_gcc
+    compiler_default = true
+  }
+}
+
+config("default-tls-dialect") {
+  if (is_fuchsia && !tlsdesc.compiler_default) {
+    assert(tlsdesc.can_enable)
+    cflags = [ "-mtls-dialect=${tlsdesc.enable_dialect}" ]
+    ldflags = cflags
   }
 }
 
@@ -1572,6 +1579,10 @@ config("Wno-nontrivial-memaccess") {
   if (!is_gcc) {
     cflags = [ "-Wno-nontrivial-memaccess" ]
   }
+}
+
+config("Wsystem-headers") {
+  cflags = [ "-Wsystem-headers" ]
 }
 
 # Adding this config directly to a linking target ensures that any deps on

@@ -6,7 +6,6 @@
 
 //! `timekeeper` is responsible for external time synchronization in Fuchsia.
 
-mod alarms;
 mod clock_manager;
 mod diagnostics;
 mod enums;
@@ -16,6 +15,8 @@ mod rtc;
 mod rtc_testing;
 mod time_source;
 mod time_source_manager;
+
+use alarms;
 
 use crate::clock_manager::ClockManager;
 use crate::diagnostics::{
@@ -29,15 +30,17 @@ use anyhow::{Context as _, Result};
 use chrono::prelude::*;
 use fidl::AsHandleRef;
 use fuchsia_component::server::ServiceFs;
+use fuchsia_inspect::health;
+use fuchsia_inspect::health::Reporter;
 use fuchsia_runtime::{UtcClock, UtcClockDetails, UtcClockUpdate, UtcDuration, UtcTimeline};
 use futures::channel::mpsc;
 use futures::future::{self, OptionFuture};
 use futures::stream::StreamExt as _;
-use std::cell::{Cell, RefCell};
+use log::{debug, error, info, warn};
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 use time_metrics_registry::TimeMetricDimensionExperiment;
-use tracing::{debug, error, info, warn};
 use zx::BootTimeline;
 use {
     fidl_fuchsia_time as ftime, fidl_fuchsia_time_alarms as fta, fidl_fuchsia_time_test as fftt,
@@ -200,6 +203,7 @@ fn koid_of(c: &UtcClock) -> u64 {
 
 #[fuchsia::main(logging_tags=["time", "timekeeper"])]
 async fn main() -> Result<()> {
+    fuchsia_trace_provider::trace_provider_create_with_fdio();
     let config: Arc<Config> =
         Arc::new(timekeeper_config::Config::take_from_startup_handle().into());
 
@@ -236,10 +240,13 @@ async fn main() -> Result<()> {
         clock: Arc::new(create_monitor_clock(&primary_track.clock)),
     });
 
+    // The root inspect node in the inspect hierarchy.
+    let inspector_root = diagnostics::INSPECTOR.root();
+
     info!("initializing diagnostics and serving inspect on servicefs");
     let cobalt_experiment = COBALT_EXPERIMENT;
     let diagnostics = Arc::new(CompositeDiagnostics::new(
-        InspectDiagnostics::new(diagnostics::INSPECTOR.root(), &primary_track, &monitor_track),
+        InspectDiagnostics::new(inspector_root, &primary_track, &monitor_track),
         CobaltDiagnostics::new(cobalt_experiment, &primary_track, &monitor_track),
     ));
 
@@ -259,15 +266,26 @@ async fn main() -> Result<()> {
         }
     };
 
-    let allow_update_rtc =
-        Rc::new(Cell::new(rtc_testing::read_and_update_state().may_update_rtc()));
+    let persistence_node = inspector_root.create_child("persistence");
+    let persistence_health = Rc::new(RefCell::new(health::Node::new(&persistence_node)));
+    persistence_health.borrow_mut().set_ok();
+
+    let persistent_state = Rc::new(RefCell::new(
+        time_persistence::State::read_and_update()
+            .map_err(|e| {
+                persistence_health
+                    .borrow_mut()
+                    .set_unhealthy(&format!("at startup: {:?}; use #DEBUG logs for details", e))
+            })
+            .unwrap_or_else(|_| Default::default()),
+    ));
 
     let (cmd_send, cmd_rcv) = mpsc::channel(1);
 
     let cmd_send_clone = cmd_send.clone();
     let serve_test_protocols = config.serve_test_protocols();
     let serve_fuchsia_time_alarms = config.serve_fuchsia_time_alarms();
-    let aur = allow_update_rtc.clone();
+    let ps = persistent_state.clone();
     fasync::Task::local(async move {
         maintain_utc(
             primary_track,
@@ -277,11 +295,13 @@ async fn main() -> Result<()> {
             config,
             cmd_send_clone,
             cmd_rcv,
-            aur,
+            ps,
         )
         .await;
     })
     .detach();
+
+    let loop_inspect = inspector_root.create_child("wake_alarms");
 
     let _inspect_server_task = inspect_runtime::publish(
         &diagnostics::INSPECTOR,
@@ -311,10 +331,10 @@ async fn main() -> Result<()> {
             .map_err(|e| {
                 // This may not be a bug, if access to wake alarms is not used.
                 // Make this a warning, but attempted connections will be errors.
-                warn!("could not connect to fuchsia.time.alarms/Wake: {}", &e);
+                warn!("could not connect to hrtimer: {}", &e);
                 e
             })
-            .map(|proxy| Rc::new(alarms::Loop::new(proxy))),
+            .map(|proxy| Rc::new(alarms::Loop::new(proxy, loop_inspect))),
     );
 
     // Look for this text to know whether connections have succeeded.
@@ -324,12 +344,15 @@ async fn main() -> Result<()> {
     // of timer clients the system may have.
     const MAX_CONCURRENT_HANDLERS: usize = 100;
 
+    let rtc_test_server = Rc::new(rtc_testing::Server::new(persistence_health, persistent_state));
+
     // fuchsia::main can only return () or Result<()>.
     let result = fs
         .for_each_concurrent(MAX_CONCURRENT_HANDLERS, |request: Rpcs| {
+            let rtc_test_server = rtc_test_server.clone();
             let time_test_mutex = time_test_mutex.clone();
-            let allow_update_rtc = allow_update_rtc.clone();
             let timer_loop = timer_loop.clone();
+            fuchsia_trace::instant!(c"timekeeper", c"request", fuchsia_trace::Scope::Process);
             async move {
                 match request {
                     Rpcs::TimeTest(stream) => {
@@ -337,10 +360,11 @@ async fn main() -> Result<()> {
                         // This is because conflicting instructions from different clients
                         // can end up being confusing for the test fixture.
                         if let Ok(_only_one_please) = time_test_mutex.try_borrow_mut() {
-                            rtc_testing::serve(allow_update_rtc, stream)
+                            rtc_test_server
+                                .serve(stream)
                                 .await
                                 .map_err(|e| {
-                                    tracing::error!("while serving fuchsia.time.test/RPC: {:?}", e)
+                                    log::error!("while serving fuchsia.time.test/RPC: {:?}", e)
                                 })
                                 .unwrap_or(());
                         } else {
@@ -480,7 +504,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
     config: Arc<Config>,
     cmd_send: mpsc::Sender<Command>,
     cmd_recv: mpsc::Receiver<Command>,
-    allow_update_rtc: Rc<Cell<bool>>,
+    persistent_state: Rc<RefCell<time_persistence::State>>,
 ) where
     R: Rtc,
     D: Diagnostics,
@@ -539,7 +563,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
         }
     }
     if config.get_early_exit() {
-        tracing::info!("early_exit=true: exiting early per request from configuration. UTC clock will not be managed");
+        log::info!("early_exit=true: exiting early per request from configuration. UTC clock will not be managed");
         return;
     }
     let primary_source_manager = time_source_fn(
@@ -567,7 +591,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
         Track::Primary,
         Arc::clone(&config),
         cmd_recv,
-        allow_update_rtc,
+        persistent_state,
     );
     let (_, r2) = mpsc::channel(1);
     let fut2_cfg_clone = config.clone();
@@ -581,7 +605,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
                 Track::Monitor,
                 fut2_cfg_clone,
                 r2,
-                Rc::new(Cell::new(true)),
+                Rc::new(RefCell::new(time_persistence::State::new(true))),
             )
         })
         .into();
@@ -631,6 +655,10 @@ mod tests {
         static ref CLOCK_OPTS: zx::ClockOpts = zx::ClockOpts::empty();
     }
 
+    fn new_state_for_test(value: bool) -> Rc<RefCell<time_persistence::State>> {
+        Rc::new(RefCell::new(time_persistence::State::new(value)))
+    }
+
     /// Creates and starts a new clock with default options, returning a tuple of the clock and its
     /// initial update time in ticks.
     fn create_clock() -> (Arc<UtcClock>, i64) {
@@ -663,6 +691,7 @@ mod tests {
             serve_test_protocols,
             has_real_time_clock: true,
             serve_fuchsia_time_alarms: false,
+            has_always_on_counter: false,
         }))
     }
 
@@ -700,7 +729,7 @@ mod tests {
         let boot_ref = zx::BootInstant::get();
 
         let (s, r) = mpsc::channel(1);
-        let b = Rc::new(Cell::new(true));
+        let b = new_state_for_test(true);
 
         // Maintain UTC until no more work remains
         let mut fut = pin!(maintain_utc(
@@ -789,7 +818,7 @@ mod tests {
 
         let boot_ref = zx::BootInstant::get();
         let (s, r) = mpsc::channel(1);
-        let b = Rc::new(Cell::new(true));
+        let b = new_state_for_test(true);
 
         // Maintain UTC until no more work remains
         let mut fut = pin!(maintain_utc(
@@ -878,7 +907,7 @@ mod tests {
 
         let boot_ref = executor.boot_now();
         let (s, r) = mpsc::channel(1);
-        let b = Rc::new(Cell::new(true));
+        let b = new_state_for_test(true);
 
         // Maintain UTC until no more work remains
         let mut fut = pin!(maintain_utc(
@@ -933,7 +962,7 @@ mod tests {
         }])
         .into();
         let (s, r) = mpsc::channel(1);
-        let b = Rc::new(Cell::new(true));
+        let b = new_state_for_test(true);
 
         // Maintain UTC until no more work remains
         let mut fut = pin!(maintain_utc(
@@ -978,7 +1007,7 @@ mod tests {
         }])
         .into();
         let (s, r) = mpsc::channel(1);
-        let b = Rc::new(Cell::new(true));
+        let b = new_state_for_test(true);
 
         // Maintain UTC until no more work remains
         let mut fut = pin!(maintain_utc(
@@ -1034,7 +1063,7 @@ mod tests {
         }])
         .into();
         let (s, r) = mpsc::channel(1);
-        let b = Rc::new(Cell::new(true));
+        let b = new_state_for_test(true);
 
         // Maintain UTC until no more work remains
         let mut fut = pin!(maintain_utc(
@@ -1089,7 +1118,7 @@ mod tests {
         .into();
 
         let (s, r) = mpsc::channel(1);
-        let b = Rc::new(Cell::new(true));
+        let b = new_state_for_test(true);
 
         // Maintain UTC until no more work remains
         let mut fut = pin!(maintain_utc(

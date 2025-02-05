@@ -43,8 +43,7 @@ bool TestCreateWriteReadClose() {
       SocketDispatcher::Create(/*flags=*/ZX_SOCKET_STREAM, &dispatcher0, &dispatcher1, &rights);
   ASSERT_EQ(status, ZX_OK);
 
-  zx_info_socket info = {};
-  dispatcher0.dispatcher()->GetInfo(&info);
+  zx_info_socket info = dispatcher0.dispatcher()->GetInfo();
   ASSERT_EQ(info.rx_buf_available, 0u);  // No bytes written yet.
 
   // Write a test pattern, read it back one byte at a time.
@@ -56,10 +55,10 @@ bool TestCreateWriteReadClose() {
   EXPECT_EQ(write_status, ZX_OK);
   EXPECT_EQ(written, kSize);
   // Expect to not be able to read on the dispatcher side you just wrote to
-  dispatcher0.dispatcher()->GetInfo(&info);
+  info = dispatcher0.dispatcher()->GetInfo();
   EXPECT_EQ(info.rx_buf_available, 0u);
   // Expect to be able to read from the paired dispatcher.
-  dispatcher1.dispatcher()->GetInfo(&info);
+  info = dispatcher1.dispatcher()->GetInfo();
   EXPECT_EQ(info.rx_buf_available, kSize);
 
   // Read out data from the peer byte-at-a-time; this is a stream socket, allowing that.
@@ -73,7 +72,7 @@ bool TestCreateWriteReadClose() {
     EXPECT_EQ(read_status, ZX_OK);
     EXPECT_EQ(bytes_read, 1u);
     // Expect consuming 1-byte reads to reduce rx_buf_available.
-    dispatcher1.dispatcher()->GetInfo(&info);
+    info = dispatcher1.dispatcher()->GetInfo();
     EXPECT_EQ(info.rx_buf_available, kSize - (i + 1));
     (*read_buffer)[i] = read->get<unsigned char>();
   }
@@ -90,7 +89,7 @@ bool TestCreateWriteReadClose() {
             ZX_OK);
   EXPECT_EQ(dispatcher0.dispatcher()->Write(write->user_in<char>(), 1, &written),
             ZX_ERR_BAD_STATE);  // |written| is not updated if Write() fails.
-  dispatcher1.dispatcher()->GetInfo(&info);
+  info = dispatcher1.dispatcher()->GetInfo();
   EXPECT_EQ(info.rx_buf_available, 1u);  // Not 2 - the second write must have failed.
 
   END_TEST;

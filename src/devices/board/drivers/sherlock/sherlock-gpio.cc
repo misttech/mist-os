@@ -16,10 +16,10 @@
 #include "sherlock-gpios.h"
 #include "sherlock.h"
 
-namespace sherlock {
+namespace {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
-static const std::vector<fpbus::Mmio> gpio_mmios{
+const std::vector<fpbus::Mmio> kGpioMmios{
     {{
         .base = T931_GPIO_BASE,
         .length = T931_GPIO_LENGTH,
@@ -34,7 +34,7 @@ static const std::vector<fpbus::Mmio> gpio_mmios{
     }},
 };
 
-static const std::vector<fpbus::Irq> gpio_irqs{
+const std::vector<fpbus::Irq> kGpioIrqs{
     {{
         .irq = T931_GPIO_IRQ_0,
         .mode = fpbus::ZirconInterruptMode::kDefault,
@@ -73,7 +73,7 @@ static const std::vector<fpbus::Irq> gpio_irqs{
 // a separate device below.
 #ifdef FACTORY_BUILD
 #define GPIO_PIN_COUNT 120
-static const gpio_pin_t gpio_pins[] = {
+const gpio_pin_t kGpioPins[] = {
     DECL_GPIO_PIN(T931_GPIOZ(0)),     DECL_GPIO_PIN(T931_GPIOZ(1)),
     DECL_GPIO_PIN(T931_GPIOZ(2)),     DECL_GPIO_PIN(T931_GPIOZ(3)),
     DECL_GPIO_PIN(T931_GPIOZ(4)),     DECL_GPIO_PIN(T931_GPIOZ(5)),
@@ -133,7 +133,7 @@ static const gpio_pin_t gpio_pins[] = {
 };
 #else
 #define GPIO_PIN_COUNT 31
-static const gpio_pin_t gpio_pins[] = {
+const gpio_pin_t kGpioPins[] = {
     // For wifi.
     DECL_GPIO_PIN(T931_WIFI_HOST_WAKE),
     // For display.
@@ -179,7 +179,7 @@ static const gpio_pin_t gpio_pins[] = {
 
 // Add a separate device for GPIO C pins to allow the GPIO driver to be colocated with SPI and
 // ot-radio. This eliminates two channel round-trips for each SPI transfer.
-static const gpio_pin_t gpio_c_pins[] = {
+const gpio_pin_t kGpioCPins[] = {
 #ifdef FACTORY_BUILD
     DECL_GPIO_PIN(T931_GPIOC(0)), DECL_GPIO_PIN(T931_GPIOC(1)), DECL_GPIO_PIN(T931_GPIOC(2)),
     DECL_GPIO_PIN(T931_GPIOC(3)), DECL_GPIO_PIN(T931_GPIOC(4)), DECL_GPIO_PIN(T931_GPIOC(5)),
@@ -195,50 +195,113 @@ static const gpio_pin_t gpio_c_pins[] = {
 #endif
 };
 
-static const std::vector<fpbus::Metadata> gpio_c_metadata{
-    {{
-        .id = std::to_string(DEVICE_METADATA_GPIO_PINS),
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&gpio_c_pins),
-            reinterpret_cast<const uint8_t*>(&gpio_c_pins) + sizeof(gpio_c_pins)),
-    }},
-};
+static_assert(std::size(kGpioPins) + std::size(kGpioCPins) == GPIO_PIN_COUNT,
+              "Incorrect pin count.");
 
-static const fpbus::Node gpio_c_dev = []() {
-  fpbus::Node dev = {};
-  dev.name() = "gpio-c";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_T931;
-  dev.did() = PDEV_DID_AMLOGIC_GPIO;
-  dev.mmio() = gpio_mmios;
-  dev.metadata() = gpio_c_metadata;
-  dev.instance_id() = 1;
-  return dev;
-}();
+zx_status_t CreateGpioCPlatformDevice(
+    fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
+  const std::vector<fpbus::Metadata> kGpioCMetadata{
+      {{
+          .id = std::to_string(DEVICE_METADATA_GPIO_PINS),
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&kGpioCPins),
+              reinterpret_cast<const uint8_t*>(&kGpioCPins) + sizeof(kGpioCPins)),
+      }},
+  };
 
-zx_status_t Sherlock::GpioInit() {
-  static_assert(std::size(gpio_pins) + std::size(gpio_c_pins) == GPIO_PIN_COUNT,
-                "Incorrect pin count.");
+  const fpbus::Node kGpioCDev{{
+      .name = "gpio-c",
+      .vid = PDEV_VID_AMLOGIC,
+      .pid = PDEV_PID_AMLOGIC_T931,
+      .did = PDEV_DID_AMLOGIC_GPIO,
+      .instance_id = 1,
+      .mmio = kGpioMmios,
+      .metadata = kGpioCMetadata,
+  }};
 
+  // TODO(https://fxbug.dev/42081248): Add the GPIO C device after all init steps have been executed
+  // to ensure that there are no simultaneous accesses to these banks.
+  fidl::Arena<> fidl_arena;
+  fdf::Arena arena('GPIO');
+  auto result = pbus.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, kGpioCDev));
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send NodeAdd request: %s", result.FormatDescription().data());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to add node: %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+
+  return ZX_OK;
+}
+
+#ifdef GPIO_TEST
+zx_status_t CreateTestGpioPlatformDevice(
+    fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
+  const gpio_pin_t kTestGpioPins[] = {
+      // Volume down, not used in this test.
+      DECL_GPIO_PIN(T931_GPIOZ(5)),
+      // Volume up, to test gpio_get_interrupt().
+      DECL_GPIO_PIN(T931_GPIOZ(4)),
+  };
+
+  const std::vector<fpbus::Metadata> kGpioMetadata{
+      {{
+          .id = std::to_string(DEVICE_METADATA_GPIO_PINS),
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&kTestGpioPins),
+              reinterpret_cast<const uint8_t*>(&kTestGpioPins) + sizeof(kTestGpioPins)),
+      }},
+  };
+
+  const fpbus::Node kTestGpioDev{{
+      .name = "sherlock-gpio-test",
+      .vid = PDEV_VID_GENERIC,
+      .pid = PDEV_PID_GENERIC,
+      .did = PDEV_DID_GPIO_TEST,
+      .metadata = kGpioMetadata,
+  }};
+
+  fidl::Arena<> fidl_arena;
+  fdf::Arena arena('GPIO');
+  auto result = pbus.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, kTestGpioDev));
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send NodeAdd request: %s", result.FormatDescription().data());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to add node: %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+
+  return ZX_OK;
+}
+#endif
+
+}  // namespace
+
+namespace sherlock {
+
+zx_status_t Sherlock::CreateGpioPlatformDevice() {
   // The Focaltech touch driver expects the interrupt line to be driven by the touch controller.
   gpio_init_steps_.push_back(GpioPull(GPIO_TOUCH_INTERRUPT, fuchsia_hardware_pin::Pull::kNone));
-
-  fuchsia_hardware_pinimpl::Metadata metadata{{std::move(gpio_init_steps_)}};
+  fuchsia_hardware_pinimpl::Metadata metadata{{.init_steps = std::move(gpio_init_steps_)}};
   gpio_init_steps_.clear();
 
-  const fit::result encoded_metadata = fidl::Persist(metadata);
+  fit::result encoded_metadata = fidl::Persist(metadata);
   if (!encoded_metadata.is_ok()) {
     zxlogf(ERROR, "Failed to encode GPIO init metadata: %s",
            encoded_metadata.error_value().FormatDescription().c_str());
     return encoded_metadata.error_value().status();
   }
 
-  const std::vector<fpbus::Metadata> gpio_metadata{
+  std::vector<fpbus::Metadata> gpio_metadata{
       {{
           .id = std::to_string(DEVICE_METADATA_GPIO_PINS),
           .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t*>(&gpio_pins),
-              reinterpret_cast<const uint8_t*>(&gpio_pins) + sizeof(gpio_pins)),
+              reinterpret_cast<const uint8_t*>(&kGpioPins),
+              reinterpret_cast<const uint8_t*>(&kGpioPins) + sizeof(kGpioPins)),
       }},
       {{
           .id = std::to_string(DEVICE_METADATA_GPIO_CONTROLLER),
@@ -246,71 +309,46 @@ zx_status_t Sherlock::GpioInit() {
       }},
   };
 
-  fpbus::Node gpio_dev;
-  gpio_dev.name() = "gpio";
-  gpio_dev.vid() = PDEV_VID_AMLOGIC;
-  gpio_dev.pid() = PDEV_PID_AMLOGIC_T931;
-  gpio_dev.did() = PDEV_DID_AMLOGIC_GPIO;
-  gpio_dev.mmio() = gpio_mmios;
-  gpio_dev.irq() = gpio_irqs;
-  gpio_dev.metadata() = gpio_metadata;
-  gpio_dev.instance_id() = 0;
+  fpbus::Node gpio_dev{{
+      .name = "gpio",
+      .vid = PDEV_VID_AMLOGIC,
+      .pid = PDEV_PID_AMLOGIC_T931,
+      .did = PDEV_DID_AMLOGIC_GPIO,
+      .instance_id = 0,
+      .mmio = kGpioMmios,
+      .irq = kGpioIrqs,
+      .metadata = gpio_metadata,
+  }};
 
-  {
-    fidl::Arena<> fidl_arena;
-    fdf::Arena arena('GPIO');
-    auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, gpio_dev));
-    if (!result.ok()) {
-      zxlogf(ERROR, "%s: NodeAdd Gpio(gpio_dev) request failed: %s", __func__,
-             result.FormatDescription().data());
-      return result.status();
-    }
-    if (result->is_error()) {
-      zxlogf(ERROR, "%s: NodeAdd Gpio(gpio_dev) failed: %s", __func__,
-             zx_status_get_string(result->error_value()));
-      return result->error_value();
-    }
+  fidl::Arena<> fidl_arena;
+  fdf::Arena arena('GPIO');
+  auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, gpio_dev));
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send NodeAdd request: %s", result.FormatDescription().data());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to add node: %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
   }
 
-  // TODO(https://fxbug.dev/42081248): Add the GPIO C device after all init steps have been executed
-  // to ensure that there are no simultaneous accesses to these banks.
-  {
-    fidl::Arena<> fidl_arena;
-    fdf::Arena arena('GPIO');
-    auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, gpio_c_dev));
-    if (!result.ok()) {
-      zxlogf(ERROR, "%s: NodeAdd Gpio(gpio_c_dev) request failed: %s", __func__,
-             result.FormatDescription().data());
-      return result.status();
-    }
-    if (result->is_error()) {
-      zxlogf(ERROR, "%s: NodeAdd Gpio(gpio_c_dev) failed: %s", __func__,
-             zx_status_get_string(result->error_value()));
-      return result->error_value();
-    }
+  return ZX_OK;
+}
+
+zx_status_t Sherlock::GpioInit() {
+  if (zx_status_t status = CreateGpioPlatformDevice(); status != ZX_OK) {
+    zxlogf(ERROR, "Failed to create gpio platform device: %s", zx_status_get_string(status));
+    return status;
   }
 
-// This test binds to system/dev/gpio/gpio-test to check that GPIOs work at all.
-// gpio-test enables interrupts and write/read on the test GPIOs configured below.
-// #define GPIO_TEST
+  if (zx_status_t status = CreateGpioCPlatformDevice(pbus_); status != ZX_OK) {
+    zxlogf(ERROR, "Failed to create gpio-c platform device: %s", zx_status_get_string(status));
+    return status;
+  }
+
 #ifdef GPIO_TEST
-  const pbus_gpio_t gpio_test_gpios[] = {
-      {
-          .gpio = T931_GPIOZ(5),  // Volume down, not used in this test.
-      },
-      {
-          .gpio = T931_GPIOZ(4),  // Volume up, to test gpio_get_interrupt().
-      },
-  };
-
-  fpbus::Node gpio_test_dev;
-  gpio_test_dev.name() = "sherlock-gpio-test";
-  gpio_test_dev.vid() = PDEV_VID_GENERIC;
-  gpio_test_dev.pid() = PDEV_PID_GENERIC;
-  gpio_test_dev.did() = PDEV_DID_GPIO_TEST;
-  gpio_test_dev.gpio() = gpio_test_gpios;
-  if ((status = pbus_.DeviceAdd(&gpio_test_dev)) != ZX_OK) {
-    zxlogf(ERROR, "%s: Could not add gpio_test_dev %d", __FUNCTION__, status);
+  if (zx_status_t status = CreateTestGpioPlatformDevice(pbus_); status != ZX_OK) {
+    zxlogf(ERROR, "Failed to create test gpio platform device: %s", zx_status_get_string(status));
     return status;
   }
 #endif

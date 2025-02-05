@@ -4,7 +4,7 @@
 {
     offer: [
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            dictionary: "diagnostics",
             from: "parent",
             to: "all",
         },

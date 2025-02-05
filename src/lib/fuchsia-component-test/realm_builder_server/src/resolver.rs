@@ -9,9 +9,9 @@ use fidl::endpoints::{create_endpoints, ServerEnd};
 use fidl::Vmo;
 use futures::lock::{Mutex, MutexGuard};
 use futures::TryStreamExt;
+use log::*;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::*;
 use url::Url;
 use version_history::AbiRevision;
 use {
@@ -106,7 +106,7 @@ impl Registry {
         let self_ref = self.clone();
         fasync::Task::local(async move {
             if let Err(err) = self_ref.handle_resolver_request_stream(stream).await {
-                warn!(%err, "`Resolver` server unexpectedly failed.", );
+                warn!(err:%; "`Resolver` server unexpectedly failed.", );
             }
         })
         .detach();
@@ -220,7 +220,7 @@ impl Registry {
                 }
                 #[cfg(fuchsia_api_level_at_least = "24")]
                 fresolution::ResolverRequest::_UnknownMethod { ordinal, .. } => {
-                    warn!(%ordinal, "Unknown Resolver request");
+                    warn!(ordinal:%; "Unknown Resolver request");
                 }
             }
         }
@@ -267,9 +267,9 @@ impl Registry {
         )
         .await?;
         let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "26")]
         package_dir.clone(ServerEnd::new(server_end.into_channel()))?;
-        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+        #[cfg(not(fuchsia_api_level_at_least = "26"))]
         package_dir.clone2(ServerEnd::new(server_end.into_channel()))?;
         let package = Some(fresolution::Package {
             url: Some(component_url.to_string()),
@@ -340,12 +340,12 @@ impl Registry {
         cm_fidl_validator::validate(&component_decl)
             .map_err(|_| fresolution::ResolverError::ManifestNotFound)?;
         let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "26")]
         component
             .package_dir
             .clone(ServerEnd::new(server_end.into_channel()))
             .map_err(|_| fresolution::ResolverError::Io)?;
-        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+        #[cfg(not(fuchsia_api_level_at_least = "26"))]
         component
             .package_dir
             .clone2(ServerEnd::new(server_end.into_channel()))

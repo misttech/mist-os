@@ -2,20 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::arrays::{Context, FsContext, FsUseType};
-use super::extensible_bitmap::ExtensibleBitmapSpan;
+use super::arrays::{FsContext, FsUseType};
 use super::metadata::HandleUnknown;
 use super::parser::ParseStrategy;
-use super::security_context::{CategorySpan, SecurityContext, SecurityLevel};
+use super::security_context::{SecurityContext, SecurityLevel};
 use super::symbols::{
-    Class, ClassDefault, ClassDefaultRange, Classes, CommonSymbol, CommonSymbols, MlsLevel,
-    Permission,
+    Class, ClassDefault, ClassDefaultRange, Classes, CommonSymbol, CommonSymbols, Permission,
 };
-use super::{CategoryId, ClassId, ParsedPolicy, RoleId, TypeId};
+use super::{ClassId, ParsedPolicy, RoleId, TypeId};
 
 use crate::{ClassPermission as _, NullessByteStr};
 use std::collections::HashMap;
-use std::num::NonZeroU32;
 
 /// The [`SecurityContext`] and [`FsUseType`] derived from some `fs_use_*` line of the policy.
 pub struct FsUseLabelAndType {
@@ -94,7 +91,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
 
         // Locate the "object_r" role.
         let cached_object_r_role = parsed_policy
-            .role_by_name("object_r")
+            .role_by_name("object_r".into())
             .ok_or_else(|| anyhow::anyhow!("missing 'object_r' role"))?
             .id();
 
@@ -107,7 +104,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
 
         // Validate the contexts used in fs_use statements.
         for fs_use in index.parsed_policy.fs_uses() {
-            index.security_context_from_policy_context(fs_use.context());
+            SecurityContext::new_from_policy_context(fs_use.context());
         }
 
         Ok(index)
@@ -130,6 +127,10 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         })
     }
 
+    /// Returns the security context that should be applied to a newly created file-like SELinux
+    /// object according to `source` and `target` security contexts, as well as the new object's
+    /// `class`. This context should be used only if no filename-transition match is found, via
+    /// [`new_file_security_context_by_name()`].
     pub fn new_file_security_context(
         &self,
         source: &SecurityContext,
@@ -151,6 +152,44 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
             source.low_level(),
             None,
         )
+    }
+
+    /// Returns the security context that should be applied to a newly created file-like SELinux
+    /// object according to `source` and `target` security contexts, as well as the new object's
+    /// `class` and `name`. If no filename-transition rule matches the supplied arguments then
+    /// `None` is returned, and the caller should fall-back to filename-independent labeling
+    /// via [`new_file_security_context()`]
+    pub fn new_file_security_context_by_name(
+        &self,
+        source: &SecurityContext,
+        target: &SecurityContext,
+        class: &crate::FileClass,
+        name: NullessByteStr<'_>,
+    ) -> Option<SecurityContext> {
+        let object_class = crate::ObjectClass::from(class.clone());
+        let policy_class = self.class(&object_class)?;
+        let type_id = self.type_transition_new_type_with_name(
+            source.type_(),
+            target.type_(),
+            policy_class,
+            name,
+        )?;
+        Some(self.new_security_context_internal(
+            source,
+            target,
+            &object_class,
+            // The SELinux notebook states the role component defaults to the object_r role.
+            self.cached_object_r_role,
+            // The SELinux notebook states the type component defaults to the type of the parent
+            // directory.
+            target.type_(),
+            // The SELinux notebook states the range/level component defaults to the low/current
+            // level of the creating process.
+            source.low_level(),
+            None,
+            // Override the "type" with the value specified by the filename-transition rules.
+            Some(type_id),
+        ))
     }
 
     /// Calculates a new security context, as follows:
@@ -182,6 +221,34 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         default_low_level: &SecurityLevel,
         default_high_level: Option<&SecurityLevel>,
     ) -> SecurityContext {
+        self.new_security_context_internal(
+            source,
+            target,
+            class,
+            default_role,
+            default_type,
+            default_low_level,
+            default_high_level,
+            None,
+        )
+    }
+
+    /// Internal implementation used by `new_file_security_context_by_name()` and
+    /// `new_security_context()` to implement the policy transition calculations.
+    /// If `override_type` is specified then the supplied value will be applied rather than a value
+    /// being calculated based on the policy; this is used by `new_file_security_context_by_name()`
+    /// to shortcut the default `type_transition` lookup.
+    fn new_security_context_internal(
+        &self,
+        source: &SecurityContext,
+        target: &SecurityContext,
+        class: &crate::ObjectClass,
+        default_role: RoleId,
+        default_type: TypeId,
+        default_low_level: &SecurityLevel,
+        default_high_level: Option<&SecurityLevel>,
+        override_type: Option<TypeId>,
+    ) -> SecurityContext {
         let (user, role, type_, low_level, high_level) = if let Some(policy_class) =
             self.class(&class)
         {
@@ -203,7 +270,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
                     },
                 };
 
-            let type_ =
+            let type_ = override_type.unwrap_or_else(|| {
                 match self.type_transition_new_type(source.type_(), target.type_(), policy_class) {
                     Some(new_type) => new_type,
                     None => match class_defaults.type_() {
@@ -211,7 +278,8 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
                         ClassDefault::Target => target.type_(),
                         _ => default_type,
                     },
-                };
+                }
+            });
 
             let (low_level, high_level) =
                 match self.range_transition_new_range(source.type_(), target.type_(), policy_class)
@@ -285,7 +353,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
             .iter()
             .find(|fs_use| fs_use.fs_type() == fs_type.as_bytes())
             .map(|fs_use| FsUseLabelAndType {
-                context: self.security_context_from_policy_context(fs_use.context()),
+                context: SecurityContext::new_from_policy_context(fs_use.context()),
                 use_type: fs_use.behavior(),
             })
     }
@@ -341,47 +409,13 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         // The returned SecurityContext must be valid with respect to the policy, since otherwise
         // we'd have rejected the policy load.
         result.and_then(|fs_context| {
-            Some(self.security_context_from_policy_context(fs_context.context()))
+            Some(SecurityContext::new_from_policy_context(fs_context.context()))
         })
     }
 
     /// Helper used to construct and validate well-known [`SecurityContext`] values.
     fn resolve_initial_context(&self, id: crate::InitialSid) -> SecurityContext {
-        self.security_context_from_policy_context(self.parsed_policy().initial_context(id))
-    }
-
-    /// Returns a [`SecurityContext`] based on the supplied policy-defined `context`.
-    fn security_context_from_policy_context(&self, context: &Context<PS>) -> SecurityContext {
-        let low_level = self.security_level(context.low_level());
-        let high_level = context.high_level().as_ref().map(|x| self.security_level(x));
-
-        // Creation of the new [`SecurityContext`] will fail if the fields are inconsistent
-        // with the policy-defined constraints (e.g. on user roles, etc).
-        SecurityContext::new(
-            context.user_id(),
-            context.role_id(),
-            context.type_id(),
-            low_level,
-            high_level,
-        )
-    }
-
-    /// Helper used by `initial_context()` to create a [`crate::SecurityLevel`] instance from
-    /// the policy fields.
-    fn security_level(&self, level: &MlsLevel<PS>) -> SecurityLevel {
-        SecurityLevel::new(
-            level.sensitivity(),
-            level.categories().spans().map(|span| self.security_context_category(span)).collect(),
-        )
-    }
-
-    /// Helper used by `security_level()` to create a `CategorySpan` instance from policy fields.
-    fn security_context_category(&self, span: ExtensibleBitmapSpan) -> CategorySpan {
-        // Spans describe zero-based bit indexes, corresponding to 1-based category Ids.
-        CategorySpan::new(
-            CategoryId(NonZeroU32::new(span.low + 1).unwrap()),
-            CategoryId(NonZeroU32::new(span.high + 1).unwrap()),
-        )
+        SecurityContext::new_from_policy_context(self.parsed_policy().initial_context(id))
     }
 
     fn role_transition_new_role(
@@ -434,6 +468,25 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
             .map(|x| x.new_type().unwrap())
     }
 
+    fn type_transition_new_type_with_name(
+        &self,
+        source_type: TypeId,
+        target_type: TypeId,
+        class: &Class<PS>,
+        name: NullessByteStr<'_>,
+    ) -> Option<TypeId> {
+        let entry = self.parsed_policy.filename_transitions().iter().find(|transition| {
+            transition.target_type() == target_type
+                && transition.target_class() == class.id()
+                && transition.name_bytes() == name.as_bytes()
+        })?;
+        entry
+            .outputs()
+            .iter()
+            .find(|entry| entry.has_source_type(source_type))
+            .map(|x| x.out_type())
+    }
+
     fn range_transition_new_range(
         &self,
         source_type: TypeId,
@@ -446,9 +499,11 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
                 && range_transition.target_class() == class.id()
             {
                 let mls_range = range_transition.mls_range();
-                let low_level = self.security_level(mls_range.low());
-                let high_level =
-                    mls_range.high().as_ref().map(|high_level| self.security_level(high_level));
+                let low_level = SecurityLevel::new_from_mls_level(mls_range.low());
+                let high_level = mls_range
+                    .high()
+                    .as_ref()
+                    .map(|high_level| SecurityLevel::new_from_mls_level(high_level));
                 return Some((low_level, high_level));
             }
         }

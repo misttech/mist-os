@@ -3,7 +3,6 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 ::fidl_next::bitflags! {
-
     #[derive(
         Clone,
         Copy,
@@ -81,7 +80,7 @@ pub enum Op {
     Add = 1,
     Mul = 2,
     Div = 3,
-    UnknownOrdinal(u32),
+    UnknownOrdinal_(u32),
 }
 
 impl ::fidl_next::Encodable for Op {
@@ -105,7 +104,7 @@ where
 
             Self::Div => 3,
 
-            Self::UnknownOrdinal(value) => value,
+            Self::UnknownOrdinal_(value) => value,
         });
 
         Ok(())
@@ -121,7 +120,7 @@ impl ::core::convert::From<WireOp> for Op {
 
             3 => Self::Div,
 
-            value => Self::UnknownOrdinal(value),
+            value => Self::UnknownOrdinal_(value),
         }
     }
 }
@@ -168,7 +167,7 @@ impl ::core::convert::From<Op> for WireOp {
 
             Op::Div => WireOp::DIV,
 
-            Op::UnknownOrdinal(value) => WireOp { value: ::fidl_next::u32_le::from(value) },
+            Op::UnknownOrdinal_(value) => WireOp { value: ::fidl_next::u32_le::from(value) },
         }
     }
 }
@@ -300,7 +299,6 @@ where
 }
 
 ::fidl_next::bitflags! {
-
     #[derive(
         Clone,
         Copy,
@@ -634,7 +632,7 @@ pub enum Expression {
 
     FunctionApplication(crate::FunctionApplication),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for Expression {
@@ -674,7 +672,7 @@ where
                 crate::FunctionApplication,
             >(value, 3, encoder, raw)?,
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -755,7 +753,7 @@ pub mod expression {
 
         FunctionApplication(&'union crate::WireFunctionApplication<'buf>),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union, 'buf> {
@@ -765,7 +763,7 @@ pub mod expression {
 
         FunctionApplication(&'union mut crate::WireFunctionApplication<'buf>),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -780,7 +778,7 @@ impl<'buf> WireExpression<'buf> {
                 self.raw.get().deref_unchecked()
             }),
 
-            unknown => crate::expression::Ref::UnknownOrdinal(unknown),
+            unknown => crate::expression::Ref::UnknownOrdinal_(unknown),
         }
     }
 
@@ -794,7 +792,7 @@ impl<'buf> WireExpression<'buf> {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            unknown => crate::expression::Mut::UnknownOrdinal(unknown),
+            unknown => crate::expression::Mut::UnknownOrdinal_(unknown),
         }
     }
 }
@@ -944,7 +942,7 @@ impl<'buf> ::core::fmt::Debug for WireOptionalExpression<'buf> {
 pub enum UnionMember {
     UnionData(u8),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnionMember {
@@ -969,7 +967,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, u8>(value, 2, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -1038,13 +1036,13 @@ pub mod union_member {
     pub enum Ref<'union> {
         UnionData(&'union u8),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         UnionData(&'union mut u8),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -1053,7 +1051,7 @@ impl WireUnionMember {
         match self.raw.ordinal() {
             2 => crate::union_member::Ref::UnionData(unsafe { self.raw.get().deref_unchecked() }),
 
-            unknown => crate::union_member::Ref::UnknownOrdinal(unknown),
+            unknown => crate::union_member::Ref::UnknownOrdinal_(unknown),
         }
     }
 
@@ -1063,7 +1061,7 @@ impl WireUnionMember {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            unknown => crate::union_member::Mut::UnknownOrdinal(unknown),
+            unknown => crate::union_member::Mut::UnknownOrdinal_(unknown),
         }
     }
 }
@@ -1086,7 +1084,7 @@ impl Clone for WireUnionMember {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireUnionMember
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     u8: ::fidl_next::Decode<___D>,
 {
@@ -1188,7 +1186,7 @@ impl Clone for WireOptionalUnionMember {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalUnionMember
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     u8: ::fidl_next::Decode<___D>,
 {
@@ -1659,7 +1657,7 @@ where
 pub enum SomeProtocolSomeMethodError {
     ErrorOne = 1,
     ErrorTwo = 2,
-    UnknownOrdinal(u32),
+    UnknownOrdinal_(u32),
 }
 
 impl ::fidl_next::Encodable for SomeProtocolSomeMethodError {
@@ -1681,7 +1679,7 @@ where
 
             Self::ErrorTwo => 2,
 
-            Self::UnknownOrdinal(value) => value,
+            Self::UnknownOrdinal_(value) => value,
         });
 
         Ok(())
@@ -1695,7 +1693,7 @@ impl ::core::convert::From<WireSomeProtocolSomeMethodError> for SomeProtocolSome
 
             2 => Self::ErrorTwo,
 
-            value => Self::UnknownOrdinal(value),
+            value => Self::UnknownOrdinal_(value),
         }
     }
 }
@@ -1740,7 +1738,7 @@ impl ::core::convert::From<SomeProtocolSomeMethodError> for WireSomeProtocolSome
 
             SomeProtocolSomeMethodError::ErrorTwo => WireSomeProtocolSomeMethodError::ERROR_TWO,
 
-            SomeProtocolSomeMethodError::UnknownOrdinal(value) => {
+            SomeProtocolSomeMethodError::UnknownOrdinal_(value) => {
                 WireSomeProtocolSomeMethodError { value: ::fidl_next::u32_le::from(value) }
             }
         }
@@ -1919,7 +1917,7 @@ impl Clone for WireSomeProtocolSomeMethodResult {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireSomeProtocolSomeMethodResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireSomeProtocolSomeMethodResponse: ::fidl_next::Decode<___D>,
 
@@ -2042,7 +2040,7 @@ impl Clone for WireOptionalSomeProtocolSomeMethodResult {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalSomeProtocolSomeMethodResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireSomeProtocolSomeMethodResponse: ::fidl_next::Decode<___D>,
 
@@ -2137,7 +2135,8 @@ where
 }
 
 /// A client handler for the SomeProtocol protocol.
-
+///
+/// See [`SomeProtocol`] for more details.
 pub trait SomeProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for SomeProtocol
@@ -2171,7 +2170,8 @@ impl<___T> SomeProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<__
 }
 
 /// A server handler for the SomeProtocol protocol.
-
+///
+/// See [`SomeProtocol`] for more details.
 pub trait SomeProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn some_method(
         &mut self,

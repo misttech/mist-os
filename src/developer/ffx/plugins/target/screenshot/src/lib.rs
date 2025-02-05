@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use chrono::{Datelike, Local, Timelike};
 use ffx_target_screenshot_args::{Format, ScreenshotCommand};
 use ffx_writer::{ToolIO, VerifiedMachineWriter};
-use fho::{moniker, FfxContext, FfxMain, FfxTool};
+use fho::{FfxContext, FfxMain, FfxTool};
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_ui_composition::{ScreenshotFormat, ScreenshotProxy, ScreenshotTakeFileRequest};
 use futures::stream::{FuturesOrdered, StreamExt};
@@ -17,6 +17,7 @@ use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use target_holders::moniker;
 
 // Reads all of the contents of the given file from the current seek
 // offset to end of file, returning the content. It errors if the seek pointer
@@ -214,6 +215,7 @@ mod test {
     use fidl_fuchsia_ui_composition::{ScreenshotRequest, ScreenshotTakeFileResponse};
     use futures::TryStreamExt;
     use std::os::unix::ffi::OsStrExt;
+    use target_holders::fake_proxy;
     use tempfile::tempdir;
 
     fn serve_fake_file(server: ServerEnd<fio::FileMarker>) {
@@ -252,7 +254,7 @@ mod test {
     }
 
     fn setup_fake_screenshot_server() -> ScreenshotProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             ScreenshotRequest::TakeFile { payload: _, responder } => {
                 let mut screenshot = ScreenshotTakeFileResponse::default();
 

@@ -6,12 +6,12 @@ import("//build/components.gni")
 
 _boards = [
   "astro",
-  "moonflower",
   "luis",
+  "moonflower",
   "nelson",
   "sherlock",
+  "uefi",
   "vim3",
-  "x64",
 ]
 
 foreach(board_name, _boards) {

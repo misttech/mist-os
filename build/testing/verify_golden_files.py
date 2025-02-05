@@ -156,7 +156,11 @@ def main():
             if args.err_msg:
                 str += args.err_msg
             else:
-                str += f'Golden file mismatch: {comparison["golden"]}'
+                str += f"Golden file mismatch: `{golden}`"
+                str += f"\n\tCompared to: `{candidate}`)"
+
+            if not os.path.exists(golden):
+                str += f"\n\tGolden file does not exist: `{golden}`"
 
             if diff_lines:
                 max_diff_lines = 16

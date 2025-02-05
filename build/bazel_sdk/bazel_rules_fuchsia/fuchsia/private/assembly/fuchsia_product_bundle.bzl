@@ -719,7 +719,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
 _build_fuchsia_product_bundle = rule(
     doc = """Create a product bundle (PB) for flashing, emulating, or updating a Fuchsia product to a target device.""",
     implementation = _build_fuchsia_product_bundle_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     executable = True,
     attrs = {
         "board_name": attr.string(

@@ -34,10 +34,28 @@ const CHECK_REFERENCES_URL: &str = "https://fuchsia.dev/go/components/build-erro
 /// of its package. Checks included in this function are:
 ///     1. If provided program binary in component manifest matches with
 ///        executable target declared in package manifest.
+///     2. If provided program bind in component manifest matches with
+///        executable target declared in package manifest.
+///     3. If provided program compat in component manifest matches with
+///        executable target declared in package manifest.
 /// If all checks pass, this function returns Ok(()).
 pub(crate) fn validate(
     component_manifest_path: &PathBuf,
     package_manifest_path: &PathBuf,
+    context: Option<&String>,
+) -> Result<(), Error> {
+    let package_manifest = read_package_manifest(package_manifest_path)?;
+    let package_targets = get_package_targets(&package_manifest);
+
+    validate_binary(component_manifest_path, &package_targets, context)?;
+    validate_driver_reference(component_manifest_path, &package_targets, context, "bind")?;
+    validate_driver_reference(component_manifest_path, &package_targets, context, "compat")?;
+    Ok(())
+}
+
+fn validate_binary(
+    component_manifest_path: &PathBuf,
+    package_targets: &Vec<String>,
     context: Option<&String>,
 ) -> Result<(), Error> {
     let component_manifest = read_component_manifest(component_manifest_path)?;
@@ -50,9 +68,7 @@ pub(crate) fn validate(
         None => {}
     }
 
-    let package_manifest = read_package_manifest(package_manifest_path)?;
-    let package_targets = get_package_targets(&package_manifest);
-    let program_binary = get_program_binary(&component_manifest);
+    let program_binary = get_program_reference(&component_manifest, "binary");
 
     if program_binary.is_none() {
         return Ok(());
@@ -72,7 +88,50 @@ pub(crate) fn validate(
         return Ok(());
     }
 
-    Err(missing_binary_error(component_manifest_path, program_binary, package_targets, context))
+    Err(missing_reference_error(
+        "binary",
+        component_manifest_path,
+        program_binary,
+        package_targets,
+        context,
+    ))
+}
+
+fn validate_driver_reference(
+    component_manifest_path: &PathBuf,
+    package_targets: &Vec<String>,
+    context: Option<&String>,
+    reference: &str,
+) -> Result<(), Error> {
+    let component_manifest = read_component_manifest(component_manifest_path)?;
+    match get_component_runner(&component_manifest).as_deref() {
+        Some(runner) => {
+            if runner != "driver" {
+                return Ok(());
+            }
+        }
+        None => {}
+    }
+
+    let program_reference = get_program_reference(&component_manifest, reference);
+
+    if program_reference.is_none() {
+        return Ok(());
+    }
+
+    let program_reference = program_reference.unwrap();
+
+    if package_targets.contains(&program_reference) {
+        return Ok(());
+    }
+
+    Err(missing_reference_error(
+        reference,
+        component_manifest_path,
+        program_reference,
+        package_targets,
+        context,
+    ))
 }
 
 fn read_package_manifest(path: &PathBuf) -> Result<String, Error> {
@@ -106,10 +165,13 @@ fn get_package_targets(package_manifest: &str) -> Vec<String> {
         .collect()
 }
 
-fn get_program_binary(component_manifest: &ComponentManifest) -> Option<String> {
+fn get_program_reference(
+    component_manifest: &ComponentManifest,
+    reference: &str,
+) -> Option<String> {
     match component_manifest {
         ComponentManifest::Cml(document) => match &document.program {
-            Some(program) => match program.info.get("binary") {
+            Some(program) => match program.info.get(reference) {
                 Some(binary) => match binary.as_str() {
                     Some(value) => Some(value.to_owned()),
                     None => None,
@@ -128,7 +190,7 @@ fn get_program_binary(component_manifest: &ComponentManifest) -> Option<String> 
             };
 
             for entry in entries {
-                if entry.key == "binary" {
+                if entry.key == reference {
                     if let Some(value) = &entry.value {
                         if let fidl_fuchsia_data::DictionaryValue::Str(ref str) = **value {
                             return Some(str.clone());
@@ -180,10 +242,11 @@ fn get_component_runner(component_manifest: &ComponentManifest) -> Option<String
     }
 }
 
-fn missing_binary_error(
+fn missing_reference_error(
+    reference: &str,
     component_manifest_path: &PathBuf,
-    program_binary: String,
-    package_targets: Vec<String>,
+    program_reference: String,
+    package_targets: &Vec<String>,
     context: Option<&String>,
 ) -> Error {
     let header = gen_header(component_manifest_path, context);
@@ -191,12 +254,12 @@ fn missing_binary_error(
         return Error::validate(format!("{}\n\tPackage deps is empty!", header));
     }
 
-    // We couldn't find the binary, let's get the nearest match.
-    let nearest_match = get_nearest_match(&program_binary, &package_targets);
+    // We couldn't find the reference, let's get the nearest match.
+    let nearest_match = get_nearest_match(&program_reference, package_targets);
 
     Error::validate(format!(
         r"{}
-program.binary={} but {} is not provided by deps!
+program.{}={} but {} is not provided by deps!
 
 Did you mean {}?
 
@@ -205,8 +268,9 @@ Try any of the following:
 
 For more details, see {}",
         header,
-        program_binary,
-        program_binary,
+        reference,
+        program_reference,
+        program_reference,
         nearest_match,
         package_targets.join("\n"),
         CHECK_REFERENCES_URL,
@@ -529,5 +593,95 @@ mod tests {
             get_nearest_match("foo", &vec!["bin/foo".to_string(), "lib/bar".to_string()]),
             "bin/foo"
         );
+    }
+
+    #[test]
+    fn validate_returns_ok_for_proper_driver_cml() {
+        let tmp_dir = TempDir::new().unwrap();
+        let component_manifest = tmp_file(
+            &tmp_dir,
+            "test.cml",
+            r#"{
+                // JSON5, which .cml uses, allows for comments.
+                program: {
+                    runner: "driver",
+                    binary: "bin/compat.so",
+                    bind: "meta/hello_world.bindbc",
+                    compat: "bin/hello_world.so",
+                },
+            }"#,
+        );
+        let package_manifest = tmp_file(
+            &tmp_dir,
+            "test.fini",
+            fini_file!(
+                "bin/compat.so=compat",
+                "bin/hello_world.so=hello_world",
+                "lib/foo=foo",
+                "meta/hello_world.bindbc=bind"
+            ),
+        );
+
+        assert_matches!(validate(&component_manifest, &package_manifest, None), Ok(()));
+    }
+
+    #[test]
+    fn validate_returns_err_if_bind_not_found() {
+        let tmp_dir = TempDir::new().unwrap();
+        let component_manifest = tmp_file(
+            &tmp_dir,
+            "test.cml",
+            r#"{
+                // JSON5, which .cml uses, allows for comments.
+                program: {
+                    runner: "driver",
+                    binary: "bin/compat.so",
+                    bind: "meta/does_not_exist.bindbc",
+                    compat: "bin/hello_world.so",
+                },
+            }"#,
+        );
+        let package_manifest = tmp_file(
+            &tmp_dir,
+            "test.fini",
+            fini_file!(
+                "bin/compat.so=compat",
+                "bin/hello_world.so=hello_world",
+                "lib/foo=foo",
+                "meta/hello_world.bindbc=bind"
+            ),
+        );
+
+        assert_matches!(validate(&component_manifest, &package_manifest, None), Err(_));
+    }
+
+    #[test]
+    fn validate_returns_err_if_compat_not_found() {
+        let tmp_dir = TempDir::new().unwrap();
+        let component_manifest = tmp_file(
+            &tmp_dir,
+            "test.cml",
+            r#"{
+                // JSON5, which .cml uses, allows for comments.
+                program: {
+                    runner: "driver",
+                    binary: "bin/compat.so",
+                    bind: "meta/hello_world.bindbc",
+                    compat: "bin/does_not_exist.so",
+                },
+            }"#,
+        );
+        let package_manifest = tmp_file(
+            &tmp_dir,
+            "test.fini",
+            fini_file!(
+                "bin/compat.so=compat",
+                "bin/hello_world.so=hello_world",
+                "lib/foo=foo",
+                "meta/hello_world.bindbc=bind"
+            ),
+        );
+
+        assert_matches!(validate(&component_manifest, &package_manifest, None), Err(_));
     }
 }

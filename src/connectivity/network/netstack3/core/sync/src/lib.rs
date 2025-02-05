@@ -15,6 +15,9 @@ pub(crate) use std::sync;
 
 use net_types::ip::{GenericOverIp, Ip};
 
+// Re-export atomics module for loom compatibility in appropriate targets.
+pub use sync::atomic;
+
 pub mod rc;
 
 /// A [`sync::Mutex`] assuming lock poisoning will never occur.

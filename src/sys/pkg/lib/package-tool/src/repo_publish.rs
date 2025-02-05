@@ -15,13 +15,14 @@ use fuchsia_repo::repo_builder::RepoBuilder;
 use fuchsia_repo::repo_client::RepoClient;
 use fuchsia_repo::repo_keys::RepoKeys;
 use fuchsia_repo::repository::{Error as RepoError, PmRepository, RepoProvider as _};
+use fuchsia_repo::util::copy_dir;
 use futures::{AsyncReadExt as _, StreamExt as _};
+use log::{error, info, warn};
 use sdk_metadata::get_repositories;
 use std::collections::BTreeSet;
 use std::fs::{create_dir_all, File};
 use std::io::{BufReader, BufWriter};
 use tempfile::TempDir;
-use tracing::{error, info, warn};
 use tuf::metadata::{MetadataPath, MetadataVersion, RawSignedMetadata, RootMetadata};
 use tuf::pouf::Pouf1;
 use tuf::repository::RepositoryProvider as _;
@@ -97,16 +98,19 @@ pub async fn cmd_repo_package_manifest_list(cmd: RepoPMListCommand) -> Result<()
 }
 
 async fn lock_repository(dir: &Utf8Path) -> Result<Lockfile> {
-    let lock_path = dir.join(REPOSITORY_LOCK_FILENAME).into_std_path_buf();
+    let lock_path = dir.join(REPOSITORY_LOCK_FILENAME);
+
+    std::fs::create_dir_all(dir).context("creating repository parent dir")?;
+
     let _log_warning_task = fasync::Task::local({
         let lock_path = lock_path.clone();
         async move {
             fasync::Timer::new(fasync::MonotonicDuration::from_secs(30)).await;
-            warn!("Obtaining a lock at {} not complete after 30s", &lock_path.display());
+            warn!("Obtaining a lock at {} not complete after 30s", &lock_path.to_string());
         }
     });
 
-    Ok(Lockfile::lock_for(&lock_path, std::time::Duration::from_secs(LOCK_TIMEOUT_SEC))
+    Ok(Lockfile::lock_for(lock_path.as_ref(), std::time::Duration::from_secs(LOCK_TIMEOUT_SEC))
         .await
         .inspect_err(|e| {
             error!(
@@ -119,20 +123,27 @@ async fn lock_repository(dir: &Utf8Path) -> Result<Lockfile> {
 }
 
 async fn repo_publish(cmd: &RepoPublishCommand) -> Result<()> {
-    if !cmd.repo_path.exists() {
-        std::fs::create_dir_all(&cmd.repo_path).expect("creating repository parent dir");
+    // Avoid tainting a product bundle. They are intended to be immutable.
+    let repo_path = &cmd.repo_path;
+    if is_product_bundle(repo_path).await? {
+        let cmdline =
+            format!("--<your args> --product-bundle {} /path/to/existing/repo", repo_path);
+        // TODO(https://fxbug.dev/371945605): This should be an error after clients are migrated.
+        log::warn!(
+            "The repo path {} points to a product bundle. Product bundles are immutable and so should not be published to. You probably want arguments like '{}'",
+            repo_path,
+            cmdline
+        );
+        log::warn!("NOTE: This will become an error by the end of 2025Q2, see https://fxbug.dev/371945605. Please migrate your use case before then.");
     }
-    let dir = cmd.repo_path.join("repository");
-    if !dir.exists() {
-        std::fs::create_dir_all(&dir).expect("creating repository dir");
-    }
-    let lock_file = lock_repository(&dir).await?;
+
+    let lock_file = lock_repository(repo_path).await?;
     let publish_result = repo_publish_oneshot(cmd).await;
     lock_file.unlock()?;
     publish_result
 }
 
-pub async fn repo_package_manifest_list(
+async fn repo_package_manifest_list(
     src_repo_path: Utf8PathBuf,
     src_trusted_root_path: Option<Utf8PathBuf>,
     manifests_dir: Utf8PathBuf,
@@ -273,18 +284,11 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
     let product_bundle_dirs = TempDir::new()?;
 
     for (i, pb) in cmd.product_bundle.iter().enumerate() {
-        let wrkdir = product_bundle_dirs.path().join(i.to_string());
-        create_dir_all(wrkdir.clone())?;
-        let manifests_dir = Utf8PathBuf::from_path_buf(wrkdir)
+        // Create helper dirs for working with a mutable copy of the PB.
+        let wrkdir = Utf8PathBuf::from_path_buf(product_bundle_dirs.path().join(i.to_string()))
             .map_err(|e| anyhow!("error converting path into UTF-8: {:?}", e))?;
 
-        // Extract product bundle
-        repo_package_manifest_list(pb.clone(), None, manifests_dir.clone()).await?;
-
-        // Stage product bundle manifest
-        let package_manifest_list_path = manifests_dir.join("package_manifests.list");
-        repo_package_manifest_list(pb.clone(), None, manifests_dir).await?;
-        repo_builder = repo_builder.add_package_list(package_manifest_list_path).await?;
+        repo_builder = stage_pb(repo_builder, &wrkdir, pb).await?;
     }
 
     // Publish all the packages.
@@ -312,6 +316,57 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Stage product bundle manifests for publishing
+async fn stage_pb<'a, R: fuchsia_repo::repository::RepoStorageProvider>(
+    mut repo_builder: RepoBuilder<'a, R>,
+    wrkdir: &Utf8PathBuf,
+    pb: &Utf8PathBuf,
+) -> Result<RepoBuilder<'a, R>> {
+    let mutated_pb = wrkdir.join("mutated_pb");
+    let manifests_dir = wrkdir.join("manifests");
+    create_dir_all(mutated_pb.clone())?;
+    create_dir_all(manifests_dir.clone())?;
+
+    // Ensure we have the keys/, repository/ and blobs/ subdirs in the mutable PB.
+    populate_mutable_pb_copy(pb, &mutated_pb, true).await?;
+
+    // Refresh the mutable PB's metadata before manifest creation
+    republish_with_refresh(&mutated_pb).await?;
+
+    // Stage product bundle manifest
+    let package_manifest_list_path = manifests_dir.join("package_manifests.list");
+    repo_package_manifest_list(mutated_pb.clone(), None, manifests_dir).await?;
+    repo_builder = repo_builder.add_package_list(package_manifest_list_path).await?;
+
+    Ok(repo_builder)
+}
+
+// Republishes a repository while refreshing its root metadata
+async fn republish_with_refresh(pb: &Utf8PathBuf) -> Result<()> {
+    let cmd = RepoPublishCommand {
+        watch: false,
+        signing_keys: None,
+        trusted_keys: None,
+        trusted_root: None,
+        package_archives: vec![],
+        package_manifests: vec![],
+        package_list_manifests: vec![],
+        product_bundle: vec![],
+        metadata_current_time: Utc::now(),
+        time_versioning: false,
+        refresh_root: true,
+        clean: false,
+        depfile: None,
+        copy_mode: fuchsia_repo::repository::CopyMode::Copy,
+        delivery_blob_type: 1,
+        ignore_missing_packages: false,
+        blob_manifest: None,
+        blob_repo_dir: None,
+        repo_path: pb.clone(),
+    };
+    Box::pin(repo_publish_oneshot(&cmd)).await
 }
 
 async fn get_trusted_root(
@@ -406,12 +461,54 @@ fn read_repo_keys_if_exists(deps: &mut BTreeSet<Utf8PathBuf>, path: &Utf8Path) -
     Ok(builder.build())
 }
 
+/// Checks whether a provided path looks like a product bundle
+async fn is_product_bundle(path: &Utf8PathBuf) -> Result<bool> {
+    let expected_pb_json = path.join("product_bundle.json");
+    if let Ok(f) = std::fs::metadata(expected_pb_json.as_std_path()) {
+        if f.is_file() {
+            Ok(true)
+        } else {
+            Err(anyhow!("{expected_pb_json} exists but is not a file"))
+        }
+    } else {
+        Ok(false)
+    }
+}
+
+/// Populates an empty dir with a 'mutable' copy of a product bundle.
+///
+/// Copy keys, metadata, blobs and PB definition.
+/// Optionally symlinks the blobs dir since copying might be expensive.
+/// Note that product bundles are supposed to be immutable. We are only
+/// using this function as a workaround to work with product bundles whose
+/// included TUF metadata has become stale or invalid.
+async fn populate_mutable_pb_copy(
+    src: &Utf8PathBuf,
+    dst: &Utf8PathBuf,
+    symlink_blobs: bool,
+) -> Result<()> {
+    for d in ["keys", "repository"] {
+        copy_dir(&src.as_std_path().join(d), &dst.as_std_path().join(d))?;
+    }
+    if symlink_blobs {
+        std::os::unix::fs::symlink(src.join("blobs"), dst.join("blobs"))?;
+    } else {
+        copy_dir(&src.as_std_path().join("blobs"), &dst.as_std_path().join("blobs"))?;
+    }
+    std::fs::copy(
+        src.as_std_path().join("product_bundle.json"),
+        dst.as_std_path().join("product_bundle.json"),
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::convert_to_depfile_filepath;
     use assembly_partitions_config::PartitionsConfig;
     use assert_matches::assert_matches;
+    use chrono::Duration;
     use fuchsia_async as fasync;
     use fuchsia_repo::repository::CopyMode;
     use fuchsia_repo::test_utils;
@@ -570,6 +667,23 @@ mod tests {
     async fn ensure_repo_unlocked(repo_path: &Utf8Path) {
         fasync::Timer::new(fasync::MonotonicDuration::from_millis(100)).await;
         lock_repository(repo_path).await.unwrap().unlock().unwrap();
+    }
+
+    #[fuchsia::test]
+    async fn test_dir_is_not_a_product_bundle() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let repo_path = Utf8Path::from_path(tempdir.path()).unwrap();
+
+        assert_matches!(is_product_bundle(&repo_path.to_path_buf()).await, Ok(false));
+    }
+
+    #[fuchsia::test]
+    async fn test_dir_is_a_product_bundle() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let repo_path = Utf8Path::from_path(tempdir.path()).unwrap();
+        File::create(repo_path.join("product_bundle.json")).unwrap();
+
+        assert_matches!(is_product_bundle(&repo_path.to_path_buf()).await, Ok(true));
     }
 
     #[fuchsia::test]
@@ -1332,7 +1446,11 @@ mod tests {
         let pb_dir = wrkdir.join("pb_dir");
         let pb_metadata_dir = pb_dir.join("repository");
         let pb_blobs_dir = pb_dir.join("blobs");
-        test_utils::make_repo_dir(pb_metadata_dir.as_std_path(), pb_blobs_dir.as_std_path()).await;
+        // Prepare fully functional empty repo for the later operations
+        let pb_client = test_utils::make_writable_empty_repository(pb_dir.clone()).await.unwrap();
+        let pkg_list = pb_client.list_packages().await.unwrap();
+        assert_eq!(pkg_list, vec![]);
+
         let pb_client =
             test_utils::make_file_system_repository(&pb_metadata_dir, &pb_blobs_dir).await;
 
@@ -1383,7 +1501,6 @@ mod tests {
 
         for (repo_pkg, pb_pkg) in std::iter::zip(repo_pkgs, pb_pkgs) {
             assert_eq!(repo_pkg.name, pb_pkg.name);
-            assert_eq!(repo_pkg.size, pb_pkg.size);
             assert_eq!(repo_pkg.hash, pb_pkg.hash);
             // Although the test is fairly quick, it does happen that the modified stamps differ by
             // a short timespan (1-2 seconds), hence we allow a grace period of 5 seconds to pass.
@@ -1400,6 +1517,194 @@ mod tests {
             assert_eq!(
                 std::fs::read(entry.path()).unwrap(),
                 std::fs::read(repo_blob_path).unwrap()
+            );
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_expired_metadata_in_product_bundle() {
+        let tempdir = TempDir::new().unwrap();
+        let wrkdir = Utf8Path::from_path(tempdir.path()).unwrap();
+
+        // Populate an expired repo with packages in a product bundle
+        let pb_metadata_dir = wrkdir.join("repository");
+        let pb_blobs_dir = wrkdir.join("blobs");
+        test_utils::make_repo_dir(
+            pb_metadata_dir.as_std_path(),
+            pb_blobs_dir.as_std_path(),
+            Some(Utc::now() - Duration::days(2000)),
+        )
+        .await;
+
+        // Have a non-expired set of repo keys
+        let keys_dir = wrkdir.join("keys");
+        test_utils::make_repo_keys_dir(&keys_dir);
+
+        let pb = ProductBundle::V2(ProductBundleV2 {
+            product_name: "".to_string(),
+            product_version: "".to_string(),
+            partitions: PartitionsConfig::default(),
+            sdk_version: "".to_string(),
+            system_a: None,
+            system_b: None,
+            system_r: None,
+            repositories: vec![Repository {
+                name: "fuchsia.com".into(),
+                metadata_path: pb_metadata_dir,
+                blobs_path: pb_blobs_dir.clone(),
+                delivery_blob_type: 1,
+                root_private_key_path: None,
+                targets_private_key_path: None,
+                snapshot_private_key_path: None,
+                timestamp_private_key_path: None,
+            }],
+            update_package_hash: None,
+            virtual_devices_path: None,
+        });
+        pb.write(wrkdir).unwrap();
+
+        // Provide an empty repo, as with `ffx repository create`
+        let repo_tempdir = TempDir::new().unwrap();
+        let repo_dir = Utf8Path::from_path(repo_tempdir.path()).unwrap();
+        let mut client = test_utils::make_writable_empty_repository(repo_dir.into()).await.unwrap();
+        client.update().await.unwrap();
+        let pkg_list = client.list_packages().await.unwrap();
+        assert_eq!(pkg_list.len(), 0);
+
+        let cmd = RepoPublishCommand {
+            package_manifests: vec![],
+            repo_path: repo_dir.into(),
+            refresh_root: true,
+            product_bundle: vec![wrkdir.to_path_buf()],
+            ..default_command_for_test()
+        };
+
+        // Publish the packages from the PB to the new repo
+        assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
+
+        client.update().await.unwrap();
+
+        let pkg_list = client.list_packages().await.unwrap();
+
+        // The two packages from inside the PB (via test_utils::make_repo_dir)
+        // should have been published to the new, previously empty repo
+        assert_eq!(pkg_list.len(), 2);
+    }
+
+    #[fuchsia::test]
+    async fn test_mistreat_product_bundle_as_tuf_repo() {
+        let tempdir = TempDir::new().unwrap();
+        let wrkdir = Utf8Path::from_path(tempdir.path()).unwrap();
+
+        // Populate a product bundle and a repo with packages
+        let pb_dir = wrkdir.join("pb_dir");
+        let pb_metadata_dir = pb_dir.join("repository");
+        let pb_blobs_dir = pb_dir.join("blobs");
+        // Prepare fully functional empty repo for the later operations
+        let pb_client = test_utils::make_writable_empty_repository(pb_dir.clone()).await.unwrap();
+        let pkg_list = pb_client.list_packages().await.unwrap();
+        assert_eq!(pkg_list, vec![]);
+        let pb_client =
+            test_utils::make_file_system_repository(&pb_metadata_dir, &pb_blobs_dir).await;
+
+        let pb = ProductBundle::V2(ProductBundleV2 {
+            product_name: "".to_string(),
+            product_version: "".to_string(),
+            partitions: PartitionsConfig::default(),
+            sdk_version: "".to_string(),
+            system_a: None,
+            system_b: None,
+            system_r: None,
+            repositories: vec![Repository {
+                name: "fuchsia.com".into(),
+                metadata_path: pb_metadata_dir,
+                blobs_path: pb_blobs_dir.clone(),
+                delivery_blob_type: 1,
+                root_private_key_path: None,
+                targets_private_key_path: None,
+                snapshot_private_key_path: None,
+                timestamp_private_key_path: None,
+            }],
+            update_package_hash: None,
+            virtual_devices_path: None,
+        });
+        pb.write(&pb_dir).unwrap();
+
+        let pkg_list = pb_client.list_packages().await.unwrap();
+
+        // test_utils::make_repo_dir should have created two test packages
+        // in the product bundle directory tree
+        assert_eq!(pkg_list.len(), 2);
+
+        // Also, "product_bundle.json" should exist in the tree.
+        let pbj = is_product_bundle(&pb_dir).await.unwrap();
+        assert!(pbj);
+
+        let cmd = RepoPublishCommand {
+            repo_path: pb_dir.to_path_buf(),
+            clean: true,
+            ..default_command_for_test()
+        };
+        // TODO(https://fxbug.dev/371945605): Should be `is_err()` after clients are migrated.
+        assert!(cmd_repo_publish(cmd).await.is_ok());
+    }
+
+    #[fuchsia::test]
+    async fn test_populate_repo_clone() {
+        let tempdir = TempDir::new().unwrap();
+        let wrkdir = Utf8Path::from_path(tempdir.path()).unwrap();
+
+        // Populate a repo with packages in a product bundle
+        let pb_dir = wrkdir.join("pb_dir");
+        let pb_metadata_dir = pb_dir.join("repository");
+        let pb_blobs_dir = pb_dir.join("blobs");
+        let pb_keys_dir = pb_dir.join("keys");
+        test_utils::make_repo_dir(pb_metadata_dir.as_std_path(), pb_blobs_dir.as_std_path(), None)
+            .await;
+        test_utils::make_repo_keys_dir(&pb_keys_dir);
+
+        let pb = ProductBundle::V2(ProductBundleV2 {
+            product_name: "".to_string(),
+            product_version: "".to_string(),
+            partitions: PartitionsConfig::default(),
+            sdk_version: "".to_string(),
+            system_a: None,
+            system_b: None,
+            system_r: None,
+            repositories: vec![Repository {
+                name: "fuchsia.com".into(),
+                metadata_path: pb_metadata_dir,
+                blobs_path: pb_blobs_dir.clone(),
+                delivery_blob_type: 1,
+                root_private_key_path: None,
+                targets_private_key_path: None,
+                snapshot_private_key_path: None,
+                timestamp_private_key_path: None,
+            }],
+            update_package_hash: None,
+            virtual_devices_path: None,
+        });
+        pb.write(&pb_dir).unwrap();
+
+        // Test generating a 'mutable' product bundle whose TUF repo we can modify.
+        for link in [false, true] {
+            let mutable_pb_dir = wrkdir.join("mutable").join(link.to_string());
+            std::fs::create_dir_all(&mutable_pb_dir).unwrap();
+
+            assert!(populate_mutable_pb_copy(&pb_dir, &mutable_pb_dir, link).await.is_ok());
+            for f in ["root.json", "snapshot.json", "targets.json", "timestamp.json"] {
+                for d in ["keys", "repository"] {
+                    let filepath = mutable_pb_dir.join(d).join(f);
+                    assert!(std::fs::exists(filepath).unwrap());
+                }
+            }
+            assert!(std::fs::exists(mutable_pb_dir.join("blobs").join("1")).unwrap());
+            assert_eq!(
+                std::fs::symlink_metadata(mutable_pb_dir.join("blobs"))
+                    .unwrap()
+                    .file_type()
+                    .is_symlink(),
+                link
             );
         }
     }

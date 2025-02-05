@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -90,10 +90,11 @@ class Remote : public zxtest::Test {
 TEST_F(Remote, ServiceGetAttributes) {
   class TestServer : public TestServerBase {
    public:
-    void GetAttr(GetAttrCompleter::Sync& completer) override {
-      completer.Reply(ZX_OK, fuchsia_io::wire::NodeAttributes{
-                                 .mode = fuchsia_io::wire::kModeTypeService,
-                             });
+    void GetAttributes(GetAttributesRequestView, GetAttributesCompleter::Sync& completer) final {
+      fuchsia_io::ImmutableNodeAttributes immutable_attrs;
+      immutable_attrs.protocols() = fuchsia_io::NodeProtocolKinds::kConnector;
+      fidl::Arena arena;
+      completer.ReplySuccess(/*mutable_attrs*/ {}, fidl::ToWire(arena, immutable_attrs));
     }
   };
   ASSERT_NO_FAILURES(StartServer<TestServer>());
@@ -102,7 +103,7 @@ TEST_F(Remote, ServiceGetAttributes) {
                                      .protocols = true,
                                  }};
   ASSERT_OK(zxio_attr_get(&remote_.io, &attr));
-  EXPECT_EQ(ZXIO_NODE_PROTOCOL_FILE, attr.protocols);
+  EXPECT_EQ(ZXIO_NODE_PROTOCOL_CONNECTOR, attr.protocols);
 }
 
 TEST_F(Remote, Borrow) {

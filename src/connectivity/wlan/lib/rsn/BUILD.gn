@@ -26,13 +26,13 @@ rustc_library("wlan-rsn") {
     "//third_party/rust_crates:bitfield",
     "//third_party/rust_crates:bytes",
     "//third_party/rust_crates:hmac",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:md-5",
     "//third_party/rust_crates:nom",
     "//third_party/rust_crates:num",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:sha1",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:zerocopy",
   ]
 

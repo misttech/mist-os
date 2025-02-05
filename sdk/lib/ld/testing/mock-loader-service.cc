@@ -92,11 +92,14 @@ void MockLoaderService::Init() {
 void MockLoaderService::ExpectLoadObject(std::string_view name,
                                          zx::result<zx::vmo> expected_result) {
   EXPECT_CALL(*mock_server_, MockLoadObject(std::string{name}))
+      .InSequence(sequence_)
       .WillOnce(Return(std::move(expected_result)));
 }
 
 void MockLoaderService::ExpectConfig(std::string_view name, zx::result<> expected_result) {
-  EXPECT_CALL(*mock_server_, MockConfig(std::string{name})).WillOnce(Return(expected_result));
+  EXPECT_CALL(*mock_server_, MockConfig(std::string{name}))
+      .InSequence(sequence_)
+      .WillOnce(Return(expected_result));
 }
 
 void MockLoaderServiceForTest::Needed(std::initializer_list<std::string_view> names) {

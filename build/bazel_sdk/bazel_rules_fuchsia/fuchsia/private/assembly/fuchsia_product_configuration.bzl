@@ -4,12 +4,12 @@
 
 """Rule for declaring a Fuchsia product configuration."""
 
+# buildifier: disable=module-docstring
+load("@bazel_skylib//lib:paths.bzl", "paths")
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:fuchsia_package.bzl", "get_driver_component_manifests")
 load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
-
-# buildifier: disable=module-docstring
 load(
     ":providers.bzl",
     "FuchsiaAssembledPackageInfo",
@@ -18,9 +18,11 @@ load(
 )
 load(
     ":utils.bzl",
+    "LOCAL_ONLY_ACTION_KWARGS",
     "combine_directories",
     "extract_labels",
     "replace_labels_with_files",
+    "select_root_dir",
 )
 
 # Define build types
@@ -39,7 +41,7 @@ INPUT_DEVICE_TYPE = struct(
     TOUCHSCREEN = "touchscreen",
 )
 
-def _create_pkg_detail(dep, relative = None):
+def _create_pkg_detail(dep):
     package_manifest_path = None
     configs = None
 
@@ -49,10 +51,6 @@ def _create_pkg_detail(dep, relative = None):
     else:
         package_manifest_path = dep[FuchsiaAssembledPackageInfo].package.package_manifest.path
         configs = dep[FuchsiaAssembledPackageInfo].configs
-
-    # Relativize the path if necessary.
-    if relative:
-        package_manifest_path = package_manifest_path.removeprefix(relative + "/")
 
     # If we have configs, return them.
     if configs:
@@ -80,52 +78,45 @@ def _collect_debug_symbols(dep):
     return getattr(dep[FuchsiaAssembledPackageInfo], "build_id_dirs", [])
 
 def _fuchsia_product_configuration_impl(ctx):
+    sdk = get_fuchsia_sdk_toolchain(ctx)
+
     product_config = json.decode(ctx.attr.product_config)
     product_config_file = ctx.actions.declare_file(ctx.label.name + "_product_config.json")
 
-    relative_base = None
-
-    # If relative_paths is set, relativize paths in the product config relative
-    # to the directory containing the product config.
-    # Otherwise, paths are relative to the execroot.
-    if (ctx.attr.relative_paths):
-        relative_base = product_config_file.dirname
-        product_config["file_relative_paths"] = True
-
-    replace_labels_with_files(product_config, ctx.attr.product_config_labels, relative = relative_base)
+    replace_labels_with_files(product_config, ctx.attr.product_config_labels)
 
     platform = product_config.get("platform", {})
     build_type = platform.get("build_type")
     product = product_config.get("product", {})
     packages = {}
 
-    output_files = []
+    input_files = []
     build_id_dirs = []
     base_pkg_details = []
     for dep in ctx.attr.base_packages:
-        base_pkg_details.append(_create_pkg_detail(dep, relative_base))
-        output_files += _collect_file_deps(dep)
+        base_pkg_details.append(_create_pkg_detail(dep))
+        input_files += _collect_file_deps(dep)
         build_id_dirs += _collect_debug_symbols(dep)
     packages["base"] = base_pkg_details
 
     cache_pkg_details = []
     for dep in ctx.attr.cache_packages:
-        cache_pkg_details.append(_create_pkg_detail(dep, relative_base))
-        output_files += _collect_file_deps(dep)
+        cache_pkg_details.append(_create_pkg_detail(dep))
+        input_files += _collect_file_deps(dep)
         build_id_dirs += _collect_debug_symbols(dep)
     packages["cache"] = cache_pkg_details
     product["packages"] = packages
 
     base_driver_details = []
     for dep in ctx.attr.base_driver_packages:
-        package_detail = _create_pkg_detail(dep, relative_base)
+        package_detail = _create_pkg_detail(dep)
         base_driver_details.append(
             {
                 "package": package_detail["manifest"],
                 "components": get_driver_component_manifests(dep),
             },
         )
-        output_files += _collect_file_deps(dep)
+        input_files += _collect_file_deps(dep)
     product["base_drivers"] = base_driver_details
 
     product_config["product"] = product
@@ -139,7 +130,7 @@ def _fuchsia_product_configuration_impl(ctx):
 
         channels_file = ctx.actions.declare_file("channel_config.json")
         ctx.actions.write(channels_file, ota_config_info.channels)
-        output_files.append(channels_file)
+        input_files.append(channels_file)
 
         omaha_config["channels_path"] = channels_file.path
 
@@ -148,27 +139,55 @@ def _fuchsia_product_configuration_impl(ctx):
             repo_config_file = ctx.actions.declare_file(hostname + ".json")
             ctx.actions.write(repo_config_file, repo_config)
             tuf_config_paths.append(repo_config_file.path)
-            output_files.append(repo_config_file)
+            input_files.append(repo_config_file)
         swd_config["tuf_config_paths"] = tuf_config_paths
 
     content = json.encode_indent(product_config, indent = "  ")
     ctx.actions.write(product_config_file, content)
-    output_files.append(product_config_file)
+    input_files.append(product_config_file)
+
+    product_config_dir = ctx.actions.declare_directory(ctx.label.name)
+    args = ["product", "--config", product_config_file.path, "--output", product_config_dir.path]
+    ctx.actions.run(
+        executable = sdk.assembly_generate_config,
+        arguments = args,
+        inputs = input_files + ctx.files.product_config_labels + ctx.files.deps,
+        outputs = [product_config_dir],
+        **LOCAL_ONLY_ACTION_KWARGS
+    )
 
     return [
-        DefaultInfo(files = depset(direct = output_files + ctx.files.product_config_labels + ctx.files.deps)),
+        DefaultInfo(files = depset([product_config_dir])),
         FuchsiaProductConfigInfo(
-            config = product_config_file.path,
+            config_path = "",
+            directory = product_config_dir.path,
             build_type = build_type,
             build_id_dirs = build_id_dirs,
         ),
     ]
 
 def _fuchsia_prebuilt_product_configuration_impl(ctx):
+    config_path = ""
+
+    # Try to find product_configuration.json, and use that if found.
+    # TODO(https://fxbug.dev/390189313): Remove this option once all product
+    # configs have a consistent layout.
+    matching_files = [file for file in ctx.files.files if file.basename == "product_configuration.json"]
+    if len(matching_files) > 1:
+        fail("More than one match for 'product_configuration.json'")
+    if len(matching_files) == 1:
+        directory = paths.dirname(matching_files[0].path)
+    else:
+        # If this fails, find the root directory of `files` and use that with `config_path`.
+        directory = select_root_dir(ctx.files.files)
+        if ctx.attr.config_filename:
+            config_path = ctx.attr.config_filename
+
     return [
-        DefaultInfo(files = depset(direct = ctx.files.files)),
+        DefaultInfo(files = depset(ctx.files.files)),
         FuchsiaProductConfigInfo(
-            config = ctx.file.product_config.path,
+            config_path = config_path,
+            directory = directory,
             build_type = ctx.attr.build_type,
             build_id_dirs = [],
         ),
@@ -177,12 +196,12 @@ def _fuchsia_prebuilt_product_configuration_impl(ctx):
 _fuchsia_prebuilt_product_configuration = rule(
     doc = "Use a prebuilt product configuration directory for hybrid assembly.",
     implementation = _fuchsia_prebuilt_product_configuration_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
-        "product_config": attr.label(
-            doc = "The product assembly input artifacts directory containing the product config.",
-            allow_single_file = True,
-            mandatory = True,
+        # TODO(https://fxbug.dev/390189313): Deprecate this once all product
+        # configs use hermetic directories.
+        "config_filename": attr.string(
+            doc = "An optional file to use for the config inside the directory.",
         ),
         "files": attr.label_list(
             doc = "All files referenced by the product config. This should be the entire contents of the product input artifacts directory.",
@@ -198,7 +217,7 @@ _fuchsia_prebuilt_product_configuration = rule(
 _fuchsia_product_configuration = rule(
     doc = """Generates a product configuration file.""",
     implementation = _fuchsia_product_configuration_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "product_config": attr.string(
             doc = "Raw json config. Used as a base template for the config.",
@@ -234,10 +253,6 @@ _fuchsia_product_configuration = rule(
             doc = "OTA configuration to include in the product. Only for use with products that use Omaha.",
             providers = [FuchsiaOmahaOtaConfigInfo],
         ),
-        "relative_paths": attr.bool(
-            doc = "Whether to generate an Assembly product configuration with relative path, so it can be relocated.",
-            default = False,
-        ),
         "deps": attr.label_list(
             doc = "Additional dependencies that must be built before this target is built.",
             default = [],
@@ -248,8 +263,8 @@ _fuchsia_product_configuration = rule(
 def fuchsia_prebuilt_product_configuration(
         name,
         product_config_dir,
-        product_config_filename,
         build_type,
+        product_config_filename = "",
         **kwargs):
     _all_files_target = "{}_all_files".format(name)
     native.filegroup(
@@ -258,8 +273,8 @@ def fuchsia_prebuilt_product_configuration(
     )
     _fuchsia_prebuilt_product_configuration(
         name = name,
-        product_config = product_config_dir + "/" + product_config_filename,
         files = [":{}".format(_all_files_target)],
+        config_filename = product_config_filename,
         build_type = build_type,
         **kwargs
     )
@@ -271,6 +286,8 @@ def fuchsia_product_configuration(
         cache_packages = None,
         base_driver_packages = None,
         ota_configuration = None,
+        # Deprecated
+        # TODO(https://fxbug.dev/390189313): Remove once all clients stop using.
         relative_paths = False,
         **kwargs):
     """A new implementation of fuchsia_product_configuration that takes raw a json config.
@@ -301,8 +318,6 @@ def fuchsia_product_configuration(
         cache_packages: Fuchsia packages to be included in cache.
         base_driver_packages: Base driver packages to include in product.
         ota_configuration: OTA configuration to use with the product.
-        relative_paths: Whether to generate an Assembly product configuration
-            with relative path, so it can be relocated.
         **kwargs: Common bazel rule args passed through to the implementation rule.
     """
 
@@ -320,39 +335,44 @@ def fuchsia_product_configuration(
         cache_packages = cache_packages,
         base_driver_packages = base_driver_packages,
         ota_configuration = ota_configuration,
-        relative_paths = relative_paths,
         **kwargs
     )
 
 def fuchsia_hybrid_product_configuration_impl(ctx):
-    product_dir_name = ctx.label.name
-    product_dir = ctx.actions.declare_directory(product_dir_name)
-    product_configuration = ctx.attr.product_configuration[FuchsiaProductConfigInfo].config.split("/")[-1]
+    replace_packages = []
+    for label in ctx.attr.packages:
+        replace_packages.append(label[FuchsiaPackageInfo].package_manifest.path)
+    for label, package_name in ctx.attr.replace_packages.items():
+        replace_packages.append(label[FuchsiaPackageInfo].package_manifest.path)
 
-    src_config_dirname = "/".join(ctx.attr.product_configuration[FuchsiaProductConfigInfo].config.split("/")[:-1])
+    product_config_dir = ctx.actions.declare_directory(ctx.label.name)
+    product_config = ctx.attr.product_configuration[FuchsiaProductConfigInfo]
+    args = [
+        "hybrid-product",
+        "--input",
+        product_config.directory,
+        "--output",
+        product_config_dir.path,
+    ]
+    if product_config.config_path:
+        args += ["--config-path", product_config.config_path]
+    for package_manifest in replace_packages:
+        args += ["--replace-package", package_manifest]
 
-    subdirectories_to_overwrite = {}
-    for label, package_dir_name in ctx.attr.replace_packages.items():
-        src_dir = "/".join(label[FuchsiaPackageInfo].package_manifest.path.split("/")[:-1])
-        subdirectories_to_overwrite[src_dir] = package_dir_name
-
-    inputs = []
-    for label in ctx.attr.replace_packages.keys():
-        inputs += label[FuchsiaPackageInfo].files
-
-    combine_directories(
-        ctx,
-        src_config_dirname,
-        product_dir.path,
-        depset(inputs, transitive = [ctx.attr.product_configuration[DefaultInfo].files]),
-        [product_dir],
-        subdirectories_to_overwrite = subdirectories_to_overwrite,
+    sdk = get_fuchsia_sdk_toolchain(ctx)
+    ctx.actions.run(
+        executable = sdk.assembly_generate_config,
+        arguments = args,
+        inputs = ctx.files.packages + ctx.files.replace_packages + ctx.files.product_configuration,
+        outputs = [product_config_dir],
+        **LOCAL_ONLY_ACTION_KWARGS
     )
 
     return [
-        DefaultInfo(files = depset([product_dir])),
+        DefaultInfo(files = depset([product_config_dir])),
         FuchsiaProductConfigInfo(
-            config = product_dir.path + "/" + product_configuration,
+            config_path = "",
+            directory = product_config_dir.path,
             build_type = ctx.attr.product_configuration[FuchsiaProductConfigInfo].build_type,
             build_id_dirs = [],
         ),
@@ -361,6 +381,7 @@ def fuchsia_hybrid_product_configuration_impl(ctx):
 fuchsia_hybrid_product_configuration = rule(
     doc = "Combine in-tree packages with a prebuilt product config from out of tree for hybrid assembly",
     implementation = fuchsia_hybrid_product_configuration_impl,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     provides = [FuchsiaProductConfigInfo],
     attrs = {
         "product_configuration": attr.label(
@@ -368,6 +389,10 @@ fuchsia_hybrid_product_configuration = rule(
             providers = [FuchsiaProductConfigInfo],
             mandatory = True,
         ),
+        "packages": attr.label_list(
+            doc = "List of packages to replace. The packages are replace by their name.",
+        ),
+        # TODO(https://fxbug.dev/390189313): Remove this once all clients move to `packages`.
         "replace_packages": attr.label_keyed_string_dict(
             doc = "List of directories and packages to replace them with",
         ),

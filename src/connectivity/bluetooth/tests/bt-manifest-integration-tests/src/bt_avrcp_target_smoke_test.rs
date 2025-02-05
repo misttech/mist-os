@@ -12,9 +12,9 @@ use fuchsia_component_test::{
 };
 use futures::channel::mpsc;
 use futures::{SinkExt, StreamExt};
+use log::info;
 use realmbuilder_mock_helpers::mock_component;
 use std::collections::HashSet;
-use tracing::info;
 
 /// AVRCP-Target component URL.
 const AVRCP_TARGET_URL: &str =

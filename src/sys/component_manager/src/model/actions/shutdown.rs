@@ -20,12 +20,12 @@ use fuchsia_async as fasync;
 use futures::future::select_all;
 use futures::prelude::*;
 use futures::select;
+use log::*;
 use moniker::ChildName;
 use std::collections::{HashMap, HashSet};
 use std::pin::pin;
 use std::sync::Arc;
 use std::{fmt, iter};
-use tracing::*;
 
 /// Shuts down all component instances in this component (stops them and guarantees they will never
 /// be started again).
@@ -576,7 +576,7 @@ fn get_dependencies_from_uses(instance: &impl Component) -> Dependencies {
                 // Any other capability type cannot be marked as weak, so we can proceed
             }
         }
-        let dep = match use_ {
+        let deps = match use_ {
             UseDecl::Service(UseServiceDecl { source, .. })
             | UseDecl::Protocol(UseProtocolDecl { source, .. })
             | UseDecl::Directory(UseDirectoryDecl { source, .. })
@@ -585,18 +585,34 @@ fn get_dependencies_from_uses(instance: &impl Component) -> Dependencies {
             | UseDecl::Runner(UseRunnerDecl { source, .. }) => match source {
                 UseSource::Child(name) => instance
                     .find_child(name.as_str(), None)
-                    .map(|child| ComponentRef::from(child.moniker)),
+                    .map(|child| vec![ComponentRef::from(child.moniker)]),
                 UseSource::Self_ => {
                     if use_.is_from_dictionary() {
                         let path = use_.source_path();
                         let dictionary =
                             path.iter_segments().next().expect("must contain at least one segment");
-                        Some(ComponentRef::Capability(dictionary.clone()))
+                        Some(vec![ComponentRef::Capability(dictionary.clone())])
                     } else {
                         // Self is the other node, no need to add a loop.
                         None
                     }
                 }
+                UseSource::Collection(collection_name) => Some(
+                    instance
+                        .children()
+                        .into_iter()
+                        .filter(|child_instance| {
+                            // We only care about children that are in a collection with a name
+                            // matching `collection_name`.
+                            child_instance
+                                .moniker
+                                .collection()
+                                .map(|c| c == collection_name)
+                                .unwrap_or(false)
+                        })
+                        .map(|child_instance| child_instance.moniker.into())
+                        .collect(),
+                ),
                 _ => None,
             },
             UseDecl::Storage(UseStorageDecl { .. }) => {
@@ -604,8 +620,10 @@ fn get_dependencies_from_uses(instance: &impl Component) -> Dependencies {
                 None
             }
         };
-        if let Some(dep) = dep {
-            edges.insert(dep, ComponentRef::Self_);
+        if let Some(deps) = deps {
+            for dep in deps {
+                edges.insert(dep, ComponentRef::Self_);
+            }
         }
     }
     edges
@@ -2038,6 +2056,35 @@ mod tests {
                 ],
                 ComponentRef::Child(dynamic_child) => hashset![child("static_child")],
                 child("static_child") => hashset![],
+            },
+            process_component_dependencies(&fake)
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_use_service_from_collection_with_multiple_instances() {
+        let decl = ComponentDeclBuilder::new()
+            .collection_default("coll")
+            .use_(
+                UseBuilder::service()
+                    .name("service_capability")
+                    .source(UseSource::Collection("coll".parse().unwrap())),
+            )
+            .build();
+
+        let dynamic_child1 = ChildName::try_new("dynamic_child1", Some("coll")).unwrap();
+        let dynamic_child2 = ChildName::try_new("dynamic_child2", Some("coll")).unwrap();
+        let mut fake = FakeComponent::from_decl(decl);
+        fake.dynamic_children
+            .push(Child { moniker: dynamic_child1.clone(), environment_name: None });
+        fake.dynamic_children
+            .push(Child { moniker: dynamic_child2.clone(), environment_name: None });
+
+        pretty_assertions::assert_eq!(
+            hashmap! {
+                ComponentRef::Self_ => hashset![],
+                ComponentRef::Child(dynamic_child1) => hashset![ComponentRef::Self_],
+                ComponentRef::Child(dynamic_child2) => hashset![ComponentRef::Self_],
             },
             process_component_dependencies(&fake)
         );

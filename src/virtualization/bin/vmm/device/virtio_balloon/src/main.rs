@@ -44,7 +44,7 @@ async fn run_virtio_balloon(
     .context("Failed to initialize device.")?;
 
     let features = device.get_features();
-    tracing::debug!("Balloon negotiated features {}", features);
+    log::debug!("Balloon negotiated features {}", features);
     // Use truncate here to drop VIRTIO_RING_F_INDIRECT_DESC flag which will be
     // set if we successfully negotiated indirect descriptor support
     let negotiated_features = wire::VirtioBalloonFeatureFlags::from_bits_truncate(features);
@@ -90,7 +90,7 @@ async fn run_virtio_balloon(
             if let Err(e) =
                 balloon_device.process_inflate_chain(ReadableChain::new(chain, &guest_mem))
             {
-                tracing::warn!("Failed to inflate chain {}", e);
+                log::warn!("Failed to inflate chain {}", e);
             }
             Ok(())
         })),
@@ -111,7 +111,7 @@ async fn run_virtio_balloon(
                             ),
                             Err(err) => {
                                 // Ignore this chain and continue processing.
-                                tracing::error!(%err,
+                                log::error!(err:%;
                                     "Device received a bad chain on the free page report queue");
                                 Ok(())
                             }
@@ -137,7 +137,7 @@ async fn main() -> Result<(), anyhow::Error> {
     fs.take_and_serve_directory_handle().context("Error starting server")?;
     fs.for_each_concurrent(None, |stream| async {
         if let Err(e) = run_virtio_balloon(stream).await {
-            tracing::error!("Error running virtio_balloon service: {}", e);
+            log::error!("Error running virtio_balloon service: {}", e);
         }
     })
     .await;

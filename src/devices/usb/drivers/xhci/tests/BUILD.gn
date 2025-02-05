@@ -34,7 +34,7 @@ test("xhci-unittest-bin") {
   ]
   deps = [
     ":test-libs",
-    "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
+    "//zircon/system/ulib/mmio-ptr",
   ]
 }
 

@@ -259,7 +259,7 @@ fn test_route_resolution_respects_source_address_matcher<I: TestIpExt + netstack
         }
         .with_generation(netstack3_ip::Generation::initial())],
     );
-    let second_table = ctx.core_api().routes::<I>().new_table();
+    let second_table = ctx.core_api().routes::<I>().new_table(100u32);
     let (device_id_2, device_metric_2) = set_up_device(
         &mut ctx,
         AddrSubnet::new(I::get_other_ip_address(254).get(), I::TEST_ADDRS.subnet.prefix()).unwrap(),
@@ -408,7 +408,7 @@ fn route_resolution_with_marks<I: TestIpExt + netstack3_core::IpExt>() {
         AddrSubnet::new(I::TEST_ADDRS.local_ip.get(), I::TEST_ADDRS.subnet.prefix()).unwrap(),
         &main_table,
     );
-    let second_table = ctx.core_api().routes::<I>().new_table();
+    let second_table = ctx.core_api().routes::<I>().new_table(101u32);
     let device_id_2 = set_up_device(
         &mut ctx,
         AddrSubnet::new(I::get_other_ip_address(254).get(), I::TEST_ADDRS.subnet.prefix()).unwrap(),

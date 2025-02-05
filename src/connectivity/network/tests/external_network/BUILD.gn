@@ -39,7 +39,7 @@ common_deps = [
 fuchsia_test_component_with_expectations("ns3-tests") {
   expectations = "expects/netstack3.json5"
   manifest = "meta/netstack3.cml"
-  deps = common_deps + [ "//src/connectivity/network/testing/netemul/configurable-netstack:configurable-netstack-netstack3" ]
+  deps = common_deps + [ "//src/connectivity/network/testing/netemul/configurable-netstack:netstack3" ]
 }
 
 fuchsia_test_package("ns3-external-network-tests") {
@@ -54,9 +54,7 @@ if (target_cpu != "riscv64") {
   fuchsia_test_component_with_expectations("ns2-tests") {
     expectations = "expects/netstack2.json5"
     manifest = "meta/netstack2.cml"
-    deps =
-        common_deps +
-        [ "//src/connectivity/network/testing/netemul/configurable-netstack" ]
+    deps = common_deps + [ "//src/connectivity/network/testing/netemul/configurable-netstack:netstack2" ]
   }
 
   fuchsia_test_package("ns2-external-network-tests") {

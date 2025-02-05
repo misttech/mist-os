@@ -32,6 +32,14 @@
                 "#test-suite",
             ],
         },
+        {
+            directory: "pkg",
+            from: "framework",
+            as: "props",
+            to: "#ta-noop",
+            rights: [ "r*" ],
+            subdir: "data/properties",
+        },
     ],
     expose: [
         {

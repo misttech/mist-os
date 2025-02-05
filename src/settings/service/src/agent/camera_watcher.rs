@@ -58,7 +58,7 @@ impl CameraWatcherAgent {
             }
             drop(guard);
 
-            tracing::info!("Camera watcher agent done processing requests");
+            log::info!("Camera watcher agent done processing requests");
         })
         .detach()
     }
@@ -101,7 +101,7 @@ impl CameraWatcherAgent {
                 Ok(())
             }
             Err(e) => {
-                tracing::error!("Unable to watch camera device: {:?}", e);
+                log::error!("Unable to watch camera device: {:?}", e);
                 Err(AgentError::UnexpectedError)
             }
         }

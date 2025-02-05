@@ -8,12 +8,13 @@ use discovery::query::TargetInfoQuery;
 use discovery::{
     DiscoverySources, FastbootConnectionState, TargetEvent, TargetHandle, TargetState,
 };
-use ffx_config::EnvironmentContext;
+use ffx_command_error::{user_error, NonFatalError};
+use ffx_config::{EnvironmentContext, TryFromEnvContext};
 use fidl_fuchsia_developer_ffx::{self as ffx};
 use fidl_fuchsia_developer_remotecontrol::{IdentifyHostResponse, RemoteControlProxy};
 use fuchsia_async::TimeoutExt;
-use futures::future::join_all;
-use futures::{FutureExt, StreamExt};
+use futures::future::{join_all, LocalBoxFuture};
+use futures::{pin_mut, select, FutureExt, StreamExt};
 use itertools::Itertools;
 use netext::IsLocalAddr;
 use std::cell::RefCell;
@@ -27,6 +28,7 @@ use target_errors::FfxTargetError;
 
 use crate::connection::Connection;
 use crate::ssh_connector::SshConnector;
+use crate::UNSPECIFIED_TARGET_NAME;
 
 const CONFIG_TARGET_SSH_TIMEOUT: &str = "target.host_pipe_ssh_timeout";
 const CONFIG_LOCAL_DISCOVERY_TIMEOUT: &str = "discovery.timeout";
@@ -104,7 +106,7 @@ trait QueryResolverT {
         &self,
         target_spec: &Option<String>,
         ctx: &EnvironmentContext,
-    ) -> Result<Resolution> {
+    ) -> Result<Resolution, FfxTargetError> {
         let query = TargetInfoQuery::from(target_spec.clone());
         if let TargetInfoQuery::Addr(a) = query {
             return Ok(Resolution::from_addr(a));
@@ -120,32 +122,55 @@ trait QueryResolverT {
         &self,
         target_spec: &Option<String>,
         env_context: &EnvironmentContext,
-    ) -> Result<Resolution, anyhow::Error> {
-        let target_spec_info = target_spec.clone().unwrap_or_else(|| "<unspecified>".to_owned());
+    ) -> Result<Resolution, FfxTargetError> {
         let query = TargetInfoQuery::from(target_spec.clone());
+        let mut handles;
+
+        let handles_fut = self.resolve_target_query(query.clone(), env_context).fuse();
+        // We want to query both the manual targets and the discoverable handles concurrently.
         if let TargetInfoQuery::NodenameOrSerial(ref s) = query {
-            match self.try_resolve_manual_target(s, env_context).await {
-                Err(e) => {
-                    tracing::debug!("Failed to resolve target {s} as manual target: {e:?}");
+            let manual_target_fut = self.try_resolve_manual_target(s, env_context).fuse();
+            pin_mut!(manual_target_fut);
+            pin_mut!(handles_fut);
+            loop {
+                select! {
+                    mtr = manual_target_fut => match mtr {
+                        Err(e) => {
+                            tracing::debug!("Failed to resolve target {s} as manual target: {e:?}");
+                            // Keep going, waiting for the discovery to complete
+                        }
+                        Ok(Some(res)) => return Ok(res), // We found a manual target, so we're done
+                        _ => (), // Keep going
+                    },
+                    handles_res = handles_fut => {
+                        // We got a response from discovery
+                        handles = handles_res.map_err(|_| FfxTargetError::OpenTargetError { err: ffx::OpenTargetError::FailedDiscovery, target: target_spec.clone()})?;
+                        break;
+                    },
                 }
-                Ok(Some(res)) => return Ok(res),
-                _ => (), // Keep going
             }
-        }
-        let mut handles = self.resolve_target_query(query, env_context).await?;
+        } else {
+            // If the query is not a nodename, we won't even bother with trying to resolve a manual
+            // target.
+            handles = handles_fut.await.map_err(|_| FfxTargetError::OpenTargetError {
+                err: ffx::OpenTargetError::FailedDiscovery,
+                target: target_spec.clone(),
+            })?;
+        };
         if handles.len() == 0 {
-            return Err(anyhow::anyhow!(
-                "unable to resolve address for target '{target_spec_info}'"
-            ));
+            return Err(FfxTargetError::OpenTargetError {
+                err: ffx::OpenTargetError::TargetNotFound,
+                target: target_spec.clone(),
+            });
         }
         if handles.len() > 1 {
-            return Err(FfxTargetError::DaemonError {
-                err: ffx::DaemonError::TargetAmbiguous,
+            return Err(FfxTargetError::OpenTargetError {
+                err: ffx::OpenTargetError::QueryAmbiguous,
                 target: target_spec.clone(),
-            }
-            .into());
+            });
         }
-        Ok(Resolution::from_target_handle(handles.remove(0))?)
+        // Unwrap() is okay because we validate that we have at least one entry
+        Ok(Resolution::from_target_handle(handles.remove(0)).unwrap())
     }
 }
 
@@ -341,7 +366,7 @@ async fn resolve_target_query_with_sources(
 pub async fn resolve_target_address(
     target_spec: &Option<String>,
     ctx: &EnvironmentContext,
-) -> Result<Resolution> {
+) -> Result<Resolution, FfxTargetError> {
     QueryResolver::default().resolve_target_address(target_spec, ctx).await
 }
 struct QueryResolver {
@@ -717,6 +742,29 @@ impl Resolution {
     }
 }
 
+impl TryFromEnvContext for Resolution {
+    fn try_from_env_context<'a>(
+        env: &'a EnvironmentContext,
+    ) -> LocalBoxFuture<'a, ffx_command_error::Result<Self>> {
+        Box::pin(async {
+            let unspecified_target = UNSPECIFIED_TARGET_NAME.to_owned();
+            let target_spec = Option::<String>::try_from_env_context(env).await?;
+            let target_spec_unwrapped = if env.is_strict() {
+                target_spec.as_ref().ok_or(user_error!(
+                    "You must specify a target via `-t <target_name>` before any command arguments"
+                ))?
+            } else {
+                target_spec.as_ref().unwrap_or(&unspecified_target)
+            };
+            tracing::trace!("resolving target spec address from {}", target_spec_unwrapped);
+            let resolution = resolve_target_address(&target_spec, env)
+                .await
+                .map_err(|e| ffx_command_error::Error::User(NonFatalError(e.into()).into()))?;
+            Ok(resolution)
+        })
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -866,37 +914,6 @@ mod test {
                 .await;
         assert!(target_spec_res.is_err());
         assert!(dbg!(target_spec_res.unwrap_err().to_string()).contains("multiple targets"));
-    }
-
-    #[fuchsia::test]
-    async fn test_locally_resolve_manual_before_mdns() {
-        use manual_targets::ManualTargets;
-        let test_env = ffx_config::test_init().await.unwrap();
-        let mut resolver = MockQueryResolverT::new();
-        let name_spec = Some("foobar".to_string());
-        // Set up to return an mDNS address;
-        let mdns_addr = "[fe80::8c14:9c4e:7c7c:c57]:123".to_string();
-        let sa = mdns_addr.parse::<SocketAddr>().unwrap();
-        let state = TargetState::Product(vec![sa.into()]);
-        let th = TargetHandle { node_name: name_spec.clone(), state };
-        resolver.expect_resolve_target_query().return_once(move |_, _| Ok(vec![th]));
-
-        let mt_addr = "127.0.0.1:123".to_string();
-        let mt_sa = mt_addr.parse::<SocketAddr>().unwrap();
-        let mt_config = manual_targets::Config::default();
-        // Also set up a manual target with a different result
-        mt_config.add(mt_addr.clone(), None).await.expect("add manual target");
-        resolver
-            .expect_try_resolve_manual_target()
-            .return_once(move |_, _| Ok(Some(Resolution::from_addr(mt_sa))));
-
-        // Confirm that we get the manual address back
-        let name_spec = Some("foobar".to_string());
-        let target_spec =
-            locally_resolve_target_spec(name_spec.clone(), &resolver, &test_env.context)
-                .await
-                .unwrap();
-        assert_eq!(target_spec, Some(mt_addr));
     }
 
     // XXX Creating a reasonable test for the rest of the behavior:

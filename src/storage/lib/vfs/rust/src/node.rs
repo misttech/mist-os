@@ -32,6 +32,13 @@ pub struct NodeOptions {
     pub rights: fio::Operations,
 }
 
+impl From<&NodeOptions> for fio::Flags {
+    fn from(options: &NodeOptions) -> Self {
+        // There is 1:1 mapping between `fio::Operations` and `fio::Flags`.
+        fio::Flags::PROTOCOL_NODE | fio::Flags::from_bits_truncate(options.rights.bits())
+    }
+}
+
 /// All nodes must implement this trait.
 pub trait Node: GetEntryInfo + IntoAny + Send + Sync + 'static {
     /// Returns node attributes (io2).
@@ -157,20 +164,20 @@ impl<N: Node> Connection<N> {
     /// Handle a [`NodeRequest`].
     async fn handle_request(&mut self, req: fio::NodeRequest) -> Result<ConnectionState, Error> {
         match req {
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "26")]
             fio::NodeRequest::DeprecatedClone { flags, object, control_handle: _ } => {
                 self.handle_clone_deprecated(flags, object);
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "26"))]
             fio::NodeRequest::Clone { flags, object, control_handle: _ } => {
                 self.handle_clone_deprecated(flags, object);
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "26")]
             fio::NodeRequest::Clone { request, control_handle: _ } => {
                 // Suppress any errors in the event a bad `request` channel was provided.
                 self.handle_clone(ServerEnd::new(request.into_channel()));
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "26"))]
             fio::NodeRequest::Clone2 { request, control_handle: _ } => {
                 // Suppress any errors in the event a bad `request` channel was provided.
                 self.handle_clone(ServerEnd::new(request.into_channel()));
@@ -220,9 +227,27 @@ impl<N: Node> Connection<N> {
             fio::NodeRequest::RemoveExtendedAttribute { responder, .. } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::NodeRequest::GetFlags { responder } => {
+                responder.send(Ok(fio::Flags::from(&self.options)))?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::NodeRequest::SetFlags { flags: _, responder } => {
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::NodeRequest::DeprecatedGetFlags { responder } => {
+                responder.send(Status::OK.into_raw(), fio::OpenFlags::NODE_REFERENCE)?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::NodeRequest::DeprecatedSetFlags { flags: _, responder } => {
+                responder.send(Status::BAD_HANDLE.into_raw())?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::NodeRequest::GetFlags { responder } => {
                 responder.send(Status::OK.into_raw(), fio::OpenFlags::NODE_REFERENCE)?;
             }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::NodeRequest::SetFlags { flags: _, responder } => {
                 responder.send(Status::BAD_HANDLE.into_raw())?;
             }
@@ -231,14 +256,6 @@ impl<N: Node> Connection<N> {
             }
             fio::NodeRequest::QueryFilesystem { responder } => {
                 responder.send(Status::NOT_SUPPORTED.into_raw(), None)?;
-            }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            fio::NodeRequest::GetFlags2 { responder } => {
-                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
-            }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            fio::NodeRequest::SetFlags2 { flags: _, responder } => {
-                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::NodeRequest::_UnknownMethod { .. } => (),
         }

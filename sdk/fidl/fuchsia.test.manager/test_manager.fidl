@@ -161,7 +161,7 @@ type RunSuiteOptions = resource table {
     /// If true, indicates the test creates an exception channel. In this case, the test manager
     /// will refrain from creating its own exception channels to avoid conflicts. Default value
     /// is false.
-    @available(added=NEXT)
+    @available(added=26)
     10: no_exception_channel bool;
 };
 
@@ -695,7 +695,7 @@ type RunOptions = table {
     /// If true, indicates the test creates an exception channel. In this case, the test manager
     /// will refrain from creating its own exception channels to avoid conflicts. Default value
     /// is false.
-    @available(added=NEXT)
+    @available(added=26)
     9: no_exception_channel bool;
 };
 

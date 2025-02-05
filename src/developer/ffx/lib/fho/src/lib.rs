@@ -4,21 +4,19 @@
 
 mod adapters;
 mod connector;
+mod fho_env;
 mod from_env;
-pub mod subtool;
+mod try_from_env;
 
-pub mod testing;
+pub mod subtool;
 
 pub use subtool::{FfxMain, FfxTool};
 
 // Re-export TryFromEnv related symbols
-pub use from_env::{
-    connection_behavior, daemon_protocol, deferred, moniker, moniker_f, AvailabilityFlag, CheckEnv,
-    Connector, Deferred, DeviceLookupDefaultImpl, FhoConnectionBehavior, FhoEnvironment,
-    TryFromEnv, TryFromEnvWith,
-};
+pub use from_env::{AvailabilityFlag, CheckEnv};
 
-pub use from_env::{toolbox, toolbox_or};
+pub use fho_env::{DeviceLookup, FhoConnectionBehavior, FhoEnvironment, MockDeviceLookup};
+pub use try_from_env::{deferred, Deferred, TryFromEnv, TryFromEnvWith};
 
 // Used for deriving an FFX tool.
 pub use fho_macro::FfxTool;

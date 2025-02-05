@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::writer::{Heap, State};
-use inspect_format::{Block, Container};
+use inspect_format::{Block, BlockKind, Container};
 use std::sync::Arc;
 
 pub fn get_state(size: usize) -> State {
@@ -13,18 +13,22 @@ pub fn get_state(size: usize) -> State {
 }
 
 pub trait GetBlockExt: crate::private::InspectTypeInternal {
-    fn get_block<F>(&self, callback: F)
+    #[track_caller]
+    fn get_block<F, K>(&self, callback: F)
     where
-        F: FnOnce(&Block<&Container>),
+        K: BlockKind,
+        F: FnOnce(&Block<&Container, K>),
     {
         let block_index = self.block_index().expect("block index is set");
         let state = self.state().expect("state is set");
         state.get_block(block_index, callback)
     }
 
-    fn get_block_mut<F>(&self, callback: F)
+    #[track_caller]
+    fn get_block_mut<F, K>(&self, callback: F)
     where
-        F: FnOnce(&mut Block<&mut Container>),
+        K: BlockKind,
+        F: FnOnce(&mut Block<&mut Container, K>),
     {
         let block_index = self.block_index().expect("block index is set");
         let state = self.state().expect("state is set");
@@ -44,13 +48,13 @@ macro_rules! assert_update_is_atomic {
         let gen = $updateable_thing
             .state()
             .unwrap()
-            .with_current_header(|header| header.header_generation_count().unwrap());
+            .with_current_header(|header| header.generation_count());
         $updateable_thing.atomic_update($($func)+);
 
         let new_gen = $updateable_thing
             .state()
             .unwrap()
-            .with_current_header(|header| header.header_generation_count().unwrap());
+            .with_current_header(|header| header.generation_count());
 
         let num_gen_updates = (new_gen - gen) / 2;
         if num_gen_updates != 1 {

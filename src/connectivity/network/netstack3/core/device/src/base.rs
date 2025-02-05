@@ -14,12 +14,13 @@ use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
 use netstack3_base::sync::RwLock;
 use netstack3_base::{
     Counter, Device, DeviceIdContext, HandleableTimer, Inspectable, Inspector, InstantContext,
-    ReferenceNotifiers, TimerBindingsTypes, TimerHandler,
+    ReferenceNotifiers, TimerBindingsTypes, TimerHandler, TxMetadataBindingsTypes,
 };
 use netstack3_filter::FilterBindingsTypes;
 use netstack3_ip::nud::{LinkResolutionContext, NudCounters};
 use packet::Buf;
 
+use crate::blackhole::{BlackholeDeviceId, BlackholePrimaryDeviceId};
 use crate::internal::arp::ArpCounters;
 use crate::internal::ethernet::{EthernetLinkDevice, EthernetTimerId};
 use crate::internal::id::{
@@ -43,6 +44,11 @@ pub struct DevicesIter<'s, BT: DeviceLayerTypes> {
         alloc::collections::hash_map::Values<'s, EthernetDeviceId<BT>, EthernetPrimaryDeviceId<BT>>,
     pub(super) pure_ip:
         alloc::collections::hash_map::Values<'s, PureIpDeviceId<BT>, PureIpPrimaryDeviceId<BT>>,
+    pub(super) blackhole: alloc::collections::hash_map::Values<
+        's,
+        BlackholeDeviceId<BT>,
+        BlackholePrimaryDeviceId<BT>,
+    >,
     pub(super) loopback: core::option::Iter<'s, LoopbackPrimaryDeviceId<BT>>,
 }
 
@@ -50,10 +56,11 @@ impl<'s, BT: DeviceLayerTypes> Iterator for DevicesIter<'s, BT> {
     type Item = DeviceId<BT>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let Self { ethernet, pure_ip, loopback } = self;
+        let Self { ethernet, pure_ip, blackhole, loopback } = self;
         ethernet
             .map(|primary| primary.clone_strong().into())
             .chain(pure_ip.map(|primary| primary.clone_strong().into()))
+            .chain(blackhole.map(|primary| primary.clone_strong().into()))
             .chain(loopback.map(|primary| primary.clone_strong().into()))
             .next()
     }
@@ -127,6 +134,8 @@ pub struct Devices<BT: DeviceLayerTypes> {
     pub ethernet: HashMap<EthernetDeviceId<BT>, EthernetPrimaryDeviceId<BT>>,
     /// Collection of PureIP devices.
     pub pure_ip: HashMap<PureIpDeviceId<BT>, PureIpPrimaryDeviceId<BT>>,
+    /// Collection of blackhole devices.
+    pub blackhole: HashMap<BlackholeDeviceId<BT>, BlackholePrimaryDeviceId<BT>>,
     /// The loopback device, if installed.
     pub loopback: Option<LoopbackPrimaryDeviceId<BT>>,
 }
@@ -134,10 +143,11 @@ pub struct Devices<BT: DeviceLayerTypes> {
 impl<BT: DeviceLayerTypes> Devices<BT> {
     /// Gets an iterator over available devices.
     pub fn iter(&self) -> DevicesIter<'_, BT> {
-        let Self { ethernet, pure_ip, loopback } = self;
+        let Self { ethernet, pure_ip, blackhole, loopback } = self;
         DevicesIter {
             ethernet: ethernet.values(),
             pure_ip: pure_ip.values(),
+            blackhole: blackhole.values(),
             loopback: loopback.iter(),
         }
     }
@@ -206,6 +216,13 @@ impl Inspectable for EthernetDeviceCounters {
 pub struct PureIpDeviceCounters {}
 
 impl Inspectable for PureIpDeviceCounters {
+    fn record<I: Inspector>(&self, _inspector: &mut I) {}
+}
+
+/// Counters for blackhole devices.
+pub struct BlackholeDeviceCounters;
+
+impl Inspectable for BlackholeDeviceCounters {
     fn record<I: Inspector>(&self, _inspector: &mut I) {}
 }
 
@@ -365,6 +382,9 @@ pub trait DeviceLayerStateTypes: InstantContext + FilterBindingsTypes {
     /// The state associated with pure IP devices.
     type PureIpDeviceState: Send + Sync + DeviceClassMatcher<Self::DeviceClass>;
 
+    /// The state associated with blackhole devices.
+    type BlackholeDeviceState: Send + Sync + DeviceClassMatcher<Self::DeviceClass>;
+
     /// An opaque identifier that is available from both strong and weak device
     /// references.
     type DeviceIdentifier: Send + Sync + Debug + Display + DeviceIdAndNameMatcher;
@@ -399,6 +419,7 @@ pub trait DeviceLayerTypes:
     + LinkResolutionContext<EthernetLinkDevice>
     + TimerBindingsTypes
     + ReferenceNotifiers
+    + TxMetadataBindingsTypes
     + 'static
 {
 }
@@ -408,6 +429,7 @@ impl<
             + LinkResolutionContext<EthernetLinkDevice>
             + TimerBindingsTypes
             + ReferenceNotifiers
+            + TxMetadataBindingsTypes
             + 'static,
     > DeviceLayerTypes for BC
 {

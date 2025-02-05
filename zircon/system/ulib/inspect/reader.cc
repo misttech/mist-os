@@ -67,7 +67,7 @@ fpromise::promise<SnapshotTree> SnapshotTreeFromInspector(Inspector insp) {
   return fpromise::join_promise_vector(std::move(promises))
       .and_then([ret = std::move(ret), names = std::move(child_names)](
                     std::vector<fpromise::result<SnapshotTree>>& children) mutable
-                -> fpromise::result<SnapshotTree> {
+                    -> fpromise::result<SnapshotTree> {
         ZX_ASSERT(names.size() == children.size());
 
         for (size_t i = 0; i < names.size(); i++) {
@@ -300,6 +300,7 @@ fpromise::result<Hierarchy> Reader::Read() {
     if (it->second.is_complete()) {
       if (it->first == 0) {
         // The root is complete, return it.
+        it->second.hierarchy.Sort();
         return fpromise::ok(std::move(it->second.hierarchy));
       }
 
@@ -331,6 +332,7 @@ fpromise::result<Hierarchy> Reader::Read() {
       if (obj.second == 0) {
         // This was the last node that needed to be added to the root to complete it.
         // Return the root.
+        parent->hierarchy.Sort();
         return fpromise::ok(std::move(parent->hierarchy));
       }
 
@@ -471,30 +473,44 @@ void Reader::ReadExtents(const BlockIndex head_extent, size_t remaining_length,
 }
 
 void Reader::InnerParseProperty(ParsedNode* parent, const Block* block) {
-  auto name = GetAndValidateName(ValueBlockFields::NameIndex::Get<size_t>(block->header));
+  const auto name = GetAndValidateName(ValueBlockFields::NameIndex::Get<size_t>(block->header));
   if (!name.has_value()) {
     return;
   }
 
-  // Do not allow reading more bytes than exist in the buffer for any property. This safeguards
-  // against cycles and excessive memory usage.
-  size_t remaining_length = std::min(
-      snapshot_.size(), PropertyBlockPayload::TotalLength::Get<size_t>(block->payload.u64));
-  BlockIndex cur_extent = PropertyBlockPayload::ExtentIndex::Get<BlockIndex>(block->payload.u64);
+  const auto get_extents_as_buffer = [&]() -> std::vector<uint8_t> {
+    // Do not allow reading more bytes than exist in the buffer for any property. This safeguards
+    // against cycles and excessive memory usage.
+    size_t remaining_length = std::min(
+        snapshot_.size(), PropertyBlockPayload::TotalLength::Get<size_t>(block->payload.u64));
+    BlockIndex cur_extent = PropertyBlockPayload::ExtentIndex::Get<BlockIndex>(block->payload.u64);
 
-  std::vector<uint8_t> buf;
-  buf.reserve(remaining_length);
-  ReadExtents(cur_extent, remaining_length, &buf);
+    std::vector<uint8_t> buf;
+    buf.reserve(remaining_length);
+    ReadExtents(cur_extent, remaining_length, &buf);
+    return buf;
+  };
 
   auto* parent_node = parent->hierarchy.node_ptr();
-  if (PropertyBlockPayload::Flags::Get<uint8_t>(block->payload.u64) &
-      static_cast<uint8_t>(PropertyBlockFormat::kBinary)) {
-    parent_node->add_property(
-        inspect::PropertyValue(std::move(name.value()), inspect::ByteVectorPropertyValue(buf)));
-  } else {
-    parent_node->add_property(inspect::PropertyValue(
-        std::move(name.value()),
-        inspect::StringPropertyValue(std::string(buf.cbegin(), buf.cend()))));
+  switch (PropertyBlockPayload::Flags::Get<PropertyBlockFormat>(block->payload.u64)) {
+    case PropertyBlockFormat::kBinary:
+      parent_node->add_property(inspect::PropertyValue(
+          std::move(name.value()), inspect::ByteVectorPropertyValue(get_extents_as_buffer())));
+      break;
+    case PropertyBlockFormat::kUtf8:
+      parent_node->add_property(
+          inspect::PropertyValue(std::move(name.value()), inspect::StringPropertyValue([&]() {
+                                   const auto buf = get_extents_as_buffer();
+                                   return std::string(buf.cbegin(), buf.cend());
+                                 }())));
+      break;
+    case PropertyBlockFormat::kStringReference:
+      parent_node->add_property(inspect::PropertyValue(
+          std::move(name.value()),
+          inspect::StringPropertyValue(*LoadStringReference(internal::GetBlock(
+              &snapshot_,
+              PropertyBlockPayload::ExtentIndex::Get<BlockIndex>(block->payload.u64))))));
+      break;
   }
 }
 

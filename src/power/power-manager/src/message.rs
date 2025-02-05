@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::platform_metrics::PlatformMetric;
-use crate::shutdown_request::ShutdownRequest;
 use crate::types::{Celsius, ThermalLoad};
 
 /// Defines the message types and arguments to be used for inter-node communication
@@ -13,9 +12,8 @@ pub enum Message {
     /// Read the temperature
     ReadTemperature,
 
-    /// Command a system shutdown
-    /// Arg: a ShutdownRequest indicating the requested shutdown state and reason
-    SystemShutdown(ShutdownRequest),
+    /// Command a system reboot due to high temperature
+    HighTemperatureReboot,
 
     /// Communicate a new thermal load value for the given sensor
     /// Arg0: a ThermalLoad value which represents the severity of thermal load on the given sensor
@@ -29,10 +27,6 @@ pub enum Message {
     /// File a crash report
     /// Arg: the crash report signature
     FileCrashReport(String),
-
-    /// Specify the termination system state, intended to be used in the DriverManagerHandler node.
-    /// Arg: the SystemPowerState value indicating the termination state
-    SetTerminationSystemState(fidl_fuchsia_system_state::SystemPowerState),
 
     /// Notify that the mic enabled state has changed
     /// Arg: the new enabled state

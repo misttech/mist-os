@@ -58,7 +58,9 @@ class VmoBuffer {
     // Enlarge the VMO as needed if it was created as resizable.
     if (str.size() > size_ - offset_ && vmo_->is_resizable()) {
       DEBUG_ASSERT(vmo_->size() < offset_ + str.size());
-      zx_status_t status = vmo_->Resize(offset_ + str.size());
+      size_t minimum_size = offset_ + str.size();
+      size_t page_aligned_size = fbl::round_up(minimum_size, size_t{PAGE_SIZE});
+      zx_status_t status = vmo_->Resize(page_aligned_size);
       if (status == ZX_OK) {
         // Update unlocked cache of the size.
         size_ = vmo_->size();
@@ -411,6 +413,6 @@ void userboot_init() {
                          /* ensure_initial_thread= */ true);
   ASSERT(status == ZX_OK);
 
-  timeline_userboot.Set(current_ticks());
-  init_time.Add(current_time() / 1000000LL);
+  timeline_userboot.Set(current_mono_ticks());
+  init_time.Add(current_mono_time() / 1000000LL);
 }

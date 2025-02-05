@@ -46,6 +46,9 @@ class Console : public fidl::WireServer<fuchsia_hardware_pty::Device> {
   void Read(ReadRequestView request, ReadCompleter::Sync& completer) final;
   void Write(WriteRequestView request, WriteCompleter::Sync& completer) final;
   void Describe(DescribeCompleter::Sync& completer) final;
+  void Reset();
+  void SetEvent(bool enable, uint32_t mask);
+  uint32_t features();
 
   void OpenClient(OpenClientRequestView request, OpenClientCompleter::Sync& completer) final;
   void ClrSetFeature(ClrSetFeatureRequestView request,
@@ -55,7 +58,8 @@ class Console : public fidl::WireServer<fuchsia_hardware_pty::Device> {
   void ReadEvents(ReadEventsCompleter::Sync& completer) final;
   void SetWindowSize(SetWindowSizeRequestView request,
                      SetWindowSizeCompleter::Sync& completer) final;
-
+  uint32_t event_mask_ = 0;
+  uint32_t features_ = 0;
   async_dispatcher_t* dispatcher_;
   Fifo rx_fifo_;
   zx::eventpair rx_event_;

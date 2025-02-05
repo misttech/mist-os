@@ -245,7 +245,7 @@ impl CloseResponder for fposix_socket::StreamSocketCloseResponder {
 }
 
 enum InitialSocketState {
-    Unbound,
+    Unbound(fposix_socket::SocketCreationOptions),
     Connected,
 }
 
@@ -264,7 +264,15 @@ impl<I: IpExt + IpSockAddrExt> worker::SocketWorkerHandler for BindingData<I> {
         spawners: &worker::TaskSpawnerCollection<crate::bindings::util::TaskWaitGroupSpawner>,
     ) {
         match args {
-            InitialSocketState::Unbound => (),
+            InitialSocketState::Unbound(fposix_socket::SocketCreationOptions {
+                marks,
+                __source_breaking: _,
+            }) => {
+                let Self { id, .. } = self;
+                for fposix_socket::Marks { domain, mark } in marks.iter().flatten() {
+                    ctx.api().tcp().set_mark(&id, (*domain).into_core(), (*mark).into_core());
+                }
+            }
             InitialSocketState::Connected => {
                 let Self { id, peer: _, task_data, task_control } = self;
                 let task_data =
@@ -303,6 +311,7 @@ pub(super) fn spawn_worker(
     ctx: crate::bindings::Ctx,
     request_stream: fposix_socket::StreamSocketRequestStream,
     spawner: &worker::ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
+    creation_opts: fposix_socket::SocketCreationOptions,
 ) {
     match (domain, proto) {
         (fposix_socket::Domain::Ipv4, fposix_socket::StreamSocketProtocol::Tcp) => {
@@ -311,7 +320,7 @@ pub(super) fn spawn_worker(
                 BindingData::<Ipv4>::new,
                 SocketWorkerProperties {},
                 request_stream,
-                InitialSocketState::Unbound,
+                InitialSocketState::Unbound(creation_opts),
                 spawner.clone(),
             ))
         }
@@ -321,7 +330,7 @@ pub(super) fn spawn_worker(
                 BindingData::<Ipv6>::new,
                 SocketWorkerProperties {},
                 request_stream,
-                InitialSocketState::Unbound,
+                InitialSocketState::Unbound(creation_opts),
                 spawner.clone(),
             ))
         }
@@ -934,7 +943,8 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetIpTypeOfService { responder } => {
-                respond_not_supported!("stream::GetIpTypeOfService", responder);
+                debug!("stream::GetIpTypeOfService is not supported, returning Ok(0)");
+                responder.send(Ok(0)).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetIpTtl { value: _, responder } => {
                 respond_not_supported!("stream::SetIpTtl", responder);
@@ -1084,10 +1094,24 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 respond_not_supported!("stream::GetIpv6ReceiveTrafficClass", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpv6TrafficClass { value: _, responder } => {
-                respond_not_supported!("stream::SetIpv6TrafficClass", responder);
+                let result = match I::VERSION {
+                    IpVersion::V4 => Err(fposix::Errno::Eopnotsupp),
+                    IpVersion::V6 => {
+                        debug!("stream::SetIpv6TrafficClass is not supported, returning Ok(())");
+                        Ok(())
+                    }
+                };
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetIpv6TrafficClass { responder } => {
-                respond_not_supported!("stream::GetIpv6TrafficClass", responder);
+                let result = match I::VERSION {
+                    IpVersion::V4 => Err(fposix::Errno::Eopnotsupp),
+                    IpVersion::V6 => {
+                        debug!("stream::GetIpv6TrafficClass is not supported, returning Ok(0)");
+                        Ok(0)
+                    }
+                };
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetIpv6ReceivePacketInfo {
                 value: _,

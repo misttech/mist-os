@@ -6,6 +6,7 @@
 #define SRC_DEVICES_BOARD_LIB_ACPI_DEVICE_H_
 
 #include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
+#include <fidl/fuchsia.hardware.i2c.businfo/cpp/fidl.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/binding.h>
@@ -21,6 +22,7 @@
 
 #include <acpica/acpi.h>
 #include <ddktl/device.h>
+#include <ddktl/metadata_server.h>
 #include <fbl/mutex.h>
 
 #include "lib/ddk/device.h"
@@ -166,6 +168,11 @@ class Device : public DeviceType,
     uint32_t space_type;
   };
 
+  using BusMetadataServer =
+      std::variant<std::monostate,
+                   ddk::MetadataServer<fuchsia_hardware_i2c_businfo::I2CBusMetadata>,
+                   ddk::MetadataServer<fuchsia_hardware_spi_businfo::SpiBusMetadata>>;
+
   static ACPI_STATUS AddressSpaceHandler(uint32_t function, ACPI_PHYSICAL_ADDRESS physical_address,
                                          uint32_t bit_width, UINT64* value, void* handler_ctx,
                                          void* region_ctx);
@@ -220,8 +227,8 @@ class Device : public DeviceType,
   std::unordered_map<uint8_t, PowerStateInfo> supported_power_states_;
   uint8_t current_power_state_ = DEV_POWER_STATE_D3COLD;
 
-  // FIDL-encoded child metadata.
-  std::vector<uint8_t> metadata_;
+  // Child metadata.
+  BusMetadata metadata_;
   BusType bus_type_ = BusType::kUnknown;
   uint32_t bus_id_ = UINT32_MAX;
 
@@ -248,6 +255,8 @@ class Device : public DeviceType,
   // Passthrough device -- the one that drivers actually bind to. This is a child of this |Device|
   // instance.
   zx_device_t* passthrough_dev_;
+
+  BusMetadataServer bus_metadata_server_;
 };
 
 }  // namespace acpi

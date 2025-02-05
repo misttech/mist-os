@@ -15,8 +15,8 @@ async fn socket() {
         .create_socket(proto::SocketCreateSocketRequest {
             options: proto::SocketType::Stream,
             handles: [
-                proto::NewHid { id: hid_socket_write },
-                proto::NewHid { id: hid_socket_read },
+                proto::NewHandleId { id: hid_socket_write },
+                proto::NewHandleId { id: hid_socket_read },
             ]
         })
         .is_ok());
@@ -25,14 +25,16 @@ async fn socket() {
         .create_socket(proto::SocketCreateSocketRequest {
             options: proto::SocketType::Stream,
             handles: [
-                proto::NewHid { id: hid_socket_write },
-                proto::NewHid { id: hid_socket_read },
+                proto::NewHandleId { id: hid_socket_write },
+                proto::NewHandleId { id: hid_socket_read },
             ],
         })
         .err()
         .unwrap();
 
-    let proto::Error::NewHidReused(proto::NewHidReused { id: i, same_call: false }) = result else {
+    let proto::Error::NewHandleIdReused(proto::NewHandleIdReused { id: i, same_call: false }) =
+        result
+    else {
         panic!();
     };
 
@@ -48,12 +50,12 @@ async fn socket() {
 
     fdomain.write_socket(
         tid_write,
-        proto::SocketWriteSocketRequest { handle: proto::Hid { id: hid_socket_write }, data },
+        proto::SocketWriteSocketRequest { handle: proto::HandleId { id: hid_socket_write }, data },
     );
     fdomain.read_socket(
         tid_read,
         proto::SocketReadSocketRequest {
-            handle: proto::Hid { id: hid_socket_read },
+            handle: proto::HandleId { id: hid_socket_read },
             max_bytes: 1024,
         },
     );
@@ -83,7 +85,7 @@ async fn socket() {
     let tid_close = 420.try_into().unwrap();
     fdomain.close(
         tid_close,
-        proto::FDomainCloseRequest { handles: vec![proto::Hid { id: hid_socket_read }] },
+        proto::FDomainCloseRequest { handles: vec![proto::HandleId { id: hid_socket_read }] },
     );
     let response_close = fdomain.next().await.unwrap();
     let FDomainEvent::ClosedHandle(got_tid, Ok(())) = response_close else {
@@ -96,7 +98,7 @@ async fn socket() {
     fdomain.write_socket(
         tid_write_fail,
         proto::SocketWriteSocketRequest {
-            handle: proto::Hid { id: hid_socket_write },
+            handle: proto::HandleId { id: hid_socket_write },
             data: b"greeble".to_vec(),
         },
     );
@@ -120,7 +122,7 @@ async fn socket() {
     fdomain.write_socket(
         tid_write_fail_2nd,
         proto::SocketWriteSocketRequest {
-            handle: proto::Hid { id: hid_socket_write },
+            handle: proto::HandleId { id: hid_socket_write },
             data: b"greeble".to_vec(),
         },
     );
@@ -138,7 +140,7 @@ async fn socket() {
 
     fdomain
         .acknowledge_write_error(proto::FDomainAcknowledgeWriteErrorRequest {
-            handle: proto::Hid { id: hid_socket_write },
+            handle: proto::HandleId { id: hid_socket_write },
         })
         .unwrap();
 
@@ -147,7 +149,7 @@ async fn socket() {
     fdomain.write_socket(
         tid_write_fail_3rd,
         proto::SocketWriteSocketRequest {
-            handle: proto::Hid { id: hid_socket_write },
+            handle: proto::HandleId { id: hid_socket_write },
             data: b"greeble".to_vec(),
         },
     );
@@ -170,15 +172,17 @@ async fn socket() {
     fdomain.read_socket(
         tid_read_fail,
         proto::SocketReadSocketRequest {
-            handle: proto::Hid { id: hid_socket_read },
+            handle: proto::HandleId { id: hid_socket_read },
             max_bytes: 1024,
         },
     );
 
     let response_read = fdomain.next().await.unwrap();
 
-    let FDomainEvent::SocketData(got_tid, Err(proto::Error::BadHid(proto::BadHid { id: got_id }))) =
-        response_read
+    let FDomainEvent::SocketData(
+        got_tid,
+        Err(proto::Error::BadHandleId(proto::BadHandleId { id: got_id })),
+    ) = response_read
     else {
         panic!();
     };
@@ -197,8 +201,8 @@ async fn channel() {
     assert!(fdomain
         .create_channel(proto::ChannelCreateChannelRequest {
             handles: [
-                proto::NewHid { id: hid_channel_write },
-                proto::NewHid { id: hid_channel_read },
+                proto::NewHandleId { id: hid_channel_write },
+                proto::NewHandleId { id: hid_channel_read },
             ]
         })
         .is_ok());
@@ -206,14 +210,16 @@ async fn channel() {
     let result = fdomain
         .create_channel(proto::ChannelCreateChannelRequest {
             handles: [
-                proto::NewHid { id: hid_channel_write },
-                proto::NewHid { id: hid_channel_read },
+                proto::NewHandleId { id: hid_channel_write },
+                proto::NewHandleId { id: hid_channel_read },
             ],
         })
         .err()
         .unwrap();
 
-    let proto::Error::NewHidReused(proto::NewHidReused { id: i, same_call: false }) = result else {
+    let proto::Error::NewHandleIdReused(proto::NewHandleIdReused { id: i, same_call: false }) =
+        result
+    else {
         panic!();
     };
 
@@ -226,8 +232,8 @@ async fn channel() {
         .create_socket(proto::SocketCreateSocketRequest {
             options: proto::SocketType::Stream,
             handles: [
-                proto::NewHid { id: hid_passing_socket_a },
-                proto::NewHid { id: hid_passing_socket_b },
+                proto::NewHandleId { id: hid_passing_socket_a },
+                proto::NewHandleId { id: hid_passing_socket_b },
             ]
         })
         .is_ok());
@@ -242,14 +248,14 @@ async fn channel() {
     fdomain.write_channel(
         tid_write,
         proto::ChannelWriteChannelRequest {
-            handle: proto::Hid { id: hid_channel_write },
-            handles: proto::Handles::Handles(vec![proto::Hid { id: hid_passing_socket_a }]),
+            handle: proto::HandleId { id: hid_channel_write },
+            handles: proto::Handles::Handles(vec![proto::HandleId { id: hid_passing_socket_a }]),
             data,
         },
     );
     fdomain.read_channel(
         tid_read,
-        proto::ChannelReadChannelRequest { handle: proto::Hid { id: hid_channel_read } },
+        proto::ChannelReadChannelRequest { handle: proto::HandleId { id: hid_channel_read } },
     );
 
     let response_write = fdomain.next().await.unwrap();
@@ -292,15 +298,17 @@ async fn channel() {
     fdomain.read_socket(
         tid_read_fail,
         proto::SocketReadSocketRequest {
-            handle: proto::Hid { id: hid_passing_socket_a },
+            handle: proto::HandleId { id: hid_passing_socket_a },
             max_bytes: 1024,
         },
     );
 
     let response_read = fdomain.next().await.unwrap();
 
-    let FDomainEvent::SocketData(got_tid, Err(proto::Error::BadHid(proto::BadHid { id: got_id }))) =
-        response_read
+    let FDomainEvent::SocketData(
+        got_tid,
+        Err(proto::Error::BadHandleId(proto::BadHandleId { id: got_id })),
+    ) = response_read
     else {
         panic!();
     };
@@ -314,7 +322,7 @@ async fn channel() {
     fdomain.write_socket(
         tid_write_socket,
         proto::SocketWriteSocketRequest {
-            handle: proto::Hid { id: hid_passing_socket_b },
+            handle: proto::HandleId { id: hid_passing_socket_b },
             data: socket_data,
         },
     );
@@ -350,7 +358,7 @@ async fn channel() {
     let tid_close = 420.try_into().unwrap();
     fdomain.close(
         tid_close,
-        proto::FDomainCloseRequest { handles: vec![proto::Hid { id: hid_channel_read }] },
+        proto::FDomainCloseRequest { handles: vec![proto::HandleId { id: hid_channel_read }] },
     );
     let response_close = fdomain.next().await.unwrap();
     let FDomainEvent::ClosedHandle(got_tid, Ok(())) = response_close else {
@@ -363,7 +371,7 @@ async fn channel() {
     fdomain.write_channel(
         tid_write_fail,
         proto::ChannelWriteChannelRequest {
-            handle: proto::Hid { id: hid_channel_write },
+            handle: proto::HandleId { id: hid_channel_write },
             handles: proto::Handles::Handles(vec![]),
             data: b"greeble".to_vec(),
         },
@@ -386,7 +394,7 @@ async fn channel() {
     fdomain.write_channel(
         tid_write_fail_2nd,
         proto::ChannelWriteChannelRequest {
-            handle: proto::Hid { id: hid_channel_write },
+            handle: proto::HandleId { id: hid_channel_write },
             handles: proto::Handles::Handles(vec![]),
             data: b"greeble".to_vec(),
         },
@@ -405,7 +413,7 @@ async fn channel() {
 
     fdomain
         .acknowledge_write_error(proto::FDomainAcknowledgeWriteErrorRequest {
-            handle: proto::Hid { id: hid_channel_write },
+            handle: proto::HandleId { id: hid_channel_write },
         })
         .unwrap();
 
@@ -414,7 +422,7 @@ async fn channel() {
     fdomain.write_channel(
         tid_write_fail_3rd,
         proto::ChannelWriteChannelRequest {
-            handle: proto::Hid { id: hid_channel_write },
+            handle: proto::HandleId { id: hid_channel_write },
             handles: proto::Handles::Handles(vec![]),
             data: b"greeble".to_vec(),
         },
@@ -435,13 +443,15 @@ async fn channel() {
     let tid_read_fail = 105.try_into().unwrap();
     fdomain.read_channel(
         tid_read_fail,
-        proto::ChannelReadChannelRequest { handle: proto::Hid { id: hid_channel_read } },
+        proto::ChannelReadChannelRequest { handle: proto::HandleId { id: hid_channel_read } },
     );
 
     let response_read = fdomain.next().await.unwrap();
 
-    let FDomainEvent::ChannelData(got_tid, Err(proto::Error::BadHid(proto::BadHid { id: got_id }))) =
-        response_read
+    let FDomainEvent::ChannelData(
+        got_tid,
+        Err(proto::Error::BadHandleId(proto::BadHandleId { id: got_id })),
+    ) = response_read
     else {
         panic!();
     };
@@ -462,14 +472,14 @@ async fn bad_id() {
         .create_socket(proto::SocketCreateSocketRequest {
             options: proto::SocketType::Stream,
             handles: [
-                proto::NewHid { id: hid_socket_write },
-                proto::NewHid { id: hid_socket_read },
+                proto::NewHandleId { id: hid_socket_write },
+                proto::NewHandleId { id: hid_socket_read },
             ],
         })
         .err()
         .unwrap();
 
-    let proto::Error::NewHidOutOfRange(proto::NewHidOutOfRange { id: i }) = result else {
+    let proto::Error::NewHandleIdOutOfRange(proto::NewHandleIdOutOfRange { id: i }) = result else {
         panic!();
     };
 
@@ -487,16 +497,19 @@ async fn bad_channel_writes() {
 
     assert!(fdomain
         .create_channel(proto::ChannelCreateChannelRequest {
-            handles: [proto::NewHid { id: channel_hid_a }, proto::NewHid { id: channel_hid_b },],
+            handles: [
+                proto::NewHandleId { id: channel_hid_a },
+                proto::NewHandleId { id: channel_hid_b },
+            ],
         })
         .is_ok());
 
     fdomain.write_channel(
         tid,
         proto::ChannelWriteChannelRequest {
-            handle: proto::Hid { id: channel_hid_a },
+            handle: proto::HandleId { id: channel_hid_a },
             data: vec![],
-            handles: proto::Handles::Handles(vec![proto::Hid { id: garbage_hid }]),
+            handles: proto::Handles::Handles(vec![proto::HandleId { id: garbage_hid }]),
         },
     );
 
@@ -510,14 +523,14 @@ async fn bad_channel_writes() {
     assert_eq!(tid, got_tid);
     assert_eq!(1, errs.len());
     let err = *errs.pop().unwrap().unwrap();
-    let proto::Error::BadHid(proto::BadHid { id: got_id }) = err else {
+    let proto::Error::BadHandleId(proto::BadHandleId { id: got_id }) = err else {
         panic!();
     };
     assert_eq!(garbage_hid, got_id);
 
     assert!(fdomain
         .acknowledge_write_error(proto::FDomainAcknowledgeWriteErrorRequest {
-            handle: proto::Hid { id: channel_hid_a }
+            handle: proto::HandleId { id: channel_hid_a }
         })
         .is_ok());
 
@@ -529,7 +542,10 @@ async fn bad_channel_writes() {
     assert!(fdomain
         .create_socket(proto::SocketCreateSocketRequest {
             options: proto::SocketType::Stream,
-            handles: [proto::NewHid { id: socket_hid_a }, proto::NewHid { id: socket_hid_b },],
+            handles: [
+                proto::NewHandleId { id: socket_hid_a },
+                proto::NewHandleId { id: socket_hid_b },
+            ],
         })
         .is_ok());
 
@@ -538,8 +554,8 @@ async fn bad_channel_writes() {
         .replace(
             tid_replace,
             proto::FDomainReplaceRequest {
-                handle: proto::Hid { id: socket_hid_b },
-                new_handle: proto::NewHid { id: socket_hid_c },
+                handle: proto::HandleId { id: socket_hid_b },
+                new_handle: proto::NewHandleId { id: socket_hid_c },
                 rights: fidl::Rights::READ,
             },
         )
@@ -553,10 +569,10 @@ async fn bad_channel_writes() {
     fdomain.write_channel(
         tid,
         proto::ChannelWriteChannelRequest {
-            handle: proto::Hid { id: channel_hid_a },
+            handle: proto::HandleId { id: channel_hid_a },
             data: vec![],
             handles: proto::Handles::Dispositions(vec![proto::HandleDisposition {
-                handle: proto::HandleOp::Duplicate(proto::Hid { id: socket_hid_c }),
+                handle: proto::HandleOp::Duplicate(proto::HandleId { id: socket_hid_c }),
                 rights: fidl::Rights::SAME_RIGHTS,
             }]),
         },
@@ -580,7 +596,7 @@ async fn bad_channel_writes() {
 
     assert!(fdomain
         .acknowledge_write_error(proto::FDomainAcknowledgeWriteErrorRequest {
-            handle: proto::Hid { id: channel_hid_a }
+            handle: proto::HandleId { id: channel_hid_a }
         })
         .is_ok());
 
@@ -588,9 +604,9 @@ async fn bad_channel_writes() {
     fdomain.write_channel(
         tid,
         proto::ChannelWriteChannelRequest {
-            handle: proto::Hid { id: channel_hid_a },
+            handle: proto::HandleId { id: channel_hid_a },
             data: vec![],
-            handles: proto::Handles::Handles(vec![proto::Hid { id: channel_hid_a }]),
+            handles: proto::Handles::Handles(vec![proto::HandleId { id: channel_hid_a }]),
         },
     );
 
@@ -616,10 +632,12 @@ async fn event_signal() {
     let tid = 42.try_into().unwrap();
 
     assert!(fdomain
-        .create_event(proto::EventCreateEventRequest { handle: proto::NewHid { id: event_hid } })
+        .create_event(proto::EventCreateEventRequest {
+            handle: proto::NewHandleId { id: event_hid }
+        })
         .is_ok());
 
-    let event_hid = proto::Hid { id: event_hid };
+    let event_hid = proto::HandleId { id: event_hid };
 
     assert!(fdomain
         .signal(proto::FDomainSignalRequest {
@@ -654,12 +672,15 @@ async fn eventpair_signal() {
 
     assert!(fdomain
         .create_event_pair(proto::EventPairCreateEventPairRequest {
-            handles: [proto::NewHid { id: event_hid_a }, proto::NewHid { id: event_hid_b }]
+            handles: [
+                proto::NewHandleId { id: event_hid_a },
+                proto::NewHandleId { id: event_hid_b }
+            ]
         })
         .is_ok());
 
-    let event_hid_a = proto::Hid { id: event_hid_a };
-    let event_hid_b = proto::Hid { id: event_hid_b };
+    let event_hid_a = proto::HandleId { id: event_hid_a };
+    let event_hid_b = proto::HandleId { id: event_hid_b };
 
     assert!(fdomain
         .signal_peer(proto::FDomainSignalPeerRequest {
@@ -692,11 +713,13 @@ async fn duplicate_new_handles_fails() {
     let event_hid_b = 0;
 
     let result = fdomain.create_event_pair(proto::EventPairCreateEventPairRequest {
-        handles: [proto::NewHid { id: event_hid_a }, proto::NewHid { id: event_hid_b }],
+        handles: [proto::NewHandleId { id: event_hid_a }, proto::NewHandleId { id: event_hid_b }],
     });
 
-    let Err(proto::Error::NewHidReused(proto::NewHidReused { id: got_id, same_call: true })) =
-        result
+    let Err(proto::Error::NewHandleIdReused(proto::NewHandleIdReused {
+        id: got_id,
+        same_call: true,
+    })) = result
     else {
         panic!()
     };
@@ -713,22 +736,22 @@ async fn duplicate_socket() {
     assert!(fdomain
         .create_socket(proto::SocketCreateSocketRequest {
             options: proto::SocketType::Stream,
-            handles: [proto::NewHid { id: hid_a }, proto::NewHid { id: hid_b },],
+            handles: [proto::NewHandleId { id: hid_a }, proto::NewHandleId { id: hid_b },],
         })
         .is_ok());
 
-    let hid_a = proto::Hid { id: hid_a };
-    let hid_b = proto::Hid { id: hid_b };
+    let hid_a = proto::HandleId { id: hid_a };
+    let hid_b = proto::HandleId { id: hid_b };
 
     assert!(fdomain
         .duplicate(proto::FDomainDuplicateRequest {
             handle: hid_a,
-            new_handle: proto::NewHid { id: hid_c },
+            new_handle: proto::NewHandleId { id: hid_c },
             rights: fidl::Rights::SAME_RIGHTS,
         })
         .is_ok());
 
-    let hid_c = proto::Hid { id: hid_c };
+    let hid_c = proto::HandleId { id: hid_c };
 
     let tid_1 = 1.try_into().unwrap();
     let tid_2 = 2.try_into().unwrap();
@@ -833,11 +856,11 @@ async fn socket_disposition() {
     assert!(fdomain
         .create_socket(proto::SocketCreateSocketRequest {
             options: proto::SocketType::Stream,
-            handles: [proto::NewHid { id: hid_a }, proto::NewHid { id: hid_b },],
+            handles: [proto::NewHandleId { id: hid_a }, proto::NewHandleId { id: hid_b },],
         })
         .is_ok());
 
-    let hid_a = proto::Hid { id: hid_a };
+    let hid_a = proto::HandleId { id: hid_a };
 
     let tid_1 = 1.try_into().unwrap();
     let tid_2 = 2.try_into().unwrap();
@@ -902,12 +925,12 @@ async fn socket_disposition_peer() {
     assert!(fdomain
         .create_socket(proto::SocketCreateSocketRequest {
             options: proto::SocketType::Stream,
-            handles: [proto::NewHid { id: hid_a }, proto::NewHid { id: hid_b },],
+            handles: [proto::NewHandleId { id: hid_a }, proto::NewHandleId { id: hid_b },],
         })
         .is_ok());
 
-    let hid_a = proto::Hid { id: hid_a };
-    let hid_b = proto::Hid { id: hid_b };
+    let hid_a = proto::HandleId { id: hid_a };
+    let hid_b = proto::HandleId { id: hid_b };
 
     let tid_1 = 1.try_into().unwrap();
     let tid_2 = 2.try_into().unwrap();
@@ -972,12 +995,12 @@ async fn socket_async_read() {
     assert!(fdomain
         .create_socket(proto::SocketCreateSocketRequest {
             options: proto::SocketType::Stream,
-            handles: [proto::NewHid { id: hid_a }, proto::NewHid { id: hid_b },],
+            handles: [proto::NewHandleId { id: hid_a }, proto::NewHandleId { id: hid_b },],
         })
         .is_ok());
 
-    let hid_a = proto::Hid { id: hid_a };
-    let hid_b = proto::Hid { id: hid_b };
+    let hid_a = proto::HandleId { id: hid_a };
+    let hid_b = proto::HandleId { id: hid_b };
 
     let tid_1 = 1.try_into().unwrap();
     let tid_2 = 2.try_into().unwrap();
@@ -1057,12 +1080,12 @@ async fn socket_async_read_detect_close() {
     assert!(fdomain
         .create_socket(proto::SocketCreateSocketRequest {
             options: proto::SocketType::Stream,
-            handles: [proto::NewHid { id: hid_a }, proto::NewHid { id: hid_b },],
+            handles: [proto::NewHandleId { id: hid_a }, proto::NewHandleId { id: hid_b },],
         })
         .is_ok());
 
-    let hid_a = proto::Hid { id: hid_a };
-    let hid_b = proto::Hid { id: hid_b };
+    let hid_a = proto::HandleId { id: hid_a };
+    let hid_b = proto::HandleId { id: hid_b };
 
     let tid_1 = 1.try_into().unwrap();
     let tid_2 = 2.try_into().unwrap();
@@ -1133,12 +1156,12 @@ async fn socket_async_read_stop() {
     assert!(fdomain
         .create_socket(proto::SocketCreateSocketRequest {
             options: proto::SocketType::Stream,
-            handles: [proto::NewHid { id: hid_a }, proto::NewHid { id: hid_b },],
+            handles: [proto::NewHandleId { id: hid_a }, proto::NewHandleId { id: hid_b },],
         })
         .is_ok());
 
-    let hid_a = proto::Hid { id: hid_a };
-    let hid_b = proto::Hid { id: hid_b };
+    let hid_a = proto::HandleId { id: hid_a };
+    let hid_b = proto::HandleId { id: hid_b };
 
     let tid_1 = 1.try_into().unwrap();
     let tid_2 = 2.try_into().unwrap();
@@ -1231,12 +1254,12 @@ async fn channel_async_read() {
 
     assert!(fdomain
         .create_channel(proto::ChannelCreateChannelRequest {
-            handles: [proto::NewHid { id: hid_a }, proto::NewHid { id: hid_b },],
+            handles: [proto::NewHandleId { id: hid_a }, proto::NewHandleId { id: hid_b },],
         })
         .is_ok());
 
-    let hid_a = proto::Hid { id: hid_a };
-    let hid_b = proto::Hid { id: hid_b };
+    let hid_a = proto::HandleId { id: hid_a };
+    let hid_b = proto::HandleId { id: hid_b };
 
     let tid_1 = 1.try_into().unwrap();
     let tid_2 = 2.try_into().unwrap();
@@ -1317,12 +1340,12 @@ async fn channel_async_read_detect_close() {
 
     assert!(fdomain
         .create_channel(proto::ChannelCreateChannelRequest {
-            handles: [proto::NewHid { id: hid_a }, proto::NewHid { id: hid_b },],
+            handles: [proto::NewHandleId { id: hid_a }, proto::NewHandleId { id: hid_b },],
         })
         .is_ok());
 
-    let hid_a = proto::Hid { id: hid_a };
-    let hid_b = proto::Hid { id: hid_b };
+    let hid_a = proto::HandleId { id: hid_a };
+    let hid_b = proto::HandleId { id: hid_b };
 
     let tid_1 = 1.try_into().unwrap();
     let tid_2 = 2.try_into().unwrap();
@@ -1393,12 +1416,12 @@ async fn channel_async_read_stop() {
 
     assert!(fdomain
         .create_channel(proto::ChannelCreateChannelRequest {
-            handles: [proto::NewHid { id: hid_a }, proto::NewHid { id: hid_b },],
+            handles: [proto::NewHandleId { id: hid_a }, proto::NewHandleId { id: hid_b },],
         })
         .is_ok());
 
-    let hid_a = proto::Hid { id: hid_a };
-    let hid_b = proto::Hid { id: hid_b };
+    let hid_a = proto::HandleId { id: hid_a };
+    let hid_b = proto::HandleId { id: hid_b };
 
     let tid_1 = 1.try_into().unwrap();
     let tid_2 = 2.try_into().unwrap();

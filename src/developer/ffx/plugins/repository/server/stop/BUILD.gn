@@ -5,12 +5,17 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_repository_server_stop") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
 
   args_sources = [ "src/args.rs" ]
-  args_deps = [ "//third_party/rust_crates:camino" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:camino",
+  ]
 
   sources = [ "src/lib.rs" ]
 
@@ -20,6 +25,7 @@ ffx_plugin("ffx_repository_server_stop") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/developer/ffx/lib/pkg",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",

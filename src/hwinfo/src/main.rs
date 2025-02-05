@@ -26,7 +26,7 @@ enum IncomingServices {
 
 #[fuchsia::main(logging_tags = ["hwinfo"])]
 async fn main() -> Result<(), Error> {
-    tracing::info!("Initiating Hwinfo Server...");
+    log::info!("Initiating Hwinfo Server...");
     let proxy = connect_to_protocol::<MiscFactoryStoreProviderMarker>()
         .expect("Failed to connect to MiscFactoryStoreProvider service");
     // Loading Device Info

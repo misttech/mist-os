@@ -8,4 +8,11 @@
             url: "fuchsia-boot:///minfs#meta/minfs.cm",
         },
     ],
+    offer: [
+        {
+            protocol: "fuchsia.scheduler.RoleManager",
+            from: "parent",
+            to: "#minfs",
+        },
+    ],
 }

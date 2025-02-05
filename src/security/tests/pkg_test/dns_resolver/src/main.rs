@@ -8,9 +8,9 @@ use fidl_fuchsia_net_name::{LookupRequest, LookupRequestStream, LookupResult};
 use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
 use futures::{StreamExt, TryStreamExt};
+use log::info;
 use security_pkg_test_util::config::load_config;
 use std::net::Ipv4Addr;
-use tracing::info;
 
 /// Flags for dns_resolver.
 #[derive(FromArgs, Debug, PartialEq)]
@@ -29,7 +29,7 @@ fn localhost() -> IpAddress {
 async fn main() {
     info!("Starting fake DNS component");
     let args @ Args { test_config_path } = &from_env();
-    info!(?args, "Initalizing fake DNS component");
+    info!(args:?; "Initalizing fake DNS component");
 
     let pkg_server_host = load_config(test_config_path).update_domain;
 
@@ -42,7 +42,7 @@ async fn main() {
                 match request {
                     LookupRequest::LookupIp { hostname, options: _, responder } => {
                         assert_eq!(pkg_server_host, hostname);
-                        info!(%hostname, localhost = ?localhost(), "LooupIp");
+                        info!(hostname:%, localhost:? = localhost(); "LooupIp");
                         responder
                             .send(Ok(&LookupResult {
                                 addresses: Some(vec![localhost()]),
@@ -52,7 +52,7 @@ async fn main() {
                     }
                     LookupRequest::LookupHostname { addr, responder } => {
                         assert_eq!(addr, localhost());
-                        info!(?addr, %pkg_server_host, "LookupHostname");
+                        info!(addr:?, pkg_server_host:%; "LookupHostname");
                         responder.send(Ok(&pkg_server_host)).unwrap();
                     }
                 }

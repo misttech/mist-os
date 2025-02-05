@@ -5,9 +5,9 @@
 #ifndef LIB_SYNC_INTERNAL_CONDITION_TEMPLATE_H_
 #define LIB_SYNC_INTERNAL_CONDITION_TEMPLATE_H_
 
-#include <zircon/syscalls.h>
 #include <lib/sync/completion.h>
 #include <lib/sync/internal/mutex-internal.h>
+#include <zircon/syscalls.h>
 
 namespace condition_impl_internal {
 
@@ -99,7 +99,7 @@ struct Waiter {
 //        In this case, |mutex_lock_err|, if not null, will be populated with an error code
 //        provided by the mutex implementation.
 template <typename Condition, typename Mutex>
-static inline zx_status_t timedwait(Condition* c, Mutex* mutex, zx_time_t deadline,
+static inline zx_status_t timedwait(Condition* c, Mutex* mutex, zx_instant_mono_t deadline,
                                     int* mutex_lock_err) __TA_NO_THREAD_SAFETY_ANALYSIS {
   sync_mutex_lock(reinterpret_cast<sync_mutex_t*>(&c->lock));
 

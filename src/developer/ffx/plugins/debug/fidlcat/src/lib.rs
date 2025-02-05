@@ -4,12 +4,14 @@
 
 use anyhow::Result;
 use errors::ffx_error;
+use ffx_config::EnvironmentContext;
 use ffx_debug_connect::{DebugAgentSocket, DebuggerProxy};
-use fho::{deferred, moniker, Deferred, FfxContext, FfxMain, FfxTool, SimpleWriter};
+use fho::{deferred, Deferred, FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_debugger::LauncherProxy;
 use fuchsia_async::unblock;
 use sdk::SdkVersion;
 use std::process::Command;
+use target_holders::moniker;
 
 struct ProcessArguments {
     arguments: Vec<String>,
@@ -50,7 +52,7 @@ impl ProcessArguments {
 pub struct FidlTool {
     #[command]
     cmd: ffx_debug_fidlcat_args::FidlcatCommand,
-    sdk: ffx_config::Sdk,
+    context: EnvironmentContext,
     #[with(deferred(moniker("/core/debugger")))]
     launcher_proxy: Deferred<LauncherProxy>,
 }
@@ -62,7 +64,8 @@ impl FfxMain for FidlTool {
     type Writer = SimpleWriter;
 
     async fn main(self, _writer: SimpleWriter) -> fho::Result<()> {
-        let Self { cmd, sdk, launcher_proxy } = self;
+        let Self { cmd, context, launcher_proxy } = self;
+        let sdk = context.get_sdk().user_message("Could not load currently active SDK")?;
 
         if let Err(e) = symbol_index::ensure_symbol_index_registered(&sdk) {
             tracing::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);

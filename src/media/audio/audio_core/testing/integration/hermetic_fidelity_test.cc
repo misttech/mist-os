@@ -293,9 +293,9 @@ AudioBuffer<OutputFormat> HermeticFidelityTest::GetRendererOutput(
         break;
     }
 
-    fuchsia::media::AudioRenderUsage usage = fuchsia::media::AudioRenderUsage::MEDIA;
+    auto usage = fuchsia::media::AudioRenderUsage2::MEDIA;
     if (path == RenderPath::Communication) {
-      usage = fuchsia::media::AudioRenderUsage::COMMUNICATION;
+      usage = fuchsia::media::AudioRenderUsage2::COMMUNICATION;
     }
     auto audio_renderer =
         CreateAudioRenderer(input_format, input_buffer_frames, usage, std::move(clock));

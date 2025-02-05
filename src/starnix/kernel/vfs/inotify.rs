@@ -23,7 +23,7 @@ use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, error, inotify_event, FIONREAD};
 use std::borrow::Cow;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::mem::size_of;
 use std::sync::atomic::{AtomicI32, Ordering};
 use zerocopy::IntoBytes;
@@ -55,7 +55,7 @@ pub struct InotifyWatcher {
 
 #[derive(Default)]
 pub struct InotifyWatchers {
-    watchers: Mutex<HashMap<FileHandleKey, InotifyWatcher>>,
+    watchers: Mutex<BTreeMap<FileHandleKey, InotifyWatcher>>,
 }
 
 #[derive(Default)]

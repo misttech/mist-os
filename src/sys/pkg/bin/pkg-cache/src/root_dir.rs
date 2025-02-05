@@ -48,7 +48,7 @@ impl BootfsThenBlobfs {
                 })
                 .collect::<Result<_, _>>()?,
             Err(e) => {
-                tracing::warn!(
+                log::warn!(
                     "error reading bootfs blobs directory, will treat as if empty {:#}",
                     anyhow::anyhow!(e)
                 );
@@ -91,9 +91,7 @@ impl package_directory::NonMetaStorage for BootfsThenBlobfs {
                     object_request.take().into_channel(),
                 )
                 .map_err(|e| {
-                    tracing::warn!(
-                        "Error calling open3 on bootfs blobs dir for blob {blob}: {e:?}"
-                    );
+                    log::warn!("Error calling open3 on bootfs blobs dir for blob {blob}: {e:?}");
                     zx::Status::INTERNAL
                 })
         } else {

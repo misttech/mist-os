@@ -53,7 +53,7 @@ typedef struct thread_data {
 typedef struct wait_data {
   zx_handle_t handle;
   zx_handle_t signals;
-  zx_duration_t timeout;
+  zx_duration_mono_t timeout;
   zx_status_t status;
 } wait_data_t;
 
@@ -70,7 +70,7 @@ static zx_handle_t event_handle;
 static void wait_readable(zx_handle_t handle, enum wait_result* result) {
   zx_signals_t pending;
   zx_signals_t signals = ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED;
-  zx_time_t deadline = ZX_TIME_INFINITE;
+  zx_instant_mono_t deadline = ZX_TIME_INFINITE;
   zx_status_t status = zx_object_wait_one(handle, signals, deadline, &pending);
   if (status == ZX_ERR_CANCELED) {
     *result = WAIT_CANCELLED;
@@ -90,7 +90,7 @@ static void wait_readable(zx_handle_t handle, enum wait_result* result) {
 static void wait_event_worker(zx_handle_t handle, enum wait_result* result) {
   zx_signals_t pending;
   zx_signals_t signals = ZX_EVENT_SIGNALED;
-  zx_time_t deadline = ZX_TIME_INFINITE;
+  zx_instant_mono_t deadline = ZX_TIME_INFINITE;
   zx_status_t status = zx_object_wait_one(handle, signals, deadline, &pending);
   if (status == ZX_ERR_CANCELED) {
     *result = WAIT_CANCELLED;

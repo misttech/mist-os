@@ -56,8 +56,11 @@ typedef struct zxio_ops {
                            size_t vector_count, zxio_flags_t flags, size_t* out_actual);
   zx_status_t (*seek)(zxio_t* io, zxio_seek_origin_t start, int64_t offset, size_t* out_offset);
   zx_status_t (*truncate)(zxio_t* io, uint64_t length);
-  zx_status_t (*flags_get)(zxio_t* io, uint32_t* out_flags);
-  zx_status_t (*flags_set)(zxio_t* io, uint32_t flags);
+  // TODO(https://fxbug.dev/376509077): Remove flags_get_deprecated/flags_set_deprecated.
+  zx_status_t (*flags_get_deprecated)(zxio_t* io, uint32_t* out_flags);
+  zx_status_t (*flags_set_deprecated)(zxio_t* io, uint32_t flags);
+  zx_status_t (*flags_get)(zxio_t* io, uint64_t* out_flags);
+  zx_status_t (*flags_set)(zxio_t* io, uint64_t flags);
   zx_status_t (*vmo_get)(zxio_t* io, zxio_vmo_flags_t flags, zx_handle_t* out_vmo);
   zx_status_t (*on_mapped)(zxio_t* io, void* ptr);
   zx_status_t (*get_read_buffer_available)(zxio_t* io, size_t* out_available);

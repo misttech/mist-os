@@ -109,7 +109,7 @@ use crate::object_store::{tree, DataObjectHandle, DirectWriter, HandleOptions, O
 use crate::range::RangeExt;
 use crate::round::{round_div, round_down, round_up};
 use crate::serialized_types::{
-    Version, Versioned, VersionedLatest, DEFAULT_MAX_SERIALIZED_RECORD_SIZE,
+    Version, Versioned, VersionedLatest, DEFAULT_MAX_SERIALIZED_RECORD_SIZE, LATEST_VERSION,
 };
 use anyhow::{anyhow, bail, ensure, Context, Error};
 use async_trait::async_trait;
@@ -1442,7 +1442,7 @@ impl Allocator {
                             [std::cmp::min(63, (len / self.block_size) as usize)] += 1;
                     }
                     Err(err) => {
-                        error!(%err, "Likely filesystem corruption.");
+                        error!(err:%; "Likely filesystem corruption.");
                         return Err(err.into());
                     }
                     Ok(x) => {
@@ -1459,7 +1459,7 @@ impl Allocator {
             }
         };
 
-        debug!(device_range = ?result, "allocate");
+        debug!(device_range:? = result; "allocate");
 
         let len = result.length().unwrap();
         let reservation_owner = reservation.either(
@@ -1565,7 +1565,7 @@ impl Allocator {
         owner_object_id: u64,
         dealloc_range: Range<u64>,
     ) -> Result<u64, Error> {
-        debug!(device_range = ?dealloc_range, "deallocate");
+        debug!(device_range:? = dealloc_range; "deallocate");
         ensure!(dealloc_range.is_valid(), FxfsError::InvalidArgs);
         // We don't currently support sharing of allocations (value.count always equals 1), so as
         // long as we can assume the deallocated range is actually allocated, we can avoid device
@@ -1899,9 +1899,10 @@ impl JournalingObject for Allocator {
     async fn flush(&self) -> Result<Version, Error> {
         let filesystem = self.filesystem.upgrade().unwrap();
         let object_manager = filesystem.object_manager();
-        if !object_manager.needs_flush(self.object_id()) {
+        let earliest_version = self.tree.get_earliest_version();
+        if !object_manager.needs_flush(self.object_id()) && earliest_version == LATEST_VERSION {
             // Early exit, but still return the earliest version used by a struct in the tree
-            return Ok(self.tree.get_earliest_version());
+            return Ok(earliest_version);
         }
 
         let fs = self.filesystem.upgrade().unwrap();
@@ -2065,7 +2066,7 @@ impl<'a> Flusher<'a> {
             .await?;
         let mut serialized_info = Vec::new();
 
-        debug!(oid = layer_object_handle.object_id(), "new allocator layer file");
+        debug!(oid = layer_object_handle.object_id(); "new allocator layer file");
         object_handle = ObjectStore::open_object(
             &root_store,
             self.allocator.object_id(),
@@ -2352,20 +2353,30 @@ mod tests {
         let mut transaction =
             fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         let mut device_ranges = collect_allocations(&allocator).await;
+
+        // Expected extents:
+        let expected = vec![
+            0..4096,        // Superblock A
+            4096..139264,   // Superblock A extension
+            139264..204800, // Superblock B extension
+            204800..335872, // Initial Journal
+            524288..528384, // Superblock B extension
+        ];
+        assert_eq!(device_ranges, expected);
         device_ranges.push(
             allocator
                 .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
                 .await
                 .expect("allocate failed"),
         );
-        assert_eq!(device_ranges.last().unwrap().length().expect("Invalid range"), fs.block_size(),);
+        assert_eq!(device_ranges.last().unwrap().length().expect("Invalid range"), fs.block_size());
         device_ranges.push(
             allocator
                 .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
                 .await
                 .expect("allocate failed"),
         );
-        assert_eq!(device_ranges.last().unwrap().length().expect("Invalid range"), fs.block_size(),);
+        assert_eq!(device_ranges.last().unwrap().length().expect("Invalid range"), fs.block_size());
         assert_eq!(overlap(&device_ranges[0], &device_ranges[1]), 0);
         transaction.commit().await.expect("commit failed");
         let mut transaction =
@@ -2376,9 +2387,9 @@ mod tests {
                 .await
                 .expect("allocate failed"),
         );
-        assert_eq!(device_ranges[2].length().unwrap(), fs.block_size());
-        assert_eq!(overlap(&device_ranges[0], &device_ranges[2]), 0);
-        assert_eq!(overlap(&device_ranges[1], &device_ranges[2]), 0);
+        assert_eq!(device_ranges[7].length().expect("Invalid range"), fs.block_size());
+        assert_eq!(overlap(&device_ranges[5], &device_ranges[7]), 0);
+        assert_eq!(overlap(&device_ranges[6], &device_ranges[7]), 0);
         transaction.commit().await.expect("commit failed");
 
         check_allocations(&allocator, &device_ranges).await;

@@ -99,6 +99,9 @@ impl FxDirectory {
         request: &ObjectRequest,
     ) -> Result<OpenedNode<dyn FxNode>, Error> {
         if path.is_empty() {
+            if protocols.create_unnamed_temporary_in_directory_path() {
+                bail!(FxfsError::NotSupported)
+            }
             return Ok(OpenedNode::new(self.clone()));
         }
         let store = self.store();
@@ -118,6 +121,9 @@ impl FxDirectory {
             )];
             let transaction_or_guard =
                 if last_segment && protocols.creation_mode() != vfs::CreationMode::Never {
+                    if protocols.create_unnamed_temporary_in_directory_path() {
+                        bail!(FxfsError::NotSupported)
+                    }
                     Left(fs.clone().new_transaction(keys, Options::default()).await?)
                 } else {
                     // When child objects are created, the object is created along with the
@@ -284,6 +290,25 @@ impl FxDirectory {
         self.watchers.lock().unwrap().send_event(&mut SingleNameEventProducer::added(name));
     }
 
+    /// As per fscrypt, a user cannot link an unencrypted file into an encrypted directory nor can
+    /// a user link an encrypted file into a directory encrypted with a different key. Appropriate
+    /// locks must be held by the caller.
+    pub fn check_fscrypt_hard_link_conditions(
+        &self,
+        source_wrapping_key_id: Option<u128>,
+    ) -> Result<(), zx::Status> {
+        match (self.directory().wrapping_key_id(), source_wrapping_key_id) {
+            (None, None) | (None, Some(_)) => {}
+            (Some(_), None) => return Err(zx::Status::BAD_STATE),
+            (Some(target_id), Some(src_id)) => {
+                if target_id != src_id {
+                    return Err(zx::Status::BAD_STATE);
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) async fn link_object(
         &self,
         mut transaction: Transaction<'_>,
@@ -318,34 +343,48 @@ impl FxDirectory {
     ) -> Result<(), zx::Status> {
         let source_dir = source_dir.downcast::<Self>().unwrap();
         let store = self.store();
-        let fs = store.filesystem().clone();
-        let source_id =
+        let mut source_id =
             match source_dir.directory.lookup(source_name).await.map_err(map_to_status)? {
                 Some((object_id, ObjectDescriptor::File)) => object_id,
                 None => return Err(zx::Status::NOT_FOUND),
                 _ => return Err(zx::Status::NOT_SUPPORTED),
             };
-        // We don't need a lock on the source directory, as it will be unchanged (unless it is the
-        // same as the destination directory). We just need a lock on the source object to ensure
-        // that it hasn't been simultaneously unlinked. We need that lock anyway to update the ref
-        // count.
-        let transaction = fs
-            .new_transaction(
-                lock_keys![
-                    LockKey::object(store.store_object_id(), self.object_id()),
-                    LockKey::object(store.store_object_id(), source_id),
-                ],
-                Options::default(),
-            )
-            .await
-            .map_err(map_to_status)?;
-        // Ensure under lock that the file still exists there.
-        match source_dir.directory.lookup(source_name).await.map_err(map_to_status)? {
-            Some((_, ObjectDescriptor::File)) => {}
-            None => return Err(zx::Status::NOT_FOUND),
-            _ => return Err(zx::Status::NOT_SUPPORTED),
-        };
-        self.link_object(transaction, &name, source_id, ObjectDescriptor::File).await
+        loop {
+            // We don't need a lock on the source directory, as it will be unchanged (unless it is
+            // the same as the destination directory). We just need a lock on the source object to
+            // ensure that it hasn't been simultaneously unlinked. This may race with a rename of
+            // the source file to somewhere else but that shouldn't matter. We need that lock anyway
+            // to update the ref count. Note, fscrypt does not require the source directory to be
+            // locked because a directory's wrapping key cannot change once the directory has
+            // entries.
+            let fs = store.filesystem();
+            let transaction = fs
+                .new_transaction(
+                    lock_keys![
+                        LockKey::object(store.store_object_id(), self.object_id()),
+                        LockKey::object(store.store_object_id(), source_id),
+                    ],
+                    Options::default(),
+                )
+                .await
+                .map_err(map_to_status)?;
+            self.check_fscrypt_hard_link_conditions(source_dir.directory().wrapping_key_id())?;
+            // Ensure under lock that the file still exists there.
+            match source_dir.directory.lookup(source_name).await.map_err(map_to_status)? {
+                Some((new_id, ObjectDescriptor::File)) => {
+                    if new_id == source_id {
+                        // We found the object that we got a lock on, it is still valid.
+                        return self
+                            .link_object(transaction, &name, source_id, ObjectDescriptor::File)
+                            .await;
+                    } else {
+                        source_id = new_id
+                    }
+                }
+                None => return Err(zx::Status::NOT_FOUND),
+                _ => return Err(zx::Status::NOT_SUPPORTED),
+            }
+        }
     }
 
     async fn rename_impl(
@@ -537,7 +576,7 @@ impl MutableDirectory for FxDirectory {
                 // If purging fails , we should still return success, since the file will appear
                 // unlinked at this point anyways.  The file should be cleaned up on a later mount.
                 if let Err(e) = self.volume().maybe_purge_file(id).await {
-                    warn!(error = ?e, "Failed to purge file");
+                    warn!(error:? = e; "Failed to purge file");
                 }
             }
             ReplacedChild::Directory(id) => {
@@ -754,15 +793,13 @@ impl VfsDirectory for FxDirectory {
                     )
                 } else if node.is::<FxFile>() {
                     let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
-                    if flags.contains(fio::OpenFlags::RIGHT_WRITABLE) && node.verified_file() {
-                        tracing::error!(
-                            "Tried to open a verified file with the RIGHT_WRITABLE flag."
-                        );
+                    if flags.contains(fio::OpenFlags::RIGHT_WRITABLE) && node.is_verified_file() {
+                        log::error!("Tried to open a verified file with the RIGHT_WRITABLE flag.");
                         return Err(zx::Status::NOT_SUPPORTED);
                     }
                     if flags.contains(fio::OpenFlags::BLOCK_DEVICE) {
-                        if node.verified_file() {
-                            tracing::error!("Tried to expose a verified file as a block device.");
+                        if node.is_verified_file() {
+                            log::error!("Tried to expose a verified file as a block device.");
                             return Err(zx::Status::NOT_SUPPORTED);
                         }
                         let mut server =
@@ -920,7 +957,7 @@ impl VfsDirectory for FxDirectory {
                 let mut iter = match self.directory.iter_from(&mut merger, "").await {
                     Ok(iter) => iter,
                     Err(e) => {
-                        error!(error = ?e, "Failed to iterate directory for watch",);
+                        error!(error:? = e; "Failed to iterate directory for watch",);
                         // TODO(https://fxbug.dev/42178164): This really should close the watcher connection
                         // with an epitaph so that the watcher knows.
                         return;
@@ -932,7 +969,7 @@ impl VfsDirectory for FxDirectory {
                 while let Some((name, _, _)) = iter.get() {
                     controller.send_event(&mut SingleNameEventProducer::existing(name));
                     if let Err(e) = iter.advance().await {
-                        error!(error = ?e, "Failed to iterate directory for watch",);
+                        error!(error:? = e; "Failed to iterate directory for watch",);
                         return;
                     }
                 }
@@ -965,7 +1002,8 @@ mod tests {
     use fidl::endpoints::{create_proxy, ClientEnd, Proxy, ServerEnd};
     use fuchsia_fs::directory::{DirEntry, DirentKind};
     use fuchsia_fs::file;
-    use futures::StreamExt;
+    use futures::{join, StreamExt};
+    use fxfs::object_store::transaction::{lock_keys, LockKey};
     use fxfs::object_store::Timestamp;
     use fxfs_crypto::FSCRYPT_PADDING;
     use fxfs_insecure_crypto::InsecureCrypt;
@@ -2210,6 +2248,409 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn test_link_into_locked_directory_fails() {
+        let fixture = TestFixture::new().await;
+        let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
+        let root = fixture.root();
+        let open_dir_1 = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+        };
+
+        let parent_1: Arc<fio::DirectoryProxy> = Arc::new(open_dir_1().await);
+
+        let open_dir_2 = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo_2",
+            )
+        };
+        let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
+
+        let wrapping_key_id = 2;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        parent_1
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+        parent_2
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+        let file = open_file_checked(parent_1.as_ref(), fio::OpenFlags::CREATE, "fee").await;
+
+        close_file_checked(file).await;
+        close_dir_checked(Arc::try_unwrap(parent_1).unwrap()).await;
+        close_dir_checked(Arc::try_unwrap(parent_2).unwrap()).await;
+
+        let device = fixture.close().await;
+        let new_fixture = TestFixture::new_with_device(device).await;
+        let root = new_fixture.root();
+        let open_dir_1 = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+        };
+        let parent_1: Arc<fio::DirectoryProxy> = Arc::new(open_dir_1().await);
+
+        let open_dir_2 = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo_2",
+            )
+        };
+        let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
+
+        let readdir = |dir: Arc<fio::DirectoryProxy>| async move {
+            let status = dir.rewind().await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("rewind failed");
+            let (status, buf) = dir.read_dirents(fio::MAX_BUF).await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("read_dirents failed");
+            let mut entries = vec![];
+            for res in fuchsia_fs::directory::parse_dir_entries(&buf) {
+                entries.push(res.expect("Failed to parse entry"));
+            }
+            entries
+        };
+
+        let encrypted_entries = readdir(Arc::clone(&parent_1)).await;
+        let mut encrypted_name = String::new();
+        for entry in encrypted_entries {
+            if entry.name == ".".to_owned() {
+                continue;
+            } else {
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
+                encrypted_name = entry.name;
+                assert!(entry.kind == DirentKind::File)
+            }
+        }
+
+        let (status, parent_2_token) = parent_2.get_token().await.expect("get token failed");
+        zx::Status::ok(status).unwrap();
+
+        assert_eq!(
+            parent_1
+                .link(&encrypted_name, parent_2_token.unwrap().into(), "file_2")
+                .await
+                .expect("FIDL transport error"),
+            zx::Status::ACCESS_DENIED.into_raw()
+        );
+
+        close_dir_checked(Arc::try_unwrap(parent_1).unwrap()).await;
+        close_dir_checked(Arc::try_unwrap(parent_2).unwrap()).await;
+        new_fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_link_encrypted_file_into_directory_encrypted_with_different_key_fails() {
+        let fixture = TestFixture::new().await;
+        let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
+        let root = fixture.root();
+        let open_dir_1 = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+        };
+
+        let parent_1: Arc<fio::DirectoryProxy> = Arc::new(open_dir_1().await);
+
+        let open_dir_2 = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo_2",
+            )
+        };
+        let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
+
+        let wrapping_key_id = 2;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+
+        let wrapping_key_id_2 = 3;
+        crypt.add_wrapping_key(wrapping_key_id_2, [2; 32]);
+
+        parent_1
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+        parent_2
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id_2.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+        let file = open_file_checked(parent_1.as_ref(), fio::OpenFlags::CREATE, "fee").await;
+
+        close_file_checked(file).await;
+
+        let (status, parent_2_token) = parent_2.get_token().await.expect("get token failed");
+        zx::Status::ok(status).unwrap();
+
+        assert_eq!(
+            parent_1
+                .link("fee", parent_2_token.unwrap().into(), "file_2")
+                .await
+                .expect("FIDL transport error"),
+            zx::Status::BAD_STATE.into_raw()
+        );
+        close_dir_checked(Arc::try_unwrap(parent_1).unwrap()).await;
+        close_dir_checked(Arc::try_unwrap(parent_2).unwrap()).await;
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_link_unencrypted_file_into_encrypted_directory_fails() {
+        let fixture = TestFixture::new().await;
+        let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
+        let root = fixture.root();
+        let open_dir_1 = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+        };
+
+        let parent_1: Arc<fio::DirectoryProxy> = Arc::new(open_dir_1().await);
+
+        let open_dir_2 = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo_2",
+            )
+        };
+        let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
+
+        let wrapping_key_id = 2;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+
+        parent_1
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+
+        let file = open_file_checked(parent_2.as_ref(), fio::OpenFlags::CREATE, "fee").await;
+
+        close_file_checked(file).await;
+
+        let (status, parent_1_token) = parent_1.get_token().await.expect("get token failed");
+        zx::Status::ok(status).unwrap();
+
+        assert_eq!(
+            parent_2
+                .link("fee", parent_1_token.unwrap().into(), "file")
+                .await
+                .expect("FIDL transport error"),
+            zx::Status::BAD_STATE.into_raw()
+        );
+        close_dir_checked(Arc::try_unwrap(parent_1).unwrap()).await;
+        close_dir_checked(Arc::try_unwrap(parent_2).unwrap()).await;
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_link_locked_directory_into_unencrypted_dir() {
+        let fixture = TestFixture::new().await;
+        let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
+        let root = fixture.root();
+        let open_dir_1 = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+        };
+
+        let parent_1: Arc<fio::DirectoryProxy> = Arc::new(open_dir_1().await);
+
+        let open_dir_2 = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo_2",
+            )
+        };
+        let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
+
+        let wrapping_key_id = 2;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        parent_1
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+        let file = open_file_checked(
+            parent_1.as_ref(),
+            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
+            "fee",
+        )
+        .await;
+        let _ = file
+            .write(&[8; 8192])
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::Status::from_raw)
+            .expect("write failed");
+
+        close_file_checked(file).await;
+        close_dir_checked(Arc::try_unwrap(parent_1).unwrap()).await;
+        close_dir_checked(Arc::try_unwrap(parent_2).unwrap()).await;
+
+        let device = fixture.close().await;
+        let new_fixture = TestFixture::new_with_device(device).await;
+        let root = new_fixture.root();
+        let open_dir_1 = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+        };
+        let parent_1: Arc<fio::DirectoryProxy> = Arc::new(open_dir_1().await);
+
+        let open_dir_2 = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo_2",
+            )
+        };
+        let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
+
+        let readdir = |dir: Arc<fio::DirectoryProxy>| async move {
+            let status = dir.rewind().await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("rewind failed");
+            let (status, buf) = dir.read_dirents(fio::MAX_BUF).await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("read_dirents failed");
+            let mut entries = vec![];
+            for res in fuchsia_fs::directory::parse_dir_entries(&buf) {
+                entries.push(res.expect("Failed to parse entry"));
+            }
+            entries
+        };
+
+        let encrypted_entries = readdir(Arc::clone(&parent_1)).await;
+        let mut encrypted_name = String::new();
+        for entry in encrypted_entries {
+            if entry.name == ".".to_owned() {
+                continue;
+            } else {
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
+                encrypted_name = entry.name;
+                assert!(entry.kind == DirentKind::File)
+            }
+        }
+
+        let (status, parent_2_token) = parent_2.get_token().await.expect("get token failed");
+        zx::Status::ok(status).unwrap();
+
+        assert_eq!(
+            parent_1
+                .link(&encrypted_name, parent_2_token.unwrap().into(), "file_2")
+                .await
+                .expect("FIDL transport error"),
+            zx::Status::OK.into_raw()
+        );
+
+        let file =
+            open_file_checked(parent_2.as_ref(), fio::OpenFlags::RIGHT_READABLE, "file_2").await;
+        let (mutable_attributes, _immutable_attributes) = file
+            .get_attributes(
+                fio::NodeAttributesQuery::CONTENT_SIZE
+                    | fio::NodeAttributesQuery::STORAGE_SIZE
+                    | fio::NodeAttributesQuery::LINK_COUNT
+                    | fio::NodeAttributesQuery::MODIFICATION_TIME
+                    | fio::NodeAttributesQuery::CHANGE_TIME
+                    | fio::NodeAttributesQuery::WRAPPING_KEY_ID,
+            )
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::Status::from_raw)
+            .expect("get_attributes failed");
+        assert_eq!(mutable_attributes.wrapping_key_id, Some(wrapping_key_id.to_le_bytes()));
+        assert_eq!(
+            file.read(fio::MAX_BUF)
+                .await
+                .expect("FIDL call failed")
+                .expect_err("reading an encrypted file should fail"),
+            zx::Status::BAD_STATE.into_raw()
+        );
+
+        close_dir_checked(Arc::try_unwrap(parent_1).unwrap()).await;
+        close_dir_checked(Arc::try_unwrap(parent_2).unwrap()).await;
+        new_fixture.close().await;
+    }
+
+    #[fuchsia::test]
     async fn test_encrypted_filename_does_not_have_slashes() {
         let fixture = TestFixture::new().await;
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
@@ -2707,6 +3148,135 @@ mod tests {
             );
         }
 
+        fixture.close().await;
+    }
+
+    // Creates two files in an inner directory and creates a race between linking the first file
+    // into another directory and renaming the second file over the first file. There is naive
+    // TOCTOU bug since we need to take a lock on the source file being linked but we have to look
+    // up what that file id is before we take any locks.
+    #[fuchsia::test]
+    async fn test_race_hard_link_with_unlink() {
+        let fixture = TestFixture::new().await;
+        {
+            let root = fixture.root();
+
+            let inner = open_dir_checked(
+                root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "bar",
+            )
+            .await;
+            let inner2 = open_dir_checked(
+                &inner,
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                ".",
+            )
+            .await;
+
+            let file = open_file_checked(
+                &inner,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::NOT_DIRECTORY,
+                "foo",
+            )
+            .await;
+            assert_eq!(
+                file.write("valid".as_bytes()).await.expect("FIDL failed").expect("Write success"),
+                5
+            );
+            close_file_checked(file).await;
+
+            let file = open_file_checked(
+                &inner,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::NOT_DIRECTORY,
+                "foo2",
+            )
+            .await;
+            assert_eq!(
+                file.write("valid".as_bytes()).await.expect("FIDL failed").expect("Write success"),
+                5
+            );
+            close_file_checked(file).await;
+
+            let inner_token = inner
+                .get_token()
+                .await
+                .expect("fidl failed")
+                .1
+                .expect("get_token returned no handle");
+            let root_token = root
+                .get_token()
+                .await
+                .expect("fidl failed")
+                .1
+                .expect("get_token returned no handle");
+
+            // Takes the lock on the destination dir of the link. Causing it to stall while trying
+            // take the requisite lock to add a child there. A lock also needs to be taken on the
+            // object being linked which will interfere with the rename call 50% of the time. Which
+            // lock gets taken first depends on the sort order, which will be dependent on the
+            // object ids for the two objects. So 50% of the time, this test can spuriously pass.
+            let write_lock = fixture
+                .fs()
+                .lock_manager()
+                .write_lock(lock_keys![LockKey::object(
+                    fixture.volume().volume().store().store_object_id(),
+                    fixture.volume().root_dir().directory().object_id()
+                )])
+                .await;
+
+            join!(
+                async move {
+                    // Ensure that the other the link task can stay blocked while locking until
+                    // renaming is complete.
+                    fasync::Timer::new(Duration::from_millis(50)).await;
+                    let _lock = write_lock;
+                },
+                async move {
+                    // Give time for the link call to do some initial lookups that the rename will
+                    // invalidate.
+                    fasync::Timer::new(Duration::from_millis(25)).await;
+                    inner
+                        .rename("foo2", inner_token.into(), "foo")
+                        .await
+                        .expect("FIDL call failed")
+                        .expect("Rename failed");
+                },
+                async move {
+                    // This link should always succeed. Since the rename should be atomic, we
+                    // should either link in the old file or the new.
+                    assert_eq!(
+                        inner2.link("foo", root_token, "baz").await.expect("Fidl call"),
+                        zx::Status::OK.into_raw()
+                    );
+                }
+            );
+        }
+
+        // Ensure that the file contents can be read back. If a race in object management happens
+        // it may resurrect the object in the tree, but the extents will all still be missing.
+        let file = open_file_checked(
+            fixture.root(),
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            "baz",
+        )
+        .await;
+        let buff = file.read(5).await.expect("FIDL failed").expect("Read failed");
+        close_file_checked(file).await;
+        assert_eq!(buff.as_slice(), "valid".as_bytes());
         fixture.close().await;
     }
 

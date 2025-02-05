@@ -86,9 +86,9 @@ rustc_binary("font_provider") {
     "//third_party/rust_crates:heck",
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:lazy_static",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:unicase",
   ]
 

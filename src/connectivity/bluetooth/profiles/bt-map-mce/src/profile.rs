@@ -10,9 +10,9 @@ use bt_obex::profile::{
 use bt_obex::server::TransportType;
 use fuchsia_bluetooth::profile::*;
 use fuchsia_bluetooth::types::Uuid;
+use log::trace;
 use profile_client::ProfileClient;
 use std::collections::HashSet;
-use tracing::trace;
 use {fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr};
 
 /// Arbitrary PSM value based on the dynamic range described in

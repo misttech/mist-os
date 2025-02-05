@@ -81,7 +81,7 @@ where
 
 #[derive(Clone, Debug)]
 pub enum EmptyFlexibleUnion {
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for EmptyFlexibleUnion {
@@ -100,7 +100,7 @@ where
         ::fidl_next::munge!(let WireEmptyFlexibleUnion { raw, _phantom: _ } = slot);
 
         match self {
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -163,24 +163,24 @@ pub struct WireEmptyFlexibleUnion {
 
 pub mod empty_flexible_union {
     pub enum Ref {
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut {
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
 impl WireEmptyFlexibleUnion {
     pub fn as_ref(&self) -> crate::empty_flexible_union::Ref {
         match self.raw.ordinal() {
-            unknown => crate::empty_flexible_union::Ref::UnknownOrdinal(unknown),
+            unknown => crate::empty_flexible_union::Ref::UnknownOrdinal_(unknown),
         }
     }
 
     pub fn as_mut(&mut self) -> crate::empty_flexible_union::Mut {
         match self.raw.ordinal() {
-            unknown => crate::empty_flexible_union::Mut::UnknownOrdinal(unknown),
+            unknown => crate::empty_flexible_union::Mut::UnknownOrdinal_(unknown),
         }
     }
 }
@@ -198,7 +198,7 @@ impl Clone for WireEmptyFlexibleUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireEmptyFlexibleUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -290,7 +290,7 @@ impl Clone for WireOptionalEmptyFlexibleUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalEmptyFlexibleUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -318,7 +318,7 @@ pub enum ExplicitFlexibleUnion {
 
     F(f32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for ExplicitFlexibleUnion {
@@ -349,7 +349,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, f32>(value, 4, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -426,7 +426,7 @@ pub mod explicit_flexible_union {
 
         F(&'union ::fidl_next::f32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
@@ -434,7 +434,7 @@ pub mod explicit_flexible_union {
 
         F(&'union mut ::fidl_next::f32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -449,7 +449,7 @@ impl<'buf> WireExplicitFlexibleUnion<'buf> {
                 crate::explicit_flexible_union::Ref::F(unsafe { self.raw.get().deref_unchecked() })
             }
 
-            unknown => crate::explicit_flexible_union::Ref::UnknownOrdinal(unknown),
+            unknown => crate::explicit_flexible_union::Ref::UnknownOrdinal_(unknown),
         }
     }
 
@@ -463,7 +463,7 @@ impl<'buf> WireExplicitFlexibleUnion<'buf> {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            unknown => crate::explicit_flexible_union::Mut::UnknownOrdinal(unknown),
+            unknown => crate::explicit_flexible_union::Mut::UnknownOrdinal_(unknown),
         }
     }
 }
@@ -591,7 +591,7 @@ pub enum ExplicitFoo {
 
     S(String),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for ExplicitFoo {
@@ -622,7 +622,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, String>(value, 2, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -697,7 +697,7 @@ pub mod explicit_foo {
 
         S(&'union ::fidl_next::WireString<'buf>),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union, 'buf> {
@@ -705,7 +705,7 @@ pub mod explicit_foo {
 
         S(&'union mut ::fidl_next::WireString<'buf>),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -716,7 +716,7 @@ impl<'buf> WireExplicitFoo<'buf> {
 
             2 => crate::explicit_foo::Ref::S(unsafe { self.raw.get().deref_unchecked() }),
 
-            unknown => crate::explicit_foo::Ref::UnknownOrdinal(unknown),
+            unknown => crate::explicit_foo::Ref::UnknownOrdinal_(unknown),
         }
     }
 
@@ -726,7 +726,7 @@ impl<'buf> WireExplicitFoo<'buf> {
 
             2 => crate::explicit_foo::Mut::S(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
 
-            unknown => crate::explicit_foo::Mut::UnknownOrdinal(unknown),
+            unknown => crate::explicit_foo::Mut::UnknownOrdinal_(unknown),
         }
     }
 }
@@ -1979,7 +1979,7 @@ impl Clone for WireFieldCollision {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireFieldCollision
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -2080,7 +2080,7 @@ impl Clone for WireOptionalFieldCollision {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalFieldCollision
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -2114,7 +2114,7 @@ pub enum FlexibleFoo {
 
     I(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for FlexibleFoo {
@@ -2145,7 +2145,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 2, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -2220,7 +2220,7 @@ pub mod flexible_foo {
 
         I(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union, 'buf> {
@@ -2228,7 +2228,7 @@ pub mod flexible_foo {
 
         I(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -2239,7 +2239,7 @@ impl<'buf> WireFlexibleFoo<'buf> {
 
             2 => crate::flexible_foo::Ref::I(unsafe { self.raw.get().deref_unchecked() }),
 
-            unknown => crate::flexible_foo::Ref::UnknownOrdinal(unknown),
+            unknown => crate::flexible_foo::Ref::UnknownOrdinal_(unknown),
         }
     }
 
@@ -2249,7 +2249,7 @@ impl<'buf> WireFlexibleFoo<'buf> {
 
             2 => crate::flexible_foo::Mut::I(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
 
-            unknown => crate::flexible_foo::Mut::UnknownOrdinal(unknown),
+            unknown => crate::flexible_foo::Mut::UnknownOrdinal_(unknown),
         }
     }
 }
@@ -2382,7 +2382,7 @@ pub enum FlexiblePizzaOrPasta {
 
     Pasta(crate::Pasta),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for FlexiblePizzaOrPasta {
@@ -2413,7 +2413,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, crate::Pasta>(value, 2, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -2490,7 +2490,7 @@ pub mod flexible_pizza_or_pasta {
 
         Pasta(&'union crate::WirePasta<'buf>),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union, 'buf> {
@@ -2498,7 +2498,7 @@ pub mod flexible_pizza_or_pasta {
 
         Pasta(&'union mut crate::WirePasta<'buf>),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -2513,7 +2513,7 @@ impl<'buf> WireFlexiblePizzaOrPasta<'buf> {
                 self.raw.get().deref_unchecked()
             }),
 
-            unknown => crate::flexible_pizza_or_pasta::Ref::UnknownOrdinal(unknown),
+            unknown => crate::flexible_pizza_or_pasta::Ref::UnknownOrdinal_(unknown),
         }
     }
 
@@ -2527,7 +2527,7 @@ impl<'buf> WireFlexiblePizzaOrPasta<'buf> {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            unknown => crate::flexible_pizza_or_pasta::Mut::UnknownOrdinal(unknown),
+            unknown => crate::flexible_pizza_or_pasta::Mut::UnknownOrdinal_(unknown),
         }
     }
 }
@@ -2664,7 +2664,7 @@ pub enum FlexibleUnion {
 
     VectorStringAlsoNeedsConstructor(Vec<String>),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for FlexibleUnion {
@@ -2701,7 +2701,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, Vec<String>>(value, 3, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -2784,7 +2784,7 @@ pub mod flexible_union {
             &'union ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>,
         ),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union, 'buf> {
@@ -2796,7 +2796,7 @@ pub mod flexible_union {
             &'union mut ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>,
         ),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -2813,7 +2813,7 @@ impl<'buf> WireFlexibleUnion<'buf> {
                 self.raw.get().deref_unchecked()
             }),
 
-            unknown => crate::flexible_union::Ref::UnknownOrdinal(unknown),
+            unknown => crate::flexible_union::Ref::UnknownOrdinal_(unknown),
         }
     }
 
@@ -2831,7 +2831,7 @@ impl<'buf> WireFlexibleUnion<'buf> {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            unknown => crate::flexible_union::Mut::UnknownOrdinal(unknown),
+            unknown => crate::flexible_union::Mut::UnknownOrdinal_(unknown),
         }
     }
 }
@@ -2985,7 +2985,7 @@ pub enum NewerSimpleUnion {
 
     V(Vec<String>),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for NewerSimpleUnion {
@@ -3022,7 +3022,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, Vec<String>>(value, 3, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -3105,7 +3105,7 @@ pub mod newer_simple_union {
 
         V(&'union ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union, 'buf> {
@@ -3115,7 +3115,7 @@ pub mod newer_simple_union {
 
         V(&'union mut ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -3128,7 +3128,7 @@ impl<'buf> WireNewerSimpleUnion<'buf> {
 
             3 => crate::newer_simple_union::Ref::V(unsafe { self.raw.get().deref_unchecked() }),
 
-            unknown => crate::newer_simple_union::Ref::UnknownOrdinal(unknown),
+            unknown => crate::newer_simple_union::Ref::UnknownOrdinal_(unknown),
         }
     }
 
@@ -3146,7 +3146,7 @@ impl<'buf> WireNewerSimpleUnion<'buf> {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            unknown => crate::newer_simple_union::Mut::UnknownOrdinal(unknown),
+            unknown => crate::newer_simple_union::Mut::UnknownOrdinal_(unknown),
         }
     }
 }
@@ -3390,7 +3390,7 @@ pub enum OlderSimpleUnion {
 
     F(f32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for OlderSimpleUnion {
@@ -3421,7 +3421,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, f32>(value, 2, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -3498,7 +3498,7 @@ pub mod older_simple_union {
 
         F(&'union ::fidl_next::f32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
@@ -3506,7 +3506,7 @@ pub mod older_simple_union {
 
         F(&'union mut ::fidl_next::f32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -3517,7 +3517,7 @@ impl<'buf> WireOlderSimpleUnion<'buf> {
 
             2 => crate::older_simple_union::Ref::F(unsafe { self.raw.get().deref_unchecked() }),
 
-            unknown => crate::older_simple_union::Ref::UnknownOrdinal(unknown),
+            unknown => crate::older_simple_union::Ref::UnknownOrdinal_(unknown),
         }
     }
 
@@ -3531,7 +3531,7 @@ impl<'buf> WireOlderSimpleUnion<'buf> {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            unknown => crate::older_simple_union::Mut::UnknownOrdinal(unknown),
+            unknown => crate::older_simple_union::Mut::UnknownOrdinal_(unknown),
         }
     }
 }
@@ -4080,7 +4080,7 @@ impl Clone for WireReverseOrdinalUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireReverseOrdinalUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 
@@ -4193,7 +4193,7 @@ impl Clone for WireOptionalReverseOrdinalUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalReverseOrdinalUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 
@@ -5992,7 +5992,8 @@ where
 }
 
 /// A client handler for the TestProtocol protocol.
-
+///
+/// See [`TestProtocol`] for more details.
 pub trait TestProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for TestProtocol
@@ -6029,7 +6030,8 @@ impl<___T> TestProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<__
 }
 
 /// A server handler for the TestProtocol protocol.
-
+///
+/// See [`TestProtocol`] for more details.
 pub trait TestProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn strict_union_hence_response_may_be_stack_allocated(
         &mut self,
@@ -6207,7 +6209,7 @@ pub struct WireUnion<'buf> {
     _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub mod r#union {
+pub mod union_ {
     pub enum Ref<'union, 'buf> {
         Primitive(&'union ::fidl_next::i32_le),
 
@@ -6230,15 +6232,15 @@ pub mod r#union {
 }
 
 impl<'buf> WireUnion<'buf> {
-    pub fn as_ref(&self) -> crate::r#union::Ref<'_, 'buf> {
+    pub fn as_ref(&self) -> crate::union_::Ref<'_, 'buf> {
         match self.raw.ordinal() {
-            1 => crate::r#union::Ref::Primitive(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::union_::Ref::Primitive(unsafe { self.raw.get().deref_unchecked() }),
 
-            2 => crate::r#union::Ref::StringNeedsConstructor(unsafe {
+            2 => crate::union_::Ref::StringNeedsConstructor(unsafe {
                 self.raw.get().deref_unchecked()
             }),
 
-            3 => crate::r#union::Ref::VectorStringAlsoNeedsConstructor(unsafe {
+            3 => crate::union_::Ref::VectorStringAlsoNeedsConstructor(unsafe {
                 self.raw.get().deref_unchecked()
             }),
 
@@ -6246,17 +6248,15 @@ impl<'buf> WireUnion<'buf> {
         }
     }
 
-    pub fn as_mut(&mut self) -> crate::r#union::Mut<'_, 'buf> {
+    pub fn as_mut(&mut self) -> crate::union_::Mut<'_, 'buf> {
         match self.raw.ordinal() {
-            1 => {
-                crate::r#union::Mut::Primitive(unsafe { self.raw.get_mut().deref_mut_unchecked() })
-            }
+            1 => crate::union_::Mut::Primitive(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
 
-            2 => crate::r#union::Mut::StringNeedsConstructor(unsafe {
+            2 => crate::union_::Mut::StringNeedsConstructor(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            3 => crate::r#union::Mut::VectorStringAlsoNeedsConstructor(unsafe {
+            3 => crate::union_::Mut::VectorStringAlsoNeedsConstructor(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
@@ -6410,7 +6410,7 @@ impl<'buf> ::core::fmt::Debug for WireOptionalUnion<'buf> {
 pub enum UnionContainingEmptyStruct {
     Empty(crate::Empty),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnionContainingEmptyStruct {
@@ -6435,7 +6435,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, crate::Empty>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -6506,13 +6506,13 @@ pub mod union_containing_empty_struct {
     pub enum Ref<'union> {
         Empty(&'union crate::WireEmpty),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         Empty(&'union mut crate::WireEmpty),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -6523,7 +6523,7 @@ impl WireUnionContainingEmptyStruct {
                 self.raw.get().deref_unchecked()
             }),
 
-            unknown => crate::union_containing_empty_struct::Ref::UnknownOrdinal(unknown),
+            unknown => crate::union_containing_empty_struct::Ref::UnknownOrdinal_(unknown),
         }
     }
 
@@ -6533,7 +6533,7 @@ impl WireUnionContainingEmptyStruct {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            unknown => crate::union_containing_empty_struct::Mut::UnknownOrdinal(unknown),
+            unknown => crate::union_containing_empty_struct::Mut::UnknownOrdinal_(unknown),
         }
     }
 }
@@ -6556,7 +6556,7 @@ impl Clone for WireUnionContainingEmptyStruct {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireUnionContainingEmptyStruct
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireEmpty: ::fidl_next::Decode<___D>,
 {
@@ -6660,7 +6660,7 @@ impl Clone for WireOptionalUnionContainingEmptyStruct {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalUnionContainingEmptyStruct
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireEmpty: ::fidl_next::Decode<___D>,
 {
@@ -6818,7 +6818,7 @@ where
 pub enum UnionWithAttributes {
     X(i64),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnionWithAttributes {
@@ -6843,7 +6843,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i64>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -6914,13 +6914,13 @@ pub mod union_with_attributes {
     pub enum Ref<'union> {
         X(&'union ::fidl_next::i64_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         X(&'union mut ::fidl_next::i64_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -6929,7 +6929,7 @@ impl<'buf> WireUnionWithAttributes<'buf> {
         match self.raw.ordinal() {
             1 => crate::union_with_attributes::Ref::X(unsafe { self.raw.get().deref_unchecked() }),
 
-            unknown => crate::union_with_attributes::Ref::UnknownOrdinal(unknown),
+            unknown => crate::union_with_attributes::Ref::UnknownOrdinal_(unknown),
         }
     }
 
@@ -6939,7 +6939,7 @@ impl<'buf> WireUnionWithAttributes<'buf> {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            unknown => crate::union_with_attributes::Mut::UnknownOrdinal(unknown),
+            unknown => crate::union_with_attributes::Mut::UnknownOrdinal_(unknown),
         }
     }
 }

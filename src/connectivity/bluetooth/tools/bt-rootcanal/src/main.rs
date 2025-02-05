@@ -131,7 +131,7 @@ impl RootcanalClient {
     async fn connect(&self, socket_addr: SocketAddr) -> Result<(), (ServiceError, Error)> {
         self.task.lock().set_starting()?;
 
-        tracing::debug!("Opening host {}", socket_addr);
+        log::debug!("Opening host {}", socket_addr);
         let connector_res = TcpStream::connect(socket_addr);
         let Ok(tcp_connector) = connector_res else {
             return Err((ServiceError::ConnectionFailed, connector_res.unwrap_err().into()));
@@ -140,7 +140,7 @@ impl RootcanalClient {
         let Ok(tcp_stream) = stream_res else {
             return Err((ServiceError::ConnectionFailed, stream_res.unwrap_err().into()));
         };
-        tracing::debug!("Connected");
+        log::debug!("Connected");
 
         let channel_res = open_virtual_device(&default_control_device()).await;
         let Ok(channel) = channel_res else {
@@ -217,11 +217,11 @@ async fn main() -> Result<(), Error> {
     let _ = fs.dir("svc").add_fidl_service(|s: RootcanalClientControllerRequestStream| s);
     let _ = fs.take_and_serve_directory_handle()?;
 
-    tracing::debug!("Listening for incoming Rootcanal FIDL connections...");
+    log::debug!("Listening for incoming Rootcanal FIDL connections...");
     let rootcanal_client = Arc::new(RootcanalClient::new());
     fs.for_each(|stream| {
         run_fidl_server(stream, Arc::clone(&rootcanal_client))
-            .unwrap_or_else(|e| tracing::info!("FIDL server encountered an error: {:?}", e))
+            .unwrap_or_else(|e| log::info!("FIDL server encountered an error: {:?}", e))
     })
     .await;
 

@@ -91,29 +91,28 @@ namespace {
 
 // Handles receiving the reason a reboot is expected to occur and converting into a
 // `GracefulRebootReasonSignal`.
-class RebootWatcherServer : public fuchsia::hardware::power::statecontrol::RebootMethodsWatcher {
+class RebootWatcherServer : public fuchsia::hardware::power::statecontrol::RebootWatcher {
  public:
   RebootWatcherServer(
       async_dispatcher_t* dispatcher,
-      fidl::InterfaceRequest<fuchsia::hardware::power::statecontrol::RebootMethodsWatcher> request,
+      fidl::InterfaceRequest<fuchsia::hardware::power::statecontrol::RebootWatcher> request,
       fpromise::completer<GracefulRebootReasonSignal, Error> completer);
 
-  void OnReboot(fuchsia::hardware::power::statecontrol::RebootReason reason,
+  void OnReboot(fuchsia::hardware::power::statecontrol::RebootOptions options,
                 OnRebootCallback callback) override;
 
  private:
-  std::unique_ptr<fidl::Binding<fuchsia::hardware::power::statecontrol::RebootMethodsWatcher>>
-      binding_;
+  std::unique_ptr<fidl::Binding<fuchsia::hardware::power::statecontrol::RebootWatcher>> binding_;
   fpromise::completer<GracefulRebootReasonSignal, Error> completer_;
 };
 
 RebootWatcherServer::RebootWatcherServer(
     async_dispatcher_t* dispatcher,
-    fidl::InterfaceRequest<fuchsia::hardware::power::statecontrol::RebootMethodsWatcher> request,
+    fidl::InterfaceRequest<fuchsia::hardware::power::statecontrol::RebootWatcher> request,
     fpromise::completer<GracefulRebootReasonSignal, Error> completer)
-    : binding_(std::make_unique<
-               fidl::Binding<fuchsia::hardware::power::statecontrol::RebootMethodsWatcher>>(
-          this, std::move(request), dispatcher)),
+    : binding_(
+          std::make_unique<fidl::Binding<fuchsia::hardware::power::statecontrol::RebootWatcher>>(
+              this, std::move(request), dispatcher)),
       completer_(std::move(completer)) {
   binding_->set_error_handler([this](const zx_status_t status) {
     if (!completer_) {
@@ -126,7 +125,7 @@ RebootWatcherServer::RebootWatcherServer(
   });
 }
 
-void RebootWatcherServer::OnReboot(fuchsia::hardware::power::statecontrol::RebootReason reason,
+void RebootWatcherServer::OnReboot(fuchsia::hardware::power::statecontrol::RebootOptions options,
                                    OnRebootCallback callback) {
   if (!completer_) {
     callback();
@@ -138,21 +137,21 @@ void RebootWatcherServer::OnReboot(fuchsia::hardware::power::statecontrol::Reboo
     cb();
     b->Unbind();
   });
-  completer_.complete_ok(GracefulRebootReasonSignal(ToGracefulRebootReason(reason),
+  completer_.complete_ok(GracefulRebootReasonSignal(ToGracefulRebootReasons(std::move(options)),
                                                     [cb = std::move(cb)]() mutable { cb.call(); }));
 }
 
 }  // namespace
 
-GracefulRebootReasonSignal::GracefulRebootReasonSignal(const GracefulRebootReason reason,
+GracefulRebootReasonSignal::GracefulRebootReasonSignal(std::vector<GracefulRebootReason> reasons,
                                                        fit::callback<void(void)> callback)
-    : reason_(reason), callback_(std::move(callback)) {
+    : reasons_(std::move(reasons)), callback_(std::move(callback)) {
   FX_CHECK(callback_ != nullptr);
 }
 
 fpromise::promise<GracefulRebootReasonSignal, Error> WaitForRebootReason(
     async_dispatcher_t* dispatcher,
-    fidl::InterfaceRequest<fuchsia::hardware::power::statecontrol::RebootMethodsWatcher> request) {
+    fidl::InterfaceRequest<fuchsia::hardware::power::statecontrol::RebootWatcher> request) {
   if (!request.is_valid()) {
     return fpromise::make_result_promise<GracefulRebootReasonSignal, Error>(
         fpromise::error(Error::kBadValue));

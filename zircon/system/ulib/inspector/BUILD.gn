@@ -28,11 +28,7 @@ zx_library("inspector") {
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/pretty",
   ]
-  if (is_mistos) {
-    configs += [ "//build/config/mistos:static_cpp_standard_library" ]
-  } else {
-    configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
-  }
+  configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
 
   # Compile this with frame pointers so that if we crash
   # the simplistic unwinder will work.

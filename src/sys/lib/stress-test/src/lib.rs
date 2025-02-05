@@ -14,11 +14,11 @@ use fuchsia_async::{MonotonicInstant, Timer};
 use futures::future::{select, Aborted, Either};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use log::{error, info};
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 use std::pin::pin;
 use std::time::Duration;
-use tracing::{error, info};
 
 /// Use entropy to generate a random seed
 pub fn random_seed() -> u64 {
@@ -93,7 +93,7 @@ pub async fn run_test<E: 'static + Environment>(mut env: E) {
                 // The counter/timer task returned.
                 // The target operation count was hit or the timer expired.
                 // The test has completed.
-                info!(%reason, "Stress test has completed!");
+                info!(reason:%; "Stress test has completed!");
                 for abort in runner_abort {
                     abort.abort();
                 }

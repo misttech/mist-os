@@ -112,7 +112,7 @@ def build_command_list(
                 ffx_path,
                 "--no-environment",
                 "-c",
-                "sdk.module=host_tools.internal",
+                "sdk.module=host_tools_used_by_ffx_action_during_build",
                 "-c",
                 f"sdk.root={sdk_root}",
                 "--schema",
@@ -128,7 +128,7 @@ def build_command_list(
                         cmds_cmd = [
                             ffx_path,
                             "-c",
-                            "sdk.module=host_tools.internal",
+                            "sdk.module=host_tools_used_by_ffx_action_during_build",
                             "-c",
                             f"sdk.root={sdk_root}",
                             "commands",

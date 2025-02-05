@@ -84,8 +84,7 @@ async fn init_shell(socket: &mut fasync::Socket, args: Vec<String>) -> Result<Op
         );
     }
 
-    let maybe_raw_pty =
-        pty::RawPty::new().await.map_err(|e| tracing::warn!("{e:?}")).ok().flatten();
+    let maybe_raw_pty = pty::RawPty::new().await.map_err(|e| log::warn!("{e:?}")).ok().flatten();
 
     let (cols, rows) = match maybe_raw_pty.as_ref() {
         Some(raw_pty) => (raw_pty.cols(), raw_pty.rows()),
@@ -200,7 +199,7 @@ async fn console_in(
                     // since we are the active client. So either something suspicious is
                     // happening, or a new event was added that we may wish to consider
                     // handling.
-                    tracing::warn!("Unexpected Pty event received: {events:#x}");
+                    log::warn!("Unexpected Pty event received: {events:#x}");
                 }
 
                 event_handler.set(fasync::OnSignals::new(eventpair, signal_event).fuse());
@@ -302,7 +301,7 @@ pub async fn handle_vsh<P: PlatformServices>(
         )
         .await
         {
-            tracing::warn!("Failed to inject helper with error: {:?}", e);
+            log::warn!("Failed to inject helper with error: {:?}", e);
         }
     }
 
@@ -315,13 +314,13 @@ pub async fn handle_vsh<P: PlatformServices>(
                 // It's expected this will be an error if for example the guest side is finished
                 // and we are no longer able to send it messages over vsock.
                 if let Err(e) = result.context("stdin handler finished with an error") {
-                    tracing::warn!("{e:?}");
+                    log::warn!("{e:?}");
                 }
             }
             result = stdout_handler => {
                 match result {
                     Ok(exit_code) => {
-                        tracing::debug!("Guest process ended with exit code: {exit_code}");
+                        log::debug!("Guest process ended with exit code: {exit_code}");
                         return Ok(exit_code);
                     }
                     Err(e) => anyhow::bail!("stdout handler finished with error: {e:?}")

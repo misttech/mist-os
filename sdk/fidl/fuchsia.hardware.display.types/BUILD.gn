@@ -5,6 +5,10 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.display.types") {
+  sdk_area = "Graphics"
+
+  contains_drivers = true
+
   sources = [
     "config.fidl",
     "display.fidl",
@@ -17,5 +21,4 @@ fidl("fuchsia.hardware.display.types") {
     "//sdk/fidl/fuchsia.images2",
     "//sdk/fidl/fuchsia.math",
   ]
-  enable_hlcpp = true
 }

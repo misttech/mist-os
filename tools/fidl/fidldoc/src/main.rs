@@ -4,14 +4,13 @@
 
 use anyhow::{anyhow, bail, Context, Error};
 use argh::FromArgs;
+use log::{error, info};
+use rayon::prelude::*;
+use serde_json::{json, Value};
+use simplelog::{Config, LevelFilter, SimpleLogger};
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::{fs, process};
-use tracing::{error, info};
-
-use rayon::prelude::*;
-
-use serde_json::{json, Value};
 
 mod fidljson;
 use fidljson::{
@@ -107,11 +106,11 @@ fn run(opt: Opt) -> Result<(), Error> {
         bail!("cannot use --silent and --verbose together");
     }
 
-    if opt.verbose {
-        tracing_subscriber::fmt().compact().with_max_level(tracing::Level::INFO).init();
+    let _ = if opt.verbose {
+        SimpleLogger::init(LevelFilter::Info, Config::default())
     } else {
-        tracing_subscriber::fmt().compact().with_max_level(tracing::Level::ERROR).init();
-    }
+        SimpleLogger::init(LevelFilter::Error, Config::default())
+    };
 
     // Read in fidldoc.config.json
     let fidl_config_file = match opt.config {

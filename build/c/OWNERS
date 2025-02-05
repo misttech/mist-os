@@ -1,2 +1,1 @@
-per-file fidl_c.gni = file: /src/fidl/OWNERS
 per-file BUILD.gn = file: /src/fidl/OWNERS

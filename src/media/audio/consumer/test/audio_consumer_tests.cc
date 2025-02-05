@@ -125,7 +125,8 @@ class AudioConsumerTests : public gtest::RealLoopFixture {
     }
 
     // Expect that usage was set on the renderer.
-    EXPECT_TRUE(fake_audio_renderer().WasSetUsageCalled(fuchsia_media::AudioRenderUsage::kMedia));
+    EXPECT_TRUE(
+        fake_audio_renderer().ExpectSetUsage2Called(fuchsia_media::AudioRenderUsage2::kMedia));
 
     return true;
   }
@@ -165,7 +166,7 @@ class AudioConsumerTests : public gtest::RealLoopFixture {
     RunLoopUntilIdle();
 
     // Expect that the stream type was set on the renderer.
-    EXPECT_TRUE(fake_audio_renderer().WasSetPcmStreamTypeCalled({{
+    EXPECT_TRUE(fake_audio_renderer().ExpectSetPcmStreamTypeCalled({{
         .sample_format = sample_format,
         .channels = channels,
         .frames_per_second = frames_per_second,
@@ -173,10 +174,10 @@ class AudioConsumerTests : public gtest::RealLoopFixture {
 
     // Expect that the provided buffers were added to the renderer.
     for (uint32_t i = 0; i < buffer_count; ++i) {
-      EXPECT_TRUE(fake_audio_renderer().WasAddPayloadBufferCalled(i, buffer_koids[i]));
+      EXPECT_TRUE(fake_audio_renderer().ExpectAddPayloadBufferCalled(i, buffer_koids[i]));
     }
 
-    EXPECT_TRUE(fake_audio_renderer().WasNoOtherCalled());
+    EXPECT_TRUE(fake_audio_renderer().ExpectNoOtherCalled());
 
     return true;
   }
@@ -193,7 +194,7 @@ class AudioConsumerTests : public gtest::RealLoopFixture {
         fidl::Client(std::move(endpoints.client), dispatcher(), &volume_control_event_handler_);
     RunLoopUntilIdle();
 
-    fake_gain_control_ = fake_audio_renderer().WasBindGainControlCalled();
+    fake_gain_control_ = fake_audio_renderer().ExpectBindGainControlCalled();
     EXPECT_TRUE(fake_gain_control_);
   }
 
@@ -294,24 +295,24 @@ TEST_F(AudioConsumerTests, CreateStreamSinkTwice) {
 
   // Expect that the renderer has not yet been updated, because that operation is pending the
   // destruction of the first stream sink.
-  EXPECT_TRUE(fake_audio_renderer().WasNoOtherCalled());
+  EXPECT_TRUE(fake_audio_renderer().ExpectNoOtherCalled());
 
   // Destroy the first stream sink.
   stream_sink_under_test() = fidl::Client<fuchsia_media::StreamSink>();
   RunLoopUntilIdle();
 
   // Expect that the audio renderer has been prepared for the new stream sink.
-  EXPECT_TRUE(fake_audio_renderer().WasSetPcmStreamTypeCalled({{
+  EXPECT_TRUE(fake_audio_renderer().ExpectSetPcmStreamTypeCalled({{
       .sample_format = kSampleFormat,
       .channels = kChannels,
       .frames_per_second = kFramesPerSecond,
   }}));
 
   for (uint32_t i = 0; i < kBufferCount; ++i) {
-    EXPECT_TRUE(fake_audio_renderer().WasAddPayloadBufferCalled(i, buffer_koids[i]));
+    EXPECT_TRUE(fake_audio_renderer().ExpectAddPayloadBufferCalled(i, buffer_koids[i]));
   }
 
-  EXPECT_TRUE(fake_audio_renderer().WasNoOtherCalled());
+  EXPECT_TRUE(fake_audio_renderer().ExpectNoOtherCalled());
 
   CleanUp();
 }
@@ -338,7 +339,7 @@ TEST_F(AudioConsumerTests, StreamSinkSendPacket) {
       });
   RunLoopUntil([&send_packet_completed]() { return send_packet_completed; });
 
-  fake_audio_renderer().WasSendPacketCalled({{
+  fake_audio_renderer().ExpectSendPacketCalled({{
       .pts = kPts,
       .payload_buffer_id = kPayloadBufferId,
       .payload_offset = kPayloadOffset,
@@ -369,7 +370,7 @@ TEST_F(AudioConsumerTests, StreamSinkSendPacketNoReply) {
                   .is_ok());
   RunLoopUntilIdle();
 
-  fake_audio_renderer().WasSendPacketNoReplyCalled({{
+  fake_audio_renderer().ExpectSendPacketNoReplyCalled({{
       .pts = kPts,
       .payload_buffer_id = kPayloadBufferId,
       .payload_offset = kPayloadOffset,
@@ -390,7 +391,7 @@ TEST_F(AudioConsumerTests, StreamSinkEndOfStream) {
   EXPECT_TRUE(stream_sink_under_test()->EndOfStream().is_ok());
   RunLoopUntilIdle();
 
-  fake_audio_renderer().WasEndOfStreamCalled();
+  fake_audio_renderer().ExpectEndOfStreamCalled();
 
   CleanUp();
 }
@@ -408,7 +409,7 @@ TEST_F(AudioConsumerTests, StreamSinkDiscardAllPackets) {
       });
   RunLoopUntil([&discard_all_packets_completed]() { return discard_all_packets_completed; });
 
-  fake_audio_renderer().WasDiscardAllPacketsCalled();
+  fake_audio_renderer().ExpectDiscardAllPacketsCalled();
 
   CleanUp();
 }
@@ -421,7 +422,7 @@ TEST_F(AudioConsumerTests, StreamSinkDiscardAllPacketsNoReply) {
   EXPECT_TRUE(stream_sink_under_test()->DiscardAllPacketsNoReply().is_ok());
   RunLoopUntilIdle();
 
-  fake_audio_renderer().WasDiscardAllPacketsNoReplyCalled();
+  fake_audio_renderer().ExpectDiscardAllPacketsNoReplyCalled();
 
   CleanUp();
 }
@@ -438,7 +439,7 @@ TEST_F(AudioConsumerTests, ConsumerStart) {
                   .is_ok());
   RunLoopUntilIdle();
 
-  fake_audio_renderer().WasPlayNoReplyCalled(kReferenceTime, kMediaTime);
+  fake_audio_renderer().ExpectPlayNoReplyCalled(kReferenceTime, kMediaTime);
 
   CleanUp();
 }
@@ -450,7 +451,7 @@ TEST_F(AudioConsumerTests, ConsumerStop) {
   EXPECT_TRUE(consumer_under_test()->Stop().is_ok());
   RunLoopUntilIdle();
 
-  fake_audio_renderer().WasPauseNoReplyCalled();
+  fake_audio_renderer().ExpectPauseNoReplyCalled();
 
   CleanUp();
 }
@@ -463,8 +464,8 @@ TEST_F(AudioConsumerTests, BindVolumeControl) {
   EXPECT_TRUE(volume_control_under_test()->SetVolume({{.volume = kVolume}}).is_ok());
   RunLoopUntilIdle();
 
-  const fuchsia_media::Usage kUsage =
-      fuchsia_media::Usage::WithRenderUsage(fuchsia_media::AudioRenderUsage::kMedia);
+  const fuchsia_media::Usage2 kUsage =
+      fuchsia_media::Usage2::WithRenderUsage(fuchsia_media::AudioRenderUsage2::kMedia);
 
   fake_audio_core().WasGetDbFromVolumeCalled(kUsage, kVolume, kGain);
   RunLoopUntilIdle();
@@ -535,7 +536,7 @@ TEST_F(AudioConsumerTests, ConsumerWatchStatus) {
                   .is_ok());
   RunLoopUntilIdle();
 
-  fake_audio_renderer().WasPlayNoReplyCalled(kReferenceTime, kMediaTime);
+  fake_audio_renderer().ExpectPlayNoReplyCalled(kReferenceTime, kMediaTime);
 
   // Expect the second |WatchStatus| call to complete now that the consumer has started.
   EXPECT_TRUE(watch_status_completed);
@@ -571,7 +572,7 @@ TEST_F(AudioConsumerTests, ConsumerWatchStatus) {
   EXPECT_TRUE(consumer_under_test()->Stop().is_ok());
   RunLoopUntilIdle();
 
-  fake_audio_renderer().WasPauseNoReplyCalled();
+  fake_audio_renderer().ExpectPauseNoReplyCalled();
 
   // Expect the third |WatchStatus| call to complete now that the consumer has stopped.
   EXPECT_TRUE(watch_status_completed);

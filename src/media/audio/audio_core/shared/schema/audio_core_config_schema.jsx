@@ -39,11 +39,13 @@
     "stream_type": {
       "type": "string",
       "enum": [
+        "accessibility",
         "background",
         "communication",
         "interruption",
         "media",
         "system_agent",
+        "render:accessibility",
         "render:background",
         "render:communication",
         "render:interruption",
@@ -70,7 +72,7 @@
         "output_channels": {
           "$ref": "#/definitions/channel_count"
         },
-        "config": {},
+        "config": { },
         "_comment": "string"
       },
       "required": [

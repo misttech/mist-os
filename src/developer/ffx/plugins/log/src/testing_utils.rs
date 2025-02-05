@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 use diagnostics_data::{BuilderArgs, LogsData, LogsDataBuilder, Severity, Timestamp};
-use fho::testing::ToolEnv;
-use fho::{FhoEnvironment, TryFromEnv};
+use fho::{FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
 use fidl::endpoints::DiscoverableProtocolMarker as _;
 use fidl_fuchsia_developer_remotecontrol::{
     IdentifyHostResponse, RemoteControlMarker, RemoteControlProxy, RemoteControlRequest,
@@ -23,6 +22,9 @@ use moniker::Moniker;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::Arc;
+use target_connector::Connector;
+use target_holders::{FakeInjector, RemoteControlProxyHolder};
 use {fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync};
 
 const NODENAME: &str = "Rust";
@@ -125,21 +127,28 @@ pub struct TestEnvironment {
 }
 
 impl TestEnvironment {
-    pub fn new(config: TestEnvironmentConfig) -> Self {
+    pub async fn new(config: TestEnvironmentConfig) -> Self {
         let (event_snd, event_rcv) = mpsc::unbounded();
         let (disconnect_snd, disconnect_rcv) = oneshot::channel();
         let state = Rc::new(State::new(config, event_snd, disconnect_rcv));
         let state_clone = state.clone();
-        let tool_env = ToolEnv::new().remote_factory_closure(move || {
-            let state = state_clone.clone();
-            async { Ok(setup_fake_rcs(state)) }
-        });
-        let fho_env = tool_env.make_environment(ffx_config::EnvironmentContext::no_context(
-            ffx_config::environment::ExecutableKind::Test,
-            Default::default(),
-            None,
-            true,
-        ));
+        let fake_injector = FakeInjector {
+            remote_factory_closure: Box::new(move || {
+                let state = state_clone.clone();
+                Box::pin(async { Ok(setup_fake_rcs(state)) })
+            }),
+            ..Default::default()
+        };
+        let fho_env = FhoEnvironment::new_with_args(
+            &ffx_config::EnvironmentContext::no_context(
+                ffx_config::environment::ExecutableKind::Test,
+                Default::default(),
+                None,
+                true,
+            ),
+            &["some", "test"],
+        );
+        fho_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
         Self { fho_env, state, event_rcv: Some(event_rcv), disconnect_snd: disconnect_snd }
     }
 
@@ -147,8 +156,8 @@ impl TestEnvironment {
         self.event_rcv.take()
     }
 
-    pub async fn rcs_connector(&self) -> fho::Connector<RemoteControlProxy> {
-        fho::Connector::try_from_env(&self.fho_env).await.expect("Could not make test connector")
+    pub async fn rcs_connector(&self) -> Connector<RemoteControlProxyHolder> {
+        Connector::try_from_env(&self.fho_env).await.expect("Could not make test connector")
     }
 
     /// Simulates a target reboot.
@@ -382,6 +391,9 @@ async fn handle_log_settings(mut stream: LogSettingsRequestStream, state: Rc<Sta
         match request {
             LogSettingsRequest::RegisterInterest { .. } => {
                 panic!("fuchsia.diagnostics/LogSettings.RegisterInterest is not supported");
+            }
+            LogSettingsRequest::SetComponentInterest { .. } => {
+                panic!("fuchsia.diagnostics/LogSettings.SetComponentInterest is not supported");
             }
             LogSettingsRequest::SetInterest { selectors, responder } => {
                 let _ = state.event_snd.unbounded_send(TestEvent::SetInterest(selectors));

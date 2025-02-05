@@ -279,6 +279,7 @@ impl<'a, BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSocke
         bindings_ctx: &mut BC,
         dst_mac: Mac,
         body: S,
+        meta: BC::TxMetadata,
     ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
@@ -292,6 +293,7 @@ impl<'a, BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSocke
             dst_mac,
             body,
             EtherType::Ipv6,
+            meta,
         )
     }
 }
@@ -324,11 +326,16 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
         cb(&mut arp, &mut locked)
     }
 
-    fn get_protocol_addr(
-        &mut self,
-        _bindings_ctx: &mut BC,
-        device_id: &EthernetDeviceId<BC>,
-    ) -> Option<Ipv4Addr> {
+    fn addr_on_interface(&mut self, device_id: &EthernetDeviceId<BC>, addr: Ipv4Addr) -> bool {
+        let mut state = integration::device_state(self, device_id);
+        let mut state = state.cast();
+        let ipv4 = state.read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>();
+        // NB: This assignment is satisfying borrow checking on state.
+        let x = ipv4.iter().map(|addr| addr.addr().addr()).any(|a| a == addr);
+        x
+    }
+
+    fn get_protocol_addr(&mut self, device_id: &EthernetDeviceId<BC>) -> Option<Ipv4Addr> {
         let mut state = integration::device_state(self, device_id);
         let mut state = state.cast();
         let ipv4 = state.read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>();
@@ -428,6 +435,7 @@ impl<'a, BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSocke
         bindings_ctx: &mut BC,
         dst_mac: Mac,
         body: S,
+        meta: BC::TxMetadata,
     ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
@@ -441,6 +449,7 @@ impl<'a, BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSocke
             dst_mac,
             body,
             EtherType::Ipv4,
+            meta,
         )
     }
 }
@@ -448,14 +457,14 @@ impl<'a, BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSocke
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
     TransmitQueueCommon<EthernetLinkDevice, BC> for CoreCtx<'_, BC, L>
 {
-    type Meta = ();
+    type Meta = BC::TxMetadata;
     type Allocator = BufVecU8Allocator;
     type Buffer = Buf<Vec<u8>>;
     type DequeueContext = BC::DequeueContext;
 
     fn parse_outgoing_frame<'a, 'b>(
         buf: &'a [u8],
-        (): &'b Self::Meta,
+        _meta: &'b Self::Meta,
     ) -> Result<SentFrame<&'a [u8]>, ParseSentFrameError> {
         SentFrame::try_parse_as_ethernet(buf)
     }
@@ -573,11 +582,11 @@ impl<BT: BindingsTypes> LockLevelFor<IpLinkDeviceState<EthernetLinkDevice, BT>>
 impl<BT: BindingsTypes> LockLevelFor<IpLinkDeviceState<EthernetLinkDevice, BT>>
     for crate::lock_ordering::EthernetTxQueue
 {
-    type Data = TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>;
+    type Data = TransmitQueueState<BT::TxMetadata, Buf<Vec<u8>>, BufVecU8Allocator>;
 }
 
 impl<BT: BindingsTypes> LockLevelFor<IpLinkDeviceState<EthernetLinkDevice, BT>>
     for crate::lock_ordering::EthernetTxDequeue
 {
-    type Data = DequeueState<(), Buf<Vec<u8>>>;
+    type Data = DequeueState<BT::TxMetadata, Buf<Vec<u8>>>;
 }

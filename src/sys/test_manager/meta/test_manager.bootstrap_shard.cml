@@ -25,17 +25,6 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: [
-                "#test_manager",
-                "#test_manager_memfs",
-            ],
-        },
-        {
             dictionary: "diagnostics",
             from: "self",
             to: [

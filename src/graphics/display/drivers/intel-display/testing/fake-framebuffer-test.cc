@@ -4,7 +4,10 @@
 
 #include "src/graphics/display/drivers/intel-display/testing/fake-framebuffer.h"
 
+#include <fidl/fuchsia.boot/cpp/fidl.h>
+#include <lib/async-loop/cpp/loop.h>
 #include <lib/zbi-format/graphics.h>
+#include <lib/zbi-format/zbi.h>
 #include <zircon/syscalls.h>
 
 #include <gtest/gtest.h>
@@ -14,14 +17,25 @@
 namespace {
 
 TEST(FakeFramebuffer, Error) {
-  fake_framebuffer::SetFramebuffer({
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  fake_framebuffer::FakeBootItems boot_items;
+  boot_items.SetFramebuffer({
       .status = ZX_ERR_NOT_FOUND,
   });
 
-  uint32_t format, width, height, stride;
-  zx_handle_t resource = 0x0a0b0c0d;
-  zx_status_t status = zx_framebuffer_get_info(resource, &format, &width, &height, &stride);
-  EXPECT_STATUS(status, ZX_ERR_NOT_FOUND);
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_boot::Items>::Create();
+  boot_items.Serve(loop.dispatcher(), std::move(server_end));
+
+  fidl::WireClient<fuchsia_boot::Items> client;
+  client.Bind(std::move(client_end), loop.dispatcher());
+
+  client->Get2(ZBI_TYPE_FRAMEBUFFER, {})
+      .Then([](fidl::WireUnownedResult<fuchsia_boot::Items::Get2>& result) {
+        ASSERT_STATUS(result.status(), ZX_OK);
+        ASSERT_TRUE(result->is_error());
+        EXPECT_STATUS(result->error_value(), ZX_ERR_NOT_FOUND);
+      });
+  loop.RunUntilIdle();
 }
 
 TEST(FakeFramebuffer, Ok) {
@@ -32,16 +46,31 @@ TEST(FakeFramebuffer, Ok) {
       .height = 0x090a0b0c,
       .stride = 0x0d0e0f10,
   };
-  fake_framebuffer::SetFramebuffer(kExpectedFramebuffer);
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  fake_framebuffer::FakeBootItems boot_items;
+  boot_items.SetFramebuffer(kExpectedFramebuffer);
 
-  uint32_t format, width, height, stride;
-  zx_handle_t resource = 0x01020304;
-  zx_status_t status = zx_framebuffer_get_info(resource, &format, &width, &height, &stride);
-  EXPECT_OK(status);
-  EXPECT_EQ(format, kExpectedFramebuffer.format);
-  EXPECT_EQ(width, kExpectedFramebuffer.width);
-  EXPECT_EQ(height, kExpectedFramebuffer.height);
-  EXPECT_EQ(stride, kExpectedFramebuffer.stride);
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_boot::Items>::Create();
+  boot_items.Serve(loop.dispatcher(), std::move(server_end));
+
+  fidl::WireClient<fuchsia_boot::Items> client;
+  client.Bind(std::move(client_end), loop.dispatcher());
+
+  client->Get2(ZBI_TYPE_FRAMEBUFFER, {})
+      .Then([&](fidl::WireUnownedResult<fuchsia_boot::Items::Get2>& result) {
+        ASSERT_STATUS(result.status(), ZX_OK);
+        ASSERT_TRUE(result->is_ok());
+        auto& items = result->value()->retrieved_items;
+        ASSERT_GE(items.count(), 1ul);
+        zbi_swfb_t fb;
+        ASSERT_GE(items[0].length, sizeof(fb));
+        ASSERT_OK(items[0].payload.read(&fb, 0, sizeof(fb)));
+        EXPECT_EQ(fb.format, kExpectedFramebuffer.format);
+        EXPECT_EQ(fb.width, kExpectedFramebuffer.width);
+        EXPECT_EQ(fb.height, kExpectedFramebuffer.height);
+        EXPECT_EQ(fb.stride, kExpectedFramebuffer.stride);
+      });
+  loop.RunUntilIdle();
 }
 
 }  // namespace

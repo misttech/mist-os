@@ -28,7 +28,7 @@ struct Condition {
 
   void wait(Mutex* mtx) { sync_condition_wait(&condition, &mtx->mtx); }
 
-  zx_status_t timedwait(Mutex* mtx, zx_duration_t timeout) {
+  zx_status_t timedwait(Mutex* mtx, zx_duration_mono_t timeout) {
     return sync_condition_timedwait(&condition, &mtx->mtx, zx_deadline_after(timeout));
   }
 };

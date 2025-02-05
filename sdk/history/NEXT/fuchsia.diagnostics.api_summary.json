@@ -173,11 +173,11 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.diagnostics/LogSettings.SetInterest",
+        "name": "fuchsia.diagnostics/LogSettings.SetComponentInterest",
         "strictness": "strict",
-        "ordinal": "8196215806791589776",
+        "ordinal": "3888577134564210369",
         "direction": "two_way",
-        "request": "fuchsia.diagnostics/LogSettingsSetInterestRequest"
+        "request": "fuchsia.diagnostics/LogSettingsSetComponentInterestRequest"
     },
     {
         "kind": "protocol",
@@ -186,14 +186,20 @@
         "transport": "channel"
     },
     {
-        "kind": "struct/member",
-        "name": "fuchsia.diagnostics/LogSettingsSetInterestRequest.selectors",
+        "kind": "table/member",
+        "name": "fuchsia.diagnostics/LogSettingsSetComponentInterestRequest.persist",
+        "ordinal": "2",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.diagnostics/LogSettingsSetComponentInterestRequest.selectors",
         "ordinal": "1",
         "type": "vector<fuchsia.diagnostics/LogInterestSelector>:64"
     },
     {
-        "kind": "struct",
-        "name": "fuchsia.diagnostics/LogSettingsSetInterestRequest"
+        "kind": "table",
+        "name": "fuchsia.diagnostics/LogSettingsSetComponentInterestRequest"
     },
     {
         "kind": "const",

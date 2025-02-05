@@ -638,7 +638,11 @@ zx::result<> Device::AddDevice(const char* name, cpp20::span<zx_device_str_prop_
     needs_passthrough = true;
   }
 
-  zx_status_t status = DdkAdd(ddk::DeviceAddArgs(name).set_flags(DEVICE_ADD_NON_BINDABLE));
+  std::array offers = {
+      ddk::MetadataServer<fuchsia_hardware_i2c_businfo::I2CBusMetadata>::kFidlServiceName,
+  };
+  zx_status_t status = DdkAdd(
+      ddk::DeviceAddArgs(name).set_flags(DEVICE_ADD_NON_BINDABLE).set_fidl_service_offers(offers));
   if (status != ZX_OK) {
     return zx::error(status);
   }
@@ -653,14 +657,56 @@ zx::result<> Device::AddDevice(const char* name, cpp20::span<zx_device_str_prop_
             Device* dev = static_cast<Device*>(ctx);
             zx_status_t result = ZX_OK;
             switch (dev->bus_type_) {
-              case BusType::kSpi:
+              case BusType::kSpi: {
+                const auto& metadata =
+                    std::get<fuchsia_hardware_spi_businfo::SpiBusMetadata>(dev->metadata_);
+                fit::result encoded_metadata = fidl::Persist(metadata);
+                if (encoded_metadata.is_error()) {
+                  zxlogf(ERROR, "Failed to encode spi bus metadata: %s",
+                         encoded_metadata.error_value().FormatDescription().c_str());
+                  result = encoded_metadata.error_value().status();
+                  break;
+                }
                 result = device_add_metadata(dev->passthrough_dev_, DEVICE_METADATA_SPI_CHANNELS,
-                                             dev->metadata_.data(), dev->metadata_.size());
+                                             encoded_metadata.value().data(),
+                                             encoded_metadata.value().size());
                 break;
-              case BusType::kI2c:
+              }
+              case BusType::kI2c: {
+                const auto& metadata =
+                    std::get<fuchsia_hardware_i2c_businfo::I2CBusMetadata>(dev->metadata_);
+
+                auto& bus_metadata_server = dev->bus_metadata_server_.emplace<
+                    ddk::MetadataServer<fuchsia_hardware_i2c_businfo::I2CBusMetadata>>();
+                if (zx_status_t status = bus_metadata_server.SetMetadata(metadata);
+                    status != ZX_OK) {
+                  zxlogf(ERROR, "Failed to set metadata for bus metadata server: %s",
+                         zx_status_get_string(status));
+                  result = status;
+                  break;
+                }
+                if (zx_status_t status =
+                        bus_metadata_server.Serve(dev->outgoing_, dev->dispatcher_);
+                    status != ZX_OK) {
+                  zxlogf(ERROR, "Failed serve bus metadata: %s", zx_status_get_string(status));
+                  result = status;
+                  break;
+                }
+
+                fit::result encoded_metadata = fidl::Persist(metadata);
+                if (encoded_metadata.is_error()) {
+                  zxlogf(ERROR, "Failed to encode i2c bus metadata: %s",
+                         encoded_metadata.error_value().FormatDescription().c_str());
+                  result = encoded_metadata.error_value().status();
+                  break;
+                }
+                // TODO(b/385164506): Don't serve DEVICE_METADATA_I2C_CHANNELS once no longer
+                // referenced.
                 result = device_add_metadata(dev->passthrough_dev_, DEVICE_METADATA_I2C_CHANNELS,
-                                             dev->metadata_.data(), dev->metadata_.size());
+                                             encoded_metadata.value().data(),
+                                             encoded_metadata.value().size());
                 break;
+              }
               default:
                 break;
             }
@@ -671,7 +717,7 @@ zx::result<> Device::AddDevice(const char* name, cpp20::span<zx_device_str_prop_
       .release = [](void* dev) {},
   };
 
-  std::array offers = {
+  std::array pt_offers = {
       fuchsia_hardware_acpi::Service::Name,
   };
 
@@ -683,8 +729,8 @@ zx::result<> Device::AddDevice(const char* name, cpp20::span<zx_device_str_prop_
       .str_props = str_props.data(),
       .str_prop_count = static_cast<uint32_t>(str_props.size()),
       .proto_id = ZX_PROTOCOL_ACPI,
-      .fidl_service_offers = offers.data(),
-      .fidl_service_offer_count = offers.size(),
+      .fidl_service_offers = pt_offers.data(),
+      .fidl_service_offer_count = pt_offers.size(),
       .flags = flags | DEVICE_ADD_MUST_ISOLATE | DEVICE_ADD_ALLOW_MULTI_COMPOSITE,
       .outgoing_dir_channel = outgoing->release(),
   };

@@ -23,6 +23,15 @@
             to: "#system-activity-governor",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: [
+                "#config-use-suspender",
+                "#fake-suspend",
+                "#system-activity-governor",
+            ],
+        },
+        {
             config: [ "fuchsia.power.WaitForSuspendingToken" ],
             from: "parent",
             to: "#system-activity-governor",
@@ -32,17 +41,6 @@
             service: "fuchsia.hardware.suspend.SuspendService",
             from: "#fake-suspend",
             to: "#system-activity-governor",
-        },
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: [
-                "#fake-suspend",
-                "#system-activity-governor",
-            ],
         },
         {
             protocol: [ "fuchsia.power.broker.Topology" ],

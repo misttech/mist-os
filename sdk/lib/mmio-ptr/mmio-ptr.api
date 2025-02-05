@@ -1,3 +1,4 @@
 {
+  "pkg/mmio-ptr/include/lib/mmio-ptr/fake.h": "7e877c8f324f66587b7503408ad791b2",
   "pkg/mmio-ptr/include/lib/mmio-ptr/mmio-ptr.h": "7f062b0bff150d8cfa5d00f7f6cf4bf0"
 }

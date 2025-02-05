@@ -156,8 +156,10 @@ struct fdio : protected fbl::RefCounted<fdio>, protected fbl::Recyclable<fdio> {
   virtual zx_status_t truncate(uint64_t off);
   virtual two_path_op rename;
   virtual two_path_op link;
-  virtual zx_status_t get_flags(fuchsia_io::wire::OpenFlags* out_flags);
-  virtual zx_status_t set_flags(fuchsia_io::wire::OpenFlags flags);
+  virtual zx_status_t get_flags(fuchsia_io::wire::Flags* out_flags);
+  virtual zx_status_t set_flags(fuchsia_io::wire::Flags flags);
+  virtual zx_status_t get_flags_deprecated(fuchsia_io::wire::OpenFlags* out_flags);
+  virtual zx_status_t set_flags_deprecated(fuchsia_io::wire::OpenFlags flags);
   virtual zx_status_t recvmsg(struct msghdr* msg, int flags, size_t* out_actual, int16_t* out_code);
   virtual zx_status_t sendmsg(const struct msghdr* msg, int flags, size_t* out_actual,
                               int16_t* out_code);

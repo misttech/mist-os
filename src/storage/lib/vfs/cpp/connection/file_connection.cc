@@ -26,8 +26,8 @@ namespace fio = fuchsia_io;
 namespace fs::internal {
 
 FileConnection::FileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
-                               fuchsia_io::Rights rights, bool append, zx_koid_t koid)
-    : Connection(vfs, std::move(vnode), rights), koid_(koid), append_(append) {
+                               fuchsia_io::Rights rights, zx_koid_t koid)
+    : Connection(vfs, std::move(vnode), rights), koid_(koid) {
   // Ensure the VFS does not create connections that have privileges which cannot be used.
   ZX_DEBUG_ASSERT(internal::DownscopeRights(rights, VnodeProtocol::kFile) == rights);
 }
@@ -49,7 +49,7 @@ void FileConnection::Unbind() {
     binding_->Unbind();
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
 void FileConnection::DeprecatedClone(DeprecatedCloneRequestView request,
                                      DeprecatedCloneCompleter::Sync& completer) {
 #else
@@ -57,20 +57,20 @@ void FileConnection::Clone(CloneRequestView request, CloneCompleter::Sync& compl
 #endif
   fio::OpenFlags inherited_flags = {};
   // The APPEND flag should be preserved when cloning a file connection.
-  if (append()) {
+  if (GetAppend()) {
     inherited_flags |= fio::OpenFlags::kAppend;
   }
   Connection::NodeCloneDeprecated(request->flags | inherited_flags, VnodeProtocol::kFile,
                                   std::move(request->object));
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
 void FileConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
 #else
 void FileConnection::Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) {
 #endif
   const fio::Flags flags = fio::Flags::kProtocolFile | fs::internal::RightsToFlags(rights()) |
-                           (append() ? fio::Flags::kFileAppend : fio::Flags());
+                           (GetAppend() ? fio::Flags::kFileAppend : fio::Flags());
   Connection::NodeClone(flags, request->request.TakeChannel());
 }
 
@@ -114,17 +114,18 @@ zx::result<> FileConnection::WithRepresentation(
       fidl::ObjectView<fidl::WireTableFrame<FileRepresentation>>::FromExternal(
           &representation_frame));
 #if FUCHSIA_API_LEVEL_AT_LEAST(18)
-  NodeAttributeBuilder attributes_builder;
-  zx::result<fio::wire::NodeAttributes2> attributes;
+  std::optional<NodeAttributeBuilder> attributes_builder;
   if (query) {
-    attributes = attributes_builder.Build(*vnode(), *query);
+    attributes_builder.emplace(vnode());
+    zx::result<fio::wire::NodeAttributes2*> attributes;
+    attributes = attributes_builder->Build(*query);
     if (attributes.is_error()) {
       return attributes.take_error();
     }
-    builder.attributes(fidl::ObjectView<fio::wire::NodeAttributes2>::FromExternal(&(*attributes)));
+    builder.attributes(fidl::ObjectView<fio::wire::NodeAttributes2>::FromExternal(*attributes));
   }
 #endif
-  builder.is_append(append());
+  builder.is_append(GetAppend());
   if (zx::result observer = vnode()->GetObserver(); observer.is_ok()) {
     builder.observer(std::move(*observer));
   } else if (observer.error_value() != ZX_ERR_NOT_SUPPORTED) {
@@ -189,9 +190,9 @@ void FileConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync&
 
 void FileConnection::GetAttributes(fio::wire::NodeGetAttributesRequest* request,
                                    GetAttributesCompleter::Sync& completer) {
-  internal::NodeAttributeBuilder builder;
-  zx::result attrs = builder.Build(*vnode(), request->query);
-  completer.Reply(zx::make_result(attrs.status_value(), attrs.is_ok() ? &*attrs : nullptr));
+  // TODO(https://fxbug.dev/346585458): This operation should require the GET_ATTRIBUTES right.
+  internal::NodeAttributeBuilder builder(vnode());
+  completer.Reply(builder.Build(request->query));
 }
 
 void FileConnection::UpdateAttributes(fio::wire::MutableNodeAttributes* request,
@@ -200,7 +201,11 @@ void FileConnection::UpdateAttributes(fio::wire::MutableNodeAttributes* request,
   completer.Reply(Connection::NodeUpdateAttributes(update));
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void FileConnection::DeprecatedGetFlags(DeprecatedGetFlagsCompleter::Sync& completer) {
+#else
 void FileConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
+#endif
   fio::OpenFlags flags = {};
   if (rights() & fio::Rights::kReadBytes) {
     flags |= fio::OpenFlags::kRightReadable;
@@ -211,16 +216,41 @@ void FileConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
   if (rights() & fio::Rights::kExecute) {
     flags |= fio::OpenFlags::kRightExecutable;
   }
-  if (append()) {
+  if (GetAppend()) {
     flags |= fio::OpenFlags::kAppend;
   }
   completer.Reply(ZX_OK, flags);
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void FileConnection::DeprecatedSetFlags(DeprecatedSetFlagsRequestView request,
+                                        DeprecatedSetFlagsCompleter::Sync& completer) {
+#else
 void FileConnection::SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) {
-  append() = static_cast<bool>(request->flags & fio::OpenFlags::kAppend);
-  completer.Reply(ZX_OK);
+#endif
+  const bool append = static_cast<bool>(request->flags & fio::OpenFlags::kAppend);
+  completer.Reply(SetAppend(append).status_value());
 }
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void FileConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
+  fio::Flags flags = fio::Flags::kProtocolFile | RightsToFlags(rights());
+  if (GetAppend()) {
+    flags |= fio::Flags::kFileAppend;
+  }
+  completer.ReplySuccess(flags);
+}
+
+void FileConnection::SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) {
+  // Only the APPEND flag is allowed.
+  if (request->flags & ~fio::Flags::kFileAppend) {
+    completer.ReplyError(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  const bool append = static_cast<bool>(request->flags & fio::Flags::kFileAppend);
+  completer.Reply(SetAppend(append));
+}
+#endif
 
 void FileConnection::QueryFilesystem(QueryFilesystemCompleter::Sync& completer) {
   zx::result result = Connection::NodeQueryFilesystem();
@@ -231,7 +261,7 @@ void FileConnection::QueryFilesystem(QueryFilesystemCompleter::Sync& completer) 
 }
 
 zx_status_t FileConnection::ResizeInternal(uint64_t length) {
-  FS_PRETTY_TRACE_DEBUG("[FileTruncate] rights: ", rights(), ", append: ", append());
+  FS_PRETTY_TRACE_DEBUG("[FileTruncate] rights: ", rights(), ", append: ", GetAppend());
   if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -288,4 +318,5 @@ void FileConnection::AdvisoryLock(fidl::WireServer<fio::File>::AdvisoryLockReque
 
 void FileConnection::handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_io::File>,
                                            fidl::UnknownMethodCompleter::Sync&) {}
+
 }  // namespace fs::internal

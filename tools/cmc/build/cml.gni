@@ -133,7 +133,7 @@ template("cm") {
       # These offers are required in all CML that does not explicitly disable it.
       # This behavior will eventually be the default everywhere: https://fxbug.dev/42175121
       required_offers = {
-        protocol = [ "fuchsia.logger.LogSink" ]
+        protocol = []
         dictionary = [ "diagnostics" ]
       }
     }

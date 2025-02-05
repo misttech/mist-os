@@ -357,6 +357,7 @@ template("fuchsia_component") {
                                "testonly",
                                "deps",
                                "public_deps",
+                               "visibility",
                              ])
       sources = _manifest_outputs
       outputs = [ "$target_out_dir/${target_name}_component_manifest/{{source_file_part}}" ]

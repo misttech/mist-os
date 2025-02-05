@@ -413,6 +413,13 @@ the syscall will fail with `ZX_ERR_TIMED_OUT`. A value of 0 indicates a page
 fault is never aborted due to a time out.
 )""")
 
+DEFINE_OPTION("kernel.userpager.overtime_printout_limit", uint32_t,
+              userpager_overtime_printout_limit, {4}, R"""(
+This options configures the maximum number of outstanding requests to emit to the debuglog when
+reporting an overtime condition. If there are a large number of outstanding requests, the details of
+all of them may not be useful, and can overload the debuglog.
+)""")
+
 DEFINE_OPTION("kernel.heap-max-size-mb", uint64_t, heap_max_size_mb, {2048}, R"""(
 This option configures the maximum size of the heap. Only has effect if kernel
 has been compiled to use a virtual heap.

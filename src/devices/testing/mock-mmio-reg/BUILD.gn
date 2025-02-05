@@ -21,7 +21,7 @@ source_set("mock-mmio-reg-zxtest") {
   public = [ "include/mock-mmio-reg/mock-mmio-reg.h" ]
   deps = [
     "//src/devices/lib/mmio:test_helper",
-    "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
+    "//zircon/system/ulib/mmio-ptr",
   ]
   public_configs = [
     ":headers.config",
@@ -37,7 +37,7 @@ source_set("mock-mmio-reg-zxtest") {
     "//src/devices/power/drivers/aml-meson-power:*",
     "//src/devices/pwm/drivers/aml-pwm:*",
     "//src/devices/registers/drivers/registers:*",
-    "//src/devices/suspend/drivers/aml-suspend/tests:*",
+    "//src/devices/suspend/drivers/generic-suspend/tests:*",
     "//src/devices/temperature/drivers/aml-trip/tests:*",
     "//src/devices/thermal/drivers/aml-thermal:*",
     "//src/devices/thermal/drivers/aml-thermal-s905d2g-legacy:*",
@@ -55,7 +55,7 @@ sdk_source_set("mock-mmio-reg") {
   public_deps = [
     "//src/devices/lib/mmio:test_helper",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
+    "//zircon/system/ulib/mmio-ptr",
   ]
   non_sdk_public_deps = [ "//third_party/googletest:gtest_no_testonly" ]
   public_configs = [ ":headers.config" ]

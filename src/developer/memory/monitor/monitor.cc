@@ -142,10 +142,6 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
       component_context_(std::move(context)),
       config_(config),
       inspector_(dispatcher_, {}),
-      logger_(
-          dispatcher_,
-          [this](Capture* c) { return capture_maker_->GetCapture(c, CaptureLevel::VMO); },
-          [this](const Capture& c, Digest* d) { GetDigest(c, d); }, &config_),
       level_(pressure_signaler::Level::kNumLevels) {
   auto bucket_matches = CreateBucketMatchesFromConfigData();
   digester_ = std::make_unique<Digester>(bucket_matches);
@@ -153,7 +149,10 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
       "/cache", kHighWaterPollFrequency, kHighWaterThreshold, dispatcher_,
       [this](Capture* c, CaptureLevel l) { return capture_maker_->GetCapture(c, l); },
       [this](const Capture& c, Digest* d) { digester_->Digest(c, d); });
-
+  logger_ = std::make_unique<Logger>(
+      dispatcher_, high_water_.get(),
+      [this](Capture* c) { return capture_maker_->GetCapture(c, CaptureLevel::VMO); },
+      [this](const Capture& c, Digest* d) { GetDigest(c, d); }, &config_);
   if (send_metrics)
     CreateMetrics(bucket_matches);
 
@@ -652,7 +651,7 @@ void Monitor::OnLevelChanged(pressure_signaler::Level level) {
                 pressure_signaler::kLevelNames[level_], "to",
                 pressure_signaler::kLevelNames[level]);
   level_ = level;
-  logger_.SetPressureLevel(level_);
+  logger_->SetPressureLevel(level_);
 }
 
 void Monitor::OnLevelChanged(OnLevelChangedRequest& request,
@@ -668,16 +667,6 @@ void Monitor::WaitForImminentOom() {
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "zx_object_wait_one returned " << zx_status_get_string(status);
     return;
-  }
-
-  // Force the current state to be written as the high_waters. Later is better.
-  memory::Capture c;
-  auto s = capture_maker_->GetCapture(&c, CaptureLevel::VMO);
-  if (s == ZX_OK) {
-    high_water_->RecordHighWater(c);
-    high_water_->RecordHighWaterDigest(c);
-  } else {
-    FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(s);
   }
 
   OnLevelChanged(pressure_signaler::Level::kImminentOOM);

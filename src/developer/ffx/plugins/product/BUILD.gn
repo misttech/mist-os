@@ -6,6 +6,7 @@ import("//src/developer/ffx/build/ffx_plugin.gni")
 import("//src/developer/ffx/build/ffx_tool.gni")
 
 ffx_plugin("ffx_product") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   config_data = [ "data/config.json" ]
@@ -23,6 +24,10 @@ ffx_plugin("ffx_product") {
   ]
 
   args_sources = [ "src/args.rs" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
 }
 
 # When used in the build, this separate subtool version is used to avoid

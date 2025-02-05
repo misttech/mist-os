@@ -277,7 +277,6 @@
                 "fuchsia.storage.ext4.Server",
                 "fuchsia.test.manager.Query",
                 "fuchsia.test.manager.RunBuilder",
-                "fuchsia.tpm.cr50.Cr50",
                 "fuchsia.tracing.controller.Provisioner",
                 "fuchsia.tracing.controller.Session",
                 "fuchsia.tracing.perfetto.ProducerConnector",
@@ -324,6 +323,11 @@
         },
         {
             service: "fuchsia.hardware.spmi.DebugService",
+            from: "parent",
+            to: "#shell",
+        },
+        {
+            service: "fuchsia.hardware.nfc.Service",
             from: "parent",
             to: "#shell",
         },

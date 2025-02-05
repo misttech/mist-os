@@ -10,10 +10,10 @@ use fidl_fuchsia_update_installer_ext::{Options, State};
 use fuchsia_inspect as inspect;
 use fuchsia_url::AbsolutePackageUrl;
 use futures::prelude::*;
+use log::warn;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::time::SystemTime;
-use tracing::warn;
 
 mod version;
 pub use self::version::Version;

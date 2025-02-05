@@ -78,11 +78,6 @@ def main():
     sources_group.add_argument(
         "--sources", help="List of source files", nargs="*"
     )
-    sources_group.add_argument(
-        "--allow-globbing",
-        action="store_true",
-        help="Allow globbing the entire source directory",
-    )
     parser.add_argument(
         "--output", help="Path to the file to generate", required=True
     )
@@ -134,55 +129,50 @@ def main():
             )
 
     current_sources = []
-    if args.sources:
-        for source in args.sources:
-            p = os.path.join(args.source_dir, source)
-            # Explicit sources must be files.
-            if not os.path.isfile(p):
-                raise ValueError(f"Source {p} is not a file")
-            current_sources.append(
-                Source(os.path.join(name, source), p, args.output)
+    for source in args.sources:
+        p = os.path.join(args.source_dir, source)
+        # Explicit sources must be files.
+        if not os.path.isfile(p):
+            raise ValueError(f"Source {p} is not a file")
+        current_sources.append(
+            Source(os.path.join(name, source), p, args.output)
+        )
+    if not name.endswith("/..."):
+        # Get the common subdirectory of all sources, which is necessary to
+        # determine the Go package name for these sources.
+        dirs = set(
+            os.path.dirname(src) for src in args.sources if src.endswith(".go")
+        )
+        if len(dirs) > 1:
+            raise ValueError(
+                f"Sources are from multiple directories {dirs}, "
+                f"this is not supported by go_library"
             )
-        if not name.endswith("/..."):
-            # Get the common subdirectory of all sources, which is necessary to
-            # determine the Go package name for these sources.
-            dirs = set(
-                os.path.dirname(src)
-                for src in args.sources
-                if src.endswith(".go")
-            )
-            if len(dirs) > 1:
-                raise ValueError(
-                    f"Sources are from multiple directories {dirs}, "
-                    f"this is not supported by go_library"
-                )
-            subdir = list(dirs)[0]
-            name = os.path.join(name, subdir)
-            source_dir = os.path.join(args.source_dir, subdir)
+        subdir = list(dirs)[0]
+        name = os.path.join(name, subdir)
+        source_dir = os.path.join(args.source_dir, subdir)
 
-            go_sources = {
-                os.path.basename(f) for f in args.sources if f.endswith(".go")
+        go_sources = {
+            os.path.basename(f) for f in args.sources if f.endswith(".go")
+        }
+
+        # Require all non-generated Go files to be listed as sources.
+        if not os.path.abspath(source_dir).startswith(build_dir):
+            # TODO: Use `glob.glob("*.go", root_dir=source_dir)`
+            # instead of os.listdir after upgrading to Python 3.10.
+            go_files = {
+                f
+                for f in os.listdir(source_dir)
+                if f.endswith(".go") and not f.endswith("_test.go")
             }
-
-            # Require all non-generated Go files to be listed as sources.
-            if not os.path.abspath(source_dir).startswith(build_dir):
-                # TODO: Use `glob.glob("*.go", root_dir=source_dir)`
-                # instead of os.listdir after upgrading to Python 3.10.
-                go_files = {
-                    f
-                    for f in os.listdir(source_dir)
-                    if f.endswith(".go") and not f.endswith("_test.go")
-                }
-                missing = go_files - go_sources
-                if missing:
-                    raise ValueError(
-                        f"go_library requires that all non-test Go files in "
-                        f"source_dir be listed as sources, but the following "
-                        f"files are missing from sources for target {name}:"
-                        f' {", ".join(sorted(missing))}'
-                    )
-    elif args.allow_globbing:
-        current_sources.append(Source(name, args.source_dir, args.output))
+            missing = go_files - go_sources
+            if missing:
+                raise ValueError(
+                    f"go_library requires that all non-test Go files in "
+                    f"source_dir be listed as sources, but the following "
+                    f"files are missing from sources for target {name}:"
+                    f' {", ".join(sorted(missing))}'
+                )
     result = get_sources(args.deps, extra_sources=current_sources)
     with open(args.output, "w") as output_file:
         json.dump(

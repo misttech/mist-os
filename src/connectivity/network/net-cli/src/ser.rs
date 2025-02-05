@@ -142,6 +142,7 @@ impl<
 #[derive(serde::Serialize)]
 pub(crate) enum DeviceClass {
     Loopback,
+    Blackhole,
     Virtual,
     Ethernet,
     WlanClient,
@@ -155,6 +156,7 @@ impl From<fidl_fuchsia_net_interfaces_ext::PortClass> for DeviceClass {
     fn from(port_class: fidl_fuchsia_net_interfaces_ext::PortClass) -> Self {
         match port_class {
             fidl_fuchsia_net_interfaces_ext::PortClass::Loopback => Self::Loopback,
+            fidl_fuchsia_net_interfaces_ext::PortClass::Blackhole => Self::Blackhole,
             fidl_fuchsia_net_interfaces_ext::PortClass::Virtual => Self::Virtual,
             fidl_fuchsia_net_interfaces_ext::PortClass::Ethernet => Self::Ethernet,
             fidl_fuchsia_net_interfaces_ext::PortClass::WlanClient => Self::WlanClient,

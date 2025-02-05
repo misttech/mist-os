@@ -272,7 +272,7 @@ impl Clone for WireComposedProtocolTwoWayAnonComposedRequest {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireComposedProtocolTwoWayAnonComposedRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -372,7 +372,7 @@ impl Clone for WireOptionalComposedProtocolTwoWayAnonComposedRequest {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalComposedProtocolTwoWayAnonComposedRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -811,7 +811,7 @@ impl Clone for WireComposedProtocolTwoWayAnonComposedWithErrorResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireComposedProtocolTwoWayAnonComposedWithErrorResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -913,7 +913,7 @@ impl Clone for WireOptionalComposedProtocolTwoWayAnonComposedWithErrorResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalComposedProtocolTwoWayAnonComposedWithErrorResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -1371,7 +1371,7 @@ impl Clone for WireComposedProtocolOnAnonComposedRequest {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireComposedProtocolOnAnonComposedRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -1471,7 +1471,7 @@ impl Clone for WireOptionalComposedProtocolOnAnonComposedRequest {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalComposedProtocolOnAnonComposedRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -1755,7 +1755,7 @@ impl Clone for WireUnionPayload {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireUnionPayload
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -1854,7 +1854,7 @@ impl Clone for WireOptionalUnionPayload {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalUnionPayload
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -2442,7 +2442,8 @@ where
 }
 
 /// A client handler for the ComposedProtocol protocol.
-
+///
+/// See [`ComposedProtocol`] for more details.
 pub trait ComposedProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn on_anon_composed(
         &mut self,
@@ -2508,9 +2509,23 @@ where
 
 /// A helper trait for the `ComposedProtocol` server sender.
 pub trait ComposedProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
-    fn on_anon_composed(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn on_anon_composed<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireComposedProtocolOnAnonComposedRequest,
+        >;
 
-    fn on_named_composed(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn on_named_composed<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireUnionPayload>;
 }
 
 impl<___T> ComposedProtocolServerSender<___T>
@@ -2518,17 +2533,34 @@ impl<___T> ComposedProtocolServerSender<___T>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
-    fn on_anon_composed(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(5307191872315199016, &mut ())
+    fn on_anon_composed<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireComposedProtocolOnAnonComposedRequest,
+        >,
+    {
+        self.as_untyped().send_event(5307191872315199016, request)
     }
 
-    fn on_named_composed(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(1712755118419701115, &mut ())
+    fn on_named_composed<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireUnionPayload>,
+    {
+        self.as_untyped().send_event(1712755118419701115, request)
     }
 }
 
 /// A server handler for the ComposedProtocol protocol.
-
+///
+/// See [`ComposedProtocol`] for more details.
 pub trait ComposedProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn one_way_anon_composed(
         &mut self,
@@ -3080,7 +3112,7 @@ impl ::core::fmt::Debug for WireMainProtocolOneWayAnonRequest<'_> {
 pub enum MainProtocolTwoWayAnonRequest {
     B(bool),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for MainProtocolTwoWayAnonRequest {
@@ -3105,7 +3137,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -3176,13 +3208,13 @@ pub mod main_protocol_two_way_anon_request {
     pub enum Ref<'union> {
         B(&'union bool),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         B(&'union mut bool),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -3193,7 +3225,7 @@ impl WireMainProtocolTwoWayAnonRequest {
                 self.raw.get().deref_unchecked()
             }),
 
-            unknown => crate::main_protocol_two_way_anon_request::Ref::UnknownOrdinal(unknown),
+            unknown => crate::main_protocol_two_way_anon_request::Ref::UnknownOrdinal_(unknown),
         }
     }
 
@@ -3203,7 +3235,7 @@ impl WireMainProtocolTwoWayAnonRequest {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            unknown => crate::main_protocol_two_way_anon_request::Mut::UnknownOrdinal(unknown),
+            unknown => crate::main_protocol_two_way_anon_request::Mut::UnknownOrdinal_(unknown),
         }
     }
 }
@@ -3226,7 +3258,7 @@ impl Clone for WireMainProtocolTwoWayAnonRequest {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -3328,7 +3360,7 @@ impl Clone for WireOptionalMainProtocolTwoWayAnonRequest {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalMainProtocolTwoWayAnonRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -3617,7 +3649,7 @@ impl ::core::fmt::Debug for WireMainProtocolTwoWayAnonWithErrorRequest<'_> {
 pub enum MainProtocolTwoWayAnonWithErrorResponse {
     B(bool),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for MainProtocolTwoWayAnonWithErrorResponse {
@@ -3642,7 +3674,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -3715,13 +3747,13 @@ pub mod main_protocol_two_way_anon_with_error_response {
     pub enum Ref<'union> {
         B(&'union bool),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         B(&'union mut bool),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -3733,7 +3765,7 @@ impl WireMainProtocolTwoWayAnonWithErrorResponse {
             }),
 
             unknown => {
-                crate::main_protocol_two_way_anon_with_error_response::Ref::UnknownOrdinal(unknown)
+                crate::main_protocol_two_way_anon_with_error_response::Ref::UnknownOrdinal_(unknown)
             }
         }
     }
@@ -3745,7 +3777,7 @@ impl WireMainProtocolTwoWayAnonWithErrorResponse {
             }),
 
             unknown => {
-                crate::main_protocol_two_way_anon_with_error_response::Mut::UnknownOrdinal(unknown)
+                crate::main_protocol_two_way_anon_with_error_response::Mut::UnknownOrdinal_(unknown)
             }
         }
     }
@@ -3769,7 +3801,7 @@ impl Clone for WireMainProtocolTwoWayAnonWithErrorResponse {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonWithErrorResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -3872,7 +3904,7 @@ impl Clone for WireOptionalMainProtocolTwoWayAnonWithErrorResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalMainProtocolTwoWayAnonWithErrorResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -4180,7 +4212,7 @@ impl<'buf> ::core::fmt::Debug for WireOptionalMainProtocolTwoWayAnonWithErrorRes
 pub enum MainProtocolOnAnonRequest {
     B(bool),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for MainProtocolOnAnonRequest {
@@ -4205,7 +4237,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -4276,13 +4308,13 @@ pub mod main_protocol_on_anon_request {
     pub enum Ref<'union> {
         B(&'union bool),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         B(&'union mut bool),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -4293,7 +4325,7 @@ impl WireMainProtocolOnAnonRequest {
                 self.raw.get().deref_unchecked()
             }),
 
-            unknown => crate::main_protocol_on_anon_request::Ref::UnknownOrdinal(unknown),
+            unknown => crate::main_protocol_on_anon_request::Ref::UnknownOrdinal_(unknown),
         }
     }
 
@@ -4303,7 +4335,7 @@ impl WireMainProtocolOnAnonRequest {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            unknown => crate::main_protocol_on_anon_request::Mut::UnknownOrdinal(unknown),
+            unknown => crate::main_protocol_on_anon_request::Mut::UnknownOrdinal_(unknown),
         }
     }
 }
@@ -4326,7 +4358,7 @@ impl Clone for WireMainProtocolOnAnonRequest {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireMainProtocolOnAnonRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -4428,7 +4460,7 @@ impl Clone for WireOptionalMainProtocolOnAnonRequest {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalMainProtocolOnAnonRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -4978,7 +5010,8 @@ where
 }
 
 /// A client handler for the MainProtocol protocol.
-
+///
+/// See [`MainProtocol`] for more details.
 pub trait MainProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn on_anon_composed(
         &mut self,
@@ -5086,38 +5119,99 @@ where
 
 /// A helper trait for the `MainProtocol` server sender.
 pub trait MainProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
-    fn on_anon_composed(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn on_anon_composed<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireComposedProtocolOnAnonComposedRequest,
+        >;
 
-    fn on_named_composed(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn on_named_composed<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireUnionPayload>;
 
-    fn on_local(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn on_local<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireUnionPayload>;
 
-    fn on_anon(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn on_anon<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireMainProtocolOnAnonRequest,
+        >;
 }
 
 impl<___T> MainProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<___T, MainProtocol>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
-    fn on_anon_composed(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(5307191872315199016, &mut ())
+    fn on_anon_composed<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireComposedProtocolOnAnonComposedRequest,
+        >,
+    {
+        self.as_untyped().send_event(5307191872315199016, request)
     }
 
-    fn on_named_composed(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(1712755118419701115, &mut ())
+    fn on_named_composed<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireUnionPayload>,
+    {
+        self.as_untyped().send_event(1712755118419701115, request)
     }
 
-    fn on_local(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(8208103053879750285, &mut ())
+    fn on_local<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireUnionPayload>,
+    {
+        self.as_untyped().send_event(8208103053879750285, request)
     }
 
-    fn on_anon(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(977183060572945300, &mut ())
+    fn on_anon<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireMainProtocolOnAnonRequest,
+        >,
+    {
+        self.as_untyped().send_event(977183060572945300, request)
     }
 }
 
 /// A server handler for the MainProtocol protocol.
-
+///
+/// See [`MainProtocol`] for more details.
 pub trait MainProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn one_way_anon_composed(
         &mut self,

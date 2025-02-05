@@ -125,7 +125,7 @@ zx_status_t UsbTest::Init() {
 }
 
 void UsbTest::TestIntrInComplete(usb_request_t* req) {
-  zxlogf(SERIAL, "%s %d %ld", __func__, req->response.status, req->response.actual);
+  zxlogf(INFO, "%s %d %ld", __func__, req->response.status, req->response.actual);
   if (suspending_) {
     usb_request_release(req);
     return;
@@ -135,7 +135,7 @@ void UsbTest::TestIntrInComplete(usb_request_t* req) {
 }
 
 void UsbTest::TestIntrOutComplete(usb_request_t* req) {
-  zxlogf(SERIAL, "%s %d %ld", __func__, req->response.status, req->response.actual);
+  zxlogf(INFO, "%s %d %ld", __func__, req->response.status, req->response.actual);
 
   if (suspending_) {
     usb_request_release(req);
@@ -185,7 +185,7 @@ void UsbTest::TestIntrOutComplete(usb_request_t* req) {
 }
 
 void UsbTest::TestBulkOutComplete(usb_request_t* req) {
-  zxlogf(SERIAL, "%s %d %ld", __func__, req->response.status, req->response.actual);
+  zxlogf(INFO, "%s %d %ld", __func__, req->response.status, req->response.actual);
   if (suspending_) {
     usb_request_release(req);
     return;
@@ -234,7 +234,7 @@ void UsbTest::TestBulkOutComplete(usb_request_t* req) {
 }
 
 void UsbTest::TestBulkInComplete(usb_request_t* req) {
-  zxlogf(SERIAL, "%s %d %ld", __func__, req->response.status, req->response.actual);
+  zxlogf(INFO, "%s %d %ld", __func__, req->response.status, req->response.actual);
   auto req_managed = usb::Request<void>(req, parent_req_size_);
   if (suspending_) {
     return;

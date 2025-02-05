@@ -199,11 +199,11 @@ zx::result<zx::bti> CreateFakeBtiWithPaddrs(cpp20::span<const zx_paddr_t> paddrs
   return fake_object::FakeHandleTable().Add(std::move(new_bti));
 }
 
-zx::result<std::vector<FakeBtiPinnedVmoInfo>> GetPinnedVmo(zx_handle_t bti) {
+zx::result<std::vector<FakeBtiPinnedVmoInfo>> GetPinnedVmo(zx::unowned_bti bti) {
   // Make sure this is a valid fake bti:
-  zx::result result = fake_object::FakeHandleTable().Get(bti);
+  zx::result result = fake_object::FakeHandleTable().Get(bti->get());
   ZX_ASSERT_MSG(result.is_ok() && result.value()->type() == ZX_OBJ_TYPE_BTI,
-                "fake_bti_get_pinned_vmos: Bad handle %u\n", bti);
+                "fake_bti_get_pinned_vmos: Bad handle %u\n", bti->get());
 
   if (result.is_error()) {
     return result.take_error();
@@ -220,7 +220,7 @@ zx::result<std::vector<FakeBtiPinnedVmoInfo>> GetPinnedVmo(zx_handle_t bti) {
       return zx::error(status);
     }
     info_list.emplace_back(FakeBtiPinnedVmoInfo{
-        .vmo = vmo_dup.release(),
+        .vmo = zx::vmo(vmo_dup.release()),
         .size = vmo_info.size,
         .offset = vmo_info.offset,
     });
@@ -228,20 +228,20 @@ zx::result<std::vector<FakeBtiPinnedVmoInfo>> GetPinnedVmo(zx_handle_t bti) {
   return zx::ok(std::move(info_list));
 }
 
-zx::result<std::vector<zx_paddr_t>> GetVmoPhysAddress(zx_handle_t bti,
-                                                      FakeBtiPinnedVmoInfo vmo_info) {
+zx::result<std::vector<zx_paddr_t>> GetVmoPhysAddress(zx::unowned_bti bti,
+                                                      FakeBtiPinnedVmoInfo& vmo_info) {
   // Make sure this is a valid fake bti:
-  zx::result obj_result = fake_object::FakeHandleTable().Get(bti);
+  zx::result obj_result = fake_object::FakeHandleTable().Get(bti->get());
   ZX_ASSERT_MSG(obj_result.is_ok() && obj_result.value()->type() == ZX_OBJ_TYPE_BTI,
-                "fake_bti_get_phys_from_pinned_vmo: Bad handle %u\n", bti);
+                "fake_bti_get_phys_from_pinned_vmo: Bad handle %u\n", bti->get());
   if (obj_result.is_error()) {
     return obj_result.take_error();
   }
   auto* bti_obj = static_cast<FakeBti*>(obj_result.value().get());
 
   zx_info_handle_basic_t target_info;
-  if (zx_status_t status = zx_object_get_info(vmo_info.vmo, ZX_INFO_HANDLE_BASIC, &target_info,
-                                              sizeof(target_info), nullptr, nullptr);
+  if (zx_status_t status = zx_object_get_info(vmo_info.vmo.get(), ZX_INFO_HANDLE_BASIC,
+                                              &target_info, sizeof(target_info), nullptr, nullptr);
       status != ZX_OK) {
     return zx::error(status);
   }

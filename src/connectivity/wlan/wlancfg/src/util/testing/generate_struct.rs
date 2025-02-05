@@ -13,7 +13,7 @@ use rand::{Rng as _, RngCore};
 use wlan_common::bss::BssDescription;
 use wlan_common::channel::{Cbw, Channel};
 use wlan_common::random_fidl_bss_description;
-use wlan_common::scan::Compatibility;
+use wlan_common::scan::{Compatible, Incompatible};
 use wlan_common::security::{wep, wpa, SecurityAuthenticator, SecurityDescriptor};
 use {
     fidl_fuchsia_wlan_common_security as fidl_security,
@@ -59,19 +59,22 @@ pub fn generate_random_sme_scan_result() -> fidl_sme::ScanResult {
     let mut rng = rand::thread_rng();
     fidl_sme::ScanResult {
         compatibility: match rng.gen_range(0..4) {
-            0 => Some(Box::new(fidl_sme::Compatibility {
+            0 => fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
                 mutual_security_protocols: vec![fidl_security::Protocol::Open],
-            })),
-            1 => Some(Box::new(fidl_sme::Compatibility {
+            }),
+            1 => fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
                 mutual_security_protocols: vec![fidl_security::Protocol::Wpa2Personal],
-            })),
-            2 => Some(Box::new(fidl_sme::Compatibility {
+            }),
+            2 => fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
                 mutual_security_protocols: vec![
                     fidl_security::Protocol::Wpa2Personal,
                     fidl_security::Protocol::Wpa3Personal,
                 ],
-            })),
-            _ => None,
+            }),
+            _ => fidl_sme::Compatibility::Incompatible(fidl_sme::Incompatible {
+                description: String::from("unknown"),
+                disjoint_security_protocols: None,
+            }),
         },
         timestamp_nanos: rng.gen(),
         bss_description: random_fidl_bss_description!(),
@@ -102,13 +105,13 @@ pub fn generate_random_bss() -> types::Bss {
             types::ScanObservation::Active
         },
         compatibility: match rng.gen_range(0..4) {
-            0 => Compatibility::expect_some([SecurityDescriptor::OPEN]),
-            1 => Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),
-            2 => Compatibility::expect_some([
+            0 => Compatible::expect_ok([SecurityDescriptor::OPEN]),
+            1 => Compatible::expect_ok([SecurityDescriptor::WPA2_PERSONAL]),
+            2 => Compatible::expect_ok([
                 SecurityDescriptor::WPA2_PERSONAL,
                 SecurityDescriptor::WPA3_PERSONAL,
             ]),
-            _ => None,
+            _ => Incompatible::unknown(),
         },
         bss_description: random_fidl_bss_description!(
             bssid: bssid.to_array(),
@@ -123,9 +126,9 @@ pub fn generate_random_bss() -> types::Bss {
 pub fn generate_random_bss_with_compatibility() -> types::Bss {
     types::Bss {
         compatibility: match rand::thread_rng().gen_range(0..3) {
-            0 => Compatibility::expect_some([SecurityDescriptor::OPEN]),
-            1 => Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),
-            2 => Compatibility::expect_some([
+            0 => Compatible::expect_ok([SecurityDescriptor::OPEN]),
+            1 => Compatible::expect_ok([SecurityDescriptor::WPA2_PERSONAL]),
+            2 => Compatible::expect_ok([
                 SecurityDescriptor::WPA2_PERSONAL,
                 SecurityDescriptor::WPA3_PERSONAL,
             ]),

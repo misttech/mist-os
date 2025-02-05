@@ -9,13 +9,12 @@ use errors::FfxError;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_show_args::ComponentShowCommand;
 use fho::{FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
-use fidl_fuchsia_developer_remotecontrol as rc;
-
+use target_holders::RemoteControlProxyHolder;
 #[derive(FfxTool)]
 pub struct ShowTool {
     #[command]
     cmd: ComponentShowCommand,
-    rcs: rc::RemoteControlProxy,
+    rcs: RemoteControlProxyHolder,
 }
 
 fho::embedded_plugin!(ShowTool);

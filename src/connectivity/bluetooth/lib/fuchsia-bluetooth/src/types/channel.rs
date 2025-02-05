@@ -5,11 +5,11 @@
 use fidl::endpoints::{ClientEnd, Proxy};
 use futures::stream::{FusedStream, Stream};
 use futures::{io, Future, TryFutureExt};
+use log::warn;
 use std::fmt;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
-use tracing::warn;
 use {
     fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
     fuchsia_async as fasync,

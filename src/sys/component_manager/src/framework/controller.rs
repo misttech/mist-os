@@ -10,7 +10,7 @@ use ::runner::component::StopInfo;
 use fidl::endpoints::{ProtocolMarker, RequestStream};
 use fuchsia_trace::{self as trace, duration, instant};
 use futures::prelude::*;
-use tracing::{error, warn};
+use log::{error, warn};
 use {fidl_fuchsia_component as fcomponent, fuchsia_async as fasync};
 
 pub async fn run_controller(
@@ -18,7 +18,7 @@ pub async fn run_controller(
     stream: fcomponent::ControllerRequestStream,
 ) {
     if let Err(err) = serve_controller(weak_component_instance, stream).await {
-        warn!(%err, "Error serving {}", fcomponent::ControllerMarker::DEBUG_NAME);
+        warn!(err:%; "Error serving {}", fcomponent::ControllerMarker::DEBUG_NAME);
     }
 }
 
@@ -59,7 +59,7 @@ pub async fn serve_controller(
                         .start(&StartReason::Controller, Some(execution_controller), incoming)
                         .await
                     {
-                        warn!(%err, "failed to start component");
+                        warn!(err:%; "failed to start component");
                         return Err(err.into());
                     }
                     Ok(())
@@ -144,7 +144,7 @@ pub async fn serve_controller(
                     let child_name =
                         moniker.leaf().expect("we already checked this is not the root component");
                     if let Err(err) = parent.remove_dynamic_child(&child_name).await {
-                        warn!(%err, %moniker,
+                        warn!(err:%, moniker:%;
                                 "Controller/Destroy: component destruction unexpectedly failed");
                     }
                     // If `res` was Ok, the contract of this method states that we should close
@@ -153,7 +153,7 @@ pub async fn serve_controller(
                 });
             }
             fcomponent::ControllerRequest::_UnknownMethod { ordinal, .. } => {
-                warn!(%ordinal, "fuchsia.component/Controller received unknown method");
+                warn!(ordinal:%; "fuchsia.component/Controller received unknown method");
             }
         }
     }
@@ -174,7 +174,7 @@ async fn execution_controller_task(
                 component.unwrap().actions().register_no_wait(StopAction::new(false)).await;
             }
             fcomponent::ExecutionControllerRequest::_UnknownMethod { ordinal, .. } => {
-                warn!(%ordinal, "fuchsia.component/ExecutionController received unknown method");
+                warn!(ordinal:%; "fuchsia.component/ExecutionController received unknown method");
             }
         }
     }

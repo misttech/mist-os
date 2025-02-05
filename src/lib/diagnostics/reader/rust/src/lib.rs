@@ -574,7 +574,7 @@ mod tests {
         Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route,
     };
     use futures::TryStreamExt;
-    use tracing::{error, info};
+    use log::{error, info};
     use {fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_logger as flogger};
 
     const TEST_COMPONENT_URL: &str = "#meta/inspect_test_component.cm";
@@ -807,32 +807,30 @@ mod tests {
         }
     }
 
-    #[fuchsia::test]
+    #[fuchsia::test(logging = false)]
     async fn snapshot_then_subscribe() {
         let (_instance, publisher, reader) = init_isolated_logging().await;
         let (mut stream, _errors) =
             reader.snapshot_then_subscribe::<Logs>().expect("subscribed to logs").split_streams();
-        tracing::subscriber::with_default(publisher, || {
-            info!("hello from test");
-            error!("error from test");
-        });
+        log::set_boxed_logger(Box::new(publisher)).unwrap();
+        info!("hello from test");
+        error!("error from test");
         let log = stream.next().await.unwrap();
         assert_eq!(log.msg().unwrap(), "hello from test");
         let log = stream.next().await.unwrap();
         assert_eq!(log.msg().unwrap(), "error from test");
     }
 
-    #[fuchsia::test]
+    #[fuchsia::test(logging = false)]
     async fn snapshot_then_subscribe_raw() {
         let (_instance, publisher, reader) = init_isolated_logging().await;
         let (mut stream, _errors) = reader
             .snapshot_then_subscribe_raw::<Logs, serde_json::Value>()
             .expect("subscribed to logs")
             .split_streams();
-        tracing::subscriber::with_default(publisher, || {
-            info!("hello from test");
-            error!("error from test");
-        });
+        log::set_boxed_logger(Box::new(publisher)).unwrap();
+        info!("hello from test");
+        error!("error from test");
         let log = stream.next().await.unwrap();
         assert_eq!(log["payload"]["root"]["message"]["value"], "hello from test");
         let log = stream.next().await.unwrap();

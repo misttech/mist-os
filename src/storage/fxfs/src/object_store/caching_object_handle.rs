@@ -169,7 +169,7 @@ impl<S: ReadObjectHandle> CachingObjectHandle<S> {
                         self.source.read(read_start as u64, read_buf.as_mut()).await?;
                     ensure!(amount_read >= len, anyhow!(FxfsError::Internal).context("Short read"));
 
-                    tracing::debug!("COH {}: Read {len}@{read_start}", self.source.object_id());
+                    log::debug!("COH {}: Read {len}@{read_start}", self.source.object_id());
 
                     let data = Vec::from(&read_buf.as_slice()[..len]).into_boxed_slice();
                     let cached_chunk = CachedChunk(Arc::new(data));
@@ -201,7 +201,7 @@ impl<S: ReadObjectHandle> CachingObjectHandle<S> {
                 to_deallocate.push(data);
             }
         }
-        tracing::debug!(
+        log::debug!(
             "COH {}: Purging {} cached chunks ({} bytes)",
             self.source.object_id(),
             to_deallocate.len(),
@@ -317,7 +317,7 @@ mod tests {
 
     impl ObjectHandle for FakeSource {
         fn object_id(&self) -> u64 {
-            unreachable!();
+            0
         }
 
         fn block_size(&self) -> u64 {

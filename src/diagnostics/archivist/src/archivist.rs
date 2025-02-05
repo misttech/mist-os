@@ -23,11 +23,11 @@ use fuchsia_component::server::{ServiceFs, ServiceObj};
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
 use futures::prelude::*;
+use log::{debug, error, info, warn};
 use moniker::ExtendedMoniker;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
 use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// Responsible for initializing an `Archivist` instance. Supports multiple configurations by
@@ -94,7 +94,7 @@ impl Archivist {
             config.component_initial_interests.into_iter().filter_map(|interest| {
                 ComponentInitialInterest::from_str(&interest)
                     .map_err(|err| {
-                        warn!(?err, invalid = %interest, "Failed to load initial interest");
+                        warn!(err:?, invalid:% = interest; "Failed to load initial interest");
                     })
                     .ok()
             });
@@ -148,7 +148,7 @@ impl Archivist {
             match KernelDebugLog::new().await {
                 Ok(klog) => logs_repo.drain_debuglog(klog),
                 Err(err) => warn!(
-                    ?err,
+                    err:?;
                     "Failed to start the kernel debug log reader. Klog won't be in syslog"
                 ),
             };
@@ -196,7 +196,7 @@ impl Archivist {
         scope: &fasync::Scope,
     ) {
         match EventSource::new("/events/log_sink_requested_event_stream").await {
-            Err(err) => warn!(?err, "Failed to create event source for log sink requests"),
+            Err(err) => warn!(err:?; "Failed to create event source for log sink requests"),
             Ok(mut event_source) => {
                 event_router.add_producer(ProducerConfig {
                     producer: &mut event_source,
@@ -211,7 +211,7 @@ impl Archivist {
 
         match EventSource::new("/events/inspect_sink_requested_event_stream").await {
             Err(err) => {
-                warn!(?err, "Failed to create event source for InspectSink requests")
+                warn!(err:?; "Failed to create event source for InspectSink requests");
             }
             Ok(mut event_source) => {
                 event_router.add_producer(ProducerConfig {
@@ -369,7 +369,7 @@ impl Archivist {
                             ordinal,
                             ..
                         } => {
-                            warn!(?method_type, ordinal, "Got unknown interaction on Router")
+                            warn!(method_type:?, ordinal; "Got unknown interaction on Router");
                         }
                     }
                 }

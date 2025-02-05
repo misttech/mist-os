@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_net_ext::IntoExt;
+use log::error;
 use net_types::ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6};
 use std::collections::HashSet;
-use tracing::error;
 use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_routes_ext as fnet_routes_ext};
 
 /// Keeps track of the current routing state, as observed from the Netstack

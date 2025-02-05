@@ -48,7 +48,7 @@ impl MetricsSession {
         let enabled = context.analytics_enabled().await;
         let analytics_path = context.get_analytics_path();
         let sdk_version = if enabled {
-            get_sdk_version(&context).await.unwrap_or_else(|| UNKNOWN_SDK.to_string())
+            get_sdk_version(&context).unwrap_or_else(|| UNKNOWN_SDK.to_string())
         } else {
             UNKNOWN_SDK.to_string()
         };
@@ -125,8 +125,8 @@ pub async fn send_enhanced_analytics() -> bool {
     enhanced_analytics().await
 }
 
-async fn get_sdk_version(context: &EnvironmentContext) -> Option<String> {
-    match context.get_sdk().await {
+fn get_sdk_version(context: &EnvironmentContext) -> Option<String> {
+    match context.get_sdk() {
         Ok(sdk) => sdk.get_version_string(),
         Err(_) => None,
     }

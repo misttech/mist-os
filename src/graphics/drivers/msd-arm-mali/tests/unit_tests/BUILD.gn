@@ -112,7 +112,10 @@ source_set("tests_requiring_hardware") {
     "test_device.cc",
   ]
 
-  deps = [ ":test_deps" ]
+  deps = [
+    ":test_deps",
+    "//src/graphics/magma/tests/unit_tests:magma_platform_device_tests",
+  ]
 }
 
 group("test_deps") {

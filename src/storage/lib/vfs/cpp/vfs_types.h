@@ -301,29 +301,6 @@ constexpr fuchsia_io::Flags RightsToFlags(fuchsia_io::Rights rights) {
   return static_cast<Flags>(static_cast<uint64_t>(rights));
 }
 
-// Encapsulates the state of a node's wire attributes on the stack. Used by connections for sending
-// an OnRepresentation event or responding to a fuchsia.io/Node.GetAttributes call.
-class NodeAttributeBuilder {
- public:
-  using NodeAttributes2 = fuchsia_io::wire::NodeAttributes2;
-  using ImmutableAttrs = fuchsia_io::wire::ImmutableNodeAttributes;
-  using MutableAttrs = fuchsia_io::wire::MutableNodeAttributes;
-
-  // Build and return a wire object that uses this object as storage. This object **must** outlive
-  // the returned wire table. The resulting table will include all attributes specified by |query|
-  // that the vnode supports.
-  zx::result<NodeAttributes2> Build(const Vnode& vnode, fuchsia_io::NodeAttributesQuery query);
-
- private:
-  // Data referenced by the table frames below:
-  VnodeAttributes attributes;
-  fuchsia_io::Abilities abilities;
-  fuchsia_io::NodeProtocolKinds protocols;
-  // Table frames the final wire object will be built from:
-  fidl::WireTableFrame<ImmutableAttrs> immutable_frame;
-  fidl::WireTableFrame<MutableAttrs> mutable_frame;
-};
-
 constexpr CreationMode CreationModeFromFidl(fuchsia_io::OpenFlags flags) {
   if (flags & fuchsia_io::OpenFlags::kCreateIfAbsent) {
     return CreationMode::kAlways;
@@ -335,6 +312,16 @@ constexpr CreationMode CreationModeFromFidl(fuchsia_io::OpenFlags flags) {
 }
 
 constexpr CreationMode CreationModeFromFidl(fuchsia_io::Flags flags) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  // We traverse the path, then lookup and create the last segment. This is used to determine if the
+  // last segment is to be created. When creating an unnamed temporary file, it is created in the
+  // last segment. And so it must already exist, we pretend that the creation mode for the last
+  // segment is '"never".
+  if ((flags & fuchsia_io::Flags::kFlagCreateAsUnnamedTemporary) ||
+      (flags & fuchsia_io::Flags::kFlagCreateAsUnnamedTemporary)) {
+    return CreationMode::kNever;
+  }
+#endif
   if (flags & fuchsia_io::Flags::kFlagMustCreate) {
     return CreationMode::kAlways;
   }

@@ -6,6 +6,7 @@ import("//src/developer/ffx/build/ffx_plugin.gni")
 import("//src/developer/ffx/build/ffx_tool.gni")
 
 ffx_plugin("ffx_fuzz") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   args_sources = [ "src/args.rs" ]
@@ -17,7 +18,11 @@ ffx_plugin("ffx_fuzz") {
     "src/reader.rs",
     "src/shell.rs",
   ]
-  args_deps = [ "shell_args" ]
+  args_deps = [
+    "shell_args",
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
@@ -25,6 +30,7 @@ ffx_plugin("ffx_fuzz") {
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/sys/fuzzing/fidl:fuchsia.fuzzer_rust",

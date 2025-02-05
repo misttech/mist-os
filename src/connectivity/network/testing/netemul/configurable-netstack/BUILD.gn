@@ -5,6 +5,16 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
+netstack2_visibility = [
+  ":*",
+  "//src/connectivity/network/testing/netemul/configurable-netstack/tests:*",
+  "//src/connectivity/network/mdns/service:*",
+  "//src/connectivity/network/tests/external_network:*",
+  "//src/connectivity/network/tests/getifaddrs:*",
+  "//src/connectivity/network/tests/multi_nic:*",
+  "//src/connectivity/weave/tests/weave_ip_forward:*",
+]
+
 rustc_binary("bin") {
   edition = "2021"
   testonly = true
@@ -35,26 +45,31 @@ rustc_binary("bin") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_component("configurable-netstack") {
+fuchsia_component("netstack2") {
   testonly = true
-  manifest = "meta/configurable-netstack.cml"
+  component_name = "configurable-netstack-netstack2"
+  manifest = "meta/configurable-netstack-netstack2.cml"
   deps = [
     ":bin",
     "//src/connectivity/network/netstack:component-debug",
   ]
+  visibility = netstack2_visibility
 }
 
-fuchsia_component("configurable-netstack-fast-udp") {
+fuchsia_component("netstack2-fast-udp") {
   testonly = true
-  manifest = "meta/configurable-netstack-fast-udp.cml"
+  component_name = "configurable-netstack-netstack2-fast-udp"
+  manifest = "meta/configurable-netstack-netstack2-fast-udp.cml"
   deps = [
     ":bin",
     "//src/connectivity/network/netstack:component-with-fast-udp-debug",
   ]
+  visibility = netstack2_visibility
 }
 
-fuchsia_component("configurable-netstack-netstack3") {
+fuchsia_component("netstack3") {
   testonly = true
+  component_name = "configurable-netstack-netstack3"
   manifest = "meta/configurable-netstack-netstack3.cml"
   deps = [
     ":bin",

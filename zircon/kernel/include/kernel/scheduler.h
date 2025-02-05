@@ -523,7 +523,7 @@ class Scheduler {
   };
 
   // Returns the current system time as a SchedTime value.
-  static SchedTime CurrentTime() { return SchedTime{current_time()}; }
+  static SchedTime CurrentTime() { return SchedTime{current_mono_time()}; }
 
   // Returns the Scheduler instance for the current CPU.
   static Scheduler* Get();
@@ -1197,7 +1197,7 @@ class Scheduler {
     Scheduler& scheduler() { return *request_dpc_.arg<Scheduler>(); }
     cpu_num_t cpu() { return scheduler().this_cpu(); }
 
-    static void TimerHandler(Timer* timer, zx_time_t now, void* arg);
+    static void TimerHandler(Timer* timer, zx_instant_mono_t now, void* arg);
     static void DpcHandler(Dpc* dpc);
 
     power_management::PowerState power_state_;

@@ -11,7 +11,7 @@
 __BEGIN_CDECLS
 
 // Reads the time stored in shared_value into read_value.
-void Reader(zx_ticks_t* shared_value, zx_ticks_t* read_value);
+void Reader(zx_instant_mono_ticks_t* shared_value, zx_instant_mono_ticks_t* read_value);
 
 __END_CDECLS
 

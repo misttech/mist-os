@@ -116,7 +116,7 @@ impl BluetoothHandler {
                                 responder,
                             } => {
                                 if let Err(e) = responder.send() {
-                                    tracing::error!("Failed to acknowledge delta from SessionWatcher: {:?}", e);
+                                    log::error!("Failed to acknowledge delta from SessionWatcher: {:?}", e);
                                     return;
                                 }
 
@@ -143,7 +143,7 @@ impl BluetoothHandler {
                             }
                             SessionsWatcherRequest::SessionRemoved { session_id, responder } => {
                                 if let Err(e) = responder.send() {
-                                    tracing::error!(
+                                    log::error!(
                                         "Failed to acknowledge session removal from SessionWatcher: {:?}",
                                         e
                                     );
@@ -151,7 +151,7 @@ impl BluetoothHandler {
                                 }
 
                                 if !active_sessions_clone.contains(&session_id) {
-                                    tracing::warn!(
+                                    log::warn!(
                                         "Tried to remove nonexistent media session id {:?}",
                                         session_id
                                     );
@@ -175,11 +175,11 @@ impl BluetoothHandler {
                         }
                     },
                     Ok(None) => {
-                        tracing::warn!("stream ended on fuchsia.media.sessions2.SessionsWatcher");
+                        log::warn!("stream ended on fuchsia.media.sessions2.SessionsWatcher");
                         break;
                     },
                     Err(e) => {
-                        tracing::error!("failed to watch fuchsia.media.sessions2.SessionsWatcher: {:?}", &e);
+                        log::error!("failed to watch fuchsia.media.sessions2.SessionsWatcher: {:?}", &e);
                         break;
                     },
                 }
@@ -221,7 +221,7 @@ async fn play_bluetooth_sound(
                 .await
                 .is_err()
                 {
-                    tracing::error!("[bluetooth_earcons_handler] failed to play bluetooth earcon connection sound");
+                    log::error!("[bluetooth_earcons_handler] failed to play bluetooth earcon connection sound");
                 }
             }
             BluetoothSoundType::Disconnected => {
@@ -234,12 +234,12 @@ async fn play_bluetooth_sound(
                 .await
                 .is_err()
                 {
-                    tracing::error!("[bluetooth_earcons_handler] failed to play bluetooth earcon disconnection sound");
+                    log::error!("[bluetooth_earcons_handler] failed to play bluetooth earcon disconnection sound");
                 }
             }
         };
     } else {
-        tracing::error!("[bluetooth_earcons_handler] failed to play bluetooth earcon sound: no sound player connection");
+        log::error!("[bluetooth_earcons_handler] failed to play bluetooth earcon sound: no sound player connection");
     }
 }
 
@@ -265,7 +265,7 @@ async fn match_background_to_media(messenger: service::message::Messenger) {
             }
         })
     } else {
-        tracing::error!("Could not extract background and media volumes")
+        log::error!("Could not extract background and media volumes")
     };
 
     // If they are different, set the background volume to match the media volume.
@@ -287,7 +287,7 @@ async fn match_background_to_media(messenger: service::message::Messenger) {
         );
 
         if receptor.next_payload().await.is_err() {
-            tracing::error!(
+            log::error!(
                 "Failed to play bluetooth connection sound after waiting for message response"
             );
         }

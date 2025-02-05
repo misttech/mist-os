@@ -150,7 +150,7 @@ class Realm final {
   Realm AddChildRealm(const std::string& child_name,
                       const ChildOptions& options = kDefaultChildOptions);
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
   // Create a sub realm as child of this Realm instance initialized with |decl|. The constructed
   // Realm is returned.
   Realm AddChildRealmFromDecl(const std::string& child_name,
@@ -292,7 +292,7 @@ class RealmBuilder final {
   Realm AddChildRealm(const std::string& child_name,
                       const ChildOptions& options = kDefaultChildOptions);
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
   // Create a sub realm as child of the root realm initialized with |decl|. The constructed
   // Realm is returned.
   // See |Realm.AddChildRealm| for more details.

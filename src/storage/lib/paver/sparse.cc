@@ -9,6 +9,7 @@
 #include <lib/zx/vmo.h>
 #include <zircon/status.h>
 
+#include <cstdarg>
 #include <cstddef>
 #include <vector>
 

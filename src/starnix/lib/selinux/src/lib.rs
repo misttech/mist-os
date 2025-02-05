@@ -9,6 +9,7 @@ pub mod security_server;
 pub use security_server::SecurityServer;
 
 mod access_vector_cache;
+mod exceptions_config;
 mod sid_table;
 mod sync;
 
@@ -30,7 +31,7 @@ impl SecurityId {
 }
 
 /// A class that may appear in SELinux policy or an access vector cache query.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum AbstractObjectClass {
     Unspecified,
     /// A well-known class used in the SELinux system, such as `process` or `file`.
@@ -344,6 +345,8 @@ common_permission_enum! {
         Ioctl("ioctl"),
         /// Permissions to create hard link.
         Link("link"),
+        /// Permission to set and unset file locks.
+        Lock("lock"),
         /// Permission to use as mount point; only useful for directories and files.
         MountOn("mounton"),
         /// Permission to open a file.
@@ -682,7 +685,7 @@ pub enum FileSystemLabelingScheme {
     /// policy. `root_sid` identifies the context for the root of the filesystem and `def_sid`
     /// identifies the context to use for unlabeled files in the filesystem (the "default
     /// context").
-    FsUse { fs_use_type: FsUseType, def_sid: SecurityId, root_sid: SecurityId },
+    FsUse { fs_use_type: FsUseType, def_sid: SecurityId, root_sid: Option<SecurityId> },
     /// This filesystem has one or more "genfscon" statements associated with it in the policy.
     GenFsCon,
 }
@@ -690,7 +693,7 @@ pub enum FileSystemLabelingScheme {
 /// SELinux security context-related filesystem mount options. These options are documented in the
 /// `context=context, fscontext=context, defcontext=context, and rootcontext=context` section of
 /// the `mount(8)` manpage.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct FileSystemMountOptions {
     /// Specifies the effective security context to use for all nodes in the filesystem, and the
     /// filesystem itself. If the filesystem already contains security attributes then these are

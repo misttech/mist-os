@@ -4,8 +4,8 @@
 
 use fidl::endpoints::{create_proxy, ServiceMarker};
 use fuchsia_component::client;
+use log::*;
 use std::collections::HashMap;
-use tracing::*;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_examples as fexamples, fidl_fuchsia_io as fio,
@@ -28,6 +28,17 @@ const TEST_COLLECTION_NAME: &str = "test_collection";
 
 /// Test string used to send to the echo service under test.
 const ECHO_TEST_STRING: &str = "hello world";
+
+async fn enumerate_service_instances(dir: &fidl_fuchsia_io::DirectoryProxy) -> Vec<String> {
+    client::Service::open_from_dir(dir, fexamples::EchoServiceMarker)
+        .expect("failed to open service in expose dir.")
+        .enumerate()
+        .await
+        .expect("failed to enumerate service instances from exposed service dir")
+        .into_iter()
+        .map(|instance| instance.instance_name().to_string())
+        .collect()
+}
 
 /*
 Test that dynamic child is offered a multi instance service with one instance renamed correctly
@@ -85,16 +96,7 @@ async fn renamed_instances_test() {
     .await
     .expect("Failed to get child expose directory.");
 
-    let renamed_service_dir_proxy =
-        client::open_service_at_dir::<fexamples::EchoServiceMarker>(&filtered_exposed_dir)
-            .expect("failed to open service in expose dir.");
-    let visible_service_instances: Vec<String> =
-        fuchsia_fs::directory::readdir(&renamed_service_dir_proxy)
-            .await
-            .expect("failed to read entries from exposed service dir")
-            .into_iter()
-            .map(|dirent| dirent.name)
-            .collect();
+    let visible_service_instances = enumerate_service_instances(&filtered_exposed_dir).await;
     info!("Entries in exposed service dir after rename: {:?}", visible_service_instances);
     assert_eq!(expected_visible_instance_list, visible_service_instances);
 
@@ -162,16 +164,7 @@ async fn filter_instances_test() {
     .await
     .expect("Failed to get child expose directory.");
 
-    let filtered_service_dir_proxy =
-        client::open_service_at_dir::<fexamples::EchoServiceMarker>(&filtered_exposed_dir)
-            .expect("failed to open service in expose dir.");
-    let visible_service_instances: Vec<String> =
-        fuchsia_fs::directory::readdir(&filtered_service_dir_proxy)
-            .await
-            .expect("failed to read entries from exposed service dir")
-            .into_iter()
-            .map(|dirent| dirent.name)
-            .collect();
+    let visible_service_instances = enumerate_service_instances(&filtered_exposed_dir).await;
     info!("Entries in exposed service dir after filter: {:?}", visible_service_instances);
     assert_eq!(source_instance_filter, visible_service_instances);
 
@@ -263,16 +256,7 @@ async fn filtered_service_through_collection_test() {
     .await
     .expect("Failed to get child expose directory.");
 
-    let filtered_service_dir_proxy =
-        client::open_service_at_dir::<fexamples::EchoServiceMarker>(&filtered_exposed_dir)
-            .expect("failed to open service in expose dir.");
-    let visible_service_instances: Vec<String> =
-        fuchsia_fs::directory::readdir(&filtered_service_dir_proxy)
-            .await
-            .expect("failed to read entries from exposed service dir")
-            .into_iter()
-            .map(|dirent| dirent.name)
-            .collect();
+    let visible_service_instances = enumerate_service_instances(&filtered_exposed_dir).await;
     info!("Entries in exposed service dir after filter: {:?}", visible_service_instances);
 
     assert_eq!(expected_visible_instance_list, visible_service_instances);
@@ -421,16 +405,7 @@ async fn aggregate_instances_test() {
     .await
     .expect("Failed to get child expose directory.");
 
-    let filtered_service_dir_proxy =
-        client::open_service_at_dir::<fexamples::EchoServiceMarker>(&filtered_exposed_dir)
-            .expect("failed to open service in expose dir.");
-    let visible_service_instances: Vec<String> =
-        fuchsia_fs::directory::readdir(&filtered_service_dir_proxy)
-            .await
-            .expect("failed to read entries from exposed service dir")
-            .into_iter()
-            .map(|dirent| dirent.name)
-            .collect();
+    let visible_service_instances = enumerate_service_instances(&filtered_exposed_dir).await;
     info!("Entries in exposed service dir after aggregation: {:?}", visible_service_instances);
     let expected_visible_instance_list: Vec<String> =
         vec!["default", "goodbye"].iter().map(|s| s.to_string()).collect();
@@ -505,16 +480,7 @@ async fn aggregate_instances_renamed_test() {
     .await
     .expect("Failed to get child expose directory.");
 
-    let renamed_service_dir_proxy =
-        client::open_service_at_dir::<fexamples::EchoServiceMarker>(&filtered_exposed_dir)
-            .expect("failed to open service in expose dir.");
-    let visible_service_instances: Vec<String> =
-        fuchsia_fs::directory::readdir(&renamed_service_dir_proxy)
-            .await
-            .expect("failed to read entries from exposed service dir")
-            .into_iter()
-            .map(|dirent| dirent.name)
-            .collect();
+    let visible_service_instances = enumerate_service_instances(&filtered_exposed_dir).await;
     info!("Entries in exposed service dir after rename: {:?}", visible_service_instances);
     let expected_visible_instance_list: Vec<String> =
         vec!["default_from_a", "hello_from_dynamic"].iter().map(|s| s.to_string()).collect();
@@ -608,16 +574,7 @@ async fn aggregate_static_instances_test() {
     .await
     .expect("Failed to get child expose directory.");
 
-    let renamed_service_dir_proxy =
-        client::open_service_at_dir::<fexamples::EchoServiceMarker>(&filtered_exposed_dir)
-            .expect("failed to open service in expose dir.");
-    let visible_service_instances: Vec<String> =
-        fuchsia_fs::directory::readdir(&renamed_service_dir_proxy)
-            .await
-            .expect("failed to read entries from exposed service dir")
-            .into_iter()
-            .map(|dirent| dirent.name)
-            .collect();
+    let visible_service_instances = enumerate_service_instances(&filtered_exposed_dir).await;
     info!("Entries in exposed service dir after rename: {:?}", visible_service_instances);
     let expected_visible_instance_list: Vec<String> =
         vec!["default_from_a", "default_from_b", "hello_from_a", "hello_from_b"]
@@ -737,16 +694,7 @@ async fn aggregate_instances_multiple_service_instances_renamed_test() {
     .await
     .expect("Failed to get child expose directory.");
 
-    let renamed_service_dir_proxy =
-        client::open_service_at_dir::<fexamples::EchoServiceMarker>(&filtered_exposed_dir)
-            .expect("failed to open service in expose dir.");
-    let visible_service_instances: Vec<String> =
-        fuchsia_fs::directory::readdir(&renamed_service_dir_proxy)
-            .await
-            .expect("failed to read entries from exposed service dir")
-            .into_iter()
-            .map(|dirent| dirent.name)
-            .collect();
+    let visible_service_instances = enumerate_service_instances(&filtered_exposed_dir).await;
     info!("Entries in exposed service dir after rename: {:?}", visible_service_instances);
     let expected_visible_instance_list: Vec<String> =
         vec!["default", "goodbye", "hello_v1", "hello_v2"].iter().map(|s| s.to_string()).collect();
@@ -826,11 +774,10 @@ async fn regular_echo_at_service_instance(
 ) -> Result<String, fidl::Error> {
     let echo_string = ECHO_TEST_STRING;
     let service_instance =
-        client::connect_to_service_instance_at_dir::<fexamples::EchoServiceMarker>(
-            exposed_dir,
-            instance_name,
-        )
-        .expect("failed to connect to filtered service instance");
+        client::Service::open_from_dir(exposed_dir, fexamples::EchoServiceMarker)
+            .expect("failed to open service")
+            .connect_to_instance(instance_name)
+            .expect("failed to connect to filtered service instance");
 
     let response = async {
         // Accessing a non-existent service instance can fail when opening the member protocol
@@ -865,15 +812,9 @@ async fn regular_echo_at_service_instance(
 
 // Confirm that the original service exposes the expected service instances.
 async fn verify_original_service(exposed_dir: &fio::DirectoryProxy) -> Vec<String> {
-    let service_proxy = client::open_service_at_dir::<fexamples::EchoServiceMarker>(&exposed_dir)
-        .expect("failed to open service in expose dir.");
-    let instances = fuchsia_fs::directory::readdir(&service_proxy)
-        .await
-        .expect("failed to read entries from service dir")
-        .into_iter()
-        .map(|dirent| dirent.name);
+    let mut instance_list = enumerate_service_instances(exposed_dir).await;
+    instance_list.sort();
     // If the source component definition has changed then update this assertion.
-    let instance_list = instances.clone().collect::<Vec<String>>();
     assert_eq!(
         vec!["default".to_string(), "goodbye".to_string(), "hello".to_string()],
         instance_list

@@ -26,7 +26,7 @@ rustc_library("fuchsia-url") {
   ]
 
   if (is_mistos) {
-    configs += [ "//build/config/mistos:mistos_config" ]
+    configs += [ "//build/config/fuchsia:mistos_config" ]
   }
 
   sources = [

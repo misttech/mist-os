@@ -18,6 +18,7 @@
 
 #include "chunk_input_stream.h"
 #include "output_sink.h"
+#include "src/lib/containers/cpp/mpsc_queue.h"
 #include "src/lib/fxl/macros.h"
 #include "src/lib/fxl/synchronization/thread_annotations.h"
 
@@ -142,7 +143,7 @@ class CodecAdapterAacEncoder : public CodecAdapter {
   // Buffers the user is in the process of adding.
   // TODO(turnage): Remove when manual buffer additions are removed in favor
   // of sysmem.
-  MpscQueue<const CodecBuffer*> staged_buffers_;
+  containers::MpscQueue<const CodecBuffer*> staged_buffers_;
   async::Loop input_processing_loop_;
 };
 

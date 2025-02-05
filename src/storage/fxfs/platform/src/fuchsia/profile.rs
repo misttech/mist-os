@@ -600,7 +600,7 @@ impl<T: RecordedVolume> ProfileState for ProfileStateImpl<T> {
         let (task, remote_handle) = async move {
             record::<T>(volume, &name, receiver)
                 .await
-                .inspect_err(|error| warn!(?error, "Profile recording '{name}' failed"))
+                .inspect_err(|error| warn!(error:?; "Profile recording '{name}' failed"))
         }
         .remote_handle();
         self.recording = Some(remote_handle);

@@ -4,11 +4,11 @@
   "pkg/inspect/include/lib/inspect/cpp/inspect.h": "efced45f09695c94c258206c3254150e",
   "pkg/inspect/include/lib/inspect/cpp/inspector.h": "30e93023560b10372e033c3acad48863",
   "pkg/inspect/include/lib/inspect/cpp/reader.h": "813934e9dc4d63b5564e1d5bf7d33944",
-  "pkg/inspect/include/lib/inspect/cpp/vmo/block.h": "ef94e09ea7d0500e5d0d3637944d4589",
+  "pkg/inspect/include/lib/inspect/cpp/vmo/block.h": "e94f7815e49b16b473d346f3b190ee9e",
   "pkg/inspect/include/lib/inspect/cpp/vmo/heap.h": "5da305adad7bcd990727edb29af8bfb4",
   "pkg/inspect/include/lib/inspect/cpp/vmo/limits.h": "154b1d9b393d9f22ada9f8dd1e75bbaa",
   "pkg/inspect/include/lib/inspect/cpp/vmo/scanner.h": "eddde27e2cc24b722fea75cdc024a850",
   "pkg/inspect/include/lib/inspect/cpp/vmo/snapshot.h": "566b1555b6d2b4afd6c42373510b990c",
-  "pkg/inspect/include/lib/inspect/cpp/vmo/state.h": "b359dbf3751c2710daa60825ceeffab2",
-  "pkg/inspect/include/lib/inspect/cpp/vmo/types.h": "4c7cb024cad06b5b1ae6c0a205ff1873"
+  "pkg/inspect/include/lib/inspect/cpp/vmo/state.h": "1ac3cb2133c524480adae356c980791b",
+  "pkg/inspect/include/lib/inspect/cpp/vmo/types.h": "ef69f2010a0d3fa5ed7fb52dfcbda382"
 }

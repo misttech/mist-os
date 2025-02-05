@@ -5,9 +5,9 @@
 use crate::common::mac::WlanGi;
 use crate::probe_sequence::{ProbeEntry, ProbeSequence};
 use ieee80211::{MacAddr, MacAddrBytes};
+use log::{debug, error};
 use std::collections::{hash_map, HashMap, HashSet};
 use std::time::Duration;
-use tracing::{debug, error};
 use wlan_common::ie::{HtCapabilities, RxMcsBitmask, SupportedRate};
 use wlan_common::mac::FrameControl;
 use wlan_common::tx_vector::{

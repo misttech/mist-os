@@ -6,6 +6,7 @@ import("//src/developer/ffx/build/ffx_plugin.gni")
 import("//src/developer/ffx/build/ffx_tool.gni")
 
 ffx_plugin("ffx_test") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
@@ -17,6 +18,7 @@ ffx_plugin("ffx_test") {
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/testing:lib",
     "//src/developer/ffx/plugins/component/common:ffx_component",
     "//src/lib/fidl/rust/fidl",
@@ -47,6 +49,7 @@ ffx_plugin("ffx_test") {
     "//src/lib/diagnostics/data/rust",
     "//src/lib/diagnostics/selectors",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:argh",
   ]
   args_sources = [ "src/args.rs" ]
 

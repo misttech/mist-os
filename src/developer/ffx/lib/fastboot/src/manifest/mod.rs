@@ -93,10 +93,13 @@ impl FlashManifestVersion {
         }
     }
 
+    #[tracing::instrument]
     fn from_product_bundle_v2(product_bundle: &ProductBundleV2) -> Result<Self> {
+        tracing::debug!("Begin loading flash manifest from ProductBundleV2: {:#?}", product_bundle);
         // Copy the unlock credentials from the partitions config to the flash manifest.
         let mut credentials = vec![];
         for c in &product_bundle.partitions.unlock_credentials {
+            tracing::debug!("Adding unlock credential: {}", c.to_string());
             credentials.push(c.to_string());
         }
 
@@ -104,11 +107,13 @@ impl FlashManifestVersion {
         let mut bootloader_partitions = vec![];
         for p in &product_bundle.partitions.bootloader_partitions {
             if let Some(name) = &p.name {
-                bootloader_partitions.push(v3::Partition {
+                let partition = v3::Partition {
                     name: name.to_string(),
                     path: p.image.to_string(),
                     condition: None,
-                });
+                };
+                tracing::debug!("Adding bootloader partition: {:#?}", partition);
+                bootloader_partitions.push(partition);
             }
         }
 
@@ -120,11 +125,10 @@ impl FlashManifestVersion {
             } else {
                 None
             };
-            bootstrap_partitions.push(v3::Partition {
-                name: p.name.to_string(),
-                path: p.image.to_string(),
-                condition,
-            });
+            let partition =
+                v3::Partition { name: p.name.to_string(), path: p.image.to_string(), condition };
+            tracing::debug!("Adding bootstrap partition: {:#?}", partition);
+            bootstrap_partitions.push(partition);
         }
         // Append the bootloader partitions, bootstrapping a device means flashing any initial
         // bootstrap images plus a working bootloader. The bootstrap partitions should always come
@@ -135,13 +139,19 @@ impl FlashManifestVersion {
         // Create a map from slot to available images by name (zbi, vbmeta, fvm).
         let mut image_map = PartitionImageMapper::new(product_bundle.partitions.clone());
         if let Some(manifest) = &product_bundle.system_a {
-            image_map.map_images_to_slot(&manifest, Slot::A)?;
+            let slot = Slot::A;
+            tracing::debug!("Mapping images: {:?} to slot: {}", manifest, slot);
+            image_map.map_images_to_slot(&manifest, slot)?;
         }
         if let Some(manifest) = &product_bundle.system_b {
-            image_map.map_images_to_slot(&manifest, Slot::B)?;
+            let slot = Slot::B;
+            tracing::debug!("Mapping images: {:?} to slot: {}", manifest, slot);
+            image_map.map_images_to_slot(&manifest, slot)?;
         }
         if let Some(manifest) = &product_bundle.system_r {
-            image_map.map_images_to_slot(&manifest, Slot::R)?;
+            let slot = Slot::R;
+            tracing::debug!("Mapping images: {:?} to slot: {}", manifest, slot);
+            image_map.map_images_to_slot(&manifest, slot)?;
         }
 
         // Define the flashable "products".
@@ -183,6 +193,8 @@ impl FlashManifestVersion {
             credentials,
             products,
         };
+
+        tracing::debug!("Created FlashManifest: {:#?}", ret);
 
         Ok(Self::V3(ret))
     }

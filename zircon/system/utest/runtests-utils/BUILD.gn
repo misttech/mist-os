@@ -7,7 +7,7 @@ import("//build/dist/renamed_binary.gni")
 import("//build/dist/resource.gni")
 import("//build/test.gni")
 import("//build/testing/bootfs_test.gni")
-import("//build/toolchain/runtime/toolchain_runtime_deps.gni")
+import("//build/toolchain/zircon/clang.gni")
 
 test("runtests-utils") {
   sources = [
@@ -92,8 +92,7 @@ resource("packaged-raw-profile") {
   #
   # "SkDvAQt_IN7-4-_K2xShZJxH9sfemvCs0bioG10wxIEC" is the cipd ID for the older
   # toolchain with the older format. We should remove this after rolling clang.
-  if (clang_toolchain_spec.version_string ==
-      "SkDvAQt_IN7-4-_K2xShZJxH9sfemvCs0bioG10wxIEC") {
+  if (clang_version_string == "SkDvAQt_IN7-4-_K2xShZJxH9sfemvCs0bioG10wxIEC") {
     sources = [ "helper/15822697145192797690.profraw" ]
   } else {
     sources = [ "helper/15822697145192797690.v10.profraw" ]

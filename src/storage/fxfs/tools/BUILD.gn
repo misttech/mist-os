@@ -61,7 +61,7 @@ if (is_host) {
       "//src/storage/lib/storage_device",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:argh",
-      "//third_party/rust_crates:tracing",
+      "//third_party/rust_crates:log",
     ]
     if (is_linux) {
       deps += [

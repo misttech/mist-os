@@ -123,10 +123,12 @@ if (toolchain_environment == "kernel.phys32" ||
     sources = [ "stdout.cc" ]
     public = [ "stdout.h" ]
     deps = [
+      "//zircon/kernel/arch/x86/phys:legacy-boot",
       "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/phys:boot-options",
       "//zircon/kernel/phys:stdio",
       "//zircon/kernel/phys:uart",
+      "//zircon/kernel/phys/lib/boot-shim",
     ]
   }
 

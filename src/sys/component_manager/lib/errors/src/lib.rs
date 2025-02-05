@@ -805,12 +805,8 @@ pub enum StartActionError {
     },
     #[error("creating program input dictionary for `{moniker}`")]
     InputDictionaryError { moniker: Moniker },
-    #[error("creating namespace for `{moniker}`: {err}")]
-    CreateNamespaceError {
-        moniker: Moniker,
-        #[source]
-        err: CreateNamespaceError,
-    },
+    #[error("creating namespace: {0}")]
+    CreateNamespaceError(#[from] CreateNamespaceError),
     #[error("starting program for `{moniker}`: {err}")]
     StartProgramError {
         moniker: Moniker,
@@ -844,7 +840,7 @@ impl StartActionError {
             | StartActionError::EagerStartError { .. } => zx::Status::INTERNAL,
             StartActionError::RebootOnTerminateForbidden { err, .. } => err.as_zx_status(),
             StartActionError::ResolveRunnerError { err, .. } => err.as_zx_status(),
-            StartActionError::CreateNamespaceError { err, .. } => err.as_zx_status(),
+            StartActionError::CreateNamespaceError(err) => err.as_zx_status(),
             StartActionError::InputDictionaryError { .. } => zx::Status::NOT_FOUND,
             StartActionError::ResolveActionError { err, .. } => err.as_zx_status(),
             StartActionError::Aborted { .. } => zx::Status::NOT_FOUND,
@@ -997,20 +993,34 @@ impl Into<fsys::UnresolveError> for UnresolveActionError {
 
 #[derive(Debug, Clone, Error)]
 pub enum CreateNamespaceError {
-    #[error("failed to clone pkg dir:\n\t{0}")]
-    ClonePkgDirFailed(#[source] fuchsia_fs::node::CloneError),
+    #[error("failed to clone pkg dir for {moniker}: {err}")]
+    ClonePkgDirFailed {
+        moniker: Moniker,
+        #[source]
+        err: fuchsia_fs::node::CloneError,
+    },
 
-    #[error("use decl without path cannot be installed into the namespace:\n\t{0:?}")]
-    UseDeclWithoutPath(UseDecl),
+    #[error(
+        "use decl without path cannot be installed into the namespace for {moniker}: {decl:?}"
+    )]
+    UseDeclWithoutPath { moniker: Moniker, decl: UseDecl },
 
-    #[error("instance not in index:\n\t{0}")]
+    #[error("instance not in index: {0}")]
     InstanceNotInInstanceIdIndex(#[from] RoutingError),
 
-    #[error(transparent)]
-    BuildNamespaceError(#[from] serve_processargs::BuildNamespaceError),
+    #[error("building namespace for {moniker}: {err}")]
+    BuildNamespaceError {
+        moniker: Moniker,
+        #[source]
+        err: serve_processargs::BuildNamespaceError,
+    },
 
-    #[error("failed to convert namespace into directory")]
-    ConvertToDirectory(#[source] ClonableError),
+    #[error("failed to convert namespace into directory for {moniker}: {err}")]
+    ConvertToDirectory {
+        moniker: Moniker,
+        #[source]
+        err: ClonableError,
+    },
 
     #[error(transparent)]
     ComponentInstanceError(#[from] ComponentInstanceError),
@@ -1019,11 +1029,11 @@ pub enum CreateNamespaceError {
 impl CreateNamespaceError {
     fn as_zx_status(&self) -> zx::Status {
         match self {
-            Self::ClonePkgDirFailed(_) => zx::Status::INTERNAL,
-            Self::UseDeclWithoutPath(_) => zx::Status::NOT_FOUND,
-            Self::InstanceNotInInstanceIdIndex(e) => e.as_zx_status(),
-            Self::BuildNamespaceError(_) => zx::Status::NOT_FOUND,
-            Self::ConvertToDirectory(_) => zx::Status::INTERNAL,
+            Self::ClonePkgDirFailed { .. } => zx::Status::INTERNAL,
+            Self::UseDeclWithoutPath { .. } => zx::Status::NOT_FOUND,
+            Self::InstanceNotInInstanceIdIndex(err) => err.as_zx_status(),
+            Self::BuildNamespaceError { .. } => zx::Status::NOT_FOUND,
+            Self::ConvertToDirectory { .. } => zx::Status::INTERNAL,
             Self::ComponentInstanceError(err) => err.as_zx_status(),
         }
     }

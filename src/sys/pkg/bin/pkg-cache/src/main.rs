@@ -21,10 +21,10 @@ use fuchsia_async::Task;
 use fuchsia_component::client::connect_to_protocol;
 use futures::join;
 use futures::prelude::*;
+use log::{error, info};
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
-use tracing::{error, info};
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable as _;
 use vfs::remote::remote_dir;
@@ -428,7 +428,7 @@ async fn serve_base_package_if_present(
     {
         Ok::<fuchsia_hash::Hash, _>(_) => (),
         Err(base_resolver::ResolverError::PackageNotInBase(_)) => {
-            tracing::warn!(%url, "package not in base, so exposed directory will close connections")
+            log::warn!(url:%; "package not in base, so exposed directory will close connections")
         }
         Err(e) => Err(e).context("resolving specific base package")?,
     }

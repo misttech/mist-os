@@ -32,6 +32,6 @@ async fn main() -> Result<(), Error> {
 
     let result =
         try_join!(watch_media_sessions_fut, avrcp_requests_fut, battery_client_fut).map(|_| ());
-    tracing::info!(?result, "finished");
+    log::info!(result:?; "finished");
     result
 }

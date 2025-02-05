@@ -20,6 +20,8 @@
     ],
     use: [
         { service: 'fuchsia.hardware.clockimpl.Service' },
+        { service: 'fuchsia.hardware.clockimpl.ClockIdsMetadata' },
+        { service: 'fuchsia.hardware.clockimpl.InitMetadata' },
     ],
     expose: [
         {

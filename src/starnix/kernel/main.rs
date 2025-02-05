@@ -12,7 +12,7 @@
 use {extended_pstate as _, tracing_mutex as _};
 
 use anyhow::{Context as _, Error};
-use fidl::endpoints::ControlHandle;
+use async_lock::OnceCell;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::health::Reporter;
 use futures::{StreamExt, TryStreamExt};
@@ -21,7 +21,10 @@ use starnix_kernel_runner::{
     create_component_from_stream, serve_component_runner, serve_container_controller,
     serve_memory_attribution_provider_elfkernel, Container, ContainerServiceConfig,
 };
-use starnix_logging::{log_debug, trace_instant, CATEGORY_STARNIX, NAME_START_KERNEL};
+use starnix_logging::{
+    log_debug, log_error, log_warn, trace_instant, CATEGORY_STARNIX, NAME_START_KERNEL,
+};
+use std::rc::Rc;
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_memory_attribution as fattribution,
     fidl_fuchsia_process_lifecycle as flifecycle, fidl_fuchsia_starnix_container as fstarcontainer,
@@ -48,24 +51,30 @@ extern "C" fn zxio_fault_catching_disabled() -> bool {
     false
 }
 
-fn maybe_serve_lifecycle() {
+fn maybe_serve_lifecycle(container: Rc<OnceCell<Container>>) -> Option<fasync::Task<()>> {
     if let Some(lifecycle) =
         fruntime::take_startup_handle(fruntime::HandleInfo::new(fruntime::HandleType::Lifecycle, 0))
     {
-        fasync::Task::local(async move {
+        Some(fasync::Task::local(async move {
             let mut stream =
                 fidl::endpoints::ServerEnd::<flifecycle::LifecycleMarker>::new(lifecycle.into())
                     .into_stream();
             if let Ok(Some(request)) = stream.try_next().await {
                 match request {
-                    flifecycle::LifecycleRequest::Stop { control_handle } => {
-                        control_handle.shutdown();
-                        std::process::exit(0);
+                    flifecycle::LifecycleRequest::Stop { .. } => {
+                        if let Some(container) = container.get() {
+                            container.kernel.shut_down();
+                        } else {
+                            log_warn!("Stopping kernel process without a running container.");
+                            std::process::exit(0);
+                        }
                     }
                 }
             }
-        })
-        .detach();
+        }))
+    } else {
+        log_warn!("No lifecycle channel received from ELF runner.");
+        None
     }
 }
 
@@ -140,9 +149,8 @@ async fn main() -> Result<(), Error> {
     fuchsia_trace_provider::trace_provider_wait_for_init();
     trace_instant!(CATEGORY_STARNIX, NAME_START_KERNEL, fuchsia_trace::Scope::Thread);
 
-    let container = async_lock::OnceCell::<Container>::new();
-
-    maybe_serve_lifecycle();
+    let container = Rc::new(OnceCell::<Container>::new());
+    let _lifecycle_task = maybe_serve_lifecycle(container.clone());
 
     let mut fs = ServiceFs::new_local();
     fs.dir("svc")
@@ -188,6 +196,8 @@ async fn main() -> Result<(), Error> {
                         .serve(config)
                         .await
                         .expect("failed to serve the expected services from the container");
+                } else {
+                    log_error!("No config provided for container, not running it.");
                 }
             }
             KernelServices::ComponentRunner(stream) => {

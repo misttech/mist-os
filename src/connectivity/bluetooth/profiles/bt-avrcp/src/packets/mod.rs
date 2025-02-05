@@ -4,10 +4,10 @@
 
 use bt_avctp::AvcCommandType;
 use fidl_fuchsia_bluetooth_avrcp as fidl_avrcp;
+use log::{debug, info, warn};
 use packet_encoding::{decodable_enum, Decodable, Encodable};
 use std::result;
 use thiserror::Error;
-use tracing::{debug, info, warn};
 
 mod browsing;
 mod continuation;

@@ -81,7 +81,7 @@ pub async fn find_partition_in(
                         }
                         Ok(false) => {}
                         Err(error) => {
-                            tracing::info!(?error, "Failure in partition match. Transient device?");
+                            log::info!(error:?; "Failure in partition match. Transient device?");
                         }
                     }
                 }

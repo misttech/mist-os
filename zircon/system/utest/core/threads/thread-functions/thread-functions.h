@@ -10,7 +10,7 @@
 
 // This file contains thread functions that do various things useful for testing thread behavior.
 
-// The arg is a zx_time_t which is passed to zx_nanosleep.
+// The arg is a zx_instant_mono_t which is passed to zx_nanosleep.
 void threads_test_sleep_fn(void* arg);
 
 // The arg is an event. It will first be waited on for signal 0, then it will issue signal 1 to

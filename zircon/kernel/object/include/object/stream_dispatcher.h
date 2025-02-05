@@ -43,7 +43,7 @@ class StreamDispatcher final : public SoloDispatcher<StreamDispatcher, ZX_DEFAUL
   zx_status_t SetAppendMode(bool value);
   bool IsInAppendMode() const;
   bool CanResizeVmo() const;
-  void GetInfo(zx_info_stream_t* info) const;
+  zx_info_stream_t GetInfo() const;
 
  private:
   explicit StreamDispatcher(uint32_t options, fbl::RefPtr<VmObjectPaged> vmo,

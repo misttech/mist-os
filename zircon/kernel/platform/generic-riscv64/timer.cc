@@ -23,7 +23,7 @@ inline zx_ticks_t platform_current_raw_ticks_synchronized() {
   return timer_current_ticks();
 }
 
-zx_ticks_t platform_convert_early_ticks(arch::EarlyTicks sample) {
+zx_instant_mono_ticks_t platform_convert_early_ticks(arch::EarlyTicks sample) {
   return sample.time + timer_get_mono_ticks_offset();
 }
 

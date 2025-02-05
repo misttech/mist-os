@@ -221,7 +221,7 @@ created ergonomic wrappers: [`component::Connect<Protocol>`][service-connect],
   // The channel creation and service connection is done in one function.
   // Opens "/svc" and returns the client endpoint, as a
   // |zx::result<fidl::ClientEnd<::fuchsia_io::Directory>>|.
-  auto client_end = component::OpenServiceRoot<Foo>();
+  auto client_end = component::OpenServiceRoot();
   if (!client_end.is_ok())
     return client_end.status_value();
   // Note: can omit template argument

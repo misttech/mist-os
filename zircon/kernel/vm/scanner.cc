@@ -39,7 +39,7 @@ constexpr uint32_t kScannerOpDisablePTReclaim = 1u << 9;
 
 // Amount of time between page table evictions. This is not atomic as it is only set during init
 // before the scanner thread starts up, at which point it becomes read only.
-zx_duration_t page_table_evict_time = ZX_SEC(10);
+zx_duration_mono_t page_table_evict_time = ZX_SEC(10);
 
 // Number of pages to attempt to de-dupe back to zero every second. This not atomic as it is only
 // set during init before the scanner thread starts up, at which point it becomes read only.
@@ -70,12 +70,12 @@ DECLARE_SINGLETON_MUTEX(accessed_scanner_lock);
 // To avoid redundant scanning we remember when the last accessed scan happened. As an accessed scan
 // might or might not harvest track the last time either kind of scan completed. Since harvesting is
 // a super set of scanning last_accessed_scan_complete >= last_harvest_accessed_scan_complete.
-ktl::atomic<zx_time_t> last_accessed_scan_complete = ZX_TIME_INFINITE_PAST;
-ktl::atomic<zx_time_t> last_harvest_accessed_scan_complete = ZX_TIME_INFINITE_PAST;
+ktl::atomic<zx_instant_mono_t> last_accessed_scan_complete = ZX_TIME_INFINITE_PAST;
+ktl::atomic<zx_instant_mono_t> last_harvest_accessed_scan_complete = ZX_TIME_INFINITE_PAST;
 
 // The accessed scan rate starts matched to the minimum aging period, since scanning more frequently
 // than that does not produce any fidelity of information.
-ktl::atomic<zx_duration_t> accessed_scan_period = PageQueues::kDefaultMinMruRotateTime;
+ktl::atomic<zx_duration_mono_t> accessed_scan_period = PageQueues::kDefaultMinMruRotateTime;
 
 ktl::atomic<bool> reclaim_pt_next_accessed_scan = false;
 
@@ -103,12 +103,12 @@ void scanner_print_stats() {
   }
 }
 
-zx_time_t calc_next_zero_scan_deadline(zx_time_t current) {
+zx_instant_mono_t calc_next_zero_scan_deadline(zx_instant_mono_t current) {
   return zero_page_scans_per_second > 0 ? zx_time_add_duration(current, ZX_SEC(1))
                                         : ZX_TIME_INFINITE;
 }
 
-zx_time_t calc_next_pt_evict_deadline(zx_time_t current, bool pt_enable_override) {
+zx_instant_mono_t calc_next_pt_evict_deadline(zx_instant_mono_t current, bool pt_enable_override) {
   if (page_table_reclaim_policy == PageTableEvictionPolicy::kAlways || pt_enable_override) {
     return zx_time_add_duration(current, page_table_evict_time);
   } else {
@@ -119,14 +119,15 @@ zx_time_t calc_next_pt_evict_deadline(zx_time_t current, bool pt_enable_override
 int scanner_request_thread(void*) {
   bool disabled = false;
   bool pt_eviction_enabled = false;
-  zx_time_t last_pt_evict = ZX_TIME_INFINITE_PAST;
-  zx_time_t next_zero_scan_deadline = calc_next_zero_scan_deadline(current_time());
-  zx_time_t next_harvest_deadline = zx_time_add_duration(current_time(), accessed_scan_period);
+  zx_instant_mono_t last_pt_evict = ZX_TIME_INFINITE_PAST;
+  zx_instant_mono_t next_zero_scan_deadline = calc_next_zero_scan_deadline(current_mono_time());
+  zx_instant_mono_t next_harvest_deadline =
+      zx_time_add_duration(current_mono_time(), accessed_scan_period);
   while (1) {
     if (disabled) {
       scanner_request_event.Wait(Deadline::infinite());
     } else {
-      zx_time_t next_pt_evict_deadline =
+      zx_instant_mono_t next_pt_evict_deadline =
           calc_next_pt_evict_deadline(last_pt_evict, pt_eviction_enabled);
       scanner_request_event.Wait(Deadline::no_slack(ktl::min(
           next_pt_evict_deadline, ktl::min(next_zero_scan_deadline, next_harvest_deadline))));
@@ -163,7 +164,7 @@ int scanner_request_thread(void*) {
       continue;
     }
 
-    zx_time_t current = current_time();
+    zx_instant_mono_t current = current_mono_time();
 
     if (current >= calc_next_pt_evict_deadline(last_pt_evict, pt_eviction_enabled) ||
         (op & kScannerOpReclaimAll)) {
@@ -209,7 +210,7 @@ int scanner_request_thread(void*) {
       pmm_evictor()->EvictFromExternalTarget(target);
       // To ensure any page table eviction that was set earlier actually occurs, force an accessed
       // scan to happen right now.
-      scanner_wait_for_accessed_scan(current_time(), true);
+      scanner_wait_for_accessed_scan(current_mono_time(), true);
     }
     if (op & kScannerOpDump) {
       op &= ~kScannerOpDump;
@@ -262,7 +263,7 @@ void scanner_dump_info() {
 // The public definition of this method is abstract to allow for this to, in the future, not
 // necessarily perform a scan itself, but sync up with the scanner thread that might be slowly
 // scanning in the background.
-void scanner_wait_for_accessed_scan(zx_time_t update_time, bool clear_bits) {
+void scanner_wait_for_accessed_scan(zx_instant_mono_t update_time, bool clear_bits) {
   if (update_time <=
       (clear_bits ? last_harvest_accessed_scan_complete : last_accessed_scan_complete)) {
     // scanning is sufficiently up to date.
@@ -288,7 +289,7 @@ void scanner_wait_for_accessed_scan(zx_time_t update_time, bool clear_bits) {
                                                      : VmAspace::TerminalAction::UpdateAge);
     pmm_page_queues()->EndAccessScan();
   }
-  last_accessed_scan_complete = current_time();
+  last_accessed_scan_complete = current_mono_time();
   if (clear_bits) {
     last_harvest_accessed_scan_complete = last_accessed_scan_complete.load();
   }
@@ -472,7 +473,7 @@ static int cmd_scanner(int argc, const cmd_args* argv, uint32_t flags) {
   } else if (!strcmp(argv[1].str, "rotate_queue")) {
     pmm_page_queues()->RotateReclaimQueues();
   } else if (!strcmp(argv[1].str, "harvest_accessed")) {
-    scanner_wait_for_accessed_scan(current_time(), true);
+    scanner_wait_for_accessed_scan(current_mono_time(), true);
   } else if (!strcmp(argv[1].str, "reclaim")) {
     if (argc < 3) {
       goto usage;

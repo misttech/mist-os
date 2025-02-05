@@ -430,7 +430,7 @@ impl Fvm {
 impl FSConfig for Fvm {
     fn options(&self) -> Options<'_> {
         Options {
-            component_name: "fvm",
+            component_name: "fvm2",
             reuse_component_after_serving: true,
             format_options: FormatOptions::default(),
             start_options: StartOptions {

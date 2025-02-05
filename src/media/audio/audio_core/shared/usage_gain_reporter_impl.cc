@@ -14,7 +14,14 @@ UsageGainReporterImpl::GetFidlRequestHandler() {
 }
 
 void UsageGainReporterImpl::RegisterListener(
-    std::string device_unique_id, fuchsia::media::Usage usage,
+    std::string device_unique_id, fuchsia::media::Usage _usage,
+    fidl::InterfaceHandle<fuchsia::media::UsageGainListener> usage_gain_listener_handler) {
+  auto usage = ToFidlUsage2(_usage);
+  RegisterListener2(device_unique_id, std::move(usage), std::move(usage_gain_listener_handler));
+}
+
+void UsageGainReporterImpl::RegisterListener2(
+    std::string device_unique_id, fuchsia::media::Usage2 usage,
     fidl::InterfaceHandle<fuchsia::media::UsageGainListener> usage_gain_listener_handler) {
   const auto deserialize_result = DeviceUniqueIdFromString(device_unique_id);
   if (deserialize_result.is_error()) {
@@ -45,7 +52,7 @@ void UsageGainReporterImpl::RegisterListener(
 
 UsageGainReporterImpl::Listener::Listener(
     UsageGainReporterImpl& parent, const DeviceConfig::OutputDeviceProfile& output_device_profile,
-    fuchsia::media::Usage usage, fuchsia::media::UsageGainListenerPtr usage_gain_listener)
+    fuchsia::media::Usage2 usage, fuchsia::media::UsageGainListenerPtr usage_gain_listener)
     : parent_(parent),
       loudness_transform_(output_device_profile.loudness_transform()),
       independent_volume_control_(output_device_profile.independent_volume_control()),

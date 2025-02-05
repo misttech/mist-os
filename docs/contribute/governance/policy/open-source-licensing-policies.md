@@ -126,6 +126,9 @@ The following are the approved licenses for production target devices:
 *   X11 license, specifically the text at
     [/third_party/github.com/intel/libva/va/x11/va_dri2.c](https://fuchsia.googlesource.com/third_party/github.com/intel/libva/+/6e86b4fb4dafa123b1e31821f61da88f10cfbe91/va/x11/va_dri2.c)
 
+*   X11-lucent license, specifically the text at
+    [https://scancode-licensedb.aboutcode.org/x11-lucent.html](https://scancode-licensedb.aboutcode.org/x11-lucent.html)
+
 *   Zlib license, specifically the text at
     [https://fuchsia.googlesource.com/third\_party/zlib/+/main/README#85](https://fuchsia.googlesource.com/third_party/zlib/+/main/README#85)
 

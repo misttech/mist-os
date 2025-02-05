@@ -418,7 +418,7 @@ def _generate_sysroot_build_rules(
                 #    repo_name        = fuchsia_idk
                 #    dist_path        = arch/x64/sysroot/dist/lib/FOO
                 #    dist_lib_subpath = FOO
-                #    strip_prefix    = ../fuchsia_idk/arch/x64/sysroot/dist/lib/
+                #    strip_prefix     = arch/x64/sysroot/dist/lib/
                 repo_name, _, label = dist_lib.partition("//")
                 repo_name = repo_name[1:]  # Remove initial @
                 dist_path = label.replace(":", "/")
@@ -428,12 +428,12 @@ def _generate_sysroot_build_rules(
                 #    repo_name        = fuchsia_sdk   (current repository name)
                 #    dist_path        = arch/x64/sysroot/dist/lib/FOO
                 #    dist_lib_subpath = FOO
-                #    strip_prefix    = ../fuchsia_sdk/arch/x64/sysroot/dist/lib/
+                #    strip_prefix     = arch/x64/sysroot/dist/lib/
                 repo_name = ctx.attr.name
                 dist_path = dist_lib
 
             dist_lib_subpath = dist_path.removeprefix(libs_base)
-            strip_prefix = "../%s/%s/dist/lib/" % (repo_name, dist_dir)
+            strip_prefix = "%s/dist/lib/" % (dist_dir)
 
             # dist_lib_subpath can be 'libfoo.so' or '<variant>/libfoo.so'
             variant, _, _ = dist_lib_subpath.rpartition("/")

@@ -14,8 +14,8 @@
 #include <lib/stdcompat/optional.h>
 
 #include <cstdint>
+#include <deque>
 #include <optional>
-#include <queue>
 
 #include <rapidjson/document.h>
 
@@ -124,14 +124,14 @@ class LogsSubscription {
  private:
   LogsSubscription::Promise ReadBatch();
   static std::optional<LogsData> LoadJson(rapidjson::Document document,
-                                          std::shared_ptr<std::queue<LogsData>> pending,
+                                          std::shared_ptr<std::deque<LogsData>> pending,
                                           std::shared_ptr<bool> done);
 
   // Iterator connection.
   fidl::SharedClient<fuchsia_diagnostics::BatchIterator> iterator_;
 
   // Pending data to return before calling BatchIterator/GetNext again.
-  std::shared_ptr<std::queue<LogsData>> pending_;
+  std::shared_ptr<std::deque<LogsData>> pending_;
   // The scope to tie async task lifetimes to this object.
   fpromise::scope scope_;
   // Whether or not this subscription has completed and will return more data.

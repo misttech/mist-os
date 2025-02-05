@@ -10,12 +10,12 @@ use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use futures::channel::{mpsc, oneshot};
 use futures::task::{Context, Poll};
 use futures::{Future, Stream, StreamExt};
+use log::{debug, error};
 use pin_project::pin_project;
 use std::collections::{BTreeMap, BTreeSet};
 use std::pin::Pin;
 use std::sync::{Arc, Weak};
 use thiserror::Error;
-use tracing::{debug, error};
 
 const RECENT_EVENT_LIMIT: usize = 200;
 
@@ -208,7 +208,7 @@ impl Stream for EventStream {
                 // Notify once that it has been drained.
                 if let Some(snd) = this.on_drained.take() {
                     snd.send(()).unwrap_or_else(|err| {
-                        error!(?err, "Failed to notify the events have been drained.");
+                        error!(err:?; "Failed to notify the events have been drained.");
                     });
                 };
                 Poll::Ready(None)
@@ -229,11 +229,11 @@ impl TerminateHandle {
     /// will complete once all buffered events have been drained.
     pub async fn terminate(self) {
         self.snd.send(()).unwrap_or_else(|err| {
-            error!(?err, "Failed to terminate the event ingestion.");
+            error!(err:?; "Failed to terminate the event ingestion.");
         });
         self.drained
             .await
-            .unwrap_or_else(|err| error!(?err, "Error waiting for events to be drained."));
+            .unwrap_or_else(|err| error!(err:?; "Error waiting for events to be drained."));
     }
 }
 

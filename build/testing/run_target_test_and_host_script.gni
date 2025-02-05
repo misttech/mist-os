@@ -64,11 +64,12 @@ import("//build/python/python_host_test.gni")
 template("run_target_test_and_host_script") {
   assert(is_host, "run_target_test_and_host_script runs on the host")
   assert(defined(invoker.test_url), "test url must be defined")
-  assert(defined(invoker.test_package), "test url must be defined")
+  assert(defined(invoker.test_package), "test package must be defined")
   assert(defined(invoker.host_script), "host script must be defined")
 
   run_host_script_on_fail = false
-  if (defined(invoker.run_host_script_on_fail)) {
+  if (defined(invoker.run_host_script_on_fail) &&
+      invoker.run_host_script_on_fail) {
     run_host_script_on_fail = true
   }
   _data_deps = [ invoker.test_package ]

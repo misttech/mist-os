@@ -41,7 +41,7 @@ group("per_test_timeout_allowlist") {
     "//src/connectivity/network/tests/integration:netstack-multicast-forwarding-integration-test-no-err-logs_test_netstack-multicast-forwarding-integration-test",
     "//src/connectivity/network/tests/integration:netstack-multicast-forwarding-integration-test-with-err-logs_test_netstack-multicast-forwarding-integration-test",
     "//src/starnix/tests/gvisor:*",
-    "//src/storage/blackout/host:*",
+    "//src/storage/blackout/host/tests:*",
     "//src/storage/lib/paver/test:*",
     "//src/virtualization/tests:termina_container_tests_pkg_test_termina_container_tests_cmp",
 

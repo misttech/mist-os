@@ -17,6 +17,11 @@ class SystemStateTransition final
     bindings_.AddBinding(dispatcher, std::move(server_end), this, fidl::kIgnoreBindingClosure);
   }
 
+  fidl::ProtocolHandler<fuchsia_system_state::SystemStateTransition> CreateHandler(
+      async_dispatcher_t* dispatcher) {
+    return bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure);
+  }
+
   void GetTerminationSystemState(GetTerminationSystemStateCompleter::Sync& completer) override {
     completer.Reply(fuchsia_system_state::SystemPowerState::kFullyOn);
   }

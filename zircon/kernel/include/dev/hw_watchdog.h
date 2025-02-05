@@ -30,10 +30,10 @@ zx_status_t hw_watchdog_set_enabled(bool enabled);
 bool hw_watchdog_is_enabled(void);
 
 // Returns the nominal timeout period of the hardware watchdog.
-zx_duration_t hw_watchdog_get_timeout_nsec(void);
+zx_duration_boot_t hw_watchdog_get_timeout_nsec(void);
 
 // Returns the last time at which the hardware watchdog was successfully pet.
-zx_time_t hw_watchdog_get_last_pet_time(void);
+zx_instant_boot_t hw_watchdog_get_last_pet_time(void);
 
 // When |suppress| is true, prevent any thread from actually petting the
 // watchdog.  Otherwise, permit threads to pet the watchdog.  This feature is

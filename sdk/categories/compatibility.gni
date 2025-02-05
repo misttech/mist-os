@@ -1,0 +1,71 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+_all_idk_categories = [
+  # A fake category used only for markers to represent targets that do not have
+  # a category and thus are not included in the IDK.
+  "not-in-idk",
+
+  # The categories supported by `sdk_atom()`.
+  "cts",
+  "partner_internal",
+  "partner",
+  "public",
+]
+
+_categories_partner_sources_may_depend_on = [
+  "partner",
+  "public",
+]
+
+_categories_partner_prebuilts_may_depend_on =
+    _categories_partner_sources_may_depend_on + [ "partner_internal" ]
+
+#
+# Marker lists.
+#
+
+# All marker targets representing IDK categories
+all_idk_category_markers_targets = []
+foreach(category, _all_idk_categories) {
+  all_idk_category_markers_targets += [ "//sdk/categories:marker-${category}" ]
+}
+
+# Incompatible marker lists.
+#
+# The following are lists of IDK category markers for categories that are
+# *incompatible* with the named IDK category. Add the list corresponding to a
+# target's SDK category to its `assert_no_deps` to ensure that no item in the
+# target's dependency tree has a dependency on a marker for an incompatible
+# category. In other words, to ensure that the target does not have a dependency
+# on a target in one of the incompatible IDK categories.
+#
+# Note: `assert_no_deps` entries appear to apply to all toolchains unless one
+# is explicitly specified in the entry. This is important because the markers
+# may be applied on any toolchain. Thus, it is critical that no toolchain be
+# specified in these lists.
+#
+# Note: Currently, only some FIDL-related targets and ffx tools and plugins take
+# dependencies on markers, so such `assert_no_deps` does not guarantee that
+# there are no, for example, uses of FIDL libraries from incompatible SDK
+# categories in the target's dependency tree
+# TODO(https://fxbug.dev/314822328): Increase coverage.
+#
+# For each category:
+# 1. Initialize marker incompatibility lists to all markers.
+# 2. Remove the compatible markers from the list.
+
+markers_partner_idk_sources_must_not_depend_on =
+    all_idk_category_markers_targets
+foreach(compatible_category, _categories_partner_sources_may_depend_on) {
+  markers_partner_idk_sources_must_not_depend_on -=
+      [ "//sdk/categories:marker-${compatible_category}" ]
+}
+
+markers_partner_idk_prebuilts_must_not_depend_on =
+    all_idk_category_markers_targets
+foreach(compatible_category, _categories_partner_prebuilts_may_depend_on) {
+  markers_partner_idk_prebuilts_must_not_depend_on -=
+      [ "//sdk/categories:marker-${compatible_category}" ]
+}

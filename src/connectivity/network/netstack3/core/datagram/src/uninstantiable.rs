@@ -7,17 +7,21 @@ use netstack3_base::socket::MaybeDualStack;
 use netstack3_base::{Uninstantiable, UninstantiableWrapper};
 
 use crate::internal::datagram::{
-    BoundSockets, DatagramBoundStateContext, DatagramIpSpecificSocketOptions,
-    DatagramSocketMapSpec, DatagramSocketSpec, DualStackConverter, IpExt, IpOptions,
-    NonDualStackConverter,
+    BoundSockets, DatagramBindingsTypes, DatagramBoundStateContext,
+    DatagramIpSpecificSocketOptions, DatagramSocketMapSpec, DatagramSocketSpec, DualStackConverter,
+    IpExt, IpOptions, NonDualStackConverter,
 };
 use crate::internal::spec_context::{
     DatagramSpecBoundStateContext, DualStackDatagramSpecBoundStateContext,
     NonDualStackDatagramSpecBoundStateContext,
 };
 
-impl<I: IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
-    DatagramSpecBoundStateContext<I, UninstantiableWrapper<P>, C> for S
+impl<
+        I: IpExt,
+        S: DatagramSocketSpec,
+        P: DatagramBoundStateContext<I, BC, S>,
+        BC: DatagramBindingsTypes,
+    > DatagramSpecBoundStateContext<I, UninstantiableWrapper<P>, BC> for S
 {
     type IpSocketsCtx<'a> = P::IpSocketsCtx<'a>;
     type DualStackContext = P::DualStackContext;
@@ -69,8 +73,12 @@ impl<I: IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
     }
 }
 
-impl<I: IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
-    NonDualStackDatagramSpecBoundStateContext<I, UninstantiableWrapper<P>, C> for S
+impl<
+        I: IpExt,
+        S: DatagramSocketSpec,
+        P: DatagramBoundStateContext<I, BC, S>,
+        BC: DatagramBindingsTypes,
+    > NonDualStackDatagramSpecBoundStateContext<I, UninstantiableWrapper<P>, BC> for S
 {
     fn nds_converter(
         core_ctx: &UninstantiableWrapper<P>,
@@ -79,8 +87,12 @@ impl<I: IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
     }
 }
 
-impl<I: IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
-    DualStackDatagramSpecBoundStateContext<I, UninstantiableWrapper<P>, C> for S
+impl<
+        I: IpExt,
+        S: DatagramSocketSpec,
+        P: DatagramBoundStateContext<I, BC, S>,
+        BC: DatagramBindingsTypes,
+    > DualStackDatagramSpecBoundStateContext<I, UninstantiableWrapper<P>, BC> for S
 {
     type IpSocketsCtx<'a> = UninstantiableWrapper<P::IpSocketsCtx<'a>>;
 

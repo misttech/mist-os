@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/config/clang/clang.gni")
+import("//build/config/clang/clang_target_toolchain_info.gni")
 import("//build/config/sanitizers/sanitizer_default_options.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/variant.gni")
@@ -21,57 +22,64 @@ config("variant-libprefix") {
 }
 
 template("sanitizer_rustflags") {
-  if (is_mac) {
-    extension = "_osx_dynamic.dylib"
-    not_needed(invoker, [ "shared_runtime" ])
-  } else if (invoker.shared_runtime) {
-    extension = ".so"
-  } else {
-    extension = ".a"
-  }
-
   # For dynamic linking (Fuchsia and macOS), there is just one combined DSO.
   # For static linking (other platforms), there are separate libraries for the
   # generic (C) and C++-specific runtime support.
-  if (defined(invoker.libs)) {
-    needed_libs = invoker.libs
+  _shared_runtime = defined(invoker.shared_runtime) && invoker.shared_runtime
+  if (_shared_runtime) {
+    needed_libs = [ "clang_rt" ]
   } else {
-    needed_libs = [ invoker.variant ]
+    needed_libs = [
+      "clang_rt",
+      "clang_rt_cxx",
+    ]
   }
-  if (extension == ".a" && defined(invoker.static_libs)) {
-    needed_libs += invoker.static_libs
+
+  if (defined(invoker.variant)) {
+    _variant = invoker.variant
   } else {
-    not_needed(invoker, [ "static_libs" ])
+    _variant = target_name
   }
 
   config(target_name) {
     visibility = [ ":*" ]
     rustflags = []
-    foreach(lib, needed_libs) {
-      # TODO(phosek): use runtime.json instead of invoking Clang.
-      libclang_rt_lib_name = "libclang_rt.${lib}${extension}"
-      libclang_rt_lib_path =
-          exec_script("/usr/bin/env",
-                      [
-                        "${rebased_clang_prefix}/clang",
-                        "--target=${current_target_tuple}",
-                        "-print-file-name=${libclang_rt_lib_name}",
-                      ],
-                      "trim string")
 
-      # If there is no runtime library provided for this target tuple,
-      # the --print-file-name returns the original filename unmodified.
-      if (libclang_rt_lib_path != libclang_rt_lib_name) {
-        rustflags += [ "-Clink-arg=" +
-                       rebase_path(libclang_rt_lib_path, root_build_dir) ]
+    # LINT.IfChange
+    _toolchain_info_variants = clang_target_toolchain_info.variants
+
+    # Not all Clang targets support all variants. E.g.
+    # x86_64-pc-windows-msvc only supports "none"
+    if (defined(_toolchain_info_variants[_variant])) {
+      _toolchain_info_variant = _toolchain_info_variants[_variant]
+
+      if (_shared_runtime) {
+        _toolchain_info_variant_libs = _toolchain_info_variant.shared
+      } else {
+        _toolchain_info_variant_libs = _toolchain_info_variant.static
       }
+
+      foreach(lib, needed_libs) {
+        libclang_rt_lib_name = _toolchain_info_variant_libs[lib]
+        if (libclang_rt_lib_name != "") {
+          rustflags +=
+              [ "-Clink-arg=${rebased_clang_dir}/${libclang_rt_lib_name}" ]
+        }
+      }
+
+      # Expose the presence of sanitizers as a compile-time condition.
+      # This allows conditional compilation of code for this variant,
+      # for instance in order to disable a specific test case.
+      # TODO(https://fxbug.dev/42168338): use cfg_sanitize instead.
+      rustflags += [ "--cfg=feature=\"variant_${invoker.variant}\"" ]
+    } else {
+      not_needed([
+                   "_toolchain_info_variants",
+                   "needed_libs",
+                 ])
     }
 
-    # Expose the presence of sanitizers as a compile-time condition.
-    # This allows conditional compilation of code for this variant,
-    # for instance in order to disable a specific test case.
-    # TODO(https://fxbug.dev/42168338): use cfg_sanitize instead.
-    rustflags += [ "--cfg=feature=\"variant_${invoker.variant}\"" ]
+    # LINT.ThenChange(//build/config/clang/generate_config_json.py)
   }
 }
 
@@ -109,8 +117,7 @@ variant("asan") {
 
 sanitizer_rustflags("asan.rustflags") {
   variant = "asan"
-  shared_runtime = is_fuchsia
-  static_libs = [ "asan_cxx" ]
+  shared_runtime = is_fuchsia || is_mac
 }
 
 sanitizer_default_options("asan_default_options") {
@@ -287,9 +294,7 @@ variant("ubsan") {
 
 sanitizer_rustflags("ubsan.rustflags") {
   variant = "ubsan"
-  shared_runtime = is_fuchsia
-  libs = [ "ubsan_standalone" ]
-  static_libs = [ "ubsan_standalone_cxx" ]
+  shared_runtime = is_fuchsia || is_mac
 }
 
 sanitizer_default_options("ubsan_default_options") {
@@ -310,7 +315,6 @@ variant("tsan") {
 sanitizer_rustflags("tsan.rustflags") {
   variant = "tsan"
   shared_runtime = false
-  static_libs = [ "tsan_cxx" ]
 }
 
 sanitizer_default_options("tsan_default_options") {
@@ -328,7 +332,6 @@ variant("hwasan") {
 sanitizer_rustflags("hwasan.rustflags") {
   variant = "hwasan"
   shared_runtime = is_fuchsia
-  static_libs = [ "hwasan_cxx" ]
 }
 
 sanitizer_default_options("hwasan_default_options") {

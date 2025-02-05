@@ -119,7 +119,6 @@ fuchsia_package(
 
 fuchsia_cc_test(
     name = "child-driver-test-bin",
-    size = "small",
     srcs = [
         "tests/child-driver-test.cc",
     ],
@@ -133,7 +132,6 @@ fuchsia_cc_test(
 
 fuchsia_cc_test(
     name = "parent-driver-test-bin",
-    size = "small",
     srcs = [
         "tests/parent-driver-test.cc",
     ],

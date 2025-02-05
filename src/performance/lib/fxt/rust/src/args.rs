@@ -311,6 +311,23 @@ impl ArgValue {
     }
 }
 
+impl std::fmt::Display for ArgValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ArgValue::Null => write!(f, "null"),
+            ArgValue::Boolean(v) => write!(f, "{v}"),
+            ArgValue::Signed32(v) => write!(f, "{v}"),
+            ArgValue::Unsigned32(v) => write!(f, "{v}"),
+            ArgValue::Signed64(v) => write!(f, "{v}"),
+            ArgValue::Unsigned64(v) => write!(f, "{v}"),
+            ArgValue::Double(v) => write!(f, "{v}"),
+            ArgValue::String(v) => write!(f, "{v}"),
+            ArgValue::Pointer(v) => write!(f, "{v:#016x}"),
+            ArgValue::KernelObj(v) => write!(f, "{v}"),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum RawArgValue<'a> {
     Null,

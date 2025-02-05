@@ -172,23 +172,18 @@ raw_display_info_t Vout::CreateRawDisplayInfo(
           .preferred_modes_count = 1,
           .edid_bytes_list = nullptr,
           .edid_bytes_count = 0,
-          .eddc_client = {.ops = nullptr, .ctx = nullptr},
           .pixel_formats_list = pixel_formats.data(),
           .pixel_formats_count = pixel_formats.size(),
       };
     }
     case VoutType::kHdmi:
+      ZX_DEBUG_ASSERT(!hdmi_.current_display_edid.is_empty());
       return raw_display_info_t{
           .display_id = display::ToBanjoDisplayId(display_id),
           .preferred_modes_list = nullptr,
           .preferred_modes_count = 0,
-          .edid_bytes_list = nullptr,
-          .edid_bytes_count = 0,
-          .eddc_client =
-              {
-                  .ops = &i2c_impl_protocol_ops_,
-                  .ctx = this,
-              },
+          .edid_bytes_list = hdmi_.current_display_edid.data(),
+          .edid_bytes_count = hdmi_.current_display_edid.size(),
           .pixel_formats_list = pixel_formats.data(),
           .pixel_formats_count = pixel_formats.size(),
       };
@@ -196,14 +191,21 @@ raw_display_info_t Vout::CreateRawDisplayInfo(
   ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
 }
 
-void Vout::DisplayConnected() {
+zx::result<> Vout::UpdateStateOnDisplayConnected() {
   switch (type_) {
-    case VoutType::kHdmi:
+    case VoutType::kHdmi: {
+      auto read_extended_edid_result = hdmi_.hdmi_host->ReadExtendedEdid();
+      if (read_extended_edid_result.is_error()) {
+        // HdmiTransmitter::ReadExtendedEdid() already logs errors.
+        return read_extended_edid_result.take_error();
+      }
+      hdmi_.current_display_edid = std::move(read_extended_edid_result).value();
       // A new connected display is not yet set up with any display timing.
       hdmi_.current_display_timing_ = {};
-      return;
+      return zx::ok();
+    }
     case VoutType::kDsi:
-      return;
+      return zx::ok();
   }
   ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
 }
@@ -319,16 +321,6 @@ zx::result<> Vout::ApplyConfiguration(const display::DisplayTiming& timing) {
 
   hdmi_.current_display_timing_ = timing;
   return zx::ok();
-}
-
-zx_status_t Vout::I2cImplTransact(const i2c_impl_op_t* op_list, size_t op_count) {
-  switch (type_) {
-    case VoutType::kHdmi:
-      return hdmi_.hdmi_host->EdidTransfer(op_list, op_count);
-    case VoutType::kDsi:
-      return ZX_ERR_NOT_SUPPORTED;
-  }
-  ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
 }
 
 void Vout::Dump() {

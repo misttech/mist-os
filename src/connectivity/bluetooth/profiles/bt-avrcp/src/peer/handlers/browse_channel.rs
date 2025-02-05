@@ -4,9 +4,9 @@
 
 use bt_avctp::{self as avctp, AvctpCommand};
 use futures::Future;
+use log::{info, trace, warn};
 use packet_encoding::{Decodable, Encodable};
 use std::sync::Arc;
-use tracing::{info, trace, warn};
 
 use crate::packets::*;
 use crate::peer_manager::TargetDelegate;

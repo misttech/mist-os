@@ -115,7 +115,7 @@ async fn main() -> Result<(), anyhow::Error> {
     fs.take_and_serve_directory_handle().context("Error starting server")?;
     fs.for_each_concurrent(None, |stream| async {
         if let Err(err) = run_virtio_block(stream).await {
-            tracing::error!(%err, "Error running virtio_block service");
+            log::error!(err:%; "Error running virtio_block service");
         }
     })
     .await;

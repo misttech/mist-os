@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/amlogic-display/hdmi-transmitter.h"
 
-#include <fuchsia/hardware/i2cimpl/c/banjo.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
@@ -14,9 +13,11 @@
 #include <zircon/syscalls/smc.h>
 #include <zircon/types.h>
 
+#include <cstdint>
 #include <memory>
 
 #include <fbl/auto_lock.h>
+#include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/amlogic-display/hdmi-transmitter-top-regs.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
@@ -185,14 +186,11 @@ zx::result<> HdmiTransmitter::ModeSet(const display::DisplayTiming& timing,
   return zx::ok();
 }
 
-zx::result<> HdmiTransmitter::I2cTransact(const i2c_impl_op_t* i2c_ops, size_t i2c_op_count) {
+zx::result<fbl::Vector<uint8_t>> HdmiTransmitter::ReadExtendedEdid() {
   fbl::AutoLock lock(&dw_lock_);
-  zx_status_t status = designware_controller_->EdidTransfer(i2c_ops, i2c_op_count);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to transfer EDID: %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
-  return zx::ok();
+  // HdmiTransmitterController already logs its errors, so we don't need to
+  // print additional error logs.
+  return designware_controller_->ReadExtendedEdid();
 }
 
 void HdmiTransmitter::WriteTopLevelReg(uint32_t addr, uint32_t val) {

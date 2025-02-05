@@ -6,7 +6,10 @@ use assert_matches::assert_matches;
 use diagnostics_assertions::assert_data_tree;
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl::endpoints::{create_proxy, ServiceMarker as _};
-use fidl_fuchsia_fxfs::BlobReaderMarker;
+use fidl_fuchsia_fxfs::{
+    BlobReaderMarker, CryptManagementMarker, CryptManagementProxy, CryptMarker, CryptProxy,
+    KeyPurpose,
+};
 use fuchsia_component::client::connect_to_protocol_at_dir_root;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use futures::channel::mpsc::{self};
@@ -37,6 +40,7 @@ pub const BLOBFS_MAX_BYTES: u64 = 8765432;
 // (defined in device/constants.rs) to ensure that when f2fs is
 // the data filesystem format, we don't run out of space
 pub const DATA_MAX_BYTES: u64 = 109876543;
+pub const STARNIX_VOLUME_NAME: &str = "starnix_volume";
 
 pub struct TestFixtureBuilder {
     netboot: bool,
@@ -216,12 +220,11 @@ impl TestFixtureBuilder {
             ramdisk_vmo: None,
             crash_reports,
             torn_down: TornDown(false),
-            ignore_crash_reports: false,
             storage_host: self.storage_host,
         };
 
-        tracing::info!(
-            realm_name = ?fixture.realm.root.child_name(),
+        log::info!(
+            realm_name:? = fixture.realm.root.child_name();
             "built new test realm",
         );
 
@@ -260,18 +263,15 @@ pub struct TestFixture {
     pub ramdisk_vmo: Option<zx::Vmo>,
     pub crash_reports: mpsc::Receiver<ffeedback::CrashReport>,
     torn_down: TornDown,
-    ignore_crash_reports: bool,
     storage_host: bool,
 }
 
 impl TestFixture {
     pub async fn tear_down(mut self) {
-        tracing::info!(realm_name = ?self.realm.root.child_name(), "tearing down");
+        log::info!(realm_name:? = self.realm.root.child_name(); "tearing down");
         // Check the crash reports before destroying the realm because tearing down the realm can
         // cause mounting errors that trigger a crash report.
-        if !self.ignore_crash_reports {
-            assert_matches!(self.crash_reports.try_next(), Ok(None) | Err(_));
-        }
+        assert_matches!(self.crash_reports.try_next(), Ok(None) | Err(_));
         self.realm.destroy().await.unwrap();
         self.torn_down.0 = true;
     }
@@ -287,6 +287,10 @@ impl TestFixture {
             vmo.create_child(zx::VmoChildOptions::SLICE, 0, vmo.get_size().unwrap()).unwrap();
         self.add_ramdisk(vmo).await;
         self.ramdisk_vmo = Some(vmo_clone);
+    }
+
+    pub fn exposed_dir(&self) -> &fio::DirectoryProxy {
+        self.realm.root.get_exposed_dir()
     }
 
     pub fn dir(&self, dir: &str, flags: fio::Flags) -> fio::DirectoryProxy {
@@ -395,6 +399,40 @@ impl TestFixture {
         self.ramdisks.push(ramdisk);
     }
 
+    pub async fn setup_starnix_crypt(&self) -> (CryptProxy, CryptManagementProxy) {
+        let crypt_management =
+            self.realm.root.connect_to_protocol_at_exposed_dir::<CryptManagementMarker>().expect(
+                "connect_to_protocol_at_exposed_dir failed for the CryptManagement protocol",
+            );
+        let crypt = self
+            .realm
+            .root
+            .connect_to_protocol_at_exposed_dir::<CryptMarker>()
+            .expect("connect_to_protocol_at_exposed_dir failed for the Crypt protocol");
+        let key = vec![0xABu8; 32];
+        crypt_management
+            .add_wrapping_key(&u128::to_le_bytes(0), key.as_slice())
+            .await
+            .expect("fidl transport error")
+            .expect("add wrapping key failed");
+        crypt_management
+            .add_wrapping_key(&u128::to_le_bytes(1), key.as_slice())
+            .await
+            .expect("fidl transport error")
+            .expect("add wrapping key failed");
+        crypt_management
+            .set_active_key(KeyPurpose::Data, &u128::to_le_bytes(0))
+            .await
+            .expect("fidl transport error")
+            .expect("set metadata key failed");
+        crypt_management
+            .set_active_key(KeyPurpose::Metadata, &u128::to_le_bytes(1))
+            .await
+            .expect("fidl transport error")
+            .expect("set metadata key failed");
+        (crypt, crypt_management)
+    }
+
     /// This must be called if any crash reports are expected, since spurious reports will cause a
     /// failure in TestFixture::tear_down.
     pub async fn wait_for_crash_reports(
@@ -403,7 +441,7 @@ impl TestFixture {
         expected_program: &'_ str,
         expected_signature: &'_ str,
     ) {
-        tracing::info!("Waiting for {count} crash reports");
+        log::info!("Waiting for {count} crash reports");
         for _ in 0..count {
             let report = self.crash_reports.next().await.expect("Sender closed");
             assert_eq!(report.program_name.as_deref(), Some(expected_program));
@@ -412,7 +450,7 @@ impl TestFixture {
         if count > 0 {
             let selector =
                 format!("realm_builder\\:{}/test-fshost:root", self.realm.root.child_name());
-            tracing::info!("Checking inspect for corruption event, selector={selector}");
+            log::info!("Checking inspect for corruption event, selector={selector}");
             let tree = ArchiveReader::new()
                 .add_selector(selector)
                 .snapshot::<Inspect>()
@@ -431,10 +469,5 @@ impl TestFixture {
                 }
             });
         }
-    }
-
-    /// Ignore crash reports when tearing down the fixture.
-    pub fn ignore_crash_reports(&mut self) {
-        self.ignore_crash_reports = true;
     }
 }

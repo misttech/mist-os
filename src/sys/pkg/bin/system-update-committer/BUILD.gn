@@ -15,23 +15,31 @@ rustc_library("lib") {
   edition = "2021"
 
   deps = [
+    ":system_update_committer_config",
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.paver:fuchsia.paver_rust",
+    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
     "//sdk/fidl/fuchsia.update:fuchsia.update_rust",
     "//sdk/rust/zx",
+    "//src/lib/detect-stall",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-runtime",
+    "//src/lib/fuchsia-sync",
+    "//src/lib/sandbox",
     "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:typed-builder",
   ]
   test_deps = [
@@ -66,13 +74,22 @@ rustc_library("lib") {
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
+fuchsia_component_manifest("manifest") {
+  component_name = "system-update-committer"
+  manifest = "meta/system-update-committer.cml"
+  restricted_features = [ "delivery_type" ]
+}
+
+fuchsia_structured_config_rust_lib("system_update_committer_config") {
+  cm_label = ":manifest"
+}
+
 grand_swd_binary("bin") {
   output_name = "system_update_committer"
 }
 
 fuchsia_component("component") {
-  component_name = "system-update-committer"
-  manifest = "meta/system-update-committer.cml"
+  cm_label = ":manifest"
   deps = [ ":bin" ]
 }
 
@@ -80,8 +97,13 @@ fuchsia_package("system-update-committer") {
   deps = [ ":component" ]
 }
 
-fuchsia_unittest_package("system-update-committer-tests") {
+fuchsia_unittest_component("unittest_component") {
+  manifest = "meta/unittests.cml"
   deps = [ ":lib_test" ]
+}
+
+fuchsia_test_package("system-update-committer-tests") {
+  test_components = [ ":unittest_component" ]
 }
 
 system_update_committer_config("enable_reboot_on_verification_failure") {

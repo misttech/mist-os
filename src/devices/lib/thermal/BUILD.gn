@@ -9,6 +9,7 @@ import("//build/zircon/zx_library.gni")
 zx_library("thermal") {
   sdk = "source"
   sdk_headers = [
+    "lib/thermal/linear_lookup_table.h",
     "lib/thermal/metadata.h",
     "lib/thermal/ntc.h",
   ]
@@ -24,6 +25,14 @@ test("lib-thermal-test-bin") {
   ]
 }
 
+test("lib-lookup-table-test-bin") {
+  sources = [ "test/linear_lookup_table-test.cc" ]
+  deps = [
+    ":thermal",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+
 fuchsia_unittest_package("lib-thermal-test") {
   deps = [ ":lib-thermal-test-bin" ]
   test_specs = {
@@ -33,7 +42,19 @@ fuchsia_unittest_package("lib-thermal-test") {
   }
 }
 
+fuchsia_unittest_package("lib-lookup-table-test") {
+  deps = [ ":lib-lookup-table-test-bin" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
 group("tests") {
   testonly = true
-  deps = [ ":lib-thermal-test" ]
+  deps = [
+    ":lib-lookup-table-test",
+    ":lib-thermal-test",
+  ]
 }

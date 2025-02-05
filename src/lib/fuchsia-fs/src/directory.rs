@@ -288,9 +288,9 @@ pub fn open_async<P: fidl::endpoints::ProtocolMarker>(
 /// Opens a new connection to the given `directory`. The cloned connection has the same permissions.
 pub fn clone(dir: &fio::DirectoryProxy) -> Result<fio::DirectoryProxy, CloneError> {
     let (client_end, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    #[cfg(fuchsia_api_level_at_least = "26")]
     dir.clone(server_end.into_channel().into()).map_err(CloneError::SendCloneRequest)?;
-    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+    #[cfg(not(fuchsia_api_level_at_least = "26"))]
     dir.clone2(server_end.into_channel().into()).map_err(CloneError::SendCloneRequest)?;
     Ok(client_end)
 }
@@ -301,9 +301,9 @@ pub fn clone_onto(
     directory: &fio::DirectoryProxy,
     request: ServerEnd<fio::DirectoryMarker>,
 ) -> Result<(), CloneError> {
-    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    #[cfg(fuchsia_api_level_at_least = "26")]
     return directory.clone(request.into_channel().into()).map_err(CloneError::SendCloneRequest);
-    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+    #[cfg(not(fuchsia_api_level_at_least = "26"))]
     return directory.clone2(request.into_channel().into()).map_err(CloneError::SendCloneRequest);
 }
 

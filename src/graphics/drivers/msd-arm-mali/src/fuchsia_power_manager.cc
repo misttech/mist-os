@@ -114,7 +114,7 @@ bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device, inspect::Node&
     on_ready_for_work_token_ = std::move(description.assertive_token);
     on_ready_for_work_control_client_end_ = std::move(description.element_control_client.value());
     on_ready_for_work_runner_.emplace(
-        std::move(description.required_level_client.value()),
+        kOnReadyForWorkPowerElementName, std::move(description.required_level_client.value()),
         std::move(description.current_level_client.value()),
         [](uint8_t new_level) { return fit::ok(new_level); },
         [](fdf_power::ElementRunnerError error) {},

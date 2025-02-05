@@ -16,9 +16,9 @@ use fuchsia_bluetooth::types::PeerId;
 use fuchsia_component::server::{ServiceFs, ServiceObj};
 use futures::stream::{SelectAll, Stream};
 use futures::{select, StreamExt};
+use log::{info, trace};
 use std::cell::RefCell;
 use std::sync::{Arc, Weak};
-use tracing::{info, trace};
 
 /// An interface for managing the state of streaming connections with remote peers.
 pub trait StreamController {

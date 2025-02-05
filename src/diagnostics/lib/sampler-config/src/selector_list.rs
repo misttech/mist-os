@@ -6,7 +6,7 @@ use fidl_fuchsia_diagnostics::{Selector, StringSelector, TreeNames};
 use selectors::FastError;
 use serde::{Deserialize, Deserializer};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use thiserror::Error;
 
 // SelectorList and StringList are adapted from SelectorEntry in
@@ -76,76 +76,67 @@ impl PartialEq for ParsedSelector {
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error(r"wildcarded components must be drivers, exactly 'bootstrap/*-drivers\\:*' (double escapes in json), and contain a name filter list: {0:?}")]
+    #[error("wildcarded component not allowlisted: '{0}'")]
     InvalidWildcardedSelector(String),
 
     #[error(transparent)]
     ParseSelector(#[from] selectors::Error),
-
-    #[error("unknown StringSelector variant found")]
-    UnknownStringSelectorVariant,
 }
 
-const DRIVER_COLLECTION_SEGMENT: &str = "*-drivers:*";
-const BOOTSTRAP_SEGMENT: &str = "bootstrap";
+struct WildcardRestriction {
+    segments: Vec<StringSelector>,
+    must_have_tree_name: bool,
+}
+
+static WILDCARD_RESTRICTIONS: LazyLock<Vec<WildcardRestriction>> = LazyLock::new(|| {
+    vec![
+        WildcardRestriction {
+            segments: vec![
+                StringSelector::ExactMatch("core".into()),
+                StringSelector::ExactMatch("bluetooth-core".into()),
+                StringSelector::StringPattern("bt-host-collection:bt-host_*".into()),
+            ],
+            must_have_tree_name: false,
+        },
+        WildcardRestriction {
+            segments: vec![
+                StringSelector::ExactMatch("bootstrap".into()),
+                StringSelector::StringPattern("*-drivers:*".into()),
+            ],
+            must_have_tree_name: true,
+        },
+    ]
+});
 
 // `selector` must be validated.
 fn verify_wildcard_restrictions(selector: &Selector, raw_selector: &str) -> Result<(), Error> {
     // Safety: assuming that the selector was parsed by selectors::parse_selectors, it has
     // been validated, and these unwraps are safe
-    let mut segments =
-        selector.component_selector.as_ref().unwrap().moniker_segments.as_ref().unwrap().iter();
-    let Some(bootstrap_segment) = segments.next() else {
+    let actual_segments =
+        selector.component_selector.as_ref().unwrap().moniker_segments.as_ref().unwrap();
+    if !actual_segments.iter().any(|segment| matches!(segment, StringSelector::StringPattern(_))) {
         return Ok(());
-    };
-
-    match bootstrap_segment {
-        StringSelector::StringPattern(_) => {
-            return Err(Error::InvalidWildcardedSelector(raw_selector.to_string()))
-        }
-        StringSelector::ExactMatch(text) if text == BOOTSTRAP_SEGMENT => {}
-        StringSelector::ExactMatch(_) => {
-            if segments.any(|s| matches!(s, StringSelector::StringPattern(_))) {
-                return Err(Error::InvalidWildcardedSelector(raw_selector.to_string()));
-            } else {
-                return Ok(());
-            }
-        }
-        StringSelector::__SourceBreaking { .. } => return Err(Error::UnknownStringSelectorVariant),
     }
-
-    let Some(collection_segment) = segments.next() else {
-        return Ok(());
-    };
-
-    match collection_segment {
-        StringSelector::StringPattern(text) if text == DRIVER_COLLECTION_SEGMENT => {
-            if segments.next().is_some() {
-                return Err(Error::InvalidWildcardedSelector(raw_selector.to_string()));
-            }
-
-            let Some(ref tree_names) = selector.tree_names else {
+    for restriction in &*WILDCARD_RESTRICTIONS {
+        if restriction.segments.len() != actual_segments.len() {
+            continue;
+        }
+        if restriction
+            .segments
+            .iter()
+            .zip(actual_segments.iter())
+            .any(|(expected_segment, actual_segment)| expected_segment != actual_segment)
+        {
+            continue;
+        }
+        if restriction.must_have_tree_name {
+            let Some(TreeNames::Some(_)) = selector.tree_names else {
                 return Err(Error::InvalidWildcardedSelector(raw_selector.to_string()));
             };
-
-            let TreeNames::Some(_) = tree_names else {
-                return Err(Error::InvalidWildcardedSelector(raw_selector.to_string()));
-            };
-
-            return Ok(());
         }
-        StringSelector::StringPattern(_) => {
-            return Err(Error::InvalidWildcardedSelector(raw_selector.to_string()))
-        }
-        StringSelector::ExactMatch(_) => {}
-        StringSelector::__SourceBreaking { .. } => return Err(Error::UnknownStringSelectorVariant),
+        return Ok(());
     }
-
-    if segments.any(|s| matches!(s, StringSelector::StringPattern(_))) {
-        return Err(Error::InvalidWildcardedSelector(raw_selector.to_string()));
-    }
-
-    Ok(())
+    Err(Error::InvalidWildcardedSelector(raw_selector.to_string()))
 }
 
 pub(crate) fn parse_selector(selector_str: &str) -> Result<ParsedSelector, Error> {
@@ -205,6 +196,7 @@ impl<'de> Deserialize<'de> for SelectorList {
 mod tests {
     use super::*;
     use anyhow::Error;
+    use assert_matches::assert_matches;
     use fidl_fuchsia_diagnostics::TreeSelector;
 
     fn require_string(data: &StringSelector, required: &str) {
@@ -277,15 +269,18 @@ mod tests {
     #[fuchsia::test]
     fn wild_card_selectors() {
         let good_selector = r#"["bootstrap/*-drivers\\:*:[name=fvm]root:field"]"#;
-        serde_json5::from_str::<SelectorList>(good_selector).unwrap();
+        assert_matches!(serde_json5::from_str::<SelectorList>(good_selector), Ok(_));
+
+        let good_selector = r#"["core/bluetooth-core/bt-host-collection\\:bt-host_*:root:field"]"#;
+        assert_matches!(serde_json5::from_str::<SelectorList>(good_selector), Ok(_));
 
         let bad_selector = r#"["not_bootstrap/*-drivers\\:*:[name=fvm]root:field"]"#;
-        serde_json5::from_str::<SelectorList>(bad_selector).expect_err("");
+        assert_matches!(serde_json5::from_str::<SelectorList>(bad_selector), Err(_));
 
         let not_exact_collection_match = r#"["bootstrap/*-drivers*:[name=fvm]root:field"]"#;
-        serde_json5::from_str::<SelectorList>(not_exact_collection_match).expect_err("");
+        assert_matches!(serde_json5::from_str::<SelectorList>(not_exact_collection_match), Err(_));
 
         let missing_filter = r#"["not_bootstrap/*-drivers\\:*:root:field"]"#;
-        serde_json5::from_str::<SelectorList>(missing_filter).expect_err("");
+        assert_matches!(serde_json5::from_str::<SelectorList>(missing_filter), Err(_));
     }
 }

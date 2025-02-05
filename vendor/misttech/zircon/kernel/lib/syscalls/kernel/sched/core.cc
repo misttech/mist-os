@@ -8,6 +8,8 @@
 
 #include "../../priv.h"
 
+#include <linux/errno.h>
+
 #define LOCAL_TRACE MISTOS_SYSCALLS_GLOBAL_TRACE(0)
 
 long sys_a0024_sched_yield() {

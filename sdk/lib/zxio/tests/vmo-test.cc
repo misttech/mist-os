@@ -90,12 +90,20 @@ TEST_F(VmoTest, Basic) {
   ASSERT_OK(zxio_read(io, buffer, 3, 0, &actual));
   EXPECT_STREQ("cde", buffer);
   ASSERT_STATUS(ZX_ERR_UNAVAILABLE, zxio_truncate(io, 0u));
-  uint32_t flags = 0u;
+
+  uint64_t flags = 0u;
   ASSERT_STATUS(ZX_OK, zxio_flags_get(io, &flags));
-  EXPECT_TRUE((flags & static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable)) != 0);
-  // See also FlagsGet test below for read-only VMO test.
-  EXPECT_TRUE((flags & static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightWritable)) != 0);
+  EXPECT_TRUE((flags & uint64_t{fuchsia_io::wire::Flags::kPermRead}) != 0);
+  EXPECT_TRUE((flags & uint64_t{fuchsia_io::wire::Flags::kPermWrite}) != 0);
   ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED, zxio_flags_set(io, flags));
+
+  uint32_t deprecated_flags = 0u;
+  ASSERT_STATUS(ZX_OK, zxio_deprecated_flags_get(io, &deprecated_flags));
+  EXPECT_TRUE(
+      (deprecated_flags & static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable)) != 0);
+  EXPECT_TRUE(
+      (deprecated_flags & static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightWritable)) != 0);
+  ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED, zxio_deprecated_flags_set(io, deprecated_flags));
 
   ASSERT_OK(zxio_write(io, buffer, sizeof(buffer), 0, &actual));
   EXPECT_EQ(actual, sizeof(buffer));

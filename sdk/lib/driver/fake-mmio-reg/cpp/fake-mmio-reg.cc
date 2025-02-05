@@ -6,14 +6,24 @@
 
 namespace fake_mmio {
 
-// Returns an mmio_buffer_t that can be used for constructing a fdf::MmioBuffer object.
 fdf::MmioBuffer FakeMmioRegRegion::GetMmioBuffer() {
+  static constexpr fdf::MmioBufferOps kFakeMmioOps = {
+      .Read8 = FakeMmioRegRegion::Read8,
+      .Read16 = FakeMmioRegRegion::Read16,
+      .Read32 = FakeMmioRegRegion::Read32,
+      .Read64 = FakeMmioRegRegion::Read64,
+      .Write8 = FakeMmioRegRegion::Write8,
+      .Write16 = FakeMmioRegRegion::Write16,
+      .Write32 = FakeMmioRegRegion::Write32,
+      .Write64 = FakeMmioRegRegion::Write64,
+  };
+
   size_t size = reg_size_ * reg_count_;
   zx::vmo vmo;
   ZX_ASSERT(zx::vmo::create(/*size=*/size, 0, &vmo) == ZX_OK);
   mmio_buffer_t mmio{};
   ZX_ASSERT(mmio_buffer_init(&mmio, 0, size, vmo.release(), ZX_CACHE_POLICY_CACHED) == ZX_OK);
-  return fdf::MmioBuffer(mmio, &FakeMmioRegRegion::kFakeMmioOps, this);
+  return fdf::MmioBuffer(mmio, &kFakeMmioOps, this);
 }
 
 uint8_t FakeMmioRegRegion::Read8(const void* ctx, const mmio_buffer_t& mmio, zx_off_t offs) {

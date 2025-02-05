@@ -4,7 +4,7 @@
 
 use crate::internal_message::*;
 use futures::channel::mpsc::UnboundedSender;
-use tracing::{error, info};
+use log::{error, info};
 use {fidl_fuchsia_ui_pointer as fptr, fuchsia_async as fasync};
 
 pub fn spawn_mouse_source_watcher(
@@ -32,8 +32,8 @@ pub fn spawn_mouse_source_watcher(
                         // insufficient to understand how to handle these fields, if present.
                         if let Some(new_device_info) = e.device_info.clone() {
                             info!(
-                                new = ?new_device_info,
-                                replacing = ?device_info,
+                                new:? = new_device_info,
+                                replacing:? = device_info;
                                 "Received device info",
                             );
 
@@ -43,8 +43,8 @@ pub fn spawn_mouse_source_watcher(
                         // Handle `view_parameters` field, if it exists.
                         if let Some(new_view_parameters) = e.view_parameters.clone() {
                             info!(
-                                new = ?new_view_parameters,
-                                replacing = ?view_parameters,
+                                new:? = new_view_parameters,
+                                replacing:? = view_parameters;
                                 "Received view parameters",
                             );
                             view_parameters = Some(new_view_parameters);
@@ -97,7 +97,7 @@ pub fn spawn_mouse_source_watcher(
                         if let Some(fptr::MouseEventStreamInfo { device_id, status }) =
                             e.stream_info.clone()
                         {
-                            info!(%device_id, ?status, "Unhandled MouseEventStreamInfo");
+                            info!(device_id:%, status:?; "Unhandled MouseEventStreamInfo");
                         }
                     }
                 }

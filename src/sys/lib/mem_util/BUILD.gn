@@ -15,8 +15,8 @@ rustc_library("mem_util") {
     "//sdk/rust/zx-status",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-fs",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
   ]
   test_deps = [
     "//src/lib/fuchsia",

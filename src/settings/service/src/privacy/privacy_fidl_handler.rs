@@ -54,7 +54,7 @@ impl TryFrom<PrivacyRequest> for Job {
                 Ok(watch::Work::new_job(SettingType::Privacy, responder))
             }
             _ => {
-                tracing::warn!("Received a call to an unsupported API: {:?}", item);
+                log::warn!("Received a call to an unsupported API: {:?}", item);
                 Err(JobError::Unsupported)
             }
         }

@@ -4,11 +4,14 @@
 
 use fho::{user_error, FfxMain, FfxTool, MachineWriter};
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
+use std::ops::Deref as _;
+use target_holders::RemoteControlProxyHolder;
 use {
     fidl_fuchsia_developer_remotecontrol as fremotecontrol, fidl_fuchsia_io as fio,
     fidl_fuchsia_net_debug as fdebug, fidl_fuchsia_net_dhcp as fdhcp,
     fidl_fuchsia_net_filter as ffilter, fidl_fuchsia_net_filter_deprecated as ffilter_deprecated,
-    fidl_fuchsia_net_interfaces as finterfaces, fidl_fuchsia_net_name as fname,
+    fidl_fuchsia_net_interfaces as finterfaces,
+    fidl_fuchsia_net_interfaces_admin as finterfaces_admin, fidl_fuchsia_net_name as fname,
     fidl_fuchsia_net_neighbor as fneighbor, fidl_fuchsia_net_root as froot,
     fidl_fuchsia_net_routes as froutes, fidl_fuchsia_net_stack as fstack,
     fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration, fidl_fuchsia_sys2 as fsys,
@@ -120,6 +123,16 @@ impl net_cli::ServiceConnector<finterfaces::StateMarker> for FfxConnector<'_> {
 }
 
 #[async_trait::async_trait]
+impl net_cli::ServiceConnector<finterfaces_admin::InstallerMarker> for FfxConnector<'_> {
+    async fn connect(
+        &self,
+    ) -> Result<<finterfaces_admin::InstallerMarker as ProtocolMarker>::Proxy, anyhow::Error> {
+        self.remotecontrol_connect::<finterfaces_admin::InstallerMarker>(NETSTACK_MONIKER_SUFFIX)
+            .await
+    }
+}
+
+#[async_trait::async_trait]
 impl net_cli::ServiceConnector<fneighbor::ControllerMarker> for FfxConnector<'_> {
     async fn connect(
         &self,
@@ -203,7 +216,7 @@ impl net_cli::ServiceConnector<fnet_migration::StateMarker> for FfxConnector<'_>
 pub struct NetTool {
     #[command]
     pub cmd: ffx_net_args::Command,
-    pub remote_control: fremotecontrol::RemoteControlProxy,
+    pub remote_control: RemoteControlProxyHolder,
 }
 
 #[async_trait::async_trait(?Send)]
@@ -222,7 +235,7 @@ impl NetTool {
         let res = net_cli::do_root(
             writer,
             net_cli::Command { cmd: self.cmd.cmd.clone() },
-            &FfxConnector { remote_control: self.remote_control.clone(), realm },
+            &FfxConnector { remote_control: self.remote_control.deref().clone(), realm },
         )
         .await
         .map_err(|e| match net_cli::underlying_user_facing_error(&e) {

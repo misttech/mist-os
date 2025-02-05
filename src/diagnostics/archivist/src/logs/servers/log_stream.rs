@@ -11,10 +11,10 @@ use diagnostics_log_encoding::{Header, FXT_HEADER_SIZE};
 use fidl::endpoints::{ControlHandle, DiscoverableProtocolMarker};
 use fidl_fuchsia_diagnostics::StreamMode;
 use futures::{AsyncWriteExt, Stream, StreamExt};
+use log::warn;
 use std::borrow::Cow;
 use std::io::Cursor;
 use std::sync::Arc;
-use tracing::warn;
 use zerocopy::FromBytes;
 use {fidl_fuchsia_diagnostics as fdiagnostics, fuchsia_async as fasync, fuchsia_trace as ftrace};
 
@@ -70,7 +70,7 @@ impl LogStreamServer {
                     control_handle,
                     ..
                 } => {
-                    warn!(ordinal, ?method_type, "Unknown request. Closing connection");
+                    warn!(ordinal, method_type:?; "Unknown request. Closing connection");
                     control_handle.shutdown_with_epitaph(zx::Status::UNAVAILABLE);
                 }
             }

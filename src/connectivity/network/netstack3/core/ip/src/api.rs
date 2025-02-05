@@ -4,6 +4,8 @@
 
 //! Defines the public API exposed to bindings by the IP module.
 
+use alloc::format;
+use alloc::string::{String, ToString as _};
 use alloc::vec::Vec;
 use assert_matches::assert_matches;
 use net_types::ip::{Ip, IpAddr, IpVersionMarker, Ipv4, Ipv6};
@@ -23,7 +25,7 @@ use crate::internal::base::{
 use crate::internal::device::{
     IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
 };
-use crate::internal::routing::rules::{Marks, Rule};
+use crate::internal::routing::rules::{MarkMatcher, Marks, Rule, RuleAction, RuleMatcher};
 use crate::internal::routing::RoutingTable;
 use crate::internal::types::{
     Destination, Entry, EntryAndGeneration, Metric, NextHop, OrderedEntry, ResolvedRoute,
@@ -57,9 +59,11 @@ where
     /// Allocates a new table in Core.
     pub fn new_table(
         &mut self,
+        bindings_id: impl Into<u32>,
     ) -> RoutingTableId<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId> {
         self.core_ctx().with_ip_routing_tables_mut(|tables| {
-            let new_table = PrimaryRc::new(RwLock::new(RoutingTable::default()));
+            let new_table =
+                PrimaryRc::new(RwLock::new(RoutingTable::with_bindings_id(bindings_id.into())));
             let table_id = RoutingTableId::new(PrimaryRc::clone_strong(&new_table));
             assert_matches!(tables.insert(table_id.clone(), new_table), None);
             table_id
@@ -185,36 +189,108 @@ where
         })
     }
 
+    /// Writes rules and routes tables information to the provided `inspector`.
+    pub fn inspect<N: Inspector>(&mut self, inspector: &mut N, main_table_id: u32)
+    where
+        for<'a> N::ChildInspector<'a>:
+            InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+    {
+        inspector.record_child("Rules", |inspector| {
+            self.inspect_rules(inspector, main_table_id);
+        });
+        inspector.record_child("RoutingTables", |inspector| {
+            self.inspect_routes(inspector, main_table_id);
+        })
+    }
+
+    /// Writes rules table information to the provided `inspector`.
+    pub fn inspect_rules<N: Inspector>(&mut self, inspector: &mut N, main_table_id: u32) {
+        self.core_ctx().with_rules_table(|core_ctx, rule_table| {
+            for Rule {
+                matcher:
+                    RuleMatcher { source_address_matcher, traffic_origin_matcher, mark_matchers },
+                action,
+            } in rule_table.iter()
+            {
+                inspector.record_unnamed_child(|inspector| {
+                    inspector.record_child("Matchers", |inspector| {
+                        let source_address_matcher = source_address_matcher
+                            .map_or_else(|| String::new(), |m| m.0.to_string());
+                        inspector.record_str("SourceAddressMatcher", &source_address_matcher);
+                        inspector.record_debug("TrafficOriginMatcher", traffic_origin_matcher);
+                        inspector.record_child("MarkMatchers", |inspector| {
+                            for (domain, matcher) in
+                                mark_matchers.iter().filter_map(|(d, m)| m.map(|m| (d, m)))
+                            {
+                                match matcher {
+                                    MarkMatcher::Unmarked => {
+                                        inspector.record_str(domain.to_str(), "Unmarked")
+                                    }
+                                    MarkMatcher::Marked { start, end, mask } => inspector
+                                        .record_debug_child(domain, |inspector| {
+                                            inspector.record_str("Mask", &format!("{mask:#010x}"));
+                                            inspector.record_str(
+                                                "Range",
+                                                &format!("{start:#x}..{end:#x}"),
+                                            );
+                                        }),
+                                }
+                            }
+                        });
+                    });
+                    inspector.record_child("Action", |inspector| match action {
+                        RuleAction::Unreachable => inspector.record_str("Action", "Unreachable"),
+                        RuleAction::Lookup(table_id) => {
+                            let bindings_id = core_ctx
+                                .with_ip_routing_table(table_id, |_core_ctx, table| {
+                                    table.bindings_id
+                                });
+                            let bindings_id = bindings_id.unwrap_or(main_table_id);
+                            inspector.record_str("Lookup", &format!("{bindings_id}"))
+                        }
+                    })
+                })
+            }
+        })
+    }
+
     /// Writes routing table information to the provided `inspector`.
-    pub fn inspect<
-        'a,
+    pub fn inspect_routes<
         N: Inspector + InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
     >(
         &mut self,
         inspector: &mut N,
+        main_table_id: u32,
     ) {
-        self.core_ctx().with_main_ip_routing_table(|_core_ctx, table| {
-            for Entry { subnet, device, gateway, metric } in table.iter_table() {
-                inspector.record_unnamed_child(|inspector| {
-                    inspector.record_display("Destination", subnet);
-                    N::record_device(inspector, "InterfaceId", device);
-                    match gateway {
-                        Some(gateway) => {
-                            inspector.record_ip_addr("Gateway", gateway.get());
+        self.core_ctx().with_ip_routing_tables(|core_ctx, tables| {
+            for table_id in tables.keys() {
+                core_ctx.with_ip_routing_table(table_id, |_core_ctx, table| {
+                    let bindings_id = table.bindings_id.unwrap_or(main_table_id);
+                    inspector.record_display_child(bindings_id, |inspector| {
+                        for Entry { subnet, device, gateway, metric } in table.iter_table() {
+                            inspector.record_unnamed_child(|inspector| {
+                                inspector.record_display("Destination", subnet);
+                                N::record_device(inspector, "InterfaceId", device);
+                                match gateway {
+                                    Some(gateway) => {
+                                        inspector.record_ip_addr("Gateway", gateway.get());
+                                    }
+                                    None => {
+                                        inspector.record_str("Gateway", "[NONE]");
+                                    }
+                                }
+                                let (metric, tracks_interface) = match metric {
+                                    Metric::MetricTracksInterface(metric) => (metric, true),
+                                    Metric::ExplicitMetric(metric) => (metric, false),
+                                };
+                                inspector.record_uint("Metric", *metric);
+                                inspector.record_bool("MetricTracksInterface", tracks_interface);
+                            });
                         }
-                        None => {
-                            inspector.record_str("Gateway", "[NONE]");
-                        }
-                    }
-                    let (metric, tracks_interface) = match metric {
-                        Metric::MetricTracksInterface(metric) => (metric, true),
-                        Metric::ExplicitMetric(metric) => (metric, false),
-                    };
-                    inspector.record_uint("Metric", *metric);
-                    inspector.record_bool("MetricTracksInterface", tracks_interface);
-                });
+                    })
+                })
             }
-        })
+        });
     }
 
     /// Replaces the entire route table atomically.

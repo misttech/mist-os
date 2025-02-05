@@ -194,8 +194,8 @@ PageQueues::~PageQueues() {
   }
 }
 
-void PageQueues::StartThreads(zx_duration_t min_mru_rotate_time,
-                              zx_duration_t max_mru_rotate_time) {
+void PageQueues::StartThreads(zx_duration_mono_t min_mru_rotate_time,
+                              zx_duration_mono_t max_mru_rotate_time) {
   // Clamp the max rotate to the minimum.
   max_mru_rotate_time = ktl::max(min_mru_rotate_time, max_mru_rotate_time);
   // Prevent a rotation rate that is too small.
@@ -227,11 +227,15 @@ void PageQueues::StartThreads(zx_duration_t min_mru_rotate_time,
   DEBUG_ASSERT(lru_thread);
   lru_thread->Resume();
 
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  ASSERT(!mru_thread_);
-  ASSERT(!lru_thread_);
-  mru_thread_ = mru_thread;
-  lru_thread_ = lru_thread;
+  {
+    Guard<SpinLock, IrqSave> guard{&lock_};
+    ASSERT(!mru_thread_);
+    ASSERT(!lru_thread_);
+    mru_thread_ = mru_thread;
+    lru_thread_ = lru_thread;
+  }
+  // Kick start any LRU processing that might be pending to ensure it doesn't spuriously timeout.
+  MaybeTriggerLruProcessing();
 }
 
 void PageQueues::StartDebugCompressor() {
@@ -313,7 +317,7 @@ bool PageQueues::IsActiveRatioTriggeringAging() const {
   return active_count.active * active_ratio_multiplier_ > active_count.inactive;
 }
 
-ktl::variant<PageQueues::AgeReason, zx_time_t> PageQueues::ConsumeAgeReason() {
+ktl::variant<PageQueues::AgeReason, zx_instant_mono_t> PageQueues::ConsumeAgeReason() {
   AutoPreemptDisabler apd;
   Guard<SpinLock, IrqSave> guard{&lock_};
   auto reason = GetAgeReasonLocked();
@@ -355,12 +359,12 @@ void PageQueues::SynchronizeWithAging() {
   }
 }
 
-ktl::variant<PageQueues::AgeReason, zx_time_t> PageQueues::GetAgeReasonLocked() const {
-  const zx_time_t current = current_time();
+ktl::variant<PageQueues::AgeReason, zx_instant_mono_t> PageQueues::GetAgeReasonLocked() const {
+  const zx_instant_mono_t current = current_mono_time();
   // Check if there is an active ratio that wants us to age.
   if (active_ratio_triggered_) {
     // Need to have passed the min time though.
-    const zx_time_t min_timeout =
+    const zx_instant_mono_t min_timeout =
         zx_time_add_duration(last_age_time_.load(ktl::memory_order_relaxed), min_mru_rotate_time_);
     if (current < min_timeout) {
       return min_timeout;
@@ -370,7 +374,7 @@ ktl::variant<PageQueues::AgeReason, zx_time_t> PageQueues::GetAgeReasonLocked() 
   }
 
   // Exceeding the maximum time forces aging.
-  const zx_time_t max_timeout =
+  const zx_instant_mono_t max_timeout =
       zx_time_add_duration(last_age_time_.load(ktl::memory_order_relaxed), max_mru_rotate_time_);
   if (max_timeout <= current) {
     return AgeReason::Timeout;
@@ -471,7 +475,7 @@ void PageQueues::Dump() {
   size_t inactive_count;
   size_t failed_reclaim;
   size_t dirty;
-  zx_time_t last_age_time;
+  zx_instant_mono_t last_age_time;
   AgeReason last_age_reason;
   ActiveInactiveCounts activeinactive;
   {
@@ -519,7 +523,7 @@ void PageQueues::Dump() {
     }
     buf_len += write_len;
   }
-  zx_time_t current = current_time();
+  zx_instant_mono_t current = current_mono_time();
   timespec age_time = zx_timespec_from_duration(zx_time_sub_time(current, last_age_time));
   printf("pq: MRU generation is %" PRIu64
          " set %ld.%lds ago due to \"%s\", LRU generation is %" PRIu64 "\n",
@@ -539,7 +543,7 @@ void PageQueues::Dump() {
 // a full scan may happen inline in that method call, and get attributed directly to this thread.
 void PageQueues::MruThread() {
   // Pretend that aging happens during startup to simplify the rest of the loop logic.
-  last_age_time_ = current_time();
+  last_age_time_ = current_mono_time();
   unsigned int iterations_since_last_age = 0;
   while (!shutdown_threads_.load(ktl::memory_order_relaxed)) {
     // Normally we should retry the loop at most once (i.e. pass this line of code twice) if an
@@ -561,7 +565,8 @@ void PageQueues::MruThread() {
     }
     // Check if there is an age reason waiting for us, consuming if there is, or if we need to wait.
     auto reason_or_timeout = ConsumeAgeReason();
-    if (const zx_time_t* age_deadline = ktl::get_if<zx_time_t>(&reason_or_timeout)) {
+    if (const zx_instant_mono_t* age_deadline =
+            ktl::get_if<zx_instant_mono_t>(&reason_or_timeout)) {
       // Wait for this time, ensuring we wake up if the active ratio should change.
       zx_status_t result = aging_active_ratio_event_.WaitDeadline(*age_deadline, Interruptible::No);
       // Check if shutdown has been requested, we need this extra check even though it is part of
@@ -626,11 +631,14 @@ void PageQueues::MruThread() {
 // expected that ProcessDontNeedAndLruQueues perform small units of work to avoid this thread
 // causing excessive lock contention.
 void PageQueues::LruThread() {
+  constexpr uint kLruNeedsProcessingPollSeconds = 90;
+  uint64_t pending_target_gen = UINT64_MAX;
   while (!shutdown_threads_.load(ktl::memory_order_relaxed)) {
-    lru_event_.WaitDeadline(ZX_TIME_INFINITE, Interruptible::No);
+    zx_status_t wait_status =
+        lru_event_.Wait(Deadline::after_mono(ZX_SEC(kLruNeedsProcessingPollSeconds)));
 
     uint64_t target_gen;
-    bool needs_processing;
+    bool needs_processing = false;
     // Take the lock so we can calculate (race free) a target mru-gen.
     {
       Guard<SpinLock, IrqSave> guard{&lock_};
@@ -643,6 +651,24 @@ void PageQueues::LruThread() {
     if (!needs_processing) {
       pq_lru_spurious_wakeup.Add(1);
       continue;
+    }
+    if (wait_status == ZX_ERR_TIMED_OUT) {
+      // The queue needs processing, but we woke up due to a timeout on the event and not a signal.
+      // This could happen due to a race where we woke up before the MruThread could actually set
+      // the signal, in which case we want to record the target_gen that we saw and then go back and
+      // wait for the signal.
+      // In the case where we have timed out *and* the target_gen we want is the same as the last
+      // target_gen we were looking for then this means that we have gone a full poll interval with:
+      //  * Processing needing to happen.
+      //  * No event being signaled.
+      //  * No other thread processing the queue for us.
+      if (pending_target_gen != target_gen) {
+        pending_target_gen = target_gen;
+        continue;
+      }
+      printf("ERROR LruThread signal was not seen after %u seconds and queue needs processing\n",
+             kLruNeedsProcessingPollSeconds);
+      Dump();
     }
 
     // Keep processing until we have caught up to what is required. This ensures we are
@@ -679,7 +705,7 @@ void PageQueues::RotateReclaimQueues(AgeReason reason) {
     // inform the user if we have waited multiples of the expected maximum aging interval, since
     // that implies we are starting to lose the requested fidelity of age information.
     int64_t timeouts = 0;
-    while (mru_semaphore_.Wait(Deadline::after(max_mru_rotate_time_, TimerSlack::none())) ==
+    while (mru_semaphore_.Wait(Deadline::after_mono(max_mru_rotate_time_, TimerSlack::none())) ==
            ZX_ERR_TIMED_OUT) {
       timeouts++;
       printf("[pq] WARNING: Waited %" PRIi64 " seconds for LRU thread, MRU semaphore %" PRIi64
@@ -698,7 +724,7 @@ void PageQueues::RotateReclaimQueues(AgeReason reason) {
     DeferPendingSignals dps{*this};
     Guard<SpinLock, IrqSave> guard{&lock_};
     mru_gen_.fetch_add(1, ktl::memory_order_relaxed);
-    last_age_time_ = current_time();
+    last_age_time_ = current_mono_time();
     last_age_reason_ = reason;
     // Update the active/inactive counts. We could be a bit smarter here since we know exactly which
     // active bucket might have changed, but this will work.

@@ -556,7 +556,7 @@ impl Clone for WireMainProtocolTwoWayImportWithErrorResult {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayImportWithErrorResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     fidl_next_test_protocolpayloads_imported::WireImportStructPayload: ::fidl_next::Decode<___D>,
 
@@ -677,7 +677,7 @@ impl Clone for WireOptionalMainProtocolTwoWayImportWithErrorResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalMainProtocolTwoWayImportWithErrorResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     fidl_next_test_protocolpayloads_imported::WireImportStructPayload: ::fidl_next::Decode<___D>,
 
@@ -2192,7 +2192,8 @@ where
 }
 
 /// A client handler for the MainProtocol protocol.
-
+///
+/// See [`MainProtocol`] for more details.
 pub trait MainProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn on_composed(
         &mut self,
@@ -2300,38 +2301,103 @@ where
 
 /// A helper trait for the `MainProtocol` server sender.
 pub trait MainProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
-    fn on_composed(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn on_composed<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = fidl_next_test_protocolpayloads_imported::WireImportStructPayload,
+        >;
 
-    fn on_local(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn on_local<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireLocalStructPayload>;
 
-    fn on_import(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn on_import<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = fidl_next_test_protocolpayloads_imported::WireImportStructPayload,
+        >;
 
-    fn on_anon(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn on_anon<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireMainProtocolOnAnonRequest,
+        >;
 }
 
 impl<___T> MainProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<___T, MainProtocol>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
-    fn on_composed(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(1872339328378152762, &mut ())
+    fn on_composed<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = fidl_next_test_protocolpayloads_imported::WireImportStructPayload,
+        >,
+    {
+        self.as_untyped().send_event(1872339328378152762, request)
     }
 
-    fn on_local(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(5135782819583756313, &mut ())
+    fn on_local<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireLocalStructPayload>,
+    {
+        self.as_untyped().send_event(5135782819583756313, request)
     }
 
-    fn on_import(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(1996489653379631369, &mut ())
+    fn on_import<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = fidl_next_test_protocolpayloads_imported::WireImportStructPayload,
+        >,
+    {
+        self.as_untyped().send_event(1996489653379631369, request)
     }
 
-    fn on_anon(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(4815229650203439104, &mut ())
+    fn on_anon<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireMainProtocolOnAnonRequest,
+        >,
+    {
+        self.as_untyped().send_event(4815229650203439104, request)
     }
 }
 
 /// A server handler for the MainProtocol protocol.
-
+///
+/// See [`MainProtocol`] for more details.
 pub trait MainProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn one_way_composed(
         &mut self,

@@ -285,7 +285,7 @@ impl gesture_arena::Contender for InitialContender {
                         )
                     }
                     Err(_) => {
-                        tracing::error!("failed to parse positions");
+                        log::error!("failed to parse positions");
                         return ExamineEventResult::Mismatch(Reason::Basic(
                             "failed to parse positions",
                         ));
@@ -358,7 +358,7 @@ impl gesture_arena::Contender for OneFingerContactContender {
                 let current_positions = match ContactPositions::from(event) {
                     Ok(positions) => positions,
                     Err(_) => {
-                        tracing::error!("failed to parse positions");
+                        log::error!("failed to parse positions");
                         return ExamineEventResult::Mismatch(Reason::Basic(
                             "failed to parse positions",
                         ));
@@ -418,7 +418,7 @@ impl gesture_arena::Contender for TwoFingerContactContender {
         let current_positions = match ContactPositions::from(event) {
             Ok(positions) => positions,
             Err(_) => {
-                tracing::error!("failed to parse positions");
+                log::error!("failed to parse positions");
                 return ExamineEventResult::Mismatch(Reason::Basic("failed to parse positions"));
             }
         };
@@ -427,7 +427,7 @@ impl gesture_arena::Contender for TwoFingerContactContender {
             // new event contact id not match old event without a finger leave surface
             // event, this is likely a bug in firmware or driver.
             Err(_) => {
-                tracing::error!("new event contact id not match old event");
+                log::error!("new event contact id not match old event");
                 return ExamineEventResult::Mismatch(Reason::Basic(
                     "contact ids changed since last event",
                 ));
@@ -505,7 +505,7 @@ impl gesture_arena::MatchedContender for MatchedContender {
         let current_positions = match ContactPositions::from(event) {
             Ok(positions) => positions,
             Err(_) => {
-                tracing::error!("failed to parse positions");
+                log::error!("failed to parse positions");
                 return VerifyEventResult::Mismatch(Reason::Basic("failed to parse positions"));
             }
         };
@@ -513,7 +513,7 @@ impl gesture_arena::MatchedContender for MatchedContender {
             // new event contact id not match old event without a finger leave surface
             // event, this is likely a bug in firmware or driver.
             Err(_) => {
-                tracing::error!("new event contact id not match old event");
+                log::error!("new event contact id not match old event");
                 return VerifyEventResult::Mismatch(Reason::Basic(
                     "contact ids changed since last event",
                 ));
@@ -612,7 +612,7 @@ impl gesture_arena::Winner for Winner {
                 let positions = match ContactPositions::from(&event) {
                     Ok(positions) => positions,
                     Err(_) => {
-                        tracing::error!("failed to parse positions");
+                        log::error!("failed to parse positions");
                         return ProcessNewEventResult::EndGesture(
                             EndGestureEvent::UnconsumedEvent(event),
                             Reason::Basic("failed to parse positions"),
@@ -624,7 +624,7 @@ impl gesture_arena::Winner for Winner {
                     // new event contact id not match old event without a finger leave
                     // surface event, this is likely a bug in firmware or driver.
                     Err(_) => {
-                        tracing::error!("new event contact id not match old event");
+                        log::error!("new event contact id not match old event");
                         return ProcessNewEventResult::EndGesture(
                             EndGestureEvent::UnconsumedEvent(event),
                             Reason::Basic("contact ids changed since last event"),

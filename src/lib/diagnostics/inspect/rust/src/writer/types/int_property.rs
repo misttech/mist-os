@@ -25,13 +25,10 @@ impl Property<'_> for IntProperty {
 
     fn set(&self, value: i64) {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
-            inner_ref
-                .state
-                .try_lock()
-                .and_then(|mut state| state.set_int_metric(inner_ref.block_index, value))
-                .unwrap_or_else(|err| {
-                    error!(err:?; "Failed to set property");
-                });
+            match inner_ref.state.try_lock() {
+                Ok(mut state) => state.set_int_metric(inner_ref.block_index, value),
+                Err(err) => error!(err:?; "Failed to set property"),
+            }
         }
     }
 }
@@ -39,34 +36,26 @@ impl Property<'_> for IntProperty {
 impl NumericProperty<'_> for IntProperty {
     fn add(&self, value: i64) -> Option<i64> {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
-            inner_ref
-                .state
-                .try_lock()
-                .and_then(|mut state| state.add_int_metric(inner_ref.block_index, value))
-                .map(Option::from)
-                .unwrap_or_else(|err| {
-                    error!(err:?; "Failed to set property");
-                    None
-                })
-        } else {
-            None
+            match inner_ref.state.try_lock() {
+                Ok(mut state) => {
+                    return Some(state.add_int_metric(inner_ref.block_index, value));
+                }
+                Err(err) => error!(err:?; "Failed to add property"),
+            }
         }
+        None
     }
 
     fn subtract(&self, value: i64) -> Option<i64> {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
-            inner_ref
-                .state
-                .try_lock()
-                .and_then(|mut state| state.subtract_int_metric(inner_ref.block_index, value))
-                .map(Option::from)
-                .unwrap_or_else(|err| {
-                    error!(err:?; "Failed to set property");
-                    None
-                })
-        } else {
-            None
+            match inner_ref.state.try_lock() {
+                Ok(mut state) => {
+                    return Some(state.subtract_int_metric(inner_ref.block_index, value));
+                }
+                Err(err) => error!(err:?; "Failed to subtract property"),
+            }
         }
+        None
     }
 }
 
@@ -76,7 +65,7 @@ mod tests {
     use crate::assert_update_is_atomic;
     use crate::writer::testing_utils::{get_state, GetBlockExt};
     use crate::writer::{Inspector, Node};
-    use inspect_format::BlockType;
+    use inspect_format::{BlockType, Int};
 
     #[fuchsia::test]
     fn int_property() {
@@ -89,31 +78,31 @@ mod tests {
         let node = root.create_child("node");
         {
             let property = node.create_int("property", 1);
-            property.get_block(|property_block| {
-                assert_eq!(property_block.block_type(), BlockType::IntValue);
-                assert_eq!(property_block.int_value().unwrap(), 1);
+            property.get_block::<_, Int>(|property_block| {
+                assert_eq!(property_block.block_type(), Some(BlockType::IntValue));
+                assert_eq!(property_block.value(), 1);
             });
-            node.get_block(|node_block| {
-                assert_eq!(node_block.child_count().unwrap(), 1);
+            node.get_block::<_, inspect_format::Node>(|node_block| {
+                assert_eq!(node_block.child_count(), 1);
             });
 
             property.set(2);
-            property.get_block(|property_block| {
-                assert_eq!(property_block.int_value().unwrap(), 2);
+            property.get_block::<_, Int>(|property_block| {
+                assert_eq!(property_block.value(), 2);
             });
 
             assert_eq!(property.subtract(5).unwrap(), -3);
-            property.get_block(|property_block| {
-                assert_eq!(property_block.int_value().unwrap(), -3);
+            property.get_block::<_, Int>(|property_block| {
+                assert_eq!(property_block.value(), -3);
             });
 
             assert_eq!(property.add(8).unwrap(), 5);
-            property.get_block(|property_block| {
-                assert_eq!(property_block.int_value().unwrap(), 5);
+            property.get_block::<_, Int>(|property_block| {
+                assert_eq!(property_block.value(), 5);
             });
         }
-        node.get_block(|node_block| {
-            assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block::<_, inspect_format::Node>(|node_block| {
+            assert_eq!(node_block.child_count(), 0);
         });
     }
 

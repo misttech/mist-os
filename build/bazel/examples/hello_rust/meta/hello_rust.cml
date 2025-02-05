@@ -5,6 +5,6 @@
     include: [ "syslog/client.shard.cml" ],
     program: {
         runner: "elf",
-        binary: "bin/hello_rust",
+        binary: "bin/hello_rust_bin",
     },
 }

@@ -70,6 +70,10 @@ class FastbootCommandError(HoneydewError):
     """Exception for errors raised by Fastboot commands."""
 
 
+class HealthCheckError(HoneydewError):
+    """Raised when health_check fails."""
+
+
 class TransportConnectionError(HoneydewError):
     """Raised when transport's check_connection fails."""
 
@@ -134,10 +138,6 @@ class FuchsiaDeviceError(HoneydewError):
     """Base exception for errors raised by fuchsia device."""
 
 
-class SessionError(HoneydewError):
-    """Exception for errors raised by Session."""
-
-
 class DeviceNotConnectedError(HoneydewError):
     """Exception to be raised when device is not connected to host."""
 
@@ -153,14 +153,6 @@ class StarnixError(HoneydewError):
 
 class UserInputError(HoneydewError):
     """Exception to be raised by UserInput"""
-
-
-class BluetoothError(HoneydewError):
-    """Exception to be raised if Bluetooth operation fails."""
-
-
-class BluetoothStateError(HoneydewError):
-    """Exception to be raised for unexpected Bluetooth states."""
 
 
 class InspectError(HoneydewError):

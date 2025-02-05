@@ -278,7 +278,7 @@ class MagmaExecuteMsdVsi : public testing::Test {
     command_stream->EtnaLink(0x8 /* prefetch */, command_stream->etna_buffer->gpu_address_);
 
     static constexpr uint32_t kTimeoutMs = 7000;
-    ExecuteCommand(command_stream, kTimeoutMs);
+    EXPECT_NO_FATAL_FAILURE(ExecuteCommand(command_stream, kTimeoutMs));
 
     EXPECT_EQ(MAGMA_STATUS_CONTEXT_KILLED, magma_connection_flush(magma_vsi_.GetConnection()));
   }
@@ -333,9 +333,9 @@ TEST_F(MagmaExecuteMsdVsi, MmuExceptionRecovery) {
 }
 
 TEST_F(MagmaExecuteMsdVsi, HangRecovery) {
-  TestHang();
+  ASSERT_NO_FATAL_FAILURE(TestHang());
   TearDown();
   // Verify new commands complete successfully.
   SetUp();
-  Test();
+  ASSERT_NO_FATAL_FAILURE(Test());
 }

@@ -16,7 +16,7 @@ enum ProviderRequestStream {
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
-    tracing::info!("started");
+    log::info!("started");
     let fs = {
         let mut fs = ServiceFs::new();
         fs.dir("svc")
@@ -48,7 +48,7 @@ async fn handle_stream(stream: ProviderRequestStream) -> Result<(), Error> {
 async fn handle_stream_stable(mut stream: fonts::ProviderRequestStream) -> Result<(), Error> {
     use fonts::ProviderRequest::*;
     while let Some(request) = stream.try_next().await.context("handle_stream_stable")? {
-        tracing::debug!("request: {}", request.method_name());
+        log::debug!("request: {}", request.method_name());
         match request {
             GetFont { request: _, responder } => {
                 responder.send(None).context("send GetFont")?;
@@ -78,7 +78,7 @@ async fn handle_stream_experimental(
 ) -> Result<(), Error> {
     use fonts_exp::ProviderRequest::*;
     while let Some(request) = stream.try_next().await.context("handle_stream_experimental")? {
-        tracing::debug!("request: {}", request.method_name());
+        log::debug!("request: {}", request.method_name());
         match request {
             GetTypefaceById { id: _, responder } => {
                 responder.send(Err(fonts_exp::Error::NotFound)).context("send GetTypefaceById")?;

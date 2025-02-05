@@ -15,7 +15,6 @@ constexpr uint16_t kDefaultCh = 149;
 constexpr wlan_common::WlanChannel kDefaultChannel = {
     .primary = kDefaultCh, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
-constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 const common::MacAddr kFakeMac({0xde, 0xad, 0xbe, 0xef, 0x00, 0x02});
 constexpr simulation::WlanTxInfo kDefaultTxInfo = {.channel = kDefaultChannel};
 
@@ -47,15 +46,13 @@ void MfgTest::CreateIF(wlan_common::WlanMacRole role) {
 }
 void MfgTest::DelIF(SimInterface* ifc) { EXPECT_EQ(DeleteInterface(ifc), ZX_OK); }
 
-void MfgTest::StartSoftAP() {
-  softap_ifc_.StartSoftAp(SimInterface::kDefaultSoftApSsid, kDefaultChannel);
-}
+void MfgTest::StartSoftAP() { softap_ifc_.StartSoftAp(kDefaultSoftApSsid, kDefaultChannel); }
 
 void MfgTest::TxAuthAndAssocReq() {
   // Get the mac address of the SoftAP
   common::MacAddr soft_ap_mac;
   softap_ifc_.GetMacAddr(&soft_ap_mac);
-  wlan_ieee80211::CSsid ssid = {.len = 6, .data = {.data_ = "Sim_AP"}};
+  const fuchsia_wlan_ieee80211::Ssid ssid = {'S', 'i', 'm', '_', 'A', 'P'};
   // Pass the auth stop for softAP iface before assoc.
   simulation::SimAuthFrame auth_req_frame(kFakeMac, soft_ap_mac, 1, simulation::AUTH_TYPE_OPEN,
                                           fuchsia_wlan_ieee80211::StatusCode::kSuccess);

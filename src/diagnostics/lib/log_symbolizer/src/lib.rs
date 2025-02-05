@@ -103,8 +103,7 @@ impl Symbolizer for LogSymbolizer {
         tx: Sender<String>,
         extra_args: Vec<String>,
     ) -> Result<()> {
-        let sdk =
-            global_env_context().context("Loading global environment context")?.get_sdk().await?;
+        let sdk = global_env_context().context("Loading global environment context")?.get_sdk()?;
         if let Err(e) = ensure_symbol_index_registered(&sdk) {
             log::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
         }
@@ -240,6 +239,8 @@ impl Symbolizer for FakeSymbolizerForTest {
 mod test {
     use super::*;
     use async_channel::bounded;
+
+    #[allow(clippy::literal_string_with_formatting_args)]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_fake_symbolizer() {
         let args = vec!["arg".to_string(), "arg2".to_string()];

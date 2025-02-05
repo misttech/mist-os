@@ -199,6 +199,11 @@ mod tests {
     }
 
     proptest! {
+        #![proptest_config(ProptestConfig{
+            failure_persistence: None,
+            ..Default::default()
+        })]
+
          /// Check the largest reported duration is u64::MAX, even if the actual duration is longer.
         #[test]
         fn success_duration_max_u64(nanos in 0u32..1_000_000_000) {

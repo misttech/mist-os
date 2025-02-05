@@ -41,12 +41,6 @@
             scope: "#starnix-tests",
         },
         {
-            protocol: "fuchsia.fxfs.CryptManagement",
-            from: "parent",
-            to: "#starnix-tests",
-            availability: "optional",
-        },
-        {
             protocol: [
                 "fuchsia.audio.device.ControlCreator",
                 "fuchsia.audio.device.Provider",
@@ -112,7 +106,7 @@
             to: [ "#starnix-tests" ],
         },
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            dictionary: "diagnostics",
             from: "parent",
             to: [ "#starnix-tests" ],
         },

@@ -82,7 +82,7 @@ fuchsia_product_size_check = rule(
     doc = """Create a size summary of an image.""",
     implementation = _fuchsia_product_size_check_impl,
     provides = [FuchsiaSizeCheckerInfo],
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "product_image": attr.label(
             doc = "fuchsia_product target to check the size of.",

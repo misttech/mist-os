@@ -13,8 +13,8 @@ executable("default_init") {
   exclude_toolchain_tags = [ "instrumented" ]
 
   configs += [
-    "//build/config/mistos:no_cpp_standard_library",
-    "//build/config/mistos:static-pie-config",
+    "//build/config/fuchsia:no_cpp_standard_library",
+    "//build/config/fuchsia:static-pie-config",
     ":config",
   ]
 

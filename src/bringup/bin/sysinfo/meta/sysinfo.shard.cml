@@ -20,6 +20,11 @@
             to: "#sysinfo",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: "#sysinfo",
+        },
+        {
             protocol: "fuchsia.sysinfo.SysInfo",
             from: "#sysinfo",
             to: "self/toolbox",

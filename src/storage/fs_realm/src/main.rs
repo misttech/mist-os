@@ -163,24 +163,24 @@ pub fn fs_realm_service(fs_realm_state: FsRealmState) -> Arc<service::Service> {
                         let res = match fs_realm_state.mount(&name, device, options).await {
                             Ok(()) => Ok(()),
                             Err(error) => {
-                                tracing::error!(?error, "mount failed");
+                                log::error!(error:?; "mount failed");
                                 Err(zx::Status::INTERNAL.into_raw())
                             }
                         };
                         responder.send(res).unwrap_or_else(|error| {
-                            tracing::error!(?error, "failed to send Mount response");
+                            log::error!(error:?; "failed to send Mount response");
                         });
                     }
                     Ok(fs_realm::ControllerRequest::Unmount { responder, name }) => {
                         let res = match fs_realm_state.unmount(&name).await {
                             Ok(()) => Ok(()),
                             Err(error) => {
-                                tracing::error!(?error, "unmount failed");
+                                log::error!(error:?; "unmount failed");
                                 Err(zx::Status::INTERNAL.into_raw())
                             }
                         };
                         responder.send(res).unwrap_or_else(|error| {
-                            tracing::error!(?error, "failed to send Unmount response");
+                            log::error!(error:?; "failed to send Unmount response");
                         });
                     }
                     Ok(fs_realm::ControllerRequest::Format {
@@ -192,28 +192,28 @@ pub fn fs_realm_service(fs_realm_state: FsRealmState) -> Arc<service::Service> {
                         let res = match format(&name, device, options).await {
                             Ok(()) => Ok(()),
                             Err(error) => {
-                                tracing::error!(?error, "format failed");
+                                log::error!(error:?; "format failed");
                                 Err(zx::Status::INTERNAL.into_raw())
                             }
                         };
                         responder.send(res).unwrap_or_else(|error| {
-                            tracing::error!(?error, "failed to send Format response");
+                            log::error!(error:?; "failed to send Format response");
                         });
                     }
                     Ok(fs_realm::ControllerRequest::Check { responder, name, device }) => {
                         let res = match check(&name, device).await {
                             Ok(()) => Ok(()),
                             Err(error) => {
-                                tracing::error!(?error, "check failed");
+                                log::error!(error:?; "check failed");
                                 Err(zx::Status::INTERNAL.into_raw())
                             }
                         };
                         responder.send(res).unwrap_or_else(|error| {
-                            tracing::error!(?error, "failed to send Check response");
+                            log::error!(error:?; "failed to send Check response");
                         });
                     }
                     Err(error) => {
-                        tracing::error!(?error, "fs_realm server failed");
+                        log::error!(error:?; "fs_realm server failed");
                         return;
                     }
                 }
@@ -240,7 +240,7 @@ async fn main() -> Result<(), Error> {
         "svc" => svc,
         "mnt" => mnt,
     };
-    tracing::info!("Serving lifecycle requests");
+    log::info!("Serving lifecycle requests");
     let _ = handle_lifecycle_requests(shutdown_tx)?;
 
     let scope = vfs::execution_scope::ExecutionScope::new();
@@ -250,7 +250,7 @@ async fn main() -> Result<(), Error> {
         vfs::path::Path::dot(),
         directory_request.into(),
     );
-    tracing::info!("Waiting for shutdown request");
+    log::info!("Waiting for shutdown request");
     // Once _lifecycle_request_stream goes out of scope, the LifecycleRequestStream will
     // automatically get dropped, thereby closing the lifecycle channel and signaling
     // that shutdown is complete.
@@ -259,7 +259,7 @@ async fn main() -> Result<(), Error> {
         .await
         .ok_or_else(|| format_err!("shutdown signal stream ended unexpectedly"))?;
 
-    tracing::info!("shutdown signal received");
+    log::info!("shutdown signal received");
     scope.shutdown();
     fs_realm_state.shutdown().await?;
     Ok(())
@@ -274,15 +274,15 @@ pub fn handle_lifecycle_requests(
         fasync::Task::spawn(async move {
             match stream.try_next().await {
                 Ok(Some(LifecycleRequest::Stop { .. })) => {
-                    shutdown.send(stream).await.unwrap_or_else(|error| {
-                        tracing::error!(?error, "failed to send shutdown message")
-                    });
+                    shutdown.send(stream).await.unwrap_or_else(
+                        |error| log::error!(error:?; "failed to send shutdown message"),
+                    );
                 }
                 Ok(None) => {
-                    tracing::info!("next item on the LifecycleRequestStream is None");
+                    log::info!("next item on the LifecycleRequestStream is None");
                 }
                 Err(error) => {
-                    tracing::error!(?error, "failed to get the next lifecycle request");
+                    log::error!(error:?; "failed to get the next lifecycle request");
                 }
             }
         })

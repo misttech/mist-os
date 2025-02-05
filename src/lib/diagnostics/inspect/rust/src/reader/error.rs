@@ -4,7 +4,7 @@
 
 use crate::writer::Error as WriterError;
 use diagnostics_hierarchy::Error as HierarchyError;
-use inspect_format::{BlockIndex, BlockType, Error as FormatError};
+use inspect_format::{BlockIndex, Error as FormatError};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -25,22 +25,22 @@ pub enum ReaderError {
     MalformedTree,
 
     #[error("VMO format error")]
-    VmoFormat(#[source] FormatError),
+    VmoFormat(#[from] FormatError),
+
+    #[error("The VMO is in an invalid format")]
+    InvalidVmo,
 
     #[error("Tried to read more slots than available at block index {0}")]
     AttemptedToReadTooManyArraySlots(BlockIndex),
 
     #[error("unexpected array entry type format: {0:?}")]
-    UnexpectedArrayEntryFormat(BlockType),
+    UnexpectedArrayEntryFormat(u8),
 
     #[error("Failed to parse name at index {0}")]
     ParseName(BlockIndex),
 
-    #[error("Failed to get link content at index {0}")]
-    GetLinkContent(BlockIndex),
-
-    #[error("Failed to get extent at index {0}")]
-    GetExtent(BlockIndex),
+    #[error("No blocks at BlockIndex {0}")]
+    GetBlock(BlockIndex),
 
     #[error("Failed to get consistent snapshot")]
     InconsistentSnapshot,
@@ -53,10 +53,10 @@ pub enum ReaderError {
 
     #[cfg(target_os = "fuchsia")]
     #[error("Failed to call vmo")]
-    Vmo(zx::Status),
+    Vmo(#[from] zx::Status),
 
     #[error("Error creating node hierarchy")]
-    Hierarchy(#[source] HierarchyError),
+    Hierarchy(#[from] HierarchyError),
 
     #[error("Failed to duplicate vmo handle")]
     DuplicateVmo,
@@ -75,10 +75,4 @@ pub enum ReaderError {
 
     #[error("Offset out of bounds while reading")]
     OffsetOutOfBounds,
-}
-
-impl From<FormatError> for ReaderError {
-    fn from(error: FormatError) -> Self {
-        Self::VmoFormat(error)
-    }
 }

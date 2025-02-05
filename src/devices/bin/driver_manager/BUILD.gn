@@ -24,6 +24,8 @@ fuchsia_structured_config_values("driver_manager_config_default") {
     verbose = false
     root_driver = "fuchsia-boot:///platform-bus#meta/platform-bus.cm"
     enable_test_shutdown_delays = false
+    power_inject_offer = true
+    power_suspend_enabled = false
   }
 }
 
@@ -82,6 +84,8 @@ source_set("driver_runner") {
     "driver_runner.h",
     "node.cc",
     "node.h",
+    "offer_injection.cc",
+    "offer_injection.h",
     "parent_set_collector.cc",
     "parent_set_collector.h",
     "pkg_utils.h",
@@ -115,9 +119,11 @@ source_set("driver_runner") {
     "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_cpp",
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_cpp",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp",
     "//sdk/fidl/fuchsia.driver.host:fuchsia.driver.host_cpp",
     "//sdk/fidl/fuchsia.driver.index:fuchsia.driver.index_cpp",
+    "//sdk/fidl/fuchsia.driver.token:fuchsia.driver.token_cpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
     "//sdk/fidl/fuchsia.system.state:fuchsia.system.state_cpp",
@@ -134,7 +140,7 @@ source_set("driver_runner") {
   ]
 
   if (is_mistos) {
-    configs += [ "//build/config/mistos:mistos_define" ]
+    configs += [ "//build/config/fuchsia:mistos_define" ]
   }
 }
 

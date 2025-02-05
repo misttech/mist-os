@@ -137,7 +137,7 @@ mod tests {
     fn test_from_reader_unaligned() {
         let size = 2_109_440usize;
         let mut the_bytes = Vec::with_capacity(size);
-        the_bytes.extend(std::iter::repeat(0xff).take(size));
+        the_bytes.extend(std::iter::repeat_n(0xff, size));
         let tree = MerkleTree::from_reader(&the_bytes[..]).unwrap();
         let expected: Hash =
             "7577266aa98ce587922fdc668c186e27f3c742fb1b732737153b70ae46973e43".parse().unwrap();

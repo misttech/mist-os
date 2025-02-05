@@ -5,11 +5,12 @@
 use async_trait::async_trait;
 use chrono::Local;
 use ffx_build_version::VersionInfo;
+use ffx_config::EnvironmentContext;
 use ffx_version_args::VersionCommand;
 use ffx_writer::{MachineWriter, ToolIO};
 use fho::{Deferred, FfxContext, FfxMain, FfxTool, Result};
-use fidl_fuchsia_developer_ffx::{self as ffx};
 use std::time::Duration;
+use target_holders::DaemonProxyHolder;
 use timeout::timeout;
 
 mod serialization;
@@ -22,8 +23,8 @@ const DEFAULT_DAEMON_TIMEOUT_MS: u64 = 1500;
 pub struct VersionTool {
     #[command]
     cmd: VersionCommand,
-    build_info: ffx_build_version::VersionInfo,
-    daemon_proxy: Deferred<ffx::DaemonProxy>,
+    context: EnvironmentContext,
+    daemon_proxy: Deferred<DaemonProxyHolder>,
 }
 
 fho::embedded_plugin!(VersionTool);
@@ -32,7 +33,7 @@ fho::embedded_plugin!(VersionTool);
 impl FfxMain for VersionTool {
     type Writer = MachineWriter<Versions>;
     async fn main(self, mut writer: Self::Writer) -> Result<()> {
-        let tool_version = self.build_info.into();
+        let tool_version = self.context.build_info().into();
         let daemon_version = if self.cmd.verbose {
             Some(get_daemon_version(self.daemon_proxy.await?).await?.into())
         } else {
@@ -48,7 +49,7 @@ impl FfxMain for VersionTool {
     }
 }
 
-async fn get_daemon_version(proxy: ffx::DaemonProxy) -> Result<VersionInfo> {
+async fn get_daemon_version(proxy: DaemonProxyHolder) -> Result<VersionInfo> {
     timeout(Duration::from_millis(DEFAULT_DAEMON_TIMEOUT_MS), proxy.get_version_info())
         .await
         .user_message("Timed out trying to get daemon version info")?
@@ -59,6 +60,7 @@ async fn get_daemon_version(proxy: ffx::DaemonProxy) -> Result<VersionInfo> {
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
+    use fidl_fuchsia_developer_ffx as ffx;
     use fidl_fuchsia_developer_ffx::DaemonRequest;
     use futures::channel::oneshot::{self, Receiver};
     use futures::future::Shared;
@@ -146,14 +148,14 @@ pub(crate) mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_daemon_succeeds() {
         let proxy = setup_fake_daemon_server(true, daemon_info());
-        assert_eq!(daemon_info(), get_daemon_version(proxy).await.unwrap());
+        assert_eq!(daemon_info(), get_daemon_version(proxy.into()).await.unwrap());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_daemon_fails() {
         let expected_output = "Failed to get daemon version info";
         let proxy = setup_fake_daemon_server(false, daemon_info());
-        match get_daemon_version(proxy).await.unwrap_err() {
+        match get_daemon_version(proxy.into()).await.unwrap_err() {
             fho::Error::User(err) => assert_eq!(&err.to_string(), expected_output),
             other => panic!("Expected '{expected_output}' user error, got: {other}"),
         }
@@ -164,7 +166,7 @@ pub(crate) mod test {
         let expected_output = "Timed out trying to get daemon version info";
         let (tx, rx) = oneshot::channel::<()>();
         let proxy = setup_hanging_daemon_server(rx.shared());
-        let daemon_version = get_daemon_version(proxy).await;
+        let daemon_version = get_daemon_version(proxy.into()).await;
         tx.send(()).unwrap();
 
         match daemon_version.unwrap_err() {

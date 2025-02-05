@@ -25,13 +25,13 @@ use futures::future::{select, Either};
 use futures::prelude::*;
 use futures::stream::Peekable;
 use futures::{pin_mut, StreamExt};
+use log::warn;
 use selectors::FastError;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::warn;
 use {fidl_fuchsia_diagnostics_host as fhost, fuchsia_async as fasync, fuchsia_trace as ftrace};
 
 #[derive(Debug, Copy, Clone)]
@@ -85,7 +85,7 @@ fn validate_and_parse_selectors(
     }
 
     if !errors.is_empty() {
-        warn!(?errors, "Found errors in selector arguments");
+        warn!(errors:?; "Found errors in selector arguments");
     }
 
     Ok(selectors)
@@ -391,7 +391,7 @@ impl ArchiveAccessorWriter for Peekable<BatchIteratorRequestStream> {
                     responder.send()?;
                 }
                 Some(Ok(BatchIteratorRequest::_UnknownMethod { method_type, ordinal, .. })) => {
-                    warn!(?method_type, ordinal, "Got unknown interaction on BatchIterator");
+                    warn!(method_type:?, ordinal; "Got unknown interaction on BatchIterator");
                     return Err(IteratorError::PeerClosed);
                 }
                 Some(Err(err)) => return Err(err.into()),

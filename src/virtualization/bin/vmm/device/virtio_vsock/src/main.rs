@@ -125,7 +125,7 @@ async fn main() -> Result<(), Error> {
                 handle_host_vsock_endpoint(stream, vsock_device.clone()).await
             }
         } {
-            tracing::info!(%err, "Stopping virtio vsock service");
+            log::info!(err:%; "Stopping virtio vsock service");
         }
     })
     .await;

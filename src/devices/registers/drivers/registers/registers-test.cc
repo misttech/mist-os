@@ -5,7 +5,7 @@
 #include "registers.h"
 
 #include <lib/ddk/metadata.h>
-#include <lib/driver/mock-mmio-reg/cpp/mock-mmio-reg.h>
+#include <lib/driver/mock-mmio/cpp/mock-mmio-reg.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 
 #include <gtest/gtest.h>

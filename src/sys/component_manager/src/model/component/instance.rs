@@ -55,6 +55,7 @@ use errors::{
 use fidl::endpoints::{create_proxy, ServerEnd};
 use futures::future::BoxFuture;
 use hooks::{CapabilityReceiver, EventPayload};
+use log::warn;
 use moniker::{ChildName, ExtendedMoniker, Moniker};
 use router_error::RouterError;
 use sandbox::{
@@ -64,7 +65,6 @@ use sandbox::{
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
-use tracing::warn;
 use vfs::directory::entry::{DirectoryEntry, OpenRequest, SubNode};
 use vfs::directory::immutable::simple as pfs;
 use vfs::execution_scope::ExecutionScope;
@@ -658,13 +658,17 @@ impl ResolvedInstanceState {
                 component.execution_scope.clone(),
             )
             .await?;
-            let namespace =
-                namespace_builder.serve().map_err(CreateNamespaceError::BuildNamespaceError)?;
-            let namespace_dir: Arc<pfs::Simple> = namespace.try_into().map_err(|err| {
-                CreateNamespaceError::ConvertToDirectory(ClonableError::from(anyhow::Error::from(
-                    err,
-                )))
+            let namespace = namespace_builder.serve().map_err(|e| {
+                CreateNamespaceError::BuildNamespaceError {
+                    moniker: component.moniker.clone(),
+                    err: e,
+                }
             })?;
+            let namespace_dir: Arc<pfs::Simple> =
+                namespace.try_into().map_err(|err| CreateNamespaceError::ConvertToDirectory {
+                    moniker: component.moniker.clone(),
+                    err: ClonableError::from(anyhow::Error::from(err)),
+                })?;
             Ok(namespace_dir)
         };
 
@@ -737,7 +741,7 @@ impl ResolvedInstanceState {
             for (key, value) in self.sandbox.component_output_dict.enumerate() {
                 let Ok(value) = value else {
                     // This capability is not cloneable. Skip it.
-                    warn!(moniker=%self.moniker(), key=%format!("{key}"),
+                    warn!(moniker:% = self.moniker(), key:%;
                           "Exposed dict contains non-cloneable. Eliding it from exposed dir.");
                     continue;
                 };
@@ -1187,7 +1191,7 @@ impl ProgramRuntime {
                 let stop_nf = component.actions().register_no_wait(StopAction::new(false)).await;
                 component.nonblocking_task_group().spawn(fasync::Task::spawn(async move {
                     let _ = stop_nf.await.map_err(
-                        |err| warn!(%err, "Watching for program termination: Stop failed"),
+                        |err| warn!(err:%; "Watching for program termination: Stop failed"),
                     );
                 }));
             }

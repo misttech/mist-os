@@ -1,55 +1,14 @@
-// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "inspect/client.shard.cml",
-        "syslog/client.shard.cml",
-        "trace/client.shard.cml",
-    ],
-    children: [
-        {
-            name: "power-broker",
-            url: "fuchsia-boot:///power-broker#meta/power-broker.cm",
-        },
-        {
-            name: "system-activity-governor",
-            url: "fuchsia-boot:///fake-system-activity-governor#meta/fake-system-activity-governor.cm",
-        },
-        {
-            name: "fake-suspend",
-            url: "fuchsia-boot:///fake-suspend-pkg#meta/fake-suspend.cm",
-        },
-    ],
-    use: [
-        {
-            protocol: "fuchsia.power.broker.Topology",
-            from: "#power-broker",
-        },
-        {
-            protocol: [
-                "fuchsia.power.suspend.Stats",
-                "fuchsia.power.system.ActivityGovernor",
-                "test.sagcontrol.State",
-            ],
-            from: "#system-activity-governor",
-        },
-    ],
+    include: [ "//src/power/testing/system-integration/meta/client_base.shard.cml" ],
     offer: [
         {
-            protocol: "test.suspendcontrol.Device",
-            from: "#fake-suspend",
+            config: "fuchsia.power.WaitForSuspendingToken",
+            from: "void",
             to: "#system-activity-governor",
-        },
-        {
-            service: "fuchsia.hardware.suspend.SuspendService",
-            from: "#fake-suspend",
-            to: "#system-activity-governor",
-        },
-        {
-            protocol: [ "fuchsia.power.broker.Topology" ],
-            from: "#power-broker",
-            to: "#system-activity-governor",
+            availability: "optional",
         },
     ],
 }

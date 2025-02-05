@@ -7,10 +7,12 @@ use crate::security::selinux_hooks::{
     FsNodeSidAndClass,
 };
 use crate::task::CurrentTask;
-use crate::vfs::{FileSystem, NamespaceNode};
+use crate::vfs::{FileSystem, Mount, NamespaceNode};
 use crate::TODO_DENY;
 use selinux::permission_check::PermissionCheck;
-use selinux::{CommonFilePermission, FileSystemPermission, SecurityId};
+use selinux::{
+    CommonFilePermission, FileSystemMountOptions, FileSystemPermission, SecurityId, SecurityServer,
+};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
@@ -62,6 +64,23 @@ pub fn sb_mount(
             CommonFilePermission::MountOn.for_class(target_class),
         )
     }
+}
+
+/// Checks that `mount` is getting remounted with the same security state as before.
+pub fn sb_remount(
+    security_server: &SecurityServer,
+    mount: &Mount,
+    new_mount_options: FileSystemMountOptions,
+) -> Result<(), Errno> {
+    let fs_name = mount.fs_name();
+    if !mount.security_state().state.equivalent_to_options(
+        security_server,
+        &new_mount_options,
+        fs_name,
+    ) {
+        return error!(EACCES);
+    }
+    Ok(())
 }
 
 /// Checks if `current_task` has the permission to get information on `fs`.

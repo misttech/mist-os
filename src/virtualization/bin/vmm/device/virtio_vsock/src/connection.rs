@@ -147,7 +147,7 @@ impl PartialEq for WantRxChainResult {
 
 impl Drop for VsockConnection {
     fn drop(&mut self) {
-        tracing::info!(connection_key = ?self.key, "Destroyed connection");
+        log::info!(connection_key:? = self.key; "Destroyed connection");
     }
 }
 
@@ -190,7 +190,7 @@ impl VsockConnection {
     }
 
     fn new(key: VsockConnectionKey, state: VsockConnectionState) -> Self {
-        tracing::info!(connection_key = ?key, "Created connection");
+        log::info!(connection_key:? = key; "Created connection");
         VsockConnection {
             key,
             state: RwLock::new(state),

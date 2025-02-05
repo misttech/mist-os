@@ -86,6 +86,7 @@ impl Isolate {
     ///
     /// Most of the time you'll want to use the appropriate convenience wrapper,
     /// [`Isolate::new_with_sdk`] or [`Isolate::new_in_test`].
+    #[allow(clippy::unused_async)] // TODO(https://fxbug.dev/386387845)
     pub async fn new_with_search(
         name: &str,
         search: SearchContext,
@@ -240,11 +241,11 @@ impl Isolate {
         ssh_key: PathBuf,
         context: &EnvironmentContext,
     ) -> Result<Self> {
-        let ffx_path = context.rerun_bin().await?;
+        let ffx_path = context.rerun_bin()?;
         let ffx_path =
             std::fs::canonicalize(ffx_path).context("could not canonicalize own path")?;
 
-        let sdk_root = context.get_sdk_root().await.ok();
+        let sdk_root = context.get_sdk_root().ok();
         let subtool_search_paths =
             context.query("ffx.subtool-search-paths").get().unwrap_or_default();
 
@@ -299,8 +300,9 @@ impl Isolate {
         Ok(daemon)
     }
 
+    #[allow(clippy::unused_async)] // TODO(https://fxbug.dev/386387845)
     pub async fn ffx_cmd(&self, args: &[&str]) -> Result<std::process::Command> {
-        let mut cmd = self.env_ctx.rerun_prefix().await?;
+        let mut cmd = self.env_ctx.rerun_prefix()?;
         cmd.args(args);
         Ok(cmd)
     }

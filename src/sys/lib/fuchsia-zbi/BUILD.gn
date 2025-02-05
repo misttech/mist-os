@@ -14,8 +14,8 @@ rustc_library("fuchsia-zbi") {
     "//sdk/rust/zx",
     "//src/sys/lib/fuchsia-zbi/abi",
     "//third_party/rust_crates:lazy_static",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:zerocopy",
   ]
 

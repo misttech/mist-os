@@ -8,12 +8,11 @@
 
 use crate::common::*;
 use crate::flags;
-
 use anyhow::{bail, Error};
 use argh::FromArgs;
 use chrono::Datelike;
+use log::info;
 use std::path::PathBuf;
-use tracing::info;
 
 /// Generates an integration test for a Fuchsia component.
 #[derive(FromArgs, PartialEq, Debug)]

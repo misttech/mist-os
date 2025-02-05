@@ -19,7 +19,7 @@ use crate::transport::{TransportLayerState, TransportStateBuilder};
 use crate::{BindingsContext, BindingsTypes, CoreCtx};
 
 /// A builder for [`StackState`].
-#[derive(Default, Clone)]
+#[derive(Clone, Default)]
 pub struct StackStateBuilder {
     transport: TransportStateBuilder,
     ipv4: ip::Ipv4StateBuilder,
@@ -37,11 +37,13 @@ impl StackStateBuilder {
         &mut self.ipv4
     }
 
+    /// Get the builder for the IPv6 state.
+    pub fn ipv6_builder(&mut self) -> &mut ip::Ipv6StateBuilder {
+        &mut self.ipv6
+    }
+
     /// Consume this builder and produce a `StackState`.
-    pub(crate) fn build_with_ctx<BC: BindingsContext>(
-        self,
-        bindings_ctx: &mut BC,
-    ) -> StackState<BC> {
+    pub fn build_with_ctx<BC: BindingsContext>(self, bindings_ctx: &mut BC) -> StackState<BC> {
         StackState {
             transport: self.transport.build_with_ctx(bindings_ctx),
             ipv4: self.ipv4.build::<StackState<BC>, _, _>(bindings_ctx),
@@ -132,13 +134,6 @@ impl<BT: BindingsTypes> StackState<BT> {
     /// Accessor for common ICMP state for `I`.
     pub fn common_icmp<I: netstack3_base::IpExt>(&self) -> &IcmpState<I, BT> {
         self.inner_icmp_state::<I>()
-    }
-}
-
-impl<BC: BindingsContext> StackState<BC> {
-    /// Create a new `StackState`.
-    pub fn new(bindings_ctx: &mut BC) -> Self {
-        StackStateBuilder::default().build_with_ctx(bindings_ctx)
     }
 }
 

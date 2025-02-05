@@ -5,6 +5,7 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_product_get_image_path") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
@@ -13,7 +14,9 @@ ffx_plugin("ffx_product_get_image_path") {
   sources = [ "src/lib.rs" ]
 
   args_deps = [
+    "//src/developer/ffx/core:lib",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:argh",
     "//third_party/rust_crates:camino",
   ]
   deps = [

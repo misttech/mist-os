@@ -136,6 +136,7 @@ bootstrap_eng_platform_aib_names = [
   # Power Framework
   "power_framework_testing_sag",
   "power_framework_testing_sag_bootstrap_shard_deprecated",
+  "power_test_platform_drivers",
 
   # Storage
   "fshost_storage_host_fxfs",
@@ -416,6 +417,9 @@ eng_only_platform_aib_names =
       # Sensors support with playback.
       "sensors_framework_eng",
 
+      # Fake power sensor
+      "fake_power_sensor",
+
       # Bluetooth testing support
       "bluetooth_pandora",
 
@@ -447,23 +451,17 @@ required_userdebug_aib_names = required_user_aib_names + [
 experimental_aib_names = [
   "adb_support",
   "bootstrap_realm_vsock_development_access",
-  "fshost_storage_host_fxfs",
-  "fshost_storage_host_gpt_fvm_minfs",
-  "fshost_storage_host_fvm_minfs",
   "nanohub_support",
   "paravirtualization_support_bootstrap",
   "power_framework_broker",
   "power_framework_sag",
   "power_framework_development_support",
-  "power_framework_testing_sag",
-  "power_framework_testing_sag_bootstrap_shard_deprecated",
 
   # Wake alarms support: generic and then hardware-specific.
   "timekeeper_wake_alarms",
 
   # Wake alarms support: hardware-specific.
   "timekeeper_wake_alarms_aml_hrtimer",
-  "topology_test_daemon",
   "trusted_execution_environment",
   "session_manager_enable_pkg_cache",
 ]
@@ -484,10 +482,28 @@ _experimental_user_aibs =
     user_platform_aib_names -
     (user_platform_aib_names + experimental_aib_names - experimental_aib_names)
 if (_experimental_user_aibs != []) {
-  print(
-      "We found experimental AIBs that are allowed in user builds. This is not allowed.")
+  print("We found user AIBs in the experimental list, which is not allowed.")
+  print("Only userdebug AIBs can be marked experimental.")
+  print("Either move the AIBs to userdebug, or go through security review.")
   print(_experimental_user_aibs)
   assert(false, "experimental AIBs cannot be used in user builds")
+}
+
+# Ensure that we do not allow any experimental AIBs in eng builds, because it
+# does not make any sense. The AIBs in the experimental list are blocked from
+# being added to the scrutiny golden files, but scrutiny is never ran on eng
+# products.
+_experimental_eng_aibs = eng_only_platform_aib_names -
+                         (eng_only_platform_aib_names + experimental_aib_names -
+                          experimental_aib_names)
+if (_experimental_eng_aibs != []) {
+  print(
+      "We found eng-only AIBs in the experimental list, which does not make sense.")
+  print("Only userdebug AIBs can be marked experimental.")
+  print(
+      "You probably meant to add these AIBs to userdebug, or should not be marking them experimental.")
+  print(_experimental_eng_aibs)
+  assert(false, "eng-only AIBs cannot be listed as experimental")
 }
 
 bringup_platform_aib_labels = []

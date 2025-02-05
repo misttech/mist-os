@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# Definitions to build each of the Fuchsia SDKs.
+# Definitions to build each of the Fuchsia IDKs.
 
 import("//build/bazel/bazel_fuchsia_sdk.gni")
 import("//build/config/build_api_module.gni")
@@ -28,9 +28,11 @@ visibility = [ ":*" ]
 # `default_toolchain`. The following assert prevents accidentally adding
 # dependencies that cause this file and the many SDK-specific rules to be
 # processed in other toolchains.
-# None of the Fuchsia targets are binaries that would have variants applied.
-# The host tools may be built with toolchain variants.
-assert(current_toolchain == default_toolchain || is_host,
+# None of the targets are binaries that would have variants applied.
+# Additional host toolchains will process this file when cross-compiling tools.
+assert(current_toolchain == default_toolchain ||
+           current_toolchain == host_toolchain ||
+           (sdk_cross_compile_host_tools && is_host),
        "Unexpected target toolchain")
 
 # Log a message if a non-default set of API levels or CPU architecture will be
@@ -292,9 +294,14 @@ if (!is_host) {
         # :fuchsia_idk_atoms_independent_of_api_level_for_one_cpu_arch,
         # which verifies there are no API level dependencies.
 
-        # There are very limited exceptions that do depend on API level but are
-        # only built at "PLATFORM".
-        ":fuchsia_idk_atoms_built_only_at_platform_for_each_cpu_arch",
+        # While the Vulkan layers support being built at individual API levels,
+        # the SDK atom is not aware of API levels so each subbuilds would be
+        # written to the same path in the IDK, clobbering all but one for each
+        # CPU architecture.
+        # TODO(https://fxbug.dev/327223536): Make an SDK atom for loadable
+        # modules that supports is API level-aware and move this to
+        # :fuchsia_idk_atoms_for_each_api_level.
+        "//src/lib/vulkan:vulkan_layers",
 
         # Atoms in :fuchsia_idk_atoms_for_each_api_level that currently must
         # also be built at "PLATFORM" for backwards compatibility with IDK users
@@ -326,36 +333,14 @@ if (!is_host) {
       }
     }
 
-    # Do not add dependencies to this target without a really good reason.
-    # Most dependencies should be built at every API level (add to
-    # :fuchsia_idk_atoms_for_each_api_level) or be verifiably independent of the
-    # API level and target CPU architecture (add to
-    # :fuchsia_idk_atoms_independent_of_api_level_for_one_cpu_arch).
-    #
-    # IDK atoms that must be built at "PLATFORM" for each CPU architecture.
-    sdk_molecule("fuchsia_idk_atoms_built_only_at_platform_for_each_cpu_arch") {
-      category = "partner"
-
-      deps = [
-        # TODO(https://fxbug.dev/327223536): `loadable_modules` (a.k.a., the
-        # "Vulkan layers") support being built at individual API levels, but
-        # each of the subbuilds currently puts the build files at the same path,
-        # so all but one of them gets clobbered. Give `loadable_modules` the
-        # proper per-API-level treatment and move this to
-        # :fuchsia_idk_atoms_for_each_api_level.
-        ":core_loadable_modules",
-      ]
-    }
-
     # The rules below only need to be processed once when building the final
     # IDK. Since sub-builds change the `target_cpu`, this cannot be used as
     # a condition. While, `host_cpu` does not change in sub-builds, using that
     # would require extra processing and building when it does not match the
     # primary target CPU. Therefore, use `sdk_inside_sub_build`.
-    # TODO(https://fxbug.dev/310006516): Once this and the issues in
-    # `fuchsia_idk_atoms_built_only_at_platform_for_each_cpu_arch` are addressed
-    # sub-builds will never target "PLATFORM" and this logic and GN variable
-    # can be removed.
+    # TODO(https://fxbug.dev/310006516): Once this and
+    # https://fxbug.dev/327223536 are addressed sub-builds will never target
+    # "PLATFORM" and this logic and GN variable can be removed.
     if (!sdk_inside_sub_build) {
       # Do not add dependencies to this target without a really good reason.
       # Most such dependencies should be verifiably independent of the API level
@@ -408,7 +393,6 @@ if (!is_host) {
           ":core_bindlib",
           ":core_dart_library",
           ":core_data",
-          ":core_documentation",
           ":core_licenses",
           ":version_history_sdk($default_toolchain)",
           "//sdk/devices",
@@ -430,6 +414,7 @@ group("tests_no_e2e") {
   assert_no_deps = e2e_test_libs
 
   deps = [
+    "//sdk/categories:tests",
     "//sdk/ctf/plasa:tests",
     "//sdk/lib:tests",
     "//sdk/rust:tests",
@@ -550,6 +535,7 @@ if (is_host) {
     category = "partner"
 
     deps = [
+      "//build/assembly/tools/generate_config:generate_config_sdk",
       "//src/developer/debug/zxdb:zxdb_sdk",
       "//src/developer/ffx:bin_sdk",
       "//src/developer/ffx/plugins/agis:sdk",
@@ -605,7 +591,8 @@ if (is_host) {
       "//src/developer/ffx/plugins/emulator:aemu_internal",
       "//src/developer/ffx/plugins/emulator:crosvm_internal",
       "//src/developer/ffx/plugins/emulator:qemu_internal",
-      "//src/developer/ffx/plugins/emulator:uefi_internal",
+      "//src/developer/ffx/plugins/emulator:uefi_internal_arm64",
+      "//src/developer/ffx/plugins/emulator:uefi_internal_x64",
     ]
   }
 } else {
@@ -689,6 +676,7 @@ sdk_molecule("core_bindlib") {
 sdk_molecule("core_packages") {
   category = "partner"
   deps = [
+    "//src/developer/build_info/testing:fake-build-info-sdk",
     "//src/graphics/examples/vkproto/cmd-buf-benchmark:cmd-buf-benchmark-test-sdk",
     "//src/graphics/examples/vkproto/driver-tests:vkproto-driver-test-sdk",
     "//src/graphics/magma/tests/integration:magma_conformance_tests_sdk",
@@ -698,6 +686,7 @@ sdk_molecule("core_packages") {
     "//src/graphics/tests/vkreadback:vkreadback_test_sdk",
     "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_sdk",
     "//src/performance/memory/heapdump/collector:collector_sdk",
+    "//src/testing/fidl/intl_property_manager:intl_property_manager_sdk",
   ]
 }
 
@@ -715,16 +704,6 @@ sdk_molecule("core_data") {
   ]
 }
 
-sdk_molecule("core_documentation") {
-  category = "partner"
-  deps = [ "//third_party/Vulkan-Loader:vulkan_license" ]
-}
-
-sdk_molecule("core_loadable_modules") {
-  category = "partner"
-  deps = [ "//src/lib/vulkan:vulkan_layers" ]
-}
-
 sdk_molecule("core_dart_library") {
   category = "partner"
   deps = [ "//sdk/testing/sl4f/client:client_sdk($dart_toolchain)" ]
@@ -732,8 +711,11 @@ sdk_molecule("core_dart_library") {
 
 sdk_molecule("core_experimental_python_e2e_tests") {
   category = "partner"
-  deps =
-      [ "//src/tests/end_to_end/rtc:rtc_conformance_test_sdk($host_toolchain)" ]
+  if (host_os == "linux") {
+    deps = [
+      "//src/tests/end_to_end/rtc:rtc_conformance_test_sdk($host_toolchain)",
+    ]
+  }
 }
 
 # C/C++ code that must be provided as prebuilt libraries for each supported API
@@ -781,6 +763,9 @@ sdk_molecule("core_cc_source_libraries") {
     "//sdk/lib/component/outgoing/cpp:cpp_sdk",
     "//sdk/lib/driver/component/cpp:cpp_sdk",
     "//sdk/lib/driver/devfs/cpp:cpp_sdk",
+    "//sdk/lib/driver/fake-bti/cpp:cpp_sdk",
+    "//sdk/lib/driver/fake-mmio-reg/cpp:cpp_sdk",
+    "//sdk/lib/driver/fake-object/cpp:cpp_sdk",
     "//sdk/lib/driver/fake-platform-device/cpp:cpp_sdk",
     "//sdk/lib/driver/metadata/cpp:cpp_sdk",
     "//sdk/lib/driver/platform-device/cpp:cpp_sdk",
@@ -832,6 +817,7 @@ sdk_molecule("core_licenses") {
     ":musl_license",
     ":open_source",
     ":sdk_notice",
+    "//third_party/Vulkan-Loader:vulkan_license",
   ]
 }
 
@@ -987,21 +973,50 @@ if (current_toolchain == default_toolchain) {
   #
   # END @internal_sdk
   #
+
+  if (!sdk_inside_sub_build) {
+    # Various ffx tests depend on the "$OUT_DIR/sdk/exported/core" manifest for
+    # the location of ffx tools. They should depend on this target to abstract
+    # the dependency from details of the IDK build.
+    # TODO(https://fxbug.dev/392136182): Remove those dependencies.
+    group("exported_idk_for_ffx_tests") {
+      testonly = true
+      visibility = []
+      visibility = [
+        # Do not add to this list. See  the comment in
+        # `//src/developer/ffx:ffx_bin`.
+
+        "//src/developer/ffx/lib/e2e_emu:isolated_emulator_data",
+        "//src/developer/ffx/lib/fuchsia-controller/tests:core_sdk_host_test_data",
+        "//src/developer/ffx/lib/symbolize/tests:ffx_symbolize_lib_e2e_test_emulator_data",
+        "//src/developer/ffx/plugins/component/create/tests/structured_config:verify_ffx_component_create_parent_overrides_emulator_data",
+        "//src/developer/ffx/plugins/component/run/tests/structured_config:verify_ffx_component_run_parent_overrides_emulator_data",
+        "//src/developer/ffx/plugins/profile/heapdump:verify_ffx_profile_heapdump_emulator_data",
+        "//src/developer/ffx/plugins/target/ssh:ffx_target_ssh_e2e_tests_emulator_data",
+        "//src/developer/ffx/tests/cli-goldens:sdk_exported_for_ffx",
+        "//src/developer/ffx/tests/mw-goldens:sdk_exported_for_ffx",
+        "//src/developer/ffx/tools/power/system-activity/application-activity:ffx_power_system_activity_application_activity_e2e_tests_emulator_data",
+        "//src/developer/ffx/tools/target-package/tests:verify_ffx_target_package_explore_emulator_data",
+        "//tools/fuchsia-sdk-run:sdk_exported",
+        "//vendor/*",
+      ]
+
+      deps = [ ":core" ]
+    }
+  }
 }  # current_toolchain == default_toolchain
 
 if (is_host) {
-  # A collection that only contains host tools that are used by the
-  # Fuchsia build system itself. In particular, this is where
-  # `ffx` will pick companion host tools when running in-tree.
-  sdk_collection("host_tools.internal") {
+  # A collection that only contains host tools that are used by the Fuchsia
+  # build when running ffx tools via the `ffx_action()` template. This allows
+  # "ffx-assembly" to find the tools it needs via an IDK manifest just as it
+  # would when used with a real IDK.
+  sdk_collection("host_tools_used_by_ffx_action_during_build") {
     # This (sorta) restricts the use of this group to instances of the
-    # `ffx_action()` template, which uses the group below (which doesn't have
-    # visibility restrictions to have a dependency on this group.)
+    # `ffx_action()` template, which uses the group below.
     visibility = []
-    visibility = [ "//src/developer/ffx/build:internal_sdk_tools_for_ffx" ]
+    visibility = [ "//src/developer/ffx/build:host_tools_used_by_ffx_action" ]
 
-    # Though ffx_action() depends on the manifest generated by this rule, this
-    # collection is not included in any SDK.
     # TODO(https://fxbug.dev/317385989): Find a solution that doesn't depend on
     # sdk_* templates.
     category = "internal"
@@ -1021,21 +1036,12 @@ if (is_host) {
     ]
 
     deps = [
-      "//src/developer/debug/zxdb:zxdb_sdk",
+      # Do not add to this list.
+      # Prefer solutions that do not require locating tool dependencies via an
+      # IDK manifest.
       "//src/storage/bin/fvm:fvm_sdk",
       "//src/storage/blobfs/tools:blobfs_sdk",
-      "//src/storage/minfs/tools:minfs_sdk",
-      "//src/storage/tools/blobfs-compression:blobfs-compression_sdk",
-      "//src/sys/pkg/bin/far:bin_sdk",
-      "//tools/bootserver_old:bootserver_sdk",
       "//tools/cmc:cmc_sdk",
-      "//tools/fidl/fidlc:fidl-format_sdk",
-      "//tools/fidl/fidlc:fidlc_sdk",
-      "//tools/fidl/fidlgen_hlcpp:fidlgen_hlcpp_sdk",
-      "//tools/fidlcat:fidlcat_sdk",
-      "//tools/net/device-finder:device-finder_sdk",
-      "//tools/symbolizer:sdk",
-      "//zircon/tools/merkleroot:merkleroot_sdk",
       "//zircon/tools/zbi:zbi_sdk",
     ]
   }
@@ -1104,42 +1110,4 @@ copy("idk_build_tools") {
 # Controls the maximum number of simultaneous subbuilds.
 pool("subbuild_pool") {
   depth = sdk_max_simultaneous_sub_builds
-}
-
-# These markers are used to define dependencies on FIDL bindings
-# so host tools can assert_no_deps to make sure all host tools
-# in the SDK are only using FIDL libraries included in the SDK.
-group("marker-cts") {
-  visibility += [ "*" ]
-}
-group("marker-excluded") {
-  visibility += [ "*" ]
-}
-group("marker-experimental") {
-  visibility += [ "*" ]
-}
-group("marker-internal") {
-  visibility += [ "*" ]
-}
-group("marker-unknown") {
-  visibility += [ "*" ]
-}
-group("marker-partner") {
-  visibility += [ "*" ]
-}
-group("marker-partner_internal") {
-  visibility += [ "*" ]
-}
-group("marker-public") {
-  visibility += [ "*" ]
-}
-
-# Marker for the allow list for use in a subtool.
-group("marker-allowed-for-ffx-subtool") {
-  visibility += [ "*" ]
-}
-
-# Marker for the allow list for use in Lacewing.
-group("marker-allowed-for-host-test") {
-  visibility += [ "*" ]
 }

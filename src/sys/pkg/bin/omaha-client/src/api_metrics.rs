@@ -8,8 +8,8 @@ use fidl_contrib::ProtocolConnector;
 use fidl_fuchsia_metrics::MetricEvent;
 use fidl_fuchsia_update::CheckNotStartedReason;
 use fuchsia_cobalt_builders::MetricEventExt as _;
+use log::info;
 use std::future::Future;
-use tracing::info;
 
 #[derive(Debug)]
 #[allow(clippy::enum_variant_names)]

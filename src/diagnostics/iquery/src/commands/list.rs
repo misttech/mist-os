@@ -73,12 +73,10 @@ impl fmt::Display for ListResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for item in self.0.iter() {
             match item {
-                ListResultItem::Moniker(moniker) => {
-                    writeln!(f, "{}", selectors::sanitize_moniker_for_selectors(moniker))?
-                }
+                ListResultItem::Moniker(moniker) => writeln!(f, "{moniker}")?,
                 ListResultItem::MonikerWithUrl(MonikerWithUrl { component_url, moniker }) => {
-                    writeln!(f, "{}:", selectors::sanitize_moniker_for_selectors(moniker))?;
-                    writeln!(f, "  {}", component_url)?;
+                    writeln!(f, "{moniker}:")?;
+                    writeln!(f, "  {component_url}")?;
                 }
             }
         }

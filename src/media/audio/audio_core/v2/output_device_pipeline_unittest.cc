@@ -141,6 +141,7 @@ std::shared_ptr<OutputDevicePipeline> CreatePipeline(TestHarness& h, const Forma
           OutputDeviceProfile(/*eligible_for_loopback=*/true,
                               {
                                   // We assume that `root` enables these usages.
+                                  StreamUsage::WithRenderUsage(RenderUsage::ACCESSIBILITY),
                                   StreamUsage::WithRenderUsage(RenderUsage::BACKGROUND),
                                   StreamUsage::WithRenderUsage(RenderUsage::COMMUNICATION),
                                   StreamUsage::WithRenderUsage(RenderUsage::INTERRUPTION),
@@ -163,6 +164,7 @@ std::shared_ptr<OutputDevicePipeline> CreatePipeline(TestHarness& h, const Forma
     return nullptr;
   }
 
+  EXPECT_TRUE(pipeline->SupportsUsage(RenderUsage::ACCESSIBILITY));
   EXPECT_TRUE(pipeline->SupportsUsage(RenderUsage::BACKGROUND));
   EXPECT_TRUE(pipeline->SupportsUsage(RenderUsage::COMMUNICATION));
   EXPECT_TRUE(pipeline->SupportsUsage(RenderUsage::INTERRUPTION));
@@ -170,6 +172,7 @@ std::shared_ptr<OutputDevicePipeline> CreatePipeline(TestHarness& h, const Forma
   EXPECT_TRUE(pipeline->SupportsUsage(RenderUsage::SYSTEM_AGENT));
   EXPECT_FALSE(pipeline->SupportsUsage(RenderUsage::ULTRASOUND));
 
+  EXPECT_TRUE(pipeline->UsageVolumeForUsage(RenderUsage::ACCESSIBILITY));
   EXPECT_TRUE(pipeline->UsageVolumeForUsage(RenderUsage::BACKGROUND));
   EXPECT_TRUE(pipeline->UsageVolumeForUsage(RenderUsage::COMMUNICATION));
   EXPECT_TRUE(pipeline->UsageVolumeForUsage(RenderUsage::INTERRUPTION));
@@ -224,6 +227,7 @@ TEST(OutputDevicePipelineTest, EmptyNoLoopback) {
       .name = "linearize",
       .input_streams =
           {
+              RenderUsage::ACCESSIBILITY,
               RenderUsage::BACKGROUND,
               RenderUsage::COMMUNICATION,
               RenderUsage::INTERRUPTION,
@@ -252,8 +256,8 @@ TEST(OutputDevicePipelineTest, EmptyNoLoopback) {
   static constexpr NodeId kConsumerId = 2;
   static constexpr NodeId kMixerId = 1;
 
-  // 2 nodes and 1 edge, plus 2 gain controls for each of 5 supported usages.
-  EXPECT_EQ(h.server->calls().size(), 13u);
+  // 2 nodes and 1 edge, plus 2 gain controls for each of 6 supported usages.
+  EXPECT_EQ(h.server->calls().size(), 15u);
 
   // The CreateGainControl calls are interleaved with node creation. To simplify the rest of this
   // test, delete all of those calls.
@@ -261,6 +265,7 @@ TEST(OutputDevicePipelineTest, EmptyNoLoopback) {
   EXPECT_EQ(h.server->calls().size(), 3u);
 
   EXPECT_EQ(pipeline->consumer_node(), kConsumerId);
+  EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::ACCESSIBILITY), kMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::BACKGROUND), kMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::COMMUNICATION), kMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::INTERRUPTION), kMixerId);
@@ -318,6 +323,7 @@ TEST(OutputDevicePipelineTest, MultilevelWithEffectsAndLoopback) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::ACCESSIBILITY,
                   RenderUsage::COMMUNICATION,
                   RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
@@ -359,8 +365,8 @@ TEST(OutputDevicePipelineTest, MultilevelWithEffectsAndLoopback) {
   static constexpr NodeId kMixCustomId = 2;
   static constexpr NodeId kMixSplitterId = 3;
 
-  // 6 nodes and 5 edges, plus 2 gain controls for each of 6 supported usages (including loopback).
-  EXPECT_EQ(h.server->calls().size(), 23u);
+  // 6 nodes and 5 edges, plus 2 gain controls for each of 7 supported usages (including loopback).
+  EXPECT_EQ(h.server->calls().size(), 25u);
 
   // The CreateGainControl calls are interleaved with node creation. To simplify the rest of this
   // test, delete all of those calls.
@@ -368,6 +374,7 @@ TEST(OutputDevicePipelineTest, MultilevelWithEffectsAndLoopback) {
   EXPECT_EQ(h.server->calls().size(), 11u);
 
   EXPECT_EQ(pipeline->consumer_node(), kConsumerId);
+  EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::ACCESSIBILITY), kMixMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::BACKGROUND), kLinearizeMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::COMMUNICATION), kMixMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::INTERRUPTION), kMixMixerId);
@@ -479,6 +486,7 @@ TEST(OutputDevicePipelineTest, UpsampleAfterLoopback) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::ACCESSIBILITY,
                   RenderUsage::COMMUNICATION,
                   RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
@@ -517,8 +525,8 @@ TEST(OutputDevicePipelineTest, UpsampleAfterLoopback) {
   static constexpr NodeId kMixMixerId = 1;
   static constexpr NodeId kMixSplitterId = 2;
 
-  // 4 nodes and 3 edges, plus 2 gain controls for each of 6 supported usages (including loopback).
-  EXPECT_EQ(h.server->calls().size(), 19u);
+  // 4 nodes and 3 edges, plus 2 gain controls for each of 7 supported usages (including loopback).
+  EXPECT_EQ(h.server->calls().size(), 21u);
 
   // The CreateGainControl calls are interleaved with node creation. To simplify the rest of this
   // test, delete all of those calls.
@@ -526,6 +534,7 @@ TEST(OutputDevicePipelineTest, UpsampleAfterLoopback) {
   EXPECT_EQ(h.server->calls().size(), 7u);
 
   EXPECT_EQ(pipeline->consumer_node(), kConsumerId);
+  EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::ACCESSIBILITY), kMixMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::BACKGROUND), kLinearizeMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::COMMUNICATION), kMixMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::INTERRUPTION), kMixMixerId);
@@ -609,6 +618,7 @@ TEST(OutputDevicePipelineTest, RechannelEffects) {
       .name = "linearize",
       .input_streams =
           {
+              RenderUsage::ACCESSIBILITY,
               RenderUsage::BACKGROUND,
               RenderUsage::COMMUNICATION,
               RenderUsage::INTERRUPTION,
@@ -644,8 +654,8 @@ TEST(OutputDevicePipelineTest, RechannelEffects) {
   static constexpr NodeId kCustomId = 2;
   static constexpr NodeId kSplitterId = 3;
 
-  // 4 nodes and 3 edges, plus 2 gain controls for each of 6 supported usages (including loopback).
-  EXPECT_EQ(h.server->calls().size(), 19u);
+  // 4 nodes and 3 edges, plus 2 gain controls for each of 7 supported usages (including loopback).
+  EXPECT_EQ(h.server->calls().size(), 21u);
 
   // The CreateGainControl calls are interleaved with node creation. To simplify the rest of this
   // test, delete all of those calls.
@@ -653,6 +663,7 @@ TEST(OutputDevicePipelineTest, RechannelEffects) {
   EXPECT_EQ(h.server->calls().size(), 7u);
 
   EXPECT_EQ(pipeline->consumer_node(), kConsumerId);
+  EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::ACCESSIBILITY), kMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::BACKGROUND), kMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::COMMUNICATION), kMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::INTERRUPTION), kMixerId);

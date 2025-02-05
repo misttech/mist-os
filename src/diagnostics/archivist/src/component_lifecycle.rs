@@ -7,7 +7,7 @@ use fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream};
 use fuchsia_async as fasync;
 use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
 use futures::{Future, StreamExt};
-use tracing::{debug, warn};
+use log::{debug, warn};
 
 /// Takes the startup handle for LIFECYCLE and returns a stream listening for Lifecycle FIDL
 /// requests on it.
@@ -31,7 +31,7 @@ where
             warn!("Lifecycle closed");
         }
         Some(Err(err)) => {
-            warn!(?err, "Lifecycle error");
+            warn!(err:?; "Lifecycle error");
         }
         Some(Ok(LifecycleRequest::Stop { .. })) => {
             debug!("Initiating shutdown.");

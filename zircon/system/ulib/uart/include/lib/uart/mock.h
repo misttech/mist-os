@@ -58,6 +58,11 @@ class IoProvider {
 class Driver {
  public:
   struct config_type {};
+
+  Driver() = default;
+  Driver(const Driver&) = delete;
+  Driver(Driver&&) = default;
+
   static constexpr IoRegisterType kIoType = IoRegisterType::kMmio8;
   constexpr config_type config() const { return {}; }
   constexpr size_t io_slots() const { return 0; }
@@ -184,8 +189,14 @@ template <typename LockType, typename LockTag>
 class TA_SCOPED_CAP Guard {
  public:
   template <typename... T>
-  __WARN_UNUSED_CONSTRUCTOR explicit Guard(LockType* sync, const char* tag) TA_ACQ(sync)
-      TA_ACQ(sync_)
+  [[maybe_unused]] explicit Guard(LockType* sync) TA_ACQ(sync) TA_ACQ(sync_) : sync_(*sync) {
+    if constexpr (std::is_same_v<LockTag, Locking>) {
+      sync_.lock();
+    }
+  }
+
+  template <typename... T>
+  [[maybe_unused]] explicit Guard(LockType* sync, const char* tag) TA_ACQ(sync) TA_ACQ(sync_)
       : sync_(*sync) {
     if constexpr (std::is_same_v<LockTag, Locking>) {
       sync_.lock();

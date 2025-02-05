@@ -144,7 +144,7 @@ static_library("elfldltl") {
   }
 
   if (is_mistos) {
-    configs += [ "//build/config/mistos:mistos_define" ]
+    configs += [ "//build/config/fuchsia:mistos_define" ]
   }
 }
 

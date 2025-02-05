@@ -36,6 +36,7 @@ fn serialize_mac<S: serde::Serializer>(
 #[derive(Serialize)]
 enum DeviceClass {
     Loopback,
+    Blackhole,
     Virtual,
     Ethernet,
     WlanClient,
@@ -89,6 +90,7 @@ impl
         ) = t;
         let device_class = match port_class {
             fidl_fuchsia_net_interfaces_ext::PortClass::Loopback => DeviceClass::Loopback,
+            fidl_fuchsia_net_interfaces_ext::PortClass::Blackhole => DeviceClass::Blackhole,
             fidl_fuchsia_net_interfaces_ext::PortClass::Virtual => DeviceClass::Virtual,
             fidl_fuchsia_net_interfaces_ext::PortClass::Ethernet => DeviceClass::Ethernet,
             fidl_fuchsia_net_interfaces_ext::PortClass::WlanClient => DeviceClass::WlanClient,

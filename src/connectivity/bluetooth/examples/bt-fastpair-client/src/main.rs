@@ -15,14 +15,14 @@ use fuchsia_bluetooth::types::PeerId;
 use fuchsia_component::client::connect_to_protocol;
 use futures::stream::TryStreamExt;
 use futures::{select, FutureExt};
+use log::{info, warn};
 use std::pin::pin;
-use tracing::{info, warn};
 
 async fn process_provider_events(mut stream: ProviderWatcherRequestStream) -> Result<(), Error> {
     while let Some(request) = stream.try_next().await? {
         let (id, responder) = request.into_on_pairing_complete().expect("only one method");
         let _ = responder.send();
-        info!(id = %PeerId::from(id), "Successful Fast Pair pairing");
+        info!(id:% = PeerId::from(id); "Successful Fast Pair pairing");
     }
     info!("Provider service ended");
     Ok(())
@@ -42,7 +42,7 @@ async fn process_pairing_events(mut stream: PairingDelegateRequestStream) -> Res
                 let _ = responder.send(true, displayed_passkey);
             }
             PairingDelegateRequest::OnPairingComplete { id, success, .. } => {
-                info!(id = %PeerId::from(id), "Normal pairing complete (success = {})", success);
+                info!(id:% = PeerId::from(id); "Normal pairing complete (success = {})", success);
             }
             _ => {}
         }

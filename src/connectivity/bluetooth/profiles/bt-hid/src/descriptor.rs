@@ -6,7 +6,7 @@ use fuchsia_bluetooth::profile::DataElement;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
-use tracing::warn;
+use log::warn;
 
 /// ClassDescriptorType from HID v1.1.1 5.3.4.7
 #[derive(Debug, FromPrimitive, PartialEq)]

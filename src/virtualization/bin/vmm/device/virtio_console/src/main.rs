@@ -67,7 +67,7 @@ async fn main() -> Result<(), Error> {
 
     fs.for_each_concurrent(None, |stream| async {
         if let Err(err) = run_virtio_console(stream).await {
-            tracing::info!(%err, "Stopping virtio console device");
+            log::info!(err:%; "Stopping virtio console device");
         }
     })
     .await;

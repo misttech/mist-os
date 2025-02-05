@@ -9,9 +9,9 @@ use fuchsia_sync::Mutex;
 use zx::prelude::*;
 
 use futures::AsyncReadExt;
+use log::{info, warn};
 use std::io::Write;
 use std::sync::Arc;
-use tracing::{info, warn};
 
 /// An RAII-style struct that initializes tracing in the test realm on creation via
 /// `Tracing::create_and_initialize_tracing` and collects and writes the trace when the

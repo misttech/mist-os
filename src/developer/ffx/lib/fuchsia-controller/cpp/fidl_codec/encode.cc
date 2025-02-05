@@ -4,16 +4,21 @@
 
 #include "encode.h"
 
+#include <Python.h>
+
 #include <string>
+
+#include <fuchsia_controller_abi/utils.h>
 
 #include "mod.h"
 #include "object_converter.h"
-#include "src/developer/ffx/lib/fuchsia-controller/cpp/abi/convert.h"
-#include "src/developer/ffx/lib/fuchsia-controller/cpp/raii/py_wrapper.h"
 #include "src/lib/fidl_codec/encoder.h"
 #include "src/lib/fidl_codec/wire_types.h"
+#include "utils.h"
 
-namespace encode {
+namespace fuchsia_controller::fidl_codec::encode {
+
+namespace fc = fuchsia_controller;
 
 PyMethodDef encode_fidl_message_py_def = {
     "encode_fidl_message", reinterpret_cast<PyCFunction>(encode_fidl_message),
@@ -41,9 +46,9 @@ struct GetPayloadTypeArgs {
 };
 
 namespace {
-std::unique_ptr<fidl_codec::Type> GetPayloadType(GetPayloadTypeArgs args) {
+std::unique_ptr<::fidl_codec::Type> GetPayloadType(GetPayloadTypeArgs args) {
   if (args.obj == Py_None) {
-    return std::make_unique<fidl_codec::EmptyPayloadType>();
+    return std::make_unique<::fidl_codec::EmptyPayloadType>();
   }
   const char *lib_c_str = PyUnicode_AsUTF8AndSize(args.library_obj, nullptr);
   if (lib_c_str == nullptr) {
@@ -91,13 +96,13 @@ PyObject *encode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds) {
     return nullptr;
   }
 
-  auto ordinal = convert::PyLong_AsU64(ordinal_obj);
-  if (ordinal == convert::MINUS_ONE_U64 && PyErr_Occurred()) {
+  auto ordinal = utils::PyLong_AsU64(ordinal_obj);
+  if (ordinal == utils::MINUS_ONE_U64 && PyErr_Occurred()) {
     return nullptr;
   }
 
-  auto txid = convert::PyLong_AsU32(txid_obj);
-  if (txid == convert::MINUS_ONE_U32 && PyErr_Occurred()) {
+  auto txid = utils::PyLong_AsU32(txid_obj);
+  if (txid == utils::MINUS_ONE_U32 && PyErr_Occurred()) {
     return nullptr;
   }
 
@@ -113,47 +118,48 @@ PyObject *encode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds) {
   if (converted == nullptr) {
     return nullptr;
   }
-  auto msg = fidl_codec::Encoder::EncodeMessage(txid, ordinal, AT_REST_FLAGS, DYNAMIC_FLAGS,
-                                                HEADER_MAGIC, converted.get(), type.get());
-  auto res = py::Object(PyTuple_New(2));
+  auto msg = ::fidl_codec::Encoder::EncodeMessage(txid, ordinal, AT_REST_FLAGS, DYNAMIC_FLAGS,
+                                                  HEADER_MAGIC, converted.get(), type.get());
+  auto res = fc::abi::utils::Object(PyTuple_New(2));
   if (res == nullptr) {
     return nullptr;
   }
-  auto buf = py::Object(PyByteArray_FromStringAndSize(
+  auto buf = fc::abi::utils::Object(PyByteArray_FromStringAndSize(
       reinterpret_cast<const char *>(msg.bytes.data()), static_cast<Py_ssize_t>(msg.bytes.size())));
   if (buf == nullptr) {
     return nullptr;
   }
-  auto handles_list = py::Object(PyList_New(static_cast<Py_ssize_t>(msg.handles.size())));
+  auto handles_list =
+      fc::abi::utils::Object(PyList_New(static_cast<Py_ssize_t>(msg.handles.size())));
   if (handles_list == nullptr) {
     return nullptr;
   }
   PyTuple_SetItem(res.get(), 0, buf.take());
   for (uint64_t i = 0; i < msg.handles.size(); ++i) {
     // This is currently done as a tuple, could also be done as a dict for better readability.
-    auto handle_tuple = py::Object(PyTuple_New(5));
+    auto handle_tuple = fc::abi::utils::Object(PyTuple_New(5));
     auto handle_disp = msg.handles[i];
-    auto operation = py::Object(PyLong_FromLong(handle_disp.operation));
+    auto operation = fc::abi::utils::Object(PyLong_FromLong(handle_disp.operation));
     if (operation == nullptr) {
       return nullptr;
     }
     PyTuple_SetItem(handle_tuple.get(), 0, operation.take());
-    auto handle_value = py::Object(PyLong_FromLong(handle_disp.handle));
+    auto handle_value = fc::abi::utils::Object(PyLong_FromLong(handle_disp.handle));
     if (handle_value == nullptr) {
       return nullptr;
     }
     PyTuple_SetItem(handle_tuple.get(), 1, handle_value.take());
-    auto type = py::Object(PyLong_FromLong(handle_disp.type));
+    auto type = fc::abi::utils::Object(PyLong_FromLong(handle_disp.type));
     if (type == nullptr) {
       return nullptr;
     }
     PyTuple_SetItem(handle_tuple.get(), 2, type.take());
-    auto rights = py::Object(PyLong_FromLong(handle_disp.rights));
+    auto rights = fc::abi::utils::Object(PyLong_FromLong(handle_disp.rights));
     if (rights == nullptr) {
       return nullptr;
     }
     PyTuple_SetItem(handle_tuple.get(), 3, rights.take());
-    auto result = py::Object(PyLong_FromLong(handle_disp.result));
+    auto result = fc::abi::utils::Object(PyLong_FromLong(handle_disp.result));
     if (result == nullptr) {
       return nullptr;
     }
@@ -186,46 +192,47 @@ PyObject *encode_fidl_object(PyObject *self, PyObject *args, PyObject *kwds) {
   if (converted == nullptr) {
     return nullptr;
   }
-  auto msg = fidl_codec::Encoder::EncodeObject(converted.get(), type.get());
-  auto res = py::Object(PyTuple_New(2));
+  auto msg = ::fidl_codec::Encoder::EncodeObject(converted.get(), type.get());
+  auto res = fc::abi::utils::Object(PyTuple_New(2));
   if (res == nullptr) {
     return nullptr;
   }
-  auto buf = py::Object(PyByteArray_FromStringAndSize(
+  auto buf = fc::abi::utils::Object(PyByteArray_FromStringAndSize(
       reinterpret_cast<const char *>(msg.bytes.data()), static_cast<Py_ssize_t>(msg.bytes.size())));
   if (buf == nullptr) {
     return nullptr;
   }
-  auto handles_list = py::Object(PyList_New(static_cast<Py_ssize_t>(msg.handles.size())));
+  auto handles_list =
+      fc::abi::utils::Object(PyList_New(static_cast<Py_ssize_t>(msg.handles.size())));
   if (handles_list == nullptr) {
     return nullptr;
   }
   PyTuple_SetItem(res.get(), 0, buf.take());
   for (uint64_t i = 0; i < msg.handles.size(); ++i) {
     // This is currently done as a tuple, could also be done as a dict for better readability.
-    auto handle_tuple = py::Object(PyTuple_New(5));
+    auto handle_tuple = fc::abi::utils::Object(PyTuple_New(5));
     auto handle_disp = msg.handles[i];
-    auto operation = py::Object(PyLong_FromLong(handle_disp.operation));
+    auto operation = fc::abi::utils::Object(PyLong_FromLong(handle_disp.operation));
     if (operation == nullptr) {
       return nullptr;
     }
     PyTuple_SetItem(handle_tuple.get(), 0, operation.take());
-    auto handle_value = py::Object(PyLong_FromLong(handle_disp.handle));
+    auto handle_value = fc::abi::utils::Object(PyLong_FromLong(handle_disp.handle));
     if (handle_value == nullptr) {
       return nullptr;
     }
     PyTuple_SetItem(handle_tuple.get(), 1, handle_value.take());
-    auto type = py::Object(PyLong_FromLong(handle_disp.type));
+    auto type = fc::abi::utils::Object(PyLong_FromLong(handle_disp.type));
     if (type == nullptr) {
       return nullptr;
     }
     PyTuple_SetItem(handle_tuple.get(), 2, type.take());
-    auto rights = py::Object(PyLong_FromLong(handle_disp.rights));
+    auto rights = fc::abi::utils::Object(PyLong_FromLong(handle_disp.rights));
     if (rights == nullptr) {
       return nullptr;
     }
     PyTuple_SetItem(handle_tuple.get(), 3, rights.take());
-    auto result = py::Object(PyLong_FromLong(handle_disp.result));
+    auto result = fc::abi::utils::Object(PyLong_FromLong(handle_disp.result));
     if (result == nullptr) {
       return nullptr;
     }
@@ -236,4 +243,4 @@ PyObject *encode_fidl_object(PyObject *self, PyObject *args, PyObject *kwds) {
   return res.take();
 }
 
-}  // namespace encode
+}  // namespace fuchsia_controller::fidl_codec::encode

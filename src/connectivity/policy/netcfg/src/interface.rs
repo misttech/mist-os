@@ -12,6 +12,7 @@ use crate::DeviceClass;
 const INTERFACE_PREFIX_WLAN: &str = "wlan";
 const INTERFACE_PREFIX_ETHERNET: &str = "eth";
 const INTERFACE_PREFIX_AP: &str = "ap";
+const INTERFACE_PREFIX_BLACKHOLE: &str = "blackhole";
 
 #[derive(PartialEq, Eq, Debug, Clone, Hash)]
 pub(crate) struct InterfaceNamingIdentifier {
@@ -117,7 +118,7 @@ impl InterfaceNamingConfig {
         // with the same identifier is re-installed, re-attempt name generation
         // since the MAC identifiers used may have changed.
         match self.interfaces.remove(&interface_naming_id) {
-            Some(name) => tracing::info!(
+            Some(name) => log::info!(
                 "{name} already existed for this identifier\
             {interface_naming_id:?}. inserting a new one."
             ),
@@ -130,7 +131,7 @@ impl InterfaceNamingConfig {
         if let Some(name) =
             self.interfaces.insert(interface_naming_id.clone(), generated_name.clone())
         {
-            tracing::error!(
+            log::error!(
                 "{name} was unexpectedly found for {interface_naming_id:?} \
             when inserting a new name"
             );
@@ -348,6 +349,7 @@ impl DynamicNameCompositionRule {
                 crate::InterfaceType::WlanClient => INTERFACE_PREFIX_WLAN,
                 crate::InterfaceType::Ethernet => INTERFACE_PREFIX_ETHERNET,
                 crate::InterfaceType::WlanAp => INTERFACE_PREFIX_AP,
+                crate::InterfaceType::Blackhole => INTERFACE_PREFIX_BLACKHOLE,
             }
             .to_string(),
             DynamicNameCompositionRule::NormalizedMac => {
@@ -450,7 +452,7 @@ impl NamingRule {
                     continue;
                 }
 
-                tracing::warn!(
+                log::warn!(
                     "name ({name}) already used for an interface installed by netcfg. \
                  using name since it is possible that the interface using this name is no \
                  longer active"
@@ -551,7 +553,8 @@ impl<'a> DeviceInfoRef<'a> {
             | DeviceClass::Ethernet
             | DeviceClass::Bridge
             | DeviceClass::Ppp
-            | DeviceClass::Lowpan => false,
+            | DeviceClass::Lowpan
+            | DeviceClass::Blackhole => false,
         }
     }
 }
@@ -604,6 +607,7 @@ mod tests {
             crate::InterfaceType::Ethernet => DeviceClass::Ethernet,
             crate::InterfaceType::WlanClient => DeviceClass::WlanClient,
             crate::InterfaceType::WlanAp => DeviceClass::WlanAp,
+            crate::InterfaceType::Blackhole => DeviceClass::Blackhole,
         }
     }
 
@@ -681,7 +685,13 @@ mod tests {
         "ethv001e";
         "virtio_attached_ethernet"
     )]
-
+    // NB: name generation for blackhole interfaces is never expected to be invoked.
+    #[test_case(
+        "/dev/sys/platform/pt/PCI0/bus/00:15.0/00:15.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
+        [0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c],
+        crate::InterfaceType::Blackhole,
+        "blackholexc";
+        "usb_blackhole")]
     fn test_generate_name(
         topological_path: &'static str,
         mac: [u8; 6],

@@ -18,8 +18,7 @@ use ffx_flash_args::FlashCommand;
 use ffx_ssh::SshKeyFiles;
 use fho::{FfxContext, FfxMain, FfxTool, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx::{
-    FastbootInterface as FidlFastbootInterface, TargetInfo, TargetProxy, TargetRebootState,
-    TargetState,
+    FastbootInterface as FidlFastbootInterface, TargetInfo, TargetRebootState, TargetState,
 };
 use fuchsia_async::{MonotonicInstant, Timer};
 use futures::try_join;
@@ -29,6 +28,7 @@ use std::io::Write;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Once;
+use target_holders::TargetProxyHolder;
 use termion::{color, style};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
@@ -43,7 +43,7 @@ const WAIT_WARN_SECS: u64 = 20;
 pub struct FlashTool {
     #[command]
     cmd: FlashCommand,
-    target_proxy: fho::Deferred<TargetProxy>,
+    target_proxy: fho::Deferred<TargetProxyHolder>,
 }
 
 fho::embedded_plugin!(FlashTool);
@@ -186,7 +186,7 @@ async fn preprocess_flash_cmd(mut cmd: FlashCommand) -> Result<FlashCommand> {
 
 #[tracing::instrument(skip(target_proxy, writer))]
 async fn flash_plugin_impl(
-    target_proxy: TargetProxy,
+    target_proxy: TargetProxyHolder,
     cmd: FlashCommand,
     writer: &mut VerifiedMachineWriter<FlashMessage>,
 ) -> fho::Result<()> {

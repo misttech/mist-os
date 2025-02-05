@@ -70,6 +70,7 @@ pub trait NetCliDepsConnector:
     + ServiceConnector<fdhcp::Server_Marker>
     + ServiceConnector<ffilter_deprecated::FilterMarker>
     + ServiceConnector<finterfaces::StateMarker>
+    + ServiceConnector<finterfaces_admin::InstallerMarker>
     + ServiceConnector<fneighbor::ControllerMarker>
     + ServiceConnector<fneighbor::ViewMarker>
     + ServiceConnector<fstack::LogMarker>
@@ -90,6 +91,7 @@ impl<O> NetCliDepsConnector for O where
         + ServiceConnector<fdhcp::Server_Marker>
         + ServiceConnector<ffilter_deprecated::FilterMarker>
         + ServiceConnector<finterfaces::StateMarker>
+        + ServiceConnector<finterfaces_admin::InstallerMarker>
         + ServiceConnector<fneighbor::ControllerMarker>
         + ServiceConnector<fneighbor::ViewMarker>
         + ServiceConnector<fstack::LogMarker>
@@ -196,6 +198,7 @@ fn write_tabulated_interfaces_info<
                 "device class",
                 match device_class {
                     ser::DeviceClass::Loopback => "loopback",
+                    ser::DeviceClass::Blackhole => "blackhole",
                     ser::DeviceClass::Virtual => "virtual",
                     ser::DeviceClass::Ethernet => "ethernet",
                     ser::DeviceClass::WlanClient => "wlan-client",
@@ -446,8 +449,12 @@ async fn do_if<C: NetCliDepsConnector>(
                         Ok(mac) => {
                             let mac = mac.map(|box_| *box_);
                             let view = (properties, mac).into();
-                            write_tabulated_interfaces_info(out, std::iter::once(view))
-                                .context("error tabulating interface info")?;
+                            if out.is_machine() {
+                                out.machine(&serde_json::to_value(&view)?)?;
+                            } else {
+                                write_tabulated_interfaces_info(out, std::iter::once(view))
+                                    .context("error tabulating interface info")?;
+                            }
                         }
                     };
                 }
@@ -858,6 +865,33 @@ async fn do_if<C: NetCliDepsConnector>(
                     out.line(format!("{:#?}", configuration))?;
                 }
             }
+        }
+        opts::IfEnum::Add(opts::IfAdd {
+            cmd: opts::IfAddEnum::Blackhole(opts::IfBlackholeAdd { name }),
+        }) => {
+            let installer =
+                ServiceConnector::<finterfaces_admin::InstallerMarker>::connect(connector)
+                    .await
+                    .expect("connect should succeed");
+
+            let (control, server_end) = finterfaces_ext::admin::Control::create_endpoints()
+                .context("create admin control endpoints")?;
+            installer
+                .install_blackhole_interface(
+                    server_end,
+                    &finterfaces_admin::Options { name: Some(name), ..Default::default() },
+                )
+                .expect("install blackhole interface should succeed");
+            control.detach().expect("detach should succeed");
+        }
+        opts::IfEnum::Remove(opts::IfRemove { interface }) => {
+            let id = interface.find_nicid(connector).await.context("find nicid")?;
+            let control = get_control(connector, id).await.context("get control")?;
+            control
+                .remove()
+                .await
+                .expect("should not get FIDL error")
+                .expect("remove should succeed");
         }
     }
     Ok(())
@@ -1823,6 +1857,7 @@ mod testutil {
         pub routes_v6: Option<froutes::StateV6Proxy>,
         pub name_lookup: Option<fname::LookupProxy>,
         pub filter: Option<fnet_filter::StateProxy>,
+        pub installer: Option<finterfaces_admin::InstallerProxy>,
     }
 
     #[async_trait::async_trait]
@@ -1884,6 +1919,18 @@ mod testutil {
                 .as_ref()
                 .cloned()
                 .ok_or(anyhow!("connector has no interfaces state instance"))
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ServiceConnector<finterfaces_admin::InstallerMarker> for TestConnector {
+        async fn connect(
+            &self,
+        ) -> Result<<finterfaces_admin::InstallerMarker as ProtocolMarker>::Proxy, Error> {
+            self.installer
+                .as_ref()
+                .cloned()
+                .ok_or(anyhow!("connector has no fuchsia.net.interfaces.admin.Installer"))
         }
     }
 

@@ -15,6 +15,7 @@ rustc_library("file_relative_path") {
   with_unit_tests = true
   deps = [
     ":file_relative_path_derive",
+    "//src/lib/assembly/container",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:pathdiff",

@@ -119,7 +119,7 @@ TestFilesystemOptions OptionsWithDescription(std::string_view description);
 zx::result<RamDevice> CreateRamDevice(const TestFilesystemOptions& options);
 
 // Returns a handle to a test crypt service.
-zx::result<zx::channel> GetCryptService();
+zx::result<fidl::ClientEnd<fuchsia_fxfs::Crypt>> InitializeCryptService();
 
 // A file system instance is a specific instance created for test purposes.
 //

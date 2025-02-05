@@ -14,8 +14,8 @@ use fidl_fuchsia_update_installer_ext::State;
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use fuchsia_sync::Mutex;
 use futures::prelude::*;
+use log::{error, info};
 use std::sync::Arc;
-use tracing::{error, info};
 
 pub enum IncomingService {
     Installer(InstallerRequestStream),

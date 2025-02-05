@@ -42,15 +42,53 @@ pub trait SuspendResumeListener {
     /// Gets the manager of suspend stats.
     fn suspend_stats(&self) -> &dyn SuspendStatsUpdater;
     /// Leases (Execution State, Suspending). Called after system suspension ends.
-    async fn on_suspend_ended(&self, suspend_suceeded: bool);
+    async fn on_suspend_ended(&self);
     /// Notify the listeners that system suspension is about to begin
     async fn notify_on_suspend(&self);
-    /// Notify the listeners of suspend results.
-    async fn notify_suspend_ended(&self);
-    /// Notify the listeners of a suspend failure.
-    async fn notify_on_suspend_fail(&self);
     /// Notify the listeners of a suspend success.
     async fn notify_on_resume(&self);
+}
+
+/// Vends "suspend blockers", object references that, when held, indicate that the system should
+/// not suspend. Practically speaking, these blockers are used to guarantee that the system does
+/// not suspend in the gap between when a wake lease is acquired and when the lease becomes
+/// satisfied.
+pub struct SuspendBlockManager {
+    marker: Mutex<Rc<()>>,
+}
+
+impl SuspendBlockManager {
+    pub fn new() -> Self {
+        SuspendBlockManager { marker: Mutex::new(Rc::new(())) }
+    }
+
+    /// Returns a suspend blocker, possibly needing to wait until an in-flight suspend attempt
+    /// completes.
+    pub async fn get_blocker(&self) -> std::rc::Weak<()> {
+        let marker = self.marker.lock().await;
+        Rc::downgrade(&marker)
+    }
+
+    /// Attempts to acquire a suspend blocker immediately, returning None if the system is currently
+    /// executing a suspend attempt.
+    pub fn try_get_blocker(&self) -> Option<std::rc::Weak<()>> {
+        self.marker.try_lock().map(|marker| Rc::downgrade(&marker))
+    }
+
+    /// If suspend is allowed, returns a guard that blocks further get_blocker() calls as long as it
+    /// is held. Otherwise, returns None.
+    pub(crate) fn suspend_allowed(&self) -> Option<futures::lock::MutexGuard<'_, Rc<()>>> {
+        match self.marker.try_lock() {
+            None => None,
+            Some(marker) => {
+                if Rc::weak_count(&marker) > 0 {
+                    None
+                } else {
+                    Some(marker)
+                }
+            }
+        }
+    }
 }
 
 /// Controls access to CPU power element and suspend management.
@@ -65,7 +103,9 @@ struct CpuManagerInner {
     /// The flag used to track whether suspension is allowed based on CPU's power level.
     /// If true, CPU has transitioned from a higher power state to CpuLevel::Inactive
     /// and is still at the CpuLevel::Inactive power level.
-    suspend_allowed: bool,
+    cpu_element_is_inactive: bool,
+    /// Allows the upper layer of SAG to block system suspension.
+    suspend_block_manager: Rc<SuspendBlockManager>,
 }
 
 /// Manager of the CPU power element and suspend logic.
@@ -89,7 +129,8 @@ impl CpuManager {
                 cpu,
                 suspender,
                 suspend_state_index: 0,
-                suspend_allowed: false,
+                cpu_element_is_inactive: false,
+                suspend_block_manager: Rc::new(SuspendBlockManager::new()),
             }),
             suspend_resume_listener: OnceCell::new(),
             _inspect_node: RefCell::new(IRingBuffer::new(inspect, 128)),
@@ -127,10 +168,10 @@ impl CpuManager {
         // check whether the system can be suspended.
         if required_level == CpuLevel::Inactive.into_primitive() {
             log::debug!("beginning suspend process for cpu");
-            inner.suspend_allowed = true;
+            inner.cpu_element_is_inactive = true;
             return Ok(true);
         } else {
-            inner.suspend_allowed = false;
+            inner.cpu_element_is_inactive = false;
             return Ok(false);
         }
     }
@@ -149,6 +190,10 @@ impl CpuManager {
         self.inner.lock().await.cpu.clone()
     }
 
+    pub async fn suspend_block_manager(&self) -> Rc<SuspendBlockManager> {
+        self.inner.lock().await.suspend_block_manager.clone()
+    }
+
     /// Attempts to suspend the system.
     ///
     /// Returns an enum representing the result of the suspend attempt.
@@ -158,10 +203,18 @@ impl CpuManager {
         {
             log::debug!("trigger_suspend: acquiring inner lock");
             let inner = self.inner.lock().await;
-            if !inner.suspend_allowed {
-                log::info!("Suspend not allowed");
+            if !inner.cpu_element_is_inactive {
+                log::info!("Suspend not allowed because CPU element is not inactive");
                 return SuspendResult::NotAllowed;
             }
+
+            let _lock = match inner.suspend_block_manager.suspend_allowed() {
+                Some(lock) => lock,
+                None => {
+                    log::info!("Suspend not allowed due to outstanding wake leases");
+                    return SuspendResult::NotAllowed;
+                }
+            };
 
             self._inspect_node.borrow_mut().add_entry(|node| {
                 node.record_int(
@@ -244,7 +297,7 @@ impl CpuManager {
         // At this point, the suspend request is no longer in flight and has been handled. With
         // `inner` going out of scope, other tasks can modify flags and update the power level of
         // CPU power element.
-        listener.on_suspend_ended(!suspend_failed).await;
+        listener.on_suspend_ended().await;
         if suspend_failed {
             SuspendResult::Fail
         } else {
@@ -252,23 +305,16 @@ impl CpuManager {
         }
     }
 
-    pub fn run(self: &Rc<Self>, inspect_root: &INode, power_elements_node: &INode) {
+    pub fn run(self: &Rc<Self>, power_elements_node: &INode) {
         let (suspend_tx, suspend_rx) = mpsc::channel(1);
-        self.run_suspend_task(inspect_root, suspend_rx);
+        self.run_suspend_task(suspend_rx);
         self.run_power_element(power_elements_node, suspend_tx);
     }
 
-    pub fn run_suspend_task(
-        self: &Rc<Self>,
-        inspect_node: &INode,
-        mut suspend_signal: Receiver<()>,
-    ) {
+    fn run_suspend_task(self: &Rc<Self>, mut suspend_signal: Receiver<()>) {
         let cpu_manager = self.clone();
-        let inspect_node = inspect_node.clone_weak();
 
         fasync::Task::local(async move {
-            let _unhandled_suspend_failures_node =
-                inspect_node.create_uint(fobs::UNHANDLED_SUSPEND_FAILURES_COUNT, 0);
             loop {
                 log::debug!("awaiting suspend signals");
                 suspend_signal.next().await;

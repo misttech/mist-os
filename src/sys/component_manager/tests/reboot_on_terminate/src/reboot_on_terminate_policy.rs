@@ -5,7 +5,7 @@
 use assert_matches::assert_matches;
 use fuchsia_component::client;
 use futures::StreamExt;
-use tracing::*;
+use log::*;
 use {
     fidl_fidl_examples_routing_echo as fecho, fidl_fidl_test_components as ftest,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,

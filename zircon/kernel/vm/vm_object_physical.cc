@@ -28,8 +28,12 @@
 #define LOCAL_TRACE VM_GLOBAL_TRACE(0)
 
 VmObjectPhysical::VmObjectPhysical(fbl::RefPtr<VmHierarchyState> state, paddr_t base, uint64_t size,
-                                   bool is_slice)
-    : VmObject(VMOType::Physical, ktl::move(state)), size_(size), base_(base), is_slice_(is_slice) {
+                                   bool is_slice, uint64_t parent_user_id)
+    : VmObject(VMOType::Physical, ktl::move(state)),
+      size_(size),
+      base_(base),
+      is_slice_(is_slice),
+      parent_user_id_(parent_user_id) {
   LTRACEF("%p, size %#" PRIx64 "\n", this, size_);
 
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size_));
@@ -47,7 +51,7 @@ VmObjectPhysical::~VmObjectPhysical() {
       parent_->RemoveChild(this, guard.take());
       // Avoid recursing destructors when we delete our parent by using the deferred deletion
       // method.
-      hierarchy_state_ptr_->DoDeferredDelete(ktl::move(parent_));
+      VmDeferredDeleter<VmObjectPhysical>::DoDeferredDelete(ktl::move(parent_));
     }
   }
 
@@ -72,8 +76,8 @@ zx_status_t VmObjectPhysical::Create(paddr_t base, uint64_t size,
     return ZX_ERR_NO_MEMORY;
   }
 
-  auto vmo = fbl::AdoptRef<VmObjectPhysical>(
-      new (&ac) VmObjectPhysical(ktl::move(state), base, size, /*is_slice=*/false));
+  auto vmo = fbl::AdoptRef<VmObjectPhysical>(new (&ac) VmObjectPhysical(
+      ktl::move(state), base, size, /*is_slice=*/false, /*parent_user_id=*/0));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -125,9 +129,11 @@ zx_status_t VmObjectPhysical::CreateChildSlice(uint64_t offset, uint64_t size, b
 
   // To mimic a slice we can just create a physical vmo with the correct region. This works since
   // nothing is resizable and the slice must be wholly contained.
+  // We can read and store the user_id here since for a slice to be being created the dispatcher
+  // side of this object must have completed, and hence the user_id has been set.
   fbl::AllocChecker ac;
-  auto vmo = fbl::AdoptRef<VmObjectPhysical>(
-      new (&ac) VmObjectPhysical(hierarchy_state_ptr_, base_ + offset, size, /*is_slice=*/true));
+  auto vmo = fbl::AdoptRef<VmObjectPhysical>(new (&ac) VmObjectPhysical(
+      hierarchy_state_ptr_, base_ + offset, size, /*is_slice=*/true, user_id()));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -139,8 +145,6 @@ zx_status_t VmObjectPhysical::CreateChildSlice(uint64_t offset, uint64_t size, b
     vmo->mapping_cache_flags_ = mapping_cache_flags_;
     // Initialize parent
     vmo->parent_ = fbl::RefPtr(this);
-    // Initialize parent user id.
-    vmo->parent_user_id_ = user_id_locked();
 
     // add the new vmo as a child.
     AddChildLocked(vmo.get());

@@ -19,8 +19,8 @@ use netstack3_base::{
     trace_duration, BroadcastIpExt, CoreTimerContext, Device, DeviceIdContext, FrameDestination,
     HandleableTimer, LinkDevice, NestedIntoCoreTimerCtx, ReceivableFrameMeta, RecvFrameContext,
     RecvIpFrameMeta, ResourceCounterContext, RngContext, SendFrameError, SendFrameErrorReason,
-    SendableFrameMeta, TimerContext, TimerHandler, TracingContext, WeakDeviceIdentifier,
-    WrapBroadcastMarker,
+    SendableFrameMeta, TimerContext, TimerHandler, TracingContext, TxMetadataBindingsTypes,
+    WeakDeviceIdentifier, WrapBroadcastMarker,
 };
 use netstack3_ip::nud::{
     LinkResolutionContext, NudBindingsTypes, NudHandler, NudState, NudTimerId, NudUserConfig,
@@ -52,10 +52,13 @@ const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
 
 /// The execution context for an Ethernet device provided by bindings.
 pub trait EthernetIpLinkDeviceBindingsContext:
-    RngContext + TimerContext + DeviceLayerTypes
+    RngContext + TimerContext + DeviceLayerTypes + TxMetadataBindingsTypes
 {
 }
-impl<BC: RngContext + TimerContext + DeviceLayerTypes> EthernetIpLinkDeviceBindingsContext for BC {}
+impl<BC: RngContext + TimerContext + DeviceLayerTypes + TxMetadataBindingsTypes>
+    EthernetIpLinkDeviceBindingsContext for BC
+{
+}
 
 /// Provides access to an ethernet device's static state.
 pub trait EthernetIpLinkDeviceStaticStateContext: DeviceIdContext<EthernetLinkDevice> {
@@ -103,13 +106,14 @@ pub fn send_as_ethernet_frame_to_dst<S, BC, CC>(
     dst_mac: Mac,
     body: S,
     ether_type: EtherType,
+    meta: BC::TxMetadata,
 ) -> Result<(), SendFrameError<S>>
 where
     S: Serializer,
     S::Buffer: BufferMut,
     BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
-        + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
+        + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = BC::TxMetadata>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
 {
     /// The minimum body length for the Ethernet frame.
@@ -124,7 +128,7 @@ where
     let frame = body
         .encapsulate(EthernetFrameBuilder::new(local_mac.get(), dst_mac, ether_type, MIN_BODY_LEN))
         .with_size_limit(max_frame_size.into());
-    send_ethernet_frame(core_ctx, bindings_ctx, device_id, frame)
+    send_ethernet_frame(core_ctx, bindings_ctx, device_id, frame, meta)
         .map_err(|err| err.into_inner().into_inner())
 }
 
@@ -133,13 +137,14 @@ fn send_ethernet_frame<S, BC, CC>(
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
     frame: S,
+    meta: BC::TxMetadata,
 ) -> Result<(), SendFrameError<S>>
 where
     S: Serializer,
     S::Buffer: BufferMut,
     BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
-        + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
+        + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = BC::TxMetadata>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
 {
     core_ctx.increment(device_id, |counters| &counters.send_total_frames);
@@ -147,7 +152,7 @@ where
         core_ctx,
         bindings_ctx,
         device_id,
-        (),
+        meta,
         frame,
     ) {
         Ok(()) => {
@@ -268,7 +273,7 @@ pub struct EthernetDeviceState<BT: NudBindingsTypes<EthernetLinkDevice>> {
     /// Immutable Ethernet device state.
     pub static_state: StaticEthernetDeviceState,
     /// Ethernet device transmit queue.
-    pub tx_queue: TransmitQueue<(), Buf<Vec<u8>>, BufVecU8Allocator>,
+    pub tx_queue: TransmitQueue<BT::TxMetadata, Buf<Vec<u8>>, BufVecU8Allocator>,
     ipv4_arp: Mutex<ArpState<EthernetLinkDevice, BT>>,
     ipv6_nud: Mutex<NudState<Ipv6, EthernetLinkDevice, BT>>,
     ipv4_nud_config: RwLock<IpMarked<Ipv4, NudUserConfig>>,
@@ -317,19 +322,19 @@ impl<BT: DeviceLayerTypes> OrderedLockAccess<ArpState<EthernetLinkDevice, BT>>
 }
 
 impl<BT: DeviceLayerTypes>
-    OrderedLockAccess<TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>>
+    OrderedLockAccess<TransmitQueueState<BT::TxMetadata, Buf<Vec<u8>>, BufVecU8Allocator>>
     for IpLinkDeviceState<EthernetLinkDevice, BT>
 {
-    type Lock = Mutex<TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>>;
+    type Lock = Mutex<TransmitQueueState<BT::TxMetadata, Buf<Vec<u8>>, BufVecU8Allocator>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.link.tx_queue.queue)
     }
 }
 
-impl<BT: DeviceLayerTypes> OrderedLockAccess<DequeueState<(), Buf<Vec<u8>>>>
+impl<BT: DeviceLayerTypes> OrderedLockAccess<DequeueState<BT::TxMetadata, Buf<Vec<u8>>>>
     for IpLinkDeviceState<EthernetLinkDevice, BT>
 {
-    type Lock = Mutex<DequeueState<(), Buf<Vec<u8>>>>;
+    type Lock = Mutex<DequeueState<BT::TxMetadata, Buf<Vec<u8>>>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.link.tx_queue.deque)
     }
@@ -381,12 +386,13 @@ pub fn send_ip_frame<BC, CC, I, S>(
     device_id: &CC::DeviceId,
     destination: IpPacketDestination<I, &DeviceId<BC>>,
     body: S,
+    meta: BC::TxMetadata,
 ) -> Result<(), SendFrameError<S>>
 where
     BC: EthernetIpLinkDeviceBindingsContext + LinkResolutionContext<EthernetLinkDevice>,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
         + NudHandler<I, EthernetLinkDevice, BC>
-        + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
+        + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = BC::TxMetadata>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
     I: EthernetIpExt + BroadcastIpExt,
     S: Serializer,
@@ -410,6 +416,7 @@ where
                 Mac::BROADCAST,
                 body,
                 I::ETHER_TYPE,
+                meta,
             )
         }
         IpPacketDestination::Multicast(multicast_ip) => send_as_ethernet_frame_to_dst(
@@ -419,6 +426,7 @@ where
             Mac::from(&multicast_ip),
             body,
             I::ETHER_TYPE,
+            meta,
         ),
         IpPacketDestination::Neighbor(ip) => NudHandler::<I, _, _>::send_ip_packet_to_neighbor(
             core_ctx,
@@ -426,6 +434,7 @@ where
             device_id,
             ip,
             body,
+            meta,
         ),
         IpPacketDestination::Loopback(_) => {
             unreachable!("Loopback packets must be delivered through the loopback device")
@@ -447,8 +456,8 @@ impl<CC, BC> ReceivableFrameMeta<CC, BC> for RecvEthernetFrameMeta<CC::DeviceId>
 where
     BC: EthernetIpLinkDeviceBindingsContext + TracingContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
-        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, DeviceIpLayerMetadata, Ipv4>, BC>
-        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, DeviceIpLayerMetadata, Ipv6>, BC>
+        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, DeviceIpLayerMetadata<BC>, Ipv4>, BC>
+        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, DeviceIpLayerMetadata<BC>, Ipv6>, BC>
         + ArpPacketHandler<EthernetLinkDevice, BC>
         + DeviceSocketHandler<EthernetLinkDevice, BC>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>
@@ -685,7 +694,7 @@ pub trait UseArpFrameMetadataBlanket {}
 impl<
         BC: EthernetIpLinkDeviceBindingsContext,
         CC: EthernetIpLinkDeviceDynamicStateContext<BC>
-            + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
+            + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = BC::TxMetadata>
             + ResourceCounterContext<CC::DeviceId, DeviceCounters>
             + UseArpFrameMetadataBlanket,
     > SendableFrameMeta<CC, BC> for ArpFrameMetadata<EthernetLinkDevice, CC::DeviceId>
@@ -701,6 +710,7 @@ impl<
         S::Buffer: BufferMut,
     {
         let Self { device_id, dst_addr } = self;
+        let meta: BC::TxMetadata = Default::default();
         send_as_ethernet_frame_to_dst(
             core_ctx,
             bindings_ctx,
@@ -708,6 +718,7 @@ impl<
             dst_addr,
             body,
             EtherType::Arp,
+            meta,
         )
     }
 }
@@ -721,7 +732,7 @@ impl DeviceSocketSendTypes for EthernetLinkDevice {
 impl<
         BC: EthernetIpLinkDeviceBindingsContext,
         CC: EthernetIpLinkDeviceDynamicStateContext<BC>
-            + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
+            + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = BC::TxMetadata>
             + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
     > SendableFrameMeta<CC, BC> for DeviceSocketMetadata<EthernetLinkDevice, EthernetDeviceId<BC>>
 where
@@ -738,6 +749,9 @@ where
         S::Buffer: BufferMut,
     {
         let Self { device_id, metadata } = self;
+        // TODO(https://fxbug.dev/391946195): Apply send buffer enforcement from
+        // device sockets instead of using default.
+        let tx_meta: BC::TxMetadata = Default::default();
         match metadata {
             Some(EthernetHeaderParams { dest_addr, protocol }) => send_as_ethernet_frame_to_dst(
                 core_ctx,
@@ -746,8 +760,9 @@ where
                 dest_addr,
                 body,
                 protocol,
+                tx_meta,
             ),
-            None => send_ethernet_frame(core_ctx, bindings_ctx, &device_id, body),
+            None => send_ethernet_frame(core_ctx, bindings_ctx, &device_id, body, tx_meta),
         }
     }
 }
@@ -798,20 +813,20 @@ impl LinkDevice for EthernetLinkDevice {
 }
 
 impl DeviceStateSpec for EthernetLinkDevice {
-    type Link<BT: DeviceLayerTypes> = EthernetDeviceState<BT>;
+    type State<BT: DeviceLayerTypes> = EthernetDeviceState<BT>;
     type External<BT: DeviceLayerTypes> = BT::EthernetDeviceState;
     type CreationProperties = EthernetCreationProperties;
     type Counters = EthernetDeviceCounters;
     type TimerId<D: WeakDeviceIdentifier> = EthernetTimerId<D>;
 
-    fn new_link_state<
+    fn new_device_state<
         CC: CoreTimerContext<Self::TimerId<CC::WeakDeviceId>, BC> + DeviceIdContext<Self>,
         BC: DeviceLayerTypes + TimerContext,
     >(
         bindings_ctx: &mut BC,
         self_id: CC::WeakDeviceId,
         EthernetCreationProperties { mac, max_frame_size }: Self::CreationProperties,
-    ) -> Self::Link<BC> {
+    ) -> Self::State<BC> {
         let ipv4_arp = Mutex::new(ArpState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(
             bindings_ctx,
             self_id.clone(),
@@ -849,7 +864,9 @@ mod tests {
 
     use net_types::ip::{Ipv4Addr, Ipv6Addr};
     use net_types::SpecifiedAddr;
-    use netstack3_base::testutil::{FakeDeviceId, FakeInstant, FakeWeakDeviceId, TEST_ADDRS_V4};
+    use netstack3_base::testutil::{
+        FakeDeviceId, FakeInstant, FakeTxMetadata, FakeWeakDeviceId, TEST_ADDRS_V4,
+    };
     use netstack3_base::{CounterContext, CtxPair, IntoCoreTimerCtx};
     use netstack3_ip::nud::{
         self, DelegateNudContext, DynamicNeighborUpdateSource, NeighborApi, UseDelegateNudContext,
@@ -870,7 +887,7 @@ mod tests {
     struct FakeEthernetCtx {
         static_state: StaticEthernetDeviceState,
         dynamic_state: DynamicEthernetDeviceState,
-        tx_queue: TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>,
+        tx_queue: TransmitQueueState<FakeTxMetadata, Buf<Vec<u8>>, BufVecU8Allocator>,
         counters: DeviceCounters,
         per_device_counters: DeviceCounters,
         ethernet_counters: EthernetDeviceCounters,
@@ -1079,6 +1096,7 @@ mod tests {
             _device_id: &Self::DeviceId,
             _neighbor: SpecifiedAddr<Ipv6Addr>,
             _body: S,
+            _tx_meta: FakeTxMetadata,
         ) -> Result<(), SendFrameError<S>> {
             unimplemented!()
         }
@@ -1122,11 +1140,11 @@ mod tests {
             cb(arp_state, &mut FakeCoreCtxWithDeviceId { core_ctx: inner, device_id })
         }
 
-        fn get_protocol_addr(
-            &mut self,
-            _bindings_ctx: &mut FakeBindingsCtx,
-            _device_id: &Self::DeviceId,
-        ) -> Option<Ipv4Addr> {
+        fn addr_on_interface(&mut self, _device_id: &Self::DeviceId, _addr: Ipv4Addr) -> bool {
+            unimplemented!()
+        }
+
+        fn get_protocol_addr(&mut self, _device_id: &Self::DeviceId) -> Option<Ipv4Addr> {
             unimplemented!()
         }
 
@@ -1179,6 +1197,7 @@ mod tests {
             bindings_ctx: &mut FakeBindingsCtx,
             link_addr: Mac,
             body: S,
+            tx_meta: FakeTxMetadata,
         ) -> Result<(), SendFrameError<S>>
         where
             S: Serializer,
@@ -1192,6 +1211,7 @@ mod tests {
                 link_addr,
                 body,
                 EtherType::Ipv4,
+                tx_meta,
             )
         }
     }
@@ -1203,7 +1223,7 @@ mod tests {
     }
 
     impl TransmitQueueCommon<EthernetLinkDevice, FakeBindingsCtx> for FakeCoreCtx {
-        type Meta = ();
+        type Meta = FakeTxMetadata;
         type Allocator = BufVecU8Allocator;
         type Buffer = Buf<Vec<u8>>;
         type DequeueContext = Never;
@@ -1217,14 +1237,14 @@ mod tests {
     }
 
     impl TransmitQueueCommon<EthernetLinkDevice, FakeBindingsCtx> for FakeInnerCtx {
-        type Meta = ();
+        type Meta = FakeTxMetadata;
         type Allocator = BufVecU8Allocator;
         type Buffer = Buf<Vec<u8>>;
         type DequeueContext = Never;
 
         fn parse_outgoing_frame<'a, 'b>(
             buf: &'a [u8],
-            (): &'b Self::Meta,
+            _tx_meta: &'b Self::Meta,
         ) -> Result<SentFrame<&'a [u8]>, ParseSentFrameError> {
             SentFrame::try_parse_as_ethernet(buf)
         }
@@ -1258,7 +1278,7 @@ mod tests {
             bindings_ctx: &mut FakeBindingsCtx,
             device_id: &Self::DeviceId,
             dequeue_context: Option<&mut Never>,
-            (): Self::Meta,
+            tx_meta: Self::Meta,
             buf: Self::Buffer,
         ) -> Result<(), DeviceSendFrameError> {
             TransmitQueueContext::send_frame(
@@ -1266,7 +1286,7 @@ mod tests {
                 bindings_ctx,
                 device_id,
                 dequeue_context,
-                (),
+                tx_meta,
                 buf,
             )
         }
@@ -1300,7 +1320,7 @@ mod tests {
             _bindings_ctx: &mut FakeBindingsCtx,
             device_id: &Self::DeviceId,
             dequeue_context: Option<&mut Never>,
-            (): Self::Meta,
+            _tx_meta: Self::Meta,
             buf: Self::Buffer,
         ) -> Result<(), DeviceSendFrameError> {
             match dequeue_context {
@@ -1349,6 +1369,7 @@ mod tests {
                 &FakeDeviceId,
                 IpPacketDestination::<Ipv4, _>::Neighbor(TEST_ADDRS_V4.remote_ip),
                 Buf::new(&mut vec![0; size], ..),
+                FakeTxMetadata::default(),
             )
             .map_err(|_serializer| ());
             let sent_frames = core_ctx.inner.frames().len();
@@ -1375,6 +1396,7 @@ mod tests {
             &FakeDeviceId,
             IpPacketDestination::<Ipv4, _>::Broadcast(()),
             Buf::new(&mut vec![0; 100], ..),
+            FakeTxMetadata::default(),
         )
         .map_err(|_serializer| ())
         .expect("send_ip_frame should succeed");

@@ -1,4 +1,5 @@
 //! Integration tests for `zeroize_derive` proc macros
+
 #![cfg(feature = "zeroize_derive")]
 
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -318,10 +319,50 @@ fn derive_deref() {
 
 #[test]
 #[cfg(feature = "alloc")]
+#[allow(dead_code)]
 fn derive_zeroize_on_drop_generic() {
     #[derive(ZeroizeOnDrop)]
     struct Y<T: Zeroize>(Box<T>);
 
     #[derive(ZeroizeOnDrop)]
     struct Z<T: Zeroize>(Vec<T>);
+}
+
+#[test]
+#[allow(dead_code)]
+fn derive_zeroize_unused_param() {
+    #[derive(Zeroize)]
+    struct Z<T> {
+        arr: [u32; 5],
+        #[zeroize(skip)]
+        skipped: T,
+    }
+}
+
+#[test]
+#[allow(dead_code)]
+// Issue #878
+fn derive_zeroize_with_marker() {
+    #[derive(ZeroizeOnDrop, Zeroize)]
+    struct Test<A: Marker> {
+        #[zeroize(skip)]
+        field: Option<A>,
+    }
+
+    #[allow(dead_code)]
+    trait Secret: ZeroizeOnDrop + Zeroize {}
+
+    impl<A: Marker> Secret for Test<A> {}
+
+    trait Marker {}
+}
+
+#[test]
+#[allow(dead_code)]
+// Issue #878
+fn derive_zeroize_used_param() {
+    #[derive(Zeroize)]
+    struct Z<T> {
+        used: T,
+    }
 }

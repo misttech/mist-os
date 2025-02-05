@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::access_vector_cache::{Fixed, Locked, Query, DEFAULT_SHARED_SIZE};
+use crate::access_vector_cache::{FifoCache, Locked, Query};
 use crate::policy::{AccessVectorComputer, SELINUX_AVD_FLAGS_PERMISSIVE};
 use crate::security_server::SecurityServer;
-use crate::{ClassPermission, FileClass, Permission, SecurityId};
+use crate::{ClassPermission, FileClass, NullessByteStr, Permission, SecurityId};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_inspect_contrib::profile_duration;
 
+use std::num::NonZeroU64;
 use std::sync::Weak;
 
 /// Describes the result of a permission lookup between two Security Contexts.
@@ -23,6 +24,10 @@ pub struct PermissionCheckResult {
     /// "permissive"), but may be suppressed for some denials ("dontaudit"), or for some allowed
     /// permissions ("auditallow").
     pub audit: bool,
+
+    /// If the `AccessDecision` indicates that permission denials should not be enforced then `permit`
+    /// will be true, and this field will hold the Id of the bug to reference in audit logging.
+    pub todo_bug: Option<NonZeroU64>,
 }
 
 /// Implements the `has_permission()` API, based on supplied `Query` and `AccessVectorComputer`
@@ -30,13 +35,13 @@ pub struct PermissionCheckResult {
 // TODO: https://fxbug.dev/362699811 - Revise the traits to avoid direct dependencies on `SecurityServer`.
 pub struct PermissionCheck<'a> {
     security_server: &'a SecurityServer,
-    access_vector_cache: &'a Locked<Fixed<Weak<SecurityServer>, DEFAULT_SHARED_SIZE>>,
+    access_vector_cache: &'a Locked<FifoCache<Weak<SecurityServer>>>,
 }
 
 impl<'a> PermissionCheck<'a> {
     pub(crate) fn new(
         security_server: &'a SecurityServer,
-        access_vector_cache: &'a Locked<Fixed<Weak<SecurityServer>, DEFAULT_SHARED_SIZE>>,
+        access_vector_cache: &'a Locked<FifoCache<Weak<SecurityServer>>>,
     ) -> Self {
         Self { security_server, access_vector_cache }
     }
@@ -66,12 +71,26 @@ impl<'a> PermissionCheck<'a> {
         self.security_server
     }
 
+    /// Returns the SID with which to label a new `file_class` instance created by `subject_sid`, with `target_sid`
+    /// as its parent, taking into account role & type transition rules, and filename-transition rules.
+    /// If a filename-transition rule matches the `file_name` then that will be used, otherwise the
+    /// filename-independent computation will be applied.
     pub fn compute_new_file_sid(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
         file_class: FileClass,
+        file_name: NullessByteStr<'_>,
     ) -> Result<SecurityId, anyhow::Error> {
+        // TODO: https://fxbug.dev/385075470 - Stop skipping empty name lookups once by-name lookup is better optimized.
+        if !file_name.as_bytes().is_empty() {
+            if let Some(sid) = self
+                .access_vector_cache
+                .compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
+            {
+                return Ok(sid);
+            }
+        }
         self.access_vector_cache.compute_new_file_sid(source_sid, target_sid, file_class)
     }
 }
@@ -100,9 +119,9 @@ fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
         } else {
             permission_access_vector & decision.auditdeny == permission_access_vector
         };
-        PermissionCheckResult { permit, audit }
+        PermissionCheckResult { permit, audit, todo_bug: None }
     } else {
-        PermissionCheckResult { permit: false, audit: true }
+        PermissionCheckResult { permit: false, audit: true, todo_bug: None }
     };
 
     if !result.permit {
@@ -113,6 +132,11 @@ fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
             // If the access decision indicates that the source domain is permissive then permit
             // all access.
             result.permit = true;
+        } else if decision.todo_bug.is_some() {
+            // If the access decision includes a `todo_bug` then permit the access and return the
+            // bug Id to the caller, for audit logging.
+            result.permit = true;
+            result.todo_bug = decision.todo_bug;
         }
     }
 
@@ -191,6 +215,16 @@ mod tests {
         ) -> Result<SecurityId, anyhow::Error> {
             unreachable!();
         }
+
+        fn compute_new_file_sid_with_name(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _file_class: FileClass,
+            _file_name: NullessByteStr<'_>,
+        ) -> Option<SecurityId> {
+            unreachable!();
+        }
     }
 
     impl AccessVectorComputer for DenyAllPermissions {
@@ -226,6 +260,16 @@ mod tests {
         ) -> Result<SecurityId, anyhow::Error> {
             unreachable!();
         }
+
+        fn compute_new_file_sid_with_name(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _file_class: FileClass,
+            _file_name: NullessByteStr<'_>,
+        ) -> Option<SecurityId> {
+            unreachable!();
+        }
     }
 
     impl AccessVectorComputer for AllowAllPermissions {
@@ -250,7 +294,7 @@ mod tests {
         for permission in &permissions {
             // DenyAllPermissions denies.
             assert_eq!(
-                PermissionCheckResult { permit: false, audit: true },
+                PermissionCheckResult { permit: false, audit: true, todo_bug: None },
                 has_permission(
                     /*is_enforcing=*/ true,
                     &deny_all,
@@ -262,7 +306,7 @@ mod tests {
             );
             // AllowAllPermissions allows.
             assert_eq!(
-                PermissionCheckResult { permit: true, audit: false },
+                PermissionCheckResult { permit: true, audit: false, todo_bug: None },
                 has_permission(
                     /*is_enforcing=*/ true,
                     &allow_all,

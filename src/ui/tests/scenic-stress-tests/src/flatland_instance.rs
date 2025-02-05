@@ -6,12 +6,12 @@ use crate::input_listener;
 use fidl::endpoints::*;
 use fuchsia_component_test::ScopedInstance;
 use futures::StreamExt;
+use log::debug;
 use rand::prelude::SliceRandom;
 use rand::rngs::SmallRng;
 use rand::Rng;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use tracing::debug;
 use {
     fidl_fuchsia_math as fmath, fidl_fuchsia_ui_composition as flatland,
     fidl_fuchsia_ui_pointer as fpointer, fidl_fuchsia_ui_views as fviews, fuchsia_async as fasync,

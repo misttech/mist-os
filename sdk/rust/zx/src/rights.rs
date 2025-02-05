@@ -15,7 +15,7 @@ use zerocopy::{FromBytes, Immutable};
 ///
 /// See [rights](https://fuchsia.dev/fuchsia-src/concepts/kernel/rights) for more information.
 #[repr(transparent)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, FromBytes, Immutable)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, FromBytes, Immutable)]
 pub struct Rights(sys::zx_rights_t);
 
 bitflags! {
@@ -63,5 +63,11 @@ bitflags! {
                                 sys::ZX_RIGHT_WRITE | sys::ZX_RIGHT_SIGNAL |
                                 sys::ZX_RIGHT_SIGNAL_PEER;
         const VMO_DEFAULT     = Self::BASIC.bits() | Self::IO.bits() | Self::PROPERTY.bits() | Self::MAP.bits() | sys::ZX_RIGHT_SIGNAL;
+    }
+}
+
+impl std::fmt::Debug for Rights {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        bitflags::parser::to_writer(self, f)
     }
 }

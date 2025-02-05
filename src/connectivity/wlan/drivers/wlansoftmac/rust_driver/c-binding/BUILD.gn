@@ -22,7 +22,7 @@ rustc_staticlib("wlansoftmac-c") {
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   public = [ "bindings.h" ]

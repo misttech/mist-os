@@ -8,14 +8,14 @@ use crate::Config;
 use anyhow::format_err;
 use async_trait::async_trait;
 use fuchsia_async::{self as fasync, TimeoutExt};
-use fuchsia_runtime::{UtcDuration, UtcInstant, BootDurationExt, UtcDurationExt};
+use fuchsia_runtime::{BootDurationExt, UtcDuration, UtcDurationExt, UtcInstant};
 
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use futures::FutureExt;
 use httpdate_hyper::{HttpsDateError, HttpsDateErrorType, NetworkTimeClient};
 use hyper::Uri;
-use tracing::warn;
+use log::warn;
 
 const NANOS_IN_SECONDS: i64 = 1_000_000_000;
 
@@ -47,9 +47,7 @@ impl HttpsDateClient for NetworkTimeClient {
                     .with_source(format_err!("Timed out after {:?}", https_timeout)))
             })
             .await?;
-        Ok(UtcInstant::from_nanos(
-            utc.timestamp_nanos_opt().expect("the timestamp should exist"),
-        ))
+        Ok(UtcInstant::from_nanos(utc.timestamp_nanos_opt().expect("the timestamp should exist")))
     }
 }
 

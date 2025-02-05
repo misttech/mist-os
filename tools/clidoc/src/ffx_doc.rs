@@ -5,12 +5,12 @@
 use crate::{escape_text, md_path, HEADER};
 use anyhow::{bail, Context, Result};
 use ffx_command::{CliArgsInfo, ErrorCodeInfo, FlagInfo, SubCommandInfo};
+use log::debug;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::process::Command;
-use tracing::debug;
 
 //LINT.IfChange(clidoc_subtool_manifest)
 /// Subtool manifest entry
@@ -70,7 +70,7 @@ pub(crate) fn write_formatted_output_for_ffx(
             String::from_utf8(output.stderr)?
         );
     } else if !output.stderr.is_empty() {
-        tracing::info!("stderr for ffx is {}", String::from_utf8(output.stderr.clone())?);
+        log::info!("stderr for ffx is {}", String::from_utf8(output.stderr.clone())?);
     }
 
     let value: CliArgsInfo = serde_json::from_slice(&output.stdout)

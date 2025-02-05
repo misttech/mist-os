@@ -28,7 +28,7 @@ func TestParseSummary(t *testing.T) {
 			"Parsed incorrect number of resultdb tests in TestSummary, got %d, want %d",
 			len(testResults), testCount)
 	}
-	requests := CreateTestResultsRequests(testResults, testCount)
+	requests := createTestResultsRequests(testResults, testCount)
 	if len(requests) != 1 {
 		t.Errorf(
 			"Grouped incorrect chunks of ResultDB sink requests, got %d, want 1",
@@ -101,7 +101,7 @@ func TestSetTestDetailsToResultSink(t *testing.T) {
 func TestSetTestCaseToResultSink(t *testing.T) {
 	outputRoot := t.TempDir()
 	detail := createTestDetailWithTestCase(5, outputRoot)
-	results, _ := TestCaseToResultSink(detail.Cases, []*resultpb.StringPair{}, detail, outputRoot)
+	results, _ := testCaseToResultSink(detail.Cases, []*resultpb.StringPair{}, detail, outputRoot)
 	if len(results) != 5 {
 		t.Errorf("Got %d test case results, want 5", len(results))
 	}

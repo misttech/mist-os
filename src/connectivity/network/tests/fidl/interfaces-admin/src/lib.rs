@@ -4,6 +4,8 @@
 
 #![cfg(test)]
 
+mod blackhole;
+
 use assert_matches::assert_matches;
 use fidl_fuchsia_hardware_network::{self as fhardware_network, FrameType};
 use fidl_fuchsia_net_ext::IntoExt;

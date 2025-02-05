@@ -22,7 +22,6 @@ cc_library(
 
 fuchsia_cc_test(
     name = "bt_lib_fidl_test",
-    testonly = True,
     srcs = [
         "hanging_getter_unittest.cc",
     ],
@@ -37,7 +36,6 @@ fuchsia_cc_test(
 fuchsia_unittest_package(
     name = "test_pkg",
     package_name = "bt_lib_fidl_tests",
-    testonly = True,
     fuchsia_api_level = "HEAD",
     unit_tests = [
         ":bt_lib_fidl_test",

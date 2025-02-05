@@ -37,12 +37,12 @@ struct BootOptions;
 
 // This holds arch::EarlyTicks timestamps collected by physboot before the
 // kernel proper is cognizant.  Once the platform timer hardware is set up for
-// real, platform_convert_early_ticks translates these values into zx_ticks_t
+// real, platform_convert_early_ticks translates these values into zx_instant_mono_ticks_t
 // values that can be published as kcounters and then converted to actual time
 // units in userland via zx_ticks_per_second().
 //
 // platform_convert_early_ticks returns zero if arch::EarlyTicks samples cannot
-// be accurately converted to zx_ticks_t.  This can happen on suboptimal x86
+// be accurately converted to zx_instant_mono_ticks_t.  This can happen on suboptimal x86
 // hardware, where the early samples are in TSC but the platform timer decides
 // that a synchronized and monotonic TSC is not available on the machine.
 class PhysBootTimes {
@@ -185,6 +185,9 @@ struct PhysHandoff {
   // ZBI_TYPE_EFI_SYSTEM_TABLE payload.
   // Physical address of the EFI system table.
   std::optional<uint64_t> efi_system_table;
+
+  // Initialized UART to be used by the kernel, if any.
+  uart::all::Driver uart;
 };
 
 static_assert(std::is_default_constructible_v<PhysHandoff>);

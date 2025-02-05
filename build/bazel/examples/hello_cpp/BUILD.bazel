@@ -60,7 +60,6 @@ fuchsia_package(
 
 fuchsia_cc_test(
     name = "hello_test",
-    size = "small",
     srcs = ["hello_test.cc"],
     deps = [
         "@fuchsia_sdk//pkg/fdio",
@@ -70,7 +69,6 @@ fuchsia_cc_test(
 
 fuchsia_cc_test(
     name = "hello_gtest",
-    size = "small",
     srcs = ["hello_gtest.cc"],
     death_unittest = True,
     deps = [

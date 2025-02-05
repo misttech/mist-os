@@ -10,6 +10,7 @@ source_set("object-info") {
     "kernel-stats-object-info-test.cc",
     "process-fixture.cc",
     "process-object-info-test.cc",
+    "stall-object-info-test.cc",
     "task-object-info-test.cc",
     "thread-object-info-test.cc",
     "vmar-object-info-test.cc",

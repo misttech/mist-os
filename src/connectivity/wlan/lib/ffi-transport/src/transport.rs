@@ -4,12 +4,12 @@
 
 use crate::completers::Completer;
 use fdf::{fdf_arena_t, Arena, ArenaStaticBox};
+use log::error;
 use std::ffi::c_void;
 use std::marker::{PhantomData, PhantomPinned};
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::{mem, slice};
-use tracing::error;
 use wlan_fidl_ext::{TryUnpack, WithName};
 use {fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, wlan_trace as wtrace};
 

@@ -10,3 +10,4 @@ scripts ot locations.
   Used by: `//build/bazel/bazel_workspace.gni`
   Used by: `//tools/devshell/lib/bazel_utils.sh`
   Used by: `//build/bazel/scripts/parse-workspace-event-log.py`
+  Used by: `//build/bazel/scripts/workspace_utils.py`

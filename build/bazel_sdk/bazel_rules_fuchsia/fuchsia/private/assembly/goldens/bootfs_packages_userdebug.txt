@@ -57,7 +57,6 @@ role_manager
 ?root
 ?sdhci
 sdmmc
-serial
 shutdown-shim
 spi
 startup

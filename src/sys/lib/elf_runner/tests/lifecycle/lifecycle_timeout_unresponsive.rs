@@ -6,7 +6,7 @@ use component_events::events::{Destroyed, Event, EventStream, Started};
 use component_events::matcher::{EventMatcher, ExitStatusMatcher};
 use component_events::sequence::{EventSequence, Ordering};
 use fuchsia_component_test::ScopedInstance;
-use tracing::info;
+use log::info;
 /// This test invokes components which don't stop when they're told to. We
 /// still expect them to be stopped when the system kills them.
 #[fuchsia::test]

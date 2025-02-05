@@ -6,8 +6,8 @@ use crate::crash_info::{ComponentCrashInfo, CrashRecords};
 use crate::error::ExceptionError;
 use fuchsia_async as fasync;
 use futures::TryStreamExt;
+use log::error;
 use moniker::Moniker;
-use tracing::error;
 use zx::{self as zx, AsHandleRef};
 
 // Registers with the job to catch exceptions raised by it. Whenever we see an exception from this
@@ -33,13 +33,13 @@ pub fn run_exceptions_server(
                     )
                     .await
                     {
-                        error!(url=%resolved_url, ?error, "failed to handle exception");
+                        error!(url:% = resolved_url, error:?; "failed to handle exception");
                     }
                 }
                 Ok(None) => break,
                 Err(error) => {
                     error!(
-                        url=%resolved_url, ?error,
+                        url:% = resolved_url, error:?;
                         "failed to read message stream for fuchsia.sys2.CrashIntrospect",
                     );
                     break;

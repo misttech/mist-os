@@ -3,12 +3,11 @@
 // found in the LICENSE file.
 
 use ffx_repository_remove_args::RemoveCommand;
-use fho::{
-    bug, daemon_protocol, return_user_error, user_error, FfxMain, FfxTool, Result, SimpleWriter,
-};
+use fho::{bug, return_user_error, user_error, FfxMain, FfxTool, Result, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{
     RepositoryConfig, RepositoryIteratorMarker, RepositoryRegistryProxy,
 };
+use target_holders::daemon_protocol;
 
 #[derive(FfxTool)]
 pub struct RepoRemoveTool {
@@ -90,6 +89,7 @@ mod test {
     };
     use futures::channel::oneshot::channel;
     use futures::StreamExt;
+    use target_holders::fake_proxy;
 
     #[fuchsia::test]
     async fn test_remove() {
@@ -97,7 +97,7 @@ mod test {
 
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::RemoveRepository { name, responder } => {
                 sender.take().unwrap().send(name).unwrap();
                 responder.send(true).unwrap()
@@ -111,7 +111,7 @@ mod test {
     #[fuchsia::test]
     async fn test_remove_fail() {
         let _test_env = ffx_config::test_init().await.expect("test initialization");
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::RemoveRepository { responder, .. } => {
                 responder.send(false).unwrap()
             }
@@ -169,7 +169,7 @@ mod test {
     #[fuchsia::test]
     async fn test_remove_all() {
         let _test_env = ffx_config::test_init().await.expect("test initialization");
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::RemoveRepository { responder, .. } => {
                 responder.send(true).unwrap()
             }
@@ -191,7 +191,7 @@ mod test {
     #[fuchsia::test]
     async fn test_remove_all_some_fail() {
         let _test_env = ffx_config::test_init().await.expect("test initialization");
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = fake_proxy(move |req| match req {
             RepositoryRegistryRequest::RemoveRepository { responder, name } => {
                 responder.send(name == "Test1").unwrap()
             }

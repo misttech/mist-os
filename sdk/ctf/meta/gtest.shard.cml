@@ -42,7 +42,7 @@
             to: "#subpackaged_gtest_runner",
         },
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            dictionary: "diagnostics",
             from: "parent",
             to: [
                 "#lib_loader_cache",

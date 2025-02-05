@@ -100,7 +100,7 @@ TEST(LockDep, GuardMoveSemantics) {
   EXPECT_TRUE(guard);
   EXPECT_TRUE(SingletonLock::Get()->lock().acquired);
 
-  Guard<FakeMutex> guard2{AdoptLock, guard.take()};
+  Guard<FakeMutex> guard2{AdoptLock, SingletonLock::Get(), guard.take()};
   EXPECT_FALSE(guard);
   EXPECT_TRUE(guard2);
   EXPECT_TRUE(SingletonLock::Get()->lock().acquired);
@@ -417,7 +417,9 @@ TEST(LockDep, FlagsPassedToSystemGetThreadLockState) {
     EXPECT_EQ(0, GetTlsTestState::match_count);
     EXPECT_EQ(0, GetTlsTestState::mismatch_count);
 
-    { Guard<FakeMutex> guard(&container.lock); }
+    {
+      Guard<FakeMutex> guard(&container.lock);
+    }
 
     EXPECT_GT(GetTlsTestState::match_count, 0);
     EXPECT_EQ(0, GetTlsTestState::mismatch_count);
@@ -433,7 +435,9 @@ TEST(LockDep, FlagsPassedToSystemGetThreadLockState) {
     EXPECT_EQ(0, GetTlsTestState::match_count);
     EXPECT_EQ(0, GetTlsTestState::mismatch_count);
 
-    { Guard<FakeMutexWithPolicyAndFlags> guard(&container.lock); }
+    {
+      Guard<FakeMutexWithPolicyAndFlags> guard(&container.lock);
+    }
 
     EXPECT_GT(GetTlsTestState::match_count, 0);
     EXPECT_EQ(0, GetTlsTestState::mismatch_count);

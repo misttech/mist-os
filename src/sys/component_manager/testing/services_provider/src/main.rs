@@ -7,9 +7,9 @@ use fidl_fuchsia_examples_services as fexamples;
 use fuchsia_component::server::ServiceFs;
 use futures::lock::Mutex;
 use futures::prelude::*;
+use log::*;
 use std::env;
 use std::sync::Arc;
-use tracing::*;
 
 struct Account {
     /// Account owner's name.
@@ -23,7 +23,7 @@ async fn main() {
     let mut args = env::args().skip(1);
     let name = args.next().expect("name arg");
     let balance = args.next().expect("balance arg").parse().expect("balance must be a number");
-    info!(%name, %balance, "starting bank account provider");
+    info!(name:%, balance:%; "starting bank account provider");
     let account = Arc::new(Mutex::new(Account { name, balance }));
 
     let mut fs = ServiceFs::new();
@@ -34,7 +34,7 @@ async fn main() {
         async move {
             match handle_request(account.clone(), request).await {
                 Ok(()) => {}
-                Err(err) => error!(%err, "failed to serve BankAccount request"),
+                Err(err) => error!(err:%; "failed to serve BankAccount request"),
             }
         }
     })
@@ -84,12 +84,12 @@ async fn handle_request(
                         } else {
                             false
                         };
-                        info!(account = %account.name, balance = %account.balance, "balance updated");
+                        info!(account:% = account.name, balance:% = account.balance; "balance updated");
                         responder.send(success).context("failed to send debit reply")?;
                     }
                     fexamples::ReadWriteAccountRequest::Credit { amount, responder } => {
                         account.balance += amount;
-                        info!(account = %account.name, balance = %account.balance, "balance updated");
+                        info!(account:% = account.name, balance:% = account.balance; "balance updated");
                         responder.send().context("failed to send credit reply")?;
                     }
                 }

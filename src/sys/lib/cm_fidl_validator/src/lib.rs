@@ -1142,6 +1142,10 @@ impl<'a> ValidationContext<'a> {
             }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             (Some(fdecl::Ref::Environment(_)), None) => {}
+            (Some(fdecl::Ref::Collection(collection)), None) if decl == DeclType::UseService => {
+                self.validate_collection_ref(decl, "source", &collection);
+                return;
+            }
             // `source` is required.
             (None, _) => self.errors.push(Error::missing_field(decl, "source")),
             // Any combination that was not recognized above must be invalid.

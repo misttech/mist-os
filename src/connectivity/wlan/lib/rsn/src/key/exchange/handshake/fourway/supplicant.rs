@@ -17,7 +17,7 @@ use crate::rsna::{
 use crate::{key_data, Error, ProtectionInfo};
 use anyhow::{ensure, format_err};
 use eapol::KeyFrameBuf;
-use tracing::error;
+use log::error;
 use zerocopy::SplitByteSlice;
 
 // IEEE Std 802.11-2016, 12.7.6.2

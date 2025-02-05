@@ -79,6 +79,7 @@ fn handle_get_mac(ns: &Netstack, interface_id: u64) -> fnet_root::InterfacesGetM
                 DeviceSpecificInfo::Loopback(_) => Some(LOOPBACK_MAC),
                 DeviceSpecificInfo::Ethernet(info) => Some(info.mac.into()),
                 DeviceSpecificInfo::PureIp(_) => None,
+                DeviceSpecificInfo::Blackhole(_) => None,
             };
             mac.map(|mac| Box::new(mac.into_fidl()))
         })

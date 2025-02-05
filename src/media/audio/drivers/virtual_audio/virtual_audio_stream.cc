@@ -15,9 +15,10 @@ namespace virtual_audio {
 
 // static
 fbl::RefPtr<VirtualAudioStream> VirtualAudioStream::Create(
-    const fuchsia_virtualaudio::Configuration& cfg, std::weak_ptr<VirtualAudioDeviceImpl> owner,
-    zx_device_t* devnode) {
-  return audio::SimpleAudioStream::Create<VirtualAudioStream>(cfg, owner, devnode);
+    const fuchsia_virtualaudio::Configuration& cfg, std::weak_ptr<VirtualAudioDevice> owner,
+    zx_device_t* devnode, fit::closure on_shutdown) {
+  return audio::SimpleAudioStream::Create<VirtualAudioStream>(cfg, owner, devnode,
+                                                              std::move(on_shutdown));
 }
 
 zx::time VirtualAudioStream::MonoTimeFromRefTime(const zx::clock& clock, zx::time ref_time) {
@@ -105,6 +106,10 @@ fuchsia_virtualaudio::Configuration VirtualAudioStream::GetDefaultConfig(bool is
   config.device_specific() =
       fuchsia_virtualaudio::DeviceSpecific::WithStreamConfig(std::move(stream_config));
   return config;
+}
+
+void VirtualAudioStream::PostToDispatcher(fit::closure task_to_post) {
+  async::PostTask(dispatcher(), [task_to_post = std::move(task_to_post)]() { task_to_post(); });
 }
 
 zx_status_t VirtualAudioStream::Init() {
@@ -671,12 +676,7 @@ zx_status_t VirtualAudioStream::ChangeActiveChannels(uint64_t active_channels_bi
   return ZX_OK;
 }
 
-// Called by parent SimpleAudioStream::Shutdown, during DdkUnbind. Notify our parent that we are
-// shutting down.
-void VirtualAudioStream::ShutdownHook() {
-  auto parent = parent_.lock();
-  ZX_ASSERT(parent);
-  parent->PostToDispatcher([parent]() { parent->DriverIsShuttingDown(); });
-}
+// Called by parent SimpleAudioStream::Shutdown, during DdkUnbind.
+void VirtualAudioStream::ShutdownHook() { on_shutdown_(); }
 
 }  // namespace virtual_audio

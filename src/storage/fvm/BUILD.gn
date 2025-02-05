@@ -209,6 +209,7 @@ fvm_sources = [
 ]
 
 fvm_deps = [
+  "//sdk/fidl/fuchsia.fs:fuchsia.fs_rust",
   "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
   "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
   "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
@@ -229,10 +230,10 @@ fvm_deps = [
   "//third_party/rust_crates:async-lock",
   "//third_party/rust_crates:event-listener",
   "//third_party/rust_crates:futures",
+  "//third_party/rust_crates:log",
   "//third_party/rust_crates:regex",
   "//third_party/rust_crates:sha2",
   "//third_party/rust_crates:static_assertions",
-  "//third_party/rust_crates:tracing",
   "//third_party/rust_crates:uuid",
   "//third_party/rust_crates:zerocopy",
 ]

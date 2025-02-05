@@ -368,6 +368,29 @@
   .end_vbar_function
 .endm
 
+// Asynchronous exceptions from arm32 EL0.
+.macro iframe.async_exception32.el0 name, call
+  .vbar_function \name
+
+    // Save state in the iframe and restore kernel invariants.
+    iframe.exc.save.el0
+
+    // If the exception came from an unrestricted task, panic.
+    mov x1, #ARM64_DISALLOWED_ARM32_ASYNC_EXCEPTION
+    ldr w12, [percpu_ptr, #PERCPU_IN_RESTRICTED_MODE]
+    cbz w12, arm64_disallowed_arm32_exception
+
+    // Call into the C++ code with the iframe and flags as arguments.
+    mov x0, sp
+    mov x1, #ARM64_EXCEPTION_FLAG_LOWER_EL
+    bl \call
+
+    // Use the common return path to restore state and eret.
+    b arm64_exc_shared_restore_lower_el
+
+  .end_vbar_function
+.endm
+
 // TODO: find the appropriate place to reenable FIQs here when they're needed.
 
 // Synchronous exceptions, i.e. everything expected that's not external.
@@ -413,6 +436,25 @@
   .end_vbar_function
 .endm
 
+// Mirror the arm64 handler but with dedicated arm32 paths.
+.macro iframe.sync_exception32.el0 name
+  .vbar_function \name
+    // Save state in the iframe and restore kernel invariants.
+    iframe.exc.save.el0
+
+    // Collect the Exception Syndrome Register that explains what this is.
+    mrs x9, esr_el1
+    lsr x11, x9, #26              // Shift ESR right 26 bits to get EC.
+    cmp x11, #0x11                // Check for 32-bit syscall...
+    beq arm32_syscall_dispatcher  // ...and jump to syscall handler.
+
+    // We've just run out of space to fit in the 0x80 bytes of the sync
+    // exception vector.  Branch to another block of code later in the file
+    // that will finish getting ready and call arm64_sync_exception.
+    b arm32_sync_exception_el0_nonsyscall
+
+  .end_vbar_function
+.endm
 
 // Define the vector table.  See <lib/arch/arm64/exception-asm.h> for a
 // more complete explanation.  Inside `.vbar_table` ... `.end_vbar_table`,
@@ -445,6 +487,13 @@ iframe.async_exception.el0 arm64_el1_exception_irq_lower_a64, arm64_irq
 
 iframe.async_exception.el0 arm64_el1_exception_serror_lower_a64, \
                            arm64_serror_exception
+
+iframe.sync_exception32.el0 arm64_el1_exception_sync_lower_a32
+
+iframe.async_exception32.el0 arm64_el1_exception_irq_lower_a32, arm64_irq
+
+iframe.async_exception32.el0 arm64_el1_exception_serror_lower_a32, \
+                             arm64_serror_exception
 
 .end_vbar_table
 
@@ -507,6 +556,9 @@ iframe.async_exception.el0 arm64_el1_exception_serror_lower_a64, \
 iframe.smccc11_workaround.el0 sync_lower_a64, 1
 iframe.smccc11_workaround.el0 irq_lower_a64, 0
 iframe.smccc11_workaround.el0 serror_lower_a64, 0
+iframe.smccc11_workaround.el0 sync_lower_a32, 1
+iframe.smccc11_workaround.el0 irq_lower_a32, 0
+iframe.smccc11_workaround.el0 serror_lower_a32, 0
 .end_vbar_table
 
 
@@ -545,12 +597,50 @@ iframe.smccc11_workaround.el0 serror_lower_a64, 0
 iframe.smccc10_workaround.el0 sync_lower_a64, 1
 iframe.smccc10_workaround.el0 irq_lower_a64, 0
 iframe.smccc10_workaround.el0 serror_lower_a64, 0
+iframe.smccc10_workaround.el0 sync_lower_a32, 1
+iframe.smccc10_workaround.el0 irq_lower_a32, 0
+iframe.smccc10_workaround.el0 serror_lower_a32, 0
 .end_vbar_table
 
 
 // Start the rest of the code on its own cache line.
 .balign 64
 
+// This function calls arm64_unrestricted_arm32_exception()
+// which expects sp to point to the saved iframe and x1
+// to contain the exception identifier.
+.iframe.function.el0 arm64_disallowed_arm32_exception
+  .label arm64_invalid_arm32_exception
+  mov x0, sp
+  mrs x2, esr_el1
+  bl arm64_unrestricted_arm32_exception
+  // Spin rather than cascade exceptions if that ever returns.
+  // Definitely don't restore state from the iframe after this!
+  // The C++ code should have done a panic and not returned at all.
+  b .
+.end_function
+
+// This is a wrapper for arm64_sync_exception_el0_nonsyscall
+// to ensure that the function is never entered from an arm32
+// exception unless the caller is in restricted mode.
+//
+// Expected state prior to branch:
+// - sp - points to the saved iframe
+// - x9 - contains the original value of x1
+// - x1 - contains the arm32 "exception id"
+//
+.iframe.function.el0 arm32_sync_exception_el0_nonsyscall
+  // If the exception came from an unrestricted task, panic.
+  ldr w12, [percpu_ptr, #PERCPU_IN_RESTRICTED_MODE]
+  cbnz w12, .Larm32_restricted_nonsyscall
+
+  // Panic if we're not supposed to be here.
+  mov x1, #ARM64_DISALLOWED_ARM32_SYNC_EXCEPTION
+  bl arm64_disallowed_arm32_exception
+
+.Larm32_restricted_nonsyscall:
+  b arm64_sync_exception_el0_nonsyscall
+.end_function
 
 // This is the tail of iframe.sync_exception.el0 that doesn't fit into
 // the vector.  x9 contains ESR_EL1.
@@ -672,6 +762,44 @@ iframe.smccc10_workaround.el0 serror_lower_a64, 0
     mov \reg, xzr
   .endr
 .endm
+
+// As per speculation_clear_gprs, but adjusted for arm32.
+.macro arm32_speculation_clear_gprs
+  // x18 holds kernel shadow_call_sp.
+  // x20 holds kernel percpu_ptr
+  //
+  // While x13-15 hold arm32 mapping of SP, LR, and PC respectively, the values
+  // have already been saved off.
+  .irp reg,x0,x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x19,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30
+    mov \reg, xzr
+  .endr
+.endm
+
+// Wrapper for restricted mode only arm32 syscalls
+//
+// Expected state prior to arm32_syscall_dispatcher branch:
+//
+// percpu and shadow call stack registers have been restored
+//
+// sp    - points to base of iframe
+//
+.iframe.function.el0 arm32_syscall_dispatcher
+
+  arm32_speculation_clear_gprs
+
+  // If the exception came from an unrestricted task, panic.
+  ldr w12, [percpu_ptr, #PERCPU_IN_RESTRICTED_MODE]
+  cbnz w12, .Larm32_restricted_syscall
+
+  mov x1, #ARM64_DISALLOWED_ARM32_SYSCALL
+  bl arm64_disallowed_arm32_exception
+
+.Larm32_restricted_syscall:
+  // Move the pointer to the iframe into the first argument.
+  mov x0, sp
+  bl syscall_from_restricted
+  // This does not return.
+.end_function
 
 //
 // Expected state prior to arm64_syscall_dispatcher branch:

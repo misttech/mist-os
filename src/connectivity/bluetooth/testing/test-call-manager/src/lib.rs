@@ -19,10 +19,10 @@ use fuchsia_component::client;
 use futures::lock::Mutex;
 use futures::stream::StreamExt;
 use futures::{FutureExt, TryStreamExt};
+use log::*;
 use serde::Serialize;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
-use tracing::*;
 
 type CallId = u64;
 type Number = String;
@@ -624,7 +624,7 @@ impl TestCallManager {
                     this.report_calls(id, inner)?;
                 } else {
                     let err = format_err!("double hanging get call on PeerHandler::WatchNextCall");
-                    error!(%err);
+                    error!(err:%; "");
                     *inner = TestCallManagerInner::default();
                     return Err(err);
                 }
@@ -656,7 +656,7 @@ impl TestCallManager {
                     } {
                         Ok(number) => match self.outgoing_call(&number).await {
                             Ok(id) => {
-                                info!(CallId = id, "Initiated outgoing call to {}", number);
+                                info!(CallId = id; "Initiated outgoing call to {}", number);
                                 Ok(())
                             }
                             Err(e) => {
@@ -761,7 +761,7 @@ impl TestCallManager {
     async fn manage_peer(mut self, id: PeerId, mut stream: PeerHandlerRequestStream) {
         while let Some(Ok(request)) = stream.next().await {
             if let Err(err) = self.handle_peer_request(id, request).await {
-                error!(%err);
+                error!(err:%; "");
                 break;
             };
         }

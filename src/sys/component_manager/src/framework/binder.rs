@@ -12,8 +12,8 @@ use cm_types::Name;
 use errors::ModelError;
 
 use lazy_static::lazy_static;
+use log::warn;
 use routing::capability_source::InternalCapability;
-use tracing::warn;
 
 lazy_static! {
     static ref BINDER_SERVICE: Name = "fuchsia.component.Binder".parse().unwrap();
@@ -100,7 +100,7 @@ async fn report_routing_failure_to_target(target: WeakComponentInstance, err: Mo
                 .await;
         }
         Err(err) => {
-            warn!(moniker=%target.moniker, error=%err, "failed to upgrade reference");
+            warn!(moniker:% = target.moniker, error:% = err; "failed to upgrade reference");
         }
     }
 }

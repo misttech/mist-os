@@ -13,12 +13,12 @@ use fuchsia_async as fasync;
 use fuchsia_async::condition::{Condition, WakerEntry};
 use fuchsia_sync::Mutex;
 use futures::Stream;
+use log::debug;
 use pin_project::{pin_project, pinned_drop};
 use std::ops::{Deref, DerefMut, Range};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use tracing::debug;
 use zerocopy::FromBytes;
 use zx::AsHandleRef as _;
 
@@ -290,7 +290,7 @@ impl Inner {
 
         let (container_msg_id, remaining) =
             u64::mut_from_prefix(self.buffer.slice_from_index_mut(self.head)).unwrap();
-        *container_msg_id = (container_id.0 as u64) << 32 | (msg_id & 0xffff_ffff);
+        *container_msg_id = ((container_id.0 as u64) << 32) | (msg_id & 0xffff_ffff);
         remaining[..msg_len].copy_from_slice(&msg[..msg_len]);
 
         self.head += total_len as u64;
@@ -400,7 +400,7 @@ impl Inner {
             // container ID, followed by a the least significant 32 bits of the per-container
             // message ID.
             let (container_msg_id, _) = u64::mut_from_prefix(dest).unwrap();
-            *container_msg_id = (socket.container_id.0 as u64) << 32 | (msg_id & 0xffff_ffff);
+            *container_msg_id = ((socket.container_id.0 as u64) << 32) | (msg_id & 0xffff_ffff);
 
             self.head += (FXT_HEADER_SIZE + amount_read) as u64;
         }
@@ -512,7 +512,7 @@ impl ContainerInfo {
                 .prev = prev;
         }
         sockets.free(socket_id.0);
-        debug!(%self.identity, "Socket closed.");
+        debug!(identity:% = self.identity; "Socket closed.");
     }
 }
 

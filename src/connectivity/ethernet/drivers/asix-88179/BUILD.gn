@@ -50,7 +50,10 @@ fuchsia_cc_driver("asix-88179-driver") {
 }
 
 fuchsia_driver_component("asix-88179") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/connectivity/ethernet:drivers",
+  ]
   component_name = "asix-88179"
   deps = [ ":asix-88179-driver" ]
   info = "meta/asix-88179-info.json"

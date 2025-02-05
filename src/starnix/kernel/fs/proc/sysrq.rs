@@ -9,10 +9,9 @@ use crate::vfs::{
     fileops_impl_noop_sync, AppendLockGuard, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeOps,
     FsStr, InputBuffer, OutputBuffer, SeekTarget,
 };
-use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootReason};
+use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootOptions, RebootReason2};
 use fuchsia_component::client::connect_to_protocol_sync;
-
-use starnix_logging::{log_warn, track_stub};
+use starnix_logging::{log_info, log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
@@ -125,7 +124,7 @@ impl FileOps for SysRqFile {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         _offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
@@ -140,10 +139,14 @@ impl FileOps for SysRqFile {
                     // When this call succeeds with a production implementation it should never
                     // return. If it returns at all it is a sign the kernel either doesn't have the
                     // capability or there was a problem with the shutdown request.
-                    let reboot_res = connect_to_protocol_sync::<AdminMarker>().unwrap().reboot(
-                        RebootReason::CriticalComponentFailure,
-                        zx::MonotonicInstant::INFINITE,
-                    );
+                    let reboot_res =
+                        connect_to_protocol_sync::<AdminMarker>().unwrap().perform_reboot(
+                            &RebootOptions {
+                                reasons: Some(vec![RebootReason2::CriticalComponentFailure]),
+                                ..Default::default()
+                            },
+                            zx::MonotonicInstant::INFINITE,
+                        );
 
                     // LINT.IfChange
                     panic!(
@@ -172,7 +175,10 @@ impl FileOps for SysRqFile {
                     track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqDumpMemoryInfo")
                 }
                 b'n' => track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqRealtimeNice"),
-                b'o' => track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqPowerOff"),
+                b'o' => {
+                    log_info!("SysRq kernel shutdown request.");
+                    current_task.kernel().shut_down();
+                }
                 b'p' => {
                     track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqDumpRegistersAndFlags",)
                 }

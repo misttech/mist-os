@@ -26,10 +26,9 @@ use futures::channel::{mpsc, oneshot};
 use futures::future::FutureExt;
 use futures::select;
 use futures::stream::{self, StreamExt, TryStreamExt};
-use std::convert::Infallible;
+use log::{debug, error, info, warn};
 use std::pin::Pin;
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
 use wlan_common::bss::BssDescription;
 use wlan_common::sequestered::Sequestered;
 use {
@@ -190,12 +189,6 @@ pub async fn serve(
     select! {
         state_machine = state_machine.fuse() => {
             match state_machine {
-                Ok(v) => {
-                    // This should never happen because the `Infallible` type should be impossible
-                    // to create.
-                    let _: Infallible = v;
-                    unreachable!()
-                }
                 Err(ExitReason(Err(e))) => error!("Client state machine for iface #{} terminated with an error: {:?}",
                     iface_id, e),
                 Err(ExitReason(Ok(_))) => info!("Client state machine for iface #{} exited gracefully",
@@ -400,7 +393,7 @@ async fn handle_connecting_error_and_retry(
 /// The CONNECTING state requests an SME connect. It handles the SME connect response:
 /// - for a successful connection, transition to CONNECTED state
 /// - for a failed connection, retry connection by passing a next_network to the
-///       DISCONNECTING state, as long as there haven't been too many connection attempts
+///   DISCONNECTING state, as long as there haven't been too many connection attempts
 #[allow(clippy::doc_lazy_continuation, reason = "mass allow for https://fxbug.dev/381896734")]
 /// During this time, incoming ManualRequests are also monitored for:
 /// - duplicate connect requests are deduped
@@ -624,7 +617,7 @@ impl ConnectedOptions {
 /// The CONNECTED state monitors the SME status. It handles the SME status response:
 /// - if still connected to the correct network, no action
 /// - if disconnected, retry connection by passing a next_network to the
-///       DISCONNECTING state
+///   DISCONNECTING state
 #[allow(clippy::doc_lazy_continuation, reason = "mass allow for https://fxbug.dev/381896734")]
 /// During this time, incoming ManualRequests are also monitored for:
 /// - duplicate connect requests are deduped

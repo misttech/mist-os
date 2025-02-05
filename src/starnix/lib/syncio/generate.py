@@ -32,7 +32,7 @@ bindgen.raw_lines = (
     MODULE_DOC_COMMENT
     + """
 
-use zerocopy::{FromBytes, IntoBytes, Immutable, KnownLayout};
+use zerocopy::{FromBytes, IntoBytes, Immutable, KnownLayout, TryFromBytes};
 """
 )
 
@@ -55,6 +55,7 @@ bindgen.var_allowlist = [
     "ZXIO_SEEK_ORIGIN.*",
     "ZXIO_ALLOCATE.*",
     "ZXIO_CREATION_MODE.*",
+    "ZXIO_SOCKET_MARK_DOMAIN.*",
     "E[A-Z]*",
     "AF_.*",
     "SO.*",
@@ -68,6 +69,7 @@ bindgen.type_allowlist = [
     "sockaddr.*",
     "timespec",
     "timeval",
+    "zxio_socket_mark",
 ]
 
 # NOTE: Types are matched against the following identifiers as regexes in the order they appear.
@@ -103,6 +105,10 @@ bindgen.set_auto_derive_traits(
         ),
         (r"timespec", ["IntoBytes, FromBytes", "Immutable", "KnownLayout"]),
         (r"timeval", ["IntoBytes, FromBytes", "Immutable", "KnownLayout"]),
+        (
+            r"zxio_socket_mark",
+            ["TryFromBytes", "Immutable", "IntoBytes", "KnownLayout"],
+        ),
     ],
 )
 

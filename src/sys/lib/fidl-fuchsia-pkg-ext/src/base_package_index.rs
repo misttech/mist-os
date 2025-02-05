@@ -82,8 +82,8 @@ mod tests {
     };
     use fuchsia_async as fasync;
     use futures::prelude::*;
+    use log::error;
     use std::sync::Arc;
-    use tracing::error;
 
     // The actual pkg-cache will fit as many items per chunk as possible.  Intentionally choose a
     // small, fixed value here to verify the BasePackageIndex behavior with multiple chunks without

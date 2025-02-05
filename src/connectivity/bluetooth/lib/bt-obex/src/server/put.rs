@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use tracing::trace;
+use log::trace;
 
 use crate::error::Error;
 use crate::header::{Header, HeaderSet, SingleResponseMode};

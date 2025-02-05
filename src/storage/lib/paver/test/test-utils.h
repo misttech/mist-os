@@ -28,8 +28,8 @@
 #include "src/storage/lib/paver/moonflower.h"
 #include "src/storage/lib/paver/nelson.h"
 #include "src/storage/lib/paver/sherlock.h"
+#include "src/storage/lib/paver/uefi.h"
 #include "src/storage/lib/paver/vim3.h"
-#include "src/storage/lib/paver/x64.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/service.h"
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
@@ -55,14 +55,7 @@ class PaverTest : public zxtest::Test {
         std::make_unique<paver::MoonflowerPartitionerFactory>());
     paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
     paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
-
-    // X64PartitionerFactory must be placed last if test will be run on x64 devices.
-    // This is because X64PartitionerFactory determines whether itself is suitable to be used for
-    // the device based on arch hardcoded at compile time. It will always be the case for x64
-    // devices. The initialization will update to x64 GPT table, which can confuse paver test for
-    // other boards.
-    paver::DevicePartitionerFactory::Register(std::make_unique<paver::X64PartitionerFactory>());
-
+    paver::DevicePartitionerFactory::Register(std::make_unique<paver::UefiPartitionerFactory>());
     paver::DevicePartitionerFactory::Register(std::make_unique<paver::DefaultPartitionerFactory>());
   }
 };

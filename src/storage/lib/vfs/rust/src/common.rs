@@ -133,7 +133,7 @@ pub async fn extended_attributes_sender(
             None => (&[][..], true),
         };
         responder.send(Ok((chunk, last))).unwrap_or_else(|error| {
-            tracing::error!(?error, "list extended attributes failed to send a chunk");
+            log::error!(error:?; "list extended attributes failed to send a chunk");
         });
         if last {
             break;
@@ -252,6 +252,8 @@ pub enum CreationMode {
     Never,
     AllowExisting,
     Always,
+    UnnamedTemporary,
+    UnlinkableUnnamedTemporary,
 }
 
 /// Used to translate fuchsia.io/Node.SetAttr calls (io1) to fuchsia.io/Node.UpdateAttributes (io2).

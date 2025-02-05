@@ -110,7 +110,7 @@ where
 pub enum UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
@@ -136,7 +136,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -219,13 +219,13 @@ pub mod unknown_interactions_ajar_driver_protocol_strict_two_way_union_response 
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -235,14 +235,14 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
     ) -> crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Ref::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -251,14 +251,14 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
     ) -> crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Mut::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -282,7 +282,7 @@ impl Clone for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionRespons
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -393,7 +393,7 @@ impl Clone for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnio
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -783,18 +783,18 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult {
         &self,
     ) -> crate::unknown_interactions_ajar_driver_protocol_strict_two_way_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -802,18 +802,18 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult {
         &mut self,
     ) -> crate::unknown_interactions_ajar_driver_protocol_strict_two_way_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -841,7 +841,7 @@ impl Clone for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse:
         ::fidl_next::Decode<___D>,
@@ -969,7 +969,7 @@ impl Clone for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayErrR
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse:
         ::fidl_next::Decode<___D>,
@@ -1237,10 +1237,10 @@ pub mod unknown_interactions_ajar_driver_protocol_strict_two_way_fields_err_resu
 
     pub enum Mut<'union> {
         Response(&'union mut crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse),
-        
+
             Err(&'union mut ::fidl_next::i32_le),
-        
-        
+
+
     }
 }
 
@@ -1250,18 +1250,18 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult {
     ) -> crate::unknown_interactions_ajar_driver_protocol_strict_two_way_fields_err_result::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_fields_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_fields_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -1270,18 +1270,18 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult {
     ) -> crate::unknown_interactions_ajar_driver_protocol_strict_two_way_fields_err_result::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_fields_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_fields_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -1309,7 +1309,7 @@ impl Clone for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrRes
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -1437,7 +1437,7 @@ impl Clone for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayFiel
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -1479,7 +1479,7 @@ impl ::core::fmt::Debug
 pub enum UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
@@ -1505,7 +1505,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -1588,13 +1588,13 @@ pub mod unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_respo
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -1604,14 +1604,14 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
     ) -> crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -1620,14 +1620,14 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
     ) -> crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -1651,7 +1651,7 @@ impl Clone for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResp
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -1762,7 +1762,7 @@ impl Clone for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnio
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -1923,10 +1923,10 @@ pub mod unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_resul
 
     pub enum Mut<'union> {
         Response(&'union mut crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse),
-        
+
             Err(&'union mut ::fidl_next::i32_le),
-        
-        
+
+
     }
 }
 
@@ -1936,18 +1936,18 @@ impl<'buf> WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult<'
     ) -> crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_result::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -1956,18 +1956,18 @@ impl<'buf> WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult<'
     ) -> crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_result::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -2388,10 +2388,10 @@ pub mod unknown_interactions_ajar_driver_protocol_strict_two_way_table_err_resul
 
     pub enum Mut<'union, 'buf> {
         Response(&'union mut crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse<'buf>),
-        
+
             Err(&'union mut ::fidl_next::i32_le),
-        
-        
+
+
     }
 }
 
@@ -2403,18 +2403,18 @@ impl<'buf> WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult<'
         'buf,
     > {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_table_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_table_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -2425,18 +2425,18 @@ impl<'buf> WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult<'
         'buf,
     > {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_table_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_table_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -2948,7 +2948,8 @@ where
 }
 
 /// A client handler for the UnknownInteractionsAjarDriverProtocol protocol.
-
+///
+/// See [`UnknownInteractionsAjarDriverProtocol`] for more details.
 pub trait UnknownInteractionsAjarDriverProtocolClientHandler<___T: ::fidl_next::protocol::Transport>
 {
     fn on_unknown_interaction(
@@ -3012,7 +3013,8 @@ where
 }
 
 /// A server handler for the UnknownInteractionsAjarDriverProtocol protocol.
-
+///
+/// See [`UnknownInteractionsAjarDriverProtocol`] for more details.
 pub trait UnknownInteractionsAjarDriverProtocolServerHandler<___T: ::fidl_next::protocol::Transport>
 {
     fn strict_one_way(
@@ -3295,7 +3297,7 @@ where
 pub enum UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
@@ -3320,7 +3322,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -3398,13 +3400,13 @@ pub mod unknown_interactions_ajar_protocol_strict_two_way_union_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -3413,14 +3415,14 @@ impl WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
         &self,
     ) -> crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Ref::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -3428,14 +3430,14 @@ impl WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
         &mut self,
     ) -> crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Mut::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -3459,7 +3461,7 @@ impl Clone for WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -3566,7 +3568,7 @@ impl Clone for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionRespo
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -3993,7 +3995,7 @@ impl Clone for WireUnknownInteractionsAjarProtocolStrictTwoWayErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
 
@@ -4116,7 +4118,7 @@ impl Clone for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayErrResult 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
 
@@ -4389,18 +4391,18 @@ impl WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult {
         &self,
     ) -> crate::unknown_interactions_ajar_protocol_strict_two_way_fields_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_fields_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_protocol_strict_two_way_fields_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -4408,18 +4410,18 @@ impl WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult {
         &mut self,
     ) -> crate::unknown_interactions_ajar_protocol_strict_two_way_fields_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_fields_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_protocol_strict_two_way_fields_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -4447,7 +4449,7 @@ impl Clone for WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -4575,7 +4577,7 @@ impl Clone for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrR
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -4615,7 +4617,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsAjarProtocolStrictTwo
 pub enum UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
@@ -4640,7 +4642,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -4721,13 +4723,13 @@ pub mod unknown_interactions_ajar_protocol_strict_two_way_union_err_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -4736,14 +4738,14 @@ impl WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
         &self,
     ) -> crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -4751,14 +4753,14 @@ impl WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
         &mut self,
     ) -> crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -4782,7 +4784,7 @@ impl Clone for WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -4893,7 +4895,7 @@ impl Clone for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrRe
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -5060,18 +5062,18 @@ impl<'buf> WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult<'buf> {
         &self,
     ) -> crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -5079,18 +5081,18 @@ impl<'buf> WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult<'buf> {
         &mut self,
     ) -> crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -5512,18 +5514,18 @@ impl<'buf> WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResult<'buf> {
     ) -> crate::unknown_interactions_ajar_protocol_strict_two_way_table_err_result::Ref<'_, 'buf>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_table_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_protocol_strict_two_way_table_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -5532,18 +5534,18 @@ impl<'buf> WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResult<'buf> {
     ) -> crate::unknown_interactions_ajar_protocol_strict_two_way_table_err_result::Mut<'_, 'buf>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_table_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_protocol_strict_two_way_table_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -5789,7 +5791,7 @@ where
 pub enum UnknownInteractionsAjarProtocolStrictEventUnionRequest {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictEventUnionRequest {
@@ -5814,7 +5816,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -5890,13 +5892,13 @@ pub mod unknown_interactions_ajar_protocol_strict_event_union_request {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -5905,14 +5907,14 @@ impl WireUnknownInteractionsAjarProtocolStrictEventUnionRequest {
         &self,
     ) -> crate::unknown_interactions_ajar_protocol_strict_event_union_request::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_event_union_request::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_ajar_protocol_strict_event_union_request::Ref::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_ajar_protocol_strict_event_union_request::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -5920,14 +5922,14 @@ impl WireUnknownInteractionsAjarProtocolStrictEventUnionRequest {
         &mut self,
     ) -> crate::unknown_interactions_ajar_protocol_strict_event_union_request::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_event_union_request::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_ajar_protocol_strict_event_union_request::Mut::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_ajar_protocol_strict_event_union_request::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -5951,7 +5953,7 @@ impl Clone for WireUnknownInteractionsAjarProtocolStrictEventUnionRequest {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictEventUnionRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -6058,7 +6060,7 @@ impl Clone for WireOptionalUnknownInteractionsAjarProtocolStrictEventUnionReques
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolStrictEventUnionRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -6323,7 +6325,7 @@ where
 pub enum UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
@@ -6348,7 +6350,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -6426,13 +6428,13 @@ pub mod unknown_interactions_ajar_protocol_flexible_event_union_request {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -6441,14 +6443,14 @@ impl WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
         &self,
     ) -> crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Ref::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -6456,14 +6458,14 @@ impl WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
         &mut self,
     ) -> crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Mut::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -6487,7 +6489,7 @@ impl Clone for WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -6594,7 +6596,7 @@ impl Clone for WireOptionalUnknownInteractionsAjarProtocolFlexibleEventUnionRequ
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolFlexibleEventUnionRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -7214,7 +7216,8 @@ where
 }
 
 /// A client handler for the UnknownInteractionsAjarProtocol protocol.
-
+///
+/// See [`UnknownInteractionsAjarProtocol`] for more details.
 pub trait UnknownInteractionsAjarProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn strict_event(
         &mut self,
@@ -7393,19 +7396,69 @@ where
 pub trait UnknownInteractionsAjarProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
     fn strict_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
 
-    fn strict_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn strict_event_fields<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest,
+        >;
 
-    fn strict_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn strict_event_union<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolStrictEventUnionRequest,
+        >;
 
-    fn strict_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn strict_event_table<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolStrictEventTableRequest<'buf>,
+        >;
 
     fn flexible_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
 
-    fn flexible_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn flexible_event_fields<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest,
+        >;
 
-    fn flexible_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn flexible_event_union<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest,
+        >;
 
-    fn flexible_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn flexible_event_table<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest<
+                'buf,
+            >,
+        >;
 }
 
 impl<___T> UnknownInteractionsAjarProtocolServerSender<___T>
@@ -7417,37 +7470,94 @@ where
         self.as_untyped().send_event(6927291151663612592, &mut ())
     }
 
-    fn strict_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(5838220329633564521, &mut ())
+    fn strict_event_fields<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest,
+        >,
+    {
+        self.as_untyped().send_event(5838220329633564521, request)
     }
 
-    fn strict_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(6303151946645602671, &mut ())
+    fn strict_event_union<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolStrictEventUnionRequest,
+        >,
+    {
+        self.as_untyped().send_event(6303151946645602671, request)
     }
 
-    fn strict_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(659277224687564957, &mut ())
+    fn strict_event_table<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolStrictEventTableRequest<'buf>,
+        >,
+    {
+        self.as_untyped().send_event(659277224687564957, request)
     }
 
     fn flexible_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
         self.as_untyped().send_event(1281760452005010931, &mut ())
     }
 
-    fn flexible_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(4298964238728681570, &mut ())
+    fn flexible_event_fields<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest,
+        >,
+    {
+        self.as_untyped().send_event(4298964238728681570, request)
     }
 
-    fn flexible_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(8950943792372972717, &mut ())
+    fn flexible_event_union<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest,
+        >,
+    {
+        self.as_untyped().send_event(8950943792372972717, request)
     }
 
-    fn flexible_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(705539350563403440, &mut ())
+    fn flexible_event_table<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest<
+                'buf,
+            >,
+        >,
+    {
+        self.as_untyped().send_event(705539350563403440, request)
     }
 }
 
 /// A server handler for the UnknownInteractionsAjarProtocol protocol.
-
+///
+/// See [`UnknownInteractionsAjarProtocol`] for more details.
 pub trait UnknownInteractionsAjarProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn strict_one_way(
         &mut self,
@@ -7731,7 +7841,7 @@ where
 pub enum UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
@@ -7757,7 +7867,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -7840,13 +7950,13 @@ pub mod unknown_interactions_closed_driver_protocol_strict_two_way_union_respons
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -7856,14 +7966,14 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
     ) -> crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Ref::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -7872,14 +7982,14 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
     ) -> crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Mut::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -7903,7 +8013,7 @@ impl Clone for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionRespo
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -8014,7 +8124,7 @@ impl Clone for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUn
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -8409,18 +8519,18 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult {
         &self,
     ) -> crate::unknown_interactions_closed_driver_protocol_strict_two_way_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -8428,18 +8538,18 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult {
         &mut self,
     ) -> crate::unknown_interactions_closed_driver_protocol_strict_two_way_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -8467,7 +8577,7 @@ impl Clone for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse:
         ::fidl_next::Decode<___D>,
@@ -8595,7 +8705,7 @@ impl Clone for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayEr
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse:
         ::fidl_next::Decode<___D>,
@@ -8867,10 +8977,10 @@ pub mod unknown_interactions_closed_driver_protocol_strict_two_way_fields_err_re
 
     pub enum Mut<'union> {
         Response(&'union mut crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse),
-        
+
             Err(&'union mut ::fidl_next::i32_le),
-        
-        
+
+
     }
 }
 
@@ -8880,18 +8990,18 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult {
     ) -> crate::unknown_interactions_closed_driver_protocol_strict_two_way_fields_err_result::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_fields_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_fields_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -8900,18 +9010,18 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult {
     ) -> crate::unknown_interactions_closed_driver_protocol_strict_two_way_fields_err_result::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_fields_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_fields_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -8939,7 +9049,7 @@ impl Clone for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrR
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -9067,7 +9177,7 @@ impl Clone for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayFi
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -9109,7 +9219,7 @@ impl ::core::fmt::Debug
 pub enum UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable
@@ -9137,7 +9247,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -9220,13 +9330,13 @@ pub mod unknown_interactions_closed_driver_protocol_strict_two_way_union_err_res
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -9236,14 +9346,14 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
     ) -> crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -9252,14 +9362,14 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
     ) -> crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -9283,7 +9393,7 @@ impl Clone for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrRe
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -9396,7 +9506,7 @@ impl Clone for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUn
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -9559,10 +9669,10 @@ pub mod unknown_interactions_closed_driver_protocol_strict_two_way_union_err_res
 
     pub enum Mut<'union> {
         Response(&'union mut crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse),
-        
+
             Err(&'union mut ::fidl_next::i32_le),
-        
-        
+
+
     }
 }
 
@@ -9572,18 +9682,18 @@ impl<'buf> WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult
     ) -> crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_result::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -9592,18 +9702,18 @@ impl<'buf> WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult
     ) -> crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_result::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -10028,10 +10138,10 @@ pub mod unknown_interactions_closed_driver_protocol_strict_two_way_table_err_res
 
     pub enum Mut<'union, 'buf> {
         Response(&'union mut crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse<'buf>),
-        
+
             Err(&'union mut ::fidl_next::i32_le),
-        
-        
+
+
     }
 }
 
@@ -10043,18 +10153,18 @@ impl<'buf> WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult
         'buf,
     > {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_table_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_table_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -10065,18 +10175,18 @@ impl<'buf> WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult
         'buf,
     > {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_table_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_table_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -10577,7 +10687,8 @@ where
 }
 
 /// A client handler for the UnknownInteractionsClosedDriverProtocol protocol.
-
+///
+/// See [`UnknownInteractionsClosedDriverProtocol`] for more details.
 pub trait UnknownInteractionsClosedDriverProtocolClientHandler<
     ___T: ::fidl_next::protocol::Transport,
 >
@@ -10640,7 +10751,8 @@ where
 }
 
 /// A server handler for the UnknownInteractionsClosedDriverProtocol protocol.
-
+///
+/// See [`UnknownInteractionsClosedDriverProtocol`] for more details.
 pub trait UnknownInteractionsClosedDriverProtocolServerHandler<
     ___T: ::fidl_next::protocol::Transport,
 >
@@ -10914,7 +11026,7 @@ where
 pub enum UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
@@ -10939,7 +11051,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -11020,13 +11132,13 @@ pub mod unknown_interactions_closed_protocol_strict_two_way_union_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -11035,14 +11147,14 @@ impl WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
         &self,
     ) -> crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Ref::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -11050,14 +11162,14 @@ impl WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
         &mut self,
     ) -> crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Mut::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -11081,7 +11193,7 @@ impl Clone for WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -11192,7 +11304,7 @@ impl Clone for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionRes
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -11622,7 +11734,7 @@ impl Clone for WireUnknownInteractionsClosedProtocolStrictTwoWayErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
 
@@ -11745,7 +11857,7 @@ impl Clone for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayErrResul
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
 
@@ -12020,18 +12132,18 @@ impl WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult {
         &self,
     ) -> crate::unknown_interactions_closed_protocol_strict_two_way_fields_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_fields_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_protocol_strict_two_way_fields_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -12039,18 +12151,18 @@ impl WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult {
         &mut self,
     ) -> crate::unknown_interactions_closed_protocol_strict_two_way_fields_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_fields_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_protocol_strict_two_way_fields_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -12078,7 +12190,7 @@ impl Clone for WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -12206,7 +12318,7 @@ impl Clone for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayFieldsEr
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -12248,7 +12360,7 @@ impl ::core::fmt::Debug
 pub enum UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
@@ -12274,7 +12386,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -12356,13 +12468,13 @@ pub mod unknown_interactions_closed_protocol_strict_two_way_union_err_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -12372,14 +12484,14 @@ impl WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
     ) -> crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -12388,14 +12500,14 @@ impl WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
     ) -> crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -12419,7 +12531,7 @@ impl Clone for WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -12530,7 +12642,7 @@ impl Clone for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErr
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -12697,18 +12809,18 @@ impl<'buf> WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult<'buf>
         &self,
     ) -> crate::unknown_interactions_closed_protocol_strict_two_way_union_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -12716,18 +12828,18 @@ impl<'buf> WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult<'buf>
         &mut self,
     ) -> crate::unknown_interactions_closed_protocol_strict_two_way_union_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -13152,18 +13264,18 @@ impl<'buf> WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResult<'buf>
     ) -> crate::unknown_interactions_closed_protocol_strict_two_way_table_err_result::Ref<'_, 'buf>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_table_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_protocol_strict_two_way_table_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -13172,18 +13284,18 @@ impl<'buf> WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResult<'buf>
     ) -> crate::unknown_interactions_closed_protocol_strict_two_way_table_err_result::Mut<'_, 'buf>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_table_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_protocol_strict_two_way_table_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -13433,7 +13545,7 @@ where
 pub enum UnknownInteractionsClosedProtocolStrictEventUnionRequest {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictEventUnionRequest {
@@ -13458,7 +13570,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -13536,13 +13648,13 @@ pub mod unknown_interactions_closed_protocol_strict_event_union_request {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -13551,14 +13663,14 @@ impl WireUnknownInteractionsClosedProtocolStrictEventUnionRequest {
         &self,
     ) -> crate::unknown_interactions_closed_protocol_strict_event_union_request::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_event_union_request::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_closed_protocol_strict_event_union_request::Ref::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_closed_protocol_strict_event_union_request::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -13566,14 +13678,14 @@ impl WireUnknownInteractionsClosedProtocolStrictEventUnionRequest {
         &mut self,
     ) -> crate::unknown_interactions_closed_protocol_strict_event_union_request::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_event_union_request::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_closed_protocol_strict_event_union_request::Mut::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_closed_protocol_strict_event_union_request::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -13597,7 +13709,7 @@ impl Clone for WireUnknownInteractionsClosedProtocolStrictEventUnionRequest {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictEventUnionRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -13704,7 +13816,7 @@ impl Clone for WireOptionalUnknownInteractionsClosedProtocolStrictEventUnionRequ
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedProtocolStrictEventUnionRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -14259,7 +14371,8 @@ where
 }
 
 /// A client handler for the UnknownInteractionsClosedProtocol protocol.
-
+///
+/// See [`UnknownInteractionsClosedProtocol`] for more details.
 pub trait UnknownInteractionsClosedProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn strict_event(
         &mut self,
@@ -14369,11 +14482,37 @@ where
 pub trait UnknownInteractionsClosedProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
     fn strict_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
 
-    fn strict_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn strict_event_fields<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest,
+        >;
 
-    fn strict_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn strict_event_union<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsClosedProtocolStrictEventUnionRequest,
+        >;
 
-    fn strict_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn strict_event_table<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsClosedProtocolStrictEventTableRequest<
+                'buf,
+            >,
+        >;
 }
 
 impl<___T> UnknownInteractionsClosedProtocolServerSender<___T>
@@ -14385,21 +14524,51 @@ where
         self.as_untyped().send_event(760799297757210939, &mut ())
     }
 
-    fn strict_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(6736355582617074292, &mut ())
+    fn strict_event_fields<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest,
+        >,
+    {
+        self.as_untyped().send_event(6736355582617074292, request)
     }
 
-    fn strict_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(4288682345454280036, &mut ())
+    fn strict_event_union<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsClosedProtocolStrictEventUnionRequest,
+        >,
+    {
+        self.as_untyped().send_event(4288682345454280036, request)
     }
 
-    fn strict_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(2871682464255309246, &mut ())
+    fn strict_event_table<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsClosedProtocolStrictEventTableRequest<
+                'buf,
+            >,
+        >,
+    {
+        self.as_untyped().send_event(2871682464255309246, request)
     }
 }
 
 /// A server handler for the UnknownInteractionsClosedProtocol protocol.
-
+///
+/// See [`UnknownInteractionsClosedProtocol`] for more details.
 pub trait UnknownInteractionsClosedProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn strict_one_way(
         &mut self,
@@ -14667,7 +14836,7 @@ where
 pub enum UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
@@ -14692,7 +14861,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -14773,13 +14942,13 @@ pub mod unknown_interactions_driver_protocol_strict_two_way_union_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -14788,14 +14957,14 @@ impl WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
         &self,
     ) -> crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Ref::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -14803,14 +14972,14 @@ impl WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
         &mut self,
     ) -> crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Mut::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -14834,7 +15003,7 @@ impl Clone for WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -14945,7 +15114,7 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionRes
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -15375,7 +15544,7 @@ impl Clone for WireUnknownInteractionsDriverProtocolStrictTwoWayErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
 
@@ -15498,7 +15667,7 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayErrResul
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
 
@@ -15773,18 +15942,18 @@ impl WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult {
         &self,
     ) -> crate::unknown_interactions_driver_protocol_strict_two_way_fields_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_fields_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_strict_two_way_fields_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -15792,18 +15961,18 @@ impl WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult {
         &mut self,
     ) -> crate::unknown_interactions_driver_protocol_strict_two_way_fields_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_fields_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_strict_two_way_fields_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -15831,7 +16000,7 @@ impl Clone for WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -15959,7 +16128,7 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayFieldsEr
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -16001,7 +16170,7 @@ impl ::core::fmt::Debug
 pub enum UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
@@ -16027,7 +16196,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -16109,13 +16278,13 @@ pub mod unknown_interactions_driver_protocol_strict_two_way_union_err_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -16125,14 +16294,14 @@ impl WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
     ) -> crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -16141,14 +16310,14 @@ impl WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
     ) -> crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -16172,7 +16341,7 @@ impl Clone for WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -16283,7 +16452,7 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErr
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -16450,18 +16619,18 @@ impl<'buf> WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult<'buf>
         &self,
     ) -> crate::unknown_interactions_driver_protocol_strict_two_way_union_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -16469,18 +16638,18 @@ impl<'buf> WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult<'buf>
         &mut self,
     ) -> crate::unknown_interactions_driver_protocol_strict_two_way_union_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -16905,18 +17074,18 @@ impl<'buf> WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResult<'buf>
     ) -> crate::unknown_interactions_driver_protocol_strict_two_way_table_err_result::Ref<'_, 'buf>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_table_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_strict_two_way_table_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -16925,18 +17094,18 @@ impl<'buf> WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResult<'buf>
     ) -> crate::unknown_interactions_driver_protocol_strict_two_way_table_err_result::Mut<'_, 'buf>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_table_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_strict_two_way_table_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -17293,18 +17462,18 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayResult {
         &self,
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -17312,18 +17481,18 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayResult {
         &mut self,
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -17351,7 +17520,7 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse: ::fidl_next::Decode<___D>,
 
@@ -17477,7 +17646,7 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayResult
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse: ::fidl_next::Decode<___D>,
 
@@ -17752,18 +17921,18 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult {
         &self,
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_fields_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_fields_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_fields_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -17771,18 +17940,18 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult {
         &mut self,
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_fields_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_fields_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_fields_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -17810,7 +17979,7 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse:
         ::fidl_next::Decode<___D>,
@@ -17941,7 +18110,7 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayFields
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse:
         ::fidl_next::Decode<___D>,
@@ -17984,7 +18153,7 @@ impl ::core::fmt::Debug
 pub enum UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
@@ -18010,7 +18179,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -18091,13 +18260,13 @@ pub mod unknown_interactions_driver_protocol_flexible_two_way_union_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -18106,14 +18275,14 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
         &self,
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Ref::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -18121,14 +18290,14 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
         &mut self,
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Mut::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -18152,7 +18321,7 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -18263,7 +18432,7 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionR
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -18431,18 +18600,18 @@ impl<'buf> WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult<'buf> 
         &self,
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_union_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -18450,18 +18619,18 @@ impl<'buf> WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult<'buf> 
         &mut self,
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_union_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -18893,18 +19062,18 @@ impl<'buf> WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResult<'buf> 
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_table_result::Ref<'_, 'buf>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_table_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_table_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -18913,18 +19082,18 @@ impl<'buf> WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResult<'buf> 
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_table_result::Mut<'_, 'buf>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_table_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_table_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -19311,22 +19480,22 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult {
         &self,
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_flexible_two_way_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_err_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -19334,22 +19503,22 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult {
         &mut self,
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_flexible_two_way_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_err_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -19382,7 +19551,7 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse:
         ::fidl_next::Decode<___D>,
@@ -19521,7 +19690,7 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayErrRes
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse:
         ::fidl_next::Decode<___D>,
@@ -19826,22 +19995,22 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult {
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_fields_err_result::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_fields_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_flexible_two_way_fields_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_fields_err_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -19850,22 +20019,22 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult {
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_fields_err_result::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_fields_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_flexible_two_way_fields_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_fields_err_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -19898,7 +20067,7 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResul
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -20041,7 +20210,7 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayFields
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -20090,7 +20259,7 @@ impl ::core::fmt::Debug
 pub enum UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
@@ -20116,7 +20285,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -20199,13 +20368,13 @@ pub mod unknown_interactions_driver_protocol_flexible_two_way_union_err_response
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -20215,14 +20384,14 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Ref::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -20231,14 +20400,14 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Mut::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -20262,7 +20431,7 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrRespon
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -20373,7 +20542,7 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionE
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -20562,22 +20731,22 @@ impl<'buf> WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult<'bu
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_result::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -20586,22 +20755,22 @@ impl<'buf> WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult<'bu
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_result::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -21064,22 +21233,22 @@ impl<'buf> WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult<'bu
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_table_err_result::Ref<'_, 'buf>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_table_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_flexible_two_way_table_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_table_err_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -21088,22 +21257,22 @@ impl<'buf> WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult<'bu
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_table_err_result::Mut<'_, 'buf>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_table_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_flexible_two_way_table_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_table_err_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -21937,7 +22106,8 @@ where
 }
 
 /// A client handler for the UnknownInteractionsDriverProtocol protocol.
-
+///
+/// See [`UnknownInteractionsDriverProtocol`] for more details.
 pub trait UnknownInteractionsDriverProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn on_unknown_interaction(
         &mut self,
@@ -22021,7 +22191,8 @@ where
 }
 
 /// A server handler for the UnknownInteractionsDriverProtocol protocol.
-
+///
+/// See [`UnknownInteractionsDriverProtocol`] for more details.
 pub trait UnknownInteractionsDriverProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn strict_one_way(
         &mut self,
@@ -22418,7 +22589,7 @@ where
 pub enum UnknownInteractionsProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictTwoWayUnionResponse {
@@ -22443,7 +22614,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -22519,13 +22690,13 @@ pub mod unknown_interactions_protocol_strict_two_way_union_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -22534,14 +22705,14 @@ impl WireUnknownInteractionsProtocolStrictTwoWayUnionResponse {
         &self,
     ) -> crate::unknown_interactions_protocol_strict_two_way_union_response::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_strict_two_way_union_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_protocol_strict_two_way_union_response::Ref::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -22549,14 +22720,14 @@ impl WireUnknownInteractionsProtocolStrictTwoWayUnionResponse {
         &mut self,
     ) -> crate::unknown_interactions_protocol_strict_two_way_union_response::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_strict_two_way_union_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_protocol_strict_two_way_union_response::Mut::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_protocol_strict_two_way_union_response::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -22580,7 +22751,7 @@ impl Clone for WireUnknownInteractionsProtocolStrictTwoWayUnionResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -22687,7 +22858,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionResponse 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -23107,7 +23278,7 @@ impl Clone for WireUnknownInteractionsProtocolStrictTwoWayErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
 
@@ -23228,7 +23399,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolStrictTwoWayErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
 
@@ -23545,7 +23716,7 @@ impl Clone for WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResponse: ::fidl_next::Decode<___D>,
 
@@ -23668,7 +23839,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolStrictTwoWayFieldsErrResul
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResponse: ::fidl_next::Decode<___D>,
 
@@ -23707,7 +23878,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsProtocolStrictTwoWayF
 pub enum UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
@@ -23732,7 +23903,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -23808,13 +23979,13 @@ pub mod unknown_interactions_protocol_strict_two_way_union_err_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -23823,14 +23994,14 @@ impl WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
         &self,
     ) -> crate::unknown_interactions_protocol_strict_two_way_union_err_response::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_strict_two_way_union_err_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -23838,14 +24009,14 @@ impl WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
         &mut self,
     ) -> crate::unknown_interactions_protocol_strict_two_way_union_err_response::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_strict_two_way_union_err_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -23869,7 +24040,7 @@ impl Clone for WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -23976,7 +24147,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrRespon
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -24999,7 +25170,7 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayResponse: ::fidl_next::Decode<___D>,
 
@@ -25123,7 +25294,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayResponse: ::fidl_next::Decode<___D>,
 
@@ -25384,18 +25555,18 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResult {
         &self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_fields_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_fields_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_fields_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -25403,18 +25574,18 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResult {
         &mut self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_fields_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_fields_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_fields_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -25442,7 +25613,7 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse: ::fidl_next::Decode<___D>,
 
@@ -25568,7 +25739,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayFieldsResult
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayFieldsResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse: ::fidl_next::Decode<___D>,
 
@@ -25608,7 +25779,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsProtocolFlexibleTwoWa
 pub enum UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
@@ -25633,7 +25804,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -25709,13 +25880,13 @@ pub mod unknown_interactions_protocol_flexible_two_way_union_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -25724,14 +25895,14 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
         &self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_union_response::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_union_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_protocol_flexible_two_way_union_response::Ref::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_protocol_flexible_two_way_union_response::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -25739,14 +25910,14 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
         &mut self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_union_response::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_union_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_protocol_flexible_two_way_union_response::Mut::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_protocol_flexible_two_way_union_response::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -25770,7 +25941,7 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -25877,7 +26048,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionRespons
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -26037,18 +26208,18 @@ impl<'buf> WireUnknownInteractionsProtocolFlexibleTwoWayUnionResult<'buf> {
         &self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_union_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_union_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_union_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -26056,18 +26227,18 @@ impl<'buf> WireUnknownInteractionsProtocolFlexibleTwoWayUnionResult<'buf> {
         &mut self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_union_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_union_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_union_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -26482,18 +26653,18 @@ impl<'buf> WireUnknownInteractionsProtocolFlexibleTwoWayTableResult<'buf> {
         &self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_table_result::Ref<'_, 'buf> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_table_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_table_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -26501,18 +26672,18 @@ impl<'buf> WireUnknownInteractionsProtocolFlexibleTwoWayTableResult<'buf> {
         &mut self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_table_result::Mut<'_, 'buf> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_table_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_table_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -26960,7 +27131,7 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse: ::fidl_next::Decode<___D>,
 
@@ -27098,7 +27269,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse: ::fidl_next::Decode<___D>,
 
@@ -27387,22 +27558,22 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult {
         &self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_fields_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_fields_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_protocol_flexible_two_way_fields_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_fields_err_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -27410,22 +27581,22 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult {
         &mut self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_fields_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_fields_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_protocol_flexible_two_way_fields_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_fields_err_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -27458,7 +27629,7 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -27597,7 +27768,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayFieldsErrRes
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -27644,7 +27815,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsProtocolFlexibleTwoWa
 pub enum UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
@@ -27669,7 +27840,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -27748,13 +27919,13 @@ pub mod unknown_interactions_protocol_flexible_two_way_union_err_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -27763,14 +27934,14 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
         &self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Ref::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -27778,14 +27949,14 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
         &mut self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Mut::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -27809,7 +27980,7 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -27918,7 +28089,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResp
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -28094,22 +28265,22 @@ impl<'buf> WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResult<'buf> {
         &self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_union_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_union_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_protocol_flexible_two_way_union_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_union_err_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -28117,22 +28288,22 @@ impl<'buf> WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResult<'buf> {
         &mut self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_union_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_union_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_protocol_flexible_two_way_union_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_union_err_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -28577,22 +28748,22 @@ impl<'buf> WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResult<'buf> {
         &self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_table_err_result::Ref<'_, 'buf> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_table_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_protocol_flexible_two_way_table_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_table_err_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -28600,22 +28771,22 @@ impl<'buf> WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResult<'buf> {
         &mut self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_table_err_result::Mut<'_, 'buf> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_table_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_protocol_flexible_two_way_table_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_table_err_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -28876,7 +29047,7 @@ where
 pub enum UnknownInteractionsProtocolStrictEventUnionRequest {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictEventUnionRequest {
@@ -28901,7 +29072,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -28977,13 +29148,13 @@ pub mod unknown_interactions_protocol_strict_event_union_request {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -28992,15 +29163,14 @@ impl WireUnknownInteractionsProtocolStrictEventUnionRequest {
         &self,
     ) -> crate::unknown_interactions_protocol_strict_event_union_request::Ref<'_> {
         match self.raw.ordinal() {
-            1 => crate::unknown_interactions_protocol_strict_event_union_request::Ref::SomeField(
-                unsafe { self.raw.get().deref_unchecked() },
-            ),
 
-            unknown => {
-                crate::unknown_interactions_protocol_strict_event_union_request::Ref::UnknownOrdinal(
-                    unknown,
-                )
-            }
+                1 => crate::unknown_interactions_protocol_strict_event_union_request::Ref::SomeField(
+                    unsafe { self.raw.get().deref_unchecked() }
+                ),
+
+
+                unknown => crate::unknown_interactions_protocol_strict_event_union_request::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -29008,15 +29178,14 @@ impl WireUnknownInteractionsProtocolStrictEventUnionRequest {
         &mut self,
     ) -> crate::unknown_interactions_protocol_strict_event_union_request::Mut<'_> {
         match self.raw.ordinal() {
-            1 => crate::unknown_interactions_protocol_strict_event_union_request::Mut::SomeField(
-                unsafe { self.raw.get_mut().deref_mut_unchecked() },
-            ),
 
-            unknown => {
-                crate::unknown_interactions_protocol_strict_event_union_request::Mut::UnknownOrdinal(
-                    unknown,
-                )
-            }
+                1 => crate::unknown_interactions_protocol_strict_event_union_request::Mut::SomeField(
+                    unsafe { self.raw.get_mut().deref_mut_unchecked() }
+                ),
+
+
+                unknown => crate::unknown_interactions_protocol_strict_event_union_request::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -29040,7 +29209,7 @@ impl Clone for WireUnknownInteractionsProtocolStrictEventUnionRequest {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictEventUnionRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -29147,7 +29316,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolStrictEventUnionRequest {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolStrictEventUnionRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -29408,7 +29577,7 @@ where
 pub enum UnknownInteractionsProtocolFlexibleEventUnionRequest {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleEventUnionRequest {
@@ -29433,7 +29602,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -29509,13 +29678,13 @@ pub mod unknown_interactions_protocol_flexible_event_union_request {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -29524,14 +29693,14 @@ impl WireUnknownInteractionsProtocolFlexibleEventUnionRequest {
         &self,
     ) -> crate::unknown_interactions_protocol_flexible_event_union_request::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_event_union_request::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_protocol_flexible_event_union_request::Ref::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_protocol_flexible_event_union_request::Ref::UnknownOrdinal_(unknown),
+
         }
     }
 
@@ -29539,14 +29708,14 @@ impl WireUnknownInteractionsProtocolFlexibleEventUnionRequest {
         &mut self,
     ) -> crate::unknown_interactions_protocol_flexible_event_union_request::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_event_union_request::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
-                unknown => crate::unknown_interactions_protocol_flexible_event_union_request::Mut::UnknownOrdinal(unknown),
-            
+
+
+                unknown => crate::unknown_interactions_protocol_flexible_event_union_request::Mut::UnknownOrdinal_(unknown),
+
         }
     }
 }
@@ -29570,7 +29739,7 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleEventUnionRequest {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleEventUnionRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -29677,7 +29846,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleEventUnionRequest 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleEventUnionRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -30576,7 +30745,8 @@ where
 }
 
 /// A client handler for the UnknownInteractionsProtocol protocol.
-
+///
+/// See [`UnknownInteractionsProtocol`] for more details.
 pub trait UnknownInteractionsProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn strict_event(
         &mut self,
@@ -30779,19 +30949,67 @@ where
 pub trait UnknownInteractionsProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
     fn strict_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
 
-    fn strict_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn strict_event_fields<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolStrictEventFieldsRequest,
+        >;
 
-    fn strict_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn strict_event_union<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolStrictEventUnionRequest,
+        >;
 
-    fn strict_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn strict_event_table<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolStrictEventTableRequest<'buf>,
+        >;
 
     fn flexible_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
 
-    fn flexible_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn flexible_event_fields<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolFlexibleEventFieldsRequest,
+        >;
 
-    fn flexible_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn flexible_event_union<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolFlexibleEventUnionRequest,
+        >;
 
-    fn flexible_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn flexible_event_table<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolFlexibleEventTableRequest<'buf>,
+        >;
 }
 
 impl<___T> UnknownInteractionsProtocolServerSender<___T>
@@ -30803,37 +31021,92 @@ where
         self.as_untyped().send_event(685715276307386305, &mut ())
     }
 
-    fn strict_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(8896208255987935026, &mut ())
+    fn strict_event_fields<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolStrictEventFieldsRequest,
+        >,
+    {
+        self.as_untyped().send_event(8896208255987935026, request)
     }
 
-    fn strict_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(3919175221694221274, &mut ())
+    fn strict_event_union<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolStrictEventUnionRequest,
+        >,
+    {
+        self.as_untyped().send_event(3919175221694221274, request)
     }
 
-    fn strict_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(2711448698318579984, &mut ())
+    fn strict_event_table<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolStrictEventTableRequest<'buf>,
+        >,
+    {
+        self.as_untyped().send_event(2711448698318579984, request)
     }
 
     fn flexible_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
         self.as_untyped().send_event(7042257263728687206, &mut ())
     }
 
-    fn flexible_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(3613822014516746241, &mut ())
+    fn flexible_event_fields<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolFlexibleEventFieldsRequest,
+        >,
+    {
+        self.as_untyped().send_event(3613822014516746241, request)
     }
 
-    fn flexible_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(2499446536152409191, &mut ())
+    fn flexible_event_union<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolFlexibleEventUnionRequest,
+        >,
+    {
+        self.as_untyped().send_event(2499446536152409191, request)
     }
 
-    fn flexible_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(5724881371349617120, &mut ())
+    fn flexible_event_table<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolFlexibleEventTableRequest<'buf>,
+        >,
+    {
+        self.as_untyped().send_event(5724881371349617120, request)
     }
 }
 
 /// A server handler for the UnknownInteractionsProtocol protocol.
-
+///
+/// See [`UnknownInteractionsProtocol`] for more details.
 pub trait UnknownInteractionsProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn strict_one_way(
         &mut self,

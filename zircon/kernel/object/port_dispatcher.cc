@@ -125,7 +125,7 @@ PortObserver::PortObserver(uint32_t options, const Handle* handle, fbl::RefPtr<P
 void PortObserver::OnMatch(zx_signals_t signals) {
   if (options_ & ZX_WAIT_ASYNC_TIMESTAMP) {
     // Getting the current time can be somewhat expensive.
-    packet_.packet.signal.timestamp = current_time();
+    packet_.packet.signal.timestamp = current_mono_time();
   } else if (options_ & ZX_WAIT_ASYNC_BOOT_TIMESTAMP) {
     packet_.packet.signal.timestamp = current_boot_time();
   }

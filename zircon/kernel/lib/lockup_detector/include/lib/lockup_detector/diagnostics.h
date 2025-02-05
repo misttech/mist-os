@@ -19,10 +19,54 @@
 #include <arch/arm64/mmu.h>
 #endif
 
+// Returns true if the system has the ability to dump the state of another CPU.
+//
+// Intended to be used in conjunction with |DumpRegistersAndBacktrace|.
+//
+// If this function returns false, |DumpRegistersAndBacktrace| should not be called.  Of course,
+// even if this function returns true, |DumpRegistersAndBacktrace| may still fail.
+bool CanDumpRegistersAndBacktrace();
+
+// Attempt to dump the registers and backtrace of the target |cpu|.
+//
+// This is a destructive operation and may leave the target CPU is an unknown state.  It should only
+// be called as part of a panic.
+//
+//
+// Example:
+//
+// if (CanDumpRegistersAndBacktrace()) {
+//   // Initiate a panic sequence to ensure that subsequent printfs are sent to serial,
+//   // however, don't try to halt any CPUs because we want to query the target's state.
+//   platform_panic_start(PanicStartHaltOtherCpus::No);
+//   printf("cpu-%d is unresponsive, attempting to dump its state", target_cpu);
+//
+//   // Attempt to dump state.
+//   zx_status_t status = DumpRegistersAndBacktrace(target_cpu, stdout);
+//   if (status != ZX_OK) {
+//     printf("failed to dump state for cpu-%d, status %d\n", target_cpu, status);
+//   }
+//   platform_halt(HALT_ACTION_HALT, ZirconCrashReason::Panic);
+// }
+//
+//
+// Errors (non-exhaustive list):
+//
+//   ZX_ERR_NOT_SUPPORTED - there is no debug facility present to support this.
+//   ZX_ERR_TIMED_OUT - timed out trying to get CPU context.
+zx_status_t DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target);
+
+// This namespace is logically private to lockup_detector and its tests.
 namespace lockup_internal {
+
+enum class FailureSeverity { Oops, Fatal };
+void DumpCommonDiagnostics(cpu_num_t cpu, FILE* output_target, FailureSeverity severity);
 
 #if defined(__aarch64__)
 // Using the supplied DAP state, obtain a backtrace, taking care to not fault.
+//
+// This function is exposed in a header file to facilitate testing.  See |DumpRegistersAndBacktrace|
+// for the platform and architecture independent interface.
 //
 // Resets |out_bt| and then fills it in as much as possible.  The backtrace may be truncated if the
 // SCS crosses a page boundary.  The contents of |out_bt| are valid even on error.
@@ -34,11 +78,6 @@ namespace lockup_internal {
 //   ZX_ERR_NOT_FOUND - if the stack is not mapped.
 zx_status_t GetBacktraceFromDapState(const arm64_dap_processor_state& state, Backtrace& out_bt);
 #endif  // __aarch64__
-
-void DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target);
-
-enum class FailureSeverity { Oops, Fatal };
-void DumpCommonDiagnostics(cpu_num_t cpu, FILE* output_target, FailureSeverity severity);
 
 }  // namespace lockup_internal
 

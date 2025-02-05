@@ -9,6 +9,7 @@ use fuchsia_async as fasync;
 use fuchsia_sync::RwLock;
 use futures::channel::mpsc::{channel, SendError};
 use futures::{try_join, FutureExt, Sink, SinkExt, Stream, StreamExt, TryStreamExt};
+use log::info;
 use rustyline::error::ReadlineError;
 use rustyline::{CompletionType, Config, EditMode, Editor};
 use std::collections::hash_map::Entry;
@@ -16,7 +17,6 @@ use std::collections::HashMap;
 use std::pin::pin;
 use std::sync::Arc;
 use std::thread;
-use tracing::info;
 
 use crate::commands::{Cmd, CmdHelper, ReplControl};
 use crate::types::{PeerFactoryMap, CLEAR_LINE, PROMPT};
@@ -297,7 +297,7 @@ fn cmd_stream() -> (impl Stream<Item = String>, impl Sink<(), Error = SendError>
                 .completion_type(CompletionType::List)
                 .edit_mode(EditMode::Emacs)
                 .build();
-            let mut rl: Editor<CmdHelper> = Editor::with_config(config);
+            let mut rl: Editor<CmdHelper, _> = Editor::with_config(config)?;
             rl.set_helper(Some(CmdHelper::new()));
             loop {
                 let readline = rl.readline(PROMPT);

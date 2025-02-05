@@ -6,7 +6,6 @@
 
 #include <lib/zx/vmar.h>
 
-#include <functional>
 #include <mutex>
 
 namespace usb::internal {
@@ -22,7 +21,7 @@ zx::result<std::optional<uint64_t>> GetMappedKey(
       // Is not unmapped at this point.
       return zx::ok(std::nullopt);
     default:
-      zxlogf(ERROR, "Unrecogonized buffer type %lu", static_cast<unsigned long>(buffer.Which()));
+      zxlogf(ERROR, "Unrecognized buffer type %lu", static_cast<unsigned long>(buffer.Which()));
       return zx::error(ZX_ERR_INTERNAL);
   }
 }
@@ -50,11 +49,11 @@ zx_status_t EndpointClientBase::Unmap(const fuchsia_hardware_usb_request::Buffer
     return ZX_OK;
   }
 
-  if (vmo_mapped_addrs_.find(*key.value()) == vmo_mapped_addrs_.end()) {
+  auto node = vmo_mapped_addrs_.extract(*key.value());
+  if (node.empty()) {
     return ZX_OK;
   }
-
-  auto mapped = vmo_mapped_addrs_.extract(*key.value()).mapped();
+  auto mapped = node.mapped();
   auto status = zx::vmar::root_self()->unmap(mapped.addr, mapped.size);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to unmap VMO %d", status);
@@ -110,6 +109,7 @@ zx_status_t EndpointClientBase::DeleteRequest(usb::FidlRequest&& request) {
 
 size_t EndpointClientBase::RegisterVmos(size_t vmo_count, size_t vmo_size) {
   std::vector<fuchsia_hardware_usb_endpoint::VmoInfo> vmo_info;
+  vmo_info.reserve(vmo_count);
   for (uint32_t i = 0; i < vmo_count; i++) {
     vmo_info.emplace_back(
         std::move(fuchsia_hardware_usb_endpoint::VmoInfo().id(buffer_id_++).size(vmo_size)));
@@ -138,7 +138,7 @@ size_t EndpointClientBase::RegisterVmos(size_t vmo_count, size_t vmo_size) {
             // Try for the next one.
             continue;
           }
-          std::lock_guard<std::mutex> _(mutex_);
+          std::lock_guard<std::mutex> _(mutex());
           vmo_mapped_addrs_.emplace(*vmo.id(), usb::MappedVmo{mapped_addr, vmo_size});
         }
         sync_completion_signal(&wait);

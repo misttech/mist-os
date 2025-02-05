@@ -128,10 +128,10 @@ struct MetricTemplate {
     /// cobalt metric.
     /// Notes:
     /// - Order matters, and must match the order of the defined dimensions
-    ///    in the cobalt metric file.
+    ///   in the cobalt metric file.
     /// - The FIRE component-ID will be inserted as the first element of event_codes.
     /// - The event_codes field may be omitted from the config file if component-ID is the only
-    ///    event code.
+    ///   event code.
     event_codes: Option<Vec<u32>>,
     /// Optional boolean specifying whether to upload
     /// the specified metric only once, the first time

@@ -44,6 +44,7 @@ class UltrasoundRenderer : public BaseRenderer {
   // |fuchsia::media::BaseRenderer| but unsupported by UltrasoundRenderer
   void SetPcmStreamType(fuchsia::media::AudioStreamType format) final;
   void SetUsage(fuchsia::media::AudioRenderUsage usage) final;
+  void SetUsage2(fuchsia::media::AudioRenderUsage2 usage) final;
   void BindGainControl(fidl::InterfaceRequest<fuchsia::media::audio::GainControl> request) final;
   void SetReferenceClock(zx::clock ref_clock) final;
 

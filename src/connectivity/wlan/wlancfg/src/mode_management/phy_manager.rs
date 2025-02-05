@@ -13,10 +13,10 @@ use async_trait::async_trait;
 use fidl::endpoints::create_proxy;
 use fuchsia_inspect::{self as inspect, NumericProperty};
 use ieee80211::{MacAddr, MacAddrBytes, NULL_ADDR};
+use log::{error, info, warn};
 use std::collections::{HashMap, HashSet};
 use std::iter::Iterator;
 use thiserror::Error;
-use tracing::{error, info, warn};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_device_service as fidl_service,
     fidl_fuchsia_wlan_sme as fidl_sme,
@@ -456,6 +456,9 @@ impl PhyManagerApi for PhyManager {
                         }
                     };
 
+                    // Safe to unwrap here: this phy_id was just used create an interface. If we
+                    // can't find it now, it's reasonable to panic
+                    #[expect(clippy::unwrap_used)]
                     let phy_container = self.phys.get_mut(&phy_id).unwrap();
                     let _ = phy_container.client_ifaces.insert(iface_id);
 
@@ -522,20 +525,15 @@ impl PhyManagerApi for PhyManager {
         }
 
         let client_capable_phys = self.phys_for_role(fidl_common::WlanMacRole::Client);
-        if client_capable_phys.is_empty() {
-            return None;
-        }
 
         // Find the first PHY with any client interfaces and return its first client interface.
-        let phy = self.phys.get_mut(&client_capable_phys[0])?;
+        let first_client_capable_phy = client_capable_phys.first()?;
+        let phy = self.phys.get_mut(first_client_capable_phy)?;
         phy.client_ifaces.iter().next().copied()
     }
 
     async fn create_or_get_ap_iface(&mut self) -> Result<Option<u16>, PhyManagerError> {
         let ap_capable_phy_ids = self.phys_for_role(fidl_common::WlanMacRole::Ap);
-        if ap_capable_phy_ids.is_empty() {
-            return Ok(None);
-        }
 
         // First check for any PHYs that can have AP interfaces but do not yet
         for ap_phy_id in ap_capable_phy_ids.iter() {
@@ -549,6 +547,10 @@ impl PhyManagerApi for PhyManager {
                 let iface_id =
                     self.create_iface(*ap_phy_id, fidl_common::WlanMacRole::Ap, mac).await?;
 
+                // Need to reborrow from self here, since self.create_iface also borrows self
+                // mutably. It's ok to unwrap here, since we just got this same interface a few
+                // lines above, and would be appropriate to panic if we can't get it.
+                #[expect(clippy::unwrap_used)]
                 let phy_container = self.phys.get_mut(ap_phy_id).unwrap();
                 let _ = phy_container.ap_ifaces.insert(iface_id);
                 return Ok(Some(iface_id));
@@ -558,7 +560,10 @@ impl PhyManagerApi for PhyManager {
         // If all of the AP-capable PHYs have created AP interfaces already, return the
         // first observed existing AP interface
         // TODO(https://fxbug.dev/42126856): Figure out a better method of interface selection.
-        let phy = match self.phys.get_mut(&ap_capable_phy_ids[0]) {
+        let Some(first_ap_capable_phy) = ap_capable_phy_ids.first() else {
+            return Ok(None);
+        };
+        let phy = match self.phys.get_mut(first_ap_capable_phy) {
             Some(phy_container) => phy_container,
             None => return Ok(None),
         };

@@ -7,6 +7,7 @@ import enum
 import logging
 import os
 
+from honeydew import errors
 from honeydew.auxiliary_devices import power_switch_dmc
 from honeydew.interfaces.auxiliary_devices import power_switch
 from honeydew.interfaces.device_classes import fuchsia_device
@@ -381,11 +382,10 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         for fx_device in self.fuchsia_devices:
             try:
                 fx_device.health_check()
-            except Exception as err:  # pylint: disable=broad-except
+            except errors.HealthCheckError as err:
                 self._devices_not_healthy = True
                 _LOGGER.warning(
-                    "Health check on %s failed with error '%s', will try to "
-                    "recover the device",
+                    "Health check on %s failed with error '%s', will try to recover the device",
                     fx_device.device_name,
                     err,
                 )

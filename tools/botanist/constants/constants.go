@@ -12,8 +12,6 @@ const (
 	FailedToResolveIPErrorMsg = "could not resolve target IP address"
 	PackageRepoSetupErrorMsg  = "failed to set up a package repository"
 	SerialReadErrorMsg        = "error reading serial log line"
-	FailedToExtendFVMMsg      = "failed to extend fvm.blk"
-	FailedToExtendBlkMsg      = "failed to extend blk"
 	CommandExceededTimeoutMsg = "Command exceeded timeout"
 	FailedToServeMsg          = "[package server] failed to serve"
 	FailedToCaptureSyslogMsg  = "failed to capture syslog"
@@ -33,7 +31,6 @@ const (
 	TestbedConfigEnvKey = "FUCHSIA_TESTBED_CONFIG"
 	// LINT.ThenChange(//src/testing/end_to_end/mobly_driver/api_infra.py)
 
-	FFXPathEnvKey            = "FUCHSIA_FFX_PATH"
-	FFXExperimentLevelEnvKey = "FUCHSIA_FFX_EXPERIMENT_LEVEL"
-	FFXConfigPathEnvKey      = "FUCHSIA_FFX_CONFIG_PATH"
+	FFXPathEnvKey       = "FUCHSIA_FFX_PATH"
+	FFXConfigPathEnvKey = "FUCHSIA_FFX_CONFIG_PATH"
 )

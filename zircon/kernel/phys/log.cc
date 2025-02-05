@@ -48,36 +48,16 @@ void Log::AppendToLog(ktl::string_view str) {
     constexpr size_t kPageSize = ZX_PAGE_SIZE;
     const size_t expand_size = (needed + kPageSize - 1) & -kPageSize;
     fbl::AllocChecker ac;
-
-    // TODO(https://fxbug.dev/42164859): While trampoline booting is in effect
-    // in the x86 codepath, care needs to be taken with `Allocation`s made
-    // before the fixed-address image recharacterization that TrampolineBoot
-    // does. In particular, we do not want to absent-mindedly free a region
-    // (e.g., due to an Allocation::Resize()) that was recharacterized as being
-    // a part of a fixed-address image. Until TrampolineBoot is removed from
-    // kernel boot, defensively leak the prior log buffer allocation when trying
-    // to resize and instead just allocate a new one. This only happens when
-    // the buffer reaches a page boundary and amounts to an infrequently
-    // exercised wart in the meantime. Once we can, go back to using
-    // Allocation::Resize().
-    //
-    // We also use kPhysScratch over kPhysLog in the meantime for related
-    // reasons: kPhysLog is a type meant to survive into hand-off, but since
-    // we're leaking prior allocations we don't want those to actually be
-    // handed off. A copy of this buffer of kPhysLog type will be allocated
-    // prior to hand-off.
-    Allocation new_buffer = Allocation::New(ac, memalloc::Type::kPhysScratch,
-                                            buffer_.size_bytes() + expand_size, kPageSize);
+    if (buffer_) {
+      buffer_.Resize(ac, buffer_.size_bytes() + expand_size);
+    } else {
+      buffer_ = Allocation::New(ac, memalloc::Type::kPhysLog, expand_size, kPageSize);
+    }
     if (!ac.check()) {
       RestoreStdout();
       ZX_PANIC("failed to increase phys log from %#zx to %#zx bytes", buffer_.size_bytes(),
                buffer_.size_bytes() + expand_size);
     }
-    if (buffer_) {
-      memcpy(new_buffer->data(), buffer_->data(), size_);
-      static_cast<void>(buffer_.release());
-    }
-    buffer_ = ktl::move(new_buffer);
     return buffer_chars_left();
   };
 

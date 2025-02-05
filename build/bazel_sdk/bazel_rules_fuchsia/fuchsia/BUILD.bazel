@@ -52,6 +52,7 @@ filegroup(
         # rules_java which we do not want to depend on. Depend on the specific
         # files instead of the filegroup for bazel_tools
         "@bazel_tools//tools/build_defs/cc:action_names.bzl",
+        "@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
         "@bazel_tools//tools/cpp:toolchain_utils.bzl",
         "@bazel_tools//tools/build_defs/repo:cache.bzl",
         "@bazel_tools//tools/build_defs/repo:http.bzl",

@@ -12,6 +12,7 @@ use zx::prelude::*;
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt};
 use ieee80211::{MacAddr, MacAddrBytes};
+use log::{debug, info, warn};
 use realm_client::{extend_namespace, InstalledNamespace};
 use std::fmt::Display;
 use std::future::Future;
@@ -19,7 +20,6 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use test_realm_helpers::tracing::Tracing;
-use tracing::{debug, info, warn};
 use wlan_common::test_utils::ExpectWithin;
 use wlantap_client::Wlantap;
 use {

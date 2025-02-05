@@ -6,9 +6,12 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::sync::Arc;
 
-use crate::common::{GlobalPrincipalIdentifier, GlobalPrincipalIdentifierFactory};
+use crate::common::{
+    GlobalPrincipalIdentifier, GlobalPrincipalIdentifierFactory, LocalPrincipalIdentifier,
+};
+use attribution_processing::{PrincipalDescription, PrincipalType};
 use fuchsia_sync::Mutex;
-use tracing::error;
+use log::error;
 use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_memory_attribution as fattribution};
 
 /// An error of the attribution client.
@@ -66,71 +69,6 @@ impl From<fattribution::Error> for AttributionClientError {
     }
 }
 
-/// A principal identifier, provided by an attribution provider. This identifier is only unique
-/// locally, for a given attribution provider.
-#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
-pub struct LocalPrincipalIdentifier(u64);
-
-impl LocalPrincipalIdentifier {
-    const SELF_PRINCIPAL_ID: u64 = 0;
-
-    pub fn self_identifier() -> Self {
-        LocalPrincipalIdentifier(LocalPrincipalIdentifier::SELF_PRINCIPAL_ID)
-    }
-
-    #[cfg(test)]
-    pub fn new_for_tests(value: u64) -> Self {
-        Self(value)
-    }
-}
-
-/// User-understandable description of a Principal
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub enum PrincipalDescription {
-    Component(String),
-    Part(String),
-}
-
-impl PrincipalDescription {
-    async fn new(
-        description: Option<fattribution::Description>,
-        introspector: &fcomponent::IntrospectorProxy,
-    ) -> Result<PrincipalDescription, AttributionClientError> {
-        match description.ok_or_else(|| {
-            AttributionClientError::MissingField("NewPrincipal::description".to_owned())
-        })? {
-            fattribution::Description::Component(moniker_token) => {
-                Ok(PrincipalDescription::Component(introspector.get_moniker(moniker_token).await??))
-            }
-            fattribution::Description::Part(part_name) => Ok(PrincipalDescription::Part(part_name)),
-            fattribution::Description::__SourceBreaking { unknown_ordinal: _ } => {
-                Err(AttributionClientError::UnknownField("Description".to_owned()))
-            }
-        }
-    }
-}
-
-/// Type of a principal.
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub enum PrincipalType {
-    Runnable,
-    Part,
-}
-
-impl TryFrom<fattribution::PrincipalType> for PrincipalType {
-    type Error = AttributionClientError;
-
-    fn try_from(value: fattribution::PrincipalType) -> Result<Self, Self::Error> {
-        match value {
-            fattribution::PrincipalType::Runnable => Ok(PrincipalType::Runnable),
-            fattribution::PrincipalType::Part => Ok(PrincipalType::Part),
-            fattribution::PrincipalType::__SourceBreaking { unknown_ordinal: _ } => {
-                Err(AttributionClientError::UnknownField("PrincipalType".to_owned()))
-            }
-        }
-    }
-}
-
 /// Definition of a Principal.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct PrincipalDefinition {
@@ -175,7 +113,7 @@ impl AttributionStateManager {
     ) -> (AttributionStateManager, GlobalPrincipalIdentifier) {
         let mut attribution_providers = AttributionState::default();
 
-        let mut principal_id_factory = GlobalPrincipalIdentifierFactory::new();
+        let mut principal_id_factory = GlobalPrincipalIdentifierFactory::default();
 
         let root_identifier = principal_id_factory.next();
         let principal = PrincipalDefinition {
@@ -234,25 +172,29 @@ impl AttributionStateManager {
     }
 }
 
+pub trait AttributionClient: Send + Sync {
+    fn get_attributions(&self) -> AttributionState;
+}
+
 /// AttributionClient is a client of a hierarchy of attribution providers, who provide the Provider
 /// FIDL protocol. It resolves component moniker names using the Introspector protocol from
 /// Component Manager.
-pub struct AttributionClient {
+pub struct AttributionClientImpl {
     introspector: fcomponent::IntrospectorProxy,
 
     attribution_state: Mutex<AttributionStateManager>,
 }
 
-impl AttributionClient {
+impl AttributionClientImpl {
     /// Creates and starts the memory attribution client.
     pub fn new(
         root_provider: fattribution::ProviderProxy,
         introspector: fcomponent::IntrospectorProxy,
         root_job_koid: zx::Koid,
-    ) -> Arc<AttributionClient> {
+    ) -> Arc<AttributionClientImpl> {
         let (manager, root_id) =
             AttributionStateManager::new_with_root_job(root_job_koid.raw_koid());
-        let client = Arc::new(AttributionClient {
+        let client = Arc::new(AttributionClientImpl {
             introspector: introspector,
             attribution_state: Mutex::new(manager),
         });
@@ -266,7 +208,7 @@ impl AttributionClient {
     fn attribute_memory(
         source_principal: GlobalPrincipalIdentifier,
         provider: fattribution::ProviderProxy,
-        client: Arc<AttributionClient>,
+        client: Arc<AttributionClientImpl>,
     ) {
         fuchsia_async::Task::spawn(Self::attribute_memory_logging_inner(
             source_principal,
@@ -279,7 +221,7 @@ impl AttributionClient {
     async fn attribute_memory_logging_inner(
         source_principal: GlobalPrincipalIdentifier,
         provider: fattribution::ProviderProxy,
-        client: Arc<AttributionClient>,
+        client: Arc<AttributionClientImpl>,
     ) {
         let result = Self::attribute_memory_inner(source_principal, provider, client.clone()).await;
         if let Err(err) = result {
@@ -291,7 +233,7 @@ impl AttributionClient {
     async fn attribute_memory_inner(
         source_principal: GlobalPrincipalIdentifier,
         provider: fattribution::ProviderProxy,
-        client: Arc<AttributionClient>,
+        client: Arc<AttributionClientImpl>,
     ) -> Result<(), AttributionClientError> {
         loop {
             let attributions = match provider.get().await {
@@ -324,17 +266,18 @@ impl AttributionClient {
                         );
 
                         let introspector = &client.introspector;
-                        let description =
-                            PrincipalDescription::new(new_principal.description, introspector)
-                                .await?;
-                        let principal_type = new_principal
-                            .principal_type
-                            .ok_or_else(|| {
+                        let description = AttributionClientImpl::new_principal_description(
+                            new_principal.description,
+                            introspector,
+                        )
+                        .await?;
+                        let principal_type = AttributionClientImpl::new_principal_type(
+                            new_principal.principal_type.ok_or_else(|| {
                                 AttributionClientError::MissingField(
                                     "NewPrincipal::type_".to_owned(),
                                 )
-                            })?
-                            .try_into()?;
+                            })?,
+                        )?;
                         let child_id = client.attribution_state.lock().add_new_principal(
                             source_principal.clone(),
                             local_identifier,
@@ -422,7 +365,38 @@ impl AttributionClient {
         }
     }
 
-    pub fn get_attributions(&self) -> AttributionState {
+    async fn new_principal_description(
+        description: Option<fattribution::Description>,
+        introspector: &fcomponent::IntrospectorProxy,
+    ) -> Result<PrincipalDescription, AttributionClientError> {
+        match description.ok_or_else(|| {
+            AttributionClientError::MissingField("NewPrincipal::description".to_owned())
+        })? {
+            fattribution::Description::Component(moniker_token) => {
+                Ok(PrincipalDescription::Component(introspector.get_moniker(moniker_token).await??))
+            }
+            fattribution::Description::Part(part_name) => Ok(PrincipalDescription::Part(part_name)),
+            fattribution::Description::__SourceBreaking { unknown_ordinal: _ } => {
+                Err(AttributionClientError::UnknownField("Description".to_owned()))
+            }
+        }
+    }
+
+    fn new_principal_type(
+        value: fattribution::PrincipalType,
+    ) -> Result<PrincipalType, AttributionClientError> {
+        match value {
+            fattribution::PrincipalType::Runnable => Ok(PrincipalType::Runnable),
+            fattribution::PrincipalType::Part => Ok(PrincipalType::Part),
+            fattribution::PrincipalType::__SourceBreaking { unknown_ordinal: _ } => {
+                Err(AttributionClientError::UnknownField("PrincipalType".to_owned()))
+            }
+        }
+    }
+}
+
+impl AttributionClient for AttributionClientImpl {
+    fn get_attributions(&self) -> AttributionState {
         self.attribution_state.lock().attribution_providers.clone()
     }
 }
@@ -444,7 +418,8 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fcomponent::IntrospectorMarker>();
 
         let root_job_koid = zx::Koid::from_raw(1);
-        let attribution_client = AttributionClient::new(root_provider, introspector, root_job_koid);
+        let attribution_client =
+            AttributionClientImpl::new(root_provider, introspector, root_job_koid);
 
         let server = attribution_server::AttributionServer::new(Box::new(|| {
             let new_principal = fattribution::NewPrincipal {

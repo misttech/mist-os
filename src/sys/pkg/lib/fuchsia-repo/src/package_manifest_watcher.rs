@@ -9,6 +9,7 @@ use fuchsia_pkg::{PackageManifest, PackageManifestList};
 use futures::channel::mpsc::{channel, Receiver};
 use futures::executor::block_on;
 use futures::{SinkExt, Stream};
+use log::error;
 use notify::{RecommendedWatcher, RecursiveMode};
 use notify_batch_watcher::{BatchEvent, BatchWatcher, Error as BatchError};
 use std::collections::{hash_map, HashMap, HashSet};
@@ -18,7 +19,6 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
-use tracing::error;
 
 type BatchResult = Result<BatchEvent, Vec<BatchError>>;
 

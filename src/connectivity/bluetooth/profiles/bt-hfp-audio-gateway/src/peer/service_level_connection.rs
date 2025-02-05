@@ -11,9 +11,9 @@ use fuchsia_inspect_derive::{AttachError, Inspect};
 use futures::channel::mpsc::{self, Receiver, Sender};
 use futures::stream::{FusedStream, Stream, StreamExt};
 use futures::{AsyncWrite, AsyncWriteExt, FutureExt};
+use log::{debug, info, warn};
 use std::collections::{HashMap, VecDeque};
 use std::io::Cursor;
-use tracing::{debug, info, warn};
 use {at_commands as at, fuchsia_async as fasync, fuchsia_inspect as inspect};
 
 use super::indicators::{AgIndicators, AgIndicatorsReporting, HfIndicators};
@@ -351,7 +351,7 @@ impl ServiceLevelConnection {
     }
 
     fn queue_slc_request(&mut self, request: SlcRequest) {
-        info!(?request, "Queueing Request");
+        info!(request:?; "Queueing Request");
         if let Err(e) = self.sender.try_send(request) {
             warn!("Couldn't relay procedure info request to internal receiver: {:?}", e);
         }

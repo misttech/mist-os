@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-display/registers-typec.h"
 
-#include <lib/driver/mock-mmio-range/cpp/mock-mmio-range.h>
+#include <lib/driver/mock-mmio/cpp/mock-mmio-range.h>
 #include <zircon/compiler.h>
 
 #include <gtest/gtest.h>

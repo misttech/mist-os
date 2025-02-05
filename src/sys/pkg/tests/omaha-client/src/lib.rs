@@ -10,6 +10,7 @@ use diagnostics_assertions::{assert_data_tree, tree_assertion, AnyProperty, Tree
 use diagnostics_hierarchy::DiagnosticsHierarchy;
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl_fuchsia_feedback::FileReportResults;
+use fidl_fuchsia_hardware_power_statecontrol::{RebootOptions, RebootReason2};
 use fidl_fuchsia_pkg::{self as fpkg, PackageCacheRequestStream, PackageResolverRequestStream};
 use fidl_fuchsia_update::{
     AttemptsMonitorMarker, AttemptsMonitorRequest, AttemptsMonitorRequestStream,
@@ -36,7 +37,7 @@ use mock_omaha_server::{
     ResponseAndMetadata,
 };
 use mock_paver::{hooks as mphooks, MockPaverService, MockPaverServiceBuilder, PaverEvent};
-use mock_reboot::{MockRebootService, RebootReason};
+use mock_reboot::MockRebootService;
 use mock_resolver::MockResolverService;
 use mock_verifier::MockVerifierService;
 use omaha_client::cup_ecdsa::test_support::{
@@ -283,8 +284,14 @@ impl TestEnvBuilder {
 
         let (send, reboot_called) = oneshot::channel();
         let send = Mutex::new(Some(send));
-        let reboot_service = Arc::new(MockRebootService::new(Box::new(move |reason| {
-            assert_eq!(reason, RebootReason::SystemUpdate);
+        let reboot_service = Arc::new(MockRebootService::new(Box::new(move |options| {
+            assert_eq!(
+                options,
+                RebootOptions {
+                    reasons: Some(vec![RebootReason2::SystemUpdate]),
+                    ..Default::default()
+                }
+            );
             send.lock().take().unwrap().send(()).unwrap();
             Ok(())
         })));
@@ -451,6 +458,29 @@ impl TestEnvBuilder {
                     .to(&omaha_client_service)
                     .to(&system_update_committer)
                     .to(&stash2),
+            )
+            .await
+            .unwrap();
+        builder
+            .add_capability(
+                cm_rust::ConfigurationDecl {
+                    name: "fuchsia.system-update-committer.StopOnIdleTimeoutMillis"
+                        .parse()
+                        .unwrap(),
+                    value: (-1).into(),
+                }
+                .into(),
+            )
+            .await
+            .unwrap();
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::configuration(
+                        "fuchsia.system-update-committer.StopOnIdleTimeoutMillis",
+                    ))
+                    .from(Ref::self_())
+                    .to(&system_update_committer),
             )
             .await
             .unwrap();

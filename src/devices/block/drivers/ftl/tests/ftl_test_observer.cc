@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.nand/cpp/wire.h>
 #include <lib/fdio/directory.h>
+#include <lib/fdio/fdio.h>
 #include <lib/fdio/namespace.h>
 
 #include <fbl/unique_fd.h>
@@ -79,6 +80,19 @@ zx_status_t FtlTestObserver::WaitForBlockDevice() {
   }
 
   status = fdio_ns_bind_fd(name_space, "/fake/dev", devfs_root().get());
+  if (status != ZX_OK) {
+    printf("Bind failed, %d\n", status);
+    return status;
+  }
+
+  int fd;
+  status = fdio_fd_create(devmgr_.RealmExposedDir().channel().release(), &fd);
+  if (status != ZX_OK) {
+    printf("fd create failed, %d\n", status);
+    return status;
+  }
+
+  status = fdio_ns_bind_fd(name_space, "/driver_exposed", fd);
   if (status != ZX_OK) {
     printf("Bind failed, %d\n", status);
     return status;

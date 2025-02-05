@@ -445,4 +445,30 @@ MemoryReservations::value_type MemoryReservations::iterator::operator*() const {
   return {start, size};
 }
 
+std::optional<StatusProperty> StatusProperty::Create(std::optional<std::string_view> prop_value) {
+  // Lacking this property is assumed to be "okay".
+  // Some older firmware may use "ok" instead of "okay".
+  if (!prop_value) {
+    return std::nullopt;
+  }
+
+  if (*prop_value == "okay" || *prop_value == "ok") {
+    return StatusProperty{Status::kOkay};
+  }
+
+  if (*prop_value == "disabled") {
+    return StatusProperty{Status::kDisabled};
+  }
+
+  if (*prop_value == "fail") {
+    return StatusProperty{Status::kFail};
+  }
+
+  if (prop_value->starts_with("fail-")) {
+    return StatusProperty{Status::kFailWithCode, prop_value->substr(5)};
+  }
+
+  return std::nullopt;
+}
+
 }  // namespace devicetree

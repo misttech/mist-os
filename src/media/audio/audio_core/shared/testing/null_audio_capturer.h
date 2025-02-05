@@ -6,6 +6,7 @@
 #define SRC_MEDIA_AUDIO_AUDIO_CORE_SHARED_TESTING_NULL_AUDIO_CAPTURER_H_
 
 #include <fuchsia/media/cpp/fidl.h>
+#include <lib/syslog/cpp/macros.h>
 
 namespace media::audio::test {
 
@@ -28,7 +29,12 @@ class NullAudioCapturer : public fuchsia::media::AudioCapturer {
   void GetReferenceClock(GetReferenceClockCallback callback) override {}
   void SetReferenceClock(::zx::clock ref_clock) override {}
   void SetUsage(fuchsia::media::AudioCaptureUsage usage) override {}
+  void SetUsage2(fuchsia::media::AudioCaptureUsage2 usage) override {}
   void GetStreamType(GetStreamTypeCallback callback) override {}
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
+    FX_LOGS(ERROR) << "NullAudioCapturer: AudioCapturer::handle_unknown_method(ordinal " << ordinal
+                   << ", method_has_response " << method_has_response << ")";
+  }
 };
 
 }  // namespace media::audio::test

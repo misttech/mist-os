@@ -259,6 +259,9 @@ if (is_fuchsia || is_mistos) {
       "kernel.compression.storage-strategy=tri_page",
       "kernel.compression.reclaim_anonymous=true",
       "kernel.compression.reclaim_zero_forks=true",
+      "kernel.ppb.borrow-in-supplypages=true",
+      "kernel.ppb.borrow-on-mru=true",
+      "kernel.ppb.loan=true",
     ]
 
     # Only add this switch if we're building with ZX_DEBUG_ASSERT enabled

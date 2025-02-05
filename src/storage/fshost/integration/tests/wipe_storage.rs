@@ -15,6 +15,10 @@ use fshost_test_fixture::disk_builder::VolumesSpec;
 use fshost_test_fixture::{write_test_blob, write_test_blob_fxblob};
 use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio};
 
+// TODO(https://fxbug.dev/391889311): Remove the not storage-host feature
+#[cfg(all(feature = "fxblob", not(feature = "storage-host")))]
+use {fshost::StarnixVolumeProviderMarker, fshost_test_fixture::STARNIX_VOLUME_NAME};
+
 pub mod config;
 use config::{blob_fs_type, data_fs_spec, data_fs_type, new_builder, volumes_spec};
 
@@ -72,7 +76,7 @@ async fn write_blob() {
                 fidl_fuchsia_storage_partitions::PartitionServiceMarker::SERVICE_NAME,
                 fio::PERM_READABLE,
             ),
-            "part-0",
+            "part-000",
         )
         .await
         .unwrap();
@@ -113,6 +117,98 @@ async fn write_blob() {
     fixture.tear_down().await;
 }
 
+#[fuchsia::test]
+// TODO(https://fxbug.dev/391889311): Remove the not storage-host feature
+#[cfg(all(feature = "fxblob", not(feature = "storage-host")))]
+async fn wipe_storage_deletes_starnix_volume() {
+    let mut builder = new_builder();
+    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec()).with_gpt();
+    builder.fshost().set_config_value("starnix_volume_name", STARNIX_VOLUME_NAME);
+
+    let fixture = builder.build().await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    // Need to connect to the StarnixVolumeProvider protocol that fshost exposes and Mount the
+    // starnix volume.
+    let volume_provider = fixture
+        .realm
+        .root
+        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
+        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
+    let (_exposed_dir_proxy, exposed_dir_server) =
+        fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+    volume_provider
+        .mount(crypt.into_client_end().unwrap(), exposed_dir_server)
+        .await
+        .expect("fidl transport error")
+        .expect("mount failed");
+
+    let vmo = fixture.into_vmo().await.unwrap();
+
+    let mut builder = new_builder().with_disk_from_vmo(vmo);
+    builder.fshost().set_config_value("ramdisk_image", true);
+    builder.with_zbi_ramdisk().format_volumes(volumes_spec());
+
+    let fixture = builder.build().await;
+    // Wait for the zbi ramdisk filesystems
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+    // Also wait for any driver binding on the "on-disk" devices
+    if cfg!(feature = "storage-host") {
+        recursive_wait(
+            &fixture.dir(
+                fidl_fuchsia_storage_partitions::PartitionServiceMarker::SERVICE_NAME,
+                fio::PERM_READABLE,
+            ),
+            "part-000",
+        )
+        .await
+        .unwrap();
+    } else {
+        let ramdisk_dir =
+            fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
+        recursive_wait(ramdisk_dir, GPT_PATH).await.unwrap();
+        if !cfg!(feature = "fxblob") {
+            recursive_wait(ramdisk_dir, BLOBFS_FVM_PATH).await.unwrap();
+            recursive_wait(ramdisk_dir, DATA_FVM_PATH).await.unwrap();
+        }
+    }
+
+    let blob_creator = if cfg!(feature = "fxblob") {
+        let (_, server_end) = fidl::endpoints::create_proxy();
+        Some(server_end)
+    } else {
+        None
+    };
+
+    // Invoke the WipeStorage API.
+    let admin =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    let (_blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
+    admin
+        .wipe_storage(Some(blobfs_server), blob_creator)
+        .await
+        .unwrap()
+        .map_err(zx::Status::from_raw)
+        .expect("WipeStorage unexpectedly failed");
+
+    let vmo = fixture.into_vmo().await.unwrap();
+    let mut builder = new_builder().with_disk_from_vmo(vmo);
+    builder.fshost().set_config_value("starnix_volume_name", STARNIX_VOLUME_NAME);
+
+    let fixture = builder.build().await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    let volumes_dir = fixture.dir("volumes", fio::Flags::empty());
+    let dir_entries =
+        fuchsia_fs::directory::readdir(&volumes_dir).await.expect("Failed to readdir the volumes");
+    assert!(dir_entries.iter().find(|x| x.name.contains(STARNIX_VOLUME_NAME)).is_none());
+    fixture.tear_down().await;
+}
+
 // Demonstrate high level usage of the fuchsia.fshost.Admin/WipeStorage method when a data
 // data partition does not already exist.
 // TODO(https://fxbug.dev/42065222): this test doesn't work on f2fs.
@@ -140,7 +236,7 @@ async fn write_blob_no_existing_data_partition() {
                 fidl_fuchsia_storage_partitions::PartitionServiceMarker::SERVICE_NAME,
                 fio::PERM_READABLE,
             ),
-            "part-0",
+            "part-000",
         )
         .await
         .unwrap();
@@ -212,7 +308,7 @@ async fn blobfs_formatted() {
                 fidl_fuchsia_storage_partitions::PartitionServiceMarker::SERVICE_NAME,
                 fio::PERM_READABLE,
             ),
-            "part-0",
+            "part-000",
         )
         .await
         .unwrap();
@@ -274,7 +370,7 @@ async fn data_unformatted() {
                 fidl_fuchsia_storage_partitions::PartitionServiceMarker::SERVICE_NAME,
                 fio::PERM_READABLE,
             ),
-            "part-0",
+            "part-000",
         )
         .await
         .unwrap();
@@ -355,65 +451,6 @@ async fn data_unformatted() {
     let mut buff: [u8; BUFF_LEN] = [0; BUFF_LEN];
     block_client.read_at(MutableBufferSlice::Memory(&mut buff), 0).await.unwrap();
     assert_eq!(buff, [0; BUFF_LEN]);
-
-    fixture.tear_down().await;
-}
-
-// Verify that WipeStorage can handle a completely corrupted FVM.
-// TODO(https://fxbug.dev/42065222): this test doesn't work on f2fs.
-#[fuchsia::test]
-#[cfg_attr(feature = "f2fs", ignore)]
-async fn handles_corrupt_fvm() {
-    let mut builder = new_builder();
-    builder.fshost().set_config_value("ramdisk_image", true);
-    // Ensure that, while we allocate an FVM or Fxfs partition inside the GPT, we leave it empty.
-    builder.with_disk().format_volumes(volumes_spec()).with_gpt().with_unformatted_volume_manager();
-    builder.with_zbi_ramdisk().format_volumes(volumes_spec());
-
-    let fixture = builder.build().await;
-    // Wait for the zbi ramdisk filesystems
-    fixture.check_fs_type("blob", blob_fs_type()).await;
-    fixture.check_fs_type("data", data_fs_type()).await;
-    // Also wait for any driver binding on the "on-disk" devices
-    if cfg!(feature = "storage-host") {
-        recursive_wait(
-            &fixture.dir(
-                fidl_fuchsia_storage_partitions::PartitionServiceMarker::SERVICE_NAME,
-                fio::PERM_READABLE,
-            ),
-            "part-0",
-        )
-        .await
-        .unwrap();
-    } else {
-        let ramdisk_dir =
-            fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
-        recursive_wait(ramdisk_dir, GPT_PATH).await.unwrap();
-    }
-
-    let (blob_creator_proxy, blob_creator) = if cfg!(feature = "fxblob") {
-        let (proxy, server_end) = fidl::endpoints::create_proxy();
-        (Some(proxy), Some(server_end))
-    } else {
-        (None, None)
-    };
-
-    // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
-    let admin =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
-    let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
-    admin
-        .wipe_storage(Some(blobfs_server), blob_creator)
-        .await
-        .unwrap()
-        .expect("WipeStorage unexpectedly failed");
-
-    // Ensure that we can write a blob into the new Blobfs instance.
-    if cfg!(feature = "fxblob") {
-        write_test_blob_fxblob(blob_creator_proxy.unwrap(), &TEST_BLOB_DATA).await;
-    } else {
-        write_test_blob(&blobfs_root, &TEST_BLOB_DATA, false).await;
-    }
 
     fixture.tear_down().await;
 }

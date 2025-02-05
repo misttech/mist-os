@@ -382,7 +382,7 @@ impl<'a, 'b, N: DriverNotify, M: DriverMem, Q: Stream<Item = DescChain<'a, 'b, N
             KeyboardListenerRequest::OnKeyEvent { event, responder } => {
                 let key_status = if let Some(events) = translate_keyboard_event(event) {
                     if let Err(e) = self.input_device.write_events_to_queue(&events) {
-                        tracing::warn!("Failed to write events to the event queue: {}", e);
+                        log::warn!("Failed to write events to the event queue: {}", e);
                         fidl_fuchsia_ui_input3::KeyEventStatus::NotHandled
                     } else {
                         fidl_fuchsia_ui_input3::KeyEventStatus::Handled
@@ -391,7 +391,7 @@ impl<'a, 'b, N: DriverNotify, M: DriverMem, Q: Stream<Item = DescChain<'a, 'b, N
                     fidl_fuchsia_ui_input3::KeyEventStatus::NotHandled
                 };
                 if let Err(e) = responder.send(key_status) {
-                    tracing::warn!("Failed to ack KeyEvent: {}", e);
+                    log::warn!("Failed to ack KeyEvent: {}", e);
                 }
             }
         }

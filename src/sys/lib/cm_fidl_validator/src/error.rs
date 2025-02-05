@@ -20,7 +20,7 @@ pub enum Error {
     #[error("{} has unnecessary field `{}`.", .0.decl, .0.field)]
     ExtraneousField(DeclField),
 
-    #[error("\"{1}\" is duplicated for field `{}` in {}.", .0.field, .0.decl)]
+    #[error("\"{}\" is duplicated for field `{}` in {}.", .1, .0.field, .0.decl)]
     DuplicateField(DeclField, String),
 
     #[error("Field `{}` for {} is invalid.",  .0.field, .0.decl)]

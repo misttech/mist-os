@@ -7,9 +7,9 @@ use crate::internal::{FiniteCyclicGroup, SaeParameters};
 use crate::PweMethod;
 use anyhow::{bail, Error};
 use ieee80211::MacAddr;
+use log::warn;
 use num::integer::Integer;
 use num::ToPrimitive;
-use tracing::warn;
 
 /// An elliptic curve group to be used as the finite cyclic group for SAE.
 pub struct Group {

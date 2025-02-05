@@ -16,7 +16,8 @@ namespace scenic_impl::display {
 
 namespace {
 
-using SetDisplayPowerResult = fuchsia::ui::display::internal::DisplayPower_SetDisplayPower_Result;
+using DisplayPowerSetDisplayPowerResponse =
+    fuchsia_ui_display_singleton::DisplayPowerSetDisplayPowerResponse;
 
 constexpr char kDisplayPowerEvents[] = "display_power_events";
 constexpr char kDisplayPowerOnEvent[] = "on";
@@ -31,10 +32,18 @@ DisplayPowerManager::DisplayPowerManager(DisplayManager& display_manager,
       inspect_display_power_events_(parent_node.CreateChild(kDisplayPowerEvents),
                                     kInspectHistorySize) {}
 
-void DisplayPowerManager::SetDisplayPower(bool power_on, SetDisplayPowerCallback callback) {
+void DisplayPowerManager::SetDisplayPower(SetDisplayPowerRequest& request,
+                                          SetDisplayPowerCompleter::Sync& completer) {
+  SetDisplayPower(request.power_on(), [completer = completer.ToAsync()](auto result) mutable {
+    completer.Reply(result);
+  });
+}
+
+void DisplayPowerManager::SetDisplayPower(bool power_on,
+                                          fit::function<void(fit::result<zx_status_t>)> completer) {
   // No display
   if (!display_manager_.default_display()) {
-    callback(SetDisplayPowerResult::WithErr(ZX_ERR_NOT_FOUND));
+    completer(fit::error(ZX_ERR_NOT_FOUND));
     return;
   }
 
@@ -57,14 +66,14 @@ void DisplayPowerManager::SetDisplayPower(bool power_on, SetDisplayPowerCallback
     if (error_value.is_framework_error()) {
       FX_LOGS(ERROR) << "Failed to call FIDL SetDisplayPower(): "
                      << set_display_power_result.error_value();
-      callback(SetDisplayPowerResult::WithErr(ZX_ERR_INTERNAL));
+      completer(fit::error(ZX_ERR_INTERNAL));
       return;
     }
 
     // error_value.is_domain_error()
     FX_LOGS(WARNING) << "DisplayCoordinator SetDisplayPower() is not supported; error status: "
                      << set_display_power_result.error_value();
-    callback(SetDisplayPowerResult::WithErr(ZX_ERR_NOT_SUPPORTED));
+    completer(fit::error(ZX_ERR_NOT_SUPPORTED));
     return;
   }
 
@@ -72,7 +81,7 @@ void DisplayPowerManager::SetDisplayPower(bool power_on, SetDisplayPowerCallback
   inspect_display_power_events_.CreateEntry([power_on](inspect::Node& n) {
     n.RecordInt(power_on ? kDisplayPowerOnEvent : kDisplayPowerOffEvent, zx_clock_get_monotonic());
   });
-  callback(SetDisplayPowerResult::WithResponse({}));
+  completer(fit::ok());
 }
 
 }  // namespace scenic_impl::display

@@ -136,9 +136,10 @@ impl FileSystem {
         kernel: &Arc<Kernel>,
         cache_mode: CacheMode,
         ops: impl FileSystemOps,
-        options: FileSystemOptions,
+        mut options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
-        let security_state = security::file_system_init_security(ops.name(), &options.params)?;
+        let mount_options = security::sb_eat_lsm_opts(&kernel, &mut options.params)?;
+        let security_state = security::file_system_init_security(ops.name(), &mount_options)?;
 
         let file_system = Arc::new(FileSystem {
             kernel: Arc::downgrade(kernel),

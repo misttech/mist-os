@@ -21,7 +21,6 @@
     use: [
         {
             protocol: [
-                "fuchsia.logger.LogSink",
                 "fuchsia.session.scene.Manager",
                 "fuchsia.ui.app.ViewProvider",
                 "fuchsia.ui.observation.test.Registry",

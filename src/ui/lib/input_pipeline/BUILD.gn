@@ -73,9 +73,9 @@ icu_rustc_library("input_pipeline") {
     "//third_party/rust_crates:glob",
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:lazy_static",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:serde",
-    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [
@@ -98,7 +98,6 @@ icu_rustc_library("input_pipeline") {
   ]
 
   sources = [
-    "src/activity.rs",
     "src/autorepeater.rs",
     "src/chromebook_keyboard_handler.rs",
     "src/consumer_controls_binding.rs",
@@ -131,6 +130,7 @@ icu_rustc_library("input_pipeline") {
     "src/input_handler.rs",
     "src/input_pipeline.rs",
     "src/inspect_handler.rs",
+    "src/interaction_state_handler.rs",
     "src/keyboard_binding.rs",
     "src/keymap_handler.rs",
     "src/lib.rs",

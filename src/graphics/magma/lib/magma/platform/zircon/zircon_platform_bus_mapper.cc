@@ -19,7 +19,7 @@ ZirconPlatformBusMapper::BusMapping::~BusMapping() {
   for (auto& pmt : pmt_) {
     zx_status_t status = pmt.unpin();
     if (status != ZX_OK) {
-      DLOG("zx_pmt_unpin failed: %d\n", status);
+      DLOG("zx_pmt_unpin failed: %s\n", zx_status_get_string(status));
     }
   }
 }
@@ -32,8 +32,8 @@ std::unique_ptr<PlatformBusMapper::BusMapping> ZirconPlatformBusMapper::MapPageR
   if ((page_count == 0) || (start_page_index + page_count) * magma::page_size() > buffer->size())
     return DRETP(nullptr, "Invalid range: %lu, %lu", start_page_index, page_count);
 
-  // Pin in 256MB chunks because Zircon can't pin a 512MB buffer (https://fxbug.dev/42121495)
-  const uint64_t kMaxPageCount = 256 * 1024 * 1024 / magma::page_size();
+  // Pin in 32MB chunks because Zircon can't pin a 512MB buffer (https://fxbug.dev/42121495)
+  const uint64_t kMaxPageCount = 32 * 1024 * 1024 / magma::page_size();
   uint64_t pmt_count = magma::round_up(page_count, kMaxPageCount) / kMaxPageCount;
 
   std::vector<uint64_t> page_addr(page_count);
@@ -70,14 +70,15 @@ std::unique_ptr<PlatformBusMapper::BusMapping> ZirconPlatformBusMapper::MapPageR
                                     nullptr);
       MAGMA_LOG(
           WARNING,
-          "Failed to pin buffer \"%s\" koid %ld  %u 0x%lx pages (0x%lx bytes) with status %d. Out of Memory?\n"
+          "Failed to pin buffer \"%s\" koid %ld  %u 0x%lx pages (0x%lx bytes) with status %s. Out of Memory?\n"
           "mem_mapped_bytes: 0x%lx mem_private_bytes: 0x%lx mem_shared_bytes: 0x%lx\n"
           "total_bytes: 0x%lx free_bytes 0x%lx: wired_bytes: 0x%lx vmo_bytes: 0x%lx\n"
           "mmu_overhead_bytes: 0x%lx other_bytes: 0x%lx\n",
-          buffer->GetName().c_str(), buffer->global_id(), i, chunk_page_count, size, status,
-          task_stats.mem_mapped_bytes, task_stats.mem_private_bytes, task_stats.mem_shared_bytes,
-          kmem_stats.total_bytes, kmem_stats.free_bytes, kmem_stats.wired_bytes,
-          kmem_stats.vmo_bytes, kmem_stats.mmu_overhead_bytes, kmem_stats.other_bytes);
+          buffer->GetName().c_str(), buffer->global_id(), i, chunk_page_count, size,
+          zx_status_get_string(status), task_stats.mem_mapped_bytes, task_stats.mem_private_bytes,
+          task_stats.mem_shared_bytes, kmem_stats.total_bytes, kmem_stats.free_bytes,
+          kmem_stats.wired_bytes, kmem_stats.vmo_bytes, kmem_stats.mmu_overhead_bytes,
+          kmem_stats.other_bytes);
       return nullptr;
     }
   }

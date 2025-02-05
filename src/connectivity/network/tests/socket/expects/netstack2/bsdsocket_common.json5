@@ -65,6 +65,9 @@
                 "DatagramIntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Datagram_IPPROTO_IPV6_IPV6_MULTICAST_HOPS",
                 "DatagramIntSocketOptionTests/IntSocketOptionTest.SetInvalid/IPv4_Datagram_IPPROTO_IPV6_IPV6_MULTICAST_HOPS",
                 "DatagramIntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Datagram_IPPROTO_IPV6_IPV6_MULTICAST_HOPS",
+
+                // Netstack2 does not support fuchsia socket marks.
+                "ZxioSocketMarkTest/ZxioSocketMarkTest.SetAndGet/*",
             ],
         },
     ],

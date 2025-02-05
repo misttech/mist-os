@@ -7,6 +7,7 @@ import("//src/developer/ffx/lib/e2e_emu/ffx_e2e_test.gni")
 
 if (is_host) {
   ffx_plugin("ffx_profile_heapdump") {
+    sdk_category = "not-yet-specified"
     version = "0.1.0"
     edition = "2021"
     plugin_deps = [
@@ -15,6 +16,10 @@ if (is_host) {
       "snapshot:ffx_profile_heapdump_snapshot",
     ]
     args_sources = [ "src/args.rs" ]
+    args_deps = [
+      "//src/developer/ffx/core:lib",
+      "//third_party/rust_crates:argh",
+    ]
   }
 
   ffx_e2e_test("verify_ffx_profile_heapdump") {

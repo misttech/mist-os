@@ -126,17 +126,13 @@ pub trait Environment: Send + Sync {
 
     /// Returns the registered devices.
     fn registered_devices(&self) -> &Arc<RegisteredDevices>;
-}
 
-// Before a filesystem is mounted, we queue requests.
-#[derive(Default)]
-pub struct FilesystemQueue {
-    exposed_dir_queue: Vec<ServerEnd<fio::DirectoryMarker>>,
-    crypt_service_exposed_dir: Vec<ServerEnd<fio::DirectoryMarker>>,
+    /// Returns the container's ServingMultiVolumeFilesystem if the container has been set.
+    fn get_container(&mut self) -> Option<&mut ServingMultiVolumeFilesystem>;
 }
 
 pub enum Filesystem {
-    Queue(FilesystemQueue),
+    Queue(Vec<ServerEnd<fio::DirectoryMarker>>),
     Serving(ServingSingleVolumeFilesystem),
     ServingMultiVolume(
         // We hold onto crypt service here to avoid it prematurely shutting down.
@@ -164,33 +160,13 @@ impl Filesystem {
         }
     }
 
-    pub fn crypt_service(&mut self) -> Result<Option<fio::DirectoryProxy>, Error> {
-        let (proxy, server) = create_proxy::<fio::DirectoryMarker>();
-        match self {
-            Filesystem::Queue(queue) => queue.crypt_service_exposed_dir.push(server),
-            Filesystem::Serving(_) => bail!(anyhow!("filesystem doesn't have crypt service")),
-            Filesystem::ServingMultiVolume(crypt_service, ..) => {
-                crypt_service.exposed_dir().clone(server.into_channel().into())?
-            }
-            Filesystem::ServingVolumeInMultiVolume(crypt_service_option, ..) => {
-                match crypt_service_option {
-                    Some(s) => s.exposed_dir().clone(server.into_channel().into())?,
-                    None => return Ok(None),
-                }
-            }
-            Filesystem::ServingGpt(..) => bail!(anyhow!("GPT has no crypt service")),
-            Filesystem::Shutdown => bail!(anyhow!("filesystem is shutting down")),
-        }
-        Ok(Some(proxy))
-    }
-
     pub fn exposed_dir(
         &mut self,
         serving_fs: Option<&mut ServingMultiVolumeFilesystem>,
     ) -> Result<fio::DirectoryProxy, Error> {
         let (proxy, server) = create_proxy::<fio::DirectoryMarker>();
         match self {
-            Filesystem::Queue(queue) => queue.exposed_dir_queue.push(server),
+            Filesystem::Queue(queue) => queue.push(server),
             Filesystem::Serving(fs) => fs.exposed_dir().clone(server.into_channel().into())?,
             Filesystem::ServingMultiVolume(_, fs, data_volume_name) => fs
                 .volume(&data_volume_name)
@@ -230,7 +206,7 @@ impl Filesystem {
         }
     }
 
-    fn queue(&mut self) -> Option<&mut FilesystemQueue> {
+    fn queue(&mut self) -> Option<&mut Vec<ServerEnd<fio::DirectoryMarker>>> {
         match self {
             Filesystem::Queue(queue) => Some(queue),
             _ => None,
@@ -374,10 +350,10 @@ impl FshostEnvironment {
         let corruption_events = inspector.root().create_child("corruption_events");
         Self {
             config: config.clone(),
-            gpt: Filesystem::Queue(FilesystemQueue::default()),
+            gpt: Filesystem::Queue(Vec::new()),
             container: None,
-            blobfs: Filesystem::Queue(FilesystemQueue::default()),
-            data: Filesystem::Queue(FilesystemQueue::default()),
+            blobfs: Filesystem::Queue(Vec::new()),
+            data: Filesystem::Queue(Vec::new()),
             fvm: None,
             launcher: Arc::new(FilesystemLauncher { config, corruption_events }),
             matcher_lock,
@@ -410,13 +386,6 @@ impl FshostEnvironment {
         self.data.exposed_dir(self.container.maybe_fs())
     }
 
-    /// Returns a proxy for the exposed dir of the data filesystem's crypt service. This can be
-    /// called before "/data" is mounted and it will get routed once the data partition is
-    /// mounted and the crypt service becomes available. Fails for single volume filesystems.
-    pub fn crypt_service_exposed_dir(&mut self) -> Result<Option<fio::DirectoryProxy>, Error> {
-        self.data.crypt_service()
-    }
-
     /// Returns a proxy for the root of the data filesystem.  This can be called before "/data" is
     /// mounted and it will get routed once the data partition is mounted.
     pub fn data_root(&mut self) -> Result<fio::DirectoryProxy, Error> {
@@ -431,7 +400,7 @@ impl FshostEnvironment {
     async fn apply_data_partition_limits(&self, device: &mut dyn Device) {
         if !device.is_fshost_ramdisk() {
             if let Err(error) = device.set_partition_max_bytes(self.config.data_max_bytes).await {
-                tracing::warn!(%error, "Failed to set max partition size for data");
+                log::warn!(error:%; "Failed to set max partition size for data");
             }
         }
     }
@@ -449,8 +418,8 @@ impl FshostEnvironment {
         let device = if (self.config.use_disk_migration && format == DiskFormat::Zxcrypt)
             || self.launcher.requires_zxcrypt(format, device.is_fshost_ramdisk())
         {
-            tracing::info!(
-                path = device.path(),
+            log::info!(
+                path = device.path();
                 "Formatting zxcrypt before formatting inner data partition.",
             );
             let ignore_paths = &mut *self.matcher_lock.lock().await;
@@ -483,7 +452,7 @@ impl FshostEnvironment {
                 self.launcher.format_data(device, config).await?
             }
             format => {
-                tracing::warn!("Unsupported format {:?}", format);
+                log::warn!("Unsupported format {:?}", format);
                 return Err(anyhow!("Cannot format filesystem"));
             }
         };
@@ -527,30 +496,25 @@ impl FshostEnvironment {
         let root = filesystem.root(None)?;
 
         // Read desired format from fs_switch, use config as default.
-        let desired_format = match fuchsia_fs::directory::open_file(
-            &root,
-            "fs_switch",
-            fio::PERM_READABLE,
-        )
-        .await
-        {
-            Ok(file) => {
-                let mut desired_format = fuchsia_fs::file::read_to_string(&file).await?;
-                desired_format = desired_format.trim_end().to_string();
-                // "toggle" is a special format request that flip-flops between fxfs and minfs.
-                if desired_format.as_str() == "toggle" {
-                    desired_format =
-                        if device_format == DiskFormat::Fxfs { "minfs" } else { "fxfs" }
-                            .to_string();
+        let desired_format =
+            match fuchsia_fs::directory::open_file(&root, "fs_switch", fio::PERM_READABLE).await {
+                Ok(file) => {
+                    let mut desired_format = fuchsia_fs::file::read_to_string(&file).await?;
+                    desired_format = desired_format.trim_end().to_string();
+                    // "toggle" is a special format request that flip-flops between fxfs and minfs.
+                    if desired_format.as_str() == "toggle" {
+                        desired_format =
+                            if device_format == DiskFormat::Fxfs { "minfs" } else { "fxfs" }
+                                .to_string();
+                    }
+                    desired_format
                 }
-                desired_format
-            }
-            Err(error) => {
-                tracing::info!(%error, default_format=self.config.data_filesystem_format.as_str(),
+                Err(error) => {
+                    log::info!(error:%, default_format=self.config.data_filesystem_format.as_str();
                     "fs_switch open failed.");
-                self.config.data_filesystem_format.to_string()
-            }
-        };
+                    self.config.data_filesystem_format.to_string()
+                }
+            };
         let desired_format = match desired_format.as_str().into() {
             DiskFormat::Fxfs => DiskFormat::Fxfs,
             DiskFormat::F2fs => DiskFormat::F2fs,
@@ -558,9 +522,9 @@ impl FshostEnvironment {
         };
 
         if device_format != desired_format {
-            tracing::info!(
+            log::info!(
                 device_format = device_format.as_str(),
-                desired_format = desired_format.as_str(),
+                desired_format = desired_format.as_str();
                 "Attempting migration"
             );
 
@@ -576,7 +540,7 @@ impl FshostEnvironment {
             if slices == 0 {
                 bail!("data_max_bytes not set. Cannot migrate.");
             }
-            tracing::info!(slices, "Allocating new partition");
+            log::info!(slices; "Allocating new partition");
             let new_data_partition_controller = fvm_allocate_partition(
                 &volume_manager,
                 DATA_TYPE_GUID,
@@ -633,7 +597,7 @@ impl FshostEnvironment {
         let mut fs = self.launcher.serve_blobfs(device).await?;
 
         let exposed_dir = fs.exposed_dir(None)?;
-        for server in queue.exposed_dir_queue.drain(..) {
+        for server in queue.drain(..) {
             exposed_dir.clone(server.into_channel().into())?;
         }
         self.blobfs = fs;
@@ -650,8 +614,8 @@ impl FshostEnvironment {
 
         let mut format: DiskFormat = if self.config.use_disk_migration {
             let format = device.content_format().await?;
-            tracing::info!(
-                format = format.as_str(),
+            log::info!(
+                format = format.as_str();
                 "Using detected disk format to potentially \
                 migrate data"
             );
@@ -670,13 +634,13 @@ impl FshostEnvironment {
         let device = if (self.config.use_disk_migration && format == DiskFormat::Zxcrypt)
             || self.launcher.requires_zxcrypt(format, device.is_fshost_ramdisk())
         {
-            tracing::info!(path = device.path(), "Attempting to unseal zxcrypt device",);
+            log::info!(path = device.path(); "Attempting to unseal zxcrypt device",);
             let ignore_paths = &mut *self.matcher_lock.lock().await;
             self.attach_driver(device, ZXCRYPT_DRIVER_PATH).await?;
             let mut new_device = match ZxcryptDevice::unseal(device).await? {
                 UnsealOutcome::Unsealed(device) => device,
                 UnsealOutcome::FormatRequired => {
-                    tracing::warn!("failed to unseal zxcrypt, format required");
+                    log::warn!("failed to unseal zxcrypt, format required");
                     return Ok(ServeFilesystemStatus::FormatRequired);
                 }
             };
@@ -684,7 +648,7 @@ impl FshostEnvironment {
             // after unsealing zxcrypt.
             if self.config.use_disk_migration {
                 format = new_device.content_format().await?;
-                tracing::info!(format = format.as_str(), "detected zxcrypt wrapped format");
+                log::info!(format = format.as_str(); "detected zxcrypt wrapped format");
             }
             ignore_paths.insert(new_device.topological_path().to_string());
             zxcrypt_device = Some(Box::new(new_device));
@@ -713,14 +677,14 @@ impl FshostEnvironment {
                 self.launcher.serve_data(device, config).await
             }
             format => {
-                tracing::warn!(format = format.as_str(), "Unsupported filesystem");
+                log::warn!(format = format.as_str(); "Unsupported filesystem");
                 Ok(ServeFilesystemStatus::FormatRequired)
             }
         }?;
 
         if let ServeFilesystemStatus::FormatRequired = filesystem {
             if let Some(device) = zxcrypt_device {
-                tracing::info!(path = device.path(), "Resealing zxcrypt device due to error.");
+                log::info!(path = device.path(); "Resealing zxcrypt device due to error.");
                 device.seal().await?;
             }
         }
@@ -750,7 +714,7 @@ impl Environment for FshostEnvironment {
         .context("Failed to start GPT")?;
         let queue = self.gpt.queue().unwrap();
         let exposed_dir = filesystem.exposed_dir();
-        for server in queue.exposed_dir_queue.drain(..) {
+        for server in queue.drain(..) {
             exposed_dir.clone(server.into_channel().into())?;
         }
         let partitions_dir = fuchsia_fs::directory::open_directory(
@@ -801,20 +765,26 @@ impl Environment for FshostEnvironment {
     }
 
     async fn mount_fxblob(&mut self, device: &mut dyn Device) -> Result<(), Error> {
-        tracing::info!(
-            path = %device.path(),
-            expected_format = "fxfs",
+        log::info!(
+            path:% = device.path(),
+            expected_format = "fxfs";
             "Mounting fxblob"
         );
-        let serving_fs = self.launcher.serve_fxblob(device.block_connector()?).await?;
+        let config = Fxfs {
+            component_type: ComponentType::StaticChild,
+            startup_profiling_seconds: Some(60),
+            ..Default::default()
+        };
+        let serving_fs =
+            self.launcher.serve_fxblob(device.block_connector()?, Box::new(config)).await?;
         self.container = Some(Box::new(FxfsContainer::new(serving_fs)));
         Ok(())
     }
 
     async fn mount_fvm(&mut self, device: &mut dyn Device) -> Result<(), Error> {
-        tracing::info!(
-            path = %device.path(),
-            expected_format = "fvm",
+        log::info!(
+            path:% = device.path(),
+            expected_format = "fvm";
             "Mounting fvm"
         );
         let serving_fs = self.launcher.serve_fvm(device).await?;
@@ -844,12 +814,12 @@ impl Environment for FshostEnvironment {
             .context("Failed to open the blob volume")?;
         let exposed_dir = blobfs.exposed_dir();
         let queue = self.blobfs.queue().ok_or_else(|| anyhow!("blobfs already mounted"))?;
-        for server in queue.exposed_dir_queue.drain(..) {
+        for server in queue.drain(..) {
             exposed_dir.clone(server.into_channel().into())?;
         }
         self.blobfs = Filesystem::ServingVolumeInMultiVolume(None, label.to_string());
         if let Err(e) = container.fs().set_byte_limit(label, self.config.blobfs_max_bytes).await {
-            tracing::warn!("Failed to set byte limit for the blob volume: {:?}", e);
+            log::warn!("Failed to set byte limit for the blob volume: {:?}", e);
         }
         Ok(())
     }
@@ -862,17 +832,12 @@ impl Environment for FshostEnvironment {
         if let Err(e) =
             container.fs().set_byte_limit(DATA_VOLUME_LABEL, self.config.data_max_bytes).await
         {
-            tracing::warn!("Failed to set byte limit for the data volume: {:?}", e);
+            log::warn!("Failed to set byte limit for the data volume: {:?}", e);
         }
         let queue = self.data.queue().unwrap();
         let exposed_dir = filesystem.exposed_dir(Some(container.fs()))?;
-        for server in queue.exposed_dir_queue.drain(..) {
+        for server in queue.drain(..) {
             exposed_dir.clone(server.into_channel().into())?;
-        }
-        if let Some(crypt_service) = filesystem.crypt_service()? {
-            for server in queue.crypt_service_exposed_dir.drain(..) {
-                crypt_service.clone(server.into_channel().into())?;
-            }
         }
         self.data = filesystem;
         Ok(())
@@ -890,7 +855,7 @@ impl Environment for FshostEnvironment {
         let (label, type_guid) =
             (device.partition_label().await?.to_string(), *device.partition_type().await?);
         if !(label == BLOBFS_PARTITION_LABEL && type_guid == BLOBFS_TYPE_GUID) {
-            tracing::error!(
+            log::error!(
                 "incorrect parameters for blobfs partition: label = {}, type = {:?}",
                 label,
                 type_guid
@@ -919,7 +884,7 @@ impl Environment for FshostEnvironment {
         if !((label == DATA_PARTITION_LABEL || label == LEGACY_DATA_PARTITION_LABEL)
             && type_guid == DATA_TYPE_GUID)
         {
-            tracing::error!(
+            log::error!(
                 "incorrect parameters for data partition: label = {}, type = {:?}",
                 label,
                 type_guid
@@ -936,8 +901,8 @@ impl Environment for FshostEnvironment {
                     Ok(Some(new_filesystem)) => {
                         // Migration successful.
                         filesystem.shutdown(None).await.unwrap_or_else(|error| {
-                            tracing::error!(
-                                ?error,
+                            log::error!(
+                                error:?;
                                 "Failed to shutdown original filesystem after migration"
                             );
                         });
@@ -946,7 +911,7 @@ impl Environment for FshostEnvironment {
                     Ok(None) => filesystem, // Migration not requested.
                     Err(error) => {
                         // Migration failed.
-                        tracing::error!(?error, "Failed to migrate filesystem");
+                        log::error!(error:?; "Failed to migrate filesystem");
                         // TODO: Log migration failure metrics.
                         // Continue with the original (unmigrated) filesystem.
                         filesystem
@@ -981,7 +946,7 @@ impl Environment for FshostEnvironment {
 
         // Rotate hardware derived key before formatting if we follow a Tee policy
         if get_policy().await? != Policy::Null {
-            tracing::info!("Rotate hardware derived key before formatting");
+            log::info!("Rotate hardware derived key before formatting");
             // Hardware derived keys are not rotatable on certain devices.
             // TODO(b/271166111): Assert hard fail when we know rotating the key should work.
             match kms_stateless::rotate_hardware_derived_key(kms_stateless::KeyInfo::new("zxcrypt"))
@@ -991,10 +956,10 @@ impl Environment for FshostEnvironment {
                 Err(kms_stateless::Error::TeeCommandNotSupported(
                     kms_stateless::TaKeysafeCommand::RotateHardwareDerivedKey,
                 )) => {
-                    tracing::warn!("The device does not support rotatable hardware keys.")
+                    log::warn!("The device does not support rotatable hardware keys.")
                 }
                 Err(e) => {
-                    tracing::warn!("Rotate hardware key failed with error {:?}.", e)
+                    log::warn!("Rotate hardware key failed with error {:?}.", e)
                 }
             }
         }
@@ -1013,7 +978,7 @@ impl Environment for FshostEnvironment {
 
         let res = self.try_migrate_data_internal(device, filesystem).await;
         if let Err(error) = &res {
-            tracing::warn!(%error, "migration failed");
+            log::warn!(error:%; "migration failed");
             if let Some(status) = error.downcast_ref::<zx::Status>().clone() {
                 register_migration_status(self.inspector.root(), *status).await;
             } else {
@@ -1030,20 +995,9 @@ impl Environment for FshostEnvironment {
 
         let queue = self.data.queue().unwrap();
         let exposed_dir = filesystem.exposed_dir(None)?;
-        for server in queue.exposed_dir_queue.drain(..) {
+        for server in queue.drain(..) {
             exposed_dir.clone(server.into_channel().into())?;
         }
-        match &filesystem {
-            Filesystem::ServingMultiVolume(..) | Filesystem::ServingVolumeInMultiVolume(..) => {
-                if let Some(crypt_service_exposed_dir) = filesystem.crypt_service()? {
-                    for server in queue.crypt_service_exposed_dir.drain(..) {
-                        crypt_service_exposed_dir.clone(server.into_channel().into())?;
-                    }
-                }
-            }
-            _ => {}
-        }
-
         self.data = filesystem;
         Ok(())
     }
@@ -1071,24 +1025,28 @@ impl Environment for FshostEnvironment {
         // If we encounter an error, log it, but continue trying to shut down the remaining
         // filesystems.
         self.blobfs.shutdown(self.container.maybe_fs()).await.unwrap_or_else(|error| {
-            tracing::error!(?error, "failed to shut down blobfs");
+            log::error!(error:?; "failed to shut down blobfs");
         });
         self.data.shutdown(self.container.maybe_fs()).await.unwrap_or_else(|error| {
-            tracing::error!(?error, "failed to shut down data");
+            log::error!(error:?; "failed to shut down data");
         });
         if let Some(container) = self.container.take() {
             container.into_fs().shutdown().await.unwrap_or_else(|error| {
-                tracing::error!(?error, "failed to shut down container");
+                log::error!(error:?; "failed to shut down container");
             })
         }
         self.gpt.shutdown(None).await.unwrap_or_else(|error| {
-            tracing::error!(?error, "failed to shut down gpt");
+            log::error!(error:?; "failed to shut down gpt");
         });
         Ok(())
     }
 
     fn registered_devices(&self) -> &Arc<RegisteredDevices> {
         &self.registered_devices
+    }
+
+    fn get_container(&mut self) -> Option<&mut ServingMultiVolumeFilesystem> {
+        self.container.maybe_fs()
     }
 }
 
@@ -1103,11 +1061,11 @@ impl FilesystemLauncher {
         device: &mut dyn Device,
         driver_path: &str,
     ) -> Result<(), Error> {
-        tracing::info!(path = %device.path(), %driver_path, "Binding driver to device");
+        log::info!(path:% = device.path(), driver_path:%; "Binding driver to device");
         match device.controller().bind(driver_path).await?.map_err(zx::Status::from_raw) {
             Err(e) if e == zx::Status::ALREADY_BOUND => {
                 // It's fine if we get an ALREADY_BOUND error.
-                tracing::info!(path = %device.path(), %driver_path,
+                log::info!(path:% = device.path(), driver_path:%;
                     "Ignoring ALREADY_BOUND error.");
                 Ok(())
             }
@@ -1144,12 +1102,12 @@ impl FilesystemLauncher {
     }
 
     pub async fn serve_blobfs(&self, device: &mut dyn Device) -> Result<Filesystem, Error> {
-        tracing::info!(path = %device.path(), "Mounting /blob");
+        log::info!(path:% = device.path(); "Mounting /blob");
 
         // Setting max partition size for blobfs
         if !device.is_fshost_ramdisk() {
             if let Err(e) = device.set_partition_max_bytes(self.config.blobfs_max_bytes).await {
-                tracing::warn!("Failed to set max partition size for blobfs: {:?}", e);
+                log::warn!("Failed to set max partition size for blobfs: {:?}", e);
             };
         }
 
@@ -1178,17 +1136,17 @@ impl FilesystemLauncher {
             Box::new(config),
         );
         let format = fs.config().disk_format();
-        tracing::info!(
-            path = %device.path(),
-            expected_format = ?format,
+        log::info!(
+            path:% = device.path(),
+            expected_format:? = format;
             "Mounting /data"
         );
 
         let detected_format = device.content_format().await?;
         if detected_format != format {
-            tracing::info!(
-                ?detected_format,
-                expected_format = ?format,
+            log::info!(
+                detected_format:?,
+                expected_format:? = format;
                 "Expected format not detected. Reformatting.",
             );
             return Ok(ServeFilesystemStatus::FormatRequired);
@@ -1204,18 +1162,18 @@ impl FilesystemLauncher {
     ) -> Result<ServeFilesystemStatus, Error> {
         let format = fs.config().disk_format();
         if self.config.check_filesystems {
-            tracing::info!(?format, "fsck started");
+            log::info!(format:?; "fsck started");
             if let Err(error) = fs.fsck().await {
                 self.report_corruption(format.as_str(), &error);
                 if self.config.format_data_on_corruption {
-                    tracing::info!("Reformatting filesystem, expect data loss...");
+                    log::info!("Reformatting filesystem, expect data loss...");
                     return Ok(ServeFilesystemStatus::FormatRequired);
                 } else {
-                    tracing::error!(?format, "format on corruption is disabled, not continuing");
+                    log::error!(format:?; "format on corruption is disabled, not continuing");
                     return Err(error);
                 }
             } else {
-                tracing::info!(?format, "fsck completed OK");
+                log::info!(format:?; "fsck completed OK");
             }
         }
 
@@ -1234,7 +1192,7 @@ impl FilesystemLauncher {
                         }
                         // If unlocking returns none, the keybag got deleted by something.
                         None => {
-                            tracing::warn!(
+                            log::warn!(
                                 "keybag not found. Perhaps the keys were shredded? \
                                 Reformatting the data volume."
                             );
@@ -1250,10 +1208,10 @@ impl FilesystemLauncher {
             Err(error) => {
                 self.report_corruption(format.as_str(), &error);
                 if self.config.format_data_on_corruption {
-                    tracing::info!("Reformatting filesystem, expect data loss...");
+                    log::info!("Reformatting filesystem, expect data loss...");
                     Ok(ServeFilesystemStatus::FormatRequired)
                 } else {
-                    tracing::error!(?format, "format on corruption is disabled, not continuing");
+                    log::error!(format:?; "format on corruption is disabled, not continuing");
                     Err(error)
                 }
             }
@@ -1268,7 +1226,7 @@ impl FilesystemLauncher {
         fvm_topo_path: &str,
         ignore_paths: &mut HashSet<String>,
     ) -> Result<Box<dyn Device>, Error> {
-        tracing::info!(path = fvm_topo_path, "Resetting fvm partitions");
+        log::info!(path = fvm_topo_path; "Resetting fvm partitions");
         let fvm_directory_proxy =
             fuchsia_fs::directory::open_in_namespace(&fvm_topo_path, fio::PERM_READABLE)?;
         let fvm_volume_manager_proxy =
@@ -1296,7 +1254,7 @@ impl FilesystemLauncher {
                     .await
                     .with_context(|| format!("Failed to destroy partition {}", entry.name))?;
                 zx::Status::ok(status).context("destroy() returned an error")?;
-                tracing::info!(partition = %entry.name, "Destroyed partition");
+                log::info!(partition:% = entry.name; "Destroyed partition");
             }
         }
 
@@ -1325,22 +1283,17 @@ impl FilesystemLauncher {
     pub async fn serve_fxblob(
         &self,
         block_connector: Box<dyn BlockConnector>,
+        config: Box<dyn FSConfig>,
     ) -> Result<ServingMultiVolumeFilesystem, Error> {
-        let mut fs = fs_management::filesystem::Filesystem::from_boxed_config(
-            block_connector,
-            Box::new(Fxfs {
-                component_type: ComponentType::StaticChild,
-                startup_profiling_seconds: Some(60),
-                ..Default::default()
-            }),
-        );
+        let mut fs =
+            fs_management::filesystem::Filesystem::from_boxed_config(block_connector, config);
         if self.config.check_filesystems {
-            tracing::info!("fsck started for fxblob");
+            log::info!("fsck started for fxblob");
             if let Err(error) = fs.fsck().await {
                 self.report_corruption("fxfs", &error);
                 return Err(error);
             } else {
-                tracing::info!("fsck completed OK for fxblob");
+                log::info!("fsck completed OK for fxblob");
             }
         }
         fs.serve_multi_volume().await
@@ -1376,40 +1329,32 @@ impl FilesystemLauncher {
         mut fs: fs_management::filesystem::Filesystem,
     ) -> Result<Filesystem, Error> {
         let format = fs.config().disk_format();
-        tracing::info!(path = device.path(), format = format.as_str(), "Formatting");
+        log::info!(path = device.path(), format = format.as_str(); "Formatting");
         match format {
             DiskFormat::Fxfs => {
                 let target_bytes = self.config.data_max_bytes;
-                tracing::info!(target_bytes, "Resizing data volume");
+                log::info!(target_bytes; "Resizing data volume");
                 let allocated_bytes =
                     device.resize(target_bytes).await.context("format volume resize")?;
                 if allocated_bytes < target_bytes {
-                    tracing::warn!(
-                        target_bytes,
-                        allocated_bytes,
-                        "Allocated less space than desired"
-                    );
+                    log::warn!(target_bytes, allocated_bytes; "Allocated less space than desired");
                 }
             }
             DiskFormat::F2fs => {
                 let target_bytes =
                     std::cmp::max(self.config.data_max_bytes, DEFAULT_F2FS_MIN_BYTES);
-                tracing::info!(target_bytes, "Resizing data volume");
+                log::info!(target_bytes; "Resizing data volume");
                 let allocated_bytes =
                     device.resize(target_bytes).await.context("format volume resize")?;
                 if allocated_bytes < DEFAULT_F2FS_MIN_BYTES {
-                    tracing::error!(
+                    log::error!(
                         minimum_bytes = DEFAULT_F2FS_MIN_BYTES,
-                        allocated_bytes,
+                        allocated_bytes;
                         "Not enough space for f2fs"
                     )
                 }
                 if allocated_bytes < target_bytes {
-                    tracing::warn!(
-                        target_bytes,
-                        allocated_bytes,
-                        "Allocated less space than desired"
-                    );
+                    log::warn!(target_bytes, allocated_bytes; "Allocated less space than desired");
                 }
             }
             _ => (),
@@ -1417,7 +1362,7 @@ impl FilesystemLauncher {
 
         fs.format().await.context("formatting data partition")?;
 
-        tracing::info!(path = device.path(), format = format.as_str(), "Serving");
+        log::info!(path = device.path(), format = format.as_str(); "Serving");
         let filesystem = if let DiskFormat::Fxfs = format {
             let mut serving_multi_vol_fs =
                 fs.serve_multi_volume().await.context("serving multi volume data partition")?;
@@ -1434,8 +1379,8 @@ impl FilesystemLauncher {
     }
 
     fn report_corruption(&self, format: &str, error: &Error) {
-        tracing::error!(format, ?error, "FILESYSTEM CORRUPTION DETECTED!");
-        tracing::error!(
+        log::error!(format, error:?; "FILESYSTEM CORRUPTION DETECTED!");
+        log::error!(
             "Please file a bug to the Storage component in http://fxbug.dev, including a \
             device snapshot collected with `ffx target snapshot` if possible.",
         );
@@ -1453,11 +1398,11 @@ impl FilesystemLauncher {
             {
                 proxy
             } else {
-                tracing::error!("Failed to connect to crash report service");
+                log::error!("Failed to connect to crash report service");
                 return;
             };
             if let Err(e) = proxy.file_report(report).await {
-                tracing::error!(?e, "Failed to file crash report");
+                log::error!(e:?; "Failed to file crash report");
             }
         })
         .detach();

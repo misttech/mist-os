@@ -2,8 +2,15 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/config/fuchsia/versioning.gni")
+
 declare_args() {
   # Set to true for the golden_file template to implicitly write updated goldens
   # instead of failing the action or test.
   update_goldens = false
+
+  # Ensure that all goldens will be updated when bumping the API level.
+  if (bump_api_level) {
+    update_goldens = true
+  }
 }

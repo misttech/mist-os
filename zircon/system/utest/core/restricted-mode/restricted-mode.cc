@@ -264,6 +264,57 @@ class RestrictedMode : public zxtest::TestWithParam<RestrictedBlobInfo> {
 
   static void TearDownTestSuite() { restricted_blobs_.reset(); }
 
+  // This function tests if machine-specific restricted mode is not supported
+  // based on if it fails on what should be a valid state configuration.
+  void ArchUnsupportedCheck() {
+    NEEDS_NEXT_SKIP(zx_restricted_bind_state);
+    NEEDS_NEXT_SKIP(zx_restricted_enter);
+
+    // If there is no matching blob, it has been removed for lack of support.
+    auto blob_entry = restricted_blobs_->find(restricted_blob_info_.machine);
+    if (blob_entry == restricted_blobs_->end()) {
+      ZXTEST_SKIP() << "hardware does not support blob:" << restricted_blob_info_.name;
+      return;
+    }
+
+    // Do not test blobs that share a machine with the host machine.
+    if (restricted_blob_info_.machine == elfldltl::ElfMachine::kNative) {
+      return;
+    }
+
+    zx::vmo vmo;
+    // Failures here will fail the test.
+    ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
+    auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
+
+    // Configure the initial register state.
+    auto state = ArchRegisterStateFactory::Create(restricted_blob_info_.machine);
+    state->InitializeRegisters(GetTlsAddress(0));
+
+    // Use a known-good pc with a minimal code path before returning.
+    state->set_pc(restricted_symbols().addr_of("exception_bounce_exception_address"));
+
+    // Write the state to the state VMO.
+    ASSERT_OK(vmo.write(&state->restricted_state(), 0, sizeof(state->restricted_state())));
+
+    zx_restricted_reason_t reason_code = 99;
+    // Enter restricted mode with reasonable args that should return with a
+    // reason_code.
+    //
+    // If the machine register state is unsupported, it will return ZX_ERR_BAD_STATE.
+    if (restricted_enter_wrapper(0, reinterpret_cast<uintptr_t>(&restricted_exit), &reason_code) ==
+        ZX_ERR_BAD_STATE) {
+      auto blob = std::move(blob_entry->second);
+      // Only test once, then remove the blob so we skip all other tests.
+      restricted_blobs_->erase(blob_entry);
+      blob.reset();
+      ZXTEST_SKIP() << "hardware does not support blob:" << restricted_blob_info_.name;
+    }
+    // Ensure the reason code was changed.  If we failed with a different error,
+    // there's still a problem.
+    ASSERT_NE(reason_code, 99);
+  }
+
   void SetUp() override {
     // Configure the machine which will be used for selecting the correct
     // register state.
@@ -273,6 +324,11 @@ class RestrictedMode : public zxtest::TestWithParam<RestrictedBlobInfo> {
     // TLS data that is shared with restricted mode.  It should be
     // mapped to a location that is reachable.
     MapSharedStorage(kRestrictedAtomicCount, kRestrictedThreadCount);
+
+    // ELF architectures that differ from the host must be tested
+    // for support because some processors do not support running
+    // alternate architectures.
+    ArchUnsupportedCheck();
   }
 
   void TearDown() override {
@@ -331,12 +387,27 @@ class RestrictedMode : public zxtest::TestWithParam<RestrictedBlobInfo> {
     auto offset = restricted_blob_info_.max_load_address;
     if (offset != 0) {
       options |= ZX_VM_OFFSET_IS_UPPER_LIMIT;
+      zx_info_vmar_t vmar_info = {};
+      ASSERT_OK(zx::vmar::root_self()->get_info(ZX_INFO_VMAR, &vmar_info, sizeof(vmar_info),
+                                                nullptr, nullptr));
+      ASSERT_GE(offset, vmar_info.base);
+      // Subtract the base from the absolute offset to get the relative offset
+      // needed for zx_vmar_map().
+      offset -= vmar_info.base;
+      // Align it to the nearest page.
+      offset -= offset % zx_system_get_page_size();
     }
 
     ASSERT_EQ(ZX_OK, zx::vmar::root_self()->map(options, offset, atomic_storage_vmo_, 0,
                                                 kAtomicStorageSize, &atomic_storage_base_));
     ASSERT_EQ(ZX_OK, zx::vmar::root_self()->map(options, offset, thread_storage_vmo_, 0,
                                                 kThreadStorageSize, &thread_storage_base_));
+    if (offset != 0) {
+      ASSERT_LT(reinterpret_cast<uint64_t>(atomic_storage_base_),
+                restricted_blob_info_.max_load_address);
+      ASSERT_LT(reinterpret_cast<uint64_t>(thread_storage_base_),
+                restricted_blob_info_.max_load_address);
+    }
   }
 
  private:
@@ -377,6 +448,8 @@ INSTANTIATE_TEST_SUITE_P(RestrictedModePerArch, RestrictedMode, zxtest::ValuesIn
                            switch (info.param.machine) {
                              case elfldltl::ElfMachine::kX86_64:
                                return "x64";
+                             case elfldltl::ElfMachine::kArm:
+                               return "aarch32";
                              case elfldltl::ElfMachine::kAarch64:
                                return "aarch64";
                              case elfldltl::ElfMachine::kRiscv:
@@ -842,11 +915,9 @@ TEST_P(RestrictedMode, KickBeforeEnter) {
   // Validate that the state is unchanged
   EXPECT_EQ(0x0101010101010101, state->restricted_state().rax);
 #elif defined(__aarch64__)  // defined(__x86_64__)
-  if (register_bytes() == sizeof(state->restricted_state().x[1])) {
-    EXPECT_EQ(0x0202020202020202, state->restricted_state().x[1]);
-  } else {
-    EXPECT_EQ(0x02020202, state->restricted_state().x[1]);
-  }
+  // Even aarch32 will show the initialized 64-bit value here since
+  // it was never re-saved by zircon.
+  EXPECT_EQ(0x0202020202020202, state->restricted_state().x[1]);
 #elif defined(__riscv)      // defined(__aarch64__)
   EXPECT_EQ(0x0b0b0b0b0b0b0b0b, state->restricted_state().a1);
 #endif                      // defined(__riscv)

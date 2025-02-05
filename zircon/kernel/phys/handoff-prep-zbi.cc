@@ -7,6 +7,7 @@
 #include <lib/boot-options/boot-options.h>
 #include <lib/memalloc/range.h>
 #include <lib/uart/all.h>
+#include <lib/uart/null.h>
 #include <lib/zbi-format/board.h>
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/memory.h>
@@ -66,9 +67,9 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
   // given as variant of lib/uart driver types, each with methods to indicate
   // the ZBI item type and payload.
   auto append_uart_item = [this](const auto& uart) {
-    const uint32_t kdrv_type = uart.extra();
-    if (kdrv_type != 0) {  // Zero means the null driver.
-      SaveForMexec({.type = ZBI_TYPE_KERNEL_DRIVER, .extra = kdrv_type},
+    using uart_t = ktl::decay_t<decltype(uart)>;
+    if constexpr (!ktl::is_same_v<uart_t, uart::null::Driver>) {
+      SaveForMexec({.type = ZBI_TYPE_KERNEL_DRIVER, .extra = uart_t::kExtra},
                    zbitl::AsBytes(uart.config()));
     }
   };

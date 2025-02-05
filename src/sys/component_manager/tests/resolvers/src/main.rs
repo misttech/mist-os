@@ -7,7 +7,7 @@ use fidl_fidl_test_components::{TriggerRequest, TriggerRequestStream};
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use futures::{StreamExt, TryStreamExt};
-use tracing::*;
+use log::*;
 
 /// Wraps all hosted protocols into a single type that can be matched against
 /// and dispatched.

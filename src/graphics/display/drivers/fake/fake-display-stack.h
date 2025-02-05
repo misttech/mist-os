@@ -6,8 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_STACK_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
-#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
-#include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/loop.h>
@@ -18,13 +16,13 @@
 #include <lib/sync/cpp/completion.h>
 
 #include <memory>
+#include <optional>
 
-#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/graphics/display/drivers/fake/sysmem-service-provider.h"
 
-namespace display {
+namespace fake_display {
 
 // FakeDisplayStack creates and holds a FakeDisplay device as well as the
 // Sysmem device and the display coordinator Controller which are attached to
@@ -32,17 +30,28 @@ namespace display {
 class FakeDisplayStack {
  public:
   FakeDisplayStack(std::unique_ptr<SysmemServiceProvider> sysmem_service_provider,
-                   const fake_display::FakeDisplayDeviceConfig& device_config);
+                   const FakeDisplayDeviceConfig& device_config);
   ~FakeDisplayStack();
 
-  display_coordinator::Controller* coordinator_controller() {
-    return coordinator_controller_.get();
-  }
-  fake_display::FakeDisplay* display() { return display_.get(); }
+  // Must not be called after SyncShutdown().
+  //
+  // The returned pointer is guaranteed to be non-null. The Controller is
+  // guaranteed to be alive until SyncShutdown() is called.
+  display_coordinator::Controller* coordinator_controller();
 
-  const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& display_client();
+  // Must not be called after SyncShutdown().
+  FakeDisplay& display_engine();
+
+  // Must not be called after SyncShutdown().
+  //
+  // The returned client is guaranteed to be valid.
+  const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& display_provider_client();
+
+  // Must not be called after SyncShutdown().
   fidl::ClientEnd<fuchsia_sysmem2::Allocator> ConnectToSysmemAllocatorV2();
 
+  // Must be called at least once.
+  //
   // Join all threads providing display and sysmem protocols, and remove all
   // the devices bound to the mock root device.
   void SyncShutdown();
@@ -50,13 +59,13 @@ class FakeDisplayStack {
  private:
   std::optional<fdf_testing::ScopedGlobalLogger> logger_;
 
-  std::shared_ptr<fdf_testing::DriverRuntime> driver_runtime_ = mock_ddk::GetDriverRuntime();
+  std::shared_ptr<fdf_testing::DriverRuntime> driver_runtime_;
   std::unique_ptr<SysmemServiceProvider> sysmem_service_provider_;
 
   fdf::SynchronizedDispatcher coordinator_client_dispatcher_;
   libsync::Completion coordinator_client_dispatcher_is_shut_down_;
 
-  std::unique_ptr<fake_display::FakeDisplay> display_;
+  std::unique_ptr<FakeDisplay> display_engine_;
   std::unique_ptr<display_coordinator::Controller> coordinator_controller_;
 
   bool shutdown_ = false;
@@ -69,6 +78,6 @@ class FakeDisplayStack {
   fidl::WireSyncClient<fuchsia_hardware_display::Provider> display_provider_client_;
 };
 
-}  // namespace display
+}  // namespace fake_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_STACK_H_

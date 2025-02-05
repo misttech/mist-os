@@ -4,55 +4,30 @@
 
 import("toolchain_runtime_deps.gni")
 
-_toolchain_runtime_deps_cflags = []
-
-if (toolchain_variant.tags + [ "asan" ] - [ "asan" ] !=
-    toolchain_variant.tags) {
-  _toolchain_runtime_deps_cflags += [ "-fsanitize=address" ]
-} else if (toolchain_variant.tags + [ "hwasan" ] - [ "hwasan" ] !=
-           toolchain_variant.tags) {
-  _toolchain_runtime_deps_cflags += [ "-fsanitize=hwaddress" ]
-} else if (toolchain_variant.tags + [ "ubsan" ] - [ "ubsan" ] !=
-           toolchain_variant.tags) {
-  # Note this should come last to ensure that if neither
-  # -fsanitize=address/hwaddress is selected, then
-  # libclang_rt.ubsan_standalone will be used as opposed to
-  # libclang_rt.asan/hwasan.
-  _toolchain_runtime_deps_cflags += [ "-fsanitize=undefined" ]
+clang_runtime_deps("static-libc++-deps") {
+  static_libcxx = true
 }
 
-toolchain_runtime_deps("static-libc++-deps") {
-  toolchain_spec = clang_toolchain_spec
-  cflags = _toolchain_runtime_deps_cflags
-  ldflags = [ "-static-libstdc++" ]
+clang_runtime_deps("shared-libc++-deps") {
+  static_libcxx = false
 }
 
-toolchain_runtime_deps("shared-libc++-deps") {
-  toolchain_spec = clang_toolchain_spec
-  cflags = _toolchain_runtime_deps_cflags
-  ldflags = []
+rust_runtime_deps("static-rust-libstd-deps") {
+  name = "libstd"
+  shared_runtime = false
 }
 
-toolchain_runtime_deps("static-rust-libstd-deps") {
-  toolchain_spec = rustc_toolchain_spec
-  rustflags = []
-  libraries = [ "libstd" ]
+rust_runtime_deps("shared-rust-libstd-deps") {
+  name = "libstd"
+  shared_runtime = true
 }
 
-toolchain_runtime_deps("shared-rust-libstd-deps") {
-  toolchain_spec = rustc_toolchain_spec
-  rustflags = [ "-Cprefer-dynamic" ]
-  libraries = [ "libstd" ]
+rust_runtime_deps("static-rust-libtest-deps") {
+  name = "libtest"
+  shared_runtime = false
 }
 
-toolchain_runtime_deps("static-rust-libtest-deps") {
-  toolchain_spec = rustc_toolchain_spec
-  rustflags = []
-  libraries = [ "libtest" ]
-}
-
-toolchain_runtime_deps("shared-rust-libtest-deps") {
-  toolchain_spec = rustc_toolchain_spec
-  rustflags = [ "-Cprefer-dynamic" ]
-  libraries = [ "libtest" ]
+rust_runtime_deps("shared-rust-libtest-deps") {
+  name = "libtest"
+  shared_runtime = true
 }

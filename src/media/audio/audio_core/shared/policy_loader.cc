@@ -33,51 +33,55 @@ const std::string kIdleCountdownMsKey = "idle_countdown_milliseconds";
 const std::string kStartupCountdownMsKey = "startup_idle_countdown_milliseconds";
 const std::string kUltrasonicChannelsKey = "use_all_ultrasonic_channels";
 
-std::optional<fuchsia::media::AudioRenderUsage> JsonToRenderUsage(const rapidjson::Value& usage) {
-  static_assert(fuchsia::media::RENDER_USAGE_COUNT == 5,
+std::optional<fuchsia::media::AudioRenderUsage2> JsonToRenderUsage(const rapidjson::Value& usage) {
+  static_assert(fuchsia::media::RENDER_USAGE2_COUNT == 6,
                 "New Render Usage(s) added to fidl without updating config loader");
 
   auto rule_str = usage.GetString();
 
   if (!strcmp(rule_str, "BACKGROUND")) {
-    return fuchsia::media::AudioRenderUsage::BACKGROUND;
+    return fuchsia::media::AudioRenderUsage2::BACKGROUND;
   }
   if (!strcmp(rule_str, "COMMUNICATION")) {
-    return fuchsia::media::AudioRenderUsage::COMMUNICATION;
+    return fuchsia::media::AudioRenderUsage2::COMMUNICATION;
   }
   if (!strcmp(rule_str, "INTERRUPTION")) {
-    return fuchsia::media::AudioRenderUsage::INTERRUPTION;
+    return fuchsia::media::AudioRenderUsage2::INTERRUPTION;
   }
   if (!strcmp(rule_str, "MEDIA")) {
-    return fuchsia::media::AudioRenderUsage::MEDIA;
+    return fuchsia::media::AudioRenderUsage2::MEDIA;
   }
   if (!strcmp(rule_str, "SYSTEM_AGENT")) {
-    return fuchsia::media::AudioRenderUsage::SYSTEM_AGENT;
+    return fuchsia::media::AudioRenderUsage2::SYSTEM_AGENT;
   }
-  FX_LOGS(ERROR) << usage.GetString() << " not a valid AudioRenderUsage.";
+  if (!strcmp(rule_str, "ACCESSIBILITY")) {
+    return fuchsia::media::AudioRenderUsage2::ACCESSIBILITY;
+  }
+  FX_LOGS(ERROR) << usage.GetString() << " not a valid AudioRenderUsage2.";
 
   return std::nullopt;
 }
 
-std::optional<fuchsia::media::AudioCaptureUsage> JsonToCaptureUsage(const rapidjson::Value& usage) {
-  static_assert(fuchsia::media::CAPTURE_USAGE_COUNT == 4,
+std::optional<fuchsia::media::AudioCaptureUsage2> JsonToCaptureUsage(
+    const rapidjson::Value& usage) {
+  static_assert(fuchsia::media::CAPTURE_USAGE2_COUNT == 4,
                 "New Capture Usage(s) added to fidl without updating config loader");
 
   auto rule_str = usage.GetString();
 
   if (!strcmp(rule_str, "BACKGROUND")) {
-    return fuchsia::media::AudioCaptureUsage::BACKGROUND;
+    return fuchsia::media::AudioCaptureUsage2::BACKGROUND;
   }
   if (!strcmp(rule_str, "COMMUNICATION")) {
-    return fuchsia::media::AudioCaptureUsage::COMMUNICATION;
+    return fuchsia::media::AudioCaptureUsage2::COMMUNICATION;
   }
   if (!strcmp(rule_str, "FOREGROUND")) {
-    return fuchsia::media::AudioCaptureUsage::FOREGROUND;
+    return fuchsia::media::AudioCaptureUsage2::FOREGROUND;
   }
   if (!strcmp(rule_str, "SYSTEM_AGENT")) {
-    return fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT;
+    return fuchsia::media::AudioCaptureUsage2::SYSTEM_AGENT;
   }
-  FX_LOGS(ERROR) << usage.GetString() << " not a valid AudioCaptureUsage.";
+  FX_LOGS(ERROR) << usage.GetString() << " not a valid AudioCaptureUsage2.";
 
   return std::nullopt;
 }
@@ -99,14 +103,14 @@ std::optional<fuchsia::media::Behavior> JsonToBehavior(const rapidjson::Value& b
   return std::nullopt;
 }
 
-std::optional<fuchsia::media::Usage> JsonToUsage(const rapidjson::Value& usage) {
-  fuchsia::media::Usage ret;
+std::optional<fuchsia::media::Usage2> JsonToUsage(const rapidjson::Value& usage) {
+  fuchsia::media::Usage2 ret;
   if (usage.HasMember("render_usage")) {
     auto u = JsonToRenderUsage(usage["render_usage"]);
     if (!u) {
       return std::nullopt;
     }
-    return fuchsia::media::Usage::WithRenderUsage(std::move(*u));
+    return fuchsia::media::Usage2::WithRenderUsage(std::move(*u));
   }
 
   if (usage.HasMember("capture_usage")) {
@@ -114,7 +118,7 @@ std::optional<fuchsia::media::Usage> JsonToUsage(const rapidjson::Value& usage) 
     if (!u) {
       return std::nullopt;
     }
-    return fuchsia::media::Usage::WithCaptureUsage(std::move(*u));
+    return fuchsia::media::Usage2::WithCaptureUsage(std::move(*u));
   }
 
   return std::nullopt;

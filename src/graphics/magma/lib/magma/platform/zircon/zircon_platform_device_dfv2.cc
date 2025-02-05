@@ -30,8 +30,7 @@ std::unique_ptr<PlatformHandle> ZirconPlatformDeviceDfv2::GetBusTransactionIniti
   return std::make_unique<ZirconPlatformHandle>(std::move(res.value()->bti));
 }
 
-std::unique_ptr<PlatformMmio> ZirconPlatformDeviceDfv2::CpuMapMmio(
-    unsigned int index, PlatformMmio::CachePolicy cache_policy) {
+std::unique_ptr<PlatformMmio> ZirconPlatformDeviceDfv2::CpuMapMmio(unsigned int index) {
   auto res = pdev_->GetMmioById(index);
   if (!res.ok()) {
     DMESSAGE("failed to get mmio: %s", res.status_string());

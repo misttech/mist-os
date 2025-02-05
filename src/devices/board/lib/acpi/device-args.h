@@ -45,7 +45,7 @@ struct DeviceArgs {
   ACPI_HANDLE handle_;
 
   // Bus metadata
-  std::vector<uint8_t> metadata_;
+  BusMetadata metadata_;
   BusType bus_type_ = BusType::kUnknown;
   uint32_t bus_id_ = UINT32_MAX;
 
@@ -57,7 +57,7 @@ struct DeviceArgs {
       : parent_(parent), manager_(manager), dispatcher_(dispatcher), handle_(handle) {}
   DeviceArgs(DeviceArgs&) = delete;
 
-  DeviceArgs& SetBusMetadata(std::vector<uint8_t> metadata, BusType bus_type, uint32_t bus_id) {
+  DeviceArgs& SetBusMetadata(BusMetadata metadata, BusType bus_type, uint32_t bus_id) {
     metadata_ = std::move(metadata);
     bus_type_ = bus_type;
     bus_id_ = bus_id;

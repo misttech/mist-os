@@ -11,26 +11,28 @@
 #![warn(missing_docs, unreachable_patterns, clippy::useless_conversion, clippy::redundant_clone)]
 
 extern crate fakealloc as alloc;
-extern crate fakestd as std;
 
 #[path = "."]
 mod internal {
     pub(super) mod datagram;
+    pub(super) mod sndbuf;
     pub(super) mod spec_context;
     pub(super) mod uninstantiable;
 }
 
 pub use internal::datagram::{
     BoundSocketState, BoundSocketStateType, BoundSockets, ConnInfo, ConnState, ConnectError,
-    DatagramApi, DatagramBoundStateContext, DatagramFlowId, DatagramIpSpecificSocketOptions,
-    DatagramSocketMapSpec, DatagramSocketSet, DatagramSocketSpec, DatagramStateContext,
-    DualStackConnState, DualStackConverter, DualStackDatagramBoundStateContext, DualStackIpExt,
-    EitherIpSocket, ExpectedConnError, ExpectedUnboundError, InUseError, IpExt, IpOptions,
-    ListenerInfo, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
-    NonDualStackConverter, NonDualStackDatagramBoundStateContext, ReferenceState, SendError,
-    SendToError, SetMulticastMembershipError, SocketInfo, SocketState, StrongRc, WeakRc,
+    DatagramApi, DatagramBindingsContext, DatagramBindingsTypes, DatagramBoundStateContext,
+    DatagramFlowId, DatagramIpSpecificSocketOptions, DatagramSocketMapSpec, DatagramSocketSet,
+    DatagramSocketSpec, DatagramStateContext, DualStackConnState, DualStackConverter,
+    DualStackDatagramBoundStateContext, DualStackIpExt, EitherIpSocket, ExpectedConnError,
+    ExpectedUnboundError, InUseError, IpExt, IpOptions, ListenerInfo, MulticastInterfaceSelector,
+    MulticastMembershipInterfaceSelector, NonDualStackConverter,
+    NonDualStackDatagramBoundStateContext, ReferenceState, SendError, SendToError,
+    SetMulticastMembershipError, SocketInfo, SocketState, StrongRc, WeakRc,
     WrapOtherStackIpOptions, WrapOtherStackIpOptionsMut,
 };
+pub use internal::sndbuf::TxMetadata;
 pub use internal::spec_context::{
     DatagramSpecBoundStateContext, DatagramSpecStateContext,
     DualStackDatagramSpecBoundStateContext, NonDualStackDatagramSpecBoundStateContext,

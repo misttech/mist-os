@@ -51,7 +51,7 @@ async fn embedding_stop_api_for_log_listener() {
         .await
         .expect("connect to log settings");
 
-    log_settings.set_component_interest(PUPPET_NAME, Severity::Debug).await.unwrap();
+    log_settings.set_interest_for_component(PUPPET_NAME, Severity::Debug, false).await.unwrap();
     assert_eq!(Some(Severity::Debug), puppet.wait_for_interest_change().await.unwrap().severity);
 
     puppet
@@ -100,7 +100,7 @@ async fn embedding_stop_api_works_for_batch_iterator() {
         .await
         .expect("connect to log settings");
 
-    log_settings.set_component_interest(PUPPET_NAME, Severity::Debug).await.unwrap();
+    log_settings.set_interest_for_component(PUPPET_NAME, Severity::Debug, false).await.unwrap();
     assert_eq!(Some(Severity::Debug), puppet.wait_for_interest_change().await.unwrap().severity);
 
     puppet

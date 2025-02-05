@@ -11,7 +11,7 @@ def _boringssl_repository_impl(repo_ctx):
 
     # IMPORTANT: keep this function in sync with the computation of
     # generated_repository_inputs['boringssl'] in
-    # //build/bazel/update_workspace.py.
+    # //build/bazel/workspace_utils.py.
     if hasattr(repo_ctx.attr, "content_hash_file"):
         repo_ctx.path(workspace_dir + "/" + repo_ctx.attr.content_hash_file)
 

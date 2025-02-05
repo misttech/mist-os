@@ -6,7 +6,7 @@ use crate::event::Publisher;
 use crate::service_context::{ExternalServiceProxy, ServiceContext};
 use anyhow::{anyhow, Context as _, Error};
 use fidl::endpoints::Proxy as _;
-use fidl_fuchsia_media::AudioRenderUsage;
+use fidl_fuchsia_media::AudioRenderUsage2;
 use fidl_fuchsia_media_sounds::{PlayerMarker, PlayerProxy};
 use futures::lock::Mutex;
 use std::collections::HashSet;
@@ -37,7 +37,7 @@ pub(super) async fn connect_to_sound_player(
             .connect_with_publisher::<PlayerMarker>(publisher)
             .await
             .context("Connecting to fuchsia.media.sounds.Player")
-            .map_err(|e| tracing::error!("Failed to connect to fuchsia.media.sounds.Player: {}", e))
+            .map_err(|e| log::error!("Failed to connect to fuchsia.media.sounds.Player: {}", e))
             .ok()
     }
 }
@@ -60,7 +60,7 @@ pub(super) async fn play_sound<'a>(
         };
         if let Some(file_channel) = sound_file_channel {
             match call_async!(sound_player_proxy => add_sound_from_file(id, file_channel)).await {
-                Ok(_) => tracing::debug!("[earcons] Added sound to Player: {}", file_name),
+                Ok(_) => log::debug!("[earcons] Added sound to Player: {}", file_name),
                 Err(e) => {
                     return Err(anyhow!("[earcons] Unable to add sound to Player: {}", e));
                 }
@@ -73,9 +73,9 @@ pub(super) async fn play_sound<'a>(
     // for the previous sound to finish to send another request.
     fasync::Task::local(async move {
         if let Err(e) =
-            call_async!(sound_player_proxy => play_sound(id, AudioRenderUsage::Background)).await
+            call_async!(sound_player_proxy => play_sound2(id, AudioRenderUsage2::Background)).await
         {
-            tracing::error!("[earcons] Unable to Play sound from Player: {}", e);
+            log::error!("[earcons] Unable to Play sound from Player: {}", e);
         };
     })
     .detach();

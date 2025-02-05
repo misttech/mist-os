@@ -22,10 +22,10 @@ use futures::future::{BoxFuture, Either};
 use futures::stream::FuturesUnordered;
 use futures::task::{Context, Poll, Waker};
 use futures::{select, Future, FutureExt, StreamExt};
+use log::{debug, info, trace, warn};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::pin::Pin;
 use std::sync::{Arc, Weak};
-use tracing::{debug, info, trace, warn};
 
 /// For sending out-of-band commands over the A2DP peer.
 mod controller;
@@ -128,7 +128,7 @@ impl StreamPermits {
         };
         permit.relabel(self.label_for(&local_id));
         if let Some(_) = self.open_streams.lock().insert(local_id.clone(), permit) {
-            warn!(id = %self.peer_id, "Started stream {local_id:?} twice, dropping previous permit");
+            warn!(id:% = self.peer_id; "Started stream {local_id:?} twice, dropping previous permit");
         }
         Some(StreamPermit { local_id, open_streams: self.open_streams.clone() })
     }
@@ -154,13 +154,13 @@ impl StreamPermits {
                     warn!("Reservation replaces acquired permit for {}", local_id.clone());
                 }
                 if !reserved_streams.lock().remove(&local_id) {
-                    warn!(%local_id, "Unrecorded reservation resolved");
+                    warn!(local_id:%; "Unrecorded reservation resolved");
                 }
                 StreamPermit { local_id, open_streams }
             }
         };
         if let Err(e) = self.sender.unbounded_send(restart_stream_available_fut.boxed()) {
-            warn!(id = %self.peer_id, %local_id, ?e, "Couldn't queue reservation to finish");
+            warn!(id:% = self.peer_id, local_id:%, e:?; "Couldn't queue reservation to finish");
         }
     }
 
@@ -297,7 +297,7 @@ impl Peer {
                         remote_streams.push(avdtp::StreamEndpoint::from_info(&info, capabilities));
                     }
                     Err(e) => {
-                        info!(%peer_id, "Stream {} capabilities failed: {:?}, skipping", info.id(), e);
+                        info!(peer_id:%; "Stream {} capabilities failed: {:?}, skipping", info.id(), e);
                     }
                 };
             }
@@ -405,7 +405,7 @@ impl Peer {
             }
             avdtp.open(&remote_id).await?;
 
-            debug!(%peer_id, "Connecting transport channel");
+            debug!(peer_id:%; "Connecting transport channel");
             let channel = profile
                 .connect(
                     &peer_id.into(),
@@ -414,16 +414,16 @@ impl Peer {
                 .await
                 .context("FIDL error: {}")?
                 .or(Err(avdtp::Error::PeerDisconnected))?;
-            trace!(%peer_id, "Connected transport channel, converting to local Channel");
+            trace!(peer_id:%; "Connected transport channel, converting to local Channel");
             let channel = match channel.try_into() {
                 Err(e) => {
-                    warn!(%peer_id, ?e, "Couldn't connect media transport: no channel");
+                    warn!(peer_id:%, e:?; "Couldn't connect media transport: no channel");
                     return Err(avdtp::Error::PeerDisconnected);
                 }
                 Ok(c) => c,
             };
 
-            trace!(%peer_id, "Connected transport channel, passing to Peer..");
+            trace!(peer_id:%; "Connected transport channel, passing to Peer..");
 
             {
                 let strong = PeerInner::upgrade(peer.clone())?;
@@ -492,7 +492,7 @@ impl Peer {
                     request = request_stream.next() => {
                         match request {
                             None => break,
-                            Some(Err(e)) => info!(peer_id = %id, ?e, "Request stream error"),
+                            Some(Err(e)) => info!(peer_id:% = id, e:?; "Request stream error"),
                             Some(Ok(request)) => match peer.upgrade() {
                                 None => return,
                                 Some(p) => {
@@ -502,7 +502,7 @@ impl Peer {
                                         Either::Right(future) => future.await,
                                     };
                                     if let Err(e) = result {
-                                        warn!(peer_id = %id, ?e, "Error handling request");
+                                        warn!(peer_id:% = id, e:?; "Error handling request");
                                     }
                                 }
                             },
@@ -513,13 +513,13 @@ impl Peer {
                     },
                     permit = stream_reservations.select_next_some() => {
                         if let Err(e) = PeerInner::start_permit(peer.clone(), permit).await {
-                            warn!(peer_id = %id, ?e, "Couldn't start stream after unpause");
+                            warn!(peer_id:% = id, e:?; "Couldn't start stream after unpause");
                         }
                     }
                     complete => break,
                 }
             }
-            info!(peer_id = %id, "disconnected");
+            info!(peer_id:% = id; "disconnected");
             if let Some(wakers) = disconnect_wakers.upgrade() {
                 for waker in wakers.lock().take().unwrap_or_else(Vec::new) {
                     waker.wake();
@@ -738,7 +738,7 @@ impl PeerInner {
         local_id: &StreamEndpointId,
         remote_id: &StreamEndpointId,
     ) -> avdtp::Result<()> {
-        trace!(?permit, ?local_id, ?remote_id, "Making outgoing start request");
+        trace!(permit:?, local_id:?, remote_id:?; "Making outgoing start request");
         let to_start = &[remote_id.clone()];
         avdtp.start(to_start).await?;
         trace!("Start response received: {permit:?}");
@@ -748,7 +748,7 @@ impl PeerInner {
             (peer.peer_id, peer.start_local_stream(permit, &local_id))
         };
         if let Err(e) = start_result {
-            warn!(%peer_id, %local_id, %remote_id, ?e, "Failed to start local stream, suspending");
+            warn!(peer_id:%, local_id:%, remote_id:%, e:?; "Failed to start local stream, suspending");
             avdtp.suspend(to_start).await?;
         }
         Ok(())
@@ -781,7 +781,7 @@ impl PeerInner {
     ) -> avdtp::Result<(StreamEndpointId, Vec<ServiceCapability>)> {
         let config = codec_params.try_into()?;
         let our_direction = self.remote_endpoint(remote_id).map(|e| e.endpoint_type().opposite());
-        debug!(?codec_params, local = ?self.local, "Looking for compatible local stream");
+        debug!(codec_params:?, local:? = self.local; "Looking for compatible local stream");
         self.local
             .compatible(config)
             .find_map(|s| {
@@ -809,7 +809,7 @@ impl PeerInner {
         if let Some(permit) = permits.get(local_id.clone()) {
             return Ok(Some(permit));
         }
-        info!(peer_id = %self.peer_id, %local_id, "No permit to start stream, adding a reservation");
+        info!(peer_id:% = self.peer_id, local_id:%; "No permit to start stream, adding a reservation");
         permits.setup_reservation_for(local_id.clone());
         Err(())
     }
@@ -831,12 +831,12 @@ impl PeerInner {
             )));
         }
 
-        info!(%peer_id, ?stream, "Starting");
+        info!(peer_id:%, stream:?; "Starting");
         let stream_finished = stream.start().map_err(|c| avdtp::Error::RequestInvalid(c))?;
         // TODO(https://fxbug.dev/42147239): if streaming stops unexpectedly, send a suspend to match to peer
         let watched_stream = WatchedStream::new(permit, stream_finished);
         if self.started.insert(local_id.clone(), watched_stream).is_some() {
-            warn!(%peer_id, %local_id, "Stream that was already started");
+            warn!(peer_id:%, local_id:%; "Stream that was already started");
         }
         Ok(())
     }
@@ -850,7 +850,7 @@ impl PeerInner {
         let peer_id = self.peer_id;
         let stream = self.get_mut(&local_id).map_err(|e| avdtp::Error::RequestInvalid(e))?;
         let remote_id = stream.endpoint().remote_id().ok_or(avdtp::Error::InvalidState)?.clone();
-        info!(%peer_id, "Suspend stream local {local_id} <-> {remote_id} remote");
+        info!(peer_id:%; "Suspend stream local {local_id} <-> {remote_id} remote");
         stream.suspend().map_err(|c| avdtp::Error::RequestInvalid(c))?;
         let _ = self.started.remove(local_id);
         Ok(remote_id)
@@ -867,7 +867,7 @@ impl PeerInner {
         if done {
             self.opening = None;
         }
-        info!(peer_id = %self.peer_id, %stream_id, "Transport connected");
+        info!(peer_id:% = self.peer_id, stream_id:%; "Transport connected");
         Ok(done)
     }
 
@@ -1017,12 +1017,12 @@ impl PeerInner {
                     let delay_str = format!("delay {}.{} ms", delay / 10, delay % 10);
                     let peer = self.peer_id;
                     match stream.set_delay(std::time::Duration::from_nanos(delay_ns)) {
-                        Ok(()) => info!(%peer, %stream_id, "reported {delay_str}"),
+                        Ok(()) => info!(peer:%, stream_id:%; "reported {delay_str}"),
                         Err(avdtp::ErrorCode::BadState) => {
-                            info!(%peer, %stream_id, "bad state {delay_str}");
+                            info!(peer:%, stream_id:%; "bad state {delay_str}");
                             break 'result responder.reject(avdtp::ErrorCode::BadState);
                         }
-                        Err(e) => info!(%peer, %stream_id, ?e, "failed {delay_str}"),
+                        Err(e) => info!(peer:%, stream_id:%, e:?; "failed {delay_str}"),
                     };
                     // Can't really respond with an Error
                     responder.send()

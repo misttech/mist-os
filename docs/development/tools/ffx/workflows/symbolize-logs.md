@@ -61,5 +61,5 @@ debug symbols are registered in your environment or available online
 <!-- Reference links -->
 
 [ffx-debug-symbolize]: https://fuchsia.dev/reference/tools/sdk/ffx#symbolize
-[ffx-log]: https://fuchsia.dev/reference/tools/sdk/ffx#log_2
+[ffx-log]: https://fuchsia.dev/reference/tools/sdk/ffx#ffx_log
 [register-debug-symbols]: /docs/development/tools/ffx/workflows/register-debug-symbols.md

@@ -12,10 +12,10 @@ mod zigzag_simple8b_rle;
 
 pub mod encoding;
 
+use log::warn;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::io::{self, Write};
 use std::num::NonZeroUsize;
-use tracing::warn;
 
 use crate::experimental::series::buffer::encoding::Encoding;
 use crate::experimental::series::interpolation::Interpolation;

@@ -85,7 +85,7 @@ static inline void WqTraceDepth(const WaitQueueCollection* collection, uint32_t 
 
 // Wait queues are building blocks that other locking primitives use to handle
 // blocking threads.
-void WaitQueue::TimeoutHandler(Timer* timer, zx_time_t now, void* arg) {
+void WaitQueue::TimeoutHandler(Timer* timer, zx_instant_mono_t now, void* arg) {
   Thread& thread = *(static_cast<Thread*>(arg));
   thread.canary().Assert();
 
@@ -188,7 +188,7 @@ SchedDuration WaitQueueCollection::MinInheritableRelativeDeadline() const {
   return min_deadline;
 }
 
-Thread* WaitQueueCollection::Peek(zx_time_t signed_now) {
+Thread* WaitQueueCollection::Peek(zx_instant_mono_t signed_now) {
   // Find the "best" thread in the queue to run at time |now|.  See the comments
   // in thread.h, immediately above the definition of WaitQueueCollection for
   // details of how the data structure and this algorithm work.
@@ -271,10 +271,10 @@ void WaitQueueCollection::Insert(Thread* thread) {
     // too fine, it could drive the sum of the thread's virtual start time into
     // saturation for low weight threads, making the key useless for sorting.
     // By putting a limit of 1 year on the offset, we know that the
-    // current_time() of the system would need to be greater than 2^63
+    // current_mono_time() of the system would need to be greater than 2^63
     // nanoseconds minus one year, or about 291 years, before this can happen.
     constexpr SchedWeight kMinPosWeight{ffl::FromRatio<int64_t>(1, SchedWeight::Format::Power)};
-    constexpr SchedDuration OneYear{SchedMs(zx_duration_t(1) * 86400 * 365245)};
+    constexpr SchedDuration OneYear{SchedMs(zx_duration_mono_t(1) * 86400 * 365245)};
     static_assert(OneYear >= (Scheduler::kDefaultTargetLatency / kMinPosWeight),
                   "SchedWeight resolution is too fine");
 
@@ -441,7 +441,7 @@ bool WaitQueue::WakeOne(zx_status_t wait_queue_error) {
     // Now that we are holding the queue lock, attempt to lock the thread's pi
     // lock.  Be prepared to drop all locks and retry the operation if we
     // fail.
-    Thread* t = Peek(current_time());
+    Thread* t = Peek(current_mono_time());
     if (t) {
       if (!t->get_lock().AcquireOrBackoff()) {
         return ChainLockTransaction::Action::Backoff;
@@ -482,7 +482,7 @@ ktl::optional<bool> WaitQueue::WakeOneLocked(zx_status_t wait_queue_error) {
   }
 
   // Check to see if there is a thread we want to wake.
-  if (Thread* t = Peek(current_time()); t != nullptr) {
+  if (Thread* t = Peek(current_mono_time()); t != nullptr) {
     // There is!  Try to lock it so we can actually wake it up.  If we can't, we
     // will need to unwind to allow the caller to release our lock before trying
     // again.
@@ -738,7 +738,7 @@ void WaitQueue::UpdateBlockedThreadEffectiveProfile(Thread& t) {
 }
 
 ktl::optional<BrwLockOps::LockForWakeResult> BrwLockOps::LockForWake(WaitQueue& queue,
-                                                                     zx_time_t now) {
+                                                                     zx_instant_mono_t now) {
   DEBUG_ASSERT_MAGIC_AND_NOT_OWQ(&queue);
   LockForWakeResult result;
   Thread* t;
@@ -829,7 +829,7 @@ ktl::optional<Thread::UnblockList> WaitQueueLockOps::LockForWakeOne(WaitQueue& q
                                                                     zx_status_t wait_queue_error) {
   DEBUG_ASSERT_MAGIC_AND_NOT_OWQ(&queue);
 
-  if (Thread* t = queue.collection_.Peek(current_time()); t != nullptr) {
+  if (Thread* t = queue.collection_.Peek(current_mono_time()); t != nullptr) {
     if (!t->get_lock().AcquireOrBackoff()) {
       return ktl::nullopt;
     }

@@ -8,13 +8,10 @@ use camino::{Utf8Path, Utf8PathBuf};
 use ffx_config::environment::EnvironmentKind;
 use ffx_config::EnvironmentContext;
 use ffx_repository_serve_args::ServeCommand;
-use ffx_target::TargetProxy;
 use fho::{
-    bug, daemon_protocol, deferred, return_bug, return_user_error, Connector, Deferred, FfxMain,
-    FfxTool, Result, SimpleWriter,
+    bug, deferred, return_bug, return_user_error, Deferred, FfxMain, FfxTool, Result, SimpleWriter,
 };
 use fidl_fuchsia_developer_ffx::{self as ffx, RepositoryRegistryProxy, ServerStatus};
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fuchsia_async as fasync;
 use fuchsia_repo::manager::RepositoryManager;
 use fuchsia_repo::repo_client::RepoClient;
@@ -23,6 +20,7 @@ use fuchsia_repo::server::RepositoryServer;
 use futures::executor::block_on;
 use futures::{SinkExt, StreamExt};
 use package_tool::{cmd_repo_publish, RepoPublishCommand};
+use pkg::config::DEFAULT_REPO_NAME;
 use pkg::{
     write_instance_info, PkgServerInfo, PkgServerInstanceInfo as _, PkgServerInstances, ServerMode,
 };
@@ -31,16 +29,10 @@ use signal_hook::iterator::Signals;
 use std::fs;
 use std::io::Write;
 use std::sync::Arc;
+use target_connector::Connector;
 use target_errors::FfxTargetError;
+use target_holders::{daemon_protocol, RemoteControlProxyHolder, TargetProxyHolder};
 use tuf::metadata::RawSignedMetadata;
-
-// LINT.IfChange
-/// Default name used for package repositories in ffx. It is expected that there is no need to
-/// change this constant. But in case this is changed, ensure that it is consistent with the ffx
-/// developer documentation, see
-/// https://cs.opensource.google/search?q=devhost&sq=&ss=fuchsia%2Ffuchsia:src%2Fdeveloper%2Fffx%2F
-pub const DEFAULT_REPO_NAME: &str = "devhost";
-// LINT.ThenChange(args.rs)
 
 mod target;
 
@@ -55,8 +47,8 @@ pub struct ServeTool {
     #[command]
     pub cmd: ServeCommand,
     pub context: EnvironmentContext,
-    pub target_proxy_connector: Connector<TargetProxy>,
-    pub rcs_proxy_connector: Connector<RemoteControlProxy>,
+    pub target_proxy_connector: Connector<TargetProxyHolder>,
+    pub rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
     #[with(deferred(daemon_protocol()))]
     pub repos: Deferred<ffx::RepositoryRegistryProxy>,
 }
@@ -195,7 +187,7 @@ pub fn get_repo_base_name(
 
 pub async fn serve_impl_validate_args(
     cmd: &ServeCommand,
-    rcs_proxy_connector: &Connector<RemoteControlProxy>,
+    rcs_proxy_connector: &Connector<RemoteControlProxyHolder>,
     repos: Deferred<RepositoryRegistryProxy>,
     context: &EnvironmentContext,
 ) -> Result<Option<PkgServerInfo>> {
@@ -214,7 +206,7 @@ ffx config remove repository.server.enabled && ffx doctor --restart-daemon
             REPO_BACKGROUND_FEATURE_FLAG,
         );
     }
-    // Check that there is a target device identifed, it is OK if it is not online.
+    // Check that there is a target device identified, it is OK if it is not online.
     if !cmd.no_device {
         let res = rcs_proxy_connector
             .try_connect(|target, err| {
@@ -400,8 +392,8 @@ async fn daemon_repo_is_running(repos: ffx::RepositoryRegistryProxy) -> Result<b
 }
 
 pub async fn serve_impl<W: Write + 'static>(
-    target_proxy: Connector<TargetProxy>,
-    rcs_proxy: Connector<RemoteControlProxy>,
+    target_proxy: Connector<TargetProxyHolder>,
+    rcs_proxy: Connector<RemoteControlProxyHolder>,
     repos: Deferred<RepositoryRegistryProxy>,
     cmd: ServeCommand,
     context: EnvironmentContext,
@@ -646,16 +638,16 @@ mod test {
     use assert_matches::assert_matches;
     use ffx_config::keys::TARGET_DEFAULT_KEY;
     use ffx_config::{ConfigLevel, TestEnv};
+    use ffx_target::TargetProxy;
     use fho::macro_deps::ffx_writer::TestBuffer;
-    use fho::testing::ToolEnv;
-    use fho::{user_error, TryFromEnv};
+    use fho::{user_error, FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
     use fidl::endpoints::DiscoverableProtocolMarker;
     use fidl_fuchsia_developer_ffx::{
         RemoteControlState, RepositoryError, RepositoryRegistrationAliasConflictMode,
         RepositoryStorageType, SshHostAddrInfo, TargetAddrInfo, TargetInfo, TargetIpPort,
         TargetRequest, TargetState,
     };
-    use fidl_fuchsia_developer_remotecontrol as frcs;
+    use fidl_fuchsia_developer_remotecontrol::{self as frcs, RemoteControlProxy};
     use fidl_fuchsia_net::{IpAddress, Ipv4Address};
     use fidl_fuchsia_pkg::{
         MirrorConfig, RepositoryConfig, RepositoryManagerMarker, RepositoryManagerRequest,
@@ -678,6 +670,7 @@ mod test {
     use std::collections::BTreeSet;
     use std::sync::Mutex;
     use std::time;
+    use target_holders::{fake_proxy, FakeInjector};
     use timeout::timeout;
     use tuf::crypto::Ed25519PrivateKey;
     use tuf::metadata::Metadata;
@@ -722,35 +715,34 @@ mod test {
 
     impl FakeRcs {
         fn new(repo_manager: FakeRepositoryManager, engine: FakeEngine) -> RemoteControlProxy {
-            let fake_rcs_proxy: RemoteControlProxy =
-                fho::testing::fake_proxy(move |req| match req {
-                    frcs::RemoteControlRequest::DeprecatedOpenCapability {
-                        moniker: _,
-                        capability_set: _,
-                        capability_name,
-                        server_channel,
-                        flags: _,
-                        responder,
-                    } => {
-                        match capability_name.as_str() {
-                            RepositoryManagerMarker::PROTOCOL_NAME => repo_manager.spawn(
-                                fidl::endpoints::ServerEnd::<RepositoryManagerMarker>::new(
-                                    server_channel,
-                                )
+            let fake_rcs_proxy: RemoteControlProxy = fake_proxy(move |req| match req {
+                frcs::RemoteControlRequest::DeprecatedOpenCapability {
+                    moniker: _,
+                    capability_set: _,
+                    capability_name,
+                    server_channel,
+                    flags: _,
+                    responder,
+                } => {
+                    match capability_name.as_str() {
+                        RepositoryManagerMarker::PROTOCOL_NAME => repo_manager.spawn(
+                            fidl::endpoints::ServerEnd::<RepositoryManagerMarker>::new(
+                                server_channel,
+                            )
+                            .into_stream(),
+                        ),
+                        EngineMarker::PROTOCOL_NAME => engine.spawn(
+                            fidl::endpoints::ServerEnd::<EngineMarker>::new(server_channel)
                                 .into_stream(),
-                            ),
-                            EngineMarker::PROTOCOL_NAME => engine.spawn(
-                                fidl::endpoints::ServerEnd::<EngineMarker>::new(server_channel)
-                                    .into_stream(),
-                            ),
-                            _ => {
-                                unreachable!();
-                            }
+                        ),
+                        _ => {
+                            unreachable!();
                         }
-                        responder.send(Ok(())).unwrap();
                     }
-                    _ => panic!("unexpected request: {:?}", req),
-                });
+                    responder.send(Ok(())).unwrap();
+                }
+                _ => panic!("unexpected request: {:?}", req),
+            });
 
             fake_rcs_proxy
         }
@@ -772,7 +764,7 @@ mod test {
             let mut knock_counter = 0;
             let knock_skip = if let Some(k) = knock_skip { k } else { vec![] };
 
-            let target_proxy: TargetProxy = fho::testing::fake_proxy(move |req| match req {
+            let target_proxy: TargetProxy = fake_proxy(move |req| match req {
                 TargetRequest::Identity { responder, .. } => {
                     let mut sender = sender.clone();
                     let events_closure = events_closure.clone();
@@ -1017,7 +1009,9 @@ mod test {
         ffx_config::test_init().await.expect("test initialization")
     }
 
-    async fn make_fake_rcs_proxy_connector(test_env: &TestEnv) -> Connector<RemoteControlProxy> {
+    async fn make_fake_rcs_proxy_connector(
+        test_env: &TestEnv,
+    ) -> Connector<RemoteControlProxyHolder> {
         let (fake_repo, _) = FakeRepositoryManager::new();
         let (fake_engine, _content) = FakeEngine::new();
         let (_, fake_target_proxy, _) = FakeTarget::new(None);
@@ -1025,19 +1019,23 @@ mod test {
         let frc = fake_repo.clone();
         let fec = fake_engine.clone();
 
-        let tool_env = ToolEnv::new()
-            .remote_factory_closure(move || {
+        let fake_injector = FakeInjector {
+            remote_factory_closure: Box::new(move || {
                 let fake_repo = frc.clone();
                 let fake_engine = fec.clone();
-                async move { Ok(FakeRcs::new(fake_repo, fake_engine)) }
-            })
-            .target_factory_closure(move || {
+                Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine)) })
+            }),
+            target_factory_closure: Box::new(move || {
                 let fake_target_proxy = fake_target_proxy.clone();
-                async { Ok(fake_target_proxy) }
-            });
+                Box::pin(async { Ok(fake_target_proxy) })
+            }),
+            ..Default::default()
+        };
 
-        let fho_env = tool_env.make_environment(test_env.context.clone());
-        Connector::try_from_env(&fho_env).await.expect("Could not make RCS test connector")
+        let env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
+        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+
+        Connector::try_from_env(&env).await.expect("Could not make RCS test connector")
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -1179,7 +1177,7 @@ mod test {
         for (cmd, expected) in test_cases {
             let (sender, _receiver) = channel();
             let mut sender = Some(sender);
-            let repos = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| match req {
+            let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
                 ffx::RepositoryRegistryRequest::ServerStatus { responder } => {
                     sender.take().unwrap().send(()).unwrap();
                     responder
@@ -1241,7 +1239,7 @@ mod test {
 
         let (sender, _receiver) = channel();
         let mut sender = Some(sender);
-        let repos = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| match req {
+        let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
             ffx::RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder.send(Err(RepositoryError::ServerNotRunning)).unwrap()
@@ -1386,7 +1384,7 @@ mod test {
         for (cmd, expected) in test_cases {
             let (sender, _receiver) = channel();
             let mut sender = Some(sender);
-            let repos = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| match req {
+            let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
                 ffx::RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                     sender.take().unwrap().send(()).unwrap();
                     responder.send(Err(RepositoryError::ServerNotRunning)).unwrap()
@@ -1454,7 +1452,7 @@ mod test {
 
             let (sender, _receiver) = channel();
             let mut sender = Some(sender);
-            let repos = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| match req {
+            let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
                 ffx::RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                     sender.take().unwrap().send(()).unwrap();
                     responder.send(Err(RepositoryError::ServerNotRunning)).unwrap()
@@ -1462,18 +1460,21 @@ mod test {
                 other => panic!("Unexpected request: {:?}", other),
             })));
 
-            let tool_env = ToolEnv::new()
-                .remote_factory_closure(move || {
+            let fake_injector = FakeInjector {
+                remote_factory_closure: Box::new(move || {
                     let fake_repo = frc.clone();
                     let fake_engine = fec.clone();
-                    async move { Ok(FakeRcs::new(fake_repo, fake_engine)) }
-                })
-                .target_factory_closure(move || {
+                    Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine)) })
+                }),
+                target_factory_closure: Box::new(move || {
                     let fake_target_proxy = fake_target_proxy.clone();
-                    async { Ok(fake_target_proxy) }
-                });
+                    Box::pin(async { Ok(fake_target_proxy) })
+                }),
+                ..Default::default()
+            };
 
-            let env = tool_env.make_environment(test_env.context.clone());
+            let env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
+            env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
 
             let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
 
@@ -1498,7 +1499,7 @@ mod test {
                     auto_publish: None,
                 },
                 repos,
-                context: env.context.clone(),
+                context: env.environment_context().clone(),
                 target_proxy_connector: Connector::try_from_env(&env)
                     .await
                     .expect("Could not make target proxy test connector"),
@@ -1606,7 +1607,7 @@ mod test {
 
         let (sender, _receiver) = channel();
         let mut sender = Some(sender);
-        let repos = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| match req {
+        let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
             ffx::RepositoryRegistryRequest::ServerStatus { responder } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder
@@ -1616,18 +1617,21 @@ mod test {
             other => panic!("Unexpected request: {:?}", other),
         })));
 
-        let tool_env = ToolEnv::new()
-            .remote_factory_closure(move || {
+        let fake_injector = FakeInjector {
+            remote_factory_closure: Box::new(move || {
                 let fake_repo = frc.clone();
                 let fake_engine = fec.clone();
-                async move { Ok(FakeRcs::new(fake_repo, fake_engine)) }
-            })
-            .target_factory_closure(move || {
+                Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine)) })
+            }),
+            target_factory_closure: Box::new(move || {
                 let fake_target_proxy = fake_target_proxy.clone();
-                async { Ok(fake_target_proxy) }
-            });
+                Box::pin(async { Ok(fake_target_proxy) })
+            }),
+            ..Default::default()
+        };
 
-        let env = tool_env.make_environment(test_env.context.clone());
+        let env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
+        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
 
         let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
         let tmp_port_file_path = tmp_port_file.path().to_owned();
@@ -1662,7 +1666,7 @@ mod test {
                     refresh_metadata: false,
                     auto_publish: None,
                 },
-                env.context.clone(),
+                env.environment_context().clone(),
                 writer,
                 ServerMode::Foreground,
             )
@@ -1776,7 +1780,7 @@ mod test {
 
         let (sender, _receiver) = channel();
         let mut sender = Some(sender);
-        let repos = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| match req {
+        let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
             ffx::RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder.send(Err(RepositoryError::ServerNotRunning)).unwrap()
@@ -1784,18 +1788,21 @@ mod test {
             other => panic!("Unexpected request: {:?}", other),
         })));
 
-        let tool_env = ToolEnv::new()
-            .remote_factory_closure(move || {
+        let fake_injector = FakeInjector {
+            remote_factory_closure: Box::new(move || {
                 let fake_repo = frc.clone();
                 let fake_engine = fec.clone();
-                async move { Ok(FakeRcs::new(fake_repo, fake_engine)) }
-            })
-            .target_factory_closure(move || {
+                Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine)) })
+            }),
+            target_factory_closure: Box::new(move || {
                 let fake_target_proxy = fake_target_proxy.clone();
-                async { Ok(fake_target_proxy) }
-            });
+                Box::pin(async { Ok(fake_target_proxy) })
+            }),
+            ..Default::default()
+        };
 
-        let env = tool_env.make_environment(test_env.context.clone());
+        let env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
+        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
 
         let test_stdout = TestBuffer::default();
         let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
@@ -1827,7 +1834,7 @@ mod test {
                     refresh_metadata: false,
                     auto_publish: None,
                 },
-                env.context.clone(),
+                env.environment_context().clone(),
                 writer,
                 ServerMode::Foreground,
             )
@@ -1868,8 +1875,12 @@ mod test {
         let mut repositories = vec![];
         for repo_name in ["fuchsia.com", "example.com"] {
             let metadata_path = pb_dir.join(repo_name);
-            fuchsia_repo::test_utils::make_repo_dir(metadata_path.as_ref(), blobs_dir.as_ref())
-                .await;
+            fuchsia_repo::test_utils::make_repo_dir(
+                metadata_path.as_ref(),
+                blobs_dir.as_ref(),
+                None,
+            )
+            .await;
             repositories.push(sdk_metadata::Repository {
                 name: repo_name.into(),
                 metadata_path,
@@ -1926,7 +1937,7 @@ mod test {
 
         let (sender, _receiver) = channel();
         let mut sender = Some(sender);
-        let repos = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| match req {
+        let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
             ffx::RepositoryRegistryRequest::ServerStatus { responder } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder
@@ -1935,18 +1946,21 @@ mod test {
             }
             other => panic!("Unexpected request: {:?}", other),
         })));
-        let tool_env = ToolEnv::new()
-            .remote_factory_closure(move || {
+        let fake_injector = FakeInjector {
+            remote_factory_closure: Box::new(move || {
                 let fake_repo = frc.clone();
                 let fake_engine = fec.clone();
-                async move { Ok(FakeRcs::new(fake_repo, fake_engine)) }
-            })
-            .target_factory_closure(move || {
+                Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine)) })
+            }),
+            target_factory_closure: Box::new(move || {
                 let fake_target_proxy = ftpc.clone();
-                async { Ok(fake_target_proxy) }
-            });
+                Box::pin(async { Ok(fake_target_proxy) })
+            }),
+            ..Default::default()
+        };
 
-        let env = tool_env.make_environment(test_env.context.clone());
+        let env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
+        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
 
         // Future resolves once fake target exists
         let _timeout = timeout(time::Duration::from_secs(10), async {
@@ -2109,7 +2123,7 @@ mod test {
 
         let (sender, _receiver) = channel();
         let mut sender = Some(sender);
-        let repos = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| match req {
+        let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
             ffx::RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder.send(Err(RepositoryError::ServerNotRunning)).unwrap()
@@ -2117,17 +2131,20 @@ mod test {
             other => panic!("Unexpected request: {:?}", other),
         })));
 
-        let tool_env = ToolEnv::new()
-            .remote_factory_closure(move || {
+        let fake_injector = FakeInjector {
+            remote_factory_closure: Box::new(move || {
                 let fake_repo = frc.clone();
                 let fake_engine = fec.clone();
-                async move { Ok(FakeRcs::new(fake_repo, fake_engine)) }
-            })
-            .target_factory_closure(move || {
+                Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine)) })
+            }),
+            target_factory_closure: Box::new(move || {
                 let fake_target_proxy = fake_target_proxy.clone();
-                async { Ok(fake_target_proxy) }
-            });
-        let env = tool_env.make_environment(test_env.context.clone());
+                Box::pin(async { Ok(fake_target_proxy) })
+            }),
+            ..Default::default()
+        };
+        let env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
+        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
 
         // Prepare serving the repo without passing the trusted root, and
         // passing of the trusted root 2.root.json explicitly
@@ -2174,7 +2191,7 @@ mod test {
         let _task = fasync::Task::local(async move {
             let (sender, _receiver) = channel();
             let mut sender = Some(sender);
-            let repos = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| match req {
+            let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
                 ffx::RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                     sender.take().unwrap().send(()).unwrap();
                     responder.send(Err(RepositoryError::ServerNotRunning)).unwrap()

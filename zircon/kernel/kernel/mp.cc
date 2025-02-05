@@ -9,12 +9,12 @@
 
 #include <assert.h>
 #include <debug.h>
-#include <inttypes.h>
 #include <lib/arch/intrin.h>
 #include <lib/console.h>
 #include <lib/fit/defer.h>
 #include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/lockup_detector.h>
+#include <lib/lockup_detector/diagnostics.h>
 #include <lib/system-topology.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
@@ -283,7 +283,7 @@ zx_status_t mp_hotplug_cpu_mask(cpu_mask_t cpu_mask) {
 }
 
 // Unplug a single CPU.  Must be called while holding the hotplug lock
-static zx_status_t mp_unplug_cpu_mask_single_locked(cpu_num_t cpu_id, zx_time_t deadline) {
+static zx_status_t mp_unplug_cpu_mask_single_locked(cpu_num_t cpu_id, zx_instant_mono_t deadline) {
   percpu& percpu_to_unplug = percpu::Get(cpu_id);
 
   // Wait for |percpu_to_unplug| to complete any in-progress DPCs and terminate its DPC thread.
@@ -319,7 +319,7 @@ static zx_status_t mp_unplug_cpu_mask_single_locked(cpu_num_t cpu_id, zx_time_t 
 //
 // This should be called in a thread context.
 //
-zx_status_t mp_unplug_cpu_mask(cpu_mask_t cpu_mask, zx_time_t deadline) {
+zx_status_t mp_unplug_cpu_mask(cpu_mask_t cpu_mask, zx_instant_mono_t deadline) {
   DEBUG_ASSERT(!arch_ints_disabled());
   Guard<Mutex> lock(&mp.hotplug_lock);
 
@@ -419,34 +419,81 @@ static void mp_all_cpu_startup_sync_hook(unsigned int rl) {
   // needed to work around certain errata presented in only some revisions of
   // the CPU silicon (something which can only be determined by the core itself
   // as it comes up).
-  //
-  // If something goes wrong, do not panic.  Instead, just log a kernel OOPS and
-  // keep going.  Things are bad, and we want to take notice in CI/CQ
-  // environments, but not bad enough to panic the system and send it into a
-  // boot-loop.
-  constexpr zx_duration_t kCpuStartupTimeout = ZX_SEC(30);
-  zx_status_t status = mp_wait_for_all_cpus_ready(Deadline::after(kCpuStartupTimeout));
-  if (status != ZX_OK) {
-    const auto online_mask = mp_get_online_mask();
-    KERNEL_OOPS(
-        "At least one CPU has not declared itself to be started after %ld ms.  "
-        "(online mask = %08x)\n",
-        kCpuStartupTimeout / ZX_MSEC(1), online_mask);
+  constexpr zx_duration_mono_t kCpuStartupTimeout = ZX_SEC(30);
+  zx_status_t status = mp_wait_for_all_cpus_ready(Deadline::after_mono(kCpuStartupTimeout));
+  if (status == ZX_OK) {
+    return;
+  }
 
-    // Also report a separate OOPS for any processor which is not yet in the
-    // online mask.  Depending on where the core got wedged, it may be "online"
-    // but has not managed to declare itself as started, or it might not have
-    // even made it to the point where it declared itself to be online.
-    for (auto* node : system_topology::GetSystemTopology().processors()) {
-      const auto& processor = node->entity.processor;
-      for (int i = 0; i < processor.logical_id_count; i++) {
-        const cpu_num_t logical_id = node->entity.processor.logical_ids[i];
-        if ((cpu_num_to_mask(logical_id) & online_mask) == 0) {
-          KERNEL_OOPS("CPU %u is not online\n", logical_id);
-        }
+  // Something has gone wrong.  One or more of the secondaries has failed to
+  // check-in before the timeout.  We can either try to limp along or fail, hard
+  // and fast.
+  //
+  // On development or engineering builds (LK_DEBUGLEVEL > 0), we will emit an
+  // oops and continue booting under the assumption that the system is "under
+  // development".  By emitting an oops and continuing, we hope to make it
+  // easier for the developer to see that there's a problem.  Separately,
+  // automated testing infrastructure is designed to look for and flag oops
+  // events.
+  //
+  // On production builds (LK_DEBUGLEVEL == 0) we're going (attempt to) dump
+  // some diagnostic data, and then panic.  This can be counter-intuitive.  The
+  // thinking here is that it's better to fail hard and fast than to let the
+  // system continue on in an unknown or degraded state.  The recovery mechanism
+  // is designed to cope with failures that happen early in boot.  Failures that
+  // happen later (think after the netstack is up and running) are less likely
+  // to trigger the appropriate recovery response.
+
+  // Build masks containing the CPUs that are online+ready, that are merely
+  // online, and that should be online+ready so we can report the ones that are
+  // missing.  Note, ready implies online.
+  const cpu_mask_t ready_mask = ready_cpu_mask.load(ktl::memory_order_relaxed);
+  const cpu_mask_t online_mask = mp_get_online_mask();
+  cpu_mask_t expected_ready_mask = 0;
+  for (system_topology::Node* node : system_topology::GetSystemTopology().processors()) {
+    const zbi_topology_processor_t& processor = node->entity.processor;
+    for (int i = 0; i < processor.logical_id_count; i++) {
+      const cpu_num_t logical_id = node->entity.processor.logical_ids[i];
+      expected_ready_mask |= cpu_num_to_mask(logical_id);
+    }
+  }
+
+  // Format a message that we can use in both the oops and panic paths.
+  char msg[200];
+  snprintf(msg, sizeof(msg),
+           "At least one CPU has not declared itself to be started after %ld ms "
+           "(ready %08x, online %08x, expected %08x)\n\n",
+           kCpuStartupTimeout / ZX_MSEC(1), ready_mask, online_mask, expected_ready_mask);
+
+  // Is this a development build?
+  if (LK_DEBUGLEVEL > 0) {
+    KERNEL_OOPS("%s", msg);
+    return;
+  }
+
+  // This is a production build.  Try to gather some diagnostic data from the
+  // CPUs that failed to check-in.
+  //
+  // Start the panic process so that anything we print from here on out will go
+  // out to serial.  Also, be sure to not attempt to halt any other CPUs since
+  // we're about to query them for their state.
+  platform_panic_start(PanicStartHaltOtherCpus::No);
+  printf("%s", msg);
+
+  // If this machine has the ability to dump diagnostic state do so for each CPU
+  // that failed to check-in.
+  if (CanDumpRegistersAndBacktrace()) {
+    cpu_mask_t dump_mask = expected_ready_mask & ~ready_mask;
+    cpu_num_t target_cpu;
+    while ((target_cpu = remove_cpu_from_mask(dump_mask)) != INVALID_CPU) {
+      status = DumpRegistersAndBacktrace(target_cpu, stdout);
+      if (status != ZX_OK) {
+        printf("failed to dump state for cpu-%u, status %d\n", target_cpu, status);
       }
     }
   }
+
+  platform_halt(HALT_ACTION_HALT, ZirconCrashReason::Panic);
 }
 
 // Before allowing the system to proceed to the USER init level, wait to be sure

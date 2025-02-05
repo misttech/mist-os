@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/hdmi-transmitter.h"
 
-#include <lib/driver/mock-mmio-range/cpp/mock-mmio-range.h>
+#include <lib/driver/mock-mmio/cpp/mock-mmio-range.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/zx/result.h>
 
@@ -38,7 +38,10 @@ class MockHdmiTransmitterController : public designware_hdmi::HdmiTransmitterCon
   ~MockHdmiTransmitterController() { EXPECT_TRUE(expected_calls_.empty()); }
 
   zx_status_t InitHw() override { return ZX_OK; }
-  zx_status_t EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count) override { return ZX_OK; }
+
+  zx::result<fbl::Vector<uint8_t>> ReadExtendedEdid() override {
+    return zx::ok(fbl::Vector<uint8_t>{});
+  }
 
   void ConfigHdmitx(const designware_hdmi::ColorParam& color_param,
                     const display::DisplayTiming& mode,

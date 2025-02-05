@@ -18,9 +18,9 @@ use fuchsia_sync::Mutex;
 use futures::FutureExt;
 use inspect_writable::{InspectWritable, InspectWritableNode};
 use lazy_static::lazy_static;
+use log::warn;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::warn;
 
 const ONE_MILLION: i32 = 1_000_000;
 /// The value stored in place of any time that could not be generated.

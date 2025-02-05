@@ -116,8 +116,7 @@ closed protocol ProjectId {
     }) -> () error zx.Status;
 
     /// Apply project id to a node_id from a GetAttrs call. This will return ZX_ERR_NOT_FOUND if
-    /// node doesn't exist, ZX_ERR_ALREADY_EXISTS if there is already a `project_id` applied to
-    /// the node, and ZX_ERR_OUT_OF_RANGE if `project_id` is set to zero.
+    /// node doesn't exist, and ZX_ERR_OUT_OF_RANGE if `project_id` is set to zero.
     strict SetForNode(struct {
         node_id uint64;
         project_id uint64;

@@ -12,8 +12,8 @@ use fuchsia_bluetooth::types::le::Peer as btPeer;
 use fuchsia_bluetooth::types::{PeerId, Uuid};
 use fuchsia_component::client::connect_to_protocol;
 use futures::stream::{StreamExt, TryStreamExt};
+use log::{info, warn};
 use std::collections::HashMap;
-use tracing::{info, warn};
 use {fidl_fuchsia_bluetooth_gatt2 as gatt, fuchsia_async as fasync};
 
 /// The UUID of with the GATT battery service.
@@ -97,19 +97,19 @@ async fn watch_battery_level(id: PeerId, mut stream: gatt::CharacteristicNotifie
         };
         let _ = responder.send();
         match read_battery_level(notif) {
-            Ok(battery_percent) => info!(%id, "Battery level: {battery_percent}"),
-            Err(e) => warn!(%id, "Couldn't read battery level: {e:?}"),
+            Ok(battery_percent) => info!(id:%; "Battery level: {battery_percent}"),
+            Err(e) => warn!(id:%; "Couldn't read battery level: {e:?}"),
         }
         // TODO(https://fxbug.dev/42074786): Integrate this with the Fuchsia power reporting services using
         // the `fuchsia.bluetooth.power.Reporter` API.
     }
-    info!(%id, "Battery notifications terminated");
+    info!(id:%; "Battery notifications terminated");
 }
 
 /// Attempts to connect to the peer and read the battery level.
 /// Returns OK if the battery level characteristic was successfully read, Error otherwise.
 async fn try_connect(id: PeerId, central: &CentralProxy) -> Result<BatteryClient, Error> {
-    info!(%id, "Trying to connect");
+    info!(id:%; "Trying to connect");
     // Try to connect and establish a GATT connection.
     let (le_client, le_server) = fidl::endpoints::create_proxy::<ConnectionMarker>();
     central.connect(&id.into(), &ConnectionOptions::default(), le_server)?;
@@ -137,8 +137,8 @@ async fn try_connect(id: PeerId, central: &CentralProxy) -> Result<BatteryClient
         .await?
         .map_err(|e| format_err!("{e:?}"))?;
     match read_battery_level(read_response) {
-        Ok(level) => info!(%id, "Battery level: {level}"),
-        Err(e) => info!(%id, "Failed to read battery level: {e:?}"),
+        Ok(level) => info!(id:%; "Battery level: {level}"),
+        Err(e) => info!(id:%; "Failed to read battery level: {e:?}"),
     };
 
     let _monitor_task = if notifications {
@@ -173,10 +173,10 @@ async fn handle_scan_result(
         let peer = btPeer::try_from(peer)?;
         match try_connect(peer.id, central).await {
             Ok(battery_client) => {
-                info!(id = %peer.id, "Successfully initiated LE connection");
+                info!(id:% = peer.id; "Successfully initiated LE connection");
                 return Ok(battery_client);
             }
-            Err(e) => info!(id = %peer.id, "Couldn't connect: {e:?}"),
+            Err(e) => info!(id:% = peer.id; "Couldn't connect: {e:?}"),
         }
     }
 

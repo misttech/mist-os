@@ -27,7 +27,6 @@ async fn component_manager_namespace() {
         "/svc/fuchsia.kernel.DebugResource",
         "/svc/fuchsia.kernel.DebuglogResource",
         "/svc/fuchsia.kernel.EnergyInfoResource",
-        "/svc/fuchsia.kernel.FramebufferResource",
         "/svc/fuchsia.kernel.DebuglogResource",
         "/svc/fuchsia.kernel.HypervisorResource",
         "/svc/fuchsia.kernel.InfoResource",

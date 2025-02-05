@@ -157,7 +157,7 @@ int main(int argc, const char** argv) {
                              return usage_option == usage_string_and_usage.first;
                            });
     if (it == kRenderUsageOptions.cend()) {
-      fprintf(stderr, "Unrecognized AudioRenderUsage %s\n\n", usage_option.c_str());
+      fprintf(stderr, "Unrecognized AudioRenderUsage '%s'\n\n", usage_option.c_str());
       usage(argv[0]);
       return 1;
     }

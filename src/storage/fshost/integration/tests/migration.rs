@@ -51,7 +51,6 @@ fn disk_size_bytes() -> u64 {
 // Original state - unknown/blank
 
 #[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
 async fn none_to_format() {
     let mut builder = new_builder();
     builder
@@ -69,7 +68,6 @@ async fn none_to_format() {
 // Original state - fxfs
 
 #[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
 async fn fxfs_to_format() {
     let mut builder = new_builder();
     builder
@@ -93,7 +91,6 @@ async fn fxfs_to_format() {
 // Original state - zxcrypt with unknown/blank
 
 #[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
 async fn zxcrypt_to_format() {
     let mut builder = new_builder();
     builder
@@ -116,7 +113,6 @@ async fn zxcrypt_to_format() {
 // Original state - zxcrypt with minfs
 
 #[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
 async fn minfs_to_format() {
     let mut builder = new_builder();
     builder
@@ -140,7 +136,6 @@ async fn minfs_to_format() {
 // Original state - zxcrypt with f2fs
 
 #[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
 async fn f2fs_to_format() {
     let mut builder = new_builder();
     builder

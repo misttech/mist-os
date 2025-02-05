@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use fidl::endpoints::Proxy;
 use std::sync::Arc;
 use vfs::directory::entry::DirectoryEntry;
 use {
@@ -42,9 +41,6 @@ pub async fn toolbox_directory(
     )
     .await?;
 
-    let (svc_dir, object) = fidl::endpoints::create_endpoints();
-    let svc_dir =
-        fio::DirectoryProxy::from_channel(fidl::AsyncChannel::from_channel(svc_dir.into_channel()));
-    dir.open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), "svc", object)?;
+    let svc_dir = fuchsia_fs::directory::open_directory(&dir, "svc", fio::PERM_READABLE).await?;
     Ok(vfs::remote::remote_dir(svc_dir))
 }

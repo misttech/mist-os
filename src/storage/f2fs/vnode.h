@@ -134,9 +134,9 @@ class VnodeF2fs : public fs::PagedVnode,
 
   zx_status_t DoTruncate(size_t len) __TA_EXCLUDES(f2fs::GetGlobalLock());
   zx_status_t TruncateBlocks(uint64_t from) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
-  zx_status_t TruncateHoleUnsafe(pgoff_t pg_start, pgoff_t pg_end, bool zero = true)
+  zx_status_t TruncateHoleUnsafe(pgoff_t pg_start, pgoff_t pg_end, bool evict = true)
       __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
-  zx_status_t TruncateHole(pgoff_t pg_start, pgoff_t pg_end, bool zero = true)
+  zx_status_t TruncateHole(pgoff_t pg_start, pgoff_t pg_end, bool evict = true)
       __TA_EXCLUDES(f2fs::GetGlobalLock());
   void TruncateToSize() __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
   void EvictVnode() __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
@@ -315,6 +315,9 @@ class VnodeF2fs : public fs::PagedVnode,
     return file_cache_->GetLockedPages(start, end);
   }
 
+  virtual zx::result<LockedPage> FindGcPage(pgoff_t index) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
   size_t GetPageCount() { return file_cache_->GetSize(); }
 
   pgoff_t Writeback(WritebackOperation &operation) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());

@@ -188,6 +188,15 @@ fidl::ClientEnd<fuchsia_component::Realm> DriverRunnerTestBase::ConnectToRealm()
                              fidl::kIgnoreBindingClosure);
   return std::move(realm_endpoints.client);
 }
+
+fidl::ClientEnd<fuchsia_component_sandbox::CapabilityStore>
+DriverRunnerTestBase::ConnectToCapabilityStore() {
+  auto store_endpoints = fidl::Endpoints<fuchsia_component_sandbox::CapabilityStore>::Create();
+  capstore_bindings_.AddBinding(dispatcher(), std::move(store_endpoints.server), &cap_store_,
+                                fidl::kIgnoreBindingClosure);
+  return std::move(store_endpoints.client);
+}
+
 FakeDriverIndex DriverRunnerTestBase::CreateDriverIndex() {
   return FakeDriverIndex(dispatcher(), [](auto args) -> zx::result<FakeDriverIndex::MatchResult> {
     if (args.name().get() == "second") {
@@ -251,8 +260,12 @@ FakeDriverIndex DriverRunnerTestBase::CreateDriverIndex() {
 }
 void DriverRunnerTestBase::SetupDriverRunner(FakeDriverIndex driver_index) {
   driver_index_.emplace(std::move(driver_index));
-  driver_runner_.emplace(ConnectToRealm(), driver_index_->Connect(), inspect(), &LoaderFactory,
-                         dispatcher(), false);
+  driver_runner_.emplace(ConnectToRealm(), ConnectToCapabilityStore(), driver_index_->Connect(),
+                         inspect(), &LoaderFactory, dispatcher(), false,
+                         driver_manager::OfferInjector{{
+                             .power_inject_offer = false,
+                             .power_suspend_enabled = false,
+                         }});
   SetupDevfs();
 }
 
@@ -278,7 +291,12 @@ void DriverRunnerTestBase::SetupDriverRunnerWithDynamicLinker(
   dynamic_linker_ =
       driver_loader::Loader::Create(loader_dispatcher, std::move(load_driver_handler));
   driver_runner_.emplace(
-      ConnectToRealm(), driver_index_->Connect(), inspect(), &LoaderFactory, dispatcher(), false,
+      ConnectToRealm(), ConnectToCapabilityStore(), driver_index_->Connect(), inspect(),
+      &LoaderFactory, dispatcher(), false,
+      driver_manager::OfferInjector{{
+          .power_inject_offer = false,
+          .power_suspend_enabled = false,
+      }},
       driver_manager::DriverRunner::DynamicLinkerArgs{
           [loader = dynamic_linker_.get()]() { return DynamicLinkerFactory(loader); },
           std::move(driver_host_runner)});

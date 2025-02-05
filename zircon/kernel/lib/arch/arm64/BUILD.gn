@@ -6,7 +6,6 @@
 
 import("//build/cpp/library_headers.gni")
 import("//build/toolchain/toolchain_environment.gni")
-import("//zircon/system/ulib/hwreg/hwreg_asm_header.gni")
 
 library_headers("headers") {
   visibility = [ "../*" ]
@@ -22,45 +21,32 @@ library_headers("headers") {
     # <lib/arch/internal/zbi-constants.h> has #include <lib/zbi-format/zbi.h>.
     "//sdk/lib/zbi-format",
   ]
-
-  if (!is_host) {
-    public_deps += [ ":gen-arm64-system-asm" ]
-  }
 }
 
 static_library("arm64") {
   visibility = [ "../*" ]
 
-  public_deps = [ ":headers" ]
-
-  include_dirs = [
-    "include",
-    "../include",
-  ]
-
   sources = [ "shadow-call-stack.S" ]
+  deps = [ "..:headers" ]
 
   if (is_kernel) {
     sources += [
       "cache-ops.S",
       "cache.cc",
+      "drop-el.S",
     ]
 
-    deps = [
-      ":gen-arm64-system-asm",
-      ":random",
-    ]
+    deps += [ ":random" ]
   }
 }
 
 source_set("random") {
   visibility = [ ":*" ]
 
-  include_dirs = [
-    "include",
-    "../include",
+  deps = [
+    "..:headers",
+    "//zircon/system/ulib/hwreg",
   ]
-  deps = [ "//zircon/system/ulib/hwreg" ]
 
   sources = [ "random.cc" ]
 
@@ -70,12 +56,4 @@ source_set("random") {
 config("random.config") {
   visibility = [ ":*" ]
   cflags = [ "-march=armv8.5-a+rng" ]
-}
-
-hwreg_asm_header("gen-arm64-system-asm") {
-  visibility = [ ":*" ]
-  output_name = "lib/arch/arm64/system-asm.h"
-  defines = [ "LIB_ARCH_PRINTERS" ]
-  sources = [ "gen-arm64-system-asm.cc" ]
-  deps = [ ".." ]
 }

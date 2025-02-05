@@ -122,38 +122,18 @@ std::unordered_set<zx_koid_t> UberStructSystem::ExtractViewRefKoids(
 void UberStructSystem::UberStructQueue::Push(scheduling::PresentId present_id,
                                              std::unique_ptr<UberStruct> uber_struct) {
   FX_DCHECK(uber_struct);
+#ifndef NDEBUG
+  // PresentIds must be strictly increasing
+  FX_DCHECK(!last_present_id_.load() || last_present_id_.load() < present_id);
+  last_present_id_.store(present_id);
+#endif
 
-  // Acquire the lock and update the appropriate queue.
-  {
-    std::scoped_lock lock(queue_mutex_);
-
-    // PresentIds must be strictly increasing
-    FX_DCHECK(pending_structs_.empty() || pending_structs_.back().present_id < present_id);
-
-    pending_structs_.push({.present_id = present_id, .uber_struct = std::move(uber_struct)});
-  }
+  pending_structs_.Push(
+      PendingUberStruct{.present_id = present_id, .uber_struct = std::move(uber_struct)});
 }
 
 std::optional<UberStructSystem::PendingUberStruct> UberStructSystem::UberStructQueue::Pop() {
-  std::optional<PendingUberStruct> pending_struct;
-
-  // Acquire the lock and fetch the next PendingUberStruct, if there is one.
-  {
-    std::scoped_lock lock(queue_mutex_);
-    if (pending_structs_.empty()) {
-      pending_struct = std::nullopt;
-    } else {
-      pending_struct = std::move(pending_structs_.front());
-      pending_structs_.pop();
-    }
-  }
-
-  return pending_struct;
-}
-
-size_t UberStructSystem::UberStructQueue::GetPendingSize() {
-  std::scoped_lock lock(queue_mutex_);
-  return pending_structs_.size();
+  return pending_structs_.Pop();
 }
 
 }  // namespace flatland

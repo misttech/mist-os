@@ -105,6 +105,10 @@ class RuntimeDynamicLinker {
       return diag.ok(found);
     }
 
+    if (mode & OpenFlags::kNoload) {
+      return diag.ok(nullptr);
+    }
+
     // A Module for `file` does not yet exist; create a new LinkingSession
     // to perform the loading and linking of the file and all its dependencies.
     LinkingSession<Loader> linking_session{modules_, max_static_tls_modid_};

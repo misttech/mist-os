@@ -47,19 +47,22 @@ func TestFromJSON(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name     string
-		obj      string
-		expected reflect.Type
+		name              string
+		obj               string
+		expected          reflect.Type
+		expectedEmuBinary string
 	}{
 		{
-			name:     "derive aemu target",
-			obj:      `{"type": "aemu", "target": "x64"}`,
-			expected: reflect.TypeOf(&AEMU{}),
+			name:              "derive aemu target",
+			obj:               `{"type": "aemu", "target": "x64"}`,
+			expected:          reflect.TypeOf(&Emulator{}),
+			expectedEmuBinary: "emulator",
 		},
 		{
-			name:     "derive qemu target",
-			obj:      `{"type": "qemu", "target": "arm64"}`,
-			expected: reflect.TypeOf(&QEMU{}),
+			name:              "derive qemu target",
+			obj:               `{"type": "qemu", "target": "arm64"}`,
+			expected:          reflect.TypeOf(&Emulator{}),
+			expectedEmuBinary: "qemu-system-aarch64",
 		},
 		// Testing FromJSON for "device" and "gce" is complex given that
 		// the constructor functions for those two targets perform a good amount
@@ -75,6 +78,11 @@ func TestFromJSON(t *testing.T) {
 			}
 			if reflect.TypeOf(target) != test.expected {
 				t.Errorf("expected target type %q, got %q", test.expected, reflect.TypeOf(target))
+			}
+			if emuTarget, ok := target.(*Emulator); ok {
+				if emuTarget.binary != test.expectedEmuBinary {
+					t.Errorf("expected binary name %q, got %q", test.expectedEmuBinary, emuTarget.binary)
+				}
 			}
 		})
 	}

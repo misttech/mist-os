@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "inspect/offer.shard.cml" ],
     collections: [
         {
             name: "fxfs-crypt",
@@ -27,7 +26,8 @@
             protocol: [ "fuchsia.update.verify.BlobfsVerifier" ],
         },
         {
-            protocol: [ "fuchsia.fxfs.CryptManagement" ],
+            protocol: "fuchsia.fshost.StarnixVolumeProvider",
+            path: "/user_volumes/starnix",
         },
         {
             protocol: "fuchsia.fxfs.BlobCreator",
@@ -65,10 +65,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.memorypressure.Provider",
-                "fuchsia.tracing.provider.Registry",
-            ],
+            protocol: "fuchsia.memorypressure.Provider",
             from: "parent",
             to: "#fxfs",
             availability: "optional",
@@ -104,13 +101,13 @@
             from: "self",
         },
         {
+            protocol: "fuchsia.fshost.StarnixVolumeProvider",
+            from: "self",
+        },
+        {
             protocol: "fuchsia.fxfs.BlobReader",
             from: "self",
             availability: "same_as_target",
-        },
-        {
-            protocol: "fuchsia.fxfs.CryptManagement",
-            from: "self",
         },
     ],
 }

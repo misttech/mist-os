@@ -40,16 +40,16 @@
 // Not safe for concurrent use by multiple threads.
 struct TaskRuntimeStats {
   // The total duration (in ticks) spent running on a CPU.
-  zx_ticks_t cpu_ticks = 0;
+  zx_duration_mono_ticks_t cpu_ticks = 0;
 
   // The total duration (in ticks) spent ready to start running.
-  zx_ticks_t queue_ticks = 0;
+  zx_duration_mono_ticks_t queue_ticks = 0;
 
   // The total duration (in ticks) spent handling page faults.
-  zx_ticks_t page_fault_ticks = 0;
+  zx_duration_mono_ticks_t page_fault_ticks = 0;
 
   // The total duration (in ticks) spent contented on kernel locks.
-  zx_ticks_t lock_contention_ticks = 0;
+  zx_duration_mono_ticks_t lock_contention_ticks = 0;
 
   // Adds another TaskRuntimeStats to this one.
   constexpr TaskRuntimeStats& operator+=(const TaskRuntimeStats& other) {
@@ -78,9 +78,9 @@ class ThreadRuntimeStats {
  public:
   struct ThreadStats {
     // When the thread entered its current state.
-    zx_ticks_t total_running_ticks = 0;
-    zx_ticks_t total_ready_ticks = 0;
-    zx_ticks_t state_change_ticks = 0;
+    zx_duration_mono_ticks_t total_running_ticks = 0;
+    zx_duration_mono_ticks_t total_ready_ticks = 0;
+    zx_duration_mono_ticks_t state_change_ticks = 0;
     thread_state current_state{THREAD_INITIAL};
   };
 
@@ -121,18 +121,18 @@ class ThreadRuntimeStats {
     // Make sure that our sampling of the ticks counter takes place between the
     // two stores of the sequence number, and is not allowed to move outside of
     // the update transaction because of pipelined execution.
-    const zx_ticks_t now =
+    const zx_instant_mono_ticks_t now =
         timer_current_mono_ticks_synchronized<GetTicksSyncFlag::kAfterPreviousStores |
                                               GetTicksSyncFlag::kBeforeSubsequentStores>();
 
     // Now go ahead an update our payload, making sure to use relaxed atomic
     // stores when writing to the contents.
     if (stats.current_state == THREAD_RUNNING) {
-      const zx_ticks_t delta = zx_ticks_sub_ticks(now, stats.state_change_ticks);
+      const zx_duration_mono_ticks_t delta = zx_ticks_sub_ticks(now, stats.state_change_ticks);
       ktl::atomic_ref(stats.total_running_ticks)
           .store(zx_ticks_add_ticks(stats.total_running_ticks, delta), ktl::memory_order_relaxed);
     } else if (stats.current_state == THREAD_READY) {
-      const zx_ticks_t delta = zx_ticks_sub_ticks(now, stats.state_change_ticks);
+      const zx_duration_mono_ticks_t delta = zx_ticks_sub_ticks(now, stats.state_change_ticks);
       ktl::atomic_ref(stats.total_ready_ticks)
           .store(zx_ticks_add_ticks(stats.total_ready_ticks, delta), ktl::memory_order_relaxed);
     }
@@ -143,8 +143,10 @@ class ThreadRuntimeStats {
 
   // Updates the page fault / lock contention ticks with the given deltas. These values do not
   // require relative coherence with other state.
-  void AddPageFaultTicks(zx_ticks_t delta) { page_fault_ticks_.fetch_add(delta); }
-  void AddLockContentionTicks(zx_ticks_t delta) { lock_contention_ticks_.fetch_add(delta); }
+  void AddPageFaultTicks(zx_duration_mono_ticks_t delta) { page_fault_ticks_.fetch_add(delta); }
+  void AddLockContentionTicks(zx_duration_mono_ticks_t delta) {
+    lock_contention_ticks_.fetch_add(delta);
+  }
 
   // Returns the instantaneous runtime stats for the thread, including the time
   // the thread has spent in its current state (if that state is either READY or
@@ -155,10 +157,11 @@ class ThreadRuntimeStats {
     // Adjust for the current time if the thread was in a state that we track
     // when we queried its stats.
     if ((res.stats.current_state == THREAD_RUNNING) || (res.stats.current_state == THREAD_READY)) {
-      const zx_ticks_t delta = zx_ticks_sub_ticks(res.now, res.stats.state_change_ticks);
-      zx_ticks_t& counter = (res.stats.current_state == THREAD_RUNNING)
-                                ? res.stats.total_running_ticks
-                                : res.stats.total_ready_ticks;
+      const zx_duration_mono_ticks_t delta =
+          zx_ticks_sub_ticks(res.now, res.stats.state_change_ticks);
+      zx_duration_mono_ticks_t& counter = (res.stats.current_state == THREAD_RUNNING)
+                                              ? res.stats.total_running_ticks
+                                              : res.stats.total_ready_ticks;
       counter = zx_ticks_add_ticks(counter, delta);
     }
 
@@ -173,7 +176,7 @@ class ThreadRuntimeStats {
 
   struct ReadResult {
     ThreadStats stats;
-    zx_ticks_t now{};
+    zx_instant_mono_ticks_t now{};
   };
 
   // Returns a coherent snapshot of the ThreadStats state.
@@ -224,8 +227,8 @@ class ThreadRuntimeStats {
                                         LockFlagsReportingDisabled) seq_lock_;
 
   SeqLockPayload<ThreadStats, decltype(seq_lock_)> published_stats_ TA_GUARDED(seq_lock_){};
-  RelaxedAtomic<zx_ticks_t> page_fault_ticks_{0};
-  RelaxedAtomic<zx_ticks_t> lock_contention_ticks_{0};
+  RelaxedAtomic<zx_duration_mono_ticks_t> page_fault_ticks_{0};
+  RelaxedAtomic<zx_duration_mono_ticks_t> lock_contention_ticks_{0};
 };
 
 }  // namespace task_runtime_stats::internal

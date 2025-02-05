@@ -67,9 +67,7 @@ TEST(Inspect, RecordAndDropInspector) {
 
 TEST(Inspect, CreateNodeWithLongStringReferences) {
   auto inspector = std::make_unique<Inspector>();
-  const std::string long_with_extent_data(3000, '.');
-
-  const inspect::StringReference long_with_extent(long_with_extent_data.c_str());
+  const std::string long_with_extent(3000, '.');
 
   const auto initial = inspector->GetStats().allocated_blocks;
   constexpr auto number_nodes_created = 1000u;
@@ -85,7 +83,7 @@ TEST(Inspect, CreateNodeWithLongStringReferences) {
   auto hierarchy = result.take_value();
   ASSERT_EQ(number_nodes_created, hierarchy.children().size());
   std::for_each(std::cbegin(hierarchy.children()), std::cend(hierarchy.children()),
-                [&](const auto& child) { EXPECT_EQ(long_with_extent_data, child.name()); });
+                [&](const auto& child) { EXPECT_EQ(long_with_extent, child.name()); });
 }
 
 TEST(Inspect, CreateNodeWithLongNames) {
@@ -105,28 +103,15 @@ TEST(Inspect, CreateNodeWithLongNames) {
   ASSERT_TRUE(result.is_ok());
   auto hierarchy = result.take_value();
   ASSERT_EQ(2u, hierarchy.children().size());
-  EXPECT_EQ(long_one_block, hierarchy.children()[0].name());
-  EXPECT_EQ(long_with_extent, hierarchy.children()[1].name());
-}
-
-TEST(Inspect, MixStringReferencesWithRegularStrings) {
-  auto inspector = std::make_unique<Inspector>();
-  auto regular = inspector->GetRoot().CreateChild("regular");
-  auto as_ref = inspector->GetRoot().CreateChild(inspect::StringReference("reference"));
-  auto result = inspect::ReadFromVmo(inspector->DuplicateVmo());
-  ASSERT_TRUE(result.is_ok());
-  auto hierarchy = result.take_value();
-
-  ASSERT_EQ(2u, hierarchy.children().size());
-  EXPECT_EQ("regular", hierarchy.children()[0].name());
-  EXPECT_EQ("reference", hierarchy.children()[1].name());
+  EXPECT_EQ(long_with_extent, hierarchy.children()[0].name());
+  EXPECT_EQ(long_one_block, hierarchy.children()[1].name());
 }
 
 TEST(Inspect, DeallocateStringReferencesThenAddMore) {
   auto inspector = std::make_unique<Inspector>();
   {
-    const inspect::StringReference sr1("first");
-    const inspect::StringReference sr2("second");
+    std::string_view sr1("first");
+    std::string_view sr2("second");
 
     auto _ = inspector->GetRoot().CreateChild(sr1);
     auto _i = inspector->GetRoot().CreateChild(sr2);
@@ -140,7 +125,7 @@ TEST(Inspect, DeallocateStringReferencesThenAddMore) {
     EXPECT_EQ("second", hierarchy.children()[1].name());
   }
 
-  const inspect::StringReference outer("outer");
+  std::string_view outer("outer");
   auto _ = inspector->GetRoot().CreateChild(outer);
 
   auto result = inspect::ReadFromVmo(inspector->DuplicateVmo());
@@ -209,8 +194,8 @@ TEST(Inspect, TransactionsBlockCopy) {
 
 TEST(Inspect, UsingStringReferencesAsNames) {
   auto inspector = std::make_unique<Inspector>();
-  const inspect::StringReference one("one");
-  const inspect::StringReference two("two");
+  std::string_view one = "one";
+  std::string_view two = "two";
 
   auto child_one = inspector->GetRoot().CreateChild(one);
   auto child_two = inspector->GetRoot().CreateChild(two);
@@ -224,13 +209,15 @@ TEST(Inspect, UsingStringReferencesAsNames) {
   // the +2 are the child blocks, note that no name/string_reference is allocated
   EXPECT_EQ(after_children + 2, after_more_children);
 
-  { auto c = child_one.CreateChild(one); }
+  {
+    auto c = child_one.CreateChild(one);
+  }
   // The 1 is the child created in the above block. Note that
   // a new NAME or STRING_REFERENCE is *not* allocated and therefore
   // not deallocated.
   EXPECT_EQ(inspector->GetStats().deallocated_blocks, 1);
 
-  auto c = child_one.CreateChild(inspect::StringReference("a new string reference"));
+  auto c = child_one.CreateChild("a new string reference");
 
   auto result = inspect::ReadFromVmo(inspector->DuplicateVmo());
   ASSERT_TRUE(result.is_ok());
@@ -238,17 +225,17 @@ TEST(Inspect, UsingStringReferencesAsNames) {
 
   // children of root
   ASSERT_EQ(2u, hierarchy.children().size());
-  EXPECT_EQ("one", hierarchy.children()[1].name());
-  EXPECT_EQ("two", hierarchy.children()[0].name());
+  EXPECT_EQ("one", hierarchy.children()[0].name());
+  EXPECT_EQ("two", hierarchy.children()[1].name());
 
   // children of child_one
-  ASSERT_EQ(2u, hierarchy.children()[1].children().size());
-  EXPECT_EQ("two", hierarchy.children()[1].children()[0].name());
-  EXPECT_EQ("a new string reference", hierarchy.children()[1].children()[1].name());
+  ASSERT_EQ(2u, hierarchy.children()[0].children().size());
+  EXPECT_EQ("a new string reference", hierarchy.children()[0].children()[0].name());
+  EXPECT_EQ("two", hierarchy.children()[0].children()[1].name());
 
   // children of child_two
-  ASSERT_EQ(1u, hierarchy.children()[0].children().size());
-  EXPECT_EQ("one", hierarchy.children()[0].children()[0].name());
+  ASSERT_EQ(1u, hierarchy.children()[1].children().size());
+  EXPECT_EQ("one", hierarchy.children()[1].children()[0].name());
 
   // Inspector::State::~Heap will ensure that release is done properly,
   // so this unit test ensures that StringReferences are correctly refcounted
@@ -256,7 +243,7 @@ TEST(Inspect, UsingStringReferencesAsNames) {
 }
 
 TEST(Inspect, CreateLazyNodeWithStringReferences) {
-  const inspect::StringReference lazy("lazy");
+  std::string_view lazy("lazy");
   Inspector inspector;
   inspector.GetRoot().CreateLazyNode(
       lazy,
@@ -335,8 +322,8 @@ TEST(Inspect, CreateGetStats) {
 TEST(Inspect, StringArrays) {
   Inspector inspector;
 
-  const inspect::StringReference array_name("array_name");
-  const inspect::StringReference shared_ref("shared_ref");
+  std::string_view array_name("array_name");
+  std::string_view shared_ref("shared_ref");
   const std::string big(inspect::internal::kMaxOrderSize + 1, '.');
 
   auto property = inspector.GetRoot().CreateInt(shared_ref, 5);
@@ -359,13 +346,13 @@ TEST(Inspect, StringArrays) {
     const auto& int_prop = hierarchy.node().properties().at(1);
     const auto& array_prop = hierarchy.node().properties().at(0);
 
-    EXPECT_EQ(shared_ref.Data(), int_prop.name());
-    EXPECT_EQ(array_name.Data(), array_prop.name());
+    EXPECT_EQ(shared_ref, int_prop.name());
+    EXPECT_EQ(array_name, array_prop.name());
 
     const auto& array_data = array_prop.Get<inspect::StringArrayValue>().value();
 
     EXPECT_EQ("zero", array_data.at(0));
-    EXPECT_EQ(shared_ref.Data(), array_data.at(1));
+    EXPECT_EQ(shared_ref, array_data.at(1));
     EXPECT_TRUE(array_data.at(2).empty());
     EXPECT_EQ(big, array_data.at(3));
     EXPECT_TRUE(array_data.at(4).empty());
@@ -382,7 +369,7 @@ TEST(Inspect, StringArrays) {
 
   const auto& int_prop = hierarchy.node().properties().at(0);
 
-  EXPECT_EQ(shared_ref.Data(), int_prop.name());
+  EXPECT_EQ(shared_ref, int_prop.name());
 }
 
 namespace {
@@ -451,7 +438,8 @@ TEST(Inspect, CreateStatsNode) {
   CheckStats(&hierarchy, &expected);
 
   for (int i = 0; i < 100; i++) {
-    inspector.GetRoot().CreateString(std::to_string(i), "This is a test", &inspector);
+    inspector.GetRoot().CreateString(std::to_string(i), "This is a test" + std::to_string(i),
+                                     &inspector);
   }
 
   ReadChildHierarchy(&inspector, &hierarchy, FUCHSIA_INSPECT_STATS);
@@ -465,7 +453,8 @@ TEST(Inspect, CreateStatsNode) {
   CheckStats(&hierarchy, &expected);
 
   for (int i = 101; i < 128; i++) {
-    inspector.GetRoot().CreateString(std::to_string(i), "This is a test", &inspector);
+    inspector.GetRoot().CreateString(std::to_string(i), "This is a test" + std::to_string(i),
+                                     &inspector);
   }
 
   ReadChildHierarchy(&inspector, &hierarchy, FUCHSIA_INSPECT_STATS);

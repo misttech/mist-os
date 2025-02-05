@@ -239,10 +239,9 @@ mod tests {
                 maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
                 utilization_per_ten_k: 10000u64,
                 total_dynamic_children: 2u64,
-                allocated_blocks: 665u64,
-                // 2 additional blocks are deallocated because of the failed allocation
+                allocated_blocks: 664u64,
                 deallocated_blocks: 4u64,
-                failed_allocations: 1u64,
+                failed_allocations: 2u64,
             }
         });
     }

@@ -8,6 +8,7 @@ zx_library("uart") {
   sdk = "source"
   sdk_headers = [
     "lib/uart/all.h",
+    "lib/uart/interrupt.h",
     "lib/uart/chars-from.h",
     "lib/uart/ns8250.h",
     "lib/uart/null.h",
@@ -67,4 +68,9 @@ zx_library("uart-mock") {
 group("tests") {
   testonly = true
   deps = [ "test:tests" ]
+}
+
+group("e2e_tests") {
+  testonly = true
+  deps = [ "test:e2e_tests" ]
 }

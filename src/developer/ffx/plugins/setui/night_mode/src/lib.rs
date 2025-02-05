@@ -5,8 +5,9 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use ffx_setui_night_mode_args::NightMode;
-use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
+use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_settings::{NightModeProxy, NightModeSettings};
+use target_holders::moniker;
 use utils::{handle_mixed_result, Either, WatchOrSetResult};
 
 #[derive(FfxTool)]
@@ -61,13 +62,14 @@ async fn command(proxy: NightModeProxy, night_mode_enabled: Option<bool>) -> Wat
 mod test {
     use super::*;
     use fidl_fuchsia_settings::NightModeRequest;
+    use target_holders::fake_proxy;
     use test_case::test_case;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_run_command() {
         const ENABLED: bool = true;
 
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             NightModeRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -91,7 +93,7 @@ mod test {
     )]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_night_mode_set_output(expected_night_mode_enabled: bool) -> Result<()> {
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             NightModeRequest::Set { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -127,7 +129,7 @@ mod test {
     async fn validate_night_mode_watch_output(
         expected_night_mode_enabled: Option<bool>,
     ) -> Result<()> {
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             NightModeRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }

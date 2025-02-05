@@ -12,8 +12,8 @@ use crate::device::{self, DeviceOps};
 use crate::error::Error;
 use fdf::ArenaStaticBox;
 use ieee80211::{Bssid, MacAddr, Ssid};
+use log::{debug, error, info, trace, warn};
 use std::fmt;
-use tracing::{debug, error, info, trace, warn};
 use wlan_common::mac::{self, CapabilityInfo};
 use wlan_common::timer::{EventId, Timer};
 use wlan_common::TimeUnit;
@@ -65,20 +65,20 @@ pub enum Rejection {
 }
 
 impl Rejection {
-    fn log_level(&self) -> tracing::Level {
+    fn log_level(&self) -> log::Level {
         match self {
-            Self::NoSrcAddr | Self::FrameMalformed => tracing::Level::ERROR,
+            Self::NoSrcAddr | Self::FrameMalformed => log::Level::Error,
             Self::Client(_, e) => e.log_level(),
-            _ => tracing::Level::TRACE,
+            _ => log::Level::Trace,
         }
     }
     fn log(&self, msg: &str) {
         match self.log_level() {
-            tracing::Level::TRACE => trace!("{}: {}", msg, self),
-            tracing::Level::DEBUG => debug!("{}: {}", msg, self),
-            tracing::Level::INFO => info!("{}: {}", msg, self),
-            tracing::Level::WARN => warn!("{}: {}", msg, self),
-            tracing::Level::ERROR => error!("{}: {}", msg, self),
+            log::Level::Trace => trace!("{}: {}", msg, self),
+            log::Level::Debug => debug!("{}: {}", msg, self),
+            log::Level::Info => info!("{}: {}", msg, self),
+            log::Level::Warn => warn!("{}: {}", msg, self),
+            log::Level::Error => error!("{}: {}", msg, self),
         }
     }
 }

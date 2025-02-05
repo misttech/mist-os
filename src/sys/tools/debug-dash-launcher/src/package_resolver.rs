@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::DiscoverableProtocolMarker as _;
+use log::{error, warn};
 use std::collections::HashMap;
-use tracing::warn;
 use {fidl_fuchsia_dash as fdash, fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg};
 
 pub(crate) struct PackageResolver {
@@ -77,8 +77,8 @@ impl PackageResolver {
                     fpkg::PackageResolverMarker,
                 >(&backend.capability_path())
                 .map_err(|e| {
-                    tracing::error!(
-                        source=?e, path=backend.capability_path(), "connecting to resolver"
+                    error!(
+                        source:?=e, path=backend.capability_path().as_str(); "connecting to resolver"
                     );
                     Error::Application(fpkg::ResolveError::Internal)
                 })?;
@@ -89,7 +89,7 @@ impl PackageResolver {
 
     fn get_resolver_backend(&self, url: &str) -> Result<ResolverBackend, Error> {
         let url = url::Url::parse(url).map_err(|e| {
-            tracing::warn!(%url, source=?e, "invalid url");
+            log::warn!(url:%, source:?=e; "invalid url");
             Error::Application(fpkg::ResolveError::InvalidUrl)
         })?;
         Ok(match url.scheme() {
@@ -106,7 +106,7 @@ impl PackageResolver {
             },
             "fuchsia-boot" => ResolverBackend::Boot,
             scheme => {
-                warn!(%scheme, %url, "unknown package url scheme");
+                warn!(scheme:%, url:%; "unknown package url scheme");
                 return Err(Error::Application(fpkg::ResolveError::InvalidUrl));
             }
         })

@@ -8,8 +8,8 @@ use fidl::endpoints::create_proxy;
 use fidl_fuchsia_stash::{Store2Marker, StoreAccessorMarker, StoreAccessorProxy, Value};
 use futures::future::BoxFuture;
 use futures::prelude::*;
+use log::{error, warn};
 use thiserror::Error;
-use tracing::{error, warn};
 
 type Result<T> = std::result::Result<T, StashError>;
 

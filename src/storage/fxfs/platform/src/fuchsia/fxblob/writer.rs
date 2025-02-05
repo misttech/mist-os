@@ -10,6 +10,7 @@ use crate::fuchsia::fxblob::BlobDirectory;
 use crate::fuchsia::node::FxNode;
 use crate::fuchsia::volume::FxVolume;
 use anyhow::{Context as _, Error};
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use delivery_blob::compression::{decode_archive, ChunkInfo, ChunkedDecompressor};
 use delivery_blob::Type1Blob;
 use fidl::endpoints::{ControlHandle as _, RequestStream as _};
@@ -28,6 +29,7 @@ use fxfs::object_store::{
 use fxfs::round::{round_down, round_up};
 use fxfs::serialized_types::BlobMetadata;
 use lazy_static::lazy_static;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use zx::{self as zx, HandleBased as _, Status};
 
@@ -36,6 +38,33 @@ lazy_static! {
 }
 
 const PAYLOAD_BUFFER_FLUSH_THRESHOLD: usize = 131_072; /* 128 KiB */
+
+/// Maximum amount of *compressed* data we'll record when we fail to decompress a chunk.
+/// We use base64 encoding, so the actual storage of the data will be large (~50 KiB).
+const MAX_CHUNK_DATA_ON_ERROR: usize = 32_768; /* 32 KiB */
+
+fn on_decompression_error(
+    merkle_root: Hash,
+    chunk_index: usize,
+    chunk_info: ChunkInfo,
+    chunk_data: &[u8],
+) {
+    log::error!("Failed to decompress chunk {chunk_index} ({chunk_info:?}) for blob {merkle_root}");
+    static RECORDED_CORRUPT_BLOB: AtomicBool = AtomicBool::new(false);
+    if RECORDED_CORRUPT_BLOB.fetch_or(true, Ordering::Relaxed) == true {
+        // To avoid buffering too much data in memory, we only keep the first corruption instance.
+        return;
+    }
+    let len = std::cmp::min(chunk_data.len(), MAX_CHUNK_DATA_ON_ERROR);
+    let encoded_chunk = BASE64_STANDARD.encode(&chunk_data[..len]);
+    fxfs::metrics::detail().record_child("delivery_blob_corruption", |node| {
+        node.record_string("merkle_root", &String::from(merkle_root));
+        node.record_int("chunk_index", chunk_index as i64);
+        node.record_int("compressed_length", chunk_info.compressed_range.len() as i64);
+        node.record_int("decompressed_length", chunk_info.decompressed_range.len() as i64);
+        node.record_string("chunk_data", encoded_chunk);
+    });
+}
 
 /// Represents an RFC-0207 compliant delivery blob that is being written. Used to implement the
 /// fuchisa.fxfs/BlobWriter protocol (see [`Self::handle_requests`]).
@@ -394,8 +423,15 @@ impl DeliveryBlobWriter {
             self.buffer = Vec::from(chunk_data);
             self.payload_offset = (prev_buff_len - self.buffer.len()) as u64;
             self.payload_persisted = self.payload_offset;
+            let hash = self.hash.clone();
             self.decompressor = Some(
-                ChunkedDecompressor::new(seek_table).context("Failed to create decompressor")?,
+                ChunkedDecompressor::new_with_error_handler(
+                    seek_table,
+                    Box::new(move |chunk_index, chunk_info, chunk_data| {
+                        on_decompression_error(hash, chunk_index, chunk_info, chunk_data);
+                    }),
+                )
+                .context("Failed to create decompressor")?,
             );
         }
 
@@ -498,20 +534,20 @@ impl DeliveryBlobWriter {
             match request {
                 BlobWriterRequest::GetVmo { size, responder } => {
                     let result = self.get_vmo(size).await.map_err(|error| {
-                        tracing::error!(?error, "BlobWriter.GetVmo failed.");
+                        log::error!(error:?; "BlobWriter.GetVmo failed.");
                         map_to_status(error).into_raw()
                     });
                     responder.send(result).unwrap_or_else(|error| {
-                        tracing::error!(?error, "Failed to send BlobWriter.GetVmo response.");
+                        log::error!(error:?; "Failed to send BlobWriter.GetVmo response.");
                     });
                 }
                 BlobWriterRequest::BytesReady { bytes_written, responder } => {
                     let result = self.bytes_ready(bytes_written).await.map_err(|error| {
-                        tracing::error!(?error, "BlobWriter.BytesReady failed.");
+                        log::error!(error:?; "BlobWriter.BytesReady failed.");
                         map_to_status(error)
                     });
                     responder.send(result.map_err(Status::into_raw)).unwrap_or_else(|error| {
-                        tracing::error!(?error, "Failed to send BlobWriter.BytesReady response.");
+                        log::error!(error:?; "Failed to send BlobWriter.BytesReady response.");
                     });
                     // If any error occurs when handling a BytesReady request, the writer will
                     // remain in an unrecoverable state. The client must use the BlobCreator
@@ -681,6 +717,41 @@ mod tests {
             assert_eq!(
                 writer
                     .bytes_ready(delivery_data.len() as u64)
+                    .await
+                    .expect("transport error on bytes_ready")
+                    .map_err(Status::from_raw)
+                    .expect_err("write unexpectedly succeeded"),
+                zx::Status::IO_DATA_INTEGRITY
+            );
+        }
+        fixture.close().await;
+    }
+
+    /// Ensure we get `IO_DATA_INTEGRITY` if one of the compressed chunks is corrupted.
+    #[fasync::run(10, test)]
+    async fn test_detect_corruption() {
+        let fixture = new_blob_fixture().await;
+
+        let mut data = vec![1; 65536];
+        thread_rng().fill(&mut data[..]);
+
+        let hash = fuchsia_merkle::from_slice(&data).root();
+        let mut compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
+        let len = compressed_data.len();
+        compressed_data[len - 1024..].fill(0);
+        {
+            let writer =
+                fixture.create_blob(&hash.into(), false).await.expect("failed to create blob");
+            let vmo = writer
+                .get_vmo(compressed_data.len() as u64)
+                .await
+                .expect("transport error on get_vmo")
+                .expect("failed to get vmo");
+            vmo.write(&compressed_data, 0).expect("failed to write to vmo");
+
+            assert_eq!(
+                writer
+                    .bytes_ready(compressed_data.len() as u64)
                     .await
                     .expect("transport error on bytes_ready")
                     .map_err(Status::from_raw)

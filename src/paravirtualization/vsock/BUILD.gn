@@ -36,7 +36,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-fs",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/main.rs" ]
@@ -54,8 +54,8 @@ rustc_library("lib") {
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
   ]
 
   sources = [
@@ -66,9 +66,13 @@ rustc_library("lib") {
   ]
 }
 
-fuchsia_package_with_single_component("vsock_service") {
+fuchsia_component("vsock_service_component") {
   cm_label = ":manifest"
   deps = [ ":bin" ]
+}
+
+fuchsia_package("vsock_service") {
+  deps = [ ":vsock_service_component" ]
 }
 
 fuchsia_unittest_package("vsock_service-tests") {

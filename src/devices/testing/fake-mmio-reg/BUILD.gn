@@ -16,7 +16,7 @@ zx_library("fake-mmio-reg") {
   sdk_headers = [ "fake-mmio-reg/fake-mmio-reg.h" ]
   public_deps = [
     "//src/devices/lib/mmio:test_helper",
-    "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
+    "//zircon/system/ulib/mmio-ptr",
   ]
   sources = []
 }

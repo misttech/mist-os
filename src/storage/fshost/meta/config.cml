@@ -181,6 +181,12 @@
             default: false,
         },
         {
+            config: "fuchsia.fshost.StarnixVolumeName",
+            key: "starnix_volume_name",
+            type: "string",
+            max_size: 64,
+        },
+        {
             config: "fuchsia.blobfs.WriteCompressionAlgorithm",
             key: "blobfs_write_compression_algorithm",
             type: "string",

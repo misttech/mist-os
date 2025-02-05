@@ -39,6 +39,16 @@ closed protocol Provider {
     }) -> (resource struct {
         s client_end:Socket;
     }) error fuchsia.posix.Errno;
+
+    /// Requests a raw socket with creation options.
+    @available(added=HEAD)
+    strict SocketWithOptions(struct {
+        domain fuchsia.posix.socket.Domain;
+        proto ProtocolAssociation;
+        opts fuchsia.posix.socket.SocketCreationOptions;
+    }) -> (resource struct {
+        s client_end:Socket;
+    }) error fuchsia.posix.Errno;
 };
 
 /// A filter for ICMPv6 types.

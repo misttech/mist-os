@@ -263,35 +263,6 @@ source_set("network_reachability_provider") {
   ]
 }
 
-source_set("power_broker") {
-  testonly = true
-
-  sources = [
-    "power_broker_current_level.h",
-    "power_broker_element_control.h",
-    "power_broker_lease_control.h",
-    "power_broker_lessor.cc",
-    "power_broker_lessor.h",
-    "power_broker_required_level.cc",
-    "power_broker_required_level.h",
-    "power_broker_topology.cc",
-    "power_broker_topology.h",
-  ]
-
-  public_deps = [
-    ":fidl_server",
-    "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
-    "//sdk/lib/async:async-cpp",
-    "//sdk/lib/fidl/hlcpp",
-    "//sdk/lib/fit",
-    "//sdk/lib/syslog/cpp",
-    "//src/developer/forensics/exceptions:constants",
-    "//src/lib/fxl",
-  ]
-
-  deps = [ "//third_party/googletest:gtest" ]
-}
-
 source_set("reboot_methods_watcher_register") {
   testonly = true
 
@@ -320,7 +291,10 @@ source_set("system_activity_governor") {
     "//sdk/lib/syslog/cpp:cpp",
   ]
 
-  deps = [ "//src/lib/testing/predicates" ]
+  deps = [
+    "//sdk/lib/async:async-cpp",
+    "//src/lib/testing/predicates",
+  ]
 }
 
 source_set("ui_state_provider") {
@@ -356,8 +330,5 @@ source_set("wake_lease") {
     "wake_lease.h",
   ]
 
-  public_deps = [
-    ":power_broker",
-    "//src/developer/forensics/exceptions/handler:lib",
-  ]
+  public_deps = [ "//src/developer/forensics/exceptions/handler:lib" ]
 }

@@ -568,11 +568,14 @@ async fn on_terminate_stop_triggers_reboot() {
         ActionsManager::register(component.clone(), StopAction::new(false)).await.unwrap();
     };
     let recv_reboot = async move {
-        let reason = match receiver.next().await.unwrap() {
-            fstatecontrol::AdminRequest::Reboot { reason, .. } => reason,
+        let reasons = match receiver.next().await.unwrap() {
+            fstatecontrol::AdminRequest::PerformReboot {
+                options: fstatecontrol::RebootOptions { reasons: Some(reasons), .. },
+                ..
+            } => reasons,
             _ => panic!("unexpected request"),
         };
-        assert_eq!(reason, fstatecontrol::RebootReason::CriticalComponentFailure);
+        assert_matches!(&reasons[..], [fstatecontrol::RebootReason2::CriticalComponentFailure]);
     };
     join!(stop, recv_reboot);
     assert!(test.model.top_instance().has_reboot_task());
@@ -613,11 +616,15 @@ async fn on_terminate_exit_triggers_reboot() {
     let info = ComponentInfo::new(component.clone()).await;
     test.mock_runner.wait_for_url("test:///system_resolved").await;
     test.mock_runner.abort_controller(&info.channel_id);
-    let reason = match receiver.next().await.unwrap() {
-        fstatecontrol::AdminRequest::Reboot { reason, .. } => reason,
+    let reasons = match receiver.next().await.unwrap() {
+        fstatecontrol::AdminRequest::PerformReboot {
+            options: fstatecontrol::RebootOptions { reasons: Some(reasons), .. },
+            ..
+        } => reasons,
         _ => panic!("unexpected request"),
     };
-    assert_eq!(reason, fstatecontrol::RebootReason::CriticalComponentFailure);
+    assert_matches!(&reasons[..], [fstatecontrol::RebootReason2::CriticalComponentFailure]);
+
     assert!(test.model.top_instance().has_reboot_task());
 }
 
@@ -739,7 +746,7 @@ async fn on_terminate_with_failed_reboot_panics() {
     test.mock_runner.wait_for_url("test:///system_resolved").await;
     test.mock_runner.abort_controller(&info.channel_id);
     match receiver.next().await.unwrap() {
-        fstatecontrol::AdminRequest::Reboot { responder, .. } => {
+        fstatecontrol::AdminRequest::PerformReboot { responder, .. } => {
             responder.send(Err(zx::sys::ZX_ERR_INTERNAL)).unwrap();
         }
         _ => panic!("unexpected request"),

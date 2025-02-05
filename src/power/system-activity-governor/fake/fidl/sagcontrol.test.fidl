@@ -32,6 +32,9 @@ open protocol State {
     /// Return immediately with the current state of SAG.
     strict Get() -> (SystemActivityGovernorState);
 
+    /// Inform the Fake SAG to pass through the call and also change state.
+    strict SetBootComplete() -> ();
+
     /// On a given connection, the first call will return immediately with SAG's
     /// current state. Subsequent `Watch` requests will only
     /// return if and only if a `test.sagcontrol.State.Set` call sends a request and SAG's

@@ -9,13 +9,13 @@ use errors::FfxError;
 use ffx_component::rcs;
 use ffx_component_route_args::RouteCommand;
 use fho::{FfxMain, FfxTool, MachineWriter, ToolIO};
-use fidl_fuchsia_developer_remotecontrol as rc;
+use target_holders::RemoteControlProxyHolder;
 
 #[derive(FfxTool)]
 pub struct RouteTool {
     #[command]
     cmd: RouteCommand,
-    rcs: rc::RemoteControlProxy,
+    rcs: RemoteControlProxyHolder,
 }
 
 fho::embedded_plugin!(RouteTool);

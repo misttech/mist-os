@@ -1,2 +1,2 @@
 # Rust API rubric proposals are facilitated and approved by the Rust on Fuchsia team.
-per-file rust.md = tmandry@google.com, dkoloski@google.com, pineapple@google.com
+per-file rust.md =dkoloski@google.com

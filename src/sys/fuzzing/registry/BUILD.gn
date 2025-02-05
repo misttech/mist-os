@@ -27,7 +27,7 @@ rustc_binary("bin") {
     "//src/sys/fuzzing/fidl:fuchsia.fuzzer_rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:url",
   ]
   sources = [
@@ -38,7 +38,12 @@ rustc_binary("bin") {
 
 fuchsia_component("registry") {
   component_name = "fuzz-registry"
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/sys/fuzzing:*",
+    "//src/sys/fuzzing/registry/tests:*",
+    "//src/sys/test_runners/fuzz/tests:*",
+  ]
   testonly = true
   manifest = "meta/fuzz-registry.cml"
   deps = [ ":bin" ]

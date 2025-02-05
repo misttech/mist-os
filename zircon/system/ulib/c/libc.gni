@@ -108,6 +108,10 @@ if (is_ubsan) {
 #     - Type: bool
 #     - Default: false
 #
+#   * objfile_metadata
+#     - Optional: As for hermetic_source_set().
+#     - Type: scope
+#
 #   * configs
 #     - Optional: Extra configs to append.  Unlike source_set(), configs
 #     is not pre-set so defaults cannot be removed and += isn't used.
@@ -181,6 +185,7 @@ template("libc_source_set") {
                              "local_sources",
                              "non_test_deps",
                              "non_test_vars",
+                             "objfile_metadata",
                              "public",
                              "remove_configs",
                              "sources",
@@ -258,6 +263,7 @@ template("libc_source_set") {
                  "allow_fini",
                  "allow_init",
                  "global_symbols",
+                 "objfile_metadata",
                  "undefined_symbols",
                ])
   } else {
@@ -277,6 +283,7 @@ template("libc_source_set") {
                                    "allow_fini",
                                    "allow_init",
                                    "global_symbols",
+                                   "objfile_metadata",
                                  ])
           undefined_symbols = libc_hermetic_undefs
           if (defined(invoker.undefined_symbols)) {
@@ -305,11 +312,17 @@ template("libc_source_set") {
   }
 
   if (basic_abi) {
-    foreach(target, compile_targets) {
-      target = target_name + target
-      user_basic_redirect("$target.basic") {
-        visibility = [ ":*" ]
-        public_deps = [ ":$target" ]
+    foreach(suffix,
+            [
+              "",
+              ".objfile",
+            ]) {
+      foreach(target, compile_targets) {
+        target = target_name + target
+        user_basic_redirect("$target.basic$suffix") {
+          visibility = [ ":*" ]
+          public_deps = [ ":$target$suffix" ]
+        }
       }
     }
   }

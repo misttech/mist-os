@@ -9,21 +9,47 @@ import("//build/rust/rustc_library.gni")
 rustc_library("lib") {
   name = "shutdown-shim"
   edition = "2021"
+  with_unit_tests = true
 
-  sources = [ "src/lib.rs" ]
+  sources = [
+    "src/collaborative_reboot.rs",
+    "src/lib.rs",
+    "src/lib.rs",
+    "src/reboot_reasons.rs",
+    "src/shutdown_watcher.rs",
+  ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
+    "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.power:fuchsia.power_rust",
+    "//sdk/fidl/fuchsia.power.internal:fuchsia.power.internal_rust",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/fidl/fuchsia.system.state:fuchsia.system.state_rust",
     "//sdk/rust/zx",
+    "//src/lib/diagnostics/inspect/runtime/rust",
+    "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-sync",
+    "//src/lib/trace/rust:trace",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:either",
     "//third_party/rust_crates:futures",
   ]
+
+  test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:test-case",
+  ]
+}
+
+fuchsia_unittest_package("shutdown-shim-unittests") {
+  deps = [ ":lib_test" ]
 }
 
 rustc_binary("bin") {
@@ -44,6 +70,14 @@ rustc_binary("bin") {
   ]
 }
 
+group("shutdown-shim") {
+  testonly = true
+  deps = [
+    ":bin",
+    ":tests",
+  ]
+}
+
 fuchsia_component("component") {
   component_name = "shutdown-shim"
   manifest = "meta/shutdown-shim.cml"
@@ -57,4 +91,12 @@ fuchsia_component("component") {
 fuchsia_package("package") {
   package_name = "shutdown-shim"
   deps = [ ":component" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":shutdown-shim-unittests",
+    "tests",
+  ]
 }

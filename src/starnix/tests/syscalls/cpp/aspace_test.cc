@@ -17,6 +17,10 @@
 // Source: //zircon/kernel/arch/arm64/include/arch/kernel_aspace.h
 #define LOWEST_MAPPABLE_ADDRESS ((uintptr_t)0x200000)
 #define HIGHEST_MAPPABLE_ADDRESS ((uintptr_t)(1ULL << 47))
+#elif defined(__arm)
+// Arch32 can only address 4GB
+#define LOWEST_MAPPABLE_ADDRESS ((uintptr_t)0x200000)
+#define HIGHEST_MAPPABLE_ADDRESS ((uintptr_t)(0xffff0000))
 // Source: //zircon/kernel/arch/riscv64/include/arch/kernel_aspace.h
 #elif defined(__riscv)
 // Assuming Sv39 on RISC-V as we do not currently support any other addressing modes.

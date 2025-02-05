@@ -6,6 +6,7 @@ import("//src/developer/ffx/build/ffx_plugin.gni")
 import("//src/developer/ffx/build/ffx_tool.gni")
 
 ffx_plugin("ffx_scrutiny") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   plugin_deps = [
@@ -21,6 +22,10 @@ ffx_plugin("ffx_scrutiny") {
   non_rust_deps = [ "//src/lib/chunked-compression" ]
 
   args_sources = [ "src/args.rs" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
 }
 
 # When used in the build, this separate subtool version must be used to avoid
@@ -41,6 +46,9 @@ ffx_tool("ffx_scrutiny_tool") {
 
   sdk_target_name = "sdk"
   sdk_category = "partner"
+
+  # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
+  exclude_toolchain_tags = [ "profile" ]
 }
 
 group("scrutiny") {

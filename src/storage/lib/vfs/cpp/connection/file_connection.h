@@ -26,12 +26,13 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
  public:
   // Refer to documentation for |Connection::Connection|.
   FileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, fuchsia_io::Rights rights,
-                 bool append, zx_koid_t koid);
+                 zx_koid_t koid);
 
  protected:
-  bool& append() { return append_; }
-  bool append() const { return append_; }
   virtual const zx::stream* stream() const { return nullptr; }
+
+  virtual bool GetAppend() const = 0;
+  virtual zx::result<> SetAppend(bool append) = 0;
 
   //
   // |fs::Connection| Implementation
@@ -49,7 +50,7 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   // |fuchsia.io/Node| operations.
   //
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
   void DeprecatedClone(DeprecatedCloneRequestView request,
                        DeprecatedCloneCompleter::Sync& completer) final;
 #else
@@ -62,8 +63,13 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   void Sync(SyncCompleter::Sync& completer) final;
   void GetAttr(GetAttrCompleter::Sync& completer) final;
   void SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync& completer) final;
-  void GetFlags(GetFlagsCompleter::Sync& completer) override;
-  void SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) override;
+  void GetFlags(GetFlagsCompleter::Sync& completer) final;
+  void SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) final;
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  void DeprecatedGetFlags(DeprecatedGetFlagsCompleter::Sync& completer) final;
+  void DeprecatedSetFlags(DeprecatedSetFlagsRequestView request,
+                          DeprecatedSetFlagsCompleter::Sync& completer) final;
+#endif
   void QueryFilesystem(QueryFilesystemCompleter::Sync& completer) final;
   void GetAttributes(fuchsia_io::wire::NodeGetAttributesRequest* request,
                      GetAttributesCompleter::Sync& completer) final;
@@ -88,14 +94,6 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   }
   void LinkInto(fuchsia_io::wire::LinkableLinkIntoRequest* request,
                 LinkIntoCompleter::Sync& completer) final {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-#endif
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  void GetFlags2(GetFlags2Completer::Sync& completer) final {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-  void SetFlags2(SetFlags2RequestView request, SetFlags2Completer::Sync& completer) final {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 #endif
@@ -132,7 +130,6 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
  private:
   std::optional<fidl::ServerBindingRef<fuchsia_io::File>> binding_;
   const zx_koid_t koid_;
-  bool append_;
 };
 
 }  // namespace fs::internal

@@ -16,6 +16,8 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 use zerocopy::IntoBytes;
 
+const U32_MAX: u64 = u32::MAX as u64;
+
 /// A trait to receive the log from the verifier.
 pub trait VerifierLogger {
     /// Log a line. The line is always a correct encoded ASCII string.
@@ -46,7 +48,20 @@ impl From<u64> for MemoryId {
     }
 }
 
+/// A counter that allows to generate new ids for parameters. The namespace is the same as for id
+/// generated for types while verifying an ebpf program, but it is started a u64::MAX / 2 and so is
+/// guaranteed to never collide because the number of instruction of an ebpf program are bounded.
+static BPF_TYPE_IDENTIFIER_COUNTER: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(u64::MAX / 2);
+
 impl MemoryId {
+    pub fn new() -> MemoryId {
+        Self {
+            id: BPF_TYPE_IDENTIFIER_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            parent: None,
+        }
+    }
+
     /// Build a new id such that `other` is prepended to the chain of parent of `self`.
     fn prepended(&self, other: MemoryId) -> Self {
         match &self.parent {
@@ -175,7 +190,7 @@ impl MemoryParameterSize {
             Self::Reference { index } => {
                 let size_type = context.reg(index + 1)?;
                 match size_type {
-                    Type::ScalarValue { value, unknown_mask: 0, .. } => Ok(value),
+                    Type::ScalarValue(data) if data.is_known() => Ok(data.value),
                     _ => Err(format!("cannot know buffer size at pc {}", context.pc)),
                 }
             }
@@ -183,20 +198,195 @@ impl MemoryParameterSize {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Range<T: Clone + Copy + std::fmt::Debug + PartialOrd + Ord + PartialEq + Eq> {
+    min: T,
+    max: T,
+}
+
+impl<T: Clone + Copy + std::fmt::Debug + PartialOrd + Ord + PartialEq + Eq> Range<T> {
+    const fn new(min: T, max: T) -> Self {
+        Self { min, max }
+    }
+}
+
+impl<T: Clone + Copy + std::fmt::Debug + PartialOrd + Ord + PartialEq + Eq> From<T> for Range<T> {
+    fn from(value: T) -> Self {
+        Self::new(value, value)
+    }
+}
+
+type U64Range = Range<u64>;
+
+impl U64Range {
+    const fn max() -> Self {
+        Self::new(0, u64::MAX)
+    }
+
+    fn extract_slices(value: u64, offset: usize, byte_count: usize) -> (u64, u64, u64) {
+        let v1 = if offset > 0 { NativeEndian::read_uint(&value.as_bytes(), offset) } else { 0 };
+        let v2 = NativeEndian::read_uint(&value.as_bytes()[offset..], byte_count);
+        let v3 = if offset + byte_count < 8 {
+            NativeEndian::read_uint(
+                &value.as_bytes()[(offset + byte_count)..],
+                8 - offset - byte_count,
+            )
+        } else {
+            0
+        };
+        if cfg!(target_endian = "little") {
+            (v1, v2, v3)
+        } else {
+            (v3, v2, v1)
+        }
+    }
+
+    fn assemble_slices(values: (u64, u64, u64), offset: usize, byte_count: usize) -> u64 {
+        let mut result: u64 = 0;
+        let (v1, v2, v3) =
+            if cfg!(target_endian = "little") { values } else { (values.2, values.1, values.0) };
+        if offset > 0 {
+            result.as_mut_bytes()[..offset].copy_from_slice(&v1.as_bytes()[..offset]);
+        }
+        result.as_mut_bytes()[offset..(offset + byte_count)]
+            .copy_from_slice(&v2.as_bytes()[..byte_count]);
+        result.as_mut_bytes()[(offset + byte_count)..]
+            .copy_from_slice(&v3.as_bytes()[..(8 - offset - byte_count)]);
+        result
+    }
+
+    /// Given a target and source values, each in the `target` and `source` ranges. Compute the
+    /// range of the result of the operation where `byte_count` bytes from `source` at offset
+    /// `source_offset` replace `byte_count` bytes from `target` at offset `target_offset`.
+    fn compute_range_for_bytes_swap(
+        target: U64Range,
+        source: U64Range,
+        target_offset: usize,
+        source_offset: usize,
+        byte_count: usize,
+    ) -> U64Range {
+        let (target_umin1, target_umin2, target_umin3) =
+            Self::extract_slices(target.min, target_offset, byte_count);
+        let (target_umax1, target_umax2, target_umax3) =
+            Self::extract_slices(target.max, target_offset, byte_count);
+        let (_, source_umin2, source_umin3) =
+            Self::extract_slices(source.min, source_offset, byte_count);
+        let (_, source_umax2, source_umax3) =
+            Self::extract_slices(source.max, source_offset, byte_count);
+
+        let (final_umin3, final_umax3) = (target_umin3, target_umax3);
+        let (final_umin2, final_umax2) =
+            if source_umax3 > source_umin3 { (0, u64::MAX) } else { (source_umin2, source_umax2) };
+        let (final_umin1, final_umax1) =
+            if target_umax3 > target_umin3 || target_umax2 > target_umin2 {
+                (0, u64::MAX)
+            } else {
+                (target_umin1, target_umax1)
+            };
+
+        let final_min = Self::assemble_slices(
+            (final_umin1, final_umin2, final_umin3),
+            target_offset,
+            byte_count,
+        );
+        let final_max = Self::assemble_slices(
+            (final_umax1, final_umax2, final_umax3),
+            target_offset,
+            byte_count,
+        );
+
+        Range::new(final_min, final_max)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ScalarValueData {
+    /// The value. Its interpresentation depends on `unknown_mask` and `unwritten_mask`.
+    value: u64,
+    /// A bit mask of unknown bits. A bit in `value` is valid (and can be used by the verifier)
+    /// if the equivalent mask in unknown_mask is 0.
+    unknown_mask: u64,
+    /// A bit mask of unwritten bits. A bit in `value` is written (and can be sent back to
+    /// userspace) if the equivalent mask in unknown_mask is 0. `unknown_mask` must always be a
+    /// subset of `unwritten_mask`.
+    unwritten_mask: u64,
+    /// The range of possible unsigned values of this scalar.
+    urange: U64Range,
+}
+
+/// Defines a partial ordering on `ScalarValueData` instances, capturing the notion of how "broad"
+/// a scalar value is in terms of the set of potential values it represents.
+///
+/// The ordering is defined such that `s1 > s2` if a proof that an eBPF program terminates
+/// in a state where a register or memory location has a scalar value `s1` is also a proof that
+/// the program terminates in a state where that location has scalar value `s2`.
+///
+/// In other words, a "broader" value represents a larger set of possible values, and
+/// proving termination with a broader type implies termination with any narrower value.
+///
+/// Examples:
+/// * `ScalarValueData { unknown_mask: 0, .. }` (a known scalar value) is less than
+///   `ScalarValueData { unknown_mask: u64::MAX, .. }` (an unknown scalar value).
+impl PartialOrd for ScalarValueData {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        fn mask_is_larger(m1: u64, m2: u64) -> bool {
+            m1 & m2 == m2
+        }
+
+        // If the values are equals, return the known result.
+        if self == other {
+            return Some(Ordering::Equal);
+        }
+
+        if mask_is_larger(self.unwritten_mask, other.unwritten_mask)
+            && mask_is_larger(self.unknown_mask, other.unknown_mask)
+            && self.value & !self.unknown_mask == other.value & !self.unknown_mask
+        {
+            return Some(Ordering::Greater);
+        }
+        if mask_is_larger(other.unwritten_mask, self.unwritten_mask)
+            && mask_is_larger(other.unknown_mask, self.unknown_mask)
+            && self.value & !other.unknown_mask == other.value & !other.unknown_mask
+        {
+            return Some(Ordering::Less);
+        }
+        None
+    }
+}
+
+impl From<u64> for ScalarValueData {
+    fn from(value: u64) -> Self {
+        Self { value, unknown_mask: 0, unwritten_mask: 0, urange: value.into() }
+    }
+}
+
+impl ScalarValueData {
+    const UNINITIALIZED: Self =
+        Self { value: 0, unknown_mask: u64::MAX, unwritten_mask: u64::MAX, urange: Range::max() };
+    const UNKNOWN_WRITTEN: Self =
+        Self { value: 0, unknown_mask: u64::MAX, unwritten_mask: 0, urange: Range::max() };
+
+    const fn is_known(&self) -> bool {
+        self.unknown_mask == 0
+    }
+
+    const fn is_fully_initialized(&self) -> bool {
+        self.unwritten_mask == 0
+    }
+
+    const fn is_uninitialized(&self) -> bool {
+        self.unwritten_mask == u64::MAX
+    }
+
+    const fn is_zero(&self) -> bool {
+        self.is_known() && self.value == 0
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Type {
     /// A number.
-    ScalarValue {
-        /// The value. Its interpresentation depends on `unknown_mask` and `unwritten_mask`.
-        value: u64,
-        /// A bit mask of unknown bits. A bit in `value` is valid (and can be used by the verifier)
-        /// if the equivalent mask in unknown_mask is 0.
-        unknown_mask: u64,
-        /// A bit mask of unwritten bits. A bit in `value` is written (and can be sent back to
-        /// userspace) if the equivalent mask in unknown_mask is 0. `unknown_mask` must always be a
-        /// subset of `unwritten_mask`.
-        unwritten_mask: u64,
-    },
+    ScalarValue(ScalarValueData),
     /// A pointer to a map object.
     ConstPtrToMap { id: u64, schema: MapSchema },
     /// A pointer into the stack.
@@ -271,92 +461,78 @@ pub enum Type {
 /// proving termination with a broader type implies termination with any narrower type.
 ///
 /// Examples:
-/// * `Type::ScalarValue { unknown_mask: 0, .. }` (a known scalar value) is less than
-///   `Type::ScalarValue { unknown_mask: u64::MAX, .. }` (an unknown scalar value).
+/// * `Type::ScalarValue(ScalarValueData({ unknown_mask: 0, .. }))` (a known scalar value) is less than
+///   `Type::ScalarValue(ScalarValueData({ unknown_mask: u64::MAX, .. }))` (an unknown scalar value).
 impl PartialOrd for Type {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        fn mask_is_larger(m1: u64, m2: u64) -> bool {
-            m1 & m2 == m2 && m1 | m2 == m1
-        }
-
         // If the values are equals, return the known result.
         if self == other {
             return Some(Ordering::Equal);
         }
 
         // If one value is not initialized, the types are ordered.
-        if self == &NOT_INIT {
+        if self == &Type::UNINITIALIZED {
             return Some(Ordering::Greater);
         }
-        if other == &NOT_INIT {
+        if other == &Type::UNINITIALIZED {
             return Some(Ordering::Less);
         }
 
         // Otherwise, only scalars are comparables.
         match (self, other) {
-            (
-                Self::ScalarValue {
-                    value: value1,
-                    unknown_mask: unknown_mask1,
-                    unwritten_mask: unwritten_mask1,
-                },
-                Self::ScalarValue {
-                    value: value2,
-                    unknown_mask: unknown_mask2,
-                    unwritten_mask: unwritten_mask2,
-                },
-            ) => {
-                if mask_is_larger(*unwritten_mask1, *unwritten_mask2)
-                    && mask_is_larger(*unknown_mask1, *unknown_mask2)
-                    && value1 & !unknown_mask1 == value2 & !unknown_mask1
-                {
-                    return Some(Ordering::Greater);
-                }
-                if mask_is_larger(*unwritten_mask2, *unwritten_mask1)
-                    && mask_is_larger(*unknown_mask2, *unknown_mask1)
-                    && value1 & !unknown_mask2 == value2 & !unknown_mask2
-                {
-                    return Some(Ordering::Less);
-                }
-                None
-            }
+            (Self::ScalarValue(data1), Self::ScalarValue(data2)) => data1.partial_cmp(data2),
             _ => None,
         }
     }
 }
 
-const NOT_INIT: Type = Type::ScalarValue {
-    value: 0,
-    unknown_mask: u64::max_value(),
-    unwritten_mask: u64::max_value(),
-};
-
 impl From<u64> for Type {
     fn from(value: u64) -> Self {
-        Self::ScalarValue { value, unknown_mask: 0, unwritten_mask: 0 }
+        Self::ScalarValue(value.into())
     }
 }
 
 impl Default for Type {
     /// A new instance of `Type` where no bit has been written yet.
     fn default() -> Self {
-        NOT_INIT.clone()
+        Self::UNINITIALIZED.clone()
     }
 }
 
 impl Type {
-    /// A new instance of `Type` where the data is usable by userspace, but the value is unknown
-    /// for the verifier.
-    pub const fn unknown_written_scalar_value() -> Self {
-        Self::ScalarValue { value: 0, unknown_mask: u64::max_value(), unwritten_mask: 0 }
-    }
+    /// An uninitialized value.
+    pub const UNINITIALIZED: Self = Self::ScalarValue(ScalarValueData::UNINITIALIZED);
+
+    /// A `Type` where the data is usable by userspace, but the value is not known by the verifier.
+    pub const UNKNOWN_SCALAR: Self = Self::ScalarValue(ScalarValueData::UNKNOWN_WRITTEN);
 
     /// The mask associated with a data of size `width`.
     fn mask(width: DataWidth) -> u64 {
         if width == DataWidth::U64 {
-            u64::max_value()
+            u64::MAX
         } else {
             (1 << width.bits()) - 1
+        }
+    }
+
+    /// Return true if `self` is a scalar with all bytes initialized.
+    fn is_written_scalar(&self) -> bool {
+        match self {
+            Self::ScalarValue(data) if data.is_fully_initialized() => true,
+            _ => false,
+        }
+    }
+
+    /// Return true if `self` is a subtype of `super`.
+    pub fn is_subtype(&self, super_type: &Type) -> bool {
+        match (self, super_type) {
+            // Anything can be used in place of an uninitialized value.
+            (_, Self::ScalarValue(data)) if data.is_uninitialized() => true,
+
+            // Every type is a subtype of itself.
+            (self_type, super_type) if self_type == super_type => true,
+
+            _ => false,
         }
     }
 
@@ -373,8 +549,8 @@ impl Type {
         }
     }
 
-    /// Given the given conditional jump `jump_type` having been tasken, constraint the type of
-    /// `type1` and `type2`.
+    /// Constraints `type1` and `type2` for a conditional jump with the specified `jump_type` and
+    /// `jump_width`.
     fn constraint(
         context: &mut ComputationContext,
         jump_type: JumpType,
@@ -383,70 +559,75 @@ impl Type {
         type2: Self,
     ) -> Result<(Self, Self), String> {
         let result = match (jump_width, jump_type, type1.inner(context)?, type2.inner(context)?) {
-            (
-                JumpWidth::W64,
-                JumpType::Eq,
-                Self::ScalarValue { value: value1, unknown_mask: known1, unwritten_mask: 0 },
-                Self::ScalarValue { value: value2, unknown_mask: known2, unwritten_mask: 0 },
-            ) => {
-                let v = Self::ScalarValue {
-                    value: value1 | value2,
-                    unknown_mask: known1 & known2,
+            (JumpWidth::W64, JumpType::Eq, Self::ScalarValue(data1), Self::ScalarValue(data2))
+                if data1.is_fully_initialized() && data2.is_fully_initialized() =>
+            {
+                let umin = std::cmp::max(data1.urange.min, data2.urange.min);
+                let umax = std::cmp::min(data1.urange.max, data2.urange.max);
+                let v = Self::ScalarValue(ScalarValueData {
+                    value: data1.value | data2.value,
+                    unknown_mask: data1.unknown_mask & data2.unknown_mask,
                     unwritten_mask: 0,
-                };
+                    urange: Range::new(umin, umax),
+                });
                 (v.clone(), v)
             }
-            (
-                JumpWidth::W32,
-                JumpType::Eq,
-                Self::ScalarValue { value: value1, unknown_mask: known1, unwritten_mask: 0 },
-                Self::ScalarValue { value: value2, unknown_mask: known2, unwritten_mask: 0 },
-            ) => {
-                let v1 = Self::ScalarValue {
-                    value: value1 | (value2 & (u32::MAX as u64)),
-                    unknown_mask: known1 & (known2 | ((u32::MAX as u64) << 32)),
-                    unwritten_mask: 0,
+            (JumpWidth::W32, JumpType::Eq, Self::ScalarValue(data1), Self::ScalarValue(data2))
+                if data1.is_fully_initialized() && data2.is_fully_initialized() =>
+            {
+                let maybe_umin = if data1.urange.min <= U32_MAX && data2.urange.min <= U32_MAX {
+                    Some(std::cmp::max(data1.urange.min, data2.urange.min))
+                } else {
+                    None
                 };
-                let v2 = Self::ScalarValue {
-                    value: value2 | (value1 & (u32::MAX as u64)),
-                    unknown_mask: known2 & (known1 | ((u32::MAX as u64) << 32)),
-                    unwritten_mask: 0,
+                let maybe_umax = if data1.urange.max <= U32_MAX && data2.urange.max <= U32_MAX {
+                    Some(std::cmp::min(data1.urange.max, data2.urange.max))
+                } else {
+                    None
                 };
+
+                let urange1 = Range::new(
+                    maybe_umin.unwrap_or(data1.urange.min),
+                    maybe_umax.unwrap_or(data1.urange.max),
+                );
+                let v1 = Self::ScalarValue(ScalarValueData {
+                    value: data1.value | (data2.value & U32_MAX),
+                    unknown_mask: data1.unknown_mask & (data2.unknown_mask | (U32_MAX << 32)),
+                    unwritten_mask: 0,
+                    urange: urange1,
+                });
+
+                let urange2 = Range::new(
+                    maybe_umin.unwrap_or(data2.urange.min),
+                    maybe_umax.unwrap_or(data2.urange.max),
+                );
+                let v2 = Self::ScalarValue(ScalarValueData {
+                    value: data2.value | (data1.value & U32_MAX),
+                    unknown_mask: data2.unknown_mask & (data1.unknown_mask | (U32_MAX << 32)),
+                    unwritten_mask: 0,
+                    urange: urange2,
+                });
                 (v1, v2)
             }
-            (
-                JumpWidth::W64,
-                JumpType::Eq,
-                Self::ScalarValue { value: 0, unknown_mask: 0, .. },
-                Self::NullOr { id, .. },
-            )
-            | (
-                JumpWidth::W64,
-                JumpType::Eq,
-                Self::NullOr { id, .. },
-                Self::ScalarValue { value: 0, unknown_mask: 0, .. },
-            ) => {
+            (JumpWidth::W64, JumpType::Eq, Self::ScalarValue(data), Self::NullOr { id, .. })
+            | (JumpWidth::W64, JumpType::Eq, Self::NullOr { id, .. }, Self::ScalarValue(data))
+                if data.is_zero() =>
+            {
                 context.set_null(id, true);
                 let zero = Type::from(0);
                 (zero.clone(), zero)
             }
-            (
-                JumpWidth::W64,
-                jump_type,
-                Self::NullOr { id, inner },
-                Self::ScalarValue { value: 0, unknown_mask: 0, .. },
-            ) if jump_type.is_strict() => {
+            (JumpWidth::W64, jump_type, Self::NullOr { id, inner }, Self::ScalarValue(data))
+                if jump_type.is_strict() && data.is_zero() =>
+            {
                 context.set_null(id, false);
                 let inner = *inner.clone();
                 inner.register_resource(context);
                 (inner, type2)
             }
-            (
-                JumpWidth::W64,
-                jump_type,
-                Self::ScalarValue { value: 0, unknown_mask: 0, .. },
-                Self::NullOr { id, inner },
-            ) if jump_type.is_strict() => {
+            (JumpWidth::W64, jump_type, Self::ScalarValue(data), Self::NullOr { id, inner })
+                if jump_type.is_strict() && data.is_zero() =>
+            {
                 context.set_null(id, false);
                 let inner = *inner.clone();
                 inner.register_resource(context);
@@ -503,8 +684,12 @@ impl Type {
         next: &mut ComputationContext,
     ) -> Result<(), String> {
         match (parameter_type, self) {
-            (Type::ScalarValueParameter, Type::ScalarValue { unwritten_mask: 0, .. })
-            | (Type::ConstPtrToMapParameter, Type::ConstPtrToMap { .. }) => Ok(()),
+            (Type::ScalarValueParameter, Type::ScalarValue(data))
+                if data.is_fully_initialized() =>
+            {
+                Ok(())
+            }
+            (Type::ConstPtrToMapParameter, Type::ConstPtrToMap { .. }) => Ok(()),
             (
                 Type::MapKeyParameter { map_ptr_index },
                 Type::PtrToMemory { offset, buffer_size, .. },
@@ -648,8 +833,8 @@ pub struct CallingContext {
     pub helpers: HashMap<u32, FunctionSignature>,
     /// The args of the program.
     pub args: Vec<Type>,
-    /// The memory id of the network packets.
-    pub packet_memory_id: Option<MemoryId>,
+    /// Packet type. Normally it should be either `None` or `args[0]`.
+    pub packet_type: Option<Type>,
 }
 
 impl CallingContext {
@@ -665,8 +850,8 @@ impl CallingContext {
         assert!(args.len() <= 5);
         self.args = args.to_vec();
     }
-    pub fn set_packet_memory_id(&mut self, memory_id: MemoryId) {
-        self.packet_memory_id = Some(memory_id);
+    pub fn set_packet_type(&mut self, packet_type: Type) {
+        self.packet_type = Some(packet_type);
     }
 }
 
@@ -687,8 +872,23 @@ pub(crate) struct StructAccess {
 #[derive(Debug)]
 pub struct VerifiedEbpfProgram {
     pub(crate) code: Vec<EbpfInstruction>,
+    pub(crate) args: Vec<Type>,
     pub(crate) struct_access_instructions: Vec<StructAccess>,
     pub(crate) maps: Vec<MapSchema>,
+}
+
+impl VerifiedEbpfProgram {
+    // Convert the program to raw code. Can be used only when the program doesn't access any
+    // structs and maps.
+    pub fn to_code(self) -> Vec<EbpfInstruction> {
+        assert!(self.struct_access_instructions.is_empty());
+        assert!(self.maps.is_empty());
+        self.code
+    }
+
+    pub fn from_verified_code(code: Vec<EbpfInstruction>, args: Vec<Type>) -> Self {
+        Self { code, struct_access_instructions: vec![], maps: vec![], args }
+    }
 }
 
 /// Verify the given code depending on the type of the parameters and the registered external
@@ -759,9 +959,8 @@ pub fn verify_program(
 
     let struct_access_instructions =
         verification_context.struct_access_instructions.into_values().collect::<Vec<_>>();
-    let maps = verification_context.calling_context.maps;
-
-    Ok(VerifiedEbpfProgram { code, struct_access_instructions, maps })
+    let CallingContext { maps, args, .. } = verification_context.calling_context;
+    Ok(VerifiedEbpfProgram { code, struct_access_instructions, maps, args })
 }
 
 struct VerificationContext<'a> {
@@ -821,25 +1020,25 @@ const STACK_MAX_INDEX: usize = BPF_STACK_SIZE / STACK_ELEMENT_SIZE;
 /// An offset inside the stack. The offset is from the end of the stack.
 /// downward.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct StackOffset(i64);
+pub struct StackOffset(u64);
 
 impl Default for StackOffset {
     fn default() -> Self {
-        Self(BPF_STACK_SIZE as i64)
+        Self(BPF_STACK_SIZE as u64)
     }
 }
 
 impl StackOffset {
-    const INVALID: Self = Self(i64::MIN);
+    const INVALID: Self = Self(u64::MAX >> 1);
 
     /// Whether the current offset is valid.
     fn is_valid(&self) -> bool {
-        self.0 >= 0 && self.0 <= (BPF_STACK_SIZE as i64)
+        self.0 <= (BPF_STACK_SIZE as u64)
     }
 
     /// The value of the register.
     fn reg(&self) -> u64 {
-        self.0 as u64
+        self.0
     }
 
     /// The index into the stack array this offset points to. Can be called only if `is_valid()`
@@ -854,7 +1053,7 @@ impl StackOffset {
     }
 
     fn checked_add<T: TryInto<i64>>(self, rhs: T) -> Option<Self> {
-        self.0.checked_add(rhs.try_into().ok()?).map(Self)
+        (self.0 as i64).checked_add(rhs.try_into().ok()?).map(|v| Self(v as u64))
     }
 }
 
@@ -874,11 +1073,11 @@ impl Stack {
     }
 
     fn get(&self, index: usize) -> &Type {
-        self.data.get(&index).unwrap_or(&NOT_INIT)
+        self.data.get(&index).unwrap_or(&Type::UNINITIALIZED)
     }
 
     fn set(&mut self, index: usize, t: Type) {
-        if t == NOT_INIT {
+        if t == Type::UNINITIALIZED {
             self.data.remove(&index);
         } else {
             self.data.insert(index, t);
@@ -904,7 +1103,7 @@ impl Stack {
         bytes: u64,
     ) -> Result<(), String> {
         for i in 0..bytes {
-            self.store(pc, offset, Type::unknown_written_scalar_value(), DataWidth::U8)?;
+            self.store(pc, offset, Type::UNKNOWN_SCALAR, DataWidth::U8)?;
             offset = offset.checked_add(1).unwrap();
         }
         Ok(())
@@ -919,10 +1118,10 @@ impl Stack {
         let read_element =
             |index: usize, start_offset: usize, end_offset: usize| -> Result<(), String> {
                 match self.get(index) {
-                    Type::ScalarValue { unwritten_mask, .. } => {
+                    Type::ScalarValue(data) => {
                         debug_assert!(end_offset > start_offset);
                         let unwritten_bits = Self::extract_sub_value(
-                            *unwritten_mask,
+                            data.unwritten_mask,
                             start_offset,
                             end_offset - start_offset,
                         );
@@ -990,33 +1189,46 @@ impl Stack {
             self.set(index, value);
         } else {
             match value {
-                Type::ScalarValue { value, unknown_mask, unwritten_mask } => {
-                    let (old_value, old_unknown_mask, old_unwritten_mask) = match self.get(index) {
-                        Type::ScalarValue { value, unknown_mask, unwritten_mask } => {
-                            (*value, *unknown_mask, *unwritten_mask)
-                        }
+                Type::ScalarValue(data) => {
+                    let old_data = match self.get(index) {
+                        Type::ScalarValue(data) => *data,
                         _ => {
                             // The value in the stack is not a scalar. Let consider it an scalar
                             // value with no written bits.
-                            let Type::ScalarValue { value, unknown_mask, unwritten_mask } =
-                                NOT_INIT
-                            else {
-                                unreachable!();
-                            };
-                            (value, unknown_mask, unwritten_mask)
+                            ScalarValueData::UNINITIALIZED
                         }
                     };
                     let sub_index = offset.sub_index();
-                    let value = Self::insert_sub_value(old_value, value, width, sub_index);
-                    let unknown_mask =
-                        Self::insert_sub_value(old_unknown_mask, unknown_mask, width, sub_index);
-                    let unwritten_mask = Self::insert_sub_value(
-                        old_unwritten_mask,
-                        unwritten_mask,
+                    let value =
+                        Self::insert_sub_value(old_data.value, data.value, width, sub_index);
+                    let unknown_mask = Self::insert_sub_value(
+                        old_data.unknown_mask,
+                        data.unknown_mask,
                         width,
                         sub_index,
                     );
-                    self.set(index, Type::ScalarValue { value, unknown_mask, unwritten_mask });
+                    let unwritten_mask = Self::insert_sub_value(
+                        old_data.unwritten_mask,
+                        data.unwritten_mask,
+                        width,
+                        sub_index,
+                    );
+                    let urange = U64Range::compute_range_for_bytes_swap(
+                        old_data.urange,
+                        data.urange,
+                        sub_index,
+                        0,
+                        width.bytes(),
+                    );
+                    self.set(
+                        index,
+                        Type::ScalarValue(ScalarValueData {
+                            value,
+                            unknown_mask,
+                            unwritten_mask,
+                            urange,
+                        }),
+                    );
                 }
                 _ => {
                     return Err(format!(
@@ -1048,14 +1260,26 @@ impl Stack {
             Ok(loaded_type)
         } else {
             match loaded_type {
-                Type::ScalarValue { value, unknown_mask, unwritten_mask } => {
+                Type::ScalarValue(data) => {
                     let sub_index = offset.sub_index();
-                    let value = Self::extract_sub_value(value, sub_index, width.bytes());
+                    let value = Self::extract_sub_value(data.value, sub_index, width.bytes());
                     let unknown_mask =
-                        Self::extract_sub_value(unknown_mask, sub_index, width.bytes());
+                        Self::extract_sub_value(data.unknown_mask, sub_index, width.bytes());
                     let unwritten_mask =
-                        Self::extract_sub_value(unwritten_mask, sub_index, width.bytes());
-                    Ok(Type::ScalarValue { value, unknown_mask, unwritten_mask })
+                        Self::extract_sub_value(data.unwritten_mask, sub_index, width.bytes());
+                    let urange = U64Range::compute_range_for_bytes_swap(
+                        0.into(),
+                        data.urange,
+                        0,
+                        sub_index,
+                        width.bytes(),
+                    );
+                    Ok(Type::ScalarValue(ScalarValueData {
+                        value,
+                        unknown_mask,
+                        unwritten_mask,
+                        urange,
+                    }))
                 }
                 _ => Err(format!("incorrect load of {} bytes at pc {}", width.bytes(), pc)),
             }
@@ -1283,7 +1507,7 @@ impl ComputationContext {
         }
 
         match value {
-            Type::ScalarValue { unwritten_mask: 0, .. } => {}
+            Type::ScalarValue(data) if data.is_fully_initialized() => {}
             // Private data should not be leaked.
             _ => return Err(format!("incorrect store at pc {}", self.pc)),
         }
@@ -1304,7 +1528,7 @@ impl ComputationContext {
             }
             Type::PtrToMemory { ref id, offset, buffer_size, .. } => {
                 self.check_memory_access(offset, buffer_size, field.offset, field.width.bytes())?;
-                Ok(Type::unknown_written_scalar_value())
+                Ok(Type::UNKNOWN_SCALAR)
             }
             Type::PtrToStruct { ref id, offset, ref descriptor, .. } => {
                 let field_desc = descriptor
@@ -1313,7 +1537,7 @@ impl ComputationContext {
 
                 let (return_type, is_32_bit_ptr_load) = match &field_desc.field_type {
                     FieldType::Scalar { .. } | FieldType::MutableScalar { .. } => {
-                        (Type::unknown_written_scalar_value(), false)
+                        (Type::UNKNOWN_SCALAR, false)
                     }
                     FieldType::PtrToArray { id: array_id, is_32_bit } => (
                         Type::PtrToArray { id: array_id.prepended(id.clone()), offset: 0 },
@@ -1348,7 +1572,7 @@ impl ComputationContext {
                     field.offset,
                     field.width.bytes(),
                 )?;
-                Ok(Type::unknown_written_scalar_value())
+                Ok(Type::UNKNOWN_SCALAR)
             }
             _ => Err(format!("incorrect load at pc {}", self.pc)),
         }
@@ -1422,93 +1646,87 @@ impl ComputationContext {
     }
 
     fn apply_computation(
+        context: &ComputationContext,
         op1: Type,
         op2: Type,
         alu_type: AluType,
         op: impl Fn(u64, u64) -> u64,
     ) -> Result<Type, String> {
-        let result: Type = match (alu_type, op1, op2) {
-            (
-                _,
-                Type::ScalarValue { value: value1, unknown_mask: 0, .. },
-                Type::ScalarValue { value: value2, unknown_mask: 0, .. },
-            ) => op(value1, value2).into(),
-            (
-                AluType::Bitwise,
-                Type::ScalarValue {
-                    value: value1,
-                    unknown_mask: unknown_mask1,
-                    unwritten_mask: unwritten_mask1,
-                },
-                Type::ScalarValue {
-                    value: value2,
-                    unknown_mask: unknown_mask2,
-                    unwritten_mask: unwritten_mask2,
-                },
-            ) => {
-                let unknown_mask = unknown_mask1 | unknown_mask2;
-                let unwritten_mask = unwritten_mask1 | unwritten_mask2;
-                let value = op(value1, value2) & !unknown_mask;
-                Type::ScalarValue { value, unknown_mask, unwritten_mask }
+        let result: Type = match (alu_type, op1.inner(context)?, op2.inner(context)?) {
+            (_, Type::ScalarValue(data1), Type::ScalarValue(data2))
+                if data1.is_known() && data2.is_known() =>
+            {
+                op(data1.value, data2.value).into()
             }
-            (
-                AluType::Shift,
-                Type::ScalarValue {
-                    value: value1,
-                    unknown_mask: unknown_mask1,
-                    unwritten_mask: unwritten_mask1,
-                },
-                Type::ScalarValue { value: value2, unknown_mask: 0, .. },
-            ) => {
-                let value = op(value1, value2);
-                let unknown_mask = op(unknown_mask1, value2);
-                let unwritten_mask = op(unwritten_mask1, value2);
-                Type::ScalarValue { value, unknown_mask, unwritten_mask }
+            (AluType::Bitwise, Type::ScalarValue(data1), Type::ScalarValue(data2)) => {
+                let unknown_mask = data1.unknown_mask | data2.unknown_mask;
+                let unwritten_mask = data1.unwritten_mask | data2.unwritten_mask;
+                let value = op(data1.value, data2.value) & !unknown_mask;
+                Type::ScalarValue(ScalarValueData {
+                    value,
+                    unknown_mask,
+                    unwritten_mask,
+                    urange: Range::max(),
+                })
             }
-            (
-                AluType::Arsh,
-                Type::ScalarValue {
-                    value: value1,
-                    unknown_mask: unknown_mask1,
-                    unwritten_mask: unwritten_mask1,
-                },
-                Type::ScalarValue { value: value2, unknown_mask: 0, .. },
-            ) => {
-                let unknown_mask = unknown_mask1.overflowing_shr(value2 as u32).0;
-                let unwritten_mask = unwritten_mask1.overflowing_shr(value2 as u32).0;
-                let value = op(value1, value2) & !unknown_mask;
-                Type::ScalarValue { value, unknown_mask, unwritten_mask }
+            (AluType::Shift, Type::ScalarValue(data1), Type::ScalarValue(data2))
+                if data2.is_known() =>
+            {
+                let value = op(data1.value, data2.value);
+                let unknown_mask = op(data1.unknown_mask, data2.value);
+                let unwritten_mask = op(data1.unwritten_mask, data2.value);
+                Type::ScalarValue(ScalarValueData {
+                    value,
+                    unknown_mask,
+                    unwritten_mask,
+                    urange: Range::max(),
+                })
             }
-            (
-                alu_type,
-                Type::PtrToStack { offset: x },
-                Type::ScalarValue { value: y, unknown_mask: 0, .. },
-            ) if alu_type.is_ptr_compatible() => {
-                Type::PtrToStack { offset: run_on_stack_offset(x, |x| op(x, y)) }
+            (AluType::Arsh, Type::ScalarValue(data1), Type::ScalarValue(data2)) => {
+                let unknown_mask = data1.unknown_mask.overflowing_shr(data2.value as u32).0;
+                let unwritten_mask = data1.unwritten_mask.overflowing_shr(data2.value as u32).0;
+                let value = op(data1.value, data2.value) & !unknown_mask;
+                Type::ScalarValue(ScalarValueData {
+                    value,
+                    unknown_mask,
+                    unwritten_mask,
+                    urange: Range::max(),
+                })
+            }
+            (alu_type, Type::PtrToStack { offset: x }, Type::ScalarValue(data))
+                if alu_type.is_ptr_compatible() && data.is_known() =>
+            {
+                Type::PtrToStack { offset: run_on_stack_offset(*x, |x| op(x, data.value)) }
             }
             (
                 alu_type,
                 Type::PtrToMemory { id, offset: x, buffer_size },
-                Type::ScalarValue { value: y, unknown_mask: 0, .. },
-            ) if alu_type.is_ptr_compatible() => {
-                let offset = op(x as u64, y);
-                Type::PtrToMemory { id: id, offset: offset as i64, buffer_size: buffer_size }
+                Type::ScalarValue(data),
+            ) if alu_type.is_ptr_compatible() && data.is_known() => {
+                let offset = op(*x as u64, data.value);
+                Type::PtrToMemory {
+                    id: id.clone(),
+                    offset: offset as i64,
+                    buffer_size: *buffer_size,
+                }
             }
             (
                 alu_type,
                 Type::PtrToStruct { id, offset: x, descriptor },
-                Type::ScalarValue { value: y, unknown_mask: 0, .. },
-            ) if alu_type.is_ptr_compatible() => {
-                let offset = op(x as u64, y);
-                Type::PtrToStruct { id: id, offset: offset as i64, descriptor: descriptor }
+                Type::ScalarValue(data),
+            ) if alu_type.is_ptr_compatible() && data.is_known() => {
+                let offset = op(*x as u64, data.value);
+                Type::PtrToStruct {
+                    id: id.clone(),
+                    offset: offset as i64,
+                    descriptor: descriptor.clone(),
+                }
             }
-            (
-                alu_type,
-                Type::PtrToArray { id, offset: x },
-                Type::ScalarValue { value: y, unknown_mask: 0, .. },
-            ) if alu_type.is_ptr_compatible() => {
-                let offset = op(x as u64, y);
-                Type::PtrToArray { id: id, offset: offset as i64 }
+            (alu_type, Type::PtrToArray { id, offset: x }, Type::ScalarValue(data))
+                if alu_type.is_ptr_compatible() && data.is_known() =>
+            {
+                let offset = op(*x as u64, data.value);
+                Type::PtrToArray { id: id.clone(), offset: offset as i64 }
             }
             (
                 AluType::Sub,
@@ -1524,7 +1742,7 @@ impl ComputationContext {
                 AluType::Sub,
                 Type::PtrToArray { id: id1, offset: x1 },
                 Type::PtrToArray { id: id2, offset: x2 },
-            ) if id1 == id2 => Type::from(op(x1 as u64, x2 as u64)),
+            ) if id1 == id2 => Type::from(op(*x1 as u64, *x2 as u64)),
             (AluType::Sub, Type::PtrToStack { offset: x1 }, Type::PtrToStack { offset: x2 }) => {
                 Type::from(op(x1.reg(), x2.reg()))
             }
@@ -1537,12 +1755,12 @@ impl ComputationContext {
                 AluType::Sub,
                 Type::PtrToEndArray { id: id1, .. },
                 Type::PtrToArray { id: id2, .. },
-            ) if id1 == id2 => Type::unknown_written_scalar_value(),
-            (
-                _,
-                Type::ScalarValue { unwritten_mask: 0, .. },
-                Type::ScalarValue { unwritten_mask: 0, .. },
-            ) => Type::unknown_written_scalar_value(),
+            ) if id1 == id2 => Type::UNKNOWN_SCALAR,
+            (_, Type::ScalarValue(data1), Type::ScalarValue(data2))
+                if data1.is_fully_initialized() && data2.is_fully_initialized() =>
+            {
+                Type::UNKNOWN_SCALAR
+            }
             _ => Type::default(),
         };
         Ok(result)
@@ -1568,7 +1786,7 @@ impl ComputationContext {
         }
         let op1 = self.reg(dst)?;
         let op2 = self.compute_source(src)?;
-        let result = Self::apply_computation(op1, op2, alu_type, op)?;
+        let result = Self::apply_computation(self, op1, op2, alu_type, op)?;
         let mut next = self.next()?;
         next.set_reg(dst, result)?;
         verification_context.states.push(next);
@@ -1605,14 +1823,14 @@ impl ComputationContext {
         dst: Register,
         offset: i16,
         src: Register,
-        op: impl FnOnce(Type, Type) -> Result<Type, String>,
+        op: impl FnOnce(&ComputationContext, Type, Type) -> Result<Type, String>,
     ) -> Result<(), String> {
         self.log_atomic_operation(op_name, verification_context, fetch, dst, offset, src);
         let addr = self.reg(dst)?;
         let value = self.reg(src)?;
         let field = Field::new(offset, width);
         let loaded_type = self.load_memory(verification_context, &addr, field)?;
-        let result = op(loaded_type.clone(), value)?;
+        let result = op(self, loaded_type.clone(), value)?;
         let mut next = self.next()?;
         next.store_memory(verification_context, &addr, field, result)?;
         if fetch {
@@ -1642,7 +1860,9 @@ impl ComputationContext {
             dst,
             offset,
             src,
-            |v1: Type, v2: Type| Self::apply_computation(v1, v2, alu_type, op),
+            |context: &ComputationContext, v1: Type, v2: Type| {
+                Self::apply_computation(context, v1, v2, alu_type, op)
+            },
         )
     }
 
@@ -1705,11 +1925,12 @@ impl ComputationContext {
         };
         let value = self.reg(dst)?;
         let new_value = match value {
-            Type::ScalarValue { value, unknown_mask, unwritten_mask } => Type::ScalarValue {
-                value: bit_op(value),
-                unknown_mask: bit_op(unknown_mask),
-                unwritten_mask: bit_op(unwritten_mask),
-            },
+            Type::ScalarValue(data) => Type::ScalarValue(ScalarValueData {
+                value: bit_op(data.value),
+                unknown_mask: bit_op(data.unknown_mask),
+                unwritten_mask: bit_op(data.unwritten_mask),
+                urange: Range::max(),
+            }),
             _ => Type::default(),
         };
         let mut next = self.next()?;
@@ -1726,27 +1947,23 @@ impl ComputationContext {
         op: impl Fn(u64, u64) -> bool,
     ) -> Result<Option<bool>, String> {
         match (jump_width, op1, op2) {
-            (
-                _,
-                Type::ScalarValue { value: x, unknown_mask: 0, .. },
-                Type::ScalarValue { value: y, unknown_mask: 0, .. },
-            ) => Ok(Some(op(*x, *y))),
+            (_, Type::ScalarValue(data1), Type::ScalarValue(data2))
+                if data1.is_known() && data2.is_known() =>
+            {
+                Ok(Some(op(data1.value, data2.value)))
+            }
 
-            (
-                _,
-                Type::ScalarValue { unwritten_mask: 0, .. },
-                Type::ScalarValue { unwritten_mask: 0, .. },
-            )
-            | (
-                JumpWidth::W64,
-                Type::ScalarValue { value: 0, unknown_mask: 0, .. },
-                Type::NullOr { .. },
-            )
-            | (
-                JumpWidth::W64,
-                Type::NullOr { .. },
-                Type::ScalarValue { value: 0, unknown_mask: 0, .. },
-            ) => Ok(None),
+            (_, Type::ScalarValue(data1), Type::ScalarValue(data2))
+                if data1.is_fully_initialized() && data2.is_fully_initialized() =>
+            {
+                Ok(None)
+            }
+            (JumpWidth::W64, Type::ScalarValue(data), Type::NullOr { .. })
+            | (JumpWidth::W64, Type::NullOr { .. }, Type::ScalarValue(data))
+                if data.is_zero() =>
+            {
+                Ok(None)
+            }
 
             (JumpWidth::W64, Type::PtrToStack { offset: x }, Type::PtrToStack { offset: y }) => {
                 Ok(Some(op(x.reg(), y.reg())))
@@ -2965,11 +3182,12 @@ impl BpfVisitor for ComputationContext {
         bpf_log!(self, context, "mov32 {}, {}", display_register(dst), display_source(src));
         let src = self.compute_source(src)?;
         let value = match src {
-            Type::ScalarValue { value, unknown_mask, unwritten_mask } => {
-                let value = (value as u32) as u64;
-                let unknown_mask = (unknown_mask as u32) as u64;
-                let unwritten_mask = (unwritten_mask as u32) as u64;
-                Type::ScalarValue { value, unknown_mask, unwritten_mask }
+            Type::ScalarValue(data) => {
+                let value = (data.value as u32) as u64;
+                let unknown_mask = (data.unknown_mask as u32) as u64;
+                let unwritten_mask = (data.unwritten_mask as u32) as u64;
+                let urange = U64Range::compute_range_for_bytes_swap(0.into(), data.urange, 0, 0, 4);
+                Type::ScalarValue(ScalarValueData { value, unknown_mask, unwritten_mask, urange })
             }
             _ => Type::default(),
         };
@@ -3152,7 +3370,7 @@ impl BpfVisitor for ComputationContext {
 
     fn exit<'a>(&mut self, context: &mut Self::Context<'a>) -> Result<(), String> {
         bpf_log!(self, context, "exit");
-        if !matches!(self.reg(0)?, Type::ScalarValue { unwritten_mask: 0, .. }) {
+        if !self.reg(0)?.is_written_scalar() {
             return Err(format!("register 0 is incorrect at exit time at pc {}", self.pc));
         }
         if !self.resources.is_empty() {
@@ -3776,7 +3994,7 @@ impl BpfVisitor for ComputationContext {
             dst,
             offset,
             src,
-            |_, x| Ok(x),
+            |_, _, x| Ok(x),
         )
     }
 
@@ -3881,30 +4099,32 @@ impl BpfVisitor for ComputationContext {
             register_offset.map(display_register).unwrap_or_else(Default::default),
             print_offset(offset)
         );
-        let Some(memory_id) = context.calling_context.packet_memory_id.clone() else {
-            return Err(format!("incorrect packet access at pc {}", self.pc));
-        };
 
-        if !matches!(self.reg(src)?, Type::PtrToMemory { offset: 0, id, .. } | Type::PtrToStruct { offset: 0, id, .. } if id == memory_id )
-        {
+        // Verify that `src` refers to a packet.
+        let src_type = self.reg(src)?;
+        let src_is_packet = match &context.calling_context.packet_type {
+            Some(packet_type) => src_type == *packet_type,
+            None => false,
+        };
+        if !src_is_packet {
             return Err(format!("R{} is not a packet at pc {}", src, self.pc));
         }
 
         if let Some(reg) = register_offset {
             let reg = self.reg(reg)?;
-            if !matches!(reg, Type::ScalarValue { unwritten_mask: 0, .. }) {
+            if !reg.is_written_scalar() {
                 return Err(format!("access to unwritten offset at pc {}", self.pc));
             }
         }
         // Handle the case where the load succeed.
         let mut next = self.next()?;
-        next.set_reg(dst, Type::unknown_written_scalar_value())?;
+        next.set_reg(dst, Type::UNKNOWN_SCALAR)?;
         for i in 1..=5 {
             next.set_reg(i, Type::default())?;
         }
         context.states.push(next);
         // Handle the case where the load fails.
-        if !matches!(self.reg(0)?, Type::ScalarValue { unwritten_mask: 0, .. }) {
+        if !self.reg(0)?.is_written_scalar() {
             return Err(format!("register 0 is incorrect at exit time at pc {}", self.pc));
         }
         if !self.resources.is_empty() {
@@ -3992,7 +4212,7 @@ fn run_on_stack_offset<F>(v: StackOffset, f: F) -> StackOffset
 where
     F: FnOnce(u64) -> u64,
 {
-    StackOffset(f(v.reg()) as i64)
+    StackOffset(f(v.reg()))
 }
 
 fn error_and_log<T>(
@@ -4015,13 +4235,15 @@ fn associate_orderings(o1: Ordering, o2: Ordering) -> Option<Ordering> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeSet;
+    use test_util::{assert_geq, assert_leq};
 
     #[test]
     fn test_type_ordering() {
         let t0 = Type::from(0);
         let t1 = Type::from(1);
         let random = Type::AliasParameter { parameter_index: 8 };
-        let unknown_written = Type::unknown_written_scalar_value();
+        let unknown_written = Type::UNKNOWN_SCALAR;
         let unwritten = Type::default();
 
         assert_eq!(t0.partial_cmp(&t0), Some(Ordering::Equal));
@@ -4107,15 +4329,9 @@ mod tests {
 
         // Store data in the range [8, 26) and verify that `read_data_ptr()` fails for any
         // reads outside of that range.
-        assert!(s
-            .store(1, StackOffset(8), Type::unknown_written_scalar_value(), DataWidth::U64)
-            .is_ok());
-        assert!(s
-            .store(1, StackOffset(16), Type::unknown_written_scalar_value(), DataWidth::U64)
-            .is_ok());
-        assert!(s
-            .store(1, StackOffset(24), Type::unknown_written_scalar_value(), DataWidth::U16)
-            .is_ok());
+        assert!(s.store(1, StackOffset(8), Type::UNKNOWN_SCALAR, DataWidth::U64).is_ok());
+        assert!(s.store(1, StackOffset(16), Type::UNKNOWN_SCALAR, DataWidth::U64).is_ok());
+        assert!(s.store(1, StackOffset(24), Type::UNKNOWN_SCALAR, DataWidth::U16).is_ok());
 
         for offset in 0..32 {
             for end in (offset + 1)..32 {
@@ -4128,5 +4344,44 @@ mod tests {
 
         // Verify that overflows are handled properly.
         assert!(s.read_data_ptr(2, StackOffset(12), u64::MAX - 2).is_err());
+    }
+
+    #[test]
+    fn test_compute_range_for_bytes_swap() {
+        // Build a list of interesting values. Interesting values are all possible combination of
+        // bytes being either 0, max value, or an intermediary value.
+        let mut values = BTreeSet::<u64>::default();
+        for v1 in &[0x00, 0x1, u64::MAX] {
+            for v2 in &[0x00, 0x1, u64::MAX] {
+                for v3 in &[0x00, 0x1, u64::MAX] {
+                    values.insert(U64Range::assemble_slices((*v1, *v2, *v3), 1, 1));
+                }
+            }
+        }
+        // Replace the second byte of old by the first byte of new and return the result.
+        let store = |old: u64, new: u64| (old & !0xff00) | ((new & 0xff) << 8);
+
+        for old in &values {
+            for new in &values {
+                let s = store(*old, *new);
+                for min_old in values.iter().filter(|v| *v <= old) {
+                    for min_new in values.iter().filter(|v| *v <= new) {
+                        for max_old in values.iter().filter(|v| *v >= old) {
+                            for max_new in values.iter().filter(|v| *v >= new) {
+                                let range = U64Range::compute_range_for_bytes_swap(
+                                    Range::new(*min_old, *max_old),
+                                    Range::new(*min_new, *max_new),
+                                    1,
+                                    0,
+                                    1,
+                                );
+                                assert_leq!(range.min, s);
+                                assert_geq!(range.max, s);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

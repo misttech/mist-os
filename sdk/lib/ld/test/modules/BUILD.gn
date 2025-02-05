@@ -16,7 +16,7 @@ import("//sdk/lib/ld/testing/test_elf_object.gni")
 # or its deps to already be loaded. Therefore tests must use uniquely named test
 # files. `per_test_modules` and `per_test_executables` includes targets that
 # will have copies generated with each suffix in `per_test_suffices`.
-# `per_test_suffices` include test names in //sdk/lib/dl/test/dl-load-tests.cc.
+# `per_test_suffices` include test names in //sdk/lib/dl/test/* test files.
 per_test_modules = [
   ":multiple-foo-deps",
   ":transitive-foo-dep",
@@ -75,6 +75,8 @@ per_test_suffices = [
   "PrecedenceInDepResolution",
   "StartupModulesBasic",
   "StartupModulesPriorityOverGlobal",
+  "RtldNoLoadBasic",
+  "DlIteratePhdrBasic",
 ]
 
 # This reaches all the runtime deps of //sdk/lib/dl/test:dl-unittests.
@@ -86,12 +88,15 @@ group("dl-test-data.deps") {
     ":init-fini-array",
     ":init-fini-array-with-deps",
     ":init-fini-array-with-legacy",
+    ":init-fini-array-with-loaded-deps",
     ":init-fini-legacy",
     ":static-tls-desc-module",
     ":static-tls-module",
     ":tls-dep-module",
     ":tls-desc-dep-module",
+    ":tls-desc-initial-dep-module",
     ":tls-desc-ld-dep-module",
+    ":tls-initial-dep-module",
     ":tls-ld-dep-module",
   ]
   foreach(suffix, per_test_suffices) {
@@ -931,6 +936,35 @@ test_loadable_module("tls-desc-dep-module") {
   configs += [ "//build/config/lto:no-lto" ]
 }
 
+test_loadable_module("tls-initial-dep-module") {
+  public = [ "tls-initial-dep.h" ]
+  sources = [ "tls-initial-dep.cc" ]
+  configs = [ "//build/config:no-tlsdesc" ]
+  deps = [ "//zircon/system/public" ]
+
+  # We need to allow undefined symbols, since __tls_get_addr will not be
+  # defined by this module or any link-time dependency, but will be supplied by libc.
+  remove_configs = [ "//build/config:symbol_no_undefined" ]
+
+  # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
+  # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
+  remove_configs += [ "//build/config/lto" ]
+  configs += [ "//build/config/lto:no-lto" ]
+}
+
+# This is the same as tls-initial-dep-module but using TLSDESC, with no __tls_get_addr.
+test_loadable_module("tls-desc-initial-dep-module") {
+  public = [ "tls-initial-dep.h" ]
+  sources = [ "tls-initial-dep.cc" ]
+  configs = [ "//build/config:tlsdesc" ]
+  deps = [ "//zircon/system/public" ]
+
+  # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
+  # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
+  remove_configs = [ "//build/config/lto" ]
+  configs += [ "//build/config/lto:no-lto" ]
+}
+
 test_loadable_module("tls-ld-dep-module") {
   public = [ "tls-ld-dep.h" ]
   sources = [ "tls-ld-dep.cc" ]
@@ -1708,6 +1742,122 @@ init_fini_array_tests = [
     ]
     shlib_deps = []
   },
+
+  # An init-fini-array module with an already-loaded dep. These modules will
+  # have different expected `value`s than the above test modules.
+  # - init-fini-array-with-loaded-deps (loaded third):
+  #   - init-fini-array-with-loaded-deps-a (loaded first):
+  #     - init-fini-array-with-loaded-deps-a-dep
+  #   - init-fini-array-with-loaded-deps-b:
+  #     - init-fini-array-with-loaded-deps-b-dep
+  #   - init-fini-array-with-loaded-deps-c (loaded second)
+  {
+    name = "init-fini-array-with-loaded-deps"
+    type = "test_loadable_module"
+    ctors = [
+      {
+        prio = false
+        value = 5
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 6
+      },
+    ]
+    shlib_deps = [
+      ":init-fini-array-with-loaded-deps-a",
+      ":init-fini-array-with-loaded-deps-b",
+      ":init-fini-array-with-loaded-deps-c",
+    ]
+  },
+
+  {
+    name = "init-fini-array-with-loaded-deps-a"
+    type = "test_shared_library"
+    ctors = [
+      {
+        prio = false
+        value = 1
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 7
+      },
+    ]
+    shlib_deps = [ ":init-fini-array-with-loaded-deps-a-dep" ]
+  },
+  {
+    name = "init-fini-array-with-loaded-deps-a-dep"
+    type = "test_shared_library"
+    ctors = [
+      {
+        prio = false
+        value = 0
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 8
+      },
+    ]
+    shlib_deps = []
+  },
+  {
+    name = "init-fini-array-with-loaded-deps-b"
+    type = "test_shared_library"
+    ctors = [
+      {
+        prio = false
+        value = 4
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 10
+      },
+    ]
+    shlib_deps = [ ":init-fini-array-with-loaded-deps-b-dep" ]
+  },
+  {
+    name = "init-fini-array-with-loaded-deps-b-dep"
+    type = "test_shared_library"
+    ctors = [
+      {
+        prio = false
+        value = 3
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 11
+      },
+    ]
+    shlib_deps = []
+  },
+  {
+    name = "init-fini-array-with-loaded-deps-c"
+    type = "test_shared_library"
+    ctors = [
+      {
+        prio = false
+        value = 2
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 9
+      },
+    ]
+    shlib_deps = []
+  },
 ]
 
 # This will generate files and targets for each entry in `init_fini_array_tests`.
@@ -1727,7 +1877,7 @@ foreach(case, init_fini_array_tests) {
         prio_attr = "(${ctor.prio})"
         prio_suffix = "_${ctor.prio}"
       }
-      contents += [ "[[gnu::constructor$prio_attr]] void ctor${prio_suffix}_${ctor.value}() { Check(${ctor.value}); }" ]
+      contents += [ "[[gnu::constructor$prio_attr]] void ctor${prio_suffix}_${ctor.value}() { Callback(${ctor.value}); }" ]
     }
     foreach(dtor, case.dtors) {
       if (dtor.prio == false) {
@@ -1737,7 +1887,7 @@ foreach(case, init_fini_array_tests) {
         prio_attr = "(${dtor.prio})"
         prio_suffix = "_${dtor.prio}"
       }
-      contents += [ "[[gnu::destructor$prio_attr]] void dtor${prio_suffix}_${dtor.value}() { Check(${dtor.value}); }" ]
+      contents += [ "[[gnu::destructor$prio_attr]] void dtor${prio_suffix}_${dtor.value}() { Callback(${dtor.value}); }" ]
     }
   }
   target(case.type, case.name) {

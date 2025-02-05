@@ -4,12 +4,12 @@
 
 use crate::security::selinux_hooks::{
     check_permission, check_self_permission, fs_node_effective_sid_and_class, fs_node_ensure_class,
-    fs_node_set_label_with_task, has_file_permissions, todo_check_permission, FsNode,
-    PermissionCheck, ProcessPermission, TaskAttrs,
+    fs_node_set_label_with_task, has_file_permissions, PermissionCheck, ProcessPermission,
+    TaskAttrs,
 };
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityId, SecurityServer};
 use crate::task::{CurrentTask, Task};
-use crate::TODO_DENY;
+use crate::vfs::FsNode;
 use selinux::{FilePermission, NullessByteStr, ObjectClass};
 use starnix_types::ownership::TempRef;
 use starnix_uapi::errors::Errno;
@@ -154,11 +154,7 @@ pub fn check_exec_access(
     if current_sid == new_sid {
         // To `exec()` a binary in the caller's domain, the caller must be granted
         // "execute_no_trans" permission to the binary.
-        todo_check_permission(
-            TODO_DENY!(
-                "https://fxbug.dev/330904217",
-                "Requires that SELinux Test Suite VM has correct labels"
-            ),
+        check_permission(
             &permission_check,
             current_sid,
             executable_sid,
@@ -169,16 +165,7 @@ pub fn check_exec_access(
         check_permission(&permission_check, current_sid, new_sid, ProcessPermission::Transition)?;
 
         // Check that the executable file has an entry point into the new domain.
-        todo_check_permission(
-            TODO_DENY!(
-                "https://fxbug.dev/330904217",
-                "Requires that SELinux Test Suite VM has correct labels"
-            ),
-            &permission_check,
-            new_sid,
-            executable_sid,
-            FilePermission::Entrypoint,
-        )?;
+        check_permission(&permission_check, new_sid, executable_sid, FilePermission::Entrypoint)?;
 
         // Check that ptrace permission is allowed if the process is traced.
         if let Some(ptracer) = current_task.ptracer_task().upgrade() {

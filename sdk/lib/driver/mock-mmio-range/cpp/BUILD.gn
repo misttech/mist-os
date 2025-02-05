@@ -6,8 +6,10 @@ import("//build/components.gni")
 import("//build/cpp/sdk_source_set.gni")
 import("//build/test.gni")
 
+# TODO(https://fxbug.dev/373899421): Delete this library once all usages are migrated
+# to sdk/lib/driver/mock-mmio.
+
 sdk_source_set("cpp") {
-  # TODO(https://fxbug.dev/373899421): Promote category to "partner".
   category = "internal"
   stable = false
   sdk_name = "mock_mmio_range_cpp"

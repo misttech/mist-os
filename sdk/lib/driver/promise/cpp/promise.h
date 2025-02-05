@@ -34,11 +34,9 @@ fpromise::result<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> OpenWith
     const fdf::Namespace& ns, async_dispatcher_t* dispatcher, const char* path,
     fuchsia_io::OpenFlags flags);
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(24)
 fpromise::result<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> OpenWithResult(
     const fdf::Namespace& ns, async_dispatcher_t* dispatcher, const char* path,
     fuchsia_io::Flags flags);
-#endif
 
 }  // namespace internal
 
@@ -54,6 +52,7 @@ fpromise::promise<fidl::WireSharedClient<Protocol>, zx_status_t> Connect(
 
 // Opens the given `path` in `ns`, and returns a fpromise::promise containing a
 // fidl::WireSharedClient on success. Uses deprecated fuchsia.io/Directory.Open1.
+// TODO(https://fxbug.dev/324080864): Mark this as removed when we update all out-of-tree usages.
 inline fpromise::promise<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> Open(
     const fdf::Namespace& ns, async_dispatcher_t* dispatcher, const char* path,
     fuchsia_io::OpenFlags flags)
@@ -62,7 +61,6 @@ inline fpromise::promise<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> 
       internal::OpenWithResultDeprecated(ns, dispatcher, path, flags));
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(24)
 // Opens the given `path` in `ns`, and returns a fpromise::promise containing a
 // fidl::WireSharedClient on success.
 inline fpromise::promise<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> Open(
@@ -70,7 +68,6 @@ inline fpromise::promise<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> 
     fuchsia_io::Flags flags) {
   return fpromise::make_result_promise(internal::OpenWithResult(ns, dispatcher, path, flags));
 }
-#endif
 
 // Adds a child to `client`, using `args`. `controller` must be provided, but
 // `node` is optional.

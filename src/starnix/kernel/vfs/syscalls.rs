@@ -50,7 +50,7 @@ use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::seal_flags::SealFlags;
 use starnix_uapi::signals::SigSet;
 use starnix_uapi::unmount_flags::UnmountFlags;
-use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserCString, UserRef};
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::vfs::{EpollEvent, FdEvents, ResolveFlags};
 use starnix_uapi::{
@@ -184,6 +184,7 @@ pub fn sys_fcntl(
         }
         F_GETOWN => {
             let file = current_task.files.get(fd)?;
+            security::check_file_fcntl_access(current_task, &file, cmd, arg)?;
             match file.get_async_owner() {
                 FileAsyncOwner::Unowned => Ok(0.into()),
                 FileAsyncOwner::Thread(tid) => Ok(tid.into()),
@@ -223,6 +224,7 @@ pub fn sys_fcntl(
                 }
             };
             owner.validate(current_task)?;
+            security::check_file_fcntl_access(current_task, &file, cmd, arg)?;
             file.set_async_owner(owner);
             Ok(SUCCESS)
         }
@@ -259,6 +261,7 @@ pub fn sys_fcntl(
             //
             // See https://man7.org/linux/man-pages/man2/open.2.html
             let file = current_task.files.get_allowing_opath(fd)?;
+            security::check_file_fcntl_access(current_task, &file, cmd, arg)?;
             Ok(file.flags().into())
         }
         F_SETFL => {
@@ -270,6 +273,7 @@ pub fn sys_fcntl(
             let requested_flags =
                 OpenFlags::from_bits_truncate((arg as u32) & settable_flags.bits());
             let file = current_task.files.get(fd)?;
+            security::check_file_fcntl_access(current_task, &file, cmd, arg)?;
 
             // If `NOATIME` flag is being set then check that it's allowed.
             if requested_flags.contains(OpenFlags::NOATIME)
@@ -283,6 +287,7 @@ pub fn sys_fcntl(
         }
         F_SETLK | F_SETLKW | F_GETLK | F_OFD_GETLK | F_OFD_SETLK | F_OFD_SETLKW => {
             let file = current_task.files.get(fd)?;
+            security::check_file_fcntl_access(current_task, &file, cmd, arg)?;
             let flock_ref = UserRef::<uapi::flock>::new(arg.into());
             let flock = current_task.read_object(flock_ref)?;
             let cmd = RecordLockCommand::from_raw(cmd).ok_or_else(|| errno!(EINVAL))?;
@@ -875,21 +880,25 @@ pub fn sys_fstat(
     Ok(())
 }
 
-pub fn sys_newfstatat(
+type StatPtr = MultiArchUserRef<uapi::stat, uapi::arch32::stat64>;
+
+pub fn sys_fstatat64(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
-    buffer: UserRef<uapi::stat>,
+    buffer: StatPtr,
     flags: u32,
 ) -> Result<(), Errno> {
     let flags =
         LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT)?;
     let name = lookup_at(locked, current_task, dir_fd, user_path, flags)?;
     let result = name.entry.node.stat(locked, current_task)?;
-    current_task.write_object(buffer, &result)?;
+    current_task.write_multi_arch_object(buffer, result)?;
     Ok(())
 }
+
+pub use sys_fstatat64 as sys_newfstatat;
 
 pub fn sys_statx(
     locked: &mut Locked<'_, Unlocked>,
@@ -1723,7 +1732,7 @@ pub fn sys_mount(
     security::sb_mount(current_task, &target, flags)?;
 
     if flags.contains(MountFlags::REMOUNT) {
-        do_mount_remount(target, flags, data_addr)
+        do_mount_remount(current_task, target, flags, data_addr)
     } else if flags.contains(MountFlags::BIND) {
         do_mount_bind(locked, current_task, source_addr, target, flags)
     } else if flags.intersects(MountFlags::SHARED | MountFlags::PRIVATE | MountFlags::DOWNSTREAM) {
@@ -1742,6 +1751,7 @@ pub fn sys_mount(
 }
 
 fn do_mount_remount(
+    current_task: &CurrentTask,
     target: NamespaceNode,
     flags: MountFlags,
     data_addr: UserCString,
@@ -1750,6 +1760,12 @@ fn do_mount_remount(
         track_stub!(TODO("https://fxbug.dev/322875506"), "MS_REMOUNT: Updating data");
     }
     let mount = target.mount_if_root()?;
+
+    let mut data_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
+    let data = current_task.read_c_string_if_non_null(data_addr, &mut data_buf)?;
+    let mount_options =
+        security::sb_eat_lsm_opts(current_task.kernel(), &mut MountParams::parse(data)?)?;
+    security::sb_remount(current_task, &mount, mount_options)?;
     let updated_flags = flags & MountFlags::CHANGEABLE_WITH_REMOUNT;
     mount.update_flags(updated_flags);
     if !flags.contains(MountFlags::BIND) {
@@ -1834,11 +1850,7 @@ fn do_mount_create(
     let mut fs_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
     let fs_type = current_task.read_c_string(filesystemtype_addr, &mut fs_buf)?;
     let mut data_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
-    let data = if data_addr.is_null() {
-        Default::default()
-    } else {
-        current_task.read_c_string(data_addr, &mut data_buf)?
-    };
+    let data = current_task.read_c_string_if_non_null(data_addr, &mut data_buf)?;
     log_trace!(
         source:%,
         target:% = target.path(current_task),
@@ -1850,7 +1862,7 @@ fn do_mount_create(
     let options = FileSystemOptions {
         source: source.into(),
         flags: flags & MountFlags::STORED_ON_FILESYSTEM,
-        params: MountParams::parse(&data)?,
+        params: MountParams::parse(data)?,
     };
 
     let fs = current_task.create_filesystem(locked, fs_type, options)?;
@@ -3154,13 +3166,17 @@ pub fn sys_io_uring_register(
 #[cfg(feature = "arch32")]
 mod arch32 {
     use crate::mm::MemoryAccessorExt;
-    use crate::vfs::syscalls::{lookup_at, sys_faccessat, sys_openat, sys_readlinkat, LookupFlags};
+    use crate::vfs::syscalls::{
+        lookup_at, sys_dup3, sys_faccessat, sys_lseek, sys_mkdirat, sys_openat, sys_readlinkat,
+        sys_unlinkat, LookupFlags,
+    };
     use crate::vfs::{CurrentTask, FdNumber, FsNode};
+    use linux_uapi::off_t;
     use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::errors::Errno;
     use starnix_uapi::file_mode::FileMode;
-    use starnix_uapi::uapi;
     use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+    use starnix_uapi::{uapi, AT_REMOVEDIR};
 
     pub fn sys_arch32_open(
         locked: &mut Locked<'_, Unlocked>,
@@ -3222,6 +3238,67 @@ mod arch32 {
     ) -> Result<usize, Errno> {
         sys_readlinkat(locked, current_task, FdNumber::AT_FDCWD, user_path, buffer, buffer_size)
     }
+
+    pub fn sys_arch32_mkdir(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_path: UserCString,
+        mode: FileMode,
+    ) -> Result<(), Errno> {
+        sys_mkdirat(locked, current_task, FdNumber::AT_FDCWD, user_path, mode)
+    }
+
+    pub fn sys_arch32_rmdir(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_path: UserCString,
+    ) -> Result<(), Errno> {
+        sys_unlinkat(locked, current_task, FdNumber::AT_FDCWD, user_path, AT_REMOVEDIR)
+    }
+
+    #[allow(non_snake_case)]
+    pub fn sys_arch32__llseek(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+        offset_high: u32,
+        offset_low: u32,
+        result: UserRef<off_t>,
+        whence: u32,
+    ) -> Result<(), Errno> {
+        let offset = ((offset_high as off_t) << 32) | (offset_low as off_t);
+        let result_value = sys_lseek(locked, current_task, fd, offset, whence)?;
+        current_task.write_object(result, &result_value).map(|_| ())
+    }
+
+    pub fn sys_arch32_dup2(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        oldfd: FdNumber,
+        newfd: FdNumber,
+    ) -> Result<FdNumber, Errno> {
+        if oldfd == newfd {
+            // O_PATH allowed for:
+            //
+            //  Duplicating the file descriptor (dup(2), fcntl(2)
+            //  F_DUPFD, etc.).
+            //
+            // See https://man7.org/linux/man-pages/man2/open.2.html
+            current_task.files.get_allowing_opath(oldfd)?;
+            return Ok(newfd);
+        }
+        sys_dup3(locked, current_task, oldfd, newfd, 0)
+    }
+
+    pub fn sys_arch32_unlink(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_path: UserCString,
+    ) -> Result<(), Errno> {
+        sys_unlinkat(locked, current_task, FdNumber::AT_FDCWD, user_path, 0)
+    }
+
+    pub use super::sys_fstatat64 as sys_arch32_fstatat64;
 }
 
 #[cfg(feature = "arch32")]

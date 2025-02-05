@@ -292,7 +292,7 @@ impl Worker {
                 Item::SinkItem(Some(SinkItem::Event(
                     ref event @ Event { ref id, kind, addr, at },
                 ))) => {
-                    info!("{}", EventLogger { event, ctx: &ctx });
+                    info!(tag = "NUD"; "{}", EventLogger { event, ctx: &ctx });
 
                     let DeviceIdAndName { id: binding_id, name: _ } = *id.bindings_id();
                     let entry = neighbor_state
@@ -525,8 +525,10 @@ fn get_ethernet_id(ctx: &Ctx, interface: u64) -> Result<EthernetDeviceId<Binding
         .ok_or(zx::Status::NOT_FOUND)?
     {
         DeviceId::Ethernet(e) => Ok(e),
-        // NUD is not supported for Loopback or pure IP devices.
-        DeviceId::Loopback(_) | DeviceId::PureIp(_) => Err(zx::Status::NOT_SUPPORTED),
+        // NUD is not supported for Loopback, pure IP, or blackhole devices.
+        DeviceId::Loopback(_) | DeviceId::PureIp(_) | DeviceId::Blackhole(_) => {
+            Err(zx::Status::NOT_SUPPORTED)
+        }
     }
 }
 

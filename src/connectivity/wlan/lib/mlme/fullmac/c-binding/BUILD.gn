@@ -17,7 +17,7 @@ rustc_staticlib("wlan-fullmac-mlme-c") {
     "//src/connectivity/wlan/lib/ffi-transport:wlan-ffi-transport",
     "//src/connectivity/wlan/lib/mlme/fullmac:wlan-fullmac-mlme",
     "//src/lib/fidl/rust/fidl",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   public = [ "bindings.h" ]

@@ -857,7 +857,7 @@ static int cmd_boot_test_success(int argc, const cmd_args* argv, uint32_t flags)
 
 static int cmd_graceful_shutdown(int argc, const cmd_args* argv, uint32_t flags) {
   printf("*** Performing graceful shutdown from kernel shell... ***\n");
-  const zx_time_t dlog_deadline = current_time() + ZX_SEC(10);
+  const zx_instant_mono_t dlog_deadline = current_mono_time() + ZX_SEC(10);
   dlog_shutdown(dlog_deadline);
   // Does not return.
   platform_halt(HALT_ACTION_SHUTDOWN, ZirconCrashReason::NoCrash);
@@ -924,7 +924,7 @@ static int cmd_repeat(int argc, const cmd_args* argv, uint32_t flags) {
 
 static constexpr TimerSlack kSlack{ZX_MSEC(10), TIMER_SLACK_CENTER};
 
-void RecurringCallback::CallbackWrapper(Timer* t, zx_time_t now, void* arg) {
+void RecurringCallback::CallbackWrapper(Timer* t, zx_instant_mono_t now, void* arg) {
   auto cb = static_cast<RecurringCallback*>(arg);
   cb->func_();
 
@@ -945,7 +945,7 @@ void RecurringCallback::Toggle() {
   Guard<SpinLock, IrqSave> guard{&lock_};
 
   if (!started_) {
-    const Deadline deadline = Deadline::after(ZX_SEC(1), kSlack);
+    const Deadline deadline = Deadline::after_mono(ZX_SEC(1), kSlack);
     // start the timer
     timer_.Set(deadline, CallbackWrapper, static_cast<void*>(this));
     started_ = true;

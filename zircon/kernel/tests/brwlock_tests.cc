@@ -18,10 +18,10 @@
 
 // Use a delay spinner to create fine grained delays between 0 and 1msec
 static void rand_delay() {
-  int64_t end = current_time() + (rand() % ZX_MSEC(1));
+  int64_t end = current_mono_time() + (rand() % ZX_MSEC(1));
   do {
     Thread::Current::Yield();
-  } while (current_time() < end);
+  } while (current_mono_time() < end);
 }
 
 // Use a helper class for running tests so that worker threads and main thread all
@@ -94,9 +94,9 @@ class BrwLockTest {
       t->Resume();
     }
 
-    zx_time_t start = current_time();
-    zx_duration_t duration = ZX_MSEC(300);
-    while (current_time() < start + duration) {
+    zx_instant_mono_t start = current_mono_time();
+    zx_duration_mono_t duration = ZX_MSEC(300);
+    while (current_mono_time() < start + duration) {
       uint32_t local_state = test.state_.load(ktl::memory_order_relaxed);
       uint32_t num_readers = local_state & 0xffff;
       uint32_t num_writers = local_state >> 16;
@@ -116,7 +116,7 @@ class BrwLockTest {
     auto join = [](Thread* t, const char* description) -> zx_status_t {
       constexpr int64_t kTimeoutMs = 5000;
       while (true) {
-        Deadline deadline = Deadline::after(zx_duration_from_msec(kTimeoutMs));
+        Deadline deadline = Deadline::after_mono(zx_duration_from_msec(kTimeoutMs));
         zx_status_t status = t->Join(nullptr, deadline.when());
         if (status != ZX_ERR_TIMED_OUT) {
           return status;

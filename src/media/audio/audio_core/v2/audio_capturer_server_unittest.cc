@@ -51,6 +51,11 @@ class AudioCapturerEventHandler : public fidl::WireAsyncEventHandler<fuchsia_med
   }
   void OnEndOfStream() final {}
   void on_fidl_error(fidl::UnbindInfo error) final { args_.on_fidl_error(error); }
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_media::AudioCapturer> metadata) override {
+    FX_LOGS(WARNING) << "AudioCapturerEventHandler: unknown event (AudioCapturer) ordinal "
+                     << metadata.event_ordinal;
+  }
 
  private:
   Args args_;
@@ -192,9 +197,17 @@ TEST(AudioCapturerServerTest, ErrorUltrasoundForbidsSetUsage) {
       .usage = CaptureUsage::ULTRASOUND,
       .format = kFormat,
   });
-  std::ignore =
-      (*h.capturer_client)
-          ->SetUsage(static_cast<fuchsia_media::AudioCaptureUsage>(CaptureUsage::FOREGROUND));
+  std::ignore = (*h.capturer_client)->SetUsage(fuchsia_media::AudioCaptureUsage::kForeground);
+  h.loop.RunUntilIdle();
+  EXPECT_EQ(h.capturer_close_status, ZX_ERR_NOT_SUPPORTED);
+}
+
+TEST(AudioCapturerServerTest, ErrorUltrasoundForbidsSetUsage2) {
+  TestHarness h({
+      .usage = CaptureUsage::ULTRASOUND,
+      .format = kFormat,
+  });
+  std::ignore = (*h.capturer_client)->SetUsage2(fuchsia_media::AudioCaptureUsage2::kForeground);
   h.loop.RunUntilIdle();
   EXPECT_EQ(h.capturer_close_status, ZX_ERR_NOT_SUPPORTED);
 }
@@ -219,9 +232,17 @@ TEST(AudioCapturerServerTest, ErrorLoopbackForbidsSetUsage) {
       .usage = CaptureUsage::LOOPBACK,
       .format = kFormat,
   });
-  std::ignore =
-      (*h.capturer_client)
-          ->SetUsage(static_cast<fuchsia_media::AudioCaptureUsage>(CaptureUsage::FOREGROUND));
+  std::ignore = (*h.capturer_client)->SetUsage(fuchsia_media::AudioCaptureUsage::kForeground);
+  h.loop.RunUntilIdle();
+  EXPECT_EQ(h.capturer_close_status, ZX_ERR_NOT_SUPPORTED);
+}
+
+TEST(AudioCapturerServerTest, ErrorLoopbackForbidsSetUsage2) {
+  TestHarness h({
+      .usage = CaptureUsage::LOOPBACK,
+      .format = kFormat,
+  });
+  std::ignore = (*h.capturer_client)->SetUsage2(fuchsia_media::AudioCaptureUsage2::kForeground);
   h.loop.RunUntilIdle();
   EXPECT_EQ(h.capturer_close_status, ZX_ERR_NOT_SUPPORTED);
 }
@@ -309,10 +330,9 @@ TEST(AudioCapturerServerTest, ConfigureWithExplicitCalls) {
             ZX_OK);
 
   ASSERT_EQ((*h.capturer_client)->SetReferenceClock(std::move(clock)).status(), ZX_OK);
-  ASSERT_EQ((*h.capturer_client)
-                ->SetUsage(static_cast<fuchsia_media::AudioCaptureUsage>(CaptureUsage::BACKGROUND))
-                .status(),
-            ZX_OK);
+  ASSERT_EQ(
+      (*h.capturer_client)->SetUsage2(fuchsia_media::AudioCaptureUsage2::kBackground).status(),
+      ZX_OK);
 
   const Format kExpectedFormat =
       Format::CreateOrDie({fuchsia_audio::SampleType::kFloat32, 2, 48000});

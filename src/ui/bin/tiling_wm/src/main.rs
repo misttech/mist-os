@@ -10,19 +10,21 @@ use fuchsia_scenic::flatland::{IdGenerator, ViewCreationTokenPair};
 use fuchsia_scenic::ViewRefPair;
 use futures::channel::mpsc::UnboundedSender;
 use futures::{StreamExt, TryStreamExt};
-use std::collections::HashMap;
-use tracing::{error, info, warn};
+use log::{error, info, warn};
+use rand::distributions::{Alphanumeric, DistString};
+use rand::thread_rng;
+use std::collections::{HashMap, VecDeque};
 use {
     fidl_fuchsia_element as element, fidl_fuchsia_session_scene as scene,
-    fidl_fuchsia_ui_composition as ui_comp, fidl_fuchsia_ui_views as ui_views,
-    fuchsia_async as fasync,
+    fidl_fuchsia_session_window as window, fidl_fuchsia_ui_composition as ui_comp,
+    fidl_fuchsia_ui_views as ui_views, fuchsia_async as fasync,
 };
 
 // The maximum number of concurrent services to serve.
 const NUM_CONCURRENT_REQUESTS: usize = 5;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct TileId(pub u64);
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TileId(pub String);
 
 impl std::fmt::Display for TileId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -48,6 +50,21 @@ pub enum MessageInternal {
         tile_id: TileId,
         view_ref: ui_views::ViewRef,
     },
+    WindowManagerListViews {
+        responder: window::ManagerListResponder,
+    },
+    WindowManagerSetOrder {
+        old_position: usize,
+        new_position: usize,
+        responder: window::ManagerSetOrderResponder,
+    },
+    WindowManagerCycle {
+        responder: window::ManagerCycleResponder,
+    },
+    WindowManagerFocusView {
+        position: usize,
+        responder: window::ManagerFocusResponder,
+    },
 }
 
 #[derive(Clone, Copy)]
@@ -64,7 +81,9 @@ pub struct TilingWm {
     root_transform_id: ui_comp::TransformId,
     layout_info: ui_comp::LayoutInfo,
     tiles: HashMap<TileId, ChildView>,
-    next_tile_id: u64,
+    // Maintains ordering of tiles from left-to-right and top-to-bottom, with the first element
+    // representing the top-left Tile and the last element representing the bottom-right Tile.
+    tile_order: VecDeque<TileId>,
 }
 
 impl Drop for TilingWm {
@@ -134,13 +153,14 @@ impl TilingWm {
                     .add_child(&self.root_transform_id, &viewport_transform_id)
                     .context("GraphicalPresenterPresentView add_child")?;
 
-                // Track all of the child view's resources.
-                let new_tile_id = TileId(self.next_tile_id);
+                let mut view_name = Alphanumeric.sample_string(&mut thread_rng(), 16);
+                view_name.make_ascii_lowercase();
+                let new_tile_id = TileId(view_name);
                 let new_tile = ChildView { viewport_transform_id, viewport_content_id };
-                self.tiles.insert(new_tile_id, new_tile);
-                self.next_tile_id += 1;
+                self.tiles.insert(new_tile_id.clone(), new_tile);
+                self.tile_order.push_front(new_tile_id.clone());
 
-                self.layout_tiles();
+                self.layout_tiles()?;
 
                 // Flush the changes.
                 self.flatland
@@ -158,7 +178,7 @@ impl TilingWm {
                         .send_on_presented()
                         .context("GraphicalPresenterPresentView send_on_presented")?;
                     run_tile_controller_request_stream(
-                        new_tile_id,
+                        new_tile_id.clone(),
                         view_controller_request_stream,
                         self.internal_sender.clone(),
                     );
@@ -183,7 +203,7 @@ impl TilingWm {
                 control_handle.shutdown_with_epitaph(zx::Status::OK);
                 match &mut self.tiles.remove(&tile_id) {
                     Some(tile) => {
-                        self.layout_tiles();
+                        self.layout_tiles()?;
                         Self::release_tile_resources(&self.flatland, tile)
                             .context("DismissClient release_tile_resources")?;
                     }
@@ -195,7 +215,7 @@ impl TilingWm {
             MessageInternal::ClientDied { tile_id } => {
                 match &mut self.tiles.remove(&tile_id) {
                     Some(tile) => {
-                        self.layout_tiles();
+                        self.layout_tiles()?;
                         Self::release_tile_resources(&self.flatland, tile)
                             .context("ClientDied release_tile_resources")?;
                     }
@@ -223,6 +243,40 @@ impl TilingWm {
 
                 Ok(())
             }
+            MessageInternal::WindowManagerListViews { responder } => {
+                let views = self.list_views();
+                if let Err(e) = responder.send(&views) {
+                    error!("Failed to send response for WindowManager Manager.List(): {}", e);
+                }
+                Ok(())
+            }
+            MessageInternal::WindowManagerSetOrder { old_position, new_position, responder } => {
+                self.set_tile_order(old_position, new_position)?;
+                self.flatland
+                    .present(ui_comp::PresentArgs {
+                        requested_presentation_time: Some(0),
+                        ..Default::default()
+                    })
+                    .context("WindowManagerSetOrder present")?;
+                if let Err(e) = responder.send() {
+                    error!("Failed to send response for WindowManager Manager.SetOrder(): {}", e);
+                }
+                Ok(())
+            }
+            MessageInternal::WindowManagerCycle { responder } => {
+                self.cycle_tiles()?;
+                self.flatland
+                    .present(ui_comp::PresentArgs {
+                        requested_presentation_time: Some(0),
+                        ..Default::default()
+                    })
+                    .context("WindowManagerSetOrder present")?;
+                if let Err(e) = responder.send() {
+                    error!("Failed to send response for WindowManager Manager.Cycle(): {}", e);
+                }
+                Ok(())
+            }
+            _ => Ok(()),
         }
     }
 
@@ -301,7 +355,7 @@ impl TilingWm {
             root_transform_id,
             layout_info,
             tiles: HashMap::new(),
-            next_tile_id: 0,
+            tile_order: VecDeque::new(),
         })
     }
 
@@ -319,12 +373,47 @@ impl TilingWm {
         })?)
     }
 
-    fn layout_tiles(&mut self) {
+    fn set_tile_order(&mut self, old_position: usize, new_position: usize) -> Result<(), Error> {
+        if old_position == new_position {
+            return Ok(());
+        }
+        if new_position > self.tile_order.len() - 1 {
+            warn!(
+                "WindowManager SetOrder failed: cannot move element out-of-bounds to position {}",
+                new_position
+            );
+            return Ok(());
+        }
+        let tile_id = match self.tile_order.remove(old_position) {
+            Some(id) => id,
+            None => {
+                warn!("WindowManager SetOrder failed: no element at position {}", old_position);
+                return Ok(());
+            }
+        };
+        self.tile_order.insert(new_position, tile_id);
+        self.layout_tiles()
+    }
+
+    fn cycle_tiles(&mut self) -> Result<(), Error> {
+        self.set_tile_order(0, self.tile_order.len() - 1)
+    }
+
+    fn list_views(&mut self) -> Vec<window::ListedView> {
+        let mut list = vec![];
+        for (pos, TileId(id)) in self.tile_order.iter().enumerate() {
+            let view = window::ListedView { position: pos as u64, id: id.to_string() };
+            list.push(view);
+        }
+        list
+    }
+
+    fn layout_tiles(&mut self) -> Result<(), Error> {
         let fullscreen_height = self.layout_info.logical_size.unwrap().height;
         let fullscreen_width = self.layout_info.logical_size.unwrap().width;
         let num_tiles = self.tiles.len() as u32;
         if num_tiles == 0 {
-            return;
+            return Ok(());
         }
         let mut columns = (num_tiles as f32).sqrt().ceil() as u32;
         let mut rows = (columns + num_tiles - 1) / columns;
@@ -347,12 +436,12 @@ impl TilingWm {
                 ui_comp::ViewportProperties { logical_size: Some(tile_size), ..Default::default() };
             for c in 0..tiles_in_row {
                 // Get next ChildView in order that will be added to this row/column slot
-                let mut next_view: Option<&ChildView> = None;
-                while next_view.is_none() {
-                    next_view = self.tiles.get(&TileId(tile_idx));
-                    tile_idx += 1
-                }
-                let view = next_view.unwrap();
+                let tile_name = &self.tile_order.get(tile_idx).expect("Index out of bounds");
+                let view = self
+                    .tiles
+                    .get_mut(tile_name)
+                    .unwrap_or_else(|| panic!("{tile_name} not found"));
+                tile_idx += 1;
                 let viewport_translation = fidl_fuchsia_math::Vec_ {
                     x: (c as i32) * (tile_width as i32),
                     y: (r as i32) * (tile_height as i32),
@@ -365,6 +454,7 @@ impl TilingWm {
                     .expect("TilingWM failed to set tile's translation");
             }
         }
+        Ok(())
     }
 
     fn watch_layout(
@@ -390,7 +480,7 @@ impl TilingWm {
                 Ok(view_ref) => {
                     internal_sender
                         .unbounded_send(MessageInternal::ReceivedClientViewRef {
-                            tile_id,
+                            tile_id: tile_id.clone(),
                             view_ref,
                         })
                         .expect("Failed to send MessageInternal::ReceivedClientViewRef");
@@ -415,6 +505,7 @@ impl TilingWm {
 
 enum ExposedServices {
     GraphicalPresenter(element::GraphicalPresenterRequestStream),
+    WindowManager(window::ManagerRequestStream),
 }
 
 fn expose_services() -> Result<ServiceFs<ServiceObj<'static, ExposedServices>>, Error> {
@@ -422,6 +513,7 @@ fn expose_services() -> Result<ServiceFs<ServiceObj<'static, ExposedServices>>, 
 
     // Add services for component outgoing directory.
     fs.dir("svc").add_fidl_service(ExposedServices::GraphicalPresenter);
+    fs.dir("svc").add_fidl_service(ExposedServices::WindowManager);
     fs.take_and_serve_directory_handle()?;
 
     Ok(fs)
@@ -436,6 +528,9 @@ fn run_services(
             match service_request {
                 ExposedServices::GraphicalPresenter(request_stream) => {
                     run_graphical_presenter_service(request_stream, internal_sender.clone());
+                }
+                ExposedServices::WindowManager(request_stream) => {
+                    run_window_manager_service(request_stream, internal_sender.clone());
                 }
             }
         })
@@ -530,6 +625,68 @@ pub fn run_tile_controller_request_stream(
         }
     })
     .detach();
+}
+
+fn run_window_manager_service(
+    mut request_stream: window::ManagerRequestStream,
+    mut internal_sender: UnboundedSender<MessageInternal>,
+) {
+    fasync::Task::local(async move {
+        loop {
+            let result = request_stream.try_next().await;
+            match result {
+                Ok(Some(request)) => {
+                    internal_sender = handle_window_manager_request(request, internal_sender);
+                }
+                Ok(None) => {
+                    info!("Window Manager ManagerRequestStream ended with Ok(None)");
+                    return;
+                }
+                Err(e) => {
+                    error!(
+                        "Error while retrieving requests from Window Manager ManagerRequestStream: {}",
+                        e
+                    );
+                    return;
+                }
+            }
+        }
+    })
+    .detach();
+}
+
+fn handle_window_manager_request(
+    request: window::ManagerRequest,
+    internal_sender: UnboundedSender<MessageInternal>,
+) -> UnboundedSender<MessageInternal> {
+    match request {
+        window::ManagerRequest::List { responder } => {
+            internal_sender
+                .unbounded_send(MessageInternal::WindowManagerListViews { responder })
+                .expect("Failed to send MessageInternal.");
+        }
+        window::ManagerRequest::SetOrder { old_position, new_position, responder } => {
+            internal_sender
+                .unbounded_send(MessageInternal::WindowManagerSetOrder {
+                    old_position: old_position as usize,
+                    new_position: new_position as usize,
+                    responder,
+                })
+                .expect("Failed to send MessageInternal.");
+        }
+        window::ManagerRequest::Cycle { responder } => {
+            internal_sender
+                .unbounded_send(MessageInternal::WindowManagerCycle { responder })
+                .expect("Failed to send MessageInternal");
+        }
+        window::ManagerRequest::Focus { position: _position, responder: _responder } => {
+            unimplemented!()
+        }
+        _ => {
+            unimplemented!()
+        }
+    }
+    internal_sender
 }
 
 #[fuchsia::main(logging = true)]

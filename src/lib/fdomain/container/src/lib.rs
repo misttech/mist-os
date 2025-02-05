@@ -112,7 +112,7 @@ pub enum FDomainEvent {
 enum UnprocessedFDomainEvent {
     Ready(FDomainEvent),
     ChannelData(NonZeroU32, fidl::MessageBufEtc),
-    ChannelStreamingData(proto::Hid, fidl::MessageBufEtc),
+    ChannelStreamingData(proto::HandleId, fidl::MessageBufEtc),
 }
 
 impl From<FDomainEvent> for UnprocessedFDomainEvent {
@@ -152,7 +152,7 @@ enum WriteOp {
 /// handle, so the write should not proceed while the handle is in the `InUse`
 /// state.
 enum ShuttingDownHandle {
-    InUse(proto::Hid, HandleState),
+    InUse(proto::HandleId, HandleState),
     Ready(AnyHandle),
 }
 
@@ -171,7 +171,9 @@ impl ShuttingDownHandle {
                     while let Poll::Ready(op) = state.read_queue.pop_front(ctx) {
                         match op {
                             ReadOp::StreamingChannel(tid, start) => {
-                                let err = Err(proto::Error::BadHid(proto::BadHid { id: hid.id }));
+                                let err = Err(proto::Error::BadHandleId(proto::BadHandleId {
+                                    id: hid.id,
+                                }));
                                 let event = if start {
                                     FDomainEvent::ChannelStreamingReadStart(tid, err)
                                 } else {
@@ -180,7 +182,9 @@ impl ShuttingDownHandle {
                                 event_queue.push_back(event.into());
                             }
                             ReadOp::StreamingSocket(tid, start) => {
-                                let err = Err(proto::Error::BadHid(proto::BadHid { id: hid.id }));
+                                let err = Err(proto::Error::BadHandleId(proto::BadHandleId {
+                                    id: hid.id,
+                                }));
                                 let event = if start {
                                     FDomainEvent::SocketStreamingReadStart(tid, err)
                                 } else {
@@ -338,7 +342,7 @@ struct HandleState {
     /// The handle itself.
     handle: Arc<AnyHandle>,
     /// Our handle ID.
-    hid: proto::Hid,
+    hid: proto::HandleId,
     /// Indicates that a write operation failed on this handle. Further
     /// operations should also fail until we receive an `AcknowledgeWriteError`
     /// method call.
@@ -369,7 +373,7 @@ struct HandleState {
 }
 
 impl HandleState {
-    fn new(handle: AnyHandle, hid: proto::Hid) -> Self {
+    fn new(handle: AnyHandle, hid: proto::HandleId) -> Self {
         HandleState {
             handle: Arc::new(handle),
             hid,
@@ -791,7 +795,7 @@ impl ClosingHandle {
 /// period ends.
 enum CloseAction {
     Close { tid: NonZeroU32, count: AtomicU32, result: Result<()> },
-    Replace { tid: NonZeroU32, new_hid: proto::NewHid, rights: fidl::Rights },
+    Replace { tid: NonZeroU32, new_hid: proto::NewHandleId, rights: fidl::Rights },
 }
 
 impl CloseAction {
@@ -821,7 +825,7 @@ impl CloseAction {
 #[pin_project::pin_project]
 pub struct FDomain {
     namespace: Box<dyn Fn() -> Result<ClientEnd<fio::DirectoryMarker>, fidl::Status> + Send>,
-    handles: HashMap<proto::Hid, HandleState>,
+    handles: HashMap<proto::HandleId, HandleState>,
     closing_handles: Vec<ClosingHandle>,
     event_queue: VecDeque<UnprocessedFDomainEvent>,
     waker: Option<Waker>,
@@ -891,23 +895,25 @@ impl FDomain {
     }
 
     /// Allocate `N` new handle IDs. These are allocated from
-    /// [`NewHid`](proto::NewHid) and are expected to follow the protocol
+    /// [`NewHandleId`](proto::NewHandleId) and are expected to follow the protocol
     /// rules for client-allocated handle IDs.
     ///
     /// If any of the handles passed fail to allocate, none of the handles will
     /// be allocated.
     fn alloc_client_handles<const N: usize>(
         &mut self,
-        ids: [proto::NewHid; N],
+        ids: [proto::NewHandleId; N],
         handles: [AnyHandle; N],
     ) -> Result<(), proto::Error> {
         for id in ids {
             if id.id & (1 << 31) != 0 {
-                return Err(proto::Error::NewHidOutOfRange(proto::NewHidOutOfRange { id: id.id }));
+                return Err(proto::Error::NewHandleIdOutOfRange(proto::NewHandleIdOutOfRange {
+                    id: id.id,
+                }));
             }
 
-            if self.handles.contains_key(&proto::Hid { id: id.id }) {
-                return Err(proto::Error::NewHidReused(proto::NewHidReused {
+            if self.handles.contains_key(&proto::HandleId { id: id.id }) {
+                return Err(proto::Error::NewHandleIdReused(proto::NewHandleIdReused {
                     id: id.id,
                     same_call: false,
                 }));
@@ -918,9 +924,12 @@ impl FDomain {
         sorted_ids.sort();
 
         if let Some(a) = sorted_ids.windows(2).find(|x| x[0] == x[1]) {
-            Err(proto::Error::NewHidReused(proto::NewHidReused { id: a[0].id, same_call: true }))
+            Err(proto::Error::NewHandleIdReused(proto::NewHandleIdReused {
+                id: a[0].id,
+                same_call: true,
+            }))
         } else {
-            let ids = ids.into_iter().map(|id| proto::Hid { id: id.id });
+            let ids = ids.into_iter().map(|id| proto::HandleId { id: id.id });
             let handles = ids.zip(handles.into_iter()).map(|(id, h)| (id, HandleState::new(h, id)));
 
             self.handles.extend(handles);
@@ -931,9 +940,9 @@ impl FDomain {
 
     /// Allocate a new handle ID. These are allocated internally and are
     /// expected to follow the protocol rules for FDomain-allocated handle IDs.
-    fn alloc_fdomain_handle(&mut self, handle: AnyHandle) -> proto::Hid {
+    fn alloc_fdomain_handle(&mut self, handle: AnyHandle) -> proto::HandleId {
         loop {
-            let id = proto::Hid { id: rand::random::<u32>() | (1u32 << 31) };
+            let id = proto::HandleId { id: rand::random::<u32>() | (1u32 << 31) };
             if let Entry::Vacant(v) = self.handles.entry(id) {
                 v.insert(HandleState::new(handle, id));
                 break id;
@@ -942,20 +951,22 @@ impl FDomain {
     }
 
     /// If a handle exists in this FDomain, remove it.
-    fn take_handle(&mut self, handle: proto::Hid) -> Result<HandleState, proto::Error> {
-        self.handles.remove(&handle).ok_or(proto::Error::BadHid(proto::BadHid { id: handle.id }))
+    fn take_handle(&mut self, handle: proto::HandleId) -> Result<HandleState, proto::Error> {
+        self.handles
+            .remove(&handle)
+            .ok_or(proto::Error::BadHandleId(proto::BadHandleId { id: handle.id }))
     }
 
     /// Use a handle in our handle table, if it exists.
     fn using_handle<T>(
         &mut self,
-        id: proto::Hid,
+        id: proto::HandleId,
         f: impl FnOnce(&mut HandleState) -> Result<T, proto::Error>,
     ) -> Result<T, proto::Error> {
         if let Some(s) = self.handles.get_mut(&id) {
             f(s)
         } else {
-            Err(proto::Error::BadHid(proto::BadHid { id: id.id }))
+            Err(proto::Error::BadHandleId(proto::BadHandleId { id: id.id }))
         }
     }
 

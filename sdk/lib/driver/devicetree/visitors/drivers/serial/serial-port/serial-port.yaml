@@ -7,7 +7,7 @@
 $id: http://devicetree.org/schemas/serial-port.yaml#
 $schema: http://devicetree.org/meta-schemas/core.yaml#
 
-title: Serial port
+title: Serial port controller
 
 maintainers:
   - Puneetha Ramachandra (puneetha@google.com)
@@ -24,6 +24,9 @@ properties:
       - description: serial device VID.
       - description: serial device PID.
 
+  "#uart-cells":
+    const: 0
+
 additionalProperties: true
 
 examples:
@@ -31,4 +34,5 @@ examples:
     bt-uart {
       compatible = "test,bt-uart";
       serial-port = <1 /*GENERIC class*/ 0x0 /*VID*/ 0x11 /*PID*/>;
+      #uart-cells = <0>;
     };

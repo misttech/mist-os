@@ -56,8 +56,8 @@ impl Router<Connector> {
                     responder.send(router::route_from_fidl(&self, payload).await)?;
                 }
                 fsandbox::ConnectorRouterRequest::_UnknownMethod { ordinal, .. } => {
-                    tracing::warn!(
-                    %ordinal,
+                    log::warn!(
+                        ordinal:%;
                         "Received unknown ConnectorRouter request"
                     );
                 }

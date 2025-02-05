@@ -109,10 +109,11 @@ void pmm_end_loan(paddr_t address, size_t count, list_node* page_list);
 // (non-loaned) pages.
 void pmm_delete_lender(paddr_t address, size_t count);
 
-// Free a list of physical pages.
+// Free a list of physical pages. This list must not contained loaned pages returned from
+// PmmNode::AllocLoanedPage.
 void pmm_free(list_node* list) __NONNULL((1));
 
-// Free a single page.
+// Free a single page. This page must not be a loaned page returned from PmmNode::AllocLoanedPage.
 void pmm_free_page(vm_page_t* page) __NONNULL((1));
 
 // Return count of unallocated physical pages in system.

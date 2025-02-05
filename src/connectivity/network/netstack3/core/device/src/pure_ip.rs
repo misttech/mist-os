@@ -15,7 +15,8 @@ use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{
     BroadcastIpExt, CoreTimerContext, Device, DeviceIdContext, ReceivableFrameMeta,
     RecvFrameContext, RecvIpFrameMeta, ResourceCounterContext, SendFrameError,
-    SendFrameErrorReason, SendableFrameMeta, TimerContext, WeakDeviceIdentifier,
+    SendFrameErrorReason, SendableFrameMeta, TimerContext, TxMetadataBindingsTypes,
+    WeakDeviceIdentifier,
 };
 use netstack3_ip::{DeviceIpLayerMetadata, IpPacketDestination};
 use packet::{Buf, BufferMut, Serializer};
@@ -63,9 +64,11 @@ pub struct PureIpDeviceCreationProperties {
 }
 
 /// Metadata for IP packets held in the TX queue.
-pub struct PureIpDeviceTxQueueFrameMetadata {
+pub struct PureIpDeviceTxQueueFrameMetadata<BT: TxMetadataBindingsTypes> {
     /// The IP version of the sent packet.
     pub ip_version: IpVersion,
+    /// Tx metadata associated with the frame.
+    pub tx_metadata: BT::TxMetadata,
 }
 
 /// Metadata for sending IP packets from a device socket.
@@ -76,11 +79,12 @@ pub struct PureIpHeaderParams {
 }
 
 /// State for a pure IP device.
-pub struct PureIpDeviceState {
+pub struct PureIpDeviceState<BT: TxMetadataBindingsTypes> {
     /// The device's dynamic state.
     dynamic_state: RwLock<DynamicPureIpDeviceState>,
     /// The device's transmit queue.
-    pub tx_queue: TransmitQueue<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>, BufVecU8Allocator>,
+    pub tx_queue:
+        TransmitQueue<PureIpDeviceTxQueueFrameMetadata<BT>, Buf<Vec<u8>>, BufVecU8Allocator>,
     /// Counters specific to pure IP devices.
     pub counters: PureIpDeviceCounters,
 }
@@ -94,7 +98,7 @@ pub struct DynamicPureIpDeviceState {
 impl Device for PureIpDevice {}
 
 impl DeviceStateSpec for PureIpDevice {
-    type Link<BT: DeviceLayerTypes> = PureIpDeviceState;
+    type State<BT: DeviceLayerTypes> = PureIpDeviceState<BT>;
     type External<BT: DeviceLayerTypes> = BT::PureIpDeviceState;
     type CreationProperties = PureIpDeviceCreationProperties;
     type Counters = PureIpDeviceCounters;
@@ -102,14 +106,14 @@ impl DeviceStateSpec for PureIpDevice {
     const DEBUG_TYPE: &'static str = "PureIP";
     type TimerId<D: WeakDeviceIdentifier> = Never;
 
-    fn new_link_state<
+    fn new_device_state<
         CC: CoreTimerContext<Self::TimerId<CC::WeakDeviceId>, BC> + DeviceIdContext<Self>,
         BC: DeviceLayerTypes + TimerContext,
     >(
         _bindings_ctx: &mut BC,
         _self_id: CC::WeakDeviceId,
         PureIpDeviceCreationProperties { mtu }: Self::CreationProperties,
-    ) -> Self::Link<BC> {
+    ) -> Self::State<BC> {
         PureIpDeviceState {
             dynamic_state: RwLock::new(DynamicPureIpDeviceState { mtu }),
             tx_queue: Default::default(),
@@ -156,10 +160,11 @@ impl DeviceSocketSendTypes for PureIpDevice {
 impl<CC, BC> ReceivableFrameMeta<CC, BC> for PureIpDeviceReceiveFrameMetadata<CC::DeviceId>
 where
     CC: DeviceIdContext<PureIpDevice>
-        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, DeviceIpLayerMetadata, Ipv4>, BC>
-        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, DeviceIpLayerMetadata, Ipv6>, BC>
+        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, DeviceIpLayerMetadata<BC>, Ipv4>, BC>
+        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, DeviceIpLayerMetadata<BC>, Ipv6>, BC>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>
         + DeviceSocketHandler<PureIpDevice, BC>,
+    BC: TxMetadataBindingsTypes,
 {
     fn receive_meta<B: BufferMut + Debug>(
         self,
@@ -215,8 +220,9 @@ where
 
 impl<CC, BC> SendableFrameMeta<CC, BC> for DeviceSocketMetadata<PureIpDevice, CC::DeviceId>
 where
-    CC: TransmitQueueHandler<PureIpDevice, BC, Meta = PureIpDeviceTxQueueFrameMetadata>
+    CC: TransmitQueueHandler<PureIpDevice, BC, Meta = PureIpDeviceTxQueueFrameMetadata<BC>>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
+    BC: TxMetadataBindingsTypes,
 {
     fn send_meta<S>(
         self,
@@ -229,10 +235,13 @@ where
         S::Buffer: BufferMut,
     {
         let Self { device_id, metadata: PureIpHeaderParams { ip_version } } = self;
+        // TODO(https://fxbug.dev/391946195): Apply send buffer enforcement from
+        // device sockets instead of using default.
+        let tx_meta: BC::TxMetadata = Default::default();
         net_types::for_any_ip_version!(
             ip_version,
             I,
-            queue_ip_frame::<_, _, I, _>(core_ctx, bindings_ctx, &device_id, body)
+            queue_ip_frame::<_, _, I, _>(core_ctx, bindings_ctx, &device_id, body, tx_meta)
         )
     }
 }
@@ -244,10 +253,11 @@ pub fn send_ip_frame<BC, CC, I, S>(
     device_id: &CC::DeviceId,
     destination: IpPacketDestination<I, &DeviceId<BC>>,
     packet: S,
+    tx_meta: BC::TxMetadata,
 ) -> Result<(), SendFrameError<S>>
 where
     BC: DeviceLayerTypes,
-    CC: TransmitQueueHandler<PureIpDevice, BC, Meta = PureIpDeviceTxQueueFrameMetadata>
+    CC: TransmitQueueHandler<PureIpDevice, BC, Meta = PureIpDeviceTxQueueFrameMetadata<BC>>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
     I: Ip + BroadcastIpExt,
     S: Serializer,
@@ -265,7 +275,7 @@ where
         }
     };
 
-    queue_ip_frame::<_, _, I, _>(core_ctx, bindings_ctx, device_id, packet)
+    queue_ip_frame::<_, _, I, _>(core_ctx, bindings_ctx, device_id, packet, tx_meta)
 }
 
 fn queue_ip_frame<BC, CC, I, S>(
@@ -273,10 +283,12 @@ fn queue_ip_frame<BC, CC, I, S>(
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
     packet: S,
+    tx_metadata: BC::TxMetadata,
 ) -> Result<(), SendFrameError<S>>
 where
-    CC: TransmitQueueHandler<PureIpDevice, BC, Meta = PureIpDeviceTxQueueFrameMetadata>
+    CC: TransmitQueueHandler<PureIpDevice, BC, Meta = PureIpDeviceTxQueueFrameMetadata<BC>>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
+    BC: TxMetadataBindingsTypes,
     I: Ip,
     S: Serializer,
     S::Buffer: BufferMut,
@@ -285,7 +297,7 @@ where
         core_ctx,
         bindings_ctx,
         device_id,
-        PureIpDeviceTxQueueFrameMetadata { ip_version: I::VERSION },
+        PureIpDeviceTxQueueFrameMetadata { ip_version: I::VERSION, tx_metadata },
         packet,
     );
     match result {
@@ -334,11 +346,11 @@ impl<BT: DeviceLayerTypes> OrderedLockAccess<DynamicPureIpDeviceState>
 
 impl<BT: DeviceLayerTypes>
     OrderedLockAccess<
-        TransmitQueueState<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>, BufVecU8Allocator>,
+        TransmitQueueState<PureIpDeviceTxQueueFrameMetadata<BT>, Buf<Vec<u8>>, BufVecU8Allocator>,
     > for IpLinkDeviceState<PureIpDevice, BT>
 {
     type Lock = Mutex<
-        TransmitQueueState<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>, BufVecU8Allocator>,
+        TransmitQueueState<PureIpDeviceTxQueueFrameMetadata<BT>, Buf<Vec<u8>>, BufVecU8Allocator>,
     >;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.link.tx_queue.queue)
@@ -346,10 +358,10 @@ impl<BT: DeviceLayerTypes>
 }
 
 impl<BT: DeviceLayerTypes>
-    OrderedLockAccess<DequeueState<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>>>
+    OrderedLockAccess<DequeueState<PureIpDeviceTxQueueFrameMetadata<BT>, Buf<Vec<u8>>>>
     for IpLinkDeviceState<PureIpDevice, BT>
 {
-    type Lock = Mutex<DequeueState<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>>>;
+    type Lock = Mutex<DequeueState<PureIpDeviceTxQueueFrameMetadata<BT>, Buf<Vec<u8>>>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.link.tx_queue.deque)
     }

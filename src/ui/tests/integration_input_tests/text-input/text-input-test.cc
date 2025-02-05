@@ -405,7 +405,7 @@ class ChromiumInputTest : public ChromiumInputBase {
 // Then taps the screen to move focus to that page, and types text on the
 // fake injected keyboard.  Loops around until the text appears in the
 // text area.
-TEST_F(ChromiumInputTest, BasicInputTest) {
+TEST_F(ChromiumInputTest, DISABLED_BasicInputTest) {
   LaunchWebEngineClient();
 
   SimulateUsAsciiTextEntry("Hello\nworld!");

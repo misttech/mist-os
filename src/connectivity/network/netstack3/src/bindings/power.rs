@@ -326,6 +326,9 @@ async fn wait_device_tx_suspension_ready(device: &WeakDeviceId<BindingsCtx>) {
         DeviceSpecificInfo::Loopback(_) => {
             // No suspension handling for loopback.
         }
+        DeviceSpecificInfo::Blackhole(_) => {
+            // No suspension handling for blackhole devices.
+        }
         DeviceSpecificInfo::Ethernet(EthernetInfo { netdevice, .. })
         | DeviceSpecificInfo::PureIp(PureIpDeviceInfo { netdevice, .. }) => {
             // For netdevice backed devices, wait for all tx descriptors to be

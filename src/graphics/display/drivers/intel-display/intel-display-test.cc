@@ -15,6 +15,7 @@
 #include <gtest/gtest.h>
 
 #include "src/devices/pci/testing/pci_protocol_fake.h"
+#include "src/graphics/display/drivers/intel-display/registers.h"
 #include "src/graphics/display/drivers/intel-display/testing/fake-buffer-collection.h"
 #include "src/graphics/display/drivers/intel-display/testing/mock-allocator.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"

@@ -6,7 +6,8 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_TESTING_LIB_SIM_ENV_SIM_FRAME_H_
 
 #include <fidl/fuchsia.wlan.common/cpp/wire.h>
-#include <fidl/fuchsia.wlan.ieee80211/cpp/wire.h>
+#include <fidl/fuchsia.wlan.ieee80211/cpp/common_types.h>
+#include <fidl/fuchsia.wlan.ieee80211/cpp/natural_types.h>
 #include <fuchsia/wlan/common/c/banjo.h>
 #include <fuchsia/wlan/ieee80211/c/banjo.h>
 #include <lib/stdcompat/span.h>
@@ -20,7 +21,7 @@
 #include "src/connectivity/wlan/lib/common/cpp/include/wlan/common/mac_frame.h"
 #include "wlan/common/macaddr.h"
 
-namespace wlan_ieee80211 = fuchsia_wlan_ieee80211::wire;
+namespace wlan_ieee80211_wire = fuchsia_wlan_ieee80211::wire;
 namespace wlan_common = fuchsia_wlan_common::wire;
 
 namespace wlan::simulation {
@@ -65,7 +66,7 @@ class InformationElement {
 // IEEE Std 802.11-2016, 9.4.2.2
 class SsidInformationElement : public InformationElement {
  public:
-  explicit SsidInformationElement(const wlan_ieee80211::CSsid& ssid) : ssid_(ssid) {}
+  explicit SsidInformationElement(const fuchsia_wlan_ieee80211::Ssid& ssid) : ssid_(ssid) {}
 
   SsidInformationElement(const SsidInformationElement& ssid_ie);
 
@@ -75,7 +76,7 @@ class SsidInformationElement : public InformationElement {
 
   std::vector<uint8_t> ToRawIe() const override;
 
-  wlan_ieee80211::CSsid ssid_;
+  fuchsia_wlan_ieee80211::Ssid ssid_;
 };
 
 // IEEE Std 802.11-2016, 9.4.2.19
@@ -141,7 +142,7 @@ class SimManagementFrame : public SimFrame {
   SimFrameType FrameType() const override;
   // Frame subtype identifier for management frames
   virtual SimMgmtFrameType MgmtFrameType() const = 0;
-  void AddSsidIe(const wlan_ieee80211::CSsid& ssid);
+  void AddSsidIe(const fuchsia_wlan_ieee80211::Ssid& ssid);
   void AddCsaIe(const wlan_common::WlanChannel& channel, uint8_t channel_switch_count);
   void AddRawIes(cpp20::span<const uint8_t> raw_ies);
   std::shared_ptr<InformationElement> FindIe(InformationElement::SimIeType ie_type) const;
@@ -162,7 +163,7 @@ class SimManagementFrame : public SimFrame {
 class SimBeaconFrame : public SimManagementFrame {
  public:
   SimBeaconFrame() = default;
-  explicit SimBeaconFrame(const wlan_ieee80211::CSsid& ssid, const common::MacAddr& bssid);
+  explicit SimBeaconFrame(const fuchsia_wlan_ieee80211::Ssid& ssid, const common::MacAddr& bssid);
 
   SimBeaconFrame(const SimBeaconFrame& beacon);
 
@@ -195,7 +196,7 @@ class SimProbeRespFrame : public SimManagementFrame {
  public:
   SimProbeRespFrame() = default;
   explicit SimProbeRespFrame(const common::MacAddr& src, const common::MacAddr& dst,
-                             const wlan_ieee80211::CSsid& ssid);
+                             const fuchsia_wlan_ieee80211::Ssid& ssid);
 
   SimProbeRespFrame(const SimProbeRespFrame& probe_resp);
 
@@ -212,7 +213,7 @@ class SimAssocReqFrame : public SimManagementFrame {
  public:
   SimAssocReqFrame() = default;
   explicit SimAssocReqFrame(const common::MacAddr& src, const common::MacAddr bssid,
-                            const wlan_ieee80211::CSsid& ssid)
+                            const fuchsia_wlan_ieee80211::Ssid& ssid)
       : SimManagementFrame(src, {}), bssid_(bssid), ssid_(ssid) {}
 
   SimAssocReqFrame(const SimAssocReqFrame& assoc_req);
@@ -224,14 +225,14 @@ class SimAssocReqFrame : public SimManagementFrame {
   SimFrame* CopyFrame() const override;
 
   common::MacAddr bssid_;
-  wlan_ieee80211::CSsid ssid_;
+  fuchsia_wlan_ieee80211::Ssid ssid_;
 };
 
 class SimAssocRespFrame : public SimManagementFrame {
  public:
   SimAssocRespFrame() = default;
   explicit SimAssocRespFrame(const common::MacAddr& src, const common::MacAddr& dst,
-                             wlan_ieee80211::StatusCode status)
+                             wlan_ieee80211_wire::StatusCode status)
       : SimManagementFrame(src, dst), status_(status) {
     capability_info_.set_ess(1);
   }
@@ -244,7 +245,7 @@ class SimAssocRespFrame : public SimManagementFrame {
 
   SimFrame* CopyFrame() const override;
 
-  wlan_ieee80211::StatusCode status_;
+  wlan_ieee80211_wire::StatusCode status_;
   wlan::CapabilityInfo capability_info_;
 };
 
@@ -252,7 +253,7 @@ class SimDisassocReqFrame : public SimManagementFrame {
  public:
   SimDisassocReqFrame() = default;
   explicit SimDisassocReqFrame(const common::MacAddr& src, const common::MacAddr& dst,
-                               wlan_ieee80211::ReasonCode reason)
+                               wlan_ieee80211_wire::ReasonCode reason)
       : SimManagementFrame(src, dst), reason_(reason) {}
 
   SimDisassocReqFrame(const SimDisassocReqFrame& disassoc_req);
@@ -263,7 +264,7 @@ class SimDisassocReqFrame : public SimManagementFrame {
 
   SimFrame* CopyFrame() const override;
 
-  wlan_ieee80211::ReasonCode reason_;
+  wlan_ieee80211_wire::ReasonCode reason_;
 };
 
 // Only one type of authentication frame for request and response
@@ -271,7 +272,7 @@ class SimAuthFrame : public SimManagementFrame {
  public:
   SimAuthFrame() = default;
   explicit SimAuthFrame(const common::MacAddr& src, const common::MacAddr& dst, uint16_t seq,
-                        SimAuthType auth_type, wlan_ieee80211::StatusCode status)
+                        SimAuthType auth_type, wlan_ieee80211_wire::StatusCode status)
       : SimManagementFrame(src, dst), seq_num_(seq), auth_type_(auth_type), status_(status) {}
 
   SimAuthFrame(const SimAuthFrame& auth);
@@ -285,7 +286,7 @@ class SimAuthFrame : public SimManagementFrame {
 
   uint16_t seq_num_;
   SimAuthType auth_type_;
-  wlan_ieee80211::StatusCode status_;
+  wlan_ieee80211_wire::StatusCode status_;
 
   // Payload for authentication frame, especially being used for SAE process for now.
   std::vector<uint8_t> payload_;
@@ -295,7 +296,7 @@ class SimDeauthFrame : public SimManagementFrame {
  public:
   SimDeauthFrame() = default;
   explicit SimDeauthFrame(const common::MacAddr& src, const common::MacAddr& dst,
-                          wlan_ieee80211::ReasonCode reason)
+                          wlan_ieee80211_wire::ReasonCode reason)
       : SimManagementFrame(src, dst), reason_(reason) {}
 
   SimDeauthFrame(const SimDeauthFrame& deauth);
@@ -306,7 +307,7 @@ class SimDeauthFrame : public SimManagementFrame {
 
   SimFrame* CopyFrame() const override;
 
-  wlan_ieee80211::ReasonCode reason_;
+  wlan_ieee80211_wire::ReasonCode reason_;
 };
 
 // IEEE 802.11-2020 9.3.3.7
@@ -332,7 +333,7 @@ class SimReassocRespFrame : public SimManagementFrame {
  public:
   SimReassocRespFrame() = default;
   explicit SimReassocRespFrame(const common::MacAddr& src, const common::MacAddr& dst,
-                               wlan_ieee80211::StatusCode status)
+                               wlan_ieee80211_wire::StatusCode status)
       : SimManagementFrame(src, dst), status_(status) {
     capability_info_.set_ess(1);
   }
@@ -345,7 +346,7 @@ class SimReassocRespFrame : public SimManagementFrame {
 
   SimFrame* CopyFrame() const override;
 
-  wlan_ieee80211::StatusCode status_;
+  wlan_ieee80211_wire::StatusCode status_;
   wlan::CapabilityInfo capability_info_;
 };
 

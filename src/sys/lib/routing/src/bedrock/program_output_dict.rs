@@ -9,10 +9,10 @@ use crate::DictExt;
 use async_trait::async_trait;
 use cm_rust::NativeIntoFidl;
 use cm_types::Path;
+use log::warn;
 use router_error::RouterError;
 use sandbox::{Connector, Data, Dict, DirEntry, Request, Routable, Router, RouterResponse};
 use std::sync::Arc;
-use tracing::warn;
 
 pub trait ProgramOutputGenerator<C: ComponentInstanceInterface + 'static> {
     /// Get a router for [Dict] that forwards the request to a [Router] served at `path`

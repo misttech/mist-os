@@ -274,6 +274,18 @@ pub struct Lease {
     _helper: Arc<LeaseHelper>,
 }
 
+impl Lease {
+    pub async fn wait_until_satisfied(&self) -> Result<(), fidl::Error> {
+        let mut status = fbroker::LeaseStatus::Unknown;
+        loop {
+            match self.control_proxy.watch_status(status).await? {
+                fbroker::LeaseStatus::Satisfied => break Ok(()),
+                new_status @ _ => status = new_status,
+            }
+        }
+    }
+}
+
 impl LeaseHelper {
     /// Creates a new LeaseHelper. Returns an error upon failure to register the to-be-leased power
     /// element with Power Broker.
@@ -316,24 +328,19 @@ impl LeaseHelper {
 
     /// Acquires a lease, completing only once the lease is satisfied. Returns an error if the
     /// underlying `Lessor.Lease` or `LeaseControl.WatchStatus` call fails.
-    pub async fn lease(self: &Arc<Self>) -> Result<Lease> {
+    pub async fn create_lease_and_wait_until_satisfied(self: &Arc<Self>) -> Result<Lease> {
+        let lease = self.create_lease().await?;
+        lease.wait_until_satisfied().await?;
+        Ok(lease)
+    }
+
+    pub async fn create_lease(self: &Arc<Self>) -> Result<Lease> {
         let lease = self
             .lessor
             .lease(BINARY_POWER_LEVELS[1])
             .await?
             .map_err(|e| anyhow!("PowerBroker::LeaseError({e:?})"))?;
-
-        // Wait for the lease to be satisfied.
-        let lease = lease.into_proxy();
-        let mut status = fbroker::LeaseStatus::Unknown;
-        loop {
-            match lease.watch_status(status).await? {
-                fbroker::LeaseStatus::Satisfied => break,
-                new_status @ _ => status = new_status,
-            }
-        }
-
-        Ok(Lease { control_proxy: lease, _helper: self.clone() })
+        Ok(Lease { control_proxy: lease.into_proxy(), _helper: self.clone() })
     }
 }
 

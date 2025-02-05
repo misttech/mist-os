@@ -5,7 +5,7 @@
 use anyhow::format_err;
 use bt_avdtp::{self as avdtp, MediaCodecType, ServiceCapability, StreamEndpointId};
 use fidl_fuchsia_media as media;
-use tracing::{trace, warn};
+use log::{trace, warn};
 
 use crate::media_types::{
     AacChannels, AacCodecInfo, AacObjectType, AacSamplingFrequency, SbcAllocation, SbcBlockCount,
@@ -395,7 +395,7 @@ impl CodecNegotiation {
             }
         });
         if caps.is_none() {
-            warn!(%id, "Couldn't find endpoint after codec negotiation!");
+            warn!(id:%; "Couldn't find endpoint after codec negotiation!");
             return None;
         }
         Some((caps.unwrap(), id))

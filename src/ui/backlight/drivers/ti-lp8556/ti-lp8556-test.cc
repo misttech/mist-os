@@ -11,7 +11,7 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/driver/mock-mmio-reg/cpp/mock-mmio-reg.h>
+#include <lib/driver/mock-mmio/cpp/mock-mmio-reg.h>
 #include <lib/inspect/cpp/reader.h>
 #include <lib/mock-i2c/mock-i2c.h>
 #include <lib/stdcompat/span.h>

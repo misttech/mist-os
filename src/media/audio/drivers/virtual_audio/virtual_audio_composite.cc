@@ -111,9 +111,10 @@ fuchsia_virtualaudio::Configuration VirtualAudioComposite::GetDefaultConfig() {
 }
 
 VirtualAudioComposite::VirtualAudioComposite(fuchsia_virtualaudio::Configuration config,
-                                             std::weak_ptr<VirtualAudioDeviceImpl> owner,
-                                             zx_device_t* parent)
+                                             std::weak_ptr<VirtualAudioDevice> owner,
+                                             zx_device_t* parent, fit::closure on_shutdown)
     : VirtualAudioCompositeDeviceType(parent),
+      VirtualAudioDriver(std::move(on_shutdown)),
       parent_(std::move(owner)),
       config_(std::move(config)) {
   ddk_proto_id_ = ZX_PROTOCOL_AUDIO_COMPOSITE;
@@ -131,10 +132,12 @@ fuchsia_virtualaudio::RingBuffer& VirtualAudioComposite::GetRingBuffer(uint64_t 
   return ring_buffers[0].ring_buffer().value();
 }
 
-fit::result<VirtualAudioComposite::ErrorT, CurrentFormat> VirtualAudioComposite::GetFormatForVA() {
+void VirtualAudioComposite::GetFormatForVA(
+    fit::callback<void(fit::result<ErrorT, CurrentFormat>)> callback) {
   if (!ring_buffer_format_.has_value() || !ring_buffer_format_->pcm_format().has_value()) {
     zxlogf(WARNING, "ring buffer not initialized yet");
-    return fit::error(ErrorT::kNoRingBuffer);
+    callback(fit::error(ErrorT::kNoRingBuffer));
+    return;
   }
   auto& pcm_format = ring_buffer_format_->pcm_format();
 
@@ -143,19 +146,21 @@ fit::result<VirtualAudioComposite::ErrorT, CurrentFormat> VirtualAudioComposite:
   if (ring_buffer.external_delay().has_value()) {
     external_delay = ring_buffer.external_delay().value();
   };
-  return fit::ok(CurrentFormat{
+  callback(fit::ok(CurrentFormat{
       .frames_per_second = pcm_format->frame_rate(),
       .sample_format = audio::utils::GetSampleFormat(pcm_format->valid_bits_per_sample(),
                                                      pcm_format->bytes_per_sample() * 8),
       .num_channels = pcm_format->number_of_channels(),
       .external_delay = zx::nsec(external_delay),
-  });
+  }));
 }
 
-fit::result<VirtualAudioComposite::ErrorT, CurrentBuffer> VirtualAudioComposite::GetBufferForVA() {
+void VirtualAudioComposite::GetBufferForVA(
+    fit::callback<void(fit::result<ErrorT, CurrentBuffer>)> callback) {
   if (!ring_buffer_vmo_.is_valid()) {
     zxlogf(WARNING, "ring buffer not initialized yet");
-    return fit::error(ErrorT::kNoRingBuffer);
+    callback(fit::error(ErrorT::kNoRingBuffer));
+    return;
   }
 
   zx::vmo dup_vmo;
@@ -163,14 +168,15 @@ fit::result<VirtualAudioComposite::ErrorT, CurrentBuffer> VirtualAudioComposite:
       ZX_RIGHT_TRANSFER | ZX_RIGHT_READ | ZX_RIGHT_WRITE | ZX_RIGHT_MAP, &dup_vmo);
   if (status != ZX_OK) {
     zxlogf(ERROR, "ring buffer creation failed: %s", zx_status_get_string(status));
-    return fit::error(ErrorT::kInternal);
+    callback(fit::error(ErrorT::kInternal));
+    return;
   }
 
-  return fit::ok(CurrentBuffer{
+  callback(fit::ok(CurrentBuffer{
       .vmo = std::move(dup_vmo),
       .num_frames = num_ring_buffer_frames_,
       .notifications_per_ring = notifications_per_ring_,
-  });
+  }));
 }
 
 void VirtualAudioComposite::Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) {
@@ -179,7 +185,7 @@ void VirtualAudioComposite::Connect(ConnectRequestView request, ConnectCompleter
     return;
   }
   connected_ = true;
-  fidl::BindServer(dispatcher(), std::move(request->composite_protocol), this,
+  fidl::BindServer(dispatcher_, std::move(request->composite_protocol), this,
                    [](virtual_audio::VirtualAudioComposite* composite_instance,
                       fidl::UnbindInfo info, fidl::ServerEnd<fuchsia_hardware_audio::Composite>) {
                      // Do not log canceled cases; these happen particularly frequently in certain
@@ -415,7 +421,7 @@ void VirtualAudioComposite::CreateRingBuffer(CreateRingBufferRequest& request,
   ring_buffer_active_channel_mask_ =
       (1 << ring_buffer_format_->pcm_format()->number_of_channels()) - 1;
   active_channel_set_time_ = zx::clock::get_monotonic();
-  ring_buffer_.emplace(dispatcher(), std::move(request.ring_buffer()), this,
+  ring_buffer_.emplace(dispatcher_, std::move(request.ring_buffer()), this,
                        std::mem_fn(&VirtualAudioComposite::OnRingBufferClosed));
   completer.Reply(zx::ok());
 }
@@ -632,7 +638,7 @@ void VirtualAudioComposite::SignalProcessingConnect(
     request.protocol().Close(ZX_ERR_ALREADY_BOUND);
     return;
   }
-  signal_.emplace(dispatcher(), std::move(request.protocol()), this,
+  signal_.emplace(dispatcher_, std::move(request.protocol()), this,
                   std::mem_fn(&VirtualAudioComposite::OnSignalProcessingClosed));
 }
 
@@ -777,5 +783,9 @@ void VirtualAudioComposite::handle_unknown_method(
   zxlogf(ERROR, "VirtualAudioComposite::handle_unknown_method (SignalProcessing) ordinal %zu",
          metadata.method_ordinal);
 }
+
+void VirtualAudioComposite::ShutdownAsync() { DdkAsyncRemove(); }
+
+void VirtualAudioComposite::DdkRelease() { OnShutdown(); }
 
 }  // namespace virtual_audio

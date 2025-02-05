@@ -26,11 +26,8 @@
             to: "#kernel_debug_broker",
         },
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
+            dictionary: "diagnostics",
+            from: "self",
             to: "#kernel_debug_broker",
         },
         {

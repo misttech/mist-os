@@ -2,8 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# These are FIDL libraries that are temporarily allowed
-# to be depended on by a ffx plugin/subtool.
+# These are FIDL libraries that are not in "partner_internal" or greater but
+# are temporarily allowed to be depended on by a ffx plugin/subtool.
 # TODO(https://fxbug.dev/42081073): Add these to the SDK or remove the plugin from ffx.
 ffx_subtool_fidl_allowlist = [
   # ffx component
@@ -13,7 +13,8 @@ ffx_subtool_fidl_allowlist = [
   "//src/developer/ffx/fidl:fuchsia.developer.ffx",
 
   # ffx driver
-  "//sdk/fidl/fuchsia.device:fuchsia.device",
+  # "//sdk/fidl/fuchsia.device:fuchsia.device" is in "partner_internal", but
+  # most APIs in it are unstable.
   "//sdk/fidl/fuchsia.driver.playground:fuchsia.driver.playground",
 
   # used by ffx debug
@@ -49,7 +50,6 @@ ffx_subtool_fidl_allowlist = [
 
   # used by ffx power
   "//sdk/fidl/fuchsia.power.topology.test:fuchsia.power.topology.test",
-  "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker",
 
   # used by ffx net-test-realm
   "//src/connectivity/network/testing/network-test-realm/fidl:fuchsia.net.test.realm",

@@ -330,7 +330,7 @@ TEST_F(AmlSpiTest, ReceiveVmo) {
 
   uint8_t rx_buffer[sizeof(kExpectedRxData)];
   EXPECT_OK(test_vmo.read(rx_buffer, 768, sizeof(rx_buffer)));
-  EXPECT_TRUE(IsBytesEqual(rx_buffer, kExpectedRxData, sizeof(rx_buffer)));
+  EXPECT_TRUE(IsBytesEqual(kExpectedRxData, rx_buffer, sizeof(rx_buffer)));
 
   driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     EXPECT_FALSE(env.ControllerReset());
@@ -387,7 +387,7 @@ TEST_F(AmlSpiTest, ExchangeVmo) {
 
   uint8_t rx_buffer[sizeof(kExpectedRxData)];
   EXPECT_OK(test_vmo.read(rx_buffer, 768, sizeof(rx_buffer)));
-  EXPECT_TRUE(IsBytesEqual(rx_buffer, kExpectedRxData, sizeof(rx_buffer)));
+  EXPECT_TRUE(IsBytesEqual(kExpectedRxData, rx_buffer, sizeof(rx_buffer)));
 
   EXPECT_EQ(tx_data, kTxData[0]);
 
@@ -985,7 +985,7 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
 }
 
 class AmlSpiNoIrqEnvironment : public BaseTestEnvironment {
-  virtual void SetUpInterrupt() override {}
+  std::optional<zx::interrupt> CreateInterrupt() override { return std::nullopt; }
 };
 
 class AmlSpiNoIrqConfig final {

@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 {
     use: [
-        { protocol: "fuchsia.inspect.InspectSink" },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent/diagnostics",
+        },
     ],
 }

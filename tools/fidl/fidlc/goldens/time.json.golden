@@ -140,7 +140,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
@@ -173,7 +172,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
@@ -206,7 +204,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
@@ -239,7 +236,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
@@ -302,10 +298,8 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "int64",
               "type_shape_v2": {
@@ -346,10 +340,8 @@
         {
           "ordinal": 2,
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "int64",
               "type_shape_v2": {
@@ -390,10 +382,8 @@
         {
           "ordinal": 3,
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "int64",
               "type_shape_v2": {
@@ -434,10 +424,8 @@
         {
           "ordinal": 4,
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "int64",
               "type_shape_v2": {

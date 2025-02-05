@@ -97,7 +97,7 @@ pub fn log_everything(enabled: bool) {
 macro_rules! debug {
     ($($arg:tt)*) => {
         if throttled_log::acquire_one() {
-            tracing::debug!($($arg)*)
+            log::debug!($($arg)*)
         }
     };
 }
@@ -105,7 +105,7 @@ macro_rules! debug {
 macro_rules! info {
     ($($arg:tt)*) => {
         if throttled_log::acquire_one() {
-            tracing::info!($($arg)*)
+            log::info!($($arg)*)
         }
     };
 }
@@ -113,7 +113,7 @@ macro_rules! info {
 macro_rules! warning {
     ($($arg:tt)*) => {
         if throttled_log::acquire_one() {
-            tracing::warn!($($arg)*)
+            log::warn!($($arg)*)
         }
     };
 }
@@ -121,7 +121,7 @@ macro_rules! warning {
 macro_rules! error {
     ($($arg:tt)*) => {
         if throttled_log::acquire_one() {
-            tracing::error!($($arg)*)
+            log::error!($($arg)*)
         }
     };
 }

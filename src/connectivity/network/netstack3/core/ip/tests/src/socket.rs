@@ -23,7 +23,7 @@ use netstack3_base::testutil::{set_logger_for_test, TestAddrs, TestIpExt};
 use netstack3_base::{EitherDeviceId, IpDeviceAddr, Mms};
 use netstack3_core::device::{DeviceId, EthernetLinkDevice};
 use netstack3_core::testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder};
-use netstack3_core::IpExt;
+use netstack3_core::{IpExt, TxMetadata};
 use netstack3_ip::device::IpDeviceIpExt;
 use netstack3_ip::marker::OptionDelegationMarker;
 use netstack3_ip::socket::{
@@ -420,6 +420,7 @@ fn test_send_local<I: IpSocketIpExt + IpExt>(
         &sock,
         buffer.into_inner().buffer_view().as_ref().into_serializer(),
         &DefaultIpSocketOptions,
+        TxMetadata::default(),
     )
     .unwrap();
 
@@ -499,6 +500,7 @@ fn test_send<I: IpSocketIpExt + IpExt>() {
         &sock,
         (&[0u8][..]).into_serializer(),
         &socket_options,
+        TxMetadata::default(),
     )
     .unwrap();
     let mut check_sent_frame = |bindings_ctx: &mut FakeBindingsCtx| {
@@ -520,6 +522,7 @@ fn test_send<I: IpSocketIpExt + IpExt>() {
         &sock,
         small_body_serializer,
         &RestrictMtu { mtu: Ipv6::MINIMUM_LINK_MTU.into(), inner: socket_options },
+        TxMetadata::default(),
     );
     assert_eq!(res, Ok(()));
     check_sent_frame(&mut bindings_ctx);
@@ -533,6 +536,7 @@ fn test_send<I: IpSocketIpExt + IpExt>() {
         &sock,
         small_body_serializer,
         &RestrictMtu { mtu: 1, inner: socket_options },
+        TxMetadata::default(),
     );
     assert_eq!(res, Err(IpSockSendError::Mtu));
 
@@ -546,6 +550,7 @@ fn test_send<I: IpSocketIpExt + IpExt>() {
         &sock,
         small_body_serializer,
         &socket_options,
+        TxMetadata::default(),
     );
     assert_eq!(res, Err(IpSockSendError::Unroutable(ResolveRouteError::Unreachable)));
 }
@@ -616,6 +621,7 @@ fn test_send_hop_limits<I: IpSocketIpExt + IpExt>() {
             &sock,
             (&[0u8][..]).into_serializer(),
             &options,
+            TxMetadata::default(),
         )
         .unwrap();
     };

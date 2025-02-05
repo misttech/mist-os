@@ -7,7 +7,7 @@ use fidl_fuchsia_dash::LauncherError;
 use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
-use tracing::warn;
+use log::warn;
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::execution_scope::ExecutionScope;
@@ -152,7 +152,7 @@ async fn inject_process_launcher_and_resolver(svc_dir: fio::DirectoryProxy) -> f
                 .unwrap();
         }),
     ) {
-        warn!(?err, "Could not inject fuchsia.process.Launcher into filesystem layout. Ignoring.");
+        warn!(err:?; "Could not inject fuchsia.process.Launcher into filesystem layout. Ignoring.");
     }
 
     // Add process resolver.
@@ -163,7 +163,7 @@ async fn inject_process_launcher_and_resolver(svc_dir: fio::DirectoryProxy) -> f
                 .unwrap();
         }),
     ) {
-        warn!(?err, "Could not inject fuchsia.process.Resolver into filesystem layout. Ignoring.");
+        warn!(err:?; "Could not inject fuchsia.process.Resolver into filesystem layout. Ignoring.");
     }
     let (svc_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let server_end = server_end.into_channel().into();

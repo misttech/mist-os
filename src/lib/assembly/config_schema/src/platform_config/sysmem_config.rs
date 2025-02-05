@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assembly_container::WalkPaths;
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -23,7 +24,15 @@ pub enum MemorySize {
 /// to override static defaults, and to allow platform config to override board
 /// config.
 #[derive(
-    Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+    Clone,
+    Debug,
+    Default,
+    Deserialize,
+    Serialize,
+    PartialEq,
+    JsonSchema,
+    SupportsFileRelativePaths,
+    WalkPaths,
 )]
 #[serde(default, deny_unknown_fields)]
 pub struct PlatformSysmemConfig {
@@ -67,6 +76,7 @@ pub struct PlatformSysmemConfig {
     /// in BoardProvidedConfig.sysmem_format_costs field.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[file_relative_paths]
+    #[walk_paths]
     #[schemars(schema_with = "crate::vec_path_schema")]
     pub format_costs: Vec<FileRelativePathBuf>,
 }

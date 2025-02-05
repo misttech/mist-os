@@ -7,8 +7,8 @@ use anyhow::{format_err, Error};
 use fidl::prelude::*;
 use futures::stream::TryStreamExt;
 use ieee80211::MacAddrBytes;
+use log::{debug, info};
 use measure_tape_for_scan_result::Measurable as _;
-use tracing::{debug, info};
 use {fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme};
 
 // TODO(https://fxbug.dev/42160765): Remove this.
@@ -120,8 +120,15 @@ pub async fn send_scan_results_over_fidl(
                 }
                 result_count += 1;
             }
+            // It's ok to slice this by index, since we've just calculated the `result_count` above
+            // by iterating through elements of scan_results[]
+            #[expect(clippy::indexing_slicing)]
             responder.send(Ok(&scan_results[..result_count]))?;
-            scan_results = &scan_results[result_count..];
+            // It's ok to slice this by index, since we've just calculated the `result_count` above
+            // by iterating through elements of scan_results[]
+            #[expect(clippy::indexing_slicing)]
+            let remaining_results = &scan_results[result_count..];
+            scan_results = remaining_results;
             sent_some_results = true;
 
             // Guarantees empty batch is sent before channel is closed.
@@ -169,7 +176,7 @@ mod tests {
     use fuchsia_async as fasync;
     use futures::task::Poll;
     use std::pin::pin;
-    use wlan_common::scan::Compatibility;
+    use wlan_common::scan::{Compatible, Incompatible};
     use wlan_common::security::SecurityDescriptor;
     use wlan_common::{assert_variant, random_fidl_bss_description};
 
@@ -335,9 +342,7 @@ mod tests {
                         ),
                         channel: types::WlanChan::new(1, types::Cbw::Cbw20),
                         observation: types::ScanObservation::Passive,
-                        compatibility: Compatibility::expect_some([
-                            SecurityDescriptor::WPA3_PERSONAL,
-                        ]),
+                        compatibility: Compatible::expect_ok([SecurityDescriptor::WPA3_PERSONAL]),
                         bss_description: random_fidl_bss_description!(
                             Wpa3,
                             bssid: [0, 0, 0, 0, 0, 0],
@@ -356,7 +361,7 @@ mod tests {
                         ),
                         channel: types::WlanChan::new(11, types::Cbw::Cbw20),
                         observation: types::ScanObservation::Passive,
-                        compatibility: None,
+                        compatibility: Incompatible::unknown(),
                         bss_description: random_fidl_bss_description!(
                             Wpa3,
                             bssid: [7, 8, 9, 10, 11, 12],
@@ -381,7 +386,7 @@ mod tests {
                     ),
                     channel: types::WlanChan::new(8, types::Cbw::Cbw20),
                     observation: types::ScanObservation::Passive,
-                    compatibility: Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),
+                    compatibility: Compatible::expect_ok([SecurityDescriptor::WPA2_PERSONAL]),
                     bss_description: random_fidl_bss_description!(
                         Wpa2,
                         bssid: [1, 2, 3, 4, 5, 6],

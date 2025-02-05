@@ -17,9 +17,9 @@ use fidl_fuchsia_bluetooth_hfp::{
 };
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use futures::stream::{FusedStream, Stream, StreamExt};
+use log::{debug, info, warn};
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tracing::{debug, info, warn};
 use {fuchsia_async as fasync, fuchsia_inspect as inspect};
 
 mod pending;

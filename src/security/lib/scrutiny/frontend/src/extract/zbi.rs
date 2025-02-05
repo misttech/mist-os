@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
+use log::info;
 use scrutiny_utils::blobfs::*;
 use scrutiny_utils::bootfs::*;
 use scrutiny_utils::fs::tempdir;
@@ -16,7 +17,6 @@ use std::io::prelude::*;
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tracing::info;
 
 pub struct ZbiExtractController {}
 
@@ -67,7 +67,7 @@ impl ZbiExtractController {
                 info!("Attempting to load FvmPartitions");
                 let mut fvm_reader = FvmReader::new(section.buffer.clone());
                 if let Ok(fvm_partitions) = fvm_reader.parse() {
-                    info!(total = fvm_partitions.len(), "Extracting Partitions in StorageRamdisk");
+                    info!(total = fvm_partitions.len(); "Extracting Partitions in StorageRamdisk");
                     let mut fvm_dir = output.clone();
                     fvm_dir.push("fvm");
                     fs::create_dir_all(fvm_dir.clone())?;

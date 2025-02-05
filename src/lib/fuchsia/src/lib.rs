@@ -16,9 +16,9 @@
 pub use fidl_fuchsia_diagnostics::{Interest, Severity};
 pub use fuchsia_macro::{main, test};
 use libc as _;
-use std::future::Future;
 #[doc(hidden)]
-pub use tracing::error;
+pub use log::error;
+use std::future::Future;
 
 //
 // LOGGING INITIALIZATION
@@ -135,7 +135,7 @@ fn init_logging_with_threads(logging: LoggingOptions<'_>) -> impl Drop {
 
 #[cfg(not(target_os = "fuchsia"))]
 fn init_logging_with_threads(logging: LoggingOptions<'_>) {
-    diagnostics_log::initialize(logging.into()).expect("initialize logging");
+    diagnostics_log::initialize(logging.into()).expect("initialize_logging");
 }
 
 //

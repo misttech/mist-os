@@ -6,9 +6,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use errors::ffx_bail;
 use ffx_gpu_usage_args as args_mod;
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_power_metrics::{self as fmetrics, GpuUsage, Metric};
-
+use target_holders::moniker;
 #[derive(FfxTool)]
 pub struct GpuUsageTool {
     #[command]
@@ -100,12 +100,13 @@ mod tests {
     use fidl_fuchsia_power_metrics::{self as fmetrics};
     use futures::channel::mpsc;
     use std::time::Duration;
+    use target_holders::fake_proxy;
 
     // Create a metrics-logger that expects a specific request type (Start, StartForever, or
     // Stop), and returns a specific error
     macro_rules! make_proxy {
         ($request_type:tt, $error_type:tt) => {
-            fho::testing::fake_proxy(move |req| match req {
+            fake_proxy(move |req| match req {
                 fmetrics::RecorderRequest::$request_type { responder, .. } => {
                     responder.send(Err(fmetrics::RecorderError::$error_type)).unwrap();
                 }
@@ -128,7 +129,7 @@ mod tests {
             output_to_syslog: false,
         };
         let (mut sender, mut receiver) = mpsc::channel(1);
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             fmetrics::RecorderRequest::StartLogging {
                 client_id,
                 metrics,
@@ -159,7 +160,7 @@ mod tests {
         let args =
             args_mod::StartCommand { interval: ONE_SEC, duration: None, output_to_syslog: false };
         let (mut sender, mut receiver) = mpsc::channel(1);
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             fmetrics::RecorderRequest::StartLoggingForever {
                 client_id,
                 metrics,
@@ -187,7 +188,7 @@ mod tests {
     async fn test_request_dispatch_stop_logging() {
         // Stop logging
         let (mut sender, mut receiver) = mpsc::channel(1);
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             fmetrics::RecorderRequest::StopLogging { client_id, responder } => {
                 assert_eq!(String::from("ffx_gpu"), client_id);
                 responder.send(true).unwrap();
@@ -201,7 +202,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_stop_logging_error() {
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             fmetrics::RecorderRequest::StopLogging { responder, .. } => {
                 responder.send(false).unwrap();
             }

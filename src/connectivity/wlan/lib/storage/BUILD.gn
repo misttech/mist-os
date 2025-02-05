@@ -22,8 +22,8 @@ rustc_library("wlan-storage") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia_nix",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:tracing",
   ]
   test_deps = [
     "//src/connectivity/wlan/lib/common/rust/:wlan-common",

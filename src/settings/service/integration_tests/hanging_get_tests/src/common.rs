@@ -13,7 +13,7 @@ pub struct HangingGetTest;
 
 impl HangingGetTest {
     pub async fn create_realm() -> Result<RealmInstance, Error> {
-        tracing::info!("Creating realm builder for hanging get test");
+        log::info!("Creating realm builder for hanging get test");
         let builder = RealmBuilder::new().await?;
         // Add setui_service as child of the realm builder.
         let setui_service =

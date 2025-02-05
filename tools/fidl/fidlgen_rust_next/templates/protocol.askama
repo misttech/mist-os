@@ -4,6 +4,7 @@
 {% let module_name = filters::ident(protocol.name.decl_name().snake())? %}
 
 /// The type corresponding to the {{ non_canonical_name }} protocol.
+{{ self::doc_string(protocol.attributes) -}}
 {% if context.config.emit_debug_impls -%}
     #[derive(Debug)]
 {%- endif %}
@@ -51,11 +52,9 @@ pub trait {{ client_sender_name }}<___T: ::fidl_next::protocol::Transport> {
         {% let method_name = filters::ident(method.name.snake())? %}
         {% let method_type_name = filters::ident(method.name.camel())? %}
 
-        {% if let Some(doc) = method.attributes.doc_string() %}
-            #[doc = "{{ doc.escape_default() }}"]
-        {% endif %}
         {% match method.kind %}
             {% when ProtocolMethodKind::OneWay %}
+                {{ self::doc_string(method.attributes) -}}
                 {% if let Some(request) = method.maybe_request_payload %}
                     fn {{ method_name }}<___R>(
                         &self,
@@ -72,6 +71,7 @@ pub trait {{ client_sender_name }}<___T: ::fidl_next::protocol::Transport> {
                     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
                 {% endif %}
             {% when ProtocolMethodKind::TwoWay %}
+                {{ self::doc_string(method.attributes) -}}
                 {% if let Some(request) = method.maybe_request_payload %}
                     fn {{ method_name }}<___R>(
                         &self,
@@ -114,11 +114,9 @@ where
         {% let method_name = filters::ident(method.name.snake())? %}
         {% let method_type_name = filters::ident(method.name.camel())? %}
 
-        {% if let Some(doc) = method.attributes.doc_string() %}
-            #[doc = "{{ doc.escape_default() }}"]
-        {% endif %}
         {% match method.kind %}
             {% when ProtocolMethodKind::OneWay %}
+                {{ self::doc_string(method.attributes) -}}
                 {% if let Some(request) = method.maybe_request_payload %}
                     fn {{ method_name }}<___R>(
                         &self,
@@ -140,6 +138,7 @@ where
                     }
                 {% endif %}
             {% when ProtocolMethodKind::TwoWay %}
+                {{ self::doc_string(method.attributes) -}}
                 {% if let Some(request) = method.maybe_request_payload %}
                     fn {{ method_name }}<___R>(
                         &self,
@@ -174,19 +173,15 @@ where
 }
 
 /// A client handler for the {{ non_canonical_name }} protocol.
-{% if let Some(doc) = protocol.attributes.doc_string() %}
-    ///
-    #[doc = "{{ doc.escape_default() }}"]
-{% endif %}
+///
+/// See [`{{ protocol_name }}`] for more details.
 pub trait {{ client_handler_name }}<___T: ::fidl_next::protocol::Transport> {
     {% for method in protocol.methods %}
         {% if method.kind == ProtocolMethodKind::Event %}
             {% let method_name = filters::ident(method.name.snake())? %}
             {% let method_type_name = filters::ident(method.name.camel())? %}
 
-            {% if let Some(doc) = method.attributes.doc_string() %}
-                #[doc = "{{ doc.escape_default() }}"]
-            {% endif %}
+            {{ self::doc_string(method.attributes) -}}
             fn {{ method_name }}(
                 &mut self,
                 sender: &::fidl_next::bind::ClientSender<___T, {{ protocol_name }}>,
@@ -260,11 +255,9 @@ pub trait {{ server_sender_name }}<___T: ::fidl_next::protocol::Transport> {
     {% for method in protocol.methods %}
         {% let method_name = filters::ident(method.name.snake())? %}
 
-        {% if let Some(doc) = method.attributes.doc_string() %}
-            #[doc = "{{ doc.escape_default() }}"]
-        {% endif %}
         {% if method.kind == ProtocolMethodKind::Event %}
-            {% if let Some(request) = method.maybe_request_payload %}
+            {{ self::doc_string(method.attributes) -}}
+            {% if let Some(request) = method.maybe_response_payload %}
                 fn {{ method_name }}<___R>(
                     &self,
                     request: &mut ___R,
@@ -290,11 +283,9 @@ where
     {% for method in protocol.methods %}
         {% let method_name = filters::ident(method.name.snake())? %}
 
-        {% if let Some(doc) = method.attributes.doc_string() %}
-            #[doc = "{{ doc.escape_default() }}"]
-        {% endif %}
         {% if method.kind == ProtocolMethodKind::Event %}
-            {% if let Some(request) = method.maybe_request_payload %}
+            {{ self::doc_string(method.attributes) -}}
+            {% if let Some(request) = method.maybe_response_payload %}
                 fn {{ method_name }}<___R>(
                     &self,
                     request: &mut ___R,
@@ -319,10 +310,8 @@ where
 }
 
 /// A server handler for the {{ non_canonical_name }} protocol.
-{% if let Some(doc) = protocol.attributes.doc_string() %}
-    ///
-    #[doc = "{{ doc.escape_default() }}"]
-{% endif %}
+///
+/// See [`{{ protocol_name }}`] for more details.
 pub trait {{ server_handler_name }}<___T: ::fidl_next::protocol::Transport> {
     {% for method in protocol.methods %}
         {% let method_name = filters::ident(method.name.snake())? %}
@@ -330,9 +319,7 @@ pub trait {{ server_handler_name }}<___T: ::fidl_next::protocol::Transport> {
 
         {% match method.kind %}
             {% when ProtocolMethodKind::OneWay %}
-                {% if let Some(doc) = method.attributes.doc_string() %}
-                    #[doc = "{{ doc.escape_default() }}"]
-                {% endif %}
+                {{ self::doc_string(method.attributes) -}}
                 fn {{ method_name }}(
                     &mut self,
                     sender: &::fidl_next::bind::ServerSender<___T, {{ protocol_name }}>,
@@ -341,9 +328,7 @@ pub trait {{ server_handler_name }}<___T: ::fidl_next::protocol::Transport> {
                     {% endif %}
                 );
             {% when ProtocolMethodKind::TwoWay %}
-                {% if let Some(doc) = method.attributes.doc_string() %}
-                    #[doc = "{{ doc.escape_default() }}"]
-                {% endif %}
+                {{ self::doc_string(method.attributes) -}}
                 fn {{ method_name }}(
                     &mut self,
                     sender: &::fidl_next::bind::ServerSender<___T, {{ protocol_name }}>,

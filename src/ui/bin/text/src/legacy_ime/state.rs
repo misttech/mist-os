@@ -85,7 +85,7 @@ impl ImeState {
         if call_did_update_state {
             let state = idx::text_state_byte_to_codeunit(self.text_state.clone());
             self.client.did_update_state(&state, None).unwrap_or_else(|e| {
-                tracing::warn!(
+                log::warn!(
                     "ImeState::increment_revision: error sending state update to ImeClient: {:?}",
                     e
                 )

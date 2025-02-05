@@ -29,7 +29,10 @@ fuchsia_cc_driver("bt-transport-usb-driver") {
 }
 
 fuchsia_driver_component("bt-transport-usb") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/connectivity/bluetooth:drivers",
+  ]
   component_name = "bt-transport-usb"
   deps = [ ":bt-transport-usb-driver" ]
   info = "meta/bt-transport-usb-info.json"

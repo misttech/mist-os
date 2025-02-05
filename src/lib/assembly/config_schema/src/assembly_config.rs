@@ -5,16 +5,19 @@
 use crate::image_assembly_config::PartialKernelConfig;
 use crate::platform_config::PlatformConfig;
 use crate::PackageDetails;
+use anyhow::Result;
 use assembly_constants::{CompiledPackageDestination, FileEntry};
+use assembly_container::{assembly_container, AssemblyContainer, WalkPaths};
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use assembly_package_utils::PackageInternalPathBuf;
 use camino::Utf8PathBuf;
+use fuchsia_pkg::PackageManifest;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::common::{DriverDetails, PackageName};
-use crate::product_config::ProductConfig;
+use crate::product_config::{ProductConfig, ProductPackageDetails};
 
 /// Configuration for a Product Assembly operation.
 ///
@@ -22,32 +25,40 @@ use crate::product_config::ProductConfig;
 /// what is desired in the assembled product images, and then generates the
 /// complete Image Assembly configuration (`crate::config::ImageAssemblyConfig`)
 /// from that.
-#[derive(Debug, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths)]
+#[derive(Debug, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths, WalkPaths)]
 #[serde(deny_unknown_fields)]
+#[assembly_container(product_configuration.json)]
 pub struct AssemblyConfig {
     #[file_relative_paths]
+    #[walk_paths]
     pub platform: PlatformConfig,
     #[file_relative_paths]
+    #[walk_paths]
     #[serde(default)]
     pub product: ProductConfig,
-    #[serde(default)]
+    // TOOD(https://fxbug.dev/390189313): Remove once all product configs stop using this field.
+    #[serde(default, skip_serializing)]
     pub file_relative_paths: bool,
 }
 
-/// Configuration for Product Assembly, when developer overrides are in use.
-///
-/// This deserializes to intermediate types that can be manipulated in order to
-/// apply developer overrides, before being parsed into the PlatformConfig
-/// and ProductConfig types.
-#[derive(Debug, Deserialize, Serialize, SupportsFileRelativePaths)]
-#[serde(deny_unknown_fields)]
-pub struct AssemblyConfigWrapperForOverrides {
-    // The platform and products configs are deserialized as a Value before it is parsed into
-    // a 'PlatformConfig``
-    pub platform: serde_json::Value,
-    pub product: serde_json::Value,
-    #[serde(default)]
-    pub file_relative_paths: bool,
+impl AssemblyConfig {
+    pub fn add_package_names(mut self) -> Result<Self> {
+        self.product.packages.base = Self::add_package_names_to_set(self.product.packages.base)?;
+        self.product.packages.cache = Self::add_package_names_to_set(self.product.packages.cache)?;
+        Ok(self)
+    }
+
+    fn add_package_names_to_set(
+        set: BTreeMap<String, ProductPackageDetails>,
+    ) -> Result<BTreeMap<String, ProductPackageDetails>> {
+        set.into_values()
+            .map(|pkg| {
+                let manifest = PackageManifest::try_load_from(&pkg.manifest)?;
+                let name = manifest.name().to_string();
+                Ok((name, pkg))
+            })
+            .collect()
+    }
 }
 
 /// A typename to represent a package that contains shell command binaries,
@@ -55,7 +66,9 @@ pub struct AssemblyConfigWrapperForOverrides {
 pub type ShellCommands = BTreeMap<PackageName, BTreeSet<PackageInternalPathBuf>>;
 
 /// A bundle of inputs to be used in the assembly of a product.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
+#[derive(
+    Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths, WalkPaths,
+)]
 #[serde(default, deny_unknown_fields)]
 pub struct AssemblyInputBundle {
     /// The parameters that specify which kernel to put into the ZBI.
@@ -103,6 +116,7 @@ pub struct AssemblyInputBundle {
 
     /// Packages to create dynamically as part of the Assembly process.
     #[file_relative_paths]
+    #[walk_paths]
     pub packages_to_compile: Vec<CompiledPackageDefinition>,
 
     /// A package that includes files to include in bootfs.
@@ -110,13 +124,14 @@ pub struct AssemblyInputBundle {
 
     /// A list of memory buckets to pass to memory monitor.
     #[file_relative_paths]
+    #[walk_paths]
     pub memory_buckets: Vec<FileRelativePathBuf>,
 }
 
 /// Contents of a compiled package. The contents provided by all
 /// selected AIBs are merged by `name` into a single package
 /// at assembly time.
-#[derive(Debug, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths, WalkPaths)]
 #[serde(deny_unknown_fields)]
 pub struct CompiledPackageDefinition {
     /// Name of the package to compile.
@@ -124,6 +139,7 @@ pub struct CompiledPackageDefinition {
 
     /// Components to compile and add to the package.
     #[file_relative_paths]
+    #[walk_paths]
     #[serde(default)]
     pub components: Vec<CompiledComponentDefinition>,
 
@@ -144,7 +160,7 @@ pub struct CompiledPackageDefinition {
 /// Contents of a compiled component. The contents provided by all
 /// selected AIBs are merged by `name` into a single package
 /// at assembly time.
-#[derive(Debug, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths, WalkPaths)]
 #[serde(deny_unknown_fields)]
 pub struct CompiledComponentDefinition {
     /// The name of the component to compile.
@@ -152,6 +168,7 @@ pub struct CompiledComponentDefinition {
 
     /// CML file shards to include in the compiled component manifest.
     #[file_relative_paths]
+    #[walk_paths]
     pub shards: Vec<FileRelativePathBuf>,
 }
 
@@ -164,6 +181,9 @@ mod tests {
     use crate::platform_config::{BuildType, FeatureSupportLevel};
     use crate::product_config::ProductPackageDetails;
     use assembly_util as util;
+    use fuchsia_pkg::{MetaPackage, PackageManifestBuilder, PackageName};
+    use std::str::FromStr;
+    use tempfile::tempdir;
 
     #[test]
     fn test_product_assembly_config_from_json5() {
@@ -287,7 +307,7 @@ mod tests {
                   ],
                   cache: [
                       { manifest: "path/to/cache/package_manifest.json" }
-                  ]
+                  ],
               },
               base_drivers: [
                 {
@@ -305,26 +325,36 @@ mod tests {
         assert_eq!(platform.build_type, BuildType::Eng);
         assert_eq!(
             config.product.packages.base,
-            vec![ProductPackageDetails {
-                manifest: FileRelativePathBuf::FileRelative(
-                    "path/to/base/package_manifest.json".into()
-                ),
-                config_data: Vec::default()
-            }]
+            [(
+                "0".to_string(),
+                ProductPackageDetails {
+                    manifest: FileRelativePathBuf::FileRelative(
+                        "path/to/base/package_manifest.json".into()
+                    ),
+                    config_data: Vec::default()
+                }
+            )]
+            .into()
         );
         assert_eq!(
             config.product.packages.cache,
-            vec![ProductPackageDetails {
-                manifest: FileRelativePathBuf::FileRelative(
-                    "path/to/cache/package_manifest.json".into()
-                ),
-                config_data: Vec::default()
-            }]
+            [(
+                "0".to_string(),
+                ProductPackageDetails {
+                    manifest: FileRelativePathBuf::FileRelative(
+                        "path/to/cache/package_manifest.json".into()
+                    ),
+                    config_data: Vec::default()
+                }
+            )]
+            .into()
         );
         assert_eq!(
             config.product.base_drivers,
             vec![DriverDetails {
-                package: "path/to/base/driver/package_manifest.json".into(),
+                package: FileRelativePathBuf::FileRelative(
+                    "path/to/base/driver/package_manifest.json".into()
+                ),
                 components: vec!["meta/path/to/component.cml".into()]
             }]
         )
@@ -381,27 +411,33 @@ mod tests {
               ],
             },
           },
-          file_relative_paths: true,
         }
     "#;
 
         let mut cursor = std::io::Cursor::new(json5);
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
         let config = config.resolve_paths_from_file("path/to/assembly_config.json").unwrap();
-        assert!(config.file_relative_paths);
         assert_eq!(
             config.product.packages.base,
-            vec![ProductPackageDetails {
-                manifest: "path/to/base/package_manifest.json".into(),
-                config_data: Vec::default()
-            }]
+            [(
+                "0".to_string(),
+                ProductPackageDetails {
+                    manifest: "path/to/base/package_manifest.json".into(),
+                    config_data: Vec::default()
+                }
+            )]
+            .into()
         );
         assert_eq!(
             config.product.packages.cache,
-            vec![ProductPackageDetails {
-                manifest: "path/to/cache/package_manifest.json".into(),
-                config_data: Vec::default()
-            }]
+            [(
+                "0".to_string(),
+                ProductPackageDetails {
+                    manifest: "path/to/cache/package_manifest.json".into(),
+                    config_data: Vec::default()
+                }
+            )]
+            .into()
         );
         assert_eq!(
             config.platform.connectivity.network.netcfg_config_path.unwrap(),
@@ -559,7 +595,7 @@ mod tests {
         assert_eq!(
             bundle.base_drivers[0],
             DriverDetails {
-                package: Utf8PathBuf::from("path/to/driver"),
+                package: FileRelativePathBuf::FileRelative(Utf8PathBuf::from("path/to/driver")),
                 components: vec!(
                     Utf8PathBuf::from("path/to/1234"),
                     Utf8PathBuf::from("path/to/5678")
@@ -581,50 +617,65 @@ mod tests {
 
     #[test]
     fn test_assembly_config_wrapper_for_overrides() {
+        let config: AssemblyConfig = serde_json::from_value(serde_json::json!({
+            "platform": {
+                "build_type": "eng",
+            },
+            "product": {},
+        }))
+        .unwrap();
+
+        let overrides = serde_json::json!({
+            "platform": {
+                "media": {
+                    "audio": "partial_stack",
+                },
+            },
+        });
+
+        let config = config.apply_overrides(overrides).unwrap();
+
+        assert_eq!(
+            config.platform.media,
+            PlatformMediaConfig { audio: Some(AudioConfig::PartialStack), ..Default::default() },
+        );
+    }
+
+    #[test]
+    fn test_get_package_names() {
+        // Prepare a directory for temporary files.
+        let dir = tempdir().unwrap();
+        let dir_path = Utf8PathBuf::from_path_buf(dir.path().to_path_buf()).unwrap();
+
+        // Generate a fake package manifest.
+        let package_name = PackageName::from_str("my_pkg").unwrap();
+        let meta_package = MetaPackage::from_name_and_variant_zero(package_name);
+        let package_manifest_builder = PackageManifestBuilder::new(meta_package);
+        let package_manifest = package_manifest_builder.build();
+        let package_manifest_path = dir_path.join("my_pkg_package_manifest.json");
+        package_manifest.write_with_relative_paths(&package_manifest_path).unwrap();
+
+        // Create an assembly config with the package manifest.
         let json5 = r#"
         {
           platform: {
             build_type: "eng",
           },
-          product: {},
         }
         "#;
-
-        let overrides = serde_json::json!({
-            "media": {
-                "audio": {
-                    "partial_stack": {}
-                }
-            }
-        });
-
         let mut cursor = std::io::Cursor::new(json5);
-        let AssemblyConfigWrapperForOverrides { platform, product: _, .. } =
-            util::from_reader(&mut cursor).unwrap();
-
-        // serde_json and serde_json5 have an incompatible handling of how they
-        // serialize / deserialize enums.  So this test validates both the
-        // value merging method but also that the problematic enum syntax is
-        // correctly parsed when bounced through a string as it's done in the
-        // product assembly binary itself.
-
-        // 1. Merge to a 'value', not to the final type, as we need serde_json5
-        //    to do the parsing, not serde_json.
-        let merged_platform_value: serde_json::Value =
-            crate::try_merge_into(platform, overrides).unwrap();
-
-        // 2. Write the value out to a string, using pretty-printing so that
-        // line numbers and such are all sensical.
-        let merged_platform_string = serde_json::to_string_pretty(&merged_platform_value).unwrap();
-
-        // 3. Parse the string using serde_json5, so that enums are handled
-        //    consistently.
-        let merged_platform: PlatformConfig =
-            serde_json5::from_str(&merged_platform_string).unwrap();
-
-        assert_eq!(
-            merged_platform.media,
-            PlatformMediaConfig { audio: Some(AudioConfig::PartialStack), ..Default::default() },
+        let mut config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
+        config.product.packages.base.insert(
+            "0".to_string(),
+            ProductPackageDetails {
+                manifest: FileRelativePathBuf::Resolved(package_manifest_path.clone()),
+                config_data: vec![],
+            },
         );
+
+        // Test the logic to add proper package names.
+        let config = config.add_package_names().unwrap();
+        let details = config.product.packages.base.get("my_pkg").unwrap();
+        assert_eq!(details.manifest.as_utf8_pathbuf(), &package_manifest_path);
     }
 }

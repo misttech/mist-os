@@ -17,6 +17,7 @@ use cm_types::{IterablePath, Name, SeparatedPath};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use log::warn;
 use moniker::{ChildName, Moniker};
 use router_error::RouterError;
 use sandbox::{
@@ -25,8 +26,6 @@ use sandbox::{
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
-use tracing::warn;
-
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
 
 lazy_static! {
@@ -616,6 +615,7 @@ fn extend_dict_with_config_use<C: ComponentInstanceInterface + 'static>(
         cm_rust::UseSource::Debug => return,
         cm_rust::UseSource::Capability(_) => return,
         cm_rust::UseSource::Framework => return,
+        cm_rust::UseSource::Collection(_) => return,
     };
 
     let metadata = Dict::new();
@@ -761,6 +761,10 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
                     ),
                 )
                 .with_porcelain_type(porcelain_type, moniker.clone())
+        }
+        cm_rust::UseSource::Collection(_) => {
+            // This arm is used for service capabilities, which are not yet supported here.
+            unimplemented!();
         }
     };
     let metadata = Dict::new();

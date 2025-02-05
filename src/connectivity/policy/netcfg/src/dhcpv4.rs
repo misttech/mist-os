@@ -21,9 +21,9 @@ use fuchsia_async::TimeoutExt as _;
 use futures::channel::oneshot;
 use futures::stream::StreamExt as _;
 use futures::FutureExt;
+use log::{info, warn};
 use net_types::ip::Ipv4Addr;
 use net_types::SpecifiedAddr;
-use tracing::{info, warn};
 use zx::HandleBased;
 
 use crate::{dns, errors, InterfaceId};
@@ -256,7 +256,7 @@ pub(super) async fn stop_client(
 
             match terminal_event_result {
                 None => {
-                    tracing::error!(
+                    log::error!(
                         "did not observe terminal event for DHCPv4 client on \
                         {interface_name} (id={interface_id})"
                     );

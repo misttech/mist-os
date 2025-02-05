@@ -156,6 +156,9 @@ type PortClass = flexible union {
     1: loopback Empty;
     /// The interface's network device port class.
     2: device fuchsia.hardware.network.PortClass;
+    /// The interface is a blackhole interface.
+    @available(added=HEAD)
+    3: blackhole Empty;
 };
 
 /// Network interface state inspection and observation.

@@ -171,17 +171,20 @@ zx::result<> I2cBusVisitor::FinalizeNode(fdf_devicetree::Node& node) {
         .channels = controller->second.channels,
         .bus_id = controller->second.bus_id,
     }};
-    auto data = fidl::Persist(bus_metadata);
-    if (data.is_error()) {
+    auto encoded_bus_metadata = fidl::Persist(bus_metadata);
+    if (encoded_bus_metadata.is_error()) {
       FDF_LOG(INFO, "Failed to persist fidl metadata for i2c controller '%s': %s",
-              node.name().c_str(), data.error_value().status_string());
+              node.name().c_str(), encoded_bus_metadata.error_value().status_string());
       return zx::ok();
     }
-    fuchsia_hardware_platform_bus::Metadata pbus_metadata = {{
+    node.AddMetadata({{
         .id = std::to_string(DEVICE_METADATA_I2C_CHANNELS),
-        .data = data.value(),
-    }};
-    node.AddMetadata(std::move(pbus_metadata));
+        .data = encoded_bus_metadata.value(),
+    }});
+    node.AddMetadata({{
+        .id = fuchsia_hardware_i2c_businfo::I2CBusMetadata::kSerializableName,
+        .data = std::move(encoded_bus_metadata.value()),
+    }});
     FDF_LOG(DEBUG, "I2C channels metadata added to node '%s'", node.name().c_str());
   }
 

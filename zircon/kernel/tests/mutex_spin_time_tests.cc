@@ -110,7 +110,7 @@ bool mutex_spin_time_test(void) {
       while (args.interlock.load() == false) {
         arch::Yield();
       }
-      start = zx::ticks(current_ticks());
+      start = zx::ticks(current_mono_ticks());
       args.interlock.store(false);
 
       // Spin until we notice that the thread is blocked.
@@ -123,7 +123,7 @@ bool mutex_spin_time_test(void) {
         arch::Yield();
       }
 
-      end = zx::ticks(current_ticks());
+      end = zx::ticks(current_mono_ticks());
     }
 
     // Now that we are out of the lock, clean up the test thread and check our
@@ -132,7 +132,7 @@ bool mutex_spin_time_test(void) {
     // limit we ended up.  There is technically no upper bound to this number,
     // but we would like to observe the overshoot amount as being "reasonable"
     // in an unloaded manual test environment.
-    zx_status_t status = test_thread->Join(nullptr, current_time() + ZX_SEC(30));
+    zx_status_t status = test_thread->Join(nullptr, current_mono_time() + ZX_SEC(30));
     ASSERT_EQ(status, ZX_OK, "test thread failed to exit!");
 
     zx::duration actual_spin_time(ticks_to_time.Scale((end - start).get()));

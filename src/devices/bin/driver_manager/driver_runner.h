@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.driver.development/cpp/wire.h>
 #include <fidl/fuchsia.driver.host/cpp/wire.h>
 #include <fidl/fuchsia.driver.index/cpp/wire.h>
+#include <fidl/fuchsia.driver.token/cpp/fidl.h>
 #include <fidl/fuchsia.ldsvc/cpp/wire.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -30,6 +31,7 @@
 #include "src/devices/bin/driver_manager/driver_host_runner.h"
 #include "src/devices/bin/driver_manager/inspect.h"
 #include "src/devices/bin/driver_manager/node.h"
+#include "src/devices/bin/driver_manager/offer_injection.h"
 #include "src/devices/bin/driver_manager/runner.h"
 #include "src/devices/bin/driver_manager/shutdown/node_removal_tracker.h"
 #include "src/devices/bin/driver_manager/shutdown/node_remover.h"
@@ -42,6 +44,7 @@ namespace driver_manager {
 
 class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::CompositeNodeManager>,
                      public fidl::WireServer<fuchsia_driver_index::DriverNotifier>,
+                     public fidl::Server<fuchsia_driver_token::NodeBusTopology>,
                      public BindManagerBridge,
                      public CompositeManagerBridge,
                      public NodeManager,
@@ -60,9 +63,11 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
 
   // |Dynamic_linker_args| should be set if dynamic linking is available.
   DriverRunner(fidl::ClientEnd<fuchsia_component::Realm> realm,
+               fidl::ClientEnd<fuchsia_component_sandbox::CapabilityStore> capability_store,
                fidl::ClientEnd<fuchsia_driver_index::DriverIndex> driver_index,
                InspectManager& inspect, LoaderServiceFactory loader_service_factory,
                async_dispatcher_t* dispatcher, bool enable_test_shutdown_delays,
+               OfferInjector offer_injector,
                std::optional<DynamicLinkerArgs> dynamic_linker_args = std::nullopt);
 
   // fidl::WireServer<fuchsia_driver_framework::CompositeNodeManager> interface
@@ -73,6 +78,13 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
 
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_driver_framework::CompositeNodeManager> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  // fidl::WireServer<fuchsia_driver_token::NodeBusTopology>
+  void Get(GetRequest& request, GetCompleter::Sync& completer) override;
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_driver_token::NodeBusTopology> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // CompositeManagerBridge interface
@@ -109,7 +121,6 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   }
 
   void PublishComponentRunner(component::OutgoingDirectory& outgoing);
-  void PublishCompositeNodeManager(component::OutgoingDirectory& outgoing);
   zx::result<> StartRootDriver(std::string_view url);
 
   // Goes through the orphan list and attempts the bind them again. Sends nodes that are still
@@ -122,6 +133,10 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   // Restarts all the nodes that are colocated with a driver with the given |url|.
   zx::result<uint32_t> RestartNodesColocatedWithDriverUrl(
       std::string_view url, fuchsia_driver_development::RestartRematchFlags rematch_flags);
+
+  void RestartWithDictionary(fidl::StringView moniker,
+                             fuchsia_component_sandbox::wire::DictionaryRef dictionary,
+                             zx::eventpair reset_eventpair);
 
   std::unordered_set<const DriverHost*> DriverHostsWithDriverUrl(std::string_view url);
 
@@ -184,9 +199,11 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
 
   uint64_t next_driver_host_id_ = 0;
   fidl::WireClient<fuchsia_driver_index::DriverIndex> driver_index_;
+  fidl::WireClient<fuchsia_component_sandbox::CapabilityStore> capability_store_;
+  uint64_t cap_id_ = 0;
   LoaderServiceFactory loader_service_factory_;
-  fidl::ServerBindingGroup<fuchsia_component_runner::ComponentRunner> runner_bindings_;
   fidl::ServerBindingGroup<fuchsia_driver_framework::CompositeNodeManager> manager_bindings_;
+  fidl::ServerBindingGroup<fuchsia_driver_token::NodeBusTopology> bus_topo_bindings_;
   fidl::ServerBindingGroup<fuchsia_driver_index::DriverNotifier> driver_notifier_bindings_;
   async_dispatcher_t* const dispatcher_;
   std::shared_ptr<Node> root_node_;

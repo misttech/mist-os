@@ -55,7 +55,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.inheritancewithrecursivedecl/ParentFirstRequest",
             "nullable": false,
@@ -87,7 +86,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.inheritancewithrecursivedecl/ChildSecondRequest",
             "nullable": false,
@@ -133,7 +131,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.inheritancewithrecursivedecl/ParentFirstRequest",
             "nullable": false,
@@ -173,13 +170,11 @@
       "members": [
         {
           "type": {
-            "kind": "request",
             "kind_v2": "endpoint",
             "role": "server",
             "protocol": "test.inheritancewithrecursivedecl/Parent",
             "nullable": false,
             "protocol_transport": "Channel",
-            "subtype": "test.inheritancewithrecursivedecl/Parent",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -233,13 +228,11 @@
       "members": [
         {
           "type": {
-            "kind": "request",
             "kind_v2": "endpoint",
             "role": "server",
             "protocol": "test.inheritancewithrecursivedecl/Parent",
             "nullable": false,
             "protocol_transport": "Channel",
-            "subtype": "test.inheritancewithrecursivedecl/Parent",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,

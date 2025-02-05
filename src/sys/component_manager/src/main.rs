@@ -18,9 +18,9 @@ use ::cm_logger::klog;
 use anyhow::Error;
 use cm_config::RuntimeConfig;
 use fuchsia_runtime::{job_default, process_self};
+use log::{error, info};
 use std::path::PathBuf;
 use std::{panic, process};
-use tracing::{error, info};
 use zx::JobCriticalOptions;
 use {fidl_fuchsia_component_internal as finternal, fuchsia_async as fasync};
 
@@ -89,13 +89,13 @@ fn main() {
         let mut builtin_environment = match build_environment(runtime_config, bootfs_svc).await {
             Ok(environment) => environment,
             Err(error) => {
-                error!(%error, "Component manager setup failed");
+                error!(error:%; "Component manager setup failed");
                 process::exit(1);
             }
         };
 
         if let Err(error) = builtin_environment.run_root().await {
-            error!(%error, "Failed to start root component");
+            error!(error:%; "Failed to start root component");
             process::exit(1);
         }
     };

@@ -26,6 +26,11 @@
             key: "enable_suspend",
             type: "bool",
         },
+        {
+            config: "fuchsia.power.StoragePowerManagementEnabled",
+            key: "storage_power_management_enabled",
+            type: "bool",
+        },
 
         // START: Power-related capabilities, some used by
         // //sdk/lib/driver/power/ccp

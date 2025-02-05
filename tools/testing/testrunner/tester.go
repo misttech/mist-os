@@ -14,7 +14,7 @@ import (
 	"io"
 	"io/fs"
 	"math"
-	"net"
+	"net/url"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -23,9 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/sftp"
-	"golang.org/x/crypto/ssh"
-
+	"go.fuchsia.dev/fuchsia/tools/botanist"
 	botanistconstants "go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/debug/covargs"
@@ -40,20 +38,12 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/retry"
 	"go.fuchsia.dev/fuchsia/tools/lib/serial"
 	"go.fuchsia.dev/fuchsia/tools/lib/subprocess"
-	"go.fuchsia.dev/fuchsia/tools/net/sshutil"
 	sshutilconstants "go.fuchsia.dev/fuchsia/tools/net/sshutil/constants"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 	"go.fuchsia.dev/fuchsia/tools/testing/testrunner/constants"
 )
 
 const (
-	// TODO(https://fxbug.dev/42152714): Fix this path.
-	// The output data directory for component v2 tests.
-	dataOutputDirV2 = "/tmp/test_manager:0/data/debug"
-
-	// The output data directory for early boot coverage.
-	dataOutputDirEarlyBoot = "/tmp/test_manager:0/data/kernel_debug/debugdata"
-
 	// Various tools for running tests.
 	runtestsName     = "runtests"
 	runTestSuiteName = "run-test-suite"
@@ -108,24 +98,6 @@ var newRunner = func(dir string, env []string) cmdRunner {
 // For testability.
 var newTempDir = func(dir, pattern string) (string, error) {
 	return os.MkdirTemp(dir, pattern)
-}
-
-// For testability
-type sshClient interface {
-	Close()
-	DisconnectionListener() <-chan struct{}
-	ReconnectWithBackoff(ctx context.Context, backoff retry.Backoff) error
-	Run(ctx context.Context, command []string, stdout, stderr io.Writer) error
-}
-
-// For testability
-type dataSinkCopier interface {
-	GetAllDataSinks(remoteDir string) ([]runtests.DataSink, error)
-	GetReferences(remoteDir string) (map[string]runtests.DataSinkReference, error)
-	Copy(sinks []runtests.DataSinkReference, localDir string) (runtests.DataSinkMap, error)
-	RemoveAll(remoteDir string) error
-	Reconnect() error
-	Close() error
 }
 
 // For testability
@@ -543,8 +515,10 @@ func (s *serialSocket) runDiagnostics(ctx context.Context) error {
 
 // for testability
 type FFXInstance interface {
+	Run(ctx context.Context, args ...string) error
 	RunWithTarget(ctx context.Context, args ...string) error
 	RunWithTargetAndTimeout(ctx context.Context, timeout time.Duration, args ...string) error
+	SetTarget(target string)
 	Stdout() io.Writer
 	Stderr() io.Writer
 	SetStdoutStderr(stdout, stderr io.Writer)
@@ -555,13 +529,8 @@ type FFXInstance interface {
 
 // FFXTester uses ffx to run tests and other enabled features.
 type FFXTester struct {
-	ffx             FFXInstance
-	experimentLevel int
-	// It will temporarily use an sshTester for functions where ffx has not been
-	// enabled to run yet.
-	// TODO(ihuh): Remove once all v1 tests are migrated to v2 and data sinks are
-	// available as an output artifact of `ffx test`.
-	sshTester      Tester
+	ffx            FFXInstance
+	experiments    botanist.Experiments
 	localOutputDir string
 
 	// The test output dirs from all the calls to Test().
@@ -589,7 +558,7 @@ type ffxTestRun struct {
 }
 
 // NewFFXTester returns an FFXTester.
-func NewFFXTester(ctx context.Context, ffx FFXInstance, sshTester Tester, localOutputDir string, experimentLevel int, llvmProfdata string) (*FFXTester, error) {
+func NewFFXTester(ctx context.Context, ffx FFXInstance, localOutputDir string, experiments botanist.Experiments, llvmProfdata string) (*FFXTester, error) {
 	err := retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), maxReconnectAttempts), func() error {
 		return ffx.RunWithTarget(ctx, "target", "wait", "-t", "10")
 	}, nil)
@@ -605,14 +574,16 @@ func NewFFXTester(ctx context.Context, ffx FFXInstance, sshTester Tester, localO
 		if err != nil {
 			return nil, err
 		}
-		debuginfodServers = strings.Split(os.Getenv("DEBUGINFOD_URLS"), " ")
+		debuginfodURLs := strings.TrimSpace(os.Getenv("DEBUGINFOD_URLS"))
+		if debuginfodURLs != "" {
+			debuginfodServers = strings.Split(debuginfodURLs, " ")
+		}
 		debuginfodCache = filepath.Join(localOutputDir, "debuginfod-cache")
 	}
 	return &FFXTester{
 		ffx:               ffx,
-		sshTester:         sshTester,
 		localOutputDir:    localOutputDir,
-		experimentLevel:   experimentLevel,
+		experiments:       experiments,
 		testRuns:          make(map[string]ffxTestRun),
 		llvmProfdata:      llvmProfdata,
 		llvmVersion:       llvmVersion,
@@ -625,24 +596,14 @@ func NewFFXTester(ctx context.Context, ffx FFXInstance, sshTester Tester, localO
 	}, nil
 }
 
-func (t *FFXTester) EnabledForTesting() bool {
-	return t.experimentLevel >= 2
-}
-
 func (t *FFXTester) Test(ctx context.Context, test testsharder.Test, stdout, stderr io.Writer, outDir string) (*TestResult, error) {
-	if t.EnabledForTesting() {
-		return BaseTestResultFromTest(test), t.testWithFile(ctx, test, stdout, stderr, outDir)
-	}
-	return t.sshTester.Test(ctx, test, stdout, stderr, outDir)
+	return BaseTestResultFromTest(test), t.testWithFile(ctx, test, stdout, stderr, outDir)
 }
 
 func (t *FFXTester) Reconnect(ctx context.Context) error {
-	if t.EnabledForTesting() {
-		return retry.Retry(ctx, retry.WithMaxDuration(retry.NewConstantBackoff(time.Second), 30*time.Second), func() error {
-			return t.ffx.RunWithTarget(ctx, "target", "wait", "-t", "10")
-		}, nil)
-	}
-	return t.sshTester.Reconnect(ctx)
+	return retry.Retry(ctx, retry.WithMaxDuration(retry.NewConstantBackoff(time.Second), 30*time.Second), func() error {
+		return t.ffx.RunWithTarget(ctx, "target", "wait", "-t", "10")
+	}, nil)
 }
 
 // testWithFile runs `ffx test` with -test-file and returns the test result.
@@ -671,7 +632,7 @@ func (t *FFXTester) testWithFile(ctx context.Context, test testsharder.Test, std
 	defer t.ffx.SetStdoutStderr(origStdout, origStderr)
 
 	extraArgs := []string{"--filter-ansi"}
-	if t.experimentLevel == 3 {
+	if t.experiments.Contains(botanist.UseFFXTestParallel) {
 		extraArgs = append(extraArgs, "--experimental-parallel-execution", "8")
 	}
 	startTime := clock.Now(ctx)
@@ -693,9 +654,6 @@ func containsError(output string, errMsgs []string) (bool, string) {
 }
 
 func (t *FFXTester) ProcessResult(ctx context.Context, test testsharder.Test, outDir string, testResult *TestResult, err error) (*TestResult, error) {
-	if !t.EnabledForTesting() {
-		return t.sshTester.ProcessResult(ctx, test, outDir, testResult, err)
-	}
 	finalTestResult := testResult
 	testRun := t.testRuns[test.PackageURL]
 	if testRun.result != nil {
@@ -900,18 +858,10 @@ func (t *FFXTester) RemoveAllEmptyOutputDirs() error {
 }
 
 func (t *FFXTester) Close() error {
-	return t.sshTester.Close()
+	return nil
 }
 
 func (t *FFXTester) EnsureSinks(ctx context.Context, sinks []runtests.DataSinkReference, outputs *TestOutputs) error {
-	if !t.EnabledForTesting() {
-		if sshTester, ok := t.sshTester.(*FuchsiaSSHTester); ok {
-			sshTester.IgnoreEarlyBoot()
-		}
-		if err := t.sshTester.EnsureSinks(ctx, sinks, outputs); err != nil {
-			return err
-		}
-	}
 	defer func() {
 		if err := os.RemoveAll(t.debuginfodCache); err != nil {
 			logger.Debugf(ctx, "failed to remove debuginfod cache: %s", err)
@@ -946,9 +896,10 @@ func (t *FFXTester) EnsureSinks(ctx context.Context, sinks []runtests.DataSinkRe
 	if len(sinksPerTest) > 0 {
 		outputs.updateDataSinks(sinksPerTest, "v2")
 	}
-	// Copy v1 sinks using the sshTester if ffx was used for testing.
-	if sshTester, ok := t.sshTester.(*FuchsiaSSHTester); ok && t.EnabledForTesting() {
-		return sshTester.copySinks(ctx, sinks, t.localOutputDir)
+	for _, sinkRef := range sinks {
+		if len(sinkRef.Sinks) > 0 {
+			return fmt.Errorf("Found v1 sinks when there should be none: %v", sinks)
+		}
 	}
 	return nil
 }
@@ -1016,11 +967,15 @@ func (t *FFXTester) getSinksFromArtifactDir(ctx context.Context, artifactDir str
 // the sinks in sinksPerTest.
 func (t *FFXTester) getSinksPerTest(ctx context.Context, sinkDir string, summary runtests.TestSummary, sinksPerTest map[string]runtests.DataSinkReference, seen map[string]struct{}) error {
 	for _, details := range summary.Tests {
-		for _, sinks := range details.DataSinks {
-			for _, sink := range sinks {
+		for i, sinks := range details.DataSinks {
+			for j, sink := range sinks {
 				if _, ok := seen[sink.File]; !ok {
-					if err := t.moveProfileToOutputDir(ctx, sinkDir, sink.File); err != nil {
+					dest, err := t.moveProfileToOutputDir(ctx, sinkDir, sink.File, details.Name)
+					if err != nil {
 						return err
+					}
+					if dest != sink.File {
+						details.DataSinks[i][j].File = dest
 					}
 					seen[sink.File] = struct{}{}
 				}
@@ -1049,8 +1004,12 @@ func (t *FFXTester) getEarlyBootSinks(ctx context.Context, sinkDir string, sinks
 			return err
 		}
 		if _, ok := seen[path]; !ok {
-			if err := t.moveProfileToOutputDir(ctx, sinkDir, sinkFile); err != nil {
+			dest, err := t.moveProfileToOutputDir(ctx, sinkDir, sinkFile, earlyBootSinksTestName)
+			if err != nil {
 				return err
+			}
+			if dest != sinkFile {
+				sinkFile = dest
 			}
 			seen[path] = struct{}{}
 		}
@@ -1071,32 +1030,44 @@ func (t *FFXTester) getEarlyBootSinks(ctx context.Context, sinkDir string, sinks
 	})
 }
 
+// for testability
+var mergeProfiles = covargs.MergeSameVersionProfiles
+
 // moveProfileToOutputDir moves the profile from the sinkDir to the local output directory.
 // If a profile of the same name already exists, then the two are merged.
-func (t *FFXTester) moveProfileToOutputDir(ctx context.Context, sinkDir, sinkFile string) error {
+func (t *FFXTester) moveProfileToOutputDir(ctx context.Context, sinkDir, sinkFile, testName string) (string, error) {
 	profile := filepath.Join(sinkDir, sinkFile)
 	destProfile := filepath.Join(t.localOutputDir, "v2", sinkFile)
 	if _, err := os.Stat(destProfile); err == nil && t.llvmProfdata != "" {
 		// Merge profiles.
 		logger.Debugf(ctx, "merging profile %s to %s", profile, destProfile)
-		if err := covargs.MergeSameVersionProfiles(ctx, sinkDir, []string{destProfile, profile}, destProfile, t.llvmProfdata, t.llvmVersion, 0, t.debuginfodServers, t.debuginfodCache); err != nil {
+		if err := mergeProfiles(ctx, sinkDir, []string{destProfile, profile}, destProfile, t.llvmProfdata, t.llvmVersion, 0, t.debuginfodServers, t.debuginfodCache); err != nil {
 			logger.Debugf(ctx, "failed to merge profiles: %s", err)
 			// TODO(https://fxbug.dev/368375861): Return err once missing build id issue is resolved.
-			return nil
+			// TODO(https://fxbug.dev/374146495): Remove following code once issue is fixed.
+			testName = url.PathEscape(strings.ReplaceAll(testName, ":", ""))
+			dest := filepath.Join(filepath.Dir(sinkFile), testName, filepath.Base(sinkFile))
+			if err := os.MkdirAll(filepath.Dir(filepath.Join(t.localOutputDir, "v2", dest)), os.ModePerm); err != nil {
+				return sinkFile, err
+			}
+			if err := os.Rename(profile, filepath.Join(t.localOutputDir, "v2", dest)); err != nil {
+				return sinkFile, err
+			}
+			return dest, nil
 		}
 		// Remove old profile.
 		if err := os.Remove(profile); err != nil {
-			return err
+			return sinkFile, err
 		}
 	} else {
 		if err := os.MkdirAll(filepath.Dir(destProfile), os.ModePerm); err != nil {
-			return err
+			return sinkFile, err
 		}
 		if err := os.Rename(profile, destProfile); err != nil {
-			return err
+			return sinkFile, err
 		}
 	}
-	return nil
+	return sinkFile, nil
 }
 
 func (t *FFXTester) RunSnapshot(ctx context.Context, snapshotFile string) error {
@@ -1109,352 +1080,22 @@ func (t *FFXTester) RunSnapshot(ctx context.Context, snapshotFile string) error 
 	}, nil)
 	if err != nil {
 		logger.Errorf(ctx, "%s: %s", constants.FailedToRunSnapshotMsg, err)
+		// TODO(https://fxbug.dev/387497485): For debugging. Remove when issue is fixed.
+		target := os.Getenv(botanistconstants.NodenameEnvKey)
+		if err := t.ffx.Run(ctx, "doctor", "--verbose", "--record", "--no-config"); err != nil {
+			logger.Errorf(ctx, "failed to run `ffx doctor`: %s", err)
+		}
+		if err := t.ffx.Run(ctx, "target", "list", target); err != nil {
+			logger.Errorf(ctx, "failed to run `ffx target list`: %s", err)
+		}
+		// Try capturing snapshot using target nodename.
+		t.ffx.SetTarget(target)
+		if err := t.ffx.Snapshot(ctx, t.localOutputDir, snapshotFile); err != nil {
+			logger.Errorf(ctx, "%s: %s", constants.FailedToRunSnapshotMsg, err)
+		}
 	}
 	logger.Debugf(ctx, "ran snapshot in %s", clock.Now(ctx).Sub(startTime))
 	return err
-}
-
-func sshToTarget(ctx context.Context, addr net.IPAddr, sshKeyFile, connName string) (*sshutil.Client, error) {
-	key, err := os.ReadFile(sshKeyFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read SSH key file: %w", err)
-	}
-	config, err := sshutil.DefaultSSHConfig(key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create an SSH client config: %w", err)
-	}
-
-	return sshutil.NewNamedClient(
-		ctx,
-		sshutil.ConstantAddrResolver{
-			Addr: &net.TCPAddr{
-				IP:   addr.IP,
-				Port: sshutil.SSHPort,
-				Zone: addr.Zone,
-			},
-		},
-		config,
-		sshutil.DefaultConnectBackoff(),
-		connName,
-	)
-}
-
-// FuchsiaSSHTester executes fuchsia tests over an SSH connection.
-type FuchsiaSSHTester struct {
-	client          sshClient
-	copier          dataSinkCopier
-	localOutputDir  string
-	serialSocket    serialClient
-	ignoreEarlyBoot bool
-	testRuns        map[string]sshTestRun
-}
-
-// NewFuchsiaSSHTester returns a FuchsiaSSHTester associated to a fuchsia
-// instance of the given nodename and the private key paired with an authorized
-// one.
-func NewFuchsiaSSHTester(ctx context.Context, addr net.IPAddr, sshKeyFile, localOutputDir, serialSocketPath string) (Tester, error) {
-	client, err := sshToTarget(ctx, addr, sshKeyFile, "test")
-	if err != nil {
-		return nil, fmt.Errorf("failed to establish an SSH connection: %w", err)
-	}
-	copier, err := runtests.NewDataSinkCopier(client)
-	if err != nil {
-		return nil, err
-	}
-	return &FuchsiaSSHTester{
-		client:         client,
-		copier:         copier,
-		localOutputDir: localOutputDir,
-		serialSocket:   &serialSocket{serialSocketPath},
-		testRuns:       make(map[string]sshTestRun),
-	}, nil
-}
-
-func (t *FuchsiaSSHTester) reconnect(ctx context.Context) error {
-	if err := t.client.ReconnectWithBackoff(ctx, retry.WithMaxDuration(retry.NewConstantBackoff(time.Second), 10*time.Second)); err != nil {
-		if err := t.serialSocket.runDiagnostics(ctx); err != nil {
-			logger.Warningf(ctx, "failed to run serial diagnostics: %s", err)
-		}
-		return fmt.Errorf("failed to reestablish SSH connection: %w", err)
-	}
-	if err := t.copier.Reconnect(); err != nil {
-		return fmt.Errorf("failed to reconnect data sink copier: %w", err)
-	}
-	return nil
-}
-
-// sshExitError is an interface that ssh.ExitError conforms to. We use this for
-// testability instead of unwrapping an error as an ssh.ExitError, because it's
-// not possible to construct an ssh.ExitError in-memory in a test due to private
-// field constraints.
-type sshExitError interface {
-	error
-	ExitStatus() int
-}
-
-// Statically assert that ssh.ExitError implements the sshExitError interface.
-var _ sshExitError = &ssh.ExitError{}
-
-func (t *FuchsiaSSHTester) isTimeoutError(test testsharder.Test, err error) bool {
-	if test.Timeout <= 0 {
-		return false
-	}
-	var exitErr sshExitError
-	if errors.As(err, &exitErr) {
-		return exitErr.ExitStatus() == timeoutExitCode
-	}
-	return false
-}
-
-func (t *FuchsiaSSHTester) runSSHCommand(ctx context.Context, command []string, stdout, stderr io.Writer) error {
-	select {
-	case <-t.client.DisconnectionListener():
-		if err := t.Reconnect(ctx); err != nil {
-			return connectionError{err}
-		}
-	default:
-		// The client is still connected, so continue to run the command.
-	}
-	cmdErr := t.client.Run(ctx, command, stdout, stderr)
-	if sshutil.IsConnectionError(cmdErr) {
-		return connectionError{cmdErr}
-	}
-	return cmdErr
-}
-
-func (t *FuchsiaSSHTester) Reconnect(ctx context.Context) error {
-	if err := t.reconnect(ctx); err != nil {
-		return fmt.Errorf("%s: %s", constants.FailedToReconnectMsg, err)
-	}
-	return nil
-}
-
-type sshTestRun struct {
-	targetOutDir  string
-	totalDuration time.Duration
-}
-
-func (t *FuchsiaSSHTester) setTestRun(test testsharder.Test, targetOutDir string, duration time.Duration) {
-	t.testRuns[test.PackageURL] = sshTestRun{targetOutDir, duration}
-}
-
-func (t *FuchsiaSSHTester) getTestRun(test testsharder.Test) (string, time.Duration) {
-	run, ok := t.testRuns[test.PackageURL]
-	if !ok {
-		return "", 0
-	}
-	return run.targetOutDir, run.totalDuration
-}
-
-// Test runs a test over SSH.
-func (t *FuchsiaSSHTester) Test(ctx context.Context, test testsharder.Test, stdout io.Writer, stderr io.Writer, outDir string) (*TestResult, error) {
-	testResult := BaseTestResultFromTest(test)
-	command, err := commandForTest(&test, false, test.Timeout)
-	if err != nil {
-		testResult.FailReason = err.Error()
-		return testResult, nil
-	}
-	// Set the output directory to retrieve test outputs.
-	targetOutDir := fmt.Sprintf("/tmp/%s", strings.ReplaceAll(test.Name, "/", "_"))
-	// Setting an output directory adds latency to test execution for coverage builds
-	// which produce a lot of output files. Since we will collect the profiles at
-	// the end anyway, don't use --deprecated-output-directory for coverage builders.
-	setOutputDir := !strings.Contains(os.Getenv("BUILDER_NAME"), "coverage")
-	if setOutputDir {
-		command = append(command, "--deprecated-output-directory", targetOutDir)
-	}
-	startTime := clock.Now(ctx)
-	testErr := t.runSSHCommand(ctx, command, stdout, stderr)
-	if setOutputDir {
-		t.setTestRun(test, targetOutDir, clock.Now(ctx).Sub(startTime))
-	}
-	if t.isTimeoutError(test, testErr) {
-		testResult.Result = runtests.TestAborted
-	} else if testErr != nil {
-		testResult.FailReason = testErr.Error()
-	} else {
-		testResult.Result = runtests.TestSuccess
-	}
-	return testResult, testErr
-}
-
-func (t *FuchsiaSSHTester) ProcessResult(ctx context.Context, test testsharder.Test, outDir string, testResult *TestResult, testErr error) (*TestResult, error) {
-	targetOutDir, totalDuration := t.getTestRun(test)
-	// Collect test outputs. This is a best effort. If any of the following steps
-	// to process the outputs fail, just log the failure but don't fail the test.
-	if targetOutDir != "" {
-		outputs, err := t.copier.GetAllDataSinks(targetOutDir)
-		if err != nil {
-			logger.Debugf(ctx, "failed to get test outputs: %s", err)
-		}
-		if len(outputs) > 0 && outDir != "" {
-			// If there were test outputs, copy them to the outDir to be recorded as OutputFiles.
-			// As this code will be deprecated once we migrate to ffx, we reuse the existing
-			// sink structure as a temporary hack even though these are just arbitrary
-			// output files, so the sink type does not matter.
-			sinkMap := runtests.DataSinkMap{"outputfile": []runtests.DataSink{}}
-			for _, output := range outputs {
-				sinkMap["outputfile"] = append(sinkMap["outputfile"], output)
-			}
-			sinkRef := runtests.DataSinkReference{Sinks: sinkMap, RemoteDir: targetOutDir}
-			if err := t.copySinks(ctx, []runtests.DataSinkReference{sinkRef}, outDir); err != nil {
-				logger.Debugf(ctx, "failed to copy test outputs to host: %s", err)
-			}
-			if err := t.copier.RemoveAll(targetOutDir); err != nil {
-				logger.Debugf(ctx, "failed to remove test outputs: %s", err)
-			}
-			// Using --deprecated-output-directory should produce outputs following the same
-			// schema as `ffx test` outputs, so we can process them like ffx test outputs.
-			runResult, err := ffxutil.GetRunResult(outDir)
-			if err != nil {
-				logger.Debugf(ctx, "failed to get run result: %s", err)
-			} else if runResult != nil {
-				if result, err := processTestResult(runResult, test, totalDuration, true); err != nil {
-					// Log the error and continue to construct the test result
-					// without the run_summary.json in the outputs.
-					logger.Debugf(ctx, "failed to process run result: %s", err)
-				} else {
-					// If there was no processing error, return the test result
-					// constructed from the run_summary.json in the outputs.
-					testResult = result
-				}
-			}
-		}
-	}
-
-	if isConnectionError(testErr) {
-		return testResult, testErr
-	}
-
-	return testResult, nil
-}
-
-// IgnoreEarlyBoot should be called from the FFXTester if it uses
-// the FuchsiaSSHTester to run tests but wants to collect early
-// boot profiles separately using ffx instead of getting it using
-// the FuchsiaSSHTester's EnsureSinks() method.
-func (t *FuchsiaSSHTester) IgnoreEarlyBoot() {
-	t.ignoreEarlyBoot = true
-}
-
-func (t *FuchsiaSSHTester) EnsureSinks(ctx context.Context, sinkRefs []runtests.DataSinkReference, outputs *TestOutputs) error {
-	// Collect v2 references.
-	var v2Sinks map[string]runtests.DataSinkReference
-	var err error
-	if err := t.runCopierWithRetry(ctx, func() error {
-		v2Sinks, err = t.copier.GetReferences(dataOutputDirV2)
-		return err
-	}); err != nil {
-		// If we fail to get v2 sinks, just log the error but continue to copy v1 sinks.
-		logger.Debugf(ctx, "failed to determine data sinks for v2 tests: %s", err)
-	}
-	var v2SinkRefs []runtests.DataSinkReference
-	for _, ref := range v2Sinks {
-		v2SinkRefs = append(v2SinkRefs, ref)
-	}
-	if len(v2SinkRefs) > 0 {
-		if err := t.copySinks(ctx, v2SinkRefs, filepath.Join(t.localOutputDir, "v2")); err != nil {
-			return err
-		}
-		outputs.updateDataSinks(v2Sinks, "v2")
-	}
-	if t.ignoreEarlyBoot {
-		return t.copySinks(ctx, sinkRefs, t.localOutputDir)
-	}
-	// Collect early boot coverage.
-	var earlyBootSinks []runtests.DataSink
-	if err := t.runCopierWithRetry(ctx, func() error {
-		earlyBootSinks, err = t.copier.GetAllDataSinks(dataOutputDirEarlyBoot)
-		return err
-	}); err != nil {
-		logger.Debugf(ctx, "failed to determine early boot data sinks: %s", err)
-	}
-	if len(earlyBootSinks) > 0 {
-		// If there were early boot sinks, record the "early_boot_sinks" test in the outputs
-		// so that the test result can be updated with the early boot sinks.
-		earlyBootSinksTest := &TestResult{
-			Name:   earlyBootSinksTestName,
-			Result: runtests.TestSuccess,
-		}
-		outputs.Record(ctx, *earlyBootSinksTest)
-		// The directory under dataOutputDirEarlyBoot is named after the type of sinks it contains.
-		sinkMap := runtests.DataSinkMap{}
-		for _, sink := range earlyBootSinks {
-			sinkType := strings.Split(filepath.ToSlash(sink.File), "/")[0]
-			if _, ok := sinkMap[sinkType]; !ok {
-				sinkMap[sinkType] = []runtests.DataSink{}
-			}
-			sinkMap[sinkType] = append(sinkMap[sinkType], sink)
-		}
-		earlyBootSinkRef := runtests.DataSinkReference{Sinks: sinkMap, RemoteDir: dataOutputDirEarlyBoot}
-		if err := t.copySinks(ctx, []runtests.DataSinkReference{earlyBootSinkRef}, filepath.Join(t.localOutputDir, "early-boot")); err != nil {
-			return err
-		}
-		outputs.updateDataSinks(map[string]runtests.DataSinkReference{earlyBootSinksTestName: earlyBootSinkRef}, "early-boot")
-	}
-	return t.copySinks(ctx, sinkRefs, t.localOutputDir)
-}
-
-func (t *FuchsiaSSHTester) runCopierWithRetry(ctx context.Context, copierFunc func() error) error {
-	return retryOnConnectionFailure(ctx, t, func() error {
-		err := copierFunc()
-		if errors.Is(err, sftp.ErrSSHFxConnectionLost) {
-			logger.Warningf(ctx, "connection lost while getting data sinks: %s", err)
-			return connectionError{err}
-		}
-		return err
-	})
-}
-
-func (t *FuchsiaSSHTester) copySinks(ctx context.Context, sinkRefs []runtests.DataSinkReference, localOutputDir string) error {
-	if err := t.runCopierWithRetry(ctx, func() error {
-		startTime := clock.Now(ctx)
-
-		// Copy() is assumed to be idempotent and thus safe to retry, which is
-		// the case for the SFTP-based data sink copier.
-		sinkMap, err := t.copier.Copy(sinkRefs, localOutputDir)
-		if err != nil {
-			return err
-		}
-		copyDuration := clock.Now(ctx).Sub(startTime)
-		sinkRef := runtests.DataSinkReference{Sinks: sinkMap}
-		numSinks := sinkRef.Size()
-		if numSinks > 0 {
-			logger.Debugf(ctx, "copied %d data sinks in %s", numSinks, copyDuration)
-		}
-		return nil
-	}); err != nil {
-		return fmt.Errorf("failed to copy data sinks off target: %w", err)
-	}
-	return nil
-}
-
-// RunSnapshot runs `snapshot` on the device.
-func (t *FuchsiaSSHTester) RunSnapshot(ctx context.Context, snapshotFile string) error {
-	if snapshotFile == "" {
-		return nil
-	}
-	startTime := clock.Now(ctx)
-	snapshotOutFile, err := osmisc.CreateFile(filepath.Join(t.localOutputDir, snapshotFile))
-	if err != nil {
-		return fmt.Errorf("failed to create snapshot output file: %w", err)
-	}
-	defer snapshotOutFile.Close()
-	if err := retryOnConnectionFailure(ctx, t, func() error {
-		return t.runSSHCommand(ctx, []string{"/bin/snapshot"}, snapshotOutFile, os.Stderr)
-	}); err != nil {
-		logger.Errorf(ctx, "%s: %s", constants.FailedToRunSnapshotMsg, err)
-		return err
-	}
-	logger.Debugf(ctx, "ran snapshot in %s", clock.Now(ctx).Sub(startTime))
-	return nil
-}
-
-// Close terminates the underlying SSH connection. The object is no longer
-// usable after calling this method.
-func (t *FuchsiaSSHTester) Close() error {
-	defer t.client.Close()
-	return t.copier.Close()
 }
 
 // for testability
@@ -1652,13 +1293,19 @@ func (t *FuchsiaSerialTester) Test(ctx context.Context, test testsharder.Test, s
 	t.socket.SetIOTimeout(testStartedTimeout)
 	reader := io.TeeReader(t.socket, &lastWrite)
 	commandStarted := false
+
+	startedStr := runtests.StartedSignature + test.Name
+	if test.PackageURL != "" {
+		// Packaged tests run with the "run-test-suite" tool which has different logs.
+		startedStr = "Running test '" + test.PackageURL + "'"
+	}
+
 	var readErr error
 	for i := 0; i < startSerialCommandMaxAttempts; i++ {
 		if err := serial.RunCommands(ctx, t.socket, []serial.Command{{Cmd: command}}); err != nil {
 			return nil, fmt.Errorf("failed to write to serial socket: %w", err)
 		}
 		startedCtx, cancel := newTestStartedContext(ctx)
-		startedStr := runtests.StartedSignature + test.Name
 		_, readErr = iomisc.ReadUntilMatchString(startedCtx, reader, startedStr)
 		cancel()
 		if readErr == nil {
@@ -1684,6 +1331,47 @@ func (t *FuchsiaSerialTester) Test(ctx context.Context, test testsharder.Test, s
 		&parseOutKernelReader{ctx: ctx, reader: io.MultiReader(&lastWrite, t.socket)},
 		// Writes to stdout as it reads from the above reader.
 		stdout)
+
+	if test.PackageURL != "" {
+		// The test was ran with the "run-test-suite" tool, parse the result.
+		res_success := test.PackageURL + " completed with result: PASSED"
+		res_failed := test.PackageURL + " completed with result: FAILED"
+		res_inconclusive := test.PackageURL + " completed with result: INCONCLUSIVE"
+		res_timed_out := test.PackageURL + " completed with result: TIMED_OUT"
+		res_errored := test.PackageURL + " completed with result: ERROR"
+		res_skipped := test.PackageURL + " completed with result: SKIPPED"
+		res_canceled := test.PackageURL + " completed with result: CANCELLED"
+		res_dnf := test.PackageURL + " completed with result: DID_NOT_FINISH"
+		match, err := iomisc.ReadUntilMatchString(ctx, testOutputReader, res_success, res_failed, res_inconclusive, res_timed_out, res_errored, res_skipped, res_canceled, res_dnf)
+		if err != nil {
+			err = fmt.Errorf("unable to derive test result from run-test-suite output: %w", err)
+			testResult.FailReason = err.Error()
+			return testResult, nil
+		}
+
+		if match == res_success {
+			testResult.Result = runtests.TestSuccess
+			return testResult, nil
+		}
+
+		if match == res_timed_out || match == res_canceled {
+			testResult.FailReason = "test timed out or canceled"
+			testResult.Result = runtests.TestAborted
+			return testResult, nil
+		}
+
+		if match == res_skipped {
+			testResult.FailReason = "test skipped"
+			testResult.Result = runtests.TestSkipped
+			return testResult, nil
+		}
+
+		logger.Errorf(ctx, "%s", match)
+		testResult.FailReason = "test failed"
+		testResult.Result = runtests.TestFailure
+		return testResult, nil
+	}
+
 	if success, err := runtests.TestPassed(ctx, testOutputReader, test.Name); err != nil {
 		testResult.FailReason = err.Error()
 		return testResult, nil

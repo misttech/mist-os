@@ -75,8 +75,6 @@ template("sdk_static_library") {
 
   # Only categories that are included in an IDK makes sense.
   valid_categories = [
-    # "excluded" is deprecated.
-    # "experimental" is deprecated.
     # "internal" is deprecated; only specific legacy cases below are allowed.
     # "cts" is only for ABI compatibility and thus not applicable.
     # "partner_internal" is only for ABI compatibility and thus not applicable.
@@ -194,7 +192,7 @@ template("sdk_static_library") {
       configs = []
     }
     if (libcxx_linkage == "static") {
-      configs += [ "//build/config/mistos:static_cpp_standard_library" ]
+      configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
     } else {
       # Adding this linker flag keeps us honest about not commiting to a
       # specific C++ ABI. If this flag is causing your library to not
@@ -203,7 +201,7 @@ template("sdk_static_library") {
       # precompiled. If you do require precompilation, you probably need to
       # find a way not to depend on dynamically linking C++ symbols because C++
       # does not have a sufficiently stable ABI for the purposes of our SDK.
-      configs += [ "//build/config/mistos:no_cpp_standard_library" ]
+      configs += [ "//build/config/fuchsia:no_cpp_standard_library" ]
     }
 
     metadata = {

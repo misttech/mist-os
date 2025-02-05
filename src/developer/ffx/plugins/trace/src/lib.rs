@@ -7,7 +7,7 @@ use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
 use ffx_target::get_target_specifier;
 use ffx_trace_args::{TraceCommand, TraceSubCommand};
-use fho::{daemon_protocol, deferred, moniker, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_developer_ffx::{self as ffx, RecordingError, TracingProxy};
 use fidl_fuchsia_tracing::{BufferingMode, KnownCategory};
 use fidl_fuchsia_tracing_controller::{
@@ -25,8 +25,10 @@ use std::future::Future;
 use std::io::{stdin, LineWriter, Stdin, Write};
 use std::path::{Component, PathBuf};
 use std::time::Duration;
+use target_holders::{daemon_protocol, moniker};
 use term_grid::Grid;
-use termion::terminal_size;
+#[cfg_attr(test, allow(unused))]
+use termion::{color, terminal_size};
 
 // This is to make the schema make sense as this plugin can output one of these based on the
 // subcommand. An alternative is to break this one plugin into multiple plugins each with their own
@@ -136,8 +138,11 @@ fn stats_to_print(trace_stat: ProviderStats, verbose: bool) -> Vec<String> {
         || (records_dropped != 0)
     {
         if records_dropped != 0 {
-            stats_output
-                .push(format!("WARNING: {provider_name:?} dropped {records_dropped:?} records!"));
+            stats_output.push(format!(
+                "{}WARNING: {provider_name:?} dropped {records_dropped:?} records!{}",
+                color::Fg(color::Yellow),
+                color::Fg(color::Reset)
+            ));
         }
         if verbose {
             stats_output.extend([
@@ -368,7 +373,10 @@ fn print_grid(writer: &mut Writer, values: Vec<String>) -> Result<()> {
         grid.add(term_grid::Cell::from(value.as_str()));
     }
 
+    #[cfg(not(test))]
     let terminal_width = terminal_size().unwrap_or((80, 80)).0;
+    #[cfg(test)]
+    let terminal_width = 80usize;
     let formatted_values = match grid.fit_into_width(terminal_width.into()) {
         Some(grid_display) => grid_display.to_string(),
         None => values.join("\n"),
@@ -575,14 +583,32 @@ pub async fn trace(
                 waiter.wait().await;
             }
             writer.line(format!("Shutting down recording and writing to file."))?;
-            stop_tracing(&context, &proxy, output, writer, opts.verbose, opts.no_symbolize).await?;
+            stop_tracing(
+                &context,
+                &proxy,
+                output,
+                writer,
+                opts.verbose,
+                opts.no_symbolize,
+                opts.no_verify_trace,
+            )
+            .await?;
         }
         TraceSubCommand::Stop(opts) => {
             let output = match opts.output {
                 Some(o) => canonical_path(o)?,
                 None => target_spec.unwrap_or_else(|| "".to_owned()),
             };
-            stop_tracing(&context, &proxy, output, writer, opts.verbose, opts.no_symbolize).await?;
+            stop_tracing(
+                &context,
+                &proxy,
+                output,
+                writer,
+                opts.verbose,
+                opts.no_symbolize,
+                opts.no_verify_trace,
+            )
+            .await?;
         }
         TraceSubCommand::Status(_opts) => status(&proxy, writer).await?,
         TraceSubCommand::Symbolize(opts) => {
@@ -684,6 +710,7 @@ async fn stop_tracing(
     mut writer: Writer,
     verbose: bool,
     skip_symbolization: bool,
+    no_verify_trace: bool,
 ) -> Result<()> {
     let res = proxy.stop_recording(&output).await?;
     let (target, output_file) = match res {
@@ -693,7 +720,18 @@ async fn stop_tracing(
                     writer.line(stat_output)?;
                 }
             }
-
+            if !no_verify_trace {
+                match std::fs::read(output_file.clone()) {
+                    Ok(content) => {
+                        let mut parser = SessionParser::new(std::io::Cursor::new(content));
+                        let mut parser_iter = parser.by_ref().peekable();
+                        if parser_iter.peek().is_none() {
+                            writer.line(format!("The trace file is empty. Please verify that the input categories are valid. Input categories are: {:?}", categories))?;
+                        }
+                    }
+                    Err(e) => ffx_bail!("Failed to read the trace file: {}", e),
+                };
+            }
             if !skip_symbolization && categories.contains(&"kernel:ipc".to_string()) {
                 symbolize_trace_file(output_file.clone(), output_file.clone(), &context)?;
             }
@@ -827,7 +865,8 @@ mod tests {
     use pretty_assertions::assert_eq;
     use serde_json::json;
     use std::matches;
-    use tempfile::NamedTempFile;
+    use target_holders::fake_proxy;
+    use tempfile::{Builder, NamedTempFile};
     use {
         fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_tracing as tracing,
         fidl_fuchsia_tracing_controller as tracing_controller,
@@ -901,7 +940,7 @@ mod tests {
     }
 
     fn setup_fake_service() -> TracingProxy {
-        fho::testing::fake_proxy(|req| match req {
+        fake_proxy(|req| match req {
             ffx::TracingRequest::StartRecording { responder, .. } => responder
                 .send(Ok(&ffx::TargetInfo {
                     nodename: Some("foo".to_owned()),
@@ -964,7 +1003,7 @@ mod tests {
     }
 
     fn setup_fake_controller_proxy() -> fho::Deferred<ProvisionerProxy> {
-        fho::Deferred::from_output(Ok(fho::testing::fake_proxy(|req| match req {
+        fho::Deferred::from_output(Ok(fake_proxy(|req| match req {
             tracing_controller::ProvisionerRequest::GetKnownCategories { responder, .. } => {
                 responder.send(&fake_known_categories()).expect("should respond");
             }
@@ -1021,7 +1060,7 @@ mod tests {
     }
 
     fn setup_closed_fake_controller_proxy() -> fho::Deferred<ProvisionerProxy> {
-        fho::Deferred::from_output(Ok(fho::testing::fake_proxy(|req| match req {
+        fho::Deferred::from_output(Ok(fake_proxy(|req| match req {
             tracing_controller::ProvisionerRequest::GetKnownCategories { responder, .. } => {
                 responder.control_handle().shutdown();
             }
@@ -1095,6 +1134,38 @@ mod tests {
         let output = test_buffers.into_stdout_str();
         let want = "12345678 -> fake_protocol_name.fake_method_name\n";
         assert!(output.contains(want));
+    }
+
+    #[fuchsia::test]
+    async fn test_empty_trace_data() {
+        let fake_temp_file =
+            Builder::new().suffix("foo.fxt").tempfile().expect("Failed to create a temp file");
+        let fake_trace_file_name = fake_temp_file.path().to_str().unwrap().to_string();
+        let env = ffx_config::test_init().await.unwrap();
+        let test_buffers = TestBuffers::default();
+        let writer = Writer::new_test(None, &test_buffers);
+        run_trace_test(
+            env.context.clone(),
+            TraceCommand {
+                sub_cmd: TraceSubCommand::Start(Start {
+                    buffer_size: 2,
+                    categories: vec!["invalid_categories".to_string()],
+                    duration: Some(1_f64),
+                    buffering_mode: tracing::BufferingMode::Oneshot,
+                    output: fake_trace_file_name,
+                    background: false,
+                    verbose: false,
+                    trigger: vec![],
+                    no_symbolize: false,
+                    no_verify_trace: false,
+                }),
+            },
+            writer,
+        )
+        .await;
+        let output = test_buffers.into_stdout_str();
+        let want = "The trace file is empty. Please verify that the input categories are valid. Input categories are: ";
+        assert!(output.contains(want), "\"{}\" didn't contain  /{}/", output, want);
     }
 
     #[fuchsia::test]
@@ -1224,6 +1295,7 @@ mod tests {
                     verbose: false,
                     trigger: vec![],
                     no_symbolize: false,
+                    no_verify_trace: true,
                 }),
             },
             writer,
@@ -1269,6 +1341,7 @@ Current tracing status:
                     verbose: false,
                     trigger: vec![],
                     no_symbolize: false,
+                    no_verify_trace: true,
                 }),
             },
             writer,
@@ -1335,6 +1408,7 @@ Current tracing status:
                     output: Some("foo.txt".to_string()),
                     verbose: false,
                     no_symbolize: false,
+                    no_verify_trace: true,
                 }),
             },
             writer,
@@ -1358,6 +1432,7 @@ Current tracing status:
                     output: Some("long_directory_name_0123456789abcdef_1123456789abcdef_2123456789abcdef_3123456789abcdef_4123456789abcdef_5123456789abcdef_6123456789abcdef_7123456789abcdef_8123456789abcdef_9123456789abcdef_a123456789abcdef_b123456789abcdef_c123456789abcdef_d123456789abcdef_e123456789abcdef_f123456789abcdef/trace.fxt".to_string()),
                     verbose: false,
                     no_symbolize: false,
+                    no_verify_trace: true,
                 }),
             },
             writer,
@@ -1387,6 +1462,7 @@ Current tracing status:
                     verbose: true,
                     trigger: vec![],
                     no_symbolize: false,
+                    no_verify_trace: true,
                 }),
             },
             writer,
@@ -1426,6 +1502,7 @@ Current tracing status:
                     output: Some("foo.txt".to_string()),
                     verbose: true,
                     no_symbolize: false,
+                    no_verify_trace: true,
                 }),
             },
             writer,
@@ -1462,6 +1539,7 @@ Current tracing status:
                     verbose: false,
                     trigger: vec![],
                     no_symbolize: false,
+                    no_verify_trace: true,
                 }),
             },
             writer,
@@ -1492,6 +1570,7 @@ Current tracing status:
                     verbose: false,
                     trigger: vec![],
                     no_symbolize: false,
+                    no_verify_trace: true,
                 }),
             },
             writer,
@@ -1526,6 +1605,7 @@ Current tracing status:
                     verbose: false,
                     trigger: vec![],
                     no_symbolize: false,
+                    no_verify_trace: true,
                 }),
             },
             writer,
@@ -1560,6 +1640,7 @@ Current tracing status:
                     verbose: false,
                     trigger: vec![],
                     no_symbolize: false,
+                    no_verify_trace: true,
                 }),
             },
             writer,
@@ -1769,8 +1850,13 @@ Current tracing status:
         stats.records_dropped = Some(10);
         stats.percentage_durable_buffer_used = Some(30.0);
         stats.non_durable_bytes_written = Some(40);
+        let _warn_str = format!(
+            "{}WARNING: \"provider_foo\" dropped 10 records!{}",
+            color::Fg(color::Yellow),
+            color::Fg(color::Reset)
+        );
         let mut expected_output = vec![
-            "WARNING: \"provider_foo\" dropped 10 records!",
+            &_warn_str,
             "\"provider_foo\" (pid: 1234) trace stats",
             "Buffer wrapped count: 10",
             "# records dropped: 10",
@@ -1782,7 +1868,7 @@ Current tracing status:
         assert_eq!(expected_output, actual_output);
 
         // Verify that dropped records warning is printed even if not verbose
-        expected_output = vec!["WARNING: \"provider_foo\" dropped 10 records!"];
+        expected_output = vec![&_warn_str];
         actual_output = stats_to_print(stats.clone(), false);
         assert_eq!(expected_output, actual_output);
 

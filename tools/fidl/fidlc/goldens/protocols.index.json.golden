@@ -1167,7 +1167,7 @@
             "end_offset": 2451
           },
           "type": {
-            "kind": "identifier"
+            "kind": "endpoint"
           }
         },
         {
@@ -1180,7 +1180,7 @@
             "end_offset": 2495
           },
           "type": {
-            "kind": "request"
+            "kind": "endpoint"
           }
         },
         {
@@ -1193,7 +1193,7 @@
             "end_offset": 2543
           },
           "type": {
-            "kind": "identifier"
+            "kind": "endpoint"
           }
         },
         {
@@ -1206,7 +1206,7 @@
             "end_offset": 2603
           },
           "type": {
-            "kind": "request"
+            "kind": "endpoint"
           }
         }
       ]
@@ -1445,7 +1445,7 @@
             "end_offset": 2738
           },
           "type": {
-            "kind": "identifier"
+            "kind": "endpoint"
           }
         }
       ]
@@ -1464,7 +1464,7 @@
             "end_offset": 2812
           },
           "type": {
-            "kind": "identifier"
+            "kind": "endpoint"
           }
         }
       ]
@@ -1483,7 +1483,7 @@
             "end_offset": 2916
           },
           "type": {
-            "kind": "request"
+            "kind": "endpoint"
           }
         }
       ]
@@ -1502,7 +1502,7 @@
             "end_offset": 3002
           },
           "type": {
-            "kind": "request"
+            "kind": "endpoint"
           }
         }
       ]

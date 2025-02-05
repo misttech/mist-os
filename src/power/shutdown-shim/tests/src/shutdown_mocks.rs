@@ -10,10 +10,10 @@ use fuchsia_component_test::LocalComponentHandles;
 use futures::channel::mpsc;
 use futures::future::BoxFuture;
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
-use log::{info, warn};
+use log::info;
 use {
-    fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
-    fidl_fuchsia_power_system as fsystem, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
+    fidl_fuchsia_io as fio, fidl_fuchsia_power_system as fsystem, fidl_fuchsia_sys2 as fsys,
+    fuchsia_async as fasync,
 };
 
 pub fn new_mocks_provider(
@@ -48,11 +48,6 @@ async fn run_mocks(
         });
     }
 
-    let send_admin_signals = send_signals.clone();
-    fs.dir("svc").add_fidl_service(move |stream| {
-        fasync::Task::spawn(run_statecontrol_admin(send_admin_signals.clone(), stream)).detach();
-    });
-
     let send_sys2_signals = send_signals.clone();
     fs.dir("svc").add_fidl_service(move |stream| {
         fasync::Task::spawn(run_sys2_system_controller(send_sys2_signals.clone(), stream)).detach();
@@ -70,16 +65,6 @@ async fn run_mocks(
     Ok(())
 }
 
-#[derive(Debug, PartialEq)]
-pub enum Admin {
-    Reboot(fstatecontrol::RebootReason),
-    RebootToBootloader,
-    RebootToRecovery,
-    Poweroff,
-    Mexec,
-    SuspendToRam,
-}
-
 #[derive(Debug)]
 pub enum LeaseState {
     Acquired,
@@ -88,7 +73,6 @@ pub enum LeaseState {
 
 #[derive(Debug)]
 pub enum Signal {
-    Statecontrol(Admin),
     Sys2Shutdown(
         // The responder is held here to keep the current request and request stream alive, but is
         // not actively read, hence the 'dead_code' attribute.
@@ -125,59 +109,6 @@ async fn run_activity_governor(
             _ => unreachable!("Unexpected request to ActivityGovernor"),
         }
     }
-}
-
-async fn run_statecontrol_admin(
-    send_signals: mpsc::UnboundedSender<Signal>,
-    mut stream: fstatecontrol::AdminRequestStream,
-) {
-    info!("new connection to {}", fstatecontrol::AdminMarker::DEBUG_NAME);
-    async move {
-        match stream.try_next().await? {
-            Some(fstatecontrol::AdminRequest::PowerFullyOn { responder }) => {
-                // PowerFullyOn is unsupported
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
-            }
-            Some(fstatecontrol::AdminRequest::Reboot { reason, responder }) => {
-                info!("Reboot called");
-                send_signals.unbounded_send(Signal::Statecontrol(Admin::Reboot(reason)))?;
-                responder.send(Ok(()))?;
-            }
-            Some(fstatecontrol::AdminRequest::RebootToBootloader { responder }) => {
-                info!("RebootToBootloader called");
-                send_signals.unbounded_send(Signal::Statecontrol(Admin::RebootToBootloader))?;
-                responder.send(Ok(()))?;
-            }
-            Some(fstatecontrol::AdminRequest::RebootToRecovery { responder }) => {
-                info!("RebootToRecovery called");
-                send_signals.unbounded_send(Signal::Statecontrol(Admin::RebootToRecovery))?;
-                responder.send(Ok(()))?;
-            }
-            Some(fstatecontrol::AdminRequest::Poweroff { responder }) => {
-                info!("Poweroff called");
-                send_signals.unbounded_send(Signal::Statecontrol(Admin::Poweroff))?;
-                responder.send(Ok(()))?;
-            }
-            Some(fstatecontrol::AdminRequest::Mexec { responder, .. }) => {
-                info!("Mexec called");
-                send_signals.unbounded_send(Signal::Statecontrol(Admin::Mexec))?;
-                responder.send(Ok(()))?;
-            }
-            Some(fstatecontrol::AdminRequest::SuspendToRam { responder }) => {
-                info!("SuspendToRam called");
-                send_signals.unbounded_send(Signal::Statecontrol(Admin::SuspendToRam))?;
-                responder.send(Ok(()))?;
-            }
-            _ => (),
-        }
-        Ok(())
-    }
-    .unwrap_or_else(|e: anyhow::Error| {
-        // Note: the shim checks liveness by writing garbage data on its first connection and
-        // observing PEER_CLOSED, so we're expecting this warning to happen once.
-        warn!("couldn't run {}: {:?}", fstatecontrol::AdminMarker::DEBUG_NAME, e);
-    })
-    .await
 }
 
 async fn run_sys2_system_controller(

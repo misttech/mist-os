@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 from typing import AbstractSet, Dict, Iterable, Optional, Sequence
 
+import cl_utils
 import remotetool
 import reproxy_logs
 
@@ -339,7 +340,7 @@ def main(argv: Sequence[str]) -> int:
     # len(logs) == 2, enforced by _MAIN_ARG_PARSER.
 
     cfg_path = remotetool._REPROXY_CFG
-    reproxy_cfg = cl_util.read_config_file_lines(
+    reproxy_cfg = cl_utils.read_config_file_lines(
         cfg_path.read_text().splitlines()
     )
 

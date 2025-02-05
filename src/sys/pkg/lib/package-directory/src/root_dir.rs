@@ -9,9 +9,9 @@ use crate::{usize_to_u64_safe, Error, NonMetaStorageError};
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use fuchsia_pkg::MetaContents;
+use log::error;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::error;
 use vfs::common::send_on_open_with_error;
 use vfs::directory::entry::{EntryInfo, OpenRequest};
 use vfs::directory::immutable::connection::ImmutableConnection;
@@ -836,18 +836,6 @@ mod tests {
             ),
             Err(zx::Status::NOT_SUPPORTED)
         );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_open_unsets_posix_writable() {
-        let (_env, root_dir) = TestEnv::new().await;
-
-        let () = crate::verify_open_adjusts_flags(
-            root_dir,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE,
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await;
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

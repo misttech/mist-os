@@ -29,6 +29,11 @@
             to: "#pkg-cache",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: [ "#pkg-cache" ],
+        },
+        {
             protocol: "fuchsia.tracing.provider.Registry",
             from: "parent",
             to: "#pkg-cache",
@@ -72,14 +77,6 @@
             from: "#fshost",
             to: "#pkg-cache",
             availability: "optional",
-        },
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: "#pkg-cache",
         },
         {
             directory: "boot",

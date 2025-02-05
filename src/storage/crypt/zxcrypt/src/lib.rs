@@ -54,7 +54,7 @@ async fn unwrap_zxcrypt_key(policy: Policy, wrapped_key: &[u8]) -> Result<Vec<u8
             return Ok(unwrapped);
         }
     }
-    tracing::warn!("Failed to unwrap zxcrypt key!");
+    log::warn!("Failed to unwrap zxcrypt key!");
     Err(zx::Status::IO_DATA_INTEGRITY)
 }
 
@@ -90,9 +90,37 @@ async fn create_zxcrypt_key(policy: Policy) -> Result<([u8; 16], Vec<u8>, Vec<u8
 
         Ok(([0; 16], header_and_key, unwrapped_key))
     } else {
-        tracing::warn!("No keys sources to create zxcrypt key");
+        log::warn!("No keys sources to create zxcrypt key");
         Err(zx::Status::INTERNAL)
     }
+}
+
+pub async fn run_crypt_service(
+    policy: Policy,
+    mut stream: fidl_fuchsia_fxfs::CryptRequestStream,
+) -> Result<(), Error> {
+    while let Some(request) = stream.try_next().await? {
+        match request {
+            CryptRequest::CreateKey { responder, .. } => responder.send(
+                create_zxcrypt_key(policy)
+                    .await
+                    .as_ref()
+                    .map(|(id, w, u)| (id, &w[..], &u[..]))
+                    .map_err(|s| s.into_raw()),
+            )?,
+            CryptRequest::CreateKeyWithId { responder, .. } => {
+                responder.send(Err(zx::Status::BAD_PATH.into_raw()))?
+            }
+            CryptRequest::UnwrapKey { responder, key, .. } => responder.send(
+                unwrap_zxcrypt_key(policy, &key)
+                    .await
+                    .as_ref()
+                    .map(|u| &u[..])
+                    .map_err(|s| s.into_raw()),
+            )?,
+        }
+    }
+    Ok::<(), Error>(())
 }
 
 /// Runs `f` with a scoped crypt service instance.  The instance will be automatically terminated on
@@ -101,35 +129,8 @@ pub async fn with_crypt_service<R, Fut: Future<Output = Result<R, Error>>>(
     policy: Policy,
     f: impl FnOnce(ClientEnd<fidl_fuchsia_fxfs::CryptMarker>) -> Fut,
 ) -> Result<R, Error> {
-    let (crypt, mut stream) = create_request_stream::<fidl_fuchsia_fxfs::CryptMarker>();
-
-    // Run a crypt service to unwrap the zxcrypt keys.
-    let mut crypt_service = pin!(async {
-        while let Some(request) = stream.try_next().await? {
-            match request {
-                CryptRequest::CreateKey { responder, .. } => responder.send(
-                    create_zxcrypt_key(policy)
-                        .await
-                        .as_ref()
-                        .map(|(id, w, u)| (id, &w[..], &u[..]))
-                        .map_err(|s| s.into_raw()),
-                )?,
-                CryptRequest::CreateKeyWithId { responder, .. } => {
-                    responder.send(Err(zx::Status::BAD_PATH.into_raw()))?
-                }
-                CryptRequest::UnwrapKey { responder, key, .. } => responder.send(
-                    unwrap_zxcrypt_key(policy, &key)
-                        .await
-                        .as_ref()
-                        .map(|u| &u[..])
-                        .map_err(|s| s.into_raw()),
-                )?,
-            }
-        }
-        Ok::<(), Error>(())
-    }
-    .fuse());
-
+    let (crypt, stream) = create_request_stream::<fidl_fuchsia_fxfs::CryptMarker>();
+    let mut crypt_service = pin!(async { run_crypt_service(policy, stream).await }.fuse());
     let mut fut = pin!(f(crypt).fuse());
 
     loop {

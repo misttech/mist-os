@@ -71,18 +71,31 @@ fuchsia_test_component("server-component") {
   deps = [ ":server" ]
 }
 
-fuchsia_test_component("configurable-netstack-test") {
-  manifest = "meta/configurable-netstack-test.cml"
+fuchsia_test_component("configurable-netstack-test-ns2") {
+  manifest = "meta/configurable-netstack-test-ns2.cml"
   deps = [
     ":client-component",
     ":server-component",
-    "//src/connectivity/network/testing/netemul/configurable-netstack",
+    "//src/connectivity/network/testing/netemul/configurable-netstack:netstack2",
+    "//src/connectivity/network/testing/netemul/sync-manager",
+  ]
+}
+
+fuchsia_test_component("configurable-netstack-test-ns3") {
+  manifest = "meta/configurable-netstack-test-ns3.cml"
+  deps = [
+    ":client-component",
+    ":server-component",
+    "//src/connectivity/network/testing/netemul/configurable-netstack:netstack3",
     "//src/connectivity/network/testing/netemul/sync-manager",
   ]
 }
 
 fuchsia_test_package("configurable-netstack-tests") {
-  test_components = [ ":configurable-netstack-test" ]
+  test_components = [
+    ":configurable-netstack-test-ns2",
+    ":configurable-netstack-test-ns3",
+  ]
 }
 
 group("tests") {

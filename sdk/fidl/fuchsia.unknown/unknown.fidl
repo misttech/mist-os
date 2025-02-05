@@ -11,13 +11,13 @@ using zx;
 /// See the composing protocol's documentation for a description of
 /// connection-scoped state, if any.
 closed protocol Cloneable {
-    @available(replaced=NEXT, renamed="Clone")
+    @available(replaced=26, renamed="Clone")
     @selector("Clone")
     strict Clone2(resource struct {
         request server_end:Cloneable;
     });
 
-    @available(added=NEXT)
+    @available(added=26)
     strict Clone(resource struct {
         request server_end:Cloneable;
     });

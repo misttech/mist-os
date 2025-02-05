@@ -18,9 +18,6 @@ group("tests") {
   deps = [
     "abs_clock:tests",
     "affine:tests",
-    "async:tests",
-    "async-loop:tests",
-    "async-testing:tests",
     "bitmap:tests",
     "c:tests",
     "closure-queue:tests",
@@ -71,4 +68,9 @@ group("tests") {
     "zxtest:tests",
     "//zircon/third_party/ulib/lz4:tests",
   ]
+}
+
+group("e2e_tests") {
+  testonly = true
+  deps = [ "uart:e2e_tests" ]
 }

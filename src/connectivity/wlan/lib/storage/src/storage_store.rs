@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Error};
+use log::{error, info, warn};
 use std::collections::HashMap;
 use std::io::Write;
 use std::os::fd::AsRawFd;
-use tracing::{error, info, warn};
 use wlan_storage_constants::{FileContent, PersistentStorageData};
 
 type FileContents = HashMap<String, FileContent>;

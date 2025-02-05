@@ -55,7 +55,8 @@ impl<___T> MyProtocolClientSender<___T> for ::fidl_next::bind::ClientSender<___T
 }
 
 /// A client handler for the MyProtocol protocol.
-
+///
+/// See [`MyProtocol`] for more details.
 pub trait MyProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for MyProtocol
@@ -86,7 +87,8 @@ impl<___T> MyProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<___T
 }
 
 /// A server handler for the MyProtocol protocol.
-
+///
+/// See [`MyProtocol`] for more details.
 pub trait MyProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for MyProtocol

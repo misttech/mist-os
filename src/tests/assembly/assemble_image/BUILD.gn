@@ -18,6 +18,7 @@ if (is_host) {
       deps = [
         "assemble_image",
         "compiled_package:compiled_package_test",
+        "developer_overrides",
         "product_drivers",
         "structured_config",
       ]

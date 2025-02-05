@@ -5,8 +5,14 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_net") {
+  sdk_category = "not-yet-specified"
   edition = "2021"
-  args_deps = [ "//src/connectivity/network/net-cli:lib" ]
+  args_deps = [
+    "//src/connectivity/network/net-cli:lib",
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
+
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
@@ -15,6 +21,7 @@ ffx_plugin("ffx_net") {
     "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",
     "//sdk/fidl/fuchsia.net.filter.deprecated:fuchsia.net.filter.deprecated_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
+    "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
     "//sdk/fidl/fuchsia.net.name:fuchsia.net.name_rust",
     "//sdk/fidl/fuchsia.net.neighbor:fuchsia.net.neighbor_rust",
     "//sdk/fidl/fuchsia.net.root:fuchsia.net.root_rust",
@@ -24,6 +31,7 @@ ffx_plugin("ffx_net") {
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/connectivity/network/net-cli:lib",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",

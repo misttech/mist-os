@@ -12,10 +12,10 @@ use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_fs::directory;
 use fuchsia_runtime::{UtcDuration, UtcInstant};
 use futures::{select, StreamExt, TryFutureExt};
+use log::{debug, error, warn};
 use std::path::PathBuf;
 use std::pin::pin;
 use thiserror::Error;
-use tracing::{debug, error, warn};
 use {fidl_fuchsia_hardware_rtc as frtc, fidl_fuchsia_io as fio};
 #[cfg(test)]
 use {fuchsia_sync::Mutex, std::sync::Arc};

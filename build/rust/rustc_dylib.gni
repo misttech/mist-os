@@ -64,9 +64,8 @@ import("//build/rust/rustc_test.gni")
 #
 #   source_root (optional)
 #     Location of the crate root (e.g. `src/main.rs` or `src/lib.rs`).
-#     This defaults to `./src/main.rs` for binaries and `./src/lib.rs` for libraries,
-#     and should only be changed when absolutely necessary
-#     (such as in the case of generated code).
+#     This defaults to `./src/lib.rs` and should only be changed when absolutely
+#     necessary (such as in the case of generated code).
 #
 #   features (optional)
 #     A list of conditional compilation flags to enable. This can be used to set features for crates
@@ -111,30 +110,36 @@ template("rustc_dylib") {
       if (defined(invoker.name)) {
         name = invoker.name + "_dylib_test"
       }
-      original_target_name = target_name
+      original_target_name = _original_target_name
       forward_variables_from(invoker, "*", [ "name" ])
     }
   }
 
-  if (defined(invoker.source_root)) {
-    source_root = invoker.source_root
-  } else {
-    source_root = "src/lib.rs"
-  }
-
-  if (defined(invoker.name)) {
-    package_name = invoker.name
-  } else {
-    package_name = target_name
-  }
-  _crate_name = string_replace(package_name, "-", "_")
-
   rustc_artifact(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "disable_clippy",
+                             "disable_rbe",
+                             "edition",
+                             "enforce_source_listing",
+                             "features",
+                             "inputs",
+                             "sources",
+                           ])
+
     target_type = "shared_library"
-    crate_root = source_root
     rust_crate_type = "dylib"
-    crate_name = _crate_name
+    crate_root = "src/lib.rs"
+    if (defined(invoker.source_root)) {
+      crate_root = source_root
+    }
+    crate_name = target_name
+    if (defined(invoker.name)) {
+      crate_name = name
+    }
     original_target_name = _original_target_name
+
     pass_through = {
       forward_variables_from(invoker,
                              [
@@ -157,36 +162,12 @@ template("rustc_dylib") {
           "Specifying root_out_dir as the output_dir of a Rust dylib is unsupported. Choose a directory that won't have libraries of the same name from other languages.")
 
       # TODO: maybe just use target_name instead?
-      output_name = _crate_name
+      output_name = crate_name
       crate_type = "dylib"
-
-      # TODO(https://fxbug.dev/42069148): Remove "--undefined-version" logic when
-      # issue resolved upstream.
-      if (is_fuchsia || is_mistos) {
-        rustflags = [ "-Clink-arg=--undefined-version" ]
-      } else if (is_linux) {
-        rustflags = [ "-Clink-arg=-Wl,--undefined-version" ]
-      }
     }
 
     configs = []
     configs = invoker.configs
-
-    deps = []
-    if (defined(invoker.deps)) {
-      deps += invoker.deps
-    }
-
-    forward_variables_from(invoker,
-                           [
-                             "disable_rbe",
-                             "disable_clippy",
-                             "edition",
-                             "enforce_source_listing",
-                             "features",
-                             "inputs",
-                             "sources",
-                           ])
 
     # Avoid walking into data_deps when checking component manifest expected includes.
     metadata = {

@@ -97,11 +97,9 @@ TEST_F(DisplayPowerManagerMockTest, Ok) {
     bool callback_executed = false;
     std::thread set_display_power_thread([&callback_executed, this] {
       display_power_manager()->SetDisplayPower(
-          /* power_on */ false,
-          [&callback_executed](
-              fuchsia::ui::display::internal::DisplayPower_SetDisplayPower_Result result) {
+          /* power_on */ false, [&callback_executed](fit::result<zx_status_t> result) {
             callback_executed = true;
-            EXPECT_TRUE(result.is_response());
+            EXPECT_TRUE(result.is_ok());
           });
     });
 
@@ -118,11 +116,9 @@ TEST_F(DisplayPowerManagerMockTest, Ok) {
     bool callback_executed = false;
     std::thread set_display_power_thread([&callback_executed, this] {
       display_power_manager()->SetDisplayPower(
-          /* power_on */ true,
-          [&callback_executed](
-              fuchsia::ui::display::internal::DisplayPower_SetDisplayPower_Result result) {
+          /* power_on */ true, [&callback_executed](fit::result<zx_status_t> result) {
             callback_executed = true;
-            EXPECT_TRUE(result.is_response());
+            EXPECT_TRUE(result.is_ok());
           });
     });
 
@@ -156,12 +152,10 @@ TEST_F(DisplayPowerManagerMockTest, NoDisplay) {
     bool callback_executed = false;
     std::thread set_display_power_thread([&callback_executed, this] {
       display_power_manager()->SetDisplayPower(
-          /* power_on */ false,
-          [&callback_executed](
-              fuchsia::ui::display::internal::DisplayPower_SetDisplayPower_Result result) {
+          /* power_on */ false, [&callback_executed](fit::result<zx_status_t> result) {
             callback_executed = true;
-            ASSERT_TRUE(result.is_err());
-            EXPECT_EQ(result.err(), ZX_ERR_NOT_FOUND);
+            ASSERT_TRUE(result.is_error());
+            EXPECT_EQ(result.error_value(), ZX_ERR_NOT_FOUND);
           });
     });
 
@@ -197,12 +191,10 @@ TEST_F(DisplayPowerManagerMockTest, NotSupported) {
     bool callback_executed = false;
     std::thread set_display_power_thread([&callback_executed, this] {
       display_power_manager()->SetDisplayPower(
-          /* power_on */ false,
-          [&callback_executed](
-              fuchsia::ui::display::internal::DisplayPower_SetDisplayPower_Result result) {
+          /* power_on */ false, [&callback_executed](fit::result<zx_status_t> result) {
             callback_executed = true;
-            EXPECT_TRUE(result.is_err());
-            EXPECT_EQ(result.err(), ZX_ERR_NOT_SUPPORTED);
+            EXPECT_TRUE(result.is_error());
+            EXPECT_EQ(result.error_value(), ZX_ERR_NOT_SUPPORTED);
           });
     });
 

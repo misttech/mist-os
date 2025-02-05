@@ -24,6 +24,11 @@
             availability: "optional",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: [ "#base-drivers" ],
+        },
+        {
             protocol: "fuchsia.kernel.InfoResource",
             from: "parent",
             to: "#base-drivers",
@@ -63,6 +68,9 @@
             to: "#base-drivers",
             source_availability: "unknown",
         },
+
+        // TODO(https://fxbug.dev/345827642): remove once OOT drivers are using these protocols from
+        // the diagnostics dictionary themselves.
         {
             protocol: [
                 "fuchsia.inspect.InspectSink",
@@ -71,22 +79,25 @@
             from: "#archivist",
             to: "#base-drivers",
         },
-        {
-            protocol: [ "fuchsia.power.system.ActivityGovernor" ],
-            from: "#system-activity-governor",
-            to: "#base-drivers",
 
-            // system-activity-governor depends on the suspend HAL but not all
-            // drivers depend on system-activity-governor.
-            // Weak to resolve dependency cycles.
-            dependency: "weak",
-            source_availability: "unknown",
-        },
-        {
-            protocol: [ "fuchsia.power.broker.Topology" ],
-            from: "#power-broker",
-            to: "#base-drivers",
-        },
+        // TODO(https://fxbug.dev/369189827): Route these statically again when the dictionary
+        // can override them.
+        // {
+        //     protocol: [ "fuchsia.power.system.ActivityGovernor" ],
+        //     from: "#system-activity-governor",
+        //     to: "#base-drivers",
+
+        //     // system-activity-governor depends on the suspend HAL but not all
+        //     // drivers depend on system-activity-governor.
+        //     // Weak to resolve dependency cycles.
+        //     dependency: "weak",
+        //     source_availability: "unknown",
+        // },
+        // {
+        //     protocol: [ "fuchsia.power.broker.Topology" ],
+        //     from: "#power-broker",
+        //     to: "#base-drivers",
+        // },
         {
             protocol: "fuchsia.component.resolution.Resolver",
             from: "#pkg-cache",

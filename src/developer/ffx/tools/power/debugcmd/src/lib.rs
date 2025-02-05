@@ -5,8 +5,9 @@
 use async_trait::async_trait;
 use errors::ffx_error;
 use ffx_power_debugcmd_args::PowerManagerDebugCommand;
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_power_manager_debug as fdebug;
+use target_holders::moniker;
 
 #[derive(FfxTool)]
 pub struct DebugCmdTool {
@@ -49,6 +50,8 @@ async fn debugcmd(proxy: fdebug::DebugProxy, cmd: PowerManagerDebugCommand) -> f
 
 #[cfg(test)]
 mod tests {
+    use target_holders::fake_proxy;
+
     use super::*;
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -59,7 +62,7 @@ mod tests {
             args: vec!["test_arg_1".to_string(), "test_arg_2".to_string()],
         };
 
-        let debug_proxy = fho::testing::fake_proxy(move |req| match req {
+        let debug_proxy = fake_proxy(move |req| match req {
             fdebug::DebugRequest::Message { node_name, command, args, responder, .. } => {
                 assert_eq!(node_name, "test_node_name");
                 assert_eq!(command, "test_command");

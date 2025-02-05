@@ -54,7 +54,7 @@ enum thread_state : uint8_t {
 // This yields roughly 10% bandwidth difference between adjacent priorities.
 //
 // Weights should not be negative, however, the value is signed for consistency
-// with zx_time_t (SchedTime) and zx_duration_t (SchedDuration), which are the
+// with zx_instant_mono_t (SchedTime) and zx_duration_mono_t (SchedDuration), which are the
 // primary types used in conjunction with SchedWeight. This is to make it less
 // likely that expressions involving weights are accidentally promoted to
 // unsigned.
@@ -76,8 +76,8 @@ using SchedUtilization = ffl::Fixed<int64_t, 20>;
 
 // Fixed-point types wrapping time and duration types to make time expressions
 // cleaner in the scheduler code.
-using SchedDuration = ffl::Fixed<zx_duration_t, 0>;
-using SchedTime = ffl::Fixed<zx_time_t, 0>;
+using SchedDuration = ffl::Fixed<zx_duration_mono_t, 0>;
+using SchedTime = ffl::Fixed<zx_instant_mono_t, 0>;
 
 namespace internal {
 // Conversion table entry. Scales the integer argument to a fixed-point weight
@@ -402,10 +402,10 @@ class SchedulerState {
   uint64_t generation() const { return generation_; }
   uint64_t flow_id() const { return flow_id_; }
 
-  zx_time_t last_started_running() const { return last_started_running_.raw_value(); }
-  zx_duration_t time_slice_ns() const { return time_slice_ns_.raw_value(); }
-  zx_duration_t runtime_ns() const { return runtime_ns_.raw_value(); }
-  zx_duration_t expected_runtime_ns() const { return expected_runtime_ns_.raw_value(); }
+  zx_instant_mono_t last_started_running() const { return last_started_running_.raw_value(); }
+  zx_duration_mono_t time_slice_ns() const { return time_slice_ns_.raw_value(); }
+  zx_duration_mono_t runtime_ns() const { return runtime_ns_.raw_value(); }
+  zx_duration_mono_t expected_runtime_ns() const { return expected_runtime_ns_.raw_value(); }
 
   const SchedTime start_time() const { return start_time_; }
   const SchedTime finish_time() const { return finish_time_; }

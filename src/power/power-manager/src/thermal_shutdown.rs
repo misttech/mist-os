@@ -8,7 +8,6 @@ use crate::log_if_err;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::platform_metrics::PlatformMetric;
-use crate::shutdown_request::{RebootReason, ShutdownRequest};
 use crate::temperature_handler::TemperatureFilter;
 use crate::types::{Celsius, Seconds};
 use anyhow::{format_err, Error};
@@ -171,12 +170,9 @@ impl ThermalShutdown {
                 self.send_message(&self.platform_metrics_node, &msg).await,
                 format!("Failed to log platform metric {:?}", msg)
             );
-            self.send_message(
-                &self.system_shutdown_node,
-                &Message::SystemShutdown(ShutdownRequest::Reboot(RebootReason::HighTemperature)),
-            )
-            .await
-            .map_err(|e| format_err!("Failed to shut down the system: {}", e))?;
+            self.send_message(&self.system_shutdown_node, &Message::HighTemperatureReboot)
+                .await
+                .map_err(|e| format_err!("Failed to shut down the system: {}", e))?;
         }
 
         Ok(())
@@ -238,10 +234,7 @@ mod tests {
         );
         let shutdown_node = mock_maker.make(
             "Shutdown",
-            vec![(
-                msg_eq!(SystemShutdown(ShutdownRequest::Reboot(RebootReason::HighTemperature))),
-                msg_ok_return!(SystemShutdown),
-            )],
+            vec![(msg_eq!(HighTemperatureReboot), msg_ok_return!(SystemShutdown))],
         );
 
         let node_futures = FuturesUnordered::new();
@@ -268,10 +261,7 @@ mod tests {
             ),
             mock_maker.make(
                 "Shutdown",
-                vec![(
-                    msg_eq!(SystemShutdown(ShutdownRequest::Reboot(RebootReason::HighTemperature))),
-                    msg_ok_return!(SystemShutdown),
-                )],
+                vec![(msg_eq!(HighTemperatureReboot), msg_ok_return!(SystemShutdown))],
             ),
             mock_maker.make(
                 "Metrics",

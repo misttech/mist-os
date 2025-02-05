@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use log::debug;
 use objects::ObexObjectError as Error;
-use tracing::debug;
 
 pub mod event_report;
 pub mod messages_listing;

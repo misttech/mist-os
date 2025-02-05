@@ -290,7 +290,7 @@ impl DeviceStorage {
         setting_key: String,
         err: String,
     ) {
-        tracing::error!("Failed to flush to stash: {:?}", err);
+        log::error!("Failed to flush to stash: {:?}", err);
 
         // Record the write failure to inspect.
         inspect_handle.lock().await.record_flush_failure(setting_key);
@@ -432,7 +432,7 @@ impl DeviceStorage {
         let (mut cached_storage, update) = self.get_inner(T::KEY).await;
         if let Some(update) = update {
             cached_storage.current_data = Some(update.and_then(|string_value| {
-                T::try_deserialize_from(&string_value).map(|val| Box::new(val) as Box<TypeErasedData>).map_err(|e| tracing::error!(
+                T::try_deserialize_from(&string_value).map(|val| Box::new(val) as Box<TypeErasedData>).map_err(|e| log::error!(
                     "Using default. Failed to deserialize type {}: {e:?}\nSource data: {string_value:?}",
                     T::KEY
                 )).ok()

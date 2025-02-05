@@ -11,7 +11,7 @@ use blocking::Unblock;
 use ffx_audio_device_args::{DeviceCommand, RecordCommand, SetCommand, SetSubCommand, SubCommand};
 use ffx_command_error::{user_error, Result};
 use ffx_optional_moniker::{exposed_dir, optional_moniker};
-use fho::{moniker, FfxContext, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{FfxContext, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl::endpoints::{create_proxy, ServerEnd};
 use fidl::HandleBased;
 use fuchsia_audio::device::Selector;
@@ -19,6 +19,7 @@ use fuchsia_audio::Registry;
 use futures::{AsyncWrite, FutureExt};
 use serde::Serialize;
 use std::io::{Read, Write};
+use target_holders::moniker;
 use zx_status::Status;
 use {
     fidl_fuchsia_audio_controller as fac, fidl_fuchsia_audio_device as fadevice,
@@ -370,11 +371,11 @@ async fn device_set(
 mod tests {
     use super::*;
     use ffx_audio_common::tests::SINE_WAV;
-    use ffx_core::macro_deps::futures::AsyncWriteExt;
     use ffx_writer::{SimpleWriter, TestBuffer, TestBuffers};
     use fuchsia_audio::device::DevfsSelector;
     use fuchsia_audio::format::SampleType;
     use fuchsia_audio::Format;
+    use futures::AsyncWriteExt;
     use std::fs;
     use std::os::unix::fs::PermissionsExt;
     use tempfile::TempDir;

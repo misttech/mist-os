@@ -21,6 +21,7 @@ if (is_host) {
       "//third_party/rust_crates:heck",
       "//third_party/rust_crates:serde",
       "//third_party/rust_crates:serde_json",
+      "//third_party/rust_crates:serde_json5",
       "//third_party/rust_crates:structopt",
       "//third_party/rust_crates:thiserror",
       "//third_party/rust_crates:tokio",
@@ -33,11 +34,13 @@ if (is_host) {
     ]
 
     sources = [
+      "src/env.rs",
       "src/errors.rs",
       "src/main.rs",
       "src/opts.rs",
       "src/params.rs",
       "src/run_tests.rs",
+      "src/schema.rs",
       "src/test_config.rs",
     ]
   }

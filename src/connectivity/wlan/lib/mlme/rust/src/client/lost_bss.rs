@@ -45,12 +45,6 @@ impl LostBssCounter {
     pub fn add_beacon_interval(&mut self, beacon_intervals_since_last_timeout: u32) {
         self.time_since_last_beacon += self.beacon_period * beacon_intervals_since_last_timeout;
     }
-
-    /// add_time() is used to record any time that is shorter than a full status check interval.
-    /// (typically when the client goes off-channel to scan while associated).
-    pub fn add_time(&mut self, time: zx::MonotonicDuration) {
-        self.time_since_last_beacon += time;
-    }
 }
 
 #[cfg(test)]
@@ -85,37 +79,6 @@ mod tests {
         // Verify that calling `handle_timeout` at originally scheduled time would not
         // return false, indicating no auto-deauth yet
         counter.add_beacon_interval(1);
-        assert!(!counter.should_deauthenticate());
-        // But if no beacon is received in timeout + 1 intervals, auto-deauth will trigger
-        counter.add_beacon_interval(TEST_TIMEOUT_BCN_COUNT - 1);
-        assert!(counter.should_deauthenticate());
-    }
-
-    #[test]
-    fn test_add_time_uninterrupted() {
-        let mut counter = LostBssCounter::start(TEST_BEACON_PERIOD, TEST_TIMEOUT_BCN_COUNT);
-        // about to timeout but not yet.
-        counter.add_time(
-            TEST_BEACON_PERIOD * TEST_TIMEOUT_BCN_COUNT - zx::MonotonicDuration::from_nanos(1),
-        );
-        assert!(!counter.should_deauthenticate());
-        // any more time will trigger auto deauth
-        counter.add_time(zx::MonotonicDuration::from_nanos(1));
-        assert!(counter.should_deauthenticate());
-    }
-
-    #[test]
-    fn test_add_time_beacon_received() {
-        let mut counter = LostBssCounter::start(TEST_BEACON_PERIOD, TEST_TIMEOUT_BCN_COUNT);
-        counter.add_beacon_interval(TEST_TIMEOUT_BCN_COUNT - 1);
-        assert!(!counter.should_deauthenticate());
-
-        // Beacon received some time later, resetting the timeout.
-        counter.reset();
-
-        // Verify that calling `handle_timeout` at originally scheduled time would not
-        // return false, indicating no auto-deauth yet
-        counter.add_time(TEST_BEACON_PERIOD);
         assert!(!counter.should_deauthenticate());
         // But if no beacon is received in timeout + 1 intervals, auto-deauth will trigger
         counter.add_beacon_interval(TEST_TIMEOUT_BCN_COUNT - 1);

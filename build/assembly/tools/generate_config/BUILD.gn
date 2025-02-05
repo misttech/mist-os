@@ -1,0 +1,28 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+assert(is_host, "This tool is only applicable on the host toolchain")
+
+import("//build/rust/rustc_binary.gni")
+import("//build/sdk/sdk_host_tool.gni")
+
+rustc_binary("generate_config") {
+  edition = "2021"
+  sources = [ "src/main.rs" ]
+  output_name = "assembly_generate_config"
+  deps = [
+    "//src/lib/assembly/config_schema",
+    "//src/lib/assembly/container",
+    "//src/sys/pkg/lib/fuchsia-pkg",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:camino",
+  ]
+}
+
+sdk_host_tool("generate_config_sdk") {
+  category = "partner"
+  output_name = "assembly_generate_config"
+  deps = [ ":generate_config" ]
+}

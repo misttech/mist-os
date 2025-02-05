@@ -25,6 +25,7 @@ def _execute_test(
     driver: base.BaseDriver,
     python_path: str,
     test_path: str,
+    test_cases: Optional[list[str]] = None,
     timeout_sec: Optional[int] = None,
     verbose: bool = False,
     hermetic: bool = False,
@@ -37,6 +38,7 @@ def _execute_test(
       driver: The environment-specific Mobly driver to use for test execution.
       python_path: path to the Python runtime for to use.
       test_path: path to the Mobly test executable to run.
+      test_cases: The set of cases to run. If None, all methods in test are run.
       timeout_sec: Number of seconds before a test is killed due to timeout.
         If set to None, timeout is not enforced.
       verbose: Whether to enable verbose output from the mobly test.
@@ -60,6 +62,8 @@ def _execute_test(
 
         cmd = [] if hermetic else [python_path]
         cmd += [test_path, "-c", tmp_config.name]
+        if test_cases:
+            cmd += ["--test_case"] + test_cases
         if verbose:
             cmd.append("-v")
         cmd_str = " ".join(cmd)
@@ -108,6 +112,7 @@ def run(
     driver: base.BaseDriver,
     python_path: str,
     test_path: str,
+    test_cases: Optional[list[str]] = None,
     timeout_sec: Optional[int] = None,
     verbose: bool = False,
     hermetic: bool = False,
@@ -122,6 +127,7 @@ def run(
       driver: The environment-specific Mobly driver to use for test execution.
       python_path: path to the Python runtime to use for test execution.
       test_path: path to the Mobly test executable to run.
+      test_cases: The set of cases to run. If None, all methods in test are run.
       timeout_sec: Number of seconds before a test is killed due to timeout.
           If None, timeout is not enforced.
       verbose: Whether to enable verbose output from the mobly test.
@@ -149,6 +155,7 @@ def run(
             test_path=test_path,
             driver=driver,
             timeout_sec=timeout_sec,
+            test_cases=test_cases,
             verbose=verbose,
             hermetic=hermetic,
         )

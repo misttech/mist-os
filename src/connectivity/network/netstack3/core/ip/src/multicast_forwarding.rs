@@ -519,7 +519,7 @@ mod testutil {
             _bindings_ctx: &mut FakeBindingsCtx<I, D>,
             device_id: &D,
             destination: IpPacketDestination<I, &D>,
-            _ip_layer_metadata: DeviceIpLayerMetadata,
+            _ip_layer_metadata: DeviceIpLayerMetadata<FakeBindingsCtx<I, D>>,
             _body: S,
             _egress_proof: ProofOfEgressCheck,
         ) -> Result<(), netstack3_base::SendFrameError<S>>

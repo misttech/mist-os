@@ -16,8 +16,10 @@
 #include <zircon/rights.h>
 
 #include <cstdint>
+#include <iomanip>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 
 #include <fbl/intrusive_wavl_tree.h>
@@ -83,21 +85,49 @@ struct ScannedBlock : public fbl::WAVLTreeContainable<std::unique_ptr<ScannedBlo
   BlockIndex GetKey() const { return index; }
 };
 
-// Helper to just print blocks, return empty string to allow triggering as part of context for an
-// assertion.
-std::string print_block(const Block* block) {
-  hexdump8(block, sizeof(Block));
-  return "";
+union BlockToByte {
+  Block b;
+  std::uint8_t bytes[sizeof(Block)];
+};
+
+std::string block_to_hex_str(const Block* block) {
+  BlockToByte coerce{*block};
+  std::stringstream ret;
+  ret << "[ ";
+  for (std::uint64_t i = 0; i < sizeof(Block); i++) {
+    if (coerce.bytes[i] == '\0') {
+      ret << "00";
+      if (i < sizeof(Block) - 1) {
+        ret << ", ";
+      }
+    } else {
+      ret << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(coerce.bytes[i]);
+      if (i < sizeof(Block) - 1) {
+        ret << ", ";
+      }
+    }
+  }
+  ret << " ]";
+  return ret.str();
 }
 
-void CompareBlock(const Block* actual, const Block expected) {
+/// Compare two blocks and fail if they are not equal
+///
+/// actual: const Block*
+/// expected: const Block
+///
+/// This is a macro so that it can generate a failure message with the real line number
+#define CompareBlock(actual, expected) __CompareBlock(actual, expected, __LINE__)
+
+void __CompareBlock(const Block* actual, const Block expected, int line) {
   if (memcmp((const uint8_t*)(&expected), (const uint8_t*)(actual), sizeof(Block)) != 0) {
-    std::cout << "Block header contents did not match. Expected BlockType: "
-              << static_cast<int>(GetType(&expected)) << ". "
-              << "Actual BlockType: " << static_cast<int>(GetType(actual)) << std::endl;
-    std::cout << "Expected: " << print_block(&expected) << std::endl;
-    std::cout << "Actual:   " << print_block(actual) << std::endl;
-    EXPECT_TRUE(false);
+    const std::string failure_msg =
+        "Block header contents did not match. Expected BlockType: " +
+        std::to_string(static_cast<int>(GetType(&expected))) + ". " +
+        "Actual BlockType: " + std::to_string(static_cast<int>(GetType(actual))) + "\n" +
+        "Expected: " + block_to_hex_str(&expected) + "\n" +
+        "Actual:   " + block_to_hex_str(actual) + "\n";
+    ADD_FAILURE("actual failure at %s:%d\n%s", __FILE__, line, failure_msg.c_str());
   }
 }
 
@@ -280,7 +310,7 @@ TEST(State, CreateAndFreeStringReference) {
   ASSERT_TRUE(snapshot);
 
   BlockIndex idx;
-  auto sr = inspect::StringReference("abcdefg");
+  std::string_view sr("abcdefg");
   ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(sr, &idx));
   ASSERT_EQ("abcdefg", TesterLoadStringReference(*state, idx));
 
@@ -299,20 +329,17 @@ TEST(State, CreateSeveralStringReferences) {
   ASSERT_TRUE(state != nullptr);
 
   const auto one = std::string(150, '1');
-  const auto one_ref = inspect::StringReference(one.c_str());
   const auto two = std::string(150, '2');
-  const auto two_ref = inspect::StringReference(two.c_str());
   const auto three = std::string(200, '3');
-  const auto three_ref = inspect::StringReference(three.c_str());
-
-  ASSERT_NE(one_ref.ID(), two_ref.ID());
-  ASSERT_NE(two_ref.ID(), three_ref.ID());
-  ASSERT_NE(one_ref.ID(), three_ref.ID());
 
   BlockIndex idx1, idx2, idx3;
-  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(one_ref, &idx1));
-  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(two_ref, &idx2));
-  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(three_ref, &idx3));
+  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(one, &idx1));
+  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(two, &idx2));
+  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(three, &idx3));
+
+  ASSERT_NE(idx1, idx2);
+  ASSERT_NE(idx1, idx3);
+  ASSERT_NE(idx2, idx3);
 
   ASSERT_EQ(one, TesterLoadStringReference(*state, idx1));
   ASSERT_EQ(two, TesterLoadStringReference(*state, idx2));
@@ -335,8 +362,7 @@ TEST(State, CreateLargeStringReference) {
   BlockIndex idx;
   std::string data(6000, '.');
 
-  auto sr = inspect::StringReference(data.c_str());
-  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(sr, &idx));
+  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(data, &idx));
   ASSERT_EQ(data, TesterLoadStringReference(*state, idx));
 
   fbl::WAVLTree<BlockIndex, std::unique_ptr<ScannedBlock>> blocks2;
@@ -365,8 +391,7 @@ TEST(State, CreateAndFreeFromSameReference) {
   BlockIndex idx2;
   std::string data(3000, '.');
 
-  auto sr2 = inspect::StringReference(data.c_str());
-  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(sr2, &idx2));
+  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(data, &idx2));
   ASSERT_EQ(data, TesterLoadStringReference(*state, idx2));
 
   fbl::WAVLTree<BlockIndex, std::unique_ptr<ScannedBlock>> blocks2;
@@ -379,7 +404,7 @@ TEST(State, CreateAndFreeFromSameReference) {
 
   // CreateStringReferenceWithCount will bump the reference count
   BlockIndex should_be_same;
-  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(sr2, &should_be_same));
+  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(data, &should_be_same));
   ASSERT_EQ(data, TesterLoadStringReference(*state, idx2));
   ASSERT_EQ(data, TesterLoadStringReference(*state, should_be_same));
   ASSERT_EQ(idx2, should_be_same);
@@ -397,7 +422,7 @@ TEST(State, CreateAndFreeFromSameReference) {
   state->ReleaseStringReference(should_be_same);
 
   // After release, this causes a re-allocation
-  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(sr2, &idx2));
+  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(data, &idx2));
   ASSERT_EQ(data, TesterLoadStringReference(*state, idx2));
 
   fbl::WAVLTree<BlockIndex, std::unique_ptr<ScannedBlock>> blocks4;
@@ -1008,12 +1033,30 @@ TEST(State, CreateExponentialHistogramChildren) {
   }
 }
 
+TEST(State, StringPropertiesInternValues) {
+  auto state = InitState(4096);
+  ASSERT_TRUE(state != NULL);
+
+  const auto p1 = state->CreateStringProperty("a", 0, "b");
+  const auto p2 = state->CreateStringProperty("b", 0, "a");
+
+  fbl::WAVLTree<BlockIndex, std::unique_ptr<ScannedBlock>> blocks;
+  size_t free_blocks, allocated_blocks;
+  auto snapshot = SnapshotAndScan(state->GetVmo(), &blocks, &free_blocks, &allocated_blocks);
+  ASSERT_TRUE(snapshot);
+
+  ASSERT_EQ(ValueBlockFields::NameIndex::Get<BlockIndex>(blocks.find(2)->block->header),
+            PropertyBlockPayload::ExtentIndex::Get<BlockIndex>(blocks.find(5)->block->payload.u64));
+  ASSERT_EQ(ValueBlockFields::NameIndex::Get<BlockIndex>(blocks.find(5)->block->header),
+            PropertyBlockPayload::ExtentIndex::Get<BlockIndex>(blocks.find(2)->block->payload.u64));
+}
+
 TEST(State, CreateSmallProperties) {
   auto state = InitState(4096);
   ASSERT_TRUE(state != NULL);
 
   std::vector<uint8_t> temp = {'8', '8', '8', '8', '8', '8', '8', '8'};
-  StringProperty a = state->CreateStringProperty("a", 0, "Hello");
+  StringProperty a = state->CreateStringProperty("a", 0, "abcd");
   ByteVectorProperty b = state->CreateByteVectorProperty("b", 0, temp);
 
   fbl::WAVLTree<BlockIndex, std::unique_ptr<ScannedBlock>> blocks;
@@ -1021,9 +1064,8 @@ TEST(State, CreateSmallProperties) {
   auto snapshot = SnapshotAndScan(state->GetVmo(), &blocks, &free_blocks, &allocated_blocks);
   ASSERT_TRUE(snapshot);
 
-  // Header (1), 2 single extent properties (6)
-  EXPECT_EQ(1u + 6u, allocated_blocks);
-  EXPECT_EQ(5u, free_blocks);
+  // Header, 3x STRING_REFERENCE, 1x EXTENT, 2x BUFFER_VALUE
+  EXPECT_EQ(7u, allocated_blocks);
 
   CompareBlock(blocks.find(0)->block, MakeHeader(4));
   EXPECT_EQ(inspect::internal::GetHeaderVmoSize(blocks.find(0)->block), state->GetStats().size);
@@ -1032,12 +1074,10 @@ TEST(State, CreateSmallProperties) {
   CompareBlock(blocks.find(2)->block,
                MakeBlock(ValueBlockFields::Type::Make(BlockType::kBufferValue) |
                              ValueBlockFields::NameIndex::Make(3),
-                         PropertyBlockPayload::ExtentIndex::Make(4) |
-                             PropertyBlockPayload::TotalLength::Make(5)));
+                         PropertyBlockPayload::Flags::Make(PropertyBlockFormat::kStringReference) |
+                             PropertyBlockPayload::ExtentIndex::Make(4)));
   CompareBlock(blocks.find(3)->block, MakeInlinedOrder0StringReferenceBlock("a"));
-
-  CompareBlock(blocks.find(4)->block,
-               MakeBlock(ExtentBlockFields::Type::Make(BlockType::kExtent), "Hello\0\0\0"));
+  CompareBlock(blocks.find(4)->block, MakeInlinedOrder0StringReferenceBlock("abcd"));
 
   // Property b fits in the next 3 blocks (value, name, extent).
 
@@ -1064,8 +1104,7 @@ TEST(State, CreateLargeSingleExtentProperties) {
   for (int i = 0; i < 2040; i++) {
     contents.push_back(input[i % input_size]);
   }
-  std::string str_contents(reinterpret_cast<const char*>(contents.data()), 2040);
-  StringProperty a = state->CreateStringProperty("a", 0, str_contents);
+
   ByteVectorProperty b = state->CreateByteVectorProperty("b", 0, contents);
 
   fbl::WAVLTree<BlockIndex, std::unique_ptr<ScannedBlock>> blocks;
@@ -1073,38 +1112,20 @@ TEST(State, CreateLargeSingleExtentProperties) {
   auto snapshot = SnapshotAndScan(state->GetVmo(), &blocks, &free_blocks, &allocated_blocks);
   ASSERT_TRUE(snapshot);
 
-  // Header (1), 2 single extent properties (6)
-  EXPECT_EQ(1u + 6u, allocated_blocks);
-  EXPECT_EQ(6u, free_blocks);
+  // Header, 1x STRING_REFERENCE, 1x BUFFER_VALUE, 1x EXTENT
+  EXPECT_EQ(4u, allocated_blocks);
 
-  CompareBlock(blocks.find(0)->block, MakeHeader(4));
+  CompareBlock(blocks.find(0)->block, MakeHeader(2));
   EXPECT_EQ(inspect::internal::GetHeaderVmoSize(blocks.find(0)->block), state->GetStats().size);
 
-  // Property a has the first 2 blocks for value and name, but needs a large block for the
-  // contents.
   CompareBlock(blocks.find(2)->block,
                MakeBlock(ValueBlockFields::Type::Make(BlockType::kBufferValue) |
                              ValueBlockFields::NameIndex::Make(3),
                          PropertyBlockPayload::ExtentIndex::Make(128) |
+                             PropertyBlockPayload::Flags::Make(PropertyBlockFormat::kBinary) |
                              PropertyBlockPayload::TotalLength::Make(2040)));
-  CompareBlock(blocks.find(3)->block, MakeInlinedOrder0StringReferenceBlock("a"));
+  CompareBlock(blocks.find(3)->block, MakeInlinedOrder0StringReferenceBlock("b"));
   CompareBlock(blocks.find(128)->block,
-               MakeBlock(ExtentBlockFields::Type::Make(BlockType::kExtent) |
-                             ExtentBlockFields::Order::Make(kNumOrders - 1),
-                         "abcdefga"));
-  EXPECT_EQ(0, memcmp(blocks.find(128)->block->payload.data, contents.data(), 2040));
-
-  // Property b has the next 2 blocks at the beginning for its value and name, but it claims
-  // another large block for the extent.
-
-  CompareBlock(blocks.find(4)->block,
-               MakeBlock(ValueBlockFields::Type::Make(BlockType::kBufferValue) |
-                             ValueBlockFields::NameIndex::Make(5),
-                         PropertyBlockPayload::ExtentIndex::Make(256) |
-                             PropertyBlockPayload::TotalLength::Make(2040) |
-                             PropertyBlockPayload::Flags::Make(PropertyBlockFormat::kBinary)));
-  CompareBlock(blocks.find(5)->block, MakeInlinedOrder0StringReferenceBlock("b"));
-  CompareBlock(blocks.find(256)->block,
                MakeBlock(ExtentBlockFields::Type::Make(BlockType::kExtent) |
                              ExtentBlockFields::Order::Make(kNumOrders - 1),
                          "abcdefga"));
@@ -1117,11 +1138,11 @@ TEST(State, CreateMultiExtentProperty) {
 
   char input[] = "abcdefg";
   size_t input_size = 7;
-  std::string contents;
+  std::vector<std::uint8_t> contents;
   for (int i = 0; i < 6000; i++) {
     contents.push_back(input[i % input_size]);
   }
-  StringProperty a = state->CreateStringProperty("a", 0, contents);
+  const auto a = state->CreateByteVectorProperty("a", 0, contents);
 
   fbl::WAVLTree<BlockIndex, std::unique_ptr<ScannedBlock>> blocks;
   size_t free_blocks, allocated_blocks;
@@ -1140,6 +1161,7 @@ TEST(State, CreateMultiExtentProperty) {
                MakeBlock(ValueBlockFields::Type::Make(BlockType::kBufferValue) |
                              ValueBlockFields::NameIndex::Make(3),
                          PropertyBlockPayload::ExtentIndex::Make(128) |
+                             PropertyBlockPayload::Flags::Make(PropertyBlockFormat::kBinary) |
                              PropertyBlockPayload::TotalLength::Make(6000)));
   CompareBlock(blocks.find(3)->block, MakeInlinedOrder0StringReferenceBlock("a"));
   // Extents are threaded between blocks 128, 256, and 384.
@@ -1167,33 +1189,30 @@ TEST(State, SetSmallStringProperty) {
   auto state = InitState(4096);
   ASSERT_TRUE(state != NULL);
 
-  StringProperty a = state->CreateStringProperty("a", 0, "Hello");
+  StringProperty a = state->CreateStringProperty("a", 0, "1234");
 
-  a.Set("World");
+  a.Set("abcd");
 
   fbl::WAVLTree<BlockIndex, std::unique_ptr<ScannedBlock>> blocks;
   size_t free_blocks, allocated_blocks;
   auto snapshot = SnapshotAndScan(state->GetVmo(), &blocks, &free_blocks, &allocated_blocks);
   ASSERT_TRUE(snapshot);
 
-  // Header (1), 1 single extent property (3)
+  // Header, 2x STRING_REFERENCE, 1x BUFFER_VALUE
   EXPECT_EQ(1u + 3u, allocated_blocks);
-  EXPECT_EQ(7u, free_blocks);
 
   CompareBlock(blocks.find(0)->block, MakeHeader(4));
   EXPECT_EQ(inspect::internal::GetHeaderVmoSize(blocks.find(0)->block), state->GetStats().size);
 
   // Property a fits in the first 3 blocks (value, name, extent).
-  CompareBlock(blocks.find(2)->block,
-               MakeBlock(ValueBlockFields::Type::Make(BlockType::kBufferValue) |
-                             ValueBlockFields::NameIndex::Make(3),
-                         PropertyBlockPayload::ExtentIndex::Make(4) |
-                             PropertyBlockPayload::TotalLength::Make(5) |
-                             PropertyBlockPayload::Flags::Make(PropertyBlockFormat::kUtf8)));
+  CompareBlock(
+      blocks.find(2)->block,
+      MakeBlock(ValueBlockFields::Type::Make(BlockType::kBufferValue) |
+                    ValueBlockFields::NameIndex::Make(3),
+                PropertyBlockPayload::ExtentIndex::Make(5) |
+                    PropertyBlockPayload::Flags::Make(PropertyBlockFormat::kStringReference)));
   CompareBlock(blocks.find(3)->block, MakeInlinedOrder0StringReferenceBlock("a"));
-
-  CompareBlock(blocks.find(4)->block,
-               MakeBlock(ValueBlockFields::Type::Make(BlockType::kExtent), "World\0\0\0"));
+  CompareBlock(blocks.find(5)->block, MakeInlinedOrder0StringReferenceBlock("abcd"));
 }
 
 TEST(State, SetSmallBinaryProperty) {
@@ -1248,30 +1267,28 @@ TEST(State, SetLargeProperty) {
 
   StringProperty a = state->CreateStringProperty("a", 0, contents);
 
-  a.Set("World");
+  a.Set("abcd");
 
   fbl::WAVLTree<BlockIndex, std::unique_ptr<ScannedBlock>> blocks;
   size_t free_blocks, allocated_blocks;
   auto snapshot = SnapshotAndScan(state->GetVmo(), &blocks, &free_blocks, &allocated_blocks);
   ASSERT_TRUE(snapshot);
 
-  // Header (1), 1 single extent property (3)
-  EXPECT_EQ(1u + 3u, allocated_blocks);
+  // Header, BUFFER_VALUE, 2x STRING_REFERENCE
+  EXPECT_EQ(4u, allocated_blocks);
   EXPECT_EQ(9u, free_blocks);
 
   CompareBlock(blocks.find(0)->block, MakeHeader(4));
   EXPECT_EQ(inspect::internal::GetHeaderVmoSize(blocks.find(0)->block), state->GetStats().size);
 
-  // Property a fits in the first 3 blocks (value, name, extent).
+  // Property a fits in 3 blocks
   CompareBlock(blocks.find(2)->block,
                MakeBlock(ValueBlockFields::Type::Make(BlockType::kBufferValue) |
                              ValueBlockFields::NameIndex::Make(3),
-                         PropertyBlockPayload::ExtentIndex::Make(4) |
-                             PropertyBlockPayload::TotalLength::Make(5)));
+                         PropertyBlockPayload::Flags::Make(PropertyBlockFormat::kStringReference) |
+                             PropertyBlockPayload::ExtentIndex::Make(4)));
   CompareBlock(blocks.find(3)->block, MakeInlinedOrder0StringReferenceBlock("a"));
-
-  CompareBlock(blocks.find(4)->block,
-               MakeBlock(ExtentBlockFields::Type::Make(BlockType::kExtent), "World\0\0\0"));
+  CompareBlock(blocks.find(4)->block, MakeInlinedOrder0StringReferenceBlock("abcd"));
 }
 
 TEST(State, SetPropertyOutOfMemory) {
@@ -1308,7 +1325,7 @@ TEST(State, CreateNodeHierarchy) {
   auto network = req.CreateUint("netw", 10);
   auto wifi = req.CreateUint("wifi", 5);
 
-  auto version = root.CreateString("vrsn", "1.0beta2");
+  auto version = root.CreateString("vrsn", "1.0b");
 
   fbl::WAVLTree<BlockIndex, std::unique_ptr<ScannedBlock>> blocks;
   size_t free_blocks, allocated_blocks;
@@ -1360,12 +1377,11 @@ TEST(State, CreateNodeHierarchy) {
       blocks.find(10)->block,
       MakeBlock(ValueBlockFields::Type::Make(BlockType::kBufferValue) |
                     ValueBlockFields::ParentIndex::Make(2) | ValueBlockFields::NameIndex::Make(11),
-                PropertyBlockPayload::ExtentIndex::Make(12) |
-                    PropertyBlockPayload::TotalLength::Make(8)));
+                PropertyBlockPayload::Flags::Make(PropertyBlockFormat::kStringReference) |
+                    PropertyBlockPayload::ExtentIndex::Make(12)));
   CompareBlock(blocks.find(11)->block, MakeInlinedOrder0StringReferenceBlock("vrsn"));
 
-  CompareBlock(blocks.find(12)->block,
-               MakeBlock(ExtentBlockFields::Type::Make(BlockType::kExtent), "1.0beta2"));
+  CompareBlock(blocks.find(12)->block, MakeInlinedOrder0StringReferenceBlock("1.0b"));
 }
 
 TEST(State, TombstoneTest) {
@@ -1479,9 +1495,9 @@ TEST(State, LinkTest) {
 
   // root will be at block index 2
   Node root = state->CreateNode("root", 0);
-  Link link = state->CreateLink("link", 2u /* root index */, "/tst", LinkBlockDisposition::kChild);
+  Link link = state->CreateLink("lnk1", 2u /* root index */, "tst1", LinkBlockDisposition::kChild);
   Link link2 =
-      state->CreateLink("lnk2", 2u /* root index */, "/tst", LinkBlockDisposition::kInline);
+      state->CreateLink("lnk2", 2u /* root index */, "tst2", LinkBlockDisposition::kInline);
 
   fbl::WAVLTree<BlockIndex, std::unique_ptr<ScannedBlock>> blocks;
   size_t free_blocks, allocated_blocks;
@@ -1507,8 +1523,8 @@ TEST(State, LinkTest) {
       MakeBlock(ValueBlockFields::Type::Make(BlockType::kLinkValue) |
                     ValueBlockFields::ParentIndex::Make(2) | ValueBlockFields::NameIndex::Make(5),
                 LinkBlockPayload::ContentIndex::Make(6)));
-  CompareBlock(blocks.find(5)->block, MakeInlinedOrder0StringReferenceBlock("link"));
-  CompareBlock(blocks.find(6)->block, MakeInlinedOrder0StringReferenceBlock("/tst"));
+  CompareBlock(blocks.find(5)->block, MakeInlinedOrder0StringReferenceBlock("lnk1"));
+  CompareBlock(blocks.find(6)->block, MakeInlinedOrder0StringReferenceBlock("tst1"));
   CompareBlock(
       blocks.find(7)->block,
       MakeBlock(ValueBlockFields::Type::Make(BlockType::kLinkValue) |
@@ -1516,7 +1532,7 @@ TEST(State, LinkTest) {
                 LinkBlockPayload::ContentIndex::Make(9) |
                     LinkBlockPayload::Flags::Make(LinkBlockDisposition::kInline)));
   CompareBlock(blocks.find(8)->block, MakeInlinedOrder0StringReferenceBlock("lnk2"));
-  CompareBlock(blocks.find(9)->block, MakeInlinedOrder0StringReferenceBlock("/tst"));
+  CompareBlock(blocks.find(9)->block, MakeInlinedOrder0StringReferenceBlock("tst2"));
 }
 
 TEST(State, LinkContentsAllocationFailure) {
@@ -1526,7 +1542,8 @@ TEST(State, LinkContentsAllocationFailure) {
   // root will be at block index 2
   Node root = state->CreateNode("root", 0);
   std::string name(2000, 'a');
-  Link link = state->CreateLink(name, 2u /* root index */, name, LinkBlockDisposition::kChild);
+  std::string content(2000, 'b');
+  Link link = state->CreateLink(name, 2u /* root index */, content, LinkBlockDisposition::kChild);
 
   fbl::WAVLTree<BlockIndex, std::unique_ptr<ScannedBlock>> blocks;
   size_t free_blocks, allocated_blocks;
@@ -1568,8 +1585,7 @@ TEST(State, GetStatsWithFailedAllocationTest) {
 
   BlockIndex idx;
   std::string data(5000, '.');
-  auto sr = inspect::StringReference(data.c_str());
-  ASSERT_EQ(ZX_ERR_NO_MEMORY, state->CreateAndIncrementStringReference(sr, &idx));
+  ASSERT_EQ(ZX_ERR_NO_MEMORY, state->CreateAndIncrementStringReference(data, &idx));
 
   inspect::InspectStats stats = state->GetStats();
   EXPECT_EQ(0u, stats.dynamic_child_count);
@@ -1715,7 +1731,7 @@ TEST(State, CreateNodeHierarchyInTransaction) {
   auto network = req.CreateUint("netw", 10);
   auto wifi = req.CreateUint("wifi", 5);
 
-  auto version = root.CreateString("vrsn", "1.0beta2");
+  auto version = root.CreateString("vrsn", "1.0b");
   state->EndTransaction();
   CheckVmoGenCount(2, state->GetVmo());
 
@@ -1769,12 +1785,11 @@ TEST(State, CreateNodeHierarchyInTransaction) {
       blocks.find(10)->block,
       MakeBlock(ValueBlockFields::Type::Make(BlockType::kBufferValue) |
                     ValueBlockFields::ParentIndex::Make(2) | ValueBlockFields::NameIndex::Make(11),
-                PropertyBlockPayload::ExtentIndex::Make(12) |
-                    PropertyBlockPayload::TotalLength::Make(8)));
+                PropertyBlockPayload::Flags::Make(PropertyBlockFormat::kStringReference) |
+                    PropertyBlockPayload::ExtentIndex::Make(12)));
   CompareBlock(blocks.find(11)->block, MakeInlinedOrder0StringReferenceBlock("vrsn"));
 
-  CompareBlock(blocks.find(12)->block,
-               MakeBlock(ExtentBlockFields::Type::Make(BlockType::kExtent), "1.0beta2"));
+  CompareBlock(blocks.find(12)->block, MakeInlinedOrder0StringReferenceBlock("1.0b"));
 }
 
 }  // namespace

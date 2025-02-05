@@ -18,17 +18,17 @@ python_build_time_tests("compute_content_hash_test") {
   ]
 }
 
+python_build_time_tests("remote_services_utils_test") {
+  tests = [ "remote_services_utils_test.py" ]
+  inputs = [ "remote_services_utils_test.py" ]
+}
+
+python_build_time_tests("workspace_utils_test") {
+  tests = [ "workspace_utils_test.py" ]
+  inputs = [ "workspace_utils.py" ]
+}
+
 if (is_host) {
-  python_host_test("update_workspace_test") {
-    main_source = "update_workspace_test.py"
-    sources = [
-      "check_ninja_build_plan.py",
-      "compute_content_hash.py",
-      "get_git_head_commit.py",
-      "update_workspace.py",
-    ]
-    libraries = [ "//third_party/parameterized" ]
-  }
   python_host_test("minimal_workspace_test") {
     main_source = "minimal_workspace_test.py"
     sources = [
@@ -36,7 +36,8 @@ if (is_host) {
       "compute_content_hash.py",
       "get_git_head_commit.py",
       "minimal_workspace.py",
-      "update_workspace.py",
+      "remote_services_utils.py",
+      "workspace_utils.py",
     ]
   }
 }
@@ -45,7 +46,8 @@ group("tests") {
   testonly = true
   deps = [
     ":minimal_workspace_test($host_toolchain)",
-    ":update_workspace_test($host_toolchain)",
+    ":remote_services_utils_test",
+    ":workspace_utils_test($host_toolchain)",
   ]
 
   # TODO(https://fxbug.dev/384878204): enable build-time tests once

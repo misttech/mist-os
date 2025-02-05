@@ -16,7 +16,7 @@
 #include "src/graphics/display/lib/api-types/cpp/event-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
 
-// Indicies into event and event_ids
+// Indices into event and event_ids
 #define WAIT_EVENT 0
 
 namespace display_test {

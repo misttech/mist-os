@@ -38,15 +38,12 @@ pub enum SaveConfig {
     DoNotSave,
 }
 
-// TODO(fxbug/127781) Remove `pub` once library centralized here.
+// TODO(https://fxbug.dev/391921340) Refactor / trim when the repo daemon protocol is retired
 #[derive(Debug)]
 pub struct ServerInfo {
-    // TODO(fxbug/127781) Remove `pub` once library centralized here.
-    pub server: RepositoryServer,
-    // TODO(fxbug/127781) Remove `pub` once library centralized here.
-    pub task: fasync::Task<()>,
-    // TODO(fxbug/127781) Remove `pub` once library centralized here.
-    pub tunnel_manager: TunnelManager,
+    server: RepositoryServer,
+    task: fasync::Task<()>,
+    tunnel_manager: TunnelManager,
 }
 
 impl ServerInfo {
@@ -68,9 +65,13 @@ impl ServerInfo {
 
         Ok(ServerInfo { server, task, tunnel_manager })
     }
+
+    pub fn local_addr(&self) -> SocketAddr {
+        self.server.local_addr()
+    }
 }
 
-// TODO(fxbug/127781) Remove `pub` once library centralized here.
+// TODO(https://fxbug.dev/391921340) Refactor / trim when the repo daemon protocol is retired
 #[derive(Debug)]
 pub enum ServerState {
     Running(ServerInfo),
@@ -126,13 +127,11 @@ impl ServerState {
     }
 }
 
+// TODO(https://fxbug.dev/391921340) Refactor / trim when the repo daemon protocol is retired
 pub struct RepoInner {
-    // TODO(fxbug/127781) Remove `pub` once library centralized here.
     pub manager: Arc<RepositoryManager>,
-    // TODO(fxbug/127781) Remove `pub` once library centralized here.
     pub server: ServerState,
-    // TODO(fxbug/127781) Remove `pub` once library centralized here.
-    pub https_client: HttpsClient,
+    https_client: HttpsClient,
 }
 
 // RepoInner can move.
@@ -234,6 +233,13 @@ impl RepoInner {
         tracing::info!("Repository protocol has been stopped");
 
         Ok(())
+    }
+
+    pub fn get_backend(
+        &self,
+        repo_spec: &RepositorySpec,
+    ) -> Result<Box<dyn RepoProvider>, RepositoryError> {
+        repo_spec_to_backend(repo_spec, self.https_client.clone())
     }
 }
 

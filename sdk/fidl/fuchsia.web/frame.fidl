@@ -145,11 +145,19 @@ type FrameMediaSettings = table {
     /// The [`fuchsia.media/AudioRenderUsage`] to set for every [`fuchsia.media/AudioRenderer`]
     /// instance created by the [`Frame`]. If not set, the usage is `COMMUNICATION` for WebRTC
     /// streams and `MEDIA` for all other streams.
+    // TODO(https://fxbug.dev/384934089): deprecate and remove |AudioRenderUsage|
+    @available(deprecated=26)
     1: renderer_usage fuchsia.media.AudioRenderUsage;
 
     /// When set, enables usage of [`fuchsia.media/AudioConsumer`] for audio playback. In that
     /// case the specified value is passed to [`fuchsia.media/SessionAudioConsumerFactory`].
     2: audio_consumer_session_id uint64;
+
+    /// The [`fuchsia.media/AudioRenderUsage2`] to set for every [`fuchsia.media/AudioRenderer`]
+    /// instance created by the [`Frame`]. If not set, the usage is `COMMUNICATION` for WebRTC
+    /// streams and `MEDIA` for all other streams.
+    @available(added=26)
+    3: renderer_usage2 fuchsia.media.AudioRenderUsage2;
 };
 
 closed protocol Frame {
@@ -184,9 +192,9 @@ closed protocol Frame {
     /// Caller should pass the other end of the token to
     /// [`fuchsia.ui.composition/Flatland.CreateViewport`] to attach the new Flatland view to its
     /// graph.
-    // TODO(https://fxbug.dev/42162471): use "resource table" syntax when it becomes available, thus getting
-    // rid of the need for CreateView2Args.  Hopefully this will be done by the time we want to
-    // rename CreateView2() to CreateView(), once the latter is deleted.
+    // TODO(https://fxbug.dev/42162471): use "resource table" syntax when it becomes available, thus
+    // getting rid of the need for CreateView2Args.  Hopefully this will be done by the time we want
+    // to rename CreateView2() to CreateView(), once the latter is deleted.
     strict CreateView2(resource struct {
         args CreateView2Args;
     });

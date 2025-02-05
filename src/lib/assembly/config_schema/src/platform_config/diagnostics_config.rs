@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assembly_container::WalkPaths;
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use fuchsia_url::boot_url::BootUrl;
 use fuchsia_url::AbsoluteComponentUrl;
@@ -15,18 +16,28 @@ pub use diagnostics_log_types::Severity;
 
 /// Diagnostics configuration options for the diagnostics area.
 #[derive(
-    Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+    Debug,
+    Default,
+    Deserialize,
+    Serialize,
+    PartialEq,
+    JsonSchema,
+    SupportsFileRelativePaths,
+    WalkPaths,
 )]
 #[serde(default, deny_unknown_fields)]
 pub struct DiagnosticsConfig {
     pub archivist: Option<ArchivistConfig>,
     /// The set of pipeline config files to supply to archivist.
     #[file_relative_paths]
+    #[walk_paths]
     pub archivist_pipelines: Vec<ArchivistPipeline>,
     pub additional_serial_log_components: Vec<String>,
     #[file_relative_paths]
+    #[walk_paths]
     pub sampler: SamplerConfig,
     #[file_relative_paths]
+    #[walk_paths]
     pub memory_monitor: MemoryMonitorConfig,
     /// The set of log levels components will receive as their initial interest.
     pub component_log_initial_interests: Vec<ComponentInitialInterest>,
@@ -41,7 +52,9 @@ pub enum ArchivistConfig {
 }
 
 /// A single archivist pipeline config.
-#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths)]
+#[derive(
+    Debug, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths, WalkPaths,
+)]
 #[serde(deny_unknown_fields)]
 pub struct ArchivistPipeline {
     /// The name of the pipeline.
@@ -50,6 +63,7 @@ pub struct ArchivistPipeline {
     /// Zero files is not valid.
     #[schemars(schema_with = "crate::vec_path_schema")]
     #[file_relative_paths]
+    #[walk_paths]
     pub files: Vec<FileRelativePathBuf>,
 }
 
@@ -113,29 +127,46 @@ impl From<PipelineType> for String {
 
 /// Diagnostics configuration options for the sampler configuration area.
 #[derive(
-    Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+    Debug,
+    Default,
+    Deserialize,
+    Serialize,
+    PartialEq,
+    JsonSchema,
+    SupportsFileRelativePaths,
+    WalkPaths,
 )]
 #[serde(default, deny_unknown_fields)]
 pub struct SamplerConfig {
     /// The metrics configs to pass to sampler.
     #[schemars(schema_with = "crate::vec_path_schema")]
     #[file_relative_paths]
+    #[walk_paths]
     pub metrics_configs: Vec<FileRelativePathBuf>,
     /// The fire configs to pass to sampler.
     #[schemars(schema_with = "crate::vec_path_schema")]
     #[file_relative_paths]
+    #[walk_paths]
     pub fire_configs: Vec<FileRelativePathBuf>,
 }
 
 /// Diagnostics configuration options for the memory monitor configuration area.
 #[derive(
-    Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+    Debug,
+    Default,
+    Deserialize,
+    Serialize,
+    PartialEq,
+    JsonSchema,
+    SupportsFileRelativePaths,
+    WalkPaths,
 )]
 #[serde(default, deny_unknown_fields)]
 pub struct MemoryMonitorConfig {
     /// The memory buckets config file to provide to memory monitor.
     #[schemars(schema_with = "crate::option_path_schema")]
     #[file_relative_paths]
+    #[walk_paths]
     pub buckets: Option<FileRelativePathBuf>,
     /// Control whether a pressure change should trigger a capture.
     pub capture_on_pressure_change: bool,
@@ -155,7 +186,7 @@ pub struct MemoryMonitorConfig {
 
 // LINT.IfChange
 /// The initial log interest that a component should receive upon starting up.
-#[derive(Debug, Deserialize, PartialEq, JsonSchema)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ComponentInitialInterest {
     /// The URL or moniker for the component which should receive the initial interest.
@@ -163,16 +194,13 @@ pub struct ComponentInitialInterest {
     /// The log severity the initial interest should specify.
     pub log_severity: Severity,
 }
-// LINT.ThenChange(/src/diagnostics/archivist/src/logs/repository.rs)
 
-impl Serialize for ComponentInitialInterest {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(format!("{}:{}", self.component, self.log_severity).as_str())
+impl ComponentInitialInterest {
+    pub fn for_structured_config(&self) -> String {
+        format!("{}:{}", self.component, self.log_severity)
     }
 }
+// LINT.ThenChange(/src/diagnostics/archivist/src/logs/repository.rs)
 
 #[derive(Debug, PartialEq, JsonSchema)]
 pub enum UrlOrMoniker {
@@ -188,6 +216,17 @@ impl std::fmt::Display for UrlOrMoniker {
             Self::Url(u) => write!(f, "{}", u),
             Self::Moniker(m) => write!(f, "{}", m),
         }
+    }
+}
+
+impl Serialize for UrlOrMoniker {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(match self {
+            Self::Url(s) | Self::Moniker(s) => s.as_str(),
+        })
     }
 }
 
@@ -373,7 +412,7 @@ mod tests {
                 log_severity: Severity::Debug,
             })
             .unwrap(),
-            "\"fuchsia-boot:///driver_host#meta/driver_host.cm:DEBUG\""
+            r#"{"component":"fuchsia-boot:///driver_host#meta/driver_host.cm","log_severity":"DEBUG"}"#,
         );
         assert_eq!(
             serde_json::to_string(&ComponentInitialInterest {
@@ -381,7 +420,30 @@ mod tests {
                 log_severity: Severity::Fatal,
             })
             .unwrap(),
-            "\"/bootstrap/driver_manager:FATAL\"",
+            r#"{"component":"/bootstrap/driver_manager","log_severity":"FATAL"}"#,
         );
+    }
+
+    #[test]
+    fn serialize_deserialize_component_log_initial_interest() {
+        let original = ComponentInitialInterest {
+            component: UrlOrMoniker::Url(
+                "fuchsia-boot:///driver_host#meta/driver_host.cm".to_string(),
+            ),
+            log_severity: Severity::Debug,
+        };
+        let serialized = serde_json::to_string(&original).expect("serialize interest");
+        let deserialized: ComponentInitialInterest =
+            serde_json::from_str(&serialized).expect("deserialize interest");
+        assert_eq!(deserialized, original);
+
+        let original = ComponentInitialInterest {
+            component: UrlOrMoniker::Moniker("/bootstrap/driver_manager".to_string()),
+            log_severity: Severity::Fatal,
+        };
+        let serialized = serde_json::to_string(&original).expect("serialize interest");
+        let deserialized: ComponentInitialInterest =
+            serde_json::from_str(&serialized).expect("deserialize interest");
+        assert_eq!(deserialized, original);
     }
 }

@@ -13,9 +13,9 @@ use net_types::{SpecifiedAddr, UnicastAddr, Witness as _};
 use netstack3_base::testutil::{FakeInstant, TestIpExt};
 use netstack3_base::WorkQueueReport;
 use netstack3_core::device::{
-    DeviceId, DeviceProvider, EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice,
+    DeviceId, EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice,
     LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId, MaxEthernetFrameSize,
-    TransmitQueueConfiguration,
+    PureIpDevice,
 };
 use netstack3_core::error::NotFoundError;
 use netstack3_core::ip::{
@@ -171,10 +171,29 @@ fn tx_queue(
     let device = add_device(&mut ctx);
 
     if with_tx_queue {
-        for_any_device_id!(DeviceId, DeviceProvider, D, &device, device => {
-                ctx.core_api().transmit_queue::<D>()
-                    .set_configuration(device, TransmitQueueConfiguration::Fifo)
-        })
+        match &device {
+            DeviceId::Loopback(device) => {
+                ctx.core_api().transmit_queue::<LoopbackDevice>().set_configuration(
+                    device,
+                    netstack3_core::device::TransmitQueueConfiguration::Fifo,
+                );
+            }
+            DeviceId::PureIp(device) => {
+                ctx.core_api().transmit_queue::<PureIpDevice>().set_configuration(
+                    device,
+                    netstack3_core::device::TransmitQueueConfiguration::Fifo,
+                );
+            }
+            DeviceId::Ethernet(device) => {
+                ctx.core_api().transmit_queue::<EthernetLinkDevice>().set_configuration(
+                    device,
+                    netstack3_core::device::TransmitQueueConfiguration::Fifo,
+                );
+            }
+            DeviceId::Blackhole(_device) => {
+                // Blackhole devices do not support transmission.
+            }
+        }
     }
 
     let _: Ipv6DeviceConfigurationUpdate = ctx

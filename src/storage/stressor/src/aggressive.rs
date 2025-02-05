@@ -31,7 +31,7 @@ impl Inner {
     pub fn next_file_num(&mut self) -> u64 {
         let mut rng = rand::thread_rng();
         if self.file_counter == 0 {
-            tracing::info!("File counter looped.");
+            log::info!("File counter looped.");
         }
         self.file_map.swap(
             self.file_counter,
@@ -109,14 +109,14 @@ impl Stressor {
             );
             let info = dir.query_filesystem(MonotonicInstant::INFINITE.into()).unwrap().1.unwrap();
 
-            tracing::info!(
+            log::info!(
                 "Aggressive stressor mode targetting {} free bytes on a {} byte volume.",
                 target_free_bytes,
                 info.total_bytes
             );
             (info.used_bytes, info.total_bytes - target_free_bytes, Some(dir))
         } else {
-            tracing::info!("Aggressive stressor running without path. Targetting 1MB of space.");
+            log::info!("Aggressive stressor running without path. Targetting 1MB of space.");
             (0, 1 << 20, None)
         };
 
@@ -148,7 +148,7 @@ impl Stressor {
                     dir.query_filesystem(MonotonicInstant::INFINITE.into()).unwrap().1.unwrap();
                 self.bytes_stored.store(info.used_bytes, Ordering::SeqCst);
             }
-            tracing::info!(
+            log::info!(
                 "bytes_stored: {}, target_bytes {}, counts: {:?}",
                 self.bytes_stored.load(Ordering::Relaxed),
                 self.target_bytes,
@@ -184,7 +184,7 @@ impl Stressor {
                 Err(e) => match e.kind() {
                     ErrorKind::NotFound => {}
                     error => {
-                        tracing::warn!("Got an open error on READ: {error:?}");
+                        log::warn!("Got an open error on READ: {error:?}");
                     }
                 },
             },
@@ -219,7 +219,7 @@ impl Stressor {
                                         .unwrap()
                                         .1
                                         .unwrap();
-                                    tracing::info!("Correcting bytes_stored. {info:?}");
+                                    log::info!("Correcting bytes_stored. {info:?}");
                                     self.bytes_stored.store(info.used_bytes, Ordering::SeqCst);
                                 }
                             }

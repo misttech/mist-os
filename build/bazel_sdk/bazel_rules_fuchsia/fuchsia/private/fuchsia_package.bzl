@@ -34,7 +34,6 @@ load(
     "fuchsia_cpu_from_ctx",
     "label_name",
     "make_resource_struct",
-    "rule_variants",
     "stub_executable",
 )
 
@@ -211,7 +210,7 @@ def _fuchsia_test_package(
         target_compatible_with = target_compatible_with,
     )
 
-    _build_fuchsia_package_test(
+    _build_fuchsia_package(
         name = "%s_fuchsia_package" % name,
         test_components = _test_component_mapping.values(),
         components = _components,
@@ -226,6 +225,7 @@ def _fuchsia_test_package(
         platform = platform,
         target_compatible_with = target_compatible_with,
         tags = tags + ["manual"],
+        testonly = True,
         **kwargs
     )
 
@@ -470,6 +470,27 @@ def _build_fuchsia_package_impl(ctx):
             for file in subpackage[FuchsiaPackageInfo].files
         ]
 
+    # Validate binary paths in cmls
+    component_manifest_files = [c.component_info.manifest for c in packaged_components]
+    depfile = ctx.actions.declare_file(pkg_dir + "components_validation.depfile")
+    ctx.actions.run(
+        executable = ctx.executable._validate_component_manifests,
+        arguments = [
+            "--cmc",
+            sdk.cmc.path,
+            "--component-manifest-paths",
+            ",".join([c.path for c in component_manifest_files]),
+            "--package-manifest",
+            manifest.path,
+            "--output",
+            depfile.path,
+        ],
+        inputs = [sdk.cmc, manifest] + component_manifest_files,
+        outputs = [depfile],
+        mnemonic = "CmcValidate",
+        progress_message = "Validating binary paths in cml for %s" % ctx.label,
+    )
+
     # Build the package
     ctx.actions.run(
         executable = sdk.ffx_package,
@@ -484,7 +505,7 @@ def _build_fuchsia_package_impl(ctx):
             "--published-name",  # name of package
             ctx.attr.package_name,
         ] + subpackages_args + api_level_input + repo_name_args,
-        inputs = build_inputs + subpackages_inputs + meta_content_inputs,
+        inputs = build_inputs + subpackages_inputs + meta_content_inputs + [depfile],
         outputs = [
             output_package_manifest,
             meta_far,
@@ -570,12 +591,11 @@ def _build_fuchsia_package_impl(ctx):
         ),
     ]
 
-_build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
-    variants = (None, "test"),
+_build_fuchsia_package = rule(
     doc = "Builds a fuchsia package.",
     implementation = _build_fuchsia_package_impl,
     cfg = fuchsia_transition,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION + ["@bazel_tools//tools/cpp:toolchain_type"],
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION, "@bazel_tools//tools/cpp:toolchain_type"],
     attrs = {
         "package_name": attr.string(
             doc = "The name of the package",
@@ -656,6 +676,11 @@ _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
         ),
         "_meta_content_append_tool": attr.label(
             default = "//fuchsia/tools:meta_content_append",
+            executable = True,
+            cfg = "exec",
+        ),
+        "_validate_component_manifests": attr.label(
+            default = "//fuchsia/tools:validate_component_manifests",
             executable = True,
             cfg = "exec",
         ),

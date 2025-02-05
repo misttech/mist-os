@@ -6,7 +6,8 @@ use explicit::UnreachableExt as _;
 use net_types::SpecifiedAddr;
 use netstack3_base::socket::SocketIpAddr;
 use netstack3_base::{
-    AnyDevice, DeviceIdContext, EitherDeviceId, IpDeviceAddr, IpExt, Mms, UninstantiableWrapper,
+    AnyDevice, DeviceIdContext, EitherDeviceId, IpDeviceAddr, IpExt, Mms, TxMetadataBindingsTypes,
+    UninstantiableWrapper,
 };
 use netstack3_filter::Tuple;
 
@@ -35,12 +36,12 @@ impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> BaseTransportIpContext<I, C>
     }
 }
 
-impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> IpSocketHandler<I, C>
+impl<I: IpExt, BC: TxMetadataBindingsTypes, P: DeviceIdContext<AnyDevice>> IpSocketHandler<I, BC>
     for UninstantiableWrapper<P>
 {
     fn new_ip_socket<O>(
         &mut self,
-        _ctx: &mut C,
+        _ctx: &mut BC,
         _device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
         _local_ip: Option<IpDeviceAddr<I::Addr>>,
         _remote_ip: SocketIpAddr<I::Addr>,
@@ -52,17 +53,18 @@ impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> IpSocketHandler<I, C>
 
     fn send_ip_packet<S, O>(
         &mut self,
-        _ctx: &mut C,
+        _ctx: &mut BC,
         _socket: &IpSock<I, Self::WeakDeviceId>,
         _body: S,
         _options: &O,
+        _tx_metadata: BC::TxMetadata,
     ) -> Result<(), IpSockSendError> {
         self.uninstantiable_unreachable()
     }
 
     fn confirm_reachable<O>(
         &mut self,
-        _bindings_ctx: &mut C,
+        _bindings_ctx: &mut BC,
         _socket: &IpSock<I, Self::WeakDeviceId>,
         _options: &O,
     ) {

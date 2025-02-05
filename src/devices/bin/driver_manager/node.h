@@ -10,7 +10,9 @@
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.driver.host/cpp/wire.h>
 #include <fidl/fuchsia.driver.index/cpp/wire.h>
+#include <lib/zx/event.h>
 #include <zircon/assert.h>
+#include <zircon/types.h>
 
 #include <list>
 #include <memory>
@@ -299,6 +301,12 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   std::optional<std::vector<fuchsia_driver_framework::NodeProperty>> GetDeprecatedNodeProperties(
       std::string_view parent_name = "default") const;
 
+  void SetDictionaryRef(std::optional<uint64_t> dictionary_ref) {
+    dictionary_ref_ = dictionary_ref;
+  }
+
+  std::optional<uint64_t> dictionary_ref() { return dictionary_ref_; }
+
   const Collection& collection() const { return collection_; }
 
   const fuchsia_driver_framework::DriverPackageType& driver_package_type() const {
@@ -323,13 +331,20 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
     can_multibind_composites_ = can_multibind_composites;
   }
 
+  std::optional<zx_koid_t> token_koid() const {
+    return driver_component_.has_value() ? std::optional(driver_component_->component_instance_koid)
+                                         : std::nullopt;
+  }
+  std::vector<fuchsia_driver_framework::BusInfo> GetBusTopology() const;
+
   ShutdownIntent shutdown_intent() { return GetShutdownHelper().shutdown_intent(); }
 
  private:
   struct DriverComponent {
     DriverComponent(Node& node, std::string url,
                     fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
-                    fidl::ClientEnd<fuchsia_driver_host::Driver> driver);
+                    fidl::ClientEnd<fuchsia_driver_host::Driver> driver,
+                    zx::event component_instance);
 
     // This represents the Driver Component within the Component Framework.
     // When this is closed with an epitaph it signals to the Component Framework
@@ -337,6 +352,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
     fidl::ServerBinding<fuchsia_component_runner::ComponentController> component_controller_ref;
     fidl::WireClient<fuchsia_driver_host::Driver> driver;
     std::string driver_url;
+    zx::event component_instance;
+    zx_koid_t component_instance_koid = 0;
 
     DriverState state = DriverState::kBinding;
   };
@@ -481,6 +498,12 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // Maps the node properties of the entries of `properties_` by their name.
   std::unordered_map<std::string, cpp20::span<const fuchsia_driver_framework::wire::NodeProperty2>>
       properties_dict_;
+
+  std::optional<fuchsia_driver_framework::BusInfo> bus_info_;
+
+  // A component framework dictionary that should be provided to the driver
+  // that binds to this node, as well as any children nodes.
+  std::optional<uint64_t> dictionary_ref_;
 
   Collection collection_ = Collection::kNone;
   fuchsia_driver_framework::DriverPackageType driver_package_type_;

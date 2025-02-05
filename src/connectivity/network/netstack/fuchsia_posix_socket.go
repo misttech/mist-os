@@ -1230,7 +1230,7 @@ func (ep *endpoint) GetIpPacketInfo(fidl.Context) (socket.BaseNetworkSocketGetIp
 }
 
 func (ep *endpoint) SetMark(_ fidl.Context, domain socket.MarkDomain, mark socket.OptionalUint32) (socket.BaseSocketSetMarkResult, error) {
-	return socket.BaseSocketSetMarkResultWithErr(posix.ErrnoEopnotsupp), nil
+	return socket.BaseSocketSetMarkResultWithResponse(socket.BaseSocketSetMarkResponse{}), nil
 }
 
 func (ep *endpoint) GetMark(_ fidl.Context, domain socket.MarkDomain) (socket.BaseSocketGetMarkResult, error) {
@@ -4210,6 +4210,28 @@ func (sp *providerImpl) DatagramSocketDeprecated(ctx fidl.Context, domain socket
 	}), nil
 }
 
+func (sp *providerImpl) DatagramSocketWithOptions(ctx fidl.Context, domain socket.Domain, proto socket.DatagramSocketProtocol, _ socket.SocketCreationOptions) (socket.ProviderDatagramSocketWithOptionsResult, error) {
+	result, err := sp.DatagramSocket(ctx, domain, proto)
+	if err != nil {
+		return socket.ProviderDatagramSocketWithOptionsResult{}, err
+	}
+	converted := socket.ProviderDatagramSocketWithOptionsResult{}
+	switch result.Which() {
+	case socket.ProviderDatagramSocketResultErr:
+		converted.SetErr(result.Err)
+	case socket.ProviderDatagramSocketResultResponse:
+		response := socket.ProviderDatagramSocketWithOptionsResponse{}
+		switch result.Response.Which() {
+		case socket.ProviderDatagramSocketResponseDatagramSocket:
+			response.SetDatagramSocket(result.Response.DatagramSocket)
+		case socket.ProviderDatagramSocketResponseSynchronousDatagramSocket:
+			response.SetSynchronousDatagramSocket(result.Response.SynchronousDatagramSocket)
+		}
+		converted.SetResponse(response)
+	}
+	return converted, nil
+}
+
 func (sp *providerImpl) DatagramSocket(ctx fidl.Context, domain socket.Domain, proto socket.DatagramSocketProtocol) (socket.ProviderDatagramSocketResult, error) {
 	code, netProto := toNetProto(domain)
 	if code != 0 {
@@ -4306,6 +4328,21 @@ func (sp *providerImpl) StreamSocket(_ fidl.Context, domain socket.Domain, proto
 	}), nil
 }
 
+func (sp *providerImpl) StreamSocketWithOptions(ctx fidl.Context, domain socket.Domain, proto socket.StreamSocketProtocol, _ socket.SocketCreationOptions) (socket.ProviderStreamSocketWithOptionsResult, error) {
+	result, err := sp.StreamSocket(ctx, domain, proto)
+	if err != nil {
+		return socket.ProviderStreamSocketWithOptionsResult{}, err
+	}
+	converted := socket.ProviderStreamSocketWithOptionsResult{}
+	switch result.Which() {
+	case socket.ProviderStreamSocketResultErr:
+		converted.SetErr(result.Err)
+	case socket.ProviderStreamSocketResultResponse:
+		converted.SetResponse(socket.ProviderStreamSocketWithOptionsResponse{S: result.Response.S})
+	}
+	return converted, nil
+}
+
 func (sp *providerImpl) InterfaceIndexToName(_ fidl.Context, index uint64) (socket.ProviderInterfaceIndexToNameResult, error) {
 	if info, ok := sp.ns.stack.NICInfo()[tcpip.NICID(index)]; ok {
 		return socket.ProviderInterfaceIndexToNameResultWithResponse(socket.ProviderInterfaceIndexToNameResponse{
@@ -4395,6 +4432,21 @@ func (sp *rawProviderImpl) Socket(ctx fidl.Context, domain socket.Domain, proto 
 	return rawsocket.ProviderSocketResultWithResponse(rawsocket.ProviderSocketResponse{
 		S: rawsocket.SocketWithCtxInterface{Channel: peerC},
 	}), nil
+}
+
+func (sp *rawProviderImpl) SocketWithOptions(ctx fidl.Context, domain socket.Domain, proto rawsocket.ProtocolAssociation, _ socket.SocketCreationOptions) (rawsocket.ProviderSocketWithOptionsResult, error) {
+	result, err := sp.Socket(ctx, domain, proto)
+	if err != nil {
+		return rawsocket.ProviderSocketWithOptionsResult{}, err
+	}
+	converted := rawsocket.ProviderSocketWithOptionsResult{}
+	switch result.Which() {
+	case rawsocket.ProviderSocketResultErr:
+		converted.SetErr(result.Err)
+	case socket.ProviderStreamSocketResultResponse:
+		converted.SetResponse(rawsocket.ProviderSocketWithOptionsResponse{S: result.Response.S})
+	}
+	return converted, nil
 }
 
 type rawSocketImpl struct {

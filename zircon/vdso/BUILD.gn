@@ -41,7 +41,6 @@ fidl("zx") {
     "eventpair.fidl",
     "exception.fidl",
     "fifo.fidl",
-    "framebuffer.fidl",
     "futex.fidl",
     "guest.fidl",
     "handle.fidl",

@@ -6,8 +6,8 @@ use anyhow::Context as _;
 use fuchsia_fs::directory::{WatchEvent, WatchMessage, Watcher};
 use futures::future::TryFutureExt as _;
 use futures::stream::{Stream, TryStreamExt as _};
+use log::error;
 use std::hash::{Hash as _, Hasher as _};
-use tracing::error;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_wlan_device as fidl_wlan_dev};
 
 pub struct NewPhyDevice {
@@ -81,9 +81,9 @@ mod tests {
     use futures::poll;
     use futures::stream::StreamExt as _;
     use futures::task::Poll;
+    use log::info;
     use std::pin::pin;
     use std::sync::Arc;
-    use tracing::info;
     use vfs::directory::entry_container::Directory;
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path;

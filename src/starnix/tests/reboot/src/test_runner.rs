@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::anyhow;
-use fidl_fuchsia_hardware_power_statecontrol::{self as fpower, RebootReason};
+use fidl_fuchsia_hardware_power_statecontrol::{self as fpower, RebootOptions, RebootReason2};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
     Capability, ChildOptions, ChildRef, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
@@ -15,7 +15,7 @@ use mock_reboot::MockRebootService;
 use std::sync::Arc;
 use {fidl_fuchsia_sys2 as fsys2, fuchsia_async as fasync};
 
-async fn build_realm() -> (RealmInstance, oneshot::Receiver<RebootReason>) {
+async fn build_realm() -> (RealmInstance, oneshot::Receiver<RebootOptions>) {
     let builder =
         RealmBuilder::with_params(RealmBuilderParams::new().from_relative_url("#meta/realm.cm"))
             .await
@@ -81,7 +81,7 @@ async fn build_realm() -> (RealmInstance, oneshot::Receiver<RebootReason>) {
 
 #[fasync::run_singlethreaded(test)]
 async fn test_reboot_ota_update() {
-    let (realm_instance, reboot_reason_receiver) = build_realm().await;
+    let (realm_instance, reboot_options_receiver) = build_realm().await;
     let lifecycle_controller = realm_instance
         .root
         .connect_to_protocol_at_exposed_dir::<fsys2::LifecycleControllerMarker>()
@@ -94,12 +94,15 @@ async fn test_reboot_ota_update() {
         .unwrap()
         .unwrap();
 
-    assert_eq!(reboot_reason_receiver.await.unwrap(), RebootReason::SystemUpdate);
+    assert_eq!(
+        reboot_options_receiver.await.unwrap(),
+        RebootOptions { reasons: Some(vec![RebootReason2::SystemUpdate]), ..Default::default() }
+    );
 }
 
 #[fasync::run_singlethreaded(test)]
 async fn test_reboot_no_args() {
-    let (realm_instance, reboot_reason_receiver) = build_realm().await;
+    let (realm_instance, reboot_options_receiver) = build_realm().await;
     let lifecycle_controller = realm_instance
         .root
         .connect_to_protocol_at_exposed_dir::<fsys2::LifecycleControllerMarker>()
@@ -109,5 +112,8 @@ async fn test_reboot_no_args() {
     lifecycle_controller.start_instance("./reboot_no_args", binder_server).await.unwrap().unwrap();
 
     fasync::Timer::new(std::time::Duration::from_secs(1)).await;
-    assert_eq!(reboot_reason_receiver.await.unwrap(), RebootReason::UserRequest);
+    assert_eq!(
+        reboot_options_receiver.await.unwrap(),
+        RebootOptions { reasons: Some(vec![RebootReason2::UserRequest]), ..Default::default() }
+    );
 }

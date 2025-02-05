@@ -534,7 +534,7 @@ class MicroSrcPipelineTest : public ClockSyncPipelineTest {
     // Buffer up to 2s of data.
     output_ = CreateOutput(kUniqueId, format_, kPayloadFrames);
     renderer_ = CreateAudioRenderer(format_, kPayloadFrames,
-                                    fuchsia::media::AudioRenderUsage::MEDIA, std::move(ref_clock));
+                                    fuchsia::media::AudioRenderUsage2::MEDIA, std::move(ref_clock));
 
     // Any initial offset, plus the signal, should fit entirely into the ring buffer
     auto offset_before_input_start = std::max(OffsetFrames(), ConvergenceFrames());
@@ -568,7 +568,7 @@ class AdjustableClockPipelineTest : public ClockSyncPipelineTest {
 
     // With this uninitialized clock, instruct AudioRenderer to use AudioCore's clock.
     renderer_ = CreateAudioRenderer(format_, kPayloadFrames,
-                                    fuchsia::media::AudioRenderUsage::MEDIA, zx::clock());
+                                    fuchsia::media::AudioRenderUsage2::MEDIA, zx::clock());
   }
 
   double NumFramesOutput(int32_t clock_slew_ppm, int64_t num_frames_input) override {

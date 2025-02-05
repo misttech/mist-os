@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use common::{SessionId, VolumeChangeEarconsTest, DEFAULT_VOLUME_LEVEL, DEFAULT_VOLUME_MUTED};
-use fidl_fuchsia_media::AudioRenderUsage;
-use fidl_fuchsia_settings::{AudioStreamSettingSource, AudioStreamSettings, Volume};
+use fidl_fuchsia_media::AudioRenderUsage2;
+use fidl_fuchsia_settings::{AudioStreamSettingSource, AudioStreamSettings2, Volume};
 use futures::StreamExt;
 
 const VOLUME_EARCON_ID: u32 = 1;
@@ -18,9 +18,9 @@ const BLUETOOTH_DOMAIN: &str = "Bluetooth";
 const NON_BLUETOOTH_DOMAIN_1: &str = "Cast App";
 const NON_BLUETOOTH_DOMAIN_2: &str = "Cast App Helper";
 
-fn changed_media_stream_settings() -> AudioStreamSettings {
-    AudioStreamSettings {
-        stream: Some(AudioRenderUsage::Media),
+fn changed_media_stream_settings() -> AudioStreamSettings2 {
+    AudioStreamSettings2 {
+        stream: Some(AudioRenderUsage2::Media),
         source: Some(AudioStreamSettingSource::User),
         user_volume: Some(Volume {
             level: Some(DEFAULT_VOLUME_LEVEL + 0.2),
@@ -31,9 +31,9 @@ fn changed_media_stream_settings() -> AudioStreamSettings {
     }
 }
 
-fn changed_interruption_stream_settings() -> AudioStreamSettings {
-    AudioStreamSettings {
-        stream: Some(fidl_fuchsia_media::AudioRenderUsage::Interruption),
+fn changed_interruption_stream_settings() -> AudioStreamSettings2 {
+    AudioStreamSettings2 {
+        stream: Some(fidl_fuchsia_media::AudioRenderUsage2::Interruption),
         source: Some(AudioStreamSettingSource::User),
         user_volume: Some(Volume {
             level: Some(DEFAULT_VOLUME_LEVEL + 0.25),
@@ -68,7 +68,7 @@ async fn test_multiple_earcons() {
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         BLUETOOTH_CONNECTED_SOUND_ID,
-        AudioRenderUsage::Background,
+        AudioRenderUsage2::Background,
     )
     .await;
     assert_eq!(
@@ -81,7 +81,7 @@ async fn test_multiple_earcons() {
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         BLUETOOTH_CONNECTED_SOUND_ID,
-        AudioRenderUsage::Background,
+        AudioRenderUsage2::Background,
     )
     .await;
     assert_eq!(
@@ -94,7 +94,7 @@ async fn test_multiple_earcons() {
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         BLUETOOTH_DISCONNECTED_SOUND_ID,
-        AudioRenderUsage::Background,
+        AudioRenderUsage2::Background,
     )
     .await;
     assert_eq!(
@@ -107,7 +107,7 @@ async fn test_multiple_earcons() {
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         BLUETOOTH_DISCONNECTED_SOUND_ID,
-        AudioRenderUsage::Background,
+        AudioRenderUsage2::Background,
     )
     .await;
     assert_eq!(
@@ -138,19 +138,19 @@ async fn test_earcons_play_at_media_volume_level() {
 
     // Set both the media and interruption streams to different volumes. The background stream
     // should match the media stream when played.
-    test_instance.set_volume(vec![changed_media_stream_settings()]).await;
+    test_instance.set_volumes(vec![changed_media_stream_settings()]).await;
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         VOLUME_EARCON_ID,
-        AudioRenderUsage::Background,
+        AudioRenderUsage2::Background,
     )
     .await;
 
-    test_instance.set_volume(vec![changed_interruption_stream_settings()]).await;
+    test_instance.set_volumes(vec![changed_interruption_stream_settings()]).await;
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         VOLUME_EARCON_ID,
-        AudioRenderUsage::Background,
+        AudioRenderUsage2::Background,
     )
     .await;
 
@@ -159,18 +159,18 @@ async fn test_earcons_play_at_media_volume_level() {
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         BLUETOOTH_CONNECTED_SOUND_ID,
-        AudioRenderUsage::Background,
+        AudioRenderUsage2::Background,
     )
     .await;
 
     // Ensure background volume was matched when earcon was played.
-    let expected_background_stream = AudioStreamSettings {
-        stream: Some(AudioRenderUsage::Background),
+    let expected_background_stream = AudioStreamSettings2 {
+        stream: Some(AudioRenderUsage2::Background),
         source: Some(AudioStreamSettingSource::System),
         user_volume: changed_media_stream_settings().user_volume,
         ..Default::default()
     };
-    test_instance.verify_volume(AudioRenderUsage::Background, expected_background_stream).await;
+    test_instance.verify_volume(AudioRenderUsage2::Background, expected_background_stream).await;
 
     let _ = test_instance.destroy().await;
 }
@@ -201,7 +201,7 @@ async fn test_bluetooth_domain() {
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         BLUETOOTH_CONNECTED_SOUND_ID,
-        AudioRenderUsage::Background,
+        AudioRenderUsage2::Background,
     )
     .await;
     assert_eq!(
@@ -215,7 +215,7 @@ async fn test_bluetooth_domain() {
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         BLUETOOTH_DISCONNECTED_SOUND_ID,
-        AudioRenderUsage::Background,
+        AudioRenderUsage2::Background,
     )
     .await;
     assert_eq!(

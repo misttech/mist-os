@@ -1,0 +1,159 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bazel/bazel_action.gni")
+import("//build/testing/test_spec.gni")
+import("//src/sys/pkg/bin/package-tool/package-tool.gni")
+
+# Build several Bazel test packages with a single GN > Bazel boundary
+# transition. This can be considerably faster than building
+# them through separate bazel_fuchsia_test_package() targets, because
+# these must always be serialized. Using a bazel_test_package_group()
+# allows Bazel to parallelize more work at the same time,
+# and avoids repeating the analysis phase on each call.
+#
+# However, this also means that *all* Bazel targets are re-built
+# it any of a single tests's dependency changes.
+#
+# Arguments:
+#    tests: (required)
+#      A list of test, each one describing the content of a given
+#      Bazel test package to build and corresponding test components. Each item
+#      in the list follows the following schema:
+#
+#          test_package_target  (required)
+#              A GN target name. It usually should be a
+#              bazel_fuchsia_test_package target so the proper test_spec target
+#              will be defined.
+#
+#          test_package_name: (optional)
+#              The `package_name` of the wrapped `fuchsia_test_package`.
+#
+#          test_component_names  (required)
+#              The `name`s of components in the wrapped `fuchsia_test_package`.
+#              This should match what you defined in the corresponding
+#              `bazel_fuchsia_test_package` target.
+#
+#          deps:
+#              Usual meaning, but all deps for all subtargets are
+#              forwarded to the group target.
+#
+#          metadata, visibility:
+#              Usual meaning, but these values are _not_ forwarded
+#              to the group target.
+#
+#    metadata: (optional)
+#       Metadata that is _only_ applied to the group target itself, not to
+#       its sub-targets.
+#
+#    testonly (optional)
+#       Usual GN meaning, but applies to each subtarget as well as the group.
+#
+#    visibility (optional)
+#       Usual GN meaning. A value provided here applies to the group target
+#       and also to each subtarget that does not have its own visibility definition.
+#
+template("bazel_test_package_group") {
+  _bazel_targets = []
+  _deps = []
+  _package_outputs = []
+  _extract_targets = []
+
+  _main_target = target_name
+  _build_action_target = "${_main_target}.bazel_build"
+
+  foreach(test, invoker.tests) {
+    assert(defined(test.test_component_names),
+           "Must define `test_component_names`")
+
+    _bazel_targets += [ test.test_package_target ]
+
+    _package_output_dir =
+        get_label_info(test.test_package_target, "target_out_dir") + "/" +
+        get_label_info(test.test_package_target, "name")
+
+    if (defined(test.test_package_name)) {
+      package_name = test.test_package_name
+    } else {
+      package_name = get_label_info(test.test_package_target, "name")
+    }
+
+    foreach(test_component_name, test.test_component_names) {
+      test_spec_target = "${package_name}.${test_component_name}"
+      _extract_target_name = "${package_name}.extract"
+
+      # Test metadata for `fx test` / test infra integration
+      test_spec(test_spec_target) {
+        if (defined(test.test_specs)) {
+          forward_variables_from(test.test_specs, "*")
+        }
+        package_url = "fuchsia-pkg://fuchsia.com/${package_name}#meta/${test_component_name}.cm"
+        target =
+            get_label_info(":${_extract_target_name}", "label_with_toolchain")
+        package_label =
+            get_label_info(":${_extract_target_name}", "label_with_toolchain")
+        package_manifests =
+            rebase_path([ "${_package_output_dir}/package_manifest.json" ],
+                        root_build_dir)
+        build_rule = "bazel_test_package_group"
+      }
+      _deps += [ ":${test_spec_target}" ]
+    }
+
+    _package_outputs += [
+      {
+        package_label = test.test_package_target
+        archive = "${package_name}.far"
+        copy_debug_symbols = true
+      },
+    ]
+
+    if (defined(test.deps)) {
+      # Loop over the deps individually, because the += / -= pattern doesn't
+      # work correctly if used with a list that contains duplicates (the -=
+      # step will fail with a "trying to remove X, but it wasn't there error")
+      foreach(dep, test.deps) {
+        _deps += [ dep ]
+        _deps -= [ dep ]
+        _deps += [ dep ]
+      }
+    }
+
+    package_tool_package_archive_extract(_extract_target_name) {
+      forward_variables_from(invoker, [ "visibility" ])
+      archive = "${target_out_dir}/${package_name}.far"
+      package_name = package_name
+      repository = "fuchsia.com"
+      package_out_dir = _package_output_dir
+      deps = [ ":${_build_action_target}" ]
+      testonly = true
+    }
+
+    _extract_targets += [ ":${_extract_target_name}" ]
+  }
+
+  bazel_action(_build_action_target) {
+    command = "build"
+    bazel_targets = _bazel_targets
+    deps = _deps
+    testonly = true
+    package_outputs = _package_outputs
+    forward_variables_from(
+        invoker,
+        "*",
+        [
+          # These arguments are handled above.
+          "deps",
+
+          # These arguments are specific to this template, and not
+          # passed to bazel_action().
+          "tests",
+        ])
+  }
+
+  group(_main_target) {
+    testonly = true
+    deps = _extract_targets
+  }
+}

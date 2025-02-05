@@ -162,6 +162,7 @@ import("//build/python/python_action.gni")
 #     compiled_packages = [
 #       {
 #         name = "core"
+#         packages = [ "//path/to/package" ],
 #         components = [
 #           {
 #             component_name = "core"
@@ -174,7 +175,7 @@ import("//build/python/python_action.gni")
 #         component_includes = [ ... ]
 #         contents = [ {
 #           label = "//some/gn/label"
-#           source = "//som/gn/file/path"
+#           source = "//some/gn/file/path"
 #           destination = "foo/bar"
 #         } ]
 #       },
@@ -675,6 +676,21 @@ template("assembly_input_bundle") {
           ]
         }
         _package.contents = _contents
+      }
+
+      # Gather the package manifests as input files
+      if (defined(package.packages)) {
+        packages = []
+        foreach(entry, package.packages) {
+          _package_out_dir = get_label_info(entry, "target_out_dir")
+          _package_name = get_label_info(entry, "name")
+          _manifest_path =
+              "${_package_out_dir}/${_package_name}/package_manifest.json"
+          _inputs += [ _manifest_path ]
+          _deps += [ entry ]
+          packages += [ rebase_path(_manifest_path, root_build_dir) ]
+        }
+        _package.packages = packages
       }
 
       # Gather the core shards as input files

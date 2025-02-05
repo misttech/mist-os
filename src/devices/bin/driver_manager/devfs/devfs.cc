@@ -25,6 +25,7 @@
 #include <fbl/ref_ptr.h>
 
 #include "src/devices/bin/driver_manager/devfs/builtin_devices.h"
+#include "src/devices/bin/driver_manager/devfs/class_names.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/fxl/strings/string_printf.h"
@@ -33,55 +34,8 @@
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 namespace driver_manager {
-namespace {
-
-struct ProtocolInfo {
-  std::string_view name;
-  uint32_t id;
-  uint32_t flags;
-};
-
-constexpr ProtocolInfo proto_infos[] = {
-#define DDK_PROTOCOL_DEF(tag, val, name, flags) {name, val, flags},
-#include <lib/ddk/protodefs.h>
-};
-
-Devnode::Target clone_target(Devnode::Target& target) { return target; }
-
-}  // namespace
 
 namespace fio = fuchsia_io;
-
-std::optional<std::string_view> ProtocolIdToClassName(uint32_t protocol_id) {
-  for (const ProtocolInfo& info : proto_infos) {
-    if (info.id != protocol_id) {
-      continue;
-    }
-    if (info.flags & PF_NOPUB) {
-      return std::nullopt;
-    }
-    return info.name;
-  }
-  return std::nullopt;
-}
-
-std::optional<std::reference_wrapper<ProtoNode>> Devfs::proto_node(std::string_view protocol_name) {
-  for (const ProtocolInfo& info : proto_infos) {
-    if (info.name == protocol_name) {
-      return proto_node(info.id);
-    }
-  }
-  return std::nullopt;
-}
-
-std::optional<std::reference_wrapper<ProtoNode>> Devfs::proto_node(uint32_t protocol_id) {
-  auto it = proto_info_nodes.find(protocol_id);
-  if (it == proto_info_nodes.end()) {
-    return std::nullopt;
-  }
-  auto& [key, value] = *it;
-  return *value;
-}
 
 std::string_view Devnode::name() const {
   if (name_.has_value()) {
@@ -152,7 +106,7 @@ Devnode::Devnode(Devfs& devfs)
 Devnode::Devnode(Devfs& devfs, PseudoDir& parent, Target target, fbl::String name)
     : devfs_(devfs),
       parent_(&parent),
-      node_(fbl::MakeRefCounted<VnodeImpl>(*this, clone_target(target))),
+      node_(fbl::MakeRefCounted<VnodeImpl>(*this, target)),
       name_([this, &parent, name = std::move(name)]() {
         auto [it, inserted] = parent.unpublished.emplace(name, *this);
         ZX_ASSERT(inserted);
@@ -161,14 +115,14 @@ Devnode::Devnode(Devfs& devfs, PseudoDir& parent, Target target, fbl::String nam
   if (target.has_value()) {
     children().AddEntry(
         fuchsia_device_fs::wire::kDeviceControllerName,
-        fbl::MakeRefCounted<fs::Service>([passthrough = target->Clone()](zx::channel channel) {
-          return (*passthrough.controller_connect.get())(
+        fbl::MakeRefCounted<fs::Service>([passthrough = target](zx::channel channel) {
+          return (*passthrough->controller_connect.get())(
               fidl::ServerEnd<fuchsia_device::Controller>(std::move(channel)));
         }));
     children().AddEntry(
         fuchsia_device_fs::wire::kDeviceProtocolName,
-        fbl::MakeRefCounted<fs::Service>([passthrough = target->Clone()](zx::channel channel) {
-          return (*passthrough.device_connect.get())(std::move(channel));
+        fbl::MakeRefCounted<fs::Service>([passthrough = target](zx::channel channel) {
+          return (*passthrough->device_connect.get())(std::move(channel));
         }));
   }
 }
@@ -254,49 +208,23 @@ void DevfsDevice::unpublish() {
   protocol_.reset();
 }
 
-ProtoNode::ProtoNode(fbl::String name) : name_(std::move(name)) {}
-
-SequentialProtoNode::SequentialProtoNode(fbl::String name) : ProtoNode(std::move(name)) {}
-
-uint32_t SequentialProtoNode::allocate_device_number() {
-  return (next_device_number_++) % (maximum_device_number_ + 1);
-}
-
-const char* SequentialProtoNode::format() { return format_; }
-
-RandomizedProtoNode::RandomizedProtoNode(fbl::String name,
-                                         std::default_random_engine::result_type seed)
-    : ProtoNode(std::move(name)), device_number_generator_(seed) {}
-
-uint32_t RandomizedProtoNode::allocate_device_number() {
-  std::uniform_int_distribution<uint32_t> distrib(0, maximum_device_number_);
-  return distrib(device_number_generator_);
-}
-
-const char* RandomizedProtoNode::format() { return format_; }
-
-zx::result<fbl::String> ProtoNode::seq_name() {
-  std::string dest;
-  for (uint32_t i = 0; i < 1000; ++i) {
-    dest.clear();
-    fxl::StringAppendf(&dest, format(), allocate_device_number());
-    {
-      fbl::RefPtr<fs::Vnode> out;
-      switch (const zx_status_t status = children().Lookup(dest, &out); status) {
-        case ZX_OK:
-          continue;
-        case ZX_ERR_NOT_FOUND:
-          break;
-        default:
-          return zx::error(status);
-      }
+zx::result<std::string> Devfs::MakeInstanceName(std::string_view class_name) {
+  if (!class_entries_.contains(std::string(class_name))) {
+    class_entries_[std::string(class_name)] = fbl::MakeRefCounted<PseudoDir>();
+    zx_status_t status = class_->AddEntry(class_name, class_entries_[std::string(class_name)]);
+    if (status != ZX_OK) {
+      LOGF(WARNING, "Failed to add class name '%.*s'  %s", static_cast<int>(class_name.size()),
+           class_name.data(), zx_status_get_string(status));
+      class_entries_.erase(std::string(class_name));
+      return zx::error(status);
     }
-    if (children().unpublished.find(dest) != children().unpublished.end()) {
-      continue;
-    }
-    return zx::ok(dest);
   }
-  return zx::error(ZX_ERR_ALREADY_EXISTS);
+  if (classes_that_assume_ordering.contains(std::string(class_name))) {
+    // must give a sequential id:
+    return zx::ok(std::format("{:03d}", classes_that_assume_ordering[class_name]++));
+  }
+  std::uniform_int_distribution<uint32_t> distrib(0, 0xffffffff);
+  return zx::ok(std::format("{}", distrib(device_number_generator_)));
 }
 
 zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_view> class_name,
@@ -311,19 +239,13 @@ zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_
 
   // Export the device to its class directory.
   if (class_name.has_value()) {
-    std::optional proto_dir = devfs_.proto_node(class_name.value());
-    if (proto_dir.has_value()) {
-      zx::result seq_name = proto_dir.value().get().seq_name();
-      if (seq_name.is_error()) {
-        return seq_name.status_value();
-      }
-      fbl::String instance_name = seq_name.value();
-
-      Devnode::Target target_clone = clone_target(target);
-      out_child.protocol_node().emplace(devfs_, proto_dir.value().get().children(),
-                                        std::move(target_clone), instance_name);
+    zx::result<std::string> instance_name = devfs_.MakeInstanceName(class_name.value());
+    if (instance_name.is_ok()) {
+      out_child.protocol_node().emplace(devfs_, *devfs_.get_class_entry(class_name.value()), target,
+                                        instance_name.value());
     }
   }
+
   out_child.topological_node().emplace(devfs_, children(), std::move(target), name);
 
   return ZX_OK;
@@ -348,82 +270,30 @@ Devfs::Devfs(std::optional<Devnode>& root) : root_(root.emplace(*this)) {
     MustAddEntry(*builtin, kZeroDevName, fbl::MakeRefCounted<BuiltinDevVnode>(false));
     MustAddEntry(pd, "builtin", std::move(builtin));
   }
-
-  // TODO(https://fxbug.dev/42064970): shrink this list to zero.
-  //
-  // Do not add to this list.
-  //
-  // These classes have clients that rely on the numbering scheme starting at
-  // 000 and increasing sequentially. This list was generated using:
-  //
-  // rg -IoN --no-ignore -g '!out/' -g '!*.md' '\bclass/[^/]+/[0-9]{3}\b' | \
-  // sed -E 's|class/(.*)/[0-9]{3}|"\1",|g' | sort | uniq
-  const std::unordered_set<std::string_view> classes_that_assume_ordering({
-      // TODO(https://fxbug.dev/42065012): Remove.
-      "adc",
-
-      // TODO(https://fxbug.dev/42065013): Remove.
-      "aml-ram",
-
-      // TODO(https://fxbug.dev/42065014): Remove.
-      // TODO(https://fxbug.dev/42065080): Remove.
-      "backlight",
-
-      // TODO(https://fxbug.dev/42068339): Remove.
-      "block",
-
-      // TODO(https://fxbug.dev/42065067): Remove.
-      "goldfish-address-space",
-      "goldfish-control",
-      "goldfish-pipe",
-
-      // TODO(https://fxbug.dev/42065072): Remove.
-      "ot-radio",
-
-      // TODO(https://fxbug.dev/42065076): Remove.
-      "securemem",
-
-      // TODO(https://fxbug.dev/42065009): Remove.
-      // TODO(https://fxbug.dev/42065080): Remove.
-      "temperature",
-
-      // TODO(https://fxbug.dev/42065080): Remove.
-      "thermal",
-  });
-  // Pre-populate the class directories.
-  std::random_device rd;
-  for (const auto& info : proto_infos) {
-    if (!(info.flags & PF_NOPUB)) {
-      std::unique_ptr<ProtoNode>& value = proto_info_nodes[info.id];
-      ZX_ASSERT_MSG(value == nullptr, "duplicate protocol with id %d", info.id);
-      if (classes_that_assume_ordering.find(info.name) != classes_that_assume_ordering.end()) {
-        value = std::make_unique<SequentialProtoNode>(info.name);
-      } else {
-        value = std::make_unique<RandomizedProtoNode>(info.name, rd());
-      }
-      MustAddEntry(*class_, info.name, value->children_);
-    }
+  for (std::string class_name : kEagerClassNames) {
+    EnsureClassExists(class_name);
   }
 }
 
-zx_status_t Devnode::export_class(Devnode::Target target, std::string_view class_path,
+zx_status_t Devnode::export_class(Devnode::Target target, std::string_view class_name,
                                   std::vector<std::unique_ptr<Devnode>>& out) {
-  std::optional proto_node = devfs_.proto_node(class_path);
-  if (!proto_node.has_value()) {
-    return ZX_ERR_NOT_FOUND;
+  zx::result<std::string> instance_name = devfs_.MakeInstanceName(class_name);
+  if (instance_name.is_error()) {
+    return instance_name.status_value();
   }
+  Devnode& child = *out.emplace_back(std::make_unique<Devnode>(
+      devfs_, *devfs_.get_class_entry(class_name), target, instance_name.value()));
 
-  ProtoNode& dn = proto_node.value().get();
-  zx::result seq_name = dn.seq_name();
-  if (seq_name.is_error()) {
-    return seq_name.error_value();
-  }
-  const fbl::String name = seq_name.value();
-
-  Devnode& child =
-      *out.emplace_back(std::make_unique<Devnode>(devfs_, dn.children(), std::move(target), name));
   child.publish();
   return ZX_OK;
+}
+
+void Devfs::EnsureClassExists(std::string_view name) {
+  if (class_entries_.contains(std::string(name))) {
+    return;
+  }
+  class_entries_[std::string(name)] = fbl::MakeRefCounted<PseudoDir>();
+  MustAddEntry(*class_, name, class_entries_[std::string(name)]);
 }
 
 zx_status_t Devnode::export_topological_path(Devnode::Target target,
@@ -496,16 +366,14 @@ zx_status_t Devnode::export_dir(Devnode::Target target,
                                 std::optional<std::string_view> class_path,
                                 std::vector<std::unique_ptr<Devnode>>& out) {
   if (topological_path.has_value()) {
-    Devnode::Target target_clone = clone_target(target);
-    zx_status_t status =
-        export_topological_path(std::move(target_clone), topological_path.value(), out);
+    zx_status_t status = export_topological_path(target, topological_path.value(), out);
     if (status != ZX_OK) {
       return status;
     }
   }
 
   if (class_path.has_value()) {
-    zx_status_t status = export_class(std::move(target), class_path.value(), out);
+    zx_status_t status = export_class(target, class_path.value(), out);
     if (status != ZX_OK) {
       return status;
     }

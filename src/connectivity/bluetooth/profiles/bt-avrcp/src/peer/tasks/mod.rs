@@ -8,12 +8,12 @@ use fuchsia_async::DurationExt;
 use fuchsia_sync::RwLock;
 use futures::future::FutureExt;
 use futures::stream::{SelectAll, StreamExt, TryStreamExt};
+use log::{error, info, trace, warn};
 use notification_stream::NotificationStream;
 use packet_encoding::{Decodable, Encodable};
 use rand::Rng;
 use std::collections::HashSet;
 use std::sync::Arc;
-use tracing::{error, info, trace, warn};
 
 mod notification_stream;
 
@@ -42,13 +42,13 @@ async fn get_available_players(
     let pdu_id = PduId::GetFolderItems;
     let peer_id = peer.read().id();
 
-    trace!(%peer_id, "Fetching available players for target peer");
+    trace!(peer_id:%; "Fetching available players for target peer");
     let resp_buf: Vec<u8> =
         { send_browse_command_internal(peer.clone(), u8::from(&pdu_id), &payload).await? };
     let response = GetFolderItemsResponse::decode(&resp_buf[..])?;
     match response {
         GetFolderItemsResponse::Failure(status) => {
-            error!(%peer_id, ?status, "GetFolderItems command failed");
+            error!(peer_id:%, status:?; "GetFolderItems command failed");
             Err(Error::CommandFailed)
         }
         GetFolderItemsResponse::Success(r) => {
@@ -75,7 +75,7 @@ async fn set_browsed_player(peer: Arc<RwLock<RemotePeer>>) -> Result<(), Error> 
     // Record player features.
     {
         let mut lock = peer.write();
-        trace!(%peer_id, "Recording player capabilities for target peer");
+        trace!(peer_id:%; "Recording player capabilities for target peer");
         lock.inspect.metrics().target_player_features(peer_id, &players);
         lock.update_available_players(&players);
     }
@@ -101,12 +101,12 @@ async fn set_browsed_player(peer: Arc<RwLock<RemotePeer>>) -> Result<(), Error> 
     let response = response?;
     match response {
         SetBrowsedPlayerResponse::Success(params) => {
-            info!(%peer_id, "Setting initial browsable player to {player_id}");
+            info!(peer_id:%; "Setting initial browsable player to {player_id}");
             peer.write().browsable_player = Some(BrowsablePlayer::new(player_id, params));
             Ok(())
         }
         SetBrowsedPlayerResponse::Failure(status) => {
-            error!(%peer_id, ?status, "SetBrowsedPlayer command failed");
+            error!(peer_id:%, status:?; "SetBrowsedPlayer command failed");
             Err(Error::CommandFailed)
         }
     }
@@ -283,7 +283,7 @@ async fn make_connection(peer: Arc<RwLock<RemotePeer>>, conn_type: AVCTPConnecti
             }
         },
         Ok(Err(e)) => {
-            error!(?e, %peer_id, "Couldn't connect to peer for {conn_type:?}");
+            error!(e:?, peer_id:%; "Couldn't connect to peer for {conn_type:?}");
             peer.write().connect_failed(conn_type, false);
         }
     }

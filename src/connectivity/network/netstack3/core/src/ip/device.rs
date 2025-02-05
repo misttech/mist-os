@@ -36,7 +36,7 @@ use netstack3_ip::device::{
     Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState, Ipv6DeviceConfiguration, Ipv6DeviceTimerId,
     Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext, Ipv6NetworkLearnedParameters,
     Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState, RsContext, RsState, RsTimerId,
-    SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacAddrsMutAndConfig, SlaacConfig,
+    SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacConfig, SlaacConfigAndState,
     SlaacContext, SlaacCounters, SlaacState, WeakAddressId,
 };
 use netstack3_ip::gmp::{
@@ -483,8 +483,8 @@ impl<
             DeviceId::Ethernet(id) => {
                 nud::confirm_reachable::<I, _, _, _>(self, bindings_ctx, id, neighbor)
             }
-            // NUD is not supported on Loopback or pure IP devices.
-            DeviceId::Loopback(_) | DeviceId::PureIp(_) => {}
+            // NUD is not supported on Loopback, pure IP, or blackhole devices.
+            DeviceId::Loopback(_) | DeviceId::PureIp(_) | DeviceId::Blackhole(_) => {}
         }
     }
 }
@@ -626,7 +626,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
 
     fn with_slaac_addrs_mut_and_configs<
         O,
-        F: FnOnce(SlaacAddrsMutAndConfig<'_, BC, Self::SlaacAddrs<'_>>, &mut SlaacState<BC>) -> O,
+        F: FnOnce(&mut Self::SlaacAddrs<'_>, SlaacConfigAndState<BC>, &mut SlaacState<BC>) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,
@@ -666,8 +666,8 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
         let mut addrs = SlaacAddrs { core_ctx, device_id: device_id.clone(), config };
 
         cb(
-            SlaacAddrsMutAndConfig {
-                addrs: &mut addrs,
+            &mut addrs,
+            SlaacConfigAndState {
                 config: slaac_config,
                 dad_transmits,
                 retrans_timer,

@@ -26,7 +26,8 @@ zx::result<Namespace> Namespace::Create(
     }
   }
   if (zx_status_t status =
-          fdio_ns_service_connect(self.incoming_, "/svc", server_end.TakeChannel().release());
+          fdio_ns_open3(self.incoming_, "/svc", uint64_t{fuchsia_io::wire::kPermReadable},
+                        server_end.TakeChannel().release());
       status != ZX_OK) {
     return zx::error(status);
   }
@@ -55,7 +56,8 @@ zx::result<Namespace> Namespace::Create(
     }
   }
   if (zx_status_t status =
-          fdio_ns_service_connect(self.incoming_, "/svc", server_end.TakeChannel().release());
+          fdio_ns_open3(self.incoming_, "/svc", uint64_t{fuchsia_io::wire::kPermReadable},
+                        server_end.TakeChannel().release());
       status != ZX_OK) {
     return zx::error(status);
   }
@@ -92,13 +94,11 @@ zx::result<> Namespace::OpenDeprecated(const char* path, fuchsia_io::OpenFlags f
   return zx::make_result(status);
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(24)
 zx::result<> Namespace::Open(const char* path, fuchsia_io::Flags flags,
                              zx::channel server_end) const {
   zx_status_t status =
       fdio_ns_open3(incoming_, path, static_cast<uint64_t>(flags), server_end.release());
   return zx::make_result(status);
 }
-#endif
 
 }  // namespace fdf

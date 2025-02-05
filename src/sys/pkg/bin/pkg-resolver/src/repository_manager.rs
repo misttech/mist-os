@@ -15,6 +15,7 @@ use fuchsia_url::{AbsolutePackageUrl, RepositoryUrl};
 use futures::future::LocalBoxFuture;
 use futures::lock::Mutex as AsyncMutex;
 use futures::prelude::*;
+use log::{error, info};
 use std::collections::hash_map::Entry;
 use std::collections::{btree_set, BTreeSet, HashMap};
 use std::ops::Deref;
@@ -23,7 +24,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::{fs, io};
 use thiserror::Error;
-use tracing::{error, info};
 use zx::Status;
 use {
     cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,

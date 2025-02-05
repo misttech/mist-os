@@ -7,6 +7,7 @@
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
         "syslog/offer.shard.cml",
+        "trace/client.shard.cml",
     ],
     program: {
         runner: "elf",
@@ -48,6 +49,13 @@
             availability: "optional",
         },
         {
+            storage: "data",
+            path: "/data",
+
+            // Only used if `serve_test_protocols: true`.
+            availability: "optional",
+        },
+        {
             directory: "dev-rtc",
             rights: [ "r*" ],
             path: "/dev/class/rtc",
@@ -59,13 +67,6 @@
             path: "/dev/class/hrtimer",
 
             // Optional during development.
-            availability: "optional",
-        },
-        {
-            storage: "data",
-            path: "/data",
-
-            // Only used if `serve_test_protocols: true`.
             availability: "optional",
         },
     ],
@@ -89,10 +90,12 @@
     ],
     expose: [
         {
-            protocol: [
-                "fuchsia.time.alarms.Wake",
-                "fuchsia.time.test.Rtc",
-            ],
+            protocol: [ "fuchsia.time.alarms.Wake" ],
+            from: "self",
+            to: "parent",
+        },
+        {
+            protocol: [ "fuchsia.time.test.Rtc" ],
             from: "self",
             to: "parent",
             availability: "optional",

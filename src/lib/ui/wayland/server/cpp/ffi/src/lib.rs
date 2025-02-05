@@ -22,7 +22,7 @@ pub struct wayland_server_handle_t {
 fn start_wayland_server() -> Result<(fasync::LocalExecutor, WaylandDispatcher), zx::Status> {
     let mut executor = fasync::LocalExecutor::new();
     let mut dispatcher = WaylandDispatcher::new().map_err(|e| {
-        tracing::error!("Failed to create wayland dispatcher: {}", e);
+        log::error!("Failed to create wayland dispatcher: {}", e);
         zx::Status::INTERNAL
     })?;
     // Try to get display properties before serving.

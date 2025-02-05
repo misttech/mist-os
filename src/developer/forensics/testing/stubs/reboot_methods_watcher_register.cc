@@ -9,26 +9,33 @@ namespace stubs {
 
 void RebootMethodsWatcherRegister::Register(
     ::fidl::InterfaceHandle<fuchsia::hardware::power::statecontrol::RebootMethodsWatcher> watcher) {
-  watcher_ = watcher.Bind();
-  watcher_->OnReboot(reason_, [] {});
+  // TODO(https://fxbug.dev/385742868): Remove this once the method is deleted
+  // from the API.
+  FX_LOGS(FATAL) << "Register is deprecated and should not be used";
 }
 
-void RebootMethodsWatcherRegister::RegisterWithAck(
-    ::fidl::InterfaceHandle<fuchsia::hardware::power::statecontrol::RebootMethodsWatcher> watcher,
-    RegisterWithAckCallback callback) {
+void RebootMethodsWatcherRegister::RegisterWatcher(
+    ::fidl::InterfaceHandle<fuchsia::hardware::power::statecontrol::RebootWatcher> watcher,
+    RegisterWatcherCallback callback) {
   watcher_ = watcher.Bind();
   callback();
-  watcher_->OnReboot(reason_, [] {});
+
+  fuchsia::hardware::power::statecontrol::RebootOptions options;
+  std::vector<fuchsia::hardware::power::statecontrol::RebootReason2> reasons = {reason_};
+  options.set_reasons(reasons);
+  watcher_->OnReboot(std::move(options), [] {});
 }
 
 void RebootMethodsWatcherRegisterHangs::Register(
     ::fidl::InterfaceHandle<fuchsia::hardware::power::statecontrol::RebootMethodsWatcher> watcher) {
-  watcher_ = watcher.Bind();
+  // TODO(https://fxbug.dev/385742868): Remove this once the method is deleted
+  // from the API.
+  FX_LOGS(FATAL) << "Register is deprecated and should not be used";
 }
 
-void RebootMethodsWatcherRegisterHangs::RegisterWithAck(
-    ::fidl::InterfaceHandle<fuchsia::hardware::power::statecontrol::RebootMethodsWatcher> watcher,
-    RegisterWithAckCallback callback) {
+void RebootMethodsWatcherRegisterHangs::RegisterWatcher(
+    ::fidl::InterfaceHandle<fuchsia::hardware::power::statecontrol::RebootWatcher> watcher,
+    RegisterWatcherCallback callback) {
   watcher_ = watcher.Bind();
   callback();
 }

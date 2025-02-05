@@ -36,10 +36,6 @@ group("e2e_tests") {
 group("core") {
   testonly = true
 
-  # The buildbot groups are not allowed to add platform features, only tests and
-  # tools.
-  assert_no_deps = [ "//bundles/platform/*" ]
-
   deps = [
     ":examples",
     ":no_e2e",
@@ -158,9 +154,4 @@ group("no_e2e_dep") {
     # Disallow test bundles to add shell commands to the main image.
     shell_commands_barrier = []
   }
-}
-
-# TODO(fxbug.dev/319132749): remove from coverage bot dependencies.
-group("cuckoo_tests") {
-  testonly = true
 }

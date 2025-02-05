@@ -464,7 +464,7 @@ class WebEngineTest : public ui_testing::PortableUITest,
 INSTANTIATE_TEST_SUITE_P(WebEngineTestParameterized, WebEngineTest,
                          testing::ValuesIn(AsTuples(ConfigsToTest())));
 
-TEST_P(WebEngineTest, ChromiumTap) {
+TEST_P(WebEngineTest, DISABLED_ChromiumTap) {
   InjectInput(TapLocation::kTopLeft);
 
   RunLoopUntil([&] { return response_state()->events_received().size() >= 1; });

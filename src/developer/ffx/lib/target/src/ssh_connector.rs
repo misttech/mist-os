@@ -6,11 +6,13 @@ use crate::target_connector::{
     FDomainConnection, OvernetConnection, TargetConnection, TargetConnectionError, TargetConnector,
     BUFFER_SIZE,
 };
+use crate::Resolution;
 use anyhow::Result;
 use ffx_command_error::FfxContext as _;
-use ffx_config::EnvironmentContext;
+use ffx_config::{EnvironmentContext, TryFromEnvContext};
 use ffx_ssh::ssh::{build_ssh_command_with_env, SshError};
 use fuchsia_async::Task;
+use futures::future::LocalBoxFuture;
 use nix::sys::signal::kill;
 use nix::sys::signal::Signal::SIGKILL;
 use nix::sys::wait::waitpid;
@@ -167,6 +169,24 @@ impl SshConnector {
     }
 }
 
+impl TryFromEnvContext for SshConnector {
+    fn try_from_env_context<'a>(
+        env: &'a EnvironmentContext,
+    ) -> LocalBoxFuture<'a, ffx_command_error::Result<Self>> {
+        Box::pin(async {
+            let resolution = Resolution::try_from_env_context(env).await?;
+            let res = resolution.addr().map_err(|_| {
+                ffx_command_error::user_error!(
+                    "query did not resolve an IP address. Resolved the following: {:?}",
+                    resolution,
+                )
+            })?;
+            tracing::debug!("connecting to address {res}");
+            SshConnector::new(res, env).await.bug().map_err(Into::into)
+        })
+    }
+}
+
 async fn start_fdomain_ssh_command(
     target: SocketAddr,
     env_context: &EnvironmentContext,
@@ -229,21 +249,32 @@ async fn try_ssh_cmd_cleanup(mut cmd: Child) -> Result<()> {
     Ok(())
 }
 
+/// This config value must be set to true to use FDomain as a remoting protocol.
+const FDOMAIN_CONFIG_KEY: &str = "ssh.allow_fdomain";
+
 impl TargetConnector for SshConnector {
     const CONNECTION_TYPE: &'static str = "ssh";
 
     async fn connect(&mut self) -> Result<TargetConnection, TargetConnectionError> {
-        let fdomain = match self.connect_fdomain().await {
-            Ok(f) => Some(f),
-            Err(FDomainConnectionError::NotSupported) => None,
-            Err(FDomainConnectionError::ConnectionError(other)) => {
-                // Eventually we should just return the error here, making
-                // FDomain authoritative about whether the device is
-                // connectable. For now we'll fall through because it's less
-                // likely to cause breakages prior to migration.
-                tracing::warn!("Connecting with FDomain encountered error {other:?}");
-                None
+        let allow_fdomain = self
+            .env_context
+            .get(FDOMAIN_CONFIG_KEY)
+            .unwrap_or_else(|_| self.env_context.is_strict());
+        let fdomain = if allow_fdomain {
+            match self.connect_fdomain().await {
+                Ok(f) => Some(f),
+                Err(FDomainConnectionError::NotSupported) => None,
+                Err(FDomainConnectionError::ConnectionError(other)) => {
+                    // Eventually we should just return the error here, making
+                    // FDomain authoritative about whether the device is
+                    // connectable. For now we'll fall through because it's less
+                    // likely to cause breakages prior to migration.
+                    tracing::warn!("Connecting with FDomain encountered error {other:?}");
+                    None
+                }
             }
+        } else {
+            None
         };
         let overnet = self.connect_overnet().await;
 

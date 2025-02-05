@@ -6,16 +6,15 @@
 #define SRC_DEVICES_USB_DRIVERS_DWC2_DWC2_H_
 
 #include <fidl/fuchsia.hardware.usb.dci/cpp/fidl.h>
-#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
 #include <fuchsia/hardware/usb/phy/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 #include <lib/sync/completion.h>
+#include <lib/zx/interrupt.h>
 #include <threads.h>
 
 #include <atomic>
@@ -232,8 +231,6 @@ class Dwc2 : public Dwc2Type,
   // Current endpoint zero request
   usb_setup_t cur_setup_ = {};
   Ep0State ep0_state_ = Ep0State::DISCONNECTED;
-
-  ddk::PDevFidl pdev_;
 
   using DciInterfaceBanjoClient = ddk::UsbDciInterfaceProtocolClient;
   using DciInterfaceFidlClient = fidl::WireSyncClient<fuchsia_hardware_usb_dci::UsbDciInterface>;

@@ -24,18 +24,12 @@
             source_availability: "unknown",
         },
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#bootstrap",
-            to: "#startup",
-        },
-        {
             config: [
                 "fuchsia.bluetooth.LegacyPairing",
                 "fuchsia.fonts.FontManifest",
                 "fuchsia.fonts.VerboseLogging",
+                "fuchsia.fshost.FxfsBlob",
+                "fuchsia.fshost.StorageHost",
                 "fuchsia.http-client.StopOnIdleTimeoutMillis",
                 "fuchsia.memory.CaptureOnPressureChange",
                 "fuchsia.memory.CriticalCaptureDelay",
@@ -97,7 +91,6 @@
                 "fuchsia.kernel.DebuglogResource",
                 "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.EnergyInfoResource",
-                "fuchsia.kernel.FramebufferResource",
                 "fuchsia.kernel.HypervisorResource",
                 "fuchsia.kernel.InfoResource",
                 "fuchsia.kernel.IommuResource",
@@ -111,6 +104,7 @@
                 "fuchsia.kernel.RootJob",
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.SmcResource",
+                "fuchsia.kernel.StallResource",
                 "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.pkg.PackageResolver-boot",
@@ -174,7 +168,6 @@
                 "fuchsia.fshost.Admin",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
-                "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.Log",
                 "fuchsia.logger.LogSink",
                 "fuchsia.paver.Paver",
@@ -183,6 +176,11 @@
                 "fuchsia.pkg.RetainedPackages",
                 "fuchsia.power.button.Monitor",
                 "fuchsia.power.clientlevel.Connector",
+
+                // TODO(https://fxbug.dev/389134835): Remove the initiator
+                // capability.
+                "fuchsia.power.CollaborativeRebootInitiator",
+                "fuchsia.power.internal.CollaborativeRebootScheduler",
                 "fuchsia.power.profile.Watcher",
                 "fuchsia.power.systemmode.ClientConfigurator",
                 "fuchsia.power.systemmode.Requester",
@@ -200,8 +198,7 @@
         },
         {
             protocol: [
-                "fuchsia.fxfs.CryptManagement",
-                "fuchsia.tpm.cr50.Cr50",
+                "fuchsia.fshost.StarnixVolumeProvider",
                 "fuchsia.virtualconsole.SessionManager",
             ],
             from: "#bootstrap",
@@ -259,12 +256,17 @@
         {
             dictionary: "diagnostics",
             from: "#bootstrap",
-            to: "#core",
+            to: [
+                "#core",
+                "#startup",
+            ],
         },
         {
             service: [
                 "fuchsia.gpu.magma.Service",
                 "fuchsia.hardware.cpu.ctrl.Service",
+                "fuchsia.hardware.gnss.Service",
+                "fuchsia.hardware.nfc.Service",
                 "fuchsia.hardware.rtc.Service",
                 "fuchsia.hardware.sockettunnel.Service",
                 "fuchsia.hardware.spmi.DebugService",

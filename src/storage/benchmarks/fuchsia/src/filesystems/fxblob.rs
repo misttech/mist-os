@@ -28,7 +28,7 @@ impl FilesystemConfig for Fxblob {
         let block_device = block_device_factory
             .create_block_device(&BlockDeviceConfig {
                 use_zxcrypt: false,
-                fvm_volume_size: Some(100 * 1024 * 1024),
+                fvm_volume_size: Some(104 * 1024 * 1024),
             })
             .await;
         let fxblob = FsManagementFilesystemInstance::new(

@@ -12,11 +12,11 @@ use fidl_fuchsia_component_internal::{
     self as component_internal, BuiltinBootResolver, CapabilityPolicyAllowlists,
     DebugRegistrationPolicyAllowlists, LogDestination, RealmBuilderResolverAndRunner,
 };
+use log::warn;
 use moniker::{ChildName, ExtendedMoniker, Moniker, MonikerError};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::warn;
 use version_history::{AbiRevision, AbiRevisionError, VersionHistory};
 
 /// Runtime configuration options.

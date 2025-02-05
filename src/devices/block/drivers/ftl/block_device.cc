@@ -22,11 +22,16 @@
 #include <ddktl/fidl.h>
 #include <fbl/algorithm.h>
 
+#include "fidl/fuchsia.storage.ftl/cpp/wire_types.h"
+#include "lib/driver/outgoing/cpp/outgoing_directory.h"
+#include "lib/fidl/cpp/wire/internal/transport.h"
 #include "lib/inspect/cpp/vmo/types.h"
 #include "lib/zbi-format/zbi.h"
 #include "nand_driver.h"
+#include "src/devices/bin/driver_runtime/dispatcher.h"
 #include "src/devices/block/drivers/ftl/metrics.h"
 #include "src/devices/block/lib/common/include/common-dfv1.h"
+#include "zircon/system/public/zircon/errors.h"
 
 namespace {
 
@@ -70,6 +75,9 @@ class LocalOperation {
 
 namespace ftl {
 
+BlockDevice::BlockDevice(zx_device_t* parent, fdf_dispatcher_t* dispatcher)
+    : DeviceType(parent), dispatcher_(dispatcher) {}
+
 BlockDevice::~BlockDevice() {
   if (thread_created_) {
     Kill();
@@ -103,7 +111,27 @@ zx_status_t BlockDevice::Bind() {
   if (status != ZX_OK) {
     return status;
   }
-  return DdkAdd(ddk::DeviceAddArgs(kDeviceName).set_inspect_vmo(metrics_.DuplicateInspectVmo()));
+
+  ddk::DeviceAddArgs args(kDeviceName);
+  args.set_inspect_vmo(metrics_.DuplicateInspectVmo());
+
+  std::array service{fuchsia_storage_ftl::Service::Name};
+  if (dispatcher_ != nullptr) {
+    outgoing_.emplace(dispatcher_);
+    zx::result result = outgoing_->AddService<fuchsia_storage_ftl::Service>(
+        fuchsia_storage_ftl::Service::InstanceHandler({
+            .config = config_binding_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
+        }));
+
+    auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    result = outgoing_->Serve(std::move(server));
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to service the outgoing directory");
+      return result.status_value();
+    }
+    args.set_fidl_service_offers(service).set_outgoing_dir(client.TakeChannel());
+  }
+  return DdkAdd(args);
 }
 
 void BlockDevice::DdkUnbind(ddk::UnbindTxn txn) {
@@ -251,6 +279,7 @@ bool BlockDevice::OnVolumeAdded(uint32_t page_size, uint32_t num_pages) {
 }
 
 zx_status_t BlockDevice::FormatInternal() {
+  std::lock_guard<std::mutex> lock(volume_lock_);
   zx_status_t status = volume_->Format();
   if (status != ZX_OK) {
     zxlogf(ERROR, "FTL: format failed: %s", zx_status_get_string(status));
@@ -268,6 +297,7 @@ bool BlockDevice::InitFtl() {
   }
   memcpy(guid_, driver->info().partition_guid, ZBI_PARTITION_GUID_LEN);
 
+  std::lock_guard<std::mutex> lock(volume_lock_);
   if (!volume_) {
     volume_ = std::make_unique<ftl::VolumeImpl>(this);
   }
@@ -334,6 +364,7 @@ int BlockDevice::WorkerThread() {
         zx_duration_t timeout = pending_flush_ ? ZX_SEC(15) : ZX_TIME_INFINITE;
         zx_status_t status = sync_completion_wait(&wake_signal_, timeout);
         if (status == ZX_ERR_TIMED_OUT) {
+          std::lock_guard<std::mutex> lock(volume_lock_);
           Flush();
           pending_flush_ = false;
         }
@@ -354,7 +385,10 @@ int BlockDevice::WorkerThread() {
     // given block operation type.
     nand_counters_.Reset();
     ftl::BlockOperationProperties* op_stats = nullptr;
+    zx_status_t metrics_status;
+    Volume::Counters counters;
     {
+      std::lock_guard<std::mutex> lock(volume_lock_);
       TRACE_DURATION_BEGIN("block:ftl", "Operation", "opcode", operation->op.command.opcode,
                            "offset_dev", operation->op.rw.offset_dev, "length",
                            operation->op.rw.length);
@@ -387,10 +421,10 @@ int BlockDevice::WorkerThread() {
           ZX_DEBUG_ASSERT(false);  // Unexpected.
       }
       TRACE_DURATION_END("block:ftl", "Operation", "nand_ops", nand_counters_.GetSum());
+      metrics_status = volume_->GetCounters(&counters);
     }
 
-    Volume::Counters counters;
-    if (volume_->GetCounters(&counters) == ZX_OK) {
+    if (metrics_status == ZX_OK) {
       metrics_.max_wear().Set(counters.wear_count);
       metrics_.initial_bad_blocks().Set(counters.initial_bad_blocks);
       metrics_.running_bad_blocks().Set(counters.running_bad_blocks);
@@ -483,6 +517,47 @@ zx_status_t BlockDevice::Flush() {
 
   zxlogf(TRACE, "FTL: Finished flush");
   return status;
+}
+
+void BlockDevice::SetVolumeForTest(std::unique_ptr<ftl::Volume> volume) {
+  std::lock_guard<std::mutex> lock(volume_lock_);
+  volume_ = std::move(volume);
+}
+
+void BlockDevice::Get(GetCompleter::Sync& completer) {
+  std::lock_guard<std::mutex> lock(volume_lock_);
+  if (!volume_) {
+    return completer.ReplyError(ZX_ERR_UNAVAILABLE);
+  }
+  bool state;
+  if (zx_status_t result = volume_->GetNewWearLeveling(&state); result != ZX_OK) {
+    return completer.ReplyError(result);
+  }
+  fidl::WireTableFrame<fuchsia_storage_ftl::wire::ConfigurationOptions> options_frame;
+  return completer.ReplySuccess(
+      fuchsia_storage_ftl::wire::ConfigurationOptions::ExternalBuilder(
+          fidl::ObjectView<fidl::WireTableFrame<fuchsia_storage_ftl::wire::ConfigurationOptions>>::
+              FromExternal(&options_frame))
+          .use_new_wear_leveling(state)
+          .Build());
+}
+
+void BlockDevice::Set(fuchsia_storage_ftl::wire::ConfigurationOptions* request,
+                      SetCompleter::Sync& completer) {
+  std::lock_guard<std::mutex> lock(volume_lock_);
+  if (!volume_) {
+    return completer.ReplyError(ZX_ERR_UNAVAILABLE);
+  }
+
+  if (!request->has_use_new_wear_leveling()) {
+    return completer.ReplyError(ZX_ERR_INVALID_ARGS);
+  }
+
+  if (zx_status_t result = volume_->SetNewWearLeveling(request->use_new_wear_leveling());
+      result != ZX_OK) {
+    return completer.ReplyError(result);
+  }
+  return completer.ReplySuccess();
 }
 
 }  // namespace ftl.

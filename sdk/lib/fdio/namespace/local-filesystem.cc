@@ -651,10 +651,7 @@ zx_status_t fdio_namespace::SetRoot(fdio_t* io) {
 }
 
 zx_status_t fdio_namespace::Export(fdio_flat_namespace_t** out) const {
-  fbl::RefPtr<LocalVnode> vn = [this]() {
-    std::lock_guard lock(lock_);
-    return root_;
-  }();
+  std::lock_guard lock(lock_);
 
   size_t count = 0;
   size_t buffer_size = 0;
@@ -663,7 +660,7 @@ zx_status_t fdio_namespace::Export(fdio_flat_namespace_t** out) const {
     buffer_size += path.size() + 1;
     return ZX_OK;
   };
-  if (zx_status_t status = vn->EnumerateRemotes(count_callback); status != ZX_OK) {
+  if (zx_status_t status = root_->EnumerateRemotes(count_callback); status != ZX_OK) {
     return status;
   }
   // Allocate enough space for a hypothetical:
@@ -717,7 +714,7 @@ zx_status_t fdio_namespace::Export(fdio_flat_namespace_t** out) const {
     return ZX_OK;
   };
 
-  if (zx_status_t status = vn->EnumerateRemotes(export_callback); status != ZX_OK) {
+  if (zx_status_t status = root_->EnumerateRemotes(export_callback); status != ZX_OK) {
     return status;
   }
 

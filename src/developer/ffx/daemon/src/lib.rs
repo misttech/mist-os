@@ -246,7 +246,7 @@ pub async fn spawn_daemon(context: &EnvironmentContext) -> Result<()> {
 // when the isolate is dropped.
 #[tracing::instrument]
 pub async fn run_daemon(context: &EnvironmentContext) -> Result<std::process::Child> {
-    let mut cmd = context.rerun_prefix().await?;
+    let mut cmd = context.rerun_prefix()?;
     let mut stdout = std::process::Stdio::null();
     let mut stderr = std::process::Stdio::null();
 

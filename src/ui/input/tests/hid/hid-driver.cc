@@ -14,6 +14,7 @@
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/driver_test_realm/realm_builder/cpp/lib.h>
 #include <lib/fdio/cpp/caller.h>
+#include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/hid/boot.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
@@ -45,14 +46,12 @@ class HidDriverTest : public zxtest::Test {
     ASSERT_OK(driver_test_realm->Start(std::move(args), &realm_result));
     ASSERT_FALSE(realm_result.is_err());
 
-    // Connect to dev.
-    fidl::InterfaceHandle<fuchsia::io::Node> dev;
-    ASSERT_OK(realm_->component().Connect("dev-topological", dev.NewRequest().TakeChannel()));
-    ASSERT_OK(fdio_fd_create(dev.TakeChannel().release(), dev_fd_.reset_and_get_address()));
+    auto exposed = realm_->component().CloneExposedDir();
+    ASSERT_OK(fdio_fd_create(exposed.TakeChannel().release(), exposed_fd_.reset_and_get_address()));
 
     // Wait for HidCtl to be created.
     zx::result hidctl_channel =
-        device_watcher::RecursiveWaitForFile(dev_fd_.get(), "sys/test/hidctl");
+        device_watcher::RecursiveWaitForFile(exposed_fd_.get(), "dev-topological/sys/test/hidctl");
     ASSERT_OK(hidctl_channel.status_value());
 
     fidl::ClientEnd<fuchsia_hardware_hidctl::Device> client_end(std::move(hidctl_channel.value()));
@@ -61,26 +60,29 @@ class HidDriverTest : public zxtest::Test {
 
   template <typename Protocol>
   zx::result<fidl::ClientEnd<Protocol>> WaitForFirstDevice(const std::string& path) {
-    fdio_cpp::UnownedFdioCaller caller(dev_fd_);
-    zx::result directory_result =
-        component::ConnectAt<fuchsia_io::Directory>(caller.directory(), path);
-    if (directory_result.is_error()) {
-      return directory_result.take_error();
+    // Open specified `path` in our exposed directory.
+    fbl::unique_fd dev_fd;
+    if (zx_status_t status = fdio_open3_fd_at(
+            exposed_fd_.get(), path.c_str(),
+            uint64_t{fuchsia_io::wire::kPermReadable | fuchsia_io::wire::Flags::kProtocolDirectory},
+            dev_fd.reset_and_get_address());
+        status != ZX_OK) {
+      return zx::error(status);
     }
-    auto& directory = directory_result.value();
+    fdio_cpp::UnownedFdioCaller caller(dev_fd);
     zx::result watch_result =
         device_watcher::WatchDirectoryForItems<zx::result<fidl::ClientEnd<Protocol>>>(
-            directory, [&directory](std::string_view devpath) {
-              return component::ConnectAt<Protocol>(directory, devpath);
+            caller.directory(), [&caller](std::string_view devpath) {
+              return component::ConnectAt<Protocol>(caller.directory(), devpath);
             });
     if (watch_result.is_error()) {
       return watch_result.take_error();
     }
-    return std::move(watch_result.value());
+    return std::move(*watch_result);
   }
 
   async::Loop loop_ = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  fbl::unique_fd dev_fd_;
+  fbl::unique_fd exposed_fd_;
   fidl::WireSyncClient<fuchsia_hardware_hidctl::Device> hidctl_client_;
   std::unique_ptr<component_testing::RealmRoot> realm_;
   fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
@@ -131,9 +133,11 @@ TEST_F(HidDriverTest, BootMouseTest) {
 
   // Wait for input-report driver to bind to avoid binding to a device which is being torn down.
   ASSERT_OK(
-      WaitForFirstDevice<fuchsia_input_report::InputDevice>("class/input-report").status_value());
+      WaitForFirstDevice<fuchsia_input_report::InputDevice>("dev-topological/class/input-report")
+          .status_value());
   // Open the /dev/class/input/ device created by MakeHidDevice.
-  zx::result input_client = WaitForFirstDevice<fuchsia_hardware_input::Controller>("class/input");
+  zx::result input_client =
+      WaitForFirstDevice<fuchsia_hardware_input::Controller>("dev-topological/class/input");
   ASSERT_OK(input_client.status_value());
 
   // Open a FIDL channel to the HID device
@@ -205,7 +209,7 @@ TEST_F(HidDriverTest, BootMouseTestInputReport) {
 
   // Open the /dev/class/input/ device created by MakeHidDevice.
   zx::result input_client =
-      WaitForFirstDevice<fuchsia_input_report::InputDevice>("class/input-report");
+      WaitForFirstDevice<fuchsia_input_report::InputDevice>("dev-topological/class/input-report");
   ASSERT_OK(input_client.status_value());
   fidl::WireSyncClient client(std::move(input_client.value()));
 

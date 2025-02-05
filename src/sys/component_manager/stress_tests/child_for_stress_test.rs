@@ -15,7 +15,7 @@ async fn main() -> Result<(), Error> {
     const URL: &str =
         "fuchsia-pkg://fuchsia.com/component-manager-stress-tests#meta/child-for-stress-test.cm";
     const COL: &str = "children";
-    tracing::debug!("started");
+    log::debug!("started");
     let mut fs = ServiceFs::new_local();
     let children_vec = Arc::new(Mutex::new(vec![]));
     fs.dir("svc").add_fidl_service(move |mut stream: fstresstests::ChildRealmRequestStream| {

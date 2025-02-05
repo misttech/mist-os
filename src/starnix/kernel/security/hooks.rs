@@ -8,10 +8,10 @@ use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
     DirEntryHandle, FileHandle, FileObject, FileSystem, FileSystemHandle, FsNode, FsStr, FsString,
-    NamespaceNode, ValueOrSize, XattrOp,
+    Mount, NamespaceNode, ValueOrSize, XattrOp,
 };
 use fuchsia_inspect_contrib::profile_duration;
-use selinux::{SecurityPermission, SecurityServer};
+use selinux::{FileSystemMountOptions, SecurityPermission, SecurityServer};
 use starnix_logging::log_debug;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_types::ownership::TempRef;
@@ -118,19 +118,35 @@ where
 
 /// Returns the security state structure for the kernel, based on the supplied "selinux" argument
 /// contents.
-pub fn kernel_init_security(enabled: bool) -> KernelState {
+pub fn kernel_init_security(enabled: bool, exceptions_config: String) -> KernelState {
     profile_duration!("security.hooks.kernel_init_security");
-    KernelState { state: enabled.then(|| selinux_hooks::kernel_init_security()) }
+    KernelState { state: enabled.then(|| selinux_hooks::kernel_init_security(exceptions_config)) }
 }
 
-/// Return security state to associate with a filesystem based on the supplied mount options.
+/// Consumes the mount options from the supplied `MountParams` and returns the security mount
+/// options for the given `MountParams`.
+/// Corresponds to the `sb_eat_lsm_opts` hook.
+pub fn sb_eat_lsm_opts(
+    kernel: &Kernel,
+    mount_params: &mut MountParams,
+) -> Result<FileSystemMountOptions, Errno> {
+    profile_duration!("security.hooks.sb_eat_lsm_opts");
+    if let Some(state) = &kernel.security_state.state {
+        if state.server.has_policy() {
+            return selinux_hooks::sb_eat_lsm_opts(mount_params);
+        }
+    }
+    Ok(FileSystemMountOptions::default())
+}
+
+/// Returns security state to associate with a filesystem based on the supplied mount options.
 /// This sits somewhere between `fs_context_parse_param()` and `sb_set_mnt_opts()` in function.
 pub fn file_system_init_security(
     name: &'static FsStr,
-    mount_params: &MountParams,
+    mount_options: &FileSystemMountOptions,
 ) -> Result<FileSystemState, Errno> {
     profile_duration!("security.hooks.file_system_init_security");
-    Ok(FileSystemState { state: selinux_hooks::file_system_init_security(name, mount_params)? })
+    Ok(FileSystemState { state: selinux_hooks::file_system_init_security(name, mount_options)? })
 }
 
 /// Gives the hooks subsystem an opportunity to note that the new `file_system` needs labeling, if
@@ -178,6 +194,19 @@ pub struct FsNodeSecurityXattr {
     pub value: FsString,
 }
 
+/// Checks whether the `current_task` has the specified `permission_flags` to the `file`.
+/// Corresponds to the `file_permission()` LSM hook.
+pub fn file_permission(
+    current_task: &CurrentTask,
+    file: &FileObject,
+    permission_flags: PermissionFlags,
+) -> Result<(), Errno> {
+    profile_duration!("security.hooks.file_permission");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::file_permission(security_server, current_task, file, permission_flags)
+    })
+}
+
 /// Called by the VFS to initialize the security state for an `FsNode` that is being linked at
 /// `dir_entry`.
 /// If the `FsNode` security state had already been initialized, or no policy is yet loaded, then
@@ -203,6 +232,26 @@ where
     }
 }
 
+/// Applies the given label to the given node without checking any permissions.
+/// Used by file-system implementations to set the label for a node, for example when it has
+/// prefetched the label in the xattr rather than letting it get fetched by
+/// `fs_node_init_with_dentry` later. Calling this doesn't need to exclude the use of
+/// `fs_node_init_with_dentry`, it will just turn that call into a fast no-op.
+/// Corresponds to the `inode_notifysecctx` LSM hook.
+pub fn fs_node_notify_security_context(
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+    context: &FsStr,
+) -> Result<(), Errno> {
+    if_selinux_else(
+        current_task,
+        |security_server| {
+            selinux_hooks::fs_node_notify_security_context(security_server, fs_node, context)
+        },
+        || error!(ENOTSUP),
+    )
+}
+
 /// Called by file-system implementations when creating the `FsNode` for a new file, to determine the
 /// correct label based on the `CurrentTask` and `parent` node, and the policy-defined transition
 /// rules, and to initialize the `FsNode`'s security state accordingly.
@@ -219,7 +268,7 @@ pub fn fs_node_init_on_create(
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
     profile_duration!("security.hooks.fs_node_init_on_create");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::fs_node_init_on_create(security_server, current_task, new_node, parent)
+        selinux_hooks::fs_node_init_on_create(security_server, current_task, new_node, Some(parent))
     })
 }
 
@@ -409,6 +458,44 @@ pub fn check_file_ioctl_access(
     profile_duration!("security.hooks.check_file_ioctl_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_file_ioctl_access(security_server, current_task, file, request)
+    })
+}
+
+/// Sets the security context of `CurrentTask` to be appropriate for a copy up operation
+/// on `fs_node`.
+///
+/// The task's security context will be reset when the `ScopedFsCreate` is dropped.
+///
+/// Returns `None` if SELinux is not enabled.
+///
+/// Corresponds to the `security_inode_copy_up()` LSM hook.
+pub fn fs_node_copy_up<'a>(
+    current_task: &'a CurrentTask,
+    fs_node: &FsNode,
+) -> Result<Option<selinux_hooks::ScopedFsCreate<'a>>, Errno> {
+    profile_duration!("security.hooks.fs_node_copy_up");
+    if_selinux_else_default_ok(current_task, |_security_server| {
+        Ok(Some(selinux_hooks::fs_node_copy_up(current_task, fs_node)))
+    })
+}
+
+/// Returns whether `current_task` has the permissions to execute this fcntl syscall.
+/// Corresponds to the `file_fcntl()` LSM hook.
+pub fn check_file_fcntl_access(
+    current_task: &CurrentTask,
+    file: &FileObject,
+    fcntl_cmd: u32,
+    fcntl_arg: u64,
+) -> Result<(), Errno> {
+    profile_duration!("security.hooks.check_file_fcntl_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_file_fcntl_access(
+            security_server,
+            current_task,
+            file,
+            fcntl_cmd,
+            fcntl_arg,
+        )
     })
 }
 
@@ -693,6 +780,19 @@ pub fn sb_mount(
     })
 }
 
+/// Checks permission before remounting `mount` with `new_mount_params`.
+/// Corresponds to the `sb_remount()` LSM hook.
+pub fn sb_remount(
+    current_task: &CurrentTask,
+    mount: &Mount,
+    new_mount_options: FileSystemMountOptions,
+) -> Result<(), Errno> {
+    profile_duration!("security.hooks.sb_remount");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::superblock::sb_remount(security_server, mount, new_mount_options)
+    })
+}
+
 /// Checks if `current_task` has the permission to get the filesystem statistics of `fs`.
 /// Corresponds to the `sb_statfs()` LSM hook.
 pub fn sb_statfs(current_task: &CurrentTask, fs: &FileSystem) -> Result<(), Errno> {
@@ -959,6 +1059,11 @@ pub fn set_procattr(
         // If SELinux is disabled then no writes are accepted.
         || error!(EINVAL),
     )
+}
+
+/// Returns true if SELinux is enabled on the kernel for this task.
+pub fn fs_is_xattr_labeled(fs: FileSystemHandle) -> bool {
+    fs.security_state.state.supports_xattr()
 }
 
 /// Stashes a reference to the selinuxfs null file for later use by hooks that remap

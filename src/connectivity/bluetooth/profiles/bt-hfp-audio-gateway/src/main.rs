@@ -10,9 +10,9 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect_derive::Inspect;
 use futures::channel::mpsc;
 use futures::future;
+use log::{debug, error, info, warn};
 use std::collections::HashSet;
 use std::pin::pin;
-use tracing::{debug, error, info, warn};
 
 use crate::config::AudioGatewayFeatureSupport;
 use crate::features::CodecId;
@@ -65,7 +65,7 @@ async fn setup_audio(
         let codec = audio::CodecAudioControl::new(provider);
         Ok(Box::new(codec))
     } else {
-        error!(r#type = config.offload_type, "Unrecognized offload type");
+        error!(r#type = config.offload_type.as_str(); "Unrecognized offload type");
         Err(anyhow!("Can't setup audio"))
     }
 }
@@ -84,7 +84,7 @@ async fn main() -> Result<(), Error> {
     let audio = setup_audio(&config, controller_codecs.clone()).await?;
 
     let feature_support = AudioGatewayFeatureSupport::load_from_config(config);
-    debug!(?feature_support, "Starting HFP Audio Gateway");
+    debug!(feature_support:?; "Starting HFP Audio Gateway");
     let (profile_client, profile_svc) = register_audio_gateway(feature_support)?;
 
     // Power integration is optional - the HFP component will function even power integration is

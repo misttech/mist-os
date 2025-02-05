@@ -20,7 +20,7 @@ use fuchsia_url::AbsolutePackageUrl;
 use futures::future::BoxFuture;
 use futures::prelude::*;
 use futures::stream::BoxStream;
-use tracing::info;
+use log::info;
 
 // On success, system will reboot before this function returns
 pub async fn apply_system_update(

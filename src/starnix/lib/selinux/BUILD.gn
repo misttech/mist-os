@@ -10,9 +10,11 @@ rustc_library("selinux") {
   edition = "2021"
   sources = [
     "src/access_vector_cache.rs",
+    "src/exceptions_config.rs",
     "src/lib.rs",
     "src/permission_check.rs",
     "src/policy/arrays.rs",
+    "src/policy/constraints.rs",
     "src/policy/error.rs",
     "src/policy/extensible_bitmap.rs",
     "src/policy/index.rs",
@@ -34,6 +36,7 @@ rustc_library("selinux") {
     "testdata/composite_policies/compiled/role_transition_not_allowed_policy.pp",
     "testdata/composite_policies/compiled/role_transition_policy.pp",
     "testdata/composite_policies/compiled/type_transition_policy.pp",
+    "testdata/composite_policies/compiled/exceptions_config_policy.pp",
     "testdata/composite_policies/compiled/with_additional_domain_policy.pp",
     "testdata/composite_policies/compiled/with_unlabeled_access_domain_policy.pp",
     "testdata/expectations/emulator",
@@ -42,6 +45,7 @@ rustc_library("selinux") {
     "testdata/micro_policies/allow_a_t_a1_attr_class0_perm0_a2_attr_class0_perm1_policy.pp",
     "testdata/micro_policies/allow_a_t_b_attr_class0_perm0_policy.pp",
     "testdata/micro_policies/allow_a_t_b_t_class0_perm0_policy.pp",
+    "testdata/micro_policies/constraints_policy.pp",
     "testdata/micro_policies/file_no_defaults_policy.pp",
     "testdata/micro_policies/file_range_source_high_policy.pp",
     "testdata/micro_policies/file_range_source_low_high_policy.pp",
@@ -63,6 +67,7 @@ rustc_library("selinux") {
   deps = [
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bstr",
+    "//third_party/rust_crates:indexmap",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:zerocopy",
   ]

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/component/incoming/cpp/service.h>
 #include <lib/driver/compat/cpp/service_offers.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
@@ -43,7 +43,7 @@ zx_status_t ServiceOffersV1::Serve(async_dispatcher_t* dispatcher,
   // via the offer.
   for (const auto& service_name : zircon_offers_) {
     const auto instance_path = std::string("svc/").append(service_name).append("/default");
-    auto client = component::ConnectAt<fuchsia_io::Directory>(dir_, instance_path.c_str());
+    auto client = component::OpenDirectoryAt(dir_, instance_path);
     if (client.is_error()) {
       return client.status_value();
     }
@@ -58,7 +58,7 @@ zx_status_t ServiceOffersV1::Serve(async_dispatcher_t* dispatcher,
 
   for (const auto& service_name : driver_offers_) {
     const auto instance_path = std::string("svc/").append(service_name).append("/default");
-    auto client = component::ConnectAt<fuchsia_io::Directory>(dir_, instance_path.c_str());
+    auto client = component::OpenDirectoryAt(dir_, instance_path);
     if (client.is_error()) {
       return client.status_value();
     }
@@ -80,7 +80,7 @@ zx_status_t ServiceOffersV1::Serve(async_dispatcher_t* dispatcher,
   // via the offer.
   for (const auto& service_name : zircon_offers_) {
     const auto instance_path = std::string("svc/").append(service_name).append("/default");
-    auto client = component::ConnectAt<fuchsia_io::Directory>(dir_, instance_path.c_str());
+    auto client = component::OpenDirectoryAt(dir_, instance_path);
     if (client.is_error()) {
       return client.status_value();
     }
@@ -95,7 +95,7 @@ zx_status_t ServiceOffersV1::Serve(async_dispatcher_t* dispatcher,
 
   for (const auto& service_name : driver_offers_) {
     const auto instance_path = std::string("svc/").append(service_name).append("/default");
-    auto client = component::ConnectAt<fuchsia_io::Directory>(dir_, instance_path.c_str());
+    auto client = component::OpenDirectoryAt(dir_, instance_path);
     if (client.is_error()) {
       return client.status_value();
     }

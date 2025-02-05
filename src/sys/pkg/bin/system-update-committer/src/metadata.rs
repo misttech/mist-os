@@ -41,9 +41,9 @@ pub async fn put_metadata_in_happy_state(
     node: &finspect::Node,
     commit_inspect: &CommitInspect,
     config: &Config,
-) -> Result<(), MetadataError> {
+) -> Result<CommitResult, MetadataError> {
     let mut unblocker = Some(unblocker);
-    if config.enable() {
+    let commit_result = if config.enable() {
         let engine = PolicyEngine::build(boot_manager).await.map_err(MetadataError::Policy)?;
         if let Some((current_config, boot_attempts)) = engine.should_verify_and_commit() {
             // At this point, the FIDL server should start responding to requests so that clients
@@ -54,8 +54,13 @@ pub async fn put_metadata_in_happy_state(
             let () =
                 do_commit(boot_manager, current_config).await.map_err(MetadataError::Commit)?;
             let () = commit_inspect.record_boot_attempts(boot_attempts);
+            CommitResult::CommittedSystem
+        } else {
+            CommitResult::CommitNotNecessary
         }
-    }
+    } else {
+        CommitResult::CommitNotNecessary
+    };
 
     // Tell the rest of the system we are now committed.
     let () = p_internal
@@ -65,7 +70,22 @@ pub async fn put_metadata_in_happy_state(
     // Ensure the FIDL server will be unblocked, even if we didn't verify health.
     unblock_fidl_server(unblocker)?;
 
-    Ok(())
+    Ok(commit_result)
+}
+
+#[derive(Debug)]
+pub enum CommitResult {
+    CommittedSystem,
+    CommitNotNecessary,
+}
+
+impl CommitResult {
+    pub fn log_msg(&self) -> &'static str {
+        match self {
+            Self::CommittedSystem => "Committed system.",
+            Self::CommitNotNecessary => "Commit not necessary.",
+        }
+    }
 }
 
 /// Records inspect data specific to committing the update if the health checks pass.

@@ -16,7 +16,7 @@ use async_utils::stream::{StreamMap, Tagged};
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource};
 use futures::future::TryFutureExt as _;
 use futures::stream::{Stream, TryStreamExt as _};
-use tracing::warn;
+use log::warn;
 
 use crate::{dns, errors, DnsServerWatchers, InterfaceId};
 
@@ -174,6 +174,7 @@ fn get_suitable_dhcpv6_prefix(
                 dhcpv6_client_state,
                 dhcpv6_pd_config: _,
                 interface_admin_auth: _,
+                interface_naming_id: _,
             }) => {
                 let Some(ClientState { prefixes, sockaddr: _ }) = dhcpv6_client_state.as_ref()
                 else {
@@ -191,6 +192,12 @@ fn get_suitable_dhcpv6_prefix(
                     interface_id, wlan_ap_state,
                 );
             }
+            crate::InterfaceConfigState::Blackhole(state) => {
+                panic!(
+                    "interface {} not expected to be blackhole with state: {:?}",
+                    interface_id, state,
+                );
+            }
         }
     }
 
@@ -203,6 +210,7 @@ fn get_suitable_dhcpv6_prefix(
                     dhcpv6_client_state,
                     dhcpv6_pd_config: _,
                     interface_admin_auth: _,
+                    interface_naming_id: _,
                 }) => {
                     if let Some(ClientState { prefixes, sockaddr: _ }) = dhcpv6_client_state {
                         prefixes
@@ -210,7 +218,10 @@ fn get_suitable_dhcpv6_prefix(
                         return None;
                     }
                 }
-                crate::InterfaceConfigState::WlanAp(crate::WlanApInterfaceState {}) => {
+                crate::InterfaceConfigState::WlanAp(crate::WlanApInterfaceState {
+                    interface_naming_id: _,
+                })
+                | crate::InterfaceConfigState::Blackhole(_) => {
                     return None;
                 }
             };
@@ -393,13 +404,13 @@ mod tests {
             interface_admin_auth: fnet_interfaces_admin::GrantForInterfaceAuthorization,
         ) -> Self {
             Self {
-                interface_naming_id,
                 control,
                 config: InterfaceConfigState::Host(HostInterfaceState {
                     dhcpv4_client: crate::Dhcpv4ClientState::NotRunning,
                     dhcpv6_client_state,
                     dhcpv6_pd_config,
                     interface_admin_auth,
+                    interface_naming_id,
                 }),
                 device_class,
                 provisioning,

@@ -13,10 +13,10 @@ use futures::channel::mpsc;
 use futures::future::join_all;
 use futures::SinkExt;
 use hooks::{Event as HookEvent, EventType};
+use log::error;
 use moniker::ExtendedMoniker;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::error;
 
 /// Implementors of this trait know how to synthesize an event.
 pub trait ComponentManagerEventSynthesisProvider: Send + Sync {
@@ -104,7 +104,7 @@ impl SynthesisTask {
                 .map(|event_info| Self::run(sender.clone(), event_info));
             for result in join_all(futs).await {
                 if let Err(error) = result {
-                    error!(?error, "Event synthesis failed");
+                    error!(error:?; "Event synthesis failed");
                 }
             }
         });

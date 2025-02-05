@@ -7,7 +7,7 @@ use fidl_fuchsia_io as fio;
 use ramdevice_client::{RamdiskClient, RamdiskClientBuilder};
 use std::path::PathBuf;
 use storage_isolated_driver_manager::{
-    create_random_guid, fvm, wait_for_block_device, BlockDeviceMatcher,
+    create_random_guid, fvm, wait_for_block_device_devfs, BlockDeviceMatcher,
 };
 use zx::{AsHandleRef, Rights, Status, Vmo};
 
@@ -46,7 +46,7 @@ impl FvmInstance {
 
         if init {
             fvm::format_for_fvm(
-                ramdisk.as_dir().expect("invalid directory proxy"),
+                &ramdisk.open().expect("invalid ramdisk").into_proxy(),
                 fvm_slice_size as usize,
             )
             .unwrap();
@@ -109,5 +109,5 @@ impl FvmInstance {
 /// Gets the full path to a volume matching the given instance GUID at the given
 /// /dev/class/block path. This function will wait until a matching volume is found.
 pub async fn get_volume_path(instance_guid: &Guid) -> PathBuf {
-    wait_for_block_device(&[BlockDeviceMatcher::InstanceGuid(instance_guid)]).await.unwrap()
+    wait_for_block_device_devfs(&[BlockDeviceMatcher::InstanceGuid(instance_guid)]).await.unwrap()
 }

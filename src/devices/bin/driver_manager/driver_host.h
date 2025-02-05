@@ -70,12 +70,13 @@ class DriverHost {
                      fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
                      fidl::VectorView<fuchsia_driver_framework::wire::Offer> offers,
                      fuchsia_component_runner::wire::ComponentStartInfo start_info,
-                     fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) = 0;
+                     zx::event node_token, fidl::ServerEnd<fuchsia_driver_host::Driver> driver,
+                     StartCallback cb) = 0;
 
   // Loads and starts a driver using dynamic linking.
   virtual void StartWithDynamicLinker(fidl::ClientEnd<fuchsia_driver_framework::Node> node,
                                       std::string node_name, DriverLoadArgs load_args,
-                                      DriverStartArgs start_args,
+                                      DriverStartArgs start_args, zx::event node_token,
                                       fidl::ServerEnd<fuchsia_driver_host::Driver> driver,
                                       StartCallback cb) {
     cb(zx::error(ZX_ERR_NOT_SUPPORTED));
@@ -100,12 +101,12 @@ class DriverHostComponent final
              fuchsia_driver_framework::wire::NodePropertyDictionary2 node_properties,
              fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
              fidl::VectorView<fuchsia_driver_framework::wire::Offer> offers,
-             fuchsia_component_runner::wire::ComponentStartInfo start_info,
+             fuchsia_component_runner::wire::ComponentStartInfo start_info, zx::event node_token,
              fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) override;
 
   void StartWithDynamicLinker(fidl::ClientEnd<fuchsia_driver_framework::Node> node,
                               std::string node_name, DriverLoadArgs load_args,
-                              DriverStartArgs start_args,
+                              DriverStartArgs start_args, zx::event node_token,
                               fidl::ServerEnd<fuchsia_driver_host::Driver> driver_host_server_end,
                               StartCallback cb) override;
 

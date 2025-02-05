@@ -752,6 +752,41 @@ static bool vmpl_for_every_page_test() {
   END_TEST;
 }
 
+static bool vmpl_skip_last_gap_test() {
+  BEGIN_TEST;
+
+  VmPageList list;
+  list.InitializeSkew(0, 0);
+  vm_page_t test_page = {};
+  EXPECT_TRUE(AddPage(&list, &test_page, PAGE_SIZE));
+
+  uint64_t saw_gap_start = 0;
+  uint64_t saw_gap_end = 0;
+  int gaps_seen = 0;
+  list.ForEveryPageAndGapInRange(
+      [](const VmPageOrMarker* slot, uint64_t offset) { return ZX_ERR_STOP; },
+      [&](uint64_t gap_start, uint64_t gap_end) {
+        saw_gap_start = gap_start;
+        saw_gap_end = gap_end;
+        gaps_seen++;
+        return ZX_ERR_NEXT;
+      },
+      0, PAGE_SIZE * 3);
+
+  // Validate we saw one gap, and it was the correct gap.
+  EXPECT_EQ(gaps_seen, 1);
+  EXPECT_EQ(saw_gap_start, 0u);
+  EXPECT_EQ(saw_gap_end, 1ul * PAGE_SIZE);
+
+  list_node_t free_list;
+  list_initialize(&free_list);
+  list.RemoveAllContent([&free_list](VmPageOrMarker&& p) {
+    list_add_tail(&free_list, &p.ReleasePage()->queue_node);
+  });
+
+  END_TEST;
+}
+
 static bool vmpl_merge_onto_test() {
   BEGIN_TEST;
 
@@ -3696,6 +3731,7 @@ VM_UNITTEST(vmpl_page_gap_iter_test)
 VM_UNITTEST(vmpl_merge_offset_test)
 VM_UNITTEST(vmpl_merge_overlap_test)
 VM_UNITTEST(vmpl_for_every_page_test)
+VM_UNITTEST(vmpl_skip_last_gap_test)
 VM_UNITTEST(vmpl_merge_onto_test)
 VM_UNITTEST(vmpl_merge_marker_test)
 VM_UNITTEST(vmpl_contiguous_run_test)

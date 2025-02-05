@@ -293,6 +293,40 @@ impl<T> fmt::Display for UserRef<T> {
     }
 }
 
+pub trait MultiArchFrom<T>: Sized {
+    fn from_64(value: T) -> Self;
+    fn from_32(value: T) -> Self;
+}
+
+impl<T, U: From<T>> MultiArchFrom<T> for U {
+    fn from_64(value: T) -> Self {
+        Self::from(value)
+    }
+    fn from_32(value: T) -> Self {
+        Self::from(value)
+    }
+}
+
+pub trait Into64<T>: Sized {
+    fn into_64(self) -> T;
+}
+
+impl<T, U: MultiArchFrom<T>> Into64<U> for T {
+    fn into_64(self) -> U {
+        U::from_64(self)
+    }
+}
+
+pub trait Into32<T>: Sized {
+    fn into_32(self) -> T;
+}
+
+impl<T, U: MultiArchFrom<T>> Into32<U> for T {
+    fn into_32(self) -> U {
+        U::from_32(self)
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum MultiArchUserRef<T64, T32> {
     Arch64(UserRef<T64>),
@@ -306,6 +340,10 @@ impl<T64, T32> MultiArchUserRef<T64, T32> {
 
     pub fn from_32(addr: UserRef<T32>) -> Self {
         Self::Arch32(addr)
+    }
+
+    pub fn is_null(&self) -> bool {
+        self.addr() == UserAddress::NULL
     }
 
     pub fn addr(&self) -> UserAddress {

@@ -5,13 +5,13 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.display.controller") {
+  sdk_area = "Graphics"
+
+  enable_banjo = true
+
   sources = [
     "display-controller.fidl",
     "pixel-format.fidl",
   ]
-  public_deps = [
-    "//sdk/banjo/fuchsia.hardware.i2cimpl",
-    "//zircon/vdso/zx",
-  ]
-  enable_banjo = true
+  public_deps = [ "//zircon/vdso/zx" ]
 }

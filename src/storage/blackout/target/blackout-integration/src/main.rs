@@ -28,10 +28,10 @@ impl Test for IntegrationTest {
         device_path: Option<String>,
         seed: u64,
     ) -> Result<()> {
-        tracing::info!(device_label, device_path, seed, "setup called");
+        log::info!(device_label:%, device_path:?, seed; "setup called");
 
         if self.setup_called.swap(true, Ordering::Relaxed) {
-            tracing::error!("setup should only be called once!");
+            log::error!("setup should only be called once!");
             return Err(anyhow::anyhow!("setup should only be called once!"));
         }
 
@@ -49,10 +49,10 @@ impl Test for IntegrationTest {
         device_path: Option<String>,
         seed: u64,
     ) -> Result<()> {
-        tracing::info!(device_label, device_path, seed, "test called");
+        log::info!(device_label:%, device_path:?, seed; "test called");
 
         if self.test_called.swap(true, Ordering::Relaxed) {
-            tracing::error!("test should only be called once!");
+            log::error!("test should only be called once!");
             return Err(anyhow::anyhow!("test should only be called once!"));
         }
 
@@ -72,7 +72,7 @@ impl Test for IntegrationTest {
         device_path: Option<String>,
         seed: u64,
     ) -> Result<()> {
-        tracing::info!(device_label, device_path, seed, "verify called");
+        log::info!(device_label:%, device_path:?, seed; "verify called");
 
         // We use the block device path to pass an indicator to fail verification, to test the
         // error propagation.

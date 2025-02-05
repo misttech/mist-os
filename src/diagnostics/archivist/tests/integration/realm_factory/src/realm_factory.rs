@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use anyhow::*;
+use cm_rust::{CapabilityDecl, DictionaryDecl};
 use diagnostics_data::Severity;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_archivist_test::*;
+use fidl_fuchsia_inspect::InspectSinkMarker;
+use fidl_fuchsia_logger::LogSinkMarker;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
 };
@@ -224,6 +227,22 @@ impl ArchivistRealmFactory {
             )
             .await?;
 
+        test_realm
+            .add_capability(CapabilityDecl::Dictionary(DictionaryDecl {
+                name: "diagnostics".parse().unwrap(),
+                source_path: None,
+            }))
+            .await?;
+        test_realm
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol::<LogSinkMarker>())
+                    .capability(Capability::protocol::<InspectSinkMarker>())
+                    .from(&archivist)
+                    .to(Ref::dictionary("self/diagnostics")),
+            )
+            .await?;
+
         // Add the puppet components.
         if let Some(puppet_decls) = options.puppets {
             for decl in puppet_decls {
@@ -236,6 +255,15 @@ impl ArchivistRealmFactory {
                             .capability(Capability::protocol::<flogger::LogSinkMarker>())
                             .capability(Capability::protocol::<finspect::InspectSinkMarker>())
                             .from(&archivist)
+                            .to(&puppet),
+                    )
+                    .await?;
+
+                test_realm
+                    .add_route(
+                        Route::new()
+                            .capability(Capability::dictionary("diagnostics"))
+                            .from(Ref::self_())
                             .to(&puppet),
                     )
                     .await?;

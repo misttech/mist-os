@@ -85,6 +85,29 @@ ZXIO_EXPORT zx_status_t zxio_recvmsg(zxio_t* io, struct msghdr* msg, int flags, 
 ZXIO_EXPORT zx_status_t zxio_sendmsg(zxio_t* io, const struct msghdr* msg, int flags,
                                      size_t* out_actual, int16_t* out_code);
 
+// A Fuchsia-specific socket option to set socket marks.
+#define SO_FUCHSIA_MARK 10000
+
+typedef uint8_t zxio_socket_mark_domain_t;
+// The first socket mark domain.
+#define ZXIO_SOCKET_MARK_DOMAIN_1 ((zxio_socket_mark_domain_t)1u)
+// The second socket mark domain.
+#define ZXIO_SOCKET_MARK_DOMAIN_2 ((zxio_socket_mark_domain_t)2u)
+
+// A fuchsia socket can have multiple optional socket marks. This structure represents
+// a socket mark for a specified domain. If `is_present` is 0, it means the socket does
+// not carry a mark for the given domain and `value` field is unspecified.
+//
+// When getting the socket mark, you need to provide the `domain` field and the other
+// fields will be filled as a result.
+// When setting the socket mark, you can set a mark for a domain with `is_present` to
+// be true, or clear the mark for that domain with `is_present` to be false.
+typedef struct zxio_socket_mark {
+  uint32_t value;
+  zxio_socket_mark_domain_t domain;
+  bool is_present;
+} zxio_socket_mark_t;
+
 __END_CDECLS
 
 #endif  // LIB_ZXIO_BSDSOCKET_H_

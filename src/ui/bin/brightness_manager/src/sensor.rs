@@ -36,7 +36,7 @@ struct AmbientLightInputReportReaderProxy {
 }
 
 fn open_input_report_device(path: &str) -> Result<InputDeviceProxy, Error> {
-    tracing::info!("Opening sensor at {:?}", path);
+    log::info!("Opening sensor at {:?}", path);
     let (proxy, server) = fidl::endpoints::create_proxy::<InputDeviceMarker>();
     fdio::service_connect(path, server.into_channel())
         .context("Failed to connect built-in service")?;
@@ -108,7 +108,7 @@ async fn open_sensor_input_report_reader() -> Result<AmbientLightInputReportRead
                     }
                 }
                 Err(e) => {
-                    tracing::info!("Skip device {}: {}", device_path, e);
+                    log::info!("Skip device {}: {}", device_path, e);
                 }
             };
         }

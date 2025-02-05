@@ -176,13 +176,13 @@ int IdlePowerThread::Run(void* arg) {
       // WARNING: Be careful not to do anything that could pend a preemption after the check above,
       // with the exception of the internal implementation of ArchIdlePowerThread::EnterIdleState.
 
-      const zx_time_t idle_start_time = current_time();
+      const zx_instant_mono_t idle_start_time = current_mono_time();
 
       // TODO(eieio): Use scheduler and timer states to determine latency requirements.
-      const zx_duration_t max_latency = 0;
+      const zx_duration_mono_t max_latency = 0;
       ArchIdlePowerThread::EnterIdleState(max_latency);
 
-      const zx_time_t idle_finish_time = current_time();
+      const zx_instant_mono_t idle_finish_time = current_mono_time();
 
       this_idle_power_thread.processor_idle_time_ns_ += idle_finish_time - idle_start_time;
 
@@ -191,15 +191,15 @@ int IdlePowerThread::Run(void* arg) {
   }
 }
 
-zx_duration_t IdlePowerThread::TakeProcessorIdleTime() {
-  zx_duration_t idle_time_ns = 0;
+zx_duration_mono_t IdlePowerThread::TakeProcessorIdleTime() {
+  zx_duration_mono_t idle_time_ns = 0;
   ktl::swap(idle_time_ns, percpu::GetCurrent().idle_power_thread.processor_idle_time_ns_);
   return idle_time_ns;
 }
 
 IdlePowerThread::TransitionResult IdlePowerThread::TransitionFromTo(State expected_state,
                                                                     State target_state,
-                                                                    zx_time_t timeout_at) {
+                                                                    zx_instant_mono_t timeout_at) {
   // Attempt to move from the expected state to the transitional state.
   StateMachine expected{.current = expected_state, .target = expected_state};
   const StateMachine transitional{.current = expected_state, .target = target_state};
@@ -312,7 +312,7 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_instant_boot_t resu
   // Suspend all of the active CPUs besides the boot CPU.
   dprintf(INFO, "Suspending non-boot CPUs...\n");
 
-  const Deadline suspend_timeout_at = Deadline::after(ZX_MIN(1));
+  const Deadline suspend_timeout_at = Deadline::after_mono(ZX_MIN(1));
   cpu_mask_t cpus_to_suspend = cpus_active_before_suspend;
   while (cpus_to_suspend != 0) {
     const cpu_num_t cpu_id = highest_cpu_set(cpus_to_suspend);
@@ -347,8 +347,8 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_instant_boot_t resu
                                              ? "Wakeup before suspend completed. Aborting suspend"
                                              : "Resuming boot CPU";
 
-            const zx_duration_t resume_delta =
-                zx_time_sub_time(now, *static_cast<zx_time_t*>(resume_at_ptr));
+            const zx_duration_boot_t resume_delta =
+                zx_time_sub_time(now, *static_cast<zx_instant_boot_t*>(resume_at_ptr));
             dprintf(INFO, "%s at time %" PRId64 ", %" PRId64 "ns after target resume time.\n",
                     message_prefix, now, resume_delta);
           },
@@ -409,7 +409,7 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_instant_boot_t resu
   // Resume all non-boot CPUs that were successfully suspended.
   dprintf(INFO, "Resuming non-boot CPUs...\n");
 
-  const Deadline resume_timeout_at = Deadline::after(ZX_MIN(1));
+  const Deadline resume_timeout_at = Deadline::after_mono(ZX_MIN(1));
   cpu_mask_t cpus_to_resume = cpus_active_before_suspend ^ cpus_to_suspend;
   while (cpus_to_resume != 0) {
     const cpu_num_t cpu_id = highest_cpu_set(cpus_to_resume);
@@ -521,7 +521,7 @@ static int cmd_suspend(int argc, const cmd_args* argv, uint32_t flags) {
       goto notenoughargs;
     }
 
-    zx_duration_t delay = argv[2].i;
+    zx_duration_boot_t delay = argv[2].i;
     const char* units = argv[3].str;
     if (!strcmp(units, "m")) {
       delay = ZX_MIN(delay);
@@ -538,7 +538,7 @@ static int cmd_suspend(int argc, const cmd_args* argv, uint32_t flags) {
       goto badunits;
     }
 
-    const zx_time_t resume_at = zx_time_add_duration(current_boot_time(), delay);
+    const zx_instant_boot_t resume_at = zx_time_add_duration(current_boot_time(), delay);
     return IdlePowerThread::TransitionAllActiveToSuspend(resume_at);
   }
 

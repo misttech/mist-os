@@ -13,8 +13,8 @@ use fidl_fuchsia_io_test::{
 use fidl_test_placeholders::{EchoMarker, EchoRequest, EchoRequestStream};
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
+use log::error;
 use std::sync::Arc;
-use tracing::error;
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::immutable::{simple, Simple};
@@ -89,6 +89,7 @@ async fn run(mut stream: TestHarnessRequestStream) -> Result<(), Error> {
                     supports_truncate: false,
                     supports_modify_directory: false,
                     supports_mutable_file: false,
+                    supports_unnamed_temporary_file: false,
                 };
                 responder.send(&config)?;
             }

@@ -633,7 +633,7 @@ fn check_config_errors(
     credential: &Credential,
 ) -> Result<(), NetworkConfigError> {
     // Verify SSID has at least 1 byte.
-    if ssid.len() < 1 {
+    if ssid.is_empty() {
         return Err(NetworkConfigError::SsidEmpty);
     }
     // Verify that credentials match the security type. This code only inspects the lengths of

@@ -33,20 +33,12 @@
 
         // Diagnostics for all components.
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
+            dictionary: "diagnostics",
             from: "parent",
             to: [
                 "#account_providers",
                 "#bank_branch",
             ],
-        },
-        {
-            dictionary: "diagnostics",
-            from: "parent",
-            to: "all",
         },
     ],
     expose: [

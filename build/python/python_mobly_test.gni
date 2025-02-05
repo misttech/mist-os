@@ -75,6 +75,11 @@ import("//build/testing/host_test_data.gni")
 #    Type: string
 #    Default: target_name
 #
+#  test_cases (optional)
+#    List of test cases to run. Defaults to running all test cases.
+#    Type: list(string)
+#    Default: empty list
+#
 #  sources (optional)
 #    Other files that are used in the Mobly test.
 #    Type: list(path)
@@ -433,6 +438,11 @@ template("python_mobly_test") {
     _common_host_test_args += invoker.extra_args
   }
 
+  if (defined(invoker.test_cases)) {
+    _common_host_test_args += [ "--test_cases" ]
+    _common_host_test_args += invoker.test_cases
+  }
+
   common_environments = []
   if (defined(invoker.environments)) {
     common_environments = invoker.environments
@@ -536,7 +546,7 @@ template("python_mobly_test") {
         "--c-extension-library-tree",
         rebase_path(
                 get_label_info(
-                    "//src/developer/ffx/lib/fuchsia-controller:libfidl_codec",
+                    "//src/developer/ffx/lib/fuchsia-controller/cpp:libfidl_codec",
                     "root_out_dir"),
                 root_build_dir) + "/libfidl_codec.so",
         rebase_path(
@@ -552,8 +562,8 @@ template("python_mobly_test") {
       deps = [
         ":${_labels.fidl_ir_list}",
         ":${_test_binary_target}",
-        "//src/developer/ffx/lib/fuchsia-controller:libfidl_codec",
-        "//src/developer/ffx/lib/fuchsia-controller:libfuchsia_controller_internal",
+        "//src/developer/ffx/lib/fuchsia-controller/cpp:libfidl_codec",
+        "//src/developer/ffx/lib/fuchsia-controller/cpp:libfuchsia_controller_internal",
       ]
     }
 

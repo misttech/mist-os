@@ -14,8 +14,8 @@ use fidl_fuchsia_pkg_ext::RepositoryConfig;
 use fuchsia_async as fasync;
 use fuchsia_url::RepositoryUrl;
 use futures::prelude::*;
+use log::{error, info};
 use std::sync::Arc;
-use tracing::{error, info};
 use zx::Status;
 
 const LIST_CHUNK_SIZE: usize = 100;

@@ -8,37 +8,53 @@
 //! to a control group (for the duration of their lifetime).
 
 use starnix_core::signals::send_freeze_signal;
-use starnix_core::task::{CurrentTask, Kernel, ProcessEntryRef, ThreadGroup, WaitQueue, Waiter};
-use starnix_core::vfs::buffers::InputBuffer;
+use starnix_core::task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter};
 use starnix_core::vfs::{
-    fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, fs_node_impl_not_dir,
-    AppendLockGuard, BytesFile, DirectoryEntryType, DynamicFile, DynamicFileBuf, DynamicFileSource,
-    FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-    FsString, VecDirectory, VecDirectoryEntry,
+    BytesFile, DirectoryEntryType, FileSystemHandle, FsNodeHandle, FsNodeInfo, FsStr, FsString,
+    PathBuilder, VecDirectoryEntry,
 };
 use starnix_logging::{log_warn, track_stub};
-use starnix_sync::{FileOpsCore, Locked, Mutex};
+use starnix_sync::Mutex;
 use starnix_types::ownership::{TempRef, WeakRef};
 use starnix_uapi::auth::FsCred;
-use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::file_mode::{mode, FileMode};
-use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::file_mode::mode;
 use starnix_uapi::{errno, error, pid_t};
 use std::collections::{btree_map, hash_map, BTreeMap, HashMap};
 use std::ops::Deref;
 use std::sync::{Arc, OnceLock, Weak};
 
-use crate::freezer::{FreezerFile, FreezerState};
+use crate::directory::CgroupDirectory;
+use crate::events::EventsFile;
+use crate::freeze::FreezeFile;
+use crate::procs::ControlGroupNode;
 
 const CONTROLLERS_FILE: &str = "cgroup.controllers";
 const PROCS_FILE: &str = "cgroup.procs";
 const FREEZE_FILE: &str = "cgroup.freeze";
+const EVENTS_FILE: &str = "cgroup.events";
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum FreezerState {
+    Thawed,
+    Frozen,
+}
+
+#[derive(Default)]
+pub struct CgroupFreezerState {
+    /// Cgroups's own freezer state as set by the `cgroup.freeze` file.
+    pub self_freezer_state: FreezerState,
+    /// Considers both the cgroup's self freezer state as set by the `cgroup.freeze` file and
+    /// the freezer state of its ancestors. A cgroup is considered frozen if either itself or any
+    /// of its ancestors is frozen.
+    pub effective_freezer_state: FreezerState,
+}
 
 /// Common operations of all cgroups.
 pub trait CgroupOps: Send + Sync + 'static {
     /// Add a process to a cgroup. Errors if the cgroup has been deleted.
-    fn add_process(&self, pid: pid_t, thread_group: WeakRef<ThreadGroup>) -> Result<(), Errno>;
+    fn add_process(&self, pid: pid_t, thread_group: &TempRef<'_, ThreadGroup>)
+        -> Result<(), Errno>;
 
     /// Create a new sub-cgroup as a child of this cgroup. Errors if the cgroup is deleted, or a
     /// child with `name` already exists.
@@ -63,8 +79,14 @@ pub trait CgroupOps: Send + Sync + 'static {
     /// Return all pids that belong to this cgroup.
     fn get_pids(&self) -> Vec<pid_t>;
 
+    /// Whether the cgroup or any of its descendants have any processes.
+    fn is_populated(&self) -> bool;
+
+    /// Get the freezer `self state` and `effective state`.
+    fn get_freezer_state(&self) -> CgroupFreezerState;
+
     /// Freeze all tasks in the cgroup.
-    fn freeze(&self) -> Result<(), Errno>;
+    fn freeze(&self);
 
     /// Thaw all tasks in the cgroup.
     fn thaw(&self);
@@ -146,13 +168,17 @@ impl CgroupRoot {
 }
 
 impl CgroupOps for CgroupRoot {
-    fn add_process(&self, pid: pid_t, _thread_group: WeakRef<ThreadGroup>) -> Result<(), Errno> {
+    fn add_process(
+        &self,
+        pid: pid_t,
+        thread_group: &TempRef<'_, ThreadGroup>,
+    ) -> Result<(), Errno> {
         let mut pid_table = self.pid_table.lock();
         match pid_table.entry(pid) {
             hash_map::Entry::Occupied(entry) => {
                 // If pid is in a child cgroup, remove it.
                 if let Some(cgroup) = entry.get().upgrade() {
-                    cgroup.remove_process_internal(pid);
+                    cgroup.state.lock().remove_process(pid, thread_group)?;
                 }
                 entry.remove();
             }
@@ -169,8 +195,9 @@ impl CgroupOps for CgroupRoot {
         fs: &FileSystemHandle,
         name: &FsStr,
     ) -> Result<CgroupHandle, Errno> {
+        let new_child = Cgroup::new(current_task, fs, name, &self.weak_self, None);
         let mut children = self.children.lock();
-        children.insert_child(name.into(), Cgroup::new(current_task, fs, &self.weak_self))
+        children.insert_child(name.into(), new_child)
     }
 
     fn remove_child(&self, name: &FsStr) -> Result<CgroupHandle, Errno> {
@@ -206,7 +233,15 @@ impl CgroupOps for CgroupRoot {
         kernel_pids.into_iter().filter(|pid| !controlled_pids.contains_key(pid)).collect()
     }
 
-    fn freeze(&self) -> Result<(), Errno> {
+    fn is_populated(&self) -> bool {
+        false
+    }
+
+    fn get_freezer_state(&self) -> CgroupFreezerState {
+        Default::default()
+    }
+
+    fn freeze(&self) {
         unreachable!("Root cgroup cannot freeze any processes.");
     }
 
@@ -266,6 +301,10 @@ impl CgroupChildren {
         })
     }
 
+    fn get_children(&self) -> Vec<CgroupHandle> {
+        self.0.values().cloned().collect()
+    }
+
     fn get_node(&self, name: &FsStr) -> Result<FsNodeHandle, Errno> {
         self.0.get(name).map(|child| child.directory_node.clone()).ok_or_else(|| errno!(ENOENT))
     }
@@ -293,8 +332,11 @@ struct CgroupState {
     /// Wait queue to thaw all blocked tasks in this cgroup.
     wait_queue: WaitQueue,
 
-    /// State of the cgroup freezer.
-    freezer_state: FreezerState,
+    /// The cgroup's own freezer state.
+    self_freezer_state: FreezerState,
+
+    /// Effective freezer state inherited from the parent cgroup.
+    inherited_freezer_state: FreezerState,
 }
 
 impl CgroupState {
@@ -309,23 +351,7 @@ impl CgroupState {
         });
     }
 
-    fn freeze_process(&self, pid: pid_t) -> Result<(), Errno> {
-        // Only freeze a process when the freezer is in frozen state.
-        if self.freezer_state != FreezerState::Frozen {
-            return error!(EINVAL);
-        }
-
-        let thread_group = self
-            .processes
-            .get(&pid)
-            .ok_or_else(|| errno!(ENOENT))?
-            .upgrade()
-            .ok_or_else(|| errno!(ENOENT))?;
-
-        self.freeze_thread_group(&thread_group)
-    }
-
-    fn freeze_thread_group(&self, thread_group: &ThreadGroup) -> Result<(), Errno> {
+    fn freeze_thread_group(&self, thread_group: &ThreadGroup) {
         // Create static-lifetime TempRefs of Tasks so that we avoid don't hold the ThreadGroup
         // lock while iterating and sending the signal.
         // SAFETY: static TempRefs are released after all signals are queued.
@@ -333,10 +359,86 @@ impl CgroupState {
         for task in tasks {
             let waiter = Waiter::new();
             let wait_canceler = self.wait_queue.wait_async(&waiter);
-            send_freeze_signal(&task, waiter, wait_canceler)?;
+            send_freeze_signal(&task, waiter, wait_canceler)
+                .expect("sending freeze signal should not fail");
+        }
+    }
+
+    fn thaw_thread_group(&self, thread_group: &ThreadGroup) {
+        // Create static-lifetime TempRefs of Tasks so that we avoid don't hold the ThreadGroup
+        // lock while iterating and sending the signal.
+        // SAFETY: static TempRefs are released after all signals are queued.
+        let tasks = thread_group.read().tasks().map(TempRef::into_static).collect::<Vec<_>>();
+        for task in tasks {
+            task.write().thaw();
+            task.interrupt();
+        }
+    }
+
+    fn get_effective_freezer_state(&self) -> FreezerState {
+        std::cmp::max(self.self_freezer_state, self.inherited_freezer_state)
+    }
+
+    fn add_process(
+        &mut self,
+        pid: pid_t,
+        thread_group: &TempRef<'_, ThreadGroup>,
+    ) -> Result<(), Errno> {
+        if self.deleted {
+            return error!(ENOENT);
+        }
+        self.processes.insert(pid, WeakRef::from(thread_group));
+
+        if self.get_effective_freezer_state() == FreezerState::Frozen {
+            self.freeze_thread_group(&thread_group);
+        }
+        Ok(())
+    }
+
+    fn remove_process(
+        &mut self,
+        pid: pid_t,
+        thread_group: &TempRef<'_, ThreadGroup>,
+    ) -> Result<(), Errno> {
+        if self.deleted {
+            return error!(ENOENT);
+        }
+        self.processes.remove(&pid);
+
+        if self.get_effective_freezer_state() == FreezerState::Frozen {
+            self.thaw_thread_group(thread_group);
+        }
+        Ok(())
+    }
+
+    fn propagate_freeze(&mut self, inherited_freezer_state: FreezerState) {
+        let prev_effective_freezer_state = self.get_effective_freezer_state();
+        self.inherited_freezer_state = inherited_freezer_state;
+        if prev_effective_freezer_state == FreezerState::Frozen {
+            return;
         }
 
-        Ok(())
+        for (_, thread_group) in self.processes.iter() {
+            let Some(thread_group) = thread_group.upgrade() else {
+                continue;
+            };
+            self.freeze_thread_group(&thread_group);
+        }
+
+        // Freeze all children cgroups while holding self state lock
+        for child in self.children.get_children() {
+            child.state.lock().propagate_freeze(FreezerState::Frozen);
+        }
+    }
+
+    fn propagate_thaw(&mut self, inherited_freezer_state: FreezerState) {
+        self.inherited_freezer_state = inherited_freezer_state;
+        if self.get_effective_freezer_state() == FreezerState::Thawed {
+            self.wait_queue.notify_all();
+            for child in self.children.get_children() {
+                child.state.lock().propagate_thaw(FreezerState::Thawed);
+            }
+        }
     }
 }
 
@@ -344,11 +446,18 @@ impl CgroupState {
 pub struct Cgroup {
     root: Weak<CgroupRoot>,
 
+    /// Name of the cgroup.
+    name: FsString,
+
+    /// Weak reference to its parent cgroup, `None` if direct descendent of the root cgroup.
+    /// This field is useful in implementing features that only apply to non-root cgroups.
+    parent: Option<Weak<Cgroup>>,
+
     /// Internal state of the Cgroup.
     state: Mutex<CgroupState>,
 
     /// The directory node associated with this control group.
-    directory_node: FsNodeHandle,
+    pub directory_node: FsNodeHandle,
 
     /// The interface nodes associated with this control group.
     interface_nodes: BTreeMap<FsString, FsNodeHandle>,
@@ -357,16 +466,32 @@ pub struct Cgroup {
 }
 pub type CgroupHandle = Arc<Cgroup>;
 
+/// Returns the path from the root to this `cgroup`.
+#[allow(dead_code)]
+pub fn path_from_root(cgroup: CgroupHandle) -> Result<FsString, Errno> {
+    let mut path = PathBuilder::new();
+    let mut current = Some(cgroup);
+    while let Some(cgroup) = current {
+        path.prepend_element(cgroup.name());
+        current = cgroup.parent()?;
+    }
+    Ok(path.build_absolute())
+}
+
 impl Cgroup {
     pub fn new(
         current_task: &CurrentTask,
         fs: &FileSystemHandle,
+        name: &FsStr,
         root: &Weak<CgroupRoot>,
+        parent: Option<Weak<Cgroup>>,
     ) -> CgroupHandle {
         Arc::new_cyclic(|weak| {
             let weak_ops = weak.clone() as Weak<dyn CgroupOps>;
             Self {
                 root: root.clone(),
+                name: name.to_owned(),
+                parent,
                 state: Default::default(),
                 directory_node: fs.create_node(
                     current_task,
@@ -394,7 +519,15 @@ impl Cgroup {
                         FREEZE_FILE.into(),
                         fs.create_node(
                             current_task,
-                            FreezerFile::new_node(weak.clone() as Weak<Self>),
+                            FreezeFile::new_node(weak.clone() as Weak<Self>),
+                            FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                        ),
+                    ),
+                    (
+                        EVENTS_FILE.into(),
+                        fs.create_node(
+                            current_task,
+                            EventsFile::new_node(weak.clone() as Weak<Self>),
                             FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
                         ),
                     ),
@@ -404,39 +537,27 @@ impl Cgroup {
         })
     }
 
+    fn name(&self) -> &FsStr {
+        self.name.as_ref()
+    }
+
     fn root(&self) -> Result<Arc<CgroupRoot>, Errno> {
         self.root.upgrade().ok_or_else(|| errno!(ENODEV))
     }
 
-    fn add_process_internal(
-        &self,
-        pid: pid_t,
-        thread_group: WeakRef<ThreadGroup>,
-    ) -> Result<(), Errno> {
-        let mut state = self.state.lock();
-        if state.deleted {
-            return error!(ENOENT);
-        }
-        state.processes.insert(pid, thread_group);
-
-        // Check if the cgroup is frozen. If so, freeze the new process.
-        if state.freezer_state == FreezerState::Frozen {
-            state.freeze_process(pid)?;
-        }
-
-        Ok(())
-    }
-
-    fn remove_process_internal(&self, pid: pid_t) {
-        let mut state = self.state.lock();
-        if !state.deleted {
-            state.processes.remove(&pid);
-        }
+    /// Returns the upgraded parent cgroup, or `Ok(None)` if cgroup is a direct desendent of root.
+    /// Errors if parent node is no longer around.
+    fn parent(&self) -> Result<Option<CgroupHandle>, Errno> {
+        self.parent.as_ref().map(|weak| weak.upgrade().ok_or_else(|| errno!(ENODEV))).transpose()
     }
 }
 
 impl CgroupOps for Cgroup {
-    fn add_process(&self, pid: pid_t, thread_group: WeakRef<ThreadGroup>) -> Result<(), Errno> {
+    fn add_process(
+        &self,
+        pid: pid_t,
+        thread_group: &TempRef<'_, ThreadGroup>,
+    ) -> Result<(), Errno> {
         let root = self.root()?;
         let mut pid_table = root.pid_table.lock();
         match pid_table.entry(pid) {
@@ -450,14 +571,14 @@ impl CgroupOps for Cgroup {
                 // If pid is in another cgroup, we need to remove it first.
                 track_stub!(TODO("https://fxbug.dev/383374687"), "check permissions");
                 if let Some(other_cgroup) = entry.get().upgrade() {
-                    other_cgroup.remove_process_internal(pid);
+                    other_cgroup.state.lock().remove_process(pid, thread_group)?;
                 }
 
-                self.add_process_internal(pid, thread_group)?;
+                self.state.lock().add_process(pid, thread_group)?;
                 entry.insert(self.weak_self.clone());
             }
             hash_map::Entry::Vacant(entry) => {
-                self.add_process_internal(pid, thread_group)?;
+                self.state.lock().add_process(pid, thread_group)?;
                 entry.insert(self.weak_self.clone());
             }
         }
@@ -471,11 +592,15 @@ impl CgroupOps for Cgroup {
         fs: &FileSystemHandle,
         name: &FsStr,
     ) -> Result<CgroupHandle, Errno> {
+        let new_child =
+            Cgroup::new(current_task, fs, name, &self.root, Some(self.weak_self.clone()));
         let mut state = self.state.lock();
         if state.deleted {
             return error!(ENOENT);
         }
-        state.children.insert_child(name.into(), Cgroup::new(current_task, fs, &self.root))
+        // New child should inherit the effective freezer state of the current cgroup.
+        new_child.state.lock().inherited_freezer_state = state.get_effective_freezer_state();
+        state.children.insert_child(name.into(), new_child)
     }
 
     fn remove_child(&self, name: &FsStr) -> Result<CgroupHandle, Errno> {
@@ -511,251 +636,64 @@ impl CgroupOps for Cgroup {
         state.processes.keys().copied().collect()
     }
 
-    fn freeze(&self) -> Result<(), Errno> {
+    fn is_populated(&self) -> bool {
         let mut state = self.state.lock();
-
-        for (_, thread_group) in state.processes.iter() {
-            let Some(thread_group) = thread_group.upgrade() else {
-                continue;
-            };
-            state.freeze_thread_group(&thread_group)?;
+        if state.deleted {
+            return false;
         }
-        state.freezer_state = FreezerState::Frozen;
-        Ok(())
+        state.update_processes();
+        if !state.processes.is_empty() {
+            return true;
+        }
+
+        state.children.get_children().into_iter().any(|child| child.is_populated())
+    }
+
+    fn get_freezer_state(&self) -> CgroupFreezerState {
+        let state = self.state.lock();
+        CgroupFreezerState {
+            self_freezer_state: state.self_freezer_state,
+            effective_freezer_state: state.get_effective_freezer_state(),
+        }
+    }
+
+    fn freeze(&self) {
+        let mut state = self.state.lock();
+        let inherited_freezer_state = state.inherited_freezer_state;
+        state.propagate_freeze(inherited_freezer_state);
+        state.self_freezer_state = FreezerState::Frozen;
     }
 
     fn thaw(&self) {
         let mut state = self.state.lock();
-        state.wait_queue.notify_all();
-        state.freezer_state = FreezerState::Thawed;
+        state.self_freezer_state = FreezerState::Thawed;
+        let inherited_freezer_state = state.inherited_freezer_state;
+        state.propagate_thaw(inherited_freezer_state);
     }
 }
 
-/// A `CgroupDirectoryNode` represents the node associated with a particular control group.
-#[derive(Debug)]
-pub struct CgroupDirectory {
-    /// The associated cgroup.
-    cgroup: Weak<dyn CgroupOps>,
-}
+#[cfg(test)]
+mod test {
+    use crate::CgroupV2Fs;
 
-impl CgroupDirectory {
-    pub fn new(cgroup: Weak<dyn CgroupOps>) -> CgroupDirectoryHandle {
-        CgroupDirectoryHandle(Arc::new(Self { cgroup }))
-    }
-}
+    use super::*;
+    use starnix_core::testing::create_kernel_task_and_unlocked;
+    use starnix_core::vfs::fs_registry::FsRegistry;
 
-/// `CgroupDirectoryHandle` is needed to implement a trait for an Arc.
-#[derive(Debug, Clone)]
-pub struct CgroupDirectoryHandle(Arc<CgroupDirectory>);
-impl CgroupDirectoryHandle {
-    fn cgroup(&self) -> Result<Arc<dyn CgroupOps>, Errno> {
-        self.cgroup.upgrade().ok_or_else(|| errno!(ENODEV))
-    }
-}
+    #[::fuchsia::test]
+    async fn cgroup_path_from_root() {
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let registry = kernel.expando.get::<FsRegistry>();
+        registry.register(b"cgroup2".into(), CgroupV2Fs::new_fs);
+        let fs = current_task
+            .create_filesystem(&mut locked, b"cgroup2".into(), Default::default())
+            .expect("");
+        let root = fs.downcast_ops::<CgroupV2Fs>().expect("").root.clone();
 
-impl Deref for CgroupDirectoryHandle {
-    type Target = CgroupDirectory;
+        let test_cgroup = root.new_child(&current_task, &fs, "test".into()).expect("");
+        let child_cgroup = test_cgroup.new_child(&current_task, &fs, "child".into()).expect("");
 
-    fn deref(&self) -> &Self::Target {
-        &self.0.deref()
-    }
-}
-
-impl FsNodeOps for CgroupDirectoryHandle {
-    fn create_file_ops(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _flags: OpenFlags,
-    ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(VecDirectory::new_file(self.cgroup()?.get_entries()))
-    }
-
-    fn mkdir(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        node: &FsNode,
-        current_task: &CurrentTask,
-        name: &FsStr,
-        _mode: FileMode,
-        _owner: FsCred,
-    ) -> Result<FsNodeHandle, Errno> {
-        let child = self.cgroup()?.new_child(current_task, &node.fs(), name)?;
-        node.update_info(|info| {
-            info.link_count += 1;
-        });
-        Ok(child.directory_node.clone())
-    }
-
-    fn mknod(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _name: &FsStr,
-        _mode: FileMode,
-        _dev: DeviceType,
-        _owner: FsCred,
-    ) -> Result<FsNodeHandle, Errno> {
-        error!(EACCES)
-    }
-
-    fn unlink(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        node: &FsNode,
-        _current_task: &CurrentTask,
-        name: &FsStr,
-        child: &FsNodeHandle,
-    ) -> Result<(), Errno> {
-        let cgroup = self.cgroup()?;
-
-        // Only cgroup directories can be removed. Cgroup interface files cannot be removed.
-        let Some(child_dir) = child.downcast_ops::<CgroupDirectoryHandle>() else {
-            return error!(EPERM);
-        };
-        let child_cgroup = child_dir.cgroup()?;
-
-        let removed = cgroup.remove_child(name)?;
-        assert!(Arc::ptr_eq(&(removed as Arc<dyn CgroupOps>), &child_cgroup));
-
-        node.update_info(|info| {
-            info.link_count -= 1;
-        });
-
-        Ok(())
-    }
-
-    fn create_symlink(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _name: &FsStr,
-        _target: &FsStr,
-        _owner: FsCred,
-    ) -> Result<FsNodeHandle, Errno> {
-        error!(EPERM)
-    }
-
-    fn lookup(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        name: &FsStr,
-    ) -> Result<FsNodeHandle, Errno> {
-        self.cgroup()?.get_node(name)
-    }
-}
-
-/// A `ControlGroupNode` backs the `cgroup.procs` file.
-///
-/// Opening and writing to this node will add tasks to the control group.
-struct ControlGroupNode {
-    cgroup: Weak<dyn CgroupOps>,
-}
-
-impl ControlGroupNode {
-    fn new(cgroup: Weak<dyn CgroupOps>) -> Self {
-        ControlGroupNode { cgroup }
-    }
-}
-
-impl FsNodeOps for ControlGroupNode {
-    fs_node_impl_not_dir!();
-
-    fn create_file_ops(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _flags: OpenFlags,
-    ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(Box::new(ControlGroupFile::new(self.cgroup.clone())))
-    }
-
-    fn truncate(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _guard: &AppendLockGuard<'_>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _length: u64,
-    ) -> Result<(), Errno> {
-        Ok(())
-    }
-}
-
-struct ControlGroupFileSource {
-    cgroup: Weak<dyn CgroupOps>,
-}
-
-impl ControlGroupFileSource {
-    fn cgroup(&self) -> Result<Arc<dyn CgroupOps>, Errno> {
-        self.cgroup.upgrade().ok_or_else(|| errno!(ENODEV))
-    }
-}
-
-impl DynamicFileSource for ControlGroupFileSource {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let cgroup = self.cgroup()?;
-        for pid in cgroup.get_pids() {
-            write!(sink, "{pid}\n")?;
-        }
-        Ok(())
-    }
-}
-
-/// A `ControlGroupFile` currently represents the `cgroup.procs` file for the control group. Writing
-/// to this file will add tasks to the control group.
-pub struct ControlGroupFile {
-    cgroup: Weak<dyn CgroupOps>,
-    dynamic_file: DynamicFile<ControlGroupFileSource>,
-}
-
-impl ControlGroupFile {
-    fn new(cgroup: Weak<dyn CgroupOps>) -> Self {
-        Self {
-            cgroup: cgroup.clone(),
-            dynamic_file: DynamicFile::new(ControlGroupFileSource { cgroup: cgroup.clone() }),
-        }
-    }
-
-    fn cgroup(&self) -> Result<Arc<dyn CgroupOps>, Errno> {
-        self.cgroup.upgrade().ok_or_else(|| errno!(ENODEV))
-    }
-}
-
-impl FileOps for ControlGroupFile {
-    fileops_impl_delegate_read_and_seek!(self, self.dynamic_file);
-    fileops_impl_noop_sync!();
-
-    fn write(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        _offset: usize,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        let bytes = data.read_all()?;
-        let pid_string = std::str::from_utf8(&bytes).map_err(|_| errno!(EINVAL))?;
-        let pid = pid_string.trim().parse::<pid_t>().map_err(|_| errno!(ENOENT))?;
-
-        // Check if the pid is a valid task.
-        let thread_group = {
-            let kernel_pids = current_task.kernel().pids.read();
-            let Some(ProcessEntryRef::Process(ref thread_group)) = kernel_pids.get_process(pid)
-            else {
-                return error!(EINVAL);
-            };
-            WeakRef::from(thread_group)
-        };
-
-        self.cgroup()?.add_process(pid, thread_group)?;
-
-        Ok(bytes.len())
+        assert_eq!(path_from_root(test_cgroup), Ok("/test".into()));
+        assert_eq!(path_from_root(child_cgroup), Ok("/test/child".into()));
     }
 }

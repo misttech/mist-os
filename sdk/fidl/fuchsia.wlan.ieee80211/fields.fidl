@@ -71,7 +71,7 @@ type WlanAccessCategory = strict enum {
 ///
 /// TODO(https://fxbug.dev/376442944): Create a spec-compliant Band ID type
 /// and migrate the platform to use it.
-@available(added=NEXT)
+@available(added=26)
 type WlanBand = flexible enum : uint8 {
     TWO_GHZ = 0;
     FIVE_GHZ = 1;

@@ -47,7 +47,7 @@ rustc_binary("bin") {
   with_unit_tests = true
 
   if (is_mistos) {
-    configs += [ "//build/config/mistos:mistos_config" ]
+    configs += [ "//build/config/fuchsia:mistos_config" ]
   }
 
   deps = [
@@ -80,10 +80,10 @@ rustc_binary("bin") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bincode",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:regex",
     "//third_party/rust_crates:serde",
-    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:zstd",
   ]
 
@@ -105,6 +105,7 @@ rustc_binary("bin") {
     "src/match_common.rs",
     "src/resolved_driver.rs",
     "src/serde_ext.rs",
+    "src/test_common.rs",
   ]
 }
 

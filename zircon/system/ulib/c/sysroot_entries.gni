@@ -11,6 +11,7 @@
 # it to a generated_file() target and later process it with a build-time
 # script.
 
+import("//build/config/sysroot.gni")
 import("//zircon/system/ulib/c/include/libc_headers.gni")
 import("//zircon/system/ulib/c/libc_toolchain.gni")
 import("//zircon/vdso/vdso.gni")
@@ -91,16 +92,30 @@ sysroot_uninstrumented_libc_entries = [
       ]
     }
   },
+
   {
     sdk = {
-      # TODO(https://fxbug.dev/42101682): The stripped binary doesn't even have section
-      # headers, so the linker can't handle it.  Eventually we'll have
-      # linker stubs.  For now, just use the unstripped library to link
-      # against.  This matches what library() gives the SDK via
-      # zircon_library().
-      source = rebase_path(sysroot_libc_unstripped, root_build_dir)
       link = "lib/libc.so"
-      deps = [ sysroot_libc_target ]
+      deps = [ "//zircon/system/ulib/c:c.stub" ]
+      source =
+          rebase_path(get_label_info(deps[0], "target_out_dir") + "/libc.so",
+                      root_build_dir)
+    }
+  },
+
+  {
+    sdk = {
+      link = "lib/Scrt1.o"
+
+      # The build-internal sysroot is the most convenient known path and direct
+      # deps label to use it as an input.
+      deps = [
+        "//zircon/system/ulib/c/startup:startfiles($variant_base_toolchain)",
+      ]
+      source = rebase_path(
+              get_label_info("//zircon/public/sysroot($variant_base_toolchain)",
+                             "target_gen_dir") + "/$link",
+              root_build_dir)
     }
   },
 ]
@@ -108,13 +123,14 @@ sysroot_uninstrumented_libc_entries = [
 # libc_headers.gni provides the entries for libc's headers.
 sysroot_uninstrumented_libc_entries += libc_headers.sysroot_entries
 
-foreach(lib,
-        [
-          "libdl.so",
-          "libm.so",
-          "libpthread.so",
-          "librt.so",
-        ]) {
+sysroot_stub_libs = [
+  "libdl.so",
+  "libm.so",
+  "libpthread.so",
+  "librt.so",
+]
+
+foreach(lib, sysroot_stub_libs) {
   sysroot_uninstrumented_libc_entries += [
     {
       sdk = {
@@ -181,14 +197,3 @@ foreach(variant, sysroot_variants) {
     },
   ]
 }
-
-# The C runtime startup object file (a.k.a. 'crt1', or 'Scrt1.o').
-sysroot_crt1_entries = [
-  {
-    sdk = {
-      link = "lib/Scrt1.o"
-      source = rebase_path(sysroot_crt1_obj, root_build_dir)
-      deps = [ sysroot_crt1_target ]
-    }
-  },
-]

@@ -7,7 +7,7 @@ use anyhow::{Context, Result};
 use device_watcher::recursive_wait_and_open;
 use fidl::endpoints::Proxy as _;
 use fidl_fuchsia_device::ControllerProxy;
-use fidl_fuchsia_hardware_block::BlockMarker;
+use fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy};
 use fidl_fuchsia_hardware_block_partition::Guid as FidlGuid;
 use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeManagerProxy};
 use fidl_fuchsia_io as fio;
@@ -24,12 +24,11 @@ extern "C" {
 }
 
 /// Formats the block device at `block_device` to be an empty FVM instance.
-pub fn format_for_fvm(block_device: &fio::DirectoryProxy, fvm_slice_size: usize) -> Result<()> {
+pub fn format_for_fvm(block_device: &BlockProxy, fvm_slice_size: usize) -> Result<()> {
     // TODO(https://fxbug.dev/42072917): In order to remove multiplexing, callers of this function
     // should directly pass in a BlockProxy. Callers holding onto a ramdisk should replace as_dir()
     // with a connect_to_device_fidl() call. This requires work downstream.
-    let device = connect_to_named_protocol_at_dir_root::<BlockMarker>(block_device, ".")?;
-    let device_raw = device.as_channel().raw_handle();
+    let device_raw = block_device.as_channel().raw_handle();
     let status = unsafe { fvm_init(device_raw, fvm_slice_size) };
     zx::ok(status).context("fvm_init failed")
 }
@@ -41,6 +40,7 @@ pub async fn bind_fvm_driver(controller: &ControllerProxy) -> Result<()> {
 }
 
 /// Binds the fvm driver and returns a connection to the newly created FVM instance.
+/// TODO(https://fxbug.dev/339491886): Remove this.
 pub async fn start_fvm_driver(
     controller: &ControllerProxy,
     block_device: &fio::DirectoryProxy,
@@ -54,12 +54,14 @@ pub async fn start_fvm_driver(
 
 /// Sets up an FVM instance on `block_device`. Returns a connection to the newly created FVM
 /// instance.
+/// TODO(https://fxbug.dev/339491886): Remove this.
 pub async fn set_up_fvm(
     controller: &ControllerProxy,
     block_device: &fio::DirectoryProxy,
     fvm_slice_size: usize,
 ) -> Result<VolumeManagerProxy> {
-    format_for_fvm(block_device, fvm_slice_size)?;
+    let block = connect_to_named_protocol_at_dir_root::<BlockMarker>(block_device, ".")?;
+    format_for_fvm(&block, fvm_slice_size)?;
     start_fvm_driver(controller, block_device).await
 }
 
@@ -69,7 +71,7 @@ pub async fn set_up_fvm(
 /// provided then the volume will start with the minimum number of slices required to have
 /// `volume_size` bytes.
 ///
-/// `wait_for_block_device` can be used to find the volume after its created.
+/// `wait_for_block_device_devfs` can be used to find the volume after its created.
 pub async fn create_fvm_volume(
     volume_manager: &VolumeManagerProxy,
     name: &str,
@@ -102,7 +104,7 @@ pub async fn create_fvm_volume(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{wait_for_block_device, BlockDeviceMatcher};
+    use crate::{wait_for_block_device_devfs, BlockDeviceMatcher};
     use fidl_fuchsia_hardware_block_volume::{VolumeMarker, ALLOCATE_PARTITION_FLAG_INACTIVE};
     use fuchsia_component::client::connect_to_protocol_at_path;
     use ramdevice_client::RamdiskClient;
@@ -159,7 +161,7 @@ mod tests {
         )
         .await
         .expect("Failed to create fvm volume");
-        let block_device_path = wait_for_block_device(&[
+        let block_device_path = wait_for_block_device_devfs(&[
             BlockDeviceMatcher::TypeGuid(&TYPE_GUID),
             BlockDeviceMatcher::InstanceGuid(&INSTANCE_GUID),
             BlockDeviceMatcher::Name(VOLUME_NAME),
@@ -198,7 +200,7 @@ mod tests {
         .await
         .expect("Failed to create fvm volume");
 
-        let block_device_path = wait_for_block_device(&[
+        let block_device_path = wait_for_block_device_devfs(&[
             BlockDeviceMatcher::TypeGuid(&TYPE_GUID),
             BlockDeviceMatcher::InstanceGuid(&INSTANCE_GUID),
             BlockDeviceMatcher::Name(VOLUME_NAME),

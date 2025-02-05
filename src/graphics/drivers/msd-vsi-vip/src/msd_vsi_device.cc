@@ -91,8 +91,7 @@ bool MsdVsiDevice::Init(void* device_handle) {
   uint32_t mmio_count = platform_device_->platform_device()->GetMmioCount();
   DASSERT(mmio_count > 0);
 
-  std::unique_ptr<magma::PlatformMmio> mmio = platform_device_->platform_device()->CpuMapMmio(
-      0, magma::PlatformMmio::CACHE_POLICY_UNCACHED_DEVICE);
+  std::unique_ptr<magma::PlatformMmio> mmio = platform_device_->platform_device()->CpuMapMmio(0);
   if (!mmio) {
     MAGMA_LOG(ERROR, "failed to map registers");
     return false;
@@ -410,7 +409,7 @@ void MsdVsiDevice::EnqueueDeviceRequest(std::unique_ptr<DeviceRequest> request) 
     if (device_request_list_.empty()) {
       device_request_list_.emplace_front(std::move(request));
     } else {
-      for(auto it = device_request_list_.begin(); ; ++it) {
+      for (auto it = device_request_list_.begin();; ++it) {
         if (it == device_request_list_.end()) {
           device_request_list_.emplace_back(std::move(request));
           break;

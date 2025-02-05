@@ -8,7 +8,7 @@ import("//build/rust/rustc_test.gni")
 common_sources = [ "src/lib.rs" ]
 common_deps = [
   ":cpp_syslog_wrapper",
-  "//third_party/rust_crates:tracing",
+  "//third_party/rust_crates:log",
 ]
 
 rustc_library("rust_cpp_bridge") {

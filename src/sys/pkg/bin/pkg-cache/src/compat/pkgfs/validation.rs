@@ -4,9 +4,9 @@
 
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
+use log::{error, info};
 use std::collections::HashSet;
 use std::sync::Arc;
-use tracing::{error, info};
 use vfs::directory::entry::{EntryInfo, OpenRequest};
 use vfs::directory::immutable::connection::ImmutableConnection;
 use vfs::directory::traversal_position::TraversalPosition;
@@ -43,9 +43,9 @@ impl Validation {
         missing.sort();
 
         if missing.is_empty() {
-            info!(total = self.base_blobs.len(), "all base package blobs were found");
+            info!(total = self.base_blobs.len(); "all base package blobs were found");
         } else {
-            error!(total = missing.len(), "base package blobs are missing");
+            error!(total = missing.len(); "base package blobs are missing");
         }
 
         #[allow(clippy::format_collect)]
@@ -243,25 +243,6 @@ mod tests {
             let validation = Validation::new(blobfs.client(), base_blobs);
             (Self { _blobfs: blobfs }, validation)
         }
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_open_unsets_posix_flags() {
-        let (_env, validation) = TestEnv::new().await;
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-
-        validation.open(
-            ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::POSIX_WRITABLE
-                | fio::OpenFlags::POSIX_EXECUTABLE,
-            VfsPath::dot(),
-            server_end.into_channel().into(),
-        );
-
-        let (status, flags) = proxy.get_flags().await.unwrap();
-        let () = zx::Status::ok(status).unwrap();
-        assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

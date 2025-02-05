@@ -47,6 +47,7 @@ Name                        | Type      | Notes
 `jtrace_target_buffer_size` | uint32_t  | Controls the amount of RAM reserved for the trace buffer.
 `jtrace_last_entry_storage` | uint32_t  | Controls the amount of RAM reserved for [per-cpu last event records](#per-cpu-last-event-records).
 `jtrace_use_large_entries`  | bool      | Controls whether large or small [trace entries](#trace-entries) are used.
+`jtrace_use_mono_timestamps`| bool      | Controls whether trace entries are timestamped with the monotonic or boot timeline.
 
 By default, JTRACE is disabled and not included in a kernel build. To enable
 JTRACE, users may set the `jtrace_enabled` build argument to a value of either
@@ -66,6 +67,7 @@ Name                        | Non-persistent Default | Persistent Default
 `jtrace_target_buffer_size` | 32768                  | 4096
 `jtrace_last_entry_storage` | 0                      | 0
 `jtrace_use_large_entries`  | true                   | false
+`jtrace_use_mono_timestamps`| false                  | false
 
 Once the build has been configured, simply rebuild and deploy the new kernel to
 your target in order to start to use JTRACE.

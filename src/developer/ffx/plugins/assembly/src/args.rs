@@ -277,6 +277,11 @@ pub struct ProductArgs {
     #[argh(option)]
     pub custom_kernel_aib: Option<Utf8PathBuf>,
 
+    /// whether to hide the warning that shows the overrides that are enabled.
+    /// This can be helpful to disable for test assemblies.
+    #[argh(switch)]
+    pub suppress_overrides_warning: bool,
+
     /// path to a file specifying developer-level overrides for assembly.
     #[argh(option)]
     pub developer_overrides: Option<Utf8PathBuf>,

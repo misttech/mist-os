@@ -46,13 +46,13 @@ constexpr std::array<const char*, 13> kUltrasoundInvalidOptions = {
     kCaptureUsageOption,
 };
 
-constexpr std::array<std::pair<const char*, fuchsia::media::AudioCaptureUsage>,
+constexpr std::array<std::pair<const char*, fuchsia::media::AudioCaptureUsage2>,
                      fuchsia::media::CAPTURE_USAGE_COUNT>
     kCaptureUsages = {{
-        {"BACKGROUND", fuchsia::media::AudioCaptureUsage::BACKGROUND},
-        {"FOREGROUND", fuchsia::media::AudioCaptureUsage::FOREGROUND},
-        {"SYSTEM_AGENT", fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT},
-        {"COMMUNICATION", fuchsia::media::AudioCaptureUsage::COMMUNICATION},
+        {"BACKGROUND", fuchsia::media::AudioCaptureUsage2::BACKGROUND},
+        {"FOREGROUND", fuchsia::media::AudioCaptureUsage2::FOREGROUND},
+        {"SYSTEM_AGENT", fuchsia::media::AudioCaptureUsage2::SYSTEM_AGENT},
+        {"COMMUNICATION", fuchsia::media::AudioCaptureUsage2::COMMUNICATION},
     }};
 
 constexpr uint32_t kPayloadBufferId = 0;
@@ -148,7 +148,7 @@ void WavRecorder::Run(sys::ComponentContext* app_context) {
         kCaptureUsages.cbegin(), kCaptureUsages.cend(),
         [&opt](auto usage_string_and_usage) { return opt == usage_string_and_usage.first; });
     if (it == kCaptureUsages.cend()) {
-      fprintf(stderr, "Unrecognized AudioCaptureUsage %s\n\n", opt.c_str());
+      fprintf(stderr, "Unrecognized AudioCaptureUsage2 %s\n\n", opt.c_str());
       Usage();
       exit(1);
     }
@@ -401,7 +401,7 @@ void WavRecorder::ReceiveClockAndContinue(
   }
 
   if (usage_) {
-    audio_capturer_->SetUsage(usage_->second);
+    audio_capturer_->SetUsage2(usage_->second);
   }
 
   if (stream_type) {

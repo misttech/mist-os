@@ -42,7 +42,7 @@ Briefly summarized:
 [rfc-0002]: /docs/contribute/governance/rfcs/0002_platform_versioning.md
 [rfc-0083]: /docs/contribute/governance/rfcs/0083_fidl_versioning.md
 [milestone]: /docs/concepts/versioning/release.md#milestone
-[release]: /docs/concepts/versioning/release.md
+[release]: /docs/concepts/versioning/README.md#releases
 
 ## Motivation
 

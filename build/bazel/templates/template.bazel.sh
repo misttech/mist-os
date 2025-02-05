@@ -6,13 +6,13 @@
 # AUTO-GENERATED - DO NOT EDIT!
 
 readonly _SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" >/dev/null 2>&1 && pwd)"
-readonly _DOWNLOAD_CONFIG_FILE=${{_SCRIPT_DIR}}/{download_config_file}
 readonly _WORKSPACE_DIR="${{_SCRIPT_DIR}}/{workspace}"
 readonly _OUTPUT_BASE="${{_SCRIPT_DIR}}/{output_base}"
 readonly _OUTPUT_USER_ROOT="${{_SCRIPT_DIR}}/{output_user_root}"
 readonly _LOG_DIR="${{_SCRIPT_DIR}}/{logs_dir}"
 readonly _BAZEL_BIN="${{_SCRIPT_DIR}}/{bazel_bin_path}"
 readonly _PYTHON_PREBUILT_DIR="${{_SCRIPT_DIR}}/{python_prebuilt_dir}"
+readonly _REMOTE_SERVICES_BAZELRC="${{_SCRIPT_DIR}}/{ninja_output_dir}/regenerator_outputs/remote_services.bazelrc"
 
 # Exported explicitly to be used by repository rules to reference the
 # Ninja output directory and binary.
@@ -75,7 +75,6 @@ do
       [[ "${{BAZEL_resultstore_socket_path-NOT_SET}}" == "NOT_SET" ]] ||
         proxy_overrides+=( "--bes_proxy=unix://$BAZEL_resultstore_socket_path" )
         # Note: go/fxbtx uses project=rbe-fuchsia-prod
-        # (currently configured: rbe_project={rbe_project})
         siblings_link_template="http://go/fxbtx/"
       ;;
     --config=remote | --config=remote_cache_only)  # Remote build execution service
@@ -130,7 +129,11 @@ build_metadata_opts=()
 # This requires less interaction from the user than 'gcloud auth ...'.
 use_gcert_auth=()
 if [[ "$FX_BUILD_LOAS_TYPE" == "unrestricted" ]]
-then use_gcert_auth=(--config=gcertauth)
+then
+  use_gcert_auth=(--config=gcertauth)
+  # Don't set this, otherwise bazel will look for it
+  # (and fail if it doesn't exist).
+  unset GOOGLE_APPLICATION_CREDENTIALS
 fi
 
 # Setting $USER so `bazel` won't fail in environments with fake UIDs. Even if
@@ -145,6 +148,7 @@ fi
 _user="${{USER:-unused-bazel-build-user}}"
 cd "${{_WORKSPACE_DIR}}" && USER="$_user" "${{_BAZEL_BIN}}"\
       --nohome_rc \
+      --bazelrc="${{_REMOTE_SERVICES_BAZELRC}}" \
       --output_base="${{_OUTPUT_BASE}}" \
       --output_user_root="${{_OUTPUT_USER_ROOT}}" \
       "$@" \

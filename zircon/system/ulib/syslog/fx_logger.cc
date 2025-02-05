@@ -192,9 +192,9 @@ zx_status_t fx_logger::VLogWriteToSocket(fx_log_severity_t severity, const char*
     return ZX_OK;
   }
 #if FUCHSIA_API_LEVEL_AT_LEAST(24)
-  zx_time_t time = zx_clock_get_boot();
+  zx_instant_boot_t time = zx_clock_get_boot();
 #else
-  zx_time_t time = zx_clock_get_monotonic();
+  zx_instant_mono_t time = zx_clock_get_monotonic();
 #endif
   fx_log_packet_t packet;
   memset(&packet, 0, sizeof(packet));
@@ -287,9 +287,9 @@ zx_status_t fx_logger::VLogWriteToFd(int fd, fx_log_severity_t severity, const c
                                      const char* file, uint32_t line, const char* msg, va_list args,
                                      bool perform_format) {
 #if FUCHSIA_API_LEVEL_AT_LEAST(24)
-  zx_time_t time = zx_clock_get_boot();
+  zx_instant_boot_t time = zx_clock_get_boot();
 #else
-  zx_time_t time = zx_clock_get_monotonic();
+  zx_instant_mono_t time = zx_clock_get_monotonic();
 #endif
   constexpr char kEllipsis[] = "...";
   constexpr size_t kEllipsisSize = sizeof(kEllipsis) - 1;

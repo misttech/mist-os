@@ -233,7 +233,7 @@ mod tests {
         let destroy_func = __fuchsia_driver_registration__.v1.destroy.expect("destroy function");
 
         let (fin_tx, fin_rx) = mpsc::channel();
-        let (server_chan, client_chan) = fdf::Channel::<[u8]>::create().unwrap();
+        let (server_chan, client_chan) = fdf::Channel::<[u8]>::create();
         with_raw_dispatcher("driver registration", move |dispatcher| {
             dispatcher
                 .spawn_task(async move {
@@ -242,7 +242,7 @@ mod tests {
                     assert_ne!(driver_server, 0);
 
                     let start_msg = DriverRequest::start_as_message(
-                        Arena::new().unwrap(),
+                        Arena::new(),
                         DriverStartArgs::default(),
                         1,
                     )
@@ -250,7 +250,7 @@ mod tests {
                     client_chan.write(start_msg).unwrap();
                     let _ = client_chan.read_bytes(dispatcher.as_ref()).await.unwrap();
 
-                    let stop_msg = DriverRequest::stop_as_message(Arena::new().unwrap()).unwrap();
+                    let stop_msg = DriverRequest::stop_as_message(Arena::new()).unwrap();
                     client_chan.write(stop_msg).unwrap();
                     let Err(Status::PEER_CLOSED) =
                         client_chan.read_bytes(dispatcher.as_ref()).await

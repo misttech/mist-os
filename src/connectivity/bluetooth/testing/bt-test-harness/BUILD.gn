@@ -40,7 +40,7 @@ rustc_library("bt-test-harness") {
     "//src/lib/fuchsia-component-test",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   # Components included in `deps` because they're used by CoreRealm and/or HostRealm

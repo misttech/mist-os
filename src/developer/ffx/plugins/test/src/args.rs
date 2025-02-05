@@ -5,11 +5,9 @@
 use anyhow::ensure;
 use argh::{ArgsInfo, FromArgs};
 use diagnostics_data::Severity;
-use ffx_core::ffx_command;
 use fidl_fuchsia_diagnostics::LogInterestSelector;
 use std::path::PathBuf;
 
-#[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,

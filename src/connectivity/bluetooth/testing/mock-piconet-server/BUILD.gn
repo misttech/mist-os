@@ -26,7 +26,7 @@ rustc_library("lib") {
     "//src/sys/lib/cm_rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   test_deps = [
@@ -69,8 +69,8 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-sync",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:slab",
-    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [ "//third_party/rust_crates:assert_matches" ]

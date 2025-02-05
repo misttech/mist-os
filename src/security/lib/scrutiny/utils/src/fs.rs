@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Result};
+use log::warn;
 use once_cell::sync::Lazy;
 use std::fs::{create_dir_all, remove_dir_all};
 use std::path::{Path, PathBuf};
 use std::process::id;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tempfile::TempDir;
-use tracing::warn;
 
 static PID: Lazy<u32> = Lazy::new(|| id());
 static NEXT_DIR_ID: AtomicU32 = AtomicU32::new(0);
@@ -65,7 +65,7 @@ impl Drop for TemporaryDirectory {
     fn drop(&mut self) {
         if let Self::ManagedDir(directory_path) = self {
             if remove_dir_all(&directory_path).is_err() {
-                warn!(path = ?directory_path, "Failed to delete temporary directory");
+                warn!(path:? = directory_path; "Failed to delete temporary directory");
             }
         }
     }

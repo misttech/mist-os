@@ -34,6 +34,7 @@ pub mod device {
     #[path = "."]
     pub(crate) mod integration {
         mod base;
+        mod blackhole;
         mod ethernet;
         mod loopback;
         mod pure_ip;
@@ -47,6 +48,7 @@ pub mod device {
 
     // Re-exported types.
     pub use netstack3_base::DeviceNameMatcher;
+    pub use netstack3_device::blackhole::{BlackholeDevice, BlackholeDeviceId};
     pub use netstack3_device::ethernet::{
         EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
         MaxEthernetFrameSize, RecvEthernetFrameMeta,
@@ -146,7 +148,7 @@ pub mod ip {
     pub use netstack3_ip::socket::{
         IpSockCreateAndSendError, IpSockCreationError, IpSockSendError,
     };
-    pub use netstack3_ip::{IpLayerEvent, ResolveRouteError};
+    pub use netstack3_ip::{IpLayerEvent, ResolveRouteError, RouterAdvertisementEvent};
 }
 
 /// Types and utilities for dealing with neighbors.
@@ -181,7 +183,7 @@ pub mod socket {
 
     pub use netstack3_base::socket::{
         AddrIsMappedError, NotDualStackCapableError, SetDualStackEnabledError, ShutdownType,
-        StrictlyZonedAddr,
+        SocketWritableListener, StrictlyZonedAddr,
     };
 }
 
@@ -232,9 +234,11 @@ pub use marker::{BindingsContext, BindingsTypes, CoreContext, IpBindingsContext,
 pub use netstack3_base::{
     CtxPair, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
     ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TracingContext,
+    TxMetadataBindingsTypes,
 };
 pub use state::{StackState, StackStateBuilder};
 pub use time::{AtomicInstant, Instant, TimerId};
+pub use transport::TxMetadata;
 
 // Re-export useful macros.
 pub use netstack3_device::for_any_device_id;

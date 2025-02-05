@@ -10,7 +10,7 @@
 #include <zircon/time.h>
 
 zx_duration_t convert_raw_tsc_duration_to_nanoseconds(int64_t duration);
-zx_time_t convert_raw_tsc_timestamp_to_clock_monotonic(int64_t ts);
+zx_instant_mono_t convert_raw_tsc_timestamp_to_clock_monotonic(int64_t ts);
 uint64_t apic_ticks_from_platform_ticks(zx_duration_t interval);
 
 #endif  // ZIRCON_KERNEL_PLATFORM_PC_INCLUDE_PLATFORM_PC_TIMER_H_

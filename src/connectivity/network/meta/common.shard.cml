@@ -46,19 +46,6 @@
             to: [ "#dns-resolver" ],
         },
         {
-            protocol: [ "fuchsia.inspect.InspectSink" ],
-            from: "parent",
-            to: [
-                "#dhcpd",
-                "#dhcpv6-client",
-                "#dns-resolver",
-                "#http-client",
-                "#netcfg",
-                "#netstack",
-                "#reachability",
-            ],
-        },
-        {
             protocol: [ "fuchsia.stash.SecureStore" ],
             from: "parent",
             to: [
@@ -215,7 +202,10 @@
         {
             storage: "data",
             from: "parent",
-            to: [ "#netcfg" ],
+            to: [
+                "#netcfg",
+                "#netstack",
+            ],
         },
     ],
     expose: [

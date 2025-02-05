@@ -79,12 +79,12 @@ impl Container for FvmContainer {
                     Some(status) if status == &zx::Status::WRONG_TYPE => {
                         // Assume that it's more likely that this is because of FDR, or after
                         // flashing rather than due to corruption, so avoid the crash report.
-                        tracing::info!("Data volume unexpected type. Reformatting.");
+                        log::info!("Data volume unexpected type. Reformatting.");
                     }
                     _ => {
                         launcher.report_corruption(format, &error);
-                        tracing::error!(
-                            ?error,
+                        log::error!(
+                            error:?;
                             "Unable to mount {format} data volume. Reformatting the data volumes."
                         );
                     }

@@ -51,62 +51,93 @@ class FakeAudioCore final : public fidl::Server<fuchsia_media::AudioCore> {
         std::make_unique<FakeAudioRenderer>(dispatcher_, std::move(request.audio_out_request()));
   }
 
-  void CreateAudioCapturer(CreateAudioCapturerRequest& request,
-                           CreateAudioCapturerCompleter::Sync& completer) override {
+  void CreateAudioCapturer(CreateAudioCapturerRequest&,
+                           CreateAudioCapturerCompleter::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 
   void CreateAudioCapturerWithConfiguration(
-      CreateAudioCapturerWithConfigurationRequest& request,
-      CreateAudioCapturerWithConfigurationCompleter::Sync& completer) override {
+      CreateAudioCapturerWithConfigurationRequest&,
+      CreateAudioCapturerWithConfigurationCompleter::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 
-  void SetRenderUsageGain(SetRenderUsageGainRequest& request,
-                          SetRenderUsageGainCompleter::Sync& completer) override {
+  void SetRenderUsageGain(SetRenderUsageGainRequest&, SetRenderUsageGainCompleter::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 
-  void SetCaptureUsageGain(SetCaptureUsageGainRequest& request,
-                           SetCaptureUsageGainCompleter::Sync& completer) override {
+  void SetRenderUsageGain2(SetRenderUsageGain2Request&,
+                           SetRenderUsageGain2Completer::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 
-  void BindUsageVolumeControl(BindUsageVolumeControlRequest& request,
-                              BindUsageVolumeControlCompleter::Sync& completer) override {
+  void SetCaptureUsageGain(SetCaptureUsageGainRequest&,
+                           SetCaptureUsageGainCompleter::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 
-  void GetDbFromVolume(GetDbFromVolumeRequest& request,
-                       GetDbFromVolumeCompleter::Sync& completer) override {
+  void SetCaptureUsageGain2(SetCaptureUsageGain2Request&,
+                            SetCaptureUsageGain2Completer::Sync&) override {
+    FX_NOTIMPLEMENTED();
+  }
+
+  void BindUsageVolumeControl(BindUsageVolumeControlRequest&,
+                              BindUsageVolumeControlCompleter::Sync&) override {
+    FX_NOTIMPLEMENTED();
+  }
+
+  void BindUsageVolumeControl2(BindUsageVolumeControl2Request&,
+                               BindUsageVolumeControl2Completer::Sync&) override {
+    FX_NOTIMPLEMENTED();
+  }
+
+  void GetDbFromVolume(GetDbFromVolumeRequest&, GetDbFromVolumeCompleter::Sync&) override {
+    FX_NOTIMPLEMENTED();
+  }
+
+  void GetDbFromVolume2(GetDbFromVolume2Request& request,
+                        GetDbFromVolume2Completer::Sync& completer) override {
     EXPECT_FALSE(get_db_from_volume_artifact_);
     get_db_from_volume_artifact_ = std::make_unique<GetDbFromValueArtifact>(
         std::move(request.usage()), request.volume(), completer.ToAsync());
   }
 
-  void GetVolumeFromDb(GetVolumeFromDbRequest& request,
-                       GetVolumeFromDbCompleter::Sync& completer) override {
+  void GetVolumeFromDb(GetVolumeFromDbRequest&, GetVolumeFromDbCompleter::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 
-  void SetInteraction(SetInteractionRequest& request,
-                      SetInteractionCompleter::Sync& completer) override {
+  void GetVolumeFromDb2(GetVolumeFromDb2Request&, GetVolumeFromDb2Completer::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 
-  void ResetInteractions(ResetInteractionsCompleter::Sync& completer) override {
+  void SetInteraction(SetInteractionRequest&, SetInteractionCompleter::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 
-  void LoadDefaults(LoadDefaultsCompleter::Sync& completer) override { FX_NOTIMPLEMENTED(); }
-
-  void EnableDeviceSettings(EnableDeviceSettingsRequest& request,
-                            EnableDeviceSettingsCompleter::Sync& completer) override {
+  void SetInteraction2(SetInteraction2Request&, SetInteraction2Completer::Sync&) override {
     FX_NOTIMPLEMENTED();
+  }
+
+  void ResetInteractions(ResetInteractionsCompleter::Sync&) override { FX_NOTIMPLEMENTED(); }
+
+  void LoadDefaults(LoadDefaultsCompleter::Sync&) override { FX_NOTIMPLEMENTED(); }
+
+  void EnableDeviceSettings(EnableDeviceSettingsRequest&,
+                            EnableDeviceSettingsCompleter::Sync&) override {
+    FX_NOTIMPLEMENTED();
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_media::AudioCore> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {
+    FX_LOGS(ERROR) << "FakeAudioCore: AudioCore::handle_unknown_method(ordinal "
+                   << metadata.method_ordinal << ", "
+                   << (metadata.unknown_method_type == fidl::UnknownMethodType::kOneWay
+                           ? "OneWay)"
+                           : "TwoWay)");
   }
 
   // Checks
-  bool WasGetDbFromVolumeCalled(const fuchsia_media::Usage& expected_usage, float expected_volume,
+  bool WasGetDbFromVolumeCalled(const fuchsia_media::Usage2& expected_usage, float expected_volume,
                                 float gain_db_to_return) {
     EXPECT_TRUE(get_db_from_volume_artifact_);
     if (!get_db_from_volume_artifact_) {
@@ -136,12 +167,12 @@ class FakeAudioCore final : public fidl::Server<fuchsia_media::AudioCore> {
 
  private:
   struct GetDbFromValueArtifact {
-    GetDbFromValueArtifact(fuchsia_media::Usage usage, float volume,
-                           GetDbFromVolumeCompleter::Async completer)
+    GetDbFromValueArtifact(fuchsia_media::Usage2 usage, float volume,
+                           GetDbFromVolume2Completer::Async completer)
         : usage(std::move(usage)), volume(volume), completer(std::move(completer)) {}
-    fuchsia_media::Usage usage;
+    fuchsia_media::Usage2 usage;
     float volume;
-    GetDbFromVolumeCompleter::Async completer;
+    GetDbFromVolume2Completer::Async completer;
   };
 
   bool unbind_completed_ = false;

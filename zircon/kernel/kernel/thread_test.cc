@@ -43,7 +43,7 @@ namespace {
 // to avoid pegging the CPU.
 template <typename F>
 void wait_for_cond(F cond) {
-  zx_duration_t wait_duration = ZX_USEC(1);
+  zx_duration_mono_t wait_duration = ZX_USEC(1);
   while (!cond()) {
     Thread::Current::SleepRelative(wait_duration);
     // Increase wait_duration time by ~10%.
@@ -643,7 +643,7 @@ bool migrate_stress_test() {
 
     // Wait for it to finish.
     int ret;
-    zx_status_t result = thread.thread->Join(&ret, Deadline::after(ZX_SEC(5)).when());
+    zx_status_t result = thread.thread->Join(&ret, Deadline::after_mono(ZX_SEC(5)).when());
     if (result != ZX_OK) {
       // If the thread has not completed in 5 seconds, it is likely that the
       // thread has hung for an unknown reason.
@@ -685,10 +685,10 @@ bool set_migrate_fn_stress_test() {
 
       while (!state->should_stop.load(ktl::memory_order_relaxed)) {
         // Spin or sleep for 100us.
-        const zx_duration_t delay = ZX_USEC(100);
+        const zx_duration_mono_t delay = ZX_USEC(100);
         if (rand() & 1) {
-          const zx_time_t spin_end = zx_time_add_duration(current_time(), delay);
-          while (current_time() < spin_end) {
+          const zx_instant_mono_t spin_end = zx_time_add_duration(current_mono_time(), delay);
+          while (current_mono_time() < spin_end) {
           }
         } else {
           Thread::Current::SleepRelative(delay);
@@ -725,7 +725,7 @@ bool set_migrate_fn_stress_test() {
 
     // Wait for it to finish.
     int ret;
-    zx_status_t result = thread.thread->Join(&ret, Deadline::after(ZX_SEC(5)).when());
+    zx_status_t result = thread.thread->Join(&ret, Deadline::after_mono(ZX_SEC(5)).when());
     if (result != ZX_OK) {
       // If the thread has not completed in 5 seconds, it is likely that the
       // thread has hung for an unknown reason.
@@ -890,13 +890,42 @@ bool backtrace_instance_method_test() {
   END_TEST;
 }
 
+// ScopedMemoryStall is currently meant to be a no-op when executed in a kernel-only thread.
+// This test verifies that it, indeed, does not modify the thread's state.
+bool scoped_memory_stall_test() {
+  BEGIN_TEST;
+
+  Thread* const current_thread = Thread::Current::Get();
+
+  // Verify previous state.
+  {
+    AnnotatedAutoPreemptDisabler preempt_disable;
+    ASSERT_EQ(ThreadStallState::IgnoredKernelOnly, current_thread->memory_stall_state());
+  }
+
+  // Enter a memory stall and verify that the state has not changed.
+  {
+    ScopedMemoryStall scoped_memory_stall;
+    AnnotatedAutoPreemptDisabler preempt_disable;
+    ASSERT_EQ(ThreadStallState::IgnoredKernelOnly, current_thread->memory_stall_state());
+  }
+
+  // After exiting the memory stall, verify that the state has not changed.
+  {
+    AnnotatedAutoPreemptDisabler preempt_disable;
+    ASSERT_EQ(ThreadStallState::IgnoredKernelOnly, current_thread->memory_stall_state());
+  }
+
+  END_TEST;
+}
+
 }  // namespace
 
 struct TaskRuntimeStatsTests {
   static bool thread_runtime_test() {
     BEGIN_TEST;
 
-    const zx_ticks_t kCpuTicks = 10, kQueueTicks = 20;
+    const zx_duration_mono_ticks_t kCpuTicks = 10, kQueueTicks = 20;
     TaskRuntimeStats trs;
     ThreadRuntimeStats stats;
     ThreadRuntimeStats::ReadResult read_res = stats.Read();
@@ -913,16 +942,16 @@ struct TaskRuntimeStatsTests {
     EXPECT_EQ(0, trs.page_fault_ticks);
     EXPECT_EQ(0, trs.lock_contention_ticks);
 
-    auto DelayTicks = [](zx_ticks_t ticks) {
-      zx_ticks_t deadline = current_ticks() + kCpuTicks;
+    auto DelayTicks = [](zx_duration_mono_ticks_t ticks) {
+      zx_instant_mono_ticks_t deadline = current_mono_ticks() + kCpuTicks;
       do {
         arch::Yield();
-      } while (current_ticks() < deadline);
+      } while (current_mono_ticks() < deadline);
     };
 
     // Test that runtime is calculated as a function of the stats and the current time spent queued.
     // When the state is set to THREAD_READY, TotalRuntime calculates queue_ticks as:
-    //   runtime.queue_ticks + (current_ticks() - state_change_ticks)
+    //   runtime.queue_ticks + (current_mono_ticks() - state_change_ticks)
     //
     stats.Update(thread_state::THREAD_READY, ThreadRuntimeStats::IrqSave);
 
@@ -947,7 +976,7 @@ struct TaskRuntimeStatsTests {
     // current time spent running. When the state is set to THREAD_RUNNING,
     // TotalRuntime calculates cpu_ticks as:
     //
-    // runtime.cpu_ticks + (current_ticks() - state_change_ticks)
+    // runtime.cpu_ticks + (current_mono_ticks() - state_change_ticks)
     //
     // Start by changing state to running.
     stats.Update(thread_state::THREAD_RUNNING, ThreadRuntimeStats::IrqSave);
@@ -956,7 +985,7 @@ struct TaskRuntimeStatsTests {
     // has to be at least the compensated queue time before we switched to
     // running.  The accumulated CPU time should still be zero, since we have
     // never been in the running state, then switched out.
-    const zx_ticks_t queue_ticks_lower_bound = trs.queue_ticks;
+    const zx_duration_mono_ticks_t queue_ticks_lower_bound = trs.queue_ticks;
 
     read_res = stats.Read();
     EXPECT_EQ(thread_state::THREAD_RUNNING, sched_stats.current_state);
@@ -974,8 +1003,8 @@ struct TaskRuntimeStatsTests {
     EXPECT_EQ(0, trs.lock_contention_ticks);
 
     // Add other times.
-    const zx_ticks_t kPageFaultTicks = 30;
-    const zx_ticks_t kLockContentionTicks = 40;
+    const zx_duration_mono_ticks_t kPageFaultTicks = 30;
+    const zx_duration_mono_ticks_t kLockContentionTicks = 40;
     const TaskRuntimeStats prev_trs = trs;
 
     stats.AddPageFaultTicks(kPageFaultTicks);
@@ -1012,5 +1041,6 @@ UNITTEST("set_context_switch_fn", set_context_switch_fn_test)
 UNITTEST("scoped_allocation_disabled_test", scoped_allocation_disabled_test)
 UNITTEST("backtrace_static_method_test", backtrace_static_method_test)
 UNITTEST("backtrace_instance_method_test", backtrace_instance_method_test)
+UNITTEST("scoped_memory_stall_test", scoped_memory_stall_test)
 UNITTEST("thread_runtime_test", TaskRuntimeStatsTests::thread_runtime_test)
 UNITTEST_END_TESTCASE(thread_tests, "thread", "thread tests")

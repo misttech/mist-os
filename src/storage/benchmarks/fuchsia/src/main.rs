@@ -7,8 +7,8 @@ use crate::blob_benchmarks::{
     OpenAndGetVmoMetaFileWarm, PageInBlobRandomCompressed, PageInBlobSequentialCompressed,
     PageInBlobSequentialUncompressed, WriteBlob, WriteRealisticBlobs,
 };
-use fuchsia_storage_benchmarks_lib::block_devices::FvmVolumeFactory;
-use fuchsia_storage_benchmarks_lib::filesystems::{
+use fuchsia_storage_benchmarks::block_devices::FvmInstance;
+use fuchsia_storage_benchmarks::filesystems::{
     Blobfs, F2fs, Fxblob, Fxfs, Memfs, Minfs, PkgDirTest,
 };
 use regex::{Regex, RegexSetBuilder};
@@ -28,7 +28,7 @@ use storage_benchmarks::{add_benchmarks, BenchmarkSet};
 mod blob_benchmarks;
 mod blob_loader;
 
-const FXFS_VOLUME_SIZE: u64 = 60 * 1024 * 1024;
+const FXFS_VOLUME_SIZE: u64 = 64 * 1024 * 1024;
 
 /// Fuchsia Filesystem Benchmarks
 #[derive(argh::FromArgs)]
@@ -146,6 +146,7 @@ fn add_blob_benchmarks(benchmark_set: &mut BenchmarkSet) {
 #[fuchsia::main(logging_tags = ["storage_benchmarks"])]
 async fn main() {
     let args: Args = argh::from_env();
+    let config = fuchsia_storage_benchmarks_config::Config::take_from_startup_handle();
 
     let _loaded_blobs = blob_loader::BlobLoader::load_blobs().await;
     if args.load_blobs_for_tracing {
@@ -160,18 +161,12 @@ async fn main() {
     filter.case_insensitive(true);
     let filter = filter.build().unwrap();
 
-    let fvm_volume_factory = FvmVolumeFactory::new().await;
-    if fvm_volume_factory.is_none() {
-        tracing::warn!("Not running any tests -- neither FVM nor GPT could be found.");
-        tracing::warn!("To run these test locally on an emulator, see the README.md.");
-        return;
-    }
-
+    let fvm_instance = FvmInstance::from_config(config.storage_host, config.fxfs_blob).await;
     let mut benchmark_set = BenchmarkSet::new();
     add_io_benchmarks(&mut benchmark_set);
     add_directory_benchmarks(&mut benchmark_set);
     add_blob_benchmarks(&mut benchmark_set);
-    let results = benchmark_set.run(fvm_volume_factory.as_ref().unwrap(), &filter).await;
+    let results = benchmark_set.run(&fvm_instance, &filter).await;
 
     results.write_table(std::io::stdout());
     if args.output_csv {

@@ -3,15 +3,31 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Run the Fuchsia Bazel SDK test suite in-tree.
-You must have built the 'generate_fuchsia_sdk_repository'
-target with 'fx build' before calling this script, as in:
+"""Run the Fuchsia Bazel SDK test suite.
 
-  fx build generate_fuchsia_sdk_repository
+This script can be used to run the test suite against three different
+types of IDK or SDK directories:
 
-You can use -- to separate the arguments that will be sent
-to the underlying `bazel test` command. Useful for debugging
-and experimentation.
+- Against an export IDK:
+
+  Use `--fuchsia_idk_directory=DIR` to specify its path. This will automatically
+  create a temporary @fuchsia_sdk repository before running the test suite.
+
+- Against an SDK directory:
+
+  Use `--fuchsia_sdk_directory=DIR` to specify its path. For now, this assumes
+  that the SDK directory is self-contained (i.e. does not depend on @rules_fuchsia).
+
+- Against the in-tree @fuchsia_sdk repository:
+
+  Use the `--fuchsia-in-tree-sdk` flag. This should auto-detect the location of
+  the in-tree @fuchsia_sdk and @fuchsia_in_tree_idk repositories.
+
+In all cases, the default --target_cpu value will be guessed by looking at the
+Fuchsia build directory.
+
+See //build/bazel/bazel_sdk/README.md for more details about these three
+categories.
 """
 
 import argparse
@@ -28,6 +44,14 @@ from pathlib import Path
 _HAS_FX = None
 
 _VERBOSE = False
+
+# The three different types of inputs supported by this script:
+# IN_TREE: Used to test the in-tree @fuchsia_sdk and @fuchsia_in_tree_idk repos.
+# SDK: Used to test a standalone (OOT) Fuchsia SDK directory.
+# IDK: Used to test a standalone Fuchsia IDK directory.
+_INPUT_MODE_IN_TREE = "in-tree"
+_INPUT_MODE_SDK = "sdk"
+_INPUT_MODE_IDK = "idk"
 
 # Type alias for string or Path type.
 # NOTE: With python 3.10+, it is possible to use 'str | Path' directly.
@@ -274,7 +298,8 @@ class BazelRepositoryMap(object):
     def __init__(
         self,
         fuchsia_source_dir: Path,
-        fuchsia_sdk_dir: T.Optional[Path],
+        explicit_fuchsia_sdk: T.Optional[Path],
+        explicit_fuchsia_in_tree_idk: T.Optional[Path],
         workspace_dir: Path,
         output_base: Path,
     ):
@@ -295,9 +320,12 @@ class BazelRepositoryMap(object):
             / "build/bazel_sdk/bazel_rules_fuchsia",
         }
 
-        if fuchsia_sdk_dir:
-            _fuchsia_sdk_dir = fuchsia_sdk_dir.resolve()
-            self._overrides["fuchsia_sdk"] = _fuchsia_sdk_dir
+        if explicit_fuchsia_sdk:
+            self._overrides["fuchsia_sdk"] = explicit_fuchsia_sdk.resolve()
+        if explicit_fuchsia_in_tree_idk:
+            self._overrides[
+                "fuchsia_in_tree_idk"
+            ] = explicit_fuchsia_in_tree_idk.resolve()
 
         # These repository overrides are used when converting Bazel labels to actual paths.
         # NOTE: Mapping labels to repository inputs is considerably simpler than
@@ -321,11 +349,10 @@ class BazelRepositoryMap(object):
             "rules_python_internal": self.IGNORED_REPO,
         }
 
-        if not fuchsia_sdk_dir:
-            fuchsia_sdk_dir = (
+        if not explicit_fuchsia_sdk:
+            self._internal_overrides["fuchsia_sdk"] = (
                 self._fuchsia_source_dir / "build/bazel_sdk/bazel_rules_fuchsia"
             )
-            self._internal_overrides["fuchsia_sdk"] = fuchsia_sdk_dir
 
     def add_override(self, name: str, path: Path) -> None:
         assert (
@@ -408,27 +435,50 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--bazel", help="Specify bazel binary.")
-    mutex_group = parser.add_mutually_exclusive_group()
+    mutex_group = parser.add_mutually_exclusive_group(required=True)
     mutex_group.add_argument(
-        "--fuchsia_build_dir",
-        help="Specify Fuchsia build directory (default is auto-detected).",
+        "--fuchsia_sdk_directory",
+        type=Path,
+        help="Specify Fuchsia SDK directory.",
     )
     mutex_group.add_argument(
-        "--fuchsia_idk_directory", help="Specify Fuchsia IDK directory."
+        "--fuchsia_idk_directory",
+        type=Path,
+        help="Specify Fuchsia IDK directory.",
+    )
+    mutex_group.add_argument(
+        "--fuchsia-in-tree-sdk",
+        action="store_true",
+        help="Run against the in-tree @fuchsia_sdk and @fuchsia_in_tree_idk repositories.",
     )
     parser.add_argument(
         "--fuchsia_source_dir",
+        type=Path,
         help="Specify Fuchsia source directory (default is auto-detected).",
     )
     parser.add_argument(
-        "--fuchsia_sdk_dir",
-        help="Specify alternative @fuchsia_sdk source repository (default is $fuchsia_source_dir/build/bazel_sdk/bazel_rules_fuchsia)",
+        "--fuchsia_build_dir",
+        type=Path,
+        help="Specify Fuchsia build directory (default is auto-detected).",
     )
     parser.add_argument(
-        "--output_base", help="Use specific Bazel output base directory."
+        "--in_tree_fuchsia_sdk",
+        type=Path,
+        help="Specify alternative in-tree @fuchsia_sdk source repository, when using --fuchsia-in-tree-sdk",
+    )
+    parser.add_argument(
+        "--in_tree_fuchsia_idk",
+        type=Path,
+        help="Specify alternative path to in-tree @fuchsia_in_tree_idk when using --fuchsia-in-tree-sdk",
+    )
+    parser.add_argument(
+        "--output_base",
+        type=Path,
+        help="Use specific Bazel output base directory.",
     )
     parser.add_argument(
         "--output_user_root",
+        type=Path,
         help="Use specific Bazel output user root directory.",
     )
     parser.add_argument(
@@ -442,9 +492,13 @@ def main() -> int:
         help="Optional path to version file for prebuilt Clang toolchain.",
     )
     parser.add_argument(
-        "--stamp-file", help="Output stamp file, written on success only."
+        "--stamp-file",
+        type=Path,
+        help="Output stamp file, written on success only.",
     )
-    parser.add_argument("--depfile", help="Output Ninja depfile file.")
+    parser.add_argument(
+        "--depfile", type=Path, help="Output Ninja depfile file."
+    )
     parser.add_argument(
         "--target_cpu",
         help="Target cpu name, using Fuchsia conventions (default is auto-detected).",
@@ -528,7 +582,7 @@ def main() -> int:
 
     # Get Fuchsia source directory.
     if args.fuchsia_source_dir:
-        fuchsia_source_dir = Path(args.fuchsia_source_dir)
+        fuchsia_source_dir = args.fuchsia_source_dir
     else:
         _fuchsia_source_dir = _find_fuchsia_source_dir_from(Path(__file__))
         if not _fuchsia_source_dir:
@@ -542,37 +596,58 @@ def main() -> int:
             f"Fuchsia source directory does not exist: {fuchsia_source_dir}"
         )
 
-    # Get Fuchsia build directory.
-    if args.fuchsia_build_dir:
-        fuchsia_build_dir = Path(args.fuchsia_build_dir)
-        has_fuchsia_build_dir = True
-    elif args.fuchsia_idk_directory:
-        has_fuchsia_build_dir = False
-        fuchsia_idk_directory = Path(args.fuchsia_idk_directory)
-        if not fuchsia_idk_directory.exists():
-            return _print_error(
-                f"Fuchsia IDK directory does not exist: {fuchsia_idk_directory}"
-            )
-    else:
-        _fuchsia_build_dir = _find_fuchsia_build_dir(fuchsia_source_dir)
-        if not _fuchsia_build_dir:
-            return _print_error(
-                "Cannot auto-detect Fuchsia build directory, use --fuchsia_build_dir=DIR"
-            )
-        fuchsia_build_dir = _fuchsia_build_dir
-        has_fuchsia_build_dir = True
-
-    if has_fuchsia_build_dir:
-        if not fuchsia_build_dir.exists():
-            return _print_error(
-                f"Fuchsia build directory does not exist: {fuchsia_build_dir}"
-            )
-
-        fuchsia_build_dir = fuchsia_build_dir.resolve()
-
-    # fuchsia_source_dir must be an absollute path or Bazel will complain
+    # fuchsia_source_dir must be an absolute path or Bazel will complain
     # when it is used for --override_repository options below.
     fuchsia_source_dir = fuchsia_source_dir.resolve()
+
+    # Get Fuchsia build directory, if possible. Provide a checking function too.
+    fuchsia_build_dir = args.fuchsia_build_dir
+    if fuchsia_build_dir is None:
+        fuchsia_build_dir = _find_fuchsia_build_dir(fuchsia_source_dir)
+
+    def check_fuchsia_build_dir(
+        print_error: T.Optional[T.Callable[[str], T.Any]] = None
+    ) -> bool:
+        """Check that fuchsia_build_dir is set and exists. Return True on success."""
+        if not fuchsia_build_dir:
+            if print_error:
+                print_error(
+                    "Cannot auto-detect Fuchsia build directory, use --fuchsia_build_dir=DIR"
+                )
+            return False
+        if not fuchsia_build_dir.exists():
+            if print_error:
+                print_error(
+                    f"Fuchsia build directory does not exist: {fuchsia_build_dir}"
+                )
+            return False
+        return True
+
+    # Determine the type of input used.
+    # This will take one of the valid _INPUT_MODE_XXX values.
+    input_mode = ""
+
+    if args.fuchsia_in_tree_sdk:
+        input_mode = _INPUT_MODE_IN_TREE
+        if not check_fuchsia_build_dir(print_error=_print_error):
+            return 1
+
+    elif args.fuchsia_sdk_directory:
+        input_mode = _INPUT_MODE_SDK
+        if not args.fuchsia_sdk_directory.exists():
+            return _print_error(
+                f"Fuchsia SDK directory does not exist: {args.fuchsia_sdk_directory}"
+            )
+
+    elif args.fuchsia_idk_directory:
+        input_mode = _INPUT_MODE_IDK
+        if not args.fuchsia_idk_directory.exists():
+            return _print_error(
+                f"Fuchsia IDK directory does not exist: {args.fuchsia_idk_directory}"
+            )
+    else:
+        assert False, f"Internal error: Invalid build mode!"
+        _find_fuchsia_build_dir(fuchsia_source_dir)
 
     # Compute Fuchsia host tag
     u = platform.uname()
@@ -631,23 +706,25 @@ def main() -> int:
     if args.target_cpu:
         target_cpu = args.target_cpu
     else:
-        if not has_fuchsia_build_dir:
-            parser.error(
-                "Cannot auto-detect --target_cpu with --fuchsia_idk_directory"
-            )
-        args_json = fuchsia_build_dir / "args.json"
-        if not args_json.exists():
-            return _print_error(
-                "Cannot auto-detect target cpu, please use --target_cpu=CPU"
-            )
+        target_cpu = ""
+        if check_fuchsia_build_dir():
+            args_json = fuchsia_build_dir / "args.json"
+            if args_json.exists():
+                with open(args_json) as f:
+                    target_cpu = json.load(f)["target_cpu"]
 
-        with open(args_json) as f:
-            target_cpu = json.load(f)["target_cpu"]
+        if not target_cpu:
+            parser.error(
+                "Cannot auto-detect --target_cpu, use --target_cpu=CPU"
+            )
 
     # Assume this script is under '$WORKSPACE/scripts'
     script_dir = Path(__file__).parent.resolve()
     workspace_dir = script_dir.parent
-    downloader_config_file = script_dir / "downloader_config"
+
+    downloader_config_file = (
+        fuchsia_source_dir / "build/bazel/config/no_downloads_allowed.config"
+    )
 
     # To ensure that the repository rules for @fuchsia_clang and
     # @prebuilt_python are re-run properly when the content of the prebuilt
@@ -727,12 +804,12 @@ def main() -> int:
         ]
 
     if args.output_user_root:
-        output_user_root = Path(args.output_user_root).resolve()
+        output_user_root = args.output_user_root.resolve()
         output_user_root.mkdir(parents=True, exist_ok=True)
         bazel_startup_args += [f"--output_user_root={output_user_root}"]
 
     if args.output_base:
-        output_base = Path(args.output_base).resolve()
+        output_base = args.output_base.resolve()
         output_base.mkdir(parents=True, exist_ok=True)
         bazel_startup_args += [f"--output_base={output_base}"]
     else:
@@ -743,27 +820,40 @@ def main() -> int:
             )[0]
         )
 
-    fuchsia_sdk_dir: T.Optional[Path] = None
-    if args.fuchsia_sdk_dir:
-        fuchsia_sdk_dir = Path(args.fuchsia_sdk_dir)
+    explicit_fuchsia_sdk = None
+    explicit_fuchsia_in_tree_idk = None
+    if input_mode == _INPUT_MODE_IN_TREE:
+        # The in-tree @fuchsia_sdk references labels in @fuchsia_in_tree_idk
+        # so both need to be overridden.
+        explicit_fuchsia_sdk = (
+            fuchsia_build_dir
+            / "gen"
+            / "build"
+            / "bazel"
+            / "output_base"
+            / "external"
+            / "fuchsia_sdk"
+        )
+        explicit_fuchsia_in_tree_idk = (
+            fuchsia_build_dir
+            / "gen"
+            / "build"
+            / "bazel"
+            / "output_base"
+            / "external"
+            / "fuchsia_in_tree_idk"
+        )
+    elif input_mode == _INPUT_MODE_SDK:
+        # Only override @fuchsia_sdk to point to the full SDK directory.
+        explicit_fuchsia_sdk = args.fuchsia_sdk_directory
 
     bazel_repo_map = BazelRepositoryMap(
         fuchsia_source_dir=fuchsia_source_dir,
-        fuchsia_sdk_dir=fuchsia_sdk_dir,
+        explicit_fuchsia_sdk=explicit_fuchsia_sdk,
+        explicit_fuchsia_in_tree_idk=explicit_fuchsia_in_tree_idk,
         workspace_dir=workspace_dir,
         output_base=output_base,
     )
-
-    if has_fuchsia_build_dir:
-        # If a @fuchsia_idk repository exists in the Fuchsia internal output_base, use it.
-        fuchsia_build_idk_repository = (
-            fuchsia_build_dir
-            / "gen/build/bazel/output_base/external/fuchsia_idk"
-        )
-        if fuchsia_build_idk_repository.is_dir():
-            bazel_repo_map.add_override(
-                "fuchsia_idk", fuchsia_build_idk_repository
-            )
 
     bazel_common_args += [
         # Prevent all downloads through a downloader configuration file.
@@ -873,8 +963,17 @@ def main() -> int:
 
     # With unrestricted LOAS credentials, the credential helper
     # can renew OAuth tokens automatically.
-    if os.environ.get("FX_BUILD_LOAS_TYPE", "") == "unrestricted":
+    is_remote_build = any(
+        a.startswith("--config=remote") for a in bazel_config_args
+    )
+    if (
+        is_remote_build
+        and os.environ.get("FX_BUILD_LOAS_TYPE", "") == "unrestricted"
+    ):
         bazel_config_args += ["--config=gcertauth"]
+        # Tell bazel to not look for the app. credential file,
+        # because it may not exist.
+        os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
 
     bazel_config_args += build_metadata_flags(siblings_link_template)
 
@@ -934,17 +1033,19 @@ def main() -> int:
             "LOCAL_FUCHSIA_CLANG_VERSION_FILE"
         ] = workspace_clang_version_file
 
-    if has_fuchsia_build_dir:
+    if input_mode == _INPUT_MODE_SDK:
         # Pass the location of the Fuchsia build directory to the
         # @fuchsia_sdk repository rule. Note that using --action_env will
         # not work because this option only affects Bazel actions, and
         # not repository rules.
-        bazel_env["LOCAL_FUCHSIA_PLATFORM_BUILD"] = str(fuchsia_build_dir)
-    else:
+        bazel_env["LOCAL_FUCHSIA_PLATFORM_BUILD"] = str(
+            fuchsia_build_dir.resolve()
+        )
+    elif input_mode == _INPUT_MODE_IDK:
         # Pass the location of the Fuchsia IDK archive to the @fuchsia_sdk
         # repository rule.
         bazel_env["LOCAL_FUCHSIA_IDK_DIRECTORY"] = str(
-            fuchsia_idk_directory.resolve()
+            args.fuchsia_idk_directory.resolve()
         )
 
     # Setting USER is required to run Bazel, so force it to run on infra bots.
@@ -984,8 +1085,7 @@ def main() -> int:
     _run_command(command_args, check_failure=True, **command_kwargs)
 
     if args.stamp_file:
-        with open(args.stamp_file, "w") as f:
-            f.write("")
+        args.stamp_file.write_bytes(b"")
 
     if args.depfile:
 
@@ -1051,7 +1151,7 @@ def main() -> int:
             f.write(
                 "%s: %s\n"
                 % (
-                    " ".join(_depfile_quote(p) for p in outputs),
+                    " ".join(_depfile_quote(str(p)) for p in outputs),
                     " ".join(_depfile_quote(str(p)) for p in implicit_inputs),
                 )
             )

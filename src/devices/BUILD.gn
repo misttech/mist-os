@@ -55,3 +55,8 @@ group("tests") {
     "usb/tests",
   ]
 }
+
+group("e2e_tests") {
+  testonly = true
+  deps = [ "block:e2e_tests" ]
+}

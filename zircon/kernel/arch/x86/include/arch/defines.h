@@ -9,9 +9,9 @@
 #ifndef ZIRCON_KERNEL_ARCH_X86_INCLUDE_ARCH_DEFINES_H_
 #define ZIRCON_KERNEL_ARCH_X86_INCLUDE_ARCH_DEFINES_H_
 
-#define PAGE_SIZE 4096
 #define PAGE_SIZE_SHIFT 12
 #define PAGE_MASK (PAGE_SIZE - 1)
+#define PAGE_SIZE (1L << PAGE_SIZE_SHIFT)
 
 // Align the heap to 2MiB to optionally support large page mappings in it.
 #define ARCH_HEAP_ALIGN_BITS 21

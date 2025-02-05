@@ -6,8 +6,8 @@ use fidl_fuchsia_fxfs_test::{TestFxfsAdminRequest, TestFxfsAdminRequestStream};
 use fidl_fuchsia_io as fio;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_fs::directory::open_in_namespace;
-use fuchsia_storage_benchmarks_lib::block_devices::FvmVolumeFactory;
-use fuchsia_storage_benchmarks_lib::filesystems::fxfs::Fxfs;
+use fuchsia_storage_benchmarks::block_devices::FvmInstance;
+use fuchsia_storage_benchmarks::filesystems::fxfs::Fxfs;
 use futures::StreamExt;
 use storage_benchmarks::{CacheClearableFilesystem, Filesystem, FilesystemConfig};
 use vfs::directory::helper::DirectlyMutable;
@@ -19,8 +19,10 @@ enum IncomingRequest {
 
 #[fuchsia::main]
 async fn main() {
-    let fvm_volume_factory = FvmVolumeFactory::new().await.unwrap();
-    let mut fs = Fxfs::new(20 * 1024 * 1024).start_filesystem(&fvm_volume_factory).await;
+    let config = verity_benchmarks_test_fxfs_config::Config::take_from_startup_handle();
+    let fvm_instance = FvmInstance::from_config(config.storage_host, config.fxfs_blob).await;
+
+    let mut fs = Fxfs::new(24 * 1024 * 1024).start_filesystem(&fvm_instance).await;
     let mut svc = ServiceFs::new();
     let root_dir = open_in_namespace(
         &fs.benchmark_dir().to_string_lossy(),

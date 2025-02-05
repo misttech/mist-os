@@ -25,7 +25,10 @@ fuchsia_cc_driver("coordinator-driver") {
 }
 
 fuchsia_driver_component("coordinator") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/graphics/display:drivers",
+  ]
   component_name = "display-coordinator"
   deps = [ ":coordinator-driver" ]
   info = "meta/coordinator-info.json"
@@ -73,7 +76,6 @@ source_set("shared") {
     ":coordinator_bind",
     "//sdk/banjo/fuchsia.hardware.audiotypes:fuchsia.hardware.audiotypes_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
     "//sdk/fidl/fuchsia.hardware.display.engine:fuchsia.hardware.display.engine_cpp",
     "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
@@ -146,8 +148,6 @@ static_library("testing") {
   sources = [
     "testing/base.cc",
     "testing/base.h",
-    "testing/fidl_client.cc",
-    "testing/fidl_client.h",
     "testing/mock-coordinator-listener.cc",
     "testing/mock-coordinator-listener.h",
   ]

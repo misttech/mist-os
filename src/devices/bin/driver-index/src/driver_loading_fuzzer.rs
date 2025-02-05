@@ -24,7 +24,7 @@ impl Session {
         seed: Option<u64>,
     ) -> Session {
         let seed_val = seed.unwrap_or_else(rand::random::<u64>);
-        tracing::info!("Driver loading fuzzer enabled with RNG seed: {}", seed_val);
+        log::info!("Driver loading fuzzer enabled with RNG seed: {}", seed_val);
 
         let mut rng = SmallRng::seed_from_u64(seed_val);
         boot_drivers.shuffle(&mut rng);
@@ -75,7 +75,7 @@ async fn push_drivers(
     drivers: Vec<ResolvedDriver>,
 ) {
     if let Err(e) = sender.send(drivers).await {
-        tracing::error!("Failed to send drivers to the Indexer: {}", e);
+        log::error!("Failed to send drivers to the Indexer: {}", e);
     }
 }
 

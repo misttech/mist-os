@@ -5,7 +5,7 @@
 use at_commands as at;
 use bt_hfp::call::indicators as call_indicators;
 use core::fmt::Debug;
-use tracing::warn;
+use log::warn;
 
 use crate::peer::update::AgUpdate;
 

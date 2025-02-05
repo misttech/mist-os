@@ -5,9 +5,7 @@
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
-#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/driver/logging/cpp/logger.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
 #include <zircon/assert.h>
@@ -21,6 +19,7 @@
 #include <cstring>
 #include <iterator>
 #include <limits>
+#include <span>
 #include <utility>
 
 #include <fbl/alloc_checker.h>
@@ -37,42 +36,7 @@ namespace display_coordinator {
 
 namespace {
 
-edid::ddc_i2c_transact ddc_tx = [](void* ctx, edid::ddc_i2c_msg_t* msgs, uint32_t count) -> bool {
-  auto i2c = static_cast<ddk::I2cImplProtocolClient*>(ctx);
-  i2c_impl_op_t ops[count];
-  for (unsigned i = 0; i < count; i++) {
-    ops[i].address = msgs[i].addr;
-    ops[i].data_buffer = msgs[i].buf;
-    ops[i].data_size = msgs[i].length;
-    ops[i].is_read = msgs[i].is_read;
-    ops[i].stop = i == (count - 1);
-  }
-  return i2c->Transact(ops, count) == ZX_OK;
-};
-
-fit::result<const char*, DisplayInfo::Edid> InitEdidFromI2c(ddk::I2cImplProtocolClient& i2c) {
-  const char* last_error = nullptr;
-
-  static constexpr int kMaxEdidAttempts = 3;
-  for (int attempt = 1; attempt <= kMaxEdidAttempts; attempt++) {
-    fit::result<const char*, edid::Edid> result = edid::Edid::Create(&i2c, ddc_tx);
-    if (result.is_ok()) {
-      DisplayInfo::Edid edid = {
-          .base = std::move(result).value(),
-      };
-      return fit::ok(std::move(edid));
-    }
-    last_error = result.error_value();
-    FDF_LOG(WARNING, "Error %d/%d initializing edid: \"%s\"", attempt, kMaxEdidAttempts,
-            last_error);
-    zx::nanosleep(zx::deadline_after(zx::msec(5)));
-  }
-
-  ZX_DEBUG_ASSERT(last_error != nullptr);
-  return fit::error(last_error);
-}
-
-fit::result<const char*, DisplayInfo::Edid> InitEdidFromBytes(cpp20::span<const uint8_t> bytes) {
+fit::result<const char*, DisplayInfo::Edid> InitEdidFromBytes(std::span<const uint8_t> bytes) {
   ZX_DEBUG_ASSERT(bytes.size() <= std::numeric_limits<uint16_t>::max());
 
   fit::result<const char*, edid::Edid> result = edid::Edid::Create(bytes);
@@ -102,8 +66,8 @@ void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
 
   ZX_DEBUG_ASSERT(edid.has_value());
 
-  node.CreateByteVector(
-      "edid-bytes", cpp20::span(edid->base.edid_bytes(), edid->base.edid_length()), &properties);
+  node.CreateByteVector("edid-bytes", std::span(edid->base.edid_bytes(), edid->base.edid_length()),
+                        &properties);
 
   size_t i = 0;
   for (const display::DisplayTiming& t : edid->timings) {
@@ -138,8 +102,8 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(
   out->id = display::ToDisplayId(banjo_display_info.display_id);
 
   zx::result get_display_info_pixel_formats_result =
-      CoordinatorPixelFormat::CreateFblVectorFromBanjoVector(cpp20::span(
-          banjo_display_info.pixel_formats_list, banjo_display_info.pixel_formats_count));
+      CoordinatorPixelFormat::CreateFblVectorFromBanjoVector(
+          std::span(banjo_display_info.pixel_formats_list, banjo_display_info.pixel_formats_count));
   if (get_display_info_pixel_formats_result.is_error()) {
     FDF_LOG(ERROR, "Cannot convert pixel formats to FIDL pixel format value: %s",
             get_display_info_pixel_formats_result.status_string());
@@ -160,18 +124,11 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(
 
   auto edid_result = [&]() -> fit::result<const char*, Edid> {
     if (banjo_display_info.edid_bytes_count != 0) {
-      cpp20::span<const uint8_t> edid_bytes(banjo_display_info.edid_bytes_list,
-                                            banjo_display_info.edid_bytes_count);
+      std::span<const uint8_t> edid_bytes(banjo_display_info.edid_bytes_list,
+                                          banjo_display_info.edid_bytes_count);
       // TODO(https://fxbug.dev/348695412): Merge and de-duplicate the modes in
       // `preferred_modes` from the logic above.
       return InitEdidFromBytes(edid_bytes);
-    }
-
-    ddk::I2cImplProtocolClient i2c(&banjo_display_info.eddc_client);
-    if (i2c.is_valid()) {
-      // TODO(https://fxbug.dev/348695412): Merge and de-duplicate the modes in
-      // `preferred_modes` from the logic above.
-      return InitEdidFromI2c(i2c);
     }
 
     return fit::error("Missing display hardware support information");

@@ -124,10 +124,7 @@ async fn get_initial_value(control: Arc<Mutex<dyn ControlTrait>>) -> Result<(f32
     let mut control = control.lock().await;
     let (backlight, auto_brightness_on) = control.get_backlight_and_auto_brightness_on();
     let initial_brightness = backlight.get_brightness().await.unwrap_or_else(|e| {
-        tracing::warn!(
-            "Didn't get the initial brightness in watch due to err {}, assuming 1.0.",
-            e
-        );
+        log::warn!("Didn't get the initial brightness in watch due to err {}, assuming 1.0.", e);
         1.0
     });
     Ok((initial_brightness as f32, auto_brightness_on))
@@ -144,7 +141,7 @@ async fn run_brightness_service(
     const MAX_CONCURRENT: usize = 10_000;
     let fut = fs.for_each_concurrent(MAX_CONCURRENT, |stream| {
         let control = control.clone();
-        run_server(stream, control).unwrap_or_else(|e| tracing::info!("{:?}", e))
+        run_server(stream, control).unwrap_or_else(|e| log::info!("{:?}", e))
     });
     fut.await;
     Ok(())
@@ -152,7 +149,7 @@ async fn run_brightness_service(
 
 #[fuchsia::main(logging_tags = ["auto-brightness"])]
 async fn main() -> Result<(), Error> {
-    tracing::info!("Started");
+    log::info!("Started");
     let config = Config::take_from_startup_handle();
     inspector().root().record_child("config", |config_node| config.record_inspect(config_node));
 

@@ -45,6 +45,7 @@ DescriptorSetAllocatorPtr DescriptorSetAllocatorCache::ObtainDescriptorSetAlloca
 }
 
 void DescriptorSetAllocatorCache::BeginFrame() {
+  TRACE_DURATION("gfx", "escher::impl::DescriptorSetAllocatorCache::BeginFrame");
   auto it = descriptor_set_allocators_.begin();
   while (it != descriptor_set_allocators_.end()) {
     if (it->second.expired()) {

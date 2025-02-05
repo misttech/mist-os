@@ -6,12 +6,13 @@ use async_trait::async_trait;
 use ffx_daemon_disconnect_args::DisconnectCommand;
 use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx as ffx;
+use target_holders::TargetProxyHolder;
 
 #[derive(FfxTool)]
 pub struct DisconnectTool {
     #[command]
     cmd: DisconnectCommand,
-    target_proxy: ffx::TargetProxy,
+    target_proxy: TargetProxyHolder,
 }
 
 fho::embedded_plugin!(DisconnectTool);
@@ -20,12 +21,12 @@ fho::embedded_plugin!(DisconnectTool);
 impl FfxMain for DisconnectTool {
     type Writer = SimpleWriter;
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        disconnect_impl(self.target_proxy, self.cmd).await
+        disconnect_impl(&self.target_proxy, self.cmd).await
     }
 }
 
 async fn disconnect_impl(
-    target_proxy: ffx::TargetProxy,
+    target_proxy: &ffx::TargetProxy,
     _cmd: DisconnectCommand,
 ) -> fho::Result<()> {
     target_proxy.disconnect().await.user_message("FIDL: disconnect failed")?;
@@ -34,10 +35,12 @@ async fn disconnect_impl(
 
 #[cfg(test)]
 mod tests {
+    use target_holders::fake_proxy;
+
     use super::*;
 
     fn setup_fake_target_server() -> ffx::TargetProxy {
-        fho::testing::fake_proxy(move |req| match req {
+        fake_proxy(move |req| match req {
             ffx::TargetRequest::Disconnect { responder } => {
                 responder.send().expect("disconnect failed");
             }
@@ -47,7 +50,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn disconnect_invoked() {
-        disconnect_impl(setup_fake_target_server(), DisconnectCommand {})
+        disconnect_impl(&setup_fake_target_server(), DisconnectCommand {})
             .await
             .expect("disconnect failed");
     }

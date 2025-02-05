@@ -27,13 +27,15 @@ ktl::optional<uint32_t> PlatformUartGetIrqNumber(uint32_t irq_num);
 template <typename Config, uart::IoRegisterType>
 class PlatformUartIoProvider;
 
-// Null Driver specialization.
-template <>
-class PlatformUartIoProvider<uart::null::Driver::config_type, uart::IoRegisterType::kMmio8>
-    : public uart::BasicIoProvider<uart::null::Driver::config_type, uart::IoRegisterType::kMmio8> {
+// No-op for stub drivers.
+template <typename Config>
+class PlatformUartIoProvider<Config, uart::IoRegisterType::kNone>
+    : public uart::BasicIoProvider<Config, uart::IoRegisterType::kNone> {
  public:
-  using Base = uart::BasicIoProvider<uart::null::Driver::config_type, uart::IoRegisterType::kMmio8>;
-  using Base::Base;
+  using Base = uart::BasicIoProvider<Config, uart::IoRegisterType::kNone>;
+
+  constexpr PlatformUartIoProvider(const Config& config, size_t io_slots)
+      : Base(config, io_slots) {}
 };
 
 // MMIO Driver specialization.

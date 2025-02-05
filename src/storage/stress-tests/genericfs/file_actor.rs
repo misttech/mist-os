@@ -4,11 +4,11 @@
 
 use async_trait::async_trait;
 use futures::{SinkExt as _, StreamExt as _};
+use log::info;
 use once_cell::sync::OnceCell;
 use storage_stress_test_utils::data::FileFactory;
 use storage_stress_test_utils::io::Directory;
 use stress_test::actor::{Actor, ActorError};
-use tracing::info;
 use zx::Status;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 

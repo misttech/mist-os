@@ -13,7 +13,7 @@ use crate::writer::{
 };
 use diagnostics_hierarchy::{ArrayFormat, ExponentialHistogramParams, LinearHistogramParams};
 use futures::future::BoxFuture;
-use inspect_format::{BlockIndex, LinkNodeDisposition, PropertyFormat};
+use inspect_format::{BlockIndex, LinkNodeDisposition};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Inspect Node data type.
@@ -431,7 +431,7 @@ impl Node {
     pub fn create_string(
         &self,
         name: impl Into<StringReference>,
-        value: impl AsRef<str>,
+        value: impl Into<StringReference>,
     ) -> StringProperty {
         self.inner
             .inner_ref()
@@ -440,12 +440,7 @@ impl Node {
                     .state
                     .try_lock()
                     .and_then(|mut state| {
-                        state.create_property(
-                            name.into(),
-                            value.as_ref().as_bytes(),
-                            PropertyFormat::String,
-                            inner_ref.block_index,
-                        )
+                        state.create_string(name.into(), value.into(), inner_ref.block_index)
                     })
                     .map(|block_index| StringProperty::new(inner_ref.state.clone(), block_index))
                     .ok()
@@ -454,8 +449,12 @@ impl Node {
     }
 
     /// Creates and saves a string property for the lifetime of the node.
-    pub fn record_string(&self, name: impl Into<StringReference>, value: impl AsRef<str>) {
-        let property = self.create_string(name.into(), value);
+    pub fn record_string(
+        &self,
+        name: impl Into<StringReference>,
+        value: impl Into<StringReference>,
+    ) {
+        let property = self.create_string(name, value);
         self.record(property);
     }
 
@@ -473,10 +472,9 @@ impl Node {
                     .state
                     .try_lock()
                     .and_then(|mut state| {
-                        state.create_property(
+                        state.create_buffer_property(
                             name.into(),
                             value.as_ref(),
-                            PropertyFormat::Bytes,
                             inner_ref.block_index,
                         )
                     })
@@ -587,22 +585,22 @@ mod tests {
         let state = get_state(4096);
         let root = Node::new_root(state);
         let node = root.create_child("node");
-        node.get_block(|node_block| {
-            assert_eq!(node_block.block_type(), BlockType::NodeValue);
-            assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block::<_, inspect_format::Node>(|node_block| {
+            assert_eq!(node_block.block_type(), Some(BlockType::NodeValue));
+            assert_eq!(node_block.child_count(), 0);
         });
         {
             let child = node.create_child("child");
-            child.get_block(|child_block| {
-                assert_eq!(child_block.block_type(), BlockType::NodeValue);
-                assert_eq!(child_block.child_count().unwrap(), 0);
+            child.get_block::<_, inspect_format::Node>(|child_block| {
+                assert_eq!(child_block.block_type(), Some(BlockType::NodeValue));
+                assert_eq!(child_block.child_count(), 0);
             });
-            node.get_block(|node_block| {
-                assert_eq!(node_block.child_count().unwrap(), 1);
+            node.get_block::<_, inspect_format::Node>(|node_block| {
+                assert_eq!(node_block.child_count(), 1);
             });
         }
-        node.get_block(|node_block| {
-            assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block::<_, inspect_format::Node>(|node_block| {
+            assert_eq!(node_block.child_count(), 0);
         });
     }
 
@@ -745,25 +743,25 @@ mod tests {
         let node_weak = node.clone_weak();
         let node_weak_2 = node_weak.clone_weak(); // Weak from another weak
 
-        node.get_block(|node_block| {
-            assert_eq!(node_block.block_type(), BlockType::NodeValue);
-            assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block::<_, inspect_format::Node>(|node_block| {
+            assert_eq!(node_block.block_type(), Some(BlockType::NodeValue));
+            assert_eq!(node_block.child_count(), 0);
         });
 
         let child_from_strong = node.create_child("child");
         let child = node_weak.create_child("child_1");
         let child_2 = node_weak_2.create_child("child_2");
         std::mem::drop(node_weak_2);
-        node.get_block(|block| {
-            assert_eq!(block.child_count().unwrap(), 3);
+        node.get_block::<_, inspect_format::Node>(|block| {
+            assert_eq!(block.child_count(), 3);
         });
         std::mem::drop(child_from_strong);
-        node.get_block(|node_block| {
-            assert_eq!(node_block.child_count().unwrap(), 2);
+        node.get_block::<_, inspect_format::Node>(|block| {
+            assert_eq!(block.child_count(), 2);
         });
         std::mem::drop(child);
-        node.get_block(|node_block| {
-            assert_eq!(node_block.child_count().unwrap(), 1);
+        node.get_block::<_, inspect_format::Node>(|block| {
+            assert_eq!(block.child_count(), 1);
         });
         assert!(node_weak.is_valid());
         assert!(child_2.is_valid());

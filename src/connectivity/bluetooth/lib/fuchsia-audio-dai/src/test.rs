@@ -7,8 +7,8 @@ use derivative::Derivative;
 use fidl_fuchsia_hardware_audio::*;
 use fuchsia_async as fasync;
 use futures::{Future, StreamExt};
+use log::warn;
 use std::sync::{Arc, Mutex};
-use tracing::warn;
 use vfs::directory::entry_container::Directory;
 use vfs::{pseudo_directory, service};
 

@@ -60,6 +60,11 @@ import("//build/bazel/bazel_action.gni")
 #       Metadata that is _only_ applied to the group target itself, not to
 #       its sub-targets.
 #
+#   no_sdk: (optional)
+#     Set this to true to build Bazel artifacts that do not depend on the Fuchsia
+#     IDK or SDK. This makes these targets available to the GN graph early during
+#     the build. This flag affects all subtargets at once.
+#
 #    testonly (optional)
 #       Usual GN meaning, but applies to each subtarget as well as the group.
 #
@@ -121,6 +126,8 @@ template("bazel_build_group") {
             bazel_dir = output.bazel_dir
             ninja_dir = "${_group_output_dir}/${output.ninja_dir}"
             tracked_files = output.tracked_files
+            copy_debug_symbols =
+                defined(output.copy_debug_symbols) && output.copy_debug_symbols
           },
         ]
       }

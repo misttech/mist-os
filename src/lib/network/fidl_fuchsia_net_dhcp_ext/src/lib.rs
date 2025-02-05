@@ -677,10 +677,7 @@ mod test {
                         "must reject partially-filled address object"
                     );
 
-                    match result {
-                        Err(_) => None,
-                        Ok(configuration) => Some(configuration),
-                    }
+                    result.ok()
                 }
                 None => {
                     prop_assert!(result.is_ok(), "absent address is always accepted");

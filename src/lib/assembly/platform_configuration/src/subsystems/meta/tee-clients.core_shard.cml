@@ -23,6 +23,11 @@
             to: "#tee-clients",
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#tee-clients",
+        },
+        {
             protocol: [
                 "fuchsia.factory.AlphaFactoryStoreProvider",
                 "fuchsia.factory.CastCredentialsFactoryStoreProvider",

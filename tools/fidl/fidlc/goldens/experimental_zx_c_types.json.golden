@@ -26,7 +26,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "primitive",
         "kind_v2": "primitive",
         "subtype": "uchar",
         "type_shape_v2": {
@@ -60,7 +59,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "primitive",
         "kind_v2": "primitive",
         "subtype": "uintptr64",
         "type_shape_v2": {
@@ -94,7 +92,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "primitive",
         "kind_v2": "primitive",
         "subtype": "usize64",
         "type_shape_v2": {
@@ -164,7 +161,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "usize64",
             "type_shape_v2": {
@@ -192,7 +188,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uintptr64",
             "type_shape_v2": {
@@ -220,7 +215,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uchar",
             "type_shape_v2": {
@@ -248,10 +242,8 @@
         },
         {
           "type": {
-            "kind": "experimental_pointer",
             "kind_v2": "experimental_pointer",
             "pointee_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "uint64",
               "type_shape_v2": {
@@ -289,13 +281,10 @@
         },
         {
           "type": {
-            "kind": "experimental_pointer",
             "kind_v2": "experimental_pointer",
             "pointee_type": {
-              "kind": "experimental_pointer",
               "kind_v2": "experimental_pointer",
               "pointee_type": {
-                "kind": "primitive",
                 "kind_v2": "primitive",
                 "subtype": "uint32",
                 "type_shape_v2": {
@@ -343,10 +332,8 @@
         },
         {
           "type": {
-            "kind": "experimental_pointer",
             "kind_v2": "experimental_pointer",
             "pointee_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.experimentalzxctypes/Struct",
               "nullable": false,
@@ -417,7 +404,6 @@
         "nullable": false
       },
       "type": {
-        "kind": "primitive",
         "kind_v2": "primitive",
         "subtype": "uchar",
         "type_shape_v2": {
@@ -452,10 +438,8 @@
         "nullable": false
       },
       "type": {
-        "kind": "experimental_pointer",
         "kind_v2": "experimental_pointer",
         "pointee_type": {
-          "kind": "primitive",
           "kind_v2": "primitive",
           "subtype": "uint32",
           "type_shape_v2": {
@@ -494,7 +478,6 @@
         "nullable": false
       },
       "type": {
-        "kind": "primitive",
         "kind_v2": "primitive",
         "subtype": "uintptr64",
         "type_shape_v2": {
@@ -523,7 +506,6 @@
         "nullable": false
       },
       "type": {
-        "kind": "primitive",
         "kind_v2": "primitive",
         "subtype": "usize64",
         "type_shape_v2": {

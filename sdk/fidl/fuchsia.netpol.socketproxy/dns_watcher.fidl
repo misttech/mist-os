@@ -36,4 +36,13 @@ closed protocol DnsServerWatcher {
     strict WatchServers() -> (struct {
         servers vector<DnsServerList>:MAX;
     });
+
+    /// No-op method that allows checking for presence.
+    ///
+    /// TODO(https://fxbug.dev/296283299): It's not currently possible for a
+    /// client with an optionally-provided protocol to check whether there's
+    /// someone on the other end without making a FIDL call . This method
+    /// provides a workaround by giving a client a method that it can call to
+    /// check for liveness.
+    strict CheckPresence() -> ();
 };

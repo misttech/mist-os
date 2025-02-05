@@ -17,9 +17,9 @@ use fuchsia_cobalt_builders::MetricEventExt as _;
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;
+use log::{error, info, warn};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tracing::{error, info, warn};
 use {
     cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio,
     fidl_fuchsia_metrics as fmetrics, fidl_fuchsia_pkg as fpkg, fuchsia_async as fasync,

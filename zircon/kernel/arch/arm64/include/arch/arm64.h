@@ -133,4 +133,9 @@ zx_status_t arm64_free_secondary_stack(cpu_num_t cpu_num);
 /* used in above exception_flags arguments */
 #define ARM64_EXCEPTION_FLAG_LOWER_EL (1 << 0)
 
+/* used in the exceptions_c which argument */
+#define ARM64_DISALLOWED_ARM32_SYSCALL (1 << 0)
+#define ARM64_DISALLOWED_ARM32_SYNC_EXCEPTION (1 << 1)
+#define ARM64_DISALLOWED_ARM32_ASYNC_EXCEPTION (1 << 2)
+
 #endif  // ZIRCON_KERNEL_ARCH_ARM64_INCLUDE_ARCH_ARM64_H_

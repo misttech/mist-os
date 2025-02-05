@@ -28,6 +28,6 @@ static_assert(sizeof(vmo_header) == offsetof(counters::DescriptorVmo, descriptor
 // which is true also for mexec (netboot) scenario.
 KCOUNTER(init_time, "init.target.time.msec")
 
-static void counters_init(unsigned level) { init_time.Add(current_time() / 1000000LL); }
+static void counters_init(unsigned level) { init_time.Add(current_mono_time() / 1000000LL); }
 
 LK_INIT_HOOK(kcounters, counters_init, LK_INIT_LEVEL_USER - 1)

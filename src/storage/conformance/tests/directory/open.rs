@@ -312,7 +312,7 @@ async fn open_child_dir_with_posix_flags() {
         );
         // Ensure expanded rights do not exceed those of the parent directory connection.
         let (status, flags) =
-            child_dir_client.get_flags().await.expect("Failed to get node flags!");
+            child_dir_client.deprecated_get_flags().await.expect("Failed to get node flags!");
         assert_matches!(zx::Status::ok(status), Ok(()));
         assert_eq!(flags & dir_flags, dir_flags);
     }
@@ -787,10 +787,10 @@ async fn open3_dir_inherit_rights() {
         proxy.get_connection_info().await.expect("get_connection_info failed").rights.unwrap(),
         fio::Operations::READ_BYTES | fio::INHERITED_WRITE_PERMISSIONS,
     );
-    // TODO(https://fxbug.dev/377534441): Update this when GetFlags2 is supported.
+    let inherited_flags = fio::Flags::from_bits_truncate(fio::INHERITED_WRITE_PERMISSIONS.bits());
     assert_eq!(
-        zx::Status::ok(proxy.get_flags2().await.expect("get_flags2 failed").unwrap_err()),
-        Err(zx::Status::NOT_SUPPORTED),
+        proxy.get_flags().await.expect("get_flags failed").map_err(zx::Status::from_raw),
+        Ok(fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PERM_READ | inherited_flags),
     );
 }
 

@@ -570,6 +570,12 @@ template("fidl_cpp_family") {
         "//sdk/lib/fidl/cpp:hlcpp_conversion",
       ]
     }
+
+    if (invoker.declare_sdk_atom_aliases) {
+      sdk_atom_alias("${target_name}_cpp_hlcpp_conversion_sdk") {
+        atom = ":$sdk_target_name($fidl_toolchain)"
+      }
+    }
   }
 
   # Note that this is not the `_cpp_target` as the template adds a suffix.

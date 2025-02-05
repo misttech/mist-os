@@ -30,19 +30,9 @@ _component_manager_bin = {
   ]
   configs_to_remove = [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
 
-  if (is_mistos) {
-    configs_to_add -= [ "//build/config/fuchsia:static_rust_standard_library" ]
-    configs_to_add += [ "//build/config/mistos:static_rust_standard_library" ]
-
-    configs_to_remove -=
-        [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
-    configs_to_remove +=
-        [ "//build/config/mistos:dynamic_rust_standard_library" ]
-  }
-
   # As this is a large binary that uses many resources to compile (and takes minutes when LTO is
   # enabled, shift it to the large RBE worker pool)
-  _concurrent_jobs = concurrent_jobs.link_highmem
+  _concurrent_jobs = concurrent_jobs.rust_highmem
   configs_to_add += _concurrent_jobs.configs
   forward_variables_from(_concurrent_jobs.vars, "*")
 
@@ -127,10 +117,11 @@ _component_manager_bin = {
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:lazy_static",
+    "//third_party/rust_crates:log",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [
@@ -156,6 +147,7 @@ _component_manager_bin = {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:paste",
     "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:proptest",
@@ -163,7 +155,6 @@ _component_manager_bin = {
     "//third_party/rust_crates:tempfile",
     "//third_party/rust_crates:test-case",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
   ]
 
   sources = [

@@ -58,7 +58,11 @@ fuchsia_cc_driver("spi-driver") {
 }
 
 fuchsia_driver_component("spi") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/devices/bus/drivers/platform/test:*",
+    "//src/devices/spi:drivers",
+  ]
   info = "meta/spi-info.json"
   component_name = "spi"
   manifest = "meta/spi.cml"

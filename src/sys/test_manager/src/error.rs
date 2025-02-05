@@ -4,8 +4,8 @@
 
 use fidl_fuchsia_test_manager::LaunchError;
 use fuchsia_component_test::error::Error as RealmBuilderError;
+use log::warn;
 use thiserror::Error;
-use tracing::warn;
 use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_debugger as fdbg};
 
 /// Error encountered running test manager

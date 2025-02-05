@@ -93,7 +93,9 @@ typedef struct __ucontext {
 
 #else
 
-typedef struct sigcontext {} mcontext_t;
+typedef struct sigcontext {
+  unsigned long regs[32];  // pc is in place of x0 (zero)
+} mcontext_t;
 
 typedef struct __ucontext {
   unsigned long uc_flags;

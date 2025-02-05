@@ -1071,18 +1071,6 @@ class VmMapping final : public VmAddressRegionOrMapping,
     AttributionCounts attribution_counts;
   };
 
-  // Exposed for testing.
-  CachedMemoryAttribution GetCachedMemoryAttribution() {
-    Guard<CriticalMutex> guard{lock()};
-    return cached_memory_attribution_;
-  }
-
-  // Exposed for testing.
-  uint64_t GetMappingGenerationCount() {
-    Guard<CriticalMutex> guard{lock()};
-    return GetMappingGenerationCountLocked();
-  }
-
   // Enumerates any different protection ranges that exist inside this mapping. The virtual range
   // specified by range_base and range_size must be within this mappings base_ and size_. The
   // provided callback is called in virtual address order for each protection type. ZX_ERR_NEXT
@@ -1161,19 +1149,6 @@ class VmMapping final : public VmAddressRegionOrMapping,
   // any VmMapping destructor by dropping the last reference when removing from the parent vmar.
   void TryMergeRightNeighborLocked(VmMapping* right_candidate) TA_REQ(lock());
 
-  // This should be called whenever a change is made to the vmo range we are mapping, that could
-  // result in the memory attribution counts of that range changing.
-  void IncrementMappingGenerationCountLocked() TA_REQ(lock()) {
-    DEBUG_ASSERT(mapping_generation_count_ != 0);
-    mapping_generation_count_++;
-  }
-
-  // Get the current generation count.
-  uint64_t GetMappingGenerationCountLocked() const TA_REQ(lock()) {
-    DEBUG_ASSERT(mapping_generation_count_ != 0);
-    return mapping_generation_count_;
-  }
-
   // Helper function that updates the |size_| to |new_size| and also increments the mapping
   // generation count. Requires both the aspace lock and the object lock to be held, since |size_|
   // can be read under either of those locks.
@@ -1193,8 +1168,6 @@ class VmMapping final : public VmAddressRegionOrMapping,
       auto iter = RegionList<>::ChildList::materialize_iterator(*this);
       RegionList<>::Observer::RestoreInvariants(iter);
     }
-
-    IncrementMappingGenerationCountLocked();
   }
 
   // For a VmMapping |state_| is only modified either with the object_ lock held, or if there is no
@@ -1241,22 +1214,6 @@ class VmMapping final : public VmAddressRegionOrMapping,
       TA_REQ(object_->lock()) __TA_NO_THREAD_SAFETY_ANALYSIS {
     return protection_ranges_;
   }
-
-  // Tracks the last cached attribution counts for the vmo range we are mapping.
-  // Only used when |object_| is a VmObjectPaged.
-  mutable CachedMemoryAttribution cached_memory_attribution_ TA_GUARDED(lock()) = {};
-
-  // The mapping's generation count is incremented on any change to the vmo range that is mapped.
-  //
-  // This is used to implement caching for attribution counts, which get queried frequently to
-  // periodically track memory usage on the system. Attributing memory to a VMO is an expensive
-  // operation and involves walking the VMO tree, quite often multiple times. If the generation
-  // counts for the vmo *and* the mapping do not change between two successive queries, we can avoid
-  // re-counting attributed memory, and simply return the previously cached value.
-  //
-  // The generation count starts at 1 to ensure that there can be no cached values initially; the
-  // cached generation count starts at 0.
-  uint64_t mapping_generation_count_ TA_GUARDED(lock()) = 1;
 };
 
 // Interface for walking a VmAspace-rooted VmAddressRegion/VmMapping tree.

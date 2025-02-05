@@ -60,13 +60,13 @@ pub async fn resize_volume(volume_proxy: &VolumeProxy, target_bytes: u64) -> Res
             manager.slice_count * DEFAULT_VOLUME_PERCENTAGE / 100,
             DEFAULT_VOLUME_SIZE / slice_size,
         );
-        tracing::info!("Using default size of {:?}", default_slices * slice_size);
+        log::info!("Using default size of {:?}", default_slices * slice_size);
         cmp::min(slices_available, default_slices)
     } else {
         (target_bytes + slice_size - 1) / slice_size
     };
     if slices_available < slice_count {
-        tracing::info!(
+        log::info!(
             "Only {:?} slices available. Some functionality may be missing",
             slices_available
         );

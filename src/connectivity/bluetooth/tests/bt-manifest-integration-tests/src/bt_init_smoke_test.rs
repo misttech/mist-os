@@ -22,9 +22,9 @@ use fuchsia_component_test::{
 };
 use futures::channel::mpsc;
 use futures::{SinkExt, StreamExt};
+use log::info;
 use realmbuilder_mock_helpers::{add_fidl_service_handler, mock_dev, provide_bt_gap_uses};
 use std::sync::Arc;
-use tracing::info;
 use vfs::directory::entry_container::Directory;
 use vfs::pseudo_directory;
 use {

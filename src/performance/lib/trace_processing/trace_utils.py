@@ -303,6 +303,7 @@ def standard_metrics_set(
     label_prefix: str,
     unit: trace_metrics.Unit,
     percentiles: tuple[int, int, int, int, int] = (5, 25, 50, 75, 95),
+    durations: List[float] | None = None,
 ) -> list[trace_metrics.TestCaseResult]:
     """Generates min, max, average and percentiles metrics for the given values.
 
@@ -312,6 +313,14 @@ def standard_metrics_set(
             '{label_prefix}Average' and '{label_prefix}P*' (percentiles).
         unit: The metrics unit.
         percentiles: Percentiles to output.
+        durations: Optional. If passed in, the average percentage is calculated
+            proportional to the duration of each Event's CPU usage, instead of
+            just taking the average of all the values. The latter assumes that
+            each value had the same duration (e.g. 1 s). For example:
+                cpu_percentages: [30, 2]
+                duration: [1, 5]
+            The average would be around (30*1+2*5)/(1+5) = 6.7%
+            instead of statistics.mean([30, 1]) = 15.5%
 
     Returns:
         A list of TestCaseResults representing each of the generated metrics.
@@ -322,15 +331,43 @@ def standard_metrics_set(
             f"{label_prefix}P{p}",
             unit,
             [percentile(values, p)],
+            f"{label_prefix}, {p}th percentile",
         )
         for p in percentiles
     ]
 
     results += [
-        trace_metrics.TestCaseResult(f"{label_prefix}Min", unit, [min(values)]),
-        trace_metrics.TestCaseResult(f"{label_prefix}Max", unit, [max(values)]),
         trace_metrics.TestCaseResult(
-            f"{label_prefix}Average", unit, [statistics.mean(values)]
+            f"{label_prefix}Min",
+            unit,
+            [min(values)],
+            f"{label_prefix}, minimum",
+        ),
+        trace_metrics.TestCaseResult(
+            f"{label_prefix}Max",
+            unit,
+            [max(values)],
+            f"{label_prefix}, maximum",
+        ),
+    ]
+
+    average: float = 0
+    if durations is not None:
+        proportional_percentages: list[float] = [
+            duration * values[i] for i, duration in enumerate(durations)
+        ]
+        # The total average CPU percentage is:
+        # (sum of the average_percentages) / (total trace duration)
+        average_percentage = sum(proportional_percentages) / sum(durations)
+        average = average_percentage
+    else:
+        average = statistics.mean(values)
+    results += [
+        trace_metrics.TestCaseResult(
+            f"{label_prefix}Average",
+            unit,
+            [average],
+            f"{label_prefix}, mean",
         ),
     ]
 

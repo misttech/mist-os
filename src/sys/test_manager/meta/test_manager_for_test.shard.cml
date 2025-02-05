@@ -14,9 +14,13 @@
         {
             protocol: [
                 "fuchsia.component.resolution.Resolver",
-                "fuchsia.inspect.InspectSink",
                 "fuchsia.process.Launcher",
             ],
+            from: "parent",
+            to: "#test_manager",
+        },
+        {
+            dictionary: "diagnostics",
             from: "parent",
             to: "#test_manager",
         },

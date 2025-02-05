@@ -93,7 +93,6 @@ class Manager {
   std::vector<ACPI_HANDLE> device_publish_order_;
   std::unordered_map<BusType, uint32_t> next_bus_ids_;
   bool published_pci_bus_ = false;
-  fidl::Arena<> allocator_;
   uint32_t device_id_ = 1;
   uint32_t next_bti_ = 0;
 };

@@ -307,179 +307,10 @@ class DirentIteratorImpl {
 static_assert(sizeof(DirentIteratorImpl) <= sizeof(zxio_dirent_iterator_t),
               "DirentIteratorImpl should fit within a zxio_dirent_iterator_t");
 
-zxio_node_protocols_t ToZxioNodeProtocols(uint32_t mode) {
-  switch (mode & (S_IFMT | fio::wire::kModeTypeService)) {
-    case S_IFDIR:
-      return ZXIO_NODE_PROTOCOL_DIRECTORY;
-    case S_IFREG:
-      return ZXIO_NODE_PROTOCOL_FILE;
-    case fio::wire::kModeTypeService:
-      // fuchsia::io has mode type service which breaks stat.
-      // TODO(https://fxbug.dev/42130287): return ZXIO_NODE_PROTOCOL_CONNECTOR instead.
-      return ZXIO_NODE_PROTOCOL_FILE;
-    case S_IFLNK:
-      return ZXIO_NODE_PROTOCOL_SYMLINK;
-    case S_IFBLK:
-      // Block-oriented devices are not supported on Fuchsia.
-    case S_IFCHR:
-      // Character-oriented devices are not supported on Fuchsia.
-    case S_IFIFO:
-      // Named pipes are not supported on Fuchsia.
-    case S_IFSOCK:
-      // Named sockets are not supported on Fuchsia.
-    default:
-      // A reasonable fallback is to keep the protocols unchanged,
-      // i.e. same as getting a protocol we do not understand.
-      return ZXIO_NODE_PROTOCOL_NONE;
-  }
-}
-
-uint32_t ToIo1ModeFileType(zxio_node_protocols_t protocols) {
-  // The "file type" portion of mode only allow one bit, so we find
-  // the best approximation given some set of |protocols|, tie-breaking
-  // in the following precedence.
-  if (protocols & ZXIO_NODE_PROTOCOL_DIRECTORY) {
-    return S_IFDIR;
-  }
-  if (protocols & ZXIO_NODE_PROTOCOL_FILE) {
-    return S_IFREG;
-  }
-  if (protocols & ZXIO_NODE_PROTOCOL_CONNECTOR) {
-    // There is no good analogue for FIDL services in POSIX land...
-    // Returning "regular file" as a fallback.
-    return S_IFREG;
-  }
-  if (protocols & ZXIO_NODE_PROTOCOL_SYMLINK) {
-    return S_IFLNK;
-  }
-  return 0;
-}
-
-class ToZxioAbilitiesForFile {
- public:
-  zxio_abilities_t operator()(uint32_t mode) {
-    zxio_abilities_t abilities = ZXIO_OPERATION_NONE;
-    if (mode & S_IRUSR) {
-      abilities |= ZXIO_OPERATION_READ_BYTES;
-    }
-    if (mode & S_IWUSR) {
-      abilities |= ZXIO_OPERATION_WRITE_BYTES;
-    }
-    if (mode & S_IXUSR) {
-      abilities |= ZXIO_OPERATION_EXECUTE;
-    }
-    // In addition, POSIX seems to allow changing file metadata
-    // regardless of read/write permissions, as long as we are the
-    // owner.
-    abilities |= ZXIO_OPERATION_GET_ATTRIBUTES;
-    abilities |= ZXIO_OPERATION_UPDATE_ATTRIBUTES;
-    return abilities;
-  }
-};
-
-class ToIo1ModePermissionsForFile {
- public:
-  uint32_t operator()(zxio_abilities_t abilities) {
-    // Permissions are not applicable on Fuchsia.
-    // We could approximate them using the |abilities| of a node.
-    uint32_t permission_bits = 0;
-    if (abilities & ZXIO_OPERATION_READ_BYTES) {
-      permission_bits |= S_IRUSR;
-    }
-    if (abilities & ZXIO_OPERATION_WRITE_BYTES) {
-      permission_bits |= S_IWUSR;
-    }
-    if (abilities & ZXIO_OPERATION_EXECUTE) {
-      permission_bits |= S_IXUSR;
-    }
-    return permission_bits;
-  }
-};
-
-class ToZxioAbilitiesForDirectory {
- public:
-  zxio_abilities_t operator()(uint32_t mode) {
-    zxio_abilities_t abilities = ZXIO_OPERATION_NONE;
-    if (mode & S_IRUSR) {
-      abilities |= ZXIO_OPERATION_ENUMERATE;
-    }
-    if (mode & S_IWUSR) {
-      abilities |= ZXIO_OPERATION_MODIFY_DIRECTORY;
-    }
-    if (mode & S_IXUSR) {
-      abilities |= ZXIO_OPERATION_TRAVERSE;
-    }
-    // In addition, POSIX seems to allow changing file metadata
-    // regardless of read/write permissions, as long as we are the
-    // owner.
-    abilities |= ZXIO_OPERATION_GET_ATTRIBUTES;
-    abilities |= ZXIO_OPERATION_UPDATE_ATTRIBUTES;
-    return abilities;
-  }
-};
-
-class ToIo1ModePermissionsForDirectory {
- public:
-  uint32_t operator()(zxio_abilities_t abilities) {
-    // Permissions are not applicable on Fuchsia.
-    // We could approximate them using the |abilities| of a node.
-    uint32_t permission_bits = 0;
-    if (abilities & ZXIO_OPERATION_ENUMERATE) {
-      permission_bits |= S_IRUSR;
-    }
-    if (abilities & ZXIO_OPERATION_MODIFY_DIRECTORY) {
-      permission_bits |= S_IWUSR;
-    }
-    if (abilities & ZXIO_OPERATION_TRAVERSE) {
-      permission_bits |= S_IXUSR;
-    }
-    return permission_bits;
-  }
-};
-
-template <typename ToZxioAbilities>
-void ToZxioNodeAttributes(fio::wire::NodeAttributes attr, ToZxioAbilities to_zxio,
-                          zxio_node_attributes_t* inout_zxio_attr) {
-  if (inout_zxio_attr->has.protocols)
-    ZXIO_NODE_ATTR_SET(*inout_zxio_attr, protocols, ToZxioNodeProtocols(attr.mode));
-  if (inout_zxio_attr->has.abilities)
-    ZXIO_NODE_ATTR_SET(*inout_zxio_attr, abilities, to_zxio(attr.mode));
-  if (inout_zxio_attr->has.id)
-    ZXIO_NODE_ATTR_SET(*inout_zxio_attr, id, attr.id);
-  if (inout_zxio_attr->has.content_size)
-    ZXIO_NODE_ATTR_SET(*inout_zxio_attr, content_size, attr.content_size);
-  if (inout_zxio_attr->has.storage_size)
-    ZXIO_NODE_ATTR_SET(*inout_zxio_attr, storage_size, attr.storage_size);
-  if (inout_zxio_attr->has.link_count)
-    ZXIO_NODE_ATTR_SET(*inout_zxio_attr, link_count, attr.link_count);
-  if (inout_zxio_attr->has.creation_time)
-    ZXIO_NODE_ATTR_SET(*inout_zxio_attr, creation_time, attr.creation_time);
-  if (inout_zxio_attr->has.modification_time)
-    ZXIO_NODE_ATTR_SET(*inout_zxio_attr, modification_time, attr.modification_time);
-}
-
-template <typename ToIo1ModePermissions>
-fio::wire::NodeAttributes ToNodeAttributes(zxio_node_attributes_t attr,
-                                           ToIo1ModePermissions to_io1) {
-  return fio::wire::NodeAttributes{
-      .mode = ToIo1ModeFileType(attr.protocols) | to_io1(attr.abilities),
-      .id = attr.has.id ? attr.id : fio::wire::kInoUnknown,
-      .content_size = attr.content_size,
-      .storage_size = attr.storage_size,
-      .link_count = attr.link_count,
-      .creation_time = attr.creation_time,
-      .modification_time = attr.modification_time,
-  };
-}
-
-// POSIX expects EBADF for access denied errors which comes from ZX_ERR_BAD_STATE;
-// ZX_ERR_ACCESS_DENIED produces EACCES which should only be used for sockets.
-zx_status_t map_status(zx_status_t status) {
-  switch (status) {
-    case ZX_ERR_ACCESS_DENIED:
-      return ZX_ERR_BAD_HANDLE;
-  }
-  return status;
+// POSIX expects `EBADF` for access denied errors, which is mapped from `ZX_ERR_BAD_HANDLE`.
+// `ZX_ERR_ACCESS_DENIED` maps to `EACCES` which should only be used for sockets.
+zx_status_t MapToPosixStatus(zx_status_t status) {
+  return status == ZX_ERR_ACCESS_DENIED ? ZX_ERR_BAD_HANDLE : status;
 }
 
 template <typename Protocol>
@@ -496,9 +327,13 @@ class Remote : public HasIo {
 
   zx_status_t AdvisoryLock(advisory_lock_req* req);
 
-  zx_status_t FlagsGet(uint32_t* out_flags);
+  zx_status_t FlagsGetDeprecated(uint32_t* out_flags);
 
-  zx_status_t FlagsSet(uint32_t flags);
+  zx_status_t FlagsSetDeprecated(uint32_t flags);
+
+  zx_status_t FlagsGet(uint64_t* out_flags);
+
+  zx_status_t FlagsSet(uint64_t flags);
 
   zx_status_t LinkInto(zx_handle_t dst_token, const char* dst_path, size_t dst_path_len);
 
@@ -531,6 +366,8 @@ class Remote : public HasIo {
     // operations by providing a method in their public interface with the same name/type.
     ops.attr_get = Adaptor<T>::template From<&T::AttrGet>;
     ops.attr_set = Adaptor<T>::template From<&T::AttrSet>;
+    ops.flags_get_deprecated = Adaptor<T>::template From<&T::FlagsGetDeprecated>;
+    ops.flags_set_deprecated = Adaptor<T>::template From<&T::FlagsSetDeprecated>;
     ops.flags_get = Adaptor<T>::template From<&T::FlagsGet>;
     ops.flags_set = Adaptor<T>::template From<&T::FlagsSet>;
     ops.sync = Adaptor<T>::template From<&T::Sync>;
@@ -557,7 +394,7 @@ class Remote : public HasIo {
     // fuchsia.io/Node composes fuchsia.unknown/Cloneable. The client end below will speak whatever
     // protocol was negotiated for the current connection.
     auto [client_end, server_end] = fidl::Endpoints<fuchsia_unknown::Cloneable>::Create();
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
     const fidl::Status result = client_->Clone(std::move(server_end));
 #else
     const fidl::Status result = client_->Clone2(std::move(server_end));
@@ -750,27 +587,14 @@ zx::result<fio::wire::MutableNodeAttributes> BuildMutableAttributes(
   return zx::ok(builder.Build());
 }
 
-template <typename Protocol, typename ToZxioAbilities>
-zx_status_t AttrGetCommon(const fidl::WireSyncClient<Protocol>& client, ToZxioAbilities to_zxio,
-                          zxio_node_attributes_t* inout_attr) {
-  const fidl::WireResult result = client->GetAttr();
-  if (!result.ok()) {
-    return result.status();
-  }
-  const auto& response = result.value();
-  if (const zx_status_t status = response.s; status != ZX_OK) {
-    return status;
-  }
-  ToZxioNodeAttributes(response.attributes, to_zxio, inout_attr);
-  return ZX_OK;
-}
-
 template <typename Protocol>
-zx_status_t AttributesGetCommon(const fidl::WireSyncClient<Protocol>& client,
-                                zxio_node_attributes_t* inout_attr) {
+zx_status_t Remote<Protocol>::AttrGet(zxio_node_attributes_t* inout_attr) {
+  if (inout_attr->has.object_type) {
+    ZXIO_NODE_ATTR_SET(*inout_attr, object_type, ProtocolToObjectType<Protocol>());
+  }
   // Construct query from has in inout_attr
   const fio::NodeAttributesQuery query = BuildAttributeQuery(inout_attr->has);
-  const fidl::WireResult result = client->GetAttributes(query);
+  const fidl::WireResult result = client()->GetAttributes(query);
   if (!result.ok()) {
     return result.status();
   }
@@ -779,54 +603,11 @@ zx_status_t AttributesGetCommon(const fidl::WireSyncClient<Protocol>& client,
     return response.error_value();
   }
   const fio::wire::NodeAttributes2* attributes = response.value();
-  if (zx_status_t status = zxio_attr_from_wire(*attributes, inout_attr); status != ZX_OK)
-    return status;
-  return ZX_OK;
-}
-
-bool NodeAttrHasAtLeastOne(const zxio_node_attributes_t::zxio_node_attr_has_t& has) {
-  // Avoid using any reinterpret casting to catch if this turns into a bitfield, use the first
-  // member instead, ensuring that it is still the first member.
-  static_assert(offsetof(zxio_node_attributes_t::zxio_node_attr_has_t, protocols) == 0);
-  const bool* has_ptr = &has.protocols;
-  bool result = false;
-
-  // Ensure that we can't exceed the size of the struct no matter what ends up inside it.
-  static_assert(sizeof(has) % sizeof(has.protocols) == 0);
-  constexpr size_t members = sizeof(has) / sizeof(has.protocols);
-  for (size_t i = 0; i < members; ++i) {
-    result = result || has_ptr[i];
-  }
-  return result;
-}
-
-template <typename Protocol, typename ToIo1ModePermissions>
-zx_status_t AttrSetCommon(const fidl::WireSyncClient<Protocol>& client, ToIo1ModePermissions to_io1,
-                          const zxio_node_attributes_t* attr) {
-  fio::wire::NodeAttributeFlags flags;
-  zxio_node_attributes_t::zxio_node_attr_has_t remaining = attr->has;
-  if (attr->has.creation_time) {
-    flags |= fio::wire::NodeAttributeFlags::kCreationTime;
-    remaining.creation_time = false;
-  }
-  if (attr->has.modification_time) {
-    flags |= fio::wire::NodeAttributeFlags::kModificationTime;
-    remaining.modification_time = false;
-  }
-  if (NodeAttrHasAtLeastOne(remaining)) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  const fidl::WireResult result = client->SetAttr(flags, ToNodeAttributes(*attr, to_io1));
-  if (!result.ok()) {
-    return result.status();
-  }
-  const auto& response = result.value();
-  return response.s;
+  return zxio_attr_from_wire(*attributes, inout_attr);
 }
 
 template <typename Protocol>
-zx_status_t AttributesSetCommon(const fidl::WireSyncClient<Protocol>& client,
-                                const zxio_node_attributes_t* attr) {
+zx_status_t Remote<Protocol>::AttrSet(const zxio_node_attributes_t* attr) {
   MutableAttributesDataHolder mutable_attributes_holder;
   fidl::WireTableFrame<fio::wire::MutableNodeAttributes> mutable_attrs_frame;
   const zx::result mutable_attributes =
@@ -834,7 +615,7 @@ zx_status_t AttributesSetCommon(const fidl::WireSyncClient<Protocol>& client,
   if (mutable_attributes.is_error()) {
     return mutable_attributes.error_value();
   }
-  const fidl::WireResult result = client->UpdateAttributes(*mutable_attributes);
+  const fidl::WireResult result = client()->UpdateAttributes(*mutable_attributes);
   if (!result.ok()) {
     return result.status();
   }
@@ -843,42 +624,6 @@ zx_status_t AttributesSetCommon(const fidl::WireSyncClient<Protocol>& client,
     return response.error_value();
   }
   return ZX_OK;
-}
-
-template <typename Protocol>
-zx_status_t Remote<Protocol>::AttrGet(zxio_node_attributes_t* inout_attr) {
-  if (inout_attr->has.object_type) {
-    ZXIO_NODE_ATTR_SET(*inout_attr, object_type, ProtocolToObjectType<Protocol>());
-  }
-  // If any of the attributes that exist only in io2 are requested, we call GetAttributes (io2)
-  if (inout_attr->has.mode || inout_attr->has.uid || inout_attr->has.gid || inout_attr->has.rdev ||
-      inout_attr->has.access_time || inout_attr->has.change_time ||
-      inout_attr->has.fsverity_options || inout_attr->has.fsverity_root_hash ||
-      inout_attr->has.fsverity_enabled || inout_attr->has.selinux_context) {
-    return AttributesGetCommon(client(), inout_attr);
-  }
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  if (inout_attr->has.wrapping_key_id) {
-    return AttributesGetCommon(client(), inout_attr);
-  }
-#endif
-  return AttrGetCommon(client(), ToZxioAbilitiesForFile(), inout_attr);
-}
-
-template <typename Protocol>
-zx_status_t Remote<Protocol>::AttrSet(const zxio_node_attributes_t* attr) {
-  // If these attributes are set, call `update_attributes` (io2) otherwise, we can fall back to
-  // `SetAttr` to only update creation and modification time.
-  if (attr->has.mode || attr->has.uid || attr->has.gid || attr->has.rdev || attr->has.access_time ||
-      attr->has.selinux_context) {
-    return AttributesSetCommon(client(), attr);
-  }
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  if (attr->has.wrapping_key_id) {
-    return AttributesSetCommon(client(), attr);
-  }
-#endif
-  return AttrSetCommon(client(), ToIo1ModePermissionsForFile(), attr);
 }
 
 template <typename Protocol>
@@ -911,8 +656,12 @@ zx_status_t Remote<Protocol>::AdvisoryLock(advisory_lock_req* req) {
 }
 
 template <typename Protocol>
-zx_status_t Remote<Protocol>::FlagsGet(uint32_t* out_flags) {
+zx_status_t Remote<Protocol>::FlagsGetDeprecated(uint32_t* out_flags) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  const fidl::WireResult result = client()->DeprecatedGetFlags();
+#else
   const fidl::WireResult result = client()->GetFlags();
+#endif
   if (!result.ok()) {
     return result.status();
   }
@@ -925,13 +674,73 @@ zx_status_t Remote<Protocol>::FlagsGet(uint32_t* out_flags) {
 }
 
 template <typename Protocol>
-zx_status_t Remote<Protocol>::FlagsSet(uint32_t flags) {
+zx_status_t Remote<Protocol>::FlagsSetDeprecated(uint32_t flags) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  const fidl::WireResult result =
+      client()->DeprecatedSetFlags(static_cast<fio::wire::OpenFlags>(flags));
+#else
   const fidl::WireResult result = client()->SetFlags(static_cast<fio::wire::OpenFlags>(flags));
+#endif
   if (!result.ok()) {
     return result.status();
   }
   const auto& response = result.value();
   return response.s;
+}
+
+template <typename Protocol>
+zx_status_t Remote<Protocol>::FlagsGet(uint64_t* out_flags) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  const fidl::WireResult result = client()->GetFlags();
+  if (result.ok()) {
+    if (result->is_error()) {
+      return result->error_value();
+    }
+    *out_flags = uint64_t{(*result)->flags};
+    return ZX_OK;
+  }
+  if (result.status() != ZX_ERR_NOT_SUPPORTED) {
+    return result.status();
+  }
+  // Fallback to fuchsia.io/Node.DeprecatedGetFlags if the server doesn't support GetFlags.
+  // TODO(https://fxbug.dev/376509077): Remove fallback when GetFlags is supported by all
+  // out-of-tree servers at all API levels.
+#endif
+  // fuchsia.io servers only support setting the APPEND flag so we can ignore other flags here.
+  uint32_t deprecated_flags = {};
+  const zx_status_t status = FlagsGetDeprecated(&deprecated_flags);
+  if (status == ZX_OK) {
+    *out_flags = {};
+    if (fio::wire::OpenFlags{deprecated_flags} & fio::wire::OpenFlags::kAppend) {
+      *out_flags |= uint64_t{fio::wire::Flags::kFileAppend};
+    }
+  }
+  return status;
+}
+
+template <typename Protocol>
+zx_status_t Remote<Protocol>::FlagsSet(uint64_t flags) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  const fidl::WireResult result = client()->SetFlags(fio::wire::Flags{flags});
+  if (result.ok()) {
+    if (result->is_error()) {
+      return result->error_value();
+    }
+    return ZX_OK;
+  }
+  if (result.status() != ZX_ERR_NOT_SUPPORTED) {
+    return result.status();
+  }
+  // Fallback to fuchsia.io/Node.DeprecatedSetFlags if the server doesn't support SetFlags.
+  // TODO(https://fxbug.dev/376509077): Remove fallback when SetFlags is supported by all
+  // out-of-tree servers at all API levels.
+#endif
+  // fuchsia.io servers only support setting the APPEND flag so we can ignore other flags here.
+  fio::wire::OpenFlags deprecated_flags = {};
+  if (fio::wire::Flags{flags} & fio::wire::Flags::kFileAppend) {
+    deprecated_flags |= fio::wire::OpenFlags::kAppend;
+  }
+  return FlagsSetDeprecated(uint32_t{deprecated_flags});
 }
 
 template <typename Protocol>
@@ -1157,31 +966,6 @@ class Directory : public Remote<fio::Directory> {
   zx_status_t ReadvAt(zx_off_t offset, const zx_iovec_t* vector, size_t vector_count,
                       zxio_flags_t flags, size_t* out_actual) {
     return Readv(vector, vector_count, flags, out_actual);
-  }
-
-  zx_status_t AttrGet(zxio_node_attributes_t* inout_attr) {
-    if (inout_attr->has.object_type) {
-      ZXIO_NODE_ATTR_SET(*inout_attr, object_type, ZXIO_OBJECT_TYPE_DIR);
-    }
-    // If any of the attributes that exist only in io2 are requested, we call GetAttributes (io2)
-    if (inout_attr->has.mode || inout_attr->has.uid || inout_attr->has.gid ||
-        inout_attr->has.rdev || inout_attr->has.access_time || inout_attr->has.change_time ||
-        inout_attr->has.casefold || inout_attr->has.wrapping_key_id ||
-        inout_attr->has.selinux_context) {
-      return AttributesGetCommon(client(), inout_attr);
-    }
-    return AttrGetCommon(client(), ToZxioAbilitiesForDirectory(), inout_attr);
-  }
-
-  zx_status_t AttrSet(const zxio_node_attributes_t* attr) {
-    // If these attributes are set, call `update_attributes` (io2) otherwise, we can fall back to
-    // `SetAttr` to only update creation and modification time.
-    if (attr->has.mode || attr->has.uid || attr->has.gid || attr->has.rdev ||
-        attr->has.access_time || attr->has.casefold || attr->has.access_time ||
-        attr->has.wrapping_key_id || attr->has.selinux_context) {
-      return AttributesSetCommon(client(), attr);
-    }
-    return AttrSetCommon(client(), ToIo1ModePermissionsForDirectory(), attr);
   }
 
   zx_status_t WatchDirectory(zxio_watch_directory_cb cb, zx_time_t deadline, void* context) {
@@ -1526,7 +1310,7 @@ class File : public Remote<fio::File> {
       return ZX_ERR_NOT_SUPPORTED;
     }
     if (stream_.is_valid()) {
-      return map_status(stream_.readv(0, vector, vector_count, out_actual));
+      return MapToPosixStatus(stream_.readv(0, vector, vector_count, out_actual));
     }
     // Fallback to fuchsia.io/Readable.Read (File composes Readable).
     fidl::UnownedClientEnd<fio::Readable> readable_client(client().client_end().handle());
@@ -1539,7 +1323,7 @@ class File : public Remote<fio::File> {
       return ZX_ERR_NOT_SUPPORTED;
     }
     if (stream_.is_valid()) {
-      return map_status(stream_.readv_at(0, offset, vector, vector_count, out_actual));
+      return MapToPosixStatus(stream_.readv_at(0, offset, vector, vector_count, out_actual));
     }
     // Fallback to fuchsia.io/File.ReadAt.
     return FileReadvAt(client(), offset, vector, vector_count, flags, out_actual);
@@ -1551,7 +1335,7 @@ class File : public Remote<fio::File> {
       return ZX_ERR_NOT_SUPPORTED;
     }
     if (stream_.is_valid()) {
-      return map_status(stream_.writev(0, vector, vector_count, out_actual));
+      return MapToPosixStatus(stream_.writev(0, vector, vector_count, out_actual));
     }
     // Fallback to fuchsia.io/Writable.Write (File composes Writable).
     fidl::UnownedClientEnd<fio::Writable> writable_client(client().client_end().handle());
@@ -1564,7 +1348,7 @@ class File : public Remote<fio::File> {
       return ZX_ERR_NOT_SUPPORTED;
     }
     if (stream_.is_valid()) {
-      return map_status(stream_.writev_at(0, offset, vector, vector_count, out_actual));
+      return MapToPosixStatus(stream_.writev_at(0, offset, vector, vector_count, out_actual));
     }
     // Fallback to fuchsia.io/File.WriteAt.
     return FileWritevAt(client(), offset, vector, vector_count, flags, out_actual);
@@ -1572,7 +1356,7 @@ class File : public Remote<fio::File> {
 
   zx_status_t Seek(zxio_seek_origin_t start, int64_t offset, size_t* out_offset) {
     if (stream_.is_valid()) {
-      return map_status(stream_.seek(start, offset, out_offset));
+      return MapToPosixStatus(stream_.seek(start, offset, out_offset));
     }
     const fidl::WireResult result =
         client()->Seek(static_cast<fio::wire::SeekOrigin>(start), offset);
@@ -1746,16 +1530,51 @@ zx_status_t zxio_symlink_init(zxio_storage_t* storage, fidl::ClientEnd<fio::Syml
 #endif
 
 uint32_t zxio_node_protocols_to_posix_type(zxio_node_protocols_t protocols) {
-  return ToIo1ModeFileType(protocols);
+  // The "file type" portion of mode only allow one bit, so we find
+  // the best approximation given some set of |protocols|, tie-breaking
+  // in the following precedence.
+  if (protocols & ZXIO_NODE_PROTOCOL_DIRECTORY) {
+    return S_IFDIR;
+  }
+  if (protocols & ZXIO_NODE_PROTOCOL_FILE) {
+    return S_IFREG;
+  }
+  if (protocols & ZXIO_NODE_PROTOCOL_CONNECTOR) {
+    // There is no good analogue for FIDL services in POSIX land...
+    // Returning "regular file" as a fallback.
+    return S_IFREG;
+  }
+  if (protocols & ZXIO_NODE_PROTOCOL_SYMLINK) {
+    return S_IFLNK;
+  }
+  return 0;
 }
 
 __EXPORT
 uint32_t zxio_get_posix_mode(zxio_node_protocols_t protocols, zxio_abilities_t abilities) {
   uint32_t mode = zxio_node_protocols_to_posix_type(protocols);
+  // Permissions are not applicable on Fuchsia so approximate them using the node's |abilities|.
+  // This mapping depends on if the node is a directory or file.
   if (mode & S_IFDIR) {
-    mode |= ToIo1ModePermissionsForDirectory()(abilities);
+    if (abilities & ZXIO_OPERATION_ENUMERATE) {
+      mode |= S_IRUSR;
+    }
+    if (abilities & ZXIO_OPERATION_MODIFY_DIRECTORY) {
+      mode |= S_IWUSR;
+    }
+    if (abilities & ZXIO_OPERATION_TRAVERSE) {
+      mode |= S_IXUSR;
+    }
   } else {
-    mode |= ToIo1ModePermissionsForFile()(abilities);
+    if (abilities & ZXIO_OPERATION_READ_BYTES) {
+      mode |= S_IRUSR;
+    }
+    if (abilities & ZXIO_OPERATION_WRITE_BYTES) {
+      mode |= S_IWUSR;
+    }
+    if (abilities & ZXIO_OPERATION_EXECUTE) {
+      mode |= S_IXUSR;
+    }
   }
   return mode;
 }

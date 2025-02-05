@@ -90,14 +90,15 @@ MainService::MainService(
             FX_LOGS(ERROR) << "Won't receive lifecycle signal: " << ToString(error);
           }));
 
-  fidl::InterfaceHandle<fuchsia::hardware::power::statecontrol::RebootMethodsWatcher> handle;
+  fidl::InterfaceHandle<fuchsia::hardware::power::statecontrol::RebootWatcher> handle;
   executor_.schedule_task(WaitForRebootReason(dispatcher_, handle.NewRequest())
                               .and_then([this, path = options.graceful_reboot_reason_write_path](
                                             GracefulRebootReasonSignal& signal) {
-                                FX_LOGS(INFO) << "Received reboot reason '"
-                                              << ToFileContent(signal.Reason()) << "'";
+                                const std::vector<GracefulRebootReason> reasons = signal.Reasons();
+                                FX_LOGS(INFO)
+                                    << "Received reboot reasons '" << ToFileContent(reasons) << "'";
 
-                                WriteGracefulRebootReason(signal.Reason(), cobalt_, path);
+                                WriteGracefulRebootReasons(reasons, cobalt_, path);
                                 signal.Respond();
                               })
                               .or_else([](const Error& error) {
@@ -105,13 +106,13 @@ MainService::MainService(
                                     << "Won't receive reboot reason: " << ToString(error);
                               }));
 
-  // We register ourselves with RebootMethodsWatcher using a fire-and-forget request that gives
+  // We register ourselves with RebootWatcher using a fire-and-forget request that gives
   // an endpoint to a long-lived connection we maintain.
   //
   // The ack response is ignored because the failures aren't expected unless the system is in a dire
   // state.
   services->Connect<fuchsia::hardware::power::statecontrol::RebootMethodsWatcherRegister>()
-      ->RegisterWithAck(std::move(handle), [] {});
+      ->RegisterWatcher(std::move(handle), [] {});
 
   network_watcher_.Register(
       fit::bind_member(&crash_reports_, &CrashReports::SetNetworkIsReachable));

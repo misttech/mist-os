@@ -86,7 +86,6 @@ source_set("semantics_integration_test_fixture") {
     "//sdk/fidl/fuchsia.accessibility.semantics:fuchsia.accessibility.semantics_hlcpp",
     "//sdk/fidl/fuchsia.component:fuchsia.component_hlcpp",
     "//sdk/fidl/fuchsia.fonts:fuchsia.fonts_hlcpp",
-    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_hlcpp",
     "//sdk/fidl/fuchsia.intl:fuchsia.intl_hlcpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_hlcpp",
     "//sdk/fidl/fuchsia.memorypressure:fuchsia.memorypressure_hlcpp",

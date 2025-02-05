@@ -5,7 +5,7 @@
     include: [
         // Run as a non-hermetic system-ish test because we can't nest fuchsia.boot/fuchsia.kernel capabilities.
         "//src/sys/test_runners/rust/default.shard.cml",
-        "inspect/offer.shard.cml",
+        "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
@@ -33,12 +33,10 @@
                 "fuchsia.boot.Items",
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.inspect.InspectSink",
                 "fuchsia.kernel.CpuResource",
                 "fuchsia.kernel.DebuglogResource",
                 "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.EnergyInfoResource",
-                "fuchsia.kernel.FramebufferResource",
                 "fuchsia.kernel.HypervisorResource",
                 "fuchsia.kernel.InfoResource",
                 "fuchsia.kernel.IommuResource",
@@ -52,7 +50,6 @@
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
-                "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
                 "fuchsia.sys2.CrashIntrospect",
             ],

@@ -20,7 +20,6 @@ namespace feedback {
 // component.
 enum class GracefulRebootReason {
   kNotSet,
-  kNone,
   kUserRequest,
   kSystemUpdate,
   kRetrySystemUpdate,
@@ -31,24 +30,29 @@ enum class GracefulRebootReason {
   kFdr,
   kZbiSwap,
   kOutOfMemory,
+  // TODO(https://fxbug.dev/42081574): Remove this reason once Netstack2 is
+  // fully migrated to Netstack3.
+  kNetstackMigration,
   kNotSupported,
   kNotParseable,
 };
 
 std::string ToString(GracefulRebootReason reason);
 
-GracefulRebootReason ToGracefulRebootReason(
-    fuchsia::hardware::power::statecontrol::RebootReason reason);
+std::vector<GracefulRebootReason> ToGracefulRebootReasons(
+    fuchsia::hardware::power::statecontrol::RebootOptions options);
 
 // The input is limited to values corresponding to |power::statecontrol::RebootReason|.
-GracefulRebootReason FromFileContent(std::string content);
+std::vector<GracefulRebootReason> FromFileContent(std::string content);
 
 // The input is limited to values corresponding to |power::statecontrol::RebootReason|.
-std::string ToFileContent(GracefulRebootReason reason);
+std::string ToFileContent(const std::vector<GracefulRebootReason>& reasons);
+
+std::string ToLog(const std::vector<GracefulRebootReason>& reasons);
 
 // Writes the graceful reboot reason to `path` and records metrics about the write.
-void WriteGracefulRebootReason(GracefulRebootReason reason, cobalt::Logger* cobalt,
-                               const std::string& path);
+void WriteGracefulRebootReasons(const std::vector<GracefulRebootReason>& reasons,
+                                cobalt::Logger* cobalt, const std::string& path);
 
 }  // namespace feedback
 }  // namespace forensics

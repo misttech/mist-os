@@ -25,6 +25,7 @@ use crate::internal::base::{
     DeviceCollectionContext, DeviceCounters, DeviceLayerStateTypes, DeviceLayerTypes,
     DeviceReceiveFrameSpec, OriginTrackerContext,
 };
+use crate::internal::blackhole::BlackholeDevice;
 use crate::internal::config::{
     ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration, DeviceConfigurationContext,
     DeviceConfigurationUpdate, DeviceConfigurationUpdateError, NdpConfiguration,
@@ -96,7 +97,7 @@ where
         let origin = core_ctx.origin_tracker();
         let primary = BasePrimaryDeviceId::new(
             |weak_ref| {
-                let link = D::new_link_state::<C::CoreContext, _>(
+                let link = D::new_device_state::<C::CoreContext, _>(
                     bindings_ctx,
                     weak_ref.clone(),
                     properties,
@@ -308,7 +309,8 @@ where
     C: ContextPair,
     C::CoreContext: DeviceApiCoreContext<EthernetLinkDevice, C::BindingsContext>
         + DeviceApiCoreContext<LoopbackDevice, C::BindingsContext>
-        + DeviceApiCoreContext<PureIpDevice, C::BindingsContext>,
+        + DeviceApiCoreContext<PureIpDevice, C::BindingsContext>
+        + DeviceApiCoreContext<BlackholeDevice, C::BindingsContext>,
     C::BindingsContext: DeviceApiBindingsContext,
 {
     fn device<D>(&mut self) -> DeviceApi<D, &mut C> {

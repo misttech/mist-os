@@ -589,6 +589,12 @@ void Dwc3::ConfigureEndpoint(ConfigureEndpointRequest& request,
 
   std::lock_guard<std::mutex> lock(uep->ep.lock);
 
+  if (uep->ep.enabled) {
+    // Endpoint already configured, nothing to do.
+    completer.Reply(zx::ok());
+    return;
+  }
+
   if (zx_status_t status = uep->fifo.Init(bti_); status != ZX_OK) {
     FDF_LOG(ERROR, "fifo init failed %s", zx_status_get_string(status));
     completer.Reply(zx::error(status));

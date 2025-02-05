@@ -157,13 +157,6 @@
             availability: "optional",
         },
         {
-            protocol: "fuchsia.tpm.cr50.Cr50",
-
-            // The source of this protocol, cr50,
-            // may not be available on all products.
-            availability: "optional",
-        },
-        {
             protocol: "fuchsia.virtualconsole.SessionManager",
 
             // The source of this protocol, virtual-console,
@@ -179,6 +172,10 @@
         },
         {
             service: "fuchsia.hardware.spmi.DebugService",
+            availability: "optional",
+        },
+        {
+            service: "fuchsia.hardware.nfc.Service",
             availability: "optional",
         },
         {

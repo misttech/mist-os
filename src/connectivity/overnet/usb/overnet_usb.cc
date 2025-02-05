@@ -70,10 +70,19 @@ zx::result<> OvernetUsb::Start() {
              KV("status", zx_status_get_string(status)));
     return zx::error(status);
   }
-  endpoint_dispatcher_.StartThread("endpoint_thread");
+
+  // Start a dispatcher to run the endpoint management on
+  auto endpoint_dispatcher = fdf::SynchronizedDispatcher::Create(
+      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "endpoint_dispatcher",
+      [](fdf_dispatcher_t*) {}, "");
+  if (endpoint_dispatcher.is_error()) {
+    FDF_SLOG(ERROR, "Failed to create endpoint dispatcher",
+             KV("status", zx_status_get_string(endpoint_dispatcher.error_value())));
+    return zx::error(client.error_value());
+  }
 
   status = bulk_out_ep_.Init(descriptors_.out_ep.b_endpoint_address, *client,
-                             endpoint_dispatcher_.dispatcher());
+                             endpoint_dispatcher->async_dispatcher());
   if (status != ZX_OK) {
     FDF_SLOG(ERROR, "Failed to init UsbEndpoint", KV("endpoint", "out"),
              KV("status", zx_status_get_string(status)));
@@ -88,12 +97,16 @@ zx::result<> OvernetUsb::Start() {
   }
 
   status = bulk_in_ep_.Init(descriptors_.in_ep.b_endpoint_address, *client,
-                            endpoint_dispatcher_.dispatcher());
+                            endpoint_dispatcher->async_dispatcher());
   if (status != ZX_OK) {
     FDF_SLOG(ERROR, "Failed to init UsbEndpoint", KV("endpoint", "in"),
              KV("status", zx_status_get_string(status)));
     return zx::error(status);
   }
+
+  // release the endpoint dispatcher to allow the driver runtime to shut it
+  // down at driver shutdown
+  endpoint_dispatcher->release();
 
   auto actual = bulk_in_ep_.AddRequests(kRequestPoolSize, kMtu,
                                         fuchsia_hardware_usb_request::Buffer::Tag::kVmoId);
@@ -190,11 +203,27 @@ zx_status_t OvernetUsb::UsbFunctionInterfaceSetConfigured(bool configured, usb_s
       return ZX_OK;
     }
 
-    function_.CancelAll(BulkInAddress());
-    function_.CancelAll(BulkOutAddress());
-
     state_ = Unconfigured();
     callback_ = std::nullopt;
+    lock.release();
+
+    // Cancel all requests in the pipeline -- the completion handler will free these requests as
+    // they come in.
+    //
+    // Do not hold locks when calling this method. It might result in deadlock as completion
+    // callbacks could be invoked during this call.
+    bulk_out_ep_->CancelAll().Then([](fidl::Result<fendpoint::Endpoint::CancelAll>& result) {
+      if (result.is_error()) {
+        FDF_LOG(ERROR, "Failed to cancel all for bulk out endpoint %s",
+                result.error_value().FormatDescription().c_str());
+      }
+    });
+    bulk_in_ep_->CancelAll().Then([](fidl::Result<fendpoint::Endpoint::CancelAll>& result) {
+      if (result.is_error()) {
+        FDF_LOG(ERROR, "Failed to cancel all for bulk in endpoint %s",
+                result.error_value().FormatDescription().c_str());
+      }
+    });
 
     zx_status_t status = function_.DisableEp(BulkInAddress());
     if (status != ZX_OK) {
@@ -232,8 +261,8 @@ zx_status_t OvernetUsb::UsbFunctionInterfaceSetConfigured(bool configured, usb_s
 
   std::vector<fuchsia_hardware_usb_request::Request> requests;
   while (auto req = bulk_out_ep_.GetRequest()) {
-    req->reset_buffers(bulk_out_ep_.GetMapped);
-    zx_status_t status = req->CacheFlushInvalidate(bulk_out_ep_.GetMapped);
+    req->reset_buffers(bulk_out_ep_.GetMapped());
+    zx_status_t status = req->CacheFlushInvalidate(bulk_out_ep_.GetMapped());
     if (status != ZX_OK) {
       FDF_SLOG(ERROR, "Cache flush failed", KV("status", zx_status_get_string(status)));
     }
@@ -292,7 +321,7 @@ void OvernetUsb::HandleSocketReadable(async_dispatcher_t*, async::WaitBase*, zx_
   // request.
   ZX_ASSERT((*request)->data()->size() == 1);
 
-  std::optional<zx_vaddr_t> addr = bulk_out_ep_.GetMappedAddr(request->request(), 0);
+  std::optional<zx_vaddr_t> addr = bulk_in_ep_.GetMappedAddr(request->request(), 0);
 
   if (!addr.has_value()) {
     FDF_LOG(ERROR, "Failed to map request");
@@ -310,7 +339,7 @@ void OvernetUsb::HandleSocketReadable(async_dispatcher_t*, async::WaitBase*, zx_
 
   if (status == ZX_OK) {
     (*request)->data()->at(0).size(actual);
-    status = request->CacheFlush(bulk_in_ep_.GetMappedLocked);
+    status = request->CacheFlush(bulk_in_ep_.GetMappedLocked());
     if (status != ZX_OK) {
       FDF_SLOG(ERROR, "Cache flush failed", KV("status", zx_status_get_string(status)));
     }
@@ -455,7 +484,8 @@ OvernetUsb::State OvernetUsb::Ready::ReceiveData(uint8_t* data, size_t len,
                                                  OvernetUsb* owner) && {
   if (len != kOvernetMagicSize ||
       !std::equal(kOvernetMagic, kOvernetMagic + kOvernetMagicSize, data)) {
-    FDF_SLOG(WARNING, "Dropped incoming data (driver not synchronized)", KV("bytes", len));
+    FDF_SLOG(WARNING, "Dropped incoming data (driver not synchronized)", KV("len", len),
+             KV("bytes", std::string(data, data + kOvernetMagicSize)));
     return *this;
   }
 
@@ -516,19 +546,21 @@ OvernetUsb::State OvernetUsb::Running::ReceiveData(uint8_t* data, size_t len,
 }
 
 void OvernetUsb::SendMagicReply(usb::FidlRequest request) {
-  auto actual = request.CopyTo(0, kOvernetMagic, kOvernetMagicSize, bulk_in_ep_.GetMappedLocked);
+  FDF_LOG(DEBUG, "SendMagicReply");
+  auto actual = request.CopyTo(0, kOvernetMagic, kOvernetMagicSize, bulk_in_ep_.GetMappedLocked());
 
   for (size_t i = 0; i < actual.size(); i++) {
     request->data()->at(i).size(actual[i]);
   }
 
-  auto status = request.CacheFlush(bulk_in_ep_.GetMappedLocked);
+  auto status = request.CacheFlush(bulk_in_ep_.GetMappedLocked());
   if (status != ZX_OK) {
     FDF_SLOG(ERROR, "Cache flush failed", KV("status", zx_status_get_string(status)));
   }
 
   std::vector<fuchsia_hardware_usb_request::Request> requests;
   requests.emplace_back(request.take_request());
+  FDF_LOG(DEBUG, "Queueing requests");
   auto result = bulk_in_ep_->QueueRequests(std::move(requests));
   if (result.is_error()) {
     FDF_SLOG(ERROR, "Failed to QueueRequests",
@@ -552,7 +584,6 @@ void OvernetUsb::Running::MagicSent() {
 
     if (std::holds_alternative<ShuttingDown>(owner_->state_)) {
       if (!owner_->HasPendingRequests()) {
-        lock.release();
         owner_->ShutdownComplete();
       }
       return;
@@ -578,14 +609,12 @@ void OvernetUsb::ReadComplete(fendpoint::Completion completion) {
   auto request = usb::FidlRequest(std::move(completion.request().value()));
   if (*completion.status() == ZX_ERR_IO_NOT_PRESENT) {
     // Device disconnected from host.
+    bulk_out_ep_.PutRequest(std::move(request));
     if (std::holds_alternative<ShuttingDown>(state_)) {
       if (!HasPendingRequests()) {
-        lock.release();
         ShutdownComplete();
       }
-      return;
     }
-    bulk_out_ep_.PutRequest(std::move(request));
     return;
   }
 
@@ -637,7 +666,6 @@ void OvernetUsb::ReadComplete(fendpoint::Completion completion) {
   } else {
     if (std::holds_alternative<ShuttingDown>(state_)) {
       if (!HasPendingRequests()) {
-        lock.release();
         ShutdownComplete();
       }
       return;
@@ -650,8 +678,9 @@ void OvernetUsb::WriteComplete(fendpoint::Completion completion) {
   auto request = usb::FidlRequest(std::move(completion.request().value()));
   fbl::AutoLock lock(&lock_);
   if (std::holds_alternative<ShuttingDown>(state_)) {
+    FDF_LOG(DEBUG, "Shutting down from WriteComplete");
+    bulk_in_ep_.PutRequest(std::move(request));
     if (!HasPendingRequests()) {
-      lock.release();
       ShutdownComplete();
     }
     return;
@@ -669,14 +698,33 @@ void OvernetUsb::WriteComplete(fendpoint::Completion completion) {
 }
 
 void OvernetUsb::Shutdown(fit::function<void()> callback) {
-  fbl::AutoLock lock(&lock_);
-  function_.CancelAll(BulkInAddress());
-  function_.CancelAll(BulkOutAddress());
+  // Cancel all requests in the pipeline -- the completion handler will free these requests as they
+  // come in.
+  //
+  // Do not hold locks when calling this method. It might result in deadlock as completion callbacks
+  // could be invoked during this call.
+  bulk_out_ep_->CancelAll().Then([](fidl::Result<fendpoint::Endpoint::CancelAll>& result) {
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to cancel all for bulk out endpoint %s",
+              result.error_value().FormatDescription().c_str());
+    }
+  });
+  bulk_in_ep_->CancelAll().Then([](fidl::Result<fendpoint::Endpoint::CancelAll>& result) {
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to cancel all for bulk in endpoint %s",
+              result.error_value().FormatDescription().c_str());
+    }
+  });
 
+  zx_status_t status = function_.SetInterface(nullptr, nullptr);
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "SetInterface failed %s", zx_status_get_string(status));
+  }
+
+  fbl::AutoLock lock(&lock_);
   state_ = ShuttingDown(std::move(callback));
 
   if (!HasPendingRequests()) {
-    lock.release();
     ShutdownComplete();
   }
 }

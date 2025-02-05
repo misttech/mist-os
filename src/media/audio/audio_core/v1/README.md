@@ -31,7 +31,7 @@ AudioOutputs based on this type. For example, if two AudioRenderers `r1` and
 `r2` are created with AudioRenderUsage MEDIA, they are both routed to the
 AudioOutput assigned to MEDIA (`o2` in the above graph).
 
-Input routing works similarly, using a type called AudioCaptureUsage.
+Input routing works similarly, using a type called AudioCaptureUsage2.
 Additionally, special "loopback" inputs are routed from AudioOutputs.
 
 ## Output Pipelines

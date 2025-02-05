@@ -26,7 +26,6 @@ rustc_library("pty") {
   ]
 
   test_deps = [
-    "//src/lib/cstr",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:futures",
   ]

@@ -18,6 +18,7 @@
 #include <lib/mmio/mmio.h>
 #include <lib/stdcompat/span.h>
 #include <lib/sysmem-version/sysmem-version.h>
+#include <lib/zbi-format/graphics.h>
 #include <lib/zx/channel.h>
 
 #include <memory>
@@ -27,23 +28,18 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/intel-display/clock/cdclk.h"
-#include "src/graphics/display/drivers/intel-display/ddi-physical-layer.h"
 #include "src/graphics/display/drivers/intel-display/display-device.h"
-#include "src/graphics/display/drivers/intel-display/dp-display.h"
+#include "src/graphics/display/drivers/intel-display/dp-aux-channel-impl.h"
 #include "src/graphics/display/drivers/intel-display/dpll.h"
 #include "src/graphics/display/drivers/intel-display/gtt.h"
-#include "src/graphics/display/drivers/intel-display/hdmi-display.h"
 #include "src/graphics/display/drivers/intel-display/i2c/gmbus-i2c.h"
 #include "src/graphics/display/drivers/intel-display/igd.h"
 #include "src/graphics/display/drivers/intel-display/interrupts.h"
+#include "src/graphics/display/drivers/intel-display/pch-engine.h"
 #include "src/graphics/display/drivers/intel-display/pipe-manager.h"
 #include "src/graphics/display/drivers/intel-display/pipe.h"
 #include "src/graphics/display/drivers/intel-display/power.h"
-#include "src/graphics/display/drivers/intel-display/registers-ddi.h"
-#include "src/graphics/display/drivers/intel-display/registers-dpll.h"
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
-#include "src/graphics/display/drivers/intel-display/registers-transcoder.h"
-#include "src/graphics/display/drivers/intel-display/registers.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
@@ -56,10 +52,6 @@ typedef struct buffer_allocation {
 } buffer_allocation_t;
 
 struct ControllerResources {
-  // Must be of type `ZX_RSRC_KIND_SYSTEM` with base
-  // `ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE`.
-  zx::unowned_resource framebuffer;
-
   // Must be of type `ZX_RSRC_KIND_MMIO` with access to all valid ranges.
   zx::unowned_resource mmio;
 
@@ -81,12 +73,13 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   static zx::result<std::unique_ptr<Controller>> Create(
       fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
       fidl::ClientEnd<fuchsia_hardware_pci::Device> pci, ControllerResources resources,
-      inspect::Inspector inspector);
+      std::optional<zbi_swfb_t> framebuffer_info, inspect::Inspector inspector);
 
   // Prefer to use the `Create()` factory function in production code.
   explicit Controller(fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
                       fidl::ClientEnd<fuchsia_hardware_pci::Device> pci,
-                      ControllerResources resources, inspect::Inspector inspector);
+                      ControllerResources resources, std::optional<zbi_swfb_t> framebuffer_info,
+                      inspect::Inspector inspector);
 
   // Creates a Controller with no valid FIDL clients and no resources for
   // testing purpose only.
@@ -119,11 +112,10 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   }
   void DisplayEngineReleaseImage(uint64_t image_handle);
   config_check_result_t DisplayEngineCheckConfiguration(
-      const display_config_t* display_configs, size_t display_count,
+      const display_config_t* banjo_display_config,
       layer_composition_operations_t* out_layer_composition_operations_list,
       size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual);
-  void DisplayEngineApplyConfiguration(const display_config_t* banjo_display_configs,
-                                       size_t display_config_count,
+  void DisplayEngineApplyConfiguration(const display_config_t* banjo_display_config,
                                        const config_stamp_t* banjo_config_stamp);
   zx_status_t DisplayEngineSetBufferCollectionConstraints(
       const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
@@ -134,6 +126,16 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   zx_status_t DisplayEngineStartCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
   zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
   zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) { return ZX_ERR_NOT_SUPPORTED; }
+
+  // TODO(https://fxbug.dev/42080631): Remove these transitional overloads.
+  config_check_result_t DisplayEngineCheckConfiguration(
+      const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
+      layer_composition_operations_t* out_layer_composition_operations_list,
+      size_t out_layer_composition_operations_size,
+      size_t* out_layer_composition_operations_actual);
+  void DisplayEngineApplyConfiguration(const display_config_t* banjo_display_configs_array,
+                                       size_t banjo_display_configs_count,
+                                       const config_stamp_t* banjo_config_stamp);
 
   // gpu core ops
   zx_status_t IntelGpuCoreReadPciConfig16(uint16_t addr, uint16_t* value_out);
@@ -226,6 +228,7 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   void DisableSystemAgentGeyserville();
 
   ControllerResources resources_;
+  std::optional<zbi_swfb_t> framebuffer_info_;
 
   std::unique_ptr<DisplayDevice> QueryDisplay(DdiId ddi_id, display::DisplayId display_id)
       __TA_REQUIRES(display_lock_);
@@ -319,14 +322,11 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   std::optional<PchEngine> pch_engine_;
   std::unique_ptr<Power> power_;
 
-  // References to displays. References are owned by devmgr, but will always
-  // be valid while they are in this vector.
-  fbl::Vector<std::unique_ptr<DisplayDevice>> display_devices_ __TA_GUARDED(display_lock_);
-  // Display ID can't be kInvalidDisplayId.
-  display::DisplayId next_id_ __TA_GUARDED(display_lock_) = display::DisplayId{1};
-  fbl::Mutex display_lock_;
-
   std::unique_ptr<DdiManager> ddi_manager_;
+
+  // Must outlive `display_devices_`.
+  //
+  // The `DisplayDevice` destructor calls into the `PipeManager`.
   std::unique_ptr<PipeManager> pipe_manager_;
 
   PowerWellRef cd_clk_power_well_;
@@ -336,7 +336,14 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
 
   cpp20::span<const DdiId> ddis_;
   fbl::Vector<GMBusI2c> gmbus_i2cs_;
-  fbl::Vector<DpAux> dp_auxs_;
+  fbl::Vector<DpAuxChannelImpl> dp_aux_channels_;
+
+  // References to displays. References are owned by devmgr, but will always
+  // be valid while they are in this vector.
+  fbl::Vector<std::unique_ptr<DisplayDevice>> display_devices_ __TA_GUARDED(display_lock_);
+  // Display ID can't be kInvalidDisplayId.
+  display::DisplayId next_id_ __TA_GUARDED(display_lock_) = display::DisplayId{1};
+  fbl::Mutex display_lock_;
 
   // Plane buffer allocation. If no alloc, start == end == registers::PlaneBufCfg::kBufferCount.
   buffer_allocation_t plane_buffers_[PipeIds<registers::Platform::kKabyLake>().size()]

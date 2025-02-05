@@ -3,7 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/rust/rustc_library.gni")
+import("//build/toolchain/concurrent_jobs.gni")
 import("//build/tools/json_merge/json_merge.gni")
+import("//sdk/categories/compatibility.gni")
 import("command.gni")
 import("plugins.gni")
 
@@ -90,8 +92,7 @@ import("plugins.gni")
 #     '--cfg feature=XXX'
 #
 #   sdk_category (optional)
-#     Publication level of the plugin in SDKs. Defaults to partner if not
-#     specified.
+#     Publication level of the plugin in SDKs. Defaults to not published.
 #     See //build/sdk/sdk_atom.gni.
 template("ffx_plugin") {
   if (defined(invoker.name)) {
@@ -117,14 +118,42 @@ template("ffx_plugin") {
       "args_with_unit_tests",
     ]
 
-    # Default to partner.
-    # TODO(https://fxbug.dev/330629017): Remove the default and use
-    # `invoker.sdk_category` directly in the individual targets to avoid
-    # this refereence counting as a use for all of them.
+    # Ensure FIDL libraries with more restrictive visibility are not used.
+    # Each target below must use these two variables for this to work.
+    # Note that not everything in categories with greater visibility is stable.
+    # TODO(https://fxbug.dev/314822328): Reframe the markers in terms of stability.
+    # Also, there are exceptions - see https://fxbug.dev/42081073 and
+    # https://fxbug.dev/326090508.
+    # TODO(https://fxbug.dev/314822328): Improve this logic to cascade properly.
+    #
+    # Plugins may specify an IDK category in which to be included. Otherwise,
+    # they are only used within the platform environment.
     if (defined(invoker.sdk_category)) {
+      # Historically, plugins rarely specified a category and defaulted to
+      # "partner". The category for those plugins was set to "not-yet-specified"
+      # and the default was changed to not in an IDK. Continue to treat those
+      # as "partner", and use the "internal" marker for plugins not specifying
+      # a category.
+      # TODO(https://fxbug.dev/330629017): For all uses of "not-yet-specified",
+      # either replace them with "partner" or remove them as appropriate. Then use
+      # invoker.sdk_category` directly in the individual targets to avoid
+      # this refereence counting as a use for all of them.
       sdk_category = invoker.sdk_category
+      if (sdk_category == "not-yet-specified") {
+        sdk_category = "partner"
+      }
+
+      category_marker = "//sdk/categories:marker-${sdk_category}"
+      if (sdk_category == "partner") {
+        disallowed_category_markers =
+            markers_partner_idk_prebuilts_must_not_depend_on
+      } else {
+        assert(false, "Unexpected SDK category '${sdk_category}'.")
+      }
     } else {
-      sdk_category = "partner"
+      # The plugin is not in an IDK, so there are no restrictions.
+      disallowed_category_markers = []
+      category_marker = "//sdk/categories:marker-not-in-idk"
     }
 
     args_deps = []
@@ -132,6 +161,7 @@ template("ffx_plugin") {
     p_deps = []
     json_deps = []
     json_merge_deps = []
+
     if (defined(invoker.plugin_deps)) {
       foreach(d, invoker.plugin_deps) {
         p_deps += [ d + "_suite" ]
@@ -173,7 +203,14 @@ template("ffx_plugin") {
                                      "with_unit_tests",
                                      "original_target_name",
                                    ])
-        deps += [ "//sdk:marker-$sdk_category" ]
+        assert_no_deps = disallowed_category_markers
+        deps += [ category_marker ]
+
+        # As these are large libraries that are slow to compile on RBE workers, switch
+        # them to the larger RBE workers.
+        _concurrent_jobs = concurrent_jobs.rust_highmem
+        configs += _concurrent_jobs.configs
+        forward_variables_from(_concurrent_jobs.vars, "*")
       }
 
       args_deps += [ ":" + sub_cmd ]
@@ -213,18 +250,11 @@ template("ffx_plugin") {
         source_root = "src/args.rs"
       }
 
-      # Due to size constraints, RBE slows down the build of plugins
-      # rather than speeding it up. Disable RBE for plugins.
-      disable_rbe = true
-
       if (defined(invoker.args_deps)) {
         args_deps += invoker.args_deps
       }
 
-      deps = args_deps + [
-               "//src/developer/ffx/core:lib",
-               "//third_party/rust_crates:argh",
-             ]
+      deps = args_deps
 
       assert(
           defined(invoker.args_sources),
@@ -255,16 +285,20 @@ template("ffx_plugin") {
                                    "original_target_name",
                                    "test_deps",
                                  ])
-      deps += [ "//sdk:marker-$sdk_category" ]
+      assert_no_deps = disallowed_category_markers
+      deps += [ category_marker ]
+
+      # As these are large libraries that are slow to compile on RBE workers, switch
+      # them to the larger RBE workers.
+      _concurrent_jobs = concurrent_jobs.rust_highmem
+      configs += _concurrent_jobs.configs
+      forward_variables_from(_concurrent_jobs.vars, "*")
     }
     if (defined(invoker.args_with_unit_tests) && invoker.args_with_unit_tests) {
       tests_deps += [ ":" + args_target_name + "_test" ]
     }
 
-    lib_deps = [
-      ":" + args_target_name,
-      "//src/developer/ffx/core:lib",
-    ]
+    lib_deps = [ ":" + args_target_name ]
 
     includes_execution = false
     if (defined(invoker.sources)) {
@@ -285,6 +319,7 @@ template("ffx_plugin") {
 
     plugins_name = crate_name + "_plugins"
     plugins(plugins_name) {
+      visibility = [ ":*" ]
       output_name = "plugins.rs"
       args = args_target_name
       if (defined(invoker.plugin_deps)) {
@@ -293,6 +328,12 @@ template("ffx_plugin") {
       }
       includes_execution = includes_execution
       execution_lib = crate_name
+
+      # The `plugins()` template does not use `assert_no_deps` or `deps`, so
+      # we cannot apply markers to these variables. The `visibility` above
+      # ensures this target is only depended on by another target in the
+      # directory using this template, and the other rules in this template do
+      # apply markers to those variables.
     }
 
     suite_deps = lib_deps + p_deps
@@ -327,7 +368,8 @@ template("ffx_plugin") {
         if (!defined(deps)) {
           deps = []
         }
-        deps += lib_deps + [ "//sdk:marker-$sdk_category" ]
+        deps += lib_deps + [ category_marker ]
+        assert_no_deps = disallowed_category_markers
       }
       suite_deps += [ ":" + crate_name ]
 
@@ -345,7 +387,7 @@ template("ffx_plugin") {
       with_unit_tests = false
       disable_rustdoc = true
       sources = [ "$target_gen_dir/plugins.rs" ]
-      deps = suite_deps + [ "//sdk:marker-$sdk_category" ]
+      deps = suite_deps + [ category_marker ]
 
       forward_variables_from(invoker,
                              "*",
@@ -363,28 +405,16 @@ template("ffx_plugin") {
                                    "original_target_name",
                                  ])
 
-      # For plugins that are not internal only (in other words, in the SDK),
-      # ensure all FIDL dependencies are available and stable. Use the
-      # "partner_internal" SDK category and greater as an approximation of this.
-      # However, note that not everything in those categories is stable.
-      # TODO(https://fxbug.dev/314822328): Reframe the markers in terms of stability.
-      # Also, there are exceptions - see https://fxbug.dev/42081073 and
-      # https://fxbug.dev/326090508.
-      # This target includes all other targets defined above, so this
-      # `assert_no_deps` covers all of them.
-      # TODO(b/314822328): improve this logic to cascade properly
-      if (sdk_category != "internal") {
-        if (!defined(assert_no_deps)) {
-          assert_no_deps = []
-        }
-        assert_no_deps += [
-          "//sdk:marker-cts",
-          "//sdk:marker-excluded",
-          "//sdk:marker-experimental",
-          "//sdk:marker-internal",
-          "//sdk:marker-unknown",
-        ]
+      if (!defined(assert_no_deps)) {
+        assert_no_deps = []
       }
+      assert_no_deps += disallowed_category_markers
+
+      # As these are large libraries that are slow to compile on RBE workers, switch
+      # them to the larger RBE workers.
+      _concurrent_jobs = concurrent_jobs.rust_highmem
+      configs += _concurrent_jobs.configs
+      forward_variables_from(_concurrent_jobs.vars, "*")
     }
   } else {
     not_needed(invoker, "*")

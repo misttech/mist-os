@@ -7,6 +7,7 @@ import("//src/developer/ffx/build/ffx_tool.gni")
 
 if (is_host) {
   ffx_plugin("ffx_component") {
+    sdk_category = "not-yet-specified"
     version = "0.1.0"
     edition = "2021"
     plugin_deps = [
@@ -32,6 +33,10 @@ if (is_host) {
     ]
 
     args_sources = [ "src/args.rs" ]
+    args_deps = [
+      "//src/developer/ffx/core:lib",
+      "//third_party/rust_crates:argh",
+    ]
   }
 
   ffx_tool("ffx_component_tool") {

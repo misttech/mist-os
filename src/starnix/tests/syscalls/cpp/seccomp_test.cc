@@ -30,7 +30,7 @@ namespace {
 // A syscall not implemented by Linux that we don't expect to be called.
 #if defined(__x86_64__)
 constexpr uint32_t kFilteredSyscall = SYS_vserver;
-#elif defined(__aarch64__) || defined(__riscv)
+#elif defined(__aarch64__) || defined(__riscv) || defined(__arm__)
 // Use the first of arch_specific_syscalls. It is not implemented on ARM64 or RISC-V.
 // TODO(b/383629319): Newer revisions of bionic seem to cause a build failure as
 // we can't find a reference to __NR_arch_specific_syscall. Use the underlying

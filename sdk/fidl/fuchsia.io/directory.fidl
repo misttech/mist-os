@@ -103,8 +103,20 @@ type Flags = flexible bits : uint64 {
     FLAG_MAYBE_CREATE = 0x00010000;
     /// Create a new object if one doesn't exist, otherwise fail the request with
     /// `ZX_ERR_ALREADY_EXISTS`. If set, a single `PROTOCOL_*` flag must be set indicating the type
-    /// of object to create. Takes precedence over [`FLAG_CREATE`]. Equivalent to POSIX `O_EXCL`.
+    /// of object to create. Takes precedence over [`FLAG_MAYBE_CREATE`]. Equivalent to POSIX
+    /// `O_EXCL`.
     FLAG_MUST_CREATE = 0x00020000;
+    /// Create a new unnamed temporary object. The object is temporary until it is linked to the
+    /// filesystem. If specified with `FLAG_TEMPORARY_AS_NOT_LINKABLE`, then the created object is
+    /// not linkable. If this flag is set:
+    ///  * `path` specified in [`fuchsia.io/Directory.Open3`] refers to the path of the directory
+    ///    which the new object will be created in,
+    ///  * A `PROTOCOL_*` flag is set to indicate the type of object to be created. Currently, this
+    ///    is only supported when specified with `PROTOCOL_FILE`, in which case, it is equivalent
+    ///    to Linux `O_TMPFILE`.
+    ///  * `FLAG_MAYBE_CREATE` will be ignored.
+    @available(added=HEAD)
+    FLAG_CREATE_AS_UNNAMED_TEMPORARY = 0x800000000;
 
     //
     // File-Specific Options
@@ -144,6 +156,23 @@ const PERM_WRITABLE Flags
 /// Set of permissions that are expected when opening a node as executable.
 const PERM_EXECUTABLE Flags
         = Flags.PERM_CONNECT | Flags.PERM_ENUMERATE | Flags.PERM_TRAVERSE | Flags.PERM_EXECUTE;
+
+/// Specifies that this object is not linkable. This is only intended to be used in the context of
+/// creating a temporary unnamed objects. When that is not the case, the node protocol defines if it
+/// is linkable (i.e. if it composes the `Linkable` protocol). When this flag is set along with
+/// `Flags.FLAG_CREATE_AS_UNNAMED_TEMPORARY`, an unnamed temporary object will be created that
+/// cannot be linked into the filesystem. This would be similar to Linux `O_TMPFILE | O_EXCL`.
+///
+/// CAUTION: if `Flags.FLAG_CREATE_AS_UNNAMED_TEMPORARY` is not specified,  then this is treated as
+/// a "must create" flag.
+///
+/// The reason for overloading `Flags.FLAG_MUST_CREATE` to mean "not linkable" in this context and
+/// "must create" in other contexts is due to the assumption that some POSIX flags are compatible
+/// with the members in `Flags`. In particular the POSIX `O_EXCL` has the same value as
+/// `Flags.FLAG_MUST_CREATE`. We are not able to define different bit members of the same value,
+/// hence it is defined seperately outside of `Flags`.
+@available(added=HEAD)
+const FLAG_TEMPORARY_AS_NOT_LINKABLE Flags = Flags.FLAG_MUST_CREATE;
 
 /// Options which can be used with Open3. Unlike [`Flags`], these options are designed for specific
 /// use cases (e.g. to reduce round-trip latency when requesting attributes).

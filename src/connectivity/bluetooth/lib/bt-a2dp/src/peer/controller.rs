@@ -14,9 +14,9 @@ use fuchsia_bluetooth::detachable_map::DetachableWeak;
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_sync::Mutex;
 use futures::{TryFutureExt, TryStreamExt};
+use log::{error, info};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{error, info};
 
 use crate::peer::Peer;
 

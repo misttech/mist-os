@@ -6,6 +6,17 @@
 #![allow(clippy::too_many_arguments)]
 // The readability of redundant closures is preferred over the small compiler optimization.
 #![allow(clippy::redundant_closure)]
+// Turn on additional lints that could lead to unexpected crashes in production code
+#![warn(clippy::indexing_slicing)]
+#![cfg_attr(test, allow(clippy::indexing_slicing))]
+#![warn(clippy::unwrap_used)]
+#![cfg_attr(test, allow(clippy::unwrap_used))]
+#![warn(clippy::expect_used)]
+#![cfg_attr(test, allow(clippy::expect_used))]
+#![warn(clippy::unreachable)]
+#![cfg_attr(test, allow(clippy::unreachable))]
+#![warn(clippy::unimplemented)]
+#![cfg_attr(test, allow(clippy::unimplemented))]
 
 pub mod access_point;
 pub mod client;

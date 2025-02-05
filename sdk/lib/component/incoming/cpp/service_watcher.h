@@ -10,8 +10,6 @@
 #include <lib/fit/function.h>
 #include <lib/zx/channel.h>
 
-#include <vector>
-
 namespace component {
 
 // A watcher for service instances.
@@ -51,7 +49,7 @@ class ServiceWatcher final {
                       const zx_packet_signal_t* signal);
 
   Callback callback_;
-  std::vector<uint8_t> buf_;
+  std::shared_ptr<std::array<uint8_t, fuchsia_io::wire::kMaxBuf>> buf_;
   zx::channel client_end_;
   std::string service_path_ = "/svc";
   async::WaitMethod<ServiceWatcher, &ServiceWatcher::OnWatchedEvent> wait_{this};

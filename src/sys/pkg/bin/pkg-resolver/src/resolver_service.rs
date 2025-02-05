@@ -24,10 +24,10 @@ use fuchsia_pkg::PackageDirectory;
 use fuchsia_url::{AbsolutePackageUrl, ParseError};
 use futures::future::Future;
 use futures::stream::TryStreamExt as _;
+use log::{error, info, warn};
 use std::sync::Arc;
 use std::time::Instant;
 use system_image::CachePackages;
-use tracing::{error, info, warn};
 use zx::Status;
 use {cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fuchsia_trace as ftrace};
 

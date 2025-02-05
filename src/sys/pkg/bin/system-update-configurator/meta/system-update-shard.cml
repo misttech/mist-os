@@ -10,12 +10,9 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
+            dictionary: "diagnostics",
             from: "parent",
-            to: [ "#system-update-configurator" ],
+            to: "#system-update-configurator",
         },
         {
             protocol: [

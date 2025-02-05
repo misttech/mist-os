@@ -802,7 +802,7 @@ impl SettingProxy {
 
         // Wait for the teardown phase to be over before continuing.
         if controller_receptor.next().await != Some(MessageEvent::Status(Status::Received)) {
-            tracing::error!("Failed to tear down {:?} controller", self.setting_type);
+            log::error!("Failed to tear down {:?} controller", self.setting_type);
         }
 
         // This ensures that the client event loop for the corresponding controller is

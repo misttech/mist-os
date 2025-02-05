@@ -279,6 +279,8 @@ go_test("clang_coverage_tests_on_target") {
     ":clang_coverage_test_deps($host_toolchain)",
     ":clang_coverage_test_deps_on_target($host_toolchain)",
     ":clang_coverage_test_package_on_target($target_toolchain)",
+    "//src/developer/ffx:test_data($host_toolchain)",
+    "//src/developer/ffx/plugins/test:ffx_test_tool_test_data($host_toolchain)",
   ]
 
   # Declare this test as a host-target interaction test, so that Fuchsia
@@ -294,6 +296,8 @@ go_test("clang_coverage_tests_on_target") {
       "fuchsia-pkg://fuchsia.com/clang_coverage_test_package_on_target#meta/clang_coverage_test_package_on_target.cm",
       "--golden-coverage",
       rebase_path("clang_golden_coverage.json", root_build_dir),
+      "--ffx",
+      rebase_path("$host_tools_dir/ffx", root_build_dir),
       "--llvm-cov",
       rebase_path("$clang_prefix/llvm-cov", root_build_dir),
       "--llvm-profdata",
@@ -335,6 +339,8 @@ go_test("rust_coverage_tests_on_target") {
     ":rust_coverage_test_deps_on_target($host_toolchain)",
     ":rust_coverage_test_package_on_target($target_toolchain)",
     "//build/rust:prebuilt_toolchain_host_test_data($host_toolchain)",
+    "//src/developer/ffx:test_data($host_toolchain)",
+    "//src/developer/ffx/plugins/test:ffx_test_tool_test_data($host_toolchain)",
   ]
 
   # Declare this test as a host-target interaction test, so that Fuchsia
@@ -350,6 +356,8 @@ go_test("rust_coverage_tests_on_target") {
       "fuchsia-pkg://fuchsia.com/rust_coverage_test_package_on_target#meta/rust_coverage_test_package_on_target.cm",
       "--golden-coverage",
       rebase_path("rust_golden_coverage.json", root_build_dir),
+      "--ffx",
+      rebase_path("$host_tools_dir/ffx", root_build_dir),
       "--llvm-cov",
       rebase_path("$clang_prefix/llvm-cov", root_build_dir),
       "--llvm-profdata",

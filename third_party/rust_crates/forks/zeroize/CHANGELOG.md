@@ -4,6 +4,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.8.1 (2024-05-25)
+### Changed
+- Feature-gate AVX-512 support under `simd`; restores MSRV 1.60 ([#1073])
+
+[#1073]: https://github.com/RustCrypto/utils/pull/1073
+
+## 1.8.0 (2024-04-24) [YANKED]
+
+NOTE: yanked due concerns over the MSRV bump. See [#1067].
+
+### Added
+- Unsafe `zeroize_flat_type` function ([#1045])
+- `Zeroize` impls for `__m512` types on `x86`/`x86_64` targets ([#1052])
+
+### Changed
+- Bump MSRV to 1.72 ([#1052])
+- Always enable AArch64 support ([#1064])
+
+### Fixed
+- Nightly warnings ([#1055])
+
+[#1045]: https://github.com/RustCrypto/utils/pull/1045
+[#1052]: https://github.com/RustCrypto/utils/pull/1052
+[#1055]: https://github.com/RustCrypto/utils/pull/1055
+[#1064]: https://github.com/RustCrypto/utils/pull/1064
+[#1067]: https://github.com/RustCrypto/utils/pull/1067
+
+## 1.7.0 (2023-11-16)
+### Changed
+- Bump MSRV to 1.60 ([#900])
+
+## 1.6.1 (2023-11-15) [YANKED]
+
+NOTE: yanked because [#900] bumped MSRV to 1.60, which vioates our MSRV policy.
+
+### Added
+- Impl `Zeroize` for `MaybeUninit` ([#900])
+
+### Removed
+- Unnecessary `cfg`s on SIMD type impls ([#930])
+
+[#900]: https://github.com/RustCrypto/utils/pull/900
+[#930]: https://github.com/RustCrypto/utils/pull/930
+
 ## 1.6.0 (2023-03-26)
 ### Added
 - Impl `Zeroize` for `core::num::Wrapping` ([#818])

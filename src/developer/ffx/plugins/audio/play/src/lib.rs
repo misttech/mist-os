@@ -6,10 +6,11 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ffx_audio_common::PlayResult;
 use ffx_audio_play_args::{AudioRenderUsageExtended, PlayCommand};
-use fho::{moniker, FfxMain, FfxTool, MachineWriter};
+use fho::{FfxMain, FfxTool, MachineWriter};
 use fidl::HandleBased;
 use fidl_fuchsia_audio_controller as fac;
 use std::io::Read;
+use target_holders::moniker;
 
 #[derive(FfxTool)]
 pub struct PlayTool {
@@ -57,7 +58,8 @@ async fn play_impl(
             })
         }
 
-        AudioRenderUsageExtended::Background(usage)
+        AudioRenderUsageExtended::Accessibility(usage)
+        | AudioRenderUsageExtended::Background(usage)
         | AudioRenderUsageExtended::Communication(usage)
         | AudioRenderUsageExtended::Interruption(usage)
         | AudioRenderUsageExtended::Media(usage)
@@ -102,9 +104,9 @@ async fn play_impl(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffx_core::macro_deps::futures::AsyncWriteExt;
     use ffx_writer::TestBuffers;
     use fidl_fuchsia_media as fmedia;
+    use futures::AsyncWriteExt;
     use std::fs;
     use std::io::Write;
     use std::os::unix::fs::PermissionsExt;
@@ -117,7 +119,7 @@ mod tests {
         let writer: MachineWriter<PlayResult> = MachineWriter::new_test(None, &test_buffers);
 
         let stdin_command = PlayCommand {
-            usage: AudioRenderUsageExtended::Media(fmedia::AudioRenderUsage::Media),
+            usage: AudioRenderUsageExtended::Media(fmedia::AudioRenderUsage2::Media),
             buffer_size: Some(48000),
             packet_count: None,
             file: None,
@@ -171,7 +173,7 @@ mod tests {
             .map_err(|e| anyhow!("Error trying to open file \"{}\": {e}", wav_path))?;
 
         let file_command = PlayCommand {
-            usage: AudioRenderUsageExtended::Media(fmedia::AudioRenderUsage::Media),
+            usage: AudioRenderUsageExtended::Media(fmedia::AudioRenderUsage2::Media),
             buffer_size: Some(48000),
             packet_count: None,
             file: Some(wav_path),

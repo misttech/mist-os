@@ -21,10 +21,10 @@ use futures::io::{AsyncWrite, AsyncWriteExt};
 use futures::stream::FuturesUnordered;
 use futures::task::{Context, Poll};
 use futures::{ready, Future, FutureExt, StreamExt, TryFutureExt};
+use log::{info, warn};
 use std::collections::HashSet;
 use std::io;
 use std::pin::Pin;
-use tracing::{info, warn};
 use zx::{self as zx, HandleBased};
 use {fuchsia_async as fasync, fuchsia_trace as trace};
 

@@ -13,11 +13,11 @@ use fuchsia_bluetooth::types::{HostInfo, Peer, PeerId};
 use futures::future::{self, BoxFuture, Future};
 use futures::{FutureExt, TryFutureExt};
 use hci_emulator_client::Emulator;
+use log::warn;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use test_harness::{SharedState, TestHarness, SHARED_STATE_TEST_COMPONENT_INDEX};
-use tracing::warn;
 
 use crate::core_realm::SHARED_STATE_INDEX;
 use crate::emulator::{watch_controller_parameters, EmulatorState};
@@ -181,7 +181,7 @@ async fn watch_peers(harness: HostHarness) -> Result<(), Error> {
                 for id in removed.into_iter() {
                     let id = id.into();
                     if harness.write_state().peers.remove(&id).is_none() {
-                        warn!(%id, "HostHarness: Removed id that wasn't present");
+                        warn!(id:%; "HostHarness: Removed id that wasn't present");
                     }
                 }
             }

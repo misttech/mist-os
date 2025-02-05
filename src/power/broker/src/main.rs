@@ -17,6 +17,7 @@ use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
+use futures::channel::mpsc::UnboundedReceiver;
 use futures::prelude::*;
 use futures::select;
 use inspect_format::constants::DEFAULT_VMO_SIZE_BYTES as DEFAULT_INSPECT_VMO;
@@ -24,8 +25,8 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::broker::{Broker, CurrentLevelSubscriber, LeaseID, RequiredLevelSubscriber};
-use crate::topology::ElementID;
+use crate::broker::{Broker, CurrentLevelSubscriber, LeaseID};
+use crate::topology::{ElementID, IndexedPowerLevel};
 
 mod broker;
 mod credentials;
@@ -386,11 +387,13 @@ impl BrokerSvc {
         element_id: ElementID,
         server_end: ServerEnd<fpb::RequiredLevelMarker>,
     ) -> RequiredLevelHandler {
-        let required_level_subscriber =
-            self.broker.borrow_mut().new_required_level_subscriber(&element_id);
-        let mut handler = RequiredLevelHandler::new(element_id.clone());
+        let receiver = {
+            let mut broker = self.broker.borrow_mut();
+            broker.watch_required_level(&element_id)
+        };
+        let mut handler = RequiredLevelHandler::new(element_id);
         let stream = server_end.into_stream();
-        handler.start(stream, required_level_subscriber);
+        handler.start(stream, receiver);
         handler
     }
 
@@ -436,21 +439,32 @@ impl RequiredLevelHandler {
     fn start(
         &mut self,
         mut stream: RequiredLevelRequestStream,
-        subscriber: RequiredLevelSubscriber,
+        mut receiver: UnboundedReceiver<Option<IndexedPowerLevel>>,
     ) {
         let element_id = self.element_id.clone();
         let mut shutdown = self.shutdown.wait_or_dropped();
         log::debug!("Starting new RequiredLevelHandler for {:?}", &self.element_id);
         Task::local(async move {
-            let subscriber = subscriber;
             loop {
                 select! {
                     _ = shutdown => {
                         break;
                     }
                     next = stream.next() => {
-                        if let Some(Ok(request)) = next {
-                            if let Err(err) = RequiredLevelHandler::handle_request(request, &subscriber).await {
+                        if next.is_none() {
+                            break;
+                        }
+                        // If there are newer required levels available, send the last one.
+                        let mut last = next;
+                        while let Some(maybe_next) = stream.next().now_or_never() {
+                            if maybe_next.is_none() {
+                                break;
+                            }
+                            log::debug!("skipping {:?}, newer required level available: {:?}", last, maybe_next);
+                            last = maybe_next;
+                        }
+                        if let Some(Ok(request)) = last {
+                            if let Err(err) = RequiredLevelHandler::handle_request(element_id.clone(), request, &mut receiver).await {
                                 log::debug!("handle_request error: {:?}", err);
                             }
                         } else {
@@ -464,13 +478,22 @@ impl RequiredLevelHandler {
     }
 
     async fn handle_request(
+        element_id: ElementID,
         request: RequiredLevelRequest,
-        subscriber: &RequiredLevelSubscriber,
+        receiver: &mut UnboundedReceiver<Option<IndexedPowerLevel>>,
     ) -> Result<(), Error> {
         match request {
             RequiredLevelRequest::Watch { responder } => {
-                subscriber.register(responder)?;
-                Ok(())
+                if let Some(Some(power_level)) = receiver.next().await {
+                    log::debug!("RequiredLevel.Watch: send({:?})", &power_level);
+                    responder.send(Ok(power_level.level)).context("response failed")
+                } else {
+                    log::info!(
+                        "RequiredLevel.Watch: receiver closed, element {:?} is no longer available.",
+                        &element_id
+                    );
+                    Ok(())
+                }
             }
             RequiredLevelRequest::_UnknownMethod { ordinal, .. } => {
                 log::warn!("Received unknown RequiredLevelRequest: {ordinal}");

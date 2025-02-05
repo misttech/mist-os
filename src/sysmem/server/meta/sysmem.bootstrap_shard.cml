@@ -41,14 +41,6 @@
             availability: "optional",
         },
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: "#sysmem",
-        },
-        {
             dictionary: "diagnostics",
             from: "self",
             to: "#sysmem",

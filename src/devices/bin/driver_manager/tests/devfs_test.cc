@@ -120,15 +120,6 @@ TEST(Devfs, Export_WithProtocol) {
   ASSERT_TRUE(root_slot.has_value());
   Devnode& root_node = root_slot.value();
 
-  std::optional proto_node = devfs.proto_node(ZX_PROTOCOL_BLOCK);
-  ASSERT_TRUE(proto_node.has_value());
-  EXPECT_EQ("block", proto_node.value().get().name());
-  {
-    fbl::RefPtr<fs::Vnode> node_000;
-    EXPECT_STATUS(proto_node.value().get().children().Lookup("000", &node_000), ZX_ERR_NOT_FOUND);
-    ASSERT_EQ(node_000, nullptr);
-  }
-
   std::vector<std::unique_ptr<Devnode>> out;
   ASSERT_OK(root_node.export_dir(Devnode::Target(), "one/two", "block", out));
 
@@ -139,10 +130,6 @@ TEST(Devfs, Export_WithProtocol) {
   std::optional node_two = lookup(node_one->get(), "two");
   ASSERT_TRUE(node_two.has_value());
   EXPECT_EQ("two", node_two->get().name());
-
-  fbl::RefPtr<fs::Vnode> node_000;
-  ASSERT_OK(proto_node.value().get().children().Lookup("000", &node_000));
-  ASSERT_NE(node_000, nullptr);
 }
 
 TEST(Devfs, Export_AlreadyExists) {
@@ -205,7 +192,7 @@ TEST(Devfs, PassthroughTarget) {
       });
 
   DevfsDevice device;
-  ASSERT_OK(root_slot.value().add_child("test", std::nullopt, passthrough.Clone(), device));
+  ASSERT_OK(root_slot.value().add_child("test", std::nullopt, passthrough, device));
   device.publish();
 
   zx::result devfs_client = devfs.Connect(vfs);

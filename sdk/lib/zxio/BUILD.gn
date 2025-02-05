@@ -97,6 +97,7 @@ source_set("zxio") {
     "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_cpp",
     "//sdk/lib/stdcompat",
     "//src/connectivity/network/netstack/udp_serde",
+    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
     "//zircon/third_party/ulib/safemath",
   ]
@@ -110,7 +111,7 @@ shared_library("zxio_standalone") {
 
   public_deps = [ ":zxio" ]
 
-  configs += [ "//build/config/mistos:static_cpp_standard_library" ]
+  configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
 
   version_script = "zxio_standalone.ld"
   inputs = [ version_script ]

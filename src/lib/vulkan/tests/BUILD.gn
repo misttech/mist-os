@@ -18,7 +18,6 @@ fuchsia_unittest_package("image-pipe-swapchain-tests") {
   manifest = "meta/image-pipe-swapchain-tests.cml"
   deps = [
     ":test_image_pipe_swapchain",
-    "//src/lib/vulkan/swapchain:image_pipe_swapchain_copy_layer",
     "//src/lib/vulkan/swapchain:image_pipe_swapchain_fb_layer",
     "//src/lib/vulkan/swapchain:image_pipe_swapchain_layer",
     "//src/lib/vulkan/validation_layers",
@@ -73,7 +72,6 @@ fuchsia_unittest_package("image-pipe-swapchain-hermetic-tests") {
   deps = [
     ":test_image_pipe_swapchain_hermetic",
     "//src/graphics/display/testing/fake-coordinator-connector:child-component",
-    "//src/lib/vulkan/swapchain:image_pipe_swapchain_copy_layer",
     "//src/lib/vulkan/swapchain:image_pipe_swapchain_fb_layer",
     "//src/lib/vulkan/validation_layers",
   ]

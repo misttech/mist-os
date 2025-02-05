@@ -17,9 +17,7 @@ std::string NameHandleSubtype(HandleSubtype subtype);
 std::string NameRawLiteralKind(RawLiteral::Kind kind);
 std::string NameConstantKind(Constant::Kind kind);
 std::string NameConstant(const Constant* constant);
-// TODO(https://fxbug.dev/42149402): Delete KindV1.
 std::string NameTypeKind(const Type* type);
-std::string NameTypeKindV2(const Type* type);
 std::string NameType(const Type* type);
 std::string NameMethodKind(Protocol::Method::Kind kind);
 std::string FullyQualifiedName(const Name& name);

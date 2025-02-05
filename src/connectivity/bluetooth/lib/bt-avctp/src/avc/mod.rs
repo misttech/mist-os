@@ -7,8 +7,8 @@ use fuchsia_bluetooth::types::Channel;
 use futures::future::Ready;
 use futures::stream::FilterMap;
 use futures::{future, Stream, StreamExt};
+use log::{info, trace};
 use packet_encoding::{Decodable, Encodable};
-use tracing::{info, trace};
 use zx::MonotonicDuration;
 
 #[cfg(test)]

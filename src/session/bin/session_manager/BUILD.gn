@@ -51,9 +51,9 @@ rustc_library("lib") {
     "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [
@@ -64,7 +64,6 @@ rustc_library("lib") {
     "//src/session/testing",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:lazy_static",
   ]
 
   sources = [
@@ -99,7 +98,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/main.rs" ]

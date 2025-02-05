@@ -41,7 +41,7 @@ async fn my_component_test_rust_test() -> Result<(), Error> {
     // let expected_string = test_function();
     // ```
 
-    tracing::debug!("Initialized.");
+    log::debug!("Initialized.");
 
     // Assert conditions here, e.g.
     // ```

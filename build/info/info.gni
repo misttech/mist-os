@@ -27,7 +27,7 @@ build_info_files = {
   # LINT.IfChange
   jiri_snapshot = "//.jiri_root/update_history/latest"
 
-  # LINT.ThenChange(//build/bazel/scripts/update_workspace.py)
+  # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
 
   latest_commit_hash = "$root_build_dir/latest-commit-hash.txt"
   latest_commit_date = "$root_build_dir/latest-commit-date.txt"

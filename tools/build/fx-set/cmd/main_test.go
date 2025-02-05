@@ -480,7 +480,7 @@ func TestConstructStaticSpec(t *testing.T) {
 			args: &setArgs{disableCxxRbe: true, buildEventService: "sponge"},
 			expected: &fintpb.Static{
 				BuildEventService: "sponge",
-				GnArgs:            []string{rbe_mode_off, `bazel_upload_build_events = "sponge"`},
+				GnArgs:            []string{`bazel_upload_build_events = "sponge"`, rbe_mode_off},
 			},
 		},
 		{

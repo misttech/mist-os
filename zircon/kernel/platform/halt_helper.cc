@@ -16,14 +16,14 @@
 HaltToken HaltToken::g_instance;
 
 void platform_graceful_halt_helper(platform_halt_action action, zircon_crash_reason_t reason,
-                                   zx_time_t panic_deadline) {
+                                   zx_instant_mono_t panic_deadline) {
   if (!HaltToken::Get().Take()) {
     printf("platform_graceful_halt_helper: halt/reboot already in progress; sleeping forever\n");
     Thread::Current::Sleep(ZX_TIME_INFINITE);
   }
 
   printf("platform_graceful_halt_helper: action=%d reason=%u panic_deadline=%ld current_time=%ld\n",
-         action, static_cast<uint32_t>(reason), panic_deadline, current_time());
+         action, static_cast<uint32_t>(reason), panic_deadline, current_mono_time());
 
   // Migrate to the boot CPU before shutting down the secondary CPUs.  Note that
   // this action also hard-pins our thread to the boot CPU, so we don't need to
@@ -45,7 +45,7 @@ void platform_graceful_halt_helper(platform_halt_action action, zircon_crash_rea
   panic("ERROR: failed to halt the platform\n");
 }
 
-zx_status_t platform_halt_secondary_cpus(zx_time_t deadline) {
+zx_status_t platform_halt_secondary_cpus(zx_instant_mono_t deadline) {
   // Ensure the current thread is pinned to the boot CPU.
   {
     Thread* current_thread = Thread::Current::Get();
@@ -61,7 +61,7 @@ zx_status_t platform_halt_secondary_cpus(zx_time_t deadline) {
   // The deadline here should be long enough that the secondary CPUs have had
   // ample time to startup but small enough that we don't hold up the shutdown
   // process "too long".
-  zx_status_t status = mp_wait_for_all_cpus_ready(Deadline::after(ZX_SEC(5)));
+  zx_status_t status = mp_wait_for_all_cpus_ready(Deadline::after_mono(ZX_SEC(5)));
   if (status != ZX_OK) {
     printf("failed to wait for cpus to start: %d\n", status);
   }

@@ -11,16 +11,16 @@ use ffx_profile_heapdump_common::{
 use ffx_profile_heapdump_snapshot_args::SnapshotCommand;
 use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl::endpoints::create_request_stream;
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
 use std::io::Write;
+use target_holders::RemoteControlProxyHolder;
 
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("ffx_profile_heapdump"))]
 pub struct SnapshotTool {
     #[command]
     cmd: SnapshotCommand,
-    remote_control: RemoteControlProxy,
+    remote_control: RemoteControlProxyHolder,
 }
 
 fho::embedded_plugin!(SnapshotTool);
@@ -35,7 +35,7 @@ impl FfxMain for SnapshotTool {
     }
 }
 
-async fn snapshot(remote_control: RemoteControlProxy, cmd: SnapshotCommand) -> Result<()> {
+async fn snapshot(remote_control: RemoteControlProxyHolder, cmd: SnapshotCommand) -> Result<()> {
     let process_selector = build_process_selector(cmd.by_name, cmd.by_koid)?;
     let contents_dir = cmd.output_contents_dir.as_ref().map(std::path::Path::new);
 

@@ -15,9 +15,20 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
+    capabilities: [
+        {
+            service: [ "fuchsia.storage.ftl.Service" ],
+        },
+    ],
     use: [
         {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
+        },
+    ],
+    expose: [
+        {
+            service: "fuchsia.storage.ftl.Service",
+            from: "self",
         },
     ],
 }

@@ -63,7 +63,7 @@ use scopeguard::ScopeGuard;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock, Weak};
+use std::sync::{Arc, Mutex, Weak};
 use storage_device::Device;
 use uuid::Uuid;
 
@@ -444,7 +444,7 @@ pub struct ObjectStore {
 
     // An optional callback to be invoked each time the ObjectStore flushes.  The callback is
     // invoked at the end of flush, while the write lock is still held.
-    flush_callback: OnceLock<Box<dyn Fn(&ObjectStore) + Send + Sync + 'static>>,
+    flush_callback: Mutex<Option<Box<dyn Fn(&ObjectStore) + Send + Sync + 'static>>>,
 }
 
 #[derive(Clone, Default)]
@@ -488,7 +488,7 @@ impl ObjectStore {
             logical_read_ops: AtomicU64::new(0),
             logical_write_ops: AtomicU64::new(0),
             last_object_id: Mutex::new(last_object_id),
-            flush_callback: OnceLock::new(),
+            flush_callback: Mutex::new(None),
         })
     }
 
@@ -532,7 +532,7 @@ impl ObjectStore {
             logical_read_ops: AtomicU64::new(0),
             logical_write_ops: AtomicU64::new(0),
             last_object_id: Mutex::new(LastObjectId::default()),
-            flush_callback: OnceLock::new(),
+            flush_callback: Mutex::new(None),
         }
     }
 
@@ -646,15 +646,15 @@ impl ObjectStore {
     pub fn set_trace(&self, trace: bool) {
         let old_value = self.trace.swap(trace, Ordering::Relaxed);
         if trace != old_value {
-            info!(store_id = self.store_object_id(), trace, "OS: trace",);
+            info!(store_id = self.store_object_id(), trace; "OS: trace",);
         }
     }
 
     /// Sets a callback to be invoked each time the ObjectStore flushes.  The callback is invoked at
     /// the end of flush, while the write lock is still held.
-    /// Note that this can only be set once per ObjectStore; repeated calls will panic.
     pub fn set_flush_callback<F: Fn(&ObjectStore) + Send + Sync + 'static>(&self, callback: F) {
-        self.flush_callback.set(Box::new(callback)).ok().unwrap();
+        let mut flush_callback = self.flush_callback.lock().unwrap();
+        *flush_callback = Some(Box::new(callback));
     }
 
     pub fn is_root(&self) -> bool {
@@ -1750,7 +1750,7 @@ impl ObjectStore {
             self.filesystem().sync(SyncOptions { flush_device: true, ..Default::default() }).await;
 
         *self.lock_state.lock().unwrap() = if let Err(error) = &sync_result {
-            error!(?error, "Failed to sync journal; store will no longer be usable");
+            error!(error:?; "Failed to sync journal; store will no longer be usable");
             LockState::Invalid
         } else {
             LockState::Locked
@@ -1881,7 +1881,8 @@ impl ObjectStore {
                     .tree
                     .find(&ObjectKey::object(object_id))
                     .await?
-                    .ok_or(FxfsError::NotFound)?,
+                    .ok_or(FxfsError::Inconsistent)
+                    .context("Object id missing")?,
                 op: Operation::ReplaceOrInsert,
             })
         }
@@ -2471,7 +2472,7 @@ mod tests {
                 .await
                 .expect("open_object failed");
 
-        assert!(handle.verified_file());
+        assert!(handle.is_verified_file());
 
         fs.close().await.expect("Close failed");
     }
@@ -2504,7 +2505,7 @@ mod tests {
                 .await
                 .expect("open_object failed");
 
-        assert!(!handle.verified_file());
+        assert!(!handle.is_verified_file());
 
         fs.close().await.expect("Close failed");
     }

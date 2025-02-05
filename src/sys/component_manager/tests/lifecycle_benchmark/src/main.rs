@@ -14,7 +14,7 @@ use {
 
 #[fuchsia::main]
 fn main() {
-    tracing::info!("Started");
+    log::info!("Started");
 
     // Initialize benchmark.
     let mut c = FuchsiaCriterion::default();

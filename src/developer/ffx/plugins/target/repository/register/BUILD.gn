@@ -5,6 +5,7 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_target_repository_register") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
@@ -17,6 +18,7 @@ ffx_plugin("ffx_target_repository_register") {
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/developer/ffx/lib/pkg",
     "//src/developer/ffx/lib/target:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/timeout:lib",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:schemars",
@@ -34,7 +36,11 @@ ffx_plugin("ffx_target_repository_register") {
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:serde_json",
   ]
-  args_deps = [ "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
+    "//third_party/rust_crates:argh",
+  ]
 
   args_sources = [ "src/args.rs" ]
 

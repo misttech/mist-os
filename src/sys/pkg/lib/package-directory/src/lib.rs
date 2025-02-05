@@ -6,10 +6,10 @@
 
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
+use log::error;
 use std::collections::HashSet;
 use std::convert::TryInto as _;
 use std::future::Future;
-use tracing::error;
 use vfs::common::send_on_open_with_error;
 use vfs::directory::entry::EntryInfo;
 use vfs::directory::entry_container::Directory;
@@ -354,21 +354,6 @@ fn get_dir_children<'a>(
     // TODO(https://fxbug.dev/42162840) Remove this sort
     res.sort_by(|a, b| a.1.cmp(&b.1));
     res
-}
-
-#[cfg(test)]
-async fn verify_open_adjusts_flags(
-    entry: std::sync::Arc<impl Directory>,
-    in_flags: fio::OpenFlags,
-    expected_flags: fio::OpenFlags,
-) {
-    let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
-
-    entry.open(ExecutionScope::new(), in_flags, VfsPath::dot(), server_end);
-
-    let (status, flags) = proxy.get_flags().await.unwrap();
-    let () = zx::Status::ok(status).unwrap();
-    assert_eq!(flags, expected_flags);
 }
 
 #[cfg(test)]

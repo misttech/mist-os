@@ -13,9 +13,9 @@
         bind: "meta/bind/framebuffer-intel-display-bind.bindbc",
     },
     use: [
-        { protocol: "fuchsia.kernel.FramebufferResource" },
         {
             protocol: [
+                "fuchsia.boot.Items",
                 "fuchsia.hardware.sysmem.Sysmem",
                 "fuchsia.sysmem2.Allocator",
             ],

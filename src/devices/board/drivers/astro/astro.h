@@ -68,6 +68,8 @@ class Astro : public AstroType {
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(Astro);
 
+  zx_status_t CreateGpioPlatformDevice();
+
   void Serve(fdf::ServerEnd<fuchsia_hardware_platform_bus::PlatformBus> request) {
     device_connect_runtime_protocol(
         parent(), fuchsia_hardware_platform_bus::Service::PlatformBus::ServiceName,

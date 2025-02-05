@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 #ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FIDL_CODEC_DECODE_H_
 #define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FIDL_CODEC_DECODE_H_
-#include "src/developer/ffx/lib/fuchsia-controller/cpp/python/py_header.h"
 
-namespace decode {
+#include <Python.h>
+
+namespace fuchsia_controller::fidl_codec::decode {
 
 // Attempts to decode a FIDL response message. The expected arguments are "bytes" which should be a
 // bytearray object representing the message to be decoded, and "handles" which should be a list of
@@ -34,5 +35,6 @@ extern PyMethodDef decode_fidl_request_py_def;
 // Represents the signature of the FIDL generalized decoder. Used to decode by type name string.
 extern PyMethodDef decode_standalone_py_def;
 
-}  // namespace decode
+}  // namespace fuchsia_controller::fidl_codec::decode
+
 #endif  // SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FIDL_CODEC_DECODE_H_

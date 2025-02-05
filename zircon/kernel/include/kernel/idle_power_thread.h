@@ -71,7 +71,7 @@ class IdlePowerThread final {
   //   - {ZX_OK, Offline} if the current state was already Offline.
   //   - {ZX_ERR_BAD_STATE, current state} if the current state was not Active or Offline.
   //   - {ZX_ERR_TIMED_OUT, Active} if the current state was Active and transition timeout expired.
-  TransitionResult TransitionActiveToOffline(zx_time_t timeout_at = ZX_TIME_INFINITE)
+  TransitionResult TransitionActiveToOffline(zx_instant_mono_t timeout_at = ZX_TIME_INFINITE)
       TA_EXCL(TransitionLock::Get()) {
     Guard<Mutex> guard{TransitionLock::Get()};
     return TransitionFromTo(State::Active, State::Offline, timeout_at);
@@ -85,7 +85,7 @@ class IdlePowerThread final {
   //   - {ZX_ERR_BAD_STATE, current state} if the current state was not Active or Offline.
   //   - {ZX_ERR_TIMED_OUT, Offline} if the current state was Offline and transition timeout
   //     expired.
-  TransitionResult TransitionOfflineToActive(zx_time_t timeout_at = ZX_TIME_INFINITE)
+  TransitionResult TransitionOfflineToActive(zx_instant_mono_t timeout_at = ZX_TIME_INFINITE)
       TA_EXCL(TransitionLock::Get()) {
     Guard<Mutex> guard{TransitionLock::Get()};
     return TransitionFromTo(State::Offline, State::Active, timeout_at);
@@ -151,8 +151,8 @@ class IdlePowerThread final {
     return state_.compare_exchange_strong(expected, desired, ktl::memory_order_acq_rel,
                                           ktl::memory_order_acquire);
   }
-  TransitionResult TransitionFromTo(State expected_state, State target_state, zx_time_t timeout_at)
-      TA_REQ(TransitionLock::Get());
+  TransitionResult TransitionFromTo(State expected_state, State target_state,
+                                    zx_instant_mono_t timeout_at) TA_REQ(TransitionLock::Get());
 
   using WakeResult = wake_vector::WakeResult;
   using WakeEvent = wake_vector::WakeEvent;
@@ -178,7 +178,7 @@ class IdlePowerThread final {
   static void UpdateMonotonicClock(cpu_num_t current_cpu, const StateMachine& current_state);
 
   // Called by the scheduler when updating per-CPU and per-thread stats.
-  static zx_duration_t TakeProcessorIdleTime();
+  static zx_duration_mono_t TakeProcessorIdleTime();
 
   ktl::atomic<StateMachine> state_;
   AutounsignalMpUnplugEvent complete_;
@@ -188,7 +188,7 @@ class IdlePowerThread final {
 
   // Accumulates the time spent in a lower-power idle state since the last reschedule. This value is
   // reset to zero on each reschedule and when a CPU goes offline.
-  zx_duration_t processor_idle_time_ns_{0};
+  zx_duration_mono_t processor_idle_time_ns_{0};
 
   DECLARE_SINGLETON_MUTEX(TransitionLock);
 

@@ -19,6 +19,13 @@ extern crate std;
 ))]
 include!("bindings_zstd_std.rs");
 
+#[cfg(all(
+    feature = "std",
+    not(feature = "experimental"),
+    not(feature = "bindgen")
+))]
+include!("bindings_zstd_errors_std.rs");
+
 // Std-based (no libc)
 #[cfg(all(
     feature = "std",

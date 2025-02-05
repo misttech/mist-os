@@ -333,6 +333,15 @@ class X86PageTableImpl : public X86PageTableBase {
     return referenced_pt_;
   }
 
+  // Accessor for the unified page table from a restricted page table.
+  // Thread safety analysis is left on for this accessor because the unified page table pointer is
+  // set during creation of the unified page table, which happens after this restricted page table
+  // is already created.
+  X86PageTableBase* get_unified_pt() TA_REQ(lock_) {
+    DEBUG_ASSERT(IsRestricted());
+    return referenced_pt_;
+  }
+
   zx_status_t MapPages(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
                        ExistingEntryAction existing_action, size_t* mapped) override final {
     canary_.Assert();
@@ -749,14 +758,10 @@ class X86PageTableImpl : public X86PageTableBase {
         // invalidations.
         arch::DeviceMemoryBarrier();
       }
+      // If this is a restricted aspace, TlbInvalidate will ensure that the associated unified
+      // aspace also has its TLB entries invalidated.
       static_cast<T*>(pt_)->TlbInvalidate(&tlb_);
-      if (pt_->IsRestricted() && pt_->referenced_pt_ != nullptr) {
-        // TODO(https://fxbug.dev/42083004): This TLB invalidation could be wrapped into the
-        // preceding one so long as we built the target mask correctly.
-        Guard<Mutex> a{AssertOrderedLock, &pt_->referenced_pt_->lock_,
-                       pt_->referenced_pt_->LockOrder()};
-        static_cast<T*>(pt_->referenced_pt_)->TlbInvalidate(&tlb_);
-      }
+
       // Clear out the pending TLB invalidations.
       tlb_.clear();
     }

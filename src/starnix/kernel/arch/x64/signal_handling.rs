@@ -7,11 +7,10 @@ use crate::signals::{SignalInfo, SignalState};
 use crate::task::{CurrentTask, Task};
 use extended_pstate::ExtendedPstateState;
 use starnix_logging::log_debug;
-use starnix_uapi::errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK};
+use starnix_uapi::errors::Errno;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
-    self as uapi, __NR_restart_syscall, error, sigaction_t, sigaltstack, sigcontext, siginfo_t,
-    ucontext,
+    self as uapi, error, sigaction_t, sigaltstack, sigcontext, siginfo_t, ucontext,
 };
 use static_assertions::const_assert_eq;
 
@@ -229,16 +228,6 @@ pub fn restore_registers(
     Ok(())
 }
 
-pub fn update_register_state_for_restart(registers: &mut RegisterState, err: ErrnoCode) {
-    registers.rax = match err {
-        // Custom restart, invoke restart_syscall instead of the original syscall.
-        ERESTART_RESTARTBLOCK => __NR_restart_syscall as u64,
-        // If the restart is not custom, simply replace `rax` with the value it had when the
-        // original syscall trap occurred.
-        _ => registers.orig_rax,
-    };
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -287,6 +276,7 @@ mod tests {
         // `rdi`, `rsi`, `rdx`, `r10`, `r8`, `r9`, should be the syscall arguments;
         // `orig_rax` should hold the syscall number;
         // and the instruction pointer should be 2 bytes after the syscall instruction.
+        current_task.thread_state.restart_code = Some(ERESTARTSYS);
         current_task.thread_state.registers.rax = ERESTARTSYS.return_value();
         current_task.thread_state.registers.rdi = SYSCALL_ARGS.0;
         current_task.thread_state.registers.rsi = SYSCALL_ARGS.1;
@@ -367,6 +357,7 @@ mod tests {
         // `rdi`, `rsi`, `rdx`, `r10`, `r8`, `r9`, should be the syscall arguments;
         // `orig_rax` should hold the syscall number;
         // and the instruction pointer should be 2 bytes after the syscall instruction.
+        current_task.thread_state.restart_code = Some(ERESTARTSYS);
         current_task.thread_state.registers.rax = ERESTARTSYS.return_value();
         current_task.thread_state.registers.rdi = SYSCALL_ARGS.0;
         current_task.thread_state.registers.rsi = SYSCALL_ARGS.1;
@@ -396,6 +387,7 @@ mod tests {
         assert_ne!(current_task.thread_state.registers.rdx, SYSCALL_ARGS.2);
 
         // Simulate another syscall being interrupted.
+        current_task.thread_state.restart_code = Some(ERESTARTSYS);
         current_task.thread_state.registers.rax = ERESTARTSYS.return_value();
         current_task.thread_state.registers.rdi = SYSCALL2_ARGS.0;
         current_task.thread_state.registers.rsi = SYSCALL2_ARGS.1;
@@ -490,6 +482,7 @@ mod tests {
         // `rdi`, `rsi`, `rdx`, `r10`, `r8`, `r9`, should be the syscall arguments;
         // `orig_rax` should hold the syscall number;
         // and the instruction pointer should be 2 bytes after the syscall instruction.
+        current_task.thread_state.restart_code = Some(ERESTARTSYS);
         current_task.thread_state.registers.rax = ERESTARTSYS.return_value();
         current_task.thread_state.registers.rdi = SYSCALL_ARGS.0;
         current_task.thread_state.registers.rsi = SYSCALL_ARGS.1;

@@ -200,14 +200,18 @@ class AcpiDeviceTest : public zxtest::Test, public loop_fixture::RealLoop {
 };
 
 TEST_F(AcpiDeviceTest, TestGetBusId) {
+  const uint32_t kBusId = 37;
   auto device = std::make_unique<acpi::Device>(std::move(
-      Args(ACPI_ROOT_OBJECT).SetBusMetadata(std::vector<uint8_t>(), acpi::BusType::kI2c, 37)));
+      Args(ACPI_ROOT_OBJECT)
+          .SetBusMetadata(
+              fuchsia_hardware_i2c_businfo::I2CBusMetadata{{.channels{}, .bus_id = kBusId}},
+              acpi::BusType::kI2c, kBusId)));
   SetUpFidlServer(std::move(device));
 
   fidl_client_->GetBusId().Then([&](auto& result) {
     ASSERT_OK(result.status());
     ASSERT_TRUE(result->is_ok());
-    ASSERT_EQ(result->value()->bus_id, 37);
+    ASSERT_EQ(result->value()->bus_id, kBusId);
     QuitLoop();
   });
   RunLoop();

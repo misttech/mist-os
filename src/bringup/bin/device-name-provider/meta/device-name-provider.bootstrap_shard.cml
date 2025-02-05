@@ -10,10 +10,15 @@
     ],
     offer: [
         {
+            config: [ "fuchsia.network.PrimaryInterface" ],
             from: "parent",
             to: "#device_name_provider",
-            config: [ "fuchsia.network.PrimaryInterface" ],
             availability: "optional",
+        },
+        {
+            dictionary: "diagnostics",
+            from: "self",
+            to: "#device_name_provider",
         },
         {
             protocol: [
@@ -29,14 +34,6 @@
             as: "dev-class-network",
             to: "#device_name_provider",
             subdir: "network",
-        },
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: "#device_name_provider",
         },
     ],
     expose: [

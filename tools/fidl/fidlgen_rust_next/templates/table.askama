@@ -2,9 +2,7 @@
 {% let name = filters::ident(base_name)? %}
 {% let wire_name = format!("Wire{base_name}") %}
 
-{% if let Some(doc) = table.attributes.doc_string() %}
-    #[doc = "{{ doc.escape_default() }}"]
-{% endif %}
+{{ self::doc_string(table.attributes) -}}
 #[derive(
 {% if !table.is_resource %}
     Clone,
@@ -81,8 +79,8 @@ impl<'buf> ::fidl_next::TakeFrom<{{ wire_name }}<'buf>> for {{ name }} {
     fn take_from(from: &mut {{ wire_name }}<'buf>) -> Self {
         Self {
             {% for member in table.members %}
-                {% let member_name = filters::ident(member.name.snake())? %}
-                {{ member_name }}: from.{{ member_name }}_mut().map(::fidl_next::TakeFrom::take_from),
+                {% let member_name = member.name.snake() %}
+                {{ member_name|ident }}: from.{{ member_name }}_mut().map(::fidl_next::TakeFrom::take_from),
             {% endfor %}
         }
     }

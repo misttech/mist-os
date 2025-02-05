@@ -47,6 +47,19 @@ void F2fsFakeDevTestFixture::TearDown() {
   }
 }
 
+void F2fsFakeDevTestFixture::Remount() {
+  if (!root_dir_ || !fs_) {
+    return;
+  }
+  ASSERT_EQ(root_dir_->Close(), ZX_OK);
+  root_dir_ = nullptr;
+  FileTester::Unmount(std::move(fs_), &bc_);
+  FileTester::MountWithOptions(loop_.dispatcher(), mount_options_, &bc_, &fs_);
+  fbl::RefPtr<VnodeF2fs> root;
+  FileTester::CreateRoot(fs_.get(), &root);
+  root_dir_ = fbl::RefPtr<Dir>::Downcast(std::move(root));
+}
+
 void FileTester::MkfsOnFakeDev(std::unique_ptr<BcacheMapper> *bc, uint64_t block_count,
                                uint32_t block_size, bool btrim) {
   auto device = std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{

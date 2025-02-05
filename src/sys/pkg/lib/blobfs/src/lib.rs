@@ -9,9 +9,9 @@
 use fidl::endpoints::{Proxy as _, ServerEnd};
 use fuchsia_hash::{Hash, ParseHashError};
 use futures::{stream, StreamExt as _};
+use log::{error, info, warn};
 use std::collections::HashSet;
 use thiserror::Error;
-use tracing::{error, info, warn};
 use vfs::common::send_on_open_with_error;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::StreamIoConnection;

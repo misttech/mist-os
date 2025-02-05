@@ -5,6 +5,7 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_profile_memory_components") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
 
@@ -18,8 +19,9 @@ ffx_plugin("ffx_profile_memory_components") {
     "//sdk/fidl/fuchsia.memory.attribution.plugin:fuchsia.memory.attribution.plugin_rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
-    "//src/developer/ffx/plugins/profile/memory/common:ffx_profile_memory_common",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/lib/fidl/rust/fidl",
+    "//src/performance/memory/attribution/processing",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
@@ -29,6 +31,10 @@ ffx_plugin("ffx_profile_memory_components") {
 
   test_deps = [ "//third_party/rust_crates:pretty_assertions" ]
   args_sources = [ "src/args.rs" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
 
   with_unit_tests = true
 }

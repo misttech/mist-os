@@ -33,10 +33,10 @@ source_set("impl") {
   sources = [
     "channel.cc",
     "clock.cc",
-    "ddk.cc",
-    "ddk_${zircon_cpu}.cc",
-    "ddk_pci.cc",
     "debug.cc",
+    "driver.cc",
+    "driver_${zircon_cpu}.cc",
+    "driver_pci.cc",
     "exceptions.cc",
     "fifo.cc",
     "futex.cc",

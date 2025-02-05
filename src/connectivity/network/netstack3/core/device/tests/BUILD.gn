@@ -9,6 +9,7 @@ rustc_test("netstack3_device_integration_test") {
   edition = "2021"
   sources = [
     "src/base.rs",
+    "src/blackhole.rs",
     "src/ethernet.rs",
     "src/lib.rs",
     "src/loopback.rs",

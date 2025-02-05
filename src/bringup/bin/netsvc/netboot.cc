@@ -275,8 +275,15 @@ zx_status_t reboot() {
   if (client_end.is_error()) {
     return client_end.status_value();
   }
-  fidl::WireResult response =
-      fidl::WireCall(client_end.value())->Reboot(statecontrol::wire::RebootReason::kUserRequest);
+
+  fidl::Arena arena;
+  auto builder = fuchsia_hardware_power_statecontrol::wire::RebootOptions::Builder(arena);
+  fuchsia_hardware_power_statecontrol::RebootReason2 reasons[1] = {
+      fuchsia_hardware_power_statecontrol::RebootReason2::kUserRequest};
+  auto vector_view =
+      fidl::VectorView<fuchsia_hardware_power_statecontrol::RebootReason2>::FromExternal(reasons);
+  builder.reasons(vector_view);
+  fidl::WireResult response = fidl::WireCall(client_end.value())->PerformReboot(builder.Build());
   if (response.status() != ZX_OK) {
     return response.status();
   }

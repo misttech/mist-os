@@ -18,7 +18,7 @@ rustc_binary("element_launcher_bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
   test_deps = [ "//third_party/rust_crates:futures" ]
 

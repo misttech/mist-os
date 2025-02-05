@@ -8,6 +8,7 @@
 import("//build/config/current_target_tuple.gni")
 import("//build/testing/boot_tests/zbi_test.gni")
 import("//build/toolchain/toolchain_environment.gni")
+import("//build/toolchain/variant.gni")
 import("//build/toolchain/zircon/clang.gni")
 import("//build/toolchain/zircon/zircon_toolchain_suite.gni")
 import("//zircon/kernel/phys/phys_executable.gni")
@@ -62,7 +63,7 @@ if (current_toolchain == default_toolchain) {
   } else if (toolchain_environment == "kernel.phys32") {
     # ... or here in the other phys environment.
 
-    config("phys32_config") {
+    variant("phys32_config") {
       configs = [
         "//zircon/kernel:standalone",
         "//zircon/kernel:warnings",
@@ -87,13 +88,11 @@ if (current_toolchain == default_toolchain) {
       # NOTE: This works because default_frame_pointers is listed in
       # remove_common_configs in the zircon_toolchain_suite() call above!
       configs += [ "//build/config:frame_pointers" ]
-    }
 
-    group("phys32_config_deps") {
-      public_deps = [ "//zircon/kernel/phys:phys_config_deps" ]
-    }
-    group("phys32_config_executable_deps") {
-      public_deps = [ "//zircon/kernel/phys:phys_config_executable_deps" ]
+      deps = [ "//zircon/kernel/phys:phys_config_deps" ]
+      executable_deps = [ "//zircon/kernel/phys:phys_config_executable_deps" ]
+      link_deps = [ "//zircon/kernel/phys:phys_config_link_deps" ]
+      source_deps = [ "//zircon/kernel/phys:phys_config_source_deps" ]
     }
 
     # phys32 code is 32-bit (i686) and loaded at a fixed address.
@@ -244,6 +243,7 @@ if (current_toolchain == default_toolchain) {
     public_deps = [
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",
+      "//zircon/kernel/phys/lib/boot-shim",
       "//zircon/system/ulib/uart",
     ]
 
@@ -286,14 +286,6 @@ if (current_toolchain == default_toolchain) {
     deps = [
       ":linuxboot-init",
       "//zircon/kernel/phys:raw-header",
-    ]
-  }
-
-  source_set("linuxboot.h") {
-    public = [ "linuxboot.h" ]
-    public_deps = [
-      # linuxboot.h has #include <lib/zircon-internal/e820.h>
-      "//zircon/system/ulib/zircon-internal:headers",
     ]
   }
 
@@ -383,6 +375,12 @@ if (current_toolchain == default_toolchain) {
     ]
   }
 
+  source_set("arch-physload") {
+    sources = [ "arch-physload.cc" ]
+    include_dirs = [ "//zircon/kernel/phys" ]
+    deps = [ "//zircon/kernel/phys:physload.header" ]
+  }
+
   source_set("arch-boot-zbi") {
     sources = [ "arch-boot-zbi.cc" ]
     deps = [
@@ -411,6 +409,14 @@ hwreg_asm_header("phys32.h") {
     "LIB_ARCH_PRINTERS",
   ]
   deps = [ "//zircon/kernel/lib/arch" ]
+}
+
+source_set("linuxboot.h") {
+  public = [ "linuxboot.h" ]
+  public_deps = [
+    # linuxboot.h has #include <lib/zircon-internal/e820.h>
+    "//zircon/system/ulib/zircon-internal:headers",
+  ]
 }
 
 hwreg_asm_header("linuxboot-asm") {

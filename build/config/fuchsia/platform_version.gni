@@ -26,12 +26,6 @@ platform_version = exec_script(python_exe_src,
                                _file_dependencies)
 
 declare_args() {
-  # If true, generate golden files for API level N+1, where N is
-  # max(platform_version.frozen_api_levels).
-  bump_api_level = false
-}
-
-declare_args() {
   # Overrides the set of API levels for which this build will provide build-time
   # support in the IDK/SDK. The default (`false`) set is all `supported` and
   # `in development` non-special API levels in //sdk/version_history.json.

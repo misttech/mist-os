@@ -8,9 +8,9 @@ use fidl_fuchsia_bluetooth::{ChannelMode, ChannelParameters};
 use fidl_fuchsia_bluetooth_bredr::*;
 use fuchsia_bluetooth::profile::{elem_to_profile_descriptor, psm_from_protocol, Psm};
 use fuchsia_bluetooth::types::Uuid;
+use log::info;
 use profile_client::ProfileClient;
 use std::fmt::Debug;
-use tracing::info;
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

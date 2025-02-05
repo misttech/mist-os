@@ -5,6 +5,7 @@
 #include "src/ui/lib/escher/vk/impl/pipeline_layout_cache.h"
 
 #include "src/ui/lib/escher/util/hasher.h"
+#include "src/ui/lib/escher/util/trace_macros.h"
 
 namespace escher {
 namespace impl {
@@ -24,7 +25,10 @@ const PipelineLayoutPtr& PipelineLayoutCache::ObtainPipelineLayout(const Pipelin
   return pair.first->layout;
 }
 
-void PipelineLayoutCache::BeginFrame() { layouts_.BeginFrame(); }
+void PipelineLayoutCache::BeginFrame() {
+  TRACE_DURATION("gfx", "escher::impl::PipelineLayoutCache::BeginFrame");
+  layouts_.BeginFrame();
+}
 
 }  // namespace impl
 }  // namespace escher

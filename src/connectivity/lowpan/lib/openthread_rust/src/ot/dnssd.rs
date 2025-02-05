@@ -269,10 +269,10 @@ pub trait Dnssd {
     /// Arguments:
     ///
     /// * `service_full_name`: Full service name (e.g.`_ipps._tcp.default.service.arpa.`)
-    ///                        Must end with `.`.
+    ///   Must end with `.`.
     /// * `addresses`: Reference to array of addresses for service.
     /// * `full_name`: Full instance name (e.g.`OpenThread._ipps._tcp.default.service.arpa.`).
-    ///                Must end with `.`.
+    ///   Must end with `.`.
     /// * `host_name`: Host name (e.g. `ot-host.default.service.arpa.`). Must end with `.`.
     /// * `port`: Service port.
     /// * `priority`: Service priority.

@@ -80,7 +80,7 @@ bool NestedTimedCriticalSectionTest() {
   EXPECT_EQ(0u, cs_state.depth);
   EXPECT_EQ(0u, cs_state.begin_ticks);
 
-  zx_ticks_t now = current_ticks();
+  zx_ticks_t now = current_mono_ticks();
 
   static constexpr const char kOuter[] = "NestedTimedCriticalSectionTest-outer";
   lockup_timed_begin(kOuter);

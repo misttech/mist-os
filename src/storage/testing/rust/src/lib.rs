@@ -5,12 +5,13 @@
 use anyhow::{anyhow, Context, Result};
 use fidl_fuchsia_device::ControllerProxy;
 use fidl_fuchsia_hardware_block_partition::{PartitionMarker, PartitionProxy};
-use fidl_fuchsia_io as fio;
+use fs_management::filesystem::BlockConnector;
 use fs_management::format::{detect_disk_format, DiskFormat};
-use fuchsia_component::client::connect_to_protocol_at_path;
+use fuchsia_component::client::{connect_to_protocol_at_path, ServiceInstanceStream};
 use fuchsia_fs::directory::{WatchEvent, Watcher};
 use futures::TryStreamExt;
 use std::path::{Path, PathBuf};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_storage_partitions as fpartitions};
 
 pub mod fvm;
 pub mod zxcrypt;
@@ -35,7 +36,7 @@ async fn partition_type_guid_matches(guid: &Guid, partition: &PartitionProxy) ->
     zx::ok(status).context("Failed to get type guid")?;
     let type_guid = if let Some(guid) = type_guid { guid } else { return Ok(false) };
     let matched = type_guid.value == *guid;
-    tracing::info!(matched, ?type_guid, target_guid=?guid, "matching type guid");
+    log::info!(matched, type_guid:?, target_guid:?=guid; "matching type guid");
     Ok(matched)
 }
 
@@ -45,7 +46,7 @@ async fn partition_instance_guid_matches(guid: &Guid, partition: &PartitionProxy
     zx::ok(status).context("Failed to get instance guid")?;
     let instance_guid = if let Some(guid) = instance_guid { guid } else { return Ok(false) };
     let matched = instance_guid.value == *guid;
-    tracing::info!(matched, ?instance_guid, target_guid=?guid, "matching instance guid");
+    log::info!(matched, instance_guid:?, target_guid:?=guid; "matching instance guid");
     Ok(matched)
 }
 
@@ -55,7 +56,7 @@ async fn partition_name_matches(name: &str, partition: &PartitionProxy) -> Resul
     zx::ok(status).context("Failed to get partition name")?;
     let partition_name = if let Some(name) = partition_name { name } else { return Ok(false) };
     let matched = partition_name == name;
-    tracing::info!(matched, partition_name, target_name = name, "matching name");
+    log::info!(matched, partition_name = partition_name.as_str(), target_name = name; "matching name");
     Ok(matched)
 }
 
@@ -91,9 +92,20 @@ impl BlockDeviceMatcher<'_> {
     }
 }
 
+async fn matches_all(partition: &PartitionProxy, matchers: &[BlockDeviceMatcher<'_>]) -> bool {
+    for matcher in matchers {
+        if !matcher.matches(partition).await.unwrap_or(false) {
+            return false;
+        }
+    }
+    true
+}
+
 /// Waits for a block device to appear in `/dev/class/block` that meets all of the requirements of
 /// `matchers`. Returns the path to the matched block device.
-pub async fn wait_for_block_device(matchers: &[BlockDeviceMatcher<'_>]) -> Result<PathBuf> {
+/// TODO(https://fxbug.dev/339491886): Remove when all clients are ported to
+/// `wait_for_block_device`.
+pub async fn wait_for_block_device_devfs(matchers: &[BlockDeviceMatcher<'_>]) -> Result<PathBuf> {
     const DEV_CLASS_BLOCK: &str = "/dev/class/block";
     assert!(!matchers.is_empty());
     let block_dev_dir =
@@ -108,23 +120,34 @@ pub async fn wait_for_block_device(matchers: &[BlockDeviceMatcher<'_>]) -> Resul
         }
         let path = Path::new(DEV_CLASS_BLOCK).join(msg.filename);
         let partition = connect_to_protocol_at_path::<PartitionMarker>(path.to_str().unwrap())?;
-        let mut matches = true;
-        for matcher in matchers {
-            if !matcher.matches(&partition).await.unwrap_or(false) {
-                matches = false;
-                break;
-            }
-        }
-        if matches {
+        if matches_all(&partition, matchers).await {
             return Ok(path);
         }
     }
     Err(anyhow!("Failed to wait for block device"))
 }
 
+/// Waits for the first partition service instance that meets all of the requirements of `matchers`.
+/// Returns the path to the matched block device.
+/// TODO(https://fxbug.dev/339491886): Remove when all clients are ported to
+/// `wait_for_block_device_devfs.
+pub async fn wait_for_block_device(
+    matchers: &[BlockDeviceMatcher<'_>],
+    mut stream: ServiceInstanceStream<fpartitions::PartitionServiceMarker>,
+) -> Result<fpartitions::PartitionServiceProxy> {
+    while let Some(proxy) = stream.try_next().await? {
+        let partition = proxy.connect_partition()?.into_proxy();
+        if matches_all(&partition, matchers).await {
+            return Ok(proxy);
+        }
+    }
+    unreachable!()
+}
+
 /// Looks for a block device already in `/dev/class/block` that meets all of the requirements of
 /// `matchers`. Returns the path to the matched block device.
-pub async fn find_block_device(matchers: &[BlockDeviceMatcher<'_>]) -> Result<PathBuf> {
+/// TODO(https://fxbug.dev/339491886): Remove when all clients are ported to `find_block_device`.
+pub async fn find_block_device_devfs(matchers: &[BlockDeviceMatcher<'_>]) -> Result<PathBuf> {
     const DEV_CLASS_BLOCK: &str = "/dev/class/block";
     assert!(!matchers.is_empty());
     let block_dev_dir =
@@ -134,28 +157,31 @@ pub async fn find_block_device(matchers: &[BlockDeviceMatcher<'_>]) -> Result<Pa
         .context("Failed to readdir /dev/class/block")?;
     for entry in entries {
         let path = Path::new(DEV_CLASS_BLOCK).join(entry.name);
-        tracing::info!(?path, "checking device");
         let partition = connect_to_protocol_at_path::<PartitionMarker>(path.to_str().unwrap())?;
-        let mut matches = true;
-        for matcher in matchers {
-            let this_matches = match matcher.matches(&partition).await {
-                Ok(this_matches) => this_matches,
-                Err(error) => {
-                    tracing::warn!(?error, ?matcher, "matcher returned an error");
-                    false
-                }
-            };
-            if !this_matches {
-                matches = false;
-                break;
-            }
-        }
-        if matches {
-            tracing::info!(?path, "found match");
+        if matches_all(&partition, matchers).await {
             return Ok(path);
         }
     }
     Err(anyhow!("Failed to find matching block device"))
+}
+
+/// Returns the first partition in `partitions` matching all of `matchers.`  Ok(None) indicates no
+/// partitions matched.
+pub async fn find_block_device<C, Iter>(
+    matchers: &[BlockDeviceMatcher<'_>],
+    partitions: Iter,
+) -> Result<Option<C>>
+where
+    C: BlockConnector,
+    Iter: Iterator<Item = C>,
+{
+    for connector in partitions {
+        let partition = connector.connect_partition()?.into_proxy();
+        if matches_all(&partition, matchers).await {
+            return Ok(Some(connector));
+        }
+    }
+    Ok(None)
 }
 
 #[cfg(test)]
@@ -175,6 +201,52 @@ mod tests {
         0xf0,
     ];
     const VOLUME_NAME: &str = "volume-name";
+
+    #[fuchsia::test]
+    async fn wait_for_block_device_devfs_with_all_match_criteria() {
+        let ramdisk = RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT).await.unwrap();
+        let fvm = fvm::set_up_fvm(
+            ramdisk.as_controller().expect("invalid controller"),
+            ramdisk.as_dir().expect("invalid directory proxy"),
+            FVM_SLICE_SIZE,
+        )
+        .await
+        .expect("Failed to format ramdisk with FVM");
+        fvm::create_fvm_volume(
+            &fvm,
+            VOLUME_NAME,
+            &TYPE_GUID,
+            &INSTANCE_GUID,
+            None,
+            ALLOCATE_PARTITION_FLAG_INACTIVE,
+        )
+        .await
+        .expect("Failed to create fvm volume");
+
+        wait_for_block_device_devfs(&[
+            BlockDeviceMatcher::TypeGuid(&TYPE_GUID),
+            BlockDeviceMatcher::InstanceGuid(&INSTANCE_GUID),
+            BlockDeviceMatcher::Name(VOLUME_NAME),
+        ])
+        .await
+        .expect("Failed to find block device");
+
+        find_block_device_devfs(&[
+            BlockDeviceMatcher::TypeGuid(&TYPE_GUID),
+            BlockDeviceMatcher::InstanceGuid(&INSTANCE_GUID),
+            BlockDeviceMatcher::Name(VOLUME_NAME),
+        ])
+        .await
+        .expect("Failed to find block device");
+
+        find_block_device_devfs(&[
+            BlockDeviceMatcher::TypeGuid(&TYPE_GUID),
+            BlockDeviceMatcher::InstanceGuid(&INSTANCE_GUID),
+            BlockDeviceMatcher::Name("something else"),
+        ])
+        .await
+        .expect_err("Unexpected match for block device");
+    }
 
     #[fuchsia::test]
     async fn wait_for_block_device_with_all_match_criteria() {
@@ -197,7 +269,7 @@ mod tests {
         .await
         .expect("Failed to create fvm volume");
 
-        wait_for_block_device(&[
+        wait_for_block_device_devfs(&[
             BlockDeviceMatcher::TypeGuid(&TYPE_GUID),
             BlockDeviceMatcher::InstanceGuid(&INSTANCE_GUID),
             BlockDeviceMatcher::Name(VOLUME_NAME),
@@ -205,7 +277,7 @@ mod tests {
         .await
         .expect("Failed to find block device");
 
-        find_block_device(&[
+        find_block_device_devfs(&[
             BlockDeviceMatcher::TypeGuid(&TYPE_GUID),
             BlockDeviceMatcher::InstanceGuid(&INSTANCE_GUID),
             BlockDeviceMatcher::Name(VOLUME_NAME),
@@ -213,7 +285,7 @@ mod tests {
         .await
         .expect("Failed to find block device");
 
-        find_block_device(&[
+        find_block_device_devfs(&[
             BlockDeviceMatcher::TypeGuid(&TYPE_GUID),
             BlockDeviceMatcher::InstanceGuid(&INSTANCE_GUID),
             BlockDeviceMatcher::Name("something else"),

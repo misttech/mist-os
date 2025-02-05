@@ -227,12 +227,13 @@ void Ramdisk::OnRequests(const block_server::Session& session,
         }
       } break;
       case block_server::Operation::Tag::Trim:
-        session.SendReply(request.request_id, zx::error(ZX_ERR_NOT_SUPPORTED));
+        session.SendReply(request.request_id, request.trace_flow_id,
+                          zx::error(ZX_ERR_NOT_SUPPORTED));
         break;
       case block_server::Operation::Tag::CloseVmo:
         ZX_PANIC("Unexpected operation");
     }
-    session.SendReply(request.request_id, zx::make_result(status));
+    session.SendReply(request.request_id, request.trace_flow_id, zx::make_result(status));
   }
 }
 

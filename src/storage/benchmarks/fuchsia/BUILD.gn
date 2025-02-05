@@ -11,7 +11,7 @@ import("//src/storage/testing/driver_test_realm.gni")
 rustc_library("framework") {
   testonly = true
   edition = "2021"
-  name = "fuchsia_storage_benchmarks_lib"
+  name = "fuchsia_storage_benchmarks"
   sources = [
     "src/block_devices.rs",
     "src/filesystems/blobfs.rs",
@@ -24,23 +24,29 @@ rustc_library("framework") {
     "src/filesystems/pkgdir.rs",
     "src/filesystems/testing.rs",
     "src/lib.rs",
+    "src/testing.rs",
   ]
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
+    "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_rust",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.storage.partitions:fuchsia.storage.partitions_rust",
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_rust",
     "//sdk/rust/zx",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",
     "//src/storage/benchmarks:framework",
     "//src/storage/benchmarks/fuchsia/pkgdir-component/fidl/test.pkgdir:test.pkgdir_rust",
+    "//src/storage/crypt/policy",
+    "//src/storage/crypt/zxcrypt",
     "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/lib/blob_writer:blob-writer",
@@ -52,8 +58,16 @@ rustc_library("framework") {
     "//src/sys/pkg/lib/fuchsia-merkle",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
+  test_deps = [
+    "//src/lib/fuchsia",
+    "//src/storage/gpt/rust",
+    "//src/storage/lib/block_client/rust:block-client",
+    "//src/storage/lib/block_server:fake_block_server",
+    "//src/sys/test_runners:tmp_storage",
+  ]
+  with_unit_tests = true
 }
 
 rustc_binary("fuchsia-storage-benchmarks") {
@@ -68,6 +82,7 @@ rustc_binary("fuchsia-storage-benchmarks") {
   ]
   deps = [
     ":framework",
+    ":fuchsia-storage-benchmarks-config",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/rust/zx",
     "//src/lib/fuchsia",
@@ -84,21 +99,27 @@ rustc_binary("fuchsia-storage-benchmarks") {
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:rand_xorshift",
     "//third_party/rust_crates:regex",
-    "//third_party/rust_crates:tracing",
   ]
-  test_deps = [
-    "//src/lib/fuchsia-runtime",
-    "//src/lib/test_util",
-    "//src/sys/test_runners:tmp_storage",
-  ]
-  with_unit_tests = true
+
+  # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
+  exclude_toolchain_tags = [ "profile" ]
+}
+
+fuchsia_component_manifest("fuchsia-storage-benchmarks-component-manifest") {
+  component_name = "storage-benchmarks"
+  manifest = "meta/storage-benchmarks.cml"
+}
+
+fuchsia_structured_config_rust_lib("fuchsia-storage-benchmarks-config") {
+  name = "fuchsia_storage_benchmarks_config"
+  cm_label = ":fuchsia-storage-benchmarks-component-manifest"
 }
 
 fuchsia_test_component("fuchsia-storage-benchmarks-component") {
   component_name = "storage-benchmarks"
-  manifest = "meta/storage-benchmarks.cml"
+  cm_label = ":fuchsia-storage-benchmarks-component-manifest"
   deps = [ ":fuchsia-storage-benchmarks" ]
-  test_type = "device"
+  test_type = "storage"
 }
 
 fuchsia_test_package("storage-benchmarks") {
@@ -114,6 +135,7 @@ fuchsia_test_package("storage-benchmarks") {
     "//src/storage/blobfs/bin:blobfs-component",
     "//src/storage/crypt/fxfs",
     "//src/storage/f2fs/bin:f2fs-component",
+    "//src/storage/fvm:fvm-component",
     "//src/storage/fxfs:fxfs_component",
     "//src/storage/memfs:memfs_component",
     "//src/storage/minfs/bin:minfs-component",
@@ -122,9 +144,8 @@ fuchsia_test_package("storage-benchmarks") {
 
 storage_driver_test_realm_v2_component(
     "fuchsia-storage-benchmarks-tests-component") {
-  component_name = "fuchsia-storage-benchmarks-tests"
   manifest = "meta/fuchsia-storage-benchmarks-tests.cml"
-  deps = [ ":fuchsia-storage-benchmarks_test" ]
+  deps = [ ":framework_test" ]
 }
 
 fuchsia_test_package("fuchsia-storage-benchmarks-tests") {
@@ -152,7 +173,7 @@ fuchsia_component_perf_test("storage_benchmarks") {
   expected_metric_names_filepath =
       "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.storage.txt"
   results_path_test_arg = "--output-fuchsiaperf"
-  test_type = "device"
+  test_type = "storage"
 
   # We don't enable this test on Astro because of the potential for it to cause extra flash wear
   # on that device type.

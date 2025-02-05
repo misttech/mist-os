@@ -23,13 +23,13 @@ use fidl_fuchsia_io::{self as fio, DirectoryProxy, DirentType};
 use fuchsia_fs::directory as ffs_dir;
 use futures::stream::{FuturesUnordered, StreamExt};
 use futures::{Future, TryFutureExt, TryStreamExt};
+use log::{debug, error, warn};
 use moniker::Moniker;
 use routing::capability_source::CapabilitySource;
 use routing::component_instance::ComponentInstanceInterface;
 use routing::RouteRequest;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tracing::{debug, error, warn};
 use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync};
 
 #[derive(Debug, PartialEq)]
@@ -221,9 +221,9 @@ impl StorageAdmin {
                                     iterator,
                                     backing_dir_source_info.clone(),
                                 )
-                                .unwrap_or_else(|error| {
-                                    warn!(?error, "Error serving storage iterator")
-                                }),
+                                .unwrap_or_else(
+                                    |error| warn!(error:?; "Error serving storage iterator"),
+                                ),
                             )
                             .detach();
                             responder.send(Ok(()))?;
@@ -264,7 +264,7 @@ impl StorageAdmin {
                     let response = match parsed_moniker {
                         Err(error) => {
                             warn!(
-                                ?error,
+                                error:?;
                                 "couldn't parse string as moniker for storage admin protocol"
                             );
                             Err(fcomponent::Error::InvalidArguments)

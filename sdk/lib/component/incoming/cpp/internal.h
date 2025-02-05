@@ -19,9 +19,19 @@ namespace component::internal {
 // Implementation of |component::Connect| that delegates to |fdio_service_connect|.
 zx::result<> ConnectRaw(zx::channel server_end, std::string_view path);
 
-// Implementation of |component::ConnectAt| for a service directory.
+// Implementation of |component::ConnectAt| for a service directory that delegates to
+// |fdio_service_connect_at|.
 zx::result<> ConnectAtRaw(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir,
                           zx::channel server_end, std::string_view protocol_name);
+
+// Implementation of |component::OpenDirectory| that delegates to |fdio_open3|.
+zx::result<fidl::ClientEnd<fuchsia_io::Directory>> OpenDirectory(std::string_view path,
+                                                                 fuchsia_io::wire::Flags flags);
+
+// Implementation of |component::OpenDirectoryAt| that delegates to |fdio_open3_at|.
+zx::result<fidl::ClientEnd<fuchsia_io::Directory>> OpenDirectoryAt(
+    fidl::UnownedClientEnd<fuchsia_io::Directory> dir, std::string_view path,
+    fuchsia_io::wire::Flags flags);
 
 // Implementation of |component::Clone| for |fuchsia.unknown/Cloneable|.
 zx::result<> CloneRaw(fidl::UnownedClientEnd<fuchsia_unknown::Cloneable>&& cloneable,
@@ -61,7 +71,7 @@ zx::result<fidl::ClientEnd<fuchsia_io::Directory>> GetGlobalServiceDirectory();
 // Determines if |Protocol| contains the |fuchsia.unknown/Cloneable.Clone2| method.
 template <typename Protocol, typename = void>
 struct has_fidl_method_fuchsia_unknown_clone : public ::std::false_type {};
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
 template <typename Protocol>
 struct has_fidl_method_fuchsia_unknown_clone<
     Protocol, std::void_t<decltype(fidl::WireRequest<typename Protocol::Clone>{

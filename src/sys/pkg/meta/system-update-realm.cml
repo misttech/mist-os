@@ -12,16 +12,18 @@
             on_terminate: "reboot",
         },
     ],
+    capabilities: [
+        {
+            config: "fuchsia.system-update-committer.StopOnIdleTimeoutMillis",
+            type: "int64",
+            value: 5000,
+        },
+    ],
     offer: [
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "all",
-        },
-        {
-            protocol: "fuchsia.inspect.InspectSink",
-            from: "parent",
-            to: "all",
+            config: "fuchsia.system-update-committer.StopOnIdleTimeoutMillis",
+            from: "self",
+            to: "#system-update-committer",
         },
         {
             protocol: [
@@ -30,6 +32,11 @@
                 "fuchsia.update.verify.BlobfsVerifier",
                 "fuchsia.update.verify.NetstackVerifier",
             ],
+            from: "parent",
+            to: "#system-update-committer",
+        },
+        {
+            dictionary: "diagnostics",
             from: "parent",
             to: "#system-update-committer",
         },

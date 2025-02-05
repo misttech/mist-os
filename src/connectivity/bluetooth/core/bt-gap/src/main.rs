@@ -20,8 +20,8 @@ use fuchsia_component::server::ServiceFs;
 use futures::channel::mpsc;
 use futures::future::BoxFuture;
 use futures::{try_join, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
+use log::{error, info, warn};
 use std::collections::HashMap;
-use tracing::{error, info, warn};
 
 use crate::generic_access_service::GenericAccessService;
 use crate::host_dispatcher::HostService::*;

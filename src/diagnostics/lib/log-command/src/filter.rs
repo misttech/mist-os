@@ -107,7 +107,7 @@ impl From<LogCommand> for LogFilterCriteria {
             exclude_tags: cmd.exclude_tags,
             pid: cmd.pid,
             tid: cmd.tid,
-            interest_selectors: cmd.set_severity,
+            interest_selectors: cmd.set_severity.into_iter().flatten().collect(),
         }
     }
 }
@@ -151,12 +151,12 @@ impl LogFilterCriteria {
     /// message, moniker, or component URL.
     fn matches_filter_string(filter_string: &str, message: &str, log: &LogsData) -> bool {
         message.contains(filter_string)
-            || log.file_path().map_or(false, |s| s.contains(filter_string))
-            || log.metadata.component_url.as_ref().map_or(false, |s| s.contains(filter_string))
+            || log.file_path().is_some_and(|s| s.contains(filter_string))
+            || log.metadata.component_url.as_ref().is_some_and(|s| s.contains(filter_string))
             || log.moniker.to_string().contains(filter_string)
     }
 
-    // TODO(b/303315896): If/when debuglog is strutured remove this.
+    // TODO(b/303315896): If/when debuglog is structured remove this.
     fn parse_tags(value: &str) -> Vec<&str> {
         let mut tags = Vec::new();
         let mut current = value;
@@ -243,8 +243,7 @@ impl LogFilterCriteria {
         if !self.tags.is_empty()
             && !self.tags.iter().any(|query_tag| {
                 let has_tag = data.tags().map(|t| t.contains(query_tag)).unwrap_or(false);
-                let moniker_has_tag = data.tags().map(|tags| tags.is_empty()).unwrap_or(true)
-                    && moniker_contains_in_last_segment(&data.moniker, query_tag);
+                let moniker_has_tag = moniker_contains_in_last_segment(&data.moniker, query_tag);
                 has_tag || moniker_has_tag
             })
         {
@@ -254,7 +253,11 @@ impl LogFilterCriteria {
             return false;
         }
 
-        if self.exclude_tags.iter().any(|f| data.tags().map(|t| t.contains(f)).unwrap_or(false)) {
+        if self.exclude_tags.iter().any(|excluded_tag| {
+            let has_tag = data.tags().map(|tag| tag.contains(excluded_tag)).unwrap_or(false);
+            let moniker_has_tag = moniker_contains_in_last_segment(&data.moniker, excluded_tag);
+            has_tag || moniker_has_tag
+        }) {
             return false;
         }
 
@@ -281,6 +284,7 @@ mod test {
     use selectors::parse_log_interest_selector;
     use std::time::Duration;
 
+    use crate::log_socket_stream::OneOrMany;
     use crate::{DumpCommand, LogSubCommand};
 
     use super::*;
@@ -303,6 +307,46 @@ mod test {
             timestamp: Timestamp::from_nanos(default_ts().as_nanos() as i64),
             data: log_data,
         }
+    }
+
+    #[fuchsia::test]
+    async fn test_criteria_tag_filter_filters_moniker() {
+        let cmd = LogCommand { tag: vec!["testcomponent".to_string()], ..empty_dump_command() };
+        let criteria = LogFilterCriteria::from(cmd);
+
+        assert!(criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp: Timestamp::from_nanos(0),
+                component_url: Some("".into()),
+                moniker: "my/testcomponent".try_into().unwrap(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("included")
+            .add_tag("tag1")
+            .add_tag("tag2")
+            .build()
+            .into()
+        )));
+    }
+
+    #[fuchsia::test]
+    async fn test_criteria_exclude_tag_filters_moniker() {
+        let cmd =
+            LogCommand { exclude_tags: vec!["testcomponent".to_string()], ..empty_dump_command() };
+        let criteria = LogFilterCriteria::from(cmd);
+        assert!(!criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp: Timestamp::from_nanos(0),
+                component_url: Some("".into()),
+                moniker: "my/testcomponent".try_into().unwrap(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("excluded")
+            .add_tag("tag1")
+            .add_tag("tag2")
+            .build()
+            .into()
+        )));
     }
 
     #[fuchsia::test]
@@ -359,7 +403,9 @@ mod test {
     async fn test_per_component_severity() {
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            set_severity: vec![parse_log_interest_selector("test_selector#DEBUG").unwrap()],
+            set_severity: vec![OneOrMany::One(
+                parse_log_interest_selector("test_selector#DEBUG").unwrap(),
+            )],
             ..LogCommand::default()
         };
         let expectations = [
@@ -398,9 +444,9 @@ mod test {
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             set_severity: vec![
-                parse_log_interest_selector("test_selector#INFO").unwrap(),
-                parse_log_interest_selector("test_selector#TRACE").unwrap(),
-                parse_log_interest_selector("test_selector#DEBUG").unwrap(),
+                OneOrMany::One(parse_log_interest_selector("test_selector#INFO").unwrap()),
+                OneOrMany::One(parse_log_interest_selector("test_selector#TRACE").unwrap()),
+                OneOrMany::One(parse_log_interest_selector("test_selector#DEBUG").unwrap()),
             ],
             ..LogCommand::default()
         };

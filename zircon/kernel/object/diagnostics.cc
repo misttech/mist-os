@@ -226,8 +226,7 @@ void DumpPeerInfo(zx_obj_type_t type, const Dispatcher* disp) {
     }
     case ZX_OBJ_TYPE_SOCKET: {
       auto sock = DownCastDispatcher<const SocketDispatcher>(disp);
-      zx_info_socket_t sock_info = {};
-      sock->GetInfo(&sock_info);
+      const zx_info_socket_t sock_info = sock->GetInfo();
       const uint32_t flags = sock_info.options;
 
       const char* sock_type = (flags & ZX_SOCKET_STREAM) ? "stream\0" : "datagram\0";

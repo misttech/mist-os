@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/service/test/cpp/fidl_test_base.h>
+#include <fidl/fidl.service.test/cpp/fidl.h>
+#include <fidl/fidl.service.test/cpp/wire_test_base.h>
 #include <lib/async/dispatcher.h>
+#include <lib/component/tests/echo_server.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fidl/cpp/string.h>
 #include <lib/fit/function.h>
@@ -22,33 +24,32 @@ namespace {
 
 using namespace component_testing;
 
-class LocalEchoServer : public fidl::service::test::testing::Echo_TestBase,
-                        public LocalComponentImpl {
+class LocalEchoServer : public LocalCppComponent {
  public:
-  explicit LocalEchoServer(async_dispatcher_t* dispatcher, bool* called)
+  explicit LocalEchoServer(async_dispatcher_t* dispatcher, unsigned int* called)
       : dispatcher_(dispatcher), called_(called) {}
 
   void OnStart() override {
-    ASSERT_EQ(outgoing()->AddPublicService(bindings_.GetHandler(this, dispatcher_)), ZX_OK);
-    sys::ServiceHandler handler;
-    fidl::service::test::EchoService::Handler echo_server(&handler);
-    ASSERT_EQ(echo_server.add_foo(bindings_.GetHandler(this, dispatcher_)), ZX_OK);
-    ASSERT_EQ(outgoing()->AddService<fidl::service::test::EchoService>(std::move(handler)), ZX_OK);
+    servers_.emplace("default", dispatcher_, called_);
+    ASSERT_EQ(outgoing()
+                  ->AddUnmanagedProtocol<fidl_service_test::Echo>(servers_.back().CreateHandler())
+                  .status_value(),
+              ZX_OK);
+    {
+      servers_.emplace("default", dispatcher_, called_);
+      auto result = outgoing()->AddService<fidl_service_test::EchoService>(
+          fidl_service_test::EchoService::InstanceHandler({
+              .foo = servers_.back().CreateHandler(),
+              .bar = servers_.back().CreateHandler(),
+          }));
+      ASSERT_EQ(result.status_value(), ZX_OK);
+    }
   }
-
-  void EchoString(::fidl::StringPtr value, EchoStringCallback callback) override {
-    callback(std::move(value));
-    *called_ = true;
-  }
-
-  bool WasCalled() const { return *called_; }
-
-  void NotImplemented_(const std::string& name) override {}
 
  private:
   async_dispatcher_t* dispatcher_;
-  bool* called_;
-  fidl::BindingSet<fidl::service::test::Echo> bindings_;
+  unsigned int* called_;
+  std::queue<EchoCommon> servers_;
 };
 
 class IncomingTest : public gtest::RealLoopFixture {};
@@ -58,12 +59,12 @@ TEST_F(IncomingTest, ConnectsToProtocolInNamespace) {
 
   realm_builder.AddChild("echo_client", "#meta/echo_client.cm",
                          ChildOptions{.startup_mode = StartupMode::EAGER});
-  bool called = false;
+  unsigned int called = 0;
   realm_builder.AddLocalChild("echo_server", [dispatcher = dispatcher(), called_ptr = &called]() {
     return std::make_unique<LocalEchoServer>(dispatcher, called_ptr);
   });
   realm_builder.AddRoute(Route{
-      .capabilities = {Protocol{fidl::service::test::Echo::Name_}},
+      .capabilities = {Protocol{fidl::DiscoverableProtocolName<fidl_service_test::Echo>}},
       .source = ChildRef{"echo_server"},
       .targets = {ChildRef{"echo_client"}},
   });
@@ -75,7 +76,7 @@ TEST_F(IncomingTest, ConnectsToProtocolInNamespace) {
     RunLoopUntil([&]() { return complete; });
   });
 
-  RunLoopUntil([&called]() { return called; });
+  RunLoopUntil([&called]() { return called > 0; });
 }
 
 TEST_F(IncomingTest, ConnectsToServiceInNamespace) {
@@ -83,12 +84,12 @@ TEST_F(IncomingTest, ConnectsToServiceInNamespace) {
 
   realm_builder.AddChild("echo_client", "#meta/echo_service_client.cm",
                          ChildOptions{.startup_mode = StartupMode::EAGER});
-  bool called = false;
+  unsigned int called = 0;
   realm_builder.AddLocalChild("echo_server", [dispatcher = dispatcher(), called_ptr = &called]() {
     return std::make_unique<LocalEchoServer>(dispatcher, called_ptr);
   });
   realm_builder.AddRoute(Route{
-      .capabilities = {Service{fidl::service::test::EchoService::Name}},
+      .capabilities = {Service{fidl_service_test::EchoService::Name}},
       .source = ChildRef{"echo_server"},
       .targets = {ChildRef{"echo_client"}},
   });
@@ -100,7 +101,7 @@ TEST_F(IncomingTest, ConnectsToServiceInNamespace) {
     RunLoopUntil([&]() { return complete; });
   });
 
-  RunLoopUntil([&called]() { return called; });
+  RunLoopUntil([&called]() { return called > 0; });
 }
 
 }  // namespace

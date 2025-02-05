@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
 use crate::PublishOptions;
-use diagnostics_log_encoding::RawSeverity;
 use diagnostics_log_types::Severity;
 use fidl_fuchsia_diagnostics::Interest;
 use fidl_fuchsia_logger::{LogSinkMarker, LogSinkProxy};
@@ -12,13 +11,6 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
-use tracing::span::{Attributes, Id, Record};
-use tracing::subscriber::Subscriber;
-use tracing::{Event, Metadata};
-use tracing_core::span::Current;
-use tracing_subscriber::layer::Layered;
-use tracing_subscriber::prelude::*;
-use tracing_subscriber::registry::Registry;
 
 mod filter;
 mod sink;
@@ -29,7 +21,7 @@ use sink::{Sink, SinkConfig};
 pub use diagnostics_log_encoding::encode::TestRecord;
 pub use diagnostics_log_encoding::Metatag;
 pub use paste::paste;
-pub use sink::TracingEvent;
+pub use sink::LogEvent;
 
 #[cfg(test)]
 use std::{
@@ -108,6 +100,15 @@ macro_rules! publisher_options {
                     $self
                 }
 
+                /// Whether or not to log file/line information regardless of severity.
+                ///
+                /// Default: false.
+                pub fn log_file_line_info(mut $self, enable: bool) -> Self {
+                    let this = &mut $self$(.$self_arg)*;
+                    this.always_log_file_line = enable;
+                    $self
+                }
+
                 /// When set, a `fuchsia_async::Task` will be spawned and held that will be
                 /// listening for interest changes.
                 ///
@@ -145,8 +146,7 @@ publisher_options!((PublisherOptions, self,), (PublishOptions, self, publisher))
 
 fn initialize_publishing(opts: PublishOptions<'_>) -> Result<Publisher, PublishError> {
     let publisher = Publisher::new(opts.publisher)?;
-    let publisher_clone = Publisher { inner: publisher.inner.clone() };
-    log::set_boxed_logger(Box::new(publisher_clone))?;
+    log::set_boxed_logger(Box::new(publisher.clone()))?;
     if opts.install_panic_hook {
         crate::install_panic_hook(opts.panic_prefix);
     }
@@ -160,8 +160,7 @@ fn initialize_publishing(opts: PublishOptions<'_>) -> Result<Publisher, PublishE
 /// otherwise it'll return errors or panic. Therefore it's recommended to never
 /// call this from libraries and only do it from binaries.
 pub fn initialize(opts: PublishOptions<'_>) -> Result<(), PublishError> {
-    let publisher = initialize_publishing(opts)?;
-    tracing::subscriber::set_global_default(publisher)?;
+    let _ = initialize_publishing(opts)?;
     Ok(())
 }
 
@@ -169,10 +168,7 @@ pub fn initialize(opts: PublishOptions<'_>) -> Result<(), PublishError> {
 /// IMPORTANT: this function can panic if `initialize` wasn't called before.
 pub fn set_minimum_severity(severity: impl Into<Severity>) {
     let severity: Severity = severity.into();
-    tracing::dispatcher::get_default(move |dispatcher| {
-        let publisher: &Publisher = dispatcher.downcast_ref().unwrap();
-        publisher.inner.filter.set_minimum_severity(severity);
-    });
+    log::set_max_level(severity.into());
 }
 
 struct AbortAndJoinOnDrop(
@@ -246,7 +242,6 @@ pub fn initialize_sync(opts: PublishOptions<'_>) -> impl Drop {
         }
 
         let interest_listening_task = publisher.take_interest_listening_task();
-        tracing::subscriber::set_global_default(publisher).expect("set global tracing subscriber");
 
         if let Some(on_interest_changes) = interest_listening_task {
             let (on_interest_changes, cancel_interest) =
@@ -263,14 +258,15 @@ pub fn initialize_sync(opts: PublishOptions<'_>) -> impl Drop {
     AbortAndJoinOnDrop(recv.recv().ok(), Some(bg_thread))
 }
 
-/// A `Publisher` acts as broker, implementing [`tracing::Subscriber`] to receive diagnostic
+/// A `Publisher` acts as broker, implementing [`log::Log`] to receive log
 /// events from a component, and then forwarding that data on to a diagnostics service.
+#[derive(Clone)]
 pub struct Publisher {
     inner: Arc<InnerPublisher>,
 }
 
 struct InnerPublisher {
-    sink: Layered<Sink, Registry>,
+    sink: Sink,
     filter: InterestFilter,
     interest_listening_task: Mutex<Option<fasync::Task<()>>>,
 }
@@ -308,7 +304,6 @@ impl Publisher {
         } else {
             Mutex::new(None)
         };
-        let sink = Registry::default().with(sink);
         Ok(Self { inner: Arc::new(InnerPublisher { sink, filter, interest_listening_task }) })
     }
 
@@ -316,7 +311,7 @@ impl Publisher {
     /// Publish the provided event for testing.
     pub fn event_for_testing(&self, record: TestRecord<'_>) {
         if self.inner.filter.enabled_for_testing(&record) {
-            self.inner.sink.downcast_ref::<Sink>().unwrap().event_for_testing(record);
+            self.inner.sink.event_for_testing(record);
         }
     }
 
@@ -335,57 +330,17 @@ impl Publisher {
 }
 
 impl log::Log for Publisher {
-    fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
-        self.inner.filter.enabled(metadata.severity())
+    fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
+        // NOTE: we handle minimum severity directly through the log max_level. So we call,
+        // log::set_max_level, log::max_level where appropriate.
+        true
     }
 
     fn log(&self, record: &log::Record<'_>) {
-        if log::Log::enabled(&self, record.metadata()) {
-            self.inner.sink.downcast_ref::<Sink>().unwrap().record_log(record);
-        }
+        self.inner.sink.record_log(record);
     }
 
     fn flush(&self) {}
-}
-
-impl Subscriber for Publisher {
-    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
-        self.inner.filter.enabled(metadata.severity())
-    }
-    fn new_span(&self, span: &Attributes<'_>) -> Id {
-        self.inner.sink.new_span(span)
-    }
-    fn record(&self, span: &Id, values: &Record<'_>) {
-        self.inner.sink.record(span, values)
-    }
-    fn record_follows_from(&self, span: &Id, follows: &Id) {
-        self.inner.sink.record_follows_from(span, follows)
-    }
-    fn event(&self, event: &Event<'_>) {
-        self.inner.sink.event(event)
-    }
-    fn enter(&self, span: &Id) {
-        self.inner.sink.enter(span)
-    }
-    fn exit(&self, span: &Id) {
-        self.inner.sink.exit(span)
-    }
-    fn register_callsite(
-        &self,
-        _metadata: &'static Metadata<'static>,
-    ) -> tracing::subscriber::Interest {
-        // Allows for dynamic severity
-        tracing::subscriber::Interest::sometimes()
-    }
-    fn clone_span(&self, id: &Id) -> Id {
-        self.inner.sink.clone_span(id)
-    }
-    fn try_close(&self, id: Id) -> bool {
-        self.inner.sink.try_close(id)
-    }
-    fn current_span(&self) -> Current {
-        self.inner.sink.current_span()
-    }
 }
 
 /// Errors arising while forwarding a diagnostics stream to the environment.
@@ -402,10 +357,6 @@ pub enum PublishError {
     /// An issue with the LogSink channel or socket prevented us from sending it to the `LogSink`.
     #[error("failed to send a socket to the LogSink")]
     SendSocket(#[source] fidl::Error),
-
-    /// Setting the default global [`tracing::Subscriber`] failed.
-    #[error("failed to install forwarder as the global default")]
-    SetGlobalDefault(#[from] tracing::subscriber::SetGlobalDefaultError),
 
     /// Installing a Logger.
     #[error("failed to install the loger")]
@@ -446,44 +397,9 @@ macro_rules! log_every_n_seconds {
         static LAST_LOG_TIMESTAMP: AtomicI64 = AtomicI64::new(0);
         if now - LAST_LOG_TIMESTAMP.load(Ordering::Acquire) >= Duration::from_secs($seconds).as_nanos() as i64 {
             paste! {
-                tracing::[< $severity:lower >]!($($arg)*);
+                log::[< $severity:lower >]!($($arg)*);
             }
             LAST_LOG_TIMESTAMP.store(now, Ordering::Release);
-        }
-    }
-}
-
-/// A type which has a `Severity`.
-pub trait SeverityExt {
-    /// Return the severity of this value.
-    fn severity(&self) -> Severity;
-
-    /// Return the raw severity of this value.
-    fn raw_severity(&self) -> RawSeverity {
-        self.severity() as u8
-    }
-}
-
-impl SeverityExt for log::Metadata<'_> {
-    fn severity(&self) -> Severity {
-        match self.level() {
-            log::Level::Error => Severity::Error,
-            log::Level::Warn => Severity::Warn,
-            log::Level::Info => Severity::Info,
-            log::Level::Debug => Severity::Debug,
-            log::Level::Trace => Severity::Trace,
-        }
-    }
-}
-
-impl SeverityExt for Metadata<'_> {
-    fn severity(&self) -> Severity {
-        match *self.level() {
-            tracing::Level::ERROR => Severity::Error,
-            tracing::Level::WARN => Severity::Warn,
-            tracing::Level::INFO => Severity::Info,
-            tracing::Level::DEBUG => Severity::Debug,
-            tracing::Level::TRACE => Severity::Trace,
         }
     }
 }
@@ -493,8 +409,7 @@ mod tests {
     use super::*;
     use diagnostics_reader::{ArchiveReader, Logs};
     use futures::{future, StreamExt};
-    use itertools::Itertools;
-    use tracing::{debug, info, info_span};
+    use log::{debug, info};
 
     #[fuchsia::test(logging = false)]
     async fn verify_setting_minimum_log_severity() {
@@ -504,14 +419,14 @@ mod tests {
             tags: &["verify_setting_minimum_log_severity"],
             ..PublisherOptions::empty()
         })
-        .expect("initialized tracing");
-        tracing::subscriber::with_default(publisher, || {
-            info!("I'm an info log");
-            debug!("I'm a debug log and won't show up");
+        .expect("initialized log");
+        log::set_boxed_logger(Box::new(publisher)).unwrap();
 
-            set_minimum_severity(Severity::Debug);
-            debug!("I'm a debug log and I show up");
-        });
+        info!("I'm an info log");
+        debug!("I'm a debug log and won't show up");
+
+        set_minimum_severity(Severity::Debug);
+        debug!("I'm a debug log and I show up");
 
         let results = logs
             .filter(|data| {
@@ -524,135 +439,6 @@ mod tests {
             .await;
         assert_eq!(results[0].msg().unwrap(), "I'm an info log");
         assert_eq!(results[1].msg().unwrap(), "I'm a debug log and I show up");
-    }
-
-    #[fuchsia::test]
-    async fn verify_nested_spans() {
-        let reader = ArchiveReader::new();
-        let (logs, _) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
-        let s1 = info_span!("", key = "span1");
-        info!("Log with no span 1");
-        {
-            let _s1_guard = s1.enter();
-            info!("Log with s1");
-            {
-                let s2 = info_span!("", other = "span2");
-                let _s2_guard = s2.enter();
-                info!("Log with s1 and s2");
-            }
-            info!("Second log with s1");
-        }
-        info!("Log with no span 2");
-
-        let results = logs
-            .filter(|data| {
-                future::ready(data.tags().unwrap().iter().any(|t| t == "verify_nested_spans"))
-            })
-            .take(5)
-            .collect::<Vec<_>>()
-            .await;
-        assert_eq!(results[0].msg().unwrap(), "Log with no span 1");
-        assert!(results[0].payload_keys_strings().collect::<Vec<_>>().is_empty());
-        assert_eq!(results[1].msg().unwrap(), "Log with s1");
-        assert_eq!(
-            results[1].payload_keys_strings().collect::<Vec<_>>(),
-            vec!["key=span1".to_string()]
-        );
-        assert_eq!(results[2].msg().unwrap(), "Log with s1 and s2");
-        assert_eq!(
-            results[2].payload_keys_strings().sorted().collect::<Vec<_>>(),
-            vec!["key=span1".to_string(), "other=span2".to_string()]
-        );
-        assert_eq!(results[3].msg().unwrap(), "Second log with s1");
-        assert_eq!(
-            results[3].payload_keys_strings().collect::<Vec<_>>(),
-            vec!["key=span1".to_string()]
-        );
-        assert_eq!(results[4].msg().unwrap(), "Log with no span 2");
-        assert!(results[4].payload_keys_strings().collect::<Vec<_>>().is_empty());
-    }
-
-    #[fuchsia::test]
-    async fn verify_sibling_spans_nested_scopes() {
-        let reader = ArchiveReader::new();
-        let (logs, _) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
-        let s1 = info_span!("", key = "span1");
-        let s2 = info_span!("", other = "span2");
-        info!("Log with no span 1");
-        {
-            let _s1_guard = s1.enter();
-            info!("Log with s1");
-            {
-                let _s2_guard = s2.enter();
-                info!("Log with s2 only");
-            }
-            info!("Second log with s1");
-        }
-        info!("Log with no span 2");
-
-        let results = logs
-            .filter(|data| {
-                future::ready(
-                    data.tags().unwrap().iter().any(|t| t == "verify_sibling_spans_nested_scopes"),
-                )
-            })
-            .take(5)
-            .collect::<Vec<_>>()
-            .await;
-        assert_eq!(results[0].msg().unwrap(), "Log with no span 1");
-        assert!(results[0].payload_keys_strings().collect::<Vec<_>>().is_empty());
-        assert_eq!(results[1].msg().unwrap(), "Log with s1");
-        assert_eq!(
-            results[1].payload_keys_strings().collect::<Vec<_>>(),
-            vec!["key=span1".to_string()]
-        );
-        assert_eq!(results[2].msg().unwrap(), "Log with s2 only");
-        assert_eq!(
-            results[2].payload_keys_strings().sorted().collect::<Vec<_>>(),
-            vec!["other=span2".to_string()]
-        );
-        assert_eq!(results[3].msg().unwrap(), "Second log with s1");
-        assert_eq!(
-            results[3].payload_keys_strings().collect::<Vec<_>>(),
-            vec!["key=span1".to_string()]
-        );
-        assert_eq!(results[4].msg().unwrap(), "Log with no span 2");
-        assert!(results[4].payload_keys_strings().collect::<Vec<_>>().is_empty());
-    }
-
-    #[fuchsia::test]
-    async fn verify_sibling_spans_multithreaded() {
-        let reader = ArchiveReader::new();
-        let (logs, _) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
-
-        let total_threads = 10;
-
-        for i in 0..total_threads {
-            std::thread::spawn(move || {
-                let s = info_span!("", thread = i);
-                let _s_guard = s.enter();
-                info!("Log from thread");
-            });
-        }
-
-        let mut results = logs
-            .filter(|data| {
-                future::ready(
-                    data.tags().unwrap().iter().any(|t| t == "verify_sibling_spans_multithreaded"),
-                )
-            })
-            .take(total_threads);
-
-        let mut seen = vec![];
-        while let Some(log) = results.next().await {
-            assert_eq!(log.msg().unwrap(), "Log from thread");
-            let hierarchy = log.payload_keys().unwrap();
-            assert_eq!(hierarchy.properties.len(), 1);
-            assert_eq!(hierarchy.properties[0].name(), "thread");
-            seen.push(hierarchy.properties[0].uint().unwrap() as usize);
-        }
-        seen.sort();
-        assert_eq!(seen, (0..total_threads).collect::<Vec<_>>());
     }
 
     #[fuchsia::test]

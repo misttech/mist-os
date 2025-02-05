@@ -11,13 +11,13 @@ use errors::FfxError;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_storage_args::{StorageCommand, SubCommandEnum};
 use fho::{FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use target_holders::RemoteControlProxyHolder;
 
 #[derive(FfxTool)]
 pub struct StorageTool {
     #[command]
     cmd: StorageCommand,
-    rcs: RemoteControlProxy,
+    rcs: RemoteControlProxyHolder,
 }
 
 fho::embedded_plugin!(StorageTool);

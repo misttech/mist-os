@@ -81,8 +81,8 @@ rustc_binary("starnix_kernel_bin") {
 
   disable_rustdoc = false
 
-  if (target_cpu == "riscv64") {
-    # At least for riscv64, remote linking requires machine
+  if (target_cpu == "riscv64" || is_lto_variant) {
+    # At least for riscv64 and LTO, remote linking requires machines
     # with more memory, particularly in the linking phase.
     _concurrent_jobs = concurrent_jobs.rust_highmem
     configs += _concurrent_jobs.configs
@@ -117,6 +117,7 @@ rustc_library("starnix_core") {
     "bpf/mod.rs",
     "bpf/program.rs",
     "bpf/syscalls.rs",
+    "container_namespace.rs",
     "device/android/bootloader_message_store.rs",
     "device/android/mod.rs",
     "device/binder.rs",
@@ -151,6 +152,7 @@ rustc_library("starnix_core") {
     "fs/proc/fs.rs",
     "fs/proc/mod.rs",
     "fs/proc/pid_directory.rs",
+    "fs/proc/pressure_directory.rs",
     "fs/proc/proc_directory.rs",
     "fs/proc/sysctl.rs",
     "fs/proc/sysrq.rs",
@@ -173,6 +175,7 @@ rustc_library("starnix_core") {
     "mm/memory_manager.rs",
     "mm/mod.rs",
     "mm/syscalls.rs",
+    "mm/userfault.rs",
     "mm/vmex_resource.rs",
     "mm/vmsplice.rs",
     "mutable_state.rs",
@@ -211,6 +214,7 @@ rustc_library("starnix_core") {
     "task/net.rs",
     "task/pid_table.rs",
     "task/process_group.rs",
+    "task/psi_provider.rs",
     "task/ptrace.rs",
     "task/scheduler.rs",
     "task/seccomp.rs",
@@ -234,6 +238,7 @@ rustc_library("starnix_core") {
     "vfs/buffers/message_queue.rs",
     "vfs/buffers/message_types.rs",
     "vfs/buffers/mod.rs",
+    "vfs/crypt_service.rs",
     "vfs/dir_entry.rs",
     "vfs/directory_file.rs",
     "vfs/dirent_sink.rs",
@@ -284,6 +289,7 @@ rustc_library("starnix_core") {
     "vfs/symlink_node.rs",
     "vfs/syscalls.rs",
     "vfs/timer.rs",
+    "vfs/userfault_file.rs",
     "vfs/vec_directory.rs",
     "vfs/wd_number.rs",
     "vfs/xattr.rs",
@@ -312,11 +318,11 @@ rustc_library("starnix_core") {
     ":starnix_logging",
     ":vdso-data($bionic_linux_toolchain)",
     "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_rust",
+    "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
     "//sdk/fidl/fuchsia.fs:fuchsia.fs_rust",
-    "//sdk/fidl/fuchsia.hardware.hrtimer:fuchsia.hardware.hrtimer_rust",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//sdk/fidl/fuchsia.images2:fuchsia.images2_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
@@ -337,10 +343,11 @@ rustc_library("starnix_core") {
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_rust",
     "//sdk/fidl/fuchsia.session.power:fuchsia.session.power_rust",
     "//sdk/fidl/fuchsia.starnix.binder:fuchsia.starnix.binder_rust",
-    "//sdk/fidl/fuchsia.starnix.runner:fuchsia.starnix.runner_rust",
+    "//sdk/fidl/fuchsia.starnix.psi:fuchsia.starnix.psi_rust",
     "//sdk/fidl/fuchsia.starnix.runner:fuchsia.starnix.runner_rust",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_rust",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_rust",
+    "//sdk/fidl/fuchsia.time.alarms:fuchsia.time.alarms_rust",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_rust",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
@@ -395,6 +402,7 @@ rustc_library("starnix_core") {
     "//src/storage/ext4/lib/metadata",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/lib/vfs/rust:vfs",
+    "//third_party/rust_crates:aes-gcm-siv",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:async-trait",
@@ -499,6 +507,7 @@ rustc_library("starnix_core") {
     features += [ "alternate_anon_allocs" ]
   }
   inputs = [
+    "//src/starnix/kernel/security/selinux_hooks/default_exceptions_config",
     "//src/starnix/lib/selinux/testdata/micro_policies/hooks_tests_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/bounded_transition_policy.pp",
   ]
@@ -561,6 +570,7 @@ rustc_library("starnix_kernel_runner") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
     "//src/lib/ui/fuchsia-scenic",
     "//src/performance/memory/attribution/server",
@@ -808,7 +818,7 @@ fuchsia_unittest_package("starnix-tests") {
   deps = [
     ":starnix-test-files",
     ":starnix_core_test",
-    "//src/starnix/examples/hello_starnix",
+    "//src/starnix/examples/hello_starnix:hello_starnix_bin",
   ]
   test_specs = {
     log_settings = {

@@ -509,12 +509,11 @@ async fn use_restricted_storage_start_failure() {
         child_bind_result,
         Err(ModelError::ActionError {
             err: ActionError::StartError {
-                err: StartActionError::CreateNamespaceError {
-                    moniker,
-                    err: CreateNamespaceError::InstanceNotInInstanceIdIndex(_),
-                }
+                err: StartActionError::CreateNamespaceError(
+                    CreateNamespaceError::InstanceNotInInstanceIdIndex(err)
+                )
             }
-        }) if moniker == Moniker::try_from(vec!["parent_consumer", "child_consumer"]).unwrap()
+        }) if moniker::ExtendedMoniker::from(err.clone()) == moniker::ExtendedMoniker::from(Moniker::try_from(vec![]).unwrap())
     );
 }
 

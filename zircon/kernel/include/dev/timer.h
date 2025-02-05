@@ -16,11 +16,11 @@
 // These correspond (currently) to calls defined in platform/timer.h
 
 // Read the current ticks of the hardware timer, at the rate the timer is ticking.
-// Generally converted to real time in current_time().
+// Generally converted to real time in current_mono_time().
 zx_ticks_t timer_current_ticks();
 
 // Set a timer to fire at the deadline specified that calls timer_tick().
-zx_status_t timer_set_oneshot_timer(zx_time_t deadline);
+zx_status_t timer_set_oneshot_timer(zx_ticks_t deadline);
 
 // Cancel a pending oneshot timer. Okay to call if no pending oneshot.
 zx_status_t timer_stop();

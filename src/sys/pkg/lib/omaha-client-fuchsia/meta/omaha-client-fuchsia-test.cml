@@ -56,8 +56,16 @@
             from: "parent",
             to: "#shutdown_shim",
         },
+
+        // TODO(https://fxbug.dev/389134835): Remove the initiator
+        // capability.
         {
-            protocol: "fuchsia.hardware.power.statecontrol.Admin",
+            protocol: "fuchsia.power.CollaborativeRebootInitiator",
+            from: "#shutdown_shim",
+            to: "#test_driver",
+        },
+        {
+            protocol: "fuchsia.power.internalCollaborativeRebootScheduler",
             from: "#shutdown_shim",
             to: "#test_driver",
         },

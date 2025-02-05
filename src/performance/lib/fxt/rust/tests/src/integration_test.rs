@@ -14,9 +14,9 @@ use fidl_fuchsia_tracing_controller::{
 use fuchsia_async::{Socket as AsyncSocket, Task};
 use fuchsia_component::client::connect_to_protocol;
 use futures::StreamExt;
+use log::info;
 use std::collections::BTreeMap;
 use std::path::Path;
-use tracing::info;
 
 const COLLECTION_NAME: &str = "dynamic";
 const CHILD_NAME: &str = "provider_puppet";

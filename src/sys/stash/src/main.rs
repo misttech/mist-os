@@ -14,10 +14,10 @@ use fuchsia_inspect::health::Reporter;
 use fuchsia_inspect::{self as inspect};
 use futures::lock::Mutex;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use log::error;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::{env, process};
-use tracing::error;
 
 mod accessor;
 mod instance;
@@ -165,7 +165,7 @@ fn stash_server(
             }
             Ok(())
         }
-        .unwrap_or_else(|err: anyhow::Error| error!(?err, "couldn't run stash service")),
+        .unwrap_or_else(|err: anyhow::Error| error!(err:?; "couldn't run stash service")),
     )
     .detach();
 }

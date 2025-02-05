@@ -60,8 +60,8 @@ class PageQueues {
   static constexpr size_t kNumOldestQueues = 2;
   static_assert(kNumOldestQueues + kNumActiveQueues <= kNumReclaim);
 
-  static constexpr zx_duration_t kDefaultMinMruRotateTime = ZX_SEC(5);
-  static constexpr zx_duration_t kDefaultMaxMruRotateTime = ZX_SEC(5);
+  static constexpr zx_duration_mono_t kDefaultMinMruRotateTime = ZX_SEC(5);
+  static constexpr zx_duration_mono_t kDefaultMaxMruRotateTime = ZX_SEC(5);
 
   // This is presently an arbitrary constant, since the min and max mru rotate time are currently
   // fixed at the same value, meaning that the active ratio can not presently trigger, or prevent,
@@ -315,7 +315,7 @@ class PageQueues {
   // indefinitely as they might attempt to offload work to a nonexistent thread. This issue is only
   // relevant for unittests that may wish to avoid starting the threads for some tests.
   // It is the responsibility of the caller to only call this once, otherwise it will panic.
-  void StartThreads(zx_duration_t min_mru_rotate_time, zx_duration_t max_mru_rotate_time);
+  void StartThreads(zx_duration_mono_t min_mru_rotate_time, zx_duration_mono_t max_mru_rotate_time);
 
   // Initializes and starts the debug compression, which attempts to immediately compress a random
   // subset of pages added to the page queues. It is an error to call this if there is no compressor
@@ -658,11 +658,11 @@ class PageQueues {
   // Due to the active ratio being sticky, it needs to be reset, which is why this method is called
   // consume. As a result, calling ConsumeAgeReason and then GetAgeReasonLocked could give different
   // results if an active ratio event was consumed and returned by the first call.
-  ktl::variant<AgeReason, zx_time_t> ConsumeAgeReason() TA_EXCL(lock_);
+  ktl::variant<AgeReason, zx_instant_mono_t> ConsumeAgeReason() TA_EXCL(lock_);
 
   // Checks if there is any pending age reason that could be consumed. See ConsumeAgeReason for more
   // details.
-  ktl::variant<AgeReason, zx_time_t> GetAgeReasonLocked() const TA_REQ(lock_);
+  ktl::variant<AgeReason, zx_instant_mono_t> GetAgeReasonLocked() const TA_REQ(lock_);
 
   // Synchronizes with any outstanding aging. This is intended to allow a reclamation process to
   // ensure it is not racing with, and falsely failing to reclaim, the aging thread due to
@@ -708,7 +708,7 @@ class PageQueues {
   ktl::atomic<bool> aging_disabled_ = false;
 
   // Time at which the mru_gen_ was last incremented.
-  ktl::atomic<zx_time_t> last_age_time_ = ZX_TIME_INFINITE_PAST;
+  ktl::atomic<zx_instant_mono_t> last_age_time_ = ZX_TIME_INFINITE_PAST;
   // Reason the last aging event happened, this is purely for informational/debugging purposes.
   // Initialized to Timeout as a somewhat arbitrary choice.
   AgeReason last_age_reason_ TA_GUARDED(lock_) = AgeReason::Timeout;
@@ -849,8 +849,8 @@ class PageQueues {
 
   // Queue rotation parameters. These are not locked as they are only read by the mru thread, and
   // are set before the mru thread is started.
-  zx_duration_t min_mru_rotate_time_;
-  zx_duration_t max_mru_rotate_time_;
+  zx_duration_mono_t min_mru_rotate_time_;
+  zx_duration_mono_t max_mru_rotate_time_;
 
   // Determines if anonymous zero page forks are placed in the zero fork queue or in the reclaimable
   // queue.

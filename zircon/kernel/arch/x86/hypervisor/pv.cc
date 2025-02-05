@@ -115,7 +115,7 @@ void pv_clock_update_system_time(PvClockState* pv_clock, hypervisor::GuestPhysic
   ktl::atomic_thread_fence(ktl::memory_order_seq_cst);
   system_time->tsc_mul = tsc_mul;
   system_time->tsc_shift = tsc_shift;
-  system_time->system_time = current_time();
+  system_time->system_time = current_mono_time();
   system_time->tsc_timestamp = _rdtsc();
   system_time->flags = pv_clock->is_stable ? kKvmSystemTimeStable : 0;
   ktl::atomic_thread_fence(ktl::memory_order_seq_cst);
@@ -142,7 +142,7 @@ zx::result<> pv_clock_populate_offset(hypervisor::GuestPhysicalAspace* gpa,
   memset(offset, 0, sizeof(*offset));
   // Zircon does not maintain a UTC or local time. We populate offset using the
   // only time available - time since the device was powered on.
-  zx_time_t time = current_time();
+  zx_instant_boot_t time = current_boot_time();
   uint64_t tsc = _rdtsc();
   offset->sec = time / ZX_SEC(1);
   offset->nsec = time % ZX_SEC(1);

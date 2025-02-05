@@ -8,9 +8,9 @@ use fidl_fuchsia_ui_types::ColorRgb;
 use futures::channel::mpsc;
 use futures::StreamExt;
 use light_realm::{assert_fidl_light_group_eq, assert_lights_eq, HardwareLight, LightRealm};
+use log::info;
 use std::collections::HashMap;
 use test_case::test_case;
-use tracing::info;
 
 const LIGHT_NAME_1: &str = "LED1";
 const LIGHT_NAME_2: &str = "LED2";

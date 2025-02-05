@@ -649,6 +649,36 @@ TEST_P(SndRcvBufSockOpt, DoubledOnGet) {
 
 INSTANTIATE_TEST_SUITE_P(SndRcvBufSockOpt, SndRcvBufSockOpt, testing::Values(SO_SNDBUF, SO_RCVBUF));
 
+class SocketMarkSockOpt : public testing::TestWithParam<std::tuple<int, int>> {};
+
+TEST_P(SocketMarkSockOpt, SetAndGet) {
+  if (!test_helper::HasCapability(CAP_NET_ADMIN)) {
+    GTEST_SKIP() << "Need CAP_NET_ADMIN to run SO_MARK tests";
+  }
+  auto [domain, type] = GetParam();
+  fbl::unique_fd fd;
+  EXPECT_TRUE(fd = fbl::unique_fd(socket(domain, type, 0))) << strerror(errno);
+
+  int initial_mark = -1;
+  socklen_t optlen = sizeof(initial_mark);
+  ASSERT_EQ(getsockopt(fd.get(), SOL_SOCKET, SO_MARK, &initial_mark, &optlen), 0)
+      << strerror(errno);
+  ASSERT_EQ(initial_mark, 0);
+
+  int mark = 100;
+  ASSERT_EQ(setsockopt(fd.get(), SOL_SOCKET, SO_MARK, &mark, sizeof(mark)), 0) << strerror(errno);
+  int retrieved_mark = 0;
+  optlen = sizeof(retrieved_mark);
+  ASSERT_EQ(getsockopt(fd.get(), SOL_SOCKET, SO_MARK, &retrieved_mark, &optlen), 0)
+      << strerror(errno);
+  ASSERT_EQ(optlen, sizeof(mark));
+  ASSERT_EQ(mark, retrieved_mark);
+}
+
+INSTANTIATE_TEST_SUITE_P(SocketMarkSockOpt, SocketMarkSockOpt,
+                         testing::Combine(testing::Values(AF_INET, AF_INET6),
+                                          testing::Values(SOCK_STREAM, SOCK_DGRAM)));
+
 class BpfTest : public testing::Test {
  protected:
   void SetUp() override {

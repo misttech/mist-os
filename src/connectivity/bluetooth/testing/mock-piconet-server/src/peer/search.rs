@@ -4,9 +4,9 @@
 
 use anyhow::Error;
 use fidl_fuchsia_bluetooth_bredr::{SearchResultsProxy, ServiceClassProfileIdentifier};
+use log::info;
 use slab::Slab;
 use std::collections::{HashMap, HashSet};
-use tracing::info;
 
 use crate::types::{RegisteredServiceId, ServiceRecord};
 

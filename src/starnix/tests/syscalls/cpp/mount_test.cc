@@ -420,6 +420,79 @@ TEST_F(MountTest, UmountWithMntAttachIsRecursive) {
   EXPECT_THAT(umount2(dir.c_str(), MNT_DETACH), SyscallSucceeds());
 }
 
+TEST_F(MountTest, BasicRemotefsMount) {
+  // Basic remotefs mounting of the container's /data namespace
+  if (!test_helper::IsStarnix()) {
+    GTEST_SKIP() << "MountTest.BasicRemotefsMount cannot be run on Linux, skipping.";
+  }
+
+  // In order to validate that the /data directory is actually correctly
+  // mounted and being serviced, we'll mount two target directories to it.
+  // We can then create a file in one of the mounted directories, and confirm
+  // that the file shows up in the second mounted directory. This is a
+  // roundabout way to validate, since we do not have access to the container's
+  // backing /data directory directly to validate file existence.
+  ASSERT_SUCCESS(MakeDir("first_target"));
+  auto first_target_dir = TestPath("first_target");
+  ASSERT_THAT(mount("/data", first_target_dir.c_str(), "remotefs", MS_SYNCHRONOUS, nullptr),
+              SyscallSucceeds());
+
+  ASSERT_SUCCESS(MakeDir("second_target"));
+  auto second_target_dir = TestPath("second_target");
+  ASSERT_THAT(mount("/data", second_target_dir.c_str(), "remotefs", MS_SYNCHRONOUS, nullptr),
+              SyscallSucceeds());
+
+  // Create a file in the first mounted directory.
+  auto new_file = first_target_dir + "/foo.txt";
+  auto new_fd = fbl::unique_fd(open(new_file.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0777));
+  ASSERT_TRUE(new_fd.is_valid());
+  new_fd.reset();
+
+  // Confirm that we can find and open the file within the second directory.
+  // In doing so, we can be reasonably assured that the common mount point (/data)
+  // was correctly mounted and serviced by the system.
+  auto previously_created_file = second_target_dir + "/foo.txt";
+  auto previously_created_fd = fbl::unique_fd(open(previously_created_file.c_str(), O_RDONLY));
+  ASSERT_TRUE(previously_created_fd.is_valid());
+}
+
+TEST_F(MountTest, RemotefsSubdirMount) {
+  // Requested mounts of a nested path (e.g. /data/foo) with a valid namespace
+  // in the ancestor path (e.g. /data) will be mounted. The kernel should
+  // transparently create the subdir nodes in the remotefs mount call.
+  if (!test_helper::IsStarnix()) {
+    GTEST_SKIP() << "MountTest.RemotefsSubdirMount cannot be run on Linux, skipping.";
+  }
+  ASSERT_SUCCESS(MakeDir("a"));
+  auto dir = TestPath("a");
+  ASSERT_THAT(mount("/data/foo", dir.c_str(), "remotefs", MS_RDONLY, nullptr), SyscallSucceeds());
+}
+
+TEST_F(MountTest, RemotefsInvalidPath) {
+  // Remotefs should not mount if it's not provided a valid namespace path
+  if (!test_helper::IsStarnix()) {
+    GTEST_SKIP() << "MountTest.RemotefsInvalidPath cannot be run on Linux, skipping.";
+  }
+  ASSERT_SUCCESS(MakeDir("a"));
+  auto dir = TestPath("a");
+  ASSERT_THAT(mount("/foo", dir.c_str(), "remotefs", MS_RDONLY, nullptr),
+              SyscallFailsWithErrno(ENOENT));
+}
+
+TEST_F(MountTest, RemotefsNoPathProvided) {
+  // TODO(b/379929394): Update this documentation after soft transition.
+  // When no root path is requested, the remotefs request should default to the data dir.
+  if (!test_helper::IsStarnix()) {
+    GTEST_SKIP() << "MountTest.RemotefsNoPathProvided cannot be run on Linux, skipping.";
+  }
+  ASSERT_SUCCESS(MakeDir("a"));
+  auto dir = TestPath("a");
+  // TODO(b/379929394): After soft transition, these should be expected to fail.
+  ASSERT_THAT(mount(".", dir.c_str(), "remotefs", MS_RDONLY, nullptr), SyscallSucceeds());
+  ASSERT_THAT(mount("/", dir.c_str(), "remotefs", MS_RDONLY, nullptr), SyscallSucceeds());
+  ASSERT_THAT(mount("", dir.c_str(), "remotefs", MS_RDONLY, nullptr), SyscallSucceeds());
+}
+
 class ProcMountsTest : public ProcTestBase {
   // Note that these tests can be affected by those in other suites e.g. a
   // MountTest above that doesn't clean up its mounts may change the value of

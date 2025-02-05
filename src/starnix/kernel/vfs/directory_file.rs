@@ -83,7 +83,7 @@ impl FileOps for MemoryDirectoryFile {
                 *readdir_position = children
                     .iter()
                     .take(count)
-                    .last()
+                    .next_back()
                     .map_or(Bound::Unbounded, |(name, _)| Bound::Excluded(name.clone()));
             });
         }

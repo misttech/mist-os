@@ -70,7 +70,7 @@ impl DriversOnlyTestRealm {
 
         let tracing = Tracing::create_and_initialize_tracing(test_ns.prefix())
             .await
-            .map_err(|e| tracing::warn!("{e:?}"))
+            .map_err(|e| log::warn!("{e:?}"))
             .ok();
 
         Self {

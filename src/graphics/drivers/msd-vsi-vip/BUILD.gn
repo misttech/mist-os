@@ -124,6 +124,7 @@ source_set("msd_vsi_test_entry") {
            "src",
            "tests/unit_tests:hardware_tests",
            "//src/graphics/magma/lib/magma_service/sys_driver:magma_driver_base",
+           "//src/graphics/magma/lib/magma_service/test_util:gtest_printer",
            "//src/graphics/magma/lib/magma_service/test_util:platform_device_helper_dfv2",
            "//src/graphics/magma/lib/magma_service/test_util:platform_msd_device_helper",
            "//third_party/googletest:gtest",

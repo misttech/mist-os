@@ -414,7 +414,7 @@ void ArchIdlePowerThread::EnterIdleState(zx_duration_t max_latency) {
       //
       percpu->monitor->PrepareForWait();
       if (percpu->monitor->Read() == kTargetStateIdle && !preemption_state.preempts_pending()) {
-        auto start = current_time();
+        auto start = current_mono_time();
         // AMD-SB-1045: Clear the RAS before a thread enters MWAIT to prevent paired hyperthreads
         // from consuming this thread's RAS entries.
         if (x86_cpu_vulnerable_to_rsb_cross_thread()) {
@@ -425,7 +425,7 @@ void ArchIdlePowerThread::EnterIdleState(zx_duration_t max_latency) {
         x86_enable_ints_and_mwait(next_state->MwaitHint());
         arch_disable_ints();
 
-        auto duration = zx_time_sub_time(current_time(), start);
+        auto duration = zx_time_sub_time(current_mono_time(), start);
         percpu->idle_states->RecordDuration(duration);
         next_state->RecordDuration(duration);
         next_state->CountEntry();

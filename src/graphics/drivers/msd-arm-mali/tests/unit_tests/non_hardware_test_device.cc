@@ -79,8 +79,7 @@ class FakeParentDevice : public ParentDevice {
   bool SetThreadRole(const char* role_name) override { return true; }
   zx::bti GetBusTransactionInitiator() override { return zx::bti(); }
 
-  std::unique_ptr<magma::PlatformMmio> CpuMapMmio(
-      unsigned int index, magma::PlatformMmio::CachePolicy cache_policy) override {
+  std::unique_ptr<magma::PlatformMmio> CpuMapMmio(unsigned int index) override {
     auto mmio = CreateMockMmio(1024 * 1024);
 
     // Initialize with the S905D3 GPU ID so protected memory can be enabled.
@@ -99,6 +98,7 @@ class FakeParentDevice : public ParentDevice {
   }
   bool suspend_enabled() override { return false; }
   std::shared_ptr<fdf::Namespace> incoming() override { return nullptr; }
+  magma::PlatformDevice* GetPlatformDevice() override { return nullptr; }
   zx::result<std::vector<fdf_power::PowerElementConfiguration>> GetPowerConfiguration() override {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }

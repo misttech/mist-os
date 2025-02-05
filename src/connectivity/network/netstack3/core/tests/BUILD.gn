@@ -14,6 +14,7 @@ rustc_test("netstack3_core_threading_test") {
   sources = [
     "threading/device_socket.rs",
     "threading/lib.rs",
+    "threading/sndbuf.rs",
     "threading/tcp.rs",
   ]
 
@@ -23,6 +24,7 @@ rustc_test("netstack3_core_threading_test") {
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/netstack3/core:netstack3-core-loom",
+    "//src/connectivity/network/netstack3/core/base:netstack3-base-loom",
     "//src/connectivity/network/netstack3/core/ip:netstack3-ip-loom",
     "//src/connectivity/network/netstack3/core/tcp:netstack3-tcp-loom",
     "//src/lib/network/packet",

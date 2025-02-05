@@ -1,0 +1,53 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+@available(added=HEAD)
+library fuchsia.boot.metadata;
+
+using fuchsia.net;
+
+/// Metadata containing the device's MAC address for Ethernet, Wifi, Bluetooth, etc.
+@serializable
+type MacAddressMetadata = table {
+    /// The MAC address as described in the Zircon Boot Image.
+    1: mac_address fuchsia.net.MacAddress;
+};
+
+const PARTITION_GUID_LEN uint64 = 32;
+
+alias PartitionGuid = array<uint8, PARTITION_GUID_LEN>;
+
+/// This is a direct copy of [`zbi.PartitionMap`].
+type PartitionMap = struct {
+    /// Total blocks used on the device.
+    block_count uint64;
+
+    /// Size of each block in bytes.
+    block_size uint64;
+
+    /// Number of partitions in the map.
+    partition_count uint32;
+
+    /// Reserved for future use.
+    reserved uint32;
+
+    /// Device GUID.
+    guid PartitionGuid;
+};
+
+/// Metadata containing the partition map for raw block device.
+@serializable
+type PartitionMapMetadata = table {
+    /// The partition map as described in the Zircon Boot Image.
+    // TODO(b/42062786): Use zbi.PartitionMap as type once the zbi FIDL library is in the SDK.
+    1: partition_map PartitionMap;
+};
+
+const SERIAL_NUMBER_LEN uint8 = 32;
+
+/// Metadata containing the device's serial number.
+@serializable
+type SerialNumberMetadata = table {
+    /// The serial number as described in the Zircon Boot Image.
+    1: serial_number string:SERIAL_NUMBER_LEN;
+};

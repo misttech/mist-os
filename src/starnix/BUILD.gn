@@ -24,6 +24,7 @@ group("tests") {
     "kernel:tests",
     "lib:tests",
     "modules:tests",
+    "psi-provider:tests",
     "runner:tests",
     "tests",
     "tools:tests",

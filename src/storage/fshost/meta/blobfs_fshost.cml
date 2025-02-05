@@ -8,4 +8,14 @@
             url: "fuchsia-boot:///blobfs#meta/blobfs.cm",
         },
     ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.scheduler.RoleManager",
+            ],
+            from: "parent",
+            to: "#blobfs",
+        },
+    ],
 }

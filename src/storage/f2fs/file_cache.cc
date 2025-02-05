@@ -223,14 +223,19 @@ void LockedPage::Zero(size_t start, size_t end) const {
 }
 
 zx::result<> LockedPage::SetVmoDirty() {
-  if (page_ && !page_->IsDirty() && !page_->IsWriteback() && page_->GetVmoManager().IsPaged()) {
-    size_t start_offset = safemath::CheckMul(page_->GetKey(), kBlockSize).ValueOrDie();
-    if (auto dirty_or = page_->GetVmoManager().DirtyPages(*page_->fs()->vfs(), start_offset,
-                                                          start_offset + kBlockSize);
-        dirty_or.is_error()) {
-      ZX_DEBUG_ASSERT(dirty_or.error_value() == ZX_ERR_NOT_FOUND);
-      return dirty_or.take_error();
-    }
+  if (!page_ || !page_->GetVmoManager().IsPaged()) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+  WaitOnWriteback();
+  if (page_->IsDirty()) {
+    return zx::ok();
+  }
+  size_t start_offset = safemath::CheckMul(page_->GetKey(), kBlockSize).ValueOrDie();
+  if (auto dirty_or = page_->GetVmoManager().DirtyPages(*page_->fs()->vfs(), start_offset,
+                                                        start_offset + Page::Size());
+      dirty_or.is_error()) {
+    ZX_DEBUG_ASSERT(dirty_or.error_value() == ZX_ERR_NOT_FOUND);
+    return dirty_or.take_error();
   }
   return zx::ok();
 }

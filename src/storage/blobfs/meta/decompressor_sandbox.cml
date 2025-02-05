@@ -5,21 +5,18 @@
     include: [
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
+        "trace/client.shard.cml",
     ],
     program: {
         runner: "elf",
         binary: "bin/decompressor",
-        args: [],
     },
     capabilities: [
         { protocol: "fuchsia.blobfs.internal.DecompressorCreator" },
     ],
     use: [
         {
-            protocol: [ "fuchsia.scheduler.RoleManager" ],
-        },
-        {
-            protocol: "fuchsia.tracing.provider.Registry",
+            protocol: "fuchsia.scheduler.RoleManager",
             availability: "optional",
         },
     ],

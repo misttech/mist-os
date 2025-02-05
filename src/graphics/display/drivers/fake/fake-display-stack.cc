@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/drivers/fake/fake-display-stack.h"
 
-#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/fdio/directory.h>
 #include <zircon/assert.h>
@@ -14,23 +14,25 @@
 #include <memory>
 #include <utility>
 
+#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 
-namespace display {
+namespace fake_display {
 
 FakeDisplayStack::FakeDisplayStack(std::unique_ptr<SysmemServiceProvider> sysmem_service_provider,
-                                   const fake_display::FakeDisplayDeviceConfig& device_config)
-    : sysmem_service_provider_(std::move(sysmem_service_provider)) {
+                                   const FakeDisplayDeviceConfig& device_config)
+    : driver_runtime_(mock_ddk::GetDriverRuntime()),
+      sysmem_service_provider_(std::move(sysmem_service_provider)) {
   if (!fdf::Logger::HasGlobalInstance()) {
     logger_.emplace();
   }
 
   fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator = ConnectToSysmemAllocatorV2();
-  display_ = std::make_unique<fake_display::FakeDisplay>(device_config, std::move(sysmem_allocator),
-                                                         inspect::Inspector{});
-  zx_status_t status = display_->Initialize();
+  display_engine_ = std::make_unique<FakeDisplay>(device_config, std::move(sysmem_allocator),
+                                                  inspect::Inspector{});
+  zx_status_t status = display_engine_->Initialize();
   if (status != ZX_OK) {
     ZX_PANIC("Failed to initialize fake-display: %s", zx_status_get_string(status));
   }
@@ -46,7 +48,8 @@ FakeDisplayStack::FakeDisplayStack(std::unique_ptr<SysmemServiceProvider> sysmem
   }
   coordinator_client_dispatcher_ = std::move(create_dispatcher_result).value();
 
-  ddk::DisplayEngineProtocolClient display_engine_client(display_->display_engine_banjo_protocol());
+  ddk::DisplayEngineProtocolClient display_engine_client(
+      display_engine_->display_engine_banjo_protocol());
   auto engine_driver_client =
       std::make_unique<display_coordinator::EngineDriverClient>(display_engine_client);
   zx::result<std::unique_ptr<display_coordinator::Controller>> create_controller_result =
@@ -67,15 +70,31 @@ FakeDisplayStack::FakeDisplayStack(std::unique_ptr<SysmemServiceProvider> sysmem
 }
 
 FakeDisplayStack::~FakeDisplayStack() {
-  // SyncShutdown() must be called before ~FakeDisplayStack().
-  ZX_ASSERT(shutdown_);
+  ZX_ASSERT_MSG(shutdown_, "FakeDisplayStack::SyncShutdown() not called");
 }
 
-const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& FakeDisplayStack::display_client() {
+display_coordinator::Controller* FakeDisplayStack::coordinator_controller() {
+  ZX_ASSERT(!shutdown_);
+  ZX_ASSERT(coordinator_controller_ != nullptr);
+  return coordinator_controller_.get();
+}
+
+FakeDisplay& FakeDisplayStack::display_engine() {
+  ZX_ASSERT(!shutdown_);
+  ZX_ASSERT(display_engine_ != nullptr);
+  return *display_engine_;
+}
+
+const fidl::WireSyncClient<fuchsia_hardware_display::Provider>&
+FakeDisplayStack::display_provider_client() {
+  ZX_ASSERT(!shutdown_);
+  ZX_ASSERT(display_provider_client_.is_valid());
   return display_provider_client_;
 }
 
 fidl::ClientEnd<fuchsia_sysmem2::Allocator> FakeDisplayStack::ConnectToSysmemAllocatorV2() {
+  ZX_ASSERT(!shutdown_);
+
   zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> connect_allocator_result =
       sysmem_service_provider_->ConnectAllocator2();
   if (connect_allocator_result.is_error()) {
@@ -103,9 +122,9 @@ void FakeDisplayStack::SyncShutdown() {
 
   coordinator_controller_->Stop();
   coordinator_controller_.reset();
-  display_.reset();
+  display_engine_.reset();
 
   sysmem_service_provider_.reset();
 }
 
-}  // namespace display
+}  // namespace fake_display

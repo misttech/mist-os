@@ -26,12 +26,15 @@
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/resource/cpp/bind.h>
-#include <fbl/string_printf.h>
 
 #include "lib/inspect/component/cpp/component.h"
 #include "src/devices/bus/drivers/platform/node-util.h"
 #include "src/devices/bus/drivers/platform/platform-bus.h"
 #include "src/devices/bus/drivers/platform/platform-interrupt.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}
 
 namespace {
 
@@ -168,8 +171,8 @@ zx_status_t PlatformDevice::Init() {
     for (uint32_t i = 0; i < node_.irq()->size(); i++) {
       auto fragment = std::make_unique<PlatformInterruptFragment>(
           parent(), this, i, fdf::Dispatcher::GetCurrent()->async_dispatcher());
-      zx_status_t status = fragment->Add(fbl::StringPrintf("%s-irq%03u", name_, i).data(), this,
-                                         node_.irq().value()[i]);
+      auto name = std::format("{}-irq{:03}", std::string_view(name_), i);
+      zx_status_t status = fragment->Add(name.c_str(), this, node_.irq().value()[i]);
       if (status != ZX_OK) {
         zxlogf(WARNING, "Failed to create interrupt fragment %u", i);
         continue;
@@ -345,24 +348,42 @@ zx_status_t PlatformDevice::Start() {
       "sysmem",           // 00:00:1b
   };
 
+  std::optional<fdf::DeviceAddress> address;
+  auto bus_type = fdf::BusType::kPlatform;
+
   char name[ZX_DEVICE_NAME_MAX];
   if (vid_ == PDEV_VID_GENERIC && pid_ == PDEV_PID_GENERIC && did_ == PDEV_DID_KPCI) {
     strlcpy(name, "pci", sizeof(name));
+    address = fdf::DeviceAddress::WithStringValue("pci");
   } else if (did_ == PDEV_DID_DEVICETREE_NODE) {
     strlcpy(name, name_, sizeof(name));
+    bus_type = fdf::BusType::kDeviceTree;
+    address = fdf::DeviceAddress::WithStringValue(name_);
   } else {
     // TODO(b/340283894): Remove legacy name format once `kLegacyNameAllowlist` is removed.
     if (kLegacyNameAllowlist.find(name_) != kLegacyNameAllowlist.end()) {
       if (instance_id_ == 0) {
         // For backwards compatibility, we elide instance id when it is 0.
         snprintf(name, sizeof(name), "%02x:%02x:%01x", vid_, pid_, did_);
+        address = fdf::DeviceAddress::WithArrayIntValue(
+            {static_cast<uint8_t>(vid_), static_cast<uint8_t>(pid_), static_cast<uint8_t>(did_)});
       } else {
         snprintf(name, sizeof(name), "%02x:%02x:%01x:%01x", vid_, pid_, did_, instance_id_);
+        address = fdf::DeviceAddress::WithArrayIntValue(
+            {static_cast<uint8_t>(vid_), static_cast<uint8_t>(pid_), static_cast<uint8_t>(did_),
+             static_cast<uint8_t>(instance_id_)});
       }
     } else {
       strlcpy(name, name_, sizeof(name));
+      address = fdf::DeviceAddress::WithStringValue(name_);
     }
   }
+
+  auto bus_info = std::make_unique<fdf::BusInfo>(fdf::BusInfo{{
+      .bus = bus_type,
+      .address = address,
+      .address_stability = fdf::DeviceAddressStability::kStable,
+  }});
 
   std::vector<zx_device_str_prop_t> dev_str_props{
       ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID, vid_),
@@ -410,7 +431,9 @@ zx_status_t PlatformDevice::Start() {
   add_props(node_.smc(), bind_fuchsia_resource::SMC_COUNT, "fuchsia.resource.SMC_");
 
   ddk::DeviceAddArgs args(name);
-  args.set_str_props(dev_str_props).set_proto_id(ZX_PROTOCOL_PDEV);
+  args.set_str_props(dev_str_props)
+      .set_proto_id(ZX_PROTOCOL_PDEV)
+      .set_bus_info(std::move(bus_info));
 
   std::array fidl_service_offers = {
       fuchsia_hardware_platform_device::Service::Name,

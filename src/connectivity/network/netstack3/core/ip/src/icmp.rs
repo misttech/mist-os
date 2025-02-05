@@ -4,6 +4,7 @@
 
 //! The Internet Control Message Protocol (ICMP).
 
+use alloc::boxed::Box;
 use core::convert::TryInto as _;
 use core::num::NonZeroU8;
 
@@ -21,7 +22,7 @@ use netstack3_base::sync::Mutex;
 use netstack3_base::{
     AnyDevice, Counter, CounterContext, DeviceIdContext, EitherDeviceId, FrameDestination,
     IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, InstantBindingsTypes, InstantContext,
-    IpDeviceAddr, IpExt, RngContext, TokenBucket,
+    IpDeviceAddr, IpExt, RngContext, TokenBucket, TxMetadataBindingsTypes,
 };
 use netstack3_filter::{self as filter, TransportPacketSerializer};
 use packet::{
@@ -47,8 +48,8 @@ use zerocopy::SplitByteSlice;
 
 use crate::internal::base::{
     AddressStatus, IpDeviceIngressStateContext, IpLayerHandler, IpPacketDestination,
-    IpSendFrameError, IpTransportContext, Ipv6PresentAddressStatus, SendIpPacketMeta,
-    TransportReceiveError, IPV6_DEFAULT_SUBNET,
+    IpSendFrameError, IpTransportContext, Ipv6PresentAddressStatus, NdpBindingsContext,
+    RouterAdvertisementEvent, SendIpPacketMeta, TransportReceiveError, IPV6_DEFAULT_SUBNET,
 };
 use crate::internal::device::nud::{ConfirmationFlags, NudIpHandler};
 use crate::internal::device::route_discovery::Ipv6DiscoveredRoute;
@@ -598,12 +599,15 @@ impl<
 
 /// A marker for all the contexts provided by bindings require by the ICMP
 /// module.
-pub trait IcmpBindingsContext: InstantContext + RngContext {}
-impl<BC: InstantContext + RngContext + IcmpBindingsTypes> IcmpBindingsContext for BC {}
+pub trait IcmpBindingsContext: InstantContext + RngContext + IcmpBindingsTypes {}
+impl<BC> IcmpBindingsContext for BC where
+    BC: InstantContext + RngContext + IcmpBindingsTypes + IcmpBindingsTypes
+{
+}
 
 /// A marker trait for all bindings types required by the ICMP module.
-pub trait IcmpBindingsTypes: InstantBindingsTypes {}
-impl<BT: InstantBindingsTypes> IcmpBindingsTypes for BT {}
+pub trait IcmpBindingsTypes: InstantBindingsTypes + TxMetadataBindingsTypes {}
+impl<BT: InstantBindingsTypes + TxMetadataBindingsTypes> IcmpBindingsTypes for BT {}
 
 /// Empty trait to work around coherence issues.
 ///
@@ -1143,7 +1147,7 @@ fn send_neighbor_advertisement<
 
 fn receive_ndp_packet<
     B: SplitByteSlice,
-    BC: IcmpBindingsContext,
+    BC: IcmpBindingsContext + NdpBindingsContext<CC::DeviceId>,
     CC: InnerIcmpv6Context<BC>
         + Ipv6DeviceHandler<BC>
         + IpDeviceHandler<Ipv6, BC>
@@ -1543,12 +1547,18 @@ fn receive_ndp_packet<
                     }
                 }
             }
+
+            bindings_ctx.on_event(RouterAdvertisementEvent {
+                options_bytes: Box::from(p.body().bytes()),
+                source: **src_ip,
+                device: device_id.clone(),
+            });
         }
     }
 }
 
 impl<
-        BC: IcmpBindingsContext,
+        BC: IcmpBindingsContext + NdpBindingsContext<CC::DeviceId>,
         CC: InnerIcmpv6Context<BC>
             + InnerIcmpContext<Ipv6, BC>
             + Ipv6DeviceHandler<BC>
@@ -1748,12 +1758,14 @@ fn send_icmp_reply<I, BC, CC, S, F>(
 ) where
     I: IpExt,
     CC: IpSocketHandler<I, BC> + DeviceIdContext<AnyDevice> + CounterContext<IcmpTxCounters<I>>,
+    BC: TxMetadataBindingsTypes,
     S: TransportPacketSerializer<I>,
     S::Buffer: BufferMut,
     F: FnOnce(SpecifiedAddr<I::Addr>) -> S,
 {
     trace!("send_icmp_reply({:?}, {}, {})", device, original_src_ip, original_dst_ip);
     core_ctx.increment(|counters| &counters.reply);
+    let tx_metadata: BC::TxMetadata = Default::default();
     core_ctx
         .send_oneshot_ip_packet(
             bindings_ctx,
@@ -1762,6 +1774,7 @@ fn send_icmp_reply<I, BC, CC, S, F>(
             original_src_ip,
             I::ICMP_IP_PROTO,
             &DefaultIpSocketOptions,
+            tx_metadata,
             |src_ip| get_body_from_src_ip(src_ip.into()),
         )
         .unwrap_or_else(|err| {
@@ -2562,6 +2575,7 @@ fn send_icmpv4_error_message<
     // body.
     original_packet.shrink_back_to(header_len + 64);
 
+    let tx_metadata: BC::TxMetadata = Default::default();
     // TODO(https://fxbug.dev/42177877): Improve source address selection for ICMP
     // errors sent from unnumbered/router interfaces.
     let _ = try_send_error!(
@@ -2574,6 +2588,7 @@ fn send_icmpv4_error_message<
             original_src_ip,
             Ipv4Proto::Icmp,
             &DefaultIpSocketOptions,
+            tx_metadata,
             |local_ip| {
                 original_packet.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
                     local_ip.addr(),
@@ -2624,6 +2639,7 @@ fn send_icmpv6_error_message<
     }
     impl DelegatedRouteResolutionOptions<Ipv6> for RestrictMtu {}
 
+    let tx_metadata: BC::TxMetadata = Default::default();
     // TODO(https://fxbug.dev/42177877): Improve source address selection for ICMP
     // errors sent from unnumbered/router interfaces.
     let _ = try_send_error!(
@@ -2636,6 +2652,7 @@ fn send_icmpv6_error_message<
             original_src_ip,
             Ipv6Proto::Icmpv6,
             &RestrictMtu,
+            tx_metadata,
             |local_ip| {
                 let icmp_builder = IcmpPacketBuilder::<Ipv6, _>::new(
                     local_ip.addr(),
@@ -2854,7 +2871,7 @@ mod tests {
     use net_types::ip::Subnet;
     use netstack3_base::testutil::{
         set_logger_for_test, FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeInstant,
-        FakeWeakDeviceId, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
+        FakeTxMetadata, FakeWeakDeviceId, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
     };
     use netstack3_base::CtxPair;
     use packet::Buf;
@@ -2863,7 +2880,7 @@ mod tests {
     use packet_formats::utils::NonZeroDuration;
 
     use super::*;
-    use crate::internal::base::IpDeviceEgressStateContext;
+    use crate::internal::base::{IpDeviceEgressStateContext, RouterAdvertisementEvent};
     use crate::internal::socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx};
     use crate::internal::socket::{
         IpSock, IpSockCreationError, IpSockSendError, IpSocketHandler, SendOptions,
@@ -2884,7 +2901,12 @@ mod tests {
     }
 
     /// `FakeBindingsCtx` specialized for ICMP.
-    type FakeIcmpBindingsCtx<I> = FakeBindingsCtx<(), (), FakeIcmpBindingsCtxState<I>, ()>;
+    type FakeIcmpBindingsCtx<I> = FakeBindingsCtx<
+        (),
+        RouterAdvertisementEvent<FakeDeviceId>,
+        FakeIcmpBindingsCtxState<I>,
+        (),
+    >;
 
     /// A fake ICMP bindings and core contexts.
     ///
@@ -3301,13 +3323,14 @@ mod tests {
             socket: &IpSock<I, Self::WeakDeviceId>,
             body: S,
             options: &O,
+            tx_meta: FakeTxMetadata,
         ) -> Result<(), IpSockSendError>
         where
             S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,
             O: SendOptions<I> + RouteResolutionOptions<I>,
         {
-            self.ip_socket_ctx.send_ip_packet(bindings_ctx, socket, body, options)
+            self.ip_socket_ctx.send_ip_packet(bindings_ctx, socket, body, options, tx_meta)
         }
 
         fn confirm_reachable<O>(

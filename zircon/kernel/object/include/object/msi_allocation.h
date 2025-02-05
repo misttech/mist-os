@@ -51,7 +51,7 @@ class MsiAllocation : public fbl::RefCounted<MsiAllocation> {
 
   ~MsiAllocation();
 
-  void GetInfo(zx_info_msi* info) const TA_EXCL(lock_);
+  zx_info_msi GetInfo() const TA_EXCL(lock_);
 
   static zx_obj_type_t get_type() { return ZX_OBJ_TYPE_MSI; }
   const msi_block_t& block() const { return block_; }

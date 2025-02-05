@@ -157,6 +157,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn start_fxfs() {
-        check_filesystem(Fxfs).await;
+        check_filesystem(Fxfs { volume_size: 4 * 1024 * 1024 }).await;
     }
 }

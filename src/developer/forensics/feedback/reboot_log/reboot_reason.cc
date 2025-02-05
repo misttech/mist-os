@@ -18,6 +18,8 @@ std::string ToString(const RebootReason reason) {
       return "NOT PARSEABLE";
     case RebootReason::kGenericGraceful:
       return "GENERIC GRACEFUL";
+    case RebootReason::kUnexpectedReasonGraceful:
+      return "UNEXPECTED REASON GRACEFUL";
     case RebootReason::kCold:
       return "COLD";
     case RebootReason::kSpontaneous:
@@ -52,6 +54,8 @@ std::string ToString(const RebootReason reason) {
       return "CRITICAL COMPONENT FAILURE";
     case RebootReason::kFdr:
       return "FACTORY DATA RESET";
+    case RebootReason::kNetstackMigration:
+      return "NETSTACK MIGRATION";
   }
 }
 
@@ -71,12 +75,14 @@ bool IsCrash(const RebootReason reason) {
     case RebootReason::kRetrySystemUpdate:
     case RebootReason::kHighTemperature:
     case RebootReason::kGenericGraceful:
+    case RebootReason::kUnexpectedReasonGraceful:
       return true;
     case RebootReason::kUserRequest:
     case RebootReason::kSystemUpdate:
     case RebootReason::kZbiSwap:
     case RebootReason::kCold:
     case RebootReason::kFdr:
+    case RebootReason::kNetstackMigration:
       return false;
   }
 }
@@ -96,6 +102,7 @@ bool IsFatal(const RebootReason reason) {
     case RebootReason::kRetrySystemUpdate:
     case RebootReason::kHighTemperature:
     case RebootReason::kGenericGraceful:
+    case RebootReason::kUnexpectedReasonGraceful:
       return true;
     case RebootReason::kUserRequest:
     case RebootReason::kSystemUpdate:
@@ -103,6 +110,7 @@ bool IsFatal(const RebootReason reason) {
     case RebootReason::kCold:
     case RebootReason::kSessionFailure:
     case RebootReason::kFdr:
+    case RebootReason::kNetstackMigration:
       return false;
   }
 }
@@ -110,6 +118,7 @@ bool IsFatal(const RebootReason reason) {
 std::optional<bool> OptionallyGraceful(const RebootReason reason) {
   switch (reason) {
     case RebootReason::kGenericGraceful:
+    case RebootReason::kUnexpectedReasonGraceful:
     case RebootReason::kUserRequest:
     case RebootReason::kSystemUpdate:
     case RebootReason::kRetrySystemUpdate:
@@ -119,7 +128,37 @@ std::optional<bool> OptionallyGraceful(const RebootReason reason) {
     case RebootReason::kSysmgrFailure:
     case RebootReason::kCriticalComponentFailure:
     case RebootReason::kFdr:
+    case RebootReason::kNetstackMigration:
       return true;
+    case RebootReason::kCold:
+    case RebootReason::kSpontaneous:
+    case RebootReason::kKernelPanic:
+    case RebootReason::kOOM:
+    case RebootReason::kHardwareWatchdogTimeout:
+    case RebootReason::kSoftwareWatchdogTimeout:
+    case RebootReason::kBrownout:
+    case RebootReason::kRootJobTermination:
+      return false;
+    case RebootReason::kNotParseable:
+      return std::nullopt;
+  }
+}
+
+std::optional<bool> OptionallyPlanned(const RebootReason reason) {
+  switch (reason) {
+    case RebootReason::kSystemUpdate:
+    case RebootReason::kNetstackMigration:
+      return true;
+    case RebootReason::kGenericGraceful:
+    case RebootReason::kUnexpectedReasonGraceful:
+    case RebootReason::kUserRequest:
+    case RebootReason::kRetrySystemUpdate:
+    case RebootReason::kZbiSwap:
+    case RebootReason::kHighTemperature:
+    case RebootReason::kSessionFailure:
+    case RebootReason::kSysmgrFailure:
+    case RebootReason::kCriticalComponentFailure:
+    case RebootReason::kFdr:
     case RebootReason::kCold:
     case RebootReason::kSpontaneous:
     case RebootReason::kKernelPanic:
@@ -140,6 +179,8 @@ cobalt::LastRebootReason ToCobaltLastRebootReason(RebootReason reason) {
       return cobalt::LastRebootReason::kUnknown;
     case RebootReason::kGenericGraceful:
       return cobalt::LastRebootReason::kGenericGraceful;
+    case RebootReason::kUnexpectedReasonGraceful:
+      return cobalt::LastRebootReason::kUnexpectedReasonGraceful;
     case RebootReason::kUserRequest:
       return cobalt::LastRebootReason::kUserRequest;
     case RebootReason::kSystemUpdate:
@@ -174,6 +215,8 @@ cobalt::LastRebootReason ToCobaltLastRebootReason(RebootReason reason) {
       return cobalt::LastRebootReason::kBrownout;
     case RebootReason::kRootJobTermination:
       return cobalt::LastRebootReason::kRootJobTermination;
+    case RebootReason::kNetstackMigration:
+      return cobalt::LastRebootReason::kNetstackMigration;
   }
 }
 
@@ -209,6 +252,8 @@ std::string ToCrashSignature(const RebootReason reason,
       return "fuchsia-retry-system-update";
     case RebootReason::kGenericGraceful:
       return "fuchsia-undetermined-userspace-reboot";
+    case RebootReason::kUnexpectedReasonGraceful:
+      return "fuchsia-unexpected-reason-userspace-reboot";
     case RebootReason::kHighTemperature:
       return "fuchsia-reboot-high-temperature";
     case RebootReason::kUserRequest:
@@ -216,6 +261,7 @@ std::string ToCrashSignature(const RebootReason reason,
     case RebootReason::kZbiSwap:
     case RebootReason::kCold:
     case RebootReason::kFdr:
+    case RebootReason::kNetstackMigration:
       FX_LOGS(FATAL) << "Not expecting a crash for reboot reason: " << ToString(reason);
       return "FATAL ERROR";
   }
@@ -240,12 +286,14 @@ std::string ToCrashProgramName(const RebootReason reason) {
     case RebootReason::kRetrySystemUpdate:
     case RebootReason::kHighTemperature:
     case RebootReason::kGenericGraceful:
+    case RebootReason::kUnexpectedReasonGraceful:
       return "system";
     case RebootReason::kUserRequest:
     case RebootReason::kSystemUpdate:
     case RebootReason::kZbiSwap:
     case RebootReason::kCold:
     case RebootReason::kFdr:
+    case RebootReason::kNetstackMigration:
       FX_LOGS(FATAL) << "Not expecting a program name request for reboot reason: "
                      << ToString(reason);
       return "FATAL ERROR";
@@ -255,6 +303,7 @@ std::string ToCrashProgramName(const RebootReason reason) {
 std::optional<fuchsia::feedback::RebootReason> ToFidlRebootReason(const RebootReason reason) {
   switch (reason) {
     case RebootReason::kGenericGraceful:
+    case RebootReason::kUnexpectedReasonGraceful:
       return std::nullopt;
     case RebootReason::kUserRequest:
       return fuchsia::feedback::RebootReason::USER_REQUEST;
@@ -290,6 +339,8 @@ std::optional<fuchsia::feedback::RebootReason> ToFidlRebootReason(const RebootRe
       return fuchsia::feedback::RebootReason::BROWNOUT;
     case RebootReason::kRootJobTermination:
       return fuchsia::feedback::RebootReason::ROOT_JOB_TERMINATION;
+    case RebootReason::kNetstackMigration:
+      return fuchsia::feedback::RebootReason::NETSTACK_MIGRATION;
     case RebootReason::kNotParseable:
       return std::nullopt;
   }

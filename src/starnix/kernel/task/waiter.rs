@@ -76,6 +76,7 @@ pub enum EventHandler {
 }
 
 impl EventHandler {
+    #[allow(unpredictable_function_pointer_comparisons)]
     pub fn add_mapping(&mut self, f: fn(FdEvents) -> FdEvents) {
         let Some(prev) = (match self {
             Self::None => None,
@@ -1107,6 +1108,29 @@ impl WaitQueue {
     /// Returns whether there is no active waiters waiting on this `WaitQueue`.
     pub fn is_empty(&self) -> bool {
         self.0.lock().waiters.is_empty()
+    }
+}
+
+/// A wait queue that dispatches events based on the value of an enum.
+pub struct TypedWaitQueue<T: Into<u64>> {
+    wait_queue: WaitQueue,
+    value_type: std::marker::PhantomData<T>,
+}
+
+// We can't #[derive(Default)] on [TypedWaitQueue<T>] as T may not implement the Default trait.
+impl<T: Into<u64>> Default for TypedWaitQueue<T> {
+    fn default() -> Self {
+        Self { wait_queue: Default::default(), value_type: Default::default() }
+    }
+}
+
+impl<T: Into<u64>> TypedWaitQueue<T> {
+    pub fn wait_async_value(&self, waiter: &Waiter, value: T) -> WaitCanceler {
+        self.wait_queue.wait_async_value(waiter, value.into())
+    }
+
+    pub fn notify_value(&self, value: T) {
+        self.wait_queue.notify_value(value.into())
     }
 }
 

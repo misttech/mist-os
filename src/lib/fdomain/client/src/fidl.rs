@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::{
-    AnyHandle, AsHandleRef, Channel, ChannelMessage, ChannelMessageStream, ChannelWriter, Error,
-    Handle, HandleInfo,
+    AnyHandle, AsHandleRef, Channel, ChannelMessageStream, ChannelWriter, Error, Handle,
+    HandleInfo, MessageBuf,
 };
 use fidl_fuchsia_fdomain as proto;
 use futures::{Stream, StreamExt, TryStream};
@@ -87,7 +87,7 @@ impl ::fidl::encoding::ProxyChannelBox<FDomainResourceDialect> for FDomainProxyC
     fn recv_etc_from(
         &self,
         ctx: &mut std::task::Context<'_>,
-        buf: &mut ChannelMessage,
+        buf: &mut MessageBuf,
     ) -> Poll<Result<(), Option<Error>>> {
         let Some(got) = std::task::ready!(self.0.lock().unwrap().poll_next_unpin(ctx)) else {
             return Poll::Ready(Err(Some(Error::ClientLost)));
@@ -140,7 +140,7 @@ impl ::fidl::encoding::ProxyChannelBox<FDomainResourceDialect> for FDomainProxyC
 pub struct FDomainResourceDialect;
 impl ::fidl::encoding::ResourceDialect for FDomainResourceDialect {
     type Handle = Handle;
-    type MessageBufEtc = ChannelMessage;
+    type MessageBufEtc = MessageBuf;
     type ProxyChannel = Channel;
 
     #[inline]
@@ -151,9 +151,9 @@ impl ::fidl::encoding::ResourceDialect for FDomainResourceDialect {
     }
 }
 
-impl ::fidl::encoding::MessageBufFor<FDomainResourceDialect> for ChannelMessage {
-    fn new() -> ChannelMessage {
-        ChannelMessage { bytes: Vec::new(), handles: Vec::new() }
+impl ::fidl::encoding::MessageBufFor<FDomainResourceDialect> for MessageBuf {
+    fn new() -> MessageBuf {
+        MessageBuf { bytes: Vec::new(), handles: Vec::new() }
     }
 
     fn split_mut(&mut self) -> (&mut Vec<u8>, &mut Vec<HandleInfo>) {
@@ -469,8 +469,8 @@ impl<T: ProtocolMarker> ClientEnd<T> {
 
 impl<'c, T: ProtocolMarker> ClientEnd<T> {
     /// Convert the `ClientEnd` into a `Proxy` through which FIDL calls may be made.
-    pub fn into_proxy(self) -> Result<T::Proxy, crate::Error> {
-        Ok(T::Proxy::from_channel(self.inner))
+    pub fn into_proxy(self) -> T::Proxy {
+        T::Proxy::from_channel(self.inner)
     }
 }
 
@@ -516,24 +516,24 @@ impl<T: ProtocolMarker> ServerEnd<T> {
     }
 
     /// Create a stream of requests off of the channel.
-    pub fn into_stream(self) -> Result<T::RequestStream, crate::Error>
+    pub fn into_stream(self) -> T::RequestStream
     where
         T: ProtocolMarker,
     {
-        Ok(T::RequestStream::from_channel(self.inner))
+        T::RequestStream::from_channel(self.inner)
     }
 
     /// Create a stream of requests and an event-sending handle
     /// from the channel.
     pub fn into_stream_and_control_handle(
         self,
-    ) -> Result<(T::RequestStream, <T::RequestStream as RequestStream>::ControlHandle), crate::Error>
+    ) -> (T::RequestStream, <T::RequestStream as RequestStream>::ControlHandle)
     where
         T: ProtocolMarker,
     {
-        let stream = self.into_stream()?;
+        let stream = self.into_stream();
         let control_handle = stream.control_handle();
-        Ok((stream, control_handle))
+        (stream, control_handle)
     }
 }
 

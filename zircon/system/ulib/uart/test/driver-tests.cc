@@ -25,10 +25,9 @@ using namespace std::literals;
 namespace {
 
 TEST(UartTests, Nonblocking) {
-  uart::KernelDriver<uart::mock::Driver, uart::mock::IoProvider, uart::mock::SyncPolicy> driver;
+  uart::mock::Driver uart;
 
-  driver.uart()
-      .ExpectLock()
+  uart.ExpectLock()
       .ExpectInit()
       .ExpectUnlock()
       // First Write call -> sends all chars, no waiting.
@@ -46,16 +45,17 @@ TEST(UartTests, Nonblocking) {
       .ExpectWrite("world\r\n"sv)
       .ExpectUnlock();
 
+  uart::KernelDriver<uart::mock::Driver, uart::mock::IoProvider, uart::mock::SyncPolicy> driver(
+      std::move(uart));
+
   driver.Init<uart::mock::Locking>();
   EXPECT_EQ(driver.Write<uart::mock::Locking>("hi!"), 3);
   EXPECT_EQ(driver.Write<uart::mock::Locking>("hello world\n"), 12);
 }
 
 TEST(UartTests, LockPolicy) {
-  uart::KernelDriver<uart::mock::Driver, uart::mock::IoProvider, uart::mock::SyncPolicy> driver;
-
-  driver.uart()
-      .ExpectLock()
+  uart::mock::Driver uart;
+  uart.ExpectLock()
       .ExpectInit()
       .ExpectUnlock()
       // First Write call -> sends all chars, no waiting.
@@ -69,6 +69,9 @@ TEST(UartTests, LockPolicy) {
       .ExpectTxReady(true)
       .ExpectWrite("world\r\n"sv);
 
+  uart::KernelDriver<uart::mock::Driver, uart::mock::IoProvider, uart::mock::SyncPolicy> driver(
+      std::move(uart));
+
   driver.Init<uart::mock::Locking>();
   // Just check that lock args are forwarded correctly.
   EXPECT_EQ(driver.Write<uart::mock::NoopLocking>("hi!"), 3);
@@ -76,10 +79,9 @@ TEST(UartTests, LockPolicy) {
 }
 
 TEST(UartTests, Blocking) {
-  uart::KernelDriver<uart::mock::Driver, uart::mock::IoProvider, uart::mock::SyncPolicy> driver;
+  uart::mock::Driver uart;
 
-  driver.uart()
-      .ExpectLock()
+  uart.ExpectLock()
       .ExpectInit()
       .ExpectUnlock()
       // First Write call -> sends all chars, no waiting.
@@ -99,9 +101,141 @@ TEST(UartTests, Blocking) {
       .ExpectWrite("world\r\n"sv)
       .ExpectUnlock();
 
+  uart::KernelDriver<uart::mock::Driver, uart::mock::IoProvider, uart::mock::SyncPolicy> driver(
+      std::move(uart));
+
   driver.Init<uart::mock::Locking>();
   EXPECT_EQ(driver.Write<uart::mock::Locking>("hi!"), 3);
   EXPECT_EQ(driver.Write<uart::mock::Locking>("hello world\n"), 12);
+}
+
+TEST(UartTests, Config) {
+  uart::all::Config all_configs;
+
+  zbi_dcfg_simple_t dcfg = {
+      .mmio_phys = 1,
+      .irq = 2,
+      .flags = 3,
+  };
+
+  // uart::foo::Driver
+  uart::ns8250::Mmio32Driver uart(dcfg);
+
+  // From uart driver.
+  all_configs = uart;
+  all_configs.Visit([&dcfg](auto& config) {
+    if constexpr (std::is_same_v<std::decay_t<decltype(*config)>, zbi_dcfg_simple_t>) {
+      using uart_type = typename std::decay_t<decltype(config)>::uart_type;
+      ASSERT_TRUE((std::is_same_v<uart_type, uart::ns8250::Mmio32Driver>));
+      EXPECT_EQ(config->mmio_phys, dcfg.mmio_phys);
+      EXPECT_EQ(config->irq, dcfg.irq);
+      EXPECT_EQ(config->flags, dcfg.flags);
+    } else {
+      FAIL("Unexpected configuration");
+    }
+  });
+
+  // From kernel driver
+  zbi_dcfg_simple_pio_t pio_cfg{
+      .base = 0x3f8,
+      .irq = 3,
+  };
+  uart::KernelDriver<uart::ns8250::PioDriver, uart::mock::IoProvider, uart::UnsynchronizedPolicy>
+      driver(pio_cfg);
+  all_configs = driver;
+  all_configs.Visit([&pio_cfg](auto& config) {
+    if constexpr (std::is_same_v<std::decay_t<decltype(*config)>, zbi_dcfg_simple_pio_t>) {
+      using uart_type = typename std::decay_t<decltype(config)>::uart_type;
+      ASSERT_TRUE((std::is_same_v<uart_type, uart::ns8250::PioDriver>));
+      EXPECT_EQ(config->base, pio_cfg.base);
+      EXPECT_EQ(config->irq, pio_cfg.irq);
+    } else {
+      FAIL("Unexpected configuration");
+    }
+  });
+
+  // Construct from uart.
+  {
+    zbi_dcfg_simple_t dcfg = {
+        .mmio_phys = 1,
+        .irq = 2,
+        .flags = 3,
+    };
+
+    // uart::foo::Driver
+    uart::ns8250::Mmio32Driver uart(dcfg);
+    uart::all::Config all_configs(uart);
+
+    all_configs.Visit([&dcfg](auto& config) {
+      if constexpr (std::is_same_v<std::decay_t<decltype(*config)>, zbi_dcfg_simple_t>) {
+        using uart_type = typename std::decay_t<decltype(config)>::uart_type;
+        ASSERT_TRUE((std::is_same_v<uart_type, uart::ns8250::Mmio32Driver>));
+        EXPECT_EQ(config->mmio_phys, dcfg.mmio_phys);
+        EXPECT_EQ(config->irq, dcfg.irq);
+        EXPECT_EQ(config->flags, dcfg.flags);
+      } else {
+        FAIL("Unexpected configuration");
+      }
+    });
+  }
+
+  // Construct from kernel driver.
+  {
+    // From kernel driver
+    zbi_dcfg_simple_pio_t pio_cfg{
+        .base = 0x3f8,
+        .irq = 3,
+    };
+    uart::KernelDriver<uart::ns8250::PioDriver, uart::mock::IoProvider, uart::UnsynchronizedPolicy>
+        driver(pio_cfg);
+    uart::all::Config all_configs(driver);
+    all_configs.Visit([&pio_cfg](auto& config) {
+      if constexpr (std::is_same_v<std::decay_t<decltype(*config)>, zbi_dcfg_simple_pio_t>) {
+        using uart_type = typename std::decay_t<decltype(config)>::uart_type;
+        ASSERT_TRUE((std::is_same_v<uart_type, uart::ns8250::PioDriver>));
+        EXPECT_EQ(config->base, pio_cfg.base);
+        EXPECT_EQ(config->irq, pio_cfg.irq);
+      } else {
+        FAIL("Unexpected configuration");
+      }
+    });
+  }
+}
+
+TEST(UartTests, AllConfig) {
+  // Assignment
+  uart::all::KernelDriver<uart::mock::IoProvider, uart::UnsynchronizedPolicy> all_driver;
+  zbi_dcfg_simple_pio_t pio_cfg{
+      .base = 0x3f8,
+      .irq = 3,
+  };
+  uart::KernelDriver<uart::ns8250::PioDriver, uart::mock::IoProvider, uart::UnsynchronizedPolicy>
+      driver(pio_cfg);
+  all_driver = std::move(driver).TakeUart();
+  uart::all::Config all_config = all_driver.config();
+  all_config.Visit([&pio_cfg](auto& config) {
+    if constexpr (std::is_same_v<std::decay_t<decltype(*config)>, zbi_dcfg_simple_pio_t>) {
+      using uart_type = typename std::decay_t<decltype(config)>::uart_type;
+      ASSERT_TRUE((std::is_same_v<uart_type, uart::ns8250::PioDriver>));
+      EXPECT_EQ(config->base, pio_cfg.base);
+      EXPECT_EQ(config->irq, pio_cfg.irq);
+    } else {
+      FAIL("Unexpected configuration");
+    }
+  });
+
+  // Constctor
+  uart::all::KernelDriver<uart::mock::IoProvider, uart::UnsynchronizedPolicy> all_driver2(
+      all_config);
+  all_driver2.Visit([&](const auto& driver) {
+    using uart_type = typename std::decay_t<decltype(driver)>::uart_type;
+    if constexpr (std::is_same_v<uart_type, uart::ns8250::PioDriver>) {
+      EXPECT_EQ(driver.config().base, pio_cfg.base);
+      EXPECT_EQ(driver.config().irq, pio_cfg.irq);
+    } else {
+      FAIL("Unexpected configuration");
+    }
+  });
 }
 
 TEST(UartTests, Null) {
@@ -131,7 +265,7 @@ TEST(UartTests, All) {
   });
 
   // Transfer state to a new instantiation and pick up using it.
-  AllDriver newdriver{driver.uart()};
+  AllDriver newdriver{std::move(driver).TakeUart()};
   newdriver.Visit([](auto&& driver) {
     EXPECT_EQ(driver.template Write("hello world\n"), 12);
     EXPECT_FALSE(driver.template Read());
@@ -238,11 +372,10 @@ TEST(UartTests, MatchCompatible) {
 
   auto visit = [](auto&& visitor) {
     auto actual_visitor = [visitor = std::move(visitor)](auto&& driver) {
-      using DriverType = std::decay_t<decltype(driver.uart())>;
+      using DriverType = std::decay_t<decltype(driver)>::uart_type;
       if constexpr (!std::is_same_v<uart::null::Driver, DriverType> &&
                     !std::is_same_v<uart::internal::DummyDriver, DriverType>) {
-        if constexpr (std::is_same_v<zbi_dcfg_simple_t,
-                                     std::decay_t<decltype(driver.uart().config())>>) {
+        if constexpr (std::is_same_v<zbi_dcfg_simple_t, std::decay_t<decltype(driver.config())>>) {
           visitor(driver);
         } else {
           FAIL("Unexpected dcfg_simple_pio_t.");
@@ -268,10 +401,11 @@ TEST(UartTests, MatchCompatible) {
     emplacer(dcfg);
 
     driver.Visit(visit([&](auto&& driver) {
-      EXPECT_EQ(driver.uart().extra(), ZBI_KERNEL_DRIVER_I8250_MMIO8_UART);
-      EXPECT_EQ(driver.uart().config_name(), uart::ns8250::Mmio8Driver::config_name());
-      EXPECT_EQ(driver.uart().config().mmio_phys, 1);
-      EXPECT_EQ(driver.uart().config().irq, 2);
+      using uart_t = typename std::decay_t<decltype(driver)>::uart_type;
+      EXPECT_EQ(uart_t::kExtra, ZBI_KERNEL_DRIVER_I8250_MMIO8_UART);
+      EXPECT_EQ(uart_t::kConfigName, uart::ns8250::Mmio8Driver::kConfigName);
+      EXPECT_EQ(driver.config().mmio_phys, 1);
+      EXPECT_EQ(driver.config().irq, 2);
     }));
   }
 
@@ -291,10 +425,11 @@ TEST(UartTests, MatchCompatible) {
     emplacer(dcfg);
 
     driver.Visit(visit([&](auto&& driver) {
-      EXPECT_EQ(driver.uart().extra(), ZBI_KERNEL_DRIVER_I8250_MMIO32_UART);
-      EXPECT_EQ(driver.uart().config_name(), uart::ns8250::Mmio32Driver::config_name());
-      EXPECT_EQ(driver.uart().config().mmio_phys, 1);
-      EXPECT_EQ(driver.uart().config().irq, 2);
+      using uart_t = typename std::decay_t<decltype(driver)>::uart_type;
+      EXPECT_EQ(uart_t::kExtra, ZBI_KERNEL_DRIVER_I8250_MMIO32_UART);
+      EXPECT_EQ(uart_t::kConfigName, uart::ns8250::Mmio32Driver::kConfigName);
+      EXPECT_EQ(driver.config().mmio_phys, 1);
+      EXPECT_EQ(driver.config().irq, 2);
     }));
   }
 
@@ -325,10 +460,11 @@ TEST(UartTests, MatchCompatible) {
     emplacer(dcfg);
 
     driver.Visit(visit([&](auto&& driver) {
-      EXPECT_EQ(driver.uart().extra(), ZBI_KERNEL_DRIVER_DW8250_UART);
-      EXPECT_EQ(driver.uart().config_name(), uart::ns8250::Dw8250Driver::config_name());
-      EXPECT_EQ(driver.uart().config().mmio_phys, 1);
-      EXPECT_EQ(driver.uart().config().irq, 2);
+      using uart_t = typename std::decay_t<decltype(driver)>::uart_type;
+      EXPECT_EQ(uart_t::kExtra, ZBI_KERNEL_DRIVER_DW8250_UART);
+      EXPECT_EQ(uart_t::kConfigName, uart::ns8250::Dw8250Driver::kConfigName);
+      EXPECT_EQ(driver.config().mmio_phys, 1);
+      EXPECT_EQ(driver.config().irq, 2);
     }));
   }
 
@@ -345,10 +481,11 @@ TEST(UartTests, MatchCompatible) {
     emplacer(dcfg);
 
     driver.Visit(visit([&](auto&& driver) {
-      EXPECT_EQ(driver.uart().extra(), ZBI_KERNEL_DRIVER_PL011_UART);
-      EXPECT_EQ(driver.uart().config_name(), uart::pl011::Driver::config_name());
-      EXPECT_EQ(driver.uart().config().mmio_phys, 1);
-      EXPECT_EQ(driver.uart().config().irq, 2);
+      using uart_t = typename std::decay_t<decltype(driver)>::uart_type;
+      EXPECT_EQ(uart_t::kExtra, ZBI_KERNEL_DRIVER_PL011_UART);
+      EXPECT_EQ(uart_t::kConfigName, uart::pl011::Driver::kConfigName);
+      EXPECT_EQ(driver.config().mmio_phys, 1);
+      EXPECT_EQ(driver.config().irq, 2);
     }));
   }
 
@@ -366,10 +503,11 @@ TEST(UartTests, MatchCompatible) {
     emplacer(dcfg);
 
     driver.Visit(visit([&](auto&& driver) {
-      EXPECT_EQ(driver.uart().extra(), ZBI_KERNEL_DRIVER_AMLOGIC_UART);
-      EXPECT_EQ(driver.uart().config_name(), uart::amlogic::Driver::config_name());
-      EXPECT_EQ(driver.uart().config().mmio_phys, 1);
-      EXPECT_EQ(driver.uart().config().irq, 2);
+      using uart_t = typename std::decay_t<decltype(driver)>::uart_type;
+      EXPECT_EQ(uart_t::kExtra, ZBI_KERNEL_DRIVER_AMLOGIC_UART);
+      EXPECT_EQ(uart_t::kConfigName, uart::amlogic::Driver::kConfigName);
+      EXPECT_EQ(driver.config().mmio_phys, 1);
+      EXPECT_EQ(driver.config().irq, 2);
     }));
   }
 }

@@ -38,8 +38,7 @@ class PlatformDevice {
   virtual std::unique_ptr<PlatformHandle> GetBusTransactionInitiator() const = 0;
 
   // Map an MMIO listed at |index| in the MDI for this device.
-  virtual std::unique_ptr<PlatformMmio> CpuMapMmio(unsigned int index,
-                                                   PlatformMmio::CachePolicy cache_policy) {
+  virtual std::unique_ptr<PlatformMmio> CpuMapMmio(unsigned int index) {
     MAGMA_DLOG("CpuMapMmio unimplemented");
     return nullptr;
   }

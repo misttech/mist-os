@@ -52,7 +52,7 @@ async fn main() {
         let ShardConfig { num_shards, shard_index, shard_part_regex: _ } = &shard_config;
         assert!(shard_index < num_shards);
 
-        tracing::info!("running (0-indexed) shard {shard_index} of {num_shards} total shards");
+        log::info!("running (0-indexed) shard {shard_index} of {num_shards} total shards");
     }
 
     let mut fs = fuchsia_component::server::ServiceFs::new_local();
@@ -81,7 +81,7 @@ async fn handle_suite_request_stream(
     suite_request_stream: fidl_fuchsia_test::SuiteRequestStream,
     shard_config: &ShardConfig,
 ) -> Result<(), anyhow::Error> {
-    tracing::debug!(
+    log::debug!(
         "handling fuchsia.test.Suite request stream for shard {}",
         shard_config.shard_index
     );
@@ -92,7 +92,7 @@ async fn handle_suite_request_stream(
             let original_suite = original_suite.clone();
             match req {
                 fidl_fuchsia_test::SuiteRequest::GetTests { iterator, control_handle: _ } => {
-                    tracing::debug!(
+                    log::debug!(
                         "handling fuchsia.test.Suite#GetTests request for shard {}",
                         shard_config.shard_index
                     );
@@ -104,7 +104,7 @@ async fn handle_suite_request_stream(
                     listener,
                     control_handle: _,
                 } => {
-                    tracing::debug!(
+                    log::debug!(
                         "handling fuchsia.test.Suite#Run request for shard {}",
                         shard_config.shard_index
                     );
@@ -136,7 +136,7 @@ async fn handle_suite_get_tests(
     iterator_requests
         .map_err(anyhow::Error::from)
         .try_for_each(|fidl_fuchsia_test::CaseIteratorRequest::GetNext { responder }| async move {
-            tracing::debug!(
+            log::debug!(
                 "handling fuchsia.test.CaseIterator#GetNext request for shard {}",
                 shard_config.shard_index
             );

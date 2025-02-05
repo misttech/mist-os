@@ -11,6 +11,9 @@
 
 namespace ktl {
 
+using std::add_const;
+using std::add_const_t;
+
 using cpp20::is_bounded_array;
 using cpp20::is_bounded_array_v;
 using cpp20::is_unbounded_array;
@@ -58,6 +61,9 @@ using std::is_copy_assignable_v;
 
 using std::is_default_constructible;
 using std::is_default_constructible_v;
+
+using std::is_class;
+using std::is_class_v;
 
 using std::is_enum;
 using std::is_enum_v;
@@ -118,6 +124,9 @@ using std::is_trivially_move_assignable_v;
 
 using std::is_trivially_move_constructible;
 using std::is_trivially_move_constructible_v;
+
+using std::is_member_object_pointer;
+using std::is_member_object_pointer_v;
 
 using std::is_unsigned;
 using std::is_unsigned_v;

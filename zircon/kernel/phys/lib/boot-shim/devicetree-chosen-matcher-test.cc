@@ -13,6 +13,8 @@
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbitl/image.h>
 
+#include <zxtest/zxtest.h>
+
 namespace {
 using boot_shim::testing::LoadDtb;
 using boot_shim::testing::LoadedDtb;
@@ -26,6 +28,14 @@ class ChosenNodeMatcherTest
     auto loaded_dtb = LoadDtb("chosen.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
     chosen_dtb_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("chosen_with_console.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    chosen_with_console_dtb_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("chosen_with_console_and_stdout_path.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    chosen_with_console_and_stdout_path_dtb_ = std::move(loaded_dtb).value();
 
     loaded_dtb = LoadDtb("chosen_unknown_intc.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
@@ -42,25 +52,36 @@ class ChosenNodeMatcherTest
 
   static void TearDownTestSuite() {
     chosen_dtb_ = std::nullopt;
+    chosen_with_console_dtb_ = std::nullopt;
     chosen_unknown_intc_dtb_ = std::nullopt;
     chosen_with_reg_offset_dtb_ = std::nullopt;
     chosen_with_translation_dtb_ = std::nullopt;
+    chosen_with_console_and_stdout_path_dtb_ = std::nullopt;
     Mixin::TearDownTestSuite();
   }
 
   devicetree::Devicetree chosen() { return chosen_dtb_->fdt(); }
+  devicetree::Devicetree chosen_with_console() { return chosen_with_console_dtb_->fdt(); }
+  devicetree::Devicetree chosen_with_console_and_stdout_path() {
+    return chosen_with_console_and_stdout_path_dtb_->fdt();
+  }
   devicetree::Devicetree chosen_with_reg_offset() { return chosen_with_reg_offset_dtb_->fdt(); }
   devicetree::Devicetree chosen_unknown_intc() { return chosen_unknown_intc_dtb_->fdt(); }
   devicetree::Devicetree chosen_with_translation() { return chosen_with_translation_dtb_->fdt(); }
 
  private:
   static std::optional<LoadedDtb> chosen_dtb_;
+  static std::optional<LoadedDtb> chosen_with_console_dtb_;
+  static std::optional<LoadedDtb> chosen_with_console_and_stdout_path_dtb_;
   static std::optional<LoadedDtb> chosen_with_reg_offset_dtb_;
   static std::optional<LoadedDtb> chosen_unknown_intc_dtb_;
   static std::optional<LoadedDtb> chosen_with_translation_dtb_;
 };
 
 std::optional<LoadedDtb> ChosenNodeMatcherTest::chosen_dtb_ = std::nullopt;
+std::optional<LoadedDtb> ChosenNodeMatcherTest::chosen_with_console_dtb_ = std::nullopt;
+std::optional<LoadedDtb> ChosenNodeMatcherTest::chosen_with_console_and_stdout_path_dtb_ =
+    std::nullopt;
 std::optional<LoadedDtb> ChosenNodeMatcherTest::chosen_with_reg_offset_dtb_ = std::nullopt;
 std::optional<LoadedDtb> ChosenNodeMatcherTest::chosen_unknown_intc_dtb_ = std::nullopt;
 std::optional<LoadedDtb> ChosenNodeMatcherTest::chosen_with_translation_dtb_ = std::nullopt;
@@ -80,7 +101,7 @@ using AllUartDrivers =
                  uart::ns8250::PxaDriver>;
 
 template <typename ChosenItemType>
-void CheckChosenMatcher(const ChosenItemType& matcher, const ExpectedChosen& expected) {
+void CheckChosenMatcher(ChosenItemType& matcher, const ExpectedChosen& expected) {
   std::vector<std::unique_ptr<devicetree::Node>> nodes_in_path;
   size_t current = 0;
   while (current < expected.uart_absolute_path.length()) {
@@ -113,17 +134,23 @@ void CheckChosenMatcher(const ChosenItemType& matcher, const ExpectedChosen& exp
   EXPECT_EQ(ramdisk_start, expected.ramdisk_start);
   EXPECT_EQ(ramdisk.size(), expected.ramdisk_end - expected.ramdisk_start);
 
-  ASSERT_TRUE(matcher.stdout_path());
-  EXPECT_EQ(*matcher.stdout_path(), expected_uart_path);
+  if (!expected_uart_path.is_empty()) {
+    ASSERT_TRUE(matcher.stdout_path());
+    EXPECT_EQ(*matcher.stdout_path(), expected_uart_path);
+  } else {
+    ASSERT_TRUE(!matcher.stdout_path());
+  }
 
   // Uart.
-  ASSERT_TRUE(matcher.uart());
+  auto uart = std::move(matcher).TakeUart();
+  ASSERT_TRUE(uart);
   uart::internal::Visit(
-      [expected](const auto& uart) {
-        using config_t = std::decay_t<decltype(uart.config())>;
+      [expected]<typename UartType>(const UartType& uart) {
+        using config_t = typename UartType::config_type;
         if constexpr (std::is_same_v<config_t, zbi_dcfg_simple_t>) {
-          EXPECT_EQ(uart.config_name(), expected.uart_config_name, "Actual name %s\n",
-                    uart.config_name().data());
+          EXPECT_EQ(UartType::kConfigName, expected.uart_config_name, "Actual name %s\n",
+                    UartType::kConfigName.data());
+
           EXPECT_EQ(uart.config().mmio_phys, expected.uart_config.mmio_phys);
           // The bootstrap phase does not decode interrupt.
           EXPECT_EQ(uart.config().irq, expected.uart_config.irq);
@@ -132,7 +159,7 @@ void CheckChosenMatcher(const ChosenItemType& matcher, const ExpectedChosen& exp
           FAIL("Unexpected driver: %s", fbl::TypeInfo<decltype(uart)>::Name());
         }
       },
-      *matcher.uart());
+      *uart);
 }
 
 TEST_F(ChosenNodeMatcherTest, Chosen) {
@@ -146,7 +173,56 @@ TEST_F(ChosenNodeMatcherTest, Chosen) {
                          .ramdisk_start = 0x48000000,
                          .ramdisk_end = 0x58000000,
                          .cmdline = "-foo=bar -bar=baz",
-                         .uart_config_name = uart::pl011::Driver::config_name(),
+                         .uart_config_name = uart::pl011::Driver::kConfigName,
+                         .uart_config =
+                             {
+                                 .mmio_phys = 0x9000000,
+                                 .irq = 33,
+                                 .flags = ZBI_KERNEL_DRIVER_IRQ_FLAGS_LEVEL_TRIGGERED |
+                                          ZBI_KERNEL_DRIVER_IRQ_FLAGS_POLARITY_HIGH,
+                             },
+                         .uart_absolute_path = "/some-interrupt-controller/pl011uart@9000000",
+                     });
+}
+
+TEST_F(ChosenNodeMatcherTest, ChosenWithConsole) {
+  auto fdt = chosen_with_console();
+  boot_shim::DevicetreeChosenNodeMatcher<AllUartDrivers> chosen_matcher("test", stdout);
+
+  ASSERT_TRUE(devicetree::Match(fdt, chosen_matcher));
+
+  CheckChosenMatcher(chosen_matcher,
+                     {
+                         .ramdisk_start = 0x48000000,
+                         .ramdisk_end = 0x58000000,
+                         .cmdline = "-foo=bar -bar=baz console=ttyS003",
+                         .uart_config_name = uart::pl011::Driver::kConfigName,
+                         .uart_config =
+                             {
+                                 .mmio_phys = 0x9003000,
+                                 .irq = 36,
+                                 .flags = ZBI_KERNEL_DRIVER_IRQ_FLAGS_LEVEL_TRIGGERED |
+                                          ZBI_KERNEL_DRIVER_IRQ_FLAGS_POLARITY_HIGH,
+                             },
+                         // no stdout-path is set in the chosen node, console should be
+                         // used as a fallback.
+                         .uart_absolute_path = "",
+                     });
+}
+
+TEST_F(ChosenNodeMatcherTest, ChosenWithConsoleAndStdout) {
+  // In this case, the stdout-path trumps whatever the console argument provides.
+  auto fdt = chosen_with_console_and_stdout_path();
+  boot_shim::DevicetreeChosenNodeMatcher<AllUartDrivers> chosen_matcher("test", stdout);
+
+  ASSERT_TRUE(devicetree::Match(fdt, chosen_matcher));
+
+  CheckChosenMatcher(chosen_matcher,
+                     {
+                         .ramdisk_start = 0x48000000,
+                         .ramdisk_end = 0x58000000,
+                         .cmdline = "-foo=bar -bar=baz console=ttyS003",
+                         .uart_config_name = uart::pl011::Driver::kConfigName,
                          .uart_config =
                              {
                                  .mmio_phys = 0x9000000,
@@ -169,7 +245,7 @@ TEST_F(ChosenNodeMatcherTest, ChosenWithRegOffset) {
                          .ramdisk_start = 0x48000000,
                          .ramdisk_end = 0x58000000,
                          .cmdline = "-foo=bar -bar=baz",
-                         .uart_config_name = uart::pl011::Driver::config_name(),
+                         .uart_config_name = uart::pl011::Driver::kConfigName,
                          .uart_config =
                              {
                                  .mmio_phys = 0x9000123,
@@ -192,7 +268,7 @@ TEST_F(ChosenNodeMatcherTest, ChosenWithAddressTranslation) {
                          .ramdisk_start = 0x48000000,
                          .ramdisk_end = 0x58000000,
                          .cmdline = "-foo=bar -bar=baz",
-                         .uart_config_name = uart::pl011::Driver::config_name(),
+                         .uart_config_name = uart::pl011::Driver::kConfigName,
                          .uart_config =
                              {
                                  .mmio_phys = 0x9030000,
@@ -214,7 +290,7 @@ TEST_F(ChosenNodeMatcherTest, ChosenWithUnknownInterruptController) {
                          .ramdisk_start = 0x48000000,
                          .ramdisk_end = 0x58000000,
                          .cmdline = "-foo=bar -bar=baz",
-                         .uart_config_name = uart::pl011::Driver::config_name(),
+                         .uart_config_name = uart::pl011::Driver::kConfigName,
                          .uart_config =
                              {
                                  .mmio_phys = 0x9000000,
@@ -240,7 +316,7 @@ TEST_F(ChosenNodeMatcherTest, CrosvmArm) {
                          .ramdisk_start = 0x81000000,
                          .ramdisk_end = 0x82bd4e28,
                          .cmdline = kCmdline,
-                         .uart_config_name = uart::ns8250::Mmio8Driver::config_name(),
+                         .uart_config_name = uart::ns8250::Mmio8Driver::kConfigName,
                          .uart_config =
                              {
                                  .mmio_phys = 0x3F8,
@@ -270,7 +346,7 @@ TEST_F(ChosenNodeMatcherTest, QemuArm) {
                          .ramdisk_start = kQemuRamdiskStart,
                          .ramdisk_end = kQemuRamdiskEnd,
                          .cmdline = kQemuCmdline,
-                         .uart_config_name = uart::pl011::Driver::config_name(),
+                         .uart_config_name = uart::pl011::Driver::kConfigName,
                          .uart_config =
                              {
                                  .mmio_phys = uart::pl011::kQemuConfig.mmio_phys,
@@ -293,20 +369,19 @@ TEST_F(ChosenNodeMatcherTest, QemuRiscv) {
 
   ASSERT_TRUE(devicetree::Match(fdt, chosen_matcher));
 
-  CheckChosenMatcher(chosen_matcher,
-                     {
-                         .ramdisk_start = kQemuRamdiskStart,
-                         .ramdisk_end = kQemuRamdiskEnd,
-                         .cmdline = kQemuCmdline,
-                         .uart_config_name = uart::ns8250::Mmio8Driver::config_name(),
-                         .uart_config =
-                             {
-                                 .mmio_phys = 0x10000000,
-                                 .irq = 10,
-                                 .flags = 0,
-                             },
-                         .uart_absolute_path = "/soc/serial@10000000",
-                     });
+  CheckChosenMatcher(chosen_matcher, {
+                                         .ramdisk_start = kQemuRamdiskStart,
+                                         .ramdisk_end = kQemuRamdiskEnd,
+                                         .cmdline = kQemuCmdline,
+                                         .uart_config_name = uart::ns8250::Mmio8Driver::kConfigName,
+                                         .uart_config =
+                                             {
+                                                 .mmio_phys = 0x10000000,
+                                                 .irq = 10,
+                                                 .flags = 0,
+                                             },
+                                         .uart_absolute_path = "/soc/serial@10000000",
+                                     });
 }
 
 TEST_F(ChosenNodeMatcherTest, VisionFive2) {
@@ -324,7 +399,7 @@ TEST_F(ChosenNodeMatcherTest, VisionFive2) {
                          .ramdisk_start = 0x48100000,
                          .ramdisk_end = 0x48fb3df5,
                          .cmdline = kCmdline,
-                         .uart_config_name = uart::ns8250::Dw8250Driver::config_name(),
+                         .uart_config_name = uart::ns8250::Dw8250Driver::kConfigName,
                          .uart_config =
                              {
                                  .mmio_phys = 0x10000000,
@@ -353,7 +428,7 @@ TEST_F(ChosenNodeMatcherTest, KhadasVim3) {
                          .ramdisk_start = 0x7fe4d000,
                          .ramdisk_end = 0x7ffff5d7,
                          .cmdline = kCmdline,
-                         .uart_config_name = uart::amlogic::Driver::config_name(),
+                         .uart_config_name = uart::amlogic::Driver::kConfigName,
                          .uart_config =
                              {
                                  .mmio_phys = 0xff803000,
@@ -379,7 +454,7 @@ TEST_F(ChosenNodeMatcherTest, BananaPiF3) {
                                          .ramdisk_start = 0x7685c000,
                                          .ramdisk_end = 0x76ebf76b,
                                          .cmdline = kCmdline,
-                                         .uart_config_name = uart::ns8250::PxaDriver::config_name(),
+                                         .uart_config_name = uart::ns8250::PxaDriver::kConfigName,
                                          .uart_config =
                                              {
                                                  .mmio_phys = 0xd4017000,

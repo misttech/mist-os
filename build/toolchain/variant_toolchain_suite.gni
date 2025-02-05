@@ -6,6 +6,7 @@
 # NOTE: Event though this file does not directly reference clang_toolchain()
 # nor zircon_toolchain(), invoking it through toolchain_template below, GN will
 # refuse to compile if the template is not previously defined.
+import("//build/config/clang/clang_toolchain_info.gni")
 import("//build/toolchain/clang_toolchain.gni")
 import("//build/toolchain/toolchain_tags.gni")
 import("//build/toolchain/variant_tags.gni")
@@ -14,7 +15,10 @@ import("//build/toolchain/zircon/zircon_toolchain.gni")
 # List of keys in toolchain_variant scope related to configs.
 _config_keys = [
   "configs",
+  "deps",
   "executable_configs",
+  "executable_deps",
+  "link_deps",
   "prefix_configs",
   "remove_common_configs",
   "remove_executable_configs",
@@ -59,13 +63,18 @@ template("_variant_toolchain") {
   pass_through_select_variant_canonical = select_variant_canonical
   pass_through_all_toolchain_variants = all_toolchain_variants
 
+  pass_through_clang_toolchain_info = clang_toolchain_info
+
   _target_type = invoker.toolchain_template
 
   # Build the toolchain_variant scope used for this toolchain() instance.
   _toolchain_variant = {
     # First forward variables from the variant.
     configs = []
+    deps = []
     executable_configs = []
+    executable_deps = []
+    link_deps = []
     prefix_configs = []
     remove_common_configs = []
     remove_executable_configs = []
@@ -77,8 +86,17 @@ template("_variant_toolchain") {
     if (defined(this_invoker.configs)) {
       configs += this_invoker.configs
     }
+    if (defined(this_invoker.deps)) {
+      deps += this_invoker.deps
+    }
     if (defined(this_invoker.executable_configs)) {
       executable_configs += this_invoker.executable_configs
+    }
+    if (defined(this_invoker.executable_deps)) {
+      executable_deps += this_invoker.executable_deps
+    }
+    if (defined(this_invoker.link_deps)) {
+      link_deps += this_invoker.link_deps
     }
     if (defined(this_invoker.prefix_configs)) {
       prefix_configs += this_invoker.prefix_configs
@@ -116,6 +134,10 @@ template("_variant_toolchain") {
       if (defined(this_invoker.toolchain_args)) {
         forward_variables_from(this_invoker.toolchain_args, "*")
       }
+
+      clang_toolchain_info = {
+      }
+      clang_toolchain_info = pass_through_clang_toolchain_info
 
       # See comment above.
       select_variant_canonical = []

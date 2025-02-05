@@ -73,8 +73,7 @@ acpi::status<> Manager::ConfigureDiscoveredDevices() {
   for (auto& handle : device_publish_order_) {
     auto device = LookupDevice(handle);
     auto result = device->GatherResources(
-        acpi_, allocator_, this,
-        [this](ACPI_HANDLE bus, BusType type, DeviceChildEntry child) -> size_t {
+        acpi_, this, [this](ACPI_HANDLE bus, BusType type, DeviceChildEntry child) -> size_t {
           DeviceBuilder* b = LookupDevice(bus);
           if (b == nullptr) {
             // Silently ignore.

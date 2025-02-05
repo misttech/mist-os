@@ -67,6 +67,15 @@ struct ArmCurrentEl : public SysRegBase<ArmCurrentEl, uint64_t> {
 };
 ARCH_ARM64_SYSREG(ArmCurrentEl, "CurrentEL");
 
+// If we are executing at an exception level higher than EL1, this disables EL2
+// monitoring, ensures would-be EL2 traps are routed to EL3, installs the
+// current stack in SP_EL1 (if any), and then drops to EL1. If we are already
+// at EL1, then this call is a no-op.
+//
+// This function is safe to call in any context. Care is taken to avoid using
+// the stack and only uses scratch registers.
+extern "C" void ArmDropToEl1WithoutEl2Monitor();
+
 // This type covers three register formats:
 //  * [arm/sysreg]/sctlr_el1: System Control Register (EL1)
 //  * [arm/sysreg]/sctlr_el2: System Control Register (EL2)

@@ -98,7 +98,7 @@ def _impl_wrapper_impl(ctx):
 # the cc_library as two separate rules.
 _codegen = rule(
     implementation = _codegen_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     # Files must be generated in genfiles in order for the header to be included
     # anywhere.
     output_to_genfiles = True,

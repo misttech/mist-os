@@ -34,10 +34,6 @@ zx_library("pci") {
   ]
 
   configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
-  if (is_mistos) {
-    configs -= [ "//build/config/fuchsia:static_cpp_standard_library" ]
-    configs += [ "//build/config/mistos:static_cpp_standard_library" ]
-  }
 }
 
 test("pci-roothost") {

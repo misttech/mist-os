@@ -38,6 +38,14 @@
       "short": null,
       "description": "prevent symbolization of the trace file. Defaults to false. If the 'kernel:ipc' category is not included in tracing, this flag does nothing. Otherwise this flag will prevent the symbolization of the kernel IPC traces, leaving only the ordinals in the trace.",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--no-verify-trace",
+      "short": null,
+      "description": "prevent checking the trace data when stopping tracing. Defaults to false. If this flag is enabled, trace result analysis will not be triggered.",
+      "hidden": false
     }
   ],
   "notes": [],

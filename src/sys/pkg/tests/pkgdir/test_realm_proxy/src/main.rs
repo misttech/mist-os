@@ -11,8 +11,8 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder};
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
+use log::{error, info};
 use realm_proxy::service::serve_with_proxy;
-use tracing::{error, info};
 use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio};
 
 // When this feature is enabled, the pkgdir tests will start Fxblob.

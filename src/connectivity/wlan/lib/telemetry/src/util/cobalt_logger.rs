@@ -11,8 +11,8 @@ macro_rules! log_cobalt_1dot1 {
         let status = $cobalt_proxy.$method_name($metric_id, $value, $event_codes).await;
         match status {
             Ok(Ok(())) => (),
-            Ok(Err(e)) => tracing::info!("Failed logging metric: {}, error: {:?}", $metric_id, e),
-            Err(e) => tracing::info!("Failed logging metric: {}, error: {}", $metric_id, e),
+            Ok(Err(e)) => log::info!("Failed logging metric: {}, error: {:?}", $metric_id, e),
+            Err(e) => log::info!("Failed logging metric: {}, error: {}", $metric_id, e),
         }
     }};
 }
@@ -23,14 +23,10 @@ macro_rules! log_cobalt_1dot1_batch {
         match status {
             Ok(Ok(())) => (),
             Ok(Err(e)) => {
-                tracing::info!(
-                    "Failed logging batch metrics, context: {}, error: {:?}",
-                    $context,
-                    e
-                );
+                log::info!("Failed logging batch metrics, context: {}, error: {:?}", $context, e);
             }
             Err(e) => {
-                tracing::info!("Failed logging batch metrics, context: {}, error: {}", $context, e)
+                log::info!("Failed logging batch metrics, context: {}, error: {}", $context, e)
             }
         }
     }};

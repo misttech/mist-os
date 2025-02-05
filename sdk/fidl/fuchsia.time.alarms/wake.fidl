@@ -33,6 +33,15 @@ alias AlarmId = string:128;
 open protocol Wake {
     // Protocol fragment with an initial approach to scheduling wake alarms.
     compose ClientSideBatonManagement;
+
+    /// Call to establish whether Wake is operational.  This just returns
+    /// immediately.
+    GetProperties() -> (table {
+        /// Set to true if the wake alarms functionality is supported.
+        /// The wake alarms may be unavailable if the hardware does
+        /// not have the required circuitry.
+        1: is_supported bool;
+    });
 };
 
 protocol ClientSideBatonManagement {
@@ -104,6 +113,11 @@ protocol ClientSideBatonManagement {
         /// The caller must handle such an event gracefully.
         alarm_id AlarmId;
     });
+
+    /// Same as [Cancel], but waits until `alarm_id` is canceled.
+    CancelSync(struct {
+        alarm_id AlarmId;
+    }) -> () error WakeError;
 };
 
 /// WakeError describes the error code that can be returned from wake

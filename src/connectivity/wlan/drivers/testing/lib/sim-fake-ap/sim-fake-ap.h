@@ -6,7 +6,8 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_TESTING_LIB_SIM_FAKE_AP_SIM_FAKE_AP_H_
 
 #include <fidl/fuchsia.wlan.common/cpp/wire.h>
-#include <fidl/fuchsia.wlan.ieee80211/cpp/wire.h>
+#include <fidl/fuchsia.wlan.ieee80211/cpp/common_types.h>
+#include <fidl/fuchsia.wlan.ieee80211/cpp/natural_types.h>
 #include <lib/zx/time.h>
 #include <netinet/if_ether.h>
 #include <stdint.h>
@@ -63,8 +64,8 @@ class FakeAp final : public StationIfc {
 
   explicit FakeAp(Environment* environ) : environment_(environ) { environ->AddStation(this); }
 
-  FakeAp(Environment* environ, const common::MacAddr& bssid, const wlan_ieee80211::CSsid& ssid,
-         const wlan_common::WlanChannel channel)
+  FakeAp(Environment* environ, const common::MacAddr& bssid,
+         const fuchsia_wlan_ieee80211::Ssid& ssid, const wlan_common::WlanChannel channel)
       : environment_(environ), bssid_(bssid), ssid_(ssid) {
     environ->AddStation(this);
     tx_info_.channel = channel;
@@ -79,13 +80,13 @@ class FakeAp final : public StationIfc {
 
   void SetChannel(const wlan_common::WlanChannel& channel);
   void SetBssid(const common::MacAddr& bssid);
-  void SetSsid(const wlan_ieee80211::CSsid& ssid);
+  void SetSsid(const fuchsia_wlan_ieee80211::Ssid& ssid);
   void SetCsaBeaconInterval(zx::duration interval);
 
   wlan_common::WlanChannel GetChannel() const { return tx_info_.channel; }
 
   common::MacAddr GetBssid() const { return bssid_; }
-  wlan_ieee80211::CSsid GetSsid() const { return ssid_; }
+  fuchsia_wlan_ieee80211::Ssid GetSsid() const { return ssid_; }
   uint32_t GetNumAssociatedClient() const;
 
   // Will we receive a message sent on the specified channel?
@@ -160,7 +161,7 @@ class FakeAp final : public StationIfc {
   // meta information needed for sending transmissions
   simulation::WlanTxInfo tx_info_;
   common::MacAddr bssid_;
-  wlan_ieee80211::CSsid ssid_;
+  fuchsia_wlan_ieee80211::Ssid ssid_;
   struct Security security_ = {.cipher_suite = IEEE80211_CIPHER_SUITE_NONE};
 
   struct BeaconState {

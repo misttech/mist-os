@@ -59,6 +59,12 @@ py_binary(
 )
 
 py_binary(
+    name = "validate_component_manifests",
+    srcs = ["validate_component_manifests.py"],
+    python_version = "PY3",
+)
+
+py_binary(
     name = "create_platform_aibs_file",
     srcs = ["create_platform_aibs_file.py"],
     python_version = "PY3",

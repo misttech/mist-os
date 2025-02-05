@@ -38,7 +38,10 @@ impl RebootImpl {
 
         // TODO(b/239569913): Update with a recovery-specific reboot reason.
         proxy
-            .reboot(powercontrol::RebootReason::FactoryDataReset)
+            .perform_reboot(&powercontrol::RebootOptions {
+                reasons: Some(vec![powercontrol::RebootReason2::FactoryDataReset]),
+                ..Default::default()
+            })
             .await?
             .map_err(|e| zx_status::from_raw(e))?;
         Ok(())
@@ -56,6 +59,7 @@ impl RebootHandler for RebootImpl {
 #[cfg(test)]
 mod test {
     use super::*;
+    use assert_matches::assert_matches;
     use fuchsia_async::TimeoutExt;
     use futures::channel::mpsc;
     use futures::{StreamExt, TryStreamExt};
@@ -63,7 +67,8 @@ mod test {
 
     // Reboot tests - this functionality is only exercised in recovery OTA flows.
     fn create_mock_powercontrol_server(
-    ) -> Result<(powercontrol::AdminProxy, mpsc::Receiver<powercontrol::RebootReason>), Error> {
+    ) -> Result<(powercontrol::AdminProxy, mpsc::Receiver<powercontrol::RebootReason2>), Error>
+    {
         let (mut sender, receiver) = mpsc::channel(1);
         let (proxy, mut request_stream) =
             fidl::endpoints::create_proxy_and_stream::<powercontrol::AdminMarker>();
@@ -73,9 +78,11 @@ mod test {
                 request_stream.try_next().await.expect("failed to read mock request")
             {
                 match request {
-                    powercontrol::AdminRequest::Reboot { reason, responder } => {
+                    powercontrol::AdminRequest::PerformReboot { options, responder } => {
+                        let reason =
+                            assert_matches!(&options.reasons.unwrap()[..], [reason] => *reason);
                         sender.start_send(reason).unwrap();
-                        let result: powercontrol::AdminRebootResult = { Ok(()) };
+                        let result: powercontrol::AdminPerformRebootResult = { Ok(()) };
                         responder.send(result).ok();
                     }
                     _ => {
@@ -99,7 +106,7 @@ mod test {
         let reboot_reason =
             receiver.next().on_timeout(MonotonicDuration::from_seconds(5), || None).await.unwrap();
 
-        assert_eq!(reboot_reason, powercontrol::RebootReason::FactoryDataReset);
+        assert_eq!(reboot_reason, powercontrol::RebootReason2::FactoryDataReset);
     }
 
     #[fuchsia::test]
@@ -117,6 +124,6 @@ mod test {
         let end_time = fasync::MonotonicInstant::now();
 
         assert!((end_time - start_time).into_seconds() >= delay_seconds.try_into().unwrap());
-        assert_eq!(reboot_reason, powercontrol::RebootReason::FactoryDataReset);
+        assert_eq!(reboot_reason, powercontrol::RebootReason2::FactoryDataReset);
     }
 }

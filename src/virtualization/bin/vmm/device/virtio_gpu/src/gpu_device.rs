@@ -128,7 +128,7 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
                 control_chain = control_stream.next() => match control_chain {
                     Some(chain) => {
                         if let Err(e) = self.process_control_chain(ReadableChain::new(chain, self.mem)).await {
-                            tracing::warn!("Error processing control queue: {}", e);
+                            log::warn!("Error processing control queue: {}", e);
                         }
                     }
                     None => {
@@ -138,11 +138,11 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
                 cursor_chain = cursor_stream.next() => match cursor_chain {
                     Some(chain) => {
                         if let Err(e) = self.process_cursor_chain(ReadableChain::new(chain, self.mem)) {
-                            tracing::warn!("Error processing cursor queue: {}", e);
+                            log::warn!("Error processing cursor queue: {}", e);
                         }
                     }
                     None => {
-                        tracing::warn!("Cursor stream has ended");
+                        log::warn!("Cursor stream has ended");
                     }
                 },
                 gpu_command = self.command_receiver.next() => match gpu_command {
@@ -232,7 +232,7 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
         chain: ReadableChain<'a, 'b, N, M>,
         cmd: u32,
     ) -> Result<(), Error> {
-        tracing::info!("Command {:#06x} is not implemented", cmd);
+        log::info!("Command {:#06x} is not implemented", cmd);
         write_error_to_chain(chain, wire::VirtioGpuError::Unspecified)
     }
 
@@ -283,22 +283,19 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
         let cmd: wire::VirtioGpuResourceCreate2d = match read_from_chain(&mut chain) {
             Ok(cmd) => cmd,
             Err(e) => {
-                tracing::warn!(
-                    "Failed to read VirtioGpuResourceCreate2d request from queue: {}",
-                    e
-                );
+                log::warn!("Failed to read VirtioGpuResourceCreate2d request from queue: {}", e);
                 return write_error_to_chain(chain, wire::VirtioGpuError::Unspecified);
             }
         };
         // 0 is used to specify 'no resource in other commands (ex: SET_SCANOUT), so let's not
         // allow creating any resources with ID 0.
         if cmd.resource_id.get() == 0 {
-            tracing::warn!("Failed to create resource with null resource id");
+            log::warn!("Failed to create resource with null resource id");
             return write_error_to_chain(chain, wire::VirtioGpuError::InvalidResourceId);
         }
         // Require that we have a non-zero size.
         if cmd.width.get() == 0 || cmd.height.get() == 0 {
-            tracing::warn!(
+            log::warn!(
                 "Failed to create resource with zero size: {}x{}",
                 cmd.width.get(),
                 cmd.height.get()
@@ -308,7 +305,7 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
         {
             let entry = self.resources.entry(cmd.resource_id.get());
             if let Entry::Occupied(_) = &entry {
-                tracing::warn!(
+                log::warn!(
                     "Failed to create resource with duplicate ID: {}",
                     cmd.resource_id.get()
                 );
@@ -319,7 +316,7 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
                     entry.or_insert(resource);
                 }
                 Err(e) => {
-                    tracing::info!("Failed to allocate resource {:?}: {}", cmd, e);
+                    log::info!("Failed to allocate resource {:?}: {}", cmd, e);
                     return write_error_to_chain(chain, wire::VirtioGpuError::OutOfMemory);
                 }
             }
@@ -342,14 +339,14 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
         let cmd: wire::VirtioGpuResourceUnref = match read_from_chain(&mut chain) {
             Ok(cmd) => cmd,
             Err(e) => {
-                tracing::warn!("Failed to read VirtioGpuResourceAttachBacking from queue: {}", e);
+                log::warn!("Failed to read VirtioGpuResourceAttachBacking from queue: {}", e);
                 return write_error_to_chain(chain, wire::VirtioGpuError::Unspecified);
             }
         };
 
         // Remove the resource from the map if it exists.
         if self.resources.remove(&cmd.resource_id.get()).is_none() {
-            tracing::warn!("Failed to unref unknown resource: {}", cmd.resource_id.get());
+            log::warn!("Failed to unref unknown resource: {}", cmd.resource_id.get());
             return write_error_to_chain(chain, wire::VirtioGpuError::InvalidResourceId);
         }
 
@@ -369,14 +366,14 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
         let cmd: wire::VirtioGpuResourceAttachBacking = match read_from_chain(&mut chain) {
             Ok(cmd) => cmd,
             Err(e) => {
-                tracing::warn!("Failed to read VirtioGpuResourceAttachBacking from queue: {}", e);
+                log::warn!("Failed to read VirtioGpuResourceAttachBacking from queue: {}", e);
                 return write_error_to_chain(chain, wire::VirtioGpuError::Unspecified);
             }
         };
 
         // Enforce an upper bound to the number of entries we attempt to read.
         if cmd.nr_entries.get() > ATTACH_BACKING_MAX_ENTRIES {
-            tracing::warn!(
+            log::warn!(
                 "Rejecting RESOURCE_ATTACH_BACKING request too many entries {} > {}",
                 cmd.nr_entries.get(),
                 ATTACH_BACKING_MAX_ENTRIES
@@ -393,7 +390,7 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
             let entry: wire::VirtioGpuMemEntry = match read_from_chain(&mut chain) {
                 Ok(entry) => entry,
                 Err(e) => {
-                    tracing::warn!("Failed to read VirtioGpuMemEntry from queue: {}", e);
+                    log::warn!("Failed to read VirtioGpuMemEntry from queue: {}", e);
                     return write_error_to_chain(chain, wire::VirtioGpuError::Unspecified);
                 }
             };
@@ -403,7 +400,7 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
                 // If translation failed, then the memory range does not reside within a valid
                 // region in guest RAM.
                 None => {
-                    tracing::warn!("Invalid device range provided: {:?}", entry);
+                    log::warn!("Invalid device range provided: {:?}", entry);
                     return write_error_to_chain(chain, wire::VirtioGpuError::InvalidParameter);
                 }
                 Some(device_range) => device_ranges.push(device_range),
@@ -413,7 +410,7 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
         // Validate resource_id
         let resource = match self.get_resource_mut(cmd.resource_id.get()) {
             None => {
-                tracing::warn!("AttachBacking to unknown resource_id {}", cmd.resource_id.get());
+                log::warn!("AttachBacking to unknown resource_id {}", cmd.resource_id.get());
                 return write_error_to_chain(chain, wire::VirtioGpuError::InvalidResourceId);
             }
             Some(resource) => resource,
@@ -438,7 +435,7 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
         let cmd: wire::VirtioGpuResourceDetachBacking = match read_from_chain(&mut chain) {
             Ok(cmd) => cmd,
             Err(e) => {
-                tracing::warn!("Failed to read VirtioGpuResourceDetachBacking from queue: {}", e);
+                log::warn!("Failed to read VirtioGpuResourceDetachBacking from queue: {}", e);
                 return write_error_to_chain(chain, wire::VirtioGpuError::Unspecified);
             }
         };
@@ -446,7 +443,7 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
         // Lookup resource
         let resource = match self.get_resource_mut(cmd.resource_id.get()) {
             None => {
-                tracing::warn!("DetachBacking to unknown resource_id {}", cmd.resource_id.get());
+                log::warn!("DetachBacking to unknown resource_id {}", cmd.resource_id.get());
                 return write_error_to_chain(chain, wire::VirtioGpuError::InvalidResourceId);
             }
             Some(resource) => resource,
@@ -471,7 +468,7 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
         let cmd: wire::VirtioGpuTransferToHost2d = match read_from_chain(&mut chain) {
             Ok(cmd) => cmd,
             Err(e) => {
-                tracing::warn!("Failed to read VirtioGpuTransferToHost2d from queue: {}", e);
+                log::warn!("Failed to read VirtioGpuTransferToHost2d from queue: {}", e);
                 return write_error_to_chain(chain, wire::VirtioGpuError::Unspecified);
             }
         };
@@ -479,7 +476,7 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
         // Validate resource_id
         let resource = match self.get_resource(cmd.resource_id.get()) {
             None => {
-                tracing::warn!("AttachBacking to unknown resource_id {}", cmd.resource_id.get());
+                log::warn!("AttachBacking to unknown resource_id {}", cmd.resource_id.get());
                 return write_error_to_chain(chain, wire::VirtioGpuError::InvalidResourceId);
             }
             Some(resource) => resource,
@@ -487,7 +484,7 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
 
         // Do the transfer.
         if let Err(e) = resource.transfer_to_host_2d(cmd.offset.get(), &cmd.r) {
-            tracing::warn!("Failed to transfer_to_host_2d: {}", e);
+            log::warn!("Failed to transfer_to_host_2d: {}", e);
             return write_error_to_chain(chain, e);
         }
 
@@ -508,7 +505,7 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
         let cmd: wire::VirtioGpuSetScanout = match read_from_chain(&mut chain) {
             Ok(cmd) => cmd,
             Err(e) => {
-                tracing::warn!("Failed to read VirtioGpuSetScanout from queue: {}", e);
+                log::warn!("Failed to read VirtioGpuSetScanout from queue: {}", e);
                 return write_error_to_chain(chain, wire::VirtioGpuError::Unspecified);
             }
         };
@@ -521,7 +518,7 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
         } else {
             let resource = self.resources.get(&cmd.resource_id.get());
             if resource.is_none() {
-                tracing::warn!("SetScanout with invalid resource_id: {}", resource_id);
+                log::warn!("SetScanout with invalid resource_id: {}", resource_id);
                 return write_error_to_chain(chain, wire::VirtioGpuError::InvalidResourceId);
             }
             resource
@@ -530,7 +527,7 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
         // Validate scanout_id
         let scanout_id: usize = cmd.scanout_id.get().try_into()?;
         if scanout_id >= self.scanouts.len() || self.scanouts[scanout_id].scanout.is_none() {
-            tracing::warn!("SetScanout to invalid scanout_id {}", scanout_id);
+            log::warn!("SetScanout to invalid scanout_id {}", scanout_id);
             return write_error_to_chain(chain, wire::VirtioGpuError::InvalidScanoutId);
         }
 
@@ -553,7 +550,7 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
         let _cmd: wire::VirtioGpuResourceFlush = match read_from_chain(&mut chain) {
             Ok(cmd) => cmd,
             Err(e) => {
-                tracing::warn!("Failed to read VirtioGpuResourceFlush from queue: {}", e);
+                log::warn!("Failed to read VirtioGpuResourceFlush from queue: {}", e);
                 return write_error_to_chain(chain, wire::VirtioGpuError::Unspecified);
             }
         };
@@ -580,14 +577,14 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
     ) -> Result<(), Error> {
         let result: Result<wire::VirtioGpuUpdateCursor, _> = read_from_chain(&mut chain);
         let Ok(cmd) = result else {
-            tracing::warn!("Failed to read VirtioGpuUpdateCursor from queue: {:?}", result);
+            log::warn!("Failed to read VirtioGpuUpdateCursor from queue: {:?}", result);
             return write_error_to_chain(chain, wire::VirtioGpuError::Unspecified);
         };
 
         // Validate scanout_id.
         let scanout_id: usize = cmd.pos.scanout_id.get().try_into()?;
         if scanout_id >= self.scanouts.len() || self.scanouts[scanout_id].scanout.is_none() {
-            tracing::warn!("UPDATE_CURSOR with invalid scanout_id {}", scanout_id);
+            log::warn!("UPDATE_CURSOR with invalid scanout_id {}", scanout_id);
             return write_error_to_chain(chain, wire::VirtioGpuError::InvalidScanoutId);
         }
 
@@ -601,16 +598,13 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
                 None
             } else {
                 let Some(resource) = self.resources.get(&resource_id) else {
-                    tracing::warn!(
-                        "UPDATE_CURSOR called with invalid resource_id: {}",
-                        resource_id
-                    );
+                    log::warn!("UPDATE_CURSOR called with invalid resource_id: {}", resource_id);
                     return write_error_to_chain(chain, wire::VirtioGpuError::InvalidResourceId);
                 };
 
                 let dimensions = (resource.width(), resource.height());
                 if dimensions != (wire::CURSOR_WIDTH, wire::CURSOR_HEIGHT) {
-                    tracing::warn!(
+                    log::warn!(
                         "UPDATE_CURSOR called with resource {} of incorrect dimensions {:?}. Expected {:?}",
                         resource.id(),
                         dimensions,
@@ -627,7 +621,7 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
             if !(0..wire::CURSOR_WIDTH).contains(&hot_x)
                 || !(0..wire::CURSOR_HEIGHT).contains(&hot_y)
             {
-                tracing::warn!("Cursor hotspot dimensions are out of bounds: {:?}", (hot_x, hot_y));
+                log::warn!("Cursor hotspot dimensions are out of bounds: {:?}", (hot_x, hot_y));
                 return write_error_to_chain(chain, wire::VirtioGpuError::InvalidParameter);
             }
 
@@ -660,7 +654,7 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
                 let scanout_id = ScanoutId { index, generation: entry.generation };
                 match responder.send(Ok(scanout_id)) {
                     Err(_) => {
-                        tracing::warn!("Response receiver dropped before reponse could be sent")
+                        log::warn!("Response receiver dropped before reponse could be sent")
                     }
                     Ok(()) => entry.scanout = Some(scanout),
                 }

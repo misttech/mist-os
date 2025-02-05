@@ -46,11 +46,11 @@ define_host_can_build_fuchsia_flag = rule(
 )
 
 _HOST_CONDITION = select({
-    "@fuchsia_sdk//fuchsia/constraints:can_host_build_fuchsia": [],
+    "@rules_fuchsia//fuchsia/constraints:can_host_build_fuchsia": [],
     "//conditions:default": ["@platforms//:incompatible"],
 })
-_HOST_DEPS = ["@fuchsia_sdk//fuchsia/constraints:check_host_compatibility"]
-_FUCHSIA_DEPS = ["@fuchsia_sdk//fuchsia/constraints:check_fuchsia_compatibility"]
+_HOST_DEPS = ["@rules_fuchsia//fuchsia/constraints:check_host_compatibility"]
+_FUCHSIA_DEPS = ["@rules_fuchsia//fuchsia/constraints:check_fuchsia_compatibility"]
 
 # Different expressions of 2 categories of constraints:
 #  - `COMPATIBILITY.HOST_*` constraints are all functionally equivalent reexpressions of one

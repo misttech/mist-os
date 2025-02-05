@@ -13,6 +13,8 @@ rustc_test("shutdown_shim_integration_test_bin") {
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.power:fuchsia.power_rust",
+    "//sdk/fidl/fuchsia.power.internal:fuchsia.power.internal_rust",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/fidl/fuchsia.system.state:fuchsia.system.state_rust",
@@ -31,6 +33,7 @@ rustc_test("shutdown_shim_integration_test_bin") {
 
   sources = [
     "src/main.rs",
+    "src/reboot_watcher_client.rs",
     "src/shutdown_mocks.rs",
   ]
 }

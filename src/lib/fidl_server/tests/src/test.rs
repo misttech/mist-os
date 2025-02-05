@@ -10,8 +10,8 @@ use fidl_server::*;
 use fuchsia_async as fasync;
 use futures::future::FutureExt;
 use futures::{pin_mut, select};
+use log::info;
 use std::sync::{mpsc, Arc, Mutex};
-use tracing::info;
 
 #[derive(Clone)]
 struct EchoHandler;

@@ -446,7 +446,12 @@ def _merge_atom_meta(a: AtomMeta, b: AtomMeta) -> AtomMeta:
         # This needs to go in each case to appease the type checker.
         assert a["type"] == b["type"]
 
-        _assert_dicts_equal(a, b, ["binaries", "variants"])
+        # "binaries" contains the legacy API level unaware prebuilts, and
+        # "variants" contains the API level-specific prebuilts. They are
+        # mutually exclusive for a given [sub-]build.
+        # The root "ifs" file corresponds to "binaries" and thus does not
+        # exist in atoms with "variants".
+        _assert_dicts_equal(a, b, ["binaries", "variants", "ifs"])
         a["binaries"] = _merge_disjoint_dicts(
             a.get("binaries"), b.get("binaries")
         )

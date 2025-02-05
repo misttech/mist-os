@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use starnix_uapi::errors::Errno;
-use starnix_uapi::{error, user_regs_struct};
+use starnix_uapi::{__NR_restart_syscall, error, user_regs_struct};
 
 /// The state of the task's registers when the thread of execution entered the kernel.
 /// This is a thin wrapper around [`zx::sys::zx_thread_state_general_regs_t`].
@@ -30,6 +30,17 @@ impl RegisterState {
         // The x0 register may be clobbered during syscall handling (for the return value), but is
         // needed when restarting a syscall.
         self.orig_x0 = self.r[0];
+    }
+
+    /// Custom restart, invoke restart_syscall instead of the original syscall.
+    pub fn prepare_for_custom_restart(&mut self) {
+        self.r[8] = __NR_restart_syscall as u64;
+    }
+
+    /// Restores x0 to match its value before restarting. This needs to be done when restarting
+    /// syscalls because x0 may have been overwritten in the syscall dispatch loop.
+    pub fn restore_original_return_register(&mut self) {
+        self.r[0] = self.orig_x0;
     }
 
     /// Returns the register that indicates the single-machine-word return value from a

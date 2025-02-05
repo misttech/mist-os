@@ -8,7 +8,7 @@
 
 int __timedwait_assign_owner(atomic_int* futex, int val, clockid_t clk, const struct timespec* at,
                              zx_handle_t new_owner) {
-  zx_time_t deadline = ZX_TIME_INFINITE;
+  zx_instant_mono_t deadline = ZX_TIME_INFINITE;
 
   if (at) {
     int ret = __timespec_to_deadline(at, clk, &deadline);

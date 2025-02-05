@@ -56,18 +56,6 @@
             to: "#shutdown_shim",
         },
         {
-            protocol: [ "fuchsia.hardware.power.statecontrol.Admin" ],
-            from: "#power_manager",
-            to: "#shutdown_shim",
-            source_availability: "unknown",
-        },
-        {
-            protocol: "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
-            from: "#power_manager",
-            to: "#shutdown_shim",
-            source_availability: "unknown",
-        },
-        {
             protocol: [ "fuchsia.power.system.ActivityGovernor" ],
             from: "#system-activity-governor",
             to: "#shutdown_shim",
@@ -80,17 +68,6 @@
             to: "#shutdown_shim",
             dependency: "weak",
             source_availability: "unknown",
-        },
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: [
-                "#critical-services",
-                "#shutdown_shim",
-            ],
         },
         {
             dictionary: "diagnostics",
@@ -147,7 +124,20 @@
             source_availability: "unknown",
         },
         {
-            protocol: "fuchsia.hardware.power.statecontrol.Admin",
+            protocol: [
+                "fuchsia.hardware.power.statecontrol.Admin",
+                "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
+            ],
+            from: "#shutdown_shim",
+        },
+
+        // TODO(https://fxbug.dev/389134835): Remove the initiator capability.
+        {
+            protocol: "fuchsia.power.CollaborativeRebootInitiator",
+            from: "#shutdown_shim",
+        },
+        {
+            protocol: "fuchsia.power.internal.CollaborativeRebootScheduler",
             from: "#shutdown_shim",
         },
         {
@@ -160,18 +150,12 @@
             from: "#critical-services",
         },
         {
-            protocol: "fuchsia.tpm.cr50.Cr50",
-            from: "#cr50_agent",
-            source_availability: "unknown",
-        },
-        {
             dictionary: "diagnostics-accessors",
             from: "#archivist",
         },
         {
             protocol: [
                 "fuchsia.diagnostics.LogSettings",
-                "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.Log",
                 "fuchsia.logger.LogSink",
             ],

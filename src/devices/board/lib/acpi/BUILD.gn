@@ -61,6 +61,7 @@ shared_fuchsia_deps = [
   "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_cpp",
   "//src/devices/lib/acpi",
   "//src/devices/pci/lib/pci",
+  "//src/lib/ddk:ddk-deprecated-binding-headers",
   "//zircon/system/ulib/sync:sync-cpp",
   "//zircon/system/ulib/zircon-internal",
 ]
@@ -68,11 +69,17 @@ shared_fuchsia_deps = [
 source_set("host-acpi") {
   sources = [
     "acpi-impl.cc",
+    "acpi-impl.h",
     "acpi.cc",
+    "acpi.h",
     "device-builder.cc",
+    "device-builder.h",
     "device-for-host.cc",
+    "device-for-host.h",
     "manager.cc",
+    "manager.h",
     "resources.cc",
+    "resources.h",
   ]
 
   public_deps = shared_public_deps
@@ -87,16 +94,27 @@ source_set("host-acpi") {
 source_set("acpi") {
   sources = [
     "acpi-impl.cc",
+    "acpi-impl.h",
     "acpi.cc",
+    "acpi.h",
     "device-builder.cc",
+    "device-builder.h",
     "device.cc",
+    "device.h",
     "event.cc",
+    "event.h",
     "fidl.cc",
+    "fidl.h",
     "global-lock.cc",
+    "global-lock.h",
     "irq-fragment.cc",
+    "irq-fragment.h",
     "manager.cc",
+    "manager.h",
     "power-resource.cc",
+    "power-resource.h",
     "resources.cc",
+    "resources.h",
   ]
 
   defines = []
@@ -104,6 +122,7 @@ source_set("acpi") {
   if (platform_enable_user_pci) {
     sources += [
       "pci.cc",
+      "pci.h",
       "pci_irqs.cc",
       "pciroot.cc",
     ]

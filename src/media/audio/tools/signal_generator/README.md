@@ -65,7 +65,7 @@ These optional parameters are interpreted as follows:
 
       By default, use a MEDIA stream and do not change the volume or gain for this RENDER_USAGE
     --usage=<RENDER_USAGE>   Set stream render usage. RENDER_USAGE must be one of:
-                             BACKGROUND, MEDIA, INTERRUPTION, SYSTEM_AGENT, COMMUNICATION
+                             ACCESSIBILITY, BACKGROUND, MEDIA, INTERRUPTION, SYSTEM_AGENT, COMMUNICATION
     --usage-vol[=<VOLUME>]   Set render usage volume (min 0.0, max 1.0, 1.0 if flag with no value)
     --usage-gain[=<DB>]      Set render usage gain, in dB (min -160.0, max 0.0, default 0.0)
       Changes to these system-wide volume/gain settings persist after the utility runs
@@ -80,7 +80,7 @@ These optional parameters are interpreted as follows:
       By default, submit data in non-timestamped buffers of 480 frames and 1 VMO,
       without specifying a precise reference time or PTS for the start of playback
     --ref                    Specify a reference time in the Play() method
-    --media[=<PTS>]          Use a specifie PTS value for playback start  
+    --media[=<PTS>]          Use a specifie PTS value for playback start
     --pts                    Apply presentation timestamps (units: frames)
     --threshold[=<SECS>]     Set PTS discontinuity threshold, in seconds (default 0.000125)
     --frames=<FRAMES>        Set packet size, in frames

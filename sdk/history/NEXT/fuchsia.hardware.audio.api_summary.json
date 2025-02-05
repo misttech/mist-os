@@ -863,6 +863,22 @@
         "name": "fuchsia.hardware.audio/Dai_GetRingBufferFormats_Response"
     },
     {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio/DelayInfo.external_delay",
+        "ordinal": "2",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio/DelayInfo.internal_delay",
+        "ordinal": "1",
+        "type": "int64"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.hardware.audio/DelayInfo"
+    },
+    {
         "kind": "enum/member",
         "name": "fuchsia.hardware.audio/DeviceType.CODEC",
         "value": "3"
@@ -1255,6 +1271,14 @@
         "response": "fuchsia.hardware.audio/RingBufferWatchClockRecoveryPositionInfoResponse"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.audio/RingBuffer.WatchDelayInfo",
+        "strictness": "flexible",
+        "ordinal": "7787366811669876639",
+        "direction": "two_way",
+        "response": "fuchsia.hardware.audio/RingBuffer_WatchDelayInfo_Response"
+    },
+    {
         "kind": "protocol",
         "name": "fuchsia.hardware.audio/RingBuffer",
         "openness": "open",
@@ -1301,6 +1325,12 @@
     {
         "kind": "struct",
         "name": "fuchsia.hardware.audio/RingBufferPositionInfo"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio/RingBufferProperties.driver_transfer_bytes",
+        "ordinal": "5",
+        "type": "uint32"
     },
     {
         "kind": "table/member",
@@ -1374,6 +1404,16 @@
     {
         "kind": "struct",
         "name": "fuchsia.hardware.audio/RingBuffer_SetActiveChannels_Response"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.audio/RingBuffer_WatchDelayInfo_Response.delay_info",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.audio/DelayInfo"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.audio/RingBuffer_WatchDelayInfo_Response"
     },
     {
         "kind": "enum/member",

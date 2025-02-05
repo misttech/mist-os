@@ -10,7 +10,7 @@
 #include <kernel/percpu.h>
 #include <lk/init.h>
 
-static constexpr zx_duration_t kSampleInterval = ZX_MSEC(10);
+static constexpr zx_duration_mono_t kSampleInterval = ZX_MSEC(10);
 
 StallAggregator StallAggregator::singleton_;
 
@@ -47,8 +47,8 @@ StallAccumulator::Stats StallAccumulator::Flush() {
 }
 
 void StallAccumulator::Consolidate() {
-  zx_time_t now = current_time();
-  zx_duration_t time_delta = now - last_consolidate_time_;
+  zx_instant_mono_t now = current_mono_time();
+  zx_duration_mono_t time_delta = now - last_consolidate_time_;
 
   if (num_contributors_stalling_ > 0) {
     accumulated_stats_.total_time_stall_some += time_delta;
@@ -128,9 +128,9 @@ void StallAggregator::SampleOnce(
     fit::inline_function<void(PerCpuStatsCallback)> iterate_per_cpu_stats) {
   // Aggregate stats from all CPUs.
   struct {
-    zx_duration_t weighted_some = 0;
-    zx_duration_t weighted_full = 0;
-    zx_duration_t total_weight = 0;
+    zx_duration_mono_t weighted_some = 0;
+    zx_duration_mono_t weighted_full = 0;
+    zx_duration_mono_t total_weight = 0;
   } totals;
   iterate_per_cpu_stats([&totals](const StallAccumulator::Stats &stats) {
     totals.weighted_some += stats.total_time_stall_some * stats.total_time_active;
@@ -139,7 +139,7 @@ void StallAggregator::SampleOnce(
   });
 
   // Compute weighted average.
-  zx_duration_t delta_some, delta_full;
+  zx_duration_mono_t delta_some, delta_full;
   if (totals.total_weight != 0) {
     delta_some = totals.weighted_some / totals.total_weight;
     delta_full = totals.weighted_full / totals.total_weight;
@@ -167,7 +167,7 @@ void StallAggregator::IteratePerCpuStats(PerCpuStatsCallback callback) {
 void StallAggregator::StartSamplingThread(uint level) {
   auto worker_thread = [](void *) {
     StallAggregator *aggregator = GetStallAggregator();
-    zx_time_t deadline = current_time();
+    zx_instant_mono_t deadline = current_mono_time();
 
     for (;;) {
       aggregator->SampleOnce();

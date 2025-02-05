@@ -176,7 +176,7 @@ void DriverHostComponent::Start(
     fuchsia_driver_framework::wire::NodePropertyDictionary2 node_properties,
     fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
     fidl::VectorView<fuchsia_driver_framework::wire::Offer> offers,
-    frunner::wire::ComponentStartInfo start_info,
+    frunner::wire::ComponentStartInfo start_info, zx::event node_token,
     fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) {
   auto binary = fdf_internal::ProgramValue(start_info.program(), "binary").value_or("");
   fidl::Arena arena;
@@ -204,6 +204,7 @@ void DriverHostComponent::Start(
       .node_offers(offers)
       .node_properties(deprecated_dictionary)
       .node_properties_2(node_properties)
+      .node_token(std::move(node_token))
       .url(start_info.resolved_url())
       .program(start_info.program())
       .incoming(start_info.ns())
@@ -289,7 +290,7 @@ zx::result<> DriverHostComponent::InstallLoader(
 
 void DriverHostComponent::StartWithDynamicLinker(
     fidl::ClientEnd<fuchsia_driver_framework::Node> node, std::string node_name,
-    DriverLoadArgs load_args, DriverStartArgs start_args,
+    DriverLoadArgs load_args, DriverStartArgs start_args, zx::event node_token,
     fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) {
   if (!IsDynamicLinkingEnabled()) {
     cb(zx::error(ZX_ERR_NOT_SUPPORTED));
@@ -308,7 +309,8 @@ void DriverHostComponent::StartWithDynamicLinker(
   std::string driver_name = std::string(load_args.driver_soname);
   dynamic_linker_driver_loader_->LoadDriver(args).ThenExactlyOnce(
       [this, driver = std::move(driver), node = std::move(node), node_name,
-       start_args = std::move(start_args), driver_name, cb = std::move(cb)](auto& result) mutable {
+       start_args = std::move(start_args), node_token = std::move(node_token), driver_name,
+       cb = std::move(cb)](auto& result) mutable {
         if (!result.ok()) {
           LOGF(ERROR, "Failed to start driver %s in driver host: %s", driver_name.c_str(),
                result.FormatDescription().c_str());
@@ -325,8 +327,8 @@ void DriverHostComponent::StartWithDynamicLinker(
         fidl::Arena arena;
         Start(std::move(node), node_name, fidl::ToWire(arena, start_args.node_properties_),
               fidl::ToWire(arena, start_args.symbols_), fidl::ToWire(arena, start_args.offers_),
-              fidl::ToWire(arena, std::move(start_args.start_info_)), std::move(driver),
-              std::move(cb));
+              fidl::ToWire(arena, std::move(start_args.start_info_)), std::move(node_token),
+              std::move(driver), std::move(cb));
       });
 }
 

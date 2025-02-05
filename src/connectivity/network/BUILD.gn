@@ -29,28 +29,16 @@ fuchsia_component("component-basic") {
 }
 
 # Some tests depend on Netstack, but don't exercise its functionality and
-# don't care between Netstack 2 and 3. These tests currently use NS2,
-# which is unavailable on RISC-V. Instead, use NS3 there. Once NS3 is
-# widely deployed, this group can be deleted.
+# don't care between Netstack 2 and 3. We give them Netstack3.
 # TODO(https://fxbug.dev/42083163): Define a package here instead of a group, then
 # use it as a subpackage within the tests that need it.
 group("netstack-for-tests") {
   testonly = true
-  deps = [ "netstack:component" ]
-
-  if (current_cpu == "riscv64") {
-    deps -= [ "netstack:component" ]
-    deps += [ "netstack3:component-dropin" ]
-  }
+  deps = [ "netstack3:component-dropin" ]
 }
 group("netstack-debug-for-tests") {
   testonly = true
-  deps = [ "netstack:component-debug" ]
-
-  if (current_cpu == "riscv64") {
-    deps -= [ "netstack:component-debug" ]
-    deps += [ "netstack3:component-debug-dropin" ]
-  }
+  deps = [ "netstack3:component-debug-dropin" ]
 }
 
 fuchsia_package("netstack2") {

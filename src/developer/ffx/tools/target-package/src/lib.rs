@@ -6,12 +6,13 @@ use argh::{ArgsInfo, FromArgs};
 use fho::FfxContext as _;
 use fidl_fuchsia_dash as fdash;
 use futures::stream::StreamExt as _;
+use target_holders::moniker;
 
 #[derive(fho::FfxTool)]
 pub struct TargetPackageTool {
     #[command]
     cmd: TargetPackageCommand,
-    #[with(fho::deferred(fho::moniker("/core/debug-dash-launcher")))]
+    #[with(fho::deferred(moniker("/core/debug-dash-launcher")))]
     dash_launcher_proxy: fho::Deferred<fdash::LauncherProxy>,
 }
 

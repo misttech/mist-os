@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/config/profile/config.gni")
 import("//build/rust/rustc_artifact.gni")
 import("//build/rust/rustc_test.gni")
 
@@ -237,6 +238,17 @@ template("rustc_library") {
       output_name = _crate_name
     }
 
+    inputs = []
+    if (defined(invoker.inputs)) {
+      inputs = invoker.inputs
+    }
+
+    # When building with profile data, add the profile path to
+    # the inputs to conform with the input verifier.
+    if (pgo_profile_path != "") {
+      inputs += [ pgo_profile_path ]
+    }
+
     deps = []
     if (defined(invoker.deps)) {
       deps += invoker.deps
@@ -265,7 +277,6 @@ template("rustc_library") {
                              "enforce_source_listing",
                              "define_rustdoc_test_override",
                              "features",
-                             "inputs",
                              "pool",
                              "public_deps",
                              "quiet_clippy",

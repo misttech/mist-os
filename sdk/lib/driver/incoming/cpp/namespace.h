@@ -135,7 +135,6 @@ class Namespace final {
     return component::OpenServiceAt<FidlService>(svc_dir(), instance);
   }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(24)
   // Protocol must compose fuchsia.io/Node.
   // DriverTransport is not supported. Protocols using DriverTransport must be service members.
   template <typename Protocol>
@@ -150,7 +149,6 @@ class Namespace final {
     }
     return zx::ok(std::move(client_end));
   }
-#endif
 
   // Protocol must compose fuchsia.io/Node. Uses deprecated fuchsia.io/Directory.Open1.
   // DriverTransport is not supported. Protocols using DriverTransport must be service members.
@@ -265,10 +263,8 @@ class Namespace final {
   zx::result<> OpenDeprecated(const char* path, fuchsia_io::OpenFlags flags,
                               zx::channel server_end) const;
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(24)
   // Opens the |path| in the driver's namespace with Open3. DriverTransport is not supported.
   zx::result<> Open(const char* path, fuchsia_io::Flags flags, zx::channel server_end) const;
-#endif
 
   fdio_ns_t* incoming_ = nullptr;
   fidl::ClientEnd<fuchsia_io::Directory> svc_dir_;

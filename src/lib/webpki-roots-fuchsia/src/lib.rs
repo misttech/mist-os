@@ -17,7 +17,7 @@ lazy_static! {
         // I could have an environment variable override this, but i'd want it keyed
         // on being a dev build so you couldn't harm trust in prod
         std::fs::read_to_string(CERT_PATH)
-            .map_err(|e| tracing::error!("unable to find root certificate store: {}, {:?}", CERT_PATH, e))
+            .map_err(|e| log::error!("unable to find root certificate store: {}, {:?}", CERT_PATH, e))
             .unwrap()
     };
     static ref CERT_DERS: Vec<Vec<u8>> = {

@@ -171,7 +171,10 @@ pub fn create_image(
 ///   - 'path': The filesystem path to open.
 ///
 /// SAFETY: Makes FFI calls to import and query devices.
-fn attempt_open_path(path: std::path::PathBuf) -> Result<MagmaDevice, Errno> {
+fn attempt_open_path(
+    path: std::path::PathBuf,
+    supported_vendor_list: &Vec<u16>,
+) -> Result<MagmaDevice, Errno> {
     let path = path.into_os_string().into_string().map_err(|_| errno!(EINVAL))?;
     let (client_channel, server_channel) = zx::Channel::create();
 
@@ -202,9 +205,8 @@ fn attempt_open_path(path: std::path::PathBuf) -> Result<MagmaDevice, Errno> {
         return Err(errno!(EINVAL));
     }
 
-    let supported_gpu_vendors = [MAGMA_VENDOR_ID_MALI as u64, MAGMA_VENDOR_ID_INTEL as u64];
-
-    if !supported_gpu_vendors.contains(&result_out) {
+    let vendor_id = result_out as u16;
+    if !supported_vendor_list.contains(&vendor_id) {
         return Err(errno!(EINVAL));
     }
     Ok(magma_device)
@@ -219,13 +221,15 @@ fn attempt_open_path(path: std::path::PathBuf) -> Result<MagmaDevice, Errno> {
 ///
 /// SAFETY: Makes an FFI call to populate the fields of `response`.
 pub fn device_import(
+    supported_vendors: &Vec<u16>,
     _control: virtio_magma_device_import_ctrl_t,
     response: &mut virtio_magma_device_import_resp_t,
 ) -> Result<MagmaDevice, Errno> {
     let entries =
         std::fs::read_dir("/dev/class/gpu").map_err(|_| errno!(EINVAL))?.filter_map(|x| x.ok());
 
-    let mut magma_devices = entries.filter_map(|entry| attempt_open_path(entry.path()).ok());
+    let mut magma_devices =
+        entries.filter_map(|entry| attempt_open_path(entry.path(), supported_vendors).ok());
     let magma_device = magma_devices.next().ok_or_else(|| errno!(EINVAL))?;
 
     if magma_devices.next().is_some() {
@@ -240,11 +244,12 @@ pub fn device_import(
     Ok(magma_device)
 }
 
-fn get_magma_vendor_id() -> Result<u64, Errno> {
+fn get_magma_vendor_id(supported_vendor_list: &Vec<u16>) -> Result<u64, Errno> {
     let entries =
         std::fs::read_dir("/dev/class/gpu").map_err(|_| errno!(EINVAL))?.filter_map(|x| x.ok());
 
-    let mut magma_devices = entries.filter_map(|entry| attempt_open_path(entry.path()).ok());
+    let mut magma_devices =
+        entries.filter_map(|entry| attempt_open_path(entry.path(), supported_vendor_list).ok());
     let magma_device = magma_devices.next().ok_or_else(|| errno!(EINVAL))?;
     let mut result_out = 0;
     let mut result_buffer_out = 0;
@@ -263,8 +268,8 @@ fn get_magma_vendor_id() -> Result<u64, Errno> {
 }
 
 /// Returns a command-line that helps Android select the correct GPU driver.
-pub fn get_magma_params() -> BString {
-    if let Some(magma_vendor_id) = get_magma_vendor_id().ok() {
+pub fn get_magma_params(supported_vendor_list: &Vec<u16>) -> BString {
+    if let Some(magma_vendor_id) = get_magma_vendor_id(supported_vendor_list).ok() {
         const MAGMA_VENDOR_ID_MALI_U64: u64 = MAGMA_VENDOR_ID_MALI as u64;
         const MAGMA_VENDOR_ID_INTEL_U64: u64 = MAGMA_VENDOR_ID_INTEL as u64;
         let gpu_type = match magma_vendor_id {

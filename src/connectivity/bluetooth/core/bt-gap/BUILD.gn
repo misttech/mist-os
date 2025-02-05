@@ -35,11 +35,11 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-sync",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:slab",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
   ]
 
   sources = [
@@ -96,7 +96,7 @@ fuchsia_structured_config_values("default_config_values") {
   cm_label = ":manifest"
   values = {
     le_privacy = true
-    le_background_scanning = true
+    le_background_scanning = false
     le_security_mode = "Mode1"
     bredr_connectable = true
     bredr_security_mode = "Mode4"

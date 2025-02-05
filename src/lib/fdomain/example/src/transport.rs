@@ -43,11 +43,11 @@ async fn echo_server(chan: fidl::Channel, prefix: String, quiet: bool) -> Result
         stream.try_next().await.context("error running echo server")?
     {
         if !quiet {
-            tracing::info!("Received echo request for string {:?}", value);
+            log::info!("Received echo request for string {:?}", value);
         }
         responder.send(&format!("{prefix}{value}")).context("error sending response")?;
         if !quiet {
-            tracing::info!("echo response sent successfully");
+            log::info!("echo response sent successfully");
         }
     }
     Ok(())
@@ -61,7 +61,7 @@ async fn echo_launcher_server(chan: fidl::AsyncChannel, quiet: bool) -> Result<(
     let mut tasks_fut = pin!(tasks.for_each_concurrent(None, move |task| async move {
         if let Err(e) = task.await {
             if !quiet {
-                tracing::warn!(error = ?e, "Echo server failed");
+                log::warn!(error:? = e; "Echo server failed");
             }
         }
     }));
@@ -76,7 +76,7 @@ async fn echo_launcher_server(chan: fidl::AsyncChannel, quiet: bool) -> Result<(
         match request {
             echo::EchoLauncherRequest::GetEcho { responder, echo_prefix } => {
                 if !quiet {
-                    tracing::info!(
+                    log::info!(
                         "Received echo launcher request with prefix string {:?}",
                         echo_prefix
                     );
@@ -90,7 +90,7 @@ async fn echo_launcher_server(chan: fidl::AsyncChannel, quiet: bool) -> Result<(
                     .send(fidl::endpoints::ClientEnd::new(client))
                     .context("error sending response")?;
                 if !quiet {
-                    tracing::info!("echo launcher response sent successfully");
+                    log::info!("echo launcher response sent successfully");
                 }
             }
             echo::EchoLauncherRequest::GetEchoPipelined {
@@ -99,7 +99,7 @@ async fn echo_launcher_server(chan: fidl::AsyncChannel, quiet: bool) -> Result<(
                 control_handle: _,
             } => {
                 if !quiet {
-                    tracing::info!(
+                    log::info!(
                         "Received pipelined echo launcher request with prefix string {:?}",
                         echo_prefix
                     );
@@ -109,7 +109,7 @@ async fn echo_launcher_server(chan: fidl::AsyncChannel, quiet: bool) -> Result<(
                     .unbounded_send(echo_server(request.into_channel(), echo_prefix, quiet))
                     .expect("Task future disappeared!");
                 if !quiet {
-                    tracing::info!("echo launcher pipeline request handled");
+                    log::info!("echo launcher pipeline request handled");
                 }
             }
         }
@@ -123,7 +123,7 @@ pub fn exec_server(quiet: bool) -> LocalFDomainTransport {
         let task = echo_launcher_server(channel, quiet);
         scope.spawn(async move {
             if let Err(e) = task.await {
-                tracing::warn!(error = ?e, "Echo server terminated");
+                log::warn!(error:? = e; "Echo server terminated");
             }
         });
     });

@@ -17,26 +17,26 @@ namespace audio::aml_g12 {
 //
 
 // Use StringReferences to save space in the Inspect VMO.
-const inspect::StringReference kCurrentPowerState("current_power_state");
+static constexpr std::string_view kCurrentPowerState = "current_power_state";
 
-const inspect::StringReference kPowerTransitions("power_transitions");
-const inspect::StringReference kCalledAt("called_at");
-const inspect::StringReference kEffectiveAt("effective_at");
-const inspect::StringReference kPowerState("power_state");
+static constexpr std::string_view kPowerTransitions = "power_transitions";
+static constexpr std::string_view kCalledAt = "called_at";
+static constexpr std::string_view kEffectiveAt = "effective_at";
+static constexpr std::string_view kPowerState = "power_state";
 
-const inspect::StringReference kRingBuffers("RingBuffers");
-const inspect::StringReference kElementId("element_id");
-const inspect::StringReference kSupportsActiveChannels("supports_active_channels");
-const inspect::StringReference kIsOutgoingStream("is_outgoing_stream");
-const inspect::StringReference kCtorTime("ctor_time");
-const inspect::StringReference kDtorTime("dtor_time");
-const inspect::StringReference kRunningIntervals("running_intervals");
-const inspect::StringReference kStartedAt("started_at");
-const inspect::StringReference kStoppedAt("stopped_at");
-const inspect::StringReference kSetActiveChannelsCalls("SetActiveChannels_calls");
-const inspect::StringReference kChannelBitmask("channel_bitmask");
+static constexpr std::string_view kRingBuffers = "RingBuffers";
+static constexpr std::string_view kElementId = "element_id";
+static constexpr std::string_view kSupportsActiveChannels = "supports_active_channels";
+static constexpr std::string_view kIsOutgoingStream = "is_outgoing_stream";
+static constexpr std::string_view kCtorTime = "ctor_time";
+static constexpr std::string_view kDtorTime = "dtor_time";
+static constexpr std::string_view kRunningIntervals = "running_intervals";
+static constexpr std::string_view kStartedAt = "started_at";
+static constexpr std::string_view kStoppedAt = "stopped_at";
+static constexpr std::string_view kSetActiveChannelsCalls = "SetActiveChannels_calls";
+static constexpr std::string_view kChannelBitmask = "channel_bitmask";
 
-const inspect::StringReference kDAIs("DAIs");
+static constexpr std::string_view kDAIs = "DAIs";
 
 // Represents a single power transition.
 class PowerTransition {

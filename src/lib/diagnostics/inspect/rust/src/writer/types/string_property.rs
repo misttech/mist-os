@@ -24,7 +24,7 @@ impl<'t> Property<'t> for StringProperty {
             inner_ref
                 .state
                 .try_lock()
-                .and_then(|mut state| state.set_property(inner_ref.block_index, value.as_bytes()))
+                .and_then(|mut state| state.set_string_property(inner_ref.block_index, value))
                 .unwrap_or_else(|e| error!("Failed to set property. Error: {:?}", e));
         }
     }
@@ -39,10 +39,24 @@ mod tests {
     use super::*;
     use crate::writer::testing_utils::{get_state, GetBlockExt};
     use crate::writer::Node;
-    use inspect_format::{BlockType, PropertyFormat};
+    use inspect_format::{BlockType, Buffer, PropertyFormat};
+
+    impl StringProperty {
+        fn load_data(&self) -> Option<String> {
+            let mut data_index = None;
+            self.get_block::<_, Buffer>(|b| data_index = Some(b.extent_index()));
+            self.inner.inner_ref().and_then(|inner_ref| {
+                inner_ref
+                    .state
+                    .try_lock()
+                    .and_then(|state| state.load_string(data_index.unwrap()))
+                    .ok()
+            })
+        }
+    }
 
     #[fuchsia::test]
-    fn string_property() {
+    fn basic_string_property() {
         // Create and use a default value.
         let default = StringProperty::default();
         default.set("test");
@@ -52,22 +66,56 @@ mod tests {
         let node = root.create_child("node");
         {
             let property = node.create_string("property", "test");
-            property.get_block(|property_block| {
-                assert_eq!(property_block.block_type(), BlockType::BufferValue);
-                assert_eq!(property_block.total_length().unwrap(), 4);
-                assert_eq!(property_block.property_format().unwrap(), PropertyFormat::String);
+            property.get_block::<_, Buffer>(|property_block| {
+                assert_eq!(property_block.block_type(), Some(BlockType::BufferValue));
+                assert_eq!(property_block.total_length(), 0);
+                assert_eq!(property_block.format(), Some(PropertyFormat::StringReference));
             });
-            node.get_block(|node_block| {
-                assert_eq!(node_block.child_count().unwrap(), 1);
+            assert_eq!(property.load_data().unwrap(), "test");
+            node.get_block::<_, inspect_format::Node>(|node_block| {
+                assert_eq!(node_block.child_count(), 1);
             });
 
             property.set("test-set");
-            property.get_block(|property_block| {
-                assert_eq!(property_block.total_length().unwrap(), 8);
+            property.get_block::<_, Buffer>(|property_block| {
+                assert_eq!(property_block.total_length(), 0);
             });
+            assert_eq!(property.load_data().unwrap(), "test-set");
         }
-        node.get_block(|node_block| {
-            assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block::<_, inspect_format::Node>(|node_block| {
+            assert_eq!(node_block.child_count(), 0);
         });
+    }
+
+    #[fuchsia::test]
+    fn string_property_interning() {
+        // Create and use a default value.
+        let default = StringProperty::default();
+        default.set("test");
+
+        let state = get_state(4096);
+        let root = Node::new_root(state);
+        let node = root.create_child("node");
+
+        let property1 = node.create_string("property", "test");
+        let mut name_idx_1 = None;
+        let mut payload_idx_1 = None;
+        property1.get_block::<_, Buffer>(|property_block| {
+            name_idx_1 = Some(property_block.name_index());
+            payload_idx_1 = Some(property_block.extent_index());
+        });
+
+        let property2 = node.create_string("test", "property");
+        let mut name_idx_2 = None;
+        let mut payload_idx_2 = None;
+        property2.get_block::<_, Buffer>(|property_block| {
+            name_idx_2 = Some(property_block.name_index());
+            payload_idx_2 = Some(property_block.extent_index());
+        });
+
+        assert_eq!(property1.load_data().unwrap(), "test");
+        assert_eq!(property2.load_data().unwrap(), "property");
+        assert_eq!(name_idx_1, payload_idx_2);
+        assert_eq!(name_idx_2, payload_idx_1);
     }
 }

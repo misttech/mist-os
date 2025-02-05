@@ -85,10 +85,12 @@ rustc_test("conformance_test") {
     "tests/file/read.rs",
     "tests/file/resize.rs",
     "tests/file/write.rs",
+    "tests/flags.rs",
     "tests/get_connection_info.rs",
     "tests/node.rs",
     "tests/remote.rs",
     "tests/service.rs",
     "tests/tests.rs",
+    "tests/unnamed_temporary_file.rs",
   ]
 }

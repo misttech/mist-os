@@ -14,9 +14,9 @@ use errors::ModelError;
 use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
 use futures::prelude::*;
 use lazy_static::lazy_static;
+use log::warn;
 use moniker::{ChildName, Moniker, MonikerError};
 use std::sync::Weak;
-use tracing::warn;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_sys2 as fsys,
@@ -43,7 +43,7 @@ impl LifecycleControllerCapabilityProvider {
         let instance =
             model.root().find(&moniker).await.ok_or(fsys::ResolveError::InstanceNotFound)?;
         instance.resolve().await.map(|_| ()).map_err(|error| {
-            warn!(%moniker, %error, "failed to resolve instance");
+            warn!(moniker:%, error:%; "failed to resolve instance");
             error.into()
         })
     }
@@ -78,7 +78,7 @@ impl LifecycleControllerCapabilityProvider {
         let incoming: IncomingCapabilities =
             args.try_into().map_err(|_| fsys::StartError::InvalidArguments)?;
         instance.start(&StartReason::Debug, None, incoming).await.map(|_| ()).map_err(|error| {
-            warn!(%moniker, %error, "failed to start instance");
+            warn!(moniker:%, error:%; "failed to start instance");
             error
         })?;
         instance.scope_to_runtime(binder.into_channel()).await;
@@ -96,7 +96,7 @@ impl LifecycleControllerCapabilityProvider {
             model.root().find(&moniker).await.ok_or(fsys::StopError::InstanceNotFound)?;
         ActionsManager::register(instance.clone(), StopAction::new(false)).await.map_err(
             |error| {
-                warn!(%moniker, %error, "failed to stop instance");
+                warn!(moniker:%, error:%; "failed to stop instance");
                 error
             },
         )?;
@@ -113,7 +113,7 @@ impl LifecycleControllerCapabilityProvider {
         let component =
             model.root().find(&moniker).await.ok_or(fsys::UnresolveError::InstanceNotFound)?;
         component.unresolve().await.map_err(|error| {
-            warn!(%moniker, %error, "failed to unresolve instance");
+            warn!(moniker:%, error:%; "failed to unresolve instance");
             error
         })?;
         Ok(())
@@ -140,7 +140,7 @@ impl LifecycleControllerCapabilityProvider {
             })?;
 
         cm_fidl_validator::validate_dynamic_child(&child_decl).map_err(|error| {
-            warn!(%parent_moniker, %error, "failed to create dynamic child. child decl is invalid");
+            warn!(parent_moniker:%, error:%; "failed to create dynamic child. child decl is invalid");
             fsys::CreateError::BadChildDecl
         })?;
         let child_decl = child_decl.fidl_into_native();
@@ -149,7 +149,7 @@ impl LifecycleControllerCapabilityProvider {
             .add_dynamic_child(collection.name.clone(), &child_decl, child_args)
             .await
             .map_err(|error| {
-                warn!(%parent_moniker, %error, "failed to add dynamic child");
+                warn!(parent_moniker:%, error:%; "failed to add dynamic child");
                 error.into()
             })
     }
@@ -170,7 +170,7 @@ impl LifecycleControllerCapabilityProvider {
             .map_err(|_| fsys::DestroyError::BadChildRef)?;
 
         parent_component.remove_dynamic_child(&child_moniker).await.map_err(|error| {
-            warn!(%parent_moniker, %error, "failed to destroy dynamic child");
+            warn!(parent_moniker:%, error:%; "failed to destroy dynamic child");
             error.into()
         })
     }
@@ -193,19 +193,19 @@ impl LifecycleControllerCapabilityProvider {
                 fsys::LifecycleControllerRequest::ResolveInstance { moniker, responder } => {
                     let res = Self::resolve_instance(&model, &scope_moniker, moniker).await;
                     responder.send(res).unwrap_or_else(
-                        |error| warn!(%error, "LifecycleController.ResolveInstance failed to send"),
+                        |error| warn!(error:%; "LifecycleController.ResolveInstance failed to send"),
                     );
                 }
                 fsys::LifecycleControllerRequest::UnresolveInstance { moniker, responder } => {
                     let res = Self::unresolve_instance(&model, &scope_moniker, moniker).await;
                     responder.send(res).unwrap_or_else(
-                        |error| warn!(%error, "LifecycleController.UnresolveInstance failed to send"),
+                        |error| warn!(error:%; "LifecycleController.UnresolveInstance failed to send"),
                     );
                 }
                 fsys::LifecycleControllerRequest::StartInstance { moniker, binder, responder } => {
                     let res = Self::start_instance(&model, &scope_moniker, moniker, binder).await;
                     responder.send(res).unwrap_or_else(
-                        |error| warn!(%error, "LifecycleController.StartInstance failed to send"),
+                        |error| warn!(error:%; "LifecycleController.StartInstance failed to send"),
                     );
                 }
                 fsys::LifecycleControllerRequest::StartInstanceWithArgs {
@@ -223,13 +223,13 @@ impl LifecycleControllerCapabilityProvider {
                     )
                     .await;
                     responder.send(res).unwrap_or_else(
-                        |error| warn!(%error, "LifecycleController.StartInstanceWithArgs failed to send"),
+                        |error| warn!(error:%; "LifecycleController.StartInstanceWithArgs failed to send"),
                     );
                 }
                 fsys::LifecycleControllerRequest::StopInstance { moniker, responder } => {
                     let res = Self::stop_instance(&model, &scope_moniker, moniker).await;
                     responder.send(res).unwrap_or_else(
-                        |error| warn!(%error, "LifecycleController.StopInstance failed to send"),
+                        |error| warn!(error:%; "LifecycleController.StopInstance failed to send"),
                     );
                 }
                 fsys::LifecycleControllerRequest::CreateInstance {
@@ -249,7 +249,7 @@ impl LifecycleControllerCapabilityProvider {
                     )
                     .await;
                     responder.send(res).unwrap_or_else(
-                        |error| warn!(%error, "LifecycleController.CreateInstance failed to send"),
+                        |error| warn!(error:%; "LifecycleController.CreateInstance failed to send"),
                     );
                 }
                 fsys::LifecycleControllerRequest::DestroyInstance {
@@ -260,7 +260,7 @@ impl LifecycleControllerCapabilityProvider {
                     let res =
                         Self::destroy_instance(&model, &scope_moniker, parent_moniker, child).await;
                     responder.send(res).unwrap_or_else(
-                        |error| warn!(%error, "LifecycleController.DestroyInstance failed to send"),
+                        |error| warn!(error:%; "LifecycleController.DestroyInstance failed to send"),
                     );
                 }
             }

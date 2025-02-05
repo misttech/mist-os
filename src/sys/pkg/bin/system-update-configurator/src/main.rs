@@ -11,7 +11,7 @@
 
 use anyhow::{Context, Error};
 use fuchsia_component::server::ServiceFs;
-use tracing::{error, info};
+use log::{error, info};
 
 pub mod bridge;
 mod health;

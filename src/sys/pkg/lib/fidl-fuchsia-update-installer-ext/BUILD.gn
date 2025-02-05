@@ -18,12 +18,12 @@ rustc_library("fidl-fuchsia-update-installer-ext") {
     "//src/sys/pkg/fidl/fuchsia.update.installer:fuchsia.update.installer_rust",
     "//src/sys/pkg/lib/event-queue",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:pin-project",
     "//third_party/rust_crates:proptest",
     "//third_party/rust_crates:proptest-derive",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:typed-builder",
   ]
 

@@ -11,6 +11,12 @@
         runner: "elf",
         binary: "bin/starnix_runner",
     },
+    children: [
+        {
+            name: "psi-provider",
+            url: "#meta/psi-provider.cm",
+        },
+    ],
     collections: [
         {
             name: "playground",
@@ -85,6 +91,7 @@
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
+                "fuchsia.time.alarms.Wake",
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
@@ -123,11 +130,6 @@
             to: [ "#kernels" ],
         },
         {
-            directory: "dev-hrtimer",
-            from: "parent",
-            to: [ "#kernels" ],
-        },
-        {
             directory: "dev-gpu",
             from: "parent",
             to: [ "#kernels" ],
@@ -141,6 +143,17 @@
             config: [ "fuchsia.ui.VisualDebuggingLevel" ],
             from: "parent",
             to: [ "#kernels" ],
+        },
+        {
+            protocol: [ "fuchsia.kernel.StallResource" ],
+            from: "parent",
+            to: "#psi-provider",
+            availability: "optional",
+        },
+        {
+            protocol: [ "fuchsia.starnix.psi.PsiProvider" ],
+            from: "#psi-provider",
+            to: "#kernels",
         },
     ],
     expose: [

@@ -4,9 +4,9 @@
 
 use bt_avctp::{AvcCommandType, AvcOpCode, AvcPacketType};
 use fidl_fuchsia_bluetooth_avrcp::AvcPanelCommand;
+use log::{trace, warn};
 use packet_encoding::{Decodable, Encodable};
 use thiserror::Error;
-use tracing::{trace, warn};
 
 use crate::packets::{Error as PacketError, *};
 

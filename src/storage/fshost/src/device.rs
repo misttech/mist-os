@@ -160,11 +160,11 @@ impl Device for NandDevice {
     }
 
     async fn partition_label(&mut self) -> Result<&str, Error> {
-        Err(anyhow!("not supported by nand device"))
+        self.block_device.partition_label().await
     }
 
     async fn partition_type(&mut self) -> Result<&[u8; 16], Error> {
-        Err(anyhow!("not supported by nand device"))
+        self.block_device.partition_type().await
     }
 
     async fn partition_instance(&mut self) -> Result<&[u8; 16], Error> {
@@ -665,6 +665,8 @@ pub enum DeviceTag {
     /// The block device containing the partition table in which the Fuchsia system resides.
     SystemPartitionTable,
 
-    /// The Fxblob device that isn't the ramdisk.
-    FxblobOnRecovery,
+    /// The non-ramdisk block device in which the Fuchsia system resides (which is either an FVM
+    /// instance, or an Fxblob instance).  Only set on recovery (and volumes within the container
+    /// will not be bound).
+    SystemContainerOnRecovery,
 }

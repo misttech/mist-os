@@ -16,7 +16,7 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use futures::channel::mpsc;
 use futures::{try_join, SinkExt, StreamExt, TryStreamExt};
-use tracing::warn;
+use log::warn;
 use {fidl_fuchsia_fuzzer as fuzz, fidl_fuchsia_test_manager as test_manager};
 
 enum IncomingService {

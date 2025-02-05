@@ -24,10 +24,10 @@ use fuchsia_bluetooth::types::{PeerId, Uuid};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect_derive::Inspect;
 use futures::{Stream, StreamExt};
+use log::{debug, error, info, trace, warn};
 use profile_client::{ProfileClient, ProfileEvent};
 use std::collections::HashSet;
 use std::sync::Arc;
-use tracing::{debug, error, info, trace, warn};
 use {
     bt_avdtp as avdtp, fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
     fidl_fuchsia_media_sessions2 as sessions2, fuchsia_inspect as inspect,
@@ -148,15 +148,15 @@ async fn connect_after_timeout(
     trace!("waiting {}ms before connecting to peer {}.", initiator_delay.into_millis(), peer_id);
     fuchsia_async::Timer::new(initiator_delay.after_now()).await;
 
-    trace!(%peer_id, "trying to connect control channel");
+    trace!(peer_id:%; "trying to connect control channel");
     let connect_fut = peers.try_connect(peer_id, channel_parameters);
     let channel = match connect_fut.await {
-        Err(e) => return warn!(%peer_id, ?e, "Failed to connect control channel"),
-        Ok(None) => return warn!(%peer_id, "Control channel already connected"),
+        Err(e) => return warn!(peer_id:%, e:?; "Failed to connect control channel"),
+        Ok(None) => return warn!(peer_id:%; "Control channel already connected"),
         Ok(Some(channel)) => channel,
     };
 
-    info!(%peer_id, mode = %channel.channel_mode(), max_tx = %channel.max_tx_size(), "Connected");
+    info!(peer_id:%, mode:% = channel.channel_mode(), max_tx:% = channel.max_tx_size(); "Connected");
     if let Err(e) =
         peers.connected(peer_id, channel, Some(zx::MonotonicDuration::from_nanos(0))).await
     {
@@ -208,14 +208,14 @@ fn handle_services_found(
             })
         })
         .collect();
-    info!(%peer_id, "Found audio profile: {service_names:?}, profiles: {profile_names:?}");
+    info!(peer_id:%; "Found audio profile: {service_names:?}, profiles: {profile_names:?}");
 
     let Some(profile) = profiles.first() else {
-        info!(%peer_id, "Couldn't find profile in results, ignoring");
+        info!(peer_id:%; "Couldn't find profile in results, ignoring");
         return;
     };
 
-    debug!(%peer_id, "Marking found");
+    debug!(peer_id:%; "Marking found");
     peers.found(peer_id.clone(), profile.clone(), peer_preferred_directions);
 
     if let Some(initiator_delay) = initiator_delay {
@@ -417,7 +417,7 @@ async fn handle_profile_events(
         let peer_id = evt.peer_id();
         match evt {
             ProfileEvent::PeerConnected { channel, .. } => {
-                info!(%peer_id, mode = %channel.channel_mode(), max_tx = %channel.max_tx_size(), "Incoming connection");
+                info!(peer_id:%, mode:% = channel.channel_mode(), max_tx:% = channel.max_tx_size(); "Incoming connection");
                 // Connected, initiate after the delay if not streaming.
                 if let Err(e) = peers.connected(peer_id, channel, initiator_delay).await {
                     warn!("Problem accepting peer connection: {e}");

@@ -10,12 +10,12 @@ use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, ServerEnd};
 use fuchsia_fs::directory;
 use fuchsia_sync::RwLock;
 use futures::TryStreamExt;
+use log::{debug, warn};
 use moniker::ExtendedMoniker;
 use std::borrow::Cow;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
-use tracing::{debug, warn};
 use {
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_diagnostics as fdiagnostics,
     fidl_fuchsia_diagnostics_host as fdiagnostics_host, fidl_fuchsia_io as fio,
@@ -298,7 +298,7 @@ async fn handle_receiver_requests<P>(
                 );
             }
             fsandbox::ReceiverRequest::_UnknownMethod { method_type, ordinal, .. } => {
-                warn!(?method_type, ordinal, "Got unknown interaction on Receiver")
+                warn!(method_type:?, ordinal; "Got unknown interaction on Receiver");
             }
         }
     }

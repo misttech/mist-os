@@ -9,15 +9,15 @@ use ffx_profile_heapdump_common::{check_snapshot_error, connect_to_collector, ex
 use ffx_profile_heapdump_download_args::DownloadCommand;
 use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl::endpoints::create_request_stream;
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
+use target_holders::RemoteControlProxyHolder;
 
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("ffx_profile_heapdump"))]
 pub struct DownloadTool {
     #[command]
     cmd: DownloadCommand,
-    remote_control: RemoteControlProxy,
+    remote_control: RemoteControlProxyHolder,
 }
 
 fho::embedded_plugin!(DownloadTool);
@@ -32,7 +32,7 @@ impl FfxMain for DownloadTool {
     }
 }
 
-async fn download(remote_control: RemoteControlProxy, cmd: DownloadCommand) -> Result<()> {
+async fn download(remote_control: RemoteControlProxyHolder, cmd: DownloadCommand) -> Result<()> {
     let (receiver_client, receiver_stream) = create_request_stream();
     let request = fheapdump_client::CollectorDownloadStoredSnapshotRequest {
         snapshot_id: Some(cmd.snapshot_id),

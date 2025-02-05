@@ -8,9 +8,9 @@ use crate::upgradable_packages::UpgradablePackages;
 use anyhow::Context as _;
 use fidl::endpoints::Proxy as _;
 use futures::stream::TryStreamExt as _;
+use log::{error, warn};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{error, warn};
 use version_history::AbiRevision;
 use {
     fidl_fuchsia_component_decl as fcomponent_decl,
@@ -86,7 +86,7 @@ pub(crate) async fn serve_request_stream(
                     )?;
             }
             fcomponent_resolution::ResolverRequest::_UnknownMethod { ordinal, .. } => {
-                warn!(%ordinal, "Unknown Resolver request");
+                warn!(ordinal:%; "Unknown Resolver request");
             }
         }
     }

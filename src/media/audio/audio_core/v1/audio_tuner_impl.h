@@ -20,6 +20,8 @@ using fuchsia::media::tuning::StreamType;
 
 inline std::optional<StreamType> StreamTypeFromRenderUsage(RenderUsage usage) {
   switch (usage) {
+    case RenderUsage::ACCESSIBILITY:
+      return StreamType::RENDER_ACCESSIBILITY;
     case RenderUsage::BACKGROUND:
       return StreamType::RENDER_BACKGROUND;
     case RenderUsage::COMMUNICATION:
@@ -39,6 +41,8 @@ inline std::optional<StreamType> StreamTypeFromRenderUsage(RenderUsage usage) {
 
 inline std::optional<RenderUsage> RenderUsageFromStreamType(StreamType usage) {
   switch (usage) {
+    case StreamType::RENDER_ACCESSIBILITY:
+      return RenderUsage::ACCESSIBILITY;
     case StreamType::RENDER_BACKGROUND:
       return RenderUsage::BACKGROUND;
     case StreamType::RENDER_COMMUNICATION:

@@ -5,10 +5,16 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_debug_connect") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
 
   args_sources = [ "src/args.rs" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
+
   sources = [ "src/lib.rs" ]
 
   deps = [
@@ -18,6 +24,7 @@ ffx_plugin("ffx_debug_connect") {
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/sdk:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:signal-hook",

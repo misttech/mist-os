@@ -116,7 +116,7 @@ impl TryFrom<SetupRequest> for Job {
                 Ok(watch::Work::new_job(SettingType::Setup, responder))
             }
             _ => {
-                tracing::warn!("Received a call to an unsupported API: {:?}", item);
+                log::warn!("Received a call to an unsupported API: {:?}", item);
                 Err(JobError::Unsupported)
             }
         }

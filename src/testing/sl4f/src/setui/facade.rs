@@ -7,9 +7,9 @@ use anyhow::{format_err, Error};
 use serde_json::{from_value, to_value, Value};
 
 use crate::setui::types::{IntlInfo, MicStates, NetworkType, SetUiResult};
-use fidl_fuchsia_media::AudioRenderUsage;
+use fidl_fuchsia_media::AudioRenderUsage2;
 use fidl_fuchsia_settings::{
-    self as fsettings, AudioMarker, AudioStreamSettingSource, AudioStreamSettings,
+    self as fsettings, AudioMarker, AudioStreamSettingSource, AudioStreamSettings2,
     ConfigurationInterfaces, DeviceState, DisplayMarker, DisplaySettings, InputMarker, InputState,
     IntlMarker, SetupMarker, SetupSettings, Volume,
 };
@@ -181,7 +181,7 @@ impl SetUiFacade {
         }
     }
 
-    /// Sets the media volume level via `fuchsia.settings.Audio.Set`.
+    /// Sets the media volume level via `fuchsia.settings.Audio.Set2`.
     ///
     /// # Arguments
     /// * `args`: JSON value containing the desired volume level as f32.
@@ -198,8 +198,8 @@ impl SetUiFacade {
             },
         };
 
-        let stream_settings = AudioStreamSettings {
-            stream: Some(AudioRenderUsage::Media),
+        let stream_settings = AudioStreamSettings2 {
+            stream: Some(AudioRenderUsage2::Media),
             source: Some(AudioStreamSettingSource::User),
             user_volume: Some(Volume {
                 level: Some(volume),
@@ -208,11 +208,13 @@ impl SetUiFacade {
             }),
             ..Default::default()
         };
-        let settings =
-            fsettings::AudioSettings { streams: Some(vec![stream_settings]), ..Default::default() };
+        let settings = fsettings::AudioSettings2 {
+            streams: Some(vec![stream_settings]),
+            ..Default::default()
+        };
 
         info!("Setting audio settings {:?}", settings);
-        match audio_proxy.set(&settings).await? {
+        match audio_proxy.set2(&settings).await? {
             Ok(_) => Ok(to_value(SetUiResult::Success)?),
             Err(e) => Err(format_err!("SetVolume failed with err {:?}", e)),
         }
@@ -372,13 +374,13 @@ mod tests {
         // Create a future to service the request stream.
         let stream_fut = async move {
             match stream.try_next().await {
-                Ok(Some(fsettings::AudioRequest::Set { settings, responder })) => {
+                Ok(Some(fsettings::AudioRequest::Set2 { settings, responder })) => {
                     let mut streams = settings.streams.unwrap();
                     assert_eq!(1, streams.len());
                     assert_eq!(
                         streams.pop().unwrap(),
-                        AudioStreamSettings {
-                            stream: Some(AudioRenderUsage::Media),
+                        AudioStreamSettings2 {
+                            stream: Some(AudioRenderUsage2::Media),
                             source: Some(AudioStreamSettingSource::User),
                             user_volume: Some(Volume {
                                 level: Some(volume),

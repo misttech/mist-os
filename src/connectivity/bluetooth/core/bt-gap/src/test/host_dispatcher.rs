@@ -17,8 +17,8 @@ use futures::channel::mpsc;
 use futures::future::join;
 use futures::stream::TryStreamExt;
 use futures::{FutureExt, StreamExt, TryFutureExt};
+use log::info;
 use std::collections::{HashMap, HashSet};
-use tracing::info;
 
 use crate::build_config::{BrEdrConfig, Config};
 use crate::host_dispatcher::{test as hd_test, HostDispatcher, NameReplace, DEFAULT_DEVICE_NAME};

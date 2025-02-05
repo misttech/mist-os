@@ -54,7 +54,8 @@ typedef struct zx_restricted_state {
   uint64_t sp;
   uint64_t pc;
   uint64_t tpidr_el0;
-  // Contains only the user-controllable upper 4-bits (NZCV).
+  // Contains the user-controllable upper 4-bits (NZCV) for aarch32/64.
+  // If M[4] is set, aarch32 bits are accessible: T, Q, IT, and GE.
   uint32_t cpsr;
   uint8_t padding1[4];
 } zx_restricted_state_t;
@@ -106,7 +107,7 @@ typedef struct zx_restricted_exception {
 
 // Configuration struct for periodically sampling a thread
 typedef struct zx_sampler_config {
-  zx_duration_t period;
+  zx_duration_mono_t period;
   size_t buffer_size;
   uint64_t iobuffer_discipline;
 } zx_sampler_config_t;
@@ -152,7 +153,7 @@ typedef struct {
 // Represents a transition between processor power levels.
 typedef struct {
   // The expected latency of the transition.
-  zx_duration_t latency;
+  zx_duration_mono_t latency;
 
   // The expected energy expended by the transition in nanojoules.
   uint64_t energy_nj;
@@ -223,6 +224,21 @@ typedef struct {
 typedef uint32_t zx_iob_allocate_id_options_t;
 
 // ====== End of upcoming IOB support ====== //
+
+// ====== Stall measurement and notification ====== //
+
+// Contains the accumulated monotonic stall times since boot.
+typedef struct zx_info_memory_stall {
+  // Total monotonic time spent with at least one memory-stalled thread.
+  zx_duration_t stall_time_some;
+
+  // Total monotonic time spent with all threads memory-stalled.
+  zx_duration_t stall_time_full;
+} zx_info_memory_stall_t;
+
+#define ZX_INFO_MEMORY_STALL ((zx_object_info_topic_t)38u)  // zx_info_memory_stall_t[1]
+
+// ====== End stall measurement and notification ====== //
 
 #ifndef _KERNEL
 

@@ -5,7 +5,7 @@
 use std::marker::PhantomData;
 
 use crate::experimental::clock::Timed;
-use crate::experimental::event::reactor::Reactor;
+use crate::experimental::event::reactor::{Context, Reactor};
 use crate::experimental::event::Event;
 use crate::experimental::series::buffer::BufferStrategy;
 use crate::experimental::series::interpolation::Interpolation;
@@ -47,25 +47,26 @@ impl Optional for Unset {
 /// [`serve::serve_time_matrix_inspection`]: crate::experimental::serve::serve_time_matrix_inspection
 /// [`TimeMatrix`]: crate::experimental::series::TimeMatrix
 #[derive(Clone, Copy, Debug)]
-pub struct SampleDataRecord<F, M = Unset>
+pub struct SampleDataRecord<F, S = (), M = Unset>
 where
     M: Optional,
 {
     statistic: F,
     metadata: M::Field,
+    phantom: PhantomData<fn() -> S>,
 }
 
-impl<F, M> SampleDataRecord<F, M>
+impl<F, S, M> SampleDataRecord<F, S, M>
 where
     M: Optional,
 {
     fn reactor<T>(
         matrix: InspectedTimeMatrix<T>,
-    ) -> impl Reactor<T, Response = (), Error = FoldError>
+    ) -> impl Reactor<T, S, Response = (), Error = FoldError>
     where
         T: Clone,
     {
-        move |event: Timed<Event<T>>| {
+        move |event: Timed<Event<T>>, _: Context<'_, S>| {
             if let Some(sample) = event.to_timed_sample() {
                 matrix.fold(sample)
             } else {
@@ -75,7 +76,7 @@ where
     }
 }
 
-impl<F> SampleDataRecord<F, Set<Metadata<F>>>
+impl<F, S> SampleDataRecord<F, S, Set<Metadata<F>>>
 where
     F: Statistic,
 {
@@ -85,14 +86,14 @@ where
         name: impl AsRef<str>,
         profile: SamplingProfile,
         interpolation: P::State<F>,
-    ) -> impl Reactor<F::Sample, Response = (), Error = FoldError>
+    ) -> impl Reactor<F::Sample, S, Response = (), Error = FoldError>
     where
         TimeMatrix<F, P>: 'static + MatrixSampler<F::Sample> + Send,
         Metadata<F>: 'static + Send + Sync,
         F: BufferStrategy<F::Aggregation, P> + Statistic,
         P: Interpolation<FillSample<F> = F::Sample>,
     {
-        let SampleDataRecord { statistic, metadata } = self;
+        let SampleDataRecord { statistic, metadata, .. } = self;
         let matrix = client.inspect_time_matrix_with_metadata(
             name.as_ref(),
             TimeMatrix::with_statistic(profile, interpolation, statistic),
@@ -102,7 +103,7 @@ where
     }
 }
 
-impl<F> SampleDataRecord<F, Unset>
+impl<F, S> SampleDataRecord<F, S, Unset>
 where
     F: Statistic,
 {
@@ -122,9 +123,9 @@ where
     pub fn with_metadata(
         self,
         metadata: impl Into<Metadata<F>>,
-    ) -> SampleDataRecord<F, Set<Metadata<F>>> {
+    ) -> SampleDataRecord<F, S, Set<Metadata<F>>> {
         let SampleDataRecord { statistic, .. } = self;
-        SampleDataRecord { statistic, metadata: metadata.into() }
+        SampleDataRecord { statistic, metadata: metadata.into(), phantom: PhantomData }
     }
 
     pub fn in_time_matrix<P>(
@@ -133,7 +134,7 @@ where
         name: impl AsRef<str>,
         profile: SamplingProfile,
         interpolation: P::State<F>,
-    ) -> impl Reactor<F::Sample, Response = (), Error = FoldError>
+    ) -> impl Reactor<F::Sample, S, Response = (), Error = FoldError>
     where
         TimeMatrix<F, P>: 'static + MatrixSampler<F::Sample> + Send,
         Metadata<F>: 'static + Send + Sync,
@@ -156,9 +157,9 @@ where
 /// [`Reactor`]: crate::experimental::event::Reactor
 /// [`Statistic`]: crate::experimental::series::statistic::Statistic
 /// [`TimeMatrix`]: crate::experimental::series::TimeMatrix
-pub fn sample_data_record<F>(statistic: F) -> SampleDataRecord<F, Unset>
+pub fn sample_data_record<S, F>(statistic: F) -> SampleDataRecord<F, S, Unset>
 where
     F: Statistic,
 {
-    SampleDataRecord { statistic, metadata: () }
+    SampleDataRecord { statistic, metadata: (), phantom: PhantomData }
 }

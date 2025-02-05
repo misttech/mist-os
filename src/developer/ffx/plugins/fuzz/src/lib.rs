@@ -7,8 +7,8 @@ use crate::shell::Shell;
 use anyhow::Result;
 use ffx_fuzz_args::{FuzzCommand, Session};
 use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_developer_remotecontrol as rcs;
 use fuchsia_fuzzctl::{StdioSink, Writer};
+use target_holders::RemoteControlProxyHolder;
 
 mod autocomplete;
 mod fuzzer;
@@ -29,7 +29,7 @@ mod shell;
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("fuzzing"))]
 pub struct FuzzTool {
-    remote_control: rcs::RemoteControlProxy,
+    remote_control: RemoteControlProxyHolder,
     #[command]
     cmd: FuzzCommand,
 }
@@ -45,7 +45,7 @@ impl FfxMain for FuzzTool {
     }
 }
 
-async fn fuzz(rc: rcs::RemoteControlProxy, command: FuzzCommand) -> Result<()> {
+async fn fuzz(rc_holder: RemoteControlProxyHolder, command: FuzzCommand) -> Result<()> {
     let session = command.as_session();
     let (is_tty, muted, use_colors) = match session {
         Session::Interactive(_) => (true, false, true),
@@ -53,6 +53,7 @@ async fn fuzz(rc: rcs::RemoteControlProxy, command: FuzzCommand) -> Result<()> {
         Session::Verbose(_) => (false, false, false),
     };
     let mut writer = Writer::new(StdioSink { is_tty });
+    let rc = (*rc_holder).clone();
     writer.mute(muted);
     writer.use_colors(use_colors);
     match session {

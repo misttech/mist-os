@@ -170,7 +170,7 @@ fn create_key_event(
         event.get_modifiers().unwrap_or_else(|| Modifiers::from_bits_allow_unknown(0)).into();
     let lock_state: FrozenLockState =
         event.get_lock_state().unwrap_or_else(|| LockState::from_bits_allow_unknown(0)).into();
-    tracing::debug!(
+    log::debug!(
         "ImeHandler::create_key_event: key:{:?}, modifier_state: {:?}, lock_state: {:?}, event_type: {:?}",
         event.get_key(),
         modifier_state,

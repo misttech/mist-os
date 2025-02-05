@@ -13,7 +13,7 @@ pub struct PassValidator;
 impl Validator for PassValidator {
     /// Pass through validation function. Always returns `Ok`.
     fn validate(&self, file_name: &str, _contents: &[u8]) -> Result<(), ValidatorError> {
-        tracing::info!("Passing validation of {}", file_name);
+        log::info!("Passing validation of {}", file_name);
         Ok(())
     }
 }

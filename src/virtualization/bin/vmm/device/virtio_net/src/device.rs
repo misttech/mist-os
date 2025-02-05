@@ -62,7 +62,7 @@ impl<T: GuestEthernetInterface> NetDevice<T> {
         while let Some(chain) = tx_stream.next().await {
             let readable_chain = ReadableChain::new(chain, guest_mem);
             if let Err(err) = self.handle_readable_chain(readable_chain).await {
-                tracing::error!("Dropping TX packet: {}", err);
+                log::error!("Dropping TX packet: {}", err);
             }
         }
 
@@ -155,13 +155,13 @@ impl<T: GuestEthernetInterface> NetDevice<T> {
                 Ok(chain) => chain,
                 Err(err) => {
                     // Ignore this chain and continue processing.
-                    tracing::error!(%err, "Device received a bad chain on the RX queue");
+                    log::error!(err:%; "Device received a bad chain on the RX queue");
                     continue;
                 }
             };
 
             if let Err(err) = self.handle_writable_chain(writable_chain).await {
-                tracing::error!("Error processing RX packet: {}", err);
+                log::error!("Error processing RX packet: {}", err);
             }
         }
 

@@ -116,6 +116,7 @@ template("rustc_test_internal") {
     pass_through = {
       forward_variables_from(invoker,
                              [
+                               "data_deps",
                                "exclude_toolchain_tags",
                                "output_dir",
                              ])
@@ -194,22 +195,7 @@ template("rustc_test_internal") {
       deps += invoker.test_deps
     }
 
-    _data_deps = []
-    if (defined(invoker.data_deps)) {
-      _data_deps = invoker.data_deps
-    }
     if (is_fuchsia || is_mistos) {
-      # Dynamic linking applies to not only to libstd but to libtest as well,
-      # which means we must depend on it as a data_dep to get it in our
-      # package.
-      _dynamic_rust_config =
-          [ "//build/config/mistos:dynamic_rust_standard_library" ]
-      if (configs + _dynamic_rust_config - _dynamic_rust_config != configs) {
-        _data_deps += [ "//build/toolchain/runtime:shared-rust-libtest-deps" ]
-      } else {
-        _data_deps += [ "//build/toolchain/runtime:static-rust-libtest-deps" ]
-      }
-
       metadata = {
         # Used by the fuchsia_test_component_manifest() template.
         test_component_manifest_cml = [
@@ -223,7 +209,6 @@ template("rustc_test_internal") {
         disable_rustdoc = [ true ]
       }
     }
-    pass_through.data_deps = _data_deps
   }
 }
 

@@ -5,8 +5,8 @@
 use crate::logs::error::LogsError;
 use fidl::prelude::*;
 use fidl_fuchsia_diagnostics::BatchIteratorControlHandle;
+use log::warn;
 use thiserror::Error;
-use tracing::warn;
 use zx_status::Status as ZxStatus;
 
 #[derive(Debug, Error)]
@@ -92,7 +92,7 @@ pub enum AccessorError {
 
 impl AccessorError {
     pub fn close(self, control: BatchIteratorControlHandle) {
-        warn!(error = %self, "Closing BatchIterator.");
+        warn!(error:% = self; "Closing BatchIterator.");
         let epitaph = match self {
             AccessorError::DuplicateBatchTimeout
             | AccessorError::MissingDataType

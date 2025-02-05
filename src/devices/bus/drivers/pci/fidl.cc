@@ -28,6 +28,11 @@
 #define RETURN_TRACE(status, format...) RETURN_STATUS(TRACE, status, format)
 
 namespace fpci = ::fuchsia_hardware_pci;
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}
+
 namespace pci {
 
 void FidlDevice::Bind(fidl::ServerEnd<fuchsia_hardware_pci::Device> request) {
@@ -62,6 +67,15 @@ zx::result<> FidlDevice::Create(zx_device_t* parent, pci::Device* device) {
       fpci::Service::Name,
   };
 
+  auto bus_info = std::make_unique<fdf::BusInfo>(fdf::BusInfo{{
+      .bus = fdf::BusType::kPci,
+      .address = fdf::DeviceAddress::WithArrayIntValue(
+          {device->bus_id(), device->dev_id(), device->func_id()}),
+      // TODO(surajmalhotra): Determine if device is soldered on or removable. For now we only
+      // really run on devices with where everythign on the pci bus is pretty much permanent.
+      .address_stability = fdf::DeviceAddressStability::kStable,
+  }});
+
   zx::result result = fidl_dev->outgoing_dir().AddService<fuchsia_hardware_pci::Service>(
       fuchsia_hardware_pci::Service::InstanceHandler({
           .device = fidl_dev->bindings_.CreateHandler(
@@ -84,6 +98,7 @@ zx::result<> FidlDevice::Create(zx_device_t* parent, pci::Device* device) {
   const auto name = std::string(device->config()->addr());
   zx_status_t status = fidl_dev->DdkAdd(ddk::DeviceAddArgs(name.c_str())
                                             .set_str_props(pci_device_props)
+                                            .set_bus_info(std::move(bus_info))
                                             .set_flags(DEVICE_ADD_MUST_ISOLATE)
                                             .set_outgoing_dir(endpoints->client.TakeChannel())
                                             .set_fidl_service_offers(offers));

@@ -6,7 +6,7 @@ library fuchsia.hardware.audio;
 using zx;
 
 /// Delay information as returned by the driver.
-@available(added=HEAD)
+@available(added=NEXT)
 type DelayInfo = table {
     /// The driver's best estimate (for the chosen format) of the delay internal to the hardware it
     /// abstracts.
@@ -319,7 +319,7 @@ type RingBufferProperties = table {
     /// `external_delay` fields in `DelayInfo`; they are orthogonal to this value.
     ///
     /// Required.
-    @available(added=HEAD)
+    @available(added=NEXT)
     5: driver_transfer_bytes uint32;
 };
 
@@ -464,7 +464,7 @@ closed(removed=24) open(added=24) protocol RingBuffer {
     /// `WatchDelayInfo` calls until the delay info changes from what was most recently reported.
     /// If `WatchDelayInfo` is called for a second time before the first call has completed, the
     /// channel must be closed with an error `ZX_ERR_BAD_STATE` returned.
-    @available(added=HEAD)
+    @available(added=NEXT)
     flexible WatchDelayInfo() -> (struct {
         delay_info DelayInfo;
     });

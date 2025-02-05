@@ -329,6 +329,7 @@ pub(crate) fn build_protection_ie(protection: &Protection) -> Result<Option<Prot
                 ProtectionInfo::LegacyWpa(wpa) => wpa,
             };
             let mut buf = vec![];
+            #[expect(clippy::unwrap_used)]
             ie::write_wpa1_ie(&mut buf, &s_wpa).unwrap(); // Writing to a Vec never fails
             Ok(Some(ProtectionIe::VendorIes(buf)))
         }
@@ -344,6 +345,7 @@ pub(crate) fn build_protection_ie(protection: &Protection) -> Result<Option<Prot
             // Writing an RSNE into a Vector can never fail as a Vector can be grown when more
             // space is required. If this panic ever triggers, something is clearly broken
             // somewhere else.
+            #[expect(clippy::unwrap_used)]
             let () = s_rsne.write_into(&mut buf).unwrap();
             Ok(Some(ProtectionIe::Rsne(buf)))
         }

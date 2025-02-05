@@ -1,0 +1,43 @@
+// Default access-check exceptions configuration for SELinux-enabled Starnix containers.
+
+//
+// Exceptions required for Android containers.
+//
+
+// https://fxbug.dev/390458405 - HALs implemented via "remote_binder" fail "entrypoint" checks.
+todo_deny https://fxbug.dev/390458405 hal_wifi_supplicant_default vendor_file file
+todo_deny https://fxbug.dev/390458405 hal_wifi_default vendor_file file
+todo_deny https://fxbug.dev/390458405 update_engine vendor_file file
+todo_deny https://fxbug.dev/390458405 hal_fuchsia_network_provider_default vendor_file file
+todo_deny https://fxbug.dev/390458405 hal_audio_default vendor_file file
+todo_deny https://fxbug.dev/390458405 hal_bluetooth_default vendor_file file
+todo_deny https://fxbug.dev/390458405 hal_bootctl_default vendor_file file
+todo_deny https://fxbug.dev/390458405 hal_audio_default vendor_file file
+todo_deny https://fxbug.dev/390458405 hal_contexthub_default vendor_file file
+todo_deny https://fxbug.dev/390458405 hal_dumpstate_default vendor_file file
+todo_deny https://fxbug.dev/390458405 hal_gnss_default vendor_file file
+todo_deny https://fxbug.dev/390458405 hal_graphics_composer_default vendor_file file
+todo_deny https://fxbug.dev/390458405 hal_health_default vendor_file file
+todo_deny https://fxbug.dev/390458405 hal_power_stats_default vendor_file file
+todo_deny https://fxbug.dev/390458405 hal_power_default vendor_file file
+todo_deny https://fxbug.dev/390458405 hal_sensors_default vendor_file file
+todo_deny https://fxbug.dev/390458405 hal_thermal_default vendor_file file
+
+// https://fxbug.dev/391136582 - fxlogcat is not correctly labeled.
+todo_deny https://fxbug.dev/391136582 logpersist system_file file
+
+// https://fxbug.dev/392857781 - Some HAL tests/pre-run steps are launched with bad labels.
+todo_deny https://fxbug.dev/392857781 init system_file file
+todo_deny https://fxbug.dev/392857781 init vendor_file file
+todo_deny https://fxbug.dev/392857781 init nativetest_data_file file
+
+// https://fxbug.dev/391664952 - Some test infra attempts to run commands via "sh" without specifying a security domain to transition to, triggering "execute_no_trans" failures.
+todo_deny https://fxbug.dev/391664952 init shell_exec file
+
+//
+// Exceptions required for the SELinux Test Suite container.
+//
+
+// https://fxbug.dev/390739936 - SEStarnix tests mis-label some files.
+todo_deny https://fxbug.dev/390739936 test_ioctl_t user_tmp_t file
+todo_deny https://fxbug.dev/390739936 test_noioctl_t user_tmp_t file

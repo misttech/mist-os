@@ -248,17 +248,17 @@ class NetdeviceMigrationTest : public ::testing::Test {
   }
 
   MockDevice& Parent() { return *parent_; }
-  testing::StrictMock<const MockNetworkDeviceIfc>& MockNetworkDevice() {
+  testing::StrictMock<MockNetworkDeviceIfc>& MockNetworkDevice() {
     return mock_network_device_ifc_;
   }
-  testing::StrictMock<const MockEthernetImpl>& MockEthernet() { return mock_ethernet_impl_; }
+  testing::StrictMock<MockEthernetImpl>& MockEthernet() { return mock_ethernet_impl_; }
   netdevice_migration::NetdeviceMigration& Device() { return *device_; }
   netdevice_migration::NetdeviceMigration* TakeDevice() { return device_.release(); }
 
  private:
   const std::shared_ptr<MockDevice> parent_;
-  testing::StrictMock<const MockNetworkDeviceIfc> mock_network_device_ifc_;
-  testing::StrictMock<const MockEthernetImpl> mock_ethernet_impl_;
+  testing::StrictMock<MockNetworkDeviceIfc> mock_network_device_ifc_;
+  testing::StrictMock<MockEthernetImpl> mock_ethernet_impl_;
   std::unique_ptr<netdevice_migration::NetdeviceMigration> device_;
   bool queued_rx_space_ = false;
 };

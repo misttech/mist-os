@@ -1070,4 +1070,70 @@ TEST(SignalHandling, FutexIsInterruptedBySignalHandler) {
   });
 }
 
+// Test to ensure that syscall restart machinery doesn't blindly trust user-controlled registers.
+TEST(SignalHandling, Repro347063218) {
+  pid_t pid = SAFE_SYSCALL(fork());
+  if (pid == 0) {
+    // crash with return register containing a bad value.
+    constexpr uint64_t value = 0x8000'0000'0000'0000ul;
+#ifdef __x86_64__
+    __asm__ volatile("ud2\n" : : "a"(value));
+#elif __aarch64__
+    __asm__ volatile(
+        "mov x0, %0\n"
+        "udf #0\n"
+        :
+        : "r"(value)
+        : "r0");
+#elif __riscv
+    __asm__ volatile(
+        "mv x0, %0\n"
+        "unimp\n"
+        :
+        : "r"(value)
+        : "x0");
+#endif
+  }
+
+  SAFE_SYSCALL(waitpid(pid, nullptr, 0));
+}
+
+#ifdef __x86_64__
+// Note that on Linux SIG_IGN will only ignore the first trap when raise() is called, but it will
+// not entirely ignore the signal when raised by an `int3` instruction. We need a custom signal
+// handler to inhibit that behavior.
+void ignore_sigtrap(int signal_number) {}
+#endif
+
+// This is similar to the above test but also checks to make sure that user-controlled errnos in
+// the return register are unable to convince the kernel to rewind the instruction pointer into
+// arbitrary blocks of code.
+TEST(SignalHandling, Repro347756382) {
+  pid_t pid = SAFE_SYSCALL(fork());
+  if (pid == 0) {
+// It should be sufficient to test this behavior on x64 where we have an existing repro case. The
+// logic for whether or not to trust register values is architecture-agnostic.
+#ifdef __x86_64__
+    EXPECT_NE(signal(SIGTRAP, ignore_sigtrap), SIG_ERR);
+    constexpr int64_t value = -513ul;
+
+    __asm__ volatile(
+        "movabs $0xcc050f00000033bf, %%rdi\n"  // mov edi, 0x33; syscall; int3
+        "movabs $0xeeeb900000003cb8, %%rdi\n"  // mov eax, 60; nop; jmp $ - 16;
+        "movabs $0xeeeb9090cccccccc, %%rdi\n"  // int3; int3; int3; int3; nop; nop; jmp $ - 16;
+        "int3\n"
+        :
+        : "a"(value)
+        : "rdi");
+
+#endif
+    exit(EXIT_SUCCESS);
+  }
+
+  int status;
+  SAFE_SYSCALL(waitpid(pid, &status, 0));
+  EXPECT_TRUE(WIFEXITED(status));
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
 }  // namespace

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_AUDIO_CORE_V1_USAGE_GAIN_REPORTER_IMPL_H_
-#define SRC_MEDIA_AUDIO_AUDIO_CORE_V1_USAGE_GAIN_REPORTER_IMPL_H_
+#ifndef SRC_MEDIA_AUDIO_AUDIO_CORE_SHARED_USAGE_GAIN_REPORTER_IMPL_H_
+#define SRC_MEDIA_AUDIO_AUDIO_CORE_SHARED_USAGE_GAIN_REPORTER_IMPL_H_
 
 #include <fuchsia/media/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
@@ -32,6 +32,15 @@ class UsageGainReporterImpl : public fuchsia::media::UsageGainReporter {
       std::string device_unique_id, fuchsia::media::Usage usage,
       fidl::InterfaceHandle<fuchsia::media::UsageGainListener> usage_gain_listener_handler) final;
 
+  void RegisterListener2(
+      std::string device_unique_id, fuchsia::media::Usage2 usage,
+      fidl::InterfaceHandle<fuchsia::media::UsageGainListener> usage_gain_listener_handler) final;
+
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
+    FX_LOGS(ERROR) << "UsageGainReporterImpl: UsageGainReporter::handle_unknown_method(ordinal "
+                   << ordinal << ", method_has_response " << method_has_response << ")";
+  }
+
  private:
   friend class UsageGainReporterTest;
 
@@ -39,23 +48,24 @@ class UsageGainReporterImpl : public fuchsia::media::UsageGainReporter {
    public:
     Listener(UsageGainReporterImpl& parent,
              const DeviceConfig::OutputDeviceProfile& output_device_profile,
-             fuchsia::media::Usage usage, fuchsia::media::UsageGainListenerPtr usage_gain_listener);
+             fuchsia::media::Usage2 usage,
+             fuchsia::media::UsageGainListenerPtr usage_gain_listener);
 
    private:
     // |media::audio::StreamVolume|
-    fuchsia::media::Usage GetStreamUsage() const final { return fidl::Clone(usage_); }
+    fuchsia::media::Usage2 GetStreamUsage() const final { return fidl::Clone(usage_); }
     void RealizeVolume(VolumeCommand volume_command) final;
 
     UsageGainReporterImpl& parent_;
     std::shared_ptr<LoudnessTransform> loudness_transform_;
     bool independent_volume_control_;
-    fuchsia::media::Usage usage_;
+    fuchsia::media::Usage2 usage_;
     fuchsia::media::UsageGainListenerPtr usage_gain_listener_;
     size_t unacked_messages_ = 0;
   };
 
-  // TODO(https://fxbug.dev/42127114): Queue a function on the async loop to periodically execute and
-  // clean up any listeners with too many unacked messages
+  // TODO(https://fxbug.dev/42127114): Queue a function on the async loop to periodically execute
+  // and clean up any listeners with too many unacked messages
 
   // TODO(https://fxbug.dev/42127693): Disconnect listeners upon device removal
 
@@ -68,4 +78,4 @@ class UsageGainReporterImpl : public fuchsia::media::UsageGainReporter {
 
 }  // namespace media::audio
 
-#endif  // SRC_MEDIA_AUDIO_AUDIO_CORE_V1_USAGE_GAIN_REPORTER_IMPL_H_
+#endif  // SRC_MEDIA_AUDIO_AUDIO_CORE_SHARED_USAGE_GAIN_REPORTER_IMPL_H_

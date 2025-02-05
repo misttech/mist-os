@@ -42,8 +42,8 @@ TEST(UartItemTest, SetItemWithMmioDriver) {
   ASSERT_TRUE(image.clear().is_ok());
 
   UartItem item;
-  auto mmio_dcfg =
-      uart::ns8250::Mmio32Driver(zbi_dcfg_simple_t{.mmio_phys = 0xBEEF, .irq = 0xDEAD});
+  using uart_t = uart::ns8250::Mmio32Driver;
+  uart_t mmio_dcfg(zbi_dcfg_simple_t{.mmio_phys = 0xBEEF, .irq = 0xDEAD});
   uart::all::Driver dcfg = mmio_dcfg;
   item.Init(dcfg);
 
@@ -54,8 +54,8 @@ TEST(UartItemTest, SetItemWithMmioDriver) {
   ASSERT_NE(it, image.end());
 
   auto& [header, payload] = *it;
-  EXPECT_EQ(header->extra, mmio_dcfg.extra());
-  ASSERT_EQ(header->length, mmio_dcfg.size());
+  EXPECT_EQ(header->extra, uart_t::kExtra);
+  ASSERT_EQ(header->length, sizeof(uart_t::config_type));
 
   auto* actual_mmio_dcfg = reinterpret_cast<zbi_dcfg_simple_t*>(payload.data());
   EXPECT_EQ(actual_mmio_dcfg->mmio_phys, mmio_dcfg.config().mmio_phys);
@@ -70,7 +70,9 @@ TEST(UartItemTest, SetItemWithPioDriver) {
   ASSERT_TRUE(image.clear().is_ok());
 
   UartItem item;
-  auto pio_cfg = uart::ns8250::PioDriver(zbi_dcfg_simple_pio_t{.base = 0xA110, .irq = 0x5A02});
+  using uart_t = uart::ns8250::PioDriver;
+  uart_t pio_cfg(zbi_dcfg_simple_pio_t{.base = 0xA110, .irq = 0x5A02});
+
   uart::all::Driver dcfg = pio_cfg;
   item.Init(dcfg);
 
@@ -81,8 +83,8 @@ TEST(UartItemTest, SetItemWithPioDriver) {
   ASSERT_NE(it, image.end());
 
   auto& [header, payload] = *it;
-  EXPECT_EQ(header->extra, pio_cfg.extra());
-  ASSERT_EQ(header->length, pio_cfg.size());
+  EXPECT_EQ(header->extra, uart_t::kExtra);
+  ASSERT_EQ(header->length, sizeof(uart_t::config_type));
 
   auto* actual_pio_dcfg = reinterpret_cast<zbi_dcfg_simple_pio_t*>(payload.data());
   EXPECT_EQ(actual_pio_dcfg->base, pio_cfg.config().base);

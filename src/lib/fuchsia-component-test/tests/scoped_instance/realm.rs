@@ -9,7 +9,7 @@ use fidl_fidl_examples_routing_echo as fecho;
 use fuchsia_component::client::connect_to_childs_protocol;
 use fuchsia_component_test::ScopedInstance;
 use futures::future::join_all;
-use tracing::*;
+use log::*;
 
 #[derive(argh::FromArgs)]
 /// Helper binary to test binding to components v2 children.

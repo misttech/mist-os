@@ -233,6 +233,7 @@ zx_status_t SegmentManager::DoGarbageCollect(uint32_t start_segno, GcType gc_typ
 zx_status_t SegmentManager::GcNodeSegment(const SummaryBlock &sum_blk, uint32_t segno,
                                           GcType gc_type) {
   const Summary *entry = sum_blk.entries;
+  PageList pages_to_disk;
   for (block_t off = 0; off < superblock_info_.GetBlocksPerSeg(); ++off, ++entry) {
     nid_t nid = CpuToLe(entry->nid);
 
@@ -257,6 +258,18 @@ zx_status_t SegmentManager::GcNodeSegment(const SummaryBlock &sum_blk, uint32_t 
 
     node_page.WaitOnWriteback();
     node_page.SetDirty();
+    if (gc_type == GcType::kFgGc) {
+      block_t addr = fs_->GetNodeVnode().GetBlockAddr(node_page);
+      if (addr == kNullAddr) {
+        continue;
+      }
+      ZX_DEBUG_ASSERT(addr != kNewAddr);
+      node_page.SetWriteback(addr);
+      pages_to_disk.push_back(node_page.release());
+    }
+  }
+  if (!pages_to_disk.is_empty()) {
+    fs_->GetWriter().ScheduleWriteBlocks(nullptr, std::move(pages_to_disk));
   }
 
   return ZX_OK;
@@ -329,39 +342,28 @@ zx_status_t SegmentManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned 
       continue;
     }
 
-    LockedPage data_page;
-    const size_t block_index = start_bidx + ofs_in_node;
-    if (vnode_or->GrabLockedPage(block_index, &data_page) != ZX_OK) {
+    const size_t index = start_bidx + ofs_in_node;
+    zx::result page_or = vnode_or->FindGcPage(index);
+    if (page_or.is_error()) {
       continue;
-    }
-
-    data_page.WaitOnWriteback();
-    pgoff_t offset = safemath::CheckMul(data_page->GetKey(), kBlockSize).ValueOrDie();
-    // Ask kernel to dirty the vmo area for |data_page|. If the regarding pages are not present, we
-    // supply a vmo and dirty it again.
-    if (zx::result dirty_or = data_page.SetVmoDirty(); dirty_or.is_error()) {
-      vnode_or->VmoRead(offset, kBlockSize);
-      ZX_ASSERT(data_page.SetVmoDirty().is_ok());
     }
     if (!vnode_or->IsValid()) {
-      // When victim blocks belong to a orphan, we load and keep them on paged_vmo instead of
+      // When victim blocks belong to an orphan, we load and keep the corresponding pages instead of
       // migration. They are available until there is no connection to the orphan or kernel reclaims
       // the pages.
-      size_t start = data_page->GetKey();
-      data_page.reset();
-      vnode_or->TruncateHoleUnsafe(start, start + 1, false);
+      vnode_or->TruncateHoleUnsafe(index, index + 1, false);
       continue;
     }
-    data_page.SetDirty();
-    data_page->SetColdData();
+    page_or->SetDirty();
+    page_or->SetColdData();
     if (gc_type == GcType::kFgGc) {
-      block_t addr = vnode_or->GetBlockAddr(data_page);
+      block_t addr = vnode_or->GetBlockAddr(*page_or);
       if (addr == kNullAddr) {
         continue;
       }
       ZX_DEBUG_ASSERT(addr != kNewAddr);
-      data_page.SetWriteback(addr);
-      pages_to_disk.push_back(data_page.release());
+      (*page_or).SetWriteback(addr);
+      pages_to_disk.push_back((*page_or).release());
     }
   }
   if (!pages_to_disk.is_empty()) {

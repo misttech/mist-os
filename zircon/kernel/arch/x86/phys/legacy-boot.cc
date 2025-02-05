@@ -60,7 +60,7 @@ void InitAcpi(LegacyBoot& boot_info) {
 
   if (auto debug_port = acpi_lite::GetDebugPort(*acpi_parser); debug_port.is_ok()) {
     if (UartDriver driver; driver.Match(*debug_port)) {
-      boot_info.uart = driver.uart();
+      boot_info.uart = ktl::move(driver).TakeUart();
       SetUartConsole(boot_info.uart);
     }
   }
@@ -149,4 +149,27 @@ void LegacyBootInitMemory(AddressSpace* aspace) {
     // identity-mapping page tables and enable paging.
     ArchSetUpAddressSpace(*aspace);
   }
+}
+
+ktl::optional<uart::ns8250::PioDriver> LegacyUartFromTty(const boot_shim::Tty& tty) {
+  constexpr auto kUartConfig = ktl::to_array<zbi_dcfg_simple_pio_t>({
+      {.base = 0x3F8, .irq = 4},
+      {.base = 0x2F8, .irq = 3},
+      {.base = 0x3E8, .irq = 4},
+      {.base = 0x2E8, .irq = 3},
+  });
+
+  switch (tty.type) {
+    case boot_shim::TtyType::kSerial:
+    case boot_shim::TtyType::kAny:
+      break;
+    default:
+      return ktl::nullopt;
+  }
+
+  if (tty.index >= kUartConfig.size()) {
+    return ktl::nullopt;
+  }
+
+  return uart::ns8250::PioDriver(kUartConfig[tty.index]);
 }

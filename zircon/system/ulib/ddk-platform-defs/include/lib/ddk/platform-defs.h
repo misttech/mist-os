@@ -94,6 +94,7 @@
 #define PDEV_PID_IRIS               0x14
 #define PDEV_PID_LILAC              0x15
 #define PDEV_PID_SORREL             0x16
+#define PDEV_PID_MAPLE              0x17
 
 #define PDEV_DID_GAUSS_AUDIO_IN     0x01
 #define PDEV_DID_GAUSS_AUDIO_OUT    0x02

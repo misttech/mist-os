@@ -118,8 +118,7 @@ pub enum PackagePathSegmentError {
     Empty,
 
     #[error(
-        "segment too long. should be at most {} bytes, was {0} bytes",
-        MAX_PACKAGE_PATH_SEGMENT_BYTES
+        "segment too long. should be at most {MAX_PACKAGE_PATH_SEGMENT_BYTES} bytes, was {0} bytes"
     )]
     TooLong(usize),
 

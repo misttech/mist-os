@@ -257,6 +257,11 @@
             to: "#console-launcher",
         },
         {
+            service: "fuchsia.hardware.nfc.Service",
+            from: "#boot-drivers",
+            to: "#console-launcher",
+        },
+        {
             service: "fuchsia.gpu.magma.Service",
             from: "#boot-drivers",
             to: "#console-launcher",
@@ -277,6 +282,15 @@
             source_availability: "unknown",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: [
+                "#boot-shell-commands",
+                "#console",
+                "#console-launcher",
+            ],
+        },
+        {
             protocol: [
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.diagnostics.host.ArchiveAccessor",
@@ -287,9 +301,7 @@
         {
             protocol: [
                 "fuchsia.diagnostics.LogSettings",
-                "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.Log",
-                "fuchsia.logger.LogSink",
             ],
             from: "#archivist",
             to: [
@@ -301,12 +313,6 @@
             service: "fuchsia.hardware.suspend.SuspendService",
             from: "#boot-drivers",
             to: "#console-launcher",
-        },
-        {
-            protocol: [ "fuchsia.tpm.cr50.Cr50" ],
-            from: "#cr50_agent",
-            to: "#console-launcher",
-            source_availability: "unknown",
         },
         {
             protocol: [

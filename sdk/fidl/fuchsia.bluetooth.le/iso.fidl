@@ -139,4 +139,13 @@ open protocol IsochronousStream {
         /// Optional.
         4: timestamp zx.Duration;
     });
+
+    /// Send data to an established ISO stream (host => controller).
+    ///
+    /// Returns ZX_ERR_INTERNAL for any errors encountered.
+    @available(added=NEXT)
+    flexible Write(table {
+        /// The data frame itself.
+        1: data vector<uint8>:MAX;
+    }) -> () error zx.Status;
 };

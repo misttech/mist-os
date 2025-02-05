@@ -4,7 +4,7 @@
 
 use crate::range::{ContentRange, Range};
 use crate::repository::{Error, RepoProvider, RepoStorage, Resource};
-use crate::util::file_stream;
+use crate::util::FileStream;
 use anyhow::{anyhow, Context as _, Result};
 use camino::{Utf8Component, Utf8Path, Utf8PathBuf};
 use delivery_blob::DeliveryBlobType;
@@ -12,13 +12,13 @@ use fuchsia_async as fasync;
 use fuchsia_merkle::Hash;
 use futures::future::BoxFuture;
 use futures::{AsyncRead, FutureExt as _};
+use log::warn;
 use std::collections::BTreeSet;
 use std::fs::{self, DirBuilder};
 use std::io::{Seek as _, SeekFrom};
 use std::os::unix::fs::MetadataExt;
 use std::time::SystemTime;
 use tempfile::{NamedTempFile, TempPath};
-use tracing::warn;
 use tuf::metadata::{MetadataPath, MetadataVersion, TargetPath};
 use tuf::pouf::Pouf1;
 use tuf::repository::{
@@ -226,7 +226,7 @@ impl FileSystemRepository {
 
             Ok(Resource {
                 content_range,
-                stream: Box::pin(file_stream(content_len, file, Some(file_path))),
+                stream: Box::pin(FileStream::new(content_len, file, Some(file_path))),
             })
         }
         .boxed()

@@ -25,8 +25,8 @@ use futures::lock::Mutex;
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use inspect_runtime::EscrowOptions;
 use inspect_testing::ExampleInspectData;
+use log::{debug, error, info, trace, warn};
 use std::sync::Arc;
-use tracing::{debug, error, info, trace, warn};
 use {fidl_fuchsia_archivist_test as fpuppet, fidl_fuchsia_diagnostics as fdiagnostics};
 
 enum IncomingServices {
@@ -40,7 +40,7 @@ enum IncomingServices {
 async fn main() -> Result<(), Error> {
     // Listen for log interest change events.
     let (interest_send, interest_recv) = unbounded::<InterestChangedEvent>();
-    subscribe_to_log_interest_changes(InterestChangedNotifier(interest_send))?;
+    let logger = subscribe_to_log_interest_changes(InterestChangedNotifier(interest_send))?;
 
     let mut fs = ServiceFs::new();
 
@@ -53,7 +53,7 @@ async fn main() -> Result<(), Error> {
     fs.for_each_concurrent(0, |service| async {
         match service {
             IncomingServices::Puppet(s) => {
-                serve_puppet(puppet_server.clone(), s).await;
+                serve_puppet(puppet_server.clone(), s, &logger).await;
             }
             IncomingServices::InspectPuppet(s) => {
                 serve_inspect_puppet(puppet_server.clone(), s).await;
@@ -65,19 +65,23 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-fn subscribe_to_log_interest_changes(notifier: InterestChangedNotifier) -> Result<(), Error> {
+fn subscribe_to_log_interest_changes(
+    notifier: InterestChangedNotifier,
+) -> Result<Publisher, Error> {
     // Don't wait for initial interest. Many times the test cases rely on knowing when the
     // component received its initial interest to know that it's running and already serving FIDL
     // requests.
     let publisher = Publisher::new(PublisherOptions::default().wait_for_initial_interest(false))?;
     publisher.set_interest_listener(notifier);
+    log::set_boxed_logger(Box::new(publisher.clone()))?;
+    log::set_max_level(log::LevelFilter::Info);
+
     let previous_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        tracing::error!(%info, "PANIC");
+        error!(info:%; "PANIC");
         previous_hook(info);
     }));
-    tracing::subscriber::set_global_default(publisher)?;
-    Ok(())
+    Ok(publisher)
 }
 
 #[derive(Clone)]
@@ -122,11 +126,15 @@ impl OnInterestChanged for InterestChangedNotifier {
     }
 }
 
-async fn serve_puppet(server: Arc<PuppetServer>, mut stream: fpuppet::PuppetRequestStream) {
+async fn serve_puppet(
+    server: Arc<PuppetServer>,
+    mut stream: fpuppet::PuppetRequestStream,
+    logger: &Publisher,
+) {
     while let Ok(Some(request)) = stream.try_next().await {
-        handle_puppet_request(server.clone(), request)
+        handle_puppet_request(server.clone(), request, logger)
             .await
-            .unwrap_or_else(|e| error!(?e, "handle_puppet_request"));
+            .unwrap_or_else(|e| error!(e:?; "handle_puppet_request"));
     }
 }
 
@@ -137,7 +145,7 @@ async fn serve_inspect_puppet(
     while let Ok(Some(request)) = stream.try_next().await {
         handle_inspect_puppet_request(server.clone(), request)
             .await
-            .unwrap_or_else(|e| error!(?e, "handle_puppet_request"));
+            .unwrap_or_else(|e| error!(e:?; "handle_puppet_request"));
     }
 }
 
@@ -227,6 +235,7 @@ async fn handle_inspect_puppet_request(
 async fn handle_puppet_request(
     server: Arc<PuppetServer>,
     request: fpuppet::PuppetRequest,
+    logger: &Publisher,
 ) -> Result<(), Error> {
     match request {
         fpuppet::PuppetRequest::CreateInspector {
@@ -270,18 +279,14 @@ async fn handle_puppet_request(
                     _ => unimplemented!("Logging with severity: {severity:?}"),
                 },
                 Some(time) => {
-                    tracing::dispatcher::get_default(|dispatcher| {
-                        let publisher: &diagnostics_log::Publisher =
-                            dispatcher.downcast_ref().unwrap();
-                        let record = TestRecord {
-                            severity: severity.into_primitive(),
-                            timestamp: zx::BootInstant::from_nanos(time),
-                            file: None,
-                            line: None,
-                            record_arguments: vec![Argument::message(message.as_str())],
-                        };
-                        publisher.event_for_testing(record);
-                    });
+                    let record = TestRecord {
+                        severity: severity.into_primitive(),
+                        timestamp: zx::BootInstant::from_nanos(time),
+                        file: None,
+                        line: None,
+                        record_arguments: vec![Argument::message(message.as_str())],
+                    };
+                    logger.event_for_testing(record);
                 }
             }
             responder.send().expect("response succeeds")

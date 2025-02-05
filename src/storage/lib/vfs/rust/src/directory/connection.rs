@@ -11,7 +11,6 @@ use crate::execution_scope::{yield_to_executor, ExecutionScope};
 use crate::node::OpenNode;
 use crate::object_request::Representation;
 use crate::path::Path;
-use crate::protocols::ToFlags as _;
 
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
@@ -81,22 +80,22 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
         request: fio::DirectoryRequest,
     ) -> Result<ConnectionState, Error> {
         match request {
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "26")]
             fio::DirectoryRequest::DeprecatedClone { flags, object, control_handle: _ } => {
                 trace::duration!(c"storage", c"Directory::DeprecatedClone");
                 self.handle_deprecated_clone(flags, object);
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "26"))]
             fio::DirectoryRequest::Clone { flags, object, control_handle: _ } => {
                 trace::duration!(c"storage", c"Directory::Clone");
                 self.handle_deprecated_clone(flags, object);
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "26")]
             fio::DirectoryRequest::Clone { request, control_handle: _ } => {
                 trace::duration!(c"storage", c"Directory::Clone");
                 self.handle_clone(request.into_channel());
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "26"))]
             fio::DirectoryRequest::Clone2 { request, control_handle: _ } => {
                 trace::duration!(c"storage", c"Directory::Clone2");
                 self.handle_clone(request.into_channel());
@@ -160,10 +159,32 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 trace::duration!(c"storage", c"Directory::RemoveExtendedAttribute");
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::DirectoryRequest::GetFlags { responder } => {
+                trace::duration!(c"storage", c"Directory::GetFlags");
+                responder.send(Ok(fio::Flags::from(&self.options)))?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::DirectoryRequest::SetFlags { flags: _, responder } => {
+                trace::duration!(c"storage", c"Directory::SetFlags");
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::DirectoryRequest::DeprecatedGetFlags { responder } => {
+                trace::duration!(c"storage", c"Directory::DeprecatedGetFlags");
+                responder.send(Status::OK.into_raw(), self.options.to_io1())?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::DirectoryRequest::DeprecatedSetFlags { flags: _, responder } => {
+                trace::duration!(c"storage", c"Directory::DeprecatedSetFlags");
+                responder.send(Status::NOT_SUPPORTED.into_raw())?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::DirectoryRequest::GetFlags { responder } => {
                 trace::duration!(c"storage", c"Directory::GetFlags");
                 responder.send(Status::OK.into_raw(), self.options.to_io1())?;
             }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::DirectoryRequest::SetFlags { flags: _, responder } => {
                 trace::duration!(c"storage", c"Directory::SetFlags");
                 responder.send(Status::NOT_SUPPORTED.into_raw())?;
@@ -264,14 +285,6 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 // chance to run before we try and process the next request for this directory.
                 yield_to_executor().await;
             }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            fio::DirectoryRequest::GetFlags2 { responder } => {
-                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
-            }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            fio::DirectoryRequest::SetFlags2 { flags: _, responder } => {
-                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
-            }
             fio::DirectoryRequest::_UnknownMethod { .. } => (),
         }
         Ok(ConnectionState::Alive)
@@ -295,7 +308,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
     }
 
     fn handle_clone(&mut self, object: fidl::Channel) {
-        let flags = self.options.rights.to_flags() | fio::Flags::PROTOCOL_DIRECTORY;
+        let flags = fio::Flags::from(&self.options);
         ObjectRequest::new(flags, &Default::default(), object).handle(|req| {
             self.directory.clone().open3(self.scope.clone(), Path::dot(), flags, req)
         });
@@ -372,6 +385,22 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                     return Err(Status::INVALID_ARGS);
                 }
             }
+            CreationMode::UnnamedTemporary | CreationMode::UnlinkableUnnamedTemporary => {
+                // We only support creating unnamed temporary files.
+                if !flags.intersects(fio::Flags::PROTOCOL_FILE) {
+                    return Err(Status::NOT_SUPPORTED);
+                }
+                // The parent connection must be able to modify directories if creating an object.
+                if !self.options.rights.contains(fio::Rights::MODIFY_DIRECTORY) {
+                    return Err(Status::ACCESS_DENIED);
+                }
+                // The ability to create an unnamed temporary file is dependent on the filesystem.
+                // We won't know if the directory the path eventually leads to supports the creation
+                // of unnamed temporary files until we have fully traversed the path. The way that
+                // Rust VFS is set up is such that the filesystem is responsible for traversing the
+                // path, so it is the filesystem's responsibility to report if it does not support
+                // this feature.
+            }
             CreationMode::AllowExisting | CreationMode::Always => {
                 // The parent connection must be able to modify directories if creating an object.
                 if !self.options.rights.contains(fio::Rights::MODIFY_DIRECTORY) {
@@ -395,7 +424,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             }
         }
 
-        if path.is_dot() {
+        if path.is_dot() && !flags.create_unnamed_temporary_in_directory_path() {
             if !flags.is_dir_allowed() {
                 return Err(Status::INVALID_ARGS);
             }

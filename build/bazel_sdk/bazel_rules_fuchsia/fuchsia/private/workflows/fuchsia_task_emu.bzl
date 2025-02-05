@@ -32,7 +32,7 @@ def _fuchsia_task_emu_impl(ctx, make_shell_task):
 
 _fuchsia_task_emu, _fuchsia_task_emu_for_test, fuchsia_task_emu = shell_task_rule(
     doc = """Start emulator using product bundle.""",
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     implementation = _fuchsia_task_emu_impl,
     attrs = {
         "product_bundle": attr.label(

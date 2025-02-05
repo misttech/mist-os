@@ -10,8 +10,8 @@ use fuchsia_bluetooth::types::{peer_audio_stream_id, PeerId};
 use fuchsia_sync::Mutex;
 use futures::stream::BoxStream;
 use futures::StreamExt;
+use log::{info, warn};
 use media::AudioDeviceEnumeratorProxy;
-use tracing::{info, warn};
 
 use crate::audio::{AudioControl, AudioControlEvent, AudioError, HF_INPUT_UUID, HF_OUTPUT_UUID};
 use crate::sco_connector::ScoConnection;

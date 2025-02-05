@@ -133,7 +133,7 @@ inline fuchsia_driver_framework::wire::NodeProperty MakeProperty(fidl::AnyArena&
       .value = fuchsia_driver_framework::wire::NodePropertyValue::WithIntValue(value)};
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
 
 inline fuchsia_driver_framework::NodeProperty2 MakeProperty2(std::string_view key,
                                                              std::string_view value) {

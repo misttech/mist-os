@@ -35,6 +35,7 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
   fuchsia_io::NodeProtocolKinds GetProtocols() const final;
 
   zx::result<LockedPage> FindDataPage(pgoff_t index, bool do_read = true);
+  zx::result<LockedPage> FindGcPage(pgoff_t index) final;
 
   // Lookup
   zx_status_t Lookup(std::string_view name, fbl::RefPtr<fs::Vnode> *out) final

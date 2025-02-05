@@ -79,10 +79,10 @@ TEST_F(ServiceWatcherTest, Begin) {
 
   ASSERT_TRUE(loop().RunUntilIdle());
   // These instances are added by TestBase:
-  EXPECT_THAT(instances,
-              ::testing::UnorderedElementsAre(
-                  std::make_pair(fuchsia_io::wire::WatchEvent::kExisting, "default"),
-                  std::make_pair(fuchsia_io::wire::WatchEvent::kExisting, "my_instance")));
+  EXPECT_THAT(instances, ::testing::UnorderedElementsAre(
+                             std::make_pair(fuchsia_io::wire::WatchEvent::kExisting, "default"),
+                             std::make_pair(fuchsia_io::wire::WatchEvent::kExisting, "my_instance"),
+                             std::make_pair(fuchsia_io::wire::WatchEvent::kIdle, ""), ));
 
   instances.clear();
   int ret = MkDir("/fuchsia.examples.EchoService/added");

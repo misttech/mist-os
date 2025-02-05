@@ -8,8 +8,8 @@ use diagnostics_assertions::assert_data_tree;
 use fidl::endpoints::RequestStream;
 use fidl::Error as FidlError;
 use fidl_fuchsia_bluetooth_snoop::{
-    PacketFormat, PacketObserverMarker, PacketObserverRequestStream, SnoopMarker, SnoopProxy,
-    SnoopRequestStream, SnoopStartRequest,
+    PacketFormat, PacketObserverMarker, PacketObserverRequest, PacketObserverRequestStream,
+    SnoopMarker, SnoopProxy, SnoopRequestStream, SnoopStartRequest,
 };
 use fuchsia_async::{Channel, TestExecutor};
 use fuchsia_inspect::Inspector;
@@ -38,10 +38,12 @@ fn setup() -> (
     (
         TestExecutor::new(),
         ConcurrentSnooperPacketFutures::new(),
+        // log size limits must be >64KiB to correctly test that we
+        // break too-large FIDL messages in the initial dump.
         PacketLogs::new(
             10,
-            10,
-            10,
+            100_000,
+            100_000,
             Duration::new(10, 0),
             inspect.root().create_child("packet_log"),
         ),
@@ -237,11 +239,7 @@ fn pump_handle_client_request(
 ) {
     let client_id = request.0;
     let mut handler = pin!(handle_client_request(request, subscribers, packet_logs));
-    if exec
-        .run_until_stalled(&mut handler)
-        .expect("Handler future to complete")
-        .expect("Client channel to accept response")
-    {
+    if exec.run_singlethreaded(&mut handler).expect("Client channel to accept response") {
         register_new_client(request_stream, client_requests, client_id);
     }
 }
@@ -325,6 +323,21 @@ fn test_handle_client_request() {
     exec.run_until_stalled(&mut item_fut).expect_pending("held open");
     assert_eq!(subscribers.number_of_subscribers(), 3);
 
+    // Add a bunch of logs to the device to test that we don't overflow when
+    // requested logs are dumped: 200 500-byte packets for 100k worth.
+    let packetlog = logs.get(&String::new()).expect("device log");
+    {
+        let mut lock = packetlog.lock();
+        for _ in 0..200 {
+            lock.insert(SnoopPacket::new(
+                true,
+                PacketFormat::AclData,
+                zx::MonotonicInstant::get(),
+                vec![0; 500],
+            ));
+        }
+    }
+
     // valid device returns no errors to a client requesting a dump
     let (proxy, mut request_stream) = fidl_endpoints();
     let (client, mut client_stream5) =
@@ -336,6 +349,20 @@ fn test_handle_client_request() {
     };
     proxy.start(client_req).unwrap();
     let request = pump_request_stream(&mut exec, &mut request_stream, ClientId(2));
+    // This task needs to run in the background as we send a request while we are handling this
+    // client (due to packets being sent).
+    let (payload_send, payload_recv) = futures::channel::mpsc::unbounded();
+    let observation_task = fuchsia_async::Task::local(async move {
+        while let Some(request) = client_stream5.next().await {
+            match request {
+                Ok(PacketObserverRequest::Observe { payload, responder }) => {
+                    payload_send.unbounded_send(payload).expect("send should succeed");
+                    responder.send().expect("repond should succeed");
+                }
+                x => panic!("Expected observed packets on client request, got {x:?}"),
+            }
+        }
+    });
     pump_handle_client_request(
         &mut exec,
         request,
@@ -344,11 +371,15 @@ fn test_handle_client_request() {
         &mut subscribers,
         &logs,
     );
-    let mut item_fut = client_stream5.next();
-    // Should be no error, but since there's no logs, closes immediately.
-    let expected_none = exec.run_until_stalled(&mut item_fut).expect("ready");
-    assert!(expected_none.is_none());
+    // We should have got at least two packets and then closed.
+    let items_delivered = exec.run_singlethreaded(&mut payload_recv.count());
+    assert!(
+        items_delivered > 1,
+        "Expected more than one observation when we overflow a FIDL packet"
+    );
+    // We didn't add the subscriber.
     assert_eq!(subscribers.number_of_subscribers(), 3);
+    drop(observation_task);
 }
 
 #[fuchsia::test]

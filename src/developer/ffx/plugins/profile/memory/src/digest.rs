@@ -494,8 +494,9 @@ pub mod processed {
                             Some(v) => v.len() as u64,
                             None => unreachable!(),
                         };
-                        let name = ffx_profile_memory_common::vmo_name_to_digest_name(&vmo.name)
-                            .to_string();
+                        let name =
+                            attribution_processing::summary::vmo_name_to_digest_name(&vmo.name)
+                                .to_string();
                         let name_sizes = process.name_to_vmo_memory.entry(name).or_default();
                         name_sizes.vmos.push(*vmo_koid);
                         name_sizes.add_vmo(vmo, share_count);

@@ -5,8 +5,9 @@
 use anyhow::{format_err, Result};
 use async_trait::async_trait;
 use ffx_setui_light_args::LightGroup;
-use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
+use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_settings::{LightProxy, LightState};
+use target_holders::moniker;
 use utils::{handle_mixed_result, Either, WatchOrSetResult};
 
 #[derive(FfxTool)]
@@ -79,6 +80,7 @@ mod test {
     use fidl_fuchsia_settings::{
         LightGroup as LightGroupSettings, LightRequest, LightType, LightValue,
     };
+    use target_holders::fake_proxy;
     use test_case::test_case;
 
     const TEST_NAME: &str = "test_name";
@@ -87,7 +89,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_run_command() {
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             LightRequest::SetLightGroupValues { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -129,7 +131,7 @@ mod test {
     )]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_light_set_output(expected_light: LightGroup) -> Result<()> {
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             LightRequest::SetLightGroupValues { responder, .. } => {
                 let _ = responder.send(Ok(()));
             }
@@ -187,7 +189,7 @@ mod test {
     ) -> Result<()> {
         let groups = [expected_light_settings];
         let groups_clone = groups.clone();
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             LightRequest::SetLightGroupValues { .. } => {
                 panic!("Unexpected call to set");
             }
@@ -237,7 +239,7 @@ mod test {
         expected_light_settings: LightGroupSettings,
     ) -> Result<()> {
         let val_clone = expected_light_settings.clone();
-        let proxy = fho::testing::fake_proxy(move |req| match req {
+        let proxy = fake_proxy(move |req| match req {
             LightRequest::SetLightGroupValues { .. } => {
                 panic!("Unexpected call to set");
             }

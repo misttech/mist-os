@@ -47,20 +47,29 @@ class FakeSystemActivityGovernor
     // Start an async task to wait for EVENTPAIR_PEER_CLOSED signal on server_token.
     zx_handle_t token_handle = server_token.get();
     active_wake_leases_[token_handle] = std::move(server_token);
-    auto wait = std::make_unique<async::WaitOnce>(token_handle, ZX_EVENTPAIR_PEER_CLOSED);
-    wait->Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                [this, token_handle](async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
-                                     const zx_packet_signal_t*) {
-                  if (status == ZX_ERR_CANCELED) {
-                    return;
-                  }
-                  ZX_ASSERT(status == ZX_OK);
-                  auto it = active_wake_leases_.find(token_handle);
-                  ZX_ASSERT(it != active_wake_leases_.end());
-                  ZX_ASSERT(token_handle == it->second.get());
-                  active_wake_leases_.erase(it);
-                });
-    wait_once_tasks_.push_back(std::move(wait));
+    if (active_wake_leases_.size() == 1) {
+      on_suspend_started_ = false;
+      listener_client_->OnResume().Then([this, token_handle](auto unused) {
+        auto wait = std::make_unique<async::WaitOnce>(token_handle, ZX_EVENTPAIR_PEER_CLOSED);
+        wait->Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                    [this, token_handle](async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
+                                         const zx_packet_signal_t*) {
+                      if (status == ZX_ERR_CANCELED) {
+                        return;
+                      }
+                      ZX_ASSERT(status == ZX_OK);
+                      auto it = active_wake_leases_.find(token_handle);
+                      ZX_ASSERT(it != active_wake_leases_.end());
+                      ZX_ASSERT(token_handle == it->second.get());
+                      active_wake_leases_.erase(it);
+                      if (active_wake_leases_.empty() && listener_client_) {
+                        listener_client_->OnSuspendStarted().Then(
+                            [this](auto unused) { on_suspend_started_ = true; });
+                      }
+                    });
+        wait_once_tasks_.push_back(std::move(wait));
+      });
+    }
     completer.Reply(std::move(client_token));
   }
 

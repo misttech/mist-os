@@ -5,22 +5,18 @@
 use async_trait::async_trait;
 use error::LogError;
 use ffx_log_args::LogCommand;
-use fho::{Connector, FfxMain, FfxTool, MachineWriter, ToolIO};
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use fho::{FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, LogSettingsProxy, StreamParameters};
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
 use fidl_fuchsia_sys2::RealmQueryProxy;
-use log_command::log_formatter::{
-    dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, Symbolize, Timestamp,
-    WriterContainer,
+use log_command::{
+    dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, LogProcessingResult,
+    LogSubCommand, Symbolize, Timestamp, WatchCommand, WriterContainer,
 };
-use log_command::{LogProcessingResult, LogSubCommand, WatchCommand};
 use std::io::Write;
+use target_connector::Connector;
+use target_holders::RemoteControlProxyHolder;
 use transactional_symbolizer::{RealSymbolizerProcess, TransactionalSymbolizer};
-
-// NOTE: This is required for the legacy ffx toolchain
-// which automatically adds ffx_core even though we don't use it.
-use ffx_core::{self as _};
 
 mod condition_variable;
 mod error;
@@ -37,7 +33,7 @@ const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 pub struct LogTool {
     #[command]
     cmd: LogCommand,
-    rcs_connector: Connector<RemoteControlProxy>,
+    rcs_connector: Connector<RemoteControlProxyHolder>,
 }
 
 struct NoOpSymoblizer;
@@ -65,7 +61,7 @@ impl FfxMain for LogTool {
 pub async fn log_impl(
     writer: impl ToolIO<OutputItem = LogEntry> + Write + 'static,
     cmd: LogCommand,
-    rcs_connector: Connector<RemoteControlProxy>,
+    rcs_connector: Connector<RemoteControlProxyHolder>,
     include_timestamp: bool,
 ) -> Result<(), LogError> {
     // TODO(b/333908164): We have 3 different flags that all do the same thing.
@@ -93,7 +89,7 @@ async fn log_main<W>(
     writer: W,
     cmd: LogCommand,
     symbolizer: Option<impl Symbolize>,
-    rcs_connector: Connector<RemoteControlProxy>,
+    rcs_connector: Connector<RemoteControlProxyHolder>,
     include_timestamp: bool,
 ) -> Result<(), LogError>
 where
@@ -113,8 +109,8 @@ struct DeviceConnection {
 }
 
 async fn connect_to_rcs(
-    rcs_connector: &Connector<RemoteControlProxy>,
-) -> fho::Result<RemoteControlProxy> {
+    rcs_connector: &Connector<RemoteControlProxyHolder>,
+) -> fho::Result<RemoteControlProxyHolder> {
     rcs_connector.try_connect(|_target, _err| Ok(())).await
 }
 
@@ -123,7 +119,7 @@ async fn connect_to_rcs(
 async fn connect_to_target(
     stream_mode: &mut fidl_fuchsia_diagnostics::StreamMode,
     prev_boot_id: Option<u64>,
-    rcs_connector: &Connector<RemoteControlProxy>,
+    rcs_connector: &Connector<RemoteControlProxyHolder>,
 ) -> Result<DeviceConnection, LogError> {
     // Connect to device
     let rcs_client = connect_to_rcs(rcs_connector).await?;
@@ -190,7 +186,7 @@ async fn log_loop<W>(
     mut cmd: LogCommand,
     mut formatter: DefaultLogFormatter<W>,
     symbolizer: Option<impl Symbolize>,
-    rcs_connector: Connector<RemoteControlProxy>,
+    rcs_connector: Connector<RemoteControlProxyHolder>,
     include_timestamp: bool,
 ) -> Result<(), LogError>
 where
@@ -250,6 +246,15 @@ where
         }
 
         cmd.maybe_set_interest(&connection.log_settings_client, &connection.realm_query).await?;
+        if let Some(LogSubCommand::SetSeverity(ref options)) = cmd.sub_command {
+            if options.no_persist {
+                // Block forever.
+                futures::future::pending::<()>().await;
+            } else {
+                // Interest persisted, exit.
+                return Ok(());
+            }
+        }
         formatter.set_boot_timestamp(Timestamp::from_nanos(
             connection.boot_timestamp.try_into().unwrap(),
         ));
@@ -309,9 +314,9 @@ mod tests {
     use fidl_fuchsia_diagnostics::StreamMode;
     use fuchsia_async as fasync;
     use futures::StreamExt;
-    use log_command::log_formatter::{LogData, TIMESTAMP_FORMAT};
     use log_command::{
-        parse_seconds_string_as_duration, parse_time, DumpCommand, SymbolizeMode, TimeFormat,
+        parse_seconds_string_as_duration, parse_time, DumpCommand, LogData, OneOrMany,
+        SymbolizeMode, TimeFormat, TIMESTAMP_FORMAT,
     };
     use moniker::Moniker;
     use selectors::parse_log_interest_selector;
@@ -337,7 +342,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn json_logger_test() {
-        let environment = TestEnvironment::new(TestEnvironmentConfig::default());
+        let environment = TestEnvironment::new(TestEnvironmentConfig::default()).await;
         let rcs_connector = environment.rcs_connector().await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
@@ -379,11 +384,14 @@ mod tests {
                 Moniker::try_from("core/other/ambiguous_selector:thing/test").unwrap(),
             ],
             ..Default::default()
-        });
+        })
+        .await;
         let rcs_connector = environment.rcs_connector().await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            set_severity: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
+            set_severity: vec![OneOrMany::One(
+                parse_log_interest_selector("ambiguous_selector#INFO").unwrap(),
+            )],
             symbolize: SymbolizeMode::Off,
             ..LogCommand::default()
         };
@@ -412,7 +420,7 @@ ffx log --force-set-severity.
 
     async fn logger_dump_string(config: TestEnvironmentConfig, cmd: LogCommand) -> String {
         let show_initial_timestamp = config.show_initial_timestamp;
-        let mut environment = TestEnvironment::new(config);
+        let mut environment = TestEnvironment::new(config).await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             symbolize: SymbolizeMode::Off,
@@ -443,11 +451,12 @@ ffx log --force-set-severity.
 
     #[fuchsia::test]
     async fn logger_sets_interest_if_one_match() {
-        let selectors = vec![parse_log_interest_selector("core/foo#INFO").unwrap()];
+        let selectors = vec![OneOrMany::One(parse_log_interest_selector("core/foo#INFO").unwrap())];
         let mut environment = TestEnvironment::new(TestEnvironmentConfig {
             instances: vec![Moniker::try_from("core/foo").unwrap()],
             ..Default::default()
-        });
+        })
+        .await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             set_severity: selectors.clone(),
@@ -461,12 +470,15 @@ ffx log --force-set-severity.
         let mut event_stream = environment.take_event_stream().unwrap();
 
         assert_matches!(tool.main_no_timestamp(writer).await, Ok(()));
-        assert_eq!(event_stream.next().await, Some(TestEvent::SetInterest(selectors)));
+        assert_eq!(
+            event_stream.next().await,
+            Some(TestEvent::SetInterest(selectors.into_iter().flatten().collect()))
+        );
     }
 
     #[fuchsia::test]
     async fn logger_prints_error_if_both_dump_and_since_now_are_combined() {
-        let environment = TestEnvironment::new(TestEnvironmentConfig::default());
+        let environment = TestEnvironment::new(TestEnvironmentConfig::default()).await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             symbolize: SymbolizeMode::Off,
@@ -486,7 +498,7 @@ ffx log --force-set-severity.
 
     #[fuchsia::test]
     async fn logger_prints_current_logs_and_exits_on_dump() {
-        let mut environment = TestEnvironment::new(TestEnvironmentConfig::default());
+        let mut environment = TestEnvironment::new(TestEnvironmentConfig::default()).await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             symbolize: SymbolizeMode::Off,
@@ -521,7 +533,8 @@ ffx log --force-set-severity.
             boot_timestamp: BOOT_TIMESTAMP,
             messages: vec![],
             ..Default::default()
-        });
+        })
+        .await;
         let rcs_connector = environment.rcs_connector().await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
@@ -595,14 +608,15 @@ ffx log --force-set-severity.
 
     #[fuchsia::test]
     async fn logger_shows_logs_since_specific_timestamp_across_reboots() {
-        let selectors = vec![parse_log_interest_selector("core/foo#INFO").unwrap()];
+        let selectors = vec![OneOrMany::One(parse_log_interest_selector("core/foo#INFO").unwrap())];
         let mut environment = TestEnvironment::new(TestEnvironmentConfig {
             messages: vec![testing_utils::test_log(testing_utils::naive_utc_nanos(
                 "1980-01-01T00:00:03",
             ))],
             send_connected_event: true,
             ..Default::default()
-        });
+        })
+        .await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Watch(WatchCommand {})),
             symbolize: SymbolizeMode::Off,
@@ -635,7 +649,10 @@ ffx log --force-set-severity.
         );
 
         // Interest should be set
-        assert_eq!(event_stream.next().await, Some(TestEvent::SetInterest(selectors.clone())));
+        assert_eq!(
+            event_stream.next().await,
+            Some(TestEvent::SetInterest(selectors.clone().into_iter().flatten().collect()))
+        );
 
         environment.reboot_target(Some(42));
 
@@ -655,7 +672,10 @@ ffx log --force-set-severity.
         environment.disconnect_target();
 
         // Interest should be set again
-        assert_eq!(event_stream.next().await, Some(TestEvent::SetInterest(selectors)));
+        assert_eq!(
+            event_stream.next().await,
+            Some(TestEvent::SetInterest(selectors.clone().into_iter().flatten().collect()))
+        );
 
         assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
     }
@@ -671,7 +691,8 @@ ffx log --force-set-severity.
             boot_id: None,
             send_connected_event: true,
             ..Default::default()
-        });
+        })
+        .await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Watch(WatchCommand {})),
             symbolize: SymbolizeMode::Off,
@@ -711,7 +732,8 @@ ffx log --force-set-severity.
             ))],
             send_connected_event: true,
             ..Default::default()
-        });
+        })
+        .await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Watch(WatchCommand {})),
             symbolize: SymbolizeMode::Off,
@@ -887,8 +909,10 @@ ffx log --force-set-severity.
         let mut environment = TestEnvironment::new(TestEnvironmentConfig {
             messages: vec![testing_utils::test_log(0)],
             ..Default::default()
-        });
-        let selector = vec![parse_log_interest_selector("archivist.cm#TRACE").unwrap()];
+        })
+        .await;
+        let selector =
+            vec![OneOrMany::One(parse_log_interest_selector("archivist.cm#TRACE").unwrap())];
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             symbolize: SymbolizeMode::Off,
@@ -901,7 +925,7 @@ ffx log --force-set-severity.
         let tool = LogTool { cmd, rcs_connector };
         let buffers = TestBuffers::default();
         let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
-
+        let selector = selector.into_iter().flatten().collect::<Vec<_>>();
         assert_matches!(tool.main_no_timestamp(writer).await, Ok(()));
         assert_eq!(buffers.into_stdout_str(), "[00000.000000][ffx] INFO: Hello world!\u{1b}[m\n");
         assert_matches!(

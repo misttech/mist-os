@@ -273,7 +273,6 @@ where
 }
 
 ::fidl_next::bitflags! {
-
     #[derive(
         Clone,
         Copy,
@@ -348,7 +347,7 @@ impl ::core::convert::From<Bits> for WireBits {
 #[repr(u32)]
 pub enum Enum {
     Val = 1,
-    UnknownOrdinal(u32),
+    UnknownOrdinal_(u32),
 }
 
 impl ::fidl_next::Encodable for Enum {
@@ -368,7 +367,7 @@ where
         *value = ::fidl_next::u32_le::from(match *self {
             Self::Val => 1,
 
-            Self::UnknownOrdinal(value) => value,
+            Self::UnknownOrdinal_(value) => value,
         });
 
         Ok(())
@@ -380,7 +379,7 @@ impl ::core::convert::From<WireEnum> for Enum {
         match u32::from(wire.value) {
             1 => Self::Val,
 
-            value => Self::UnknownOrdinal(value),
+            value => Self::UnknownOrdinal_(value),
         }
     }
 }
@@ -419,7 +418,7 @@ impl ::core::convert::From<Enum> for WireEnum {
         match natural {
             Enum::Val => WireEnum::VAL,
 
-            Enum::UnknownOrdinal(value) => WireEnum { value: ::fidl_next::u32_le::from(value) },
+            Enum::UnknownOrdinal_(value) => WireEnum { value: ::fidl_next::u32_le::from(value) },
         }
     }
 }
@@ -589,7 +588,7 @@ impl ::core::fmt::Debug for WireTable<'_> {
 pub enum Union {
     B(bool),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for Union {
@@ -614,7 +613,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -679,34 +678,34 @@ pub struct WireUnion {
     _phantom: ::core::marker::PhantomData<()>,
 }
 
-pub mod r#union {
+pub mod union_ {
     pub enum Ref<'union> {
         B(&'union bool),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         B(&'union mut bool),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
 impl WireUnion {
-    pub fn as_ref(&self) -> crate::r#union::Ref<'_> {
+    pub fn as_ref(&self) -> crate::union_::Ref<'_> {
         match self.raw.ordinal() {
-            1 => crate::r#union::Ref::B(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::union_::Ref::B(unsafe { self.raw.get().deref_unchecked() }),
 
-            unknown => crate::r#union::Ref::UnknownOrdinal(unknown),
+            unknown => crate::union_::Ref::UnknownOrdinal_(unknown),
         }
     }
 
-    pub fn as_mut(&mut self) -> crate::r#union::Mut<'_> {
+    pub fn as_mut(&mut self) -> crate::union_::Mut<'_> {
         match self.raw.ordinal() {
-            1 => crate::r#union::Mut::B(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
+            1 => crate::union_::Mut::B(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
 
-            unknown => crate::r#union::Mut::UnknownOrdinal(unknown),
+            unknown => crate::union_::Mut::UnknownOrdinal_(unknown),
         }
     }
 }
@@ -729,7 +728,7 @@ impl Clone for WireUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -831,7 +830,7 @@ impl Clone for WireOptionalUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -1463,13 +1462,13 @@ where
 pub struct Compound {
     pub bits: crate::Bits,
 
-    pub r#enum: crate::Enum,
+    pub enum_: crate::Enum,
 
-    pub r#struct: crate::Struct,
+    pub struct_: crate::Struct,
 
     pub table: crate::Table,
 
-    pub r#union: crate::Union,
+    pub union_: crate::Union,
 
     pub opt_struct: Option<Box<crate::Struct>>,
 
@@ -1504,10 +1503,10 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 bits,
-                r#enum,
-                r#struct,
+                enum_,
+                struct_,
                 table,
-                r#union,
+                union_,
                 opt_struct,
                 opt_union,
 
@@ -1516,13 +1515,13 @@ where
 
         ::fidl_next::Encode::encode(&mut self.bits, encoder, bits)?;
 
-        ::fidl_next::Encode::encode(&mut self.r#enum, encoder, r#enum)?;
+        ::fidl_next::Encode::encode(&mut self.enum_, encoder, enum_)?;
 
-        ::fidl_next::Encode::encode(&mut self.r#struct, encoder, r#struct)?;
+        ::fidl_next::Encode::encode(&mut self.struct_, encoder, struct_)?;
 
         ::fidl_next::Encode::encode(&mut self.table, encoder, table)?;
 
-        ::fidl_next::Encode::encode(&mut self.r#union, encoder, r#union)?;
+        ::fidl_next::Encode::encode(&mut self.union_, encoder, union_)?;
 
         ::fidl_next::Encode::encode(&mut self.opt_struct, encoder, opt_struct)?;
 
@@ -1562,13 +1561,13 @@ impl<'buf> ::fidl_next::TakeFrom<WireCompound<'buf>> for Compound {
         Self {
             bits: ::fidl_next::TakeFrom::take_from(&mut from.bits),
 
-            r#enum: ::fidl_next::TakeFrom::take_from(&mut from.r#enum),
+            enum_: ::fidl_next::TakeFrom::take_from(&mut from.enum_),
 
-            r#struct: ::fidl_next::TakeFrom::take_from(&mut from.r#struct),
+            struct_: ::fidl_next::TakeFrom::take_from(&mut from.struct_),
 
             table: ::fidl_next::TakeFrom::take_from(&mut from.table),
 
-            r#union: ::fidl_next::TakeFrom::take_from(&mut from.r#union),
+            union_: ::fidl_next::TakeFrom::take_from(&mut from.union_),
 
             opt_struct: ::fidl_next::TakeFrom::take_from(&mut from.opt_struct),
 
@@ -1583,13 +1582,13 @@ impl<'buf> ::fidl_next::TakeFrom<WireCompound<'buf>> for Compound {
 pub struct WireCompound<'buf> {
     pub bits: crate::WireBits,
 
-    pub r#enum: crate::WireEnum,
+    pub enum_: crate::WireEnum,
 
-    pub r#struct: crate::WireStruct,
+    pub struct_: crate::WireStruct,
 
     pub table: crate::WireTable<'buf>,
 
-    pub r#union: crate::WireUnion,
+    pub union_: crate::WireUnion,
 
     pub opt_struct: ::fidl_next::WireBox<'buf, crate::WireStruct>,
 
@@ -1621,10 +1620,10 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut bits,
-                mut r#enum,
-                mut r#struct,
+                mut enum_,
+                mut struct_,
                 mut table,
-                mut r#union,
+                mut union_,
                 mut opt_struct,
                 mut opt_union,
 
@@ -1633,13 +1632,13 @@ where
 
         ::fidl_next::Decode::decode(bits.as_mut(), decoder)?;
 
-        ::fidl_next::Decode::decode(r#enum.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(enum_.as_mut(), decoder)?;
 
-        ::fidl_next::Decode::decode(r#struct.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(struct_.as_mut(), decoder)?;
 
         ::fidl_next::Decode::decode(table.as_mut(), decoder)?;
 
-        ::fidl_next::Decode::decode(r#union.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(union_.as_mut(), decoder)?;
 
         ::fidl_next::Decode::decode(opt_struct.as_mut(), decoder)?;
 
@@ -4597,7 +4596,7 @@ impl ::core::fmt::Debug for WireResourceTable<'_> {
 pub enum ResourceUnion {
     B(bool),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for ResourceUnion {
@@ -4622,7 +4621,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -4691,13 +4690,13 @@ pub mod resource_union {
     pub enum Ref<'union> {
         B(&'union bool),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         B(&'union mut bool),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -4706,7 +4705,7 @@ impl WireResourceUnion {
         match self.raw.ordinal() {
             1 => crate::resource_union::Ref::B(unsafe { self.raw.get().deref_unchecked() }),
 
-            unknown => crate::resource_union::Ref::UnknownOrdinal(unknown),
+            unknown => crate::resource_union::Ref::UnknownOrdinal_(unknown),
         }
     }
 
@@ -4714,14 +4713,14 @@ impl WireResourceUnion {
         match self.raw.ordinal() {
             1 => crate::resource_union::Mut::B(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
 
-            unknown => crate::resource_union::Mut::UnknownOrdinal(unknown),
+            unknown => crate::resource_union::Mut::UnknownOrdinal_(unknown),
         }
     }
 }
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireResourceUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -4800,7 +4799,7 @@ impl Default for WireOptionalResourceUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalResourceUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -4836,11 +4835,11 @@ pub struct Resource {
 
     pub server_end: ::fidl_next::bind::ServerEnd<::fidl_next::zx::Handle, crate::Protocol>,
 
-    pub r#struct: crate::ResourceStruct,
+    pub struct_: crate::ResourceStruct,
 
     pub table: crate::ResourceTable,
 
-    pub r#union: crate::ResourceUnion,
+    pub union_: crate::ResourceUnion,
 
     pub opt_handle: Option<::fidl_next::zx::Handle>,
 
@@ -4968,9 +4967,9 @@ where
                 vmo,
                 client_end,
                 server_end,
-                r#struct,
+                struct_,
                 table,
-                r#union,
+                union_,
                 opt_handle,
                 opt_vmo,
                 opt_client_end,
@@ -5003,11 +5002,11 @@ where
 
         ::fidl_next::Encode::encode(&mut self.server_end, encoder, server_end)?;
 
-        ::fidl_next::Encode::encode(&mut self.r#struct, encoder, r#struct)?;
+        ::fidl_next::Encode::encode(&mut self.struct_, encoder, struct_)?;
 
         ::fidl_next::Encode::encode(&mut self.table, encoder, table)?;
 
-        ::fidl_next::Encode::encode(&mut self.r#union, encoder, r#union)?;
+        ::fidl_next::Encode::encode(&mut self.union_, encoder, union_)?;
 
         ::fidl_next::Encode::encode(&mut self.opt_handle, encoder, opt_handle)?;
 
@@ -5089,11 +5088,11 @@ impl<'buf> ::fidl_next::TakeFrom<WireResource<'buf>> for Resource {
 
             server_end: ::fidl_next::TakeFrom::take_from(&mut from.server_end),
 
-            r#struct: ::fidl_next::TakeFrom::take_from(&mut from.r#struct),
+            struct_: ::fidl_next::TakeFrom::take_from(&mut from.struct_),
 
             table: ::fidl_next::TakeFrom::take_from(&mut from.table),
 
-            r#union: ::fidl_next::TakeFrom::take_from(&mut from.r#union),
+            union_: ::fidl_next::TakeFrom::take_from(&mut from.union_),
 
             opt_handle: ::fidl_next::TakeFrom::take_from(&mut from.opt_handle),
 
@@ -5150,11 +5149,11 @@ pub struct WireResource<'buf> {
 
     pub server_end: ::fidl_next::bind::ServerEnd<::fidl_next::WireHandle, crate::Protocol>,
 
-    pub r#struct: crate::WireResourceStruct,
+    pub struct_: crate::WireResourceStruct,
 
     pub table: crate::WireResourceTable<'buf>,
 
-    pub r#union: crate::WireResourceUnion,
+    pub union_: crate::WireResourceUnion,
 
     pub opt_handle: ::fidl_next::WireOptionalHandle,
 
@@ -5287,9 +5286,9 @@ where
                 mut vmo,
                 mut client_end,
                 mut server_end,
-                mut r#struct,
+                mut struct_,
                 mut table,
-                mut r#union,
+                mut union_,
                 mut opt_handle,
                 mut opt_vmo,
                 mut opt_client_end,
@@ -5322,11 +5321,11 @@ where
 
         ::fidl_next::Decode::decode(server_end.as_mut(), decoder)?;
 
-        ::fidl_next::Decode::decode(r#struct.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(struct_.as_mut(), decoder)?;
 
         ::fidl_next::Decode::decode(table.as_mut(), decoder)?;
 
-        ::fidl_next::Decode::decode(r#union.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(union_.as_mut(), decoder)?;
 
         ::fidl_next::Decode::decode(opt_handle.as_mut(), decoder)?;
 
@@ -6697,7 +6696,8 @@ where
 }
 
 /// A client handler for the Protocol protocol.
-
+///
+/// See [`Protocol`] for more details.
 pub trait ProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn event_basic(
         &mut self,
@@ -6910,68 +6910,202 @@ where
 
 /// A helper trait for the `Protocol` server sender.
 pub trait ProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
-    fn event_basic(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn event_basic<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireBasic<'buf>>;
 
-    fn event_compound(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn event_compound<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireCompound<'buf>>;
 
-    fn event_array_basic(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn event_array_basic<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayBasic<'buf>>;
 
-    fn event_array_compound(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn event_array_compound<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireArrayCompound<'buf>,
+        >;
 
-    fn event_vector_basic(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn event_vector_basic<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorBasic<'buf>>;
 
-    fn event_vector_compound(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn event_vector_compound<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireVectorCompound<'buf>,
+        >;
 
-    fn event_vector_optional(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn event_vector_optional<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireVectorOptional<'buf>,
+        >;
 
-    fn event_array_vector_nested(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn event_array_vector_nested<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireArrayVectorNested<'buf>,
+        >;
 
-    fn event_resource(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn event_resource<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireResource<'buf>>;
 }
 
 impl<___T> ProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<___T, Protocol>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
-    fn event_basic(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(5892309624949902400, &mut ())
+    fn event_basic<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireBasic<'buf>>,
+    {
+        self.as_untyped().send_event(5892309624949902400, request)
     }
 
-    fn event_compound(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(7024581948727571669, &mut ())
+    fn event_compound<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireCompound<'buf>>,
+    {
+        self.as_untyped().send_event(7024581948727571669, request)
     }
 
-    fn event_array_basic(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(5888282827283820590, &mut ())
+    fn event_array_basic<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayBasic<'buf>>,
+    {
+        self.as_untyped().send_event(5888282827283820590, request)
     }
 
-    fn event_array_compound(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(2189769767733851157, &mut ())
+    fn event_array_compound<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireArrayCompound<'buf>,
+        >,
+    {
+        self.as_untyped().send_event(2189769767733851157, request)
     }
 
-    fn event_vector_basic(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(4583890770109526006, &mut ())
+    fn event_vector_basic<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorBasic<'buf>>,
+    {
+        self.as_untyped().send_event(4583890770109526006, request)
     }
 
-    fn event_vector_compound(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(6026375226599919603, &mut ())
+    fn event_vector_compound<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireVectorCompound<'buf>,
+        >,
+    {
+        self.as_untyped().send_event(6026375226599919603, request)
     }
 
-    fn event_vector_optional(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(1684763340073130077, &mut ())
+    fn event_vector_optional<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireVectorOptional<'buf>,
+        >,
+    {
+        self.as_untyped().send_event(1684763340073130077, request)
     }
 
-    fn event_array_vector_nested(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(1228201560727880574, &mut ())
+    fn event_array_vector_nested<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireArrayVectorNested<'buf>,
+        >,
+    {
+        self.as_untyped().send_event(1228201560727880574, request)
     }
 
-    fn event_resource(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(5745997765922613643, &mut ())
+    fn event_resource<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireResource<'buf>>,
+    {
+        self.as_untyped().send_event(5745997765922613643, request)
     }
 }
 
 /// A server handler for the Protocol protocol.
-
+///
+/// See [`Protocol`] for more details.
 pub trait ProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn one_way_basic(
         &mut self,

@@ -50,15 +50,16 @@ zx::result<BusLauncher> BusLauncher::Create() {
     }
   }
 
-  // Connect to dev.
-  auto dev_client = realm.component().Connect<fuchsia_io::Directory>("dev-topological");
-  if (dev_client.is_error()) {
-    std::cerr << "Failed to connect to dev-topological: " << dev_client.error_value() << '\n';
-    return dev_client.take_error();
+  // Open dev.
+  auto [dev_client, dev_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  zx_status_t status = realm.component().exposed()->Open3(
+      "dev-topological", fuchsia::io::PERM_READABLE, {}, dev_server.TakeChannel());
+  if (status != ZX_OK) {
+    std::cerr << "Failed to open dev-topological: " << zx_status_get_string(status) << '\n';
+    return zx::error(status);
   }
   fbl::unique_fd dev_fd;
-  zx_status_t status =
-      fdio_fd_create(dev_client.value().channel().release(), dev_fd.reset_and_get_address());
+  status = fdio_fd_create(dev_client.TakeChannel().release(), dev_fd.reset_and_get_address());
   if (status != ZX_OK) {
     std::cerr << "Failed to create fd: " << zx_status_get_string(status) << '\n';
     return zx::error(status);

@@ -9,12 +9,13 @@ from pathlib import Path
 from unittest import mock
 
 import minimal_workspace
-import update_workspace
+import remote_services_utils
 
-_FAKE_BUILD_CONFIG = {
-    "host_tag": "powerpc",
-    "rbe_instance_name": "johnny/cache/instance/default",
+_FAKE_RBE_SUBSTITUTIONS = {
+    "remote_download_outputs": "",
+    "remote_instance_name": "johnny/cache/instance/default",
     "rbe_project": "cache-is-king",
+    "container_image": "docker://gcr.io/cloud-marketplace/google/debian11@sha256:69e2789c9f3d28c6a0f13b25062c240ee7772be1f5e6d41bb4680b63eae6b304",
 }
 
 
@@ -28,9 +29,9 @@ class MainTests(unittest.TestCase):
                 Path, "read_text", return_value="template text\n"
             ) as mock_read:
                 with mock.patch.object(
-                    update_workspace,
-                    "generate_fuchsia_build_config",
-                    return_value=_FAKE_BUILD_CONFIG,
+                    remote_services_utils,
+                    "generate_rbe_template_substitutions",
+                    return_value=_FAKE_RBE_SUBSTITUTIONS,
                 ) as mock_build_config:
                     status = minimal_workspace.main([f"--topdir={td}"])
 

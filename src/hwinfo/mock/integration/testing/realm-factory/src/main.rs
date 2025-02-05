@@ -8,7 +8,7 @@ use fidl_test_mock::{RealmFactoryRequest, RealmFactoryRequestStream, RealmOption
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use futures::{StreamExt, TryStreamExt};
-use tracing::*;
+use log::*;
 use {
     fidl_fuchsia_hwinfo as fhwinfo, fidl_fuchsia_hwinfo_mock as fhwinfo_mock,
     fuchsia_async as fasync, zx_status,

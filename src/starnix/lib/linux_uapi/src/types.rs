@@ -25,6 +25,7 @@ mod common {
 }
 
 // Export for 'arm' which is only used via arch32
+#[allow(dead_code)]
 pub mod arch32 {
     pub type c_char = u8;
 

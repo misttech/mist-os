@@ -92,7 +92,7 @@ template("idk") {
   if (defined(invoker.idk_subbuilds_label)) {
     _subbuilds_target_prefix = invoker.idk_subbuilds_label
     if (defined(invoker.idk_subbuilds_prefix)) {
-      _subbuilds_dir_prefix = invoker.idk_subbuild_prefix
+      _subbuilds_dir_prefix = invoker.idk_subbuilds_prefix
     } else {
       # Same default as idk_subbuilds()
       _subbuilds_dir_prefix = "idk_subbuild.${_sdk_collection_name}"

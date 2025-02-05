@@ -7,7 +7,7 @@ use crate::client::{Context, TimedEvent};
 use crate::device::DeviceOps;
 use anyhow::bail;
 use futures::Future;
-use tracing::error;
+use log::error;
 use wlan_common::mac::BeaconHdr;
 use wlan_common::timer::EventId;
 use wlan_common::{ie, TimeUnit};
@@ -121,15 +121,11 @@ impl<'a, T: ChannelActions> BoundChannelState<'a, T> {
         let result = self.actions.switch_channel(new_main_channel).await;
         match result {
             Ok(()) => {
-                tracing::info!("Switched to new main channel {:?}", new_main_channel);
+                log::info!("Switched to new main channel {:?}", new_main_channel);
                 self.channel_state.main_channel.replace(new_main_channel);
             }
             Err(e) => {
-                tracing::error!(
-                    "Failed to switch to new main channel {:?}: {}",
-                    new_main_channel,
-                    e
-                );
+                log::error!("Failed to switch to new main channel {:?}: {}", new_main_channel, e);
             }
         }
         self.actions.enable_scanning();

@@ -13,11 +13,11 @@ use futures::channel::{mpsc, oneshot};
 use futures::future::{BoxFuture, Shared};
 use futures::lock::Mutex;
 use futures::{select, FutureExt, SinkExt, StreamExt};
+use log::{error, info, trace, warn};
 use packet_encoding::Encodable;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{error, info, trace, warn};
 use {fuchsia_async as fasync, fuchsia_inspect as inspect};
 
 /// RFCOMM channels used to communicate with profile clients.
@@ -95,9 +95,6 @@ impl OutstandingFrames {
             if self.commands.contains_key(&frame.dlci) {
                 // There can only be one outstanding command frame with P/F = 1 per
                 // DLCI.
-                // TODO(https://fxbug.dev/42139132): Our implementation should never try to send
-                // more than one command frame on the same DLCI. However, it may make
-                // sense to make this more intelligent and queue for later.
                 return Err(Error::Other(format_err!("Command Frame outstanding")));
             }
             let _ = self.commands.insert(frame.dlci, frame.clone());
@@ -219,11 +216,11 @@ impl SessionInner {
                     let _ = self.multiplexer().close_session_channel(&dlci);
                     return false;
                 }
-                trace!(%server_channel, %dlci, "Established RFCOMM channel");
+                trace!(server_channel:%, dlci:%; "Established RFCOMM channel");
                 true
             }
             Err(e) => {
-                warn!(%server_channel, "Couldn't establish DLCI {dlci:?}: {e:?}");
+                warn!(server_channel:%; "Couldn't establish DLCI {dlci:?}: {e:?}");
                 false
             }
         }
@@ -240,7 +237,7 @@ impl SessionInner {
 
         if let Some(channel_open_fn) = self.pending_channels.remove(&server_channel) {
             if let Err(e) = self.open_remote_channel(server_channel, channel_open_fn).await {
-                warn!(%server_channel, "Error opening remote channel: {e:?}");
+                warn!(server_channel:%; "Error opening remote channel: {e:?}");
             }
         }
         Ok(())
@@ -255,9 +252,9 @@ impl SessionInner {
 
         let outstanding_channels = std::mem::take(&mut self.pending_channels);
         for (server_channel, channel_open_fn) in outstanding_channels {
-            trace!(%server_channel, "Processing RFCOMM open channel request.");
+            trace!(server_channel:%; "Processing RFCOMM open channel request.");
             if let Err(e) = self.open_remote_channel(server_channel, channel_open_fn).await {
-                warn!(%server_channel, "Error opening remote channel: {e:?}");
+                warn!(server_channel:%; "Error opening remote channel: {e:?}");
             }
         }
         Ok(())
@@ -335,7 +332,7 @@ impl SessionInner {
     /// Mux Control DLCI.
     async fn start_multiplexer(&mut self) -> Result<(), Error> {
         if self.multiplexer().started() || self.role() == Role::Negotiating {
-            warn!(role = ?self.role(), "Multiplexer already started");
+            warn!(role:? = self.role(); "Multiplexer already started");
             return Err(Error::MultiplexerAlreadyStarted);
         }
         self.multiplexer().set_role(Role::Negotiating);
@@ -349,7 +346,7 @@ impl SessionInner {
     /// for the given `dlci`.
     async fn start_parameter_negotiation(&mut self, dlci: DLCI) -> Result<(), Error> {
         if !self.multiplexer().started() {
-            warn!(role = ?self.role(), "ParameterNegotiation request before multiplexer startup");
+            warn!(role:? = self.role(); "ParameterNegotiation request before multiplexer startup");
             return Err(Error::MultiplexerNotStarted);
         }
         let max_frame_size = self.multiplexer().parameters().max_frame_size;
@@ -475,7 +472,7 @@ impl SessionInner {
     /// 1) Mux Control DLCI - indicates request to start up the session multiplexer.
     /// 2) User DLCI - indicates request to establish up an RFCOMM channel over the provided `dlci`.
     async fn handle_sabm_command(&mut self, dlci: DLCI) {
-        trace!(%dlci, "Handling SABM");
+        trace!(dlci:%; "Handling SABM");
         if dlci.is_mux_control() {
             match &self.role() {
                 Role::Unassigned => {
@@ -605,7 +602,7 @@ impl SessionInner {
     /// Handles a Disconnect command over the provided `dlci`. Returns a flag indicating
     /// session termination.
     async fn handle_disconnect_command(&mut self, dlci: DLCI) -> bool {
-        trace!(%dlci, "Received Disconnect");
+        trace!(dlci:%; "Received Disconnect");
 
         let terminate_session = if dlci.is_user() {
             let pn_identifier =
@@ -620,7 +617,7 @@ impl SessionInner {
 
             // Otherwise, it's a request to close the DLC.
             if !self.multiplexer().close_session_channel(&dlci) {
-                warn!(%dlci, "Received Disc command for unopened DLCI");
+                warn!(dlci:%; "Received Disc command for unopened DLCI");
                 self.send_dm_response(dlci).await;
                 return false;
             }
@@ -660,7 +657,7 @@ impl SessionInner {
                 // If we are not negotiating anymore, mux startup was either canceled
                 // or completed. No need to do anything.
                 if self.role() != Role::Negotiating {
-                    trace!(role = ?self.role(),
+                    trace!(role:? = self.role();
                         "Received response when mux startup was either canceled or completed",
                     );
                     return false;
@@ -961,7 +958,7 @@ impl Session {
         let _ = futures::future::join(session_inner_task, peer_processing_task).await;
 
         // Session has finished; notify any subscribed clients.
-        info!(%peer_id, "Session with peer ended");
+        info!(peer_id:%; "Session with peer ended");
         let _ = termination_sender.send(());
     }
 
@@ -1035,7 +1032,7 @@ impl Session {
     ) {
         let mut w_inner = self.inner.lock().await;
         if let Err(e) = w_inner.open_remote_channel(server_channel, channel_opened_cb).await {
-            warn!(%server_channel, "Couldn't open RFCOMM channel: {e:?}");
+            warn!(server_channel:%; "Couldn't open RFCOMM channel: {e:?}");
         }
     }
 

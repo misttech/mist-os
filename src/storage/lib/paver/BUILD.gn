@@ -176,8 +176,8 @@ source_set("vim3") {
   ]
 }
 
-source_set("x64") {
-  sources = [ "x64.cc" ]
+source_set("uefi") {
+  sources = [ "uefi.cc" ]
   public_deps = [
     ":gpt",
     ":paver-core",
@@ -209,8 +209,8 @@ source_set("paver") {
     ":nelson",
     ":paver-core",
     ":sherlock",
+    ":uefi",
     ":vim3",
-    ":x64",
     "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
   ]
 }

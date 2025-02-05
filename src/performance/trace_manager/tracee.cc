@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/performance/trace_manager/tracee.h"
+#include "tracee.h"
 
+#include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-engine/fields.h>
@@ -13,9 +14,14 @@
 
 #include <fbl/algorithm.h>
 
-#include "lib/fit/defer.h"
-#include "src/performance/trace_manager/trace_session.h"
-#include "src/performance/trace_manager/util.h"
+#include "util.h"
+#include "zircon/syscalls.h"
+
+// LINT.IfChange
+// Pulled from trace_engine's context_impl.h
+static constexpr size_t kMaxDurableBufferSize = size_t{1024} * 1024;
+
+// LINT.ThenChange(//zircon/system/ulib/trace-engine/context_impl.h)
 
 namespace tracing {
 
@@ -33,6 +39,7 @@ fuchsia::tracing::BufferingMode EngineBufferingModeToProviderMode(trace_bufferin
       __UNREACHABLE;
   }
 }
+
 }  // namespace
 
 Tracee::Tracee(async::Executor& executor, std::shared_ptr<const BufferForwarder> output,
@@ -63,6 +70,15 @@ bool Tracee::Initialize(fidl::VectorPtr<std::string> categories, size_t buffer_s
   // trace.
   if (bundle_->name == "ktrace_provider") {
     buffer_size = std::max(buffer_size, size_t{32} * 1024 * 1024);
+    // In streaming and circular mode, part of the trace buffer will be reserved for the durable
+    // buffer. If ktrace attempts to write 32MiB of data, and our buffer is also 32MiB, we'll drop
+    // data because our usable buffer size will be slightly smaller.
+    //
+    // For the same reason, we need to add on some additional space for the metadata records that
+    // trace-engine writes since the partially fill the buffer.
+    if (buffering_mode != fuchsia::tracing::BufferingMode::ONESHOT) {
+      buffer_size += kMaxDurableBufferSize + size_t{zx_system_get_page_size()};
+    }
   }
 
   zx::vmo buffer_vmo;

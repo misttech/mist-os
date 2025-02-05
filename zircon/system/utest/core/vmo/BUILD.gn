@@ -22,6 +22,7 @@ source_set("vmo") {
     ":helpers",
     "//sdk/lib/fit",
     "//src/zircon/testing/maybe-standalone-test",
+    "//zircon/kernel/lib/arch",
     "//zircon/system/ulib/explicit-memory",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",

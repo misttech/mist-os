@@ -27,7 +27,7 @@ class FakeAudioRenderer : public AudioObject, public fuchsia::media::AudioRender
  public:
   static std::shared_ptr<FakeAudioRenderer> Create(
       async_dispatcher_t* dispatcher, std::optional<Format> format,
-      fuchsia::media::AudioRenderUsage usage, LinkMatrix* link_matrix,
+      fuchsia::media::AudioRenderUsage2 usage, LinkMatrix* link_matrix,
       std::shared_ptr<AudioCoreClockFactory> clock_factory) {
     return std::make_shared<FakeAudioRenderer>(dispatcher, std::move(format), usage, link_matrix,
                                                clock_factory);
@@ -37,7 +37,7 @@ class FakeAudioRenderer : public AudioObject, public fuchsia::media::AudioRender
       std::shared_ptr<AudioCoreClockFactory> clock_factory);
 
   FakeAudioRenderer(async_dispatcher_t* dispatcher, std::optional<Format> format,
-                    fuchsia::media::AudioRenderUsage usage, LinkMatrix* link_matrix,
+                    fuchsia::media::AudioRenderUsage2 usage, LinkMatrix* link_matrix,
                     std::shared_ptr<AudioCoreClockFactory> clock_factory);
 
   // Enqueues a packet that has all samples initialized to |sample| and lasts for |duration|.
@@ -76,13 +76,18 @@ class FakeAudioRenderer : public AudioObject, public fuchsia::media::AudioRender
   void BindGainControl(::fidl::InterfaceRequest<::fuchsia::media::audio::GainControl>
                            gain_control_request) override {}
   void SetUsage(fuchsia::media::AudioRenderUsage usage) override {}
+  void SetUsage2(fuchsia::media::AudioRenderUsage2 usage2) override {}
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
+    FX_LOGS(ERROR) << "FakeAudioRenderer: AudioRenderer::handle_unknown_method(ordinal " << ordinal
+                   << ", method_has_response " << method_has_response << ")";
+  }
 
  private:
   zx::duration FindMinLeadTime();
 
   async_dispatcher_t* dispatcher_;
   std::optional<Format> format_;
-  fuchsia::media::AudioRenderUsage usage_;
+  fuchsia::media::AudioRenderUsage2 usage_;
   PacketFactory packet_factory_;
   std::unordered_map<const AudioObject*, std::shared_ptr<PacketQueue>> packet_queues_;
   fbl::RefPtr<VersionedTimelineFunction> timeline_function_ =

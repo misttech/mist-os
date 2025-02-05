@@ -88,7 +88,7 @@ class TestAmlSdmmcWithBanjo : public AmlSdmmcWithBanjo {
   }
 
   zx_status_t WaitForInterruptImpl() override {
-    zx::result result = fake_bti::GetPinnedVmo(bti().get());
+    zx::result result = fake_bti::GetPinnedVmo(zx::unowned_bti(bti()));
     if (result.is_error()) {
       return result.status_value();
     }
@@ -100,11 +100,11 @@ class TestAmlSdmmcWithBanjo : public AmlSdmmcWithBanjo {
     std::vector<fake_bti::FakeBtiPinnedVmoInfo> pinned_vmos = std::move(result.value());
     if (pinned_vmos.size() == kTuningVmoSize &&
         pinned_vmos[0].size >= sizeof(aml_sdmmc_tuning_blk_pattern_4bit)) {
-      zx_vmo_write(pinned_vmos[1].vmo, aml_sdmmc_tuning_blk_pattern_4bit, pinned_vmos[1].offset,
-                   sizeof(aml_sdmmc_tuning_blk_pattern_4bit));
+      zx_vmo_write(pinned_vmos[1].vmo.get(), aml_sdmmc_tuning_blk_pattern_4bit,
+                   pinned_vmos[1].offset, sizeof(aml_sdmmc_tuning_blk_pattern_4bit));
     }
     for (auto& pinned_vmo : pinned_vmos) {
-      zx_handle_close(pinned_vmo.vmo);
+      zx_handle_close(pinned_vmo.vmo.get());
     }
 
     if (request_index_ < request_results_.size() && request_results_[request_index_] == 0) {

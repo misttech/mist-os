@@ -9,9 +9,9 @@ use anyhow::Context as _;
 use fidl::endpoints::ServerEnd;
 use fuchsia_url::UnpinnedAbsolutePackageUrl;
 use futures::stream::TryStreamExt as _;
+use log::error;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::error;
 use vfs::directory::entry_container::Directory;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg};
 

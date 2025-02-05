@@ -105,7 +105,7 @@ void DLog::StartThreads() {
   }
 }
 
-zx_status_t DLog::Shutdown(zx_time_t deadline) {
+zx_status_t DLog::Shutdown(zx_instant_mono_t deadline) {
   dprintf(INFO, "Shutting down debuglog\n");
 
   // Are we the first to try to shutdown this instance?  Try to claim the honor.
@@ -179,7 +179,7 @@ void DLog::BluescreenInit() {
   printf("\nZIRCON KERNEL PANIC\n\n");
 
   // Print uptime, current CPU, and version information.
-  printf("UPTIME: %" PRIi64 "ms, CPU: %" PRIu32 "\n", current_time() / ZX_MSEC(1),
+  printf("UPTIME: %" PRIi64 "ms, CPU: %" PRIu32 "\n", current_mono_time() / ZX_MSEC(1),
          arch_curr_cpu_num());
   print_backtrace_version_info();
   g_crashlog.base_address = (uintptr_t)__executable_start;
@@ -617,7 +617,7 @@ void dlog_serial_write(ktl::string_view str) {
 
 void dlog_bluescreen_init() { DLOG->BluescreenInit(); }
 void dlog_panic_start() { DLOG->PanicStart(); }
-zx_status_t dlog_shutdown(zx_time_t deadline) { return DLOG->Shutdown(deadline); }
+zx_status_t dlog_shutdown(zx_instant_mono_t deadline) { return DLOG->Shutdown(deadline); }
 size_t dlog_render_to_crashlog(ktl::span<char> target) { return DLOG->RenderToCrashlog(target); }
 
 LK_INIT_HOOK(debuglog, [](uint level) { DLOG->StartThreads(); }, LK_INIT_LEVEL_PLATFORM)

@@ -189,6 +189,7 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   // This should be declared before any objects it backs so it is destructed last.
   fidl::Arena<512> arena_;
   std::vector<fuchsia_driver_framework::wire::NodeProperty> properties_;
+  std::optional<fuchsia_driver_framework::BusInfo> bus_info_;
 
   std::optional<driver_devfs::Connector<fuchsia_device::Controller>> devfs_connector_;
   std::optional<driver_devfs::Connector<fuchsia_device::Controller>> devfs_controller_connector_;

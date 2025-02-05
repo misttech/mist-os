@@ -298,7 +298,7 @@ impl FxVolume {
             if let Err(e) = self.store.lock().await {
                 // The store will be left in a safe state and there won't be data-loss unless
                 // there's an issue flushing the journal later.
-                warn!(error = ?e, "Locking store error");
+                warn!(error:? = e; "Locking store error");
             }
         }
         let sync_status = self
@@ -307,7 +307,7 @@ impl FxVolume {
             .sync(SyncOptions { flush_device: true, ..Default::default() })
             .await;
         if let Err(e) = sync_status {
-            error!(error = ?e, "Failed to sync filesystem; data may be lost");
+            error!(error:? = e; "Failed to sync filesystem; data may be lost");
         }
     }
 
@@ -420,7 +420,7 @@ impl FxVolume {
         mut level_stream: impl Stream<Item = MemoryPressureLevel> + FusedStream + Unpin,
         terminate: oneshot::Receiver<()>,
     ) {
-        debug!(store_id = self.store.store_object_id(), "FxVolume::background_task start");
+        debug!(store_id = self.store.store_object_id(); "FxVolume::background_task start");
         let mut terminate = terminate.fuse();
         // Default to the normal period until updates come from the `level_stream`.
         let mut level = MemoryPressureLevel::Normal;
@@ -481,7 +481,7 @@ impl FxVolume {
                 self.dirent_cache.set_limit(config.for_level(&level).cache_size_limit);
             }
         }
-        debug!(store_id = self.store.store_object_id(), "FxVolume::background_task end");
+        debug!(store_id = self.store.store_object_id(); "FxVolume::background_task end");
     }
 
     /// Reports that a certain number of bytes will be dirtied in a pager-backed VMO.
@@ -515,14 +515,14 @@ impl FxVolume {
                     warn!(
                         store_id = self.store.store_object_id(),
                         oid = file.object_id(),
-                        error = ?e,
+                        error:? = e;
                         "Failed to flush",
                     )
                 }
             }
             flushed += 1;
         }
-        debug!(store_id = self.store.store_object_id(), file_count = flushed, "FxVolume flushed");
+        debug!(store_id = self.store.store_object_id(), file_count = flushed; "FxVolume flushed");
     }
 
     /// Spawns a short term task for the volume that includes a guard that will prevent termination.
@@ -660,38 +660,39 @@ impl FxVolumeAndRoot {
             match request {
                 ProjectIdRequest::SetLimit { responder, project_id, bytes, nodes } => responder
                     .send(
-                        self.volume
-                            .store()
-                            .set_project_limit(project_id, bytes, nodes)
-                            .await
-                            .map_err(|error| {
-                                error!(?error, store_id, project_id, "Failed to set project limit");
-                                map_to_raw_status(error)
-                            }),
-                    )?,
-                ProjectIdRequest::Clear { responder, project_id } => responder.send(
-                    self.volume.store().clear_project_limit(project_id).await.map_err(|error| {
-                        error!(?error, store_id, project_id, "Failed to clear project limit");
-                        map_to_raw_status(error)
-                    }),
+                    self.volume.store().set_project_limit(project_id, bytes, nodes).await.map_err(
+                        |error| {
+                            error!(error:?, store_id, project_id; "Failed to set project limit");
+                            map_to_raw_status(error)
+                        },
+                    ),
                 )?,
+                ProjectIdRequest::Clear { responder, project_id } => {
+                    responder
+                        .send(self.volume.store().clear_project_limit(project_id).await.map_err(
+                        |error| {
+                            error!(error:?, store_id, project_id; "Failed to clear project limit");
+                            map_to_raw_status(error)
+                        },
+                    ))?
+                }
                 ProjectIdRequest::SetForNode { responder, node_id, project_id } => responder.send(
                     self.volume.store().set_project_for_node(node_id, project_id).await.map_err(
                         |error| {
-                            error!(?error, store_id, node_id, project_id, "Failed to apply node.");
+                            error!(error:?, store_id, node_id, project_id; "Failed to apply node.");
                             map_to_raw_status(error)
                         },
                     ),
                 )?,
                 ProjectIdRequest::GetForNode { responder, node_id } => responder.send(
                     self.volume.store().get_project_for_node(node_id).await.map_err(|error| {
-                        error!(?error, store_id, node_id, "Failed to get node.");
+                        error!(error:?, store_id, node_id; "Failed to get node.");
                         map_to_raw_status(error)
                     }),
                 )?,
                 ProjectIdRequest::ClearForNode { responder, node_id } => responder.send(
                     self.volume.store().clear_project_for_node(node_id).await.map_err(|error| {
-                        error!(?error, store_id, node_id, "Failed to clear for node.");
+                        error!(error:?, store_id, node_id; "Failed to clear for node.");
                         map_to_raw_status(error)
                     }),
                 )?,
@@ -699,7 +700,7 @@ impl FxVolumeAndRoot {
                     responder.send(match self.list_projects(&token).await {
                         Ok((ref entries, ref next_token)) => Ok((entries, next_token.as_ref())),
                         Err(error) => {
-                            error!(?error, store_id, ?token, "Failed to list projects.");
+                            error!(error:?, store_id, token:?; "Failed to list projects.");
                             Err(map_to_raw_status(error))
                         }
                     })?
@@ -708,7 +709,7 @@ impl FxVolumeAndRoot {
                     responder.send(match self.project_info(project_id).await {
                         Ok((ref limit, ref usage)) => Ok((limit, usage)),
                         Err(error) => {
-                            error!(?error, store_id, project_id, "Failed to get project info.");
+                            error!(error:?, store_id, project_id; "Failed to get project info.");
                             Err(map_to_raw_status(error))
                         }
                     })?
@@ -1415,6 +1416,7 @@ mod tests {
         const VOLUME_NAME: &str = "A";
         const FILE_NAME: &str = "B";
         const PROJECT_ID: u64 = 42;
+        const PROJECT_ID2: u64 = 343;
         let volume_store_id;
         let node_id;
         let mut device = DeviceHolder::new(FakeDevice::new(8192, 512));
@@ -1510,12 +1512,6 @@ mod tests {
                 .expect("Setting project on node");
 
             project_proxy
-                .set_for_node(node_id, PROJECT_ID)
-                .await
-                .unwrap()
-                .expect_err("Should not be able to reset project for node.");
-
-            project_proxy
                 .set_limit(PROJECT_ID, BYTES_LIMIT_2, NODES_LIMIT_2)
                 .await
                 .unwrap()
@@ -1574,12 +1570,15 @@ mod tests {
                     .expect("Unable to connect to project id service")
             };
 
-            {
-                let BytesAndNodes { bytes, nodes } =
-                    project_proxy.info(PROJECT_ID).await.unwrap().expect("Fetching project info").0;
-                assert_eq!(bytes, BYTES_LIMIT_2);
-                assert_eq!(nodes, NODES_LIMIT_2);
-            }
+            let usage_bytes_and_nodes = {
+                let (
+                    BytesAndNodes { bytes: limit_bytes, nodes: limit_nodes },
+                    usage_bytes_and_nodes,
+                ) = project_proxy.info(PROJECT_ID).await.unwrap().expect("Fetching project info");
+                assert_eq!(limit_bytes, BYTES_LIMIT_2);
+                assert_eq!(limit_nodes, NODES_LIMIT_2);
+                usage_bytes_and_nodes
+            };
 
             // Should be unable to clear the project limit, due to being in use.
             project_proxy.clear(PROJECT_ID).await.unwrap().expect("To clear limits");
@@ -1588,15 +1587,23 @@ mod tests {
                 project_proxy.get_for_node(node_id).await.unwrap().expect("Checking project"),
                 PROJECT_ID
             );
-            project_proxy.clear_for_node(node_id).await.unwrap().expect("Clearing project");
+            project_proxy
+                .set_for_node(node_id, PROJECT_ID2)
+                .await
+                .unwrap()
+                .expect("Changing project");
             assert_eq!(
                 project_proxy.get_for_node(node_id).await.unwrap().expect("Checking project"),
-                0
+                PROJECT_ID2
             );
 
             assert_eq!(
                 project_proxy.info(PROJECT_ID).await.unwrap().expect_err("Expect missing limits"),
                 Status::NOT_FOUND.into_raw()
+            );
+            assert_eq!(
+                project_proxy.info(PROJECT_ID2).await.unwrap().expect("Fetching project info").1,
+                usage_bytes_and_nodes
             );
 
             std::mem::drop(volume_proxy);

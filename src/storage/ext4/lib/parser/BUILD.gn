@@ -19,7 +19,7 @@ rustc_library("parser") {
     "//src/lib/fidl/rust/fidl",
     "//src/storage/ext4/read-only:ext4-read-only",
     "//src/storage/lib/vfs/rust:vfs",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   test_deps = [

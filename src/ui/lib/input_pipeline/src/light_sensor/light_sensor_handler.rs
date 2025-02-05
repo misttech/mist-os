@@ -93,7 +93,7 @@ impl ActiveSetting {
 
         if saturated(reading) {
             if self.adjust_down() {
-                tracing::info!("adjusting down due to saturation sentinel");
+                log::info!("adjusting down due to saturation sentinel");
                 self.update_device(&device_proxy, track_feature_update)
                     .await
                     .context("updating light sensor device")?;
@@ -105,7 +105,7 @@ impl ActiveSetting {
             let value = value as u32;
             if value >= saturation_point {
                 if self.adjust_down() {
-                    tracing::info!("adjusting down due to saturation point");
+                    log::info!("adjusting down due to saturation point");
                     self.update_device(&device_proxy, track_feature_update)
                         .await
                         .context("updating light sensor device")?;
@@ -118,7 +118,7 @@ impl ActiveSetting {
 
         if pull_up {
             if self.adjust_up() {
-                tracing::info!("adjusting up");
+                log::info!("adjusting up");
                 self.update_device(&device_proxy, track_feature_update)
                     .await
                     .context("updating light sensor device")?;
@@ -322,7 +322,7 @@ impl<T> LightSensorHandler<T> {
         let hanging_get = RefCell::new(HangingGet::new_unknown_state(Box::new(
             |sensor_data: &LightSensorData, responder: SensorWatchResponder| -> bool {
                 if let Err(e) = responder.send(&FidlLightSensorData::from(*sensor_data)) {
-                    tracing::warn!("Failed to send updated data to client: {e:?}",);
+                    log::warn!("Failed to send updated data to client: {e:?}",);
                 }
                 true
             },
@@ -436,7 +436,7 @@ where
                     if let Err(e) =
                         active_setting.update_device(&device_proxy, track_feature_update).await
                     {
-                        tracing::error!(
+                        log::error!(
                             "Unable to set initial settings for sensor. Falling back \
                                         to static setting: {e:?}"
                         );
@@ -560,7 +560,7 @@ where
                 && light_sensor_descriptor.product_id == self.product_id)
             {
                 // Don't handle the event.
-                tracing::warn!(
+                log::warn!(
                     "Unexpected device in light sensor handler: {:?}",
                     light_sensor_descriptor,
                 );
@@ -577,7 +577,7 @@ where
                     return vec![input_event];
                 }
                 Err(SaturatedError::Anyhow(e)) => {
-                    tracing::warn!("Failed to get light sensor readings: {e:?}");
+                    log::warn!("Failed to get light sensor readings: {e:?}");
                     // Don't handle the event.
                     return vec![input_event];
                 }

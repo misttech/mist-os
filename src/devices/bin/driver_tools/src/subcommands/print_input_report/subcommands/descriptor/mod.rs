@@ -59,8 +59,8 @@ pub async fn descriptor(
             if let Err(err) =
                 get_and_write_descriptor(input_device_proxy, &input_device_path, writer).await
             {
-                tracing::error!(
-                    from = ?input_device_path, %err, "Failed to print input descriptors");
+                log::error!(
+                    from:? = input_device_path, err:%; "Failed to print input descriptors");
             }
         })
         .detach();

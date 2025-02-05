@@ -63,6 +63,21 @@
             from: "parent",
             to: "#test_suite",
         },
+
+        // TODO(b/345827642): Remove once all old CTF prebuilts
+        // have been pruned. This is needed for compatibility
+        // with older driver CTF tests.
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "parent/diagnostics",
+            to: [
+                "#test_realm_factory",
+                "#test_suite",
+            ],
+        },
     ],
     expose: [
         {

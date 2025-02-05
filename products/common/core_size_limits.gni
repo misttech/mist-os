@@ -26,7 +26,7 @@ size_checker_input = {
         "cobalt",
         "cobalt_system_metrics",
       ]
-      limit = 3256320  # 3.105 MiB
+      limit = 3268608  # 3.117 MiB
       creep_limit = 40960  # 40.0 KiB
     },
 
@@ -66,7 +66,7 @@ size_checker_input = {
     {
       component = "Connectivity/Location"
       pkgs = [ "regulatory_region" ]
-      limit = 1839264  # 1.754 MiB
+      limit = 1843360  # 1.758 MiB
       creep_limit = 24576  # 24.0 KiB
     },
     {
@@ -171,7 +171,7 @@ size_checker_input = {
         "memory_sampler",
         "memory_pressure_signaler",
       ]
-      limit = 2621440  # 2.5 MiB
+      limit = 2519040  # 2.4 MiB
       creep_limit = 102400  # 100 KiB
     },
     {
@@ -234,9 +234,8 @@ size_checker_input = {
         "httpsdate-time-source",
         "httpsdate-time-source-pull",
         "timekeeper",
-        "timekeeper",
       ]
-      limit = 2904064  # 2.77 MiB
+      limit = 3006464  # 2.87 MiB
       creep_limit = 24576  # 24.0 KiB
     },
     {
@@ -251,6 +250,7 @@ size_checker_input = {
         "audio-capture-timestamp-validator",
         "audio_ffx_daemon",
         "virtual_audio",
+        "virtual-audio-dfv2",
         "audio-codec-ctl",
         "audio-effects-ctl",
         "audio_listener",

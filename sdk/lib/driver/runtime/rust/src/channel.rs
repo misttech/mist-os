@@ -27,17 +27,20 @@ pub struct Channel<T: ?Sized + 'static>(pub(crate) DriverHandle, PhantomData<Mes
 impl<T: ?Sized + 'static> Channel<T> {
     /// Creates a new channel pair that can be used to send messages of type `T`
     /// between threads managed by the driver runtime.
-    pub fn create() -> Result<(Self, Self), Status> {
+    pub fn create() -> (Self, Self) {
         let mut channel1 = 0;
         let mut channel2 = 0;
-        Status::ok(unsafe { fdf_channel_create(0, &mut channel1, &mut channel2) })?;
+        // This call cannot fail as the only reason it would fail is due to invalid
+        // option flags, and 0 is a valid option.
+        Status::ok(unsafe { fdf_channel_create(0, &mut channel1, &mut channel2) })
+            .expect("failed to create channel pair");
         // SAFETY: if fdf_channel_create returned ZX_OK, it will have placed
         // valid channel handles that must be non-zero.
         unsafe {
-            Ok((
+            (
                 Self::from_handle_unchecked(NonZero::new_unchecked(channel1)),
                 Self::from_handle_unchecked(NonZero::new_unchecked(channel2)),
-            ))
+            )
         }
     }
 
@@ -376,8 +379,8 @@ mod tests {
 
     #[test]
     fn send_and_receive_bytes_synchronously() {
-        let (first, second) = Channel::create().unwrap();
-        let arena = Arena::new().unwrap();
+        let (first, second) = Channel::create();
+        let arena = Arena::new();
         assert_eq!(first.try_read_bytes().unwrap_err(), Status::from_raw(ZX_ERR_SHOULD_WAIT));
         first.write_with_data(arena.clone(), |arena| arena.insert_slice(&[1, 2, 3, 4])).unwrap();
         assert_eq!(&*second.try_read_bytes().unwrap().unwrap().data().unwrap(), &[1, 2, 3, 4]);
@@ -396,9 +399,9 @@ mod tests {
     #[test]
     fn send_and_receive_bytes_asynchronously() {
         with_raw_dispatcher("channel async", |dispatcher| {
-            let arena = Arena::new().unwrap();
+            let arena = Arena::new();
             let (fin_tx, fin_rx) = mpsc::channel();
-            let (first, second) = Channel::create().unwrap();
+            let (first, second) = Channel::create();
 
             dispatcher
                 .spawn_task(async move {
@@ -412,8 +415,8 @@ mod tests {
 
     #[test]
     fn send_and_receive_objects_synchronously() {
-        let arena = Arena::new().unwrap();
-        let (first, second) = Channel::create().unwrap();
+        let arena = Arena::new();
+        let (first, second) = Channel::create();
         let (tx, rx) = mpsc::channel();
         first
             .write_with_data(arena.clone(), |arena| arena.insert(DropSender::new(1, tx.clone())))
@@ -429,9 +432,9 @@ mod tests {
     #[test]
     fn send_and_receive_handles_synchronously() {
         println!("Create channels and write one end of one of the channel pairs to the other");
-        let (first, second) = Channel::<()>::create().unwrap();
-        let (inner_first, inner_second) = Channel::<String>::create().unwrap();
-        let message = Message::new_with(Arena::new().unwrap(), |arena| {
+        let (first, second) = Channel::<()>::create();
+        let (inner_first, inner_second) = Channel::<String>::create();
+        let message = Message::new_with(Arena::new(), |arena| {
             (None, Some(arena.insert_boxed_slice(Box::new([Some(inner_first.into())]))))
         });
         first.write(message).unwrap();
@@ -456,14 +459,14 @@ mod tests {
 
         println!("Send and receive a string across the now-transmitted channel pair.");
         inner_first_received
-            .write_with_data(Arena::new().unwrap(), |arena| arena.insert("boom".to_string()))
+            .write_with_data(Arena::new(), |arena| arena.insert("boom".to_string()))
             .unwrap();
         assert_eq!(inner_second.try_read().unwrap().unwrap().data().unwrap(), &"boom".to_string());
     }
 
     async fn ping(dispatcher: &Dispatcher, chan: Channel<u8>) {
         println!("starting ping!");
-        chan.write_with_data(Arena::new().unwrap(), |arena| arena.insert(0)).unwrap();
+        chan.write_with_data(Arena::new(), |arena| arena.insert(0)).unwrap();
         while let Ok(Some(msg)) = chan.read(dispatcher.as_ref()).await {
             let next = *msg.data().unwrap();
             println!("ping! {next}");
@@ -489,7 +492,7 @@ mod tests {
     fn async_ping_pong() {
         with_raw_dispatcher("async ping pong", |dispatcher| {
             let (fin_tx, fin_rx) = mpsc::channel();
-            let (ping_chan, pong_chan) = Channel::create().unwrap();
+            let (ping_chan, pong_chan) = Channel::create();
             dispatcher.spawn_task(ping(&dispatcher, ping_chan)).unwrap();
             dispatcher.spawn_task(pong(&dispatcher, fin_tx, pong_chan)).unwrap();
 
@@ -501,7 +504,7 @@ mod tests {
     fn async_ping_pong_on_fuchsia_async() {
         with_raw_dispatcher("async ping pong", |dispatcher| {
             let (fin_tx, fin_rx) = mpsc::channel();
-            let (ping_chan, pong_chan) = Channel::create().unwrap();
+            let (ping_chan, pong_chan) = Channel::create();
 
             dispatcher
                 .post_task_sync(|_status| {
@@ -529,7 +532,7 @@ mod tests {
     fn early_cancel_future() {
         with_raw_dispatcher("early cancellation", |dispatcher| {
             let (fin_tx, fin_rx) = mpsc::channel();
-            let (a, b) = Channel::create().unwrap();
+            let (a, b) = Channel::create();
             dispatcher
                 .spawn_task(async move {
                     // create, poll, and then immediately drop a read future for channel `a`
@@ -540,7 +543,7 @@ mod tests {
                         panic!("expected pending state after polling channel read once");
                     };
                     drop(fut);
-                    b.write_with_data(Arena::new().unwrap(), |arena| arena.insert(1)).unwrap();
+                    b.write_with_data(Arena::new(), |arena| arena.insert(1)).unwrap();
                     assert_eq!(
                         a.read(dispatcher.as_ref()).await.unwrap().unwrap().data(),
                         Some(&1)

@@ -14,7 +14,6 @@
 namespace wlan::brcmfmac {
 
 // Some default AP and association request values
-constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 
 const wlan_common::WlanChannel kAp0Channel = {
     .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};

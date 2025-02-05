@@ -5,45 +5,80 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_repository_server_start") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
 
   args_sources = [ "src/args.rs" ]
   args_deps = [
+    "//src/developer/ffx/core:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/plugins/repository/serve:ffx_repository_serve_args",
+    "//third_party/rust_crates:argh",
     "//third_party/rust_crates:camino",
   ]
   sources = [
     "src/lib.rs",
     "src/server.rs",
+    "src/server_impl.rs",
+    "src/target.rs",
   ]
 
   deps = [
+    "//build/sdk/meta:rust",
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
+    "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
+    "//sdk/fidl/fuchsia.pkg.rewrite:fuchsia.pkg.rewrite_rust",
+    "//src/developer/ffx/command/error:lib",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/daemonize:lib",
+    "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/developer/ffx/lib/pkg",
+    "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/lib/target:lib",
+    "//src/developer/ffx/lib/target/connector:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
+    "//src/developer/ffx/lib/target_errors:lib",
     "//src/developer/ffx/lib/timeout:lib",
-    "//src/developer/ffx/plugins/repository/serve:ffx_repository_serve",
-    "//src/developer/ffx/plugins/repository/serve:ffx_repository_serve_args",
     "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-url",
     "//src/lib/network/fidl_fuchsia_net_ext",
+    "//src/sys/lib/fidl-fuchsia-pkg-ext",
+    "//src/sys/pkg/lib/fuchsia-repo",
+    "//src/sys/pkg/lib/package-tool",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-fs",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:camino",
+    "//third_party/rust_crates:chrono",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:http",
     "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:signal-hook",
     "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:tuf",
   ]
   test_deps = [
+    "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//src/developer/ffx/config:lib",
+    "//src/developer/ffx/lib/pkg:empty-repo-keys",
+    "//src/developer/ffx/lib/pkg:empty-repo-metadata",
+    "//src/developer/ffx/lib/target:lib",
+    "//src/lib/assembly/partitions_config",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-hyper",
+    "//src/sys/lib/fidl-fuchsia-pkg-rewrite-ext",
+    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:tempfile",
+    "//third_party/rust_crates:url",
   ]
 }

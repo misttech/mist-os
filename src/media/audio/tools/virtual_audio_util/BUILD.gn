@@ -11,10 +11,7 @@ group("util") {
 executable("bin") {
   output_name = "virtual_audio"
 
-  sources = [
-    "//src/media/audio/drivers/virtual_audio/virtual_audio.h",
-    "virtual_audio.cc",
-  ]
+  sources = [ "virtual_audio.cc" ]
 
   deps = [
     "//sdk/fidl/fuchsia.virtualaudio:fuchsia.virtualaudio_hlcpp",

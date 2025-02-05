@@ -5,17 +5,18 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_cpu_load") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
 
   sources = [ "src/lib.rs" ]
   deps = [
-    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
     "//sdk/fidl/fuchsia.power.metrics:fuchsia.power.metrics_rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/rcs:lib",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
   ]
@@ -28,5 +29,9 @@ ffx_plugin("ffx_cpu_load") {
   with_unit_tests = true
 
   args_sources = [ "src/args.rs" ]
-  args_deps = [ "//third_party/rust_crates:regex" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:regex",
+  ]
 }

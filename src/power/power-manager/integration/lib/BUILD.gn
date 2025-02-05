@@ -51,15 +51,14 @@ rustc_library("lib") {
   sources = [
     "src/client_connectors/mod.rs",
     "src/client_connectors/power_profile_client.rs",
-    "src/client_connectors/reboot_watcher_client.rs",
     "src/client_connectors/system_power_mode_client.rs",
     "src/client_connectors/thermal_client.rs",
     "src/lib.rs",
     "src/mocks/activity_service.rs",
+    "src/mocks/admin.rs",
     "src/mocks/input_settings_service.rs",
     "src/mocks/kernel_service.rs",
     "src/mocks/mod.rs",
-    "src/mocks/system_controller.rs",
   ]
 }
 

@@ -12,6 +12,7 @@ use lock_order::lock::{
     DelegatedOrderedLockAccess, LockLevelFor, UnlockedAccess, UnlockedAccessMarkerFor,
 };
 use lock_order::relation::LockBefore;
+use log::debug;
 use net_types::ethernet::Mac;
 use net_types::ip::{
     AddrSubnet, Ip, IpAddress, IpInvariant, IpVersion, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6,
@@ -24,6 +25,7 @@ use netstack3_base::{
     RecvIpFrameMeta, ReferenceNotifiersExt, RemoveResourceResultWithContext,
     ResourceCounterContext, SendFrameError,
 };
+use netstack3_device::blackhole::{BlackholeDeviceCounters, BlackholeDeviceId};
 use netstack3_device::ethernet::{
     self, EthernetDeviceCounters, EthernetDeviceId, EthernetIpLinkDeviceDynamicStateContext,
     EthernetLinkDevice, EthernetPrimaryDeviceId, EthernetWeakDeviceId,
@@ -113,8 +115,9 @@ where
                     )
                 }
             }
-            // NUD is not supported on Loopback and Pure IP devices.
+            // NUD is not supported on Loopback, Blackhole, and Pure IP devices.
             DeviceId::Loopback(LoopbackDeviceId { .. })
+            | DeviceId::Blackhole(BlackholeDeviceId { .. })
             | DeviceId::PureIp(PureIpDeviceId { .. }) => {}
         }
     }
@@ -140,8 +143,9 @@ where
                     )
                 }
             }
-            // NUD is not supported on Loopback and Pure IP devices.
+            // NUD is not supported on Loopback, Blackhole, and Pure IP devices.
             DeviceId::Loopback(LoopbackDeviceId { .. })
+            | DeviceId::Blackhole(BlackholeDeviceId { .. })
             | DeviceId::PureIp(PureIpDeviceId { .. }) => {}
         }
     }
@@ -151,15 +155,16 @@ where
             DeviceId::Ethernet(id) => {
                 NudHandler::<I, EthernetLinkDevice, _>::flush(self, bindings_ctx, &id)
             }
-            // NUD is not supported on Loopback and Pure IP devices.
+            // NUD is not supported on Loopback, Blackhole, and Pure IP devices.
             DeviceId::Loopback(LoopbackDeviceId { .. })
+            | DeviceId::Blackhole(BlackholeDeviceId { .. })
             | DeviceId::PureIp(PureIpDeviceId { .. }) => {}
         }
     }
 }
 
 impl<I, D, L, BC> ReceivableFrameMeta<CoreCtx<'_, BC, L>, BC>
-    for RecvIpFrameMeta<D, DeviceIpLayerMetadata, I>
+    for RecvIpFrameMeta<D, DeviceIpLayerMetadata<BC>, I>
 where
     BC: BindingsContext,
     D: Into<DeviceId<BC>>,
@@ -212,7 +217,7 @@ impl<
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,
         destination: IpPacketDestination<I, &DeviceId<BC>>,
-        ip_layer_metadata: DeviceIpLayerMetadata,
+        ip_layer_metadata: DeviceIpLayerMetadata<BC>,
         body: S,
         ProofOfEgressCheck { .. }: ProofOfEgressCheck,
     ) -> Result<(), SendFrameError<S>>
@@ -237,7 +242,7 @@ impl<
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,
         destination: IpPacketDestination<I, &DeviceId<BC>>,
-        ip_layer_metadata: DeviceIpLayerMetadata,
+        ip_layer_metadata: DeviceIpLayerMetadata<BC>,
         body: S,
         ProofOfEgressCheck { .. }: ProofOfEgressCheck,
     ) -> Result<(), SendFrameError<S>>
@@ -752,6 +757,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
                 Some(Ipv6DeviceLinkLayerAddr::Mac(ethernet::get_mac(self, &id).get()))
             }
             DeviceId::Loopback(LoopbackDeviceId { .. })
+            | DeviceId::Blackhole(BlackholeDeviceId { .. })
             | DeviceId::PureIp(PureIpDeviceId { .. }) => None,
         }
     }
@@ -762,6 +768,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
                 Some(ethernet::get_mac(self, &id).to_eui64_with_magic(Mac::DEFAULT_EUI_MAGIC))
             }
             DeviceId::Loopback(LoopbackDeviceId { .. })
+            | DeviceId::Blackhole(BlackholeDeviceId { .. })
             | DeviceId::PureIp(PureIpDeviceId { .. }) => None,
         }
     }
@@ -775,6 +782,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
             DeviceId::Ethernet(id) => ethernet::set_mtu(self, &id, mtu),
             DeviceId::Loopback(LoopbackDeviceId { .. }) => {}
             DeviceId::PureIp(id) => pure_ip::set_mtu(self, &id, mtu),
+            DeviceId::Blackhole(BlackholeDeviceId { .. }) => {}
         }
     }
 
@@ -881,6 +889,7 @@ pub(crate) fn get_mtu<
         DeviceId::Ethernet(id) => ethernet::get_mtu(core_ctx, &id),
         DeviceId::Loopback(id) => device_state(core_ctx, id).cast_with(|s| &s.link.mtu).copied(),
         DeviceId::PureIp(id) => pure_ip::get_mtu(core_ctx, &id),
+        DeviceId::Blackhole(_id) => Mtu::no_limit(),
     }
 }
 
@@ -901,7 +910,9 @@ fn join_link_multicast_group<
             &id,
             MulticastAddr::from(&multicast_addr),
         ),
-        DeviceId::Loopback(LoopbackDeviceId { .. }) | DeviceId::PureIp(PureIpDeviceId { .. }) => {}
+        DeviceId::Loopback(LoopbackDeviceId { .. })
+        | DeviceId::PureIp(PureIpDeviceId { .. })
+        | DeviceId::Blackhole(BlackholeDeviceId { .. }) => {}
     }
 }
 
@@ -922,7 +933,9 @@ fn leave_link_multicast_group<
             &id,
             MulticastAddr::from(&multicast_addr),
         ),
-        DeviceId::Loopback(LoopbackDeviceId { .. }) | DeviceId::PureIp(PureIpDeviceId { .. }) => {}
+        DeviceId::Loopback(LoopbackDeviceId { .. })
+        | DeviceId::PureIp(PureIpDeviceId { .. })
+        | DeviceId::Blackhole(BlackholeDeviceId { .. }) => {}
     }
 }
 
@@ -931,7 +944,7 @@ fn send_ip_frame<BC, S, I, L>(
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
     destination: IpPacketDestination<I, &DeviceId<BC>>,
-    ip_layer_metadata: DeviceIpLayerMetadata,
+    ip_layer_metadata: DeviceIpLayerMetadata<BC>,
     body: S,
 ) -> Result<(), SendFrameError<S>>
 where
@@ -944,12 +957,17 @@ where
         + LockBefore<crate::lock_ordering::PureIpDeviceTxQueue>,
     for<'a> CoreCtx<'a, BC, L>: EthernetIpLinkDeviceDynamicStateContext<BC, DeviceId = EthernetDeviceId<BC>>
         + NudHandler<I, EthernetLinkDevice, BC>
-        + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>,
+        + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = BC::TxMetadata>,
 {
     match device {
-        DeviceId::Ethernet(id) => {
-            ethernet::send_ip_frame(core_ctx, bindings_ctx, id, destination, body)
-        }
+        DeviceId::Ethernet(id) => ethernet::send_ip_frame(
+            core_ctx,
+            bindings_ctx,
+            id,
+            destination,
+            body,
+            ip_layer_metadata.into_tx_metadata(),
+        ),
         DeviceId::Loopback(id) => loopback::send_ip_frame(
             core_ctx,
             bindings_ctx,
@@ -958,8 +976,19 @@ where
             ip_layer_metadata,
             body,
         ),
-        DeviceId::PureIp(id) => {
-            pure_ip::send_ip_frame(core_ctx, bindings_ctx, id, destination, body)
+        DeviceId::PureIp(id) => pure_ip::send_ip_frame(
+            core_ctx,
+            bindings_ctx,
+            id,
+            destination,
+            body,
+            ip_layer_metadata.into_tx_metadata(),
+        ),
+        DeviceId::Blackhole(id) => {
+            // Just drop the frame.
+            debug!("dropping frame in send_ip_frame on blackhole device {id:?}");
+            core_ctx.increment(id, DeviceCounters::send_frame::<I>);
+            Ok(())
         }
     }
 }
@@ -1176,6 +1205,25 @@ impl<'a, BC: BindingsContext, L> ResourceCounterContext<PureIpDeviceId<BC>, Pure
     ) -> O {
         cb(device_state(self, device_id)
             .unlocked_access::<crate::lock_ordering::PureIpDeviceCounters>())
+    }
+}
+
+// Blackhole devices have no device-specific counters.
+impl<'a, BC: BindingsContext, L> CounterContext<BlackholeDeviceCounters> for CoreCtx<'a, BC, L> {
+    fn with_counters<O, F: FnOnce(&BlackholeDeviceCounters) -> O>(&self, cb: F) -> O {
+        cb(&BlackholeDeviceCounters)
+    }
+}
+
+impl<'a, BC: BindingsContext, L>
+    ResourceCounterContext<BlackholeDeviceId<BC>, BlackholeDeviceCounters> for CoreCtx<'a, BC, L>
+{
+    fn with_per_resource_counters<O, F: FnOnce(&BlackholeDeviceCounters) -> O>(
+        &mut self,
+        _device_id: &BlackholeDeviceId<BC>,
+        cb: F,
+    ) -> O {
+        cb(&BlackholeDeviceCounters)
     }
 }
 

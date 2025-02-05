@@ -29,9 +29,8 @@ zx::bti ParentDeviceDFv2::GetBusTransactionInitiator() {
   return zx::bti(pdev_.GetBusTransactionInitiator()->release_handle());
 }
 
-std::unique_ptr<magma::PlatformMmio> ParentDeviceDFv2::CpuMapMmio(
-    unsigned int index, magma::PlatformMmio::CachePolicy cache_policy) {
-  return pdev_.CpuMapMmio(index, cache_policy);
+std::unique_ptr<magma::PlatformMmio> ParentDeviceDFv2::CpuMapMmio(unsigned int index) {
+  return pdev_.CpuMapMmio(index);
 }
 
 std::unique_ptr<magma::PlatformInterrupt> ParentDeviceDFv2::RegisterInterrupt(unsigned int index) {

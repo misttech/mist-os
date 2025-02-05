@@ -186,7 +186,7 @@ void F2fs::CheckIndexInPrevNodes(block_t blkaddr) {
   }
 
   // Deallocate previous index in the node page
-  vnode_refptr->TruncateHole(bidx, bidx + 1, true);
+  vnode_refptr->TruncateHole(bidx, bidx + 1);
 }
 
 void F2fs::DoRecoverData(VnodeF2fs &vnode, NodePage &page) {

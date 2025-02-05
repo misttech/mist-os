@@ -210,6 +210,9 @@ struct MemoryMappingExt : public MemoryMapping {
 
  public:
   MemoryMappingExt(const MemoryMapping &mapping) : MemoryMapping(mapping) {}
+  bool ContainsFlag(std::string_view flag) const {
+    return std::ranges::find(vm_flags, flag) != vm_flags.end();
+  }
 };
 
 // Encoder for serializing netlink messages

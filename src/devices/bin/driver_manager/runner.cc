@@ -74,9 +74,11 @@ zx::result<> Runner::Publish(component::OutgoingDirectory& outgoing) {
       bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
 }
 
-void Runner::StartDriverComponent(std::string_view moniker, std::string_view url,
-                                  std::string_view collection_name,
-                                  const std::vector<NodeOffer>& offers, StartCallback callback) {
+void Runner::StartDriverComponent(
+    std::string_view moniker, std::string_view url, std::string_view collection_name,
+    const std::vector<NodeOffer>& offers,
+    std::optional<fuchsia_component_sandbox::DictionaryRef> dictionary_ref,
+    StartCallback callback) {
   zx::event token;
   zx_status_t status = zx::event::create(0, &token);
   if (status != ZX_OK) {
@@ -103,8 +105,15 @@ void Runner::StartDriverComponent(std::string_view moniker, std::string_view url
 
   auto child_args_builder = fcomponent::wire::CreateChildArgs::Builder(arena).numbered_handles(
       fidl::VectorView<fprocess::wire::HandleInfo>::FromExternal(&handle_info, 1));
+
+  size_t offers_count;
+  if (!dictionary_ref.has_value()) {
+    offers_count = offers.size() + offer_injector_.ExtraOffersCount();
+  } else {
+    offers_count = offers.size();
+  }
+  fidl::VectorView<fdecl::wire::Offer> dynamic_offers(arena, offers_count);
   if (!offers.empty()) {
-    fidl::VectorView<fdecl::wire::Offer> dynamic_offers(arena, offers.size());
     for (size_t i = 0; i < offers.size(); i++) {
       const auto& offer = offers[i];
       zx::result get_offer_result = GetInnerOffer(offer);
@@ -115,9 +124,17 @@ void Runner::StartDriverComponent(std::string_view moniker, std::string_view url
       auto [inner_offer, _] = get_offer_result.value();
       dynamic_offers[i] = inner_offer;
     }
-
-    child_args_builder.dynamic_offers(dynamic_offers);
   }
+  if (!dictionary_ref.has_value()) {
+    offer_injector_.Inject(arena, dynamic_offers, offers.size());
+  }
+
+  child_args_builder.dynamic_offers(dynamic_offers);
+
+  if (dictionary_ref.has_value()) {
+    child_args_builder.dictionary(fidl::ToWire(arena, *std::move(dictionary_ref)));
+  }
+
   auto create_callback =
       [this, child_moniker = std::string(moniker.data()), koid = koid.value()](
           fidl::WireUnownedResult<fcomponent::Realm::CreateChild>& result) mutable {
@@ -126,8 +143,7 @@ void Runner::StartDriverComponent(std::string_view moniker, std::string_view url
           LOGF(ERROR, "Failed to create child '%s': %s", child_moniker.c_str(),
                result.FormatDescription().c_str());
           is_error = true;
-        }
-        if (result.value().is_error()) {
+        } else if (result.value().is_error()) {
           LOGF(ERROR, "Failed to create child '%s': %s", child_moniker.c_str(),
                GetErrorString(result.value().error_value()));
           is_error = true;

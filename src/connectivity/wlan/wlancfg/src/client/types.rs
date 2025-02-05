@@ -118,14 +118,14 @@ pub struct Bss {
     /// The scanning mode used to observe the BSS.
     pub observation: ScanObservation,
     /// Compatibility with this device's network stack.
-    pub compatibility: Option<wlan_common::scan::Compatibility>,
+    pub compatibility: wlan_common::scan::Compatibility,
     /// The BSS description with information that SME needs for connecting.
     pub bss_description: Sequestered<fidl_common::BssDescription>,
 }
 
 impl Bss {
     pub fn is_compatible(&self) -> bool {
-        self.compatibility.is_some()
+        self.compatibility.is_ok()
     }
 
     pub fn is_same_bssid_and_security(&self, other: &Bss) -> bool {

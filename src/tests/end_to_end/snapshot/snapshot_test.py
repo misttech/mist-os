@@ -38,28 +38,8 @@ class SnapshotPerfResults(FuchsiaPerfResults[None, None]):
     def post_action(self, _: None) -> None:
         final_path = os.path.join(self._directory.name, _SNAPSHOT_ZIP)
         with zipfile.ZipFile(final_path) as zf:
-            # IMPORTANT: the exact contents of these files should not be verified. We just
-            # want to assert that they exist and are not empty.
-            self._validate_non_empty_files(
-                zf,
-                [
-                    "annotations.json",
-                    "build.snapshot.xml",
-                    "log.system.txt",
-                    "log.kernel.txt",
-                    "metadata.json",
-                ],
-            )
             self._validate_inspect(zf)
         self._directory.cleanup()
-
-    def _validate_non_empty_files(
-        self, zf: zipfile.ZipFile, filenames: List[str]
-    ) -> None:
-        for filename in filenames:
-            with zf.open(filename) as f:
-                contents = f.read()
-                asserts.assert_greater(len(contents), 0)
 
     def _validate_inspect(self, zf: zipfile.ZipFile) -> None:
         with zf.open("inspect.json") as inspect_file:

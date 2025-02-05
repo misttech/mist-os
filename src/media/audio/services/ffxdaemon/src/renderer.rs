@@ -54,9 +54,7 @@ impl Renderer {
                     proxy.set_reference_clock(reference_clock)?;
                 }
 
-                if let Some(usage) = renderer_config.usage {
-                    proxy.set_usage(usage)?;
-                }
+                renderer_config.usage.and_then(|usage| proxy.set_usage2(usage).ok());
 
                 proxy.set_pcm_stream_type(&fmedia::AudioStreamType::from(format))?;
 
@@ -116,6 +114,9 @@ impl Renderer {
                     if min_lead_time_nsec > 0 {
                         break;
                     }
+                }
+                fmedia::AudioRendererEvent::_UnknownEvent { .. } => {
+                    todo!("AudioRenderer UnknownEvent")
                 }
             }
         }

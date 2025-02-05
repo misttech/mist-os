@@ -11,7 +11,7 @@
 use crate::range::{ContentLength, Range};
 use crate::repository::{Error, RepoProvider, RepositorySpec};
 use crate::resource::Resource;
-use crate::util::file_stream;
+use crate::util::FileStream;
 use anyhow::{anyhow, Context as _};
 use futures::future::BoxFuture;
 use futures::{AsyncRead, FutureExt as _, TryStreamExt as _};
@@ -206,7 +206,7 @@ where
 
         Ok(Resource {
             content_range: content_len.into(),
-            stream: Box::pin(file_stream(total_len, file, None)),
+            stream: Box::pin(FileStream::new(total_len, file, None)),
         })
     }
 }
@@ -386,7 +386,7 @@ mod tests {
             std::fs::create_dir(&metadata_repo_path).unwrap();
             std::fs::create_dir(&blob_repo_path).unwrap();
 
-            make_repo_dir(blob_repo_path.as_std_path(), blob_repo_path.as_std_path()).await;
+            make_repo_dir(blob_repo_path.as_std_path(), blob_repo_path.as_std_path(), None).await;
             let remote_repo =
                 FileSystemRepository::new(metadata_repo_path.clone(), blob_repo_path.clone());
 

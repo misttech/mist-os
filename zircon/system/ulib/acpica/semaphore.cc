@@ -20,7 +20,7 @@ struct AcpiSemaphore {
     sync_mutex_unlock(&mutex_);
   }
 
-  ACPI_STATUS WaitWithDeadline(uint32_t units, zx_time_t deadline) {
+  ACPI_STATUS WaitWithDeadline(uint32_t units, zx_instant_mono_t deadline) {
     zx_status_t result = sync_mutex_timedlock(&mutex_, deadline);
     if (result == ZX_ERR_TIMED_OUT) {
       return AE_TIME;
@@ -112,7 +112,7 @@ ACPI_STATUS AcpiOsWaitSemaphore(ACPI_SEMAPHORE Handle, UINT32 Units, UINT16 Time
     return AE_OK;
   }
 
-  zx_time_t deadline = zx_deadline_after(ZX_MSEC(Timeout));
+  zx_instant_mono_t deadline = zx_deadline_after(ZX_MSEC(Timeout));
   return Handle->WaitWithDeadline(Units, deadline);
 }
 

@@ -78,7 +78,7 @@ zx_status_t ClockDispatcher::Create(uint64_t options, const zx_clock_create_args
   // value.  Otherwise, the clock starts in the stopped state, and any specified
   // backstop time must simply be non-negative.
   //
-  if (((options & ZX_CLOCK_OPT_AUTO_START) && (create_args.backstop_time > current_time())) ||
+  if (((options & ZX_CLOCK_OPT_AUTO_START) && (create_args.backstop_time > current_mono_time())) ||
       (create_args.backstop_time < 0)) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -101,7 +101,8 @@ ClockDispatcher::ClockDispatcher(uint64_t options, zx_time_t backstop_time)
 
   // Compute the initial state
   if (options & ZX_CLOCK_OPT_AUTO_START) {
-    ZX_DEBUG_ASSERT(backstop_time <= current_time());  // This should have been checked by Create
+    ZX_DEBUG_ASSERT(backstop_time <=
+                    current_mono_time());  // This should have been checked by Create
     affine::Ratio ticks_to_time_ratio = timer_get_ticks_to_time_ratio();
 
     zx_ticks_t now_ticks = GetCurrentTicks();
@@ -133,7 +134,7 @@ ClockDispatcher::ClockDispatcher(uint64_t options, zx_time_t backstop_time)
 ClockDispatcher::~ClockDispatcher() { kcounter_add(dispatcher_clock_destroy_count, 1); }
 
 zx_ticks_t ClockDispatcher::GetCurrentTicks() const {
-  return is_boot() ? current_boot_ticks() : current_ticks();
+  return is_boot() ? current_boot_ticks() : current_mono_ticks();
 }
 
 zx_status_t ClockDispatcher::Read(zx_time_t* out_now) {

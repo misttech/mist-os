@@ -367,12 +367,22 @@ func fetchFromSymbolServer(ctx context.Context, mergedProfileFile string, tempDi
 	modules := []symbolize.FileCloser{}
 	files := make(chan symbolize.FileCloser)
 	malformedModules := make(chan string)
+	mu := sync.Mutex{}
+	seenModules := make(map[string]struct{})
 	s := make(chan struct{}, jobs)
 	var wg sync.WaitGroup
 	for _, entry := range *entries {
 		wg.Add(1)
 		go func(module string) {
 			defer wg.Done()
+			mu.Lock()
+			if _, ok := seenModules[module]; ok {
+				mu.Unlock()
+				logger.Debugf(ctx, "already fetched module %s", module)
+				return
+			}
+			seenModules[module] = struct{}{}
+			mu.Unlock()
 			s <- struct{}{}
 			defer func() { <-s }()
 			var file symbolize.FileCloser

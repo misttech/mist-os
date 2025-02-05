@@ -241,6 +241,34 @@ TEST(FtlTest, PartialPageWriteRecovery) {
   }
 }
 
+TEST(FtlTest, EnableNewWearLeveling) {
+  FtlShell ftl_shell;
+  auto driver_owned = std::make_unique<NdmRamDriver>(kDefaultOptions, kBoringTestOptions);
+  ASSERT_EQ(nullptr, driver_owned->Init());
+  ASSERT_TRUE(ftl_shell.InitWithDriver(std::move(driver_owned)));
+  ftl::Volume* volume = ftl_shell.volume();
+
+  ftl::VolumeImpl* volume_impl = reinterpret_cast<ftl::VolumeImpl*>(volume);
+
+  bool state;
+  volume_impl->GetNewWearLeveling(&state);
+  ASSERT_FALSE(state);
+
+  volume_impl->SetNewWearLeveling(true);
+  volume_impl->GetNewWearLeveling(&state);
+  ASSERT_TRUE(state);
+
+  // Remount to see that the status has reset.
+  volume->ReAttach();
+  volume_impl->GetNewWearLeveling(&state);
+  ASSERT_FALSE(state);
+
+  // Now enable it.
+  volume_impl->SetNewWearLeveling(true);
+  volume_impl->GetNewWearLeveling(&state);
+  ASSERT_TRUE(state);
+}
+
 // Demonstrate how ECC failures part way through a map block can lead to permanent data loss
 // due to preemptive recycling of free map pages during initialization.
 //

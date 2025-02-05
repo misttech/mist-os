@@ -36,6 +36,11 @@ closed protocol Interrupt {
     /// Physical interrupts honor the options `ZX_INTERRUPT_EDGE_LOW`, `ZX_INTERRUPT_EDGE_HIGH`,
     /// `ZX_INTERRUPT_LEVEL_LOW`, `ZX_INTERRUPT_LEVEL_HIGH`, and `ZX_INTERRUPT_REMAP_IRQ`.
     ///
+    /// Both physical and virtual interrupts honor the option `ZX_INTERRUPT_TIMESTAMP_MONO`.
+    /// An interrupt created with this option will return a monotonic timestamp from
+    /// [`zx_interrupt_wait()`], and will assume timestamps passed to [`zx_interrupt_trigger()`]
+    /// are on the monotonic timeline. By default, these timestamps operate on the boot timeline.
+    ///
     /// The handles will have `ZX_RIGHT_INSPECT`, `ZX_RIGHT_DUPLICATE`, `ZX_RIGHT_TRANSFER`
     /// (allowing them to be sent to another process via [`zx_channel_write()`]), `ZX_RIGHT_READ`,
     /// `ZX_RIGHT_WRITE` (required for [`zx_interrupt_ack()`]), `ZX_RIGHT_WAIT` (required for
@@ -209,7 +214,7 @@ closed protocol Interrupt {
     /// ```c
     /// #include <zircon/syscalls.h>
     ///
-    /// zx_status_t zx_interrupt_wait(zx_handle_t handle, zx_instant_boot_t* out_timestamp);
+    /// zx_status_t zx_interrupt_wait(zx_handle_t handle, zx_time_t* out_timestamp);
     /// ```
     ///
     /// ## Description
@@ -230,8 +235,10 @@ closed protocol Interrupt {
     /// ## Return value
     ///
     /// `zx_interrupt_wait()` returns `ZX_OK` on success, and *out_timestamp*, if
-    /// non-NULL, returns the timestamp of when the interrupt was triggered (relative
-    /// to `ZX_CLOCK_BOOT`)
+    /// non-NULL, returns the timestamp of when the interrupt was triggered. By default,
+    /// this timestamp is relative to `ZX_CLOCK_BOOT`. However, if the interrupt was
+    /// created using the `ZX_INTERRUPT_TIMESTAMP_MONO` flag, this timestamp will be
+    /// relative to `ZX_CLOCK_MONOTONIC`.
     ///
     /// ## Errors
     ///
@@ -269,7 +276,7 @@ closed protocol Interrupt {
     strict Wait(resource struct {
         handle Handle:INTERRUPT;
     }) -> (struct {
-        out_timestamp InstantBoot;
+        out_timestamp Time;
     }) error Status;
 
     // TODO(https://fxbug.dev/42107929): No DESTROY rights here.
@@ -424,7 +431,7 @@ closed protocol Interrupt {
     ///
     /// zx_status_t zx_interrupt_trigger(zx_handle_t handle,
     ///                                  uint32_t options,
-    ///                                  zx_instant_boot_t timestamp);
+    ///                                  zx_time_t timestamp);
     /// ```
     ///
     /// ## Description
@@ -434,6 +441,10 @@ closed protocol Interrupt {
     /// to a port, or [`zx_interrupt_wait()`] to return if it is waiting on this interrupt.
     ///
     /// *options* must be zero.
+    ///
+    /// *timestamp* is by default interpreted as a timestamp on `ZX_CLOCK_BOOT`. However, if
+    /// the interrupt was created with the `ZX_INTERRUPT_TIMESTAMP_MONO` option, then this
+    /// timestamp will be interpreted as a timestamp on `ZX_CLOCK_MONOTONIC`.
     ///
     /// ## Rights
     ///
@@ -478,6 +489,6 @@ closed protocol Interrupt {
     strict Trigger(resource struct {
         handle Handle:INTERRUPT;
         options uint32;
-        timestamp InstantBoot;
+        timestamp Time;
     }) -> () error Status;
 };

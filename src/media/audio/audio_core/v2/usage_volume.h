@@ -49,7 +49,7 @@ class UsageVolume : public media::audio::StreamVolume {
   ~UsageVolume();
 
   // Implements media::audio::StreamVolume.
-  fuchsia::media::Usage GetStreamUsage() const final;
+  fuchsia::media::Usage2 GetStreamUsage() const final;
   void RealizeVolume(media::audio::VolumeCommand volume_command) final;
 
   // Returns the underlying GainControls managed by this object.

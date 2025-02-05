@@ -29,10 +29,8 @@
             name: "local-mdns",
             url: "#meta/mdns.cm",
         },
-        {
-            name: "local-netstack",
-            url: "#meta/configurable-netstack.cm",
-        },
+
+        // local-netstack is provided by files that include this one.
         {
             name: "local-name-provider",
             url: "#meta/device-name-provider-local.cm",
@@ -47,10 +45,8 @@
             name: "remote-mdns",
             url: "#meta/mdns.cm",
         },
-        {
-            name: "remote-netstack",
-            url: "#meta/configurable-netstack.cm",
-        },
+
+        // remote-netstack is provided by files that include this one.
         {
             name: "remote-name-provider",
             url: "#meta/device-name-provider-remote.cm",
@@ -132,7 +128,7 @@
             to: "#remote-mdns",
         },
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            dictionary: "diagnostics",
             from: "parent",
             to: [
                 "#local-mdns",

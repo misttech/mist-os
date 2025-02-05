@@ -60,7 +60,7 @@ use {
 pub struct Features {
     pub kernel: KernelFeatures,
 
-    pub selinux: bool,
+    pub selinux: SELinuxFeature,
 
     #[cfg(not(feature = "starnix_lite"))]
     pub ashmem: bool,
@@ -72,7 +72,7 @@ pub struct Features {
     pub gralloc: bool,
 
     #[cfg(not(feature = "starnix_lite"))]
-    pub magma: bool,
+    pub magma_supported_vendors: Option<Vec<u16>>,
 
     #[cfg(not(feature = "starnix_lite"))]
     pub gfxstream: bool,
@@ -107,6 +107,15 @@ pub struct Features {
     pub nanohub: bool,
 }
 
+#[derive(Default, Debug)]
+pub struct SELinuxFeature {
+    pub enabled: bool,
+
+    /// A path to a file in the Container's package that lists all the permission checks
+    /// that are allowed to fail.
+    pub exceptions_path: Option<String>,
+}
+
 impl Features {
     pub fn record_inspect(&self, parent_node: &fuchsia_inspect::Node) {
         parent_node.record_child("features", |inspect_node| match self {
@@ -126,7 +135,7 @@ impl Features {
                 ashmem,
                 framebuffer,
                 gralloc,
-                magma,
+                magma_supported_vendors,
                 gfxstream,
                 container,
                 test_data,
@@ -140,11 +149,21 @@ impl Features {
                 network_manager,
                 nanohub,
             } => {
-                inspect_node.record_bool("selinux", *selinux);
+                inspect_node.record_bool("selinux", selinux.enabled);
                 inspect_node.record_bool("ashmem", *ashmem);
                 inspect_node.record_bool("framebuffer", *framebuffer);
                 inspect_node.record_bool("gralloc", *gralloc);
-                inspect_node.record_bool("magma", *magma);
+                inspect_node.record_string(
+                    "magma_supported_vendors",
+                    match magma_supported_vendors {
+                        Some(vendors) => vendors
+                            .iter()
+                            .map(|vendor| format!("0x{:x}", vendor))
+                            .collect::<Vec<String>>()
+                            .join(","),
+                        None => "".to_string(),
+                    },
+                );
                 inspect_node.record_bool("gfxstream", *gfxstream);
                 inspect_node.record_bool("container", *container);
                 inspect_node.record_bool("test_data", *test_data);
@@ -232,7 +251,21 @@ pub fn parse_features(
             #[cfg(not(feature = "starnix_lite"))]
             ("gralloc", _) => features.gralloc = true,
             #[cfg(not(feature = "starnix_lite"))]
-            ("magma", _) => features.magma = true,
+            ("magma", _) => if features.magma_supported_vendors.is_none() {
+                const VENDOR_ARM: u16 = 0x13B5;
+                const VENDOR_INTEL: u16 = 0x8086;
+                features.magma_supported_vendors = Some(vec![VENDOR_ARM, VENDOR_INTEL])
+            },
+            #[cfg(not(feature = "starnix_lite"))]
+            ("magma_supported_vendors", Some(arg)) => {
+                features.magma_supported_vendors = Some(
+                    arg.split(',')
+                        .map(|s| {
+                            let err = anyhow!("Feature format must be: magma_supported_vendors:0x1234[,0xabcd]");
+                            let trimmed = s.trim_start_matches("0x");
+                            u16::from_str_radix(trimmed, 16).map_err(|_| err)
+                        }).collect::<Result<Vec<u16>, Error>>()?);
+            },
             ("nanohub", _) => features.nanohub = true,
             ("network_manager", _) => features.network_manager = true,
             #[cfg(not(feature = "starnix_lite"))]
@@ -253,7 +286,9 @@ pub fn parse_features(
             }
             ("rootfs_rw", _) => features.rootfs_rw = true,
             ("self_profile", _) => features.self_profile = true,
-            ("selinux", _) => features.selinux = true,
+            ("selinux", arg) => {
+                features.selinux = SELinuxFeature { enabled: true, exceptions_path: arg };
+            }
             ("test_data", _) => features.test_data = true,
             (f, _) => {
                 return Err(anyhow!("Unsupported feature: {}", f));
@@ -373,8 +408,8 @@ pub fn run_container_features(
         gralloc_device_init(locked, system_task);
     }
     #[cfg(not(feature = "starnix_lite"))]
-    if features.magma {
-        magma_device_init(locked, system_task);
+    if let Some(supported_vendors) = &features.magma_supported_vendors {
+        magma_device_init(locked, system_task, supported_vendors.clone());
     }
     #[cfg(not(feature = "starnix_lite"))]
     if features.gfxstream {

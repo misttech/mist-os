@@ -4,10 +4,12 @@
 
 #include "src/graphics/display/drivers/intel-display/i2c/gmbus-i2c.h"
 
+#include <lib/fit/defer.h>
 #include <threads.h>
 
 #include <fbl/auto_lock.h>
 
+#include "src/graphics/display/drivers/intel-display/edid-reader.h"
 #include "src/graphics/display/drivers/intel-display/i2c/gmbus-gpio.h"
 #include "src/graphics/display/drivers/intel-display/registers-gmbus.h"
 #include "src/graphics/display/lib/driver-utils/poll-until.h"
@@ -147,92 +149,158 @@ bool GMBusI2c::SetDdcSegment(uint8_t segment_num) {
   return i2c_scl(mmio_space_, *gpio_port_, 1);
 }
 
-static constexpr size_t kMaxTransferSize = 255;
-zx_status_t GMBusI2c::I2cImplGetMaxTransferSize(uint64_t* out_size) {
-  *out_size = kMaxTransferSize;
-  return ZX_OK;
-}
-
-zx_status_t GMBusI2c::I2cImplSetBitrate(uint32_t bitrate) {
-  // no-op for now
-  return ZX_OK;
-}
-
-zx_status_t GMBusI2c::I2cImplTransact(const i2c_impl_op_t* ops, size_t size) {
+bool GMBusI2c::ProbeDisplay() {
   ZX_ASSERT(gmbus_pin_pair_.has_value());
   ZX_ASSERT(gpio_port_.has_value());
 
-  for (unsigned i = 0; i < size; i++) {
-    if (ops[i].data_size > kMaxTransferSize) {
-      return ZX_ERR_INVALID_ARGS;
-    }
-  }
-  if (!ops[size - 1].stop) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  // The GMBus register is a limited interface to the i2c bus - it doesn't support complex
-  // transactions like setting the E-DDC segment. For now, providing a special-case interface
-  // for reading the E-DDC is good enough.
   fbl::AutoLock lock(&lock_);
-  zx_status_t fail_res = ZX_ERR_IO;
-  bool gmbus_set = false;
-  for (unsigned i = 0; i < size; i++) {
-    const i2c_impl_op_t* op = ops + i;
-    if (op->address == kDdcSegmentAddress && !op->is_read && op->data_size == 1) {
-      registers::GMBusClockPortSelect::Get().FromValue(0).WriteTo(mmio_space_);
-      gmbus_set = false;
-      if (!SetDdcSegment(*static_cast<uint8_t*>(op->data_buffer))) {
-        goto fail;
-      }
-    } else if (op->address == kDdcDataAddress) {
-      if (!gmbus_set) {
-        auto gmbus_clock_port_select = registers::GMBusClockPortSelect::Get().FromValue(0);
-        gmbus_clock_port_select.SetPinPair(*gmbus_pin_pair_).WriteTo(mmio_space_);
 
-        gmbus_set = true;
-      }
+  // Clears the GMBus clock configuration before starting a DDC transaction.
+  auto gmbus_clock_port_select = registers::GMBusClockPortSelect::Get().FromValue(0);
+  gmbus_clock_port_select.WriteTo(mmio_space_);
 
-      uint8_t* buf = static_cast<uint8_t*>(op->data_buffer);
-      uint8_t len = static_cast<uint8_t>(op->data_size);
-      if (op->is_read ? GMBusRead(kDdcDataAddress, buf, len)
-                      : GMBusWrite(kDdcDataAddress, buf, len)) {
-        // Alias `mmio_space_` to aid Clang's thread safety analyzer, which
-        // can't reason about closure scopes. The type system helps ensure
-        // thread-safety, because the scope of the alias is included in the
-        // scope of the AutoLock.
-        fdf::MmioBuffer& mmio_space = *mmio_space_;
+  gmbus_clock_port_select.SetPinPair(*gmbus_pin_pair_).WriteTo(mmio_space_);
 
-        if (!display::PollUntil(
-                [&]() {
-                  return registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_waiting();
-                },
-                zx::msec(1), 10)) {
-          FDF_LOG(TRACE, "Transition to wait phase timed out");
-          goto fail;
-        }
-      } else {
-        goto fail;
-      }
+  // We disable Clang thread safety analyzer as it cannot reason about mutex
+  // usage in closures. The closure is called while `lock_` is held, so it's
+  // safe to call `I2cClearNack()`.
+  auto clear_nack_on_failure = fit::defer([this]() __TA_NO_THREAD_SAFETY_ANALYSIS {
+    if (!I2cClearNack()) {
+      FDF_LOG(TRACE, "Failed to clear nack");
+    }
+  });
+
+  uint8_t byte_read;
+  bool read_result = GMBusRead(kDdcDataAddress, &byte_read, 1);
+  if (!read_result) {
+    FDF_LOG(ERROR, "Failed to read a EDID byte from the E-DDC channel");
+    return false;
+  }
+
+  // Alias `mmio_space_` to aid Clang's thread safety analyzer, which
+  // can't reason about closure scopes. The type system helps ensure
+  // thread-safety, because the scope of the alias is included in the
+  // scope of the AutoLock.
+  fdf::MmioBuffer& mmio_space = *mmio_space_;
+
+  if (!display::PollUntil(
+          [&]() {
+            return registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_waiting();
+          },
+          zx::msec(1), 10)) {
+    FDF_LOG(ERROR, "Failed to transition GMBus Controller to wait state");
+    return false;
+  }
+
+  if (!I2cFinish()) {
+    FDF_LOG(ERROR, "Failed to finish DDC transactions");
+    return false;
+  }
+
+  clear_nack_on_failure.cancel();
+  return true;
+}
+
+zx::result<> GMBusI2c::ReadEdidBlock(int index, std::span<uint8_t, edid::kBlockSize> edid_block) {
+  ZX_DEBUG_ASSERT(index >= 0);
+  ZX_DEBUG_ASSERT(index < edid::kMaxEdidBlockCount);
+
+  ZX_ASSERT(gmbus_pin_pair_.has_value());
+  ZX_ASSERT(gpio_port_.has_value());
+
+  fbl::AutoLock lock(&lock_);
+
+  // Clears the GMBus clock configuration before starting a DDC transaction.
+  auto gmbus_clock_port_select = registers::GMBusClockPortSelect::Get().FromValue(0);
+  gmbus_clock_port_select.WriteTo(mmio_space_);
+
+  // Size of an E-DDC segment.
+  //
+  // VESA Enhanced Display Data Channel (E-DDC) Standard version 1.3 revised
+  // Dec 31 2020, Section 2.2.5 "Segment Pointer", page 18.
+  static constexpr int kEddcSegmentSize = 256;
+  static_assert(kEddcSegmentSize == edid::kBlockSize * 2);
+
+  const int segment_pointer = index / 2;
+
+  // `segment_pointer` is in [0, 127], so casting `segment_pointer` to
+  // uint8_t doesn't overflow.
+  const bool set_ddc_segment_success = SetDdcSegment(static_cast<uint8_t>(segment_pointer));
+  if (!set_ddc_segment_success) {
+    // A display device that doesn't support E-DDC returns an I2C NACK response
+    // when the host writes to the segment pointer. Thus, we ignore the NACK
+    // and perform non-segmented DDC read operations if the segment pointer is
+    // zero.
+    if (segment_pointer == 0) {
+      FDF_LOG(INFO, "E-DDC segment pointer is not supported. Will perform DDC read.");
     } else {
-      fail_res = ZX_ERR_NOT_SUPPORTED;
-      goto fail;
-    }
-
-    if (op->stop) {
-      if (!I2cFinish()) {
-        goto fail;
-      }
-      gmbus_set = false;
+      FDF_LOG(ERROR, "Failed to set DDC segment %d for block %d", segment_pointer, index);
+      return zx::error(ZX_ERR_IO);
     }
   }
 
-  return ZX_OK;
-fail:
-  if (!I2cClearNack()) {
-    FDF_LOG(TRACE, "Failed to clear nack");
+  gmbus_clock_port_select.SetPinPair(*gmbus_pin_pair_).WriteTo(mmio_space_);
+
+  // We disable the Clang thread safety analyzer as it cannot reason about mutex
+  // usage in closures. The closure is called while `lock_` is held, so it's
+  // safe to call `I2cClearNack()`.
+  auto clear_nack_on_failure = fit::defer([this]() __TA_NO_THREAD_SAFETY_ANALYSIS {
+    if (!I2cClearNack()) {
+      FDF_LOG(TRACE, "Failed to clear nack");
+    }
+  });
+
+  // Segment offset of the first byte in the current block.
+  // Its value must be 0 or 128, so casting it to uint8_t doesn't overflow.
+  const uint8_t initial_segment_offset =
+      static_cast<uint8_t>(index % 2 * static_cast<int>(edid::kBlockSize));
+  bool write_offset_result = GMBusWrite(kDdcDataAddress, &initial_segment_offset, 1);
+  if (!write_offset_result) {
+    FDF_LOG(ERROR, "Failed to write offset %d for block %d", initial_segment_offset, index);
+    return zx::error(ZX_ERR_IO);
   }
-  return fail_res;
+
+  // Alias `mmio_space_` to aid Clang's thread safety analyzer, which
+  // can't reason about closure scopes. The type system helps ensure
+  // thread-safety, because the scope of the alias is included in the
+  // scope of the AutoLock.
+  fdf::MmioBuffer& mmio_space = *mmio_space_;
+
+  if (!display::PollUntil(
+          [&]() {
+            return registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_waiting();
+          },
+          zx::msec(1), 10)) {
+    FDF_LOG(ERROR, "Failed to transition GMBus Controller to wait state");
+    return zx::error(ZX_ERR_IO);
+  }
+
+  bool read_result = GMBusRead(kDdcDataAddress, edid_block.data(), edid_block.size());
+  if (!read_result) {
+    FDF_LOG(ERROR, "Failed to read EDID block %d", index);
+    return zx::error(ZX_ERR_IO);
+  }
+
+  if (!display::PollUntil(
+          [&]() {
+            return registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_waiting();
+          },
+          zx::msec(1), 10)) {
+    FDF_LOG(ERROR, "Failed to transition GMBus Controller to wait state");
+    return zx::error(ZX_ERR_IO);
+  }
+
+  if (!I2cFinish()) {
+    FDF_LOG(ERROR, "Failed to finish DDC transactions");
+    return zx::error(ZX_ERR_IO);
+  }
+
+  clear_nack_on_failure.cancel();
+  return zx::ok();
+}
+
+zx::result<fbl::Vector<uint8_t>> GMBusI2c::ReadExtendedEdid() {
+  return intel_display::ReadExtendedEdid(fit::bind_member<&GMBusI2c::ReadEdidBlock>(this));
 }
 
 bool GMBusI2c::GMBusWrite(uint8_t addr, const uint8_t* buf, uint8_t size) {

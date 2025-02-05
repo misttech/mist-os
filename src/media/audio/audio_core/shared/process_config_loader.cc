@@ -127,6 +127,9 @@ fpromise::result<VolumeCurve, std::string> ParseVolumeCurveFromJsonObject(
 }
 
 std::optional<RenderUsage> RenderUsageFromString(std::string_view string) {
+  if (string == "accessibility" || string == "render:accessibility") {
+    return RenderUsage::ACCESSIBILITY;
+  }
   if (string == "background" || string == "render:background") {
     return RenderUsage::BACKGROUND;
   }

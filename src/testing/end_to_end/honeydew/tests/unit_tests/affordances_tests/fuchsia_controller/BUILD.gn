@@ -29,31 +29,6 @@ if (is_host) {
     extra_args = [ "-v" ]
   }
 
-  python_host_test("bluetooth_gap_fc_test") {
-    main_source = "bluetooth_gap_test.py"
-    libraries = [
-      "//src/testing/end_to_end/honeydew",
-      "//third_party/parameterized",
-    ]
-    main_callable = "unittest.main"
-    extra_args = [ "-v" ]
-  }
-  python_host_test("bluetooth_le_fc_test") {
-    main_source = "bluetooth_le_test.py"
-    libraries = [
-      "//src/testing/end_to_end/honeydew",
-      "//third_party/parameterized",
-    ]
-    main_callable = "unittest.main"
-    extra_args = [ "-v" ]
-  }
-  python_host_test("bluetooth_fidl_servers_fc_test") {
-    main_source = "bluetooth_fidl_servers_test.py"
-    libraries = [ "//src/testing/end_to_end/honeydew" ]
-    main_callable = "unittest.main"
-    extra_args = [ "-v" ]
-  }
-
   python_host_test("location_fc_test") {
     main_source = "location_test.py"
     libraries = [ "//src/testing/end_to_end/honeydew" ]
@@ -72,9 +47,6 @@ if (is_host) {
 group("tests") {
   testonly = true
   public_deps = [
-    ":bluetooth_fidl_servers_fc_test($host_toolchain)",
-    ":bluetooth_gap_fc_test($host_toolchain)",
-    ":bluetooth_le_fc_test($host_toolchain)",
     ":location_fc_test($host_toolchain)",
     ":netstack_fc_test($host_toolchain)",
     ":rtc_fc_test($host_toolchain)",

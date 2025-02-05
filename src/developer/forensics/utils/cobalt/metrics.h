@@ -64,6 +64,8 @@ enum class LastRebootReason {
   kUnknown = cobalt_registry::LastRebootUptimeMigratedMetricDimensionReason::Unknown,
   kGenericGraceful =
       cobalt_registry::LastRebootUptimeMigratedMetricDimensionReason::GenericGraceful,
+  kUnexpectedReasonGraceful =
+      cobalt_registry::LastRebootUptimeMigratedMetricDimensionReason::UnexpectedReasonGraceful,
   kGenericUngraceful =
       cobalt_registry::LastRebootUptimeMigratedMetricDimensionReason::GenericUngraceful,
   kCold = cobalt_registry::LastRebootUptimeMigratedMetricDimensionReason::Cold,
@@ -91,6 +93,8 @@ enum class LastRebootReason {
       cobalt_registry::LastRebootUptimeMigratedMetricDimensionReason::CriticalComponentFailure,
   kRootJobTermination =
       cobalt_registry::LastRebootUptimeMigratedMetricDimensionReason::RootJobTermination,
+  kNetstackMigration =
+      cobalt_registry::LastRebootUptimeMigratedMetricDimensionReason::NetstackMigration,
 };
 
 enum class PreviousBootEncodingVersion {

@@ -8,20 +8,22 @@ using zx;
 
 // A handle ID. This is the same size as an actual Zircon handle, and refers to
 // one conceptually, but internally it is not actually a Zircon handle number.
-type Hid = struct {
+type HandleId = struct {
     id uint32;
 };
 
 // A new handle ID. The ID should be a handle ID that has not been used before
 // in this session. The call this is passed to will presumably make a handle at
-// this ID, and it can be used as a `Hid` in subsequent calls.
-type NewHid = struct {
+// this ID, and it can be used as a `HandleId` in subsequent calls.
+type NewHandleId = struct {
     id uint32;
 };
 
-// A handle, and the rights that handle is known to possess.
+// A handle, and the rights that handle is known to possess. This is meant to be
+// a direct analogue to `zx_handle_info_t` as described in
+// https://fuchsia.dev/reference/syscalls/channel_read_etc
 type HandleInfo = struct {
-    handle Hid;
+    handle HandleId;
     type zx.ObjType;
     rights zx.Rights;
 };
@@ -32,27 +34,26 @@ type AioStopped = struct {
 };
 
 type Error = flexible union {
-    // An error produced by interacting with the handle itself. Value should
-    // translate to a zx.Status.
-    1: target_error int32;
+    // An error produced by interacting with the handle itself.
+    1: target_error zx.Status;
 
     // An invalid handle ID was given.
-    2: bad_hid struct {
+    2: bad_handle_id struct {
         id uint32;
     };
 
-    // We passed a `NewHid` that contained an ID with a 1 in the most
+    // We passed a `NewHandleId` that contained an ID with a 1 in the most
     // significant bit.
-    3: new_hid_out_of_range struct {
+    3: new_handle_id_out_of_range struct {
         id uint32;
     };
 
-    // We passed a `NewHid` that collides with an already-allocated handle.
-    4: new_hid_reused struct {
+    // We passed a `NewHandleId` that collides with an already-allocated handle.
+    4: new_handle_id_reused struct {
         id uint32;
 
-        // Indicates this `NewHid` did not collide before the method was called,
-        // but we passed the same `NewHid` to the method twice.
+        // Indicates this `NewHandleId` did not collide before the method was called,
+        // but we passed the same `NewHandleId` to the method twice.
         same_call bool;
     };
 
@@ -90,7 +91,7 @@ type Error = flexible union {
     // safely without knowing what they were. The signals field should contain
     // only the signals that weren't understood.
     12: signals_unknown struct {
-        signals uint32;
+        signals zx.Signals;
     };
 
     // The flexible features of this protocol allowed the client to send us
@@ -115,8 +116,8 @@ type Error = flexible union {
 // A handle, paired with an operation to perform on that handle (move or
 // duplicate).
 type HandleOp = strict union {
-    1: move Hid;
-    2: duplicate Hid;
+    1: move HandleId;
+    2: duplicate HandleId;
 };
 
 // A handle disposition. Contains a handle to be written to a channel, as well
@@ -140,50 +141,50 @@ open protocol FDomain {
     // Adds a new channel handle to this namespace which points to a
     // fuchsia.io.Directory. Can be used to "bootstrap" the FDomain.
     flexible Namespace(struct {
-        new_handle NewHid;
+        new_handle NewHandleId;
     }) -> () error Error;
 
     // Close one or more handles.
     flexible Close(struct {
-        handles vector<Hid>;
+        handles vector<HandleId>;
     }) -> () error Error;
 
     // Duplicate a handle.
     flexible Duplicate(struct {
-        handle Hid;
-        new_handle NewHid;
+        handle HandleId;
+        new_handle NewHandleId;
         rights zx.Rights;
     }) -> () error Error;
 
     // Close a handle and replace it with a new one with possibly different
     // rights.
     flexible Replace(struct {
-        handle Hid;
-        new_handle NewHid;
+        handle HandleId;
+        new_handle NewHandleId;
         rights zx.Rights;
     }) -> () error Error;
 
     // Set or clear signals on a handle.
     flexible Signal(struct {
-        handle Hid;
-        set uint32;
-        clear uint32;
+        handle HandleId;
+        set zx.Signals;
+        clear zx.Signals;
     }) -> () error Error;
 
     // Set or clear signals on a handle's peer.
     flexible SignalPeer(struct {
-        handle Hid;
-        set uint32;
-        clear uint32;
+        handle HandleId;
+        set zx.Signals;
+        clear zx.Signals;
     }) -> () error Error;
 
     // Wait for signals from the given handle. Reply will be returned when one
     // of the given signals is asserted.
     flexible WaitForSignals(struct {
-        handle Hid;
-        signals uint32;
+        handle HandleId;
+        signals zx.Signals;
     }) -> (struct {
-        signals uint32;
+        signals zx.Signals;
     }) error Error;
 
     // When a write error occurs, further write operations to that handle will
@@ -191,6 +192,6 @@ open protocol FDomain {
     // multiple writes asynchronously without transient failures affecting their
     // order.
     flexible AcknowledgeWriteError(struct {
-        handle Hid;
+        handle HandleId;
     }) -> () error Error;
 };

@@ -5,12 +5,15 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_repository_add") {
+  sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
 
   args_deps = [
-    "//src/developer/ffx/plugins/repository/serve:ffx_repository_serve",
+    "//src/developer/ffx/core:lib",
+    "//src/developer/ffx/lib/pkg:pkg",
+    "//third_party/rust_crates:argh",
     "//third_party/rust_crates:camino",
   ]
 
@@ -20,6 +23,7 @@ ffx_plugin("ffx_repository_add") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/developer/ffx/lib/pkg",
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/lib/fuchsia-url",
     "//src/sys/pkg/lib/fuchsia-repo",
     "//third_party/rust_crates:async-trait",

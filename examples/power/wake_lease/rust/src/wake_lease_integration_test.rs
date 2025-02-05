@@ -32,9 +32,6 @@ impl ActivityGovernorListener {
                         assert!(on_suspend_sender.unbounded_send(()).is_ok());
                         responder.send().context("send failed")
                     }
-                    fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
-                        responder.send().context("send failed")
-                    }
                     _ => unreachable!(),
                 }
             })
@@ -65,7 +62,7 @@ async fn wake_lease_blocks_system_suspend_until_release() -> Result<()> {
         }],
     )
     .await?;
-    let activity_lease = lease_helper.lease().await?;
+    let activity_lease = lease_helper.create_lease_and_wait_until_satisfied().await?;
     let _ = boot_control.set_boot_complete().await?;
 
     // Register a Listener on System Activity Governor to check for suspend callbacks.

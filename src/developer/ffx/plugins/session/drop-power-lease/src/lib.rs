@@ -5,8 +5,9 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use ffx_session_drop_power_lease_args::SessionDropPowerLeaseCommand;
-use fho::{moniker, user_error, FfxMain, FfxTool, SimpleWriter};
+use fho::{user_error, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_session_power::HandoffProxy;
+use target_holders::moniker;
 
 #[derive(FfxTool)]
 pub struct DropPowerLeaseTool {
@@ -46,10 +47,11 @@ pub async fn drop_power_lease_impl<W: std::io::Write>(
 mod test {
     use super::*;
     use fidl_fuchsia_session_power::HandoffRequest;
+    use target_holders::fake_proxy;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_drop_power_lease() {
-        let proxy = fho::testing::fake_proxy(|req| match req {
+        let proxy = fake_proxy(|req| match req {
             HandoffRequest::Take { responder } => {
                 let _ = responder.send(Ok(fidl::Event::create().into()));
             }

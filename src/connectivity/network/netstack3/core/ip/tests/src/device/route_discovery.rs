@@ -32,7 +32,7 @@ use netstack3_ip::device::{
 };
 use netstack3_ip::{
     self as ip, AddableEntry, AddableEntryEither, AddableMetric, Entry, IpLayerEvent, Metric,
-    IPV6_DEFAULT_SUBNET,
+    RouterAdvertisementEvent, IPV6_DEFAULT_SUBNET,
 };
 
 const ONE_SECOND: NonZeroDuration = NonZeroDuration::from_secs(1).unwrap();
@@ -103,6 +103,11 @@ fn discovered_route_to_entry(
     }
 }
 
+/// Returns a buffer containing a router advertisement IPv6 packet and a second
+/// buffer containing the NDP options encapsulating within it.
+///
+/// The latter can be used for asserting on the [`RouterAdvertisementEvent`]
+/// expected to be dispatched upon receiving this router advertisement.
 fn router_advertisement_buf(
     src_ip: LinkLocalUnicastAddr<Ipv6Addr>,
     router_lifetime_secs: u16,
@@ -110,7 +115,7 @@ fn router_advertisement_buf(
     on_link_prefix_flag: bool,
     on_link_prefix_valid_lifetime_secs: u32,
     more_specific_route: Option<(Subnet<Ipv6Addr>, u32)>,
-) -> impl BufferMut {
+) -> (impl BufferMut, impl BufferMut) {
     let src_ip: Ipv6Addr = src_ip.get();
     let dst_ip = Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get();
     let p = PrefixInformation::new(
@@ -129,31 +134,38 @@ fn router_advertisement_buf(
         ))
     });
     let options = [NdpOptionBuilder::PrefixInformation(p)];
-    let options = options.iter().chain(more_specific_route_opt.as_ref());
-    OptionSequenceBuilder::new(options)
-        .into_serializer()
-        .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
-            src_ip,
-            dst_ip,
-            IcmpZeroCode,
-            RouterAdvertisement::new(
-                0,     /* hop_limit */
-                false, /* managed_flag */
-                false, /* other_config_flag */
-                router_lifetime_secs,
-                0, /* reachable_time */
-                0, /* retransmit_timer */
-            ),
-        ))
-        .encapsulate(Ipv6PacketBuilder::new(
-            src_ip,
-            dst_ip,
-            ip::icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
-            Ipv6Proto::Icmpv6,
-        ))
-        .serialize_vec_outer()
-        .unwrap()
-        .unwrap_b()
+    let options = options.into_iter().chain(more_specific_route_opt).collect::<Vec<_>>();
+    (
+        OptionSequenceBuilder::new(options.iter())
+            .into_serializer()
+            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+                src_ip,
+                dst_ip,
+                IcmpZeroCode,
+                RouterAdvertisement::new(
+                    0,     /* hop_limit */
+                    false, /* managed_flag */
+                    false, /* other_config_flag */
+                    router_lifetime_secs,
+                    0, /* reachable_time */
+                    0, /* retransmit_timer */
+                ),
+            ))
+            .encapsulate(Ipv6PacketBuilder::new(
+                src_ip,
+                dst_ip,
+                ip::icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
+                Ipv6Proto::Icmpv6,
+            ))
+            .serialize_vec_outer()
+            .unwrap()
+            .unwrap_b(),
+        OptionSequenceBuilder::new(options.iter())
+            .into_serializer()
+            .serialize_vec_outer()
+            .unwrap()
+            .unwrap_b(),
+    )
 }
 
 // Assert internal timers in integration tests by going through the contexts
@@ -204,22 +216,34 @@ fn discovery_integration() {
     // Clear events so we can assert on route-added events later.
     let _: Vec<DispatchedEvent> = ctx.bindings_ctx.take_events();
 
+    let (ra_buf, options_buf) = buf(0, false, as_secs(ONE_SECOND).into(), 0);
     // Do nothing as router with no valid lifetime has not been discovered
     // yet and prefix does not make on-link determination.
     ctx.test_api().receive_ip_packet::<Ipv6, _>(
         &device_id,
         Some(FrameDestination::Individual { local: true }),
-        buf(0, false, as_secs(ONE_SECOND).into(), 0),
+        ra_buf,
     );
+    let ra_event1 = RouterAdvertisementEvent {
+        options_bytes: options_buf.as_ref().into(),
+        device: device_id.downgrade(),
+        source: **src_ip,
+    };
     assert_timers_integration(&mut ctx.core_ctx(), &device_id, []);
 
     // Discover a default router only as on-link prefix has no valid
     // lifetime.
+    let (ra_buf, options_buf) = buf(as_secs(ONE_SECOND), true, 0, 0);
     ctx.test_api().receive_ip_packet::<Ipv6, _>(
         &device_id,
         Some(FrameDestination::Individual { local: true }),
-        buf(as_secs(ONE_SECOND), true, 0, 0),
+        ra_buf,
     );
+    let ra_event2 = RouterAdvertisementEvent {
+        options_bytes: options_buf.as_ref().into(),
+        device: device_id.downgrade(),
+        source: **src_ip,
+    };
     let gateway_route = Ipv6DiscoveredRoute { subnet: IPV6_DEFAULT_SUBNET, gateway: Some(src_ip) };
     assert_timers_integration(
         &mut ctx.core_ctx(),
@@ -230,17 +254,27 @@ fn discovery_integration() {
     let gateway_route_entry = discovered_route_to_entry(&device_id, gateway_route);
     assert_eq!(
         ctx.bindings_ctx.take_events(),
-        [DispatchedEvent::IpLayerIpv6(IpLayerEvent::AddRoute(
-            gateway_route_entry.clone().map_device_id(|d| d.downgrade()).into(),
-        ))]
+        [
+            DispatchedEvent::RouterAdvertisement(ra_event1),
+            DispatchedEvent::IpLayerIpv6(IpLayerEvent::AddRoute(
+                gateway_route_entry.clone().map_device_id(|d| d.downgrade()).into(),
+            )),
+            DispatchedEvent::RouterAdvertisement(ra_event2),
+        ]
     );
 
     // Discover an on-link prefix and update valid lifetime for default
     // router.
+    let (ra_buf, options_buf) = buf(as_secs(TWO_SECONDS), true, as_secs(ONE_SECOND).into(), 0);
+    let ra_event3 = RouterAdvertisementEvent {
+        options_bytes: options_buf.as_ref().into(),
+        device: device_id.downgrade(),
+        source: **src_ip,
+    };
     ctx.test_api().receive_ip_packet::<Ipv6, _>(
         &device_id,
         Some(FrameDestination::Individual { local: true }),
-        buf(as_secs(TWO_SECONDS), true, as_secs(ONE_SECOND).into(), 0),
+        ra_buf,
     );
     let on_link_route = Ipv6DiscoveredRoute { subnet, gateway: None };
     let on_link_route_entry = discovered_route_to_entry(&device_id, on_link_route);
@@ -255,16 +289,26 @@ fn discovery_integration() {
     );
     assert_eq!(
         ctx.bindings_ctx.take_events(),
-        [DispatchedEvent::IpLayerIpv6(IpLayerEvent::AddRoute(
-            on_link_route_entry.clone().map_device_id(|d| d.downgrade()).into(),
-        ))]
+        [
+            DispatchedEvent::IpLayerIpv6(IpLayerEvent::AddRoute(
+                on_link_route_entry.clone().map_device_id(|d| d.downgrade()).into(),
+            )),
+            DispatchedEvent::RouterAdvertisement(ra_event3),
+        ]
     );
 
     // Discover more-specific route.
+    let (ra_buf, options_buf) =
+        buf(as_secs(TWO_SECONDS), true, as_secs(ONE_SECOND).into(), as_secs(THREE_SECONDS).into());
+    let ra_event4 = RouterAdvertisementEvent {
+        options_bytes: options_buf.as_ref().into(),
+        device: device_id.downgrade(),
+        source: **src_ip,
+    };
     ctx.test_api().receive_ip_packet::<Ipv6, _>(
         &device_id,
         Some(FrameDestination::Individual { local: true }),
-        buf(as_secs(TWO_SECONDS), true, as_secs(ONE_SECOND).into(), as_secs(THREE_SECONDS).into()),
+        ra_buf,
     );
     let more_specific_route = Ipv6DiscoveredRoute { subnet, gateway: Some(src_ip) };
     let more_specific_route_entry = discovered_route_to_entry(&device_id, more_specific_route);
@@ -280,17 +324,26 @@ fn discovery_integration() {
 
     assert_eq!(
         ctx.bindings_ctx.take_events(),
-        [DispatchedEvent::IpLayerIpv6(IpLayerEvent::AddRoute(
-            more_specific_route_entry.clone().map_device_id(|d| d.downgrade()).into(),
-        ))]
+        [
+            DispatchedEvent::IpLayerIpv6(IpLayerEvent::AddRoute(
+                more_specific_route_entry.clone().map_device_id(|d| d.downgrade()).into(),
+            )),
+            DispatchedEvent::RouterAdvertisement(ra_event4),
+        ]
     );
 
     // Invalidate default router and more specific route, and update valid
     // lifetime for on-link prefix.
+    let (ra_buf, options_buf) = buf(0, true, as_secs(TWO_SECONDS).into(), 0);
+    let ra_event5 = RouterAdvertisementEvent {
+        options_bytes: options_buf.as_ref().into(),
+        device: device_id.downgrade(),
+        source: **src_ip,
+    };
     ctx.test_api().receive_ip_packet::<Ipv6, _>(
         &device_id,
         Some(FrameDestination::Individual { local: true }),
-        buf(0, true, as_secs(TWO_SECONDS).into(), 0),
+        ra_buf,
     );
     assert_timers_integration(
         &mut ctx.core_ctx(),
@@ -303,41 +356,57 @@ fn discovery_integration() {
         let ip::Entry { subnet, device, gateway, metric: _ } = more_specific_route_entry;
         let event2 = IpLayerEvent::RemoveRoutes { subnet, device: device.downgrade(), gateway };
         let events = ctx.bindings_ctx.take_events();
-        assert_eq!(events.len(), 2);
+        assert_eq!(events.len(), 3);
         assert!(events.contains(&DispatchedEvent::IpLayerIpv6(event1)));
         assert!(events.contains(&DispatchedEvent::IpLayerIpv6(event2)));
+        assert!(events.contains(&DispatchedEvent::RouterAdvertisement(ra_event5)));
     }
 
     // Do nothing as prefix does not make on-link determination and router
     // with valid lifetime is not discovered.
+    let (ra_buf, options_buf) = buf(0, false, 0, 0);
+    let ra_event6 = RouterAdvertisementEvent {
+        options_bytes: options_buf.as_ref().into(),
+        device: device_id.downgrade(),
+        source: **src_ip,
+    };
     ctx.test_api().receive_ip_packet::<Ipv6, _>(
         &device_id,
         Some(FrameDestination::Individual { local: true }),
-        buf(0, false, 0, 0),
+        ra_buf,
     );
     assert_timers_integration(
         &mut ctx.core_ctx(),
         &device_id,
         [(on_link_route, FakeInstant::from(TWO_SECONDS.get()))],
     );
-    assert_eq!(ctx.bindings_ctx.take_events(), []);
+    assert_eq!(ctx.bindings_ctx.take_events(), [DispatchedEvent::RouterAdvertisement(ra_event6)]);
 
     // Invalidate on-link prefix.
+    let (ra_buf, options_buf) = buf(0, true, 0, 0);
+    let ra_event7 = RouterAdvertisementEvent {
+        options_bytes: options_buf.as_ref().into(),
+        device: device_id.downgrade(),
+        source: **src_ip,
+    };
     ctx.test_api().receive_ip_packet::<Ipv6, _>(
         &device_id,
         Some(FrameDestination::Individual { local: true }),
-        buf(0, true, 0, 0),
+        ra_buf,
     );
     assert_timers_integration(&mut ctx.core_ctx(), &device_id, []);
     {
         let ip::Entry { subnet, device, gateway, metric: _ } = on_link_route_entry;
         assert_eq!(
             ctx.bindings_ctx.take_events(),
-            [DispatchedEvent::IpLayerIpv6(IpLayerEvent::RemoveRoutes {
-                subnet,
-                device: device.downgrade(),
-                gateway
-            }),]
+            [
+                DispatchedEvent::IpLayerIpv6(IpLayerEvent::RemoveRoutes {
+                    subnet,
+                    device: device.downgrade(),
+                    gateway
+                }),
+                DispatchedEvent::RouterAdvertisement(ra_event7),
+            ]
         );
     }
 }
@@ -377,10 +446,16 @@ fn discovery_integration_infinite_to_finite_to_infinite_lifetime() {
     // lifetime.
     let router_lifetime_secs = u16::MAX;
     let prefix_lifetime_secs = u32::MAX;
+    let (ra_buf, options_buf) = buf(router_lifetime_secs, true, prefix_lifetime_secs);
+    let ra_event1 = RouterAdvertisementEvent {
+        options_bytes: options_buf.as_ref().into(),
+        device: device_id.downgrade(),
+        source: **src_ip,
+    };
     ctx.test_api().receive_ip_packet::<Ipv6, _>(
         &device_id,
         Some(FrameDestination::Individual { local: true }),
-        buf(router_lifetime_secs, true, prefix_lifetime_secs),
+        ra_buf,
     );
     assert_timers_integration(
         &mut ctx.core_ctx(),
@@ -396,16 +471,24 @@ fn discovery_integration_infinite_to_finite_to_infinite_lifetime() {
             DispatchedEvent::IpLayerIpv6(IpLayerEvent::AddRoute(
                 on_link_route_entry.clone().map_device_id(|d| d.downgrade()).into(),
             )),
+            DispatchedEvent::RouterAdvertisement(ra_event1),
         ]
     );
 
     // Router and prefix with finite lifetimes.
     let router_lifetime_secs = u16::MAX - 1;
     let prefix_lifetime_secs = u32::MAX - 1;
+    let (ra_buf, options_buf) = buf(router_lifetime_secs, true, prefix_lifetime_secs);
+    let ra_event2 = RouterAdvertisementEvent {
+        options_bytes: options_buf.as_ref().into(),
+        device: device_id.downgrade(),
+        source: **src_ip,
+    };
+
     ctx.test_api().receive_ip_packet::<Ipv6, _>(
         &device_id,
         Some(FrameDestination::Individual { local: true }),
-        buf(router_lifetime_secs, true, prefix_lifetime_secs),
+        ra_buf,
     );
     assert_timers_integration(
         &mut ctx.core_ctx(),
@@ -415,31 +498,43 @@ fn discovery_integration_infinite_to_finite_to_infinite_lifetime() {
             (on_link_route, FakeInstant::from(Duration::from_secs(prefix_lifetime_secs.into()))),
         ],
     );
-    assert_eq!(ctx.bindings_ctx.take_events(), []);
+    assert_eq!(ctx.bindings_ctx.take_events(), [DispatchedEvent::RouterAdvertisement(ra_event2)]);
 
     // Router with finite lifetime and on-link prefix with infinite
     // lifetime.
     let router_lifetime_secs = u16::MAX;
     let prefix_lifetime_secs = u32::MAX;
+    let (ra_buf, options_buf) = buf(router_lifetime_secs, true, prefix_lifetime_secs);
+    let ra_event3 = RouterAdvertisementEvent {
+        options_bytes: options_buf.as_ref().into(),
+        device: device_id.downgrade(),
+        source: **src_ip,
+    };
     ctx.test_api().receive_ip_packet::<Ipv6, _>(
         &device_id,
         Some(FrameDestination::Individual { local: true }),
-        buf(router_lifetime_secs, true, prefix_lifetime_secs),
+        ra_buf,
     );
     assert_timers_integration(
         &mut ctx.core_ctx(),
         &device_id,
         [(gateway_route, FakeInstant::from(Duration::from_secs(router_lifetime_secs.into())))],
     );
-    assert_eq!(ctx.bindings_ctx.take_events(), []);
+    assert_eq!(ctx.bindings_ctx.take_events(), [DispatchedEvent::RouterAdvertisement(ra_event3)]);
 
     // Router and prefix invalidated.
     let router_lifetime_secs = 0;
     let prefix_lifetime_secs = 0;
+    let (ra_buf, options_buf) = buf(router_lifetime_secs, true, prefix_lifetime_secs);
+    let ra_event4 = RouterAdvertisementEvent {
+        options_bytes: options_buf.as_ref().into(),
+        device: device_id.downgrade(),
+        source: **src_ip,
+    };
     ctx.test_api().receive_ip_packet::<Ipv6, _>(
         &device_id,
         Some(FrameDestination::Individual { local: true }),
-        buf(router_lifetime_secs, true, prefix_lifetime_secs),
+        ra_buf,
     );
     assert_timers_integration(&mut ctx.core_ctx(), &device_id, []);
 
@@ -450,7 +545,11 @@ fn discovery_integration_infinite_to_finite_to_infinite_lifetime() {
         let event2 = IpLayerEvent::RemoveRoutes { subnet, device: device.downgrade(), gateway };
         assert_eq!(
             ctx.bindings_ctx.take_events(),
-            [DispatchedEvent::IpLayerIpv6(event1), DispatchedEvent::IpLayerIpv6(event2)]
+            [
+                DispatchedEvent::IpLayerIpv6(event1),
+                DispatchedEvent::IpLayerIpv6(event2),
+                DispatchedEvent::RouterAdvertisement(ra_event4)
+            ]
         );
     }
 }
@@ -474,17 +573,24 @@ fn flush_routes_on_interface_disabled_integration() {
     let _: Vec<DispatchedEvent> = ctx.bindings_ctx.take_events();
 
     // Discover both an on-link prefix and default router.
+    let (ra_buf, options_buf) = router_advertisement_buf(
+        src_ip,
+        as_secs(TWO_SECONDS),
+        subnet,
+        true,
+        as_secs(ONE_SECOND).into(),
+        None,
+    );
+    let ra_event = RouterAdvertisementEvent {
+        options_bytes: options_buf.as_ref().into(),
+        device: device_id.downgrade(),
+        source: **src_ip,
+    };
+
     ctx.test_api().receive_ip_packet::<Ipv6, _>(
         &device_id,
         Some(FrameDestination::Individual { local: true }),
-        router_advertisement_buf(
-            src_ip,
-            as_secs(TWO_SECONDS),
-            subnet,
-            true,
-            as_secs(ONE_SECOND).into(),
-            None,
-        ),
+        ra_buf,
     );
     assert_timers_integration(
         &mut ctx.core_ctx(),
@@ -503,6 +609,7 @@ fn flush_routes_on_interface_disabled_integration() {
             DispatchedEvent::IpLayerIpv6(IpLayerEvent::AddRoute(
                 on_link_route_entry.clone().map_device_id(|d| d.downgrade()).into(),
             )),
+            DispatchedEvent::RouterAdvertisement(ra_event),
         ]
     );
 

@@ -188,6 +188,10 @@ def _filter_local_command(args: Iterable[str]) -> list[str]:
     return list(cl_utils.strip_option_prefix(args, "--local-only"))
 
 
+def _remove_remote_command(args: Iterable[str]) -> list[str]:
+    return list(a for a in args if not a.startswith("--remote-only"))
+
+
 class RustRemoteAction(object):
     def __init__(
         self,
@@ -471,8 +475,10 @@ class RustRemoteAction(object):
         command, aux_files = self._rust_action.dep_only_command_with_rspfiles(
             str(self.local_depfile)
         )
+        local_filtered = _filter_local_command(command)
+        remote_removed = _remove_remote_command(local_filtered)
         return (
-            cl_utils.auto_env_prefix_command(_filter_local_command(command)),
+            cl_utils.auto_env_prefix_command(remote_removed),
             aux_files,
         )
 
@@ -509,6 +515,11 @@ class RustRemoteAction(object):
             ):
                 yield tok
                 yield f"-Clink-arg=--ld-path={self.remote_ld_path}"
+                continue
+
+            remote_only_prefix = "--remote-only="
+            if tok.startswith(remote_only_prefix):
+                yield tok.removeprefix(remote_only_prefix)
                 continue
 
             # else
@@ -1046,7 +1057,7 @@ class RustRemoteAction(object):
         # or any of the remote action features.
         export_dir = self.miscomparison_export_dir
         command = cl_utils.auto_env_prefix_command(
-            _filter_local_command(self.original_command)
+            _remove_remote_command(_filter_local_command(self.original_command))
         )
         if self.check_determinism:
             self.vmsg("Comparing two local runs of the original command.")

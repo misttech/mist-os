@@ -447,12 +447,13 @@ mod tests {
     use assembly_util::write_json_file;
     use fuchsia_archive::Utf8Reader;
     use fuchsia_hash::HASH_SIZE;
-    use fuchsia_pkg::PackagePath;
+    use fuchsia_pkg::{MetaContents, PackagePath};
     use serde_json::json;
     use std::fs::File;
     use std::io::{BufReader, Write};
     use std::str::FromStr;
     use tempfile::{tempdir, NamedTempFile};
+    use update_package::images::{self, AssetType, VersionedImagePackagesManifest};
 
     #[test]
     fn build() {
@@ -503,33 +504,21 @@ mod tests {
 
         let file = File::open(outdir.join("images.json")).unwrap();
         let reader = BufReader::new(file);
-        let i: serde_json::Value = serde_json::from_reader(reader).unwrap();
+        let i: VersionedImagePackagesManifest = serde_json::from_reader(reader).unwrap();
+        match i {
+            VersionedImagePackagesManifest::Version1(v) => {
+                assert_eq!(v.assets.len(), 1);
+                let asset = &v.assets[0];
+                assert_eq!(asset.slot, images::Slot::Fuchsia);
+                assert_eq!(asset.type_, AssetType::Zbi);
+                assert_eq!(asset.size, 0);
 
-        assert_eq!(
-            serde_json::json!({
-                "version": "1",
-                "contents": {
-                    "partitions": [
-                            {
-                                "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                                "size": 0,
-                                "slot": "fuchsia",
-                                "type": "zbi",
-                                "url": "fuchsia-pkg://test.com/update_images_fuchsia/0?hash=5e09a4766c1db520e8a871f8301e2046dc258bfb8eb1163c5f82d524d21d5c3f#zbi",
-                            },
-                    ],
-                    "firmware":
-                            [{
-                                "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                                "size": 0,
-                                "url": "fuchsia-pkg://test.com/update_images_firmware/0?hash=97ae32f0e5edfb0688f1a8bee3cab63d3de82b6c9fdb888f050da8eab17a18b2#firmware_tpl",
-                                "type": "tpl",
-                            }],
-
-                },
-            }),
-            i
-        );
+                assert_eq!(v.firmware.len(), 1);
+                let firmware = &v.firmware[0];
+                assert_eq!(firmware.type_, "tpl".to_string());
+                assert_eq!(firmware.size, 0);
+            }
+        }
 
         let file = File::open(outdir.join("packages.json")).unwrap();
         let reader = BufReader::new(file);
@@ -551,14 +540,14 @@ mod tests {
         assert_eq!(package, br#"{"name":"update","version":"0"}"#);
         let contents = far_reader.read_file("meta/contents").unwrap();
         let contents = std::str::from_utf8(&contents).unwrap();
-        let expected_contents = "\
-            board=9c579992f6e9f8cbd4ba81af6e23b1d5741e280af60f795e9c2bbcc76c4b7065\n\
-            epoch.json=0362de83c084397826800778a1cf927280a5d5388cb1f828d77f74108726ad69\n\
-            images.json=95a71ad6b533ac0a5b5ef4effb68f10098b60664d04ee6d4b06de870d1b9edf5\n\
-            packages.json=85a3911ff39c118ee1a4be5f7a117f58a5928a559f456b6874440a7fb8c47a9a\n\
-            version=d2ff44655653e2cbbecaf89dbf33a8daa8867e41dade2c6b4f127c3f0450c96b\n\
-        "
-        .to_string();
+        let contents = MetaContents::deserialize(std::io::Cursor::new(contents)).unwrap();
+        let mut contents: Vec<String> = contents.into_contents().into_keys().collect();
+        contents.sort();
+        let expected_contents: Vec<String> =
+            vec!["board", "epoch.json", "images.json", "packages.json", "version"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
         assert_eq!(expected_contents, contents);
 
         let far_path = outdir.join("update_images_fuchsia.far");
@@ -567,10 +556,9 @@ mod tests {
         assert_eq!(package, br#"{"name":"update_images_fuchsia","version":"0"}"#);
         let contents = far_reader.read_file("meta/contents").unwrap();
         let contents = std::str::from_utf8(&contents).unwrap();
-        let expected_contents = "\
-            zbi=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
-        "
-        .to_string();
+        let contents = MetaContents::deserialize(std::io::Cursor::new(contents)).unwrap();
+        let contents: Vec<String> = contents.into_contents().into_keys().collect();
+        let expected_contents: Vec<String> = vec!["zbi".to_string()];
         assert_eq!(expected_contents, contents);
 
         let far_path = outdir.join("update_images_recovery.far");
@@ -590,10 +578,9 @@ mod tests {
         assert_eq!(package, br#"{"name":"update_images_firmware","version":"0"}"#);
         let contents = far_reader.read_file("meta/contents").unwrap();
         let contents = std::str::from_utf8(&contents).unwrap();
-        let expected_contents = "\
-            firmware_tpl=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
-        "
-        .to_string();
+        let contents = MetaContents::deserialize(std::io::Cursor::new(contents)).unwrap();
+        let contents: Vec<String> = contents.into_contents().into_keys().collect();
+        let expected_contents = vec!["firmware_tpl".to_string()];
         assert_eq!(expected_contents, contents);
 
         // Ensure the expected package fars/manifests were generated.
@@ -673,62 +660,36 @@ mod tests {
         builder.set_repository(RepositoryUrl::parse_host("test.com".to_string()).unwrap());
         let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
         let update_package = builder.build(tool_provider).unwrap();
-        assert_eq!(
-            update_package.merkle,
-            "c467965e232bc9aa1bfe3ab20a46c19602848484b817443b1181095f1e3932bd".parse().unwrap()
-        );
         assert_eq!(update_package.package_manifests.len(), 4);
 
         let file = File::open(outdir.join("images.json")).unwrap();
         let reader = BufReader::new(file);
-        let i: serde_json::Value = serde_json::from_reader(reader).unwrap();
-        assert_eq!(
-            serde_json::json!({
-                "version": "1",
-                "contents": {
-                    "partitions": [
-                            {
-                                "type": "zbi",
-                                "slot": "fuchsia",
-                                "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                                "size": 0,
-                                "url": "fuchsia-pkg://test.com/update_images_fuchsia/0?hash=5e09a4766c1db520e8a871f8301e2046dc258bfb8eb1163c5f82d524d21d5c3f#zbi",
-                            },
-                            {
-                                "type": "zbi",
-                                "slot": "recovery",
-                                "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                                "size": 0,
-                                "url": "fuchsia-pkg://test.com/update_images_recovery/0?hash=0717335a7ccc00223d1f6b443cac36539dbf477f36abfbd4ac00623a6f587a47#zbi",
+        let i: VersionedImagePackagesManifest = serde_json::from_reader(reader).unwrap();
+        match i {
+            VersionedImagePackagesManifest::Version1(v) => {
+                assert_eq!(v.assets.len(), 3);
+                let asset = &v.assets[0];
+                assert_eq!(asset.slot, images::Slot::Fuchsia);
+                assert_eq!(asset.type_, AssetType::Zbi);
+                assert_eq!(asset.size, 0);
+                let asset = &v.assets[1];
+                assert_eq!(asset.slot, images::Slot::Recovery);
+                assert_eq!(asset.type_, AssetType::Zbi);
+                assert_eq!(asset.size, 0);
+                let asset = &v.assets[2];
+                assert_eq!(asset.slot, images::Slot::Recovery);
+                assert_eq!(asset.type_, AssetType::Vbmeta);
+                assert_eq!(asset.size, 0);
 
-                            },
-                            {
-                                "type": "vbmeta",
-                                "slot": "recovery",
-                                "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                                "size": 0,
-                                "url": "fuchsia-pkg://test.com/update_images_recovery/0?hash=0717335a7ccc00223d1f6b443cac36539dbf477f36abfbd4ac00623a6f587a47#vbmeta",
-
-                            },
-                    ],
-                    "firmware": [
-                            {
-                                "type" : "dtbo",
-                                "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                                "size": 0,
-                                "url": "fuchsia-pkg://test.com/update_images_firmware/0?hash=7a96bbeb770fe8b25d6337b7403ef752b87291f570731c6f5199af4c22e1fea1#dtbo",
-                            },
-                            {
-                                "type" : "tpl",
-                                "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                                "size": 0,
-                                "url": "fuchsia-pkg://test.com/update_images_firmware/0?hash=7a96bbeb770fe8b25d6337b7403ef752b87291f570731c6f5199af4c22e1fea1#firmware_tpl",
-                            },
-                    ],
-                },
-            }),
-            i
-        );
+                assert_eq!(v.firmware.len(), 2);
+                let firmware = &v.firmware[0];
+                assert_eq!(firmware.type_, "dtbo".to_string());
+                assert_eq!(firmware.size, 0);
+                let firmware = &v.firmware[1];
+                assert_eq!(firmware.type_, "tpl".to_string());
+                assert_eq!(firmware.size, 0);
+            }
+        }
 
         let file = File::open(outdir.join("packages.json")).unwrap();
         let reader = BufReader::new(file);
@@ -750,14 +711,14 @@ mod tests {
         assert_eq!(package, br#"{"name":"update","version":"0"}"#);
         let contents = far_reader.read_file("meta/contents").unwrap();
         let contents = std::str::from_utf8(&contents).unwrap();
-        let expected_contents = "\
-            board=9c579992f6e9f8cbd4ba81af6e23b1d5741e280af60f795e9c2bbcc76c4b7065\n\
-            epoch.json=0362de83c084397826800778a1cf927280a5d5388cb1f828d77f74108726ad69\n\
-            images.json=a493e6aa6a5a68d2342657bac3e3a22299d13ad9ca868bac32fc6d1aac89790d\n\
-            packages.json=85a3911ff39c118ee1a4be5f7a117f58a5928a559f456b6874440a7fb8c47a9a\n\
-            version=d2ff44655653e2cbbecaf89dbf33a8daa8867e41dade2c6b4f127c3f0450c96b\n\
-        "
-        .to_string();
+        let contents = MetaContents::deserialize(std::io::Cursor::new(contents)).unwrap();
+        let mut contents: Vec<String> = contents.into_contents().into_keys().collect();
+        contents.sort();
+        let expected_contents: Vec<String> =
+            vec!["board", "epoch.json", "images.json", "packages.json", "version"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
         assert_eq!(expected_contents, contents);
 
         let far_path = outdir.join("update_images_fuchsia.far");
@@ -766,10 +727,9 @@ mod tests {
         assert_eq!(package, br#"{"name":"update_images_fuchsia","version":"0"}"#);
         let contents = far_reader.read_file("meta/contents").unwrap();
         let contents = std::str::from_utf8(&contents).unwrap();
-        let expected_contents = "\
-            zbi=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
-        "
-        .to_string();
+        let contents = MetaContents::deserialize(std::io::Cursor::new(contents)).unwrap();
+        let contents: Vec<String> = contents.into_contents().into_keys().collect();
+        let expected_contents = vec!["zbi".to_string()];
         assert_eq!(expected_contents, contents);
 
         let far_path = outdir.join("update_images_recovery.far");
@@ -778,11 +738,10 @@ mod tests {
         assert_eq!(package, br#"{"name":"update_images_recovery","version":"0"}"#);
         let contents = far_reader.read_file("meta/contents").unwrap();
         let contents = std::str::from_utf8(&contents).unwrap();
-        let expected_contents = "\
-            vbmeta=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
-            zbi=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
-        "
-        .to_string();
+        let contents = MetaContents::deserialize(std::io::Cursor::new(contents)).unwrap();
+        let mut contents: Vec<String> = contents.into_contents().into_keys().collect();
+        contents.sort();
+        let expected_contents = vec!["vbmeta".to_string(), "zbi".to_string()];
         assert_eq!(expected_contents, contents);
 
         let far_path = outdir.join("update_images_firmware.far");
@@ -791,11 +750,10 @@ mod tests {
         assert_eq!(package, br#"{"name":"update_images_firmware","version":"0"}"#);
         let contents = far_reader.read_file("meta/contents").unwrap();
         let contents = std::str::from_utf8(&contents).unwrap();
-        let expected_contents = "\
-            dtbo=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
-            firmware_tpl=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
-        "
-        .to_string();
+        let contents = MetaContents::deserialize(std::io::Cursor::new(contents)).unwrap();
+        let mut contents: Vec<String> = contents.into_contents().into_keys().collect();
+        contents.sort();
+        let expected_contents = vec!["dtbo".to_string(), "firmware_tpl".to_string()];
         assert_eq!(expected_contents, contents);
 
         // Ensure the expected package fars/manifests were generated.

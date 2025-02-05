@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_bluetooth::types::Channel;
-use tracing::{trace, warn};
+use log::{trace, warn};
 
 pub use crate::client::get::GetOperation;
 pub use crate::client::put::PutOperation;
@@ -38,7 +38,7 @@ pub(crate) trait SrmOperation {
     fn try_enable_srm(&mut self, headers: &mut HeaderSet) -> Result<(), Error> {
         let requested_srm = headers.try_add_srm(self.get_srm())?;
         self.set_srm(requested_srm);
-        trace!(operation = ?Self::OPERATION_TYPE, "Requesting SRM {requested_srm:?}");
+        trace!(operation:? = Self::OPERATION_TYPE; "Requesting SRM {requested_srm:?}");
         Ok(())
     }
 
@@ -51,11 +51,11 @@ pub(crate) trait SrmOperation {
             *srm
         } else {
             // No SRM indication from peer defaults to disabled.
-            trace!(operation = ?Self::OPERATION_TYPE, "Response doesn't contain SRM header");
+            trace!(operation:? = Self::OPERATION_TYPE; "Response doesn't contain SRM header");
             SingleResponseMode::Disable
         };
 
-        trace!(current_status = ?self.get_srm(), operation = ?Self::OPERATION_TYPE, "Peer responded with {srm_response:?}");
+        trace!(current_status:? = self.get_srm(), operation:? = Self::OPERATION_TYPE; "Peer responded with {srm_response:?}");
         match (srm_response, self.get_srm()) {
             (SingleResponseMode::Enable, SingleResponseMode::Disable) => {
                 warn!("SRM stays disabled");
@@ -66,7 +66,7 @@ pub(crate) trait SrmOperation {
             }
             _ => {} // Otherwise, both sides agree on the SRM status.
         }
-        trace!(status = ?self.get_srm(), operation = ?Self::OPERATION_TYPE, "SRM status");
+        trace!(status:? = self.get_srm(), operation:? = Self::OPERATION_TYPE; "SRM status");
     }
 }
 
@@ -164,7 +164,7 @@ impl ObexClient {
         // be included in all subsequent operations.
         let headers: HeaderSet = response.into();
         if let Some(Header::ConnectionId(id)) = headers.get(&HeaderIdentifier::ConnectionId) {
-            trace!(id = ?id, "Found Connection Identifier in CONNECT response");
+            trace!(id:? = id; "Found Connection Identifier in CONNECT response");
             self.set_connection_status(ConnectionStatus::Connected { id: Some(*id) });
         }
         Ok(headers)

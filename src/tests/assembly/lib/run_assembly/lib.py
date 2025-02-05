@@ -13,6 +13,7 @@ def run_product_assembly(
     input_bundles,
     legacy_bundle,
     outdir,
+    suppress_overrides_warning=False,
     extra_config=[],
     capture_output=False,
     **kwargs,
@@ -39,7 +40,7 @@ def run_product_assembly(
         "assembly_enabled=true",
         "sdk.root=" + root_build_dir,
         "sdk.type=in-tree",
-        "sdk.module=host_tools.internal",
+        "sdk.module=host_tools_used_by_ffx_action_during_build",
     ]
 
     args = [ffx_bin]
@@ -61,6 +62,9 @@ def run_product_assembly(
         "--outdir",
         outdir,
     ]
+
+    if suppress_overrides_warning:
+        args += ["--suppress-overrides-warning"]
 
     for arg_name, value in kwargs.items():
         args.append("--" + arg_name.replace("_", "-"))

@@ -165,7 +165,7 @@ class TimerQueue {
   // When the preemption timer fires, Scheduler::TimerTick is called. Set the
   // deadline to ZX_TIME_INFINITE to cancel the preemption timer.
   // Scheduler::TimerTick may be called spuriously after cancellation.
-  void PreemptReset(zx_time_t deadline);
+  void PreemptReset(zx_instant_mono_t deadline);
 
   // Returns true if the preemption deadline is set and will definitely fire in
   // the future. A false value does not definitively mean the preempt timer will
@@ -212,7 +212,7 @@ class TimerQueue {
                                                    fbl::DoublyLinkedList<Timer*>& dst_list);
 
   // A helper function for PrintTimerQueues that prints all of the timers in the given timer_list
-  // into the given buffer. Also takes in the current time, which is either a zx_time_t or a
+  // into the given buffer. Also takes in the current time, which is either a zx_instant_mono_t or a
   // zx_instant_boot_t depending on the timeline the timer_list is operating on.
   template <typename TimestampType>
   static void PrintTimerList(TimestampType now, fbl::DoublyLinkedList<Timer*>& timer_list,
@@ -227,12 +227,12 @@ class TimerQueue {
   // the platform oneshot timer.
   //
   // These can only be called when interrupts are disabled.
-  void UpdatePlatformTimerMono(zx_time_t new_deadline);
+  void UpdatePlatformTimerMono(zx_instant_mono_t new_deadline);
   void UpdatePlatformTimerBoot(zx_instant_boot_t new_deadline);
 
   // Converts the given monotonic timestamp to the raw ticks value it corresponds to.
   // Returns nullopt if the monotonic clock is paused.
-  static ktl::optional<zx_ticks_t> ConvertMonotonicTimeToRawTicks(zx_time_t mono);
+  static ktl::optional<zx_ticks_t> ConvertMonotonicTimeToRawTicks(zx_instant_mono_t mono);
 
   // Converts the given boot timestamp to the raw ticks value it corresponds to.
   static zx_ticks_t ConvertBootTimeToRawTicks(zx_instant_boot_t boot);
@@ -250,7 +250,7 @@ class TimerQueue {
   fbl::DoublyLinkedList<Timer*> boot_timer_list_ TA_GUARDED(Timer::TimerLock::Get());
 
   // This TimerQueue's preemption deadline. ZX_TIME_INFINITE means not set.
-  zx_time_t preempt_timer_deadline_ = ZX_TIME_INFINITE;
+  zx_instant_mono_t preempt_timer_deadline_ = ZX_TIME_INFINITE;
 
   // This TimerQueue's deadline for its platform timer or ZX_TIME_INFINITE if not set.
   // The deadline is stored in raw platform ticks, as that is the unit used by the

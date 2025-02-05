@@ -116,7 +116,7 @@ pub fn spawn_device_info_server(server: DeviceInfoServer, stream: DeviceRequestS
         server
             .handle_requests_from_stream(stream)
             .await
-            .unwrap_or_else(|e| tracing::error!("Failed to run device_info service: {:?}", e));
+            .unwrap_or_else(|e| log::error!("Failed to run device_info service: {:?}", e));
     })
     .detach();
 }
@@ -126,7 +126,7 @@ pub fn spawn_board_info_server(server: BoardInfoServer, stream: BoardRequestStre
         server
             .handle_requests_from_stream(stream)
             .await
-            .unwrap_or_else(|e| tracing::error!("Failed to run board_info service: {:?}", e));
+            .unwrap_or_else(|e| log::error!("Failed to run board_info service: {:?}", e));
     })
     .detach();
 }
@@ -136,7 +136,7 @@ pub fn spawn_product_info_server(server: ProductInfoServer, stream: ProductReque
         server
             .handle_requests_from_stream(stream)
             .await
-            .unwrap_or_else(|e| tracing::error!("Failed to run product_info service: {:?}", e));
+            .unwrap_or_else(|e| log::error!("Failed to run product_info service: {:?}", e));
     })
     .detach();
 }

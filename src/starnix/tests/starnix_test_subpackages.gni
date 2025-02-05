@@ -16,4 +16,5 @@ starnix_test_subpackages = [
   "//src/power/system-activity-governor:package",
   "//src/power/system-activity-governor:config-no-suspender",
   "//src/power/system-activity-governor:config-use-suspender",
+  "//src/sys/time/testing/wake-alarms:pkg",
 ]

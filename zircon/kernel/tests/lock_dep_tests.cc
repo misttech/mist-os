@@ -28,7 +28,7 @@
 #if WITH_LOCK_DEP_TESTS
 
 // Defined in kernel/lib/lockdep.
-zx_status_t TriggerAndWaitForLoopDetection(zx_time_t deadline);
+zx_status_t TriggerAndWaitForLoopDetection(zx_instant_mono_t deadline);
 
 namespace test {
 
@@ -1569,7 +1569,7 @@ static bool bug_84827_regression_test() {
 
   // Start up our work thread.  It will migrate to our first chosen core and
   // then signal us via the test args state.
-  constexpr zx_duration_t kDropLockTimeout = ZX_USEC(100);
+  constexpr zx_duration_mono_t kDropLockTimeout = ZX_USEC(100);
   Thread* work_thread = Thread::Create(
       "bug_84827_test_thread",
       [](void* ctx) -> int {
@@ -1580,7 +1580,7 @@ static bool bug_84827_regression_test() {
 
         // Enter the lock (disabling interrupts) and signal that we are waiting
         // for our secondary buddy to join us.
-        zx_time_t deadline = current_time() + kDropLockTimeout;
+        zx_instant_mono_t deadline = current_mono_time() + kDropLockTimeout;
         {  // Scope for our lock
           Guard<SpinLock, IrqSave> guard(&args.lock);
           args.state.store(TestState::WaitingForSecondaryReady);
@@ -1589,7 +1589,7 @@ static bool bug_84827_regression_test() {
           while (args.state.load() != TestState::SecondaryIsReady) {
             // If the deadline has been exceeded, attempt to back up the state
             // machine.
-            if (current_time() >= deadline) {
+            if (current_mono_time() >= deadline) {
               TestState expected = TestState::WaitingForSecondaryReady;
 
               // Try to exchange WaitingForSecondaryReady for
@@ -1604,7 +1604,7 @@ static bool bug_84827_regression_test() {
                 // reset our deadline, and go back to waiting for the secondary
                 // to join us.
                 args.state.store(TestState::WaitingForSecondaryReady);
-                deadline = current_time() + kDropLockTimeout;
+                deadline = current_mono_time() + kDropLockTimeout;
               } else {
                 // The CMPX succeeded!  We must be in the SecondaryIsReady state
                 // at this point.  Break out of our loop so we can start the
@@ -1640,7 +1640,7 @@ static bool bug_84827_regression_test() {
   // Start by turning off interrupts and joining up with our primary buddy.
   {  // Explicit scope for the RAII guard.
     InterruptDisableGuard irqd;
-    zx_time_t deadline = current_time() + kDropLockTimeout;
+    zx_instant_mono_t deadline = current_mono_time() + kDropLockTimeout;
 
     while (true) {
       // Try to advance from WaitingForSecondaryReady to SecondaryIsReady.  If
@@ -1653,11 +1653,11 @@ static bool bug_84827_regression_test() {
       // We have exceeded our deadline waiting for our primary.  Re-enable
       // interrupts briefly, allowing any pending IRQs to take place.  Then shut
       // them off again, reset our deadline, and go back to waiting.
-      if (current_time() >= deadline) {
+      if (current_mono_time() >= deadline) {
         arch_disable_ints();
         arch::Yield();
         arch_enable_ints();
-        deadline = current_time() + kDropLockTimeout;
+        deadline = current_mono_time() + kDropLockTimeout;
       }
     }
 
@@ -1696,11 +1696,13 @@ static bool bug_84827_regression_test() {
           if (args.first_cpu_mask == Thread::Current::Get()->GetCpuAffinity()) {
             bool prev_state = arch_blocking_disallowed();
             arch_set_blocking_disallowed(false);
-            { Guard<SpinLock, IrqSave> guard(&args.lock); }
+            {
+              Guard<SpinLock, IrqSave> guard(&args.lock);
+            }
             arch_set_blocking_disallowed(prev_state);
           } else {
-            zx_time_t spin_deadline = current_time() + ZX_USEC(10);
-            while (current_time() < spin_deadline) {
+            zx_instant_mono_t spin_deadline = current_mono_time() + ZX_USEC(10);
+            while (current_mono_time() < spin_deadline) {
               // empty body, just spin.
             }
             args.state.store(TestState::IPIHasBeenQueued);

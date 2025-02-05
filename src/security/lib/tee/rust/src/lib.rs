@@ -5,8 +5,8 @@
 mod tee_client_api;
 
 use self::tee_client_api::*;
+use log::error;
 use std::{mem, ptr};
-use tracing::error;
 
 use self::tee_client_api::{
     TEEC_TempMemoryReference as TeecTempMemoryReference, TEEC_Value as TeecValue,

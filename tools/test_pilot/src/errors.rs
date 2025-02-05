@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use std::io;
+use std::path::PathBuf;
 use thiserror::Error;
 
 /// Error encountered while executing test binary
@@ -22,4 +23,18 @@ pub enum TestRunError {
 
     #[error("Error writing stderr: {0:?}")]
     StderrWrite(#[source] io::Error),
+}
+
+/// Error encountered validating config
+#[derive(Debug, Error, Eq, PartialEq)]
+pub enum UsageError {
+    // TODO(b/393444515): replace 'detail' fields below with actual errors and use #[source].
+    #[error("Schema file {path} could not be opened for reading: {detail}")]
+    FailedToOpenSchema { path: PathBuf, detail: String },
+
+    #[error("Failure attempting to parse schema {path}: {detail}")]
+    FailedToParseSchema { path: PathBuf, detail: String },
+
+    #[error("Schema not well-formed: {0}")]
+    InvalidSchema(String),
 }

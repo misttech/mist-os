@@ -129,7 +129,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse",
             "nullable": false,
@@ -161,7 +160,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse",
             "nullable": false,
@@ -193,7 +191,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse",
             "nullable": false,
@@ -225,7 +222,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result",
             "nullable": false,
@@ -242,7 +238,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response",
             "nullable": false,
@@ -257,7 +252,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -286,7 +280,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result",
             "nullable": false,
@@ -303,7 +296,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response",
             "nullable": false,
@@ -318,7 +310,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -347,7 +338,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result",
             "nullable": false,
@@ -364,7 +354,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response",
             "nullable": false,
@@ -379,7 +368,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -408,7 +396,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result",
             "nullable": false,
@@ -425,7 +412,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response",
             "nullable": false,
@@ -440,7 +426,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -534,7 +519,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse",
             "nullable": false,
@@ -566,7 +550,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse",
             "nullable": false,
@@ -598,7 +581,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictTwoWayTableResponse",
             "nullable": false,
@@ -630,7 +612,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result",
             "nullable": false,
@@ -647,7 +628,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response",
             "nullable": false,
@@ -662,7 +642,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -691,7 +670,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result",
             "nullable": false,
@@ -708,7 +686,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response",
             "nullable": false,
@@ -723,7 +700,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -752,7 +728,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result",
             "nullable": false,
@@ -769,7 +744,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response",
             "nullable": false,
@@ -784,7 +758,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -813,7 +786,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result",
             "nullable": false,
@@ -830,7 +802,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response",
             "nullable": false,
@@ -845,7 +816,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -891,7 +861,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictEventFieldsRequest",
             "nullable": false,
@@ -923,7 +892,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictEventUnionRequest",
             "nullable": false,
@@ -955,7 +923,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictEventTableRequest",
             "nullable": false,
@@ -1004,7 +971,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest",
             "nullable": false,
@@ -1036,7 +1002,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolFlexibleEventUnionRequest",
             "nullable": false,
@@ -1068,7 +1033,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolFlexibleEventTableRequest",
             "nullable": false,
@@ -1181,7 +1145,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse",
             "nullable": false,
@@ -1213,7 +1176,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse",
             "nullable": false,
@@ -1245,7 +1207,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse",
             "nullable": false,
@@ -1277,7 +1238,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result",
             "nullable": false,
@@ -1294,7 +1254,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response",
             "nullable": false,
@@ -1309,7 +1268,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -1338,7 +1296,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result",
             "nullable": false,
@@ -1355,7 +1312,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response",
             "nullable": false,
@@ -1370,7 +1326,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -1399,7 +1354,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result",
             "nullable": false,
@@ -1416,7 +1370,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response",
             "nullable": false,
@@ -1431,7 +1384,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -1460,7 +1412,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result",
             "nullable": false,
@@ -1477,7 +1428,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response",
             "nullable": false,
@@ -1492,7 +1442,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -1569,7 +1518,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse",
             "nullable": false,
@@ -1601,7 +1549,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse",
             "nullable": false,
@@ -1633,7 +1580,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictTwoWayTableResponse",
             "nullable": false,
@@ -1665,7 +1611,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result",
             "nullable": false,
@@ -1682,7 +1627,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response",
             "nullable": false,
@@ -1697,7 +1641,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -1726,7 +1669,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result",
             "nullable": false,
@@ -1743,7 +1685,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response",
             "nullable": false,
@@ -1758,7 +1699,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -1787,7 +1727,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result",
             "nullable": false,
@@ -1804,7 +1743,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response",
             "nullable": false,
@@ -1819,7 +1757,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -1848,7 +1785,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result",
             "nullable": false,
@@ -1865,7 +1801,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response",
             "nullable": false,
@@ -1880,7 +1815,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -1926,7 +1860,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictEventFieldsRequest",
             "nullable": false,
@@ -1958,7 +1891,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictEventUnionRequest",
             "nullable": false,
@@ -1990,7 +1922,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictEventTableRequest",
             "nullable": false,
@@ -2120,7 +2051,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse",
             "nullable": false,
@@ -2152,7 +2082,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse",
             "nullable": false,
@@ -2184,7 +2113,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocolStrictTwoWayTableResponse",
             "nullable": false,
@@ -2216,7 +2144,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result",
             "nullable": false,
@@ -2233,7 +2160,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response",
             "nullable": false,
@@ -2248,7 +2174,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -2277,7 +2202,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result",
             "nullable": false,
@@ -2294,7 +2218,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response",
             "nullable": false,
@@ -2309,7 +2232,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -2338,7 +2260,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result",
             "nullable": false,
@@ -2355,7 +2276,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response",
             "nullable": false,
@@ -2370,7 +2290,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -2399,7 +2318,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result",
             "nullable": false,
@@ -2416,7 +2334,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response",
             "nullable": false,
@@ -2431,7 +2348,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -2460,7 +2376,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result",
             "nullable": false,
@@ -2477,7 +2392,6 @@
           "is_composed": false,
           "has_error": false,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response",
             "nullable": false,
@@ -2507,7 +2421,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result",
             "nullable": false,
@@ -2524,7 +2437,6 @@
           "is_composed": false,
           "has_error": false,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response",
             "nullable": false,
@@ -2554,7 +2466,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result",
             "nullable": false,
@@ -2571,7 +2482,6 @@
           "is_composed": false,
           "has_error": false,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response",
             "nullable": false,
@@ -2601,7 +2511,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result",
             "nullable": false,
@@ -2618,7 +2527,6 @@
           "is_composed": false,
           "has_error": false,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response",
             "nullable": false,
@@ -2648,7 +2556,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result",
             "nullable": false,
@@ -2665,7 +2572,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response",
             "nullable": false,
@@ -2680,7 +2586,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -2709,7 +2614,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result",
             "nullable": false,
@@ -2726,7 +2630,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response",
             "nullable": false,
@@ -2741,7 +2644,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -2770,7 +2672,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result",
             "nullable": false,
@@ -2787,7 +2688,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response",
             "nullable": false,
@@ -2802,7 +2702,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -2831,7 +2730,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result",
             "nullable": false,
@@ -2848,7 +2746,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response",
             "nullable": false,
@@ -2863,7 +2760,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -2957,7 +2853,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocolStrictTwoWayFieldsResponse",
             "nullable": false,
@@ -2989,7 +2884,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocolStrictTwoWayUnionResponse",
             "nullable": false,
@@ -3021,7 +2915,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocolStrictTwoWayTableResponse",
             "nullable": false,
@@ -3053,7 +2946,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_StrictTwoWayErr_Result",
             "nullable": false,
@@ -3070,7 +2962,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_StrictTwoWayErr_Response",
             "nullable": false,
@@ -3085,7 +2976,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -3114,7 +3004,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result",
             "nullable": false,
@@ -3131,7 +3020,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response",
             "nullable": false,
@@ -3146,7 +3034,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -3175,7 +3062,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result",
             "nullable": false,
@@ -3192,7 +3078,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response",
             "nullable": false,
@@ -3207,7 +3092,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -3236,7 +3120,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_StrictTwoWayTableErr_Result",
             "nullable": false,
@@ -3253,7 +3136,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_StrictTwoWayTableErr_Response",
             "nullable": false,
@@ -3268,7 +3150,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -3297,7 +3178,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWay_Result",
             "nullable": false,
@@ -3314,7 +3194,6 @@
           "is_composed": false,
           "has_error": false,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWay_Response",
             "nullable": false,
@@ -3344,7 +3223,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayFields_Result",
             "nullable": false,
@@ -3361,7 +3239,6 @@
           "is_composed": false,
           "has_error": false,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayFields_Response",
             "nullable": false,
@@ -3391,7 +3268,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result",
             "nullable": false,
@@ -3408,7 +3284,6 @@
           "is_composed": false,
           "has_error": false,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response",
             "nullable": false,
@@ -3438,7 +3313,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayTable_Result",
             "nullable": false,
@@ -3455,7 +3329,6 @@
           "is_composed": false,
           "has_error": false,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayTable_Response",
             "nullable": false,
@@ -3485,7 +3358,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayErr_Result",
             "nullable": false,
@@ -3502,7 +3374,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayErr_Response",
             "nullable": false,
@@ -3517,7 +3388,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -3546,7 +3416,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result",
             "nullable": false,
@@ -3563,7 +3432,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response",
             "nullable": false,
@@ -3578,7 +3446,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -3607,7 +3474,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result",
             "nullable": false,
@@ -3624,7 +3490,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response",
             "nullable": false,
@@ -3639,7 +3504,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -3668,7 +3532,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result",
             "nullable": false,
@@ -3685,7 +3548,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response",
             "nullable": false,
@@ -3700,7 +3562,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -3746,7 +3607,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocolStrictEventFieldsRequest",
             "nullable": false,
@@ -3778,7 +3638,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocolStrictEventUnionRequest",
             "nullable": false,
@@ -3810,7 +3669,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocolStrictEventTableRequest",
             "nullable": false,
@@ -3859,7 +3717,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocolFlexibleEventFieldsRequest",
             "nullable": false,
@@ -3891,7 +3748,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocolFlexibleEventUnionRequest",
             "nullable": false,
@@ -3923,7 +3779,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocolFlexibleEventTableRequest",
             "nullable": false,
@@ -3962,7 +3817,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -4047,7 +3901,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -4103,7 +3956,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -4159,7 +4011,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -4215,7 +4066,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -4300,7 +4150,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -4356,7 +4205,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -4441,7 +4289,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -4497,7 +4344,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -4553,7 +4399,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -4638,7 +4483,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -4694,7 +4538,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -4779,7 +4622,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -4836,7 +4678,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -4949,7 +4790,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -5005,7 +4845,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -5061,7 +4900,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -5117,7 +4955,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -5202,7 +5039,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -5259,7 +5095,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -5372,7 +5207,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -5432,7 +5266,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -5486,7 +5319,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -5539,7 +5371,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -5592,7 +5423,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -5645,7 +5475,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -5699,7 +5528,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -5752,7 +5580,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -5806,7 +5633,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -5859,7 +5685,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -5912,7 +5737,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -5966,7 +5790,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -6019,7 +5842,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -6073,7 +5895,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -6127,7 +5948,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -6181,7 +6001,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -6234,7 +6053,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -6287,7 +6105,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -6340,7 +6157,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -6394,7 +6210,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -6448,7 +6263,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -6502,7 +6316,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -6558,7 +6371,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -6612,7 +6424,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response",
             "nullable": false,
@@ -6638,7 +6449,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -6692,7 +6502,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response",
             "nullable": false,
@@ -6718,7 +6527,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -6772,7 +6580,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response",
             "nullable": false,
@@ -6798,7 +6605,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -6853,7 +6659,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -6907,7 +6712,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response",
             "nullable": false,
@@ -6933,7 +6737,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -6987,7 +6790,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -7041,7 +6843,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -7095,7 +6896,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -7149,7 +6949,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response",
             "nullable": false,
@@ -7175,7 +6974,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -7229,7 +7027,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response",
             "nullable": false,
@@ -7255,7 +7052,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -7309,7 +7105,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response",
             "nullable": false,
@@ -7335,7 +7130,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -7390,7 +7184,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -7444,7 +7237,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response",
             "nullable": false,
@@ -7470,7 +7262,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -7524,7 +7315,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -7578,7 +7368,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response",
             "nullable": false,
@@ -7604,7 +7393,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -7658,7 +7446,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response",
             "nullable": false,
@@ -7684,7 +7471,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -7738,7 +7524,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response",
             "nullable": false,
@@ -7764,7 +7549,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -7819,7 +7603,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -7873,7 +7656,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response",
             "nullable": false,
@@ -7899,7 +7681,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -7953,7 +7734,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -8007,7 +7787,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -8061,7 +7840,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response",
             "nullable": false,
@@ -8087,7 +7865,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -8141,7 +7918,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response",
             "nullable": false,
@@ -8167,7 +7943,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -8221,7 +7996,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response",
             "nullable": false,
@@ -8247,7 +8021,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -8302,7 +8075,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -8356,7 +8128,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response",
             "nullable": false,
@@ -8382,7 +8153,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -8436,7 +8206,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -8490,7 +8259,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response",
             "nullable": false,
@@ -8516,7 +8284,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -8541,7 +8308,6 @@
           "ordinal": 3,
           "name": "framework_err",
           "type": {
-            "kind": "internal",
             "kind_v2": "internal",
             "subtype": "framework_error",
             "type_shape_v2": {
@@ -8595,7 +8361,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response",
             "nullable": false,
@@ -8621,7 +8386,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -8646,7 +8410,6 @@
           "ordinal": 3,
           "name": "framework_err",
           "type": {
-            "kind": "internal",
             "kind_v2": "internal",
             "subtype": "framework_error",
             "type_shape_v2": {
@@ -8700,7 +8463,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response",
             "nullable": false,
@@ -8726,7 +8488,6 @@
           "ordinal": 3,
           "name": "framework_err",
           "type": {
-            "kind": "internal",
             "kind_v2": "internal",
             "subtype": "framework_error",
             "type_shape_v2": {
@@ -8780,7 +8541,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response",
             "nullable": false,
@@ -8806,7 +8566,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -8831,7 +8590,6 @@
           "ordinal": 3,
           "name": "framework_err",
           "type": {
-            "kind": "internal",
             "kind_v2": "internal",
             "subtype": "framework_error",
             "type_shape_v2": {
@@ -8885,7 +8643,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response",
             "nullable": false,
@@ -8911,7 +8668,6 @@
           "ordinal": 3,
           "name": "framework_err",
           "type": {
-            "kind": "internal",
             "kind_v2": "internal",
             "subtype": "framework_error",
             "type_shape_v2": {
@@ -8966,7 +8722,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -9020,7 +8775,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response",
             "nullable": false,
@@ -9046,7 +8800,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -9071,7 +8824,6 @@
           "ordinal": 3,
           "name": "framework_err",
           "type": {
-            "kind": "internal",
             "kind_v2": "internal",
             "subtype": "framework_error",
             "type_shape_v2": {
@@ -9126,7 +8878,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -9180,7 +8931,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response",
             "nullable": false,
@@ -9206,7 +8956,6 @@
           "ordinal": 3,
           "name": "framework_err",
           "type": {
-            "kind": "internal",
             "kind_v2": "internal",
             "subtype": "framework_error",
             "type_shape_v2": {
@@ -9260,7 +9009,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response",
             "nullable": false,
@@ -9286,7 +9034,6 @@
           "ordinal": 3,
           "name": "framework_err",
           "type": {
-            "kind": "internal",
             "kind_v2": "internal",
             "subtype": "framework_error",
             "type_shape_v2": {
@@ -9340,7 +9087,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response",
             "nullable": false,
@@ -9366,7 +9112,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -9420,7 +9165,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response",
             "nullable": false,
@@ -9446,7 +9190,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -9500,7 +9243,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response",
             "nullable": false,
@@ -9526,7 +9268,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -9581,7 +9322,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -9635,7 +9375,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response",
             "nullable": false,
@@ -9661,7 +9400,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -9715,7 +9453,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -9769,7 +9506,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -9823,7 +9559,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -9877,7 +9612,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayErr_Response",
             "nullable": false,
@@ -9903,7 +9637,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -9928,7 +9661,6 @@
           "ordinal": 3,
           "name": "framework_err",
           "type": {
-            "kind": "internal",
             "kind_v2": "internal",
             "subtype": "framework_error",
             "type_shape_v2": {
@@ -9982,7 +9714,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response",
             "nullable": false,
@@ -10008,7 +9739,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -10033,7 +9763,6 @@
           "ordinal": 3,
           "name": "framework_err",
           "type": {
-            "kind": "internal",
             "kind_v2": "internal",
             "subtype": "framework_error",
             "type_shape_v2": {
@@ -10087,7 +9816,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayFields_Response",
             "nullable": false,
@@ -10113,7 +9841,6 @@
           "ordinal": 3,
           "name": "framework_err",
           "type": {
-            "kind": "internal",
             "kind_v2": "internal",
             "subtype": "framework_error",
             "type_shape_v2": {
@@ -10167,7 +9894,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response",
             "nullable": false,
@@ -10193,7 +9919,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -10218,7 +9943,6 @@
           "ordinal": 3,
           "name": "framework_err",
           "type": {
-            "kind": "internal",
             "kind_v2": "internal",
             "subtype": "framework_error",
             "type_shape_v2": {
@@ -10272,7 +9996,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayTable_Response",
             "nullable": false,
@@ -10298,7 +10021,6 @@
           "ordinal": 3,
           "name": "framework_err",
           "type": {
-            "kind": "internal",
             "kind_v2": "internal",
             "subtype": "framework_error",
             "type_shape_v2": {
@@ -10353,7 +10075,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -10407,7 +10128,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response",
             "nullable": false,
@@ -10433,7 +10153,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -10458,7 +10177,6 @@
           "ordinal": 3,
           "name": "framework_err",
           "type": {
-            "kind": "internal",
             "kind_v2": "internal",
             "subtype": "framework_error",
             "type_shape_v2": {
@@ -10513,7 +10231,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -10567,7 +10284,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response",
             "nullable": false,
@@ -10593,7 +10309,6 @@
           "ordinal": 3,
           "name": "framework_err",
           "type": {
-            "kind": "internal",
             "kind_v2": "internal",
             "subtype": "framework_error",
             "type_shape_v2": {
@@ -10647,7 +10362,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWay_Response",
             "nullable": false,
@@ -10673,7 +10387,6 @@
           "ordinal": 3,
           "name": "framework_err",
           "type": {
-            "kind": "internal",
             "kind_v2": "internal",
             "subtype": "framework_error",
             "type_shape_v2": {
@@ -10727,7 +10440,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_StrictTwoWayErr_Response",
             "nullable": false,
@@ -10753,7 +10465,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -10807,7 +10518,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response",
             "nullable": false,
@@ -10833,7 +10543,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -10887,7 +10596,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_StrictTwoWayTableErr_Response",
             "nullable": false,
@@ -10913,7 +10621,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -10968,7 +10675,6 @@
           "ordinal": 1,
           "name": "some_field",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -11022,7 +10728,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response",
             "nullable": false,
@@ -11048,7 +10753,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {

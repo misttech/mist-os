@@ -20,7 +20,7 @@ async fn symbolize_fn_ptr() {
     let outputs = run_print_fn_ptr(&emu).await;
 
     info!("creating symbolizer instance...");
-    let mut symbolizer = Symbolizer::with_context(emu.env_context()).await.unwrap();
+    let mut symbolizer = Symbolizer::with_context(emu.env_context()).unwrap();
 
     info!("adding modules to symbolizer...");
     for Module { name, build_id, mappings } in outputs.modules {

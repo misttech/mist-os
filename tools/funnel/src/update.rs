@@ -73,7 +73,7 @@ mod update {
             UpdateError::CouldNotCanonicalizePath { given_path: funnel_parent.into(), source: e }
         })?);
 
-        tracing::debug!("about to run cipd command: {:?}", cipd);
+        log::debug!("about to run cipd command: {:?}", cipd);
         // Check errors
         match cipd.spawn() {
             Ok(mut cipd_process) => {

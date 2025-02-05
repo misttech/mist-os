@@ -6,6 +6,7 @@
 #define SRC_MEDIA_AUDIO_AUDIO_CORE_SHARED_TESTING_NULL_AUDIO_RENDERER_H_
 
 #include <fuchsia/media/cpp/fidl.h>
+#include <lib/syslog/cpp/macros.h>
 
 namespace media::audio::test {
 
@@ -33,7 +34,12 @@ class NullAudioRenderer : public fuchsia::media::AudioRenderer {
   void GetMinLeadTime(GetMinLeadTimeCallback callback) override {}
   void BindGainControl(::fidl::InterfaceRequest<::fuchsia::media::audio::GainControl>
                            gain_control_request) override {}
-  void SetUsage(fuchsia::media::AudioRenderUsage usage) override {}
+  void SetUsage(fuchsia::media::AudioRenderUsage _usage) override {}
+  void SetUsage2(fuchsia::media::AudioRenderUsage2 _usage) override {}
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
+    FX_LOGS(ERROR) << "NullAudioRenderer: AudioRenderer::handle_unknown_method(ordinal " << ordinal
+                   << ", method_has_response " << method_has_response << ")";
+  }
 };
 
 }  // namespace media::audio::test

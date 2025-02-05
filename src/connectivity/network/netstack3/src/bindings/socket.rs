@@ -54,6 +54,7 @@ macro_rules! respond_not_supported {
 }
 
 pub(crate) mod datagram;
+pub(crate) mod event_pair;
 pub(crate) mod packet;
 pub(crate) mod queue;
 pub(crate) mod raw;
@@ -121,7 +122,31 @@ pub(crate) async fn serve(
                 }
                 psocket::ProviderRequest::StreamSocket { domain, proto, responder } => {
                     let (client, request_stream) = create_request_stream();
-                    stream::spawn_worker(domain, proto, ctx.clone(), request_stream, &task_spawner);
+                    stream::spawn_worker(
+                        domain,
+                        proto,
+                        ctx.clone(),
+                        request_stream,
+                        &task_spawner,
+                        Default::default(),
+                    );
+                    responder.send(Ok(client)).unwrap_or_log("failed to respond");
+                }
+                psocket::ProviderRequest::StreamSocketWithOptions {
+                    domain,
+                    proto,
+                    opts,
+                    responder,
+                } => {
+                    let (client, request_stream) = create_request_stream();
+                    stream::spawn_worker(
+                        domain,
+                        proto,
+                        ctx.clone(),
+                        request_stream,
+                        &task_spawner,
+                        opts,
+                    );
                     responder.send(Ok(client)).unwrap_or_log("failed to respond");
                 }
                 psocket::ProviderRequest::DatagramSocketDeprecated { domain, proto, responder } => {
@@ -133,6 +158,7 @@ pub(crate) async fn serve(
                         request_stream,
                         SocketWorkerProperties {},
                         &task_spawner,
+                        Default::default(),
                     )
                     .map(|()| client);
                     responder.send(response).unwrap_or_log("failed to respond");
@@ -146,9 +172,33 @@ pub(crate) async fn serve(
                         request_stream,
                         SocketWorkerProperties {},
                         &task_spawner,
+                        Default::default(),
                     )
                     .map(|()| {
-                        psocket::ProviderDatagramSocketResponse::SynchronousDatagramSocket(client)
+                        use psocket::ProviderDatagramSocketResponse;
+                        ProviderDatagramSocketResponse::SynchronousDatagramSocket(client)
+                    });
+                    responder.send(response).unwrap_or_log("failed to respond");
+                }
+                psocket::ProviderRequest::DatagramSocketWithOptions {
+                    domain,
+                    proto,
+                    responder,
+                    opts,
+                } => {
+                    let (client, request_stream) = create_request_stream();
+                    let response = datagram::spawn_worker(
+                        domain,
+                        proto,
+                        ctx.clone(),
+                        request_stream,
+                        SocketWorkerProperties {},
+                        &task_spawner,
+                        opts,
+                    )
+                    .map(|()| {
+                        use psocket::ProviderDatagramSocketWithOptionsResponse;
+                        ProviderDatagramSocketWithOptionsResponse::SynchronousDatagramSocket(client)
                     });
                     responder.send(response).unwrap_or_log("failed to respond");
                 }
@@ -247,6 +297,10 @@ fn flags_for_device(info: &DeviceSpecificInfo<'_>) -> psocket::InterfaceFlags {
         DeviceSpecificInfo::Loopback(info) => info.with_dynamic_info(|common_info| {
             let FromDynamicInfo { admin_enabled } = common_info.into();
             Flags { physical_up: true, admin_enabled: admin_enabled, loopback: true }
+        }),
+        DeviceSpecificInfo::Blackhole(info) => info.with_dynamic_info(|common_info| {
+            let FromDynamicInfo { admin_enabled } = common_info.into();
+            Flags { physical_up: true, admin_enabled: admin_enabled, loopback: false }
         }),
         DeviceSpecificInfo::PureIp(info) => {
             info.with_dynamic_info(|DynamicNetdeviceInfo { common_info, phy_up }| {
@@ -584,12 +638,12 @@ impl IntoErrno for udp::SendToError {
             // NB: Mapping MTU to EMSGSIZE is different from the impl on
             // `IpSockSendError` which maps to EINVAL instead.
             Self::Send(IpSockSendError::Mtu) => Errno::Emsgsize,
-            Self::Send(IpSockSendError::IllegalLoopbackAddress) => Errno::Einval,
-            Self::Send(IpSockSendError::BroadcastNotAllowed) => Errno::Eacces,
-            Self::Send(IpSockSendError::Unroutable(err)) => err.into_errno(),
+            Self::Send(err) => err.into_errno(),
             Self::RemotePortUnset => Errno::Einval,
             Self::RemoteUnexpectedlyMapped => Errno::Enetunreach,
             Self::RemoteUnexpectedlyNonMapped => Errno::Eafnosupport,
+            Self::SendBufferFull => Errno::Eagain,
+            Self::InvalidLength => Errno::Emsgsize,
         }
     }
 }
@@ -597,9 +651,14 @@ impl IntoErrno for udp::SendToError {
 impl IntoErrno for udp::SendError {
     fn into_errno(self) -> Errno {
         match self {
+            // NB: Mapping MTU to EMSGSIZE is different from the impl on
+            // `IpSockSendError` which maps to EINVAL instead.
+            Self::IpSock(IpSockSendError::Mtu) => Errno::Emsgsize,
             Self::IpSock(err) => err.into_errno(),
             Self::NotWriteable => Errno::Epipe,
             Self::RemotePortUnset => Errno::Edestaddrreq,
+            Self::SendBufferFull => Errno::Eagain,
+            Self::InvalidLength => Errno::Emsgsize,
         }
     }
 }

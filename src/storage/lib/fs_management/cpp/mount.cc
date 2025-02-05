@@ -211,8 +211,8 @@ zx::result<MountedVolume*> StartedMultiVolumeFilesystem::CreateVolume(
   return zx::ok(&iter->second);
 }
 
-__EXPORT zx::result<> StartedMultiVolumeFilesystem::CheckVolume(std::string_view volume_name,
-                                                                zx::channel crypt_client) {
+__EXPORT zx::result<> StartedMultiVolumeFilesystem::CheckVolume(
+    std::string_view volume_name, fidl::ClientEnd<fuchsia_fxfs::Crypt> crypt_client) {
   return fs_management::CheckVolume(exposed_dir_, volume_name, std::move(crypt_client));
 }
 
@@ -294,8 +294,14 @@ zx::result<StartedSingleVolumeMultiVolumeFilesystem> MountMultiVolumeWithDefault
 
   fidl::Arena arena;
   auto mount_options = fuchsia_fs_startup::wire::MountOptions::Builder(arena);
-  if (options.crypt_client)
-    mount_options.crypt(fidl::ClientEnd<fuchsia_fxfs::Crypt>(options.crypt_client()));
+  if (options.crypt_client) {
+    zx::result crypt_client = options.crypt_client();
+    if (crypt_client.is_error()) {
+      std::cerr << "Failed to get crypt client: " << crypt_client.status_string() << "\n";
+      return crypt_client.take_error();
+    }
+    mount_options.crypt(*std::move(crypt_client));
+  }
 
   auto volume = OpenVolume(*outgoing_dir_or, volume_name, std::move(server), mount_options.Build());
 

@@ -386,15 +386,11 @@ zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
   return ZX_OK;
 }
 
-zx_status_t HdmiHost::EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count) {
-  zx::result<> i2c_transact_result = hdmi_transmitter_->I2cTransact(op_list, op_count);
-  if (i2c_transact_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to transfer EDID: %s", i2c_transact_result.status_string());
-    return i2c_transact_result.status_value();
-  }
-  return ZX_OK;
+zx::result<fbl::Vector<uint8_t>> HdmiHost::ReadExtendedEdid() {
+  // HdmiTransmitter::ReadExtendedEdid() already logs errors, so we don't need
+  // additional error logging.
+  return hdmi_transmitter_->ReadExtendedEdid();
 }
-
 namespace {
 
 // Returns true iff the display PLL and clock trees can be programmed to

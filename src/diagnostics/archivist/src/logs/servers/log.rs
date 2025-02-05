@@ -8,8 +8,8 @@ use crate::logs::repository::LogsRepository;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_diagnostics::StreamMode;
 use futures::StreamExt;
+use log::warn;
 use std::sync::Arc;
-use tracing::warn;
 use {fidl_fuchsia_logger as flogger, fuchsia_async as fasync, fuchsia_trace as ftrace};
 
 pub struct LogServer {

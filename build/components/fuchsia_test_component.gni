@@ -11,6 +11,7 @@ type_moniker_map = {
   device = "/core/testing/devices-tests"
   drm = "/core/testing/drm-tests"
   starnix = "/core/testing/starnix-tests"
+  storage = "/core/testing/storage-tests"
   system = "/core/testing/system-tests"
   system_validation = "/core/testing/system-validation-tests"
   test_arch = "/core/testing/test-arch-tests"

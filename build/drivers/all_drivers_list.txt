@@ -187,8 +187,8 @@
 //src/devices/serial/drivers/virtio-console:virtio_console-driver
 //src/devices/spi/drivers/aml-spi:aml-spi-driver
 //src/devices/spi/drivers/spi:spi-driver
-//src/devices/suspend/drivers/aml-suspend:aml-suspend-driver
-//src/devices/suspend/drivers/aml-suspend:aml-suspend-driver-with-fake-syscall
+//src/devices/suspend/drivers/generic-suspend:generic-suspend-driver
+//src/devices/suspend/drivers/generic-suspend:generic-suspend-driver-with-fake-syscall
 //src/devices/tee/drivers/optee:optee-driver
 //src/devices/temperature/drivers/aml-trip:aml-trip-driver
 //src/devices/temperature/drivers/shtv3:shtv3-driver
@@ -218,7 +218,6 @@
 //src/devices/tests/fidl-service:child-driver
 //src/devices/tests/fidl-service:parent-driver
 //src/devices/tests/isolateddevmgr:isolateddevmgr-test-driver-driver
-//src/devices/tests/mock-device:mock-device-driver
 //src/devices/tests/multibind-composite-test/drivers:root-driver
 //src/devices/tests/multibind-composite-test/drivers:spec-composite-1-driver
 //src/devices/tests/multibind-composite-test/drivers:spec-composite-2-driver
@@ -334,12 +333,14 @@
 //src/media/audio/drivers/testing/realm:dai-test-driver
 //src/media/audio/drivers/usb-audio:usb-audio-driver
 //src/media/audio/drivers/virtual_audio:virtual_audio_driver-driver
+//src/media/audio/drivers/virtual-audio-dfv2:virtual-audio-dfv2-driver
 //src/power/fake-powersource:fake_battery_driver
 //src/power/power-manager/testing/fake_driver:fake-cpu-ctrl
 //src/power/power-manager/testing/fake_driver:fake-temperature
 //src/power/power-manager/testing/fake_driver:fake-temperature2
 //src/power/power-manager/testing/fake_driver:nelson-fake-driver
 //src/power/power-manager/testing/fake_root:root_driver
+//src/power/testing/system-integration/example/test-driver:driver
 //src/storage/fvm/driver:fuchsia_driver
 //src/sys/component_manager/tests/structured_config/client_integration/cpp_driver:receiver_driver
 //src/ui/backlight/drivers/ti-lp8556:ti-lp8556-driver

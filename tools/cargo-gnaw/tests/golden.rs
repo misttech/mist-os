@@ -71,10 +71,8 @@ fn main() {
 
     #[derive(Debug, Default)]
     struct Options {
-        /// Fuchsia SDK metadata output path; relative to the base test directory.
-        sdk_metadata_path: Option<Vec<&'static str>>,
-        /// Fuchsia SDK metadata golden path; relative to the golden files directory.
-        sdk_metadata_golden_path: Option<Vec<&'static str>>,
+        /// Whether to output SDK metadata into the BUILD.gn file
+        output_sdk_metadata: bool,
         /// Extra arguments to pass to gnaw.
         extra_args: Vec<&'static str>,
     }
@@ -165,17 +163,14 @@ fn main() {
             options: Options { extra_args: vec!["--skip-root"], ..Default::default() },
         },
         TestCase {
+            manifest_path: vec!["licenses", "Cargo.toml"],
+            golden_expected_filename: vec!["licenses", "BUILD.gn"],
+            options: Default::default(),
+        },
+        TestCase {
             manifest_path: vec!["sdk_metadata", "Cargo.toml"],
             golden_expected_filename: vec!["sdk_metadata", "BUILD.gn"],
-            options: Options {
-                sdk_metadata_path: Some(vec!["sdk_metas", "sdk_metadata.sdk.meta.json"]),
-                sdk_metadata_golden_path: Some(vec![
-                    "sdk_metadata",
-                    "sdk_metas",
-                    "sdk_metadata.sdk.meta.json",
-                ]),
-                ..Default::default()
-            },
+            options: Options { output_sdk_metadata: true, ..Default::default() },
         },
         TestCase {
             manifest_path: vec!["testonly", "Cargo.toml"],
@@ -184,16 +179,11 @@ fn main() {
         },
     ];
 
-    let run_gnaw = |manifest_path: &[&str],
-                    extra_args: &[&str],
-                    sdk_metadata_path: Option<&[&str]>| {
+    let run_gnaw = |manifest_path: &[&str], extra_args: &[&str], output_sdk_metadata: bool| {
         let test_dir = tempfile::TempDir::new().unwrap();
         let mut manifest_path: PathBuf =
             test_dir.path().join(manifest_path.iter().collect::<PathBuf>());
         let output = test_dir.path().join("BUILD.gn");
-        let output_sdk_metadata = sdk_metadata_path.map(|sdk_metadata_path| {
-            test_dir.path().join(sdk_metadata_path.iter().collect::<PathBuf>())
-        });
 
         // we need the emitted file to be under the same path as the gn targets it references
         let test_base_dir = PathBuf::from(&paths.test_base_dir);
@@ -227,11 +217,8 @@ fn main() {
             // is necessary here.
             absolute_cargo_binary_path.to_str().unwrap(),
         ];
-        if let Some(output_sdk_metadata) = &output_sdk_metadata {
-            args.extend(&[
-                "--output-fuchsia-sdk-metadata",
-                output_sdk_metadata.parent().unwrap().to_str().unwrap(),
-            ]);
+        if output_sdk_metadata {
+            args.extend(&["--output-fuchsia-sdk-metadata"]);
         }
         args.extend(extra_args);
         gnaw_lib::run(&args)
@@ -239,22 +226,14 @@ fn main() {
         let output = std::fs::read_to_string(&output)
             .with_context(|| format!("while reading tempfile: {}", output.display()))
             .expect("tempfile read success");
-        let output_sdk_metadata = output_sdk_metadata
-            .as_ref()
-            .map(std::fs::read_to_string)
-            .transpose()
-            .with_context(|| {
-                format!("while reading sdk metadata: {}", output_sdk_metadata.unwrap().display())
-            })
-            .expect("sdk metadata read success");
-        Result::<_, anyhow::Error>::Ok((output, output_sdk_metadata))
+        Result::<_, anyhow::Error>::Ok(output)
     };
 
     for test in tests {
-        let (output, output_sdk_metadata) = run_gnaw(
+        let output = run_gnaw(
             &test.manifest_path,
             &test.options.extra_args,
-            test.options.sdk_metadata_path.as_deref(),
+            test.options.output_sdk_metadata,
         )
         .with_context(|| format!("\n\ttest was: {:?}", &test))
         .expect("gnaw_lib::run should succeed");
@@ -274,24 +253,6 @@ fn main() {
             &test,
             &output
         );
-
-        if let Some(output_sdk_metadata) = output_sdk_metadata {
-            let expected_sdk_metadata_path = test_base_dir.join(
-                test.options.sdk_metadata_golden_path.as_ref().unwrap().iter().collect::<PathBuf>(),
-            );
-            let expected_sdk_metadata = std::fs::read_to_string(&expected_sdk_metadata_path)
-                .with_context(|| {
-                    format!("while reading sdk metadata: {}", expected_sdk_metadata_path.display())
-                })
-                .expect("sdk metadata read success");
-            assert_eq!(
-                DisplayAsDebug(&expected_sdk_metadata),
-                DisplayAsDebug(&output_sdk_metadata),
-                "left: expected; right: actual: {:?}\n\nGenerated content:\n----------\n{}\n----------\n",
-                &test,
-                &output_sdk_metadata,
-            );
-        }
     }
 
     #[derive(Debug)]
@@ -324,7 +285,7 @@ fn main() {
         },
     ];
     for test in tests {
-        let result = run_gnaw(&test.manifest_path, &test.extra_args, None);
+        let result = run_gnaw(&test.manifest_path, &test.extra_args, false);
         let error = match result {
             Ok(_) => panic!("gnaw unexpectedly succeeded for {:?}", test),
             Err(e) => e,

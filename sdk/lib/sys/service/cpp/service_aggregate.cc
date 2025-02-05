@@ -16,7 +16,7 @@ std::vector<std::string> ServiceAggregateBase::ListInstances() const {
   std::vector<std::string> instances;
 
   fidl::InterfaceHandle<fuchsia::unknown::Cloneable> handle;
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
   zx_status_t status = dir_->Clone(handle.NewRequest());
 #else
   zx_status_t status = dir_->Clone2(handle.NewRequest());

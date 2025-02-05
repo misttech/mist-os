@@ -6,6 +6,7 @@
 
 #include <lib/magma/platform/platform_logger.h>
 #include <lib/magma/util/dlog.h>
+#include <lib/magma_service/test_util/platform_device_helper.h>
 #include <lib/magma_service/test_util/platform_msd_device_helper.h>
 
 #include <gtest/gtest.h>
@@ -17,6 +18,10 @@ ParentDevice* test_device_s;
 }  // namespace
 
 msd::DeviceHandle* GetTestDeviceHandle() { return test_device_s->ToDeviceHandle(); }
+
+magma::PlatformDevice* TestPlatformDevice::GetInstance() {
+  return test_device_s->GetPlatformDevice();
+}
 
 zx_status_t magma_indriver_test(ParentDevice* device) {
   DLOG("running magma unit tests");
@@ -40,5 +45,6 @@ zx_status_t magma_indriver_test(ParentDevice* device) {
 // Should never happen.
 extern "C" void _Exit(int value) {
   fprintf(stderr, "GTEST called _Exit\n");
-  while (true) {}
+  while (true) {
+  }
 }

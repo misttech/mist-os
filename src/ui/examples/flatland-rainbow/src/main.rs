@@ -25,8 +25,8 @@ use fuchsia_scenic::ViewRefPair;
 use futures::channel::mpsc::{unbounded, UnboundedSender};
 use futures::prelude::*;
 use internal_message::*;
+use log::{error, info, warn};
 use std::ops::DerefMut;
-use tracing::{error, info, warn};
 use {
     fidl_fuchsia_element as felement, fidl_fuchsia_math as fmath, fidl_fuchsia_ui_app as fapp,
     fidl_fuchsia_ui_composition as fland, fidl_fuchsia_ui_pointer as fptr,
@@ -513,14 +513,14 @@ async fn main() {
                   InternalMessage::TouchEvent{timestamp, interaction: _, phase, position_in_viewport } => {
                     info!(
                         x = position_in_viewport[0], y = position_in_viewport[1], time = timestamp,
-                        ?phase, "Received TouchEvent"
+                        phase:?; "Received TouchEvent"
                     );
                   },
                   InternalMessage::MouseEvent{ timestamp, trace_flow_id: _, position_in_viewport,
                     scroll_v: _, scroll_h: _, pressed_buttons} => {
                     info!(
                         time = timestamp, x = position_in_viewport[0],
-                        y = position_in_viewport[1], buttons = ?pressed_buttons,
+                        y = position_in_viewport[1], buttons:? = pressed_buttons;
                         "Received MouseEvent"
                     );
                   },

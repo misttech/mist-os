@@ -9,7 +9,7 @@ use state::*;
 use crate::ap::event::{ClientEvent, Event};
 use crate::ap::{aid, Context, MlmeRequest, RsnCfg};
 use ieee80211::{MacAddr, MacAddrBytes};
-use tracing::error;
+use log::error;
 use wlan_common::ie::SupportedRate;
 use wlan_common::mac::{Aid, CapabilityInfo};
 use wlan_common::timer::EventId;
@@ -28,13 +28,17 @@ impl RemoteClient {
     }
 
     pub fn aid(&self) -> Option<Aid> {
-        // Safe: |state| is never None.
-        self.state.as_ref().unwrap().aid()
+        // Safe: |state| is never None and always replaced with Some(..).
+        #[expect(clippy::unwrap_used)]
+        let aid = self.state.as_ref().unwrap().aid();
+        aid
     }
 
     pub fn authenticated(&self) -> bool {
-        // Safe: |state| is never None.
-        self.state.as_ref().unwrap().authenticated()
+        // Safe: |state| is never None and always replaced with Some(..).
+        #[expect(clippy::unwrap_used)]
+        let authenticated = self.state.as_ref().unwrap().authenticated();
+        authenticated
     }
 
     pub fn associated(&self) -> bool {
@@ -47,7 +51,7 @@ impl RemoteClient {
         auth_type: fidl_mlme::AuthenticationTypes,
     ) {
         // Safe: |state| is never None and always replaced with Some(..).
-        self.state = Some(self.state.take().unwrap().handle_auth_ind(self, ctx, auth_type));
+        self.state = self.state.take().map(|state| state.handle_auth_ind(self, ctx, auth_type));
     }
 
     #[allow(clippy::too_many_arguments, reason = "mass allow for https://fxbug.dev/381896734")]
@@ -63,37 +67,40 @@ impl RemoteClient {
         s_rsne: Option<Vec<u8>>,
     ) {
         // Safe: |state| is never None and always replaced with Some(..).
-        self.state = Some(self.state.take().unwrap().handle_assoc_ind(
-            self,
-            ctx,
-            aid_map,
-            ap_capabilities,
-            client_capabilities,
-            ap_rates,
-            client_rates,
-            rsn_cfg,
-            s_rsne,
-        ));
+        self.state = self.state.take().map(|state| {
+            state.handle_assoc_ind(
+                self,
+                ctx,
+                aid_map,
+                ap_capabilities,
+                client_capabilities,
+                ap_rates,
+                client_rates,
+                rsn_cfg,
+                s_rsne,
+            )
+        });
     }
 
     pub fn handle_disassoc_ind(&mut self, ctx: &mut Context, aid_map: &mut aid::Map) {
         // Safe: |state| is never None and always replaced with Some(..).
-        self.state = Some(self.state.take().unwrap().handle_disassoc_ind(self, ctx, aid_map));
+        self.state = self.state.take().map(|state| state.handle_disassoc_ind(self, ctx, aid_map));
     }
 
     pub fn handle_eapol_ind(&mut self, ctx: &mut Context, data: &[u8]) {
         // Safe: |state| is never None and always replaced with Some(..).
-        self.state = Some(self.state.take().unwrap().handle_eapol_ind(self, ctx, data));
+        self.state = self.state.take().map(|state| state.handle_eapol_ind(self, ctx, data));
     }
 
     pub fn handle_eapol_conf(&mut self, ctx: &mut Context, result: fidl_mlme::EapolResultCode) {
         // Safe: |state| is never None and always replaced with Some(..).
-        self.state = Some(self.state.take().unwrap().handle_eapol_conf(self, ctx, result));
+        self.state = self.state.take().map(|state| state.handle_eapol_conf(self, ctx, result));
     }
 
     pub fn handle_timeout(&mut self, ctx: &mut Context, event_id: EventId, event: ClientEvent) {
         // Safe: |state| is never None and always replaced with Some(..).
-        self.state = Some(self.state.take().unwrap().handle_timeout(self, ctx, event_id, event))
+        self.state =
+            self.state.take().map(|state| state.handle_timeout(self, ctx, event_id, event));
     }
 
     /// Sends MLME-AUTHENTICATE.response (IEEE Std 802.11-2016, 6.3.5.5) to the MLME.
@@ -103,7 +110,7 @@ impl RemoteClient {
         result_code: fidl_mlme::AuthenticateResultCode,
     ) {
         // TODO(https://fxbug.dev/42172646) - Added to help investigate hw-sim test. Remove later
-        tracing::info!("Sending fidl_mlme::AuthenticateResponse - result code: {:?}", result_code);
+        log::info!("Sending fidl_mlme::AuthenticateResponse - result code: {:?}", result_code);
         ctx.mlme_sink.send(MlmeRequest::AuthResponse(fidl_mlme::AuthenticateResponse {
             peer_sta_address: self.addr.to_array(),
             result_code,

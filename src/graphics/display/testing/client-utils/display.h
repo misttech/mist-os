@@ -65,7 +65,7 @@ class Display {
   std::string monitor_name_;
   std::string monitor_serial_;
 
-  // Display physical dimension in millimiters
+  // Display physical dimension in millimeters
   uint32_t horizontal_size_mm_;
   uint32_t vertical_size_mm_;
   // flag used to indicate whether the values are actual values or fallback

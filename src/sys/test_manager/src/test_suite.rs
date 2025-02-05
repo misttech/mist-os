@@ -24,8 +24,8 @@ use futures::channel::{mpsc, oneshot};
 use futures::future::Either;
 use futures::prelude::*;
 use futures::StreamExt;
+use log::{error, info, warn};
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use {
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_test_manager as ftest_manager,
     fuchsia_async as fasync,
@@ -141,18 +141,18 @@ impl TestRunBuilder {
         match futures::future::select(serve_controller_fut.boxed(), get_events_fut.boxed()).await {
             Either::Left((serve_result, _fut)) => {
                 if let Err(e) = serve_result {
-                    warn!(?diagnostics, "Error serving RunController: {:?}", e);
+                    warn!(diagnostics:?; "Error serving RunController: {:?}", e);
                 }
             }
             Either::Right((get_events_result, serve_fut)) => {
                 if let Err(e) = get_events_result {
-                    warn!(?diagnostics, "Error sending events for RunController: {:?}", e);
+                    warn!(diagnostics:?; "Error sending events for RunController: {:?}", e);
                 }
                 // Wait for the client to close the channel.
                 // TODO(https://fxbug.dev/42169156) once https://fxbug.dev/42169061 is fixed, this is no longer
                 // necessary.
                 if let Err(e) = serve_fut.await {
-                    warn!(?diagnostics, "Error serving RunController: {:?}", e);
+                    warn!(diagnostics:?; "Error serving RunController: {:?}", e);
                 }
             }
         }
@@ -188,7 +188,7 @@ impl TestRunBuilder {
         let debug_task = fasync::Task::local(
             debug_data_processor
                 .collect_and_serve(event_sender)
-                .unwrap_or_else(|err| warn!(?err, "Error serving debug data")),
+                .unwrap_or_else(|err| warn!(err:?; "Error serving debug data")),
         );
 
         // This future returns the task which needs to be completed before completion.
@@ -281,7 +281,7 @@ impl Suite {
         let debug_task = fasync::Task::local(
             debug_data_processor
                 .collect_and_serve_for_suite(event_sender.clone())
-                .unwrap_or_else(|err| warn!(?err, "Error serving debug data")),
+                .unwrap_or_else(|err| warn!(err:?; "Error serving debug data")),
         );
 
         // This future returns the task which needs to be completed before completion.
@@ -502,7 +502,7 @@ async fn run_single_suite_for_suite_runner(
             debug_data_sender,
             &diagnostics,
             &suite_realm,
-            false, // use_debug_agent
+            use_debug_agent_for_runs(&options),
         )
         .await
         {
@@ -514,8 +514,8 @@ async fn run_single_suite_for_suite_runner(
                 if let Err(err) = instance.destroy(diagnostics.child("destroy")).await {
                     // Failure to destroy an instance could mean that some component events fail to send.
                     error!(
-                        ?diagnostics,
-                        ?err,
+                        diagnostics:?,
+                        err:?;
                         "Failed to destroy instance. Debug data may be lost."
                     );
                 }
@@ -532,11 +532,11 @@ async fn run_single_suite_for_suite_runner(
     let ((), controller_ret) = futures::future::join(run_test_remote, controller_fut).await;
 
     if let Err(e) = controller_ret {
-        warn!(?diagnostics, "Ended test {}: {:?}", test_url, e);
+        warn!(diagnostics:?; "Ended test {}: {:?}", test_url, e);
     }
 
     diagnostics.set_property(EXECUTION_PROPERTY, "complete");
-    info!(?diagnostics, "Test destruction complete");
+    info!(diagnostics:?; "Test destruction complete");
 }
 
 pub(crate) async fn run_single_suite(
@@ -600,7 +600,7 @@ pub(crate) async fn run_single_suite(
             debug_data_sender,
             &diagnostics,
             &suite_realm,
-            false, // use_debug_agent
+            use_debug_agent_for_runs(&options),
         )
         .await
         {
@@ -621,19 +621,19 @@ pub(crate) async fn run_single_suite(
     let ((), controller_ret) = futures::future::join(run_test_remote, controller_fut).await;
 
     if let Err(e) = controller_ret {
-        warn!(?diagnostics, "Ended test {}: {:?}", test_url, e);
+        warn!(diagnostics:?; "Ended test {}: {:?}", test_url, e);
     }
 
     if let Some(instance) = maybe_instance.take() {
         diagnostics.set_property(EXECUTION_PROPERTY, "tear_down");
-        info!(?diagnostics, "Test suite has finished, destroying instance...");
+        info!(diagnostics:?; "Test suite has finished, destroying instance...");
         if let Err(err) = instance.destroy(diagnostics.child("destroy")).await {
             // Failure to destroy an instance could mean that some component events fail to send.
-            error!(?diagnostics, ?err, "Failed to destroy instance. Debug data may be lost.");
+            error!(diagnostics:?, err:?; "Failed to destroy instance. Debug data may be lost.");
         }
     }
     diagnostics.set_property(EXECUTION_PROPERTY, "complete");
-    info!(?diagnostics, "Test destruction complete");
+    info!(diagnostics:?; "Test destruction complete");
 }
 
 // Separate suite into a hermetic and a non-hermetic collection
@@ -670,6 +670,20 @@ where
         }
     }
     (serial_suites, parallel_suites)
+}
+
+// Determine whether debug_agent should be used for test runs.
+fn use_debug_agent_for_runs(options: &ftest_manager::RunOptions) -> bool {
+    match options.no_exception_channel {
+        Some(true) => {
+            // Do not use debug_agent when the option is set to true.
+            false
+        }
+        Some(false) | None => {
+            // Use debug_agent when the option is set to false or not specified.
+            true
+        }
+    }
 }
 
 #[cfg(test)]

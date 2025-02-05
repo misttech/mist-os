@@ -6,8 +6,8 @@ use fidl_test_wlan_realm::WlanConfig;
 
 use ieee80211::Bssid;
 use lazy_static::lazy_static;
+use log::info;
 use std::pin::pin;
-use tracing::info;
 use wlan_common::bss::Protection;
 use wlan_common::ie::rsn::cipher::{CIPHER_CCMP_128, CIPHER_TKIP};
 use wlan_hw_sim::*;

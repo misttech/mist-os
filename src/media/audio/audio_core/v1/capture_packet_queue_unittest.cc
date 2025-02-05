@@ -60,7 +60,7 @@ class CapturePacketQueueTest : public ::testing::Test {
   char* payload_start_ = nullptr;
 };
 
-TEST_F(CapturePacketQueueTest, Preallocated_FramesFitPerfectly) {
+TEST_F(CapturePacketQueueTest, PreallocatedFramesFitPerfectly) {
   CreateMapper(40);
   auto result = CapturePacketQueue::CreatePreallocated(payload_buffer_, kFormat, 10);
   ASSERT_TRUE(result.is_ok()) << result.error();
@@ -97,7 +97,7 @@ TEST_F(CapturePacketQueueTest, Preallocated_FramesFitPerfectly) {
   ASSERT_EQ(pq->ReadySize(), 0u);
 }
 
-TEST_F(CapturePacketQueueTest, Preallocated_FramesLeftover) {
+TEST_F(CapturePacketQueueTest, PreallocatedFramesLeftover) {
   CreateMapper(40);
   auto result = CapturePacketQueue::CreatePreallocated(payload_buffer_, kFormat, 15);
   ASSERT_TRUE(result.is_ok()) << result.error();
@@ -124,7 +124,7 @@ TEST_F(CapturePacketQueueTest, Preallocated_FramesLeftover) {
   ASSERT_EQ(pq->ReadySize(), 0u);
 }
 
-TEST_F(CapturePacketQueueTest, Preallocated_MixStatePreserved) {
+TEST_F(CapturePacketQueueTest, PreallocatedMixStatePreserved) {
   CreateMapper(20);
   auto result = CapturePacketQueue::CreatePreallocated(payload_buffer_, kFormat, 10);
   ASSERT_TRUE(result.is_ok()) << result.error();
@@ -148,7 +148,7 @@ TEST_F(CapturePacketQueueTest, Preallocated_MixStatePreserved) {
                                });
 }
 
-TEST_F(CapturePacketQueueTest, Preallocated_PartialMix) {
+TEST_F(CapturePacketQueueTest, PreallocatedPartialMix) {
   CreateMapper(20);
   auto result = CapturePacketQueue::CreatePreallocated(payload_buffer_, kFormat, 10);
   ASSERT_TRUE(result.is_ok()) << result.error();
@@ -181,7 +181,7 @@ TEST_F(CapturePacketQueueTest, Preallocated_PartialMix) {
   }
 }
 
-TEST_F(CapturePacketQueueTest, Preallocated_DiscardedMix) {
+TEST_F(CapturePacketQueueTest, PreallocatedDiscardedMix) {
   CreateMapper(20);
   auto result = CapturePacketQueue::CreatePreallocated(payload_buffer_, kFormat, 10);
   ASSERT_TRUE(result.is_ok()) << result.error();
@@ -212,7 +212,7 @@ TEST_F(CapturePacketQueueTest, Preallocated_DiscardedMix) {
   EXPECT_EQ(CapturePacketQueue::PacketMixStatus::Discarded, pq->FinishMixerJob(mix_state));
 }
 
-TEST_F(CapturePacketQueueTest, Preallocated_DiscardedAfterPartialMix) {
+TEST_F(CapturePacketQueueTest, PreallocatedDiscardedAfterPartialMix) {
   CreateMapper(20);
   auto result = CapturePacketQueue::CreatePreallocated(payload_buffer_, kFormat, 10);
   ASSERT_TRUE(result.is_ok()) << result.error();
@@ -254,7 +254,7 @@ TEST_F(CapturePacketQueueTest, Preallocated_DiscardedAfterPartialMix) {
   EXPECT_EQ(CapturePacketQueue::PacketMixStatus::Discarded, pq->FinishMixerJob(mix_state));
 }
 
-TEST_F(CapturePacketQueueTest, Preallocated_Recycle) {
+TEST_F(CapturePacketQueueTest, PreallocatedRecycle) {
   CreateMapper(20);
   auto result = CapturePacketQueue::CreatePreallocated(payload_buffer_, kFormat, 10);
   ASSERT_TRUE(result.is_ok()) << result.error();
@@ -294,7 +294,7 @@ TEST_F(CapturePacketQueueTest, Preallocated_Recycle) {
   }
 }
 
-TEST_F(CapturePacketQueueTest, Preallocated_RecycleErrors) {
+TEST_F(CapturePacketQueueTest, PreallocatedRecycleErrors) {
   CreateMapper(20);
   auto result = CapturePacketQueue::CreatePreallocated(payload_buffer_, kFormat, 10);
   ASSERT_TRUE(result.is_ok()) << result.error();
@@ -377,7 +377,7 @@ TEST_F(CapturePacketQueueTest, DynamicallyAllocated) {
   ASSERT_EQ(pq->PendingSize(), 0u);
 }
 
-TEST_F(CapturePacketQueueTest, DynamicallyAllocated_PushErrors) {
+TEST_F(CapturePacketQueueTest, DynamicallyAllocatedPushErrors) {
   CreateMapper(50);
   auto pq = CapturePacketQueue::CreateDynamicallyAllocated(payload_buffer_, kFormat);
 

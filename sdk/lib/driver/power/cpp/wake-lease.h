@@ -17,6 +17,9 @@
 
 namespace fdf_power {
 
+// Wrapper around usage of fuchsia.power.system/ActivityGovernor.AcquireWakeLease. The wrapper
+// reduces wake lease creation by allow callers to set timeout after which to drop the lease and
+// provides mechanisms to extend that timeout.
 class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernorListener> {
  public:
   // If |log| is set to true, logs will be emitted when acquiring leases and when lease times out.
@@ -44,10 +47,10 @@ class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernor
   // rather than at the point this method is called.
   bool AcquireWakeLease(zx::duration timeout);
 
-  // Deposit a wake lease which will automatically be dropped after the specified timeout deadline.
-  // If a lease was already held from an earlier invocation, it will be dropped in favor of the new
-  // lease if the new lease has a later deadline. If the old lease has a later deadline, then the
-  // new lease will be dropped instead.
+  // Provide a wake lease which will be dropped either:
+  //   * immediately if there is already a wake lease with a later deadline
+  //   * at the specified deadline
+  // In the latter case any previous lease held by this object is dropped immediately.
   void DepositWakeLease(zx::eventpair wake_lease, zx::time timeout_deadline);
 
   // Cancel timeout and take the wake lease. Returns ZX_ERR_BAD_HANDLE if we don't currently have a
@@ -58,10 +61,10 @@ class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernor
   // a wake lease.
   zx::result<zx::eventpair> GetWakeLeaseCopy();
 
-  // fuchsia.power.system/ActivityGovernorListener implementation.
+  // fuchsia.power.system/ActivityGovernorListener implementation. This is used to avoid creating
+  // wake leases in cases where the system is resumed and `HandleInterrupt` is called.
   void OnResume(OnResumeCompleter::Sync& completer) override;
   void OnSuspendStarted(OnSuspendStartedCompleter::Sync& completer) override;
-  void OnSuspendFail(OnSuspendFailCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernorListener> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
@@ -77,7 +80,7 @@ class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernor
   fidl::WireSyncClient<fuchsia_power_system::ActivityGovernor> sag_client_;
   std::optional<fidl::ServerBinding<fuchsia_power_system::ActivityGovernorListener>>
       listener_binding_;
-  bool system_suspended_ = false;
+  bool system_suspended_ = true;
   // Time before which we should take a wake lease if we are informed of
   // suspension.
   zx_time_t prevent_sleep_before_ = 0;
@@ -88,6 +91,7 @@ class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernor
   inspect::UintProperty total_lease_acquisitions_;
   inspect::BoolProperty wake_lease_held_;
   inspect::BoolProperty wake_lease_grabbable_;
+  inspect::UintProperty wake_lease_last_attempted_acquisition_timestamp_;
   inspect::UintProperty wake_lease_last_acquired_timestamp_;
   inspect::UintProperty wake_lease_last_refreshed_timestamp_;
 };
