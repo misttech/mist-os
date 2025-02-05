@@ -29,7 +29,10 @@ group("isolated_test_spec_allowlist") {
     # RTC tests change device to a future time and resets it back to present.
     # Failing to reset the time can cause subsequent tests to fail. So prevent it
     # from affecting other tests by isolating it to its own shard.
-    "//src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_rtc:rtc_test_fc",
+
+    # TODO(https://fxbug.dev/394397268): Uncomment this in fxr/1199586 (after test path is updated)
+    # "//src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_rtc:rtc_test_fc",
+
     "//src/tests/end_to_end/rtc:rtc_conformance_test",
     "//src/tests/end_to_end/rtc:rtc_conformance_test.hermetic",
   ]
