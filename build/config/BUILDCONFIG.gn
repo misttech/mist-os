@@ -3018,19 +3018,6 @@ template("_fuchsia_shared_library") {
     _link_output_dir =
         rebase_path(get_path_info(link_output_file, "dir"), root_build_dir)
 
-    # rustc doesn't support building dylibs with LTO enabled without the
-    # `-Zdylib-lto` flag. For now we just disable LTO on these targets.
-    if (defined(configs) && defined(crate_type)) {
-      configs += [
-        "//build/config/lto",
-        "//build/config/lto:thinlto",
-      ]
-      configs -= [
-        "//build/config/lto",
-        "//build/config/lto:thinlto",
-      ]
-    }
-
     # Note: the manifest-related metadata is added to the builder target as
     # some targets (e.g. drivers) depend on it directly in the builder
     # toolchain.

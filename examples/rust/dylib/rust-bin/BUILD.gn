@@ -21,11 +21,6 @@ rustc_test("rust-bin") {
     "//examples/rust/dylib/rust-shared",
     "//src/lib/fuchsia",
   ]
-
-  # rustc doesn't support linking to dylibs while using LTO unless the
-  # `-Zdylib-lto` flag is passed. For now we exclude this binary from building
-  # with any LTO variants.
-  exclude_toolchain_tags = [ "lto" ]
 }
 
 fuchsia_unittest_package("rust-shared") {
