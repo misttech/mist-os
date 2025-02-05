@@ -147,11 +147,22 @@ zx_status_t FakeDisplay::InitSysmemAllocatorClient() {
 
 void FakeDisplay::DisplayEngineSetListener(
     const display_engine_listener_protocol_t* engine_listener) {
-  std::lock_guard engine_listener_lock(engine_listener_mutex_);
-  engine_listener_client_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
+  {
+    std::lock_guard engine_listener_lock(engine_listener_mutex_);
+    engine_listener_client_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
+  }
+  SendDisplayInformation();
+}
 
+void FakeDisplay::SendDisplayInformation() {
   const display_mode_t banjo_display_mode = CreateBanjoDisplayMode();
   const raw_display_info_t banjo_display_info = CreateRawDisplayInfo(&banjo_display_mode);
+
+  std::lock_guard engine_listener_lock(engine_listener_mutex_);
+  if (!engine_listener_client_.is_valid()) {
+    FDF_LOG(WARNING, "OnDisplayAdded() emitted with invalid event listener; event dropped");
+    return;
+  }
   engine_listener_client_.OnDisplayAdded(&banjo_display_info);
 }
 
@@ -716,14 +727,12 @@ int FakeDisplay::CaptureThread() {
 }
 
 zx::result<> FakeDisplay::ServiceAnyCaptureRequest() {
-  std::lock_guard engine_listener_lock(engine_listener_mutex_);
   // `current_capture_target_image_` is a pointer to DisplayImageInfo stored in
   // `imported_captures_` (guarded by `capture_mutex_`). So `capture_mutex_`
   // must be locked while the capture image is being used.
 
   std::lock_guard capture_lock(capture_mutex_);
-  if (engine_listener_client_.is_valid() &&
-      (current_capture_target_image_id_ != display::kInvalidDriverCaptureImageId) &&
+  if ((current_capture_target_image_id_ != display::kInvalidDriverCaptureImageId) &&
       ++capture_complete_signal_count_ >= kNumOfVsyncsForCapture) {
     {
       auto dst = imported_captures_.find(current_capture_target_image_id_);
@@ -805,12 +814,22 @@ zx::result<> FakeDisplay::ServiceAnyCaptureRequest() {
         }
       }
     }
-    engine_listener_client_.OnCaptureComplete();
+
+    SendCaptureComplete();
+
     current_capture_target_image_id_ = display::kInvalidDriverCaptureImageId;
     capture_complete_signal_count_ = 0;
   }
 
   return zx::ok();
+}
+
+void FakeDisplay::SendCaptureComplete() {
+  std::lock_guard engine_listener_lock(engine_listener_mutex_);
+  if (!engine_listener_client_.is_valid()) {
+    return;
+  }
+  engine_listener_client_.OnCaptureComplete();
 }
 
 int FakeDisplay::VSyncThread() {
@@ -825,17 +844,19 @@ int FakeDisplay::VSyncThread() {
 }
 
 void FakeDisplay::SendVsync() {
+  // See the discussion in `DisplayEngineApplyConfiguration()` about
+  // the reason we use relaxed memory order here.
+  const display::DriverConfigStamp current_config_stamp =
+      current_config_stamp_.load(std::memory_order_relaxed);
+  const config_stamp_t banjo_current_config_stamp =
+      display::ToBanjoDriverConfigStamp(current_config_stamp);
+
   std::lock_guard engine_listener_lock(engine_listener_mutex_);
-  if (engine_listener_client_.is_valid()) {
-    // See the discussion in `DisplayEngineApplyConfiguration()` about
-    // the reason we use relaxed memory order here.
-    const display::DriverConfigStamp current_config_stamp =
-        current_config_stamp_.load(std::memory_order_relaxed);
-    const config_stamp_t banjo_current_config_stamp =
-        display::ToBanjoDriverConfigStamp(current_config_stamp);
-    engine_listener_client_.OnDisplayVsync(ToBanjoDisplayId(kDisplayId), zx_clock_get_monotonic(),
-                                           &banjo_current_config_stamp);
+  if (!engine_listener_client_.is_valid()) {
+    return;
   }
+  engine_listener_client_.OnDisplayVsync(ToBanjoDisplayId(kDisplayId), zx_clock_get_monotonic(),
+                                         &banjo_current_config_stamp);
 }
 
 void FakeDisplay::RecordDisplayConfigToInspectRootNode() {

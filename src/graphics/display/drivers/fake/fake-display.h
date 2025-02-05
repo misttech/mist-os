@@ -111,7 +111,8 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
 
   bool IsCaptureSupported() const;
 
-  void SendVsync();
+  // Dispatches an OnVsync() event to the Display Coordinator.
+  void SendVsync() __TA_EXCLUDES(engine_listener_mutex_);
 
   // Just for display core unittests.
   zx::result<display::DriverImageId> ImportVmoImageForTesting(zx::vmo vmo, size_t offset);
@@ -134,6 +135,12 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   //
   // Returns an error if the capture failed in such a catastrophic failure.
   zx::result<> ServiceAnyCaptureRequest();
+
+  // Dispatches an OnCaptureComplete() event to the Display Coordinator.
+  void SendCaptureComplete() __TA_EXCLUDES(engine_listener_mutex_);
+
+  // Dispatches an OnDisplayAdded() event to the Display Coordinator.
+  void SendDisplayInformation() __TA_EXCLUDES(engine_listener_mutex_);
 
   // Initializes the sysmem Allocator client used to import incoming buffer
   // collection tokens.
@@ -176,9 +183,6 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   thrd_t vsync_thread_;
   thrd_t capture_thread_;
 
-  // Guards display coordinator interface.
-  mutable std::mutex engine_listener_mutex_;
-
   // Guards imported images and references to imported images.
   mutable std::mutex image_mutex_;
 
@@ -186,6 +190,14 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   // `capture_mutex_` must never be acquired when `image_mutex_` is already
   // held.
   mutable std::mutex capture_mutex_;
+
+  // Guards the Display Coordinator's event listener connection.
+  //
+  // No other mutex may be acquired while this mutex is acquired. In other words,
+  // event dispatch logic is expected to capture this mutex, dispatch the event,
+  // and immediately release the mutex. This ordering keeps the driver ready
+  // for a migration to the api-protocols library.
+  mutable std::mutex engine_listener_mutex_;
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
   fidl::SyncClient<fuchsia_sysmem2::Allocator> sysmem_;
