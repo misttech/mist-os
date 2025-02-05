@@ -498,7 +498,7 @@ When migrating a DFv1 driver to DFv2, you may run into the following error messa
 in the logs:
 
 ```none {:.devsite-disable-click-to-copy}
-[driver_host,driver] ERROR: [src/devices/bin/driver_host/driver.cc(120)] __fuchsia_driver_registration__ symbol not available, falling back to __fuchsia_driver_lifecycle__.
+[driver_host,driver] ERROR: [src/devices/bin/driver_host/driver.cc(120)] __fuchsia_driver_registration__ symbol not available_.
 [driver_host,driver] ERROR: [src/devices/bin/driver_host/driver.cc(316)] Failed to start driver 'fuchsia-pkg://fuchsia.com/fake-battery#meta/fake_battery.cm', could not Load driver: ZX_ERR_NOT_FOUND
 ```
 

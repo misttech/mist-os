@@ -95,7 +95,6 @@ def verify_exported_symbols(symbols):
 
     # These symbols need to be exported
     expected_symbols = {
-        "__fuchsia_driver_lifecycle__",
         "__fuchsia_driver_registration__",
     }
     if expected_symbols.isdisjoint(symbols):
