@@ -6,14 +6,14 @@ import("//build/config/clang/clang.gni")
 import("//build/config/sysroot.gni")
 
 declare_args() {
-  # List of GN paths to source files to be instrumented by `profile` variants.
+  # List of paths to source files to be instrumented by `profile` variants.
   profile_source_files = [
     # https://fxbug.dev/42061298: profile all checked-in sources.
     # (don't profile generated sources under out/)
     "//*",
   ]
 
-  # List of GN paths to source files to NOT instrument by `profile` variants.
+  # List of paths to source files to NOT instrument by `profile` variants.
   # These take precedence over `profile_source_files`.
   dont_profile_source_files = [
     # Do not instrument system headers that are under //prebuilt.
@@ -37,7 +37,7 @@ declare_args() {
     dont_profile_source_files += [ "$target_sysroot/*" ]
   }
 
-  # List GN path to files in Clang's `-fprofile-list` format describing files
+  # List of paths to files in Clang's `-fprofile-list` format describing files
   # and functions to be instrumented by `profile` variants.
   profile_source_files_list_files = []
 

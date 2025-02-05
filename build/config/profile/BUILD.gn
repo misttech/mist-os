@@ -16,22 +16,33 @@ _coverage_common_flags = [
 
 _profile_source_files_lines = []
 foreach(file, dont_profile_source_files) {
-  # Escape "/" and "." since this is parsed as a regex.
-  # Note that the compiler internally expands "*" into ".*".
-  # See: https://clang.llvm.org/docs/SanitizerSpecialCaseList.html
   file = rebase_path(file, root_build_dir)
-  file = string_replace(file, "/", "\/")
-  file = string_replace(file, ".", "\.")
-  _profile_source_files_lines += [ "!src:$file" ]
+
+  # See https://clang.llvm.org/docs/UsersManual.html#cmdoption-fprofile-list
+  # for supported prefixes and categories.
+
+  # When the "source:path=skip" format is used, Clang excludes the files that are
+  # under the provided path from instrumentation and adds the `skipprofile`
+  # attribute, which only prevents instrumentation, but does not restrict inlining
+  # between functions in the same way that the `noprofile` attribute does.
+
+  # Clang uses a glob pattern matcher described in:
+  # https://llvm.org/doxygen/classllvm_1_1GlobPattern.html
+  _profile_source_files_lines += [ "source:$file=skip" ]
 }
 foreach(file, profile_source_files) {
-  # Escape "/" and "." since this is parsed as a regex.
-  # Note that the compiler internally expands "*" into ".*".
-  # See: https://clang.llvm.org/docs/SanitizerSpecialCaseList.html
   file = rebase_path(file, root_build_dir)
-  file = string_replace(file, "/", "\/")
-  file = string_replace(file, ".", "\.")
-  _profile_source_files_lines += [ "src:$file" ]
+
+  # See https://clang.llvm.org/docs/UsersManual.html#cmdoption-fprofile-list
+  # for supported prefixes and categories.
+
+  # When the "source:path" format is used without any of the supported categories
+  # (`allow`, `skip`, and `forbid`), Clang chooses the `allow` category as default
+  # to instrument the files that are under the provided path.
+
+  # Clang uses a glob pattern matcher described in:
+  # https://llvm.org/doxygen/classllvm_1_1GlobPattern.html
+  _profile_source_files_lines += [ "source:$file" ]
 }
 
 # This can't use a generated_file() target because there's no way to
