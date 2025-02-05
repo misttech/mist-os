@@ -298,8 +298,15 @@ if (!is_host) {
 
     category = "partner"
 
-    if (current_build_target_api_level == "PLATFORM") {
-      deps = [ ":fuchsia_idk_atoms_for_main_platform_build" ]
+    if (!sdk_inside_sub_build) {
+      assert(
+          current_build_target_api_level == "PLATFORM" ||
+          # Handle core.x64-sdk_source_sets_and_shlibs-apiXX-build_only builders.
+          # TODO(https://fxbug.dev/42082833): Remove this.
+          override_target_api_level != false)
+      deps = [ ":fuchsia_idk_atoms_produced_by_main_platform_build" ]
+    } else if (current_build_target_api_level == "PLATFORM") {
+      deps = [ ":fuchsia_idk_atoms_built_only_at_platform_for_each_cpu_arch" ]
     } else {
       deps = [ ":fuchsia_idk_atoms_for_each_api_level" ]
     }
@@ -320,11 +327,14 @@ if (!is_host) {
     ]
   }
 
-  if (current_build_target_api_level == "PLATFORM") {
+  if (current_build_target_api_level == "PLATFORM" ||
+      # Handle core.x64-sdk_source_sets_and_shlibs-apiXX-build_only builders.
+      # TODO(https://fxbug.dev/42082833): Remove this.
+      override_target_api_level != false) {
     # These rules are processed at least once for the primary target CPU,
     # which may not match the host_cpu. They may also be processed for
-    # additional CPU architectures when building the final IDK.
-    sdk_molecule("fuchsia_idk_atoms_for_main_platform_build") {
+    # additional CPU architectures when building the IDK.
+    sdk_molecule("fuchsia_idk_atoms_built_only_at_platform_for_each_cpu_arch") {
       category = "partner"
 
       deps = [
@@ -350,9 +360,38 @@ if (!is_host) {
         ":core_cc_prebuilt_libraries",
         ":core_sysroot",
       ]
+    }
 
-      if (!sdk_inside_sub_build) {
-        deps += [
+    # The rules below only need to be processed once when building the IDK.
+    # Since sub-builds change the `target_cpu`, this cannot be used as
+    # a condition. While, `host_cpu` does not change in sub-builds, using that
+    # would require extra processing and building when it does not match the
+    # primary target CPU. Therefore, use `sdk_inside_sub_build`.
+    # TODO(https://fxbug.dev/310006516): Once this and
+    # https://fxbug.dev/327223536 are addressed sub-builds will never target
+    # "PLATFORM" and this logic and GN variable can be removed.
+    if (!sdk_inside_sub_build) {
+      sdk_molecule("fuchsia_idk_atoms_produced_by_main_platform_build") {
+        category = "partner"
+        deps = [
+          ":fuchsia_idk_atoms_built_in_main_platform_build_only",
+          ":fuchsia_idk_atoms_built_only_at_platform_for_each_cpu_arch",
+        ]
+      }
+
+      sdk_molecule("fuchsia_idk_atoms_built_in_main_platform_build_only") {
+        # This molecule is a subset of the target above for organization only
+        # and should thus not be used elsewhere.
+        visibility = []
+        visibility = [
+          ":fuchsia_idk_atoms_produced_by_main_platform_build.manifest",
+
+          # Dependencies related to template sub-targets.
+          ":fuchsia_idk_atoms_built_in_main_platform_build_only",
+          ":fuchsia_idk_atoms_built_in_main_platform_build_only.validate",
+        ]
+        category = "partner"
+        deps = [
           ":fuchsia_idk_atoms_built_only_at_platform_for_one_cpu_arch",
           ":fuchsia_idk_atoms_independent_of_api_level_for_one_cpu_arch",
 
@@ -369,17 +408,7 @@ if (!is_host) {
           ":fuchsia_idk_atoms_host_tests",
         ]
       }
-    }
 
-    # The rules below only need to be processed once when building the final
-    # IDK. Since sub-builds change the `target_cpu`, this cannot be used as
-    # a condition. While, `host_cpu` does not change in sub-builds, using that
-    # would require extra processing and building when it does not match the
-    # primary target CPU. Therefore, use `sdk_inside_sub_build`.
-    # TODO(https://fxbug.dev/310006516): Once this and
-    # https://fxbug.dev/327223536 are addressed sub-builds will never target
-    # "PLATFORM" and this logic and GN variable can be removed.
-    if (!sdk_inside_sub_build) {
       # Do not add dependencies to this target without a really good reason.
       # Most such dependencies should be verifiably independent of the API level
       # and (not verifiable) CPU architecture (add to
