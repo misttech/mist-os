@@ -15,6 +15,7 @@ static const struct FidlCodedHandle Handleexception2147483648notnullableTable;
 static const struct FidlCodedHandle Handlefifo2147483648notnullableTable;
 static const struct FidlCodedHandle Handleguest2147483648notnullableTable;
 static const struct FidlCodedHandle Handleinterrupt2147483648notnullableTable;
+static const struct FidlCodedHandle Handleiob2147483648notnullableTable;
 static const struct FidlCodedHandle Handleiommu2147483648notnullableTable;
 static const struct FidlCodedHandle Handlejob2147483648notnullableTable;
 static const struct FidlCodedHandle Handlemsi2147483648notnullableTable;
@@ -155,7 +156,7 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .is_resource = kFidlIsResource_Resource,
             },
             .offset_v2 = 44,
-            .field_type = (const fidl_type_t*)&Handleiommu2147483648notnullableTable,
+            .field_type = (const fidl_type_t*)&Handleiob2147483648notnullableTable,
         },
     },
     {
@@ -165,7 +166,7 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .is_resource = kFidlIsResource_Resource,
             },
             .offset_v2 = 48,
-            .field_type = (const fidl_type_t*)&Handlejob2147483648notnullableTable,
+            .field_type = (const fidl_type_t*)&Handleiommu2147483648notnullableTable,
         },
     },
     {
@@ -175,7 +176,7 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .is_resource = kFidlIsResource_Resource,
             },
             .offset_v2 = 52,
-            .field_type = (const fidl_type_t*)&Handlemsi2147483648notnullableTable,
+            .field_type = (const fidl_type_t*)&Handlejob2147483648notnullableTable,
         },
     },
     {
@@ -185,7 +186,7 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .is_resource = kFidlIsResource_Resource,
             },
             .offset_v2 = 56,
-            .field_type = (const fidl_type_t*)&Handlepager2147483648notnullableTable,
+            .field_type = (const fidl_type_t*)&Handlemsi2147483648notnullableTable,
         },
     },
     {
@@ -195,7 +196,7 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .is_resource = kFidlIsResource_Resource,
             },
             .offset_v2 = 60,
-            .field_type = (const fidl_type_t*)&Handlepmt2147483648notnullableTable,
+            .field_type = (const fidl_type_t*)&Handlepager2147483648notnullableTable,
         },
     },
     {
@@ -205,7 +206,7 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .is_resource = kFidlIsResource_Resource,
             },
             .offset_v2 = 64,
-            .field_type = (const fidl_type_t*)&Handleport2147483648notnullableTable,
+            .field_type = (const fidl_type_t*)&Handlepmt2147483648notnullableTable,
         },
     },
     {
@@ -215,7 +216,7 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .is_resource = kFidlIsResource_Resource,
             },
             .offset_v2 = 68,
-            .field_type = (const fidl_type_t*)&Handleprocess2147483648notnullableTable,
+            .field_type = (const fidl_type_t*)&Handleport2147483648notnullableTable,
         },
     },
     {
@@ -225,7 +226,7 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .is_resource = kFidlIsResource_Resource,
             },
             .offset_v2 = 72,
-            .field_type = (const fidl_type_t*)&Handleprofile2147483648notnullableTable,
+            .field_type = (const fidl_type_t*)&Handleprocess2147483648notnullableTable,
         },
     },
     {
@@ -235,7 +236,7 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .is_resource = kFidlIsResource_Resource,
             },
             .offset_v2 = 76,
-            .field_type = (const fidl_type_t*)&Handleresource2147483648notnullableTable,
+            .field_type = (const fidl_type_t*)&Handleprofile2147483648notnullableTable,
         },
     },
     {
@@ -245,7 +246,7 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .is_resource = kFidlIsResource_Resource,
             },
             .offset_v2 = 80,
-            .field_type = (const fidl_type_t*)&Handlesocket2147483648notnullableTable,
+            .field_type = (const fidl_type_t*)&Handleresource2147483648notnullableTable,
         },
     },
     {
@@ -255,7 +256,7 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .is_resource = kFidlIsResource_Resource,
             },
             .offset_v2 = 84,
-            .field_type = (const fidl_type_t*)&Handlestream2147483648notnullableTable,
+            .field_type = (const fidl_type_t*)&Handlesocket2147483648notnullableTable,
         },
     },
     {
@@ -265,7 +266,7 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .is_resource = kFidlIsResource_Resource,
             },
             .offset_v2 = 88,
-            .field_type = (const fidl_type_t*)&Handlesuspendtoken2147483648notnullableTable,
+            .field_type = (const fidl_type_t*)&Handlestream2147483648notnullableTable,
         },
     },
     {
@@ -275,7 +276,7 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .is_resource = kFidlIsResource_Resource,
             },
             .offset_v2 = 92,
-            .field_type = (const fidl_type_t*)&Handlethread2147483648notnullableTable,
+            .field_type = (const fidl_type_t*)&Handlesuspendtoken2147483648notnullableTable,
         },
     },
     {
@@ -285,7 +286,7 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .is_resource = kFidlIsResource_Resource,
             },
             .offset_v2 = 96,
-            .field_type = (const fidl_type_t*)&Handletimer2147483648notnullableTable,
+            .field_type = (const fidl_type_t*)&Handlethread2147483648notnullableTable,
         },
     },
     {
@@ -295,7 +296,7 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .is_resource = kFidlIsResource_Resource,
             },
             .offset_v2 = 100,
-            .field_type = (const fidl_type_t*)&Handlevcpu2147483648notnullableTable,
+            .field_type = (const fidl_type_t*)&Handletimer2147483648notnullableTable,
         },
     },
     {
@@ -305,7 +306,7 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .is_resource = kFidlIsResource_Resource,
             },
             .offset_v2 = 104,
-            .field_type = (const fidl_type_t*)&Handlevmar2147483648notnullableTable,
+            .field_type = (const fidl_type_t*)&Handlevcpu2147483648notnullableTable,
         },
     },
     {
@@ -315,7 +316,7 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .is_resource = kFidlIsResource_Resource,
             },
             .offset_v2 = 108,
-            .field_type = (const fidl_type_t*)&Handlevmo2147483648notnullableTable,
+            .field_type = (const fidl_type_t*)&Handlevmar2147483648notnullableTable,
         },
     },
     {
@@ -325,26 +326,6 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .is_resource = kFidlIsResource_Resource,
             },
             .offset_v2 = 112,
-            .field_type = (const fidl_type_t*)&Handlevmo5notnullableTable,
-        },
-    },
-    {
-        .field = {
-            .header = {
-                .element_type = kFidlStructElementType_Field,
-                .is_resource = kFidlIsResource_Resource,
-            },
-            .offset_v2 = 116,
-            .field_type = (const fidl_type_t*)&Handlehandle2147483648notnullableTable,
-        },
-    },
-    {
-        .field = {
-            .header = {
-                .element_type = kFidlStructElementType_Field,
-                .is_resource = kFidlIsResource_Resource,
-            },
-            .offset_v2 = 120,
             .field_type = (const fidl_type_t*)&Handlevmo2147483648notnullableTable,
         },
     },
@@ -354,8 +335,28 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .element_type = kFidlStructElementType_Field,
                 .is_resource = kFidlIsResource_Resource,
             },
+            .offset_v2 = 116,
+            .field_type = (const fidl_type_t*)&Handlevmo5notnullableTable,
+        },
+    },
+    {
+        .field = {
+            .header = {
+                .element_type = kFidlStructElementType_Field,
+                .is_resource = kFidlIsResource_Resource,
+            },
+            .offset_v2 = 120,
+            .field_type = (const fidl_type_t*)&Handlehandle2147483648notnullableTable,
+        },
+    },
+    {
+        .field = {
+            .header = {
+                .element_type = kFidlStructElementType_Field,
+                .is_resource = kFidlIsResource_Resource,
+            },
             .offset_v2 = 124,
-            .field_type = (const fidl_type_t*)&Handlevmo1notnullableTable,
+            .field_type = (const fidl_type_t*)&Handlevmo2147483648notnullableTable,
         },
     },
     {
@@ -365,7 +366,7 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .is_resource = kFidlIsResource_Resource,
             },
             .offset_v2 = 128,
-            .field_type = (const fidl_type_t*)&Protocol25test_handles_SomeProtocolnotnullableTable,
+            .field_type = (const fidl_type_t*)&Handlevmo1notnullableTable,
         },
     },
     {
@@ -375,6 +376,16 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
                 .is_resource = kFidlIsResource_Resource,
             },
             .offset_v2 = 132,
+            .field_type = (const fidl_type_t*)&Protocol25test_handles_SomeProtocolnotnullableTable,
+        },
+    },
+    {
+        .field = {
+            .header = {
+                .element_type = kFidlStructElementType_Field,
+                .is_resource = kFidlIsResource_Resource,
+            },
+            .offset_v2 = 136,
             .field_type = (const fidl_type_t*)&Request0notnullableTable,
         },
     },
@@ -383,9 +394,9 @@ const struct FidlCodedStruct test_handles_HandlesTable = {
     .tag = kFidlTypeStruct,
     .name = "test.handles/Handles",
     .is_empty = kFidlEmpty_IsNotEmpty,
-    .size_v2 = 136,
+    .size_v2 = 140,
     .elements = Fields20test_handles_Handles,
-    .element_count = 34,
+    .element_count = 35,
 };
 
 static const struct FidlCodedHandle Handlehandle2147483648notnullableTable = {
@@ -461,6 +472,13 @@ static const struct FidlCodedHandle Handleguest2147483648notnullableTable = {
 static const struct FidlCodedHandle Handleinterrupt2147483648notnullableTable = {
     .tag = kFidlTypeHandle,
     .handle_subtype = ZX_OBJ_TYPE_INTERRUPT,
+    .handle_rights = 0x80000000,
+    .nullable = kFidlNullability_Nonnullable,
+};
+
+static const struct FidlCodedHandle Handleiob2147483648notnullableTable = {
+    .tag = kFidlTypeHandle,
+    .handle_subtype = ZX_OBJ_TYPE_IOB,
     .handle_rights = 0x80000000,
     .nullable = kFidlNullability_Nonnullable,
 };

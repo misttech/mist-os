@@ -174,6 +174,7 @@ pub enum HandleSubtype {
     Fifo,
     Guest,
     Interrupt,
+    Iob,
     Iommu,
     Job,
     Msi,

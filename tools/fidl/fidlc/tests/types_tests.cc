@@ -120,6 +120,7 @@ TEST(TypesTests, GoodHandleSubtype) {
   static_assert(HandleSubtype::kFifo == static_cast<HandleSubtype>(ZX_OBJ_TYPE_FIFO));
   static_assert(HandleSubtype::kGuest == static_cast<HandleSubtype>(ZX_OBJ_TYPE_GUEST));
   static_assert(HandleSubtype::kInterrupt == static_cast<HandleSubtype>(ZX_OBJ_TYPE_INTERRUPT));
+  static_assert(HandleSubtype::kIob == static_cast<HandleSubtype>(ZX_OBJ_TYPE_IOB));
   static_assert(HandleSubtype::kIommu == static_cast<HandleSubtype>(ZX_OBJ_TYPE_IOMMU));
   static_assert(HandleSubtype::kJob == static_cast<HandleSubtype>(ZX_OBJ_TYPE_JOB));
   static_assert(HandleSubtype::kDebugLog == static_cast<HandleSubtype>(ZX_OBJ_TYPE_DEBUGLOG));

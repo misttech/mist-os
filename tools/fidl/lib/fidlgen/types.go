@@ -311,6 +311,7 @@ const (
 	HandleSubtypeFifo         HandleSubtype = "fifo"
 	HandleSubtypeGuest        HandleSubtype = "guest"
 	HandleSubtypeInterrupt    HandleSubtype = "interrupt"
+	HandleSubtypeIob          HandleSubtype = "iob"
 	HandleSubtypeIommu        HandleSubtype = "iommu"
 	HandleSubtypeJob          HandleSubtype = "job"
 	HandleSubtypeMsi          HandleSubtype = "msi"
@@ -374,6 +375,7 @@ const (
 	ObjectTypeClock
 	ObjectTypeStream
 	ObjectTypeMsi
+	ObjectTypeIob
 )
 
 func ObjectTypeFromHandleSubtype(val HandleSubtype) ObjectType {
@@ -398,6 +400,8 @@ func ObjectTypeFromHandleSubtype(val HandleSubtype) ObjectType {
 		return ObjectTypeGuest
 	case HandleSubtypeInterrupt:
 		return ObjectTypeInterrupt
+	case HandleSubtypeIob:
+		return ObjectTypeIob
 	case HandleSubtypeIommu:
 		return ObjectTypeIommu
 	case HandleSubtypeJob:

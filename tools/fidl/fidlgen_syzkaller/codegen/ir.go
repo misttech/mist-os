@@ -198,6 +198,7 @@ var handleSubtypes = map[fidlgen.HandleSubtype]string{
 	fidlgen.HandleSubtypeGuest:        "zx_guest",
 	fidlgen.HandleSubtypeNone:         "zx_handle",
 	fidlgen.HandleSubtypeInterrupt:    "zx_interrupt",
+	fidlgen.HandleSubtypeIob:          "zx_iob",
 	fidlgen.HandleSubtypeIommu:        "zx_iommu",
 	fidlgen.HandleSubtypeJob:          "zx_job",
 	fidlgen.HandleSubtypeMsi:          "zx_msi",

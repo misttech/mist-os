@@ -381,6 +381,7 @@ pub fn handle_type_to_cpp_str(ty: &HandleSubtype) -> String {
         HandleSubtype::Fifo => String::from("zx::fifo"),
         HandleSubtype::Guest => String::from("zx::guest"),
         HandleSubtype::Interrupt => String::from("zx::interrupt"),
+        HandleSubtype::Iob => String::from("zx::iob"),
         HandleSubtype::Iommu => String::from("zx::iommu"),
         HandleSubtype::Job => String::from("zx::job"),
         HandleSubtype::Msi => String::from("zx::msi"),

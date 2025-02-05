@@ -507,8 +507,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
         "data": "FdfHandles",
-        "start_offset": 1693,
-        "end_offset": 1703
+        "start_offset": 1723,
+        "end_offset": 1733
       },
       "members": [
         {
@@ -517,8 +517,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "fdf_channel_handle",
-            "start_offset": 1728,
-            "end_offset": 1746
+            "start_offset": 1758,
+            "end_offset": 1776
           },
           "type": {
             "kind": "handle"
@@ -530,8 +530,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "client_end_driver",
-            "start_offset": 1772,
-            "end_offset": 1789
+            "start_offset": 1802,
+            "end_offset": 1819
           },
           "type": {
             "kind": "endpoint"
@@ -543,8 +543,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "server_end_driver",
-            "start_offset": 1821,
-            "end_offset": 1838
+            "start_offset": 1851,
+            "end_offset": 1868
           },
           "type": {
             "kind": "endpoint"
@@ -707,13 +707,26 @@
           }
         },
         {
+          "name": "iob_handle",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
+            "data": "iob_handle",
+            "start_offset": 663,
+            "end_offset": 673
+          },
+          "type": {
+            "kind": "handle"
+          }
+        },
+        {
           "name": "iommu_handle",
           "location": {
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "iommu_handle",
-            "start_offset": 663,
-            "end_offset": 675
+            "start_offset": 693,
+            "end_offset": 705
           },
           "type": {
             "kind": "handle"
@@ -725,8 +738,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "job_handle",
-            "start_offset": 697,
-            "end_offset": 707
+            "start_offset": 727,
+            "end_offset": 737
           },
           "type": {
             "kind": "handle"
@@ -738,8 +751,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "msi_handle",
-            "start_offset": 727,
-            "end_offset": 737
+            "start_offset": 757,
+            "end_offset": 767
           },
           "type": {
             "kind": "handle"
@@ -751,8 +764,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "pager_handle",
-            "start_offset": 757,
-            "end_offset": 769
+            "start_offset": 787,
+            "end_offset": 799
           },
           "type": {
             "kind": "handle"
@@ -764,8 +777,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "pmt_handle",
-            "start_offset": 791,
-            "end_offset": 801
+            "start_offset": 821,
+            "end_offset": 831
           },
           "type": {
             "kind": "handle"
@@ -777,8 +790,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "port_handle",
-            "start_offset": 821,
-            "end_offset": 832
+            "start_offset": 851,
+            "end_offset": 862
           },
           "type": {
             "kind": "handle"
@@ -790,8 +803,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "process_handle",
-            "start_offset": 853,
-            "end_offset": 867
+            "start_offset": 883,
+            "end_offset": 897
           },
           "type": {
             "kind": "handle"
@@ -803,8 +816,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "profile_handle",
-            "start_offset": 891,
-            "end_offset": 905
+            "start_offset": 921,
+            "end_offset": 935
           },
           "type": {
             "kind": "handle"
@@ -816,8 +829,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "resource_handle",
-            "start_offset": 929,
-            "end_offset": 944
+            "start_offset": 959,
+            "end_offset": 974
           },
           "type": {
             "kind": "handle"
@@ -829,8 +842,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "socket_handle",
-            "start_offset": 969,
-            "end_offset": 982
+            "start_offset": 999,
+            "end_offset": 1012
           },
           "type": {
             "kind": "handle"
@@ -842,8 +855,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "stream_handle",
-            "start_offset": 1005,
-            "end_offset": 1018
+            "start_offset": 1035,
+            "end_offset": 1048
           },
           "type": {
             "kind": "handle"
@@ -855,8 +868,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "suspendtoken_handle",
-            "start_offset": 1041,
-            "end_offset": 1060
+            "start_offset": 1071,
+            "end_offset": 1090
           },
           "type": {
             "kind": "handle"
@@ -868,8 +881,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "thread_handle",
-            "start_offset": 1090,
-            "end_offset": 1103
+            "start_offset": 1120,
+            "end_offset": 1133
           },
           "type": {
             "kind": "handle"
@@ -881,8 +894,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "timer_handle",
-            "start_offset": 1126,
-            "end_offset": 1138
+            "start_offset": 1156,
+            "end_offset": 1168
           },
           "type": {
             "kind": "handle"
@@ -894,8 +907,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "vcpu_handle",
-            "start_offset": 1160,
-            "end_offset": 1171
+            "start_offset": 1190,
+            "end_offset": 1201
           },
           "type": {
             "kind": "handle"
@@ -907,8 +920,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "vmar_handle",
-            "start_offset": 1192,
-            "end_offset": 1203
+            "start_offset": 1222,
+            "end_offset": 1233
           },
           "type": {
             "kind": "handle"
@@ -920,8 +933,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "vmo_handle",
-            "start_offset": 1224,
-            "end_offset": 1234
+            "start_offset": 1254,
+            "end_offset": 1264
           },
           "type": {
             "kind": "handle"
@@ -933,8 +946,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "rights_handle",
-            "start_offset": 1255,
-            "end_offset": 1268
+            "start_offset": 1285,
+            "end_offset": 1298
           },
           "type": {
             "kind": "handle"
@@ -946,8 +959,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "aliased_plain_handle_field",
-            "start_offset": 1330,
-            "end_offset": 1356
+            "start_offset": 1360,
+            "end_offset": 1386
           },
           "type": {
             "kind": "handle"
@@ -959,8 +972,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "aliased_subtype_handle_field",
-            "start_offset": 1383,
-            "end_offset": 1411
+            "start_offset": 1413,
+            "end_offset": 1441
           },
           "type": {
             "kind": "handle"
@@ -972,8 +985,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "aliased_rights_handle_field",
-            "start_offset": 1440,
-            "end_offset": 1467
+            "start_offset": 1470,
+            "end_offset": 1497
           },
           "type": {
             "kind": "handle"
@@ -985,8 +998,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "some_protocol",
-            "start_offset": 1496,
-            "end_offset": 1509
+            "start_offset": 1526,
+            "end_offset": 1539
           },
           "type": {
             "kind": "endpoint"
@@ -998,8 +1011,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
             "data": "request_some_protocol",
-            "start_offset": 1539,
-            "end_offset": 1560
+            "start_offset": 1569,
+            "end_offset": 1590
           },
           "type": {
             "kind": "endpoint"
@@ -1015,8 +1028,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
         "data": "DriverProtocol",
-        "start_offset": 1627,
-        "end_offset": 1641
+        "start_offset": 1657,
+        "end_offset": 1671
       },
       "methods": [],
       "composed_protocols": []

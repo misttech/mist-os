@@ -22,6 +22,7 @@ type Handles = resource struct {
     fifo_handle zx.Handle:FIFO;
     guest_handle zx.Handle:GUEST;
     interrupt_handle zx.Handle:INTERRUPT;
+    iob_handle zx.Handle:IOB;
     iommu_handle zx.Handle:IOMMU;
     job_handle zx.Handle:JOB;
     msi_handle zx.Handle:MSI;

@@ -22,7 +22,7 @@ using FdfHandles = ::test::handles::FdfHandles;
 template <>
 struct MinSize<Handles> {
   operator size_t() {
-    return MinSize<::zx::handle>() + MinSize<::zx::bti>() + MinSize<::zx::channel>() + MinSize<::zx::clock>() + MinSize<::zx::debuglog>() + MinSize<::zx::event>() + MinSize<::zx::eventpair>() + MinSize<::zx::exception>() + MinSize<::zx::fifo>() + MinSize<::zx::guest>() + MinSize<::zx::interrupt>() + MinSize<::zx::iommu>() + MinSize<::zx::job>() + MinSize<::zx::msi>() + MinSize<::zx::pager>() + MinSize<::zx::pmt>() + MinSize<::zx::port>() + MinSize<::zx::process>() + MinSize<::zx::profile>() + MinSize<::zx::resource>() + MinSize<::zx::socket>() + MinSize<::zx::stream>() + MinSize<::zx::suspend_token>() + MinSize<::zx::thread>() + MinSize<::zx::timer>() + MinSize<::zx::vcpu>() + MinSize<::zx::vmar>() + MinSize<::zx::vmo>() + MinSize<::zx::vmo>() + MinSize<::zx::handle>() + MinSize<::zx::vmo>() + MinSize<::zx::vmo>() + MinSize<::fidl::InterfaceHandle<::test::handles::SomeProtocol>>() + MinSize<::fidl::InterfaceRequest<::test::handles::SomeProtocol>>();
+    return MinSize<::zx::handle>() + MinSize<::zx::bti>() + MinSize<::zx::channel>() + MinSize<::zx::clock>() + MinSize<::zx::debuglog>() + MinSize<::zx::event>() + MinSize<::zx::eventpair>() + MinSize<::zx::exception>() + MinSize<::zx::fifo>() + MinSize<::zx::guest>() + MinSize<::zx::interrupt>() + MinSize<::zx::iob>() + MinSize<::zx::iommu>() + MinSize<::zx::job>() + MinSize<::zx::msi>() + MinSize<::zx::pager>() + MinSize<::zx::pmt>() + MinSize<::zx::port>() + MinSize<::zx::process>() + MinSize<::zx::profile>() + MinSize<::zx::resource>() + MinSize<::zx::socket>() + MinSize<::zx::stream>() + MinSize<::zx::suspend_token>() + MinSize<::zx::thread>() + MinSize<::zx::timer>() + MinSize<::zx::vcpu>() + MinSize<::zx::vmar>() + MinSize<::zx::vmo>() + MinSize<::zx::vmo>() + MinSize<::zx::handle>() + MinSize<::zx::vmo>() + MinSize<::zx::vmo>() + MinSize<::fidl::InterfaceHandle<::test::handles::SomeProtocol>>() + MinSize<::fidl::InterfaceRequest<::test::handles::SomeProtocol>>();
   }
 };
 template <>
@@ -30,7 +30,7 @@ struct Allocate<Handles> {
   Handles operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<Handles>());
     Handles out;
-    const size_t slack_per_member = (*size - MinSize<Handles>()) / 34;
+    const size_t slack_per_member = (*size - MinSize<Handles>()) / 35;
     size_t out_size;
     out_size = MinSize<::zx::handle>() + slack_per_member;
     out.plain_handle = Allocate<::zx::handle>{}(src, &out_size);
@@ -54,6 +54,8 @@ struct Allocate<Handles> {
     out.guest_handle = Allocate<::zx::guest>{}(src, &out_size);
     out_size = MinSize<::zx::interrupt>() + slack_per_member;
     out.interrupt_handle = Allocate<::zx::interrupt>{}(src, &out_size);
+    out_size = MinSize<::zx::iob>() + slack_per_member;
+    out.iob_handle = Allocate<::zx::iob>{}(src, &out_size);
     out_size = MinSize<::zx::iommu>() + slack_per_member;
     out.iommu_handle = Allocate<::zx::iommu>{}(src, &out_size);
     out_size = MinSize<::zx::job>() + slack_per_member;

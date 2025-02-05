@@ -53,6 +53,7 @@ var handleSubtypeConsts = map[fidlgen.HandleSubtype]string{
 	fidlgen.HandleSubtypeFifo:         "FIFO",
 	fidlgen.HandleSubtypeGuest:        "GUEST",
 	fidlgen.HandleSubtypeInterrupt:    "INTERRUPT",
+	fidlgen.HandleSubtypeIob:          "IOB",
 	fidlgen.HandleSubtypeIommu:        "IOMMU",
 	fidlgen.HandleSubtypeJob:          "JOB",
 	fidlgen.HandleSubtypeMsi:          "MSI",

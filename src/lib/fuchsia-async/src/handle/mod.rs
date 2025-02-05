@@ -42,6 +42,7 @@ macro_rules! invoke_for_handle_types {
         $x! {Guest, "Guest", GUEST, ZX_OBJ_TYPE_GUEST, FuchsiaOnly}
         $x! {Vcpu, "VCPU", VCPU, ZX_OBJ_TYPE_VCPU, FuchsiaOnly}
         $x! {Timer, "Timer", TIMER, ZX_OBJ_TYPE_TIMER, FuchsiaOnly}
+        $x! {Iob, "Iobuffer", IOB, ZX_OBJ_TYPE_IOB, FuchsiaOnly}
         $x! {Iommu, "IOMMU", IOMMU, ZX_OBJ_TYPE_IOMMU, Stub}
         $x! {Bti, "BTI", BTI, ZX_OBJ_TYPE_BTI, Stub}
         $x! {Profile, "Profile", PROFILE, ZX_OBJ_TYPE_PROFILE, FuchsiaOnly}
