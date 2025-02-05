@@ -731,7 +731,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8723864686794533473"`
+**Current value for `target_cpu = "arm64"`:** `"8723774076320846705"`
 
 From //out/not-default/args.gn:10
 
@@ -739,7 +739,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8723864686794533473"`
+**Current value for `target_cpu = "riscv64"`:** `"8723774076320846705"`
 
 From //out/not-default/args.gn:10
 
@@ -747,7 +747,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8723864686794533473"`
+**Current value for `target_cpu = "x64"`:** `"8723774076320846705"`
 
 From //out/not-default/args.gn:10
 
@@ -2431,7 +2431,7 @@ These take precedence over `profile_source_files`.
 
 **Current value (from the default):** `["//prebuilt/*"]`
 
-From //build/config/profile/config.gni:15
+From //build/config/profile/config.gni:18
 
 ### dwarf_version
 
@@ -4928,7 +4928,7 @@ Profile data path that is used by PGO.
 
 **Current value (from the default):** `""`
 
-From //build/config/profile/config.gni:29
+From //build/config/profile/config.gni:45
 
 ### platform_enable_user_pci
 
@@ -5082,7 +5082,7 @@ List of GN paths to source files to be instrumented by `profile` variants.
 
 **Current value (from the default):** `["//*"]`
 
-From //build/config/profile/config.gni:7
+From //build/config/profile/config.gni:10
 
 ### profile_source_files_list_files
 
@@ -5091,7 +5091,7 @@ and functions to be instrumented by `profile` variants.
 
 **Current value (from the default):** `[]`
 
-From //build/config/profile/config.gni:26
+From //build/config/profile/config.gni:42
 
 ### proprietary_codecs
 
@@ -5979,6 +5979,14 @@ Whether or not unified address spaces are leveraged.
 **Current value (from the default):** `true`
 
 From //src/starnix/kernel/args.gni:29
+
+### starnix_use_cowmap
+
+Whether to use CowMap instead of BTreeMap to back RangeMap.
+
+**Current value (from the default):** `false`
+
+From //src/starnix/lib/range_map/BUILD.gn:7
 
 ### sysmem_contiguous_guard_page_count
 
