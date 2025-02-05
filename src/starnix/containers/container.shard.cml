@@ -29,11 +29,6 @@
             from: "parent",
             availability: "transitional",
         },
-        {
-            protocol: [ "fuchsia.session.power.ListenerRegistry" ],
-            from: "parent",
-            availability: "optional",
-        },
     ],
     offer: [
         {
