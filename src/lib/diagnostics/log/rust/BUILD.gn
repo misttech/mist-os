@@ -70,16 +70,27 @@ rustc_test("diagnostics_log_lib_test") {
     args = [ "--test-threads=1" ]
   } else {
     deps += [
+      "//src/lib/diagnostics/log/rust/fidl:fuchsia.diagnostics.crasher_rust",
       "//src/lib/diagnostics/reader/rust",
       "//src/lib/fuchsia",
       "//src/lib/fuchsia-async",
+      "//src/lib/fuchsia-component-test",
       "//src/lib/test_util",
+      "//src/sys/lib/moniker",
       "//third_party/rust_crates:futures",
     ]
   }
 }
 
 fuchsia_unittest_package("diagnostics-log-tests") {
-  deps = [ ":diagnostics_log_lib_test" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+  deps = [
+    ":diagnostics_log_lib_test",
+    "rust-crasher:component",
+  ]
   manifest = "meta/test.cml"
 }

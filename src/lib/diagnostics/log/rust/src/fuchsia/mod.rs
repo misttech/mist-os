@@ -408,8 +408,53 @@ macro_rules! log_every_n_seconds {
 mod tests {
     use super::*;
     use diagnostics_reader::{ArchiveReader, Logs};
+    use fidl_fuchsia_diagnostics_crasher::CrasherMarker;
+    use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
     use futures::{future, StreamExt};
     use log::{debug, info};
+    use moniker::ExtendedMoniker;
+
+    #[fuchsia::test]
+    async fn panic_integration_test() {
+        let builder = RealmBuilder::new().await.unwrap();
+        let puppet = builder
+            .add_child("rust-crasher", "#meta/crasher.cm", ChildOptions::new())
+            .await
+            .unwrap();
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol::<CrasherMarker>())
+                    .from(&puppet)
+                    .to(Ref::parent()),
+            )
+            .await
+            .unwrap();
+        let realm = builder.build().await.unwrap();
+        let child_name = realm.root.child_name();
+        let reader = ArchiveReader::new();
+        let (logs, _) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
+        let proxy = realm.root.connect_to_protocol_at_exposed_dir::<CrasherMarker>().unwrap();
+        let target_moniker =
+            ExtendedMoniker::parse_str(&format!("realm_builder:{}/rust-crasher", child_name))
+                .unwrap();
+        proxy.crash("This is a test panic.").await.unwrap();
+
+        let result =
+            logs.filter(|data| future::ready(target_moniker == data.moniker)).next().await.unwrap();
+        assert_eq!(result.line_number(), Some(29).as_ref());
+        assert_eq!(
+            result.file_path(),
+            Some("src/lib/diagnostics/log/rust/rust-crasher/src/main.rs")
+        );
+        assert!(result
+            .payload_keys()
+            .unwrap()
+            .get_property("info")
+            .unwrap()
+            .to_string()
+            .contains("This is a test panic."));
+    }
 
     #[fuchsia::test(logging = false)]
     async fn verify_setting_minimum_log_severity() {
