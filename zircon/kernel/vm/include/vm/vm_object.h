@@ -61,11 +61,15 @@ enum class Resizability {
   NonResizable,
 };
 
-// Argument which specifies the type of clone.
-enum class CloneType {
-  Snapshot,
-  SnapshotAtLeastOnWrite,
-  SnapshotModified,
+// Argument which specifies the required snapshot semantics for the clone.
+enum class SnapshotType {
+  // All pages must appear as if a snapshot is performed at the moment of the clone.
+  Full,
+  // Only pages already modified in the hierarchy need to appear as if a snapshot is performed at
+  // the moment of the clone.
+  Modified,
+  // No pages need to be initially snapshot, but they must have a snapshot taken if written.
+  OnWrite,
 };
 
 // Argument that specifies the context in which we are supplying pages.
@@ -598,7 +602,7 @@ class VmObject : public VmHierarchyBase,
 
   // create a copy-on-write clone vmo at the page-aligned offset and length
   // note: it's okay to start or extend past the size of the parent
-  virtual zx_status_t CreateClone(Resizability resizable, CloneType type, uint64_t offset,
+  virtual zx_status_t CreateClone(Resizability resizable, SnapshotType type, uint64_t offset,
                                   uint64_t size, bool copy_name, fbl::RefPtr<VmObject>* child_vmo) {
     return ZX_ERR_NOT_SUPPORTED;
   }

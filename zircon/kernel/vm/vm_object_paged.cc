@@ -743,7 +743,7 @@ zx_status_t VmObjectPaged::CreateChildReferenceCommon(uint32_t options, VmCowRan
   return ZX_OK;
 }
 
-zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, uint64_t offset,
+zx_status_t VmObjectPaged::CreateClone(Resizability resizable, SnapshotType type, uint64_t offset,
                                        uint64_t size, bool copy_name,
                                        fbl::RefPtr<VmObject>* child_vmo) {
   LTRACEF("vmo %p offset %#" PRIx64 " size %#" PRIx64 "\n", this, offset, size);

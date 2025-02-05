@@ -108,7 +108,7 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Creates a copy-on-write clone with the desired parameters. This can fail due to various
   // internal states not being correct.
-  zx_status_t CreateCloneLocked(CloneType type, bool require_unidirection, VmCowRange range,
+  zx_status_t CreateCloneLocked(SnapshotType type, bool require_unidirection, VmCowRange range,
                                 fbl::RefPtr<VmCowPages>* cow_child) TA_REQ(lock());
 
   // VmCowPages are initially created in the Init state and need to be transitioned to Alive prior
@@ -806,42 +806,43 @@ class VmCowPages final : public VmHierarchyBase,
     return true;
   }
 
-  bool is_snapshot_at_least_on_write_supported() const TA_REQ(lock()) {
-    canary_.Assert();
-
-    if (is_parent_hidden_locked()) {
+  // Returns whether or not performing a bidirectional clone would result in a valid tree structure.
+  // This does not perform checks on whether there are pinned pages, or if a bidirectional clone
+  // would semantically make sense.
+  bool can_bidirectional_clone_locked() const TA_REQ(lock()) {
+    // If the immediate node has a page source of any kind then bidirectional cloning is not
+    // possible. A page source is otherwise permitted in the tree.
+    if (page_source_) {
       return false;
     }
 
-    bool result = is_root_source_preserving_page_content();
-    DEBUG_ASSERT(result == is_root_source_user_pager_backed());
-
-    return result;
-  }
-
-  bool can_snapshot_modified_locked() const TA_REQ(lock()) {
-    // Root must be pager-backed.
-    if (!is_root_source_user_pager_backed()) {
-      return false;
-    }
-
-    // We don't support COW clones for contiguous VMOs.
-    if (is_source_supplying_specific_physical_pages()) {
-      return false;
-    }
-
-    // Unless we are the root VMO, we can't snapshot if has children, as it would create an
-    // inconsistent hierarchy.
-    if (!parent_) {
-      return true;
-    }
+    // Children may not exist on the current node, as the bidirectional clone path cannot presently
+    // fix them up.
     if (children_list_len_ != 0) {
       return false;
     }
 
-    // Snapshot-modified is currently unsupported for at-least-on-write VMO chains of length >2.
-    AssertHeld(parent_->lock_ref());
-    if (parent_->parent_ && !is_parent_hidden_locked()) {
+    // If there is a parent then either that parent is hidden, or the parent is the root of the
+    // tree. This forbids creating a bi-directional clone at the end of chain of unidirectional
+    // clones.
+    if (parent_ && parent_locked().parent_ && !is_parent_hidden_locked()) {
+      return false;
+    }
+
+    return true;
+  }
+
+  // Returns whether or not performing a unidirectional clone would result in a valid tree
+  // structure. This does not mean that the a unidirectional clone would semantically make sense.
+  bool can_unidirectional_clone_locked() const TA_REQ(lock()) {
+    // Root must be pager-backed, otherwise we must always be doing a bidirectional clone.
+    if (!is_root_source_user_pager_backed()) {
+      return false;
+    }
+
+    // Any parent must not be hidden. This transitively ensures that there is a never a
+    // unidirectional clone anywhere below a hidden parent.
+    if (parent_ && is_parent_hidden_locked()) {
       return false;
     }
 

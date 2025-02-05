@@ -965,63 +965,6 @@ TEST(Snapshot, CloneAfterSliceRoot) {
   EXPECT_EQ(*reinterpret_cast<uint64_t*>(slicesnapshot->base_addr()), 0xc0ffee);
 }
 
-// Ensures that a snapshot-modified child can not be created on a VMO with pinned pages.
-TEST(Snapshot, PinBeforeCreateFailure) {
-  auto system_resource = maybe_standalone::GetSystemResource();
-
-  if (!*system_resource) {
-    printf("System resource not available, skipping\n");
-    return;
-  }
-
-  UserPager pager;
-  ASSERT_TRUE(pager.Init());
-
-  Vmo* vmo;
-  ASSERT_TRUE(pager.CreateVmo(1, &vmo));
-  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 1));
-
-  zx::iommu iommu;
-  zx::bti bti;
-  zx_iommu_desc_dummy_t desc;
-  auto final_bti_check = fit::defer([&bti]() {
-    if (bti.is_valid()) {
-      zx_info_bti_t info;
-      ASSERT_OK(bti.get_info(ZX_INFO_BTI, &info, sizeof(info), nullptr, nullptr));
-      EXPECT_EQ(0, info.pmo_count);
-      EXPECT_EQ(0, info.quarantine_count);
-    }
-  });
-
-  zx::result<zx::resource> result =
-      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
-  ASSERT_OK(result.status_value());
-  zx::resource iommu_resource = std::move(result.value());
-
-  ASSERT_OK(zx::iommu::create(iommu_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
-  EXPECT_OK(zx::bti::create(iommu, 0, 0xdead1eaf, &bti));
-
-  auto name = "PinBeforeCreateFailure";
-  if (bti.is_valid()) {
-    EXPECT_OK(bti.set_property(ZX_PROP_NAME, name, strlen(name)));
-  }
-
-  zx::pmt pmt;
-  zx_paddr_t addr;
-  zx_status_t status =
-      bti.pin(ZX_BTI_PERM_READ, vmo->vmo(), 0, zx_system_get_page_size(), &addr, 1, &pmt);
-  ASSERT_OK(status, "pin failed");
-
-  // Fail to clone if pages are pinned
-  auto clone = vmo->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
-  ASSERT_NULL(clone);
-  pmt.unpin();
-
-  // Clone successfully after pages are unpinned
-  clone = vmo->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
-  ASSERT_NOT_NULL(clone);
-}
-
 // Tests calling op_range with the flag ZX_OP_COMMIT to ensure a panic is not triggered.
 TEST(Snapshot, CommitRangeInSnapshot) {
   UserPager pager;

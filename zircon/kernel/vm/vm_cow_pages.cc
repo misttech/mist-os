@@ -1153,7 +1153,7 @@ zx_status_t VmCowPages::CloneUnidirectionalLocked(uint64_t offset, uint64_t size
   return ZX_OK;
 }
 
-zx_status_t VmCowPages::CreateCloneLocked(CloneType type, bool require_unidirectional,
+zx_status_t VmCowPages::CreateCloneLocked(SnapshotType type, bool require_unidirectional,
                                           VmCowRange range, fbl::RefPtr<VmCowPages>* cow_child) {
   canary_.Assert();
 
@@ -1164,53 +1164,33 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, bool require_unidirect
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
-  // Upgrade clone type, if possible.
-  if (type == CloneType::SnapshotAtLeastOnWrite && !is_snapshot_at_least_on_write_supported()) {
-    if (can_snapshot_modified_locked()) {
-      type = CloneType::SnapshotModified;
-    } else {
-      type = CloneType::Snapshot;
-    }
-  } else if (type == CloneType::SnapshotModified) {
-    if (!can_snapshot_modified_locked()) {
-      type = CloneType::Snapshot;
-    }
+  // A full snapshot is not compatible with there being a root page source. More specifically a
+  // full snapshot requires that there be no unidirectional clones in the tree, and this invariant
+  // is maintained by limiting unidirectional clones to only existing if there *is* a root page
+  // source. Any unidirectional clones in the tree would be able to introduce / modify content,
+  // which is not compatible with the notion of a full snapshot.
+  if (type == SnapshotType::Full && can_root_source_evict()) {
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
-  // All validation *must* be performed here prior to construction the VmCowPages, as the
-  // destructor for VmCowPages may acquire the lock, which we are already holding.
-
-  switch (type) {
-    case CloneType::Snapshot: {
-      if (!is_cow_clonable_locked() || require_unidirectional) {
-        return ZX_ERR_NOT_SUPPORTED;
-      }
-
-      // If this is non-zero, that means that there are pages which hardware can
-      // touch, so the vmo can't be safely cloned.
-      // TODO: consider immediately forking these pages.
-      if (pinned_page_count_locked()) {
-        return ZX_ERR_BAD_STATE;
-      }
-      break;
+  // Determine whether the snapshot type is requiring a bidirectional clone or not.
+  const bool require_bidirectional = [&]() TA_REQ(lock()) {
+    switch (type) {
+      case SnapshotType::Full:
+        // As per the above check, a full snapshot is incompatible with unidirectional clones, and
+        // so this type insists on bidirectional.
+        return true;
+      case SnapshotType::Modified:
+        // If there is a parent then a bidirectional clone is required in order to produce a
+        // snapshot of any of the pages we have modified with respect to our parent. In the absence
+        // of a parent there is no restriction.
+        return !!parent_;
+      case SnapshotType::OnWrite:
+        // Any kind of clone implements on copy-on-write, so no restriction.
+        return false;
     }
-    case CloneType::SnapshotAtLeastOnWrite: {
-      if (!is_snapshot_at_least_on_write_supported()) {
-        return ZX_ERR_NOT_SUPPORTED;
-      }
-
-      break;
-    }
-    case CloneType::SnapshotModified: {
-      if (!can_snapshot_modified_locked()) {
-        return ZX_ERR_NOT_SUPPORTED;
-      }
-      if (pinned_page_count_locked()) {
-        return ZX_ERR_BAD_STATE;
-      }
-      break;
-    }
-  }
+    return false;
+  }();
 
   // Offsets within the new clone must not overflow when projected onto the root.
   {
@@ -1227,27 +1207,21 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, bool require_unidirect
     }
   }
 
-  switch (type) {
-    case CloneType::Snapshot: {
-      return CloneBidirectionalLocked(range.offset, range.len, cow_child);
-    }
-    case CloneType::SnapshotAtLeastOnWrite: {
-      return CloneUnidirectionalLocked(range.offset, range.len, cow_child);
-    }
-    case CloneType::SnapshotModified: {
-      // TODO(https://fxbug.dev/42074633): consider extending this to take unidirectional clones of
-      // snapshot-modified leaves if possible.
-      if (parent_) {
-        if (require_unidirectional) {
-          return ZX_ERR_NOT_SUPPORTED;
-        }
-        return CloneBidirectionalLocked(range.offset, range.len, cow_child);
-      } else {
-        return CloneUnidirectionalLocked(range.offset, range.len, cow_child);
-      }
-    }
+  // Preference unidirectional clones if possible.
+  if (!require_bidirectional && can_unidirectional_clone_locked()) {
+    return CloneUnidirectionalLocked(range.offset, range.len, cow_child);
   }
-
+  // Perform a bidirectional clone if possible.
+  if (!require_unidirectional && can_bidirectional_clone_locked()) {
+    // If this is non-zero, that means that there are pages which hardware can
+    // touch, so the vmo can't be safely cloned.
+    // TODO: consider immediately forking these pages.
+    if (pinned_page_count_locked()) {
+      return ZX_ERR_BAD_STATE;
+    }
+    return CloneBidirectionalLocked(range.offset, range.len, cow_child);
+  }
+  // Incompatible mixture of requested snapshot type and available clone type.
   return ZX_ERR_NOT_SUPPORTED;
 }
 

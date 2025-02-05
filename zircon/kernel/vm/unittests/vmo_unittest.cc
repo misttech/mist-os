@@ -1337,7 +1337,7 @@ static bool vmo_lookup_clone_test() {
   ASSERT_EQ(ZX_OK, status, "vmobject creation\n");
 
   fbl::RefPtr<VmObject> clone;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, alloc_size, false,
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, alloc_size, false,
                             &clone);
   ASSERT_EQ(ZX_OK, status, "vmobject creation\n");
   ASSERT_TRUE(clone, "vmobject creation\n");
@@ -1409,7 +1409,7 @@ static bool vmo_clone_removes_write_test() {
   vmo->set_user_id(42);
   fbl::RefPtr<VmObject> clone;
   status =
-      vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, true, &clone);
+      vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, PAGE_SIZE, true, &clone);
   EXPECT_EQ(ZX_OK, status, "create clone");
 
   // Aspace should now have a read only mapping with the same underlying page.
@@ -1468,7 +1468,7 @@ static bool vmo_clones_of_compressed_pages_test() {
   // Creating a clone should keep the page compressed.
   fbl::RefPtr<VmObject> clone;
   status =
-      vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, true, &clone);
+      vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, PAGE_SIZE, true, &clone);
   ASSERT_OK(status);
   clone->set_user_id(43);
   EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE,
@@ -1531,8 +1531,8 @@ static bool vmo_clone_kernel_mapped_compressed_test() {
 
   // Now create a child of the VMO and fork the page into it.
   fbl::RefPtr<VmObject> clone;
-  ASSERT_OK(vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, true,
-                             &clone));
+  ASSERT_OK(
+      vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, PAGE_SIZE, true, &clone));
   data = 41;
   EXPECT_OK(clone->Write(&data, 0, sizeof(data)));
 
@@ -1610,8 +1610,8 @@ static bool vmo_move_pages_on_access_test() {
 
   // Touching pages in a child should also move the page to the front of the queues.
   fbl::RefPtr<VmObject> child;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                            PAGE_SIZE, true, &child);
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite, 0, PAGE_SIZE, true,
+                            &child);
   ASSERT_EQ(ZX_OK, status);
 
   status = child->GetPageBlocking(0, VMM_PF_FLAG_SW_FAULT, nullptr, nullptr, nullptr);
@@ -1788,8 +1788,8 @@ static bool vmo_eviction_hints_clone_test() {
 
   // Create a clone.
   fbl::RefPtr<VmObject> clone;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                            2 * PAGE_SIZE, true, &clone);
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite, 0, 2 * PAGE_SIZE,
+                            true, &clone);
   ASSERT_EQ(ZX_OK, status);
 
   // Use the clone to perform a bunch of hinting operations on the first page.
@@ -1816,8 +1816,8 @@ static bool vmo_eviction_hints_clone_test() {
 
   // Hinting should also work via a clone of a clone.
   fbl::RefPtr<VmObject> clone2;
-  status = clone->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                              2 * PAGE_SIZE, true, &clone2);
+  status = clone->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite, 0, 2 * PAGE_SIZE,
+                              true, &clone2);
   ASSERT_EQ(ZX_OK, status);
 
   // Hint that the page is not needed.
@@ -1881,8 +1881,8 @@ static bool vmo_eviction_hints_clone_test() {
   // Create another clone that sees the forked page.
   // Hinting through this clone should have no effect, since it will see the forked page.
   fbl::RefPtr<VmObject> clone3;
-  status = clone->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                              2 * PAGE_SIZE, true, &clone3);
+  status = clone->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite, 0, 2 * PAGE_SIZE,
+                              true, &clone3);
   ASSERT_EQ(ZX_OK, status);
 
   // Move the page back to the DontNeed queue first.
@@ -1999,7 +1999,7 @@ static bool vmo_attribution_clones_test() {
 
   // Create a clone that sees the second and third pages.
   fbl::RefPtr<VmObject> clone;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, PAGE_SIZE,
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, PAGE_SIZE,
                             2 * PAGE_SIZE, true, &clone);
   ASSERT_EQ(ZX_OK, status);
   clone->set_user_id(0xfc);
@@ -2328,8 +2328,8 @@ static bool vmo_attribution_pager_test() {
 
   // Create a COW clone that sees the first page.
   fbl::RefPtr<VmObject> clone;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                            PAGE_SIZE, true, &clone);
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite, 0, PAGE_SIZE, true,
+                            &clone);
   ASSERT_EQ(ZX_OK, status);
   clone->set_user_id(0xfc);
 
@@ -2505,8 +2505,8 @@ static bool vmo_parent_merge_test() {
   vmo->set_user_id(42);
 
   fbl::RefPtr<VmObject> child;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, false,
-                            &child);
+  status =
+      vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, PAGE_SIZE, false, &child);
   ASSERT_EQ(ZX_OK, status);
 
   child->set_user_id(43);
@@ -2528,17 +2528,17 @@ static bool vmo_parent_merge_test() {
   status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE, &vmo);
   ASSERT_EQ(ZX_OK, status);
   vmo->set_user_id(42);
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, false,
-                            &child);
+  status =
+      vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, PAGE_SIZE, false, &child);
   ASSERT_EQ(ZX_OK, status);
   child->set_user_id(43);
   fbl::RefPtr<VmObject> child2;
-  status = child->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, false,
+  status = child->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, PAGE_SIZE, false,
                               &child2);
   ASSERT_EQ(ZX_OK, status);
   child2->set_user_id(44);
   fbl::RefPtr<VmObject> child3;
-  status = child->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, false,
+  status = child->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, PAGE_SIZE, false,
                               &child3);
   ASSERT_EQ(ZX_OK, status);
   child3->set_user_id(45);
@@ -3070,8 +3070,8 @@ static bool vmo_write_does_not_commit_test() {
 
   // Create a CoW clone of the vmo.
   fbl::RefPtr<VmObject> clone;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, false,
-                            &clone);
+  status =
+      vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, PAGE_SIZE, false, &clone);
 
   // Querying the page for read in the clone should return it.
   EXPECT_OK(clone->GetPageBlocking(0, 0, nullptr, nullptr, nullptr));
@@ -3860,7 +3860,7 @@ static bool vmo_snapshot_modified_test() {
 
   // Snapshot-modified all 3 pages of root.
   fbl::RefPtr<VmObject> clone;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0, alloc_size,
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::Modified, 0, alloc_size,
                             false, &clone);
   ASSERT_EQ(ZX_OK, status, "vmobject full clone\n");
   ASSERT_NONNULL(clone, "vmobject full clone\n");
@@ -3868,8 +3868,8 @@ static bool vmo_snapshot_modified_test() {
 
   // Hang another snapshot-modified clone off root that only sees the first page.
   fbl::RefPtr<VmObject> clone2;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0, PAGE_SIZE,
-                            false, &clone2);
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::Modified, 0, PAGE_SIZE, false,
+                            &clone2);
   ASSERT_EQ(ZX_OK, status, "vmobject partial clone\n");
   ASSERT_NONNULL(clone2, "vmobject partial clone\n");
   clone2->set_user_id(44);
@@ -3893,7 +3893,7 @@ static bool vmo_snapshot_modified_test() {
 
   // Call snapshot-modified again on the full clone, which will create a hidden parent.
   fbl::RefPtr<VmObject> snapshot;
-  status = clone->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
+  status = clone->CreateClone(Resizability::NonResizable, SnapshotType::Modified, 0,
                               PAGE_SIZE * kNumPages, false, &snapshot);
   ASSERT_EQ(ZX_OK, status, "vmobject snapshot-modified\n");
   ASSERT_NONNULL(snapshot, "vmobject snapshot-modified clone\n");
@@ -3908,8 +3908,8 @@ static bool vmo_snapshot_modified_test() {
 
   // Calling CreateClone directly with SnapshotAtLeastOnWrite should upgrade to snapshot-modified.
   fbl::RefPtr<VmObject> atleastonwrite;
-  status = clone->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                              alloc_size, false, &atleastonwrite);
+  status = clone->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite, 0, alloc_size,
+                              false, &atleastonwrite);
   ASSERT_EQ(ZX_OK, status, "vmobject snapshot-at-least-on-write clone.\n");
   ASSERT_NONNULL(atleastonwrite, "vmobject snapshot-at-least-on-write clone\n");
 
@@ -3925,8 +3925,8 @@ static bool vmo_snapshot_modified_test() {
 
   // Snapshot-modified of root-slice should work.
   fbl::RefPtr<VmObject> slicesnapshot;
-  status = slice->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
-                              kSliceSize, false, &slicesnapshot);
+  status = slice->CreateClone(Resizability::NonResizable, SnapshotType::Modified, 0, kSliceSize,
+                              false, &slicesnapshot);
   ASSERT_EQ(ZX_OK, status, "snapshot-modified root-slice\n");
   ASSERT_NONNULL(slicesnapshot, "snapshot modified root-slice\n");
   slicesnapshot->set_user_id(46);
@@ -3944,7 +3944,7 @@ static bool vmo_snapshot_modified_test() {
 
   // Create a slice of the clone of the root-slice.
   fbl::RefPtr<VmObject> slicesnapshot_slice;
-  status = slicesnapshot->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
+  status = slicesnapshot->CreateClone(Resizability::NonResizable, SnapshotType::Modified, 0,
                                       kSliceSize, false, &slicesnapshot_slice);
   ASSERT_EQ(ZX_OK, status, "slice snapshot-modified-root-slice\n");
   ASSERT_NONNULL(slicesnapshot_slice, "slice snapshot-modified-root-slice\n");
@@ -3952,7 +3952,7 @@ static bool vmo_snapshot_modified_test() {
 
   // Check that snapshot-modified will work again on the snapshot-modified clone of the slice.
   fbl::RefPtr<VmObject> slicesnapshot2;
-  status = slicesnapshot->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
+  status = slicesnapshot->CreateClone(Resizability::NonResizable, SnapshotType::Modified, 0,
                                       kSliceSize, false, &slicesnapshot2);
   ASSERT_EQ(ZX_OK, status, "snapshot-modified root-slice-snapshot\n");
   ASSERT_NONNULL(slicesnapshot2, "snapshot-modified root-slice-snapshot\n");
@@ -3965,7 +3965,7 @@ static bool vmo_snapshot_modified_test() {
 
   // Snapshot-modified should not be allowed on a slice of a clone.
   fbl::RefPtr<VmObject> cloneslicesnapshot;
-  status = cloneslice->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
+  status = cloneslice->CreateClone(Resizability::NonResizable, SnapshotType::Modified, 0,
                                    kSliceSize, false, &cloneslicesnapshot);
   ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, status, "snapshot-modified clone-slice\n");
   ASSERT_NULL(cloneslicesnapshot, "snapshot-modified clone-slice\n");
@@ -3977,8 +3977,8 @@ static bool vmo_snapshot_modified_test() {
   anon_vmo->set_user_id(0x49);
 
   fbl::RefPtr<VmObject> anon_clone;
-  status = anon_vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
-                                 PAGE_SIZE, true, &anon_clone);
+  status = anon_vmo->CreateClone(Resizability::NonResizable, SnapshotType::Modified, 0, PAGE_SIZE,
+                                 true, &anon_clone);
   ASSERT_OK(status);
   anon_clone->set_user_id(0x50);
 
@@ -3992,31 +3992,31 @@ static bool vmo_snapshot_modified_test() {
 
   // Snapshot-modified should also be upgraded when used on a SNAPSHOT clone.
   fbl::RefPtr<VmObject> anon_snapshot;
-  status = anon_clone->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
-                                   PAGE_SIZE, true, &anon_snapshot);
+  status = anon_clone->CreateClone(Resizability::NonResizable, SnapshotType::Modified, 0, PAGE_SIZE,
+                                   true, &anon_snapshot);
   ASSERT_OK(status);
   anon_snapshot->set_user_id(0x51);
 
   // Snapshot-modified shold not be allowed on a unidirectional chain of length > 2
   fbl::RefPtr<VmObject> chain1;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                            PAGE_SIZE, true, &chain1);
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite, 0, PAGE_SIZE, true,
+                            &chain1);
   ASSERT_OK(status);
   chain1->set_user_id(0x52);
   uint64_t data1 = 42;
   EXPECT_OK(chain1->Write(&data1, 0, sizeof(data)));
 
   fbl::RefPtr<VmObject> chain2;
-  status = chain1->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                               PAGE_SIZE, true, &chain2);
+  status = chain1->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite, 0, PAGE_SIZE,
+                               true, &chain2);
   ASSERT_OK(status);
   chain2->set_user_id(0x51);
   uint64_t data2 = 43;
   EXPECT_OK(chain2->Write(&data2, 0, sizeof(data)));
 
   fbl::RefPtr<VmObject> chain_snap;
-  status = chain2->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
-                               PAGE_SIZE, true, &chain_snap);
+  status = chain2->CreateClone(Resizability::NonResizable, SnapshotType::Modified, 0, PAGE_SIZE,
+                               true, &chain_snap);
   ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, status, "snapshot-modified unidirectional chain\n");
 
   END_TEST;
@@ -4179,7 +4179,7 @@ static bool vmo_skip_range_update_test() {
   EXPECT_OK(vmo->CommitRange(0, PAGE_SIZE * kNumPages));
 
   fbl::RefPtr<VmObject> child;
-  ASSERT_OK(vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0u,
+  ASSERT_OK(vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0u,
                              PAGE_SIZE * kNumPages, false, &child));
 
   // Fork some pages into the child to have some regions that should be able to avoid range updates.

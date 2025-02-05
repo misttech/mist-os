@@ -268,7 +268,7 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
     return zx::error{ZX_ERR_OUT_OF_RANGE};
   }
 
-  zx_status_t CreateClone(Resizability resizable, CloneType type, uint64_t offset, uint64_t size,
+  zx_status_t CreateClone(Resizability resizable, SnapshotType type, uint64_t offset, uint64_t size,
                           bool copy_name, fbl::RefPtr<VmObject>* child_vmo) override;
 
   zx_status_t CacheOp(uint64_t offset, uint64_t len, CacheOpType type) override;

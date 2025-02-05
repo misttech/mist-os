@@ -996,7 +996,7 @@ static bool vmaspace_priority_bidir_clone_test() {
 
   // Create a clone of the VMO.
   fbl::RefPtr<VmObject> vmo_child;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, true,
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, PAGE_SIZE, true,
                             &vmo_child);
   ASSERT_OK(status);
   VmObjectPaged* childp = reinterpret_cast<VmObjectPaged*>(vmo_child.get());
@@ -1015,7 +1015,7 @@ static bool vmaspace_priority_bidir_clone_test() {
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugIsHighMemoryPriority());
 
   // Create a new clone of the VMO and map in the clone.
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, true,
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, PAGE_SIZE, true,
                             &vmo_child);
   ASSERT_OK(status);
   childp = reinterpret_cast<VmObjectPaged*>(vmo_child.get());
@@ -1117,8 +1117,8 @@ static bool vmaspace_priority_pager_test() {
 
   // Create a clone of the VMO.
   fbl::RefPtr<VmObject> vmo_child;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                            PAGE_SIZE, true, &vmo_child);
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite, 0, PAGE_SIZE, true,
+                            &vmo_child);
   ASSERT_OK(status);
   VmObjectPaged* childp = reinterpret_cast<VmObjectPaged*>(vmo_child.get());
 
@@ -1133,8 +1133,8 @@ static bool vmaspace_priority_pager_test() {
 
   // Create a second child of the root.
   fbl::RefPtr<VmObject> vmo_child2;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                            PAGE_SIZE, true, &vmo_child);
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite, 0, PAGE_SIZE, true,
+                            &vmo_child);
   ASSERT_OK(status);
   VmObjectPaged* childp2 = reinterpret_cast<VmObjectPaged*>(vmo_child.get());
 
