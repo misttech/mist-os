@@ -6,7 +6,9 @@ use munge::munge;
 
 use crate::decoder::InternalHandleDecoder;
 use crate::encoder::InternalHandleEncoder;
-use crate::{decode, encode, u64_le, Decode, Decoder, Encode, Encoder, Slot, WireEnvelope};
+use crate::{
+    u64_le, Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Slot, WireEnvelope,
+};
 
 /// A raw FIDL union
 #[repr(C)]
@@ -30,7 +32,7 @@ impl RawWireUnion {
         ord: u64,
         encoder: &mut E,
         slot: Slot<'_, Self>,
-    ) -> Result<(), encode::EncodeError> {
+    ) -> Result<(), EncodeError> {
         munge!(let Self { mut ordinal, envelope } = slot);
 
         *ordinal = u64_le::from_native(ord);
@@ -43,7 +45,7 @@ impl RawWireUnion {
         ord: u64,
         encoder: &mut E,
         slot: Slot<'_, Self>,
-    ) -> Result<(), encode::EncodeError> {
+    ) -> Result<(), EncodeError> {
         munge!(let Self { mut ordinal, envelope } = slot);
 
         *ordinal = u64_le::from_native(ord);
@@ -57,10 +59,10 @@ impl RawWireUnion {
     }
 
     /// Decodes an absent union from a slot.
-    pub fn decode_absent(slot: Slot<'_, Self>) -> Result<(), decode::DecodeError> {
+    pub fn decode_absent(slot: Slot<'_, Self>) -> Result<(), DecodeError> {
         munge!(let Self { ordinal: _, envelope } = slot);
         if !WireEnvelope::is_encoded_zero(envelope) {
-            return Err(decode::DecodeError::InvalidUnionEnvelope);
+            return Err(DecodeError::InvalidUnionEnvelope);
         }
         Ok(())
     }
@@ -71,7 +73,7 @@ impl RawWireUnion {
     pub fn decode_unknown_static<D: InternalHandleDecoder + ?Sized>(
         slot: Slot<'_, Self>,
         decoder: &mut D,
-    ) -> Result<(), decode::DecodeError> {
+    ) -> Result<(), DecodeError> {
         munge!(let Self { ordinal: _, envelope } = slot);
         WireEnvelope::decode_unknown_static(envelope, decoder)
     }
@@ -82,7 +84,7 @@ impl RawWireUnion {
     pub fn decode_unknown<'buf, D: Decoder<'buf> + ?Sized>(
         slot: Slot<'_, Self>,
         decoder: &mut D,
-    ) -> Result<(), decode::DecodeError> {
+    ) -> Result<(), DecodeError> {
         munge!(let Self { ordinal: _, envelope } = slot);
         WireEnvelope::decode_unknown(envelope, decoder)
     }
@@ -91,7 +93,7 @@ impl RawWireUnion {
     pub fn decode_as_static<D: InternalHandleDecoder + ?Sized, T: Decode<D>>(
         slot: Slot<'_, Self>,
         decoder: &mut D,
-    ) -> Result<(), decode::DecodeError> {
+    ) -> Result<(), DecodeError> {
         munge!(let Self { ordinal: _, envelope } = slot);
         WireEnvelope::decode_as_static::<D, T>(envelope, decoder)
     }
@@ -100,7 +102,7 @@ impl RawWireUnion {
     pub fn decode_as<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>>(
         slot: Slot<'_, Self>,
         decoder: &mut D,
-    ) -> Result<(), decode::DecodeError> {
+    ) -> Result<(), DecodeError> {
         munge!(let Self { ordinal: _, envelope } = slot);
         WireEnvelope::decode_as::<D, T>(envelope, decoder)
     }

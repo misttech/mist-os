@@ -9,8 +9,8 @@ use munge::munge;
 
 use super::raw::RawWireVector;
 use crate::{
-    decode, encode, Decode, Decoder, Encodable, Encode, Encoder, EncoderExt as _, Slot, TakeFrom,
-    WireVector,
+    Decode, DecodeError, Decoder, Encodable, EncodableOption, Encode, EncodeError, EncodeOption,
+    Encoder, EncoderExt as _, Slot, TakeFrom, WireVector,
 };
 
 /// An optional FIDL vector
@@ -97,29 +97,29 @@ impl<T: fmt::Debug> fmt::Debug for WireOptionalVector<'_, T> {
 unsafe impl<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>> Decode<D>
     for WireOptionalVector<'buf, T>
 {
-    fn decode(mut slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), decode::DecodeError> {
+    fn decode(mut slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { raw } = slot.as_mut());
         RawWireVector::decode(raw, decoder)?;
 
         let this = unsafe { slot.deref_unchecked() };
         if this.raw.as_ptr().is_null() && this.raw.len() != 0 {
-            return Err(decode::DecodeError::InvalidOptionalSize(this.raw.len()));
+            return Err(DecodeError::InvalidOptionalSize(this.raw.len()));
         }
 
         Ok(())
     }
 }
 
-impl<T: Encodable> encode::EncodableOption for Vec<T> {
+impl<T: Encodable> EncodableOption for Vec<T> {
     type EncodedOption<'buf> = WireOptionalVector<'buf, T::Encoded<'buf>>;
 }
 
-impl<E: Encoder + ?Sized, T: Encode<E>> encode::EncodeOption<E> for Vec<T> {
+impl<E: Encoder + ?Sized, T: Encode<E>> EncodeOption<E> for Vec<T> {
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut E,
         slot: Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), encode::EncodeError> {
+    ) -> Result<(), EncodeError> {
         if let Some(vec) = this {
             encoder.encode_next_slice(vec.as_mut_slice())?;
             WireOptionalVector::encode_present(slot, vec.len() as u64);

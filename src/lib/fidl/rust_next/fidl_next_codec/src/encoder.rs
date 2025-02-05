@@ -8,8 +8,7 @@ use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 use core::slice::from_mut;
 
-use crate::encode::EncodeError;
-use crate::{Chunk, Encode, Slot, CHUNK_SIZE};
+use crate::{Chunk, Encode, EncodeError, Slot, CHUNK_SIZE};
 
 /// An encoder for FIDL handles (internal).
 pub trait InternalHandleEncoder {

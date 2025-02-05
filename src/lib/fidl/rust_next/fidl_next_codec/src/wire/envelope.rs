@@ -10,7 +10,7 @@ use munge::munge;
 use crate::decoder::InternalHandleDecoder;
 use crate::encoder::InternalHandleEncoder;
 use crate::{
-    decode, encode, u16_le, u32_le, Decode, Decoder, DecoderExt as _, Encode, Encoder,
+    u16_le, u32_le, Decode, DecodeError, Decoder, DecoderExt as _, Encode, EncodeError, Encoder,
     EncoderExt as _, Slot, CHUNK_SIZE,
 };
 
@@ -45,7 +45,7 @@ impl WireEnvelope {
         value: &mut T,
         encoder: &mut E,
         slot: Slot<'_, Self>,
-    ) -> Result<(), encode::EncodeError> {
+    ) -> Result<(), EncodeError> {
         munge! {
             let Self {
                 encoded: Encoded {
@@ -59,7 +59,7 @@ impl WireEnvelope {
         let handles_before = encoder.__internal_handle_count();
 
         if size_of::<T::Encoded<'_>>() > 4 {
-            return Err(encode::EncodeError::ExpectedInline(size_of::<T::Encoded<'_>>()));
+            return Err(EncodeError::ExpectedInline(size_of::<T::Encoded<'_>>()));
         }
 
         let slot = unsafe { Slot::new_unchecked(maybe_num_bytes.as_mut_ptr().cast()) };
@@ -79,7 +79,7 @@ impl WireEnvelope {
         value: &mut T,
         encoder: &mut E,
         slot: Slot<'_, Self>,
-    ) -> Result<(), encode::EncodeError> {
+    ) -> Result<(), EncodeError> {
         munge! {
             let Self {
                 encoded: Encoded {
@@ -132,14 +132,14 @@ impl WireEnvelope {
     fn out_of_line_chunks(
         maybe_num_bytes: Slot<'_, u32_le>,
         flags: Slot<'_, u16_le>,
-    ) -> Result<Option<usize>, decode::DecodeError> {
+    ) -> Result<Option<usize>, DecodeError> {
         if flags.to_native() & Self::IS_INLINE_BIT == 0 {
             let num_bytes = maybe_num_bytes.to_native();
             if num_bytes as usize % CHUNK_SIZE != 0 {
-                return Err(decode::DecodeError::InvalidEnvelopeSize(num_bytes));
+                return Err(DecodeError::InvalidEnvelopeSize(num_bytes));
             }
             if num_bytes <= 4 {
-                return Err(decode::DecodeError::OutOfLineValueTooSmall(num_bytes));
+                return Err(DecodeError::OutOfLineValueTooSmall(num_bytes));
             }
             Ok(Some(num_bytes as usize / CHUNK_SIZE))
         } else {
@@ -151,7 +151,7 @@ impl WireEnvelope {
     pub fn decode_unknown_static<D: InternalHandleDecoder + ?Sized>(
         slot: Slot<'_, Self>,
         decoder: &mut D,
-    ) -> Result<(), decode::DecodeError> {
+    ) -> Result<(), DecodeError> {
         munge! {
             let Self {
                 encoded: Encoded {
@@ -163,7 +163,7 @@ impl WireEnvelope {
         }
 
         if let Some(count) = Self::out_of_line_chunks(maybe_num_bytes, flags)? {
-            return Err(decode::DecodeError::ExpectedInline(count * CHUNK_SIZE));
+            return Err(DecodeError::ExpectedInline(count * CHUNK_SIZE));
         }
 
         decoder.__internal_take_handles(num_handles.to_native() as usize)?;
@@ -175,7 +175,7 @@ impl WireEnvelope {
     pub fn decode_unknown<'buf, D: Decoder<'buf> + ?Sized>(
         slot: Slot<'_, Self>,
         decoder: &mut D,
-    ) -> Result<(), decode::DecodeError> {
+    ) -> Result<(), DecodeError> {
         munge! {
             let Self {
                 encoded: Encoded {
@@ -199,7 +199,7 @@ impl WireEnvelope {
     pub fn decode_as_static<D: InternalHandleDecoder + ?Sized, T: Decode<D>>(
         mut slot: Slot<'_, Self>,
         decoder: &mut D,
-    ) -> Result<(), decode::DecodeError> {
+    ) -> Result<(), DecodeError> {
         munge! {
             let Self {
                 encoded: Encoded {
@@ -214,12 +214,12 @@ impl WireEnvelope {
         let num_handles = num_handles.to_native() as usize;
 
         if let Some(count) = Self::out_of_line_chunks(maybe_num_bytes, flags)? {
-            return Err(decode::DecodeError::ExpectedInline(count * CHUNK_SIZE));
+            return Err(DecodeError::ExpectedInline(count * CHUNK_SIZE));
         }
 
         // Decode inline value
         if size_of::<T>() > 4 {
-            return Err(decode::DecodeError::InlineValueTooBig(size_of::<T>()));
+            return Err(DecodeError::InlineValueTooBig(size_of::<T>()));
         }
         munge!(let Self { mut decoded_inline } = slot);
         let mut slot = unsafe { Slot::<T>::new_unchecked(decoded_inline.as_mut_ptr().cast()) };
@@ -227,7 +227,7 @@ impl WireEnvelope {
 
         let handles_consumed = handles_before - decoder.__internal_handles_remaining();
         if handles_consumed != num_handles {
-            return Err(decode::DecodeError::IncorrectNumberOfHandlesConsumed {
+            return Err(DecodeError::IncorrectNumberOfHandlesConsumed {
                 expected: num_handles,
                 actual: handles_consumed,
             });
@@ -240,7 +240,7 @@ impl WireEnvelope {
     pub fn decode_as<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>>(
         mut slot: Slot<'_, Self>,
         decoder: &mut D,
-    ) -> Result<(), decode::DecodeError> {
+    ) -> Result<(), DecodeError> {
         munge! {
             let Self {
                 encoded: Encoded {
@@ -270,7 +270,7 @@ impl WireEnvelope {
         } else {
             // Decode inline value
             if size_of::<T>() > 4 {
-                return Err(decode::DecodeError::InlineValueTooBig(size_of::<T>()));
+                return Err(DecodeError::InlineValueTooBig(size_of::<T>()));
             }
             munge!(let Self { mut decoded_inline } = slot);
             let mut slot = unsafe { Slot::<T>::new_unchecked(decoded_inline.as_mut_ptr().cast()) };
@@ -279,7 +279,7 @@ impl WireEnvelope {
 
         let handles_consumed = handles_before - decoder.__internal_handles_remaining();
         if handles_consumed != num_handles {
-            return Err(decode::DecodeError::IncorrectNumberOfHandlesConsumed {
+            return Err(DecodeError::IncorrectNumberOfHandlesConsumed {
                 expected: num_handles,
                 actual: handles_consumed,
             });

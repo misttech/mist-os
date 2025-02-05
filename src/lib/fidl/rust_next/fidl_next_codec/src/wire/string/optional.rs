@@ -8,8 +8,8 @@ use core::str::from_utf8;
 use munge::munge;
 
 use crate::{
-    decode, encode, Decode, Decoder, Encoder, Slot, TakeFrom, WireOptionalVector, WireString,
-    WireVector,
+    Decode, DecodeError, Decoder, EncodableOption, EncodeError, EncodeOption, Encoder, Slot,
+    TakeFrom, WireOptionalVector, WireString, WireVector,
 };
 
 /// An optional FIDL string
@@ -65,7 +65,7 @@ impl fmt::Debug for WireOptionalString<'_> {
 }
 
 unsafe impl<'buf, D: Decoder<'buf> + ?Sized> Decode<D> for WireOptionalString<'buf> {
-    fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), decode::DecodeError> {
+    fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { mut vec } = slot);
 
         WireOptionalVector::decode(vec.as_mut(), decoder)?;
@@ -78,16 +78,16 @@ unsafe impl<'buf, D: Decoder<'buf> + ?Sized> Decode<D> for WireOptionalString<'b
     }
 }
 
-impl encode::EncodableOption for String {
+impl EncodableOption for String {
     type EncodedOption<'buf> = WireOptionalString<'buf>;
 }
 
-impl<E: Encoder + ?Sized> encode::EncodeOption<E> for String {
+impl<E: Encoder + ?Sized> EncodeOption<E> for String {
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut E,
         slot: Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), encode::EncodeError> {
+    ) -> Result<(), EncodeError> {
         if let Some(string) = this {
             encoder.write(string.as_bytes());
             WireOptionalString::encode_present(slot, string.len() as u64);
