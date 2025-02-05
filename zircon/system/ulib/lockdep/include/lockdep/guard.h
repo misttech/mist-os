@@ -263,15 +263,6 @@ class __TA_SCOPED_CAPABILITY
     state.state_.reset();
   }
 
-  // Adopts the lock state and validator state. This constructor uses a type
-  // tag argument to avoid automatic move constructor semantics.
-  //
-  // Example:
-  //  Guard<fbl::Mutex> guard{AdoptLock, std::move(rvalue_arugment)};
-  //
-  __WARN_UNUSED_CONSTRUCTOR Guard(AdoptLockTag, Guard&& other) __TA_ACQUIRE(other.validator_.lock())
-      : validator_{std::move(other.validator_)}, state_{std::move(other.state_)} {}
-
   // Temporarily releases and un-tracks the guarded lock before executing the
   // given callable Op and then re-acquires and tracks the lock. This permits
   // the same Guard instance to protect a larger scope while performing an
@@ -589,16 +580,6 @@ class __TA_SCOPED_CAPABILITY Guard<LockType, Option, internal::EnableIfShared<Lo
     ZX_DEBUG_ASSERT(&lock->lock() == validator_.lock());
     state.state_.reset();
   }
-
-  // Adopts the lock state and validator state. This constructor uses a type
-  // tag argument to avoid automatic move constructor semantics.
-  //
-  // Example:
-  //  Guard<fbl::Mutex> guard{AdoptLock, std::move(rvalue_arugment)};
-  //
-  __WARN_UNUSED_CONSTRUCTOR Guard(AdoptLockTag, Guard&& other)
-      __TA_ACQUIRE_SHARED(other.validator_.lock())
-      : validator_{std::move(other.validator_)}, state_{std::move(other.state_)} {}
 
   // Temporarily releases and un-tracks the guarded lock before executing the
   // given callable Op and then re-acquires and tracks the lock. This permits
