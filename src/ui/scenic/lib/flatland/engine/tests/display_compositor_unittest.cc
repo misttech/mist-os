@@ -183,6 +183,7 @@ class DisplayCompositorTest : public DisplayCompositorTestBase {
     RunLoopUntilIdle();
     libsync::Completion completion;
     async::PostTask(display_coordinator_loop_.dispatcher(), [this, &completion]() mutable {
+      display_coordinator_loop_.RunUntilIdle();
       mock_display_coordinator_.reset();
       completion.Signal();
     });
@@ -313,8 +314,6 @@ TEST_F(DisplayCompositorTest, ImportAndReleaseBufferCollectionTest) {
                                    MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
         completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk, {});
       }));
-
-  display_compositor_.reset();
 }
 
 // This test makes sure the buffer negotiations work as intended.
@@ -447,8 +446,6 @@ TEST_F(DisplayCompositorTest,
                     .height = 1},
       BufferCollectionUsage::kClientImage));
   EXPECT_TRUE(BufferCollectionSupportsDisplay(kGlobalBufferCollectionId));
-
-  display_compositor_.reset();
 }
 
 // This test makes sure the buffer negotiations work as intended.
@@ -570,8 +567,6 @@ TEST_F(DisplayCompositorTest,
                     .height = 1},
       BufferCollectionUsage::kClientImage));
   EXPECT_FALSE(BufferCollectionSupportsDisplay(kGlobalBufferCollectionId));
-
-  display_compositor_.reset();
 }
 
 TEST_F(DisplayCompositorTest, SysmemNegotiationTest_InRendererOnlyMode_DisplayShouldExcludeItself) {
@@ -649,8 +644,6 @@ TEST_F(DisplayCompositorTest, SysmemNegotiationTest_InRendererOnlyMode_DisplaySh
                     .height = 1},
       BufferCollectionUsage::kClientImage));
   EXPECT_FALSE(BufferCollectionSupportsDisplay(kGlobalBufferCollectionId));
-
-  display_compositor_.reset();
 }
 
 TEST_F(DisplayCompositorTest, ClientDropSysmemToken) {
@@ -701,8 +694,6 @@ TEST_F(DisplayCompositorTest, ClientDropSysmemToken) {
   EXPECT_FALSE(display_compositor_->ImportBufferCollection(
       kGlobalBufferCollectionId, sysmem_allocator_.get(), std::move(dup_token),
       BufferCollectionUsage::kClientImage, std::nullopt));
-
-  display_compositor_.reset();
 }
 
 TEST_F(DisplayCompositorTest, ImageIsValidAfterReleaseBufferCollection) {
@@ -794,8 +785,6 @@ TEST_F(DisplayCompositorTest, ImageIsValidAfterReleaseBufferCollection) {
                                     MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
         completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk, {});
       }));
-
-  display_compositor_.reset();
 }
 
 TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
@@ -974,8 +963,6 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
                                     MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
         completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk, {});
       }));
-
-  display_compositor_.reset();
 }
 
 // This test checks that DisplayCompositor properly processes ConfigStamp from Vsync.
@@ -1023,8 +1010,6 @@ TEST_F(DisplayCompositorTest, VsyncConfigStampAreProcessed) {
   // Sending later vsync should signal and remove the earlier one too.
   SendOnVsyncEvent(kConfigStamp2);
   EXPECT_EQ(0u, GetPendingApplyConfigs().size());
-
-  display_compositor_.reset();
 }
 
 // When compositing directly to a hardware display layer, the display coordinator
@@ -1318,8 +1303,6 @@ TEST_F(DisplayCompositorTest, DISABLED_HardwareFrameCorrectnessTest) {
                                     MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
         completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk, {});
       }));
-
-  display_compositor_.reset();
 }
 
 void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
@@ -1539,8 +1522,6 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
                                     MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
         completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk, {});
       }));
-
-  display_compositor_.reset();
 }
 
 // TODO(https://fxbug.dev/377979329): re-enable after display coordinator relaxes image reuse
@@ -1928,7 +1909,6 @@ TEST_F(DisplayCompositorTest, DISABLED_ChecksDisplayImageSignalFences) {
         .Times(1)
         .WillOnce(Return());
   }
-  display_compositor_.reset();
 }
 
 // Tests that RenderOnly mode does not attempt to ImportBufferCollection() to display.
@@ -1976,7 +1956,6 @@ TEST_F(DisplayCompositorTest, RendererOnly_ImportAndReleaseBufferCollectionTest)
                                     MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
         completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk, {});
       }));
-  display_compositor_.reset();
 }
 
 }  // namespace flatland::test
