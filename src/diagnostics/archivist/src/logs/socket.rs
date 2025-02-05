@@ -22,21 +22,9 @@ pub trait Encoding {
 #[derive(Clone, Debug)]
 pub struct LegacyEncoding;
 
-/// An encoding that can parse the [structured log format]
-///
-/// [structured log format]: https://fuchsia.dev/fuchsia-src/development/logs/encodings
-#[derive(Clone, Debug)]
-pub struct StructuredEncoding;
-
 impl Encoding for LegacyEncoding {
     fn wrap_bytes(buf: Vec<u8>, stats: &Arc<LogStreamStats>) -> Option<StoredMessage> {
         StoredMessage::from_legacy(buf.into_boxed_slice(), stats)
-    }
-}
-
-impl Encoding for StructuredEncoding {
-    fn wrap_bytes(buf: Vec<u8>, stats: &Arc<LogStreamStats>) -> Option<StoredMessage> {
-        StoredMessage::new(buf.into_boxed_slice(), stats)
     }
 }
 
@@ -51,15 +39,6 @@ pub struct LogMessageSocket<E> {
 impl LogMessageSocket<LegacyEncoding> {
     /// Creates a new `LogMessageSocket` from the given `socket` that reads the legacy format.
     pub fn new(socket: fasync::Socket, stats: Arc<LogStreamStats>) -> Self {
-        stats.open_socket();
-        Self { socket, stats, _encoder: PhantomData, buffer: Vec::new() }
-    }
-}
-
-impl LogMessageSocket<StructuredEncoding> {
-    /// Creates a new `LogMessageSocket` from the given `socket` that reads the structured log
-    /// format.
-    pub fn new_structured(socket: fasync::Socket, stats: Arc<LogStreamStats>) -> Self {
         stats.open_socket();
         Self { socket, stats, _encoder: PhantomData, buffer: Vec::new() }
     }
@@ -108,13 +87,9 @@ impl<E> Drop for LogMessageSocket<E> {
 mod tests {
     use super::*;
     use crate::testing::TEST_IDENTITY;
-    use diagnostics_data::{LogsField, Severity};
-    use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
-    use diagnostics_log_encoding::{Argument, Record};
+    use diagnostics_data::Severity;
     use diagnostics_message::fx_log_packet_t;
-
     use futures::StreamExt;
-    use std::io::Cursor;
 
     #[fasync::run_until_stalled(test)]
     async fn logger_stream_test() {
@@ -149,48 +124,6 @@ mod tests {
         sin.write(packet.as_bytes()).unwrap();
 
         let result_message = ls.next().await.unwrap().unwrap().parse(&TEST_IDENTITY).unwrap();
-        assert_eq!(result_message, expected_p);
-    }
-
-    #[fasync::run_until_stalled(test)]
-    async fn structured_logger_stream_test() {
-        let (sin, sout) = zx::Socket::create_datagram();
-        let timestamp = zx::BootInstant::from_nanos(107);
-        let record = Record {
-            timestamp,
-            severity: Severity::Fatal as u8,
-            arguments: vec![Argument::new("key", "value"), Argument::tag("tag-a")],
-        };
-        let mut buffer = Cursor::new(vec![0u8; 1024]);
-        let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
-        encoder.write_record(record).unwrap();
-        let encoded = &buffer.get_ref()[..buffer.position() as usize];
-
-        let expected_p = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            timestamp,
-            component_url: Some(TEST_IDENTITY.url.clone()),
-            moniker: TEST_IDENTITY.moniker.clone(),
-            severity: Severity::Fatal,
-        })
-        .add_tag("tag-a")
-        .add_key(diagnostics_data::LogsProperty::String(
-            LogsField::Other("key".to_string()),
-            "value".to_string(),
-        ))
-        .build();
-
-        let socket = fasync::Socket::from_socket(sout);
-        let mut stream = LogMessageSocket::new_structured(socket, Default::default());
-
-        sin.write(encoded).unwrap();
-        let bytes = stream.next().await.unwrap().unwrap();
-        let result_message = bytes.parse(&TEST_IDENTITY).unwrap();
-        assert_eq!(bytes.size(), encoded.len());
-        assert_eq!(result_message, expected_p);
-
-        // write again
-        sin.write(encoded).unwrap();
-        let result_message = stream.next().await.unwrap().unwrap().parse(&TEST_IDENTITY).unwrap();
         assert_eq!(result_message, expected_p);
     }
 }
