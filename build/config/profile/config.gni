@@ -2,6 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/config/clang/clang.gni")
+import("//build/config/sysroot.gni")
+
 declare_args() {
   # List of GN paths to source files to be instrumented by `profile` variants.
   profile_source_files = [
@@ -20,6 +23,19 @@ declare_args() {
     # Also, change the expression to not reject //third_party/cobalt/*
     #"//third_party/*",
   ]
+
+  # When clang_prefix is provided, it might be installed somewhere other than //prebuilt.
+  # This ensures that we don't profile source files that are under clang_prefix directory.
+  if (clang_prefix != default_clang_prefix) {
+    clang_dir = get_path_info(clang_prefix, "dir")
+    dont_profile_source_files += [ "$clang_dir/*" ]
+  }
+
+  # When target_sysroot is provided, it might be installed somewhere other than //prebuilt.
+  # This ensures that we don't profile source files that are under target_sysroot directory.
+  if (target_sysroot != "") {
+    dont_profile_source_files += [ "$target_sysroot/*" ]
+  }
 
   # List GN path to files in Clang's `-fprofile-list` format describing files
   # and functions to be instrumented by `profile` variants.
