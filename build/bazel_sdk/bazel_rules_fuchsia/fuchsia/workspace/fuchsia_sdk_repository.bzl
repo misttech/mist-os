@@ -206,7 +206,7 @@ Loads a particular version of the Fuchsia IDK.
                 repository files. Defaults to @fuchsia_sdk otherwise for compatibility reasons. For details
                 see https://fxbug.dev/381126633.
                 """,
-            default = False,
+            default = True,
         ),
         "buildifier": attr.label(
             doc = "An optional label to the buildifier tool, used to reformat all generated Bazel files.",
