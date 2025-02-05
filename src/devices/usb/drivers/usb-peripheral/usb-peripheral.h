@@ -138,7 +138,6 @@ class UsbPeripheral : public UsbPeripheralType,
                                uint8_t* out_num_interfaces);
   zx_status_t FunctionRegistered();
   void FunctionCleared();
-  zx_status_t SetInterfaceOnParent(bool reset = false) __TA_REQUIRES(lock_);
 
   inline const ddk::UsbDciProtocolClient& dci() const { return dci_; }
   inline const fidl::WireSyncClient<fuchsia_hardware_usb_dci::UsbDci>& dci_new() const {
@@ -175,6 +174,9 @@ class UsbPeripheral : public UsbPeripheralType,
                             size_t* out_read_actual);
   void CommonSetConnected(bool connected);
   // SetSpeed() is trivial and warrants no common impl.
+
+  zx_status_t StartController();
+  zx_status_t StopController();
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbPeripheral);
 
@@ -217,7 +219,7 @@ class UsbPeripheral : public UsbPeripheralType,
 
   // Our parent's DCI protocol.
   const ddk::UsbDciProtocolClient dci_;
-  bool dci_new_valid_ = true;
+  bool dci_new_valid_ = false;
   fidl::WireSyncClient<fuchsia_hardware_usb_dci::UsbDci> dci_new_;
   // USB device descriptor set via ioctl_usb_peripheral_set_device_desc()
   usb_device_descriptor_t device_desc_ = {};

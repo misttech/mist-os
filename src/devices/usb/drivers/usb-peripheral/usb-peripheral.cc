@@ -191,6 +191,23 @@ zx_status_t UsbPeripheral::Init() {
   }
 
   usb_monitor_.Start();
+
+  // Try to set DciIntf over FIDL. We don't do this for Banjo because SetInterface is used to
+  // indicate that all functions have been attached/un-attached. This is a separate method in
+  // FIDL, so we set DciIntf here for FIDL.
+  fidl::Arena arena;
+  auto client_end = intf_srv_.AddBinding();
+  auto result = dci_new_.buffer(arena)->SetInterface(std::move(client_end));
+  // DCI FIDL is not available. Return OK because we could be using Banjo DCI instead.
+  // In the future when we remove banjo. This should be an error.
+  if (!result.ok()) {
+    zxlogf(DEBUG, "(framework) SetInterface(): %s", result.status_string());
+    return ZX_OK;
+  }
+  if (result->is_error()) {
+    return (result->error_value() == ZX_ERR_NOT_SUPPORTED) ? ZX_OK : result->error_value();
+  }
+  dci_new_valid_ = true;
   return ZX_OK;
 }
 
@@ -378,34 +395,59 @@ void UsbPeripheral::FunctionCleared() {
   ClearFunctionsComplete();
 }
 
-zx_status_t UsbPeripheral::SetInterfaceOnParent(bool reset) {
-  fidl::Arena arena;
-  auto client_end = intf_srv_.AddBinding();
-  auto result = dci_new_.buffer(arena)->SetInterface(
-      reset ? fidl::ClientEnd<fuchsia_hardware_usb_dci::UsbDciInterface>() : std::move(client_end));
-
-  if (!result.ok()) {
-    zxlogf(DEBUG, "(framework) SetInterface(): %s", result.status_string());
-  } else if (result->is_error() && result->error_value() == ZX_ERR_NOT_SUPPORTED) {
-    zxlogf(DEBUG, "SetInterface(): %s", result.status_string());
-    dci_new_valid_ = false;
-  } else if (result->is_error() && result->error_value() != ZX_ERR_NOT_SUPPORTED) {
-    return result->error_value();
-  } else {
+zx_status_t UsbPeripheral::StartController() {
+  if (dci_new_valid_) {
+    fidl::Arena arena;
+    auto result = dci_new_.buffer(arena)->StartController();
+    if (!result.ok()) {
+      zxlogf(DEBUG, "(framework) StartController(): %s", result.status_string());
+      return ZX_ERR_INTERNAL;
+    }
+    if (result->is_error()) {
+      zxlogf(DEBUG, "StartController(): %s", result.status_string());
+      return result->error_value();
+    }
     return ZX_OK;
   }
 
   // Not all DCI drivers have the new FIDL protocols plumbed through. For drivers still in
   // migration, fall back to banjo if FIDL fails.
-  zxlogf(WARNING, "could not SetInterface() over FIDL, falling back to banjo");
+  zxlogf(WARNING, "could not StartController over FIDL, falling back to banjo");
   // TODO(b/356940744): Move all DCI drivers over to the UsbDci FIDL protocol.
-  zx_status_t status =
-      dci_.SetInterface(reset ? nullptr : this, reset ? nullptr : &usb_dci_interface_protocol_ops_);
+  zx_status_t status = dci_.SetInterface(this, &usb_dci_interface_protocol_ops_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "SetInterface failed %s", zx_status_get_string(status));
     return status;
   }
+  return ZX_OK;
+}
 
+zx_status_t UsbPeripheral::StopController() {
+  CommonSetConnected(false);
+
+  if (dci_new_valid_) {
+    fidl::Arena arena;
+    auto result = dci_new_.buffer(arena)->StopController();
+    if (!result.ok()) {
+      zxlogf(DEBUG, "(framework) StopController(): %s", result.status_string());
+      return ZX_ERR_INTERNAL;
+    }
+    if (result->is_error()) {
+      zxlogf(DEBUG, "StopController(): %s", result.status_string());
+      return result->error_value();
+    }
+    return ZX_OK;
+  }
+
+  // Not all DCI drivers have the new FIDL protocols plumbed through. For drivers still in
+  // migration, fall back to banjo if FIDL fails.
+  zxlogf(WARNING, "could not StopController over FIDL, falling back to banjo");
+  // TODO(b/356940744): Move all DCI drivers over to the UsbDci FIDL protocol.
+  zx_status_t status = dci_.SetInterface(nullptr, nullptr);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "SetInterface failed %s", zx_status_get_string(status));
+    return status;
+  }
   return ZX_OK;
 }
 
@@ -611,10 +653,17 @@ void UsbPeripheral::ClearFunctions() {
       return;
     }
     shutting_down_ = true;
-    SetInterfaceOnParent(true);
-    for (size_t i = 0; i < 256; i++) {
-      UsbDciCancelAll(static_cast<uint8_t>(i));
-    }
+  }
+  auto status = StopController();
+  if (status != ZX_OK) {
+    zxlogf(INFO, "Failed to stop controller %s", zx_status_get_string(status));
+    return;
+  }
+  for (size_t i = 0; i < 256; i++) {
+    UsbDciCancelAll(static_cast<uint8_t>(i));
+  }
+  {
+    fbl::AutoLock lock(&lock_);
     for (auto& configuration : configurations_) {
       for (const auto& function : configuration->functions) {
         if (function->zxdev()) {
@@ -694,7 +743,7 @@ zx_status_t UsbPeripheral::DeviceStateChangedLocked() {
   zxlogf(INFO, "%s cur_usb_mode: %d parent_usb_mode: %d", __func__, cur_usb_mode_,
          parent_usb_mode_);
 
-  std::optional<bool> set_interface_on_parent_reset = std::nullopt;
+  std::optional<bool> stop = std::nullopt;
   usb_mode_t new_dci_usb_mode = cur_usb_mode_;
   if (parent_usb_mode_ == USB_MODE_PERIPHERAL) {
     if (lock_functions_) {
@@ -708,10 +757,10 @@ zx_status_t UsbPeripheral::DeviceStateChangedLocked() {
     if (AllFunctionsRegistered()) {
       // switch DCI to device mode
       new_dci_usb_mode = USB_MODE_PERIPHERAL;
-      set_interface_on_parent_reset = false;
+      stop = false;
     } else {
       new_dci_usb_mode = USB_MODE_NONE;
-      set_interface_on_parent_reset = true;
+      stop = true;
     }
   } else {
     new_dci_usb_mode = parent_usb_mode_;
@@ -721,8 +770,10 @@ zx_status_t UsbPeripheral::DeviceStateChangedLocked() {
     zxlogf(INFO, "%s: set DCI mode %d", __func__, new_dci_usb_mode);
     cur_usb_mode_ = new_dci_usb_mode;
 
-    if (set_interface_on_parent_reset.has_value()) {
-      auto status = SetInterfaceOnParent(*set_interface_on_parent_reset);
+    if (stop.has_value()) {
+      lock_.Release();
+      auto status = *stop ? StopController() : StartController();
+      lock_.Acquire();
       if (status != ZX_OK) {
         return status;
       }

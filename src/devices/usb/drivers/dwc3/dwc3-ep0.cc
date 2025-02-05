@@ -33,7 +33,8 @@ zx_status_t Dwc3::Ep0Init() {
 
 void Dwc3::Ep0Reset() {
   std::lock_guard<std::mutex> lock(ep0_.lock);
-  CmdEpEndTransfer(ep0_.out);
+  CancelAll(ep0_.out);
+  CancelAll(ep0_.in);
   ep0_.state = Ep0::State::None;
 }
 
@@ -181,21 +182,17 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
       break;
     case Ep0::State::WaitNrdyOut:
       if (ep_num == kEp0Out) {
-        if (ep0_.cur_setup.w_length > 0) {
-          EpStartTransfer(ep0_.out, ep0_.shared_fifo, TRB_TRBCTL_STATUS_3, 0, 0, false);
-        } else {
-          EpStartTransfer(ep0_.out, ep0_.shared_fifo, TRB_TRBCTL_STATUS_2, 0, 0, false);
-        }
+        EpStartTransfer(ep0_.out, ep0_.shared_fifo,
+                        ep0_.cur_setup.w_length ? TRB_TRBCTL_STATUS_3 : TRB_TRBCTL_STATUS_2, 0, 0,
+                        false);
         ep0_.state = Ep0::State::Status;
       }
       break;
     case Ep0::State::WaitNrdyIn:
       if (ep_num == kEp0In) {
-        if (ep0_.cur_setup.w_length > 0) {
-          EpStartTransfer(ep0_.in, ep0_.shared_fifo, TRB_TRBCTL_STATUS_3, 0, 0, false);
-        } else {
-          EpStartTransfer(ep0_.in, ep0_.shared_fifo, TRB_TRBCTL_STATUS_2, 0, 0, false);
-        }
+        EpStartTransfer(ep0_.in, ep0_.shared_fifo,
+                        ep0_.cur_setup.w_length ? TRB_TRBCTL_STATUS_3 : TRB_TRBCTL_STATUS_2, 0, 0,
+                        false);
         ep0_.state = Ep0::State::Status;
       }
       break;
@@ -248,17 +245,6 @@ zx::result<size_t> Dwc3::HandleEp0Setup(const fdescriptor::wire::UsbSetup& setup
         // fall through to the common DoControlCall
         break;
     }
-  } else if ((setup.bm_request_type == (USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_INTERFACE)) &&
-             (setup.b_request == USB_REQ_SET_INTERFACE)) {
-    ResetConfiguration();
-    configured_ = false;
-
-    zx::result<size_t> status = DoControlCall(setup, nullptr, 0, nullptr, 0);
-    if (status.is_ok()) {
-      configured_ = true;
-      Ep0StartEndpoints();
-    }
-    return status;
   }
 
   if ((setup.bm_request_type & USB_DIR_MASK) == USB_DIR_IN) {

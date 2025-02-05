@@ -544,6 +544,12 @@ void Dwc3::ConnectToEndpoint(ConnectToEndpointRequest& request,
 }
 
 void Dwc3::SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Sync& completer) {
+  if (!request.interface().is_valid()) {
+    zxlogf(ERROR, "Interface should be valid");
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+
   std::lock_guard<std::mutex> lock(dci_lock_);
 
   if (dci_intf_.is_valid()) {
@@ -553,9 +559,11 @@ void Dwc3::SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Syn
   }
 
   dci_intf_.Bind(std::move(request.interface()));
+  completer.Reply(zx::ok());
+}
 
-  StartPeripheralMode();
-
+void Dwc3::StartController(StartControllerCompleter::Sync& completer) {
+  ZX_ASSERT(!irq_thread_started_);
   // Start the interrupt thread.
   auto irq_thunk = +[](void* arg) -> int { return static_cast<Dwc3*>(arg)->IrqThread(); };
   if (int rc = thrd_create_with_name(&irq_thread_, irq_thunk, static_cast<void*>(this),
@@ -566,6 +574,38 @@ void Dwc3::SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Syn
   }
   irq_thread_started_.store(true);
 
+  StartPeripheralMode();
+  completer.Reply(zx::ok());
+}
+
+void Dwc3::StopController(StopControllerCompleter::Sync& completer) {
+  Ep0Reset();
+  ep0_.Reset();
+  for (UserEndpoint& uep : user_endpoints_) {
+    CancelAll(uep.ep);
+    uep.Reset();
+  }
+
+  if (irq_thread_started_.load()) {
+    zx_status_t status = SignalIrqThread(IrqSignal::Exit);
+    // if we can't signal the thread, we are not going to be able to shut down
+    // and we should just terminate the process instead.
+    ZX_ASSERT(status == ZX_OK);
+    thrd_join(irq_thread_, nullptr);
+    irq_thread_started_.store(false);
+  }
+
+  zx_status_t status;
+  {
+    std::lock_guard<std::mutex> _(lock_);
+    status = ResetHw();
+  }
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to reset hardware %s", zx_status_get_string(status));
+    completer.Reply(zx::error(status));
+    return;
+  }
+  zx::nanosleep(zx::deadline_after(zx::msec(50)));
   completer.Reply(zx::ok());
 }
 
@@ -630,7 +670,7 @@ void Dwc3::DisableEndpoint(DisableEndpointRequest& request,
   FidlRequestQueue to_complete;
   {
     std::lock_guard<std::mutex> lock(uep->ep.lock);
-    to_complete = UserEpCancelAllLocked(*uep);
+    to_complete = CancelAllLocked(uep->ep);
     uep->fifo.Release();
     uep->ep.enabled = false;
   }
@@ -683,7 +723,7 @@ zx::result<> Dwc3::CommonCancelAll(uint8_t ep_addr) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  if (zx_status_t status = UserEpCancelAll(*uep); status != ZX_OK) {
+  if (zx_status_t status = CancelAll(uep->ep); status != ZX_OK) {
     return zx::error(status);
   }
   return zx::ok();

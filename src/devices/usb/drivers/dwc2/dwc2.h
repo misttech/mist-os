@@ -71,6 +71,10 @@ class Dwc2 : public Dwc2Type,
 
   void SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Sync& completer) override;
 
+  void StartController(StartControllerCompleter::Sync& completer) override;
+
+  void StopController(StopControllerCompleter::Sync& completer) override;
+
   void ConfigureEndpoint(ConfigureEndpointRequest& request,
                          ConfigureEndpointCompleter::Sync& completer) override;
 

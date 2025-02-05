@@ -1433,13 +1433,8 @@ void Dwc2::ConnectToEndpoint(ConnectToEndpointRequest& request,
 
 void Dwc2::SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Sync& completer) {
   if (!request.interface().is_valid()) {
-    // Take offline.
-    fbl::AutoLock _(&lock_);
-    dci_intf_.reset();
-    SetConnected(false);
-    SoftDisconnect();
-    ep0_state_ = Ep0State::DISCONNECTED;
-    zx::nanosleep(zx::deadline_after(zx::msec(50)));
+    zxlogf(ERROR, "Interface should be valid");
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
     return;
   }
 
@@ -1451,13 +1446,27 @@ void Dwc2::SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Syn
   dci_intf_ = DciInterfaceFidlClient();
   std::get<DciInterfaceFidlClient>(*dci_intf_).Bind(std::move(request.interface()));
 
-  zx_status_t status = CommonSetInterface();
+  completer.Reply(zx::ok());
+}
 
+void Dwc2::StartController(StartControllerCompleter::Sync& completer) {
+  auto status = InitController();
   if (status != ZX_OK) {
     completer.Reply(zx::error(status));
-  } else {
-    completer.Reply(fit::ok());
+    return;
   }
+
+  completer.Reply(zx::ok());
+}
+
+void Dwc2::StopController(StopControllerCompleter::Sync& completer) {
+  fbl::AutoLock _(&lock_);
+  SetConnected(false);
+  SoftDisconnect();
+  ep0_state_ = Ep0State::DISCONNECTED;
+  zx::nanosleep(zx::deadline_after(zx::msec(50)));
+
+  completer.Reply(zx::ok());
 }
 
 void Dwc2::ConfigureEndpoint(ConfigureEndpointRequest& request,

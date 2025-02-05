@@ -77,7 +77,8 @@ class UsbAdbDevice : public UsbAdb,
   void Start(StartRequestView request, StartCompleter::Sync& completer) override;
   void Stop(StopCompleter::Sync& completer) override;
 
-  // Helper method called when fadb::Device closes.
+  // Helper methods.
+  void Start();
   void Stop();
 
   // fadb::UsbAdbImpl methods.
@@ -107,7 +108,7 @@ class UsbAdbDevice : public UsbAdb,
                                usb::EndpointClient<UsbAdbDevice>& ep);
 
   // Helper method to get free request buffer and queue the request for transmitting.
-  zx::result<> SendLocked() __TA_REQUIRES(bulk_in_ep_.mutex());
+  void SendLocked() __TA_REQUIRES(bulk_in_ep_.mutex());
   // Helper method to get free request buffer and queue the request for receiving.
   void ReceiveLocked() __TA_REQUIRES(bulk_out_ep_.mutex());
 

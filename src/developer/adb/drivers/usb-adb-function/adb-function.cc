@@ -48,12 +48,6 @@ void UsbAdbDevice::Start(StartRequestView request, StartCompleter::Sync& complet
     return CompleteTxn(completer, ZX_ERR_ALREADY_BOUND);
   }
 
-  adb_binding_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                       std::move(request->interface), this, [this](fidl::UnbindInfo info) {
-                         zxlogf(INFO, "Device closed with reason '%s'",
-                                info.FormatDescription().c_str());
-                         Stop();
-                       });
   // Reset interface and configure endpoints as adb binding is set now.
   zx_status_t status = function_.SetInterface(this, &usb_function_interface_protocol_ops_);
   if (status != ZX_OK && status != ZX_ERR_ALREADY_BOUND) {
@@ -61,16 +55,48 @@ void UsbAdbDevice::Start(StartRequestView request, StartCompleter::Sync& complet
     CompleteTxn(completer, status);
     return;
   }
+  adb_binding_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                       std::move(request->interface), this, [this](fidl::UnbindInfo info) {
+                         zxlogf(INFO, "Device closed with reason '%s'",
+                                info.FormatDescription().c_str());
+                         Stop();
+                       });
+  CompleteTxn(completer, ZX_OK);
+
+  Start();
+}
+
+void UsbAdbDevice::Start() {
+  if (!Online() || !adb_binding_) {
+    return;
+  }
+
   auto result = fidl::WireSendEvent(adb_binding_.value())
                     ->OnStatusChanged(Online() ? fadb::StatusFlags::kOnline : fadb::StatusFlags(0));
   if (!result.ok()) {
     zxlogf(ERROR, "Could not call AdbInterface Status.");
-    CompleteTxn(completer, result.error().status());
     return;
   }
-  CompleteTxn(completer, status);
 
-  // Run receive to pass up messages received while disconnected.
+  // queue RX requests
+  std::vector<fuchsia_hardware_usb_request::Request> requests;
+  while (auto req = bulk_out_ep_.GetRequest()) {
+    req->reset_buffers(bulk_out_ep_.GetMapped());
+    auto status = req->CacheFlushInvalidate(bulk_out_ep_.GetMapped());
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Cache flush and invalidate failed %d", status);
+    }
+
+    requests.emplace_back(req->take_request());
+  }
+  if (!requests.empty()) {
+    auto result = bulk_out_ep_->QueueRequests(std::move(requests));
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to QueueRequests %s", result.error_value().FormatDescription().c_str());
+      return;
+    }
+  }
+
   std::lock_guard<std::mutex> _(bulk_out_ep_.mutex());
   ReceiveLocked();
 }
@@ -89,23 +115,10 @@ void UsbAdbDevice::Stop() {
     adb_binding_.reset();
   }
 
-  // Cancel all requests in the pipeline -- the completion handler will free these requests as they
-  // come in.
-  //
-  // Do not hold locks when calling this method. It might result in deadlock as completion callbacks
-  // could be invoked during this call.
-  bulk_out_ep_->CancelAll().Then([](fidl::Result<fendpoint::Endpoint::CancelAll>& result) {
-    if (result.is_error()) {
-      zxlogf(ERROR, "Failed to cancel all for bulk out endpoint %s",
-             result.error_value().FormatDescription().c_str());
-    }
-  });
-  bulk_in_ep_->CancelAll().Then([](fidl::Result<fendpoint::Endpoint::CancelAll>& result) {
-    if (result.is_error()) {
-      zxlogf(ERROR, "Failed to cancel all for bulk in endpoint %s",
-             result.error_value().FormatDescription().c_str());
-    }
-  });
+  zx_status_t status = ConfigureEndpoints(false);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to unconifgure endpoints %s.", zx_status_get_string(status));
+  }
 
   {
     std::lock_guard<std::mutex> _(bulk_out_ep_.mutex());
@@ -127,7 +140,7 @@ void UsbAdbDevice::Stop() {
     }
   }
 
-  zx_status_t status = function_.SetInterface(nullptr, nullptr);
+  status = function_.SetInterface(nullptr, nullptr);
   if (status != ZX_OK) {
     zxlogf(ERROR, "SetInterface failed %s", zx_status_get_string(status));
   }
@@ -137,13 +150,9 @@ void UsbAdbDevice::Stop() {
   ShutdownComplete();
 }
 
-zx::result<> UsbAdbDevice::SendLocked() {
-  if (tx_pending_reqs_.empty()) {
-    return zx::ok();
-  }
-
-  if (!Online()) {
-    return zx::error(ZX_ERR_BAD_STATE);
+void UsbAdbDevice::SendLocked() {
+  if (!Online() || tx_pending_reqs_.empty()) {
+    return;
   }
 
   auto& current = tx_pending_reqs_.front();
@@ -184,12 +193,10 @@ zx::result<> UsbAdbDevice::SendLocked() {
     CompleteTxn(current.completer, ZX_OK);
     tx_pending_reqs_.pop();
   }
-
-  return zx::ok();
 }
 
 void UsbAdbDevice::ReceiveLocked() {
-  if (pending_replies_.empty() || rx_requests_.empty()) {
+  if (!Online() || pending_replies_.empty() || rx_requests_.empty()) {
     return;
   }
 
@@ -234,7 +241,7 @@ void UsbAdbDevice::ReceiveLocked() {
 void UsbAdbDevice::QueueTx(QueueTxRequest& request, QueueTxCompleter::Sync& completer) {
   size_t length = request.data().size();
 
-  if (!Online() || length == 0) {
+  if (length == 0) {
     zxlogf(INFO, "Invalid state - Online %d Length %zu", Online(), length);
     completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
     return;
@@ -244,19 +251,10 @@ void UsbAdbDevice::QueueTx(QueueTxRequest& request, QueueTxCompleter::Sync& comp
   tx_pending_reqs_.emplace(
       txn_req_t{.request = std::move(request), .start = 0, .completer = completer.ToAsync()});
 
-  auto result = SendLocked();
-  if (result.is_error()) {
-    zxlogf(INFO, "SendLocked failed %d", result.error_value());
-  }
+  SendLocked();
 }
 
 void UsbAdbDevice::Receive(ReceiveCompleter::Sync& completer) {
-  // Return early during shutdown.
-  if (!Online()) {
-    completer.Reply(fit::error(ZX_ERR_BAD_STATE));
-    return;
-  }
-
   std::lock_guard<std::mutex> lock(bulk_out_ep_.mutex());
   rx_requests_.emplace(completer.ToAsync());
   ReceiveLocked();
@@ -302,10 +300,7 @@ void UsbAdbDevice::TxComplete(fendpoint::Completion completion) {
     return;
   }
 
-  auto result = SendLocked();
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to SendLocked %d", result.error_value());
-  }
+  SendLocked();
 }
 
 size_t UsbAdbDevice::UsbFunctionInterfaceGetDescriptorsSize() { return sizeof(descriptors_); }
@@ -329,10 +324,16 @@ zx_status_t UsbAdbDevice::UsbFunctionInterfaceControl(const usb_setup_t* setup,
 }
 
 zx_status_t UsbAdbDevice::ConfigureEndpoints(bool enable) {
-  zx_status_t status;
-  // Configure endpoint if not already done.
-  if (enable && !bulk_out_ep_.RequestsEmpty()) {
-    status = function_.ConfigEp(&descriptors_.bulk_out_ep, nullptr);
+  {
+    std::lock_guard<std::mutex> _(lock_);
+    if (status_ == fadb::StatusFlags(enable)) {
+      return ZX_OK;
+    }
+    status_ = fadb::StatusFlags(enable);
+  }
+
+  if (enable) {
+    zx_status_t status = function_.ConfigEp(&descriptors_.bulk_out_ep, nullptr);
     if (status != ZX_OK) {
       zxlogf(ERROR, "Failed to Config BULK OUT ep - %d.", status);
       return status;
@@ -344,25 +345,10 @@ zx_status_t UsbAdbDevice::ConfigureEndpoints(bool enable) {
       return status;
     }
 
-    // queue RX requests
-    std::vector<fuchsia_hardware_usb_request::Request> requests;
-    while (auto req = bulk_out_ep_.GetRequest()) {
-      req->reset_buffers(bulk_out_ep_.GetMapped());
-      auto status = req->CacheFlushInvalidate(bulk_out_ep_.GetMapped());
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "Cache flush and invalidate failed %d", status);
-      }
-
-      requests.emplace_back(req->take_request());
-    }
-    auto result = bulk_out_ep_->QueueRequests(std::move(requests));
-    if (result.is_error()) {
-      zxlogf(ERROR, "Failed to QueueRequests %s", result.error_value().FormatDescription().c_str());
-      return result.error_value().status();
-    }
+    Start();
     zxlogf(INFO, "ADB endpoints configured.");
-  } else if (!enable) {
-    status = function_.DisableEp(bulk_out_addr());
+  } else {
+    zx_status_t status = function_.DisableEp(bulk_out_addr());
     if (status != ZX_OK) {
       zxlogf(ERROR, "Failed to disable BULK OUT ep - %d.", status);
       return status;
@@ -373,27 +359,21 @@ zx_status_t UsbAdbDevice::ConfigureEndpoints(bool enable) {
       zxlogf(ERROR, "Failed to disable BULK IN ep - %d.", status);
       return status;
     }
-  }
 
-  if (adb_binding_.has_value()) {
-    auto result = fidl::WireSendEvent(adb_binding_.value())
-                      ->OnStatusChanged(enable ? fadb::StatusFlags::kOnline : fadb::StatusFlags(0));
-    if (!result.ok()) {
-      zxlogf(ERROR, "Could not call AdbInterface Status.");
-      return ZX_ERR_IO;
+    if (adb_binding_.has_value()) {
+      auto result =
+          fidl::WireSendEvent(adb_binding_.value())->OnStatusChanged(fadb::StatusFlags(0));
+      if (!result.ok()) {
+        zxlogf(ERROR, "Could not call AdbInterface Status.");
+        return ZX_ERR_IO;
+      }
     }
   }
-
   return ZX_OK;
 }
 
 zx_status_t UsbAdbDevice::UsbFunctionInterfaceSetConfigured(bool configured, usb_speed_t speed) {
   zxlogf(INFO, "configured? - %d  speed - %d.", configured, speed);
-  {
-    std::lock_guard<std::mutex> _(lock_);
-    status_ = fadb::StatusFlags(configured);
-  }
-
   return ConfigureEndpoints(configured);
 }
 
@@ -403,19 +383,7 @@ zx_status_t UsbAdbDevice::UsbFunctionInterfaceSetInterface(uint8_t interface, ui
   if (interface != descriptors_.adb_intf.b_interface_number || alt_setting > 1) {
     return ZX_ERR_INVALID_ARGS;
   }
-
-  auto status = ConfigureEndpoints(alt_setting);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ConfigureEndpoints failed %d", status);
-    return status;
-  }
-
-  {
-    std::lock_guard<std::mutex> _(lock_);
-    status_ = alt_setting ? fadb::StatusFlags::kOnline : fadb::StatusFlags(0);
-  }
-
-  return status;
+  return ConfigureEndpoints(alt_setting);
 }
 
 void UsbAdbDevice::ShutdownComplete() {
@@ -424,7 +392,8 @@ void UsbAdbDevice::ShutdownComplete() {
   // Only call the callback if all requests are returned.
   if (stop_completed_ && shutdown_callback_ && bulk_in_ep_.RequestsFull() &&
       bulk_out_ep_.RequestsFull()) {
-    shutdown_callback_();
+    auto callback = std::move(shutdown_callback_);
+    callback();
     stop_completed_ = false;
   }
 }

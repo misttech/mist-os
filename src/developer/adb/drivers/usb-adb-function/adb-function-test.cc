@@ -137,6 +137,8 @@ class UsbAdbTest : public zxtest::Test {
 
   void ReleaseFakeAdbDaemon(std::unique_ptr<FakeAdbDaemon>& fake_adb) {
     // Calls during Stop().
+    mock_usb_.ExpectDisableEp(ZX_OK, kBulkOutEp);
+    mock_usb_.ExpectDisableEp(ZX_OK, kBulkInEp);
     mock_usb_.ExpectSetInterface(ZX_OK, {});
 
     libsync::Completion stop_sync;
@@ -148,7 +150,6 @@ class UsbAdbTest : public zxtest::Test {
         infra->fake_dev.fake_endpoint(kBulkOutEp).RequestComplete(ZX_ERR_IO_NOT_PRESENT, 0);
       }
     });
-    released_ = true;
     stop_sync.Wait();
   }
 
@@ -205,15 +206,6 @@ class UsbAdbTest : public zxtest::Test {
   }
 
   void TearDown() override {
-    mock_usb_.ExpectDisableEp(ZX_OK, kBulkOutEp);
-    mock_usb_.ExpectDisableEp(ZX_OK, kBulkInEp);
-    if (!released_) {
-      incoming_.SyncCall([](IncomingNamespace* infra) {
-        for (size_t i = 0; i < kBulkTxRxCount; i++) {
-          infra->fake_dev.fake_endpoint(kBulkOutEp).RequestComplete(ZX_ERR_CANCELED, 0);
-        }
-      });
-    }
     mock_usb_.ExpectSetInterface(ZX_OK, {});
 
     ASSERT_OK(fdf::RunOnDispatcherSync(adb_dispatcher_->async_dispatcher(),
@@ -228,7 +220,6 @@ class UsbAdbTest : public zxtest::Test {
   fdf::UnownedSynchronizedDispatcher adb_dispatcher_ =
       mock_ddk::GetDriverRuntime()->StartBackgroundDispatcher();
   zx_device_t* dev_;
-  bool released_ = false;
 
  protected:
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
@@ -292,7 +283,11 @@ void UsbAdbTest::SendTestData(std::unique_ptr<FakeAdbDaemon>& fake_adb, size_t s
   });
 }
 
-TEST_F(UsbAdbTest, SetUpTearDown) { ASSERT_NO_FATAL_FAILURE(); }
+TEST_F(UsbAdbTest, SetUpTearDown) {
+  ASSERT_NO_FATAL_FAILURE();
+  mock_usb_.ExpectDisableEp(ZX_OK, kBulkOutEp);
+  mock_usb_.ExpectDisableEp(ZX_OK, kBulkInEp);
+}
 
 TEST_F(UsbAdbTest, StartStop) {
   auto fake_adb = CreateFakeAdbDaemon();

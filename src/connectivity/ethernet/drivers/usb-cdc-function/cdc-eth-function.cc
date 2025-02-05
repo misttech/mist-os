@@ -407,7 +407,7 @@ zx_status_t UsbCdc::UsbFunctionInterfaceControl(const usb_setup_t* setup,
 zx_status_t UsbCdc::UsbFunctionInterfaceSetConfigured(bool configured, usb_speed_t speed) {
   TRACE_DURATION("cdc_eth", __func__, "configured", configured, "speed", speed);
 
-  if (configured_) {
+  if (configured_ == configured) {
     return ZX_OK;
   }
 

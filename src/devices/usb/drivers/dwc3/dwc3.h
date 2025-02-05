@@ -54,6 +54,10 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
 
   void SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Sync& completer) override;
 
+  void StartController(StartControllerCompleter::Sync& completer) override;
+
+  void StopController(StopControllerCompleter::Sync& completer) override;
+
   void ConfigureEndpoint(ConfigureEndpointRequest& request,
                          ConfigureEndpointCompleter::Sync& completer) override;
 
@@ -188,6 +192,10 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
 
     zx_status_t Init(zx::bti& bti);
     void Release();
+    void Reset() {
+      current = nullptr;
+      next = first;
+    }
 
     zx_paddr_t GetTrbPhys(dwc3_trb_t* trb) const {
       ZX_DEBUG_ASSERT((trb >= first) && (trb <= last));
@@ -248,6 +256,12 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
     bool IsOutput() const { return IsOutput(ep_num); }
     bool IsInput() const { return IsInput(ep_num); }
 
+    void Reset() {
+      enabled = false;
+      got_not_ready = false;
+      stalled = false;
+    }
+
     FidlRequestQueue queued_reqs;            // requests waiting to be processed
     std::optional<RequestInfo> current_req;  // request currently being processed (if any)
     uint32_t rsrc_id{0};                     // resource ID for current_req
@@ -273,6 +287,12 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
     UserEndpoint& operator=(const UserEndpoint&) = delete;
     UserEndpoint(UserEndpoint&&) = delete;
     UserEndpoint& operator=(UserEndpoint&&) = delete;
+
+    void Reset() {
+      std::lock_guard<std::mutex> _(ep.lock);
+      fifo.Reset();
+      ep.Reset();
+    }
 
     __TA_GUARDED(ep.lock) Fifo fifo;
     Endpoint ep;
@@ -328,6 +348,15 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
     Ep0& operator=(const Ep0&) = delete;
     Ep0(Ep0&&) = delete;
     Ep0& operator=(Ep0&&) = delete;
+
+    void Reset() {
+      std::lock_guard<std::mutex> _(lock);
+      shared_fifo.Reset();
+      cur_setup = {};
+      cur_speed = fuchsia_hardware_usb_descriptor::wire::UsbSpeed::kUndefined;
+      out.Reset();
+      in.Reset();
+    }
 
     enum class State {
       None,
@@ -440,13 +469,13 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
 
   // Methods specific to user endpoints
   void UserEpQueueNext(UserEndpoint& uep) __TA_REQUIRES(uep.ep.lock) __TA_EXCLUDES(lock_);
-  zx_status_t UserEpCancelAll(UserEndpoint& uep) __TA_EXCLUDES(lock_, uep.ep.lock);
+  zx_status_t CancelAll(Endpoint& ep) __TA_EXCLUDES(lock_, ep.lock);
 
   // Cancel all currently in flight requests, and return a list of requests
   // which were in-flight.  Note that these requests have not been completed
   // yet.  It is the responsibility of the caller to (eventually) take care of
   // this once the lock has been dropped.
-  [[nodiscard]] FidlRequestQueue UserEpCancelAllLocked(UserEndpoint& uep) __TA_REQUIRES(uep.ep.lock)
+  [[nodiscard]] FidlRequestQueue CancelAllLocked(Endpoint& ep) __TA_REQUIRES(ep.lock)
       __TA_EXCLUDES(lock_);
 
   // Commands
