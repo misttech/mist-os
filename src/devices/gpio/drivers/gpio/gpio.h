@@ -6,8 +6,8 @@
 #define SRC_DEVICES_GPIO_DRIVERS_GPIO_GPIO_H_
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
-#include <fidl/fuchsia.hardware.pin/cpp/wire.h>
-#include <fidl/fuchsia.hardware.pinimpl/cpp/driver/wire.h>
+#include <fidl/fuchsia.hardware.pin/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.pinimpl/cpp/driver/fidl.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
@@ -143,13 +143,13 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_pin::Pin>,
 class GpioInitDevice {
  public:
   static std::unique_ptr<GpioInitDevice> Create(
-      const fidl::VectorView<fuchsia_hardware_pinimpl::wire::InitStep>& init_steps,
+      std::span<fuchsia_hardware_pinimpl::InitStep> init_steps,
       fidl::UnownedClientEnd<fuchsia_driver_framework::Node> node, fdf::Logger& logger,
       uint32_t controller_id, fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl>& pinimpl);
 
  private:
   static zx_status_t ConfigureGpios(
-      const fidl::VectorView<fuchsia_hardware_pinimpl::wire::InitStep>& init_steps,
+      std::span<fuchsia_hardware_pinimpl::InitStep> init_steps,
       fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl>& pinimpl);
 
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
