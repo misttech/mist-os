@@ -54,7 +54,7 @@ pub fn track_file_not_found(path: BString) {
         match NOT_FOUND_COUNTS.lock().entry(path) {
             Entry::Occupied(mut o) => *o.get_mut() += 1,
             Entry::Vacant(v) => {
-                crate::log_warn!(
+                crate::log_info!(
                     tag = "not_found",
                     path:% = v.key();
                     "couldn't resolve",
