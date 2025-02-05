@@ -77,12 +77,6 @@ void DeviceServer::Initialize(std::string name, std::optional<ServiceOffersV1> s
 }
 
 zx_status_t DeviceServer::AddMetadata(uint32_t type, const void* data, size_t size) {
-  // Constant taken from fuchsia.system.state/METADATA_BYTES_MAX. We cannot depend on non-SDK
-  // FIDL library here so we redefined the constant instead.
-  constexpr size_t kMaxMetadataSize = 8192;
-  if (size > kMaxMetadataSize) {
-    return ZX_ERR_INVALID_ARGS;
-  }
   Metadata metadata(size);
   auto begin = static_cast<const uint8_t*>(data);
   std::copy(begin, begin + size, metadata.begin());
