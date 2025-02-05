@@ -36,6 +36,10 @@ rustc_library("rust") {
     "//third_party/rust_crates:futures",
   ]
 
+  # TODO(https://fxbug.dev/394632612): Fix the leaks and remove this here and
+  # the visibility list for //build/config/sanitizers:suppress-lsan.DO-NOT-USE-THIS.
+  test_deps += [ "//build/config/sanitizers:suppress-lsan.DO-NOT-USE-THIS" ]
+
   sources = [
     "src/context.rs",
     "src/incoming.rs",

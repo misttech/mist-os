@@ -146,6 +146,7 @@ sanitizer_default_options("lsan_default_options") {
 # scripts/gn/trim_visibility.py --target="//build/config/sanitizers:suppress-lsan.DO-NOT-USE-THIS"
 sanitizer_extra_options("suppress-lsan.DO-NOT-USE-THIS") {
   visibility = [
+    "//sdk/lib/driver/component/rust:*",
     "//src/cobalt/bin/system-metrics/*",
     "//src/devices/usb/drivers/xhci/*",
     "//src/fonts/*",
