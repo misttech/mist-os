@@ -2488,7 +2488,6 @@ assembly_input_bundle("driver_framework") {
     "//src/devices/bin/devfs:package",
     "//src/devices/bin/driver_host:package",
     "//src/devices/bin/driver_manager:package",
-    "//src/devices/bin/driver_manager/devfs:package",
     "//src/devices/bin/driver-index:package",
   ]
   compiled_packages = [

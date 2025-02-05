@@ -237,7 +237,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
   // This should be used on the root node. Install the root node at the top of the devfs filesystem.
   void SetupDevfsForRootNode(std::optional<Devfs>& devfs) {
-    devfs.emplace(devfs_device_.topological_node(), dispatcher_);
+    devfs.emplace(devfs_device_.topological_node());
   }
 
   // This is exposed for testing. Setup this node's devfs nodes.
@@ -282,7 +282,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // TODO(https://fxbug.dev/42160282): Remove const_cast once VectorView supports const.
   fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols() const {
     return fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol>::FromExternal(
-        const_cast<decltype(symbols_)&>(symbols_));
+        const_cast<decltype(symbols_) &>(symbols_));
   }
 
   // Returns the node properties of the node and its parents if the node is a composite node.

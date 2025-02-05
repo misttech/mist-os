@@ -6,7 +6,7 @@
 
 void DriverManagerTestBase::SetUp() {
   TestLoopFixture::SetUp();
-  devfs_ = std::make_unique<driver_manager::Devfs>(root_devnode_, dispatcher());
+  devfs_ = std::make_unique<driver_manager::Devfs>(root_devnode_);
   root_ = CreateNode("root");
   root_->AddToDevfsForTesting(root_devnode_.value());
 }

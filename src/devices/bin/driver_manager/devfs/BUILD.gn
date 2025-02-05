@@ -2,8 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components.gni")
-
 source_set("devfs") {
   sources = [
     "builtin_devices.cc",
@@ -12,7 +10,6 @@ source_set("devfs") {
     "devfs.h",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_cpp",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
@@ -32,14 +29,4 @@ source_set("devfs") {
     "//src/devices/lib/log",
     "//src/lib/fxl",
   ]
-}
-
-fuchsia_component("component") {
-  component_name = "devfs-driver"
-  manifest = "meta/devfs-driver.cml"
-}
-
-fuchsia_package("package") {
-  package_name = "devfs-driver"
-  deps = [ ":component" ]
 }

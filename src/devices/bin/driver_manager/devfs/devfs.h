@@ -5,13 +5,11 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_DEVFS_DEVFS_H_
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_DEVFS_DEVFS_H_
 
-#include <fidl/fuchsia.component.runner/cpp/fidl.h>
 #include <fidl/fuchsia.device.fs/cpp/wire.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async/dispatcher.h>
 #include <lib/component/incoming/cpp/clone.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
 
 #include <random>
 
@@ -120,10 +118,6 @@ class Devnode {
   };
 
  private:
-  // Advertises a service that corresponds to the class name
-  zx_status_t TryAddService(std::string_view class_name, Target target,
-                            std::string_view instance_name);
-
   zx_status_t export_class(Devnode::Target target, std::string_view class_path,
                            std::vector<std::unique_ptr<Devnode>>& out);
 
@@ -143,11 +137,6 @@ class Devnode {
   const fbl::RefPtr<VnodeImpl> node_;
 
   const std::optional<fbl::String> name_;
-
-  // If service_name_ is valid, it means that there is a service advertised, and should be removed
-  // upon destruction of this devnode.
-  std::optional<std::string> service_path_;
-  std::optional<std::string> service_name_;
 };
 
 class PseudoDir : public fs::PseudoDir {
@@ -172,14 +161,10 @@ class DevfsDevice {
   std::optional<Devnode> protocol_;
 };
 
-// Manages the root functionality of devfs.
-// Also acts a a proxy driver.
-// Mounts as a boot driver and adversises services that are registered under
-// a recognized class name.  See class_names.h for more info.
-class Devfs : public fidl::Server<fuchsia_component_runner::ComponentController> {
+class Devfs {
  public:
   // `root` must outlive `this`.
-  explicit Devfs(std::optional<Devnode>& root, async_dispatcher_t* dispatcher);
+  explicit Devfs(std::optional<Devnode>& root);
 
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> Connect(fs::FuchsiaVfs& vfs);
 
@@ -190,37 +175,12 @@ class Devfs : public fidl::Server<fuchsia_component_runner::ComponentController>
     return class_entries_[std::string(class_name)];
   }
 
-  component::OutgoingDirectory& outgoing() { return outgoing_; }
-
-  // Called by the Driver Runner when the special devfs driver component is
-  // created.
-  void AttachComponent(fuchsia_component_runner::ComponentStartInfo info,
-                       fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller);
-
-  // fuchsia_component_runner::ComponentController
-  void Stop(StopCompleter::Sync& completer) override { CloseComponent(); }
-  void Kill(KillCompleter::Sync& completer) override { CloseComponent(); }
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_component_runner::ComponentController> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override {}
-
  private:
   friend class Devnode;
 
   static std::optional<std::reference_wrapper<fs::Vnode>> Lookup(PseudoDir& parent,
                                                                  std::string_view name);
-
-  // close the fake driver component
-  void CloseComponent() {
-    if (binding_.has_value()) {
-      binding_->Close(ZX_OK);
-      binding_.reset();
-    }
-  }
   Devnode& root_;
-  component::OutgoingDirectory outgoing_;
-  async_dispatcher_t* dispatcher_;
-  std::optional<fidl::ServerBinding<fuchsia_component_runner::ComponentController>> binding_;
   std::default_random_engine device_number_generator_;
 
   fbl::RefPtr<PseudoDir> class_ = fbl::MakeRefCounted<PseudoDir>();

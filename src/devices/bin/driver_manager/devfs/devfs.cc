@@ -155,12 +155,6 @@ Devnode::~Devnode() {
 
   children().RemoveAllEntries();
 
-  if (service_path_.has_value() && service_name_.has_value()) {
-    [[maybe_unused]] auto res = devfs_.outgoing().RemoveProtocolAt(*service_path_, *service_name_);
-    service_path_.reset();
-    service_name_.reset();
-  }
-
   if (parent_ == nullptr) {
     return;
   }
@@ -227,40 +221,6 @@ zx::result<std::string> Devfs::MakeInstanceName(std::string_view class_name) {
   return zx::ok(std::format("{}", distrib(device_number_generator_)));
 }
 
-zx_status_t Devnode::TryAddService(std::string_view class_name, Target target,
-                                   std::string_view instance_name) {
-  // Lookup class name in mapping to see if we can translate it to a service name and a service
-  // member
-  auto name_iterator = kClassNameToService.find(class_name);
-  if (name_iterator == kClassNameToService.end()) {
-    return ZX_OK;  // If the class is not in the map, then we are not making it available.
-  }
-  auto& [key, service] = *name_iterator;
-  if (service.state == ServiceEntry::DEVFS_ONLY) {
-    return ZX_OK;
-  }
-  std::string path = "svc/" + service.service_name + "/" + std::string(instance_name);
-  component::AnyHandler handler = [passthrough = target](zx::channel channel) {
-    (*passthrough->device_connect.get())(std::move(channel));
-  };
-  zx::result result =
-      devfs_.outgoing().AddUnmanagedProtocolAt(std::move(handler), path, service.member_name);
-  if (result.is_ok()) {
-    LOGF(INFO, "Added service entry '%s' for class '%.*s'",
-         (path + "/" + std::string(service.member_name)).c_str(),
-         static_cast<int>(class_name.size()), class_name.data());
-    // set the service name so we know that we need to remove the service if the devnode is
-    // destroyed.
-    service_path_ = path;
-    service_name_ = service.member_name;
-    return ZX_OK;
-  }
-  LOGF(WARNING, "Failed to add service entry '%s' for class '%.*s'  %d (%s)",
-       (path + "/" + std::string(service.member_name)).c_str(), static_cast<int>(class_name.size()),
-       class_name.data(), result.status_value(), zx_status_get_string(result.status_value()));
-  return result.status_value();
-}
-
 zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_view> class_name,
                                Target target, DevfsDevice& out_child) {
   // Check that the child does not have a duplicate name.
@@ -277,29 +237,12 @@ zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_
     if (instance_name.is_ok()) {
       out_child.protocol_node().emplace(devfs_, *devfs_.get_class_entry(class_name.value()), target,
                                         instance_name.value());
-      out_child.protocol_node()->TryAddService(class_name.value(), target, instance_name.value());
     }
   }
 
   out_child.topological_node().emplace(devfs_, children(), std::move(target), name);
 
   return ZX_OK;
-}
-
-void Devfs::AttachComponent(
-    fuchsia_component_runner::ComponentStartInfo info,
-    fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller) {
-  // Serve the outgoing directory:
-  if (!info.outgoing_dir().has_value()) {
-    LOGF(WARNING, "No outgoing dir available for devfs component.");
-    return;
-  }
-  auto result = outgoing_.Serve(std::move(*info.outgoing_dir()));
-  if (result.is_error()) {
-    LOGF(WARNING, "Failed to serve the devfs outgoing directory %s", result.status_string());
-    return;
-  }
-  binding_.emplace(dispatcher_, std::move(controller), this, fidl::kIgnoreBindingClosure);
 }
 
 zx::result<fidl::ClientEnd<fio::Directory>> Devfs::Connect(fs::FuchsiaVfs& vfs) {
@@ -310,8 +253,7 @@ zx::result<fidl::ClientEnd<fio::Directory>> Devfs::Connect(fs::FuchsiaVfs& vfs) 
   return zx::make_result(vfs.ServeDirectory(root_.node_, std::move(server)), std::move(client));
 }
 
-Devfs::Devfs(std::optional<Devnode>& root, async_dispatcher_t* dispatcher)
-    : root_(root.emplace(*this)), outgoing_(dispatcher), dispatcher_(dispatcher) {
+Devfs::Devfs(std::optional<Devnode>& root) : root_(root.emplace(*this)) {
   PseudoDir& pd = root_.children();
   MustAddEntry(pd, "class", class_);
   MustAddEntry(pd, kNullDevName, fbl::MakeRefCounted<BuiltinDevVnode>(true));
@@ -322,7 +264,7 @@ Devfs::Devfs(std::optional<Devnode>& root, async_dispatcher_t* dispatcher)
     MustAddEntry(*builtin, kZeroDevName, fbl::MakeRefCounted<BuiltinDevVnode>(false));
     MustAddEntry(pd, "builtin", std::move(builtin));
   }
-  for (const auto& [class_name, service_entry] : kClassNameToService) {
+  for (const auto& class_name : kEagerClassNames) {
     class_entries_[std::string(class_name)] = fbl::MakeRefCounted<PseudoDir>();
     MustAddEntry(*class_, class_name, class_entries_[std::string(class_name)]);
   }
@@ -426,5 +368,4 @@ zx_status_t Devnode::export_dir(Devnode::Target target,
 
   return ZX_OK;
 }
-
 }  // namespace driver_manager
