@@ -6,6 +6,8 @@
 import abc
 from collections.abc import Callable
 
+import fuchsia_inspect
+
 from honeydew.affordances.connectivity.bluetooth.avrcp import avrcp
 from honeydew.affordances.connectivity.bluetooth.gap import gap
 from honeydew.affordances.connectivity.bluetooth.le import le
@@ -22,7 +24,6 @@ from honeydew.affordances.session import session
 from honeydew.affordances.tracing import tracing
 from honeydew.affordances.ui.screenshot import screenshot
 from honeydew.affordances.ui.user_input import user_input
-from honeydew.interfaces.affordances import inspect
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
 )
@@ -208,15 +209,6 @@ class FuchsiaDevice(abc.ABC):
 
     @properties.Affordance
     @abc.abstractmethod
-    def inspect(self) -> inspect.Inspect:
-        """Returns a inspect affordance object.
-
-        Returns:
-            inspect.Inspect object
-        """
-
-    @properties.Affordance
-    @abc.abstractmethod
     def rtc(self) -> rtc.Rtc:
         """Returns an RTC affordance object.
 
@@ -330,6 +322,29 @@ class FuchsiaDevice(abc.ABC):
 
         Raises:
             errors.HealthCheckError
+        """
+
+    @abc.abstractmethod
+    def get_inspect_data(
+        self,
+        selectors: list[str] | None = None,
+        monikers: list[str] | None = None,
+    ) -> fuchsia_inspect.InspectDataCollection:
+        """Return the inspect data associated with the given selectors and
+        monikers.
+
+        Args:
+            selectors: selectors to be queried.
+            monikers: component monikers.
+
+        Note: If both `selectors` and `monikers` lists are empty, inspect data
+        for the whole system will be returned.
+
+        Returns:
+            Inspect data collection
+
+        Raises:
+            InspectError: Failed to return inspect data.
         """
 
     @abc.abstractmethod

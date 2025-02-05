@@ -15,7 +15,6 @@ import fuchsia_inspect
 from parameterized import param, parameterized
 
 from honeydew import errors
-from honeydew.affordances.ffx import inspect as inspect_impl
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller as system_power_state_controller_interface,
 )
@@ -167,7 +166,9 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         self.mock_device_logger = mock.MagicMock(
             spec=affordances_capable.FuchsiaDeviceLogger
         )
-        self.mock_inspect = mock.MagicMock(spec=inspect_impl.Inspect)
+        self.mock_inspect = mock.MagicMock(
+            spec=affordances_capable.InspectCapableDevice
+        )
 
         with mock.patch.object(
             system_power_state_controller_using_starnix.SystemPowerStateControllerUsingStarnix,
@@ -240,7 +241,7 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         mock_suspend: mock.Mock,
     ) -> None:
         """Test case for SystemPowerStateControllerUsingStarnix.suspend_resume()"""
-        self.mock_inspect.get_data.side_effect = [
+        self.mock_inspect.get_inspect_data.side_effect = [
             fuchsia_inspect.InspectDataCollection.from_list(
                 _SAG_INSPECT_DATA_BEFORE
             ),
@@ -279,7 +280,7 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         mock_suspend: mock.Mock,
     ) -> None:
         """Test case for SystemPowerStateControllerUsingStarnix.suspend_resume()"""
-        self.mock_inspect.get_data.side_effect = [
+        self.mock_inspect.get_inspect_data.side_effect = [
             fuchsia_inspect.InspectDataCollection.from_list(
                 _SAG_INSPECT_DATA_BEFORE
             ),
@@ -322,7 +323,7 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         mock_suspend: mock.Mock,
     ) -> None:
         """Test case for SystemPowerStateControllerUsingStarnix.suspend_resume()"""
-        self.mock_inspect.get_data.side_effect = [
+        self.mock_inspect.get_inspect_data.side_effect = [
             fuchsia_inspect.InspectDataCollection.from_list(
                 _SAG_INSPECT_DATA_BEFORE
             ),
@@ -625,7 +626,7 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
     ) -> None:
         """Test case for SystemPowerStateControllerUsingStarnix._get_suspend_stats_from_sag_inspect_data()
         raising exception as it fails to read SAG inspect data."""
-        self.mock_inspect.get_data.side_effect = errors.InspectError(
+        self.mock_inspect.get_inspect_data.side_effect = errors.InspectError(
             "Inspect operation failed"
         )
         with self.assertRaisesRegex(
@@ -639,7 +640,7 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
     ) -> None:
         """Test case for SystemPowerStateControllerUsingStarnix._get_suspend_events_from_fsh_inspect_data()
         raising exception as it fails to read FSH inspect data."""
-        self.mock_inspect.get_data.side_effect = errors.InspectError(
+        self.mock_inspect.get_inspect_data.side_effect = errors.InspectError(
             "Inspect operation failed"
         )
         with self.assertRaisesRegex(

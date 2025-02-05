@@ -6,6 +6,8 @@
 import abc
 from collections.abc import Callable
 
+import fuchsia_inspect
+
 from honeydew.typing import custom_types
 
 
@@ -64,4 +66,32 @@ class FuchsiaDeviceClose(abc.ABC):
 
         Args:
             fn: Function that need to be called during FuchsiaDevice cleanup.
+        """
+
+
+class InspectCapableDevice(abc.ABC):
+    """Abstract base class to be implemented by a device which supports the
+    inspect operation."""
+
+    @abc.abstractmethod
+    def get_inspect_data(
+        self,
+        selectors: list[str] | None = None,
+        monikers: list[str] | None = None,
+    ) -> fuchsia_inspect.InspectDataCollection:
+        """Return the inspect data associated with the given selectors and
+        monikers.
+
+        Args:
+            selectors: selectors to be queried.
+            monikers: component monikers.
+
+        Note: If both `selectors` and `monikers` lists are empty, inspect data
+        for the whole system will be returned.
+
+        Returns:
+            Inspect data collection
+
+        Raises:
+            InspectError: Failed to return inspect data.
         """

@@ -5,6 +5,7 @@
 
 import asyncio
 import ipaddress
+import json
 import logging
 import os
 from collections.abc import Callable
@@ -20,6 +21,7 @@ import fidl.fuchsia_hardware_power_statecontrol as fhp_statecontrol
 import fidl.fuchsia_hwinfo as f_hwinfo
 import fidl.fuchsia_io as f_io
 import fuchsia_controller_py as fcp
+import fuchsia_inspect
 
 from honeydew import errors
 from honeydew.affordances.connectivity.bluetooth.avrcp import (
@@ -45,7 +47,6 @@ from honeydew.affordances.connectivity.wlan.wlan_policy_ap import (
     wlan_policy_ap,
     wlan_policy_ap_using_fc,
 )
-from honeydew.affordances.ffx import inspect as inspect_ffx
 from honeydew.affordances.location import location, location_using_fc
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller as system_power_state_controller_interface,
@@ -58,7 +59,6 @@ from honeydew.affordances.session import session, session_using_ffx
 from honeydew.affordances.tracing import tracing, tracing_using_fc
 from honeydew.affordances.ui.screenshot import screenshot, screenshot_using_ffx
 from honeydew.affordances.ui.user_input import user_input, user_input_using_fc
-from honeydew.interfaces.affordances import inspect as inspect_interface
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
 )
@@ -120,6 +120,7 @@ class FuchsiaDevice(
     affordances_capable.RebootCapableDevice,
     affordances_capable.FuchsiaDeviceLogger,
     affordances_capable.FuchsiaDeviceClose,
+    affordances_capable.InspectCapableDevice,
 ):
     """FuchsiaDevice abstract base class implementation using
     Fuchsia-Controller.
@@ -413,7 +414,7 @@ class FuchsiaDevice(
         return system_power_state_controller_using_starnix.SystemPowerStateControllerUsingStarnix(
             device_name=self.device_name,
             ffx=self.ffx,
-            inspect=self.inspect,
+            inspect=self,
             device_logger=self,
         )
 
@@ -545,18 +546,6 @@ class FuchsiaDevice(
         )
 
     @properties.Affordance
-    def inspect(self) -> inspect_interface.Inspect:
-        """Returns a inspect affordance object.
-
-        Returns:
-            inspect.Inspect object
-        """
-        return inspect_ffx.Inspect(
-            device_name=self.device_name,
-            ffx=self.ffx,
-        )
-
-    @properties.Affordance
     def netstack(self) -> netstack.Netstack:
         """Returns a netstack affordance object.
 
@@ -626,6 +615,73 @@ class FuchsiaDevice(
         ) as err:
             raise errors.HealthCheckError(
                 f"health check failed on '{self._device_info.name}'"
+            ) from err
+
+    def get_inspect_data(
+        self,
+        selectors: list[str] | None = None,
+        monikers: list[str] | None = None,
+    ) -> fuchsia_inspect.InspectDataCollection:
+        """Return the inspect data associated with the given selectors and
+        monikers.
+
+        Args:
+            selectors: selectors to be queried.
+            monikers: component monikers.
+
+        Note: If both `selectors` and `monikers` lists are empty, inspect data
+        for the whole system will be returned.
+
+        Returns:
+            Inspect data collection
+
+        Raises:
+            InspectError: Failed to return inspect data.
+        """
+        selectors_and_monikers: list[str] = []
+        if selectors:
+            selectors_and_monikers += selectors
+        if monikers:
+            for moniker in monikers:
+                selectors_and_monikers.append(moniker.replace(":", r"\:"))
+
+        cmd: list[str] = [
+            "--machine",
+            "json",
+            "inspect",
+            "show",
+        ] + selectors_and_monikers
+
+        try:
+            message: str = (
+                f"Collecting the inspect data from {self.device_name}"
+            )
+            if selectors:
+                message = f"{message}, with selectors={selectors}"
+            if monikers:
+                message = f"{message}, with monikers={monikers}"
+            _LOGGER.info(message)
+            inspect_data_json_str: str = self.ffx.run(
+                cmd=cmd,
+                log_output=False,
+            )
+            _LOGGER.info(
+                "Collected the inspect data from %s.", self.device_name
+            )
+
+            inspect_data_json_obj: list[dict[str, Any]] = json.loads(
+                inspect_data_json_str
+            )
+            return fuchsia_inspect.InspectDataCollection.from_list(
+                inspect_data_json_obj
+            )
+        except (
+            errors.FfxCommandError,
+            errors.DeviceNotConnectedError,
+            fuchsia_inspect.InspectDataError,
+        ) as err:
+            raise errors.InspectError(
+                f"Failed to collect the inspect data from {self.device_name}"
             ) from err
 
     def log_message_to_device(

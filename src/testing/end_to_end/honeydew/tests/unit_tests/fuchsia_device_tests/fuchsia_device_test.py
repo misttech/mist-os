@@ -17,6 +17,7 @@ import fidl.fuchsia_hardware_power_statecontrol as fhp_statecontrol
 import fidl.fuchsia_hwinfo as f_hwinfo
 import fidl.fuchsia_io as f_io
 import fuchsia_controller_py as fuchsia_controller
+import fuchsia_inspect
 from fuchsia_controller_py import ZxStatus
 from parameterized import param, parameterized
 
@@ -58,6 +59,73 @@ from honeydew.typing import custom_types
 
 # pylint: disable=protected-access
 
+_INSPECT_DATA_JSON_TEXT = """
+[
+  {
+    "data_source": "Inspect",
+    "metadata": {
+        "component_url": "foo",
+        "timestamp": 181016000000000,
+        "file_name": "foo.txt"
+    },
+    "moniker": "core/example",
+    "payload": {
+      "root": {
+        "value": 100
+      }
+    },
+    "version": 1
+  },
+  {
+    "data_source": "Inspect",
+    "metadata": {
+        "component_url": "foo2",
+        "timestamp": 181016000000000
+    },
+    "moniker": "core/example",
+    "payload": {
+      "root": {
+        "value": 100
+      }
+    },
+    "version": 1
+  },
+  {
+    "data_source": "Inspect",
+    "metadata": {
+        "component_url": "foo2",
+        "timestamp": 181016000000000,
+        "errors": [
+          {
+            "message": "Unknown failure"
+          }
+        ]
+    },
+    "moniker": "core/example",
+    "payload": null,
+    "version": 1
+  }
+]
+"""
+
+_INSPECT_DATA_BAD_VERSION = """
+{
+    "data_source": "Inspect",
+    "metadata": {
+        "component_url": "foo",
+        "timestamp": 181016000000000,
+        "file_name": "foo.txt"
+    },
+    "moniker": "core/example",
+    "payload": {
+      "root": {
+        "value": 100
+      }
+    },
+    "version": 2
+  }
+"""
+
 _INPUT_ARGS: dict[str, Any] = {
     "device_name": "fuchsia-emulator",
     "device_serial_socket": "/tmp/socket",
@@ -74,7 +142,12 @@ _INPUT_ARGS: dict[str, Any] = {
 }
 
 
-_MOCK_ARGS: dict[str, str] = {"board": "x64", "product": "core"}
+_MOCK_ARGS: dict[str, str] = {
+    "board": "x64",
+    "product": "core",
+    "INSPECT_DATA_JSON_TEXT": _INSPECT_DATA_JSON_TEXT,
+    "INSPECT_DATA_BAD_VERSION": _INSPECT_DATA_BAD_VERSION,
+}
 
 _BASE64_ENCODED_BYTES: bytes = base64.b64decode("some base64 encoded string==")
 
@@ -748,6 +821,164 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
 
         mock_ffx_check_connection.assert_called_once_with(self.fd_fc_obj.ffx)
         mock_fc_check_connection.assert_not_called()
+
+    @parameterized.expand(
+        [
+            param(
+                label="without_selectors_and_monikers",
+                selectors=None,
+                monikers=None,
+                expected_cmd=[
+                    "--machine",
+                    "json",
+                    "inspect",
+                    "show",
+                ],
+            ),
+            param(
+                label="with_one_selector",
+                selectors=["selector1"],
+                monikers=None,
+                expected_cmd=[
+                    "--machine",
+                    "json",
+                    "inspect",
+                    "show",
+                    "selector1",
+                ],
+            ),
+            param(
+                label="with_two_selectors",
+                selectors=["selector1", "selector2"],
+                monikers=None,
+                expected_cmd=[
+                    "--machine",
+                    "json",
+                    "inspect",
+                    "show",
+                    "selector1",
+                    "selector2",
+                ],
+            ),
+            param(
+                label="with_one_moniker",
+                selectors=None,
+                monikers=["core/coll:bar"],
+                expected_cmd=[
+                    "--machine",
+                    "json",
+                    "inspect",
+                    "show",
+                    r"core/coll\:bar",
+                ],
+            ),
+            param(
+                label="with_one_selector_and_one_moniker",
+                selectors=["selector1"],
+                monikers=["core/coll:bar"],
+                expected_cmd=[
+                    "--machine",
+                    "json",
+                    "inspect",
+                    "show",
+                    "selector1",
+                    r"core/coll\:bar",
+                ],
+            ),
+        ],
+        name_func=_custom_test_name_func,
+    )
+    @mock.patch.object(
+        ffx_transport.FFX,
+        "run",
+        autospec=True,
+    )
+    def test_get_inspect_data(
+        self,
+        mock_ffx_run: mock.Mock,
+        label: str,  # pylint: disable=unused-argument
+        selectors: list[str],
+        monikers: list[str],
+        expected_cmd: list[str],
+    ) -> None:
+        """Test case for get_inspect_data()"""
+        mock_ffx_run.return_value = _MOCK_ARGS["INSPECT_DATA_JSON_TEXT"]
+
+        inspect_data_collection: fuchsia_inspect.InspectDataCollection = (
+            self.fd_fc_obj.get_inspect_data(
+                selectors=selectors,
+                monikers=monikers,
+            )
+        )
+
+        self.assertIsInstance(
+            inspect_data_collection, fuchsia_inspect.InspectDataCollection
+        )
+        for inspect_data in inspect_data_collection.data:
+            self.assertIsInstance(inspect_data, fuchsia_inspect.InspectData)
+
+        mock_ffx_run.assert_called_with(
+            mock.ANY,
+            cmd=expected_cmd,
+            log_output=False,
+        )
+
+    @parameterized.expand(
+        [
+            param(
+                label="with_FfxCommandError",
+                side_effect=errors.FfxCommandError("error"),
+                expected_error=errors.InspectError,
+            ),
+            param(
+                label="with_DeviceNotConnectedError",
+                side_effect=errors.DeviceNotConnectedError("error"),
+                expected_error=errors.InspectError,
+            ),
+            param(
+                label="with_someother_error",
+                side_effect=errors.FfxTimeoutError("error"),
+                expected_error=errors.FfxTimeoutError,
+            ),
+        ],
+        name_func=_custom_test_name_func,
+    )
+    @mock.patch.object(
+        ffx_transport.FFX,
+        "run",
+        autospec=True,
+    )
+    def test_get_inspect_data_exception_when_ffx_run_fails(
+        self,
+        mock_ffx_run: mock.Mock,
+        label: str,  # pylint: disable=unused-argument,
+        side_effect: type[errors.HoneydewError],
+        expected_error: type[errors.HoneydewError],
+    ) -> None:
+        """Test case for get_inspect_data() raising InspectError failure."""
+        mock_ffx_run.side_effect = side_effect
+
+        with self.assertRaises(expected_error):
+            self.fd_fc_obj.get_inspect_data()
+
+        mock_ffx_run.assert_called_once()
+
+    @mock.patch.object(
+        ffx_transport.FFX,
+        "run",
+        autospec=True,
+    )
+    def test_get_inspect_data_exception_when_inspect_data_parsing_fails(
+        self,
+        mock_ffx_run: mock.Mock,
+    ) -> None:
+        """Test case for get_inspect_data() raising InspectError failure."""
+        mock_ffx_run.return_value = _MOCK_ARGS["INSPECT_DATA_BAD_VERSION"]
+
+        with self.assertRaises(errors.InspectError):
+            self.fd_fc_obj.get_inspect_data()
+
+        mock_ffx_run.assert_called_once()
 
     @parameterized.expand(
         [

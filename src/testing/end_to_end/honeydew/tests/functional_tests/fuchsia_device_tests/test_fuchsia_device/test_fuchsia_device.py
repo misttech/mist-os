@@ -6,7 +6,9 @@
 import logging
 import os
 import tempfile
+from typing import Any
 
+import fuchsia_inspect
 from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, test_runner
 
@@ -118,6 +120,67 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
     def test_health_check(self) -> None:
         """Test case for health_check()"""
         self.device.health_check()
+
+    def test_get_inspect_data_without_selectors_and_monikers(self) -> None:
+        inspect_data_collection: fuchsia_inspect.InspectDataCollection = (
+            self.device.get_inspect_data()
+        )
+
+        asserts.assert_is_instance(
+            inspect_data_collection, fuchsia_inspect.InspectDataCollection
+        )
+        for inspect_data in inspect_data_collection.data:
+            asserts.assert_is_instance(
+                inspect_data,
+                fuchsia_inspect.InspectData,
+            )
+
+    def test_get_inspect_data_with_one_selector_validate_schema(self) -> None:
+        class _AnyUnsignedInteger:
+            def __eq__(self, other: object) -> bool:
+                return isinstance(other, int) and other >= 0
+
+        inspect_data_collection: fuchsia_inspect.InspectDataCollection = (
+            self.device.get_inspect_data(
+                selectors=["bootstrap/archivist:root/fuchsia.inspect.Health"],
+            )
+        )
+
+        expected_payload: dict[str, Any] = {
+            "root": {
+                "fuchsia.inspect.Health": {
+                    "start_timestamp_nanos": _AnyUnsignedInteger(),
+                    "status": "OK",
+                }
+            }
+        }
+        fuchsia_inspect_health_data: fuchsia_inspect.InspectData = (
+            inspect_data_collection.data[0]
+        )
+        asserts.assert_equal(
+            fuchsia_inspect_health_data.payload,
+            expected_payload,
+            f"Expected payload: ####{expected_payload}#### but "
+            f"received payload: ####{fuchsia_inspect_health_data.payload}####",
+        )
+
+    def test_get_inspect_data_with_multiple_selectors(self) -> None:
+        selectors: list[str] = [
+            "bootstrap/fshost",
+            "bootstrap/archivist",
+        ]
+
+        inspect_data_collection: fuchsia_inspect.InspectDataCollection = (
+            self.device.get_inspect_data(
+                selectors=selectors,
+            )
+        )
+
+        monikers: list[str] = [
+            inspect_data.moniker
+            for inspect_data in inspect_data_collection.data
+        ]
+        asserts.assert_equal(sorted(monikers), sorted(selectors))
 
     def test_log_message_to_device(self) -> None:
         """Test case for log_message_to_device()"""
