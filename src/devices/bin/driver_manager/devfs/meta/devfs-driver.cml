@@ -1,0 +1,56 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [],
+    program: {
+        runner: "driver",
+        binary: "meta/devfs-driver.cm",
+    },
+    capabilities: [
+        {
+            service: [
+                "fuchsia.hardware.adc.Service",
+                "fuchsia.hardware.audio.CodecConnectorService",
+                "fuchsia.hardware.audio.CompositeConnectorService",
+                "fuchsia.hardware.audio.DaiConnectorService",
+                "fuchsia.hardware.audio.StreamConfigConnectorService",
+                "fuchsia.hardware.clock.measure.Service",
+                "fuchsia.hardware.goldfish.AddressSpaceService",
+                "fuchsia.hardware.gpu.mali.Service",
+                "fuchsia.hardware.hrtimer.Service",
+                "fuchsia.hardware.i2c.Service",
+                "fuchsia.hardware.input.Service",
+                "fuchsia.hardware.registers.Service",
+                "fuchsia.hardware.rtc.Service",
+                "fuchsia.hardware.sdio.DriverService",
+                "fuchsia.hardware.tee.Service",
+                "fuchsia.services.test.Device",
+            ],
+        },
+    ],
+    use: [],
+    expose: [
+        {
+            service: [
+                "fuchsia.hardware.adc.Service",
+                "fuchsia.hardware.audio.CodecConnectorService",
+                "fuchsia.hardware.audio.CompositeConnectorService",
+                "fuchsia.hardware.audio.DaiConnectorService",
+                "fuchsia.hardware.audio.StreamConfigConnectorService",
+                "fuchsia.hardware.clock.measure.Service",
+                "fuchsia.hardware.goldfish.AddressSpaceService",
+                "fuchsia.hardware.gpu.mali.Service",
+                "fuchsia.hardware.hrtimer.Service",
+                "fuchsia.hardware.i2c.Service",
+                "fuchsia.hardware.input.Service",
+                "fuchsia.hardware.registers.Service",
+                "fuchsia.hardware.rtc.Service",
+                "fuchsia.hardware.sdio.DriverService",
+                "fuchsia.hardware.tee.Service",
+                "fuchsia.services.test.Device",
+            ],
+            from: "self",
+        },
+    ],
+}

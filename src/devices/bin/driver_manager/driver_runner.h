@@ -123,6 +123,15 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   void PublishComponentRunner(component::OutgoingDirectory& outgoing);
   zx::result<> StartRootDriver(std::string_view url);
 
+  // Register a proxy driver called 'Devfs-Driver' that will advertise services that correspond to
+  // the protocols offered by devfs class paths.  This call will start the driver registration, but
+  // that registration will not be complete until the component framework calls the AddChild
+  // callback.  That callback will then update |devfs| with an outgoing directory and a
+  // ComponentController.
+  // This function should only be called once when the driver manager is starting, and will no
+  // longer be needed when devfs migration is complete.
+  void StartDevfsDriver(driver_manager::Devfs& devfs);
+
   // Goes through the orphan list and attempts the bind them again. Sends nodes that are still
   // orphaned back to the orphan list. Tracks the result of the bindings and then when finished
   // uses the result_callback to report the results.

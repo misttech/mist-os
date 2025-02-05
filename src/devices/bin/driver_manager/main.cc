@@ -47,6 +47,7 @@
 namespace fio = fuchsia_io;
 
 namespace {
+
 // Sets the logging process name. Needed to redirect output
 // to serial.
 void SetLoggingProcessName() {
@@ -59,6 +60,7 @@ void SetLoggingProcessName() {
   }
   driver_logger::GetLogger().AddTag(process_name);
 }
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -141,6 +143,7 @@ int main(int argc, char** argv) {
   std::optional<driver_manager::Devfs> devfs;
   driver_runner.root_node()->SetupDevfsForRootNode(devfs);
   driver_runner.PublishComponentRunner(outgoing);
+  driver_runner.StartDevfsDriver(*devfs);
 
   // Find and load v2 Drivers.
   LOGF(INFO, "Starting DriverRunner with root driver URL: %s", config.root_driver().c_str());

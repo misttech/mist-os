@@ -54,8 +54,9 @@ std::optional<std::reference_wrapper<const Devnode>> lookup(const Devnode& paren
 }
 
 TEST(Devfs, Export) {
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   std::optional<Devnode> root_slot;
-  const Devfs devfs(root_slot);
+  const Devfs devfs(root_slot, loop.dispatcher());
   ASSERT_TRUE(root_slot.has_value());
   Devnode& root_node = root_slot.value();
   std::vector<std::unique_ptr<Devnode>> out;
@@ -71,8 +72,9 @@ TEST(Devfs, Export) {
 }
 
 TEST(Devfs, Export_ExcessSeparators) {
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   std::optional<Devnode> root_slot;
-  const Devfs devfs(root_slot);
+  const Devfs devfs(root_slot, loop.dispatcher());
   ASSERT_TRUE(root_slot.has_value());
   Devnode& root_node = root_slot.value();
   std::vector<std::unique_ptr<Devnode>> out;
@@ -84,8 +86,9 @@ TEST(Devfs, Export_ExcessSeparators) {
 }
 
 TEST(Devfs, Export_OneByOne) {
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   std::optional<Devnode> root_slot;
-  const Devfs devfs(root_slot);
+  const Devfs devfs(root_slot, loop.dispatcher());
   ASSERT_TRUE(root_slot.has_value());
   Devnode& root_node = root_slot.value();
   std::vector<std::unique_ptr<Devnode>> out;
@@ -102,8 +105,9 @@ TEST(Devfs, Export_OneByOne) {
 }
 
 TEST(Devfs, Export_InvalidPath) {
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   std::optional<Devnode> root_slot;
-  const Devfs devfs(root_slot);
+  const Devfs devfs(root_slot, loop.dispatcher());
   ASSERT_TRUE(root_slot.has_value());
   Devnode& root_node = root_slot.value();
   std::vector<std::unique_ptr<Devnode>> out;
@@ -115,8 +119,9 @@ TEST(Devfs, Export_InvalidPath) {
 }
 
 TEST(Devfs, Export_WithProtocol) {
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   std::optional<Devnode> root_slot;
-  Devfs devfs(root_slot);
+  const Devfs devfs(root_slot, loop.dispatcher());
   ASSERT_TRUE(root_slot.has_value());
   Devnode& root_node = root_slot.value();
 
@@ -133,8 +138,9 @@ TEST(Devfs, Export_WithProtocol) {
 }
 
 TEST(Devfs, Export_AlreadyExists) {
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   std::optional<Devnode> root_slot;
-  const Devfs devfs(root_slot);
+  const Devfs devfs(root_slot, loop.dispatcher());
   ASSERT_TRUE(root_slot.has_value());
   Devnode& root_node = root_slot.value();
   std::vector<std::unique_ptr<Devnode>> out;
@@ -144,8 +150,9 @@ TEST(Devfs, Export_AlreadyExists) {
 }
 
 TEST(Devfs, Export_DropDevfs) {
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   std::optional<Devnode> root_slot;
-  const Devfs devfs(root_slot);
+  const Devfs devfs(root_slot, loop.dispatcher());
   ASSERT_TRUE(root_slot.has_value());
   Devnode& root_node = root_slot.value();
   std::vector<std::unique_ptr<Devnode>> out;
@@ -172,7 +179,7 @@ TEST(Devfs, PassthroughTarget) {
   fs::SynchronousVfs vfs(loop.dispatcher());
 
   std::optional<Devnode> root_slot;
-  Devfs devfs(root_slot);
+  Devfs devfs(root_slot, loop.dispatcher());
   ASSERT_TRUE(root_slot.has_value());
   fuchsia_device_fs::ConnectionType connection_type;
   Devnode::PassThrough passthrough(

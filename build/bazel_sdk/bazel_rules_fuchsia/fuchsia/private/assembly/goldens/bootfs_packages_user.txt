@@ -16,6 +16,7 @@ clock
 ?cpu-manager
 critical-services
 devfs
+devfs-driver
 device-name-provider
 display-coordinator
 driver-index
