@@ -130,6 +130,11 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   int VSyncThread();
   int CaptureThread() __TA_EXCLUDES(capture_mutex_, image_mutex_);
 
+  // Simulates a display capture, if a capture was requested.
+  //
+  // Returns an error if the capture failed in such a catastrophic failure.
+  zx::result<> ServiceAnyCaptureRequest();
+
   // Initializes the sysmem Allocator client used to import incoming buffer
   // collection tokens.
   //
