@@ -4,7 +4,6 @@
 
 mod boxed;
 mod envelope;
-mod framework_error;
 mod ptr;
 mod string;
 mod table;
@@ -13,7 +12,6 @@ mod vec;
 
 pub use self::boxed::*;
 pub use self::envelope::*;
-pub use self::framework_error::*;
 pub use self::ptr::*;
 pub use self::string::*;
 pub use self::table::*;

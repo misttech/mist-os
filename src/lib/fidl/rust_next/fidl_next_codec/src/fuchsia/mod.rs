@@ -2,8 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::zx::Handle;
-use crate::EncodeError;
+mod channel;
+mod handle;
+
+use zx::Handle;
+
+use crate::{DecodeError, EncodeError};
+
+pub use self::channel::*;
+pub use self::handle::*;
+
+/// A decoder which support Zircon handles.
+pub trait HandleDecoder {
+    /// Takes the next handle from the decoder.
+    fn take_handle(&mut self) -> Result<Handle, DecodeError>;
+
+    /// Returns the number of handles remaining in the decoder.
+    fn handles_remaining(&mut self) -> usize;
+}
 
 /// An encoder which supports Zircon handles.
 pub trait HandleEncoder {

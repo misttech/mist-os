@@ -21,16 +21,34 @@
 )]
 #![forbid(unsafe_op_in_unsafe_fn)]
 
-pub mod bind;
-mod framework_error;
-#[cfg(target_os = "fuchsia")]
-pub mod fuchsia;
-pub mod protocol;
 #[cfg(test)]
+#[macro_use]
 mod testing;
 
-pub use ::fidl_next_codec::*;
+mod chunk;
+mod decode;
+pub mod decoder;
+mod encode;
+pub mod encoder;
+#[cfg(target_os = "fuchsia")]
+mod fuchsia;
+mod owned;
+mod slot;
+mod take;
+mod wire;
 
-pub use self::framework_error::*;
+pub use bitflags::bitflags;
+pub use munge::munge;
+pub use rend::{f32_le, f64_le, i16_le, i32_le, i64_le, u16_le, u32_le, u64_le};
+
+pub use self::chunk::*;
+pub use self::decode::*;
+pub use self::decoder::{Decoder, DecoderExt};
+pub use self::encode::*;
+pub use self::encoder::{Encoder, EncoderExt};
 #[cfg(target_os = "fuchsia")]
 pub use self::fuchsia::*;
+pub use self::owned::*;
+pub use self::slot::*;
+pub use self::take::*;
+pub use self::wire::*;

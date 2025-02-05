@@ -16,16 +16,8 @@ rustc_library("fidl_next") {
     "src/bind/method.rs",
     "src/bind/mod.rs",
     "src/bind/server.rs",
-    "src/chunk.rs",
-    "src/decode/error.rs",
-    "src/decode/mod.rs",
-    "src/decoder.rs",
-    "src/encode/error.rs",
-    "src/encode/mod.rs",
-    "src/encoder.rs",
     "src/framework_error.rs",
     "src/lib.rs",
-    "src/owned.rs",
     "src/protocol/buffer.rs",
     "src/protocol/client.rs",
     "src/protocol/error.rs",
@@ -35,47 +27,22 @@ rustc_library("fidl_next") {
     "src/protocol/server.rs",
     "src/protocol/transport.rs",
     "src/protocol/wire.rs",
-    "src/slot.rs",
-    "src/take.rs",
-    "src/testing/mod.rs",
-    "src/testing/transport.rs",
-    "src/wire/boxed.rs",
-    "src/wire/envelope.rs",
-    "src/wire/framework_error.rs",
-    "src/wire/mod.rs",
-    "src/wire/ptr.rs",
-    "src/wire/string/mod.rs",
-    "src/wire/string/optional.rs",
-    "src/wire/string/required.rs",
-    "src/wire/table.rs",
-    "src/wire/union.rs",
-    "src/wire/vec/mod.rs",
-    "src/wire/vec/optional.rs",
-    "src/wire/vec/raw.rs",
-    "src/wire/vec/required.rs",
+    "src/testing.rs",
   ]
   deps = [
-    # Used for lock-free mpsc channel, but not for any APIs
-    "//third_party/rust_crates:futures",
-
-    # Meaningful dependencies
-    "//third_party/rust_crates:bitflags",
-    "//third_party/rust_crates:munge",
-    "//third_party/rust_crates:rend",
+    "//src/lib/fidl/rust_next/fidl_next_codec",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:zerocopy",
+
+    # Used for lock-free mpsc channel, but not for any APIs
+    "//third_party/rust_crates:futures",
   ]
 
   if (is_fuchsia) {
     sources += [
-      "src/fuchsia/decoder.rs",
-      "src/fuchsia/encoder.rs",
       "src/fuchsia/mod.rs",
       "src/fuchsia/transport/channel.rs",
       "src/fuchsia/transport/mod.rs",
-      "src/fuchsia/wire/channel.rs",
-      "src/fuchsia/wire/handle.rs",
-      "src/fuchsia/wire/mod.rs",
     ]
     deps += [
       "//sdk/rust/zx",
@@ -88,8 +55,8 @@ rustc_library("fidl_next") {
 
   # NOTE: this library is still experimental
   visibility = [
-    ":*",
     "//:developer_universe_packages",
+    "//src/lib/fidl/rust_next/*",
     "//tools/fidl/fidlc/testdata/*",
     "//tools/fidl/fidlgen_rust_next/*",
   ]

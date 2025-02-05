@@ -21,9 +21,8 @@ use zx::sys::{
 use zx::{AsHandleRef as _, Channel, Handle, Status};
 
 use crate::decoder::InternalHandleDecoder;
-use crate::fuchsia::{HandleDecoder, HandleEncoder};
 use crate::protocol::Transport;
-use crate::{Chunk, DecodeError, Decoder, Encoder, CHUNK_SIZE};
+use crate::{Chunk, DecodeError, Decoder, Encoder, HandleDecoder, HandleEncoder, CHUNK_SIZE};
 
 struct Shared {
     is_closed: AtomicBool,

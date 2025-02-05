@@ -9,8 +9,7 @@ use core::ptr::slice_from_raw_parts_mut;
 use core::slice::from_raw_parts;
 
 use munge::{Destructure, Move, Restructure};
-
-use crate::{FromBytes, IntoBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 /// An initialized but potentially invalid value.
 ///

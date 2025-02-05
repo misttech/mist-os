@@ -4,14 +4,8 @@
 
 //! Fuchsia-specific FIDL extensions.
 
-mod decoder;
-mod encoder;
 mod transport;
-mod wire;
 
-pub use self::decoder::*;
-pub use self::encoder::*;
 pub use self::transport::*;
-pub use self::wire::*;
 
 pub use zx;

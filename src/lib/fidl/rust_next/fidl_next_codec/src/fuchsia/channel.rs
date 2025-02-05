@@ -4,15 +4,14 @@
 
 use core::mem::replace;
 
-use crate::zx::sys::zx_handle_t;
-use crate::zx::{Channel, Handle};
-use munge::munge;
-
 use crate::fuchsia::{HandleDecoder, HandleEncoder, WireHandle, WireOptionalHandle};
 use crate::{
-    Decode, DecodeError, Encodable, EncodableOption, Encode, EncodeError, EncodeOption, Slot,
-    TakeFrom,
+    munge, Decode, DecodeError, Encodable, EncodableOption, Encode, EncodeError, EncodeOption,
+    Slot, TakeFrom,
 };
+
+use zx::sys::zx_handle_t;
+use zx::{Channel, Handle};
 
 /// A Zircon channel.
 #[derive(Debug)]

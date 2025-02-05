@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{u32_le, u64_le, Decode, DecodeError, Encodable, Encode, EncodeError, IntoBytes, Slot};
+use crate::{u32_le, u64_le, Decode, DecodeError, Encodable, Encode, EncodeError, Slot};
+
+use zerocopy::IntoBytes;
 
 /// A FIDL protocol message header
 #[derive(Clone, Copy, Debug, IntoBytes)]

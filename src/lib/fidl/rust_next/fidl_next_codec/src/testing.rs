@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub mod transport;
-
 use crate::{Chunk, Decode, DecoderExt as _, Encode, EncoderExt as _, Owned};
 
 pub fn assert_encoded<T: Encode<Vec<Chunk>>>(mut value: T, chunks: &[Chunk]) {
