@@ -4,8 +4,8 @@
 
 use core::marker::PhantomData;
 
-use crate::protocol::Transport;
-use crate::{Decode, DecodeError, DecoderExt as _, Owned};
+use fidl_next_codec::{Decode, DecodeError, DecoderExt as _, Owned};
+use fidl_next_protocol::Transport;
 
 use super::Method;
 

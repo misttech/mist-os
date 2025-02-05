@@ -4,8 +4,8 @@
 
 use core::marker::PhantomData;
 
-use crate::protocol::{self, ProtocolError, Transport};
-use crate::{Encode, EncodeError};
+use fidl_next_codec::{Encode, EncodeError};
+use fidl_next_protocol::{self as protocol, ProtocolError, Transport};
 
 use super::{Method, ServerEnd};
 

@@ -7,11 +7,17 @@ import("//build/fidl/fidl.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 
-rustc_library("fidl_next") {
+rustc_library("fidl_next_bind") {
   edition = "2021"
-  sources = [ "src/lib.rs" ]
+  sources = [
+    "src/buffer.rs",
+    "src/client.rs",
+    "src/endpoint.rs",
+    "src/lib.rs",
+    "src/method.rs",
+    "src/server.rs",
+  ]
   deps = [
-    "//src/lib/fidl/rust_next/fidl_next_bind",
     "//src/lib/fidl/rust_next/fidl_next_codec",
     "//src/lib/fidl/rust_next/fidl_next_protocol",
   ]
@@ -27,15 +33,15 @@ rustc_library("fidl_next") {
   ]
 }
 
-fuchsia_unittest_package("fidl_next_test_package") {
-  deps = [ ":fidl_next_test" ]
+fuchsia_unittest_package("fidl_next_bind_test_package") {
+  deps = [ ":fidl_next_bind_test" ]
 }
 
 group("tests") {
   testonly = true
   deps = [
-    ":fidl_next_test($host_toolchain)",
+    ":fidl_next_bind_test($host_toolchain)",
     # TODO: fix and re-enable device-side tests.
-    # ":fidl_next_test_package",
+    # ":fidl_next_bind_test_package",
   ]
 }

@@ -7,7 +7,7 @@ use core::marker::PhantomData;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
-use crate::protocol::{self, ProtocolError, Transport};
+use fidl_next_protocol::{self as protocol, ProtocolError, Transport};
 
 use super::{ClientEnd, Method, ResponseBuffer};
 

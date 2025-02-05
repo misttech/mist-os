@@ -4,7 +4,7 @@
 
 use core::marker::PhantomData;
 
-use crate::{
+use fidl_next_codec::{
     munge, Decode, DecodeError, Encodable, EncodableOption, Encode, EncodeError, EncodeOption,
     Slot, TakeFrom,
 };

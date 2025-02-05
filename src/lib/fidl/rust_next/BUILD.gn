@@ -9,6 +9,7 @@ group("tests") {
   testonly = true
   deps = [
     "fidl_next:tests",
+    "fidl_next_bind:tests",
     "fidl_next_codec:tests",
     "fidl_next_protocol:tests",
   ]
