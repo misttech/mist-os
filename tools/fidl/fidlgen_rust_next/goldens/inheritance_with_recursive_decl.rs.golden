@@ -4,7 +4,7 @@
 
 #[derive(Debug)]
 pub struct ParentFirstRequest {
-    pub request: ::fidl_next::bind::ServerEnd<::fidl_next::zx::Handle, crate::Parent>,
+    pub request: ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::zx::Handle, crate::Parent>,
 }
 
 impl ::fidl_next::Encodable for ParentFirstRequest {
@@ -13,7 +13,9 @@ impl ::fidl_next::Encodable for ParentFirstRequest {
 
 impl<___E> ::fidl_next::Encode<___E> for ParentFirstRequest
 where
-    ::fidl_next::bind::ServerEnd<::fidl_next::zx::Handle, crate::Parent>: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
     fn encode(
         &mut self,
@@ -68,14 +70,14 @@ impl ::fidl_next::TakeFrom<WireParentFirstRequest> for ParentFirstRequest {
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireParentFirstRequest {
-    pub request: ::fidl_next::bind::ServerEnd<::fidl_next::WireHandle, crate::Parent>,
+    pub request: ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::WireHandle, crate::Parent>,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireParentFirstRequest
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::bind::ServerEnd<::fidl_next::WireHandle, crate::Parent>: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -227,7 +229,7 @@ where
 
 #[derive(Debug)]
 pub struct ChildSecondRequest {
-    pub request: ::fidl_next::bind::ServerEnd<::fidl_next::zx::Handle, crate::Parent>,
+    pub request: ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::zx::Handle, crate::Parent>,
 }
 
 impl ::fidl_next::Encodable for ChildSecondRequest {
@@ -236,7 +238,9 @@ impl ::fidl_next::Encodable for ChildSecondRequest {
 
 impl<___E> ::fidl_next::Encode<___E> for ChildSecondRequest
 where
-    ::fidl_next::bind::ServerEnd<::fidl_next::zx::Handle, crate::Parent>: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
     fn encode(
         &mut self,
@@ -291,14 +295,14 @@ impl ::fidl_next::TakeFrom<WireChildSecondRequest> for ChildSecondRequest {
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireChildSecondRequest {
-    pub request: ::fidl_next::bind::ServerEnd<::fidl_next::WireHandle, crate::Parent>,
+    pub request: ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::WireHandle, crate::Parent>,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireChildSecondRequest
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::bind::ServerEnd<::fidl_next::WireHandle, crate::Parent>: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

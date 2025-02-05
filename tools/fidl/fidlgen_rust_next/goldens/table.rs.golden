@@ -204,12 +204,6 @@ impl ::fidl_next::Encodable for NewerSimpleTable {
 impl<___E> ::fidl_next::Encode<___E> for NewerSimpleTable
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -295,12 +289,6 @@ pub struct WireNewerSimpleTable<'buf> {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireNewerSimpleTable<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -415,8 +403,6 @@ impl ::fidl_next::Encodable for OlderSimpleTable {
 impl<___E> ::fidl_next::Encode<___E> for OlderSimpleTable
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i64: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -472,8 +458,6 @@ pub struct WireOlderSimpleTable<'buf> {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOlderSimpleTable<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -554,12 +538,6 @@ impl ::fidl_next::Encodable for ReverseOrdinalTable {
 impl<___E> ::fidl_next::Encode<___E> for ReverseOrdinalTable
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -645,12 +623,6 @@ pub struct WireReverseOrdinalTable<'buf> {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireReverseOrdinalTable<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -771,10 +743,6 @@ impl ::fidl_next::Encodable for SimpleTable {
 impl<___E> ::fidl_next::Encode<___E> for SimpleTable
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -846,10 +814,6 @@ pub struct WireSimpleTable<'buf> {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSimpleTable<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -1317,134 +1281,6 @@ impl ::fidl_next::Encodable for SixtyFourOrdinalTable {
 impl<___E> ::fidl_next::Encode<___E> for SixtyFourOrdinalTable
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    crate::ExtensionTable: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -2384,134 +2220,6 @@ pub struct WireSixtyFourOrdinalTable<'buf> {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSixtyFourOrdinalTable<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    crate::WireExtensionTable<'buf>: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -3968,8 +3676,6 @@ impl ::fidl_next::Encodable for TableWithAttributes {
 impl<___E> ::fidl_next::Encode<___E> for TableWithAttributes
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i64: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -4025,8 +3731,6 @@ pub struct WireTableWithAttributes<'buf> {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireTableWithAttributes<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

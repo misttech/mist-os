@@ -4,7 +4,7 @@
 
 #[derive(Clone, Debug)]
 pub struct Baz {
-    pub g: fidl_next_test_middle::Bar,
+    pub g: ::fidl_next_test_middle::Bar,
 }
 
 impl ::fidl_next::Encodable for Baz {
@@ -13,7 +13,7 @@ impl ::fidl_next::Encodable for Baz {
 
 impl<___E> ::fidl_next::Encode<___E> for Baz
 where
-    fidl_next_test_middle::Bar: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -68,14 +68,12 @@ impl ::fidl_next::TakeFrom<WireBaz> for Baz {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireBaz {
-    pub g: fidl_next_test_middle::WireBar,
+    pub g: ::fidl_next_test_middle::WireBar,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireBaz
 where
-    ___D: ?Sized,
-
-    fidl_next_test_middle::WireBar: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

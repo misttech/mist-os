@@ -33,9 +33,9 @@ impl ::fidl_next::Encodable for {{ name }} {
 impl<___E> ::fidl_next::Encode<___E> for {{ name }}
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-    {% for member in table.members %}
-        {{ context.natural_type(member.ty) }}: ::fidl_next::Encode<___E>,
-    {% endfor %}
+    {% if table.is_resource %}
+        ___E: ::fidl_next::fuchsia::HandleEncoder,
+    {% endif %}
 {
     fn encode(
         &mut self,
@@ -95,9 +95,9 @@ pub struct {{ wire_name }}<'buf> {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for {{ wire_name }}<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-    {% for member in table.members %}
-        {{ context.wire_type(member.ty) }}: ::fidl_next::Decode<___D>,
-    {% endfor %}
+    {% if table.is_resource %}
+        ___D: ::fidl_next::fuchsia::HandleDecoder,
+    {% endif %}
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

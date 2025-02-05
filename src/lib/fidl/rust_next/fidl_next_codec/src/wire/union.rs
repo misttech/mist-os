@@ -5,6 +5,7 @@
 use munge::munge;
 
 use crate::decoder::InternalHandleDecoder;
+use crate::encoder::InternalHandleEncoder;
 use crate::{decode, encode, u64_le, Decode, Decoder, Encode, Encoder, Slot, WireEnvelope};
 
 /// A raw FIDL union
@@ -21,6 +22,19 @@ impl RawWireUnion {
 
         *ordinal = u64_le::from_native(0);
         WireEnvelope::encode_zero(envelope);
+    }
+
+    /// Encodes a `'static` value and ordinal in a slot.
+    pub fn encode_as_static<E: InternalHandleEncoder + ?Sized, T: Encode<E>>(
+        value: &mut T,
+        ord: u64,
+        encoder: &mut E,
+        slot: Slot<'_, Self>,
+    ) -> Result<(), encode::EncodeError> {
+        munge!(let Self { mut ordinal, envelope } = slot);
+
+        *ordinal = u64_le::from_native(ord);
+        WireEnvelope::encode_value_static(value, encoder, envelope)
     }
 
     /// Encodes a value and ordinal in a slot.

@@ -15,9 +15,7 @@ impl ::fidl_next::Encodable for Int16Int8 {
 
 impl<___E> ::fidl_next::Encode<___E> for Int16Int8
 where
-    i16: ::fidl_next::Encode<___E>,
-
-    i8: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -86,11 +84,7 @@ pub struct WireInt16Int8 {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireInt16Int8
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i16_le: ::fidl_next::Decode<___D>,
-
-    i8: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -123,7 +117,7 @@ impl ::fidl_next::Encodable for ArrayInt16Int8 {
 
 impl<___E> ::fidl_next::Encode<___E> for ArrayInt16Int8
 where
-    [crate::Int16Int8; 3]: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -183,9 +177,7 @@ pub struct WireArrayInt16Int8 {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireArrayInt16Int8
 where
-    ___D: ?Sized,
-
-    [crate::WireInt16Int8; 3]: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -217,9 +209,7 @@ impl ::fidl_next::Encodable for Int8Int32 {
 
 impl<___E> ::fidl_next::Encode<___E> for Int8Int32
 where
-    i8: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -288,11 +278,7 @@ pub struct WireInt8Int32 {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireInt8Int32
 where
-    ___D: ?Sized,
-
-    i8: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -318,7 +304,7 @@ where
 pub struct NonInlineStructTestStruct {
     pub element: Option<Box<crate::Int16Int8>>,
 
-    pub h: ::fidl_next::zx::Handle,
+    pub h: ::fidl_next::fuchsia::zx::Handle,
 }
 
 impl ::fidl_next::Encodable for NonInlineStructTestStruct {
@@ -327,9 +313,11 @@ impl ::fidl_next::Encodable for NonInlineStructTestStruct {
 
 impl<___E> ::fidl_next::Encode<___E> for NonInlineStructTestStruct
 where
-    Option<Box<crate::Int16Int8>>: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    ::fidl_next::zx::Handle: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
+
+    ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
     fn encode(
         &mut self,
@@ -395,16 +383,16 @@ impl<'buf> ::fidl_next::TakeFrom<WireNonInlineStructTestStruct<'buf>>
 pub struct WireNonInlineStructTestStruct<'buf> {
     pub element: ::fidl_next::WireBox<'buf, crate::WireInt16Int8>,
 
-    pub h: ::fidl_next::WireHandle,
+    pub h: ::fidl_next::fuchsia::WireHandle,
 }
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireNonInlineStructTestStruct<'buf>
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::WireBox<'buf, crate::WireInt16Int8>: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 
-    ::fidl_next::WireHandle: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -441,11 +429,7 @@ impl ::fidl_next::Encodable for StructPaddingTestStruct {
 
 impl<___E> ::fidl_next::Encode<___E> for StructPaddingTestStruct
 where
-    crate::Int16Int8: ::fidl_next::Encode<___E>,
-
-    crate::Int8Int32: ::fidl_next::Encode<___E>,
-
-    crate::ArrayInt16Int8: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -521,13 +505,7 @@ pub struct WireStructPaddingTestStruct {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructPaddingTestStruct
 where
-    ___D: ?Sized,
-
-    crate::WireInt16Int8: ::fidl_next::Decode<___D>,
-
-    crate::WireInt8Int32: ::fidl_next::Decode<___D>,
-
-    crate::WireArrayInt16Int8: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -565,9 +543,11 @@ impl ::fidl_next::Encodable for TopLevelStruct {
 
 impl<___E> ::fidl_next::Encode<___E> for TopLevelStruct
 where
-    crate::StructPaddingTestStruct: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::NonInlineStructTestStruct: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
+
+    ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
     fn encode(
         &mut self,
@@ -636,11 +616,11 @@ pub struct WireTopLevelStruct<'buf> {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireTopLevelStruct<'buf>
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    crate::WireStructPaddingTestStruct: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 
-    crate::WireNonInlineStructTestStruct<'buf>: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

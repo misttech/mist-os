@@ -2,11 +2,13 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
-pub const BITS_MEMBER: fidl_next_test_dependent::MyBits = fidl_next_test_dependent::MyBits::MEMBER;
+pub const BITS_MEMBER: ::fidl_next_test_dependent::MyBits =
+    ::fidl_next_test_dependent::MyBits::MEMBER;
 
 pub const BITS_MEMBER_PRIMITIVE: u8 = 1;
 
-pub const ENUM_MEMBER: fidl_next_test_dependent::MyEnum = fidl_next_test_dependent::MyEnum::Member;
+pub const ENUM_MEMBER: ::fidl_next_test_dependent::MyEnum =
+    ::fidl_next_test_dependent::MyEnum::Member;
 
 pub const ENUM_MEMBER_PRIMITIVE: u8 = 1;
 
@@ -17,7 +19,10 @@ impl ::fidl_next::Encodable for MyStruct {
     type Encoded<'buf> = WireMyStruct;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for MyStruct {
+impl<___E> ::fidl_next::Encode<___E> for MyStruct
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -71,7 +76,7 @@ pub struct WireMyStruct {}
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMyStruct
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

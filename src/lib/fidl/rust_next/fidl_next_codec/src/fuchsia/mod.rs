@@ -2,11 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+//! Fuchsia-specific extensions to the FIDL codec.
+
 mod channel;
 mod handle;
 
 use zx::Handle;
 
+use crate::decoder::InternalHandleDecoder;
+use crate::encoder::InternalHandleEncoder;
 use crate::{DecodeError, EncodeError};
 
 pub use self::channel::*;
@@ -14,7 +18,7 @@ pub use self::handle::*;
 pub use zx;
 
 /// A decoder which support Zircon handles.
-pub trait HandleDecoder {
+pub trait HandleDecoder: InternalHandleDecoder {
     /// Takes the next handle from the decoder.
     fn take_handle(&mut self) -> Result<Handle, DecodeError>;
 
@@ -23,7 +27,7 @@ pub trait HandleDecoder {
 }
 
 /// An encoder which supports Zircon handles.
-pub trait HandleEncoder {
+pub trait HandleEncoder: InternalHandleEncoder {
     /// Pushes a handle into the encoder.
     fn push_handle(&mut self, handle: Handle) -> Result<(), EncodeError>;
 

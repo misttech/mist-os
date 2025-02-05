@@ -15,9 +15,7 @@ impl ::fidl_next::Encodable for TwoWayAddRequest {
 
 impl<___E> ::fidl_next::Encode<___E> for TwoWayAddRequest
 where
-    u16: ::fidl_next::Encode<___E>,
-
-    u16: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -86,11 +84,7 @@ pub struct WireTwoWayAddRequest {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTwoWayAddRequest
 where
-    ___D: ?Sized,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -123,7 +117,7 @@ impl ::fidl_next::Encodable for TwoWayAddResponse {
 
 impl<___E> ::fidl_next::Encode<___E> for TwoWayAddResponse
 where
-    u16: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -183,9 +177,7 @@ pub struct WireTwoWayAddResponse {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTwoWayAddResponse
 where
-    ___D: ?Sized,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

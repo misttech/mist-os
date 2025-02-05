@@ -13,7 +13,7 @@ impl ::fidl_next::Encodable for Int32Wrapper {
 
 impl<___E> ::fidl_next::Encode<___E> for Int32Wrapper
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -73,9 +73,7 @@ pub struct WireInt32Wrapper {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireInt32Wrapper
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -107,9 +105,7 @@ impl ::fidl_next::Encodable for SimpleProtocolAddRequest {
 
 impl<___E> ::fidl_next::Encode<___E> for SimpleProtocolAddRequest
 where
-    i32: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -178,11 +174,7 @@ pub struct WireSimpleProtocolAddRequest {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSimpleProtocolAddRequest
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -215,7 +207,7 @@ impl ::fidl_next::Encodable for SimpleProtocolAddResponse {
 
 impl<___E> ::fidl_next::Encode<___E> for SimpleProtocolAddResponse
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -275,9 +267,7 @@ pub struct WireSimpleProtocolAddResponse {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSimpleProtocolAddResponse
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -462,11 +452,7 @@ impl ::fidl_next::Encodable for SimpleUnion {
 
 impl<___E> ::fidl_next::Encode<___E> for SimpleUnion
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
-
-    f32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -477,11 +463,11 @@ where
 
         match self {
             Self::A(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::B(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, f32>(value, 2, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, f32>(value, 2, encoder, raw)?
             }
         }
 
@@ -495,7 +481,7 @@ impl ::fidl_next::EncodableOption for Box<SimpleUnion> {
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<SimpleUnion>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     SimpleUnion: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -603,13 +589,9 @@ impl Clone for WireSimpleUnion {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireSimpleUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireSimpleUnion
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::f32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -716,13 +698,9 @@ impl Clone for WireOptionalSimpleUnion {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalSimpleUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalSimpleUnion
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::f32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -754,7 +732,7 @@ impl ::core::fmt::Debug for WireOptionalSimpleUnion {
 
 #[derive(Debug)]
 pub struct StructWithNullableHandle {
-    pub val: Option<::fidl_next::zx::Handle>,
+    pub val: Option<::fidl_next::fuchsia::zx::Handle>,
 }
 
 impl ::fidl_next::Encodable for StructWithNullableHandle {
@@ -763,7 +741,9 @@ impl ::fidl_next::Encodable for StructWithNullableHandle {
 
 impl<___E> ::fidl_next::Encode<___E> for StructWithNullableHandle
 where
-    Option<::fidl_next::zx::Handle>: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
     fn encode(
         &mut self,
@@ -818,14 +798,14 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableHandle> for StructWithNullableH
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableHandle {
-    pub val: ::fidl_next::WireOptionalHandle,
+    pub val: ::fidl_next::fuchsia::WireOptionalHandle,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableHandle
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::WireOptionalHandle: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -846,7 +826,10 @@ where
 
 #[derive(Debug)]
 pub struct StructWithNullableProtocol {
-    pub val: ::fidl_next::bind::ClientEnd<Option<::fidl_next::zx::Handle>, crate::SimpleProtocol>,
+    pub val: ::fidl_next::bind::ClientEnd<
+        Option<::fidl_next::fuchsia::zx::Handle>,
+        crate::SimpleProtocol,
+    >,
 }
 
 impl ::fidl_next::Encodable for StructWithNullableProtocol {
@@ -855,8 +838,9 @@ impl ::fidl_next::Encodable for StructWithNullableProtocol {
 
 impl<___E> ::fidl_next::Encode<___E> for StructWithNullableProtocol
 where
-    ::fidl_next::bind::ClientEnd<Option<::fidl_next::zx::Handle>, crate::SimpleProtocol>:
-        ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
     fn encode(
         &mut self,
@@ -911,15 +895,17 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableProtocol> for StructWithNullabl
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableProtocol {
-    pub val: ::fidl_next::bind::ClientEnd<::fidl_next::WireOptionalHandle, crate::SimpleProtocol>,
+    pub val: ::fidl_next::bind::ClientEnd<
+        ::fidl_next::fuchsia::WireOptionalHandle,
+        crate::SimpleProtocol,
+    >,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableProtocol
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::bind::ClientEnd<::fidl_next::WireOptionalHandle, crate::SimpleProtocol>:
-        ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -940,7 +926,10 @@ where
 
 #[derive(Debug)]
 pub struct StructWithNullableRequest {
-    pub val: ::fidl_next::bind::ServerEnd<Option<::fidl_next::zx::Handle>, crate::SimpleProtocol>,
+    pub val: ::fidl_next::bind::ServerEnd<
+        Option<::fidl_next::fuchsia::zx::Handle>,
+        crate::SimpleProtocol,
+    >,
 }
 
 impl ::fidl_next::Encodable for StructWithNullableRequest {
@@ -949,8 +938,9 @@ impl ::fidl_next::Encodable for StructWithNullableRequest {
 
 impl<___E> ::fidl_next::Encode<___E> for StructWithNullableRequest
 where
-    ::fidl_next::bind::ServerEnd<Option<::fidl_next::zx::Handle>, crate::SimpleProtocol>:
-        ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
     fn encode(
         &mut self,
@@ -1005,15 +995,17 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableRequest> for StructWithNullable
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableRequest {
-    pub val: ::fidl_next::bind::ServerEnd<::fidl_next::WireOptionalHandle, crate::SimpleProtocol>,
+    pub val: ::fidl_next::bind::ServerEnd<
+        ::fidl_next::fuchsia::WireOptionalHandle,
+        crate::SimpleProtocol,
+    >,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableRequest
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::bind::ServerEnd<::fidl_next::WireOptionalHandle, crate::SimpleProtocol>:
-        ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -1043,7 +1035,9 @@ impl ::fidl_next::Encodable for StructWithNullableString {
 
 impl<___E> ::fidl_next::Encode<___E> for StructWithNullableString
 where
-    Option<String>: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -1103,9 +1097,9 @@ pub struct WireStructWithNullableString<'buf> {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStructWithNullableString<'buf>
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::WireOptionalString<'buf>: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -1135,7 +1129,9 @@ impl ::fidl_next::Encodable for StructWithNullableStruct {
 
 impl<___E> ::fidl_next::Encode<___E> for StructWithNullableStruct
 where
-    Option<Box<crate::Int32Wrapper>>: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -1195,9 +1191,9 @@ pub struct WireStructWithNullableStruct<'buf> {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStructWithNullableStruct<'buf>
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::WireBox<'buf, crate::WireInt32Wrapper>: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -1227,7 +1223,7 @@ impl ::fidl_next::Encodable for StructWithNullableUnion {
 
 impl<___E> ::fidl_next::Encode<___E> for StructWithNullableUnion
 where
-    Option<Box<crate::SimpleUnion>>: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -1287,9 +1283,7 @@ pub struct WireStructWithNullableUnion {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableUnion
 where
-    ___D: ?Sized,
-
-    crate::WireOptionalSimpleUnion: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -1319,7 +1313,9 @@ impl ::fidl_next::Encodable for StructWithNullableVector {
 
 impl<___E> ::fidl_next::Encode<___E> for StructWithNullableVector
 where
-    Option<Vec<i32>>: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -1379,9 +1375,9 @@ pub struct WireStructWithNullableVector<'buf> {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStructWithNullableVector<'buf>
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::WireOptionalVector<'buf, ::fidl_next::i32_le>: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

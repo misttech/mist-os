@@ -174,7 +174,7 @@ impl ::core::convert::From<ExampleEnum> for WireExampleEnum {
 
 #[derive(Clone, Debug)]
 pub struct ExampleProtocolMethodRequest {
-    pub arg: fidl_next_test_exampleusing::Empty,
+    pub arg: ::fidl_next_test_exampleusing::Empty,
 }
 
 impl ::fidl_next::Encodable for ExampleProtocolMethodRequest {
@@ -183,7 +183,7 @@ impl ::fidl_next::Encodable for ExampleProtocolMethodRequest {
 
 impl<___E> ::fidl_next::Encode<___E> for ExampleProtocolMethodRequest
 where
-    fidl_next_test_exampleusing::Empty: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -238,14 +238,12 @@ impl ::fidl_next::TakeFrom<WireExampleProtocolMethodRequest> for ExampleProtocol
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireExampleProtocolMethodRequest {
-    pub arg: fidl_next_test_exampleusing::WireEmpty,
+    pub arg: ::fidl_next_test_exampleusing::WireEmpty,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleProtocolMethodRequest
 where
-    ___D: ?Sized,
-
-    fidl_next_test_exampleusing::WireEmpty: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -413,7 +411,7 @@ impl ::fidl_next::Encodable for ExampleStruct {
 
 impl<___E> ::fidl_next::Encode<___E> for ExampleStruct
 where
-    u32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -473,9 +471,7 @@ pub struct WireExampleStruct {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleStruct
 where
-    ___D: ?Sized,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -516,8 +512,6 @@ impl ::fidl_next::Encodable for ExampleTable {
 impl<___E> ::fidl_next::Encode<___E> for ExampleTable
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    u32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -573,8 +567,6 @@ pub struct WireExampleTable<'buf> {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExampleTable<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -632,9 +624,7 @@ impl ::fidl_next::Encodable for ExampleUnion {
 
 impl<___E> ::fidl_next::Encode<___E> for ExampleUnion
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    u32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -645,7 +635,7 @@ where
 
         match self {
             Self::Variant(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, u32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, u32>(value, 1, encoder, raw)?
             }
         }
 
@@ -659,7 +649,7 @@ impl ::fidl_next::EncodableOption for Box<ExampleUnion> {
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ExampleUnion>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     ExampleUnion: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -752,11 +742,9 @@ impl Clone for WireExampleUnion {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireExampleUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleUnion
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -853,11 +841,9 @@ impl Clone for WireOptionalExampleUnion {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalExampleUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalExampleUnion
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,

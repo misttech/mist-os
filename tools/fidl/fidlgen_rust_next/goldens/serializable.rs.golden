@@ -9,7 +9,10 @@ impl ::fidl_next::Encodable for SerializableStruct {
     type Encoded<'buf> = WireSerializableStruct;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for SerializableStruct {
+impl<___E> ::fidl_next::Encode<___E> for SerializableStruct
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -63,7 +66,7 @@ pub struct WireSerializableStruct {}
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSerializableStruct
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -174,9 +177,7 @@ impl ::fidl_next::Encodable for SerializableUnion {
 
 impl<___E> ::fidl_next::Encode<___E> for SerializableUnion
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    bool: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -187,7 +188,7 @@ where
 
         match self {
             Self::Unused(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, bool>(value, 1, encoder, raw)?
             }
         }
 
@@ -201,7 +202,7 @@ impl ::fidl_next::EncodableOption for Box<SerializableUnion> {
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<SerializableUnion>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     SerializableUnion: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -296,11 +297,9 @@ impl Clone for WireSerializableUnion {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireSerializableUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireSerializableUnion
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    bool: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -395,11 +394,9 @@ impl Clone for WireOptionalSerializableUnion {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalSerializableUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalSerializableUnion
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    bool: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,

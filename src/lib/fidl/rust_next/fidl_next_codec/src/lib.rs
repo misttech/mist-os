@@ -31,7 +31,7 @@ pub mod decoder;
 mod encode;
 pub mod encoder;
 #[cfg(target_os = "fuchsia")]
-mod fuchsia;
+pub mod fuchsia;
 mod owned;
 mod slot;
 mod take;
@@ -46,8 +46,6 @@ pub use self::decode::*;
 pub use self::decoder::{Decoder, DecoderExt};
 pub use self::encode::*;
 pub use self::encoder::{Encoder, EncoderExt};
-#[cfg(target_os = "fuchsia")]
-pub use self::fuchsia::*;
 pub use self::owned::*;
 pub use self::slot::*;
 pub use self::take::*;

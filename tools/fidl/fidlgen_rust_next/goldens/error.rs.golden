@@ -13,7 +13,9 @@ impl ::fidl_next::Encodable for ExampleFooRequest {
 
 impl<___E> ::fidl_next::Encode<___E> for ExampleFooRequest
 where
-    String: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -73,9 +75,9 @@ pub struct WireExampleFooRequest<'buf> {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExampleFooRequest<'buf>
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::WireString<'buf>: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -105,7 +107,7 @@ impl ::fidl_next::Encodable for ExampleFooResponse {
 
 impl<___E> ::fidl_next::Encode<___E> for ExampleFooResponse
 where
-    i64: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -165,9 +167,7 @@ pub struct WireExampleFooResponse {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleFooResponse
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -199,11 +199,9 @@ impl ::fidl_next::Encodable for ExampleFooResult {
 
 impl<___E> ::fidl_next::Encode<___E> for ExampleFooResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::ExampleFooResponse: ::fidl_next::Encode<___E>,
-
-    u32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -233,7 +231,7 @@ impl ::fidl_next::EncodableOption for Box<ExampleFooResult> {
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ExampleFooResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     ExampleFooResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -331,13 +329,11 @@ impl<'buf> WireExampleFooResult<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D> for WireExampleFooResult<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExampleFooResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireExampleFooResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -419,13 +415,11 @@ impl<'buf> Default for WireOptionalExampleFooResult<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalExampleFooResult<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalExampleFooResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireExampleFooResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,

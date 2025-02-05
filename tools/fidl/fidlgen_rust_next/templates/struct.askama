@@ -31,9 +31,13 @@ impl ::fidl_next::Encodable for {{ name }} {
 
 impl<___E> ::fidl_next::Encode<___E> for {{ name }}
 where
-    {% for member in strct.members %}
-        {{ context.natural_type(member.ty) }}: ::fidl_next::Encode<___E>,
-    {% endfor %}
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+    {% if !is_static %}
+        ___E: ::fidl_next::Encoder,
+    {% endif %}
+    {% if strct.is_resource %}
+        ___E: ::fidl_next::fuchsia::HandleEncoder,
+    {% endif %}
 {
     fn encode(
         &mut self,
@@ -110,10 +114,13 @@ pub struct {{ wire_name }}{{ params }} {
 
 unsafe impl<{% if !is_static %}'buf, {% endif %}___D> ::fidl_next::Decode<___D> for {{ wire_name }}{{ params }}
 where
-    ___D: ?Sized,
-    {% for member in strct.members %}
-        {{ context.wire_type(member.ty) }}: ::fidl_next::Decode<___D>,
-    {% endfor %}
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+    {% if !is_static %}
+        ___D: ::fidl_next::Decoder<'buf>,
+    {% endif %}
+    {% if strct.is_resource %}
+        ___D: ::fidl_next::fuchsia::HandleDecoder,
+    {% endif %}
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

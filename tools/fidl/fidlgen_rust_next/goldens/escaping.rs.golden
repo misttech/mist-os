@@ -16,7 +16,10 @@ impl ::fidl_next::Encodable for DocCommentWithQuotes {
     type Encoded<'buf> = WireDocCommentWithQuotes;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for DocCommentWithQuotes {
+impl<___E> ::fidl_next::Encode<___E> for DocCommentWithQuotes
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -70,7 +73,7 @@ pub struct WireDocCommentWithQuotes {}
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDocCommentWithQuotes
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

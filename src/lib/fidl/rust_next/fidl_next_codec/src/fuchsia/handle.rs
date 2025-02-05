@@ -165,6 +165,13 @@ impl<E: HandleEncoder + ?Sized> EncodeOption<E> for Handle {
     }
 }
 
+unsafe impl<D: HandleDecoder + ?Sized> Decode<D> for WireOptionalHandle {
+    fn decode(mut slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
+        munge!(let Self { handle } = slot.as_mut());
+        WireHandle::decode(handle, decoder)
+    }
+}
+
 impl TakeFrom<WireOptionalHandle> for Option<Handle> {
     fn take_from(from: &mut WireOptionalHandle) -> Self {
         from.take()

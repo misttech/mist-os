@@ -375,15 +375,9 @@ impl ::fidl_next::Encodable for Struct {
 
 impl<___E> ::fidl_next::Encode<___E> for Struct
 where
-    i64: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    String: ::fidl_next::Encode<___E>,
-
-    bool: ::fidl_next::Encode<___E>,
-
-    crate::Enum: ::fidl_next::Encode<___E>,
-
-    crate::Bits: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -473,17 +467,9 @@ pub struct WireStruct<'buf> {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStruct<'buf>
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireString<'buf>: ::fidl_next::Decode<___D>,
-
-    bool: ::fidl_next::Decode<___D>,
-
-    crate::WireEnum: ::fidl_next::Decode<___D>,
-
-    crate::WireBits: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

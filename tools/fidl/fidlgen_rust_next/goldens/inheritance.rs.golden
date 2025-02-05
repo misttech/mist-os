@@ -13,7 +13,9 @@ impl ::fidl_next::Encodable for SuperFooRequest {
 
 impl<___E> ::fidl_next::Encode<___E> for SuperFooRequest
 where
-    String: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -73,9 +75,9 @@ pub struct WireSuperFooRequest<'buf> {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSuperFooRequest<'buf>
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::WireString<'buf>: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -105,7 +107,7 @@ impl ::fidl_next::Encodable for SuperFooResponse {
 
 impl<___E> ::fidl_next::Encode<___E> for SuperFooResponse
 where
-    i64: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -165,9 +167,7 @@ pub struct WireSuperFooResponse {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSuperFooResponse
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

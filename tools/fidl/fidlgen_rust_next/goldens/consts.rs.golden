@@ -198,9 +198,10 @@ pub const USERNAME: &str = "\"squeenze\"";
 
 pub const ZX_CONST: u64 = 65536;
 
-pub const ZX_OBJ_VAL: fidl_next::zx::ObjectType = fidl_next::zx::ObjectType::CHANNEL;
+pub const ZX_OBJ_VAL: ::fidl_next::fuchsia::zx::ObjectType =
+    ::fidl_next::fuchsia::zx::ObjectType::CHANNEL;
 
-pub const ZX_RIGHTS_VAL: fidl_next::zx::Rights = fidl_next::zx::Rights::READ;
+pub const ZX_RIGHTS_VAL: ::fidl_next::fuchsia::zx::Rights = ::fidl_next::fuchsia::zx::Rights::READ;
 
 pub const BITS_PRIMITIVE_TRUE: u32 = 2;
 

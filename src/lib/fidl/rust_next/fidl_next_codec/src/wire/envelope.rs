@@ -8,6 +8,7 @@ use core::ptr::addr_of_mut;
 use munge::munge;
 
 use crate::decoder::InternalHandleDecoder;
+use crate::encoder::InternalHandleEncoder;
 use crate::{
     decode, encode, u16_le, u32_le, Decode, Decoder, DecoderExt as _, Encode, Encoder,
     EncoderExt as _, Slot, CHUNK_SIZE,
@@ -37,6 +38,40 @@ impl WireEnvelope {
     pub fn encode_zero(slot: Slot<'_, Self>) {
         munge!(let Self { mut zero } = slot);
         *zero = [0; 8];
+    }
+
+    /// Encodes a `'static` value into an envelope with an encoder.
+    pub fn encode_value_static<E: InternalHandleEncoder + ?Sized, T: Encode<E>>(
+        value: &mut T,
+        encoder: &mut E,
+        slot: Slot<'_, Self>,
+    ) -> Result<(), encode::EncodeError> {
+        munge! {
+            let Self {
+                encoded: Encoded {
+                    mut maybe_num_bytes,
+                    mut num_handles,
+                    mut flags,
+                },
+            } = slot;
+        }
+
+        let handles_before = encoder.__internal_handle_count();
+
+        if size_of::<T::Encoded<'_>>() > 4 {
+            return Err(encode::EncodeError::ExpectedInline(size_of::<T::Encoded<'_>>()));
+        }
+
+        let slot = unsafe { Slot::new_unchecked(maybe_num_bytes.as_mut_ptr().cast()) };
+        value.encode(encoder, slot)?;
+
+        *flags = u16_le::from_native(Self::IS_INLINE_BIT);
+
+        *num_handles = u16_le::from_native(
+            (encoder.__internal_handle_count() - handles_before).try_into().unwrap(),
+        );
+
+        Ok(())
     }
 
     /// Encodes a value into an envelope with an encoder.

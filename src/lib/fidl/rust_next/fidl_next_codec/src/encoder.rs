@@ -11,8 +11,18 @@ use core::slice::from_mut;
 use crate::encode::EncodeError;
 use crate::{Chunk, Encode, Slot, CHUNK_SIZE};
 
+/// An encoder for FIDL handles (internal).
+pub trait InternalHandleEncoder {
+    /// Returns the number of handles written to the encoder.
+    ///
+    /// This method exposes details about Fuchsia resources that plain old FIDL shouldn't need to
+    /// know about. Do not use this method outside of this crate.
+    #[doc(hidden)]
+    fn __internal_handle_count(&self) -> usize;
+}
+
 /// An encoder for FIDL messages.
-pub trait Encoder {
+pub trait Encoder: InternalHandleEncoder {
     /// Returns the number of bytes written to the encoder.
     fn bytes_written(&self) -> usize;
 
@@ -28,13 +38,12 @@ pub trait Encoder {
 
     /// Rewrites bytes at a position in the encoder.
     fn rewrite(&mut self, pos: usize, bytes: &[u8]);
+}
 
-    /// Returns the number of handles written to the encoder.
-    ///
-    /// This method exposes details about Fuchsia resources that plain old FIDL shouldn't need to
-    /// know about. Do not use this method outside of this crate.
-    #[doc(hidden)]
-    fn __internal_handle_count(&self) -> usize;
+impl<T: InternalHandleEncoder> InternalHandleEncoder for &mut T {
+    fn __internal_handle_count(&self) -> usize {
+        T::__internal_handle_count(self)
+    }
 }
 
 impl<T: Encoder> Encoder for &mut T {
@@ -53,9 +62,11 @@ impl<T: Encoder> Encoder for &mut T {
     fn rewrite(&mut self, pos: usize, bytes: &[u8]) {
         T::rewrite(self, pos, bytes)
     }
+}
 
+impl InternalHandleEncoder for Vec<Chunk> {
     fn __internal_handle_count(&self) -> usize {
-        T::__internal_handle_count(self)
+        0
     }
 }
 
@@ -105,10 +116,6 @@ impl Encoder for Vec<Chunk> {
         unsafe {
             ptr.copy_from_nonoverlapping(bytes.as_ptr(), bytes.len());
         }
-    }
-
-    fn __internal_handle_count(&self) -> usize {
-        0
     }
 }
 

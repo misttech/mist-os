@@ -1,15 +1,15 @@
 {% let (lib, ty) = id.split() %}
 
 {% if lib == "zx" && ty.non_canonical() == "ObjType" %}
-    fidl_next::zx::ObjectType
+    ::fidl_next::fuchsia::zx::ObjectType
 {% else %}
     {% if lib == context.schema.name %}
         crate::
     {% else if lib == "zx" %}
-        fidl_next::zx::
+        ::fidl_next::fuchsia::zx::
     {% else %}
         {% let escaped = lib.replace(".", "_") %}
-        fidl_next_{{ escaped }}::
+        ::fidl_next_{{ escaped }}::
     {% endif %}
 
     {% let ty_name %}

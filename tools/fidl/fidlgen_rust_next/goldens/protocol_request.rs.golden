@@ -88,7 +88,7 @@ where
 
 #[derive(Debug)]
 pub struct ParentGetChildResponse {
-    pub c: ::fidl_next::bind::ClientEnd<::fidl_next::zx::Handle, crate::Child>,
+    pub c: ::fidl_next::bind::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::Child>,
 }
 
 impl ::fidl_next::Encodable for ParentGetChildResponse {
@@ -97,7 +97,9 @@ impl ::fidl_next::Encodable for ParentGetChildResponse {
 
 impl<___E> ::fidl_next::Encode<___E> for ParentGetChildResponse
 where
-    ::fidl_next::bind::ClientEnd<::fidl_next::zx::Handle, crate::Child>: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
     fn encode(
         &mut self,
@@ -152,14 +154,14 @@ impl ::fidl_next::TakeFrom<WireParentGetChildResponse> for ParentGetChildRespons
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireParentGetChildResponse {
-    pub c: ::fidl_next::bind::ClientEnd<::fidl_next::WireHandle, crate::Child>,
+    pub c: ::fidl_next::bind::ClientEnd<::fidl_next::fuchsia::WireHandle, crate::Child>,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireParentGetChildResponse
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::bind::ClientEnd<::fidl_next::WireHandle, crate::Child>: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -180,7 +182,7 @@ where
 
 #[derive(Debug)]
 pub struct ParentGetChildRequestResponse {
-    pub r: ::fidl_next::bind::ServerEnd<::fidl_next::zx::Handle, crate::Child>,
+    pub r: ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::zx::Handle, crate::Child>,
 }
 
 impl ::fidl_next::Encodable for ParentGetChildRequestResponse {
@@ -189,7 +191,9 @@ impl ::fidl_next::Encodable for ParentGetChildRequestResponse {
 
 impl<___E> ::fidl_next::Encode<___E> for ParentGetChildRequestResponse
 where
-    ::fidl_next::bind::ServerEnd<::fidl_next::zx::Handle, crate::Child>: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
     fn encode(
         &mut self,
@@ -244,14 +248,14 @@ impl ::fidl_next::TakeFrom<WireParentGetChildRequestResponse> for ParentGetChild
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireParentGetChildRequestResponse {
-    pub r: ::fidl_next::bind::ServerEnd<::fidl_next::WireHandle, crate::Child>,
+    pub r: ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::WireHandle, crate::Child>,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireParentGetChildRequestResponse
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::bind::ServerEnd<::fidl_next::WireHandle, crate::Child>: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -272,7 +276,7 @@ where
 
 #[derive(Debug)]
 pub struct ParentTakeChildRequest {
-    pub c: ::fidl_next::bind::ClientEnd<::fidl_next::zx::Handle, crate::Child>,
+    pub c: ::fidl_next::bind::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::Child>,
 }
 
 impl ::fidl_next::Encodable for ParentTakeChildRequest {
@@ -281,7 +285,9 @@ impl ::fidl_next::Encodable for ParentTakeChildRequest {
 
 impl<___E> ::fidl_next::Encode<___E> for ParentTakeChildRequest
 where
-    ::fidl_next::bind::ClientEnd<::fidl_next::zx::Handle, crate::Child>: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
     fn encode(
         &mut self,
@@ -336,14 +342,14 @@ impl ::fidl_next::TakeFrom<WireParentTakeChildRequest> for ParentTakeChildReques
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireParentTakeChildRequest {
-    pub c: ::fidl_next::bind::ClientEnd<::fidl_next::WireHandle, crate::Child>,
+    pub c: ::fidl_next::bind::ClientEnd<::fidl_next::fuchsia::WireHandle, crate::Child>,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireParentTakeChildRequest
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::bind::ClientEnd<::fidl_next::WireHandle, crate::Child>: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -364,7 +370,7 @@ where
 
 #[derive(Debug)]
 pub struct ParentTakeChildRequestRequest {
-    pub r: ::fidl_next::bind::ServerEnd<::fidl_next::zx::Handle, crate::Child>,
+    pub r: ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::zx::Handle, crate::Child>,
 }
 
 impl ::fidl_next::Encodable for ParentTakeChildRequestRequest {
@@ -373,7 +379,9 @@ impl ::fidl_next::Encodable for ParentTakeChildRequestRequest {
 
 impl<___E> ::fidl_next::Encode<___E> for ParentTakeChildRequestRequest
 where
-    ::fidl_next::bind::ServerEnd<::fidl_next::zx::Handle, crate::Child>: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
     fn encode(
         &mut self,
@@ -428,14 +436,14 @@ impl ::fidl_next::TakeFrom<WireParentTakeChildRequestRequest> for ParentTakeChil
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireParentTakeChildRequestRequest {
-    pub r: ::fidl_next::bind::ServerEnd<::fidl_next::WireHandle, crate::Child>,
+    pub r: ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::WireHandle, crate::Child>,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireParentTakeChildRequestRequest
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::bind::ServerEnd<::fidl_next::WireHandle, crate::Child>: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

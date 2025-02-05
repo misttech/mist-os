@@ -13,7 +13,7 @@ impl ::fidl_next::Encodable for ByteAndBytes {
 
 impl<___E> ::fidl_next::Encode<___E> for ByteAndBytes
 where
-    u8: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -73,9 +73,7 @@ pub struct WireByteAndBytes {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireByteAndBytes
 where
-    ___D: ?Sized,
-
-    u8: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

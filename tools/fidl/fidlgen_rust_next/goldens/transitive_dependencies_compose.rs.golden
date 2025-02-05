@@ -17,7 +17,7 @@ pub mod top {
 
         type Request<'buf> = ();
 
-        type Response<'buf> = fidl_next_test_bottom::WireBottomGetFooResponse;
+        type Response<'buf> = ::fidl_next_test_bottom::WireBottomGetFooResponse;
     }
 }
 
@@ -52,7 +52,7 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: TopClientHandler<___T>,
 
-    for<'buf> fidl_next_test_bottom::WireBottomGetFooResponse:
+    for<'buf> ::fidl_next_test_bottom::WireBottomGetFooResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
     fn on_event(

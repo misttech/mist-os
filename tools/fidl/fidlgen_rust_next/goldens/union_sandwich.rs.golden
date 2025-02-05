@@ -13,9 +13,9 @@ impl ::fidl_next::Encodable for UnionSize12Alignment4 {
 
 impl<___E> ::fidl_next::Encode<___E> for UnionSize12Alignment4
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    [u8; 6]: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -40,7 +40,7 @@ impl ::fidl_next::EncodableOption for Box<UnionSize12Alignment4> {
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionSize12Alignment4>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnionSize12Alignment4: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -124,11 +124,11 @@ impl<'buf> WireUnionSize12Alignment4<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D> for WireUnionSize12Alignment4<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionSize12Alignment4<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    [u8; 6]: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -203,12 +203,11 @@ impl<'buf> Default for WireOptionalUnionSize12Alignment4<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
-    for WireOptionalUnionSize12Alignment4<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnionSize12Alignment4<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    [u8; 6]: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -247,11 +246,9 @@ impl ::fidl_next::Encodable for SandwichUnionSize12Alignment4 {
 
 impl<___E> ::fidl_next::Encode<___E> for SandwichUnionSize12Alignment4
 where
-    u32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnionSize12Alignment4: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -329,13 +326,9 @@ pub struct WireSandwichUnionSize12Alignment4<'buf> {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSandwichUnionSize12Alignment4<'buf>
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
-
-    crate::WireUnionSize12Alignment4<'buf>: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -373,9 +366,7 @@ impl ::fidl_next::Encodable for StructSize16Alignment8 {
 
 impl<___E> ::fidl_next::Encode<___E> for StructSize16Alignment8
 where
-    u64: ::fidl_next::Encode<___E>,
-
-    u64: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -444,11 +435,7 @@ pub struct WireStructSize16Alignment8 {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructSize16Alignment8
 where
-    ___D: ?Sized,
-
-    ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -481,9 +468,9 @@ impl ::fidl_next::Encodable for UnionSize24Alignment8 {
 
 impl<___E> ::fidl_next::Encode<___E> for UnionSize24Alignment8
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::StructSize16Alignment8: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -509,7 +496,7 @@ impl ::fidl_next::EncodableOption for Box<UnionSize24Alignment8> {
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionSize24Alignment8>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnionSize24Alignment8: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -593,11 +580,11 @@ impl<'buf> WireUnionSize24Alignment8<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D> for WireUnionSize24Alignment8<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionSize24Alignment8<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    crate::WireStructSize16Alignment8: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -676,12 +663,11 @@ impl<'buf> Default for WireOptionalUnionSize24Alignment8<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
-    for WireOptionalUnionSize24Alignment8<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnionSize24Alignment8<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    crate::WireStructSize16Alignment8: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -722,11 +708,9 @@ impl ::fidl_next::Encodable for SandwichUnionSize24Alignment8 {
 
 impl<___E> ::fidl_next::Encode<___E> for SandwichUnionSize24Alignment8
 where
-    u32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnionSize24Alignment8: ::fidl_next::Encode<___E>,
-
-    u32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -804,13 +788,9 @@ pub struct WireSandwichUnionSize24Alignment8<'buf> {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSandwichUnionSize24Alignment8<'buf>
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
-
-    crate::WireUnionSize24Alignment8<'buf>: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -846,9 +826,9 @@ impl ::fidl_next::Encodable for UnionSize36Alignment4 {
 
 impl<___E> ::fidl_next::Encode<___E> for UnionSize36Alignment4
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    [u8; 32]: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -873,7 +853,7 @@ impl ::fidl_next::EncodableOption for Box<UnionSize36Alignment4> {
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionSize36Alignment4>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnionSize36Alignment4: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -957,11 +937,11 @@ impl<'buf> WireUnionSize36Alignment4<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D> for WireUnionSize36Alignment4<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionSize36Alignment4<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    [u8; 32]: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -1036,12 +1016,11 @@ impl<'buf> Default for WireOptionalUnionSize36Alignment4<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
-    for WireOptionalUnionSize36Alignment4<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnionSize36Alignment4<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    [u8; 32]: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -1080,11 +1059,9 @@ impl ::fidl_next::Encodable for SandwichUnionSize36Alignment4 {
 
 impl<___E> ::fidl_next::Encode<___E> for SandwichUnionSize36Alignment4
 where
-    u32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnionSize36Alignment4: ::fidl_next::Encode<___E>,
-
-    u32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -1162,13 +1139,9 @@ pub struct WireSandwichUnionSize36Alignment4<'buf> {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSandwichUnionSize36Alignment4<'buf>
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
-
-    crate::WireUnionSize36Alignment4<'buf>: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -1204,9 +1177,7 @@ impl ::fidl_next::Encodable for UnionSize8Alignment4 {
 
 impl<___E> ::fidl_next::Encode<___E> for UnionSize8Alignment4
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    u32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -1217,7 +1188,7 @@ where
 
         match self {
             Self::Variant(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, u32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, u32>(value, 1, encoder, raw)?
             }
         }
 
@@ -1231,7 +1202,7 @@ impl ::fidl_next::EncodableOption for Box<UnionSize8Alignment4> {
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionSize8Alignment4>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnionSize8Alignment4: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -1326,11 +1297,9 @@ impl Clone for WireUnionSize8Alignment4 {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireUnionSize8Alignment4
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireUnionSize8Alignment4
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -1427,11 +1396,9 @@ impl Clone for WireOptionalUnionSize8Alignment4 {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalUnionSize8Alignment4
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalUnionSize8Alignment4
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -1472,11 +1439,7 @@ impl ::fidl_next::Encodable for SandwichUnionSize8Alignment4 {
 
 impl<___E> ::fidl_next::Encode<___E> for SandwichUnionSize8Alignment4
 where
-    u32: ::fidl_next::Encode<___E>,
-
-    crate::UnionSize8Alignment4: ::fidl_next::Encode<___E>,
-
-    u32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -1552,13 +1515,7 @@ pub struct WireSandwichUnionSize8Alignment4 {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSandwichUnionSize8Alignment4
 where
-    ___D: ?Sized,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
-
-    crate::WireUnionSize8Alignment4: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

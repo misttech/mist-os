@@ -17,11 +17,9 @@ impl ::fidl_next::Encodable for FlexibleFoo {
 
 impl<___E> ::fidl_next::Encode<___E> for FlexibleFoo
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    String: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -54,7 +52,7 @@ impl ::fidl_next::EncodableOption for Box<FlexibleFoo> {
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<FlexibleFoo>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     FlexibleFoo: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -148,13 +146,11 @@ impl<'buf> WireFlexibleFoo<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D> for WireFlexibleFoo<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireFlexibleFoo<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    ::fidl_next::WireString<'buf>: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -236,13 +232,11 @@ impl<'buf> Default for WireOptionalFlexibleFoo<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalFlexibleFoo<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalFlexibleFoo<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    ::fidl_next::WireString<'buf>: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -283,11 +277,9 @@ impl ::fidl_next::Encodable for StrictFoo {
 
 impl<___E> ::fidl_next::Encode<___E> for StrictFoo
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    String: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -316,7 +308,7 @@ impl ::fidl_next::EncodableOption for Box<StrictFoo> {
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<StrictFoo>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     StrictFoo: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -406,13 +398,11 @@ impl<'buf> WireStrictFoo<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D> for WireStrictFoo<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStrictFoo<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    ::fidl_next::WireString<'buf>: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -494,13 +484,11 @@ impl<'buf> Default for WireOptionalStrictFoo<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalStrictFoo<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalStrictFoo<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    ::fidl_next::WireString<'buf>: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -539,7 +527,9 @@ impl ::fidl_next::Encodable for ProtocolRequestStrictResponseFlexibleRequest {
 
 impl<___E> ::fidl_next::Encode<___E> for ProtocolRequestStrictResponseFlexibleRequest
 where
-    crate::StrictFoo: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -603,9 +593,9 @@ pub struct WireProtocolRequestStrictResponseFlexibleRequest<'buf> {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireProtocolRequestStrictResponseFlexibleRequest<'buf>
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    crate::WireStrictFoo<'buf>: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -635,7 +625,9 @@ impl ::fidl_next::Encodable for ProtocolRequestStrictResponseFlexibleResponse {
 
 impl<___E> ::fidl_next::Encode<___E> for ProtocolRequestStrictResponseFlexibleResponse
 where
-    crate::FlexibleFoo: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -699,9 +691,9 @@ pub struct WireProtocolRequestStrictResponseFlexibleResponse<'buf> {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireProtocolRequestStrictResponseFlexibleResponse<'buf>
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    crate::WireFlexibleFoo<'buf>: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -731,7 +723,9 @@ impl ::fidl_next::Encodable for ProtocolRequestFlexibleResponseStrictRequest {
 
 impl<___E> ::fidl_next::Encode<___E> for ProtocolRequestFlexibleResponseStrictRequest
 where
-    crate::FlexibleFoo: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -795,9 +789,9 @@ pub struct WireProtocolRequestFlexibleResponseStrictRequest<'buf> {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireProtocolRequestFlexibleResponseStrictRequest<'buf>
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    crate::WireFlexibleFoo<'buf>: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -827,7 +821,9 @@ impl ::fidl_next::Encodable for ProtocolRequestFlexibleResponseStrictResponse {
 
 impl<___E> ::fidl_next::Encode<___E> for ProtocolRequestFlexibleResponseStrictResponse
 where
-    crate::StrictFoo: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -891,9 +887,9 @@ pub struct WireProtocolRequestFlexibleResponseStrictResponse<'buf> {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireProtocolRequestFlexibleResponseStrictResponse<'buf>
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    crate::WireStrictFoo<'buf>: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

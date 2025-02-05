@@ -15,9 +15,9 @@ impl ::fidl_next::Encodable for ExampleUseOfVectors {
 
 impl<___E> ::fidl_next::Encode<___E> for ExampleUseOfVectors
 where
-    Vec<u8>: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    Vec<Vec<bool>>: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -93,11 +93,9 @@ pub struct WireExampleUseOfVectors<'buf> {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExampleUseOfVectors<'buf>
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::WireVector<'buf, u8>: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireVector<'buf, ::fidl_next::WireVector<'buf, bool>>: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

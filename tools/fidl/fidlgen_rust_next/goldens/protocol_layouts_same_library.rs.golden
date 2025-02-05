@@ -24,8 +24,6 @@ impl ::fidl_next::Encodable for ComposedProtocolOneWayAnonComposedRequest {
 impl<___E> ::fidl_next::Encode<___E> for ComposedProtocolOneWayAnonComposedRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    u16: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -84,8 +82,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireComposedProtocolOneWayAnonComposedRequest<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -143,9 +139,7 @@ impl ::fidl_next::Encodable for ComposedProtocolTwoWayAnonComposedRequest {
 
 impl<___E> ::fidl_next::Encode<___E> for ComposedProtocolTwoWayAnonComposedRequest
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    bool: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -156,7 +150,7 @@ where
 
         match self {
             Self::B(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, bool>(value, 1, encoder, raw)?
             }
         }
 
@@ -170,7 +164,7 @@ impl ::fidl_next::EncodableOption for Box<ComposedProtocolTwoWayAnonComposedRequ
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ComposedProtocolTwoWayAnonComposedRequest>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     ComposedProtocolTwoWayAnonComposedRequest: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -269,12 +263,9 @@ impl Clone for WireComposedProtocolTwoWayAnonComposedRequest {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
-    for WireComposedProtocolTwoWayAnonComposedRequest
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireComposedProtocolTwoWayAnonComposedRequest
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    bool: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -369,12 +360,10 @@ impl Clone for WireOptionalComposedProtocolTwoWayAnonComposedRequest {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalComposedProtocolTwoWayAnonComposedRequest
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    bool: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -420,8 +409,6 @@ impl ::fidl_next::Encodable for ComposedProtocolTwoWayAnonComposedResponse {
 impl<___E> ::fidl_next::Encode<___E> for ComposedProtocolTwoWayAnonComposedResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    u16: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -480,8 +467,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireComposedProtocolTwoWayAnonComposedResponse<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -550,8 +535,6 @@ impl ::fidl_next::Encodable for ComposedProtocolTwoWayAnonComposedWithErrorReque
 impl<___E> ::fidl_next::Encode<___E> for ComposedProtocolTwoWayAnonComposedWithErrorRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    u16: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -610,8 +593,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireComposedProtocolTwoWayAnonComposedWithErrorRequest<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -671,9 +652,7 @@ impl ::fidl_next::Encodable for ComposedProtocolTwoWayAnonComposedWithErrorRespo
 
 impl<___E> ::fidl_next::Encode<___E> for ComposedProtocolTwoWayAnonComposedWithErrorResponse
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    bool: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -684,7 +663,7 @@ where
 
         match self {
             Self::B(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, bool>(value, 1, encoder, raw)?
             }
         }
 
@@ -699,7 +678,7 @@ impl ::fidl_next::EncodableOption for Box<ComposedProtocolTwoWayAnonComposedWith
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<ComposedProtocolTwoWayAnonComposedWithErrorResponse>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     ComposedProtocolTwoWayAnonComposedWithErrorResponse: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -808,12 +787,10 @@ impl Clone for WireComposedProtocolTwoWayAnonComposedWithErrorResponse {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireComposedProtocolTwoWayAnonComposedWithErrorResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    bool: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -910,12 +887,10 @@ impl Clone for WireOptionalComposedProtocolTwoWayAnonComposedWithErrorResponse {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalComposedProtocolTwoWayAnonComposedWithErrorResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    bool: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -952,11 +927,9 @@ impl ::fidl_next::Encodable for ComposedProtocolTwoWayAnonComposedWithErrorResul
 
 impl<___E> ::fidl_next::Encode<___E> for ComposedProtocolTwoWayAnonComposedWithErrorResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::ComposedProtocolTwoWayAnonComposedWithErrorResponse: ::fidl_next::Encode<___E>,
-
-    u32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -987,7 +960,7 @@ impl ::fidl_next::EncodableOption for Box<ComposedProtocolTwoWayAnonComposedWith
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<ComposedProtocolTwoWayAnonComposedWithErrorResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     ComposedProtocolTwoWayAnonComposedWithErrorResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -1100,14 +1073,12 @@ impl<'buf> WireComposedProtocolTwoWayAnonComposedWithErrorResult<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireComposedProtocolTwoWayAnonComposedWithErrorResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireComposedProtocolTwoWayAnonComposedWithErrorResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -1194,14 +1165,12 @@ impl<'buf> Default for WireOptionalComposedProtocolTwoWayAnonComposedWithErrorRe
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalComposedProtocolTwoWayAnonComposedWithErrorResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireComposedProtocolTwoWayAnonComposedWithErrorResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -1243,9 +1212,7 @@ impl ::fidl_next::Encodable for ComposedProtocolOnAnonComposedRequest {
 
 impl<___E> ::fidl_next::Encode<___E> for ComposedProtocolOnAnonComposedRequest
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    bool: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -1256,7 +1223,7 @@ where
 
         match self {
             Self::B(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, bool>(value, 1, encoder, raw)?
             }
         }
 
@@ -1270,7 +1237,7 @@ impl ::fidl_next::EncodableOption for Box<ComposedProtocolOnAnonComposedRequest>
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ComposedProtocolOnAnonComposedRequest>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     ComposedProtocolOnAnonComposedRequest: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -1369,11 +1336,9 @@ impl Clone for WireComposedProtocolOnAnonComposedRequest {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireComposedProtocolOnAnonComposedRequest
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireComposedProtocolOnAnonComposedRequest
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    bool: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -1468,12 +1433,9 @@ impl Clone for WireOptionalComposedProtocolOnAnonComposedRequest {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
-    for WireOptionalComposedProtocolOnAnonComposedRequest
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalComposedProtocolOnAnonComposedRequest
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    bool: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -1519,8 +1481,6 @@ impl ::fidl_next::Encodable for TablePayload {
 impl<___E> ::fidl_next::Encode<___E> for TablePayload
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    u16: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -1576,8 +1536,6 @@ pub struct WireTablePayload<'buf> {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireTablePayload<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -1635,9 +1593,7 @@ impl ::fidl_next::Encodable for UnionPayload {
 
 impl<___E> ::fidl_next::Encode<___E> for UnionPayload
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    bool: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -1648,7 +1604,7 @@ where
 
         match self {
             Self::B(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, bool>(value, 1, encoder, raw)?
             }
         }
 
@@ -1662,7 +1618,7 @@ impl ::fidl_next::EncodableOption for Box<UnionPayload> {
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionPayload>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnionPayload: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -1753,11 +1709,9 @@ impl Clone for WireUnionPayload {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireUnionPayload
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireUnionPayload
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    bool: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -1852,11 +1806,9 @@ impl Clone for WireOptionalUnionPayload {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalUnionPayload
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalUnionPayload
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    bool: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -1893,11 +1845,9 @@ impl ::fidl_next::Encodable for ComposedProtocolTwoWayNamedComposedWithErrorResu
 
 impl<___E> ::fidl_next::Encode<___E> for ComposedProtocolTwoWayNamedComposedWithErrorResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnionPayload: ::fidl_next::Encode<___E>,
-
-    u32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -1928,7 +1878,7 @@ impl ::fidl_next::EncodableOption for Box<ComposedProtocolTwoWayNamedComposedWit
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<ComposedProtocolTwoWayNamedComposedWithErrorResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     ComposedProtocolTwoWayNamedComposedWithErrorResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -2037,14 +1987,12 @@ impl<'buf> WireComposedProtocolTwoWayNamedComposedWithErrorResult<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireComposedProtocolTwoWayNamedComposedWithErrorResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnionPayload: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -2126,14 +2074,12 @@ impl<'buf> Default for WireOptionalComposedProtocolTwoWayNamedComposedWithErrorR
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalComposedProtocolTwoWayNamedComposedWithErrorResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnionPayload: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -2721,11 +2667,9 @@ impl ::fidl_next::Encodable for MainProtocolTwoWayLocalWithErrorResult {
 
 impl<___E> ::fidl_next::Encode<___E> for MainProtocolTwoWayLocalWithErrorResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnionPayload: ::fidl_next::Encode<___E>,
-
-    u32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -2755,7 +2699,7 @@ impl ::fidl_next::EncodableOption for Box<MainProtocolTwoWayLocalWithErrorResult
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<MainProtocolTwoWayLocalWithErrorResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     MainProtocolTwoWayLocalWithErrorResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -2857,14 +2801,12 @@ impl<'buf> WireMainProtocolTwoWayLocalWithErrorResult<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireMainProtocolTwoWayLocalWithErrorResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnionPayload: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -2944,14 +2886,12 @@ impl<'buf> Default for WireOptionalMainProtocolTwoWayLocalWithErrorResult<'buf> 
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalMainProtocolTwoWayLocalWithErrorResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnionPayload: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -3001,8 +2941,6 @@ impl ::fidl_next::Encodable for MainProtocolOneWayAnonRequest {
 impl<___E> ::fidl_next::Encode<___E> for MainProtocolOneWayAnonRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    u16: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -3060,8 +2998,6 @@ pub struct WireMainProtocolOneWayAnonRequest<'buf> {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireMainProtocolOneWayAnonRequest<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -3121,9 +3057,7 @@ impl ::fidl_next::Encodable for MainProtocolTwoWayAnonRequest {
 
 impl<___E> ::fidl_next::Encode<___E> for MainProtocolTwoWayAnonRequest
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    bool: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -3134,7 +3068,7 @@ where
 
         match self {
             Self::B(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, bool>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -3152,7 +3086,7 @@ impl ::fidl_next::EncodableOption for Box<MainProtocolTwoWayAnonRequest> {
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<MainProtocolTwoWayAnonRequest>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     MainProtocolTwoWayAnonRequest: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -3256,11 +3190,9 @@ impl Clone for WireMainProtocolTwoWayAnonRequest {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonRequest
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonRequest
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    bool: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -3358,11 +3290,9 @@ impl Clone for WireOptionalMainProtocolTwoWayAnonRequest {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalMainProtocolTwoWayAnonRequest
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalMainProtocolTwoWayAnonRequest
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    bool: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -3408,8 +3338,6 @@ impl ::fidl_next::Encodable for MainProtocolTwoWayAnonResponse {
 impl<___E> ::fidl_next::Encode<___E> for MainProtocolTwoWayAnonResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    u16: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -3467,8 +3395,6 @@ pub struct WireMainProtocolTwoWayAnonResponse<'buf> {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonResponse<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -3537,8 +3463,6 @@ impl ::fidl_next::Encodable for MainProtocolTwoWayAnonWithErrorRequest {
 impl<___E> ::fidl_next::Encode<___E> for MainProtocolTwoWayAnonWithErrorRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    u16: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -3597,8 +3521,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireMainProtocolTwoWayAnonWithErrorRequest<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -3658,9 +3580,7 @@ impl ::fidl_next::Encodable for MainProtocolTwoWayAnonWithErrorResponse {
 
 impl<___E> ::fidl_next::Encode<___E> for MainProtocolTwoWayAnonWithErrorResponse
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    bool: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -3671,7 +3591,7 @@ where
 
         match self {
             Self::B(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, bool>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -3689,7 +3609,7 @@ impl ::fidl_next::EncodableOption for Box<MainProtocolTwoWayAnonWithErrorRespons
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<MainProtocolTwoWayAnonWithErrorResponse>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     MainProtocolTwoWayAnonWithErrorResponse: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -3799,11 +3719,9 @@ impl Clone for WireMainProtocolTwoWayAnonWithErrorResponse {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonWithErrorResponse
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonWithErrorResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    bool: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -3901,12 +3819,9 @@ impl Clone for WireOptionalMainProtocolTwoWayAnonWithErrorResponse {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
-    for WireOptionalMainProtocolTwoWayAnonWithErrorResponse
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalMainProtocolTwoWayAnonWithErrorResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    bool: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -3943,11 +3858,9 @@ impl ::fidl_next::Encodable for MainProtocolTwoWayAnonWithErrorResult {
 
 impl<___E> ::fidl_next::Encode<___E> for MainProtocolTwoWayAnonWithErrorResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::MainProtocolTwoWayAnonWithErrorResponse: ::fidl_next::Encode<___E>,
-
-    u32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -3977,7 +3890,7 @@ impl ::fidl_next::EncodableOption for Box<MainProtocolTwoWayAnonWithErrorResult>
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<MainProtocolTwoWayAnonWithErrorResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     MainProtocolTwoWayAnonWithErrorResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -4079,14 +3992,12 @@ impl<'buf> WireMainProtocolTwoWayAnonWithErrorResult<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireMainProtocolTwoWayAnonWithErrorResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireMainProtocolTwoWayAnonWithErrorResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -4172,14 +4083,12 @@ impl<'buf> Default for WireOptionalMainProtocolTwoWayAnonWithErrorResult<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalMainProtocolTwoWayAnonWithErrorResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireMainProtocolTwoWayAnonWithErrorResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -4221,9 +4130,7 @@ impl ::fidl_next::Encodable for MainProtocolOnAnonRequest {
 
 impl<___E> ::fidl_next::Encode<___E> for MainProtocolOnAnonRequest
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    bool: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -4234,7 +4141,7 @@ where
 
         match self {
             Self::B(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, bool>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -4252,7 +4159,7 @@ impl ::fidl_next::EncodableOption for Box<MainProtocolOnAnonRequest> {
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<MainProtocolOnAnonRequest>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     MainProtocolOnAnonRequest: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -4356,11 +4263,9 @@ impl Clone for WireMainProtocolOnAnonRequest {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireMainProtocolOnAnonRequest
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireMainProtocolOnAnonRequest
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    bool: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -4458,11 +4363,9 @@ impl Clone for WireOptionalMainProtocolOnAnonRequest {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalMainProtocolOnAnonRequest
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalMainProtocolOnAnonRequest
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    bool: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,

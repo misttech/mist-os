@@ -19,13 +19,7 @@ impl ::fidl_next::Encodable for AllInstants {
 
 impl<___E> ::fidl_next::Encode<___E> for AllInstants
 where
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
-
-    i64: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -108,15 +102,7 @@ pub struct WireAllInstants {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireAllInstants
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -184,14 +170,6 @@ impl ::fidl_next::Encodable for ComplexInstants {
 impl<___E> ::fidl_next::Encode<___E> for ComplexInstants
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    [i64; 10]: ::fidl_next::Encode<___E>,
-
-    Vec<i64>: ::fidl_next::Encode<___E>,
-
-    [i64; 10]: ::fidl_next::Encode<___E>,
-
-    [i64; 10]: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -291,14 +269,6 @@ pub struct WireComplexInstants<'buf> {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireComplexInstants<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    [::fidl_next::i64_le; 10]: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireVector<'buf, ::fidl_next::i64_le>: ::fidl_next::Decode<___D>,
-
-    [::fidl_next::i64_le; 10]: ::fidl_next::Decode<___D>,
-
-    [::fidl_next::i64_le; 10]: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

@@ -15,9 +15,7 @@ impl ::fidl_next::Encodable for Padding1ByteEnd {
 
 impl<___E> ::fidl_next::Encode<___E> for Padding1ByteEnd
 where
-    u16: ::fidl_next::Encode<___E>,
-
-    u8: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -86,11 +84,7 @@ pub struct WirePadding1ByteEnd {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding1ByteEnd
 where
-    ___D: ?Sized,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
-
-    u8: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -125,9 +119,7 @@ impl ::fidl_next::Encodable for Padding1ByteMiddle {
 
 impl<___E> ::fidl_next::Encode<___E> for Padding1ByteMiddle
 where
-    u8: ::fidl_next::Encode<___E>,
-
-    u16: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -196,11 +188,7 @@ pub struct WirePadding1ByteMiddle {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding1ByteMiddle
 where
-    ___D: ?Sized,
-
-    u8: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -237,11 +225,7 @@ impl ::fidl_next::Encodable for Padding2ByteAlignmentLength6 {
 
 impl<___E> ::fidl_next::Encode<___E> for Padding2ByteAlignmentLength6
 where
-    u8: ::fidl_next::Encode<___E>,
-
-    u16: ::fidl_next::Encode<___E>,
-
-    u8: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -317,13 +301,7 @@ pub struct WirePadding2ByteAlignmentLength6 {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding2ByteAlignmentLength6
 where
-    ___D: ?Sized,
-
-    u8: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
-
-    u8: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -361,9 +339,7 @@ impl ::fidl_next::Encodable for Padding2ByteEnd {
 
 impl<___E> ::fidl_next::Encode<___E> for Padding2ByteEnd
 where
-    u32: ::fidl_next::Encode<___E>,
-
-    u16: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -432,11 +408,7 @@ pub struct WirePadding2ByteEnd {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding2ByteEnd
 where
-    ___D: ?Sized,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -471,9 +443,7 @@ impl ::fidl_next::Encodable for Padding2ByteMiddle {
 
 impl<___E> ::fidl_next::Encode<___E> for Padding2ByteMiddle
 where
-    u16: ::fidl_next::Encode<___E>,
-
-    u32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -542,11 +512,7 @@ pub struct WirePadding2ByteMiddle {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding2ByteMiddle
 where
-    ___D: ?Sized,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -581,9 +547,7 @@ impl ::fidl_next::Encodable for Padding3ByteEnd {
 
 impl<___E> ::fidl_next::Encode<___E> for Padding3ByteEnd
 where
-    u32: ::fidl_next::Encode<___E>,
-
-    u8: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -652,11 +616,7 @@ pub struct WirePadding3ByteEnd {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding3ByteEnd
 where
-    ___D: ?Sized,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
-
-    u8: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -691,9 +651,7 @@ impl ::fidl_next::Encodable for Padding3ByteMiddle {
 
 impl<___E> ::fidl_next::Encode<___E> for Padding3ByteMiddle
 where
-    u8: ::fidl_next::Encode<___E>,
-
-    u32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -762,11 +720,7 @@ pub struct WirePadding3ByteMiddle {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding3ByteMiddle
 where
-    ___D: ?Sized,
-
-    u8: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -805,13 +759,7 @@ impl ::fidl_next::Encodable for Padding4ByteAlignmentLength12 {
 
 impl<___E> ::fidl_next::Encode<___E> for Padding4ByteAlignmentLength12
 where
-    u32: ::fidl_next::Encode<___E>,
-
-    u8: ::fidl_next::Encode<___E>,
-
-    u16: ::fidl_next::Encode<___E>,
-
-    u16: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -894,15 +842,7 @@ pub struct WirePadding4ByteAlignmentLength12 {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding4ByteAlignmentLength12
 where
-    ___D: ?Sized,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
-
-    u8: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -943,9 +883,7 @@ impl ::fidl_next::Encodable for Padding4ByteEnd {
 
 impl<___E> ::fidl_next::Encode<___E> for Padding4ByteEnd
 where
-    u64: ::fidl_next::Encode<___E>,
-
-    u32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -1014,11 +952,7 @@ pub struct WirePadding4ByteEnd {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding4ByteEnd
 where
-    ___D: ?Sized,
-
-    ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -1053,9 +987,7 @@ impl ::fidl_next::Encodable for Padding4ByteMiddle {
 
 impl<___E> ::fidl_next::Encode<___E> for Padding4ByteMiddle
 where
-    u32: ::fidl_next::Encode<___E>,
-
-    u64: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -1124,11 +1056,7 @@ pub struct WirePadding4ByteMiddle {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding4ByteMiddle
 where
-    ___D: ?Sized,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -1165,11 +1093,7 @@ impl ::fidl_next::Encodable for Padding5ByteEnd {
 
 impl<___E> ::fidl_next::Encode<___E> for Padding5ByteEnd
 where
-    u64: ::fidl_next::Encode<___E>,
-
-    u16: ::fidl_next::Encode<___E>,
-
-    u8: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -1245,13 +1169,7 @@ pub struct WirePadding5ByteEnd {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding5ByteEnd
 where
-    ___D: ?Sized,
-
-    ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
-
-    u8: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -1291,11 +1209,7 @@ impl ::fidl_next::Encodable for Padding5ByteMiddle {
 
 impl<___E> ::fidl_next::Encode<___E> for Padding5ByteMiddle
 where
-    u16: ::fidl_next::Encode<___E>,
-
-    u8: ::fidl_next::Encode<___E>,
-
-    u64: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -1371,13 +1285,7 @@ pub struct WirePadding5ByteMiddle {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding5ByteMiddle
 where
-    ___D: ?Sized,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
-
-    u8: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -1415,9 +1323,7 @@ impl ::fidl_next::Encodable for Padding6ByteEnd {
 
 impl<___E> ::fidl_next::Encode<___E> for Padding6ByteEnd
 where
-    u64: ::fidl_next::Encode<___E>,
-
-    u16: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -1486,11 +1392,7 @@ pub struct WirePadding6ByteEnd {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding6ByteEnd
 where
-    ___D: ?Sized,
-
-    ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -1525,9 +1427,7 @@ impl ::fidl_next::Encodable for Padding6ByteMiddle {
 
 impl<___E> ::fidl_next::Encode<___E> for Padding6ByteMiddle
 where
-    u16: ::fidl_next::Encode<___E>,
-
-    u64: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -1596,11 +1496,7 @@ pub struct WirePadding6ByteMiddle {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding6ByteMiddle
 where
-    ___D: ?Sized,
-
-    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -1635,9 +1531,7 @@ impl ::fidl_next::Encodable for Padding7ByteEnd {
 
 impl<___E> ::fidl_next::Encode<___E> for Padding7ByteEnd
 where
-    u64: ::fidl_next::Encode<___E>,
-
-    u8: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -1706,11 +1600,7 @@ pub struct WirePadding7ByteEnd {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding7ByteEnd
 where
-    ___D: ?Sized,
-
-    ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
-
-    u8: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -1745,9 +1635,7 @@ impl ::fidl_next::Encodable for Padding7ByteMiddle {
 
 impl<___E> ::fidl_next::Encode<___E> for Padding7ByteMiddle
 where
-    u8: ::fidl_next::Encode<___E>,
-
-    u64: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -1816,11 +1704,7 @@ pub struct WirePadding7ByteMiddle {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding7ByteMiddle
 where
-    ___D: ?Sized,
-
-    u8: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

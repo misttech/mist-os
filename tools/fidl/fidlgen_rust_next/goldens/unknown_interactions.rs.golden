@@ -14,7 +14,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarDriverProtocolStrictTwoWa
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -85,9 +85,7 @@ pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse {
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -120,9 +118,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarDriverProtocolStrictTwoWa
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -133,7 +129,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -155,7 +151,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -279,12 +275,10 @@ impl Clone for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionRespons
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -390,12 +384,10 @@ impl Clone for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnio
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -446,8 +438,6 @@ impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -509,8 +499,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -568,6 +556,8 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarDriverProtocolStrictTwoWa
 
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -633,7 +623,7 @@ pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse {}
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -662,11 +652,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarDriverProtocolStrictTwoWa
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -676,13 +662,13 @@ where
         ::fidl_next::munge!(let WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult { raw, _phantom: _ } = slot);
 
         match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse,
             >(value, 1, encoder, raw)?,
 
             Self::Err(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 2, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 2, encoder, raw)?
             }
         }
 
@@ -700,7 +686,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -838,15 +824,10 @@ impl Clone for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -966,15 +947,10 @@ impl Clone for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayErrR
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -1017,7 +993,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarDriverProtocolStrictTwoWa
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -1088,9 +1064,7 @@ pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrRespons
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -1123,12 +1097,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarDriverProtocolStrictTwoWa
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse:
-        ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -1138,13 +1107,13 @@ where
         ::fidl_next::munge!(let WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult { raw, _phantom: _ } = slot);
 
         match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse,
             >(value, 1, encoder, raw)?,
 
             Self::Err(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 2, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 2, encoder, raw)?
             }
         }
 
@@ -1162,7 +1131,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -1306,15 +1275,10 @@ impl Clone for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrRes
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -1434,15 +1398,10 @@ impl Clone for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayFiel
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -1489,9 +1448,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarDriverProtocolStrictTwoWa
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -1502,7 +1459,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -1524,7 +1481,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -1648,12 +1605,10 @@ impl Clone for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResp
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -1759,12 +1714,10 @@ impl Clone for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnio
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -1806,12 +1759,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarDriverProtocolStrictTwoWa
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse:
-        ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -1845,7 +1795,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -1972,15 +1922,12 @@ impl<'buf> WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult<'
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -2076,15 +2023,12 @@ impl<'buf> Default
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -2139,8 +2083,6 @@ impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -2203,8 +2145,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -2269,12 +2209,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarDriverProtocolStrictTwoWa
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse:
-        ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -2308,7 +2245,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -2441,15 +2378,12 @@ impl<'buf> WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult<'
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse<'buf>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -2545,15 +2479,12 @@ impl<'buf> Default
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse<'buf>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -3205,7 +3136,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictTwoWayField
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -3272,9 +3203,7 @@ pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -3306,9 +3235,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictTwoWayUnion
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -3319,7 +3246,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -3340,7 +3267,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -3458,12 +3385,10 @@ impl Clone for WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -3565,12 +3490,10 @@ impl Clone for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionRespo
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -3618,8 +3541,6 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictTwoWayTable
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictTwoWayTableResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -3680,8 +3601,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -3737,7 +3656,10 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictTwoWayErrRe
     type Encoded<'buf> = WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictTwoWayErrResponse {
+impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictTwoWayErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3796,7 +3718,7 @@ pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse {}
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -3825,11 +3747,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictTwoWayErrRe
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictTwoWayErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    crate::UnknownInteractionsAjarProtocolStrictTwoWayErrResponse: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -3839,13 +3757,13 @@ where
         ::fidl_next::munge!(let WireUnknownInteractionsAjarProtocolStrictTwoWayErrResult { raw, _phantom: _ } = slot);
 
         match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 crate::UnknownInteractionsAjarProtocolStrictTwoWayErrResponse,
             >(value, 1, encoder, raw)?,
 
             Self::Err(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 2, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 2, encoder, raw)?
             }
         }
 
@@ -3860,7 +3778,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsAjarProtocolStrictT
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsAjarProtocolStrictTwoWayErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsAjarProtocolStrictTwoWayErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -3992,14 +3910,10 @@ impl Clone for WireUnknownInteractionsAjarProtocolStrictTwoWayErrResult {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -4115,14 +4029,10 @@ impl Clone for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayErrResult 
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -4165,7 +4075,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictTwoWayField
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -4236,9 +4146,7 @@ pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse {
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -4270,11 +4178,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictTwoWayField
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    crate::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -4284,13 +4188,13 @@ where
         ::fidl_next::munge!(let WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult { raw, _phantom: _ } = slot);
 
         match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 crate::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse,
             >(value, 1, encoder, raw)?,
 
             Self::Err(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 2, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 2, encoder, raw)?
             }
         }
 
@@ -4308,7 +4212,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -4446,15 +4350,10 @@ impl Clone for WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -4574,15 +4473,10 @@ impl Clone for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrR
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -4626,9 +4520,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictTwoWayUnion
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -4639,7 +4531,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -4661,7 +4553,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -4781,12 +4673,10 @@ impl Clone for WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -4892,12 +4782,10 @@ impl Clone for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrRe
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -4938,11 +4826,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictTwoWayUnion
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -4976,7 +4862,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -5097,15 +4983,12 @@ impl<'buf> WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -5198,15 +5081,12 @@ impl<'buf> Default for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUn
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -5259,8 +5139,6 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictTwoWayTable
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -5322,8 +5200,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -5385,11 +5261,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictTwoWayTable
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -5423,7 +5297,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -5550,15 +5424,12 @@ impl<'buf> WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResult<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse<'buf>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -5651,15 +5522,12 @@ impl<'buf> Default for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayTa
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayTableErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse<'buf>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -5701,7 +5569,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictEventFields
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictEventFieldsRequest
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -5766,9 +5634,7 @@ pub struct WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest {
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -5800,9 +5666,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictEventUnionR
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictEventUnionRequest
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -5813,7 +5677,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -5832,7 +5696,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsAjarProtocolStrictE
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsAjarProtocolStrictEventUnionRequest>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsAjarProtocolStrictEventUnionRequest: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -5950,12 +5814,10 @@ impl Clone for WireUnknownInteractionsAjarProtocolStrictEventUnionRequest {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictEventUnionRequest
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -6057,12 +5919,10 @@ impl Clone for WireOptionalUnknownInteractionsAjarProtocolStrictEventUnionReques
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolStrictEventUnionRequest
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -6110,8 +5970,6 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictEventTableR
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictEventTableRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -6172,8 +6030,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictEventTableRequest<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -6233,7 +6089,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolFlexibleEventFiel
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -6300,9 +6156,7 @@ pub struct WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -6334,9 +6188,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolFlexibleEventUnio
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolFlexibleEventUnionRequest
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -6347,7 +6199,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -6368,7 +6220,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsAjarProtocolFlexibleEventUnionRequest>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsAjarProtocolFlexibleEventUnionRequest: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -6486,12 +6338,10 @@ impl Clone for WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -6593,12 +6443,10 @@ impl Clone for WireOptionalUnknownInteractionsAjarProtocolFlexibleEventUnionRequ
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolFlexibleEventUnionRequest
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -6646,8 +6494,6 @@ impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolFlexibleEventTabl
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolFlexibleEventTableRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -6708,8 +6554,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -7745,7 +7589,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsClosedDriverProtocolStrictTwo
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -7816,9 +7660,7 @@ pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -7851,9 +7693,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsClosedDriverProtocolStrictTwo
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -7864,7 +7704,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -7886,7 +7726,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -8010,12 +7850,10 @@ impl Clone for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionRespo
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -8121,12 +7959,10 @@ impl Clone for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUn
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -8177,8 +8013,6 @@ impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -8241,8 +8075,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -8302,6 +8134,8 @@ impl ::fidl_next::Encodable for UnknownInteractionsClosedDriverProtocolStrictTwo
 
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -8367,7 +8201,7 @@ pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse {}
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -8397,12 +8231,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsClosedDriverProtocolStrictTwo
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse:
-        ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -8412,13 +8241,13 @@ where
         ::fidl_next::munge!(let WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult { raw, _phantom: _ } = slot);
 
         match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse,
             >(value, 1, encoder, raw)?,
 
             Self::Err(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 2, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 2, encoder, raw)?
             }
         }
 
@@ -8436,7 +8265,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -8574,15 +8403,10 @@ impl Clone for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult 
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -8702,15 +8526,10 @@ impl Clone for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayEr
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -8757,7 +8576,7 @@ impl ::fidl_next::Encodable
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -8828,9 +8647,7 @@ pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrRespo
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -8863,12 +8680,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsClosedDriverProtocolStrictTwo
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse:
-        ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -8878,13 +8690,13 @@ where
         ::fidl_next::munge!(let WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult { raw, _phantom: _ } = slot);
 
         match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse,
             >(value, 1, encoder, raw)?,
 
             Self::Err(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 2, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 2, encoder, raw)?
             }
         }
 
@@ -8902,7 +8714,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -9046,15 +8858,10 @@ impl Clone for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrR
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -9174,15 +8981,10 @@ impl Clone for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayFi
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -9231,9 +9033,7 @@ impl ::fidl_next::Encodable
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -9244,7 +9044,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -9266,7 +9066,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -9390,12 +9190,10 @@ impl Clone for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrRe
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -9503,12 +9301,10 @@ impl Clone for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUn
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -9551,12 +9347,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsClosedDriverProtocolStrictTwo
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse:
-        ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -9590,7 +9383,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -9718,15 +9511,12 @@ impl<'buf> WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -9822,15 +9612,12 @@ impl<'buf> Default
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -9887,8 +9674,6 @@ impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -9951,8 +9736,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -10018,12 +9801,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsClosedDriverProtocolStrictTwo
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse:
-        ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -10057,7 +9837,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -10191,15 +9971,12 @@ impl<'buf> WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse<'buf>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -10297,15 +10074,12 @@ impl<'buf> Default
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse<'buf>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -10932,7 +10706,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictTwoWayFie
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -11001,9 +10775,7 @@ pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -11035,9 +10807,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictTwoWayUni
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -11048,7 +10818,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -11070,7 +10840,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -11190,12 +10960,10 @@ impl Clone for WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -11301,12 +11069,10 @@ impl Clone for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionRes
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -11354,8 +11120,6 @@ impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictTwoWayTab
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsClosedProtocolStrictTwoWayTableResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -11417,8 +11181,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -11474,7 +11236,10 @@ impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictTwoWayErr
     type Encoded<'buf> = WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsClosedProtocolStrictTwoWayErrResponse {
+impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsClosedProtocolStrictTwoWayErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -11535,7 +11300,7 @@ pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse {}
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -11564,11 +11329,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictTwoWayErr
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsClosedProtocolStrictTwoWayErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    crate::UnknownInteractionsClosedProtocolStrictTwoWayErrResponse: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -11578,13 +11339,13 @@ where
         ::fidl_next::munge!(let WireUnknownInteractionsClosedProtocolStrictTwoWayErrResult { raw, _phantom: _ } = slot);
 
         match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 crate::UnknownInteractionsClosedProtocolStrictTwoWayErrResponse,
             >(value, 1, encoder, raw)?,
 
             Self::Err(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 2, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 2, encoder, raw)?
             }
         }
 
@@ -11599,7 +11360,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsClosedProtocolStric
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsClosedProtocolStrictTwoWayErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsClosedProtocolStrictTwoWayErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -11731,14 +11492,10 @@ impl Clone for WireUnknownInteractionsClosedProtocolStrictTwoWayErrResult {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -11854,14 +11611,10 @@ impl Clone for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayErrResul
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -11904,7 +11657,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictTwoWayFie
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -11975,9 +11728,7 @@ pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse {
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -12010,12 +11761,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictTwoWayFie
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    crate::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse:
-        ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -12025,13 +11771,13 @@ where
         ::fidl_next::munge!(let WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult { raw, _phantom: _ } = slot);
 
         match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 crate::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse,
             >(value, 1, encoder, raw)?,
 
             Self::Err(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 2, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 2, encoder, raw)?
             }
         }
 
@@ -12049,7 +11795,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -12187,15 +11933,10 @@ impl Clone for WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult 
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -12315,15 +12056,10 @@ impl Clone for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayFieldsEr
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -12370,9 +12106,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictTwoWayUni
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -12383,7 +12117,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -12405,7 +12139,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -12528,12 +12262,10 @@ impl Clone for WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -12639,12 +12371,10 @@ impl Clone for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErr
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -12685,11 +12415,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictTwoWayUni
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -12723,7 +12451,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -12844,15 +12572,12 @@ impl<'buf> WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult<'buf>
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -12947,15 +12672,12 @@ impl<'buf> Default
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -13009,8 +12731,6 @@ impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -13072,8 +12792,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -13135,11 +12853,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictTwoWayTab
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -13173,7 +12889,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -13300,15 +13016,12 @@ impl<'buf> WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResult<'buf>
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse<'buf>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -13403,15 +13116,12 @@ impl<'buf> Default
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayTableErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse<'buf>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -13453,7 +13163,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictEventFiel
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsClosedProtocolStrictEventFieldsRequest
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -13520,9 +13230,7 @@ pub struct WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest {
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -13554,9 +13262,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictEventUnio
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsClosedProtocolStrictEventUnionRequest
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -13567,7 +13273,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -13588,7 +13294,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsClosedProtocolStrictEventUnionRequest>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsClosedProtocolStrictEventUnionRequest: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -13706,12 +13412,10 @@ impl Clone for WireUnknownInteractionsClosedProtocolStrictEventUnionRequest {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictEventUnionRequest
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -13813,12 +13517,10 @@ impl Clone for WireOptionalUnknownInteractionsClosedProtocolStrictEventUnionRequ
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedProtocolStrictEventUnionRequest
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -13866,8 +13568,6 @@ impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictEventTabl
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsClosedProtocolStrictEventTableRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -13928,8 +13628,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictEventTableRequest<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -14742,7 +14440,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolStrictTwoWayFie
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -14811,9 +14509,7 @@ pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse {
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -14845,9 +14541,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolStrictTwoWayUni
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -14858,7 +14552,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -14880,7 +14574,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -15000,12 +14694,10 @@ impl Clone for WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -15111,12 +14803,10 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionRes
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -15164,8 +14854,6 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolStrictTwoWayTab
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolStrictTwoWayTableResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -15227,8 +14915,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -15284,7 +14970,10 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolStrictTwoWayErr
     type Encoded<'buf> = WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolStrictTwoWayErrResponse {
+impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolStrictTwoWayErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -15345,7 +15034,7 @@ pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse {}
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -15374,11 +15063,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolStrictTwoWayErr
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolStrictTwoWayErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    crate::UnknownInteractionsDriverProtocolStrictTwoWayErrResponse: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -15388,13 +15073,13 @@ where
         ::fidl_next::munge!(let WireUnknownInteractionsDriverProtocolStrictTwoWayErrResult { raw, _phantom: _ } = slot);
 
         match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 crate::UnknownInteractionsDriverProtocolStrictTwoWayErrResponse,
             >(value, 1, encoder, raw)?,
 
             Self::Err(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 2, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 2, encoder, raw)?
             }
         }
 
@@ -15409,7 +15094,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsDriverProtocolStric
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsDriverProtocolStrictTwoWayErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsDriverProtocolStrictTwoWayErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -15541,14 +15226,10 @@ impl Clone for WireUnknownInteractionsDriverProtocolStrictTwoWayErrResult {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -15664,14 +15345,10 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayErrResul
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -15714,7 +15391,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolStrictTwoWayFie
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -15785,9 +15462,7 @@ pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse {
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -15820,12 +15495,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolStrictTwoWayFie
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    crate::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse:
-        ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -15835,13 +15505,13 @@ where
         ::fidl_next::munge!(let WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult { raw, _phantom: _ } = slot);
 
         match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 crate::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse,
             >(value, 1, encoder, raw)?,
 
             Self::Err(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 2, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 2, encoder, raw)?
             }
         }
 
@@ -15859,7 +15529,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -15997,15 +15667,10 @@ impl Clone for WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult 
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -16125,15 +15790,10 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayFieldsEr
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -16180,9 +15840,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolStrictTwoWayUni
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -16193,7 +15851,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -16215,7 +15873,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -16338,12 +15996,10 @@ impl Clone for WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -16449,12 +16105,10 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErr
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -16495,11 +16149,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolStrictTwoWayUni
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -16533,7 +16185,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -16654,15 +16306,12 @@ impl<'buf> WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult<'buf>
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -16757,15 +16406,12 @@ impl<'buf> Default
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -16819,8 +16465,6 @@ impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -16882,8 +16526,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -16945,11 +16587,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolStrictTwoWayTab
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -16983,7 +16623,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -17110,15 +16750,12 @@ impl<'buf> WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResult<'buf>
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse<'buf>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -17213,15 +16850,12 @@ impl<'buf> Default
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayTableErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse<'buf>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -17259,7 +16893,10 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayR
     type Encoded<'buf> = WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolFlexibleTwoWayResponse {
+impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolFlexibleTwoWayResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -17318,7 +16955,7 @@ pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse {}
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -17347,11 +16984,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayR
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolFlexibleTwoWayResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    crate::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse: ::fidl_next::Encode<___E>,
-
-    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -17361,12 +16994,12 @@ where
         ::fidl_next::munge!(let WireUnknownInteractionsDriverProtocolFlexibleTwoWayResult { raw, _phantom: _ } = slot);
 
         match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 crate::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse,
             >(value, 1, encoder, raw)?,
 
-            Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
@@ -17383,7 +17016,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsDriverProtocolFlexi
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsDriverProtocolFlexibleTwoWayResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -17519,14 +17152,10 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayResult {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -17647,14 +17276,10 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayResult
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -17698,7 +17323,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayF
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -17769,9 +17394,7 @@ pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse {
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -17803,11 +17426,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayF
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    crate::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse: ::fidl_next::Encode<___E>,
-
-    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -17817,12 +17436,12 @@ where
         ::fidl_next::munge!(let WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult { raw, _phantom: _ } = slot);
 
         match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 crate::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse,
             >(value, 1, encoder, raw)?,
 
-            Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
@@ -17842,7 +17461,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -17982,15 +17601,10 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -18115,15 +17729,10 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayFields
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -18171,9 +17780,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayU
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -18184,7 +17791,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -18206,7 +17813,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -18326,12 +17933,10 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse 
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -18437,12 +18042,10 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionR
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -18483,11 +18086,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayU
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse: ::fidl_next::Encode<___E>,
-
-    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -18522,7 +18123,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -18643,15 +18244,12 @@ impl<'buf> WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult<'buf> 
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -18751,15 +18349,12 @@ impl<'buf> Default
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -18816,8 +18411,6 @@ impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -18879,8 +18472,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -18942,11 +18533,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayT
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse: ::fidl_next::Encode<___E>,
-
-    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -18981,7 +18570,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -19108,15 +18697,12 @@ impl<'buf> WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResult<'buf> 
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse<'buf>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -19216,15 +18802,12 @@ impl<'buf> Default
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayTableResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse<'buf>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -19265,8 +18848,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayE
     type Encoded<'buf> = WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse;
 }
 
-impl<___E> ::fidl_next::Encode<___E>
-    for UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse
+impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -19330,7 +18914,7 @@ pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse {}
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -19361,13 +18945,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayE
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    crate::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
-
-    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -19377,16 +18955,16 @@ where
         ::fidl_next::munge!(let WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult { raw, _phantom: _ } = slot);
 
         match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 crate::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse,
             >(value, 1, encoder, raw)?,
 
             Self::Err(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 2, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 2, encoder, raw)?
             }
 
-            Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
@@ -19405,7 +18983,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -19562,17 +19140,10 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -19703,17 +19274,10 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayErrRes
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -19761,7 +19325,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayF
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -19832,9 +19396,7 @@ pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse 
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -19869,14 +19431,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayF
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    crate::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse:
-        ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
-
-    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -19886,16 +19441,16 @@ where
         ::fidl_next::munge!(let WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult { raw, _phantom: _ } = slot);
 
         match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 crate::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse,
             >(value, 1, encoder, raw)?,
 
             Self::Err(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 2, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 2, encoder, raw)?
             }
 
-            Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
@@ -19915,7 +19470,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -20082,17 +19637,10 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResul
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -20227,17 +19775,10 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayFields
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -20289,9 +19830,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayU
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -20302,7 +19841,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -20324,7 +19863,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -20448,12 +19987,10 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrRespon
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -20559,12 +20096,10 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionE
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -20608,14 +20143,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayU
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse:
-        ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
-
-    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -20654,7 +20184,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -20795,17 +20325,12 @@ impl<'buf> WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult<'bu
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -20908,17 +20433,12 @@ impl<'buf> Default
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -20977,8 +20497,6 @@ impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -21040,8 +20558,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -21108,14 +20624,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayT
 impl<___E> ::fidl_next::Encode<___E>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse:
-        ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
-
-    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -21154,7 +20665,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -21299,17 +20810,12 @@ impl<'buf> WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult<'bu
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse<'buf>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -21412,17 +20918,12 @@ impl<'buf> Default
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse<'buf>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -22523,7 +22024,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictTwoWayFieldsRes
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWayFieldsResponse
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -22588,9 +22089,7 @@ pub struct WireUnknownInteractionsProtocolStrictTwoWayFieldsResponse {
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayFieldsResponse
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -22622,9 +22121,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictTwoWayUnionResp
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWayUnionResponse
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -22635,7 +22132,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -22654,7 +22151,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsProtocolStrictTwoWa
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsProtocolStrictTwoWayUnionResponse>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsProtocolStrictTwoWayUnionResponse: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -22772,12 +22269,10 @@ impl Clone for WireUnknownInteractionsProtocolStrictTwoWayUnionResponse {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayUnionResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -22879,12 +22374,10 @@ impl Clone for WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionResponse 
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -22932,8 +22425,6 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictTwoWayTableResp
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWayTableResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -22994,8 +22485,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayTableResponse<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -23051,7 +22540,10 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictTwoWayErrRespon
     type Encoded<'buf> = WireUnknownInteractionsProtocolStrictTwoWayErrResponse;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWayErrResponse {
+impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWayErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -23110,7 +22602,7 @@ pub struct WireUnknownInteractionsProtocolStrictTwoWayErrResponse {}
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayErrResponse
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -23139,11 +22631,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictTwoWayErrResult
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWayErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    crate::UnknownInteractionsProtocolStrictTwoWayErrResponse: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -23153,13 +22641,13 @@ where
         ::fidl_next::munge!(let WireUnknownInteractionsProtocolStrictTwoWayErrResult { raw, _phantom: _ } = slot);
 
         match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 crate::UnknownInteractionsProtocolStrictTwoWayErrResponse,
             >(value, 1, encoder, raw)?,
 
             Self::Err(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 2, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 2, encoder, raw)?
             }
         }
 
@@ -23173,7 +22661,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsProtocolStrictTwoWa
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnknownInteractionsProtocolStrictTwoWayErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsProtocolStrictTwoWayErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -23299,14 +22787,9 @@ impl Clone for WireUnknownInteractionsProtocolStrictTwoWayErrResult {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
-    for WireUnknownInteractionsProtocolStrictTwoWayErrResult
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireUnknownInteractionsProtocolStrictTwoWayErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -23420,14 +22903,10 @@ impl Clone for WireOptionalUnknownInteractionsProtocolStrictTwoWayErrResult {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolStrictTwoWayErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -23469,7 +22948,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictTwoWayFieldsErr
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -23536,9 +23015,7 @@ pub struct WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResponse
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -23570,11 +23047,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictTwoWayFieldsErr
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWayFieldsErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    crate::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -23584,13 +23057,13 @@ where
         ::fidl_next::munge!(let WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResult { raw, _phantom: _ } = slot);
 
         match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 crate::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse,
             >(value, 1, encoder, raw)?,
 
             Self::Err(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 2, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 2, encoder, raw)?
             }
         }
 
@@ -23605,7 +23078,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsProtocolStrictTwoWa
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsProtocolStrictTwoWayFieldsErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsProtocolStrictTwoWayFieldsErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -23737,14 +23210,10 @@ impl Clone for WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResult {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -23860,14 +23329,10 @@ impl Clone for WireOptionalUnknownInteractionsProtocolStrictTwoWayFieldsErrResul
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -23911,9 +23376,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictTwoWayUnionErrR
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWayUnionErrResponse
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -23924,7 +23387,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -23943,7 +23406,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsProtocolStrictTwoWa
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsProtocolStrictTwoWayUnionErrResponse>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsProtocolStrictTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -24061,12 +23524,10 @@ impl Clone for WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -24168,12 +23629,10 @@ impl Clone for WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrRespon
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -24212,11 +23671,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictTwoWayUnionErrR
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWayUnionErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -24248,7 +23705,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsProtocolStrictTwoWa
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsProtocolStrictTwoWayUnionErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsProtocolStrictTwoWayUnionErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -24363,14 +23820,12 @@ impl<'buf> WireUnknownInteractionsProtocolStrictTwoWayUnionErrResult<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayUnionErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -24461,14 +23916,12 @@ impl<'buf> Default for WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionE
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -24521,8 +23974,6 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictTwoWayTableErrR
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWayTableErrResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -24583,8 +24034,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -24646,11 +24095,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictTwoWayTableErrR
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWayTableErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnknownInteractionsProtocolStrictTwoWayTableErrResponse: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -24682,7 +24129,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsProtocolStrictTwoWa
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsProtocolStrictTwoWayTableErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsProtocolStrictTwoWayTableErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -24799,15 +24246,12 @@ impl<'buf> WireUnknownInteractionsProtocolStrictTwoWayTableErrResult<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayTableErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse<'buf>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -24898,15 +24342,12 @@ impl<'buf> Default for WireOptionalUnknownInteractionsProtocolStrictTwoWayTableE
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolStrictTwoWayTableErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse<'buf>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -24944,7 +24385,10 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayRespons
     type Encoded<'buf> = WireUnknownInteractionsProtocolFlexibleTwoWayResponse;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoWayResponse {
+impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoWayResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -25003,7 +24447,7 @@ pub struct WireUnknownInteractionsProtocolFlexibleTwoWayResponse {}
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayResponse
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -25032,11 +24476,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayResult 
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoWayResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    crate::UnknownInteractionsProtocolFlexibleTwoWayResponse: ::fidl_next::Encode<___E>,
-
-    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -25046,12 +24486,12 @@ where
         ::fidl_next::munge!(let WireUnknownInteractionsProtocolFlexibleTwoWayResult { raw, _phantom: _ } = slot);
 
         match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 crate::UnknownInteractionsProtocolFlexibleTwoWayResponse,
             >(value, 1, encoder, raw)?,
 
-            Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
@@ -25067,7 +24507,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsProtocolFlexibleTwo
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnknownInteractionsProtocolFlexibleTwoWayResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -25193,14 +24633,9 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayResult {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
-    for WireUnknownInteractionsProtocolFlexibleTwoWayResult
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireUnknownInteractionsProtocolFlexibleTwoWayResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsProtocolFlexibleTwoWayResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -25319,14 +24754,10 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayResult {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsProtocolFlexibleTwoWayResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -25369,7 +24800,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayFieldsR
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -25434,9 +24865,7 @@ pub struct WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -25468,11 +24897,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayFieldsR
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoWayFieldsResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    crate::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse: ::fidl_next::Encode<___E>,
-
-    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -25482,12 +24907,12 @@ where
         ::fidl_next::munge!(let WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResult { raw, _phantom: _ } = slot);
 
         match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 crate::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse,
             >(value, 1, encoder, raw)?,
 
-            Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
@@ -25504,7 +24929,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsProtocolFlexibleTwo
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsProtocolFlexibleTwoWayFieldsResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayFieldsResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -25640,14 +25065,10 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResult {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -25768,14 +25189,10 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayFieldsResult
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayFieldsResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -25820,9 +25237,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayUnionRe
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoWayUnionResponse
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -25833,7 +25248,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -25852,7 +25267,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsProtocolFlexibleTwo
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsProtocolFlexibleTwoWayUnionResponse>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayUnionResponse: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -25970,12 +25385,10 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -26077,12 +25490,10 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionRespons
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -26121,11 +25532,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayUnionRe
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoWayUnionResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse: ::fidl_next::Encode<___E>,
-
-    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -26158,7 +25567,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsProtocolFlexibleTwo
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsProtocolFlexibleTwoWayUnionResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayUnionResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -26275,14 +25684,12 @@ impl<'buf> WireUnknownInteractionsProtocolFlexibleTwoWayUnionResult<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayUnionResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -26378,14 +25785,12 @@ impl<'buf> Default for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnio
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -26441,8 +25846,6 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayTableRe
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoWayTableResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -26503,8 +25906,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -26566,11 +25967,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayTableRe
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoWayTableResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnknownInteractionsProtocolFlexibleTwoWayTableResponse: ::fidl_next::Encode<___E>,
-
-    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -26603,7 +26002,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsProtocolFlexibleTwo
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsProtocolFlexibleTwoWayTableResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayTableResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -26722,15 +26121,12 @@ impl<'buf> WireUnknownInteractionsProtocolFlexibleTwoWayTableResult<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayTableResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse<'buf>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -26826,15 +26222,12 @@ impl<'buf> Default for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayTabl
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayTableResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse<'buf>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -26875,7 +26268,10 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayErrResp
     type Encoded<'buf> = WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoWayErrResponse {
+impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoWayErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -26934,7 +26330,7 @@ pub struct WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse {}
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -26965,13 +26361,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayErrResu
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoWayErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    crate::UnknownInteractionsProtocolFlexibleTwoWayErrResponse: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
-
-    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -26981,16 +26371,16 @@ where
         ::fidl_next::munge!(let WireUnknownInteractionsProtocolFlexibleTwoWayErrResult { raw, _phantom: _ } = slot);
 
         match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 crate::UnknownInteractionsProtocolFlexibleTwoWayErrResponse,
             >(value, 1, encoder, raw)?,
 
             Self::Err(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 2, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 2, encoder, raw)?
             }
 
-            Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
@@ -27007,7 +26397,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsProtocolFlexibleTwo
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsProtocolFlexibleTwoWayErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -27166,16 +26556,10 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayErrResult {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -27306,16 +26690,10 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayErrResult {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -27362,7 +26740,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayFieldsE
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -27431,9 +26809,7 @@ pub struct WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse {
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -27467,13 +26843,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayFieldsE
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    crate::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
-
-    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -27483,16 +26853,16 @@ where
         ::fidl_next::munge!(let WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult { raw, _phantom: _ } = slot);
 
         match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 crate::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse,
             >(value, 1, encoder, raw)?,
 
             Self::Err(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 2, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 2, encoder, raw)?
             }
 
-            Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
+            Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as_static::<
                 ___E,
                 ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
@@ -27511,7 +26881,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -27668,17 +27038,10 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -27809,17 +27172,10 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayFieldsErrRes
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -27868,9 +27224,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayUnionEr
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -27881,7 +27235,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -27903,7 +27257,7 @@ impl ::fidl_next::EncodableOption
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -28021,12 +27375,10 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -28130,12 +27482,10 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResp
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -28176,13 +27526,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayUnionEr
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
-
-    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -28219,7 +27565,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsProtocolFlexibleTwo
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -28352,16 +27698,12 @@ impl<'buf> WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResult<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -28462,16 +27804,12 @@ impl<'buf> Default for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnio
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -28529,8 +27867,6 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayTableEr
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -28592,8 +27928,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -28657,13 +27991,9 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayTableEr
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoWayTableErrResult
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    crate::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse: ::fidl_next::Encode<___E>,
-
-    i32: ::fidl_next::Encode<___E>,
-
-    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -28700,7 +28030,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsProtocolFlexibleTwo
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsProtocolFlexibleTwoWayTableErrResult>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayTableErrResult: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -28837,17 +28167,12 @@ impl<'buf> WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResult<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse<'buf>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -28948,17 +28273,12 @@ impl<'buf> Default for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayTabl
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayTableErrResult<'buf>
 where
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
     ___D: ::fidl_next::Decoder<'buf>,
-
-    crate::WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse<'buf>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -29005,7 +28325,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictEventFieldsRequ
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictEventFieldsRequest
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -29070,9 +28390,7 @@ pub struct WireUnknownInteractionsProtocolStrictEventFieldsRequest {
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictEventFieldsRequest
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -29104,9 +28422,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictEventUnionReque
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictEventUnionRequest
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -29117,7 +28433,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -29136,7 +28452,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsProtocolStrictEvent
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsProtocolStrictEventUnionRequest>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsProtocolStrictEventUnionRequest: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -29254,12 +28570,10 @@ impl Clone for WireUnknownInteractionsProtocolStrictEventUnionRequest {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictEventUnionRequest
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -29361,12 +28675,10 @@ impl Clone for WireOptionalUnknownInteractionsProtocolStrictEventUnionRequest {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolStrictEventUnionRequest
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -29414,8 +28726,6 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictEventTableReque
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictEventTableRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -29474,8 +28784,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictEventTableRequest<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -29535,7 +28843,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleEventFieldsRe
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleEventFieldsRequest
 where
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -29600,9 +28908,7 @@ pub struct WireUnknownInteractionsProtocolFlexibleEventFieldsRequest {
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleEventFieldsRequest
 where
-    ___D: ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -29634,9 +28940,7 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleEventUnionReq
 
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleEventUnionRequest
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -29647,7 +28951,7 @@ where
 
         match self {
             Self::SomeField(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -29666,7 +28970,7 @@ impl ::fidl_next::EncodableOption for Box<UnknownInteractionsProtocolFlexibleEve
 impl<___E> ::fidl_next::EncodeOption<___E>
     for Box<UnknownInteractionsProtocolFlexibleEventUnionRequest>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleEventUnionRequest: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -29784,12 +29088,10 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleEventUnionRequest {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleEventUnionRequest
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -29891,12 +29193,10 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleEventUnionRequest 
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleEventUnionRequest
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -29944,8 +29244,6 @@ impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleEventTableReq
 impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleEventTableRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -30006,8 +29304,6 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleEventTableRequest<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

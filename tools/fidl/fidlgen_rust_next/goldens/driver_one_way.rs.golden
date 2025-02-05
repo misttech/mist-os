@@ -13,7 +13,7 @@ impl ::fidl_next::Encodable for Payload {
 
 impl<___E> ::fidl_next::Encode<___E> for Payload
 where
-    u32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -73,9 +73,7 @@ pub struct WirePayload {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePayload
 where
-    ___D: ?Sized,
-
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -105,7 +103,7 @@ impl ::fidl_next::Encodable for OneWaySendRequest {
 
 impl<___E> ::fidl_next::Encode<___E> for OneWaySendRequest
 where
-    crate::Payload: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -165,9 +163,7 @@ pub struct WireOneWaySendRequest {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireOneWaySendRequest
 where
-    ___D: ?Sized,
-
-    crate::WirePayload: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

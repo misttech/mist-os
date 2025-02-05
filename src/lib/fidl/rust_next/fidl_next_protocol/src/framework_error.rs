@@ -39,7 +39,7 @@ impl From<WireFrameworkError> for FrameworkError {
     }
 }
 
-unsafe impl<D> Decode<D> for WireFrameworkError {
+unsafe impl<D: ?Sized> Decode<D> for WireFrameworkError {
     fn decode(slot: Slot<'_, Self>, _: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { inner } = slot);
         match inner.to_native() {

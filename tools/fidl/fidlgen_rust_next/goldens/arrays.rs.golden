@@ -13,7 +13,7 @@ impl ::fidl_next::Encodable for StructLargeArray {
 
 impl<___E> ::fidl_next::Encode<___E> for StructLargeArray
 where
-    [u32; 100]: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -73,9 +73,7 @@ pub struct WireStructLargeArray {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructLargeArray
 where
-    ___D: ?Sized,
-
-    [::fidl_next::u32_le; 100]: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -105,7 +103,7 @@ impl ::fidl_next::Encodable for StructSmallArray {
 
 impl<___E> ::fidl_next::Encode<___E> for StructSmallArray
 where
-    [u32; 2]: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
     fn encode(
         &mut self,
@@ -165,9 +163,7 @@ pub struct WireStructSmallArray {
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructSmallArray
 where
-    ___D: ?Sized,
-
-    [::fidl_next::u32_le; 2]: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -208,8 +204,6 @@ impl ::fidl_next::Encodable for TableLargeArray {
 impl<___E> ::fidl_next::Encode<___E> for TableLargeArray
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    [u32; 100]: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -265,8 +259,6 @@ pub struct WireTableLargeArray<'buf> {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireTableLargeArray<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    [::fidl_next::u32_le; 100]: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -335,8 +327,6 @@ impl ::fidl_next::Encodable for TableSmallArray {
 impl<___E> ::fidl_next::Encode<___E> for TableSmallArray
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-
-    [u32; 2]: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -392,8 +382,6 @@ pub struct WireTableSmallArray<'buf> {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireTableSmallArray<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
-
-    [::fidl_next::u32_le; 2]: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -451,9 +439,9 @@ impl ::fidl_next::Encodable for UnionLargeArray {
 
 impl<___E> ::fidl_next::Encode<___E> for UnionLargeArray
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    [u32; 100]: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -478,7 +466,7 @@ impl ::fidl_next::EncodableOption for Box<UnionLargeArray> {
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionLargeArray>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnionLargeArray: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -560,11 +548,11 @@ impl<'buf> WireUnionLargeArray<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D> for WireUnionLargeArray<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionLargeArray<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    [::fidl_next::u32_le; 100]: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -641,11 +629,11 @@ impl<'buf> Default for WireOptionalUnionLargeArray<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalUnionLargeArray<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnionLargeArray<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    [::fidl_next::u32_le; 100]: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -682,9 +670,9 @@ impl ::fidl_next::Encodable for UnionSmallArray {
 
 impl<___E> ::fidl_next::Encode<___E> for UnionSmallArray
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    [u32; 2]: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
     fn encode(
         &mut self,
@@ -709,7 +697,7 @@ impl ::fidl_next::EncodableOption for Box<UnionSmallArray> {
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionSmallArray>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnionSmallArray: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -791,11 +779,11 @@ impl<'buf> WireUnionSmallArray<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D> for WireUnionSmallArray<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionSmallArray<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    [::fidl_next::u32_le; 2]: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -872,11 +860,11 @@ impl<'buf> Default for WireOptionalUnionSmallArray<'buf> {
     }
 }
 
-unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalUnionSmallArray<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnionSmallArray<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    [::fidl_next::u32_le; 2]: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,

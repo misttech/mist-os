@@ -18,10 +18,10 @@ pub type VecOfStringsAtMost5 = Vec<String>;
 pub type WireVecOfStringsAtMost5<'buf> =
     ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>;
 
-pub type ReferenceMe = fidl_next_test_someotherlibrary::ReferenceMe;
+pub type ReferenceMe = ::fidl_next_test_someotherlibrary::ReferenceMe;
 
 /// The wire type corresponding to [`ReferenceMe`].
-pub type WireReferenceMe = fidl_next_test_someotherlibrary::WireReferenceMe;
+pub type WireReferenceMe = ::fidl_next_test_someotherlibrary::WireReferenceMe;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u32)]
@@ -114,15 +114,15 @@ impl ::core::convert::From<ObjType> for WireObjType {
     }
 }
 
-pub type Channel = ::fidl_next::zx::Handle;
+pub type Channel = ::fidl_next::fuchsia::zx::Handle;
 
 /// The wire type corresponding to [`Channel`].
-pub type WireChannel = ::fidl_next::WireHandle;
+pub type WireChannel = ::fidl_next::fuchsia::WireHandle;
 
-pub type AliasOfChannel = ::fidl_next::zx::Handle;
+pub type AliasOfChannel = ::fidl_next::fuchsia::zx::Handle;
 
 /// The wire type corresponding to [`AliasOfChannel`].
-pub type WireAliasOfChannel = ::fidl_next::WireHandle;
+pub type WireAliasOfChannel = ::fidl_next::fuchsia::WireHandle;
 
 #[derive(Debug)]
 pub struct ExampleOfUseOfAliases {
@@ -134,13 +134,13 @@ pub struct ExampleOfUseOfAliases {
 
     pub field_of_vec_of_strings_at_most_5: Vec<String>,
 
-    pub field_of_vec_of_ref_me_at_most_5: Vec<fidl_next_test_someotherlibrary::ReferenceMe>,
+    pub field_of_vec_of_ref_me_at_most_5: Vec<::fidl_next_test_someotherlibrary::ReferenceMe>,
 
-    pub field_of_channel: ::fidl_next::zx::Handle,
+    pub field_of_channel: ::fidl_next::fuchsia::zx::Handle,
 
-    pub field_of_client_end: ::fidl_next::zx::Handle,
+    pub field_of_client_end: ::fidl_next::fuchsia::zx::Handle,
 
-    pub field_of_nullable_client_end: Option<::fidl_next::zx::Handle>,
+    pub field_of_nullable_client_end: Option<::fidl_next::fuchsia::zx::Handle>,
 }
 
 impl ::fidl_next::Encodable for ExampleOfUseOfAliases {
@@ -149,21 +149,11 @@ impl ::fidl_next::Encodable for ExampleOfUseOfAliases {
 
 impl<___E> ::fidl_next::Encode<___E> for ExampleOfUseOfAliases
 where
-    u32: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    Vec<String>: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 
-    Vec<String>: ::fidl_next::Encode<___E>,
-
-    Vec<String>: ::fidl_next::Encode<___E>,
-
-    Vec<fidl_next_test_someotherlibrary::ReferenceMe>: ::fidl_next::Encode<___E>,
-
-    ::fidl_next::zx::Handle: ::fidl_next::Encode<___E>,
-
-    ::fidl_next::zx::Handle: ::fidl_next::Encode<___E>,
-
-    Option<::fidl_next::zx::Handle>: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
     fn encode(
         &mut self,
@@ -296,35 +286,22 @@ pub struct WireExampleOfUseOfAliases<'buf> {
         ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>,
 
     pub field_of_vec_of_ref_me_at_most_5:
-        ::fidl_next::WireVector<'buf, fidl_next_test_someotherlibrary::WireReferenceMe>,
+        ::fidl_next::WireVector<'buf, ::fidl_next_test_someotherlibrary::WireReferenceMe>,
 
-    pub field_of_channel: ::fidl_next::WireHandle,
+    pub field_of_channel: ::fidl_next::fuchsia::WireHandle,
 
-    pub field_of_client_end: ::fidl_next::WireHandle,
+    pub field_of_client_end: ::fidl_next::fuchsia::WireHandle,
 
-    pub field_of_nullable_client_end: ::fidl_next::WireOptionalHandle,
+    pub field_of_nullable_client_end: ::fidl_next::fuchsia::WireOptionalHandle,
 }
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExampleOfUseOfAliases<'buf>
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 
-    ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireVector<'buf, fidl_next_test_someotherlibrary::WireReferenceMe>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireHandle: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireHandle: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireOptionalHandle: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

@@ -9,7 +9,12 @@ impl ::fidl_next::Encodable for EmptyResourceStruct {
     type Encoded<'buf> = WireEmptyResourceStruct;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for EmptyResourceStruct {
+impl<___E> ::fidl_next::Encode<___E> for EmptyResourceStruct
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::fuchsia::HandleEncoder,
+{
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -63,7 +68,9 @@ pub struct WireEmptyResourceStruct {}
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmptyResourceStruct
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -95,6 +102,8 @@ impl ::fidl_next::Encodable for EmptyResourceTable {
 impl<___E> ::fidl_next::Encode<___E> for EmptyResourceTable
 where
     ___E: ::fidl_next::Encoder + ?Sized,
+
+    ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
     fn encode(
         &mut self,
@@ -138,6 +147,8 @@ pub struct WireEmptyResourceTable<'buf> {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireEmptyResourceTable<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -174,7 +185,9 @@ impl ::fidl_next::Encodable for EmptyResourceUnion {
 
 impl<___E> ::fidl_next::Encode<___E> for EmptyResourceUnion
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
     fn encode(
         &mut self,
@@ -199,7 +212,7 @@ impl ::fidl_next::EncodableOption for Box<EmptyResourceUnion> {
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<EmptyResourceUnion>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     EmptyResourceUnion: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -269,9 +282,11 @@ impl WireEmptyResourceUnion {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireEmptyResourceUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmptyResourceUnion
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -343,9 +358,11 @@ impl Default for WireOptionalEmptyResourceUnion {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalEmptyResourceUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalEmptyResourceUnion
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -460,7 +477,7 @@ impl ::core::convert::From<ObjType> for WireObjType {
 
 #[derive(Debug)]
 pub struct TableWithHandle {
-    pub h: Option<::fidl_next::zx::Handle>,
+    pub h: Option<::fidl_next::fuchsia::zx::Handle>,
 }
 
 impl TableWithHandle {
@@ -481,7 +498,7 @@ impl<___E> ::fidl_next::Encode<___E> for TableWithHandle
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 
-    ::fidl_next::zx::Handle: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
     fn encode(
         &mut self,
@@ -538,7 +555,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireTableWithHandle<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
 
-    ::fidl_next::WireHandle: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -551,7 +568,7 @@ where
                 0 => unsafe { ::core::hint::unreachable_unchecked() },
 
                 1 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireHandle>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::fuchsia::WireHandle>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -566,15 +583,15 @@ where
 }
 
 impl<'buf> WireTableWithHandle<'buf> {
-    pub fn h(&self) -> Option<&::fidl_next::WireHandle> {
+    pub fn h(&self) -> Option<&::fidl_next::fuchsia::WireHandle> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
 
-    pub fn h_mut(&mut self) -> Option<&mut ::fidl_next::WireHandle> {
+    pub fn h_mut(&mut self) -> Option<&mut ::fidl_next::fuchsia::WireHandle> {
         unsafe { Some(self.table.get_mut(1)?.deref_mut_unchecked()) }
     }
 
-    pub fn take_h(&mut self) -> Option<::fidl_next::WireHandle> {
+    pub fn take_h(&mut self) -> Option<::fidl_next::fuchsia::WireHandle> {
         unsafe { Some(self.table.get_mut(1)?.take_unchecked()) }
     }
 }
@@ -587,7 +604,7 @@ impl ::core::fmt::Debug for WireTableWithHandle<'_> {
 
 #[derive(Debug)]
 pub enum UnionWithHandle {
-    H(::fidl_next::zx::Handle),
+    H(::fidl_next::fuchsia::zx::Handle),
 
     UnknownOrdinal_(u64),
 }
@@ -598,9 +615,9 @@ impl ::fidl_next::Encodable for UnionWithHandle {
 
 impl<___E> ::fidl_next::Encode<___E> for UnionWithHandle
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    ::fidl_next::zx::Handle: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
     fn encode(
         &mut self,
@@ -610,11 +627,10 @@ where
         ::fidl_next::munge!(let WireUnionWithHandle { raw, _phantom: _ } = slot);
 
         match self {
-            Self::H(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, ::fidl_next::zx::Handle>(
-                    value, 1, encoder, raw,
-                )?
-            }
+            Self::H(value) => ::fidl_next::RawWireUnion::encode_as_static::<
+                ___E,
+                ::fidl_next::fuchsia::zx::Handle,
+            >(value, 1, encoder, raw)?,
 
             Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
@@ -631,7 +647,7 @@ impl ::fidl_next::EncodableOption for Box<UnionWithHandle> {
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionWithHandle>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     UnionWithHandle: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -683,13 +699,13 @@ pub struct WireUnionWithHandle {
 
 pub mod union_with_handle {
     pub enum Ref<'union> {
-        H(&'union ::fidl_next::WireHandle),
+        H(&'union ::fidl_next::fuchsia::WireHandle),
 
         UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
-        H(&'union mut ::fidl_next::WireHandle),
+        H(&'union mut ::fidl_next::fuchsia::WireHandle),
 
         UnknownOrdinal_(u64),
     }
@@ -715,11 +731,11 @@ impl WireUnionWithHandle {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireUnionWithHandle
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireUnionWithHandle
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::WireHandle: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -727,9 +743,10 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireHandle>(
-                raw, decoder,
-            )?,
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<
+                ___D,
+                ::fidl_next::fuchsia::WireHandle,
+            >(raw, decoder)?,
 
             _ => ::fidl_next::RawWireUnion::decode_unknown_static(raw, decoder)?,
         }
@@ -741,7 +758,9 @@ where
 impl ::core::fmt::Debug for WireUnionWithHandle {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireHandle>().fmt(f) },
+            1 => unsafe {
+                self.raw.get().deref_unchecked::<::fidl_next::fuchsia::WireHandle>().fmt(f)
+            },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -796,11 +815,11 @@ impl Default for WireOptionalUnionWithHandle {
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalUnionWithHandle
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalUnionWithHandle
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::WireHandle: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -808,9 +827,10 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireHandle>(
-                raw, decoder,
-            )?,
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<
+                ___D,
+                ::fidl_next::fuchsia::WireHandle,
+            >(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown_static(raw, decoder)?,
@@ -828,13 +848,13 @@ impl ::core::fmt::Debug for WireOptionalUnionWithHandle {
 
 #[derive(Debug)]
 pub struct HandlesInTypes {
-    pub normal_handle: ::fidl_next::zx::Handle,
+    pub normal_handle: ::fidl_next::fuchsia::zx::Handle,
 
-    pub handle_in_vec: Vec<::fidl_next::zx::Handle>,
+    pub handle_in_vec: Vec<::fidl_next::fuchsia::zx::Handle>,
 
-    pub handle_in_array: [::fidl_next::zx::Handle; 5],
+    pub handle_in_array: [::fidl_next::fuchsia::zx::Handle; 5],
 
-    pub handle_in_mixed_vec_array: Vec<[::fidl_next::zx::Handle; 5]>,
+    pub handle_in_mixed_vec_array: Vec<[::fidl_next::fuchsia::zx::Handle; 5]>,
 
     pub table_with_handle: crate::TableWithHandle,
 
@@ -847,17 +867,11 @@ impl ::fidl_next::Encodable for HandlesInTypes {
 
 impl<___E> ::fidl_next::Encode<___E> for HandlesInTypes
 where
-    ::fidl_next::zx::Handle: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    Vec<::fidl_next::zx::Handle>: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 
-    [::fidl_next::zx::Handle; 5]: ::fidl_next::Encode<___E>,
-
-    Vec<[::fidl_next::zx::Handle; 5]>: ::fidl_next::Encode<___E>,
-
-    crate::TableWithHandle: ::fidl_next::Encode<___E>,
-
-    crate::UnionWithHandle: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
     fn encode(
         &mut self,
@@ -945,13 +959,14 @@ impl<'buf> ::fidl_next::TakeFrom<WireHandlesInTypes<'buf>> for HandlesInTypes {
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireHandlesInTypes<'buf> {
-    pub normal_handle: ::fidl_next::WireHandle,
+    pub normal_handle: ::fidl_next::fuchsia::WireHandle,
 
-    pub handle_in_vec: ::fidl_next::WireVector<'buf, ::fidl_next::WireHandle>,
+    pub handle_in_vec: ::fidl_next::WireVector<'buf, ::fidl_next::fuchsia::WireHandle>,
 
-    pub handle_in_array: [::fidl_next::WireHandle; 5],
+    pub handle_in_array: [::fidl_next::fuchsia::WireHandle; 5],
 
-    pub handle_in_mixed_vec_array: ::fidl_next::WireVector<'buf, [::fidl_next::WireHandle; 5]>,
+    pub handle_in_mixed_vec_array:
+        ::fidl_next::WireVector<'buf, [::fidl_next::fuchsia::WireHandle; 5]>,
 
     pub table_with_handle: crate::WireTableWithHandle<'buf>,
 
@@ -960,19 +975,11 @@ pub struct WireHandlesInTypes<'buf> {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireHandlesInTypes<'buf>
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::WireHandle: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 
-    ::fidl_next::WireVector<'buf, ::fidl_next::WireHandle>: ::fidl_next::Decode<___D>,
-
-    [::fidl_next::WireHandle; 5]: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireVector<'buf, [::fidl_next::WireHandle; 5]>: ::fidl_next::Decode<___D>,
-
-    crate::WireTableWithHandle<'buf>: ::fidl_next::Decode<___D>,
-
-    crate::WireUnionWithHandle: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

@@ -13,9 +13,9 @@ use core::task::{Context, Poll};
 use std::sync::Arc;
 
 use fidl_next_codec::decoder::InternalHandleDecoder;
-use fidl_next_codec::{
-    Chunk, DecodeError, Decoder, EncodeError, Encoder, HandleDecoder, HandleEncoder, CHUNK_SIZE,
-};
+use fidl_next_codec::encoder::InternalHandleEncoder;
+use fidl_next_codec::fuchsia::{HandleDecoder, HandleEncoder};
+use fidl_next_codec::{Chunk, DecodeError, Decoder, EncodeError, Encoder, CHUNK_SIZE};
 use fuchsia_async::{RWHandle, ReadableHandle as _};
 use futures::task::AtomicWaker;
 use zx::sys::{
@@ -83,6 +83,13 @@ impl Buffer {
     }
 }
 
+impl InternalHandleEncoder for Buffer {
+    #[inline]
+    fn __internal_handle_count(&self) -> usize {
+        self.handles.len()
+    }
+}
+
 impl Encoder for Buffer {
     #[inline]
     fn bytes_written(&self) -> usize {
@@ -102,11 +109,6 @@ impl Encoder for Buffer {
     #[inline]
     fn rewrite(&mut self, pos: usize, bytes: &[u8]) {
         Encoder::rewrite(&mut self.chunks, pos, bytes)
-    }
-
-    #[inline]
-    fn __internal_handle_count(&self) -> usize {
-        self.handles.len()
     }
 }
 

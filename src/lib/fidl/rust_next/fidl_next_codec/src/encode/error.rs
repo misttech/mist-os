@@ -14,4 +14,8 @@ pub enum EncodeError {
     /// An encoded union had an unknown ordinal
     #[error("cannot encode unknown union ordinal of {0}")]
     UnknownUnionOrdinal(usize),
+
+    /// Attempted to encode a value larger than 4 bytes in an inline envelope
+    #[error("cannot encode a {0}-byte value in a 4-byte inline envelope")]
+    ExpectedInline(usize),
 }

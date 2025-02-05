@@ -23,11 +23,11 @@ pub type AliasOfBytes = Vec<u8>;
 pub type WireAliasOfBytes<'buf> = ::fidl_next::WireVector<'buf, u8>;
 
 pub type AliasOfRequest =
-    ::fidl_next::bind::ServerEnd<Option<::fidl_next::zx::Handle>, crate::MyProtocol>;
+    ::fidl_next::bind::ServerEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::MyProtocol>;
 
 /// The wire type corresponding to [`AliasOfRequest`].
 pub type WireAliasOfRequest =
-    ::fidl_next::bind::ServerEnd<::fidl_next::WireOptionalHandle, crate::MyProtocol>;
+    ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::MyProtocol>;
 
 pub type AliasOfString = String;
 
@@ -157,11 +157,16 @@ pub struct Testing {
 
     pub a3: [[u64; 1]; 4],
 
-    pub r1: ::fidl_next::bind::ServerEnd<Option<::fidl_next::zx::Handle>, crate::MyProtocol>,
+    pub r1:
+        ::fidl_next::bind::ServerEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::MyProtocol>,
 
-    pub r2: Vec<::fidl_next::bind::ServerEnd<Option<::fidl_next::zx::Handle>, crate::MyProtocol>>,
+    pub r2: Vec<
+        ::fidl_next::bind::ServerEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::MyProtocol>,
+    >,
 
-    pub r3: [::fidl_next::bind::ServerEnd<Option<::fidl_next::zx::Handle>, crate::MyProtocol>; 4],
+    pub r3:
+        [::fidl_next::bind::ServerEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::MyProtocol>;
+            4],
 
     pub b1: Vec<u8>,
 
@@ -194,64 +199,11 @@ impl ::fidl_next::Encodable for Testing {
 
 impl<___E> ::fidl_next::Encode<___E> for Testing
 where
-    u64: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    Vec<u64>: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 
-    [u64; 1]: ::fidl_next::Encode<___E>,
-
-    Vec<Vec<u64>>: ::fidl_next::Encode<___E>,
-
-    Vec<[u64; 1]>: ::fidl_next::Encode<___E>,
-
-    [Vec<u64>; 4]: ::fidl_next::Encode<___E>,
-
-    [[u64; 1]; 4]: ::fidl_next::Encode<___E>,
-
-    Option<Vec<u64>>: ::fidl_next::Encode<___E>,
-
-    Vec<Option<Vec<u64>>>: ::fidl_next::Encode<___E>,
-
-    [Option<Vec<u64>>; 4]: ::fidl_next::Encode<___E>,
-
-    [u64; 1]: ::fidl_next::Encode<___E>,
-
-    Vec<[u64; 1]>: ::fidl_next::Encode<___E>,
-
-    [[u64; 1]; 4]: ::fidl_next::Encode<___E>,
-
-    ::fidl_next::bind::ServerEnd<Option<::fidl_next::zx::Handle>, crate::MyProtocol>:
-        ::fidl_next::Encode<___E>,
-
-    Vec<::fidl_next::bind::ServerEnd<Option<::fidl_next::zx::Handle>, crate::MyProtocol>>:
-        ::fidl_next::Encode<___E>,
-
-    [::fidl_next::bind::ServerEnd<Option<::fidl_next::zx::Handle>, crate::MyProtocol>; 4]:
-        ::fidl_next::Encode<___E>,
-
-    Vec<u8>: ::fidl_next::Encode<___E>,
-
-    Vec<Vec<u8>>: ::fidl_next::Encode<___E>,
-
-    [Vec<u8>; 4]: ::fidl_next::Encode<___E>,
-
-    String: ::fidl_next::Encode<___E>,
-
-    Vec<String>: ::fidl_next::Encode<___E>,
-
-    [String; 4]: ::fidl_next::Encode<___E>,
-
-    Vec<u64>: ::fidl_next::Encode<___E>,
-
-    Vec<Vec<u64>>: ::fidl_next::Encode<___E>,
-
-    [Vec<u64>; 3]: ::fidl_next::Encode<___E>,
-
-    [u64; 2]: ::fidl_next::Encode<___E>,
-
-    Vec<[u64; 2]>: ::fidl_next::Encode<___E>,
-
-    [[u64; 2]; 3]: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
     fn encode(
         &mut self,
@@ -470,14 +422,17 @@ pub struct WireTesting<'buf> {
 
     pub a3: [[::fidl_next::u64_le; 1]; 4],
 
-    pub r1: ::fidl_next::bind::ServerEnd<::fidl_next::WireOptionalHandle, crate::MyProtocol>,
+    pub r1:
+        ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::MyProtocol>,
 
     pub r2: ::fidl_next::WireVector<
         'buf,
-        ::fidl_next::bind::ServerEnd<::fidl_next::WireOptionalHandle, crate::MyProtocol>,
+        ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::MyProtocol>,
     >,
 
-    pub r3: [::fidl_next::bind::ServerEnd<::fidl_next::WireOptionalHandle, crate::MyProtocol>; 4],
+    pub r3:
+        [::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::MyProtocol>;
+            4],
 
     pub b1: ::fidl_next::WireVector<'buf, u8>,
 
@@ -506,71 +461,11 @@ pub struct WireTesting<'buf> {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireTesting<'buf>
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder<'buf>,
 
-    ::fidl_next::WireVector<'buf, ::fidl_next::u64_le>: ::fidl_next::Decode<___D>,
-
-    [::fidl_next::u64_le; 1]: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireVector<'buf, ::fidl_next::WireVector<'buf, ::fidl_next::u64_le>>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireVector<'buf, [::fidl_next::u64_le; 1]>: ::fidl_next::Decode<___D>,
-
-    [::fidl_next::WireVector<'buf, ::fidl_next::u64_le>; 4]: ::fidl_next::Decode<___D>,
-
-    [[::fidl_next::u64_le; 1]; 4]: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireOptionalVector<'buf, ::fidl_next::u64_le>: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireVector<'buf, ::fidl_next::WireOptionalVector<'buf, ::fidl_next::u64_le>>:
-        ::fidl_next::Decode<___D>,
-
-    [::fidl_next::WireOptionalVector<'buf, ::fidl_next::u64_le>; 4]: ::fidl_next::Decode<___D>,
-
-    [::fidl_next::u64_le; 1]: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireVector<'buf, [::fidl_next::u64_le; 1]>: ::fidl_next::Decode<___D>,
-
-    [[::fidl_next::u64_le; 1]; 4]: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::bind::ServerEnd<::fidl_next::WireOptionalHandle, crate::MyProtocol>:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireVector<
-        'buf,
-        ::fidl_next::bind::ServerEnd<::fidl_next::WireOptionalHandle, crate::MyProtocol>,
-    >: ::fidl_next::Decode<___D>,
-
-    [::fidl_next::bind::ServerEnd<::fidl_next::WireOptionalHandle, crate::MyProtocol>; 4]:
-        ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireVector<'buf, u8>: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireVector<'buf, ::fidl_next::WireVector<'buf, u8>>: ::fidl_next::Decode<___D>,
-
-    [::fidl_next::WireVector<'buf, u8>; 4]: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireString<'buf>: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>: ::fidl_next::Decode<___D>,
-
-    [::fidl_next::WireString<'buf>; 4]: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireVector<'buf, ::fidl_next::u64_le>: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireVector<'buf, ::fidl_next::WireVector<'buf, ::fidl_next::u64_le>>:
-        ::fidl_next::Decode<___D>,
-
-    [::fidl_next::WireVector<'buf, ::fidl_next::u64_le>; 3]: ::fidl_next::Decode<___D>,
-
-    [::fidl_next::u64_le; 2]: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireVector<'buf, [::fidl_next::u64_le; 2]>: ::fidl_next::Decode<___D>,
-
-    [[::fidl_next::u64_le; 2]; 3]: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

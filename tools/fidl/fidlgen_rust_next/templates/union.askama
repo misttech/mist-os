@@ -8,10 +8,9 @@
     let UnionTemplateStrings {
         params,
         phantom,
-        decode_param,
-        decode_where,
         decode_unknown,
         decode_as,
+        encode_as,
     } = self.template_strings()
 %}
 
@@ -39,10 +38,13 @@ impl ::fidl_next::Encodable for {{ name }} {
 
 impl<___E> ::fidl_next::Encode<___E> for {{ name }}
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-    {% for member in union.members %}
-        {{ context.natural_type(member.ty) }}: ::fidl_next::Encode<___E>,
-    {% endfor %}
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+    {% if !is_static %}
+        ___E: ::fidl_next::Encoder,
+    {% endif %}
+    {% if union.is_resource %}
+        ___E: ::fidl_next::fuchsia::HandleEncoder,
+    {% endif %}
 {
     fn encode(
         &mut self,
@@ -53,7 +55,7 @@ where
 
         match self {
             {% for member in union.members %}
-                Self::{{ member.name.camel()|ident }}(value) => ::fidl_next::RawWireUnion::encode_as::<
+                Self::{{ member.name.camel()|ident }}(value) => ::fidl_next::RawWireUnion::{{ encode_as }}::<
                     ___E,
                     {{ context.natural_type(member.ty) }},
                 >(value, {{ member.ordinal }}, encoder, raw)?,
@@ -77,7 +79,7 @@ impl ::fidl_next::EncodableOption for Box<{{ name }}> {
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<{{ name }}>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     {{ name }}: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
@@ -222,12 +224,15 @@ impl{{ params }} {{ wire_name }}{{ params }} {
     }
 {% endif %}
 
-unsafe impl<{{ decode_param }}___D: ?Sized> ::fidl_next::Decode<___D> for {{ wire_name }}{{ params }}
+unsafe impl<{% if !is_static %}'buf, {% endif %}___D> ::fidl_next::Decode<___D> for {{ wire_name }}{{ params }}
 where
-    {{ decode_where }},
-    {% for member in union.members %}
-        {{ context.wire_type(member.ty) }}: ::fidl_next::Decode<___D>,
-    {% endfor %}
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+    {% if !is_static %}
+        ___D: ::fidl_next::Decoder<'buf>,
+    {% endif %}
+    {% if union.is_resource %}
+        ___D: ::fidl_next::fuchsia::HandleDecoder,
+    {% endif %}
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -354,12 +359,15 @@ impl{{ params }} Default for WireOptional{{ name }}{{ params }} {
     }
 {% endif %}
 
-unsafe impl<{{ decode_param }}___D: ?Sized> ::fidl_next::Decode<___D> for WireOptional{{ name }}{{ params }}
+unsafe impl<{% if !is_static %}'buf, {% endif %}___D> ::fidl_next::Decode<___D> for WireOptional{{ name }}{{ params }}
 where
-    {{ decode_where }},
-    {% for member in union.members %}
-        {{ context.wire_type(member.ty) }}: ::fidl_next::Decode<___D>,
-    {% endfor %}
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+    {% if !is_static %}
+        ___D: ::fidl_next::Decoder<'buf>,
+    {% endif %}
+    {% if union.is_resource %}
+        ___D: ::fidl_next::fuchsia::HandleDecoder,
+    {% endif %}
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
