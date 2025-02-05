@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::fmt::Display;
+
 use fidl::endpoints::ProtocolMarker as _;
 use fidl_fuchsia_netemul as fnetemul;
 use futures::FutureExt as _;
@@ -103,6 +105,15 @@ impl std::str::FromStr for Protocol {
             "tcp" => Ok(Self::Tcp),
             "udp" => Ok(Self::Udp),
             s => Err(anyhow::anyhow!("unknown protocol {s}")),
+        }
+    }
+}
+
+impl Display for Protocol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Tcp => write!(f, "tcp"),
+            Self::Udp => write!(f, "udp"),
         }
     }
 }
@@ -333,6 +344,7 @@ mod test {
     #[test_case(Protocol::Tcp; "tcp")]
     #[test_case(Protocol::Udp; "udp")]
     async fn loopback<N: Netstack, I: TestIpExt>(name: &str, protocol: Protocol) {
+        let name = &format!("{name}-{protocol}");
         bench::<N, I>(
             name, protocol, 1400,  /* message_size */
             1,     /* flows */
