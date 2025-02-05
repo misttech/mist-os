@@ -82,9 +82,9 @@ bool with_source_context() {
                    .error_value();
   auto line_after_error = std::source_location::current();
 
-  // the -3 offset must match the with_source_context line
+  // the -2 offset must match the with_source_context line
   auto expected_prefix =
-      mtl::format("42, %s:%d:", line_after_error.file_name(), line_after_error.line() - 3);
+      mtl::format("42, %s:%d:", line_after_error.file_name(), line_after_error.line() - 2);
 
   auto error_str = error.to_string();
   ASSERT_BYTES_EQ((const uint8_t*)(expected_prefix.data()), (const uint8_t*)(error_str.data()),
