@@ -138,8 +138,7 @@ zx_status_t Device::AddWlanDeviceConnector() {
 
 void Device::GetSupportedMacRoles(GetSupportedMacRolesCompleter::Sync& completer) {
   ltrace_fn();
-  constexpr uint32_t kTag = 'GSMC';
-  fdf::Arena fdf_arena(kTag);
+  fdf::Arena fdf_arena(0u);
 
   client_.buffer(fdf_arena)->GetSupportedMacRoles().ThenExactlyOnce(
       [completer = completer.ToAsync()](
@@ -170,8 +169,7 @@ const fidl::Array<uint8_t, 6> NULL_MAC_ADDR{0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 void Device::CreateIface(CreateIfaceRequestView request, CreateIfaceCompleter::Sync& completer) {
   ltrace_fn();
-  constexpr uint32_t kTag = 'CIFC';
-  fdf::Arena fdf_arena(kTag);
+  fdf::Arena fdf_arena(0u);
 
   fidl::Arena fidl_arena;
   auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(fidl_arena);
@@ -210,8 +208,7 @@ void Device::CreateIface(CreateIfaceRequestView request, CreateIfaceCompleter::S
 
 void Device::DestroyIface(DestroyIfaceRequestView request, DestroyIfaceCompleter::Sync& completer) {
   ltrace_fn();
-  constexpr uint32_t kTag = 'DIFC';
-  fdf::Arena fdf_arena(kTag);
+  fdf::Arena fdf_arena(0u);
 
   fidl::Arena fidl_arena;
   auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(fidl_arena);
@@ -243,8 +240,7 @@ void Device::DestroyIface(DestroyIfaceRequestView request, DestroyIfaceCompleter
 void Device::SetCountry(SetCountryRequestView request, SetCountryCompleter::Sync& completer) {
   ltrace_fn();
   ldebug_device("SetCountry to %s", wlan::common::Alpha2ToStr(request->req.alpha2).c_str());
-  constexpr uint32_t kTag = 'SCNT';
-  fdf::Arena fdf_arena(kTag);
+  fdf::Arena fdf_arena(0u);
 
   auto alpha2 = ::fidl::Array<uint8_t, fuchsia_wlan_phyimpl::wire::kWlanphyAlpha2Len>();
   memcpy(alpha2.data(), request->req.alpha2.data(), fuchsia_wlan_phyimpl::wire::kWlanphyAlpha2Len);
@@ -272,8 +268,7 @@ void Device::SetCountry(SetCountryRequestView request, SetCountryCompleter::Sync
 
 void Device::GetCountry(GetCountryCompleter::Sync& completer) {
   ltrace_fn();
-  constexpr uint32_t kTag = 'GCNT';
-  fdf::Arena fdf_arena(kTag);
+  fdf::Arena fdf_arena(0u);
 
   client_.buffer(fdf_arena)->GetCountry().ThenExactlyOnce(
       [completer = completer.ToAsync()](
@@ -307,8 +302,7 @@ void Device::GetCountry(GetCountryCompleter::Sync& completer) {
 
 void Device::ClearCountry(ClearCountryCompleter::Sync& completer) {
   ltrace_fn();
-  constexpr uint32_t kTag = 'CCNT';
-  fdf::Arena fdf_arena(kTag);
+  fdf::Arena fdf_arena(0u);
 
   client_.buffer(fdf_arena)->ClearCountry().ThenExactlyOnce(
       [completer = completer.ToAsync()](
@@ -332,8 +326,7 @@ void Device::SetPowerSaveMode(SetPowerSaveModeRequestView request,
                               SetPowerSaveModeCompleter::Sync& completer) {
   ltrace_fn();
   ldebug_device("SetPowerSaveMode to %d", request->req);
-  constexpr uint32_t kTag = 'SPSM';
-  fdf::Arena fdf_arena(kTag);
+  fdf::Arena fdf_arena(0u);
 
   fidl::Arena fidl_arena;
   auto builder =
@@ -364,8 +357,7 @@ void Device::SetPowerSaveMode(SetPowerSaveModeRequestView request,
 
 void Device::GetPowerSaveMode(GetPowerSaveModeCompleter::Sync& completer) {
   ltrace_fn();
-  constexpr uint32_t kTag = 'GPSM';
-  fdf::Arena fdf_arena(kTag);
+  fdf::Arena fdf_arena(0u);
 
   client_.buffer(fdf_arena)->GetPowerSaveMode().ThenExactlyOnce(
       [completer = completer.ToAsync()](
