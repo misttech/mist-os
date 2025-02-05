@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{u32_le, u64_le, Decode, DecodeError, Encodable, Encode, EncodeError, Slot};
+use fidl_next_codec::{u32_le, u64_le, Decode, DecodeError, Encodable, Encode, EncodeError, Slot};
 
 use zerocopy::IntoBytes;
 

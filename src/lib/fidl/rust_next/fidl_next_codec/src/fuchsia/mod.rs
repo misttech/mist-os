@@ -11,6 +11,7 @@ use crate::{DecodeError, EncodeError};
 
 pub use self::channel::*;
 pub use self::handle::*;
+pub use zx;
 
 /// A decoder which support Zircon handles.
 pub trait HandleDecoder {

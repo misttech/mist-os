@@ -13,11 +13,11 @@ use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use core::task::{Context, Poll};
 use std::sync::{mpsc, Arc};
 
+use fidl_next_codec::decoder::InternalHandleDecoder;
+use fidl_next_codec::{Chunk, DecodeError, Decoder, CHUNK_SIZE};
 use futures::task::AtomicWaker;
 
-use crate::decoder::InternalHandleDecoder;
-use crate::protocol::Transport;
-use crate::{Chunk, DecodeError, Decoder, CHUNK_SIZE};
+use crate::Transport;
 
 struct SharedEnd {
     sender_count: AtomicUsize,

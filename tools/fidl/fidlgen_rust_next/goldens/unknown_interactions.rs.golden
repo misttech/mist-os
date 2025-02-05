@@ -17338,7 +17338,7 @@ where
 pub enum UnknownInteractionsDriverProtocolFlexibleTwoWayResult {
     Response(crate::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse),
 
-    FrameworkErr(::fidl_next::FrameworkError),
+    FrameworkErr(::fidl_next::protocol::FrameworkError),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayResult {
@@ -17351,7 +17351,7 @@ where
 
     crate::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse: ::fidl_next::Encode<___E>,
 
-    ::fidl_next::FrameworkError: ::fidl_next::Encode<___E>,
+    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -17368,7 +17368,7 @@ where
 
             Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
                 ___E,
-                ::fidl_next::FrameworkError,
+                ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
         }
 
@@ -17447,13 +17447,13 @@ pub mod unknown_interactions_driver_protocol_flexible_two_way_result {
     pub enum Ref<'union> {
         Response(&'union crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse),
 
-        FrameworkErr(&'union ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union ::fidl_next::protocol::WireFrameworkError),
     }
 
     pub enum Mut<'union> {
         Response(&'union mut crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse),
 
-        FrameworkErr(&'union mut ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union mut ::fidl_next::protocol::WireFrameworkError),
     }
 }
 
@@ -17508,7 +17508,9 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayResult {
             },
 
             3 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireFrameworkError>() },
+                raw: unsafe {
+                    self.raw.clone_unchecked::<::fidl_next::protocol::WireFrameworkError>()
+                },
                 _phantom: ::core::marker::PhantomData,
             },
 
@@ -17524,7 +17526,7 @@ where
 
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -17539,7 +17541,7 @@ where
 
             3 => ::fidl_next::RawWireUnion::decode_as_static::<
                 ___D,
-                ::fidl_next::WireFrameworkError,
+                ::fidl_next::protocol::WireFrameworkError,
             >(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
@@ -17558,7 +17560,7 @@ impl ::core::fmt::Debug for WireUnknownInteractionsDriverProtocolFlexibleTwoWayR
                         >().fmt(f)
             },
             3 => unsafe {
-                self.raw.get().deref_unchecked::<::fidl_next::WireFrameworkError>().fmt(f)
+                self.raw.get().deref_unchecked::<::fidl_next::protocol::WireFrameworkError>().fmt(f)
             },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -17634,7 +17636,9 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayResult
             },
 
             3 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireFrameworkError>() },
+                raw: unsafe {
+                    self.raw.clone_unchecked::<::fidl_next::protocol::WireFrameworkError>()
+                },
                 _phantom: ::core::marker::PhantomData,
             },
 
@@ -17650,7 +17654,7 @@ where
 
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -17665,7 +17669,7 @@ where
 
             3 => ::fidl_next::RawWireUnion::decode_as_static::<
                 ___D,
-                ::fidl_next::WireFrameworkError,
+                ::fidl_next::protocol::WireFrameworkError,
             >(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
@@ -17790,7 +17794,7 @@ where
 pub enum UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult {
     Response(crate::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse),
 
-    FrameworkErr(::fidl_next::FrameworkError),
+    FrameworkErr(::fidl_next::protocol::FrameworkError),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult {
@@ -17803,7 +17807,7 @@ where
 
     crate::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse: ::fidl_next::Encode<___E>,
 
-    ::fidl_next::FrameworkError: ::fidl_next::Encode<___E>,
+    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -17820,7 +17824,7 @@ where
 
             Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
                 ___E,
-                ::fidl_next::FrameworkError,
+                ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
         }
 
@@ -17904,7 +17908,7 @@ pub mod unknown_interactions_driver_protocol_flexible_two_way_fields_result {
     pub enum Ref<'union> {
         Response(&'union crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse),
 
-        FrameworkErr(&'union ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union ::fidl_next::protocol::WireFrameworkError),
     }
 
     pub enum Mut<'union> {
@@ -17912,7 +17916,7 @@ pub mod unknown_interactions_driver_protocol_flexible_two_way_fields_result {
             &'union mut crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse,
         ),
 
-        FrameworkErr(&'union mut ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union mut ::fidl_next::protocol::WireFrameworkError),
     }
 }
 
@@ -17967,7 +17971,9 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult {
             },
 
             3 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireFrameworkError>() },
+                raw: unsafe {
+                    self.raw.clone_unchecked::<::fidl_next::protocol::WireFrameworkError>()
+                },
                 _phantom: ::core::marker::PhantomData,
             },
 
@@ -17984,7 +17990,7 @@ where
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse:
         ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -17999,7 +18005,7 @@ where
 
             3 => ::fidl_next::RawWireUnion::decode_as_static::<
                 ___D,
-                ::fidl_next::WireFrameworkError,
+                ::fidl_next::protocol::WireFrameworkError,
             >(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
@@ -18018,7 +18024,7 @@ impl ::core::fmt::Debug for WireUnknownInteractionsDriverProtocolFlexibleTwoWayF
                         >().fmt(f)
             },
             3 => unsafe {
-                self.raw.get().deref_unchecked::<::fidl_next::WireFrameworkError>().fmt(f)
+                self.raw.get().deref_unchecked::<::fidl_next::protocol::WireFrameworkError>().fmt(f)
             },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -18098,7 +18104,9 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayFields
             },
 
             3 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireFrameworkError>() },
+                raw: unsafe {
+                    self.raw.clone_unchecked::<::fidl_next::protocol::WireFrameworkError>()
+                },
                 _phantom: ::core::marker::PhantomData,
             },
 
@@ -18115,7 +18123,7 @@ where
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse:
         ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -18130,7 +18138,7 @@ where
 
             3 => ::fidl_next::RawWireUnion::decode_as_static::<
                 ___D,
-                ::fidl_next::WireFrameworkError,
+                ::fidl_next::protocol::WireFrameworkError,
             >(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
@@ -18466,7 +18474,7 @@ impl ::core::fmt::Debug
 pub enum UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult {
     Response(crate::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse),
 
-    FrameworkErr(::fidl_next::FrameworkError),
+    FrameworkErr(::fidl_next::protocol::FrameworkError),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult {
@@ -18479,7 +18487,7 @@ where
 
     crate::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse: ::fidl_next::Encode<___E>,
 
-    ::fidl_next::FrameworkError: ::fidl_next::Encode<___E>,
+    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -18496,7 +18504,7 @@ where
 
             Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
                 ___E,
-                ::fidl_next::FrameworkError,
+                ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
         }
 
@@ -18583,7 +18591,7 @@ pub mod unknown_interactions_driver_protocol_flexible_two_way_union_result {
     pub enum Ref<'union> {
         Response(&'union crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse),
 
-        FrameworkErr(&'union ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union ::fidl_next::protocol::WireFrameworkError),
     }
 
     pub enum Mut<'union> {
@@ -18591,7 +18599,7 @@ pub mod unknown_interactions_driver_protocol_flexible_two_way_union_result {
             &'union mut crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse,
         ),
 
-        FrameworkErr(&'union mut ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union mut ::fidl_next::protocol::WireFrameworkError),
     }
 }
 
@@ -18643,7 +18651,7 @@ where
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse:
         ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -18656,9 +18664,10 @@ where
                 crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse,
             >(raw, decoder)?,
 
-            3 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireFrameworkError>(
-                raw, decoder,
-            )?,
+            3 => ::fidl_next::RawWireUnion::decode_as::<
+                ___D,
+                ::fidl_next::protocol::WireFrameworkError,
+            >(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
@@ -18678,7 +18687,7 @@ impl<'buf> ::core::fmt::Debug
                         >().fmt(f)
             },
             3 => unsafe {
-                self.raw.get().deref_unchecked::<::fidl_next::WireFrameworkError>().fmt(f)
+                self.raw.get().deref_unchecked::<::fidl_next::protocol::WireFrameworkError>().fmt(f)
             },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -18750,7 +18759,7 @@ where
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse:
         ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -18763,9 +18772,10 @@ where
                 crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse,
             >(raw, decoder)?,
 
-            3 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireFrameworkError>(
-                raw, decoder,
-            )?,
+            3 => ::fidl_next::RawWireUnion::decode_as::<
+                ___D,
+                ::fidl_next::protocol::WireFrameworkError,
+            >(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -18923,7 +18933,7 @@ impl ::core::fmt::Debug for WireUnknownInteractionsDriverProtocolFlexibleTwoWayT
 pub enum UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult {
     Response(crate::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse),
 
-    FrameworkErr(::fidl_next::FrameworkError),
+    FrameworkErr(::fidl_next::protocol::FrameworkError),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult {
@@ -18936,7 +18946,7 @@ where
 
     crate::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse: ::fidl_next::Encode<___E>,
 
-    ::fidl_next::FrameworkError: ::fidl_next::Encode<___E>,
+    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -18953,7 +18963,7 @@ where
 
             Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
                 ___E,
-                ::fidl_next::FrameworkError,
+                ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
         }
 
@@ -19042,7 +19052,7 @@ pub mod unknown_interactions_driver_protocol_flexible_two_way_table_result {
             &'union crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse<'buf>,
         ),
 
-        FrameworkErr(&'union ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union ::fidl_next::protocol::WireFrameworkError),
     }
 
     pub enum Mut<'union, 'buf> {
@@ -19052,7 +19062,7 @@ pub mod unknown_interactions_driver_protocol_flexible_two_way_table_result {
             >,
         ),
 
-        FrameworkErr(&'union mut ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union mut ::fidl_next::protocol::WireFrameworkError),
     }
 }
 
@@ -19106,7 +19116,7 @@ where
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse<'buf>:
         ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -19119,9 +19129,10 @@ where
                 crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse<'buf>,
             >(raw, decoder)?,
 
-            3 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireFrameworkError>(
-                raw, decoder,
-            )?,
+            3 => ::fidl_next::RawWireUnion::decode_as::<
+                ___D,
+                ::fidl_next::protocol::WireFrameworkError,
+            >(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
@@ -19141,7 +19152,7 @@ impl<'buf> ::core::fmt::Debug
                         >().fmt(f)
             },
             3 => unsafe {
-                self.raw.get().deref_unchecked::<::fidl_next::WireFrameworkError>().fmt(f)
+                self.raw.get().deref_unchecked::<::fidl_next::protocol::WireFrameworkError>().fmt(f)
             },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -19213,7 +19224,7 @@ where
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse<'buf>:
         ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -19226,9 +19237,10 @@ where
                 crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse<'buf>,
             >(raw, decoder)?,
 
-            3 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireFrameworkError>(
-                raw, decoder,
-            )?,
+            3 => ::fidl_next::RawWireUnion::decode_as::<
+                ___D,
+                ::fidl_next::protocol::WireFrameworkError,
+            >(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -19340,7 +19352,7 @@ pub enum UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult {
 
     Err(i32),
 
-    FrameworkErr(::fidl_next::FrameworkError),
+    FrameworkErr(::fidl_next::protocol::FrameworkError),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult {
@@ -19355,7 +19367,7 @@ where
 
     i32: ::fidl_next::Encode<___E>,
 
-    ::fidl_next::FrameworkError: ::fidl_next::Encode<___E>,
+    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -19376,7 +19388,7 @@ where
 
             Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
                 ___E,
-                ::fidl_next::FrameworkError,
+                ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
         }
 
@@ -19463,7 +19475,7 @@ pub mod unknown_interactions_driver_protocol_flexible_two_way_err_result {
 
         Err(&'union ::fidl_next::i32_le),
 
-        FrameworkErr(&'union ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union ::fidl_next::protocol::WireFrameworkError),
     }
 
     pub enum Mut<'union> {
@@ -19471,7 +19483,7 @@ pub mod unknown_interactions_driver_protocol_flexible_two_way_err_result {
 
         Err(&'union mut ::fidl_next::i32_le),
 
-        FrameworkErr(&'union mut ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union mut ::fidl_next::protocol::WireFrameworkError),
     }
 }
 
@@ -19539,7 +19551,9 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult {
             },
 
             3 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireFrameworkError>() },
+                raw: unsafe {
+                    self.raw.clone_unchecked::<::fidl_next::protocol::WireFrameworkError>()
+                },
                 _phantom: ::core::marker::PhantomData,
             },
 
@@ -19558,7 +19572,7 @@ where
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -19577,7 +19591,7 @@ where
 
             3 => ::fidl_next::RawWireUnion::decode_as_static::<
                 ___D,
-                ::fidl_next::WireFrameworkError,
+                ::fidl_next::protocol::WireFrameworkError,
             >(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
@@ -19597,7 +19611,7 @@ impl ::core::fmt::Debug for WireUnknownInteractionsDriverProtocolFlexibleTwoWayE
             },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
             3 => unsafe {
-                self.raw.get().deref_unchecked::<::fidl_next::WireFrameworkError>().fmt(f)
+                self.raw.get().deref_unchecked::<::fidl_next::protocol::WireFrameworkError>().fmt(f)
             },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -19678,7 +19692,9 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayErrRes
             },
 
             3 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireFrameworkError>() },
+                raw: unsafe {
+                    self.raw.clone_unchecked::<::fidl_next::protocol::WireFrameworkError>()
+                },
                 _phantom: ::core::marker::PhantomData,
             },
 
@@ -19697,7 +19713,7 @@ where
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -19716,7 +19732,7 @@ where
 
             3 => ::fidl_next::RawWireUnion::decode_as_static::<
                 ___D,
-                ::fidl_next::WireFrameworkError,
+                ::fidl_next::protocol::WireFrameworkError,
             >(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
@@ -19843,7 +19859,7 @@ pub enum UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult {
 
     Err(i32),
 
-    FrameworkErr(::fidl_next::FrameworkError),
+    FrameworkErr(::fidl_next::protocol::FrameworkError),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult {
@@ -19860,7 +19876,7 @@ where
 
     i32: ::fidl_next::Encode<___E>,
 
-    ::fidl_next::FrameworkError: ::fidl_next::Encode<___E>,
+    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -19881,7 +19897,7 @@ where
 
             Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
                 ___E,
-                ::fidl_next::FrameworkError,
+                ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
         }
 
@@ -19975,7 +19991,7 @@ pub mod unknown_interactions_driver_protocol_flexible_two_way_fields_err_result 
 
         Err(&'union ::fidl_next::i32_le),
 
-        FrameworkErr(&'union ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union ::fidl_next::protocol::WireFrameworkError),
     }
 
     pub enum Mut<'union> {
@@ -19985,7 +20001,7 @@ pub mod unknown_interactions_driver_protocol_flexible_two_way_fields_err_result 
 
         Err(&'union mut ::fidl_next::i32_le),
 
-        FrameworkErr(&'union mut ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union mut ::fidl_next::protocol::WireFrameworkError),
     }
 }
 
@@ -20055,7 +20071,9 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResul
             },
 
             3 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireFrameworkError>() },
+                raw: unsafe {
+                    self.raw.clone_unchecked::<::fidl_next::protocol::WireFrameworkError>()
+                },
                 _phantom: ::core::marker::PhantomData,
             },
 
@@ -20074,7 +20092,7 @@ where
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -20093,7 +20111,7 @@ where
 
             3 => ::fidl_next::RawWireUnion::decode_as_static::<
                 ___D,
-                ::fidl_next::WireFrameworkError,
+                ::fidl_next::protocol::WireFrameworkError,
             >(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
@@ -20113,7 +20131,7 @@ impl ::core::fmt::Debug for WireUnknownInteractionsDriverProtocolFlexibleTwoWayF
             },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
             3 => unsafe {
-                self.raw.get().deref_unchecked::<::fidl_next::WireFrameworkError>().fmt(f)
+                self.raw.get().deref_unchecked::<::fidl_next::protocol::WireFrameworkError>().fmt(f)
             },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -20198,7 +20216,9 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayFields
             },
 
             3 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireFrameworkError>() },
+                raw: unsafe {
+                    self.raw.clone_unchecked::<::fidl_next::protocol::WireFrameworkError>()
+                },
                 _phantom: ::core::marker::PhantomData,
             },
 
@@ -20217,7 +20237,7 @@ where
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -20236,7 +20256,7 @@ where
 
             3 => ::fidl_next::RawWireUnion::decode_as_static::<
                 ___D,
-                ::fidl_next::WireFrameworkError,
+                ::fidl_next::protocol::WireFrameworkError,
             >(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
@@ -20578,7 +20598,7 @@ pub enum UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult {
 
     Err(i32),
 
-    FrameworkErr(::fidl_next::FrameworkError),
+    FrameworkErr(::fidl_next::protocol::FrameworkError),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult {
@@ -20595,7 +20615,7 @@ where
 
     i32: ::fidl_next::Encode<___E>,
 
-    ::fidl_next::FrameworkError: ::fidl_next::Encode<___E>,
+    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -20616,7 +20636,7 @@ where
 
             Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
                 ___E,
-                ::fidl_next::FrameworkError,
+                ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
         }
 
@@ -20711,7 +20731,7 @@ pub mod unknown_interactions_driver_protocol_flexible_two_way_union_err_result {
 
         Err(&'union ::fidl_next::i32_le),
 
-        FrameworkErr(&'union ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union ::fidl_next::protocol::WireFrameworkError),
     }
 
     pub enum Mut<'union> {
@@ -20721,7 +20741,7 @@ pub mod unknown_interactions_driver_protocol_flexible_two_way_union_err_result {
 
         Err(&'union mut ::fidl_next::i32_le),
 
-        FrameworkErr(&'union mut ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union mut ::fidl_next::protocol::WireFrameworkError),
     }
 }
 
@@ -20785,7 +20805,7 @@ where
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -20800,9 +20820,10 @@ where
 
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
 
-            3 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireFrameworkError>(
-                raw, decoder,
-            )?,
+            3 => ::fidl_next::RawWireUnion::decode_as::<
+                ___D,
+                ::fidl_next::protocol::WireFrameworkError,
+            >(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
@@ -20823,7 +20844,7 @@ impl<'buf> ::core::fmt::Debug
             },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
             3 => unsafe {
-                self.raw.get().deref_unchecked::<::fidl_next::WireFrameworkError>().fmt(f)
+                self.raw.get().deref_unchecked::<::fidl_next::protocol::WireFrameworkError>().fmt(f)
             },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -20897,7 +20918,7 @@ where
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -20912,9 +20933,10 @@ where
 
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
 
-            3 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireFrameworkError>(
-                raw, decoder,
-            )?,
+            3 => ::fidl_next::RawWireUnion::decode_as::<
+                ___D,
+                ::fidl_next::protocol::WireFrameworkError,
+            >(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -21076,7 +21098,7 @@ pub enum UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult {
 
     Err(i32),
 
-    FrameworkErr(::fidl_next::FrameworkError),
+    FrameworkErr(::fidl_next::protocol::FrameworkError),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult {
@@ -21093,7 +21115,7 @@ where
 
     i32: ::fidl_next::Encode<___E>,
 
-    ::fidl_next::FrameworkError: ::fidl_next::Encode<___E>,
+    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -21114,7 +21136,7 @@ where
 
             Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
                 ___E,
-                ::fidl_next::FrameworkError,
+                ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
         }
 
@@ -21211,7 +21233,7 @@ pub mod unknown_interactions_driver_protocol_flexible_two_way_table_err_result {
 
         Err(&'union ::fidl_next::i32_le),
 
-        FrameworkErr(&'union ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union ::fidl_next::protocol::WireFrameworkError),
     }
 
     pub enum Mut<'union, 'buf> {
@@ -21223,7 +21245,7 @@ pub mod unknown_interactions_driver_protocol_flexible_two_way_table_err_result {
 
         Err(&'union mut ::fidl_next::i32_le),
 
-        FrameworkErr(&'union mut ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union mut ::fidl_next::protocol::WireFrameworkError),
     }
 }
 
@@ -21287,7 +21309,7 @@ where
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -21302,9 +21324,10 @@ where
 
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
 
-            3 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireFrameworkError>(
-                raw, decoder,
-            )?,
+            3 => ::fidl_next::RawWireUnion::decode_as::<
+                ___D,
+                ::fidl_next::protocol::WireFrameworkError,
+            >(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
@@ -21325,7 +21348,7 @@ impl<'buf> ::core::fmt::Debug
             },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
             3 => unsafe {
-                self.raw.get().deref_unchecked::<::fidl_next::WireFrameworkError>().fmt(f)
+                self.raw.get().deref_unchecked::<::fidl_next::protocol::WireFrameworkError>().fmt(f)
             },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -21399,7 +21422,7 @@ where
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -21414,9 +21437,10 @@ where
 
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
 
-            3 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireFrameworkError>(
-                raw, decoder,
-            )?,
+            3 => ::fidl_next::RawWireUnion::decode_as::<
+                ___D,
+                ::fidl_next::protocol::WireFrameworkError,
+            >(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -24999,7 +25023,7 @@ where
 pub enum UnknownInteractionsProtocolFlexibleTwoWayResult {
     Response(crate::UnknownInteractionsProtocolFlexibleTwoWayResponse),
 
-    FrameworkErr(::fidl_next::FrameworkError),
+    FrameworkErr(::fidl_next::protocol::FrameworkError),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayResult {
@@ -25012,7 +25036,7 @@ where
 
     crate::UnknownInteractionsProtocolFlexibleTwoWayResponse: ::fidl_next::Encode<___E>,
 
-    ::fidl_next::FrameworkError: ::fidl_next::Encode<___E>,
+    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -25029,7 +25053,7 @@ where
 
             Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
                 ___E,
-                ::fidl_next::FrameworkError,
+                ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
         }
 
@@ -25105,13 +25129,13 @@ pub mod unknown_interactions_protocol_flexible_two_way_result {
     pub enum Ref<'union> {
         Response(&'union crate::WireUnknownInteractionsProtocolFlexibleTwoWayResponse),
 
-        FrameworkErr(&'union ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union ::fidl_next::protocol::WireFrameworkError),
     }
 
     pub enum Mut<'union> {
         Response(&'union mut crate::WireUnknownInteractionsProtocolFlexibleTwoWayResponse),
 
-        FrameworkErr(&'union mut ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union mut ::fidl_next::protocol::WireFrameworkError),
     }
 }
 
@@ -25158,7 +25182,9 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayResult {
             },
 
             3 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireFrameworkError>() },
+                raw: unsafe {
+                    self.raw.clone_unchecked::<::fidl_next::protocol::WireFrameworkError>()
+                },
                 _phantom: ::core::marker::PhantomData,
             },
 
@@ -25174,7 +25200,7 @@ where
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayResponse: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -25189,7 +25215,7 @@ where
 
             3 => ::fidl_next::RawWireUnion::decode_as_static::<
                 ___D,
-                ::fidl_next::WireFrameworkError,
+                ::fidl_next::protocol::WireFrameworkError,
             >(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
@@ -25208,7 +25234,7 @@ impl ::core::fmt::Debug for WireUnknownInteractionsProtocolFlexibleTwoWayResult 
                         >().fmt(f)
             },
             3 => unsafe {
-                self.raw.get().deref_unchecked::<::fidl_next::WireFrameworkError>().fmt(f)
+                self.raw.get().deref_unchecked::<::fidl_next::protocol::WireFrameworkError>().fmt(f)
             },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -25282,7 +25308,9 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayResult {
             },
 
             3 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireFrameworkError>() },
+                raw: unsafe {
+                    self.raw.clone_unchecked::<::fidl_next::protocol::WireFrameworkError>()
+                },
                 _phantom: ::core::marker::PhantomData,
             },
 
@@ -25298,7 +25326,7 @@ where
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayResponse: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -25313,7 +25341,7 @@ where
 
             3 => ::fidl_next::RawWireUnion::decode_as_static::<
                 ___D,
-                ::fidl_next::WireFrameworkError,
+                ::fidl_next::protocol::WireFrameworkError,
             >(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
@@ -25431,7 +25459,7 @@ where
 pub enum UnknownInteractionsProtocolFlexibleTwoWayFieldsResult {
     Response(crate::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse),
 
-    FrameworkErr(::fidl_next::FrameworkError),
+    FrameworkErr(::fidl_next::protocol::FrameworkError),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayFieldsResult {
@@ -25444,7 +25472,7 @@ where
 
     crate::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse: ::fidl_next::Encode<___E>,
 
-    ::fidl_next::FrameworkError: ::fidl_next::Encode<___E>,
+    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -25461,7 +25489,7 @@ where
 
             Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
                 ___E,
-                ::fidl_next::FrameworkError,
+                ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
         }
 
@@ -25540,13 +25568,13 @@ pub mod unknown_interactions_protocol_flexible_two_way_fields_result {
     pub enum Ref<'union> {
         Response(&'union crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse),
 
-        FrameworkErr(&'union ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union ::fidl_next::protocol::WireFrameworkError),
     }
 
     pub enum Mut<'union> {
         Response(&'union mut crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse),
 
-        FrameworkErr(&'union mut ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union mut ::fidl_next::protocol::WireFrameworkError),
     }
 }
 
@@ -25601,7 +25629,9 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResult {
             },
 
             3 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireFrameworkError>() },
+                raw: unsafe {
+                    self.raw.clone_unchecked::<::fidl_next::protocol::WireFrameworkError>()
+                },
                 _phantom: ::core::marker::PhantomData,
             },
 
@@ -25617,7 +25647,7 @@ where
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -25632,7 +25662,7 @@ where
 
             3 => ::fidl_next::RawWireUnion::decode_as_static::<
                 ___D,
-                ::fidl_next::WireFrameworkError,
+                ::fidl_next::protocol::WireFrameworkError,
             >(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
@@ -25651,7 +25681,7 @@ impl ::core::fmt::Debug for WireUnknownInteractionsProtocolFlexibleTwoWayFieldsR
                         >().fmt(f)
             },
             3 => unsafe {
-                self.raw.get().deref_unchecked::<::fidl_next::WireFrameworkError>().fmt(f)
+                self.raw.get().deref_unchecked::<::fidl_next::protocol::WireFrameworkError>().fmt(f)
             },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -25727,7 +25757,9 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayFieldsResult
             },
 
             3 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireFrameworkError>() },
+                raw: unsafe {
+                    self.raw.clone_unchecked::<::fidl_next::protocol::WireFrameworkError>()
+                },
                 _phantom: ::core::marker::PhantomData,
             },
 
@@ -25743,7 +25775,7 @@ where
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -25758,7 +25790,7 @@ where
 
             3 => ::fidl_next::RawWireUnion::decode_as_static::<
                 ___D,
-                ::fidl_next::WireFrameworkError,
+                ::fidl_next::protocol::WireFrameworkError,
             >(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
@@ -26080,7 +26112,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsProtocolFlexibleTwoWa
 pub enum UnknownInteractionsProtocolFlexibleTwoWayUnionResult {
     Response(crate::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse),
 
-    FrameworkErr(::fidl_next::FrameworkError),
+    FrameworkErr(::fidl_next::protocol::FrameworkError),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayUnionResult {
@@ -26093,7 +26125,7 @@ where
 
     crate::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse: ::fidl_next::Encode<___E>,
 
-    ::fidl_next::FrameworkError: ::fidl_next::Encode<___E>,
+    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -26110,7 +26142,7 @@ where
 
             Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
                 ___E,
-                ::fidl_next::FrameworkError,
+                ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
         }
 
@@ -26193,13 +26225,13 @@ pub mod unknown_interactions_protocol_flexible_two_way_union_result {
     pub enum Ref<'union> {
         Response(&'union crate::WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse),
 
-        FrameworkErr(&'union ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union ::fidl_next::protocol::WireFrameworkError),
     }
 
     pub enum Mut<'union> {
         Response(&'union mut crate::WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse),
 
-        FrameworkErr(&'union mut ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union mut ::fidl_next::protocol::WireFrameworkError),
     }
 }
 
@@ -26250,7 +26282,7 @@ where
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -26263,9 +26295,10 @@ where
                 crate::WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
             >(raw, decoder)?,
 
-            3 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireFrameworkError>(
-                raw, decoder,
-            )?,
+            3 => ::fidl_next::RawWireUnion::decode_as::<
+                ___D,
+                ::fidl_next::protocol::WireFrameworkError,
+            >(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
@@ -26283,7 +26316,7 @@ impl<'buf> ::core::fmt::Debug for WireUnknownInteractionsProtocolFlexibleTwoWayU
                         >().fmt(f)
             },
             3 => unsafe {
-                self.raw.get().deref_unchecked::<::fidl_next::WireFrameworkError>().fmt(f)
+                self.raw.get().deref_unchecked::<::fidl_next::protocol::WireFrameworkError>().fmt(f)
             },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -26352,7 +26385,7 @@ where
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -26365,9 +26398,10 @@ where
                 crate::WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
             >(raw, decoder)?,
 
-            3 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireFrameworkError>(
-                raw, decoder,
-            )?,
+            3 => ::fidl_next::RawWireUnion::decode_as::<
+                ___D,
+                ::fidl_next::protocol::WireFrameworkError,
+            >(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -26523,7 +26557,7 @@ impl ::core::fmt::Debug for WireUnknownInteractionsProtocolFlexibleTwoWayTableRe
 pub enum UnknownInteractionsProtocolFlexibleTwoWayTableResult {
     Response(crate::UnknownInteractionsProtocolFlexibleTwoWayTableResponse),
 
-    FrameworkErr(::fidl_next::FrameworkError),
+    FrameworkErr(::fidl_next::protocol::FrameworkError),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayTableResult {
@@ -26536,7 +26570,7 @@ where
 
     crate::UnknownInteractionsProtocolFlexibleTwoWayTableResponse: ::fidl_next::Encode<___E>,
 
-    ::fidl_next::FrameworkError: ::fidl_next::Encode<___E>,
+    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -26553,7 +26587,7 @@ where
 
             Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
                 ___E,
-                ::fidl_next::FrameworkError,
+                ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
         }
 
@@ -26636,7 +26670,7 @@ pub mod unknown_interactions_protocol_flexible_two_way_table_result {
     pub enum Ref<'union, 'buf> {
         Response(&'union crate::WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse<'buf>),
 
-        FrameworkErr(&'union ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union ::fidl_next::protocol::WireFrameworkError),
     }
 
     pub enum Mut<'union, 'buf> {
@@ -26644,7 +26678,7 @@ pub mod unknown_interactions_protocol_flexible_two_way_table_result {
             &'union mut crate::WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse<'buf>,
         ),
 
-        FrameworkErr(&'union mut ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union mut ::fidl_next::protocol::WireFrameworkError),
     }
 }
 
@@ -26696,7 +26730,7 @@ where
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse<'buf>:
         ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -26709,9 +26743,10 @@ where
                 crate::WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse<'buf>,
             >(raw, decoder)?,
 
-            3 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireFrameworkError>(
-                raw, decoder,
-            )?,
+            3 => ::fidl_next::RawWireUnion::decode_as::<
+                ___D,
+                ::fidl_next::protocol::WireFrameworkError,
+            >(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
@@ -26729,7 +26764,7 @@ impl<'buf> ::core::fmt::Debug for WireUnknownInteractionsProtocolFlexibleTwoWayT
                         >().fmt(f)
             },
             3 => unsafe {
-                self.raw.get().deref_unchecked::<::fidl_next::WireFrameworkError>().fmt(f)
+                self.raw.get().deref_unchecked::<::fidl_next::protocol::WireFrameworkError>().fmt(f)
             },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -26799,7 +26834,7 @@ where
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse<'buf>:
         ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -26812,9 +26847,10 @@ where
                 crate::WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse<'buf>,
             >(raw, decoder)?,
 
-            3 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireFrameworkError>(
-                raw, decoder,
-            )?,
+            3 => ::fidl_next::RawWireUnion::decode_as::<
+                ___D,
+                ::fidl_next::protocol::WireFrameworkError,
+            >(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -26920,7 +26956,7 @@ pub enum UnknownInteractionsProtocolFlexibleTwoWayErrResult {
 
     Err(i32),
 
-    FrameworkErr(::fidl_next::FrameworkError),
+    FrameworkErr(::fidl_next::protocol::FrameworkError),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayErrResult {
@@ -26935,7 +26971,7 @@ where
 
     i32: ::fidl_next::Encode<___E>,
 
-    ::fidl_next::FrameworkError: ::fidl_next::Encode<___E>,
+    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -26956,7 +26992,7 @@ where
 
             Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
                 ___E,
-                ::fidl_next::FrameworkError,
+                ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
         }
 
@@ -27041,7 +27077,7 @@ pub mod unknown_interactions_protocol_flexible_two_way_err_result {
 
         Err(&'union ::fidl_next::i32_le),
 
-        FrameworkErr(&'union ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union ::fidl_next::protocol::WireFrameworkError),
     }
 
     pub enum Mut<'union> {
@@ -27049,7 +27085,7 @@ pub mod unknown_interactions_protocol_flexible_two_way_err_result {
 
         Err(&'union mut ::fidl_next::i32_le),
 
-        FrameworkErr(&'union mut ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union mut ::fidl_next::protocol::WireFrameworkError),
     }
 }
 
@@ -27119,7 +27155,9 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayErrResult {
             },
 
             3 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireFrameworkError>() },
+                raw: unsafe {
+                    self.raw.clone_unchecked::<::fidl_next::protocol::WireFrameworkError>()
+                },
                 _phantom: ::core::marker::PhantomData,
             },
 
@@ -27137,7 +27175,7 @@ where
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -27156,7 +27194,7 @@ where
 
             3 => ::fidl_next::RawWireUnion::decode_as_static::<
                 ___D,
-                ::fidl_next::WireFrameworkError,
+                ::fidl_next::protocol::WireFrameworkError,
             >(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
@@ -27176,7 +27214,7 @@ impl ::core::fmt::Debug for WireUnknownInteractionsProtocolFlexibleTwoWayErrResu
             },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
             3 => unsafe {
-                self.raw.get().deref_unchecked::<::fidl_next::WireFrameworkError>().fmt(f)
+                self.raw.get().deref_unchecked::<::fidl_next::protocol::WireFrameworkError>().fmt(f)
             },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -27257,7 +27295,9 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayErrResult {
             },
 
             3 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireFrameworkError>() },
+                raw: unsafe {
+                    self.raw.clone_unchecked::<::fidl_next::protocol::WireFrameworkError>()
+                },
                 _phantom: ::core::marker::PhantomData,
             },
 
@@ -27275,7 +27315,7 @@ where
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -27294,7 +27334,7 @@ where
 
             3 => ::fidl_next::RawWireUnion::decode_as_static::<
                 ___D,
-                ::fidl_next::WireFrameworkError,
+                ::fidl_next::protocol::WireFrameworkError,
             >(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
@@ -27418,7 +27458,7 @@ pub enum UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult {
 
     Err(i32),
 
-    FrameworkErr(::fidl_next::FrameworkError),
+    FrameworkErr(::fidl_next::protocol::FrameworkError),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult {
@@ -27433,7 +27473,7 @@ where
 
     i32: ::fidl_next::Encode<___E>,
 
-    ::fidl_next::FrameworkError: ::fidl_next::Encode<___E>,
+    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -27454,7 +27494,7 @@ where
 
             Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
                 ___E,
-                ::fidl_next::FrameworkError,
+                ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
         }
 
@@ -27541,7 +27581,7 @@ pub mod unknown_interactions_protocol_flexible_two_way_fields_err_result {
 
         Err(&'union ::fidl_next::i32_le),
 
-        FrameworkErr(&'union ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union ::fidl_next::protocol::WireFrameworkError),
     }
 
     pub enum Mut<'union> {
@@ -27549,7 +27589,7 @@ pub mod unknown_interactions_protocol_flexible_two_way_fields_err_result {
 
         Err(&'union mut ::fidl_next::i32_le),
 
-        FrameworkErr(&'union mut ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union mut ::fidl_next::protocol::WireFrameworkError),
     }
 }
 
@@ -27617,7 +27657,9 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult {
             },
 
             3 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireFrameworkError>() },
+                raw: unsafe {
+                    self.raw.clone_unchecked::<::fidl_next::protocol::WireFrameworkError>()
+                },
                 _phantom: ::core::marker::PhantomData,
             },
 
@@ -27636,7 +27678,7 @@ where
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -27655,7 +27697,7 @@ where
 
             3 => ::fidl_next::RawWireUnion::decode_as_static::<
                 ___D,
-                ::fidl_next::WireFrameworkError,
+                ::fidl_next::protocol::WireFrameworkError,
             >(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
@@ -27675,7 +27717,7 @@ impl ::core::fmt::Debug for WireUnknownInteractionsProtocolFlexibleTwoWayFieldsE
             },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
             3 => unsafe {
-                self.raw.get().deref_unchecked::<::fidl_next::WireFrameworkError>().fmt(f)
+                self.raw.get().deref_unchecked::<::fidl_next::protocol::WireFrameworkError>().fmt(f)
             },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -27756,7 +27798,9 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayFieldsErrRes
             },
 
             3 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireFrameworkError>() },
+                raw: unsafe {
+                    self.raw.clone_unchecked::<::fidl_next::protocol::WireFrameworkError>()
+                },
                 _phantom: ::core::marker::PhantomData,
             },
 
@@ -27775,7 +27819,7 @@ where
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -27794,7 +27838,7 @@ where
 
             3 => ::fidl_next::RawWireUnion::decode_as_static::<
                 ___D,
-                ::fidl_next::WireFrameworkError,
+                ::fidl_next::protocol::WireFrameworkError,
             >(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
@@ -28123,7 +28167,7 @@ pub enum UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult {
 
     Err(i32),
 
-    FrameworkErr(::fidl_next::FrameworkError),
+    FrameworkErr(::fidl_next::protocol::FrameworkError),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult {
@@ -28138,7 +28182,7 @@ where
 
     i32: ::fidl_next::Encode<___E>,
 
-    ::fidl_next::FrameworkError: ::fidl_next::Encode<___E>,
+    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -28159,7 +28203,7 @@ where
 
             Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
                 ___E,
-                ::fidl_next::FrameworkError,
+                ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
         }
 
@@ -28248,7 +28292,7 @@ pub mod unknown_interactions_protocol_flexible_two_way_union_err_result {
 
         Err(&'union ::fidl_next::i32_le),
 
-        FrameworkErr(&'union ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union ::fidl_next::protocol::WireFrameworkError),
     }
 
     pub enum Mut<'union> {
@@ -28256,7 +28300,7 @@ pub mod unknown_interactions_protocol_flexible_two_way_union_err_result {
 
         Err(&'union mut ::fidl_next::i32_le),
 
-        FrameworkErr(&'union mut ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union mut ::fidl_next::protocol::WireFrameworkError),
     }
 }
 
@@ -28317,7 +28361,7 @@ where
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -28332,9 +28376,10 @@ where
 
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
 
-            3 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireFrameworkError>(
-                raw, decoder,
-            )?,
+            3 => ::fidl_next::RawWireUnion::decode_as::<
+                ___D,
+                ::fidl_next::protocol::WireFrameworkError,
+            >(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
@@ -28355,7 +28400,7 @@ impl<'buf> ::core::fmt::Debug
             },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
             3 => unsafe {
-                self.raw.get().deref_unchecked::<::fidl_next::WireFrameworkError>().fmt(f)
+                self.raw.get().deref_unchecked::<::fidl_next::protocol::WireFrameworkError>().fmt(f)
             },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -28426,7 +28471,7 @@ where
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -28441,9 +28486,10 @@ where
 
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
 
-            3 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireFrameworkError>(
-                raw, decoder,
-            )?,
+            3 => ::fidl_next::RawWireUnion::decode_as::<
+                ___D,
+                ::fidl_next::protocol::WireFrameworkError,
+            >(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -28602,7 +28648,7 @@ pub enum UnknownInteractionsProtocolFlexibleTwoWayTableErrResult {
 
     Err(i32),
 
-    FrameworkErr(::fidl_next::FrameworkError),
+    FrameworkErr(::fidl_next::protocol::FrameworkError),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayTableErrResult {
@@ -28617,7 +28663,7 @@ where
 
     i32: ::fidl_next::Encode<___E>,
 
-    ::fidl_next::FrameworkError: ::fidl_next::Encode<___E>,
+    ::fidl_next::protocol::FrameworkError: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -28638,7 +28684,7 @@ where
 
             Self::FrameworkErr(value) => ::fidl_next::RawWireUnion::encode_as::<
                 ___E,
-                ::fidl_next::FrameworkError,
+                ::fidl_next::protocol::FrameworkError,
             >(value, 3, encoder, raw)?,
         }
 
@@ -28729,7 +28775,7 @@ pub mod unknown_interactions_protocol_flexible_two_way_table_err_result {
 
         Err(&'union ::fidl_next::i32_le),
 
-        FrameworkErr(&'union ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union ::fidl_next::protocol::WireFrameworkError),
     }
 
     pub enum Mut<'union, 'buf> {
@@ -28739,7 +28785,7 @@ pub mod unknown_interactions_protocol_flexible_two_way_table_err_result {
 
         Err(&'union mut ::fidl_next::i32_le),
 
-        FrameworkErr(&'union mut ::fidl_next::WireFrameworkError),
+        FrameworkErr(&'union mut ::fidl_next::protocol::WireFrameworkError),
     }
 }
 
@@ -28801,7 +28847,7 @@ where
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -28816,9 +28862,10 @@ where
 
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
 
-            3 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireFrameworkError>(
-                raw, decoder,
-            )?,
+            3 => ::fidl_next::RawWireUnion::decode_as::<
+                ___D,
+                ::fidl_next::protocol::WireFrameworkError,
+            >(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
@@ -28839,7 +28886,7 @@ impl<'buf> ::core::fmt::Debug
             },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
             3 => unsafe {
-                self.raw.get().deref_unchecked::<::fidl_next::WireFrameworkError>().fmt(f)
+                self.raw.get().deref_unchecked::<::fidl_next::protocol::WireFrameworkError>().fmt(f)
             },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -28911,7 +28958,7 @@ where
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireFrameworkError: ::fidl_next::Decode<___D>,
+    ::fidl_next::protocol::WireFrameworkError: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -28926,9 +28973,10 @@ where
 
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
 
-            3 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireFrameworkError>(
-                raw, decoder,
-            )?,
+            3 => ::fidl_next::RawWireUnion::decode_as::<
+                ___D,
+                ::fidl_next::protocol::WireFrameworkError,
+            >(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,

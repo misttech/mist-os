@@ -58,6 +58,6 @@
         {%- endmatch -%}
     {%- when TypeKind::Internal with { subtype } -%}
         {%- match subtype -%}
-            {%- when InternalSubtype::FrameworkError -%} ::fidl_next::FrameworkError
+            {%- when InternalSubtype::FrameworkError -%} ::fidl_next::protocol::FrameworkError
         {%- endmatch -%}
 {%- endmatch -%}

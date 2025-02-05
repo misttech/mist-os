@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Next-generation FIDL Rust bindings library.
+//! FIDL protocols.
 
 #![deny(
     future_incompatible,
@@ -21,7 +21,24 @@
 )]
 #![forbid(unsafe_op_in_unsafe_fn)]
 
-pub mod bind;
+mod buffer;
+mod client;
+mod error;
+mod framework_error;
+#[cfg(target_os = "fuchsia")]
+pub mod fuchsia;
+mod lockers;
+pub mod mpsc;
+mod server;
+#[cfg(test)]
+mod testing;
+mod transport;
+mod wire;
 
-pub use ::fidl_next_codec::*;
-pub use ::fidl_next_protocol as protocol;
+pub use self::buffer::*;
+pub use self::client::*;
+pub use self::error::*;
+pub use self::framework_error::*;
+pub use self::server::*;
+pub use self::transport::*;
+pub use self::wire::*;

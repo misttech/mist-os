@@ -4,7 +4,7 @@
 
 use thiserror::Error;
 
-use crate::DecodeError;
+use fidl_next_codec::DecodeError;
 
 /// Errors that can be produced by FIDL clients and servers.
 #[derive(Error, Debug)]

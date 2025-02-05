@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_next_codec::{DecoderExt, WireString};
 use fuchsia_async::{Scope, Task};
 
-use crate::protocol::{
+use crate::{
     Client, ClientHandler, ClientSender, Responder, Server, ServerHandler, ServerSender, Transport,
 };
-use crate::{DecoderExt, WireString};
 
 pub struct Ignore;
 

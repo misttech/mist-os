@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::protocol::{Transport, WireMessageHeader, FLAG_0_WIRE_FORMAT_V2_BIT, MAGIC_NUMBER};
-use crate::{u32_le, u64_le, DecodeError, DecoderExt as _, EncodeError, EncoderExt as _};
+use fidl_next_codec::{u32_le, u64_le, DecodeError, DecoderExt as _, EncodeError, EncoderExt as _};
+
+use crate::{Transport, WireMessageHeader, FLAG_0_WIRE_FORMAT_V2_BIT, MAGIC_NUMBER};
 
 /// Encodes a message into the given buffer.
 pub fn encode_header<T: Transport>(

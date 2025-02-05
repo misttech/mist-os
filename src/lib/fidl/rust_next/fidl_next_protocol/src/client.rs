@@ -9,9 +9,10 @@ use core::pin::Pin;
 use core::task::{Context, Poll};
 use std::sync::{Arc, Mutex};
 
-use crate::protocol::lockers::Lockers;
-use crate::protocol::{decode_header, encode_header, ProtocolError, Transport};
-use crate::{Encode, EncodeError, EncoderExt};
+use fidl_next_codec::{Encode, EncodeError, EncoderExt};
+
+use crate::lockers::Lockers;
+use crate::{decode_header, encode_header, ProtocolError, Transport};
 
 use super::lockers::LockerError;
 

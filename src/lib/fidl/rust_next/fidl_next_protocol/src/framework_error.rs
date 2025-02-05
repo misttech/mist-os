@@ -5,7 +5,9 @@
 use core::fmt;
 use core::hint::unreachable_unchecked;
 
-use crate::{i32_le, munge, Decode, DecodeError, Encodable, Encode, EncodeError, Slot, TakeFrom};
+use fidl_next_codec::{
+    i32_le, munge, Decode, DecodeError, Encodable, Encode, EncodeError, Slot, TakeFrom,
+};
 
 /// An internal framework error.
 #[derive(Clone, Copy, Debug)]

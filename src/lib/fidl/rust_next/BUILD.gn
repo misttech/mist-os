@@ -10,5 +10,6 @@ group("tests") {
   deps = [
     "fidl_next:tests",
     "fidl_next_codec:tests",
+    "fidl_next_protocol:tests",
   ]
 }

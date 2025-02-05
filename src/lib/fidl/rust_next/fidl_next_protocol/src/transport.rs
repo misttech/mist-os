@@ -5,7 +5,7 @@
 use core::error::Error;
 use core::future::Future;
 
-use crate::{Decoder, Encoder};
+use fidl_next_codec::{Decoder, Encoder};
 
 // Design philosophy:
 //

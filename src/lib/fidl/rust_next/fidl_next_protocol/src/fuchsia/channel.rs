@@ -12,6 +12,10 @@ use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use core::task::{Context, Poll};
 use std::sync::Arc;
 
+use fidl_next_codec::decoder::InternalHandleDecoder;
+use fidl_next_codec::{
+    Chunk, DecodeError, Decoder, EncodeError, Encoder, HandleDecoder, HandleEncoder, CHUNK_SIZE,
+};
 use fuchsia_async::{RWHandle, ReadableHandle as _};
 use futures::task::AtomicWaker;
 use zx::sys::{
@@ -20,9 +24,7 @@ use zx::sys::{
 };
 use zx::{AsHandleRef as _, Channel, Handle, Status};
 
-use crate::decoder::InternalHandleDecoder;
-use crate::protocol::Transport;
-use crate::{Chunk, DecodeError, Decoder, Encoder, HandleDecoder, HandleEncoder, CHUNK_SIZE};
+use crate::Transport;
 
 struct Shared {
     is_closed: AtomicBool,
@@ -109,7 +111,7 @@ impl Encoder for Buffer {
 }
 
 impl HandleEncoder for Buffer {
-    fn push_handle(&mut self, handle: Handle) -> Result<(), crate::EncodeError> {
+    fn push_handle(&mut self, handle: Handle) -> Result<(), EncodeError> {
         self.handles.push(handle);
         Ok(())
     }

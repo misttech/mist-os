@@ -16,42 +16,14 @@ rustc_library("fidl_next") {
     "src/bind/method.rs",
     "src/bind/mod.rs",
     "src/bind/server.rs",
-    "src/framework_error.rs",
     "src/lib.rs",
-    "src/protocol/buffer.rs",
-    "src/protocol/client.rs",
-    "src/protocol/error.rs",
-    "src/protocol/lockers.rs",
-    "src/protocol/mod.rs",
-    "src/protocol/mpsc.rs",
-    "src/protocol/server.rs",
-    "src/protocol/transport.rs",
-    "src/protocol/wire.rs",
-    "src/testing.rs",
   ]
   deps = [
     "//src/lib/fidl/rust_next/fidl_next_codec",
-    "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:zerocopy",
-
-    # Used for lock-free mpsc channel, but not for any APIs
-    "//third_party/rust_crates:futures",
+    "//src/lib/fidl/rust_next/fidl_next_protocol",
   ]
 
-  if (is_fuchsia) {
-    sources += [
-      "src/fuchsia/mod.rs",
-      "src/fuchsia/transport/channel.rs",
-      "src/fuchsia/transport/mod.rs",
-    ]
-    deps += [
-      "//sdk/rust/zx",
-      "//src/lib/fuchsia-async",
-    ]
-  }
-
   with_unit_tests = true
-  test_deps = [ "//src/lib/fuchsia-async" ]
 
   # NOTE: this library is still experimental
   visibility = [
