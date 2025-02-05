@@ -265,10 +265,6 @@ if (!is_host) {
       "//:bazel_workspace",
       "//:build_only",
       "//build/bazel/licenses:all_bazel_inputs",
-
-      # TODO(https://fxbug.dev/392136182): Migrate vendor uses to
-      # ":exported_idk_for_ffx_tests".
-      "//vendor/*",
     ]
 
     category = "partner"
