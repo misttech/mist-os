@@ -46,16 +46,18 @@ constexpr uint kArchRwUserFlags = kArchRwFlags | ARCH_MMU_FLAG_PERM_USER;
 // by a user pager, but is incapable of actually providing pages.
 class StubPageProvider : public PageProvider {
  public:
-  StubPageProvider(bool trap_dirty = false) : trap_dirty_(trap_dirty) {}
+  explicit StubPageProvider(bool trap_dirty = false) : trap_dirty_(trap_dirty) {}
+  StubPageProvider(bool trap_dirty, bool ignore_requests)
+      : trap_dirty_(trap_dirty), ignore_requests_(ignore_requests) {}
   ~StubPageProvider() override = default;
 
   const PageSourceProperties& properties() const override { return properties_; }
 
  private:
-  void SendAsyncRequest(PageRequest* request) override { panic("Not implemented\n"); }
-  void ClearAsyncRequest(PageRequest* request) override { panic("Not implemented\n"); }
+  void SendAsyncRequest(PageRequest* request) override { ASSERT(ignore_requests_); }
+  void ClearAsyncRequest(PageRequest* request) override { ASSERT(ignore_requests_); }
   void SwapAsyncRequest(PageRequest* old, PageRequest* new_req) override {
-    panic("Not implemented\n");
+    ASSERT(ignore_requests_);
   }
   bool DebugIsPageOk(vm_page_t* page, uint64_t offset) override { return true; }
   void OnDetach() override {}
@@ -79,16 +81,25 @@ class StubPageProvider : public PageProvider {
       .is_handling_free = false,
   };
   const bool trap_dirty_ = false;
+  const bool ignore_requests_ = false;
 };
 
 // Helper function to allocate memory in a user address space.
 zx_status_t AllocUser(VmAspace* aspace, const char* name, size_t size, user_inout_ptr<void>* ptr);
 
-// Create a pager-backed VMO |out_vmo| with size equals |num_pages| pages, and commit all its pages.
-// |trap_dirty| controls whether modifications to pages must be trapped in order to generate DIRTY
-// page requests. |resizable| controls whether the created VMO is resizable.
-// Returns pointers to the pages committed in |out_pages|, so that tests can examine
-// their state. Allows tests to work with pager-backed VMOs without blocking on page faults.
+// Create a pager-backed VMO |out_vmo| with size equals |num_pages| pages, and commit
+// |commited_pages| of its pages. |trap_dirty| controls whether modifications to pages must be
+// trapped in order to generate DIRTY page requests. |resizable| controls whether the created VMO is
+// resizable. Returns pointers to the pages committed in |out_pages|, so that tests can examine
+// their state. Allows tests to work with pager-backed VMOs without blocking on page faults. The
+// |ignore_requests| flag can be set if attempts at sending page faults should be ignored, or result
+// in a panic.
+zx_status_t make_partially_committed_pager_vmo(size_t num_pages, size_t committed_pages,
+                                               bool trap_dirty, bool resizable,
+                                               bool ignore_requests, vm_page_t** out_pages,
+                                               fbl::RefPtr<VmObjectPaged>* out_vmo);
+
+// Convenience wrapper for |make_partially_committed_pager_vmo| that commits all pages.
 zx_status_t make_committed_pager_vmo(size_t num_pages, bool trap_dirty, bool resizable,
                                      vm_page_t** out_pages, fbl::RefPtr<VmObjectPaged>* out_vmo);
 

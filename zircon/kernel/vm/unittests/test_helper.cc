@@ -36,11 +36,19 @@ zx_status_t AllocUser(VmAspace* aspace, const char* name, size_t size, user_inou
   return ZX_OK;
 }
 
-zx_status_t make_uncommitted_pager_vmo(size_t num_pages, bool trap_dirty, bool resizable,
-                                       fbl::RefPtr<VmObjectPaged>* out_vmo) {
+zx_status_t make_partially_committed_pager_vmo(size_t num_pages, size_t committed_pages,
+                                               bool trap_dirty, bool resizable,
+                                               bool ignore_requests, vm_page_t** out_pages,
+                                               fbl::RefPtr<VmObjectPaged>* out_vmo) {
+  // Disable the scanner so we can safely submit our aux vmo and query pages without eviction
+  // happening.
+  AutoVmScannerDisable scanner_disable;
+
+  // Create a pager backed VMO and jump through some hoops to pre-fill pages for it so we do not
+  // actually take any page faults.
   fbl::AllocChecker ac;
   fbl::RefPtr<StubPageProvider> pager =
-      fbl::MakeRefCountedChecked<StubPageProvider>(&ac, trap_dirty);
+      fbl::MakeRefCountedChecked<StubPageProvider>(&ac, trap_dirty, ignore_requests);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -57,57 +65,56 @@ zx_status_t make_uncommitted_pager_vmo(size_t num_pages, bool trap_dirty, bool r
     return status;
   }
 
-  *out_vmo = ktl::move(vmo);
-  return ZX_OK;
-}
-
-zx_status_t make_committed_pager_vmo(size_t num_pages, bool trap_dirty, bool resizable,
-                                     vm_page_t** out_pages, fbl::RefPtr<VmObjectPaged>* out_vmo) {
-  // Disable the scanner so we can safely submit our aux vmo and query pages without eviction
-  // happening.
-  AutoVmScannerDisable scanner_disable;
-
-  // Create a pager backed VMO and jump through some hoops to pre-fill pages for it so we do not
-  // actually take any page faults.
-  fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status = make_uncommitted_pager_vmo(num_pages, trap_dirty, resizable, &vmo);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  fbl::RefPtr<VmObjectPaged> aux_vmo;
-  status = VmObjectPaged::Create(0, 0, num_pages * PAGE_SIZE, &aux_vmo);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  status = aux_vmo->CommitRange(0, num_pages * PAGE_SIZE);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
-
-  VmPageSpliceList splice_list;
-  status = aux_vmo->TakePages(0, num_pages * PAGE_SIZE, &splice_list);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  status = vmo->SupplyPages(0, num_pages * PAGE_SIZE, &splice_list, SupplyOptions::PagerSupply);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  for (uint64_t i = 0; i < num_pages; i++) {
-    status = vmo->GetPage(i * PAGE_SIZE, 0, nullptr, nullptr, &out_pages[i], nullptr);
+  if (committed_pages > 0) {
+    fbl::RefPtr<VmObjectPaged> aux_vmo;
+    status = VmObjectPaged::Create(0, 0, committed_pages * PAGE_SIZE, &aux_vmo);
     if (status != ZX_OK) {
       return status;
+    }
+
+    status = aux_vmo->CommitRange(0, committed_pages * PAGE_SIZE);
+    if (status != ZX_OK) {
+      return status;
+    }
+
+    __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
+
+    VmPageSpliceList splice_list;
+    status = aux_vmo->TakePages(0, committed_pages * PAGE_SIZE, &splice_list);
+    if (status != ZX_OK) {
+      return status;
+    }
+
+    status =
+        vmo->SupplyPages(0, committed_pages * PAGE_SIZE, &splice_list, SupplyOptions::PagerSupply);
+    if (status != ZX_OK) {
+      return status;
+    }
+
+    if (out_pages) {
+      for (uint64_t i = 0; i < committed_pages; i++) {
+        status = vmo->GetPage(i * PAGE_SIZE, 0, nullptr, nullptr, &out_pages[i], nullptr);
+        if (status != ZX_OK) {
+          return status;
+        }
+      }
     }
   }
 
   *out_vmo = ktl::move(vmo);
   return ZX_OK;
+}
+
+zx_status_t make_uncommitted_pager_vmo(size_t num_pages, bool trap_dirty, bool resizable,
+                                       fbl::RefPtr<VmObjectPaged>* out_vmo) {
+  return make_partially_committed_pager_vmo(num_pages, 0, trap_dirty, resizable, false, nullptr,
+                                            out_vmo);
+}
+
+zx_status_t make_committed_pager_vmo(size_t num_pages, bool trap_dirty, bool resizable,
+                                     vm_page_t** out_pages, fbl::RefPtr<VmObjectPaged>* out_vmo) {
+  return make_partially_committed_pager_vmo(num_pages, num_pages, trap_dirty, resizable, false,
+                                            out_pages, out_vmo);
 }
 
 uint32_t test_rand(uint32_t seed) { return (seed = seed * 1664525 + 1013904223); }
