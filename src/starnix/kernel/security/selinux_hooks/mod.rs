@@ -209,15 +209,17 @@ pub(super) fn fs_node_init_with_dentry<L>(
 where
     L: LockEqualOrBefore<FileOpsCore>,
 {
+    // Attempt to derive a specific security class for the `FsNode`, based on its file mode.
+    // TODO: This ensures a correct class for nodes with a wrong `FileMode` at
+    // creation, but should not really be required.
+    fs_node_ensure_class(&dir_entry.node)?;
+
     // This hook is called every time an `FsNode` is linked to a `DirEntry`, so it is expected that
     // the `FsNode` may already have been labeled.
     let fs_node = &dir_entry.node;
     if fs_node.security_state.lock().label.is_initialized() {
         return Ok(());
     }
-
-    // Attempt to derive a specific security class for the `FsNode`, based on its file mode.
-    fs_node_ensure_class(&dir_entry.node)?;
 
     // If the parent has a from-task label then propagate it to the new node,  rather than applying
     // the filesystem's labeling scheme. This allows nodes in per-process and per-task directories
